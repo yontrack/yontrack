@@ -15,6 +15,30 @@ branches, builds, promotions, and validations across the software delivery lifec
 
 ---
 
+## Rules
+
+These rules apply unconditionally. Follow them in every change, without exception.
+
+### Database
+- **Never** modify existing Flyway migration files — always add a new one
+- **Always** add `ON DELETE CASCADE` on FK references to entity tables
+- Use `SERIAL PRIMARY KEY NOT NULL` for auto-increment primary keys
+
+### Frontend
+- **Never** access `localStorage` directly — always use the wrapper functions in `@components/storage/local`
+
+### Property Types
+- **Never** rename a `PropertyType` class after it is deployed — its fully qualified class name (FQCN) is its persistent storage ID
+
+### Workflow
+- When fixing a GitHub issue: **always** create a branch named `claude/<short-description>-pipeline` before making any changes (use `/fix-issue` skill)
+- **Never** create a pull request unless explicitly asked
+
+### Tests
+- **Always** use `Roles.*` constants for role names in tests — never string literals
+
+---
+
 ## Build & Run
 
 ```bash
@@ -146,8 +170,6 @@ class MyPropertyType(
 
 data class MyProperty(val name: String)
 ```
-
-The property type's FQCN is its ID — do not rename the class after it's in production.
 
 **Adding a GraphQL mutation for a property:**
 ```kotlin
@@ -313,11 +335,6 @@ CREATE TABLE MY_TABLE (
 CREATE INDEX MY_TABLE_ENTITY_IDX ON MY_TABLE (ENTITY_ID);
 ```
 
-Rules:
-- Never modify existing migration files
-- Always add ON DELETE CASCADE for FK references to entity tables
-- Use SERIAL for auto-increment primary keys
-
 ### Security
 
 ```kotlin
@@ -477,8 +494,7 @@ preferences.setPreferences({ myField: newValue })
 
 ### Local Preferences (browser localStorage)
 
-Use wrapper functions in `@components/storage/local` — never access `localStorage` directly.
-Add a dedicated `get`/`set` function pair for each new preference token.
+Use wrapper functions in `@components/storage/local`. Add a dedicated `get`/`set` function pair for each new preference token.
 
 ### Page Events (cross-component communication)
 
@@ -595,7 +611,7 @@ For complex integration test scenarios, use `MockRestTemplateProvider` (see `Jir
 
 ### Testing Authorizations
 
-To test behavior under a specific global role, use `asGlobalRole` with a `Roles` constant (never use string literals):
+Use `asGlobalRole` with a `Roles` constant to test behavior under a specific global role:
 
 ```kotlin
 import net.nemerosa.ontrack.model.security.Roles
@@ -632,23 +648,10 @@ Note: `ProjectEdit extends ProjectConfig` — so checking `ProjectConfig` in `ca
 
 ---
 
-## Adding a New Extension — Checklist
+## Skills
 
-1. Create `ontrack-extension-{name}/build.gradle.kts` and declare dependencies
-2. Register the module in `settings.gradle.kts`
-3. Define `{Name}ExtensionFeature : ExtensionFeature`
-4. Implement the core extension class(es) extending `AbstractExtension`
-5. Add service interface + `@Service` implementation
-6. Add `.graphqls` SDL file + `@Controller` GraphQL resolver
-7. Add Flyway migration in `ontrack-database/` if new tables are needed
-8. Write `*Test.kt` unit tests with MockK
-9. Write `*IT.kt` integration tests
-10. For each new property type, add UI components in `ontrack-web-core/components/framework/properties/`
+Use these skills for common multi-step workflows:
 
----
-
-## Workflow Conventions
-
-When picking and fixing a GitHub issue:
-- Always create a branch named `claude/<short-description>-pipeline` before making any changes
-- Never create a pull request unless explicitly asked to do so
+- `/new-extension` — scaffold a new extension end-to-end (module, feature, service, GraphQL, migration, tests, UI)
+- `/add-property-type` — add a complete property type (Kotlin class, mutation provider, frontend UI components)
+- `/fix-issue` — pick a GitHub issue, create the correctly-named branch, implement the fix
