@@ -593,6 +593,22 @@ fun `client returns correct data`() {
 
 For complex integration test scenarios, use `MockRestTemplateProvider` (see `JiraLinkNotificationChannelIT`).
 
+### Testing Authorizations
+
+To test behavior under a specific global role, use `asGlobalRole` with a `Roles` constant (never use string literals):
+
+```kotlin
+import net.nemerosa.ontrack.model.security.Roles
+
+asGlobalRole(Roles.GLOBAL_AUTOMATION) {
+    // code runs with AUTOMATION role permissions
+}
+```
+
+Role constants are in `net.nemerosa.ontrack.model.security.Roles` (e.g. `GLOBAL_AUTOMATION`, `GLOBAL_CREATOR`, `GLOBAL_CONTROLLER`).
+
+Note: `ProjectEdit extends ProjectConfig` — so checking `ProjectConfig` in `canEdit()` covers both project owners (who have `ProjectEdit`) and automation users (who have `ProjectConfig` directly).
+
 ---
 
 ## Key File Locations
