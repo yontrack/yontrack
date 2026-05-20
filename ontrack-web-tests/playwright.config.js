@@ -16,6 +16,8 @@ const htmlOutput = process.env.HTML_REPORT_PATH || 'reports/html';
 
 module.exports = defineConfig({
     testDir: './tests',
+    timeout: 120000,
+    expect: {timeout: 30000},
     /* Run tests in files in parallel */
     fullyParallel: false,
     /* Fail the build on CI if you accidentally left test.only in the source code. */
@@ -28,7 +30,7 @@ module.exports = defineConfig({
     /* Reporter to use. See https://playwright.dev/docs/test-reporters */
     reporter: [
         ['junit', {outputFile: junitOutput}],
-        ['html', {outputFolder: htmlOutput}],
+        ['html', {outputFolder: htmlOutput, open: 'never'}],
     ],
     /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
     use: {

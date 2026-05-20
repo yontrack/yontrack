@@ -542,6 +542,35 @@ This generates the path `/extension/{featureId}/my-page`. Add its icon in `UserM
 Implement `ProjectEntityUserMenuItemExtension` on the server side.
 Use the `userMenuActions` GraphQL field with `gqlUserMenuActionFragment` on the frontend.
 
+### Auto-Versioning Post-Processing UI
+
+Each `PostProcessing<T>` backend extension needs a matching frontend `Display.js`:
+
+- **Path:** `ontrack-web-core/components/framework/auto-versioning-post-processing/{id}/Display.js`
+  where `{id}` is the value of `PostProcessing.id` (e.g. `github`, `jenkins`)
+- **Props:** all fields of the config data class spread individually (the full config JSON is spread as props)
+- **Only `Display.js` is required** — no Icon.js, Form.js, or FormPrepare.js
+- Use an Ant Design `Descriptions` table for read-only display; include a `<Typography.Text code>{id}</Typography.Text>` type header
+
+```javascript
+export default function Display({
+    dockerImage, dockerCommand, commitMessage,
+    mySpecificField,
+    parameters = [],
+}) {
+    const items = [
+        { key: 'mySpecificField', label: "My field", children: <Typography.Text code>{mySpecificField}</Typography.Text>, span: 12 },
+        // ... one item per config field
+    ]
+    return (
+        <Space direction="vertical">
+            <Typography.Text code>my-id</Typography.Text>
+            <Descriptions items={items} span={12}/>
+        </Space>
+    )
+}
+```
+
 ---
 
 ## Testing Patterns
@@ -644,6 +673,7 @@ Note: `ProjectEdit extends ProjectConfig` — so checking `ProjectConfig` in `ca
 | Frontend local storage     | `ontrack-web-core/components/storage/local.js`                                |
 | Frontend ref data          | `ontrack-web-core/components/providers/RefDataProvider.js`                    |
 | Property UI components     | `ontrack-web-core/components/framework/properties/{fqcn}/`                    |
+| Post-processing UI         | `ontrack-web-core/components/framework/auto-versioning-post-processing/{id}/` |
 | Dev guide docs             | `doc/dev-guide/`                                                              |
 
 ---
