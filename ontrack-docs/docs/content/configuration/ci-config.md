@@ -301,6 +301,28 @@ branch:
           - BRONZE
 ```
 
+A promotion can also have dependencies. For example:
+
+```yaml
+branch:
+  promotions:
+    - BRONZE:
+        validations:
+          - build
+          - ui-unit
+    - SILVER:
+        validations:
+          - acceptance
+          - ui-acceptance
+        dependsOn:
+          - BRONZE
+```
+
+The semantic of `dependsOn` is different from `promotions`:
+
+* `promotions` define the list of other promotions that participate in the auto-promotion of this promotion ("if BRONZE is granted and the listed validations are OK, then SILVER is granted automatically")
+* `dependsOn` defines the list of promotions that must be completed before the promotion can be completed ("trying to promote to SILVER without having completed BRONZE" will fail)
+
 #### Build configuration
 
 The `build` configuration is optional.
