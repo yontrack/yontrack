@@ -8,6 +8,7 @@ import com.fasterxml.jackson.databind.JsonNode
 import net.nemerosa.ontrack.extension.scm.SCMExtensionConfigProperties
 import net.nemerosa.ontrack.extension.scm.SCMExtensionFeature
 import net.nemerosa.ontrack.extension.scm.changelog.SCMChangeLogEnabled
+import net.nemerosa.ontrack.extension.scm.changelog.SCMCommitFilter
 import net.nemerosa.ontrack.extension.scm.service.SCMDetector
 import net.nemerosa.ontrack.extension.support.AbstractExtension
 import net.nemerosa.ontrack.job.Schedule
@@ -103,7 +104,7 @@ class ScmCommitSearchExtension(
             var commitCount = 0
             val projectIssueKeys = mutableSetOf<String>()
             val issueConfig = scm.getConfiguredIssueService()
-            scm.forAllCommits { commit ->
+            scm.forAllCommits(project = project, filter = SCMCommitFilter.ALL) { commit ->
                 commitCount++
                 // Logging
                 if (traceCommits) {

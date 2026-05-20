@@ -36,6 +36,7 @@ import java.io.File
 import java.io.IOException
 import java.lang.String.format
 import java.time.Duration
+import java.time.LocalDateTime
 import java.util.*
 import java.util.concurrent.locks.ReentrantLock
 import java.util.function.Consumer
@@ -344,6 +345,63 @@ class GitRepositoryClientImpl(
             git.log().all().call()
                 .map { toCommit(it) }
                 .forEach(code)
+        } catch (_: NoHeadException) {
+            // Ignoring this error, nothing to scan
+        } catch (e: GitAPIException) {
+            throw GitRepositoryAPIException(repository.remote, e)
+        } catch (e: IOException) {
+            throw GitRepositoryIOException(repository.remote, e)
+        }
+    }
+
+    override fun forCommits(
+        sinceCommit: String?,
+        sinceCommitTimestamp: LocalDateTime?,
+        count: Int,
+        code: (GitCommit) -> Unit
+    ) {
+        try {
+            val gitRepository = git.repository
+
+            // Get all commits, ordered from newest to oldest by default
+            val allRevCommits = git.log().all().call().toList()
+
+            // Reverse to get oldest first and convert to GitCommit
+            val oldestFirst = allRevCommits.reversed().map { toCommit(it) }
+
+            // Determine where to start processing
+            val startIndex = when {
+                sinceCommit != null -> {
+                    val commitId = gitRepository.resolve(sinceCommit)
+                    if (commitId != null) {
+                        // Find the index of this commit by ID
+                        val commitIdStr = commitId.name
+                        val index = oldestFirst.indexOfFirst { it.id == commitIdStr }
+                        if (index < 0) 0 else index + 1
+                    } else 0
+                }
+                sinceCommitTimestamp != null -> {
+                    // Find the first commit strictly after this timestamp
+                    val index = oldestFirst.indexOfFirst { it.commitTime > sinceCommitTimestamp }
+                    if (index < 0) oldestFirst.size else index
+                }
+                else -> 0
+            }
+
+            // Process commits starting from the determined index
+            if (startIndex >= 0 && startIndex < oldestFirst.size) {
+                var processed = 0
+                for (i in startIndex until oldestFirst.size) {
+                    val gitCommit = oldestFirst[i]
+                    code(gitCommit)
+                    processed++
+
+                    // Stop if we've reached the count limit
+                    if (processed >= count) {
+                        break
+                    }
+                }
+            }
         } catch (_: NoHeadException) {
             // Ignoring this error, nothing to scan
         } catch (e: GitAPIException) {

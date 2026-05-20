@@ -524,6 +524,145 @@ class GitRepositoryClientImplTest {
             }
         }
     }
+    @Test
+    fun `forCommits with count limit`() {
+        GitRepo.prepare {
+            gitInit()
+            (1..10).forEach {
+                commit(it)
+            }
+            log()
+        } and { client, _ ->
+            val commits = mutableListOf<String>()
+            client.forCommits(
+                sinceCommit = null,
+                sinceCommitTimestamp = null,
+                count = 5
+            ) { commit ->
+                commits.add(commit.shortMessage)
+            }
+            assertEquals(
+                listOf("Commit 1", "Commit 2", "Commit 3", "Commit 4", "Commit 5"),
+                commits
+            )
+        }
+    }
+
+    @Test
+    fun `forCommits from specific commit`() {
+        GitRepo.prepare {
+            gitInit()
+            (1..10).forEach {
+                commit(it)
+            }
+            log()
+        } and { client, repo ->
+            val c5 = repo.commitLookup("Commit 5")
+            val commits = mutableListOf<String>()
+            client.forCommits(
+                sinceCommit = c5,
+                sinceCommitTimestamp = null,
+                count = 100
+            ) { commit ->
+                commits.add(commit.shortMessage)
+            }
+            assertEquals(
+                (6..10).map { "Commit $it" },
+                commits
+            )
+        }
+    }
+
+    @Test
+    fun `forCommits with timestamp filter`() {
+        GitRepo.prepare {
+            gitInit()
+            commit(1, pause = true)
+            commit(2, pause = true)
+            commit(3, pause = true)
+            log()
+        } and { client, repo ->
+            // Get timestamp of commit 2
+            val c2Hash = repo.commitLookup("Commit 2")
+            val c2Commit = client.getCommitFor(c2Hash)
+            assertNotNull(c2Commit)
+
+            val commits = mutableListOf<String>()
+            client.forCommits(
+                sinceCommit = null,
+                sinceCommitTimestamp = c2Commit.commitTime,
+                count = 100
+            ) { commit ->
+                commits.add(commit.shortMessage)
+            }
+            assertEquals(
+                listOf("Commit 3"),
+                commits
+            )
+        }
+    }
+
+    /**
+     * ```
+     *     *   C5 (main)
+     *     | * C4 (2.1)
+     *     |/
+     *     * C3
+     *     * C2
+     *     * C1
+     * ```
+     */
+    @Test
+    fun `forCommits iterates over all branches`() {
+        GitRepo.prepare {
+            gitInit()
+            commit(1)
+            commit(2)
+            commit(3)
+            git("checkout", "-b", "2.1")
+            commit(4)
+            git("checkout", "main")
+            commit(5)
+            log()
+        } and { client, _ ->
+            val commits = mutableListOf<String>()
+            client.forCommits(
+                sinceCommit = null,
+                sinceCommitTimestamp = null,
+                count = 100
+            ) { commit ->
+                commits.add(commit.shortMessage)
+            }
+            assertEquals(
+                (1..5).map { "Commit $it" }.toSet(),
+                commits.toSet()
+            )
+        }
+    }
+
+    @Test
+    fun `forCommits from beginning of time`() {
+        GitRepo.prepare {
+            gitInit()
+            (1..3).forEach {
+                commit(it)
+            }
+            log()
+        } and { client, _ ->
+            val commits = mutableListOf<String>()
+            client.forCommits(
+                sinceCommit = null,
+                sinceCommitTimestamp = null,
+                count = 100
+            ) { commit ->
+                commits.add(commit.shortMessage)
+            }
+            assertEquals(
+                listOf("Commit 1", "Commit 2", "Commit 3"),
+                commits
+            )
+        }
+    }
 
     /**
      * Prepares some branches in a test repo.

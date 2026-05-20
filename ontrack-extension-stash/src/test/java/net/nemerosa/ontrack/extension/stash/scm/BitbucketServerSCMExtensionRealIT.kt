@@ -15,6 +15,7 @@ import net.nemerosa.ontrack.extension.stash.model.StashConfiguration
 import net.nemerosa.ontrack.it.AsAdminTest
 import net.nemerosa.ontrack.model.files.FileRefService
 import net.nemerosa.ontrack.model.files.downloadDocument
+import net.nemerosa.ontrack.model.structure.Project
 import net.nemerosa.ontrack.test.TestUtils.uid
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -84,7 +85,7 @@ class BitbucketServerSCMExtensionRealIT : AbstractBitbucketTestSupport() {
 
     @Test
     fun `Creating a branch`() {
-        withScm { scm, _ ->
+        withScm { scm, _, _ ->
             val branchName = uid("branch/")
             val commit = scm.createBranch(bitbucketServerEnv.defaultBranch, branchName)
             assertTrue(commit.isNotBlank(), "Commit returned")
@@ -93,7 +94,7 @@ class BitbucketServerSCMExtensionRealIT : AbstractBitbucketTestSupport() {
 
     @Test
     fun `Creating a pull request with reviewers`() {
-        withScm { scm, _ ->
+        withScm { scm, _, _ ->
             // Creating the branch
             val branchName = uid("branch/")
             scm.createBranch(bitbucketServerEnv.defaultBranch, branchName)
@@ -125,7 +126,7 @@ class BitbucketServerSCMExtensionRealIT : AbstractBitbucketTestSupport() {
 
     @Test
     fun `Editing and downloading a file on a branch`() {
-        withScm { scm, _ ->
+        withScm { scm, _, _ ->
             val branchName = uid("branch/")
             val fileName = uid("file_")
             val fileContent = uid("content_")
@@ -176,7 +177,7 @@ class BitbucketServerSCMExtensionRealIT : AbstractBitbucketTestSupport() {
 
     @Test
     fun `Creating and deleting a branch`() {
-        withScm { scm, _ ->
+        withScm { scm, _, _ ->
             val branch = uid("test/")
             // Creating the branch
             val commit = scm.createBranch(
@@ -209,10 +210,10 @@ class BitbucketServerSCMExtensionRealIT : AbstractBitbucketTestSupport() {
 
     @Test
     fun `Listing all commits`() {
-        withScm { scm, _ ->
+        withScm { scm, _, project ->
             if (scm is SCMChangeLogEnabled) {
                 val commits = mutableListOf<SCMCommit>()
-                scm.forAllCommits {
+                scm.forAllCommits(project) {
                     commits += it
                 }
                 assertTrue(commits.isNotEmpty(), "At least one commit must be present")
@@ -227,7 +228,7 @@ class BitbucketServerSCMExtensionRealIT : AbstractBitbucketTestSupport() {
         remoteAutoMerge: Boolean = false,
         code: (scm: SCM, pr: SCMPullRequest, head: String, config: StashConfiguration) -> Unit,
     ) {
-        withScm { scm, config ->
+        withScm { scm, config, _ ->
             val commonName = uid("branch-")
             val baseName = "base/$commonName"
             val headName = "head/$commonName"
@@ -271,11 +272,11 @@ class BitbucketServerSCMExtensionRealIT : AbstractBitbucketTestSupport() {
         }
     }
 
-    private fun withScm(code: (scm: SCM, config: StashConfiguration) -> Unit) {
+    private fun withScm(code: (scm: SCM, config: StashConfiguration, project: Project) -> Unit) {
         project {
             val config = bitbucketServerConfig()
             val scm = scmDetector.getSCM(this) ?: fail("No SCM for project")
-            code(scm, config)
+            code(scm, config, this)
         }
     }
 

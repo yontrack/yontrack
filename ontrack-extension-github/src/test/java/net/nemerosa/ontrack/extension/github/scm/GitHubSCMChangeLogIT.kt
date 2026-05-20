@@ -30,7 +30,7 @@ class GitHubSCMChangeLogIT : AbstractGitHubTestSupport() {
                 val scm = scmExtension.getSCM(this)
                 if (scm is SCMChangeLogEnabled) {
                     val messages = mutableListOf<String>()
-                    scm.forAllCommits { commit ->
+                    scm.forAllCommits(this) { commit ->
                         messages += commit.message
                     }
                     assertTrue(messages.isNotEmpty(), "At least one commit must be found")

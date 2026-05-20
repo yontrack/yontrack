@@ -2,6 +2,7 @@ package net.nemerosa.ontrack.git
 
 import net.nemerosa.ontrack.git.model.*
 import org.eclipse.jgit.revwalk.RevCommit
+import java.time.LocalDateTime
 import java.util.function.Consumer
 import java.util.function.Predicate
 import java.util.stream.Stream
@@ -9,7 +10,6 @@ import java.util.stream.Stream
 /**
  * Defines a client for a Git repository.
  */
-@Deprecated("Will be removed in V6. Always use native methods of the SCM.")
 interface GitRepositoryClient {
 
     /**
@@ -111,9 +111,22 @@ interface GitRepositoryClient {
     fun <T> forEachCommitFrom(branch: String, commit: String, include: Boolean = true, code: (RevCommit) -> T?): T?
 
     /**
-     * Loops through all commmits of a repository.
+     * Loops through all commits of a repository.
      */
     fun forEachCommit(code: (GitCommit) -> Unit)
+
+    /**
+     * Iterates over commits in a repository, based on a filter.
+     *
+     * Only commits strictly AFTER the given [sinceCommit] or strictly AFTER the given [sinceCommitTimestamp]
+     * are returned.
+     */
+    fun forCommits(
+        sinceCommit: String?,
+        sinceCommitTimestamp: LocalDateTime?,
+        count: Int,
+        code: (GitCommit) -> Unit
+    )
 
     /**
      * Gets the earliest commit that contains the commit.

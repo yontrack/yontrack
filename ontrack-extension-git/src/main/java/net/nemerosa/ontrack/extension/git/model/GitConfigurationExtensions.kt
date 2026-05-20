@@ -12,3 +12,8 @@ val GitConfiguration.gitRepository: GitRepository
         remote = remote,
         authenticator = authenticator,
     )
+
+/**
+ * Gets the link to a given commit.
+ */
+fun GitConfiguration.getCommitLink(commit: String): String = commitLink.replace("{commit}", commit)

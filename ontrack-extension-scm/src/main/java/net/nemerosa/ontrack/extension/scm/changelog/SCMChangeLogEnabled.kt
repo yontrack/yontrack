@@ -12,19 +12,6 @@ import net.nemerosa.ontrack.model.structure.Project
 interface SCMChangeLogEnabled : SCM {
 
     /**
-     * Gets the change log between two builds.
-     *
-     * Implementation notes:
-     *
-     * * the two builds are in the same project at the moment of the call.
-     *
-     * @param from Build boundary
-     * @param to Build boundary
-     * @return Change log containing the commits and the issues
-     */
-    // fun getChangeLog(from: Build, to: Build): SCMChangeLog
-
-    /**
      * Given a [build][Build], returns a commit ID or any other reference which is suitable
      * for getting a change log.
      */
@@ -64,7 +51,15 @@ interface SCMChangeLogEnabled : SCM {
 
     /**
      * Looping over all the commits in the repository
+     *
+     * @param project Project holding the repository
+     * @param filter Filter to apply to the commits
+     * @param code Code to execute for each commit
      */
-    fun forAllCommits(code: (commit: SCMCommit) -> Unit)
+    fun forAllCommits(
+        project: Project,
+        filter: SCMCommitFilter = SCMCommitFilter.ALL,
+        code: (commit: SCMCommit) -> Unit
+    )
 
 }

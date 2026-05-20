@@ -3,6 +3,9 @@ package net.nemerosa.ontrack.extension.stash.scm
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
+import net.nemerosa.ontrack.extension.git.casc.GitConfigService
+import net.nemerosa.ontrack.extension.git.model.getCommitLink
+import net.nemerosa.ontrack.extension.git.model.gitRepository
 import net.nemerosa.ontrack.extension.git.property.GitBranchConfigurationProperty
 import net.nemerosa.ontrack.extension.git.property.GitBranchConfigurationPropertyType
 import net.nemerosa.ontrack.extension.git.property.GitBranchConfigurationPropertyTypeUtils
@@ -12,6 +15,8 @@ import net.nemerosa.ontrack.extension.issues.IssueServiceRegistry
 import net.nemerosa.ontrack.extension.issues.model.ConfiguredIssueService
 import net.nemerosa.ontrack.extension.scm.changelog.SCMChangeLogEnabled
 import net.nemerosa.ontrack.extension.scm.changelog.SCMCommit
+import net.nemerosa.ontrack.extension.scm.changelog.SCMCommitFilter
+import net.nemerosa.ontrack.extension.scm.changelog.SimpleSCMCommit
 import net.nemerosa.ontrack.extension.scm.service.*
 import net.nemerosa.ontrack.extension.stash.StashExtensionFeature
 import net.nemerosa.ontrack.extension.stash.client.BitbucketClient
@@ -19,14 +24,18 @@ import net.nemerosa.ontrack.extension.stash.client.BitbucketClientFactory
 import net.nemerosa.ontrack.extension.stash.model.BitbucketRepository
 import net.nemerosa.ontrack.extension.stash.model.StashConfiguration
 import net.nemerosa.ontrack.extension.stash.model.getRepositoryUrl
+import net.nemerosa.ontrack.extension.stash.property.StashConfigurator
 import net.nemerosa.ontrack.extension.stash.property.StashGitConfiguration
 import net.nemerosa.ontrack.extension.stash.property.StashProjectConfigurationPropertyType
 import net.nemerosa.ontrack.extension.stash.service.StashConfigurationService
 import net.nemerosa.ontrack.extension.stash.settings.BitbucketServerSettings
 import net.nemerosa.ontrack.extension.support.AbstractExtension
+import net.nemerosa.ontrack.git.GitRepositoryClientFactory
 import net.nemerosa.ontrack.model.settings.CachedSettingsService
 import net.nemerosa.ontrack.model.structure.*
 import net.nemerosa.ontrack.model.support.OntrackConfigProperties
+import org.slf4j.Logger
+import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
 
 @Component
@@ -39,7 +48,12 @@ class BitbucketServerSCMExtension(
     private val stashConfigurationService: StashConfigurationService,
     private val issueServiceRegistry: IssueServiceRegistry,
     private val ontrackConfigProperties: OntrackConfigProperties,
+    private val bitbucketServerConfigurator: StashConfigurator,
+    private val gitRepositoryClientFactory: GitRepositoryClientFactory,
+    private val gitConfigService: GitConfigService,
 ) : AbstractExtension(extensionFeature), SCMExtension {
+
+    private val logger: Logger = LoggerFactory.getLogger(BitbucketServerSCMExtension::class.java)
 
     override val type: String = "bitbucket-server"
 
@@ -265,15 +279,31 @@ class BitbucketServerSCMExtension(
         override fun getBranchesForCommit(project: Project, commit: String): List<String> =
             client.getBranchesForCommit(repo, commit)
 
-        override fun forAllCommits(code: (commit: SCMCommit) -> Unit) {
-            client.forEachCommit(repo) { commit ->
-                code(
-                    BitbucketServerSCMCommit(
-                        root = configuration.url,
-                        repo = repo,
-                        commit = commit
-                    )
+        override fun forAllCommits(
+            project: Project,
+            filter: SCMCommitFilter,
+            code: (commit: SCMCommit) -> Unit
+        ) {
+            val configuration = bitbucketServerConfigurator.getConfiguration(project)
+            val gitRepo = configuration?.gitRepository
+                ?: error("Cannot get the Git repository for project $project")
+            val gitRepoClient = gitRepositoryClientFactory.getClient(gitRepo, gitConfigService.gitConnectionConfig)
+            gitRepoClient.sync { logger.info(it) }
+            gitRepoClient.forCommits(
+                sinceCommit = filter.sinceCommit,
+                sinceCommitTimestamp = filter.sinceCommitTimestamp,
+                count = filter.count,
+            ) { gitCommit ->
+                val scmCommit = SimpleSCMCommit(
+                    id = gitCommit.id,
+                    shortId = gitCommit.shortId,
+                    author = gitCommit.author.name,
+                    authorEmail = gitCommit.author.email,
+                    timestamp = gitCommit.commitTime,
+                    message = gitCommit.fullMessage,
+                    link = configuration.getCommitLink(gitCommit.id),
                 )
+                code(scmCommit)
             }
         }
 
