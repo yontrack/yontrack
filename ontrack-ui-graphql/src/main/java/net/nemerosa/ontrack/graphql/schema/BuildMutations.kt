@@ -165,6 +165,21 @@ class BuildMutations(
         ) { input ->
             structureService.deleteBuild(ID.of(input.id))
         },
+        /**
+         * Deleting build links from a build, optionally filtered by target project and/or qualifier
+         */
+        unitMutation(
+            name = "deleteBuildLinks",
+            description = "Deletes build links from a build, optionally filtered by target project and/or qualifier",
+            input = DeleteBuildLinksInput::class
+        ) { input ->
+            val from = structureService.getBuild(ID.of(input.fromBuild))
+            val links = structureService.getQualifiedBuildsUsedBy(from, size = Int.MAX_VALUE / 2)
+            links.pageItems
+                .filter { input.project == null || it.build.project.name == input.project }
+                .filter { input.qualifier == null || it.qualifier == input.qualifier }
+                .forEach { structureService.deleteBuildLink(from, it.build, it.qualifier) }
+        },
     )
 
 
@@ -358,6 +373,15 @@ data class LinksBuildInputItem(
 data class DeleteBuildByIdInput(
     @APIDescription("ID of the build to delete")
     val id: Int,
+)
+
+data class DeleteBuildLinksInput(
+    @APIDescription("ID of the build from which links must be deleted")
+    val fromBuild: Int,
+    @APIDescription("Name of the target project — if null, links to all projects are deleted")
+    val project: String? = null,
+    @APIDescription("Qualifier to match — if null, links with any qualifier are deleted")
+    val qualifier: String? = null,
 )
 
 @Component
