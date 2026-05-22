@@ -896,6 +896,14 @@ type Configuration {
   name: String!
 }
 
+"Output type for the configureBranch mutation."
+type ConfigureBranchPayload implements Payload {
+  "Configured branch"
+  branch: Branch
+  "List of errors"
+  errors: [UserError]
+}
+
 "Output type for the configureBuild mutation."
 type ConfigureBuildPayload implements Payload {
   "Configured build"
@@ -1268,6 +1276,12 @@ type DeleteBuildGitCommitPropertyByIdPayload implements Payload {
 type DeleteBuildGitCommitPropertyPayload implements Payload {
   "Build updated"
   build: Build
+  "List of errors"
+  errors: [UserError]
+}
+
+"Output type for the deleteBuildLinks mutation."
+type DeleteBuildLinksPayload implements Payload {
   "List of errors"
   errors: [UserError]
 }
@@ -3168,6 +3182,11 @@ type Mutation {
   ): CheckAutoVersioningPayload
   "Cleans auto-versioning audit entries based on the retention policy"
   cleanupAutoVersioningAuditEntries: CleanupAutoVersioningAuditEntriesPayload
+  "Configuration of a Yontrack branch based on some input"
+  configureBranch(
+    "Input for the mutation"
+    input: ConfigureBranchInput
+  ): ConfigureBranchPayload
   "Configuration of a Yontrack build based on some input"
   configureBuild(
     "Input for the mutation"
@@ -3373,6 +3392,11 @@ type Mutation {
     "Input for the mutation"
     input: DeleteBuildGitCommitPropertyByIdInput
   ): DeleteBuildGitCommitPropertyByIdPayload
+  "Deletes build links from a build, optionally filtered by target project and/or qualifier"
+  deleteBuildLinks(
+    "Input for the mutation"
+    input: DeleteBuildLinksInput
+  ): DeleteBuildLinksPayload
   "Deletes the message property on a build identified by name."
   deleteBuildMessageProperty(
     "Input for the mutation"
@@ -8105,6 +8129,8 @@ type WorkflowNode {
   executorId: String!
   "Unique ID of the node in its workflow."
   id: String!
+  "Interval in seconds to wait between checks of an async process inside the execution of a node. Not defined by default, using default settings."
+  interval: Int
   "List of the IDs of the parents for this node"
   parents: [WorkflowParentNode!]!
   "Timeout in seconds (5 minutes by default)"
@@ -8145,6 +8171,7 @@ enum AutoApprovalMode {
 enum AutoVersioningAuditState {
   CREATED
   ERROR
+  PENDING_SCHEDULE
   POST_PROCESSING_END
   POST_PROCESSING_LAUNCHED
   POST_PROCESSING_START
@@ -8634,6 +8661,18 @@ input CheckAutoVersioningInput {
   project: String!
 }
 
+"Input type for the configureBranch mutation."
+input ConfigureBranchInput {
+  "Type of CI engine. Will be guessed from the environment if not specified."
+  ci: String
+  "YAML configuration"
+  config: String!
+  "List of environment variables"
+  env: [CIEnv!]!
+  "Type of SCM. Will be guessed from the environment if not specified."
+  scm: String
+}
+
 "Input type for the configureBuild mutation."
 input ConfigureBuildInput {
   "Type of CI engine. Will be guessed from the environment if not specified."
@@ -9078,6 +9117,16 @@ input DeleteBuildGitCommitPropertyInput {
   build: String!
   "Project name"
   project: String!
+}
+
+"Input type for the deleteBuildLinks mutation."
+input DeleteBuildLinksInput {
+  "ID of the build from which links must be deleted"
+  fromBuild: Int!
+  "Name of the target project ? if null, links to all projects are deleted"
+  project: String
+  "Qualifier to match ? if null, links with any qualifier are deleted"
+  qualifier: String
 }
 
 "Input type for the deleteBuildMessagePropertyById mutation."
