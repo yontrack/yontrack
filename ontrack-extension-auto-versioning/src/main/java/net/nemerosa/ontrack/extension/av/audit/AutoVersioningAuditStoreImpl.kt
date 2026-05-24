@@ -2,6 +2,7 @@ package net.nemerosa.ontrack.extension.av.audit
 
 import com.fasterxml.jackson.databind.JsonNode
 import net.nemerosa.ontrack.extension.av.config.AutoApprovalMode
+import net.nemerosa.ontrack.extension.av.config.AutoVersioningPushMode
 import net.nemerosa.ontrack.extension.av.config.AutoVersioningSourceConfigPath
 import net.nemerosa.ontrack.extension.av.dispatcher.AutoVersioningOrder
 import net.nemerosa.ontrack.json.parse
@@ -323,6 +324,7 @@ class AutoVersioningAuditStoreImpl(
                 prBodyTemplateFormat = getString("PR_BODY_TEMPLATE_FORMAT"),
                 additionalPaths = additionalPaths,
                 schedule = readLocalDateTime("SCHEDULE"),
+                pushMode = getString("PUSH_MODE").let { AutoVersioningPushMode.valueOf(it) },
             ),
             audit = readStates(),
             routing = getString("ROUTING"),

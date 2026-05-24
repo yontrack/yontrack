@@ -2,6 +2,7 @@ package net.nemerosa.ontrack.extension.av.workflows
 
 import com.fasterxml.jackson.databind.JsonNode
 import net.nemerosa.ontrack.extension.av.config.AutoApprovalMode
+import net.nemerosa.ontrack.extension.av.config.AutoVersioningPushMode
 import net.nemerosa.ontrack.extension.av.config.AutoVersioningSourceConfig
 import net.nemerosa.ontrack.extension.av.config.AutoVersioningSourceConfigPath
 
@@ -25,6 +26,7 @@ data class AutoVersioningWorkflowNodeExecutorData(
     val prBodyTemplate: String? = null,
     val prBodyTemplateFormat: String? = null,
     val additionalPaths: List<AutoVersioningSourceConfigPath> = emptyList(),
+    val pushMode: AutoVersioningPushMode = AutoVersioningPushMode.PR,
 ) {
 
     fun resolve(templating: (text: String) -> String) = AutoVersioningWorkflowNodeExecutorData(
@@ -46,7 +48,8 @@ data class AutoVersioningWorkflowNodeExecutorData(
         prTitleTemplate = prTitleTemplate,
         prBodyTemplate = prBodyTemplate,
         prBodyTemplateFormat = prBodyTemplateFormat,
-        additionalPaths = additionalPaths
+        additionalPaths = additionalPaths,
+        pushMode = pushMode,
     )
 
 }

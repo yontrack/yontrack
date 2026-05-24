@@ -122,6 +122,7 @@ class AutoVersioningWorkflowNodeExecutor(
             prBodyTemplateFormat = resolvedData.prBodyTemplateFormat,
             additionalPaths = resolvedData.additionalPaths,
             schedule = null,
+            pushMode = resolvedData.pushMode,
         )
     }
 

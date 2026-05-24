@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonProperty
 import com.fasterxml.jackson.databind.JsonNode
 import net.nemerosa.ontrack.common.api.APIDescription
 import net.nemerosa.ontrack.extension.av.config.AutoApprovalMode
+import net.nemerosa.ontrack.extension.av.config.AutoVersioningPushMode
 import net.nemerosa.ontrack.extension.av.config.AutoVersioningSourceConfig
 import net.nemerosa.ontrack.extension.av.config.AutoVersioningSourceConfigPath
 
@@ -42,7 +43,9 @@ data class JsonAutoVersioningConfig(
     val additionalPaths: List<AutoVersioningSourceConfigPath>? = null,
     @APIDescription("Cron schedule (when to start applying queued requests)")
     val cronSchedule: String? = null,
-    val disabled: Boolean? = null
+    val disabled: Boolean? = null,
+    @APIDescription("Push mode")
+    val pushMode: AutoVersioningPushMode = AutoVersioningPushMode.PR,
 ) {
     fun toConfig() = AutoVersioningSourceConfig(
         sourceProject = project,
@@ -68,5 +71,6 @@ data class JsonAutoVersioningConfig(
         additionalPaths = additionalPaths,
         cronSchedule = cronSchedule,
         disabled = disabled,
+        pushMode = pushMode,
     )
 }

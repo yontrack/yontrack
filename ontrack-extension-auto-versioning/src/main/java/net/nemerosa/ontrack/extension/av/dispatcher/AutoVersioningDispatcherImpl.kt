@@ -138,6 +138,7 @@ class AutoVersioningDispatcherImpl(
                 prBodyTemplateFormat = config.prBodyTemplateFormat,
                 additionalPaths = config.additionalPaths ?: emptyList(),
                 schedule = computeSchedule(config.cronSchedule),
+                pushMode = config.pushMode,
             )
         } catch (ex: Exception) {
             // Logging the event

@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.node.ObjectNode
 import net.nemerosa.ontrack.extension.av.config.AutoApprovalMode
+import net.nemerosa.ontrack.extension.av.config.AutoVersioningPushMode
 import net.nemerosa.ontrack.extension.av.config.AutoVersioningSourceConfigPath
 import net.nemerosa.ontrack.extension.av.dispatcher.AutoVersioningOrder
 import net.nemerosa.ontrack.json.parseOrNull
@@ -88,6 +89,7 @@ class AutoVersioningAuditStoreMigration(
                             prBodyTemplateFormat = data.prBodyTemplateFormat,
                             additionalPaths = data.additionalPaths ?: emptyList(),
                             schedule = null,
+                            pushMode = AutoVersioningPushMode.PR,
                         ),
                         audit = data.states,
                         routing = data.routing,

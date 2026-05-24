@@ -75,6 +75,8 @@ data class AutoVersioningSourceConfig(
     val cronSchedule: String? = null,
     @APIDescription("Set if this configuration is disabled")
     val disabled: Boolean? = null,
+    @APIDescription("Push mode")
+    val pushMode: AutoVersioningPushMode = AutoVersioningPushMode.PR,
 ) {
 
     /**
