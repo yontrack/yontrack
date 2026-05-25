@@ -76,7 +76,7 @@ data class AutoVersioningSourceConfig(
     @APIDescription("Set if this configuration is disabled")
     val disabled: Boolean? = null,
     @APIDescription("Push mode")
-    val pushMode: AutoVersioningPushMode = AutoVersioningPushMode.PR,
+    val pushMode: AutoVersioningPushMode? = AutoVersioningPushMode.PR,
 ) {
 
     /**
@@ -194,6 +194,7 @@ data class AutoVersioningSourceConfig(
             additionalPaths = additionalPaths,
             cronSchedule = cronSchedule,
             disabled = disabled,
+            pushMode = pushMode,
         )
 
 }

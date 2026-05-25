@@ -134,6 +134,29 @@ interface AutoVersioningAuditService {
     fun onPostProcessingEnd(order: AutoVersioningOrder, upgradeBranch: String)
 
     /**
+     * Preparing to push to the target branch directly.
+     *
+     * @param order Auto-versioning order being processed
+     * @param upgradeBranch Actual name of the upgrade branch
+     */
+    fun onPushing(order: AutoVersioningOrder, upgradeBranch: String)
+
+    /**
+     * Auto-versioning has been pushed to the target branch.
+     *
+     * @param order Auto-versioning order being processed
+     * @param upgradeBranch Actual name of the upgrade branch
+     * @param commit Commit SHA of the pushed changes
+     * @param commitLink Link to the pushed commit
+     */
+    fun onPushed(
+        order: AutoVersioningOrder,
+        upgradeBranch: String,
+        commit: String,
+        commitLink: String,
+    )
+
+    /**
      * Creating the SCM PR for the [order] from the [upgradeBranch] branch.
      *
      * @param order Auto versioning order being processed

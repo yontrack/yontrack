@@ -2,10 +2,7 @@ package net.nemerosa.ontrack.extension.av.processing
 
 import net.nemerosa.ontrack.common.replaceGroup
 import net.nemerosa.ontrack.extension.av.audit.AutoVersioningAuditService
-import net.nemerosa.ontrack.extension.av.config.AutoApprovalMode
-import net.nemerosa.ontrack.extension.av.config.AutoVersioningSourceConfig
-import net.nemerosa.ontrack.extension.av.config.AutoVersioningSourceConfigPath
-import net.nemerosa.ontrack.extension.av.config.AutoVersioningTargetFileService
+import net.nemerosa.ontrack.extension.av.config.*
 import net.nemerosa.ontrack.extension.av.dispatcher.AutoVersioningOrder
 import net.nemerosa.ontrack.extension.av.dispatcher.VersionSourceFactory
 import net.nemerosa.ontrack.extension.av.dispatcher.getBuildVersion
@@ -16,6 +13,7 @@ import net.nemerosa.ontrack.extension.av.postprocessing.PostProcessingInfo
 import net.nemerosa.ontrack.extension.av.postprocessing.PostProcessingNotFoundException
 import net.nemerosa.ontrack.extension.av.postprocessing.PostProcessingRegistry
 import net.nemerosa.ontrack.extension.av.properties.FilePropertyType
+import net.nemerosa.ontrack.extension.scm.changelog.SCMCommit
 import net.nemerosa.ontrack.extension.scm.service.SCM
 import net.nemerosa.ontrack.extension.scm.service.SCMDetector
 import net.nemerosa.ontrack.extension.scm.service.SCMPullRequestStatus
@@ -214,103 +212,9 @@ class AutoVersioningProcessingServiceImpl(
                     }
                 }
 
-                // Creates a PR with auto approval
-                try {
-                    logger.debug("Processing auto versioning order creating PR: {}", order)
-                    // Audit
-                    autoVersioningAuditService.onPRCreating(order, upgradeBranch)
-                    // PR title & message
-                    val (prTitle, prBody) = autoVersioningTemplatingService.generatePRInfo(order, avRenderer)
-                    // PR creation
-                    val pr = scm.createPR(
-                        from = upgradeBranch,
-                        to = scmBranch,
-                        title = prTitle,
-                        // Change log as description?
-                        description = prBody,
-                        // Auto approval
-                        autoApproval = order.autoApproval,
-                        // Remote auto merge?
-                        remoteAutoMerge = (order.autoApprovalMode == AutoApprovalMode.SCM),
-                        // Commit message to use on merge
-                        message = order.getCommitMessage(),
-                        // List of reviewers
-                        reviewers = order.reviewers,
-                    )
-                    // If auto approval mode = CLIENT and PR is not merged, we had a timeout
-                    logger.debug("Processing auto versioning order end of PR process: {}", order)
-                    val outcome = if (order.autoApproval) {
-                        when (order.autoApprovalMode) {
-                            AutoApprovalMode.SCM -> {
-                                autoVersioningAuditService.onPRApproved(
-                                    order = order,
-                                    upgradeBranch = upgradeBranch,
-                                    prName = pr.name,
-                                    prLink = pr.link
-                                )
-                                autoVersioningEventService.sendSuccess(
-                                    order,
-                                    "Auto versioning PR has been created and approved. Its merge process will be done at SCM level.",
-                                    pr
-                                )
-                                // OK
-                                AutoVersioningProcessingOutcome.CREATED
-                            }
-
-                            AutoApprovalMode.CLIENT -> if (pr.status != SCMPullRequestStatus.MERGED) {
-                                logger.debug("Processing auto versioning order PR timed out: {}", order)
-                                // Audit
-                                autoVersioningAuditService.onPRTimeout(
-                                    order = order,
-                                    upgradeBranch = upgradeBranch,
-                                    prName = pr.name,
-                                    prLink = pr.link
-                                )
-                                // Notification
-                                autoVersioningEventService.sendPRMergeTimeoutError(
-                                    order,
-                                    pr = pr
-                                )
-                                // OK
-                                AutoVersioningProcessingOutcome.TIMEOUT
-                            } else {
-                                autoVersioningAuditService.onPRMerged(
-                                    order = order,
-                                    upgradeBranch = upgradeBranch,
-                                    prName = pr.name,
-                                    prLink = pr.link
-                                )
-                                autoVersioningEventService.sendSuccess(
-                                    order,
-                                    "Auto versioning PR has been created, approved and merged.",
-                                    pr
-                                )
-                                // OK
-                                AutoVersioningProcessingOutcome.CREATED
-                            }
-                        }
-                    } else {
-                        autoVersioningAuditService.onPRCreated(
-                            order = order,
-                            upgradeBranch = upgradeBranch,
-                            prName = pr.name,
-                            prLink = pr.link
-                        )
-                        autoVersioningEventService.sendSuccess(
-                            order,
-                            "Auto versioning PR has been created.",
-                            pr
-                        )
-                        // OK
-                        AutoVersioningProcessingOutcome.CREATED
-                    }
-                    // Back validation
-                    onCompletion(order, outcome)
-                    // OK
-                    return outcome
-                } catch (e: Exception) {
-                    autoVersioningEventService.sendError(order, "Failed to create PR", e)
-                    throw e
+                return when (order.pushMode) {
+                    AutoVersioningPushMode.PR -> prPush(order, upgradeBranch, avRenderer, scm, scmBranch)
+                    AutoVersioningPushMode.PUSH -> directPush(order, upgradeBranch, scm, scmBranch)
                 }
 
             } else {
@@ -322,6 +226,147 @@ class AutoVersioningProcessingServiceImpl(
             logger.debug("Processing auto versioning order no config: {}", order)
             autoVersioningAuditService.onProcessingAborted(order, "Target branch is not configured")
             return AutoVersioningProcessingOutcome.NO_CONFIG
+        }
+    }
+
+    private fun directPush(
+        order: AutoVersioningOrder,
+        upgradeBranch: String,
+        scm: SCM,
+        scmBranch: String,
+    ): AutoVersioningProcessingOutcome =
+        try {
+            logger.debug("Processing auto-versioning order direct push: {}", order)
+            // Audit
+            autoVersioningAuditService.onPushing(order, upgradeBranch)
+            // Pushing the branch directly
+            val commit: SCMCommit = scm.mergeBranch(
+                head = upgradeBranch,
+                base = scmBranch,
+            )
+            // Audit
+            autoVersioningAuditService.onPushed(
+                order = order,
+                upgradeBranch = upgradeBranch,
+                commit = commit.id,
+                commitLink = commit.link,
+            )
+            autoVersioningEventService.sendSuccessPush(
+                order = order,
+                message = "Auto-versioning pushed.",
+                commit = commit.id,
+                commitLink = commit.link,
+            )
+            // OK
+            AutoVersioningProcessingOutcome.CREATED
+        } catch (e: Exception) {
+            autoVersioningEventService.sendError(order, "Failed to directly push", e)
+            throw e
+        }
+
+    private fun prPush(
+        order: AutoVersioningOrder,
+        upgradeBranch: String,
+        avRenderer: AutoVersioningTemplateRenderer,
+        scm: SCM,
+        scmBranch: String,
+    ): AutoVersioningProcessingOutcome {
+        try {
+            logger.debug("Processing auto versioning order creating PR: {}", order)
+            // Audit
+            autoVersioningAuditService.onPRCreating(order, upgradeBranch)
+            // PR title & message
+            val (prTitle, prBody) = autoVersioningTemplatingService.generatePRInfo(order, avRenderer)
+            // PR creation
+            val pr = scm.createPR(
+                from = upgradeBranch,
+                to = scmBranch,
+                title = prTitle,
+                // Change log as description?
+                description = prBody,
+                // Auto approval
+                autoApproval = order.autoApproval,
+                // Remote auto merge?
+                remoteAutoMerge = (order.autoApprovalMode == AutoApprovalMode.SCM),
+                // Commit message to use on merge
+                message = order.getCommitMessage(),
+                // List of reviewers
+                reviewers = order.reviewers,
+            )
+            // If auto approval mode = CLIENT and PR is not merged, we had a timeout
+            logger.debug("Processing auto versioning order end of PR process: {}", order)
+            val outcome = if (order.autoApproval) {
+                when (order.autoApprovalMode) {
+                    AutoApprovalMode.SCM -> {
+                        autoVersioningAuditService.onPRApproved(
+                            order = order,
+                            upgradeBranch = upgradeBranch,
+                            prName = pr.name,
+                            prLink = pr.link
+                        )
+                        autoVersioningEventService.sendSuccess(
+                            order,
+                            "Auto versioning PR has been created and approved. Its merge process will be done at SCM level.",
+                            pr
+                        )
+                        // OK
+                        AutoVersioningProcessingOutcome.CREATED
+                    }
+
+                    AutoApprovalMode.CLIENT -> if (pr.status != SCMPullRequestStatus.MERGED) {
+                        logger.debug("Processing auto versioning order PR timed out: {}", order)
+                        // Audit
+                        autoVersioningAuditService.onPRTimeout(
+                            order = order,
+                            upgradeBranch = upgradeBranch,
+                            prName = pr.name,
+                            prLink = pr.link
+                        )
+                        // Notification
+                        autoVersioningEventService.sendPRMergeTimeoutError(
+                            order,
+                            pr = pr
+                        )
+                        // OK
+                        AutoVersioningProcessingOutcome.TIMEOUT
+                    } else {
+                        autoVersioningAuditService.onPRMerged(
+                            order = order,
+                            upgradeBranch = upgradeBranch,
+                            prName = pr.name,
+                            prLink = pr.link
+                        )
+                        autoVersioningEventService.sendSuccess(
+                            order,
+                            "Auto versioning PR has been created, approved and merged.",
+                            pr
+                        )
+                        // OK
+                        AutoVersioningProcessingOutcome.CREATED
+                    }
+                }
+            } else {
+                autoVersioningAuditService.onPRCreated(
+                    order = order,
+                    upgradeBranch = upgradeBranch,
+                    prName = pr.name,
+                    prLink = pr.link
+                )
+                autoVersioningEventService.sendSuccess(
+                    order,
+                    "Auto versioning PR has been created.",
+                    pr
+                )
+                // OK
+                AutoVersioningProcessingOutcome.CREATED
+            }
+            // Back validation
+            onCompletion(order, outcome)
+            // OK
+            return outcome
+        } catch (e: Exception) {
+            autoVersioningEventService.sendError(order, "Failed to create PR", e)
+            throw e
         }
     }
 

@@ -104,6 +104,7 @@ object AutoVersioningTestFixtures {
         notifications: List<AutoVersioningNotification>? = null,
         cronSchedule: String? = null,
         disabled: Boolean? = null,
+        pushMode: AutoVersioningPushMode? = AutoVersioningPushMode.PR,
     ) = AutoVersioningSourceConfig(
         sourceProject = sourceProject,
         sourceBranch = sourceBranch,
@@ -128,6 +129,7 @@ object AutoVersioningTestFixtures {
         additionalPaths = null,
         cronSchedule = cronSchedule,
         disabled = disabled,
+        pushMode = pushMode,
     )
 
 }

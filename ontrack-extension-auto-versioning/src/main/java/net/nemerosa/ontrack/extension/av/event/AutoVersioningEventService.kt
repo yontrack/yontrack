@@ -26,12 +26,22 @@ interface AutoVersioningEventService {
     )
 
     /**
-     * Broadcasts the success of an autoversioning success
+     * Broadcasts the success of an auto-versioning request based on a PR
      */
     fun sendSuccess(
         order: AutoVersioningOrder,
         message: String,
         pr: SCMPullRequest,
+    )
+
+    /**
+     * Broadcasts the success of an auto-versioning request based on a PR
+     */
+    fun sendSuccessPush(
+        order: AutoVersioningOrder,
+        message: String,
+        commit: String,
+        commitLink: String,
     )
 
 }

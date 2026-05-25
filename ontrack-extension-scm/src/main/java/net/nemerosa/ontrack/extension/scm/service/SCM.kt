@@ -1,5 +1,6 @@
 package net.nemerosa.ontrack.extension.scm.service
 
+import net.nemerosa.ontrack.extension.scm.changelog.SCMCommit
 import net.nemerosa.ontrack.model.structure.Branch
 import net.nemerosa.ontrack.model.structure.Project
 
@@ -142,5 +143,17 @@ interface SCM {
      * @return List of branch names (simple names, like `main` and not `refs/heads/main`)
      */
     fun getBranchesForCommit(project: Project, commit: String): List<String>
+
+    /**
+     * Merges the branch [head] into the branch [base].
+     *
+     * @param head Branch to merge from (source, e.g. the auto-versioning upgrade branch)
+     * @param base Branch to merge into (target, e.g. `main`)
+     * @return The commit resulting from the merge
+     */
+    fun mergeBranch(
+        head: String,
+        base: String,
+    ): SCMCommit
 
 }

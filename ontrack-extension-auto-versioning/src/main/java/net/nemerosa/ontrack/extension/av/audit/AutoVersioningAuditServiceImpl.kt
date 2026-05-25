@@ -92,4 +92,20 @@ class AutoVersioningAuditServiceImpl(
     override fun onPRMerged(order: AutoVersioningOrder, upgradeBranch: String, prName: String, prLink: String) {
         super.onPRMerged(order, upgradeBranch, prName, prLink)
     }
+
+    override fun onPushing(
+        order: AutoVersioningOrder,
+        upgradeBranch: String
+    ) {
+        super.onPushing(order, upgradeBranch)
+    }
+
+    override fun onPushed(
+        order: AutoVersioningOrder,
+        upgradeBranch: String,
+        commit: String,
+        commitLink: String
+    ) {
+        super.onPushed(order, upgradeBranch, commit, commitLink)
+    }
 }

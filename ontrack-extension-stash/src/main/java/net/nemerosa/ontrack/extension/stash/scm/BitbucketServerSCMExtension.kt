@@ -336,6 +336,23 @@ class BitbucketServerSCMExtension(
             return SCMPullRequestStatus.MERGED
         }
 
+        override fun mergeBranch(head: String, base: String): SCMCommit {
+            val gitRepoClient = gitRepositoryClientFactory.getClient(
+                stashConfiguration.gitRepository,
+                gitConfigService.gitConnectionConfig,
+            )
+            val gitCommit = gitRepoClient.mergeBranch(head, base)
+            return SimpleSCMCommit(
+                id = gitCommit.id,
+                shortId = gitCommit.shortId,
+                author = gitCommit.author.name,
+                authorEmail = gitCommit.author.email,
+                timestamp = gitCommit.commitTime,
+                message = gitCommit.fullMessage,
+                link = stashConfiguration.getCommitLink(gitCommit.id),
+            )
+        }
+
         private val client: BitbucketClient by lazy {
             bitbucketClientFactory.getBitbucketClient(configuration)
         }

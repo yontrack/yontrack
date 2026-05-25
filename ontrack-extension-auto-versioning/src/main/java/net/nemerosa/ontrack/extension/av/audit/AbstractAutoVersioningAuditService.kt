@@ -216,4 +216,38 @@ abstract class AbstractAutoVersioningAuditService(
             AutoVersioningAuditEntryStateDataKeys.PR_LINK to prLink
         )
     }
+
+    override fun onPushing(
+        order: AutoVersioningOrder,
+        upgradeBranch: String
+    ) {
+        store.addState(
+            targetBranch = order.branch,
+            uuid = order.uuid,
+            routing = null,
+            queue = null,
+            upgradeBranch = upgradeBranch,
+            state = AutoVersioningAuditState.PUSHING,
+            AutoVersioningAuditEntryStateDataKeys.BRANCH to upgradeBranch,
+        )
+    }
+
+    override fun onPushed(
+        order: AutoVersioningOrder,
+        upgradeBranch: String,
+        commit: String,
+        commitLink: String
+    ) {
+        store.addState(
+            targetBranch = order.branch,
+            uuid = order.uuid,
+            routing = null,
+            queue = null,
+            upgradeBranch = upgradeBranch,
+            state = AutoVersioningAuditState.PUSHED,
+            AutoVersioningAuditEntryStateDataKeys.BRANCH to upgradeBranch,
+            AutoVersioningAuditEntryStateDataKeys.COMMIT_ID to commit,
+            AutoVersioningAuditEntryStateDataKeys.COMMIT_LINK to commitLink,
+        )
+    }
 }

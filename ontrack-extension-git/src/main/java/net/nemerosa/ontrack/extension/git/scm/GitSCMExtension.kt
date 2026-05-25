@@ -5,6 +5,7 @@ import net.nemerosa.ontrack.extension.git.property.GitBranchConfigurationPropert
 import net.nemerosa.ontrack.extension.git.property.GitBranchConfigurationPropertyType
 import net.nemerosa.ontrack.extension.git.property.GitProjectConfigurationProperty
 import net.nemerosa.ontrack.extension.git.property.GitProjectConfigurationPropertyType
+import net.nemerosa.ontrack.extension.scm.changelog.SCMCommit
 import net.nemerosa.ontrack.extension.scm.service.SCM
 import net.nemerosa.ontrack.extension.scm.service.SCMExtension
 import net.nemerosa.ontrack.extension.scm.service.SCMPath
@@ -123,6 +124,13 @@ class GitSCMExtension(
 
         override fun getBranchesForCommit(project: Project, commit: String): List<String> {
             unsupported("findBranchFromScmBranchName")
+        }
+
+        override fun mergeBranch(
+            head: String,
+            base: String
+        ): SCMCommit {
+            unsupported("mergeBranch")
         }
 
         private fun unsupported(operation: String): Nothing =

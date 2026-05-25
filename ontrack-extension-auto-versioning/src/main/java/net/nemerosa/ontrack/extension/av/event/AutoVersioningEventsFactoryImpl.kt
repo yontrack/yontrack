@@ -16,7 +16,9 @@ class AutoVersioningEventsFactoryImpl(
     override fun success(
         order: AutoVersioningOrder,
         message: String,
-        pr: SCMPullRequest,
+        pr: SCMPullRequest?,
+        commit: String?,
+        commitLink: String?,
     ): Event =
         Event.of(AutoVersioningEvents.AUTO_VERSIONING_SUCCESS)
             .withBranch(order.branch)
@@ -24,8 +26,10 @@ class AutoVersioningEventsFactoryImpl(
             .with("VERSION", order.targetVersion)
             .with("PROMOTION", order.sourcePromotion)
             .with("MESSAGE", close(message))
-            .with("PR_NAME", pr.name)
-            .with("PR_LINK", pr.link)
+            .with("PR_NAME", pr?.name)
+            .with("PR_LINK", pr?.link)
+            .with("COMMIT", commit)
+            .with("COMMIT_LINK", commitLink)
             .build()
 
     override fun error(

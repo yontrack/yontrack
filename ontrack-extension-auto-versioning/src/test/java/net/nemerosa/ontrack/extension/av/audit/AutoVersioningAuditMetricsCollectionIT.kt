@@ -192,6 +192,31 @@ class AutoVersioningAuditMetricsCollectionIT : AbstractAutoVersioningTestSupport
                         autoVersioningAuditService.onPRTimeout(it, "branch", "#1", "uri:1")
                     }
                 }
+                // Pushing
+                repeat(15) {
+                    create(source) {
+                        autoVersioningAuditService.onCreated(it)
+                        autoVersioningAuditService.onScheduled(it, "routing")
+                        autoVersioningAuditService.onReceived(it, "queue")
+                        autoVersioningAuditService.onProcessingStart(it)
+                        autoVersioningAuditService.onProcessingCreatingBranch(it, "branch")
+                        autoVersioningAuditService.onProcessingUpdatingFile(it, "branch", "file")
+                        autoVersioningAuditService.onPushing(it, "branch")
+                    }
+                }
+                // Pushed
+                repeat(16) {
+                    create(source) {
+                        autoVersioningAuditService.onCreated(it)
+                        autoVersioningAuditService.onScheduled(it, "routing")
+                        autoVersioningAuditService.onReceived(it, "queue")
+                        autoVersioningAuditService.onProcessingStart(it)
+                        autoVersioningAuditService.onProcessingCreatingBranch(it, "branch")
+                        autoVersioningAuditService.onProcessingUpdatingFile(it, "branch", "file")
+                        autoVersioningAuditService.onPushing(it, "branch")
+                        autoVersioningAuditService.onPushed(it, "branch", "abc123", "uri:abc123")
+                    }
+                }
                 // Collects the metrics
                 val gauges =
                     meterRegistry.find(AutoVersioningMetrics.States.stateCount)
@@ -223,6 +248,8 @@ class AutoVersioningAuditMetricsCollectionIT : AbstractAutoVersioningTestSupport
                         AutoVersioningAuditState.PR_CREATED to 12.0,
                         AutoVersioningAuditState.PR_APPROVED to 13.0,
                         AutoVersioningAuditState.PR_TIMEOUT to 14.0,
+                        AutoVersioningAuditState.PUSHING to 15.0,
+                        AutoVersioningAuditState.PUSHED to 16.0,
                     ).toSortedMap(),
                     stateValues.toSortedMap()
                 )

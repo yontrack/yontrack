@@ -9,7 +9,9 @@ interface AutoVersioningEventsFactory {
     fun success(
         order: AutoVersioningOrder,
         message: String,
-        pr: SCMPullRequest,
+        pr: SCMPullRequest? = null,
+        commit: String? = null,
+        commitLink: String? = null,
     ): Event
 
     fun error(

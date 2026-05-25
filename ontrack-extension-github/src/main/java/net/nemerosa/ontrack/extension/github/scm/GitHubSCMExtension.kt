@@ -349,6 +349,24 @@ class GitHubSCMExtension(
             return gitRepoClient.getBranchesForCommit(commit)
         }
 
+        override fun mergeBranch(
+            head: String,
+            base: String,
+        ): SCMCommit {
+            val commit = client.mergeBranch(
+                repository = repository,
+                head = head,
+                base = base,
+            ) ?: run {
+                // HTTP 204: already up-to-date — return current HEAD of target branch
+                val sha = client.getBranchLastCommit(repository, base, retryOnNotFound = false)
+                    ?: error("Cannot find last commit for branch $base in $repository")
+                client.getCommit(repository, sha)
+                    ?: error("Cannot find commit $sha in $repository")
+            }
+            return GitHubSCMCommit(commit)
+        }
+
         private val client: OntrackGitHubClient by lazy {
             clientFactory.create(configuration)
         }

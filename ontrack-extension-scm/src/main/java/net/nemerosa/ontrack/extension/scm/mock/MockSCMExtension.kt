@@ -424,6 +424,13 @@ class MockSCMExtension(
         override fun getBranchesForCommit(project: Project, commit: String): List<String> =
             repository(mockScmProjectProperty.name).getBranchesForCommit(commit)
 
+        override fun mergeBranch(
+            head: String,
+            base: String
+        ): SCMCommit {
+            TODO("Not yet implemented")
+        }
+
         override fun forAllCommits(
             project: Project,
             filter: SCMCommitFilter,

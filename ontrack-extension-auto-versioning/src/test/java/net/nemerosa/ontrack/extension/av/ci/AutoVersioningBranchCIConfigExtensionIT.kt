@@ -1,6 +1,7 @@
 package net.nemerosa.ontrack.extension.av.ci
 
 import net.nemerosa.ontrack.extension.av.config.AutoVersioningConfigurationService
+import net.nemerosa.ontrack.extension.av.config.AutoVersioningPushMode
 import net.nemerosa.ontrack.extension.av.validation.AutoVersioningValidationData
 import net.nemerosa.ontrack.extension.config.ConfigTestSupport
 import net.nemerosa.ontrack.extension.config.EnvFixtures
@@ -291,6 +292,67 @@ class AutoVersioningBranchCIConfigExtensionIT : AbstractQLKTITSupport() {
         testBranch("main", true)
         testBranch("release/1.0", false)
         testBranch("release/2.1", true)
+    }
+
+    @Test
+    @AsAdminTest
+    fun `pushMode is not set by default`() {
+        val branch = configTestSupport.configureBranch(
+            """
+                version: v1
+                configuration:
+                  defaults:
+                    branch:
+                      autoVersioning:
+                        configurations:
+                          - sourceProject: my-project
+                            sourceBranch: main
+                            sourcePromotion: GOLD
+                            targetPath: versions.properties
+                            targetProperty: yontrackVersion
+            """.trimIndent(),
+            ci = "generic",
+            scm = "mock",
+            env = EnvFixtures.generic()
+        )
+        assertNotNull(
+            autoVersioningConfigurationService.getAutoVersioning(branch),
+            "Auto-versioning config has been set"
+        ) { av ->
+            val avConfig = av.configurations.single()
+            assertEquals(AutoVersioningPushMode.PR, avConfig.pushMode)
+        }
+    }
+
+    @Test
+    @AsAdminTest
+    fun `pushMode can be set to PUSH`() {
+        val branch = configTestSupport.configureBranch(
+            """
+                version: v1
+                configuration:
+                  defaults:
+                    branch:
+                      autoVersioning:
+                        configurations:
+                          - sourceProject: my-project
+                            sourceBranch: main
+                            sourcePromotion: GOLD
+                            targetPath: versions.properties
+                            targetProperty: yontrackVersion
+                            pushMode: PUSH
+            """.trimIndent(),
+            ci = "generic",
+            scm = "mock",
+            env = EnvFixtures.generic()
+        )
+        assertNotNull(
+            autoVersioningConfigurationService.getAutoVersioning(branch),
+            "Auto-versioning config has been set"
+        ) { av ->
+            val avConfig = av.configurations.single()
+            assertEquals(AutoVersioningPushMode.PUSH, avConfig.pushMode)
+        }
     }
 
 }

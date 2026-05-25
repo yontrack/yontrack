@@ -212,4 +212,107 @@ internal class AutoVersioningMutationsIT : AbstractAutoVersioningTestSupport() {
         }
     }
 
+    @Test
+    fun `Setting a configuration with push mode PUSH`() {
+        asAdmin {
+            project {
+                branch {
+                    run(
+                        """
+                        mutation {
+                            setAutoVersioningConfig(input: {
+                                branchId: $id,
+                                configurations: [
+                                    {
+                                        sourceProject: "A",
+                                        sourceBranch: "main",
+                                        sourcePromotion: "GOLD",
+                                        targetPath: "gradle.properties",
+                                        targetProperty: "a-version",
+                                        pushMode: PUSH,
+                                    },
+                                ]
+                            }) {
+                                errors {
+                                    message
+                                }
+                            }
+                        }
+                    """
+                    ) { data ->
+                        checkGraphQLUserErrors(data, "setAutoVersioningConfig")
+                        val config = autoVersioningConfigurationService.getAutoVersioning(this)
+                        assertEquals(
+                            AutoVersioningConfig(
+                                listOf(
+                                    sourceConfig(
+                                        sourceProject = "A",
+                                        sourceBranch = "main",
+                                        sourcePromotion = "GOLD",
+                                        targetPath = "gradle.properties",
+                                        targetProperty = "a-version",
+                                        pushMode = AutoVersioningPushMode.PUSH,
+                                    ),
+                                )
+                            ),
+                            config
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `Setting a configuration by name with push mode PUSH`() {
+        asAdmin {
+            project {
+                branch {
+                    run(
+                        """
+                        mutation {
+                            setAutoVersioningConfigByName(input: {
+                                project: "${project.name}",
+                                branch: "$name",
+                                configurations: [
+                                    {
+                                        sourceProject: "A",
+                                        sourceBranch: "main",
+                                        sourcePromotion: "GOLD",
+                                        targetPath: "gradle.properties",
+                                        targetProperty: "a-version",
+                                        pushMode: PUSH,
+                                    },
+                                ]
+                            }) {
+                                errors {
+                                    message
+                                }
+                            }
+                        }
+                    """
+                    ) { data ->
+                        checkGraphQLUserErrors(data, "setAutoVersioningConfigByName")
+                        val config = autoVersioningConfigurationService.getAutoVersioning(this)
+                        assertEquals(
+                            AutoVersioningConfig(
+                                listOf(
+                                    sourceConfig(
+                                        sourceProject = "A",
+                                        sourceBranch = "main",
+                                        sourcePromotion = "GOLD",
+                                        targetPath = "gradle.properties",
+                                        targetProperty = "a-version",
+                                        pushMode = AutoVersioningPushMode.PUSH,
+                                    ),
+                                )
+                            ),
+                            config
+                        )
+                    }
+                }
+            }
+        }
+    }
+
 }

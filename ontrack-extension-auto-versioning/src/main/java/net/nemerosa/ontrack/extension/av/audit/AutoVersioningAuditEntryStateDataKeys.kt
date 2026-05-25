@@ -18,4 +18,14 @@ object AutoVersioningAuditEntryStateDataKeys {
      * PR name
      */
     const val PR_NAME = "prName"
+
+    /**
+     * Commit id
+     */
+    const val COMMIT_ID = "commitId"
+
+    /**
+     * Commit link
+     */
+    const val COMMIT_LINK = "commitLink"
 }

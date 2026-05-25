@@ -37,7 +37,17 @@ enum class AutoVersioningAuditState(
     /**
      * PR was merged
      */
-    PR_MERGED(isRunning = false);
+    PR_MERGED(isRunning = false),
+
+    /**
+     * Pushing to the target branch directly
+     */
+    PUSHING(isProcessing = true),
+
+    /**
+     * Pushed to the target branch directly
+     */
+    PUSHED(isRunning = false);
 
     companion object {
         val runningAndNotProcessingStates = entries.filter { it.isRunning && !it.isProcessing }.toSet()

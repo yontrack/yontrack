@@ -3,6 +3,7 @@ package net.nemerosa.ontrack.extension.av.dispatcher
 import net.nemerosa.ontrack.extension.av.audit.AutoVersioningAuditEntryUUIDNotFoundException
 import net.nemerosa.ontrack.extension.av.audit.AutoVersioningAuditService
 import net.nemerosa.ontrack.extension.av.audit.AutoVersioningAuditStore
+import net.nemerosa.ontrack.extension.av.config.AutoVersioningPushMode
 import net.nemerosa.ontrack.extension.av.config.AutoVersioningSourceConfig
 import net.nemerosa.ontrack.extension.av.scheduler.AutoVersioningScheduler
 import net.nemerosa.ontrack.extension.av.scheduler.ScheduleService
@@ -138,7 +139,7 @@ class AutoVersioningDispatcherImpl(
                 prBodyTemplateFormat = config.prBodyTemplateFormat,
                 additionalPaths = config.additionalPaths ?: emptyList(),
                 schedule = computeSchedule(config.cronSchedule),
-                pushMode = config.pushMode,
+                pushMode = config.pushMode ?: AutoVersioningPushMode.PR,
             )
         } catch (ex: Exception) {
             // Logging the event

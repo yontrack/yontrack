@@ -213,4 +213,13 @@ interface GitRepositoryClient {
      */
     fun getLastCommitForExpression(regex: String): String?
 
+    /**
+     * Merges the [head] branch into the [base] branch and pushes to remote.
+     *
+     * @param head Source branch (merge FROM)
+     * @param base Target branch (merge INTO)
+     * @return The resulting merge commit
+     */
+    fun mergeBranch(head: String, base: String): GitCommit
+
 }

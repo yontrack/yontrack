@@ -215,4 +215,8 @@ class MockOntrackGitHubClient(
 
     override fun forAllCommits(repository: String, code: (commit: GitHubCommit) -> Unit) {
     }
+
+    override fun mergeBranch(repository: String, head: String, base: String): GitHubCommit? {
+        TODO("Not yet implemented")
+    }
 }

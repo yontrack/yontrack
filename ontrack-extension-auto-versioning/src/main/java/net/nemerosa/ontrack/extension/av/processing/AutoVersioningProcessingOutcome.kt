@@ -1,7 +1,7 @@
 package net.nemerosa.ontrack.extension.av.processing
 
 /**
- * Status of the processing of a auto versioning order.
+ * Status of the processing of an auto-versioning order.
  *
  * @property message Display message
  */
@@ -10,24 +10,24 @@ enum class AutoVersioningProcessingOutcome(
 ) {
 
     /**
-     * The PR has been successfully created.
+     * The auto-versioning process was completed successfully.
      */
-    CREATED("PR created"),
+    CREATED("The auto-versioning process was completed successfully"),
 
     /**
      * The order was correct, but no PR was created because there was no change in the target version.
      */
-    SAME_VERSION("PR not created because no change in version"),
+    SAME_VERSION("Auto-versioning process not started because no change in version"),
 
     /**
      * The order was correct, but the process way not be complete because of a timeout.
      */
-    TIMEOUT("PR not created because missing configuration"),
+    TIMEOUT("Auto-versioning process not started because missing configuration"),
 
     /**
      * The order was correct, but no PR was created because there was some missing configuration (typically
-     * missing Git configuration at target project or branch).
+     * missing Git configuration at the level of the target project or branch).
      */
-    NO_CONFIG("PR not created because missing configuration"),
+    NO_CONFIG("Auto-versioning process not started because missing configuration"),
 
 }

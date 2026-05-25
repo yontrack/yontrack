@@ -38,6 +38,7 @@ import java.lang.String.format
 import java.time.Duration
 import java.time.LocalDateTime
 import java.util.*
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.locks.ReentrantLock
 import java.util.function.Consumer
 import java.util.function.Predicate
@@ -730,6 +731,54 @@ class GitRepositoryClientImpl(
             p.reset(or, RevWalk(db).parseTree(id))
             return p
         }
+    }
+
+    override fun mergeBranch(head: String, base: String): GitCommit {
+        val directoryLock = getDirectoryLock(repositoryDir.absolutePath)
+        directoryLock.lock()
+        try {
+            // Fetch latest remote state
+            fetch { logger.debug("[git] $it") }
+            // Checkout base branch locally, resetting from remote tracking ref
+            val localBaseExists = git.repository.findRef("refs/heads/$base") != null
+            if (localBaseExists) {
+                git.checkout().setName(base).call()
+                git.reset().setMode(ResetCommand.ResetType.HARD).setRef("refs/remotes/origin/$base").call()
+            } else {
+                git.checkout().setName(base).setStartPoint("refs/remotes/origin/$base").setCreateBranch(true).call()
+            }
+            // Merge head into base
+            val headRef = git.repository.resolve("refs/remotes/origin/$head")
+                ?: error("Cannot resolve remote branch $head in ${repository.remote}")
+            val mergeResult = git.merge()
+                .include(headRef)
+                .setMessage("Merge $head into $base")
+                .call()
+            if (!mergeResult.mergeStatus.isSuccessful) {
+                throw GitRepositoryMergeException(repository.remote, head, base, mergeResult.mergeStatus.name)
+            }
+            // Push base to remote
+            git.push()
+                .setRemote("origin")
+                .add("refs/heads/$base")
+                .invoke("Pushing $base to ${repository.remote}")
+            // Return the merge commit
+            val revCommit = RevWalk(git.repository).parseCommit(mergeResult.newHead)
+            return toCommit(revCommit)
+        } catch (e: GitAPIException) {
+            throw GitRepositoryAPIException(repository.remote, e)
+        } catch (e: IOException) {
+            throw GitRepositoryIOException(repository.remote, e)
+        } finally {
+            directoryLock.unlock()
+        }
+    }
+
+    companion object {
+        private val directoryLocks = ConcurrentHashMap<String, ReentrantLock>()
+
+        private fun getDirectoryLock(path: String): ReentrantLock =
+            directoryLocks.computeIfAbsent(path) { ReentrantLock() }
     }
 
     private fun range(from: String, to: String, reorder: Boolean = true): GitRange {

@@ -331,6 +331,16 @@ interface OntrackGitHubClient {
      */
     fun forAllCommits(repository: String, code: (commit: GitHubCommit) -> Unit)
 
+    /**
+     * Merges [head] branch into [base] branch using the GitHub Merges API.
+     *
+     * @param repository Repository name, like `nemerosa/ontrack`
+     * @param head Source branch (merge FROM, e.g. the upgrade branch)
+     * @param base Target branch (merge INTO, e.g. `main`)
+     * @return The resulting merge commit, or null if already up-to-date (nothing to merge)
+     */
+    fun mergeBranch(repository: String, head: String, base: String): GitHubCommit?
+
     companion object {
         const val PROPERTY_GITHUB_CLIENT_TYPE = "ontrack.extension.github.client.type"
         const val PROPERTY_GITHUB_CLIENT_TYPE_DEFAULT = "default"

@@ -6,7 +6,8 @@ import net.nemerosa.ontrack.extension.av.event.AutoVersioningEvents.AUTO_VERSION
 import net.nemerosa.ontrack.extension.av.event.AutoVersioningEvents.AUTO_VERSIONING_PR_MERGE_TIMEOUT_ERROR
 import net.nemerosa.ontrack.extension.av.event.AutoVersioningEvents.AUTO_VERSIONING_SUCCESS
 import net.nemerosa.ontrack.extension.scm.service.SCMPullRequest
-import net.nemerosa.ontrack.model.events.*
+import net.nemerosa.ontrack.model.events.EventFactory
+import net.nemerosa.ontrack.model.events.EventPostService
 import net.nemerosa.ontrack.model.support.StartupService
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Propagation
@@ -40,6 +41,17 @@ class AutoVersioningEventServiceImpl(
     override fun sendSuccess(order: AutoVersioningOrder, message: String, pr: SCMPullRequest) {
         eventPostService.post(
             autoVersioningEventsFactory.success(order, message, pr)
+        )
+    }
+
+    override fun sendSuccessPush(
+        order: AutoVersioningOrder,
+        message: String,
+        commit: String,
+        commitLink: String,
+    ) {
+        eventPostService.post(
+            autoVersioningEventsFactory.success(order, message, commit = commit, commitLink = commitLink)
         )
     }
 

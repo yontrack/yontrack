@@ -101,7 +101,7 @@ class AutoVersioningAuditStoreImpl(
                 POST_PROCESSING, POST_PROCESSING_CONFIG, VALIDATION_STAMP,
                 MOST_RECENT_STATE, RUNNING, STATES, ROUTING, QUEUE,
                 REVIEWERS, PR_TITLE_TEMPLATE, PR_BODY_TEMPLATE, PR_BODY_TEMPLATE_FORMAT,
-                ADDITIONAL_PATHS, SCHEDULE
+                ADDITIONAL_PATHS, SCHEDULE, PUSH_MODE
             ) VALUES (
                 :uuid, :timestamp, :branchId,
                 :sourceProject, :sourceBuildId, :sourcePromotionRunId, :sourcePromotion, :sourceBackValidation, :qualifier,
@@ -110,7 +110,7 @@ class AutoVersioningAuditStoreImpl(
                 :postProcessing, CAST(:postProcessingConfig as JSONB), :validationStamp,
                 :mostRecentState, :running, CAST(:states as JSONB), :routing, :queue,
                 :reviewers, :prTitleTemplate, :prBodyTemplate, :prBodyTemplateFormat,
-                CAST(:additionalPaths as JSONB), :schedule
+                CAST(:additionalPaths as JSONB), :schedule, :pushMode
             )
         """.trimIndent()
 
@@ -148,6 +148,7 @@ class AutoVersioningAuditStoreImpl(
             "prBodyTemplateFormat" to entry.order.prBodyTemplateFormat,
             "additionalPaths" to additionalPathsJson,
             "schedule" to dateTimeForDB(entry.order.schedule),
+            "pushMode" to entry.order.pushMode.name,
         )
 
         namedParameterJdbcTemplate!!.update(sql, params)

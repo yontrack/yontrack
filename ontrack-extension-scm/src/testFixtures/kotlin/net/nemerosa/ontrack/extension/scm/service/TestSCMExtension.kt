@@ -1,6 +1,7 @@
 package net.nemerosa.ontrack.extension.scm.service
 
 import net.nemerosa.ontrack.extension.scm.SCMExtensionFeature
+import net.nemerosa.ontrack.extension.scm.changelog.SCMCommit
 import net.nemerosa.ontrack.extension.support.AbstractExtension
 import net.nemerosa.ontrack.model.structure.Branch
 import net.nemerosa.ontrack.model.structure.Project
@@ -109,6 +110,13 @@ class TestSCMExtension(
         }
 
         override fun getBranchesForCommit(project: Project, commit: String): List<String> {
+            TODO("Not yet implemented")
+        }
+
+        override fun mergeBranch(
+            head: String,
+            base: String
+        ): SCMCommit {
             TODO("Not yet implemented")
         }
     }
