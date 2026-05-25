@@ -223,6 +223,65 @@ class BitbucketServerSCMExtensionRealIT : AbstractBitbucketTestSupport() {
         }
     }
 
+    @Test
+    fun `mergeBranch merges a branch into a base branch`() {
+        withScm { scm, _, _ ->
+            val commonName = uid("merge-")
+            val baseBranch = "base/$commonName"
+            val headBranch = "head/$commonName"
+            val fileName = uid("file_") + ".txt"
+            val marker = uid("content_")
+
+            scm.createBranch(bitbucketServerEnv.defaultBranch, baseBranch)
+            scm.createBranch(baseBranch, headBranch)
+            try {
+                // Upload a new file on headBranch so it diverges from baseBranch
+                scm.upload(
+                    scmBranch = headBranch,
+                    commit = "",
+                    path = fileName,
+                    content = marker.encodeToByteArray(),
+                    message = "Test merge commit $marker",
+                )
+
+                val commit = scm.mergeBranch(head = headBranch, base = baseBranch)
+
+                assertTrue(commit.id.isNotBlank(), "Merge commit SHA must not be blank")
+                assertTrue(commit.shortId.isNotBlank(), "Merge commit short SHA must not be blank")
+                assertTrue(commit.author.isNotBlank(), "Merge commit author must not be blank")
+                assertTrue(commit.message.isNotBlank(), "Merge commit message must not be blank")
+                assertTrue(commit.link.isNotBlank(), "Merge commit link must not be blank")
+
+                // Verify the merged content is visible on baseBranch
+                val content = scm.download(scmBranch = baseBranch, path = fileName)
+                assertNotNull(content, "File must be present on base branch after merge") {
+                    assertEquals(marker, it.decodeToString())
+                }
+            } finally {
+                scm.deleteBranch(headBranch)
+                scm.deleteBranch(baseBranch)
+            }
+        }
+    }
+
+    @Test
+    fun `mergeBranch returns current HEAD when already up-to-date`() {
+        withScm { scm, _, _ ->
+            val testBranch = uid("up-to-date/")
+            scm.createBranch(bitbucketServerEnv.defaultBranch, testBranch)
+            try {
+                // No new commits on testBranch — merging back into defaultBranch is a no-op
+                val commit = scm.mergeBranch(head = testBranch, base = bitbucketServerEnv.defaultBranch)
+
+                assertTrue(commit.id.isNotBlank(), "Commit SHA must not be blank")
+                assertTrue(commit.shortId.isNotBlank(), "Commit short SHA must not be blank")
+                assertTrue(commit.author.isNotBlank(), "Commit author must not be blank")
+            } finally {
+                scm.deleteBranch(testBranch)
+            }
+        }
+    }
+
     private fun withPR(
         autoApproval: Boolean,
         remoteAutoMerge: Boolean = false,

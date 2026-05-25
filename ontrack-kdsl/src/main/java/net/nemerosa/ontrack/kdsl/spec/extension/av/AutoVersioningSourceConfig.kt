@@ -27,4 +27,5 @@ data class AutoVersioningSourceConfig(
     val prBodyTemplateFormat: String? = null,
     val additionalPaths: List<AutoVersioningSourceConfigPath>? = null,
     val cronSchedule: String? = null,
+    val pushMode: AutoVersioningPushMode? = null,
 )

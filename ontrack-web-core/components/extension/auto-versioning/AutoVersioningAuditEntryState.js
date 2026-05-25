@@ -12,6 +12,7 @@ import {
     FaThumbsUp,
     FaTimes,
     FaTimesCircle,
+    FaUpload,
     FaWindowClose
 } from "react-icons/fa";
 
@@ -114,6 +115,18 @@ const statuses = {
         tooltip: "PR is being created",
         icon: <FaCodeBranch/>,
         text: "Creating PR",
+    },
+    PUSHING: {
+        type: 'secondary',
+        tooltip: "Pushing changes directly to the target branch",
+        icon: <FaUpload/>,
+        text: "Pushing",
+    },
+    PUSHED: {
+        type: 'success',
+        tooltip: "Changes pushed directly to the target branch",
+        icon: <FaCheck/>,
+        text: "Pushed",
     },
     SCHEDULED: {
         type: 'secondary',

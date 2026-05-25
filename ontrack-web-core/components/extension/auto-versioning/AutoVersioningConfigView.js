@@ -84,6 +84,7 @@ export default function AutoVersioningConfigView({branchId}) {
                                     }
                                     cronSchedule
                                     disabled
+                                    pushMode
                                 }
                             }
                         }

@@ -305,6 +305,21 @@ class MockSCMExtension(
         fun getCommit(id: String): SCMCommit? =
             branches.flatMap { it.commits }.find { it.id == id }
 
+        fun mergeBranch(head: String, base: String): SCMCommit {
+            // Copy all files from the head branch into the base branch
+            files[head]?.forEach { (path, content) ->
+                registerFile(base, path, content)
+            }
+            // Register a merge commit on the base branch and return it
+            val commitId = registerCommit(base, "Merge $head into $base")
+            return getCommit(commitId) ?: MockCommit(
+                repository = name,
+                revision = 0L,
+                id = commitId,
+                message = "Merge $head into $base",
+            )
+        }
+
         fun getBranchesForCommit(commit: String): List<String> =
             branches.filter { branch ->
                 branch.commits.any { it.id == commit }
@@ -427,9 +442,7 @@ class MockSCMExtension(
         override fun mergeBranch(
             head: String,
             base: String
-        ): SCMCommit {
-            TODO("Not yet implemented")
-        }
+        ): SCMCommit = repository(mockScmProjectProperty.name).mergeBranch(head, base)
 
         override fun forAllCommits(
             project: Project,

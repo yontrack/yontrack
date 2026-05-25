@@ -302,6 +302,8 @@ type AutoVersioningSourceConfig {
   prBodyTemplateFormat: String
   "Template for the title of the pull request (optional)"
   prTitleTemplate: String
+  "Push mode"
+  pushMode: AutoVersioningPushMode
   "Qualifier for the build link to create (when links are created)"
   qualifier: String
   "List of reviewers to always set on the pull request created by the auto versioning"
@@ -1276,6 +1278,12 @@ type DeleteBuildGitCommitPropertyByIdPayload implements Payload {
 type DeleteBuildGitCommitPropertyPayload implements Payload {
   "Build updated"
   build: Build
+  "List of errors"
+  errors: [UserError]
+}
+
+"Output type for the deleteBuildLinks mutation."
+type DeleteBuildLinksPayload implements Payload {
   "List of errors"
   errors: [UserError]
 }
@@ -3386,6 +3394,11 @@ type Mutation {
     "Input for the mutation"
     input: DeleteBuildGitCommitPropertyByIdInput
   ): DeleteBuildGitCommitPropertyByIdPayload
+  "Deletes build links from a build, optionally filtered by target project and/or qualifier"
+  deleteBuildLinks(
+    "Input for the mutation"
+    input: DeleteBuildLinksInput
+  ): DeleteBuildLinksPayload
   "Deletes the message property on a build identified by name."
   deleteBuildMessageProperty(
     "Input for the mutation"
@@ -8173,6 +8186,8 @@ enum AutoVersioningAuditState {
   PR_CREATING
   PR_MERGED
   PR_TIMEOUT
+  PUSHED
+  PUSHING
   RECEIVED
   SCHEDULED
   THROTTLED
@@ -8190,6 +8205,12 @@ enum AutoVersioningNotificationScope {
   ERROR
   PR_TIMEOUT
   SUCCESS
+}
+
+"Way the auto-versioning update is pushed to the target branch."
+enum AutoVersioningPushMode {
+  PR
+  PUSH
 }
 
 "CHML values"
@@ -8487,6 +8508,8 @@ input AutoVersioningSourceConfigInput {
   prBodyTemplateFormat: String
   "Template for the title of the pull request (optional)"
   prTitleTemplate: String
+  "Push mode"
+  pushMode: AutoVersioningPushMode
   "Qualifier for the build link to create (when links are created)"
   qualifier: String
   "List of reviewers to always set on the pull request created by the auto versioning"
@@ -9106,6 +9129,16 @@ input DeleteBuildGitCommitPropertyInput {
   build: String!
   "Project name"
   project: String!
+}
+
+"Input type for the deleteBuildLinks mutation."
+input DeleteBuildLinksInput {
+  "ID of the build from which links must be deleted"
+  fromBuild: Int!
+  "Name of the target project ? if null, links to all projects are deleted"
+  project: String
+  "Qualifier to match ? if null, links with any qualifier are deleted"
+  qualifier: String
 }
 
 "Input type for the deleteBuildMessagePropertyById mutation."

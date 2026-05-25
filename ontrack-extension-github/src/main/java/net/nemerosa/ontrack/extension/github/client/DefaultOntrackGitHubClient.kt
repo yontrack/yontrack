@@ -817,16 +817,14 @@ class DefaultOntrackGitHubClient(
     override fun mergeBranch(repository: String, head: String, base: String): GitHubCommit? {
         val client = createGitHubRestTemplate()
         val (owner, name) = getRepositoryParts(repository)
-        return client("Merging branch $head into $base") {
-            postForObject(
-                "/repos/$owner/$name/merges",
-                mapOf(
-                    "base" to base,
-                    "head" to head,
-                ),
-                GitHubCommit::class.java,
-            )
-        }
+        return client.postForObject(
+            "/repos/$owner/$name/merges",
+            mapOf(
+                "base" to base,
+                "head" to head,
+            ),
+            GitHubCommit::class.java,
+        )
     }
 
     override fun compareCommits(repository: String, base: String, head: String): List<GitHubCommit> {

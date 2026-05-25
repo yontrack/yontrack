@@ -3,6 +3,7 @@ import AutoVersioningPostProcessing from "@components/extension/auto-versioning/
 import AutoVersioningConfigNotifications from "@components/extension/auto-versioning/AutoVersioningConfigNotifications";
 import AutoVersioningAdditionalPaths from "@components/extension/auto-versioning/AutoVersioningAdditionalPaths";
 import AutoVersioningSchedule from "@components/extension/auto-versioning/AutoVersioningSchedule";
+import AutoVersioningPushMode from "@components/extension/auto-versioning/AutoVersioningPushMode";
 
 export default function AutoVersioningConfigDetails({source, additionalItems = [], size}) {
 
@@ -111,6 +112,12 @@ export default function AutoVersioningConfigDetails({source, additionalItems = [
                 }
             </>,
             span: 8,
+        },
+        {
+            key: 'pushMode',
+            label: 'Push mode',
+            children: source.pushMode && <AutoVersioningPushMode pushMode={source.pushMode}/>,
+            span: 4,
         },
         {
             key: 'postProcessing',

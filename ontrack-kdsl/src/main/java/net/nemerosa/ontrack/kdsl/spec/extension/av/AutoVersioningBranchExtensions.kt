@@ -72,6 +72,13 @@ fun Branch.setAutoVersioningConfig(
                         }
                     ),
                     cronSchedule = Optional.presentIfNotNull(config.cronSchedule),
+                    pushMode = Optional.presentIfNotNull(
+                        config.pushMode?.let {
+                            net.nemerosa.ontrack.kdsl.connector.graphql.schema.type.AutoVersioningPushMode.valueOf(
+                                it.name
+                            )
+                        }
+                    ),
                 )
             }
         )
