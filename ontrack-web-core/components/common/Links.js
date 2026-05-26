@@ -21,6 +21,10 @@ export function branchPromotionLevelsUri(branch) {
     return `/branch/${branch.id}/promotionLevels`
 }
 
+export function branchValidationStampsUri(branch) {
+    return `/branch/${branch.id}/validationStamps`
+}
+
 export function branchAutoVersioningUri(branch) {
     return `/extension/auto-versioning/config/${branch.id}`
 }

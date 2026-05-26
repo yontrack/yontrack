@@ -14,8 +14,8 @@ import DisableBranchCommand from "@components/branches/DisableBranchCommand";
 import {isAuthorized} from "@components/common/authorizations";
 import BranchDeleteCommand from "@components/branches/BranchDeleteCommand";
 import {CloseCommand, Command} from "@components/common/Commands";
-import {FaMedal, FaProjectDiagram} from "react-icons/fa";
-import {branchLinksUri, branchPromotionLevelsUri, projectUri} from "@components/common/Links";
+import {FaMedal, FaProjectDiagram, FaStamp} from "react-icons/fa";
+import {branchLinksUri, branchPromotionLevelsUri, branchValidationStampsUri, projectUri} from "@components/common/Links";
 import UserMenuActions from "@components/entities/UserMenuActions";
 import JumpToBranch from "@components/branches/JumpToBranch";
 import LoadingContainer from "@components/common/LoadingContainer";
@@ -97,6 +97,13 @@ export default function BranchView({id}) {
                     href={branchPromotionLevelsUri(branch)}
                     text="Promotions"
                     title="Management of the promotion levels for this branch"
+                />,
+                <Command
+                    key="validationStamps"
+                    icon={<FaStamp/>}
+                    href={branchValidationStampsUri(branch)}
+                    text="Validations"
+                    title="Management of the validation stamps for this branch"
                 />,
                 <UserMenuActions key="userMenuActions" actions={branch.userMenuActions}/>,
                 <JumpToBranch key="branch" projectName={branch.project.name}/>,
