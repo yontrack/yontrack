@@ -5,6 +5,7 @@ import AutoVersioningConfigDetails from "@components/extension/auto-versioning/A
 import {isAuthorized} from "@components/common/authorizations";
 import InlineConfirmCommand from "@components/common/InlineConfirmCommand";
 import {useEffect, useState} from "react";
+import FieldLabel from "@components/extension/auto-versioning/AutoVersioningFieldLabel";
 
 const {Column} = Table
 
@@ -39,7 +40,7 @@ export default function AutoVersioningConfig({branch, config, onDeleteConfig}) {
 
                     <Column
                         key="sourceProject"
-                        title="Project"
+                        title={<FieldLabel fieldName="sourceProject" description="Project to watch"/>}
                         render={(_, source) => (
                             <>
                                 <ProjectLinkByName name={source.sourceProject}/>
@@ -49,7 +50,8 @@ export default function AutoVersioningConfig({branch, config, onDeleteConfig}) {
 
                     <Column
                         key="sourceBranch"
-                        title="Branch"
+                        title={<FieldLabel fieldName="sourceBranch"
+                                           description="Branches to watch using a regular expression"/>}
                         render={(_, source) => (
                             <>
                                 <Typography.Text code>{source.sourceBranch}</Typography.Text>
@@ -59,7 +61,7 @@ export default function AutoVersioningConfig({branch, config, onDeleteConfig}) {
 
                     <Column
                         key="sourcePromotion"
-                        title="Promotion"
+                        title={<FieldLabel fieldName="sourcePromotion" description="Promotion to watch"/>}
                         render={(_, source) => (
                             <>
                                 <Typography.Text code>{source.sourcePromotion}</Typography.Text>
@@ -69,7 +71,8 @@ export default function AutoVersioningConfig({branch, config, onDeleteConfig}) {
 
                     <Column
                         key="approval"
-                        title="Approval"
+                        title={<FieldLabel fieldName="autoApproval / autoApprovalMode"
+                                           description="Auto-approval and approval mode"/>}
                         render={(_, source) =>
                             <>
                                 <AutoVersioningApproval
@@ -82,7 +85,8 @@ export default function AutoVersioningConfig({branch, config, onDeleteConfig}) {
 
                     <Column
                         key="targetPath"
-                        title="Target path"
+                        title={<FieldLabel fieldName="targetPath"
+                                           description="Comma-separated list of files to update with the new version"/>}
                         render={(_, source) =>
                             <>
                                 <Typography.Text code>{source.targetPath}</Typography.Text>
