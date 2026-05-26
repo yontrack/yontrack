@@ -3929,6 +3929,11 @@ type Mutation {
     "Input for the mutation"
     input: ReorderPromotionLevelByIdInput
   ): ReorderPromotionLevelByIdPayload
+  "Reordering the validation stamps in a branch"
+  reorderValidationStampById(
+    "Input for the mutation"
+    input: ReorderValidationStampByIdInput
+  ): ReorderValidationStampByIdPayload
   "Rescheduling an auto-versioning order"
   rescheduleAutoVersioning(
     "Input for the mutation"
@@ -5983,6 +5988,12 @@ type ReorderPredefinedPromotionLevelByIdPayload implements Payload {
 
 "Output type for the reorderPromotionLevelById mutation."
 type ReorderPromotionLevelByIdPayload implements Payload {
+  "List of errors"
+  errors: [UserError]
+}
+
+"Output type for the reorderValidationStampById mutation."
+type ReorderValidationStampByIdPayload implements Payload {
   "List of errors"
   errors: [UserError]
 }
@@ -10141,6 +10152,16 @@ input ReorderPredefinedPromotionLevelByIdInput {
 
 "Input type for the reorderPromotionLevelById mutation."
 input ReorderPromotionLevelByIdInput {
+  "Branch ID"
+  branchId: Int!
+  "New name to swap"
+  newName: String!
+  "Old name to swap"
+  oldName: String!
+}
+
+"Input type for the reorderValidationStampById mutation."
+input ReorderValidationStampByIdInput {
   "Branch ID"
   branchId: Int!
   "New name to swap"

@@ -83,6 +83,25 @@ class ValidationStampMutations(
             ) { input ->
                 structureService.bulkUpdateValidationStamps(ID.of(input.id))
             },
+            /**
+             * Reordering validation stamps
+             */
+            unitMutation<ReorderValidationStampByIdInput>(
+                name = "reorderValidationStampById",
+                description = "Reordering the validation stamps in a branch"
+            ) { input ->
+                val branchId = ID.of(input.branchId)
+                val list = structureService.getValidationStampListForBranch(branchId).toMutableList()
+                val oldIndex = list.indexOfFirst { it.name == input.oldName }
+                val newIndex = list.indexOfFirst { it.name == input.newName }
+                if (oldIndex >= 0 && newIndex >= 0 && oldIndex != newIndex) {
+                    val oldItem = list[oldIndex]
+                    list[oldIndex] = list[newIndex]
+                    list[newIndex] = oldItem
+                    val ids = list.map { it.id() }
+                    structureService.reorderValidationStamps(branchId, Reordering(ids))
+                }
+            },
         )
 
     private fun setupValidationStamp(input: SetupValidationStampInput): ValidationStamp {
@@ -224,4 +243,13 @@ data class DeleteValidationStampByIdInput(
 data class BulkUpdateValidationStampByIdInput(
     @APIDescription("Validation stamp ID")
     val id: Int,
+)
+
+data class ReorderValidationStampByIdInput(
+    @APIDescription("Branch ID")
+    val branchId: Int,
+    @APIDescription("Old name to swap")
+    val oldName: String,
+    @APIDescription("New name to swap")
+    val newName: String,
 )
