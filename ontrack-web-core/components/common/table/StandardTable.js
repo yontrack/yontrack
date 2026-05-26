@@ -47,6 +47,7 @@ export default function StandardTable({
                                           filterForm = [],
                                           filterExtraButtons = [],
                                           autoRefresh = false,
+                                          scroll,
                                       }) {
 
     const [localReloadCount, localReload] = useRefresh()
@@ -130,6 +131,7 @@ export default function StandardTable({
                         onChange={onTableChange}
                         rowKey={rowKey}
                         size={tableSize}
+                        scroll={scroll}
                         footer={() =>
                             <Space>
                                 <TablePaginationFooter

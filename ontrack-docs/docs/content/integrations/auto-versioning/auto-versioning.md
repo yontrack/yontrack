@@ -580,6 +580,13 @@ You can click on the ID to get more details about the auto-versioning process. T
 * the history of the states of the process
 * all details stored in the auto-versioning order
 
+### Column visibility
+
+The audit table can be wide. You can use the **Columns** button in the filter bar to show or hide individual columns.
+Your selection is saved in the browser's local storage and restored on your next visit.
+
+The table also supports horizontal scrolling when not all columns fit on screen.
+
 ### Audit cleanup
 
 To avoid accumulating audit log entries forever, a cleanup job is run every day to remove obsolete entries.

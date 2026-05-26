@@ -71,6 +71,17 @@ export function setLocallySelectedValidationStampFilter(branchId, validationStam
     }
 }
 
+const avAuditColumnVisibility = 'av_audit_column_visibility'
+
+export function getAutoVersioningAuditColumnVisibility() {
+    const json = localStorage.getItem(avAuditColumnVisibility)
+    return json ? JSON.parse(json) : null
+}
+
+export function setAutoVersioningAuditColumnVisibility(visible) {
+    localStorage.setItem(avAuditColumnVisibility, JSON.stringify(visible))
+}
+
 export const useLocalWorkflowShowDetails = () => {
     const localStorageKey = 'workflow-show-details'
     const initialValue = localStorage.getItem(localStorageKey);
