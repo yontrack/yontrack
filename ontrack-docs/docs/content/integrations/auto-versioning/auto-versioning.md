@@ -445,6 +445,35 @@ As of now, only two post-processing mechanisms are supported:
 * [Jenkins pipeline](jenkins.md)
 * [GitHub Actions workflow](github.md)
 
+## Push mode
+
+The `pushMode` [configuration parameter](#configuration) controls how Yontrack pushes version changes
+to the target branch. Two modes are available:
+
+`PR` _(default)_
+
+:   Yontrack creates a dedicated upgrade branch, applies the version change (and any post-processing),
+    then opens a **pull request** against the target branch. The pull request lifecycle is then governed
+    by the [`autoApproval` and `autoApprovalMode`](#pull-requests) settings.
+
+`PUSH`
+
+:   Yontrack applies the version change directly on the target branch, committing and pushing the
+    change without creating a pull request. [Post-processing](#post-processing) (if configured) still
+    runs before the merge. No approval flow is involved.
+
+:   !!! warning "No target-side validation"
+
+        Because no pull request is created, any workflow or pipeline that would normally run against
+        a PR (e.g. CI checks, required status checks) will **not** run before the change lands on the
+        target branch. Use this mode only when the target branch does not require gated validation of
+        incoming changes.
+
+!!! note
+
+    When `pushMode` is set to `PUSH`, the `autoApproval`, `autoApprovalMode`, `prTitleTemplate`,
+    `prBodyTemplate`, `prBodyTemplateFormat`, and `reviewers` parameters have no effect.
+
 ## Pull requests
 
 After a branch is created to hold the new version, after this branch has been optionally post-processed, Yontrack will
@@ -538,7 +567,8 @@ Each log entry contains the following information:
 * version being updated
 * the [schedule](#scheduling) if set
 * [post-processing](#post-processing) ID if any
-* [auto approval mode](#pull-requests) if any
+* [push mode](#push-mode) (`PR` or `PUSH`)
+* [auto approval mode](#pull-requests) if any (only relevant in `PR` push mode)
 * running flag - is the auto-versioning process still running?
 * current state of the auto-versioning process
 * link to the PR if any
