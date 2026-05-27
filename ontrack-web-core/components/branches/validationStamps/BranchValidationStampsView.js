@@ -14,6 +14,8 @@ import {EventsContext, useEventForRefresh} from "@components/common/EventsContex
 import ValidationDataType from "@components/framework/validation-data-type/ValidationDataType";
 import {useMutation, useQuery} from "@components/services/GraphQL";
 import SortableList, {SortableItem, SortableKnob} from "react-easy-sort";
+import ConfirmCommand from "@components/common/ConfirmCommand";
+import {FaTrash} from "react-icons/fa";
 
 export default function BranchValidationStampsView({id}) {
 
@@ -24,6 +26,7 @@ export default function BranchValidationStampsView({id}) {
 
     const refreshCreationCount = useEventForRefresh("validationStamp.created")
     const refreshReorderCount = useEventForRefresh("validationStamp.reordered")
+    const refreshDeleteCount = useEventForRefresh("validationStamp.deleted")
 
     const {data: branch, loading} = useQuery(
         gql`
@@ -52,13 +55,18 @@ export default function BranchValidationStampsView({id}) {
                             }
                             config
                         }
+                        authorizations {
+                            name
+                            action
+                            authorized
+                        }
                     }
                 }
             }
         `,
         {
             variables: {id: Number(id)},
-            deps: [refreshCreationCount, refreshReorderCount],
+            deps: [refreshCreationCount, refreshReorderCount, refreshDeleteCount],
             initialData: null,
             dataFn: data => data.branch,
         }
@@ -158,6 +166,26 @@ export default function BranchValidationStampsView({id}) {
                                                 </div>
                                             }
                                         />
+                                        {isAuthorized(vs, 'validation_stamp', 'delete') && (
+                                            <ConfirmCommand
+                                                icon={<FaTrash/>}
+                                                text="Delete"
+                                                confirmTitle={`Delete "${vs.name}"?`}
+                                                confirmText="All data associated with this validation stamp will be permanently deleted."
+                                                confirmOkText="Delete"
+                                                confirmOkType="danger"
+                                                gqlQuery={gql`
+                                                    mutation DeleteValidationStamp($id: Int!) {
+                                                        deleteValidationStampById(input: {id: $id}) {
+                                                            errors { message }
+                                                        }
+                                                    }
+                                                `}
+                                                gqlVariables={{id: Number(vs.id)}}
+                                                gqlUserNode="deleteValidationStampById"
+                                                onSuccess={() => eventsContext.fireEvent("validationStamp.deleted")}
+                                            />
+                                        )}
                                     </List.Item>
                                 </SortableItem>
                             )}
