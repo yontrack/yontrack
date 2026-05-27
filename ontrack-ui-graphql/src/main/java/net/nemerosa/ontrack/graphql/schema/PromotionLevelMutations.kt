@@ -106,9 +106,8 @@ class PromotionLevelMutations(
                 val newIndex = list.indexOfFirst { it.name == input.newName }
                 // If indexes are equal of not valid, skip
                 if (oldIndex >= 0 && newIndex >= 0 && oldIndex != newIndex) {
-                    val oldItem = list[oldIndex]
-                    list[oldIndex] = list[newIndex]
-                    list[newIndex] = oldItem
+                    val item = list.removeAt(oldIndex)
+                    list.add(newIndex, item)
                     // Collecting the IDs
                     val ids = list.map { it.id() }
                     structureService.reorderPromotionLevels(

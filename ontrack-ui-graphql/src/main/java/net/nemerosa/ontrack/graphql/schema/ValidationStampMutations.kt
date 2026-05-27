@@ -95,9 +95,8 @@ class ValidationStampMutations(
                 val oldIndex = list.indexOfFirst { it.name == input.oldName }
                 val newIndex = list.indexOfFirst { it.name == input.newName }
                 if (oldIndex >= 0 && newIndex >= 0 && oldIndex != newIndex) {
-                    val oldItem = list[oldIndex]
-                    list[oldIndex] = list[newIndex]
-                    list[newIndex] = oldItem
+                    val item = list.removeAt(oldIndex)
+                    list.add(newIndex, item)
                     val ids = list.map { it.id() }
                     structureService.reorderValidationStamps(branchId, Reordering(ids))
                 }

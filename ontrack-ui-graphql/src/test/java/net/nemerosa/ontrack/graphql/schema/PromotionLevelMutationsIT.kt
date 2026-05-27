@@ -76,7 +76,7 @@ class PromotionLevelMutationsIT : AbstractQLKTITSupport() {
     }
 
     @Test
-    fun `Reordering the promotion levels`() {
+    fun `Moving promotion levels preserves insertion order`() {
         asAdmin {
             project {
                 branch {
@@ -85,7 +85,7 @@ class PromotionLevelMutationsIT : AbstractQLKTITSupport() {
                     promotionLevel("SILVER")
                     promotionLevel("BRONZE")
 
-                    fun swap(oldName: String, newName: String) {
+                    fun move(oldName: String, newName: String) {
                         run(
                             """
                             mutation {
@@ -105,24 +105,26 @@ class PromotionLevelMutationsIT : AbstractQLKTITSupport() {
                         }
                     }
 
-                    swap("BRONZE", "PLATINUM")
+                    // Drag BRONZE (index 3) to index 0: [BRONZE, PLATINUM, GOLD, SILVER]
+                    move("BRONZE", "PLATINUM")
                     assertEquals(
                         listOf(
                             "BRONZE",
+                            "PLATINUM",
                             "GOLD",
                             "SILVER",
-                            "PLATINUM",
                         ),
                         structureService.getPromotionLevelListForBranch(id).map { it.name }
                     )
 
-                    swap("GOLD", "SILVER")
+                    // Drag PLATINUM (index 1) to index 2: [BRONZE, GOLD, PLATINUM, SILVER]
+                    move("PLATINUM", "GOLD")
                     assertEquals(
                         listOf(
                             "BRONZE",
-                            "SILVER",
                             "GOLD",
                             "PLATINUM",
+                            "SILVER",
                         ),
                         structureService.getPromotionLevelListForBranch(id).map { it.name }
                     )
