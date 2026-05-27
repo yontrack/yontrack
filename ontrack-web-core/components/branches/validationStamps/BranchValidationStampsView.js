@@ -3,7 +3,7 @@ import Head from "next/head";
 import {subBranchTitle} from "@components/common/Titles";
 import {downToBranchBreadcrumbs} from "@components/common/Breadcrumbs";
 import MainPage from "@components/layouts/MainPage";
-import {List, Skeleton, Space, Typography} from "antd";
+import {Input, List, Skeleton, Space, Typography} from "antd";
 import {gql} from "graphql-request";
 import {CloseCommand} from "@components/common/Commands";
 import {branchUri} from "@components/common/Links";
@@ -22,6 +22,7 @@ export default function BranchValidationStampsView({id}) {
     const eventsContext = useContext(EventsContext)
 
     const [commands, setCommands] = useState([])
+    const [filterText, setFilterText] = useState('')
 
     const refreshCreationCount = useEventForRefresh("validationStamp.created")
     const refreshReorderCount = useEventForRefresh("validationStamp.reordered")
@@ -111,6 +112,10 @@ export default function BranchValidationStampsView({id}) {
         })
     }
 
+    const filteredStamps = (branch?.validationStamps ?? []).filter(vs =>
+        !filterText || vs.name.toLowerCase().includes(filterText.toLowerCase())
+    )
+
     return (
         <>
             <Head>
@@ -122,10 +127,18 @@ export default function BranchValidationStampsView({id}) {
                     breadcrumbs={branch ? downToBranchBreadcrumbs({branch}) : []}
                     commands={commands}
                 >
-                    <SortableList onSortEnd={onSortEnd} handle=".drag-handle">
+                    <Input.Search
+                        placeholder="Filter by name"
+                        allowClear
+                        value={filterText}
+                        onChange={e => setFilterText(e.target.value)}
+                        onSearch={value => setFilterText(value)}
+                        style={{marginBottom: 16, maxWidth: 320}}
+                    />
+                    <SortableList onSortEnd={onSortEnd} handle=".drag-handle" allowDrag={!filterText}>
                         <List
                             itemLayout="horizontal"
-                            dataSource={branch?.validationStamps ?? []}
+                            dataSource={filteredStamps}
                             renderItem={(vs, index) => (
                                 <SortableItem key={vs.id} index={index}>
                                     <List.Item className="no-select">
