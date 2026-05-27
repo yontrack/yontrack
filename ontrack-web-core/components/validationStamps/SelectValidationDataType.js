@@ -3,7 +3,7 @@ import {useGraphQLClient} from "@components/providers/ConnectionContextProvider"
 import {gql} from "graphql-request";
 import {Select} from "antd";
 
-export default function SelectValidationDataType({value, onChange, onValidationDataTypeSelected}) {
+export default function SelectValidationDataType({value, onChange, onValidationDataTypeSelected, allowClear = false}) {
 
     const client = useGraphQLClient()
 
@@ -44,6 +44,7 @@ export default function SelectValidationDataType({value, onChange, onValidationD
                 loading={loading}
                 value={value}
                 onChange={onLocalChange}
+                allowClear={allowClear}
             />
         </>
     )

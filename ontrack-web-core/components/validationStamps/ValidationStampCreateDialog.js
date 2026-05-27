@@ -1,19 +1,28 @@
 import FormDialog, {useFormDialog} from "@components/form/FormDialog";
 import {EventsContext} from "@components/common/EventsContext";
 import {gql} from "graphql-request";
-import {useContext} from "react";
+import {useContext, useState} from "react";
 import {Form, Input} from "antd";
+import SelectValidationDataType from "@components/validationStamps/SelectValidationDataType";
+import ValidationDataTypeForm from "@components/framework/validation-data-type-form/ValidationDataTypeForm";
+import Well from "@components/common/Well";
 
 export const useValidationStampCreateDialog = () => {
 
     const eventsContext = useContext(EventsContext)
+    const [dataTypeId, setDataTypeId] = useState()
 
     return useFormDialog({
+        dataTypeId, setDataTypeId,
+        init: () => {
+            setDataTypeId(undefined)
+        },
         prepareValues: (values, {branch}) => {
             return {
                 ...values,
                 description: values.description ?? '',
                 branchId: Number(branch.id),
+                dataTypeConfig: dataTypeId ? values.dataTypeConfig : undefined,
             }
         },
         query: gql`
@@ -21,11 +30,15 @@ export const useValidationStampCreateDialog = () => {
                 $branchId: Int!,
                 $name: String!,
                 $description: String!,
+                $dataType: String,
+                $dataTypeConfig: JSON,
             ) {
                 createValidationStampById(input: {
                     branchId: $branchId,
                     name: $name,
                     description: $description,
+                    dataType: $dataType,
+                    dataTypeConfig: $dataTypeConfig,
                 }) {
                     errors {
                         message
@@ -68,6 +81,25 @@ export default function ValidationStampCreateDialog({dialog}) {
                 >
                     <Input placeholder="Validation stamp description" allowClear/>
                 </Form.Item>
+                <Form.Item
+                    name="dataType"
+                    label="Data type"
+                >
+                    <SelectValidationDataType
+                        allowClear
+                        onValidationDataTypeSelected={id => dialog.setDataTypeId(id)}
+                    />
+                </Form.Item>
+                {dialog.dataTypeId && (
+                    <Form.Item label="Data type configuration">
+                        <Well>
+                            <ValidationDataTypeForm
+                                prefix="dataTypeConfig"
+                                dataType={{descriptor: {id: dialog.dataTypeId}, config: {}}}
+                            />
+                        </Well>
+                    </Form.Item>
+                )}
             </FormDialog>
         </>
     )
