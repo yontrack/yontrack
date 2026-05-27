@@ -50,6 +50,11 @@ class BranchAuthorizationContributor(
                     securityService.isProjectFunctionGranted<PromotionLevelCreate>(branch)
                 ),
                 Authorization(
+                    CoreAuthorizationContributor.VALIDATION_STAMP,
+                    Authorization.CREATE,
+                    securityService.isProjectFunctionGranted<ValidationStampCreate>(branch)
+                ),
+                Authorization(
                     CoreAuthorizationContributor.BUILD,
                     Authorization.CREATE,
                     securityService.isProjectFunctionGranted<BuildCreate>(branch)
