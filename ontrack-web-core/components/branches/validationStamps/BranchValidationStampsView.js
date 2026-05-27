@@ -12,13 +12,11 @@ import {isAuthorized} from "@components/common/authorizations";
 import ValidationStampCreateCommand from "@components/validationStamps/ValidationStampCreateCommand";
 import {EventsContext, useEventForRefresh} from "@components/common/EventsContext";
 import ValidationDataType from "@components/framework/validation-data-type/ValidationDataType";
-import {useQuery} from "@components/services/GraphQL";
+import {useMutation, useQuery} from "@components/services/GraphQL";
 import SortableList, {SortableItem, SortableKnob} from "react-easy-sort";
-import {useGraphQLClient} from "@components/providers/ConnectionContextProvider";
 
 export default function BranchValidationStampsView({id}) {
 
-    const client = useGraphQLClient()
     const eventsContext = useContext(EventsContext)
 
     const [commands, setCommands] = useState([])
@@ -81,34 +79,37 @@ export default function BranchValidationStampsView({id}) {
         }
     }, [branch, loading])
 
+    const {mutate: reorderMutation} = useMutation(
+        gql`
+            mutation ReorderValidationStamps(
+                $branchId: Int!,
+                $oldName: String!,
+                $newName: String!,
+            ) {
+                reorderValidationStampById(input: {
+                    branchId: $branchId,
+                    oldName: $oldName,
+                    newName: $newName,
+                }) {
+                    errors {
+                        message
+                    }
+                }
+            }
+        `,
+        {
+            userNodeName: 'reorderValidationStampById',
+            onSuccess: () => eventsContext.fireEvent("validationStamp.reordered"),
+        }
+    )
+
     const onSortEnd = (oldIndex, newIndex) => {
         const oldName = branch.validationStamps[oldIndex].name
         const newName = branch.validationStamps[newIndex].name
-        client.request(
-            gql`
-                mutation ReorderValidationStamps(
-                    $branchId: Int!,
-                    $oldName: String!,
-                    $newName: String!,
-                ) {
-                    reorderValidationStampById(input: {
-                        branchId: $branchId,
-                        oldName: $oldName,
-                        newName: $newName,
-                    }) {
-                        errors {
-                            message
-                        }
-                    }
-                }
-            `,
-            {
-                branchId: Number(branch.id),
-                oldName,
-                newName,
-            }
-        ).then(() => {
-            eventsContext.fireEvent("validationStamp.reordered")
+        reorderMutation({
+            branchId: Number(branch.id),
+            oldName,
+            newName,
         })
     }
 
