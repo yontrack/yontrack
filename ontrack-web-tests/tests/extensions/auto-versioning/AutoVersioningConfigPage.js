@@ -10,7 +10,7 @@ export class AutoVersioningConfigPage {
     }
 
     async expectOnPage() {
-        await expect(this.page.getByText("Target path")).toBeVisible()
+        await expect(this.page.getByText("targetPath")).toBeVisible()
     }
 
     async displayConfig(projectName) {
@@ -19,7 +19,7 @@ export class AutoVersioningConfigPage {
 
         const row = await table.findRow(async row => {
             const tableRow = new TableRow(this.page, table, row)
-            const cell = await tableRow.getCell("Project")
+            const cell = await tableRow.getCell("sourceProject")
             const link = cell.getByRole('link', {name: projectName, exact: true})
             return await link.isVisible()
         })

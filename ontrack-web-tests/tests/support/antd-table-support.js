@@ -34,7 +34,7 @@ export class Table {
 
     async getColumnIndex(columnName) {
         const nameColumnIndex = await this.table.locator('thead tr th').allTextContents()
-        const index = nameColumnIndex.indexOf(columnName)
+        const index = nameColumnIndex.findIndex(text => text.includes(columnName))
         if (index < 0) {
             throw Error(`Could not find column with title ${columnName}`)
         }
