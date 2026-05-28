@@ -108,7 +108,10 @@ class YontrackPromotionNotificationChannel(
         val output = YontrackPromotionNotificationChannelOutput(
             runId = run.id(),
             promotionLevelId = promotionLevel.id(),
-        )
+        ).run {
+            // Early notification of the creation of the promotion run
+            outputProgressCallback(this)
+        }
 
         return if (config.waitForPromotion) {
             // Promotion created, waiting for the promotion notifications to be completed
