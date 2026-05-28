@@ -15,20 +15,14 @@ class NotificationProcessingResultServiceImpl(
 
     override fun getActualizedResult(processingResult: NotificationProcessingResult<*>): NotificationProcessingResult<*>? {
         val recordId = processingResult.recordId
-        val record = securityService.asAdmin { notificationRecordingService.findRecordById(recordId) } ?: return null
-        val channel = notificationChannelRegistry.findChannel(record.channel) ?: return null
-        val result = channel.getNotificationResult(record) ?: return null
-        return NotificationProcessingResult(
-            recordId = recordId,
-            result = result,
-        )
+        val result = getActualizedResult(recordId) ?: return null
+        return NotificationProcessingResult(recordId = recordId, result = result)
     }
 
     override fun getActualizedResult(recordId: String): NotificationResult<*>? {
         val record = securityService.asAdmin { notificationRecordingService.findRecordById(recordId) } ?: return null
         val channel = notificationChannelRegistry.findChannel(record.channel) ?: return null
-        val result = channel.getNotificationResult(record) ?: return null
-        return result
+        return channel.getNotificationResult(record)
     }
 
 }
