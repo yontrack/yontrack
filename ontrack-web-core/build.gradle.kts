@@ -34,6 +34,8 @@ val dockerBuild by tasks.registering(Exec::class) {
     workingDir = projectDir
     commandLine("sh", "-c", """
         docker image build -t nemerosa/ontrack-ui:${project.version} . && \
-        docker image tag nemerosa/ontrack-ui:${project.version} nemerosa/ontrack-ui:latest
+        docker image tag nemerosa/ontrack-ui:${project.version} nemerosa/ontrack-ui:latest && \
+        docker image tag nemerosa/ontrack-ui:${project.version} yontrack/yontrack-ui:${project.version} && \
+        docker image tag nemerosa/ontrack-ui:${project.version} yontrack/yontrack-ui:latest
     """)
 }
