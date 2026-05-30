@@ -246,26 +246,15 @@ pipeline {
                 echo "Docker push"
                 sh '''
                     echo ${DOCKER_HUB_PSW} | docker login --username ${DOCKER_HUB_USR} --password-stdin
+                    
+                    # Legacy organization
                     docker image push nemerosa/ontrack:${VERSION}
                     docker image push nemerosa/ontrack-ui:${VERSION}
+                    
+                    # Yontrack organization
+                    docker image push yontrack/yontrack:${VERSION}
+                    docker image push yontrack/yontrack-ui:${VERSION}
                 '''
-                script {
-                    def m = env.ONTRACK_BRANCH_NAME =~ /^release-(\d+)\.\d+/
-                    if (m) {
-                        String majorVersion = m[0][1]
-                        String lastReleaseBranch = ontrackCliLastBranch(pattern: /^release-$majorVersion\.\d+/)
-                        if (lastReleaseBranch == env.ONTRACK_BRANCH_NAME) {
-                            withEnv(["MAJOR_VERSION=${majorVersion}"]) {
-                                sh '''
-                                    docker image tag nemerosa/ontrack:${VERSION} nemerosa/ontrack:${MAJOR_VERSION}
-                                    docker image tag nemerosa/ontrack-ui:${VERSION} nemerosa/ontrack-ui:${MAJOR_VERSION}
-                                    docker image push nemerosa/ontrack:${MAJOR_VERSION}
-                                    docker image push nemerosa/ontrack-ui:${MAJOR_VERSION}
-                                '''
-                            }
-                        }
-                    }
-                }
             }
             post {
                 always {
