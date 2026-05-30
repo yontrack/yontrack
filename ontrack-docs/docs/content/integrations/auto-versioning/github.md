@@ -65,7 +65,7 @@ on:
         required: true
         type: string
       repository:
-        description: "Repository to process, like 'nemerosa/ontrack'"
+        description: "Repository to process, like 'yontrack/yontrack'"
         required: true
         type: string
       upgrade_branch:

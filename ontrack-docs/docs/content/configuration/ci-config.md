@@ -191,8 +191,8 @@ configuration: { }
 The following elements will be configured automatically in Yontrack:
 
 * a [project](#project-configuration) will be created based on the detected SCM URL (for example, if the SCM URL is
-  `https://github.com/nemerosa/ontrack`, a project named `ontrack` will be created and associated with the
-  `https://github.com/nemerosa/ontrack` GitHub repository)
+  `https://github.com/yontrack/yontrack`, a project named `ontrack` will be created and associated with the
+  `https://github.com/yontrack/yontrack` GitHub repository)
 * a [branch](#branch-configuration) will be created based on the detected SCM branch (for example, if the SCM branch is
   `release/1.0`, a branch named `release-1.0` will be created and associated with the `release/1.0` SCM branch)
 * a [build](#build-configuration) will be created and associated with the detected SCM commit. The name of the build is

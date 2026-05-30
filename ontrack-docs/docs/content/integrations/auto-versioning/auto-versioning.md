@@ -423,7 +423,7 @@ To update the `myVersion` property in the `images` table, one can set the auto v
 !!! warning
 
     As of the time of writing, the TOML support is still experimental. See
-    issue [#1156](https://github.com/nemerosa/ontrack/issues/1156).
+    issue [#1156](https://github.com/yontrack/yontrack/issues/1156).
 
 ## Post-processing
 

@@ -2,7 +2,7 @@ Yontrack
 ========
 
 [![Slack chat](https://img.shields.io/badge/slack-ontrack-brightgreen.svg?logo=slack)](https://ontrack-run.slack.com/)
-[![Average time to resolve an issue](http://isitmaintained.com/badge/resolution/nemerosa/ontrack.svg)](http://isitmaintained.com/project/nemerosa/ontrack "Average time to resolve an issue")
+[![Average time to resolve an issue](http://isitmaintained.com/badge/resolution/yontrack/yontrack.svg)](http://isitmaintained.com/project/yontrack/yontrack "Average time to resolve an issue")
 
 # [Continuous delivery monitoring](https://yontrack.com).
 

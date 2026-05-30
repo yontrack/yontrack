@@ -14,7 +14,7 @@ You need:
 Get a clean working copy of the Yntrack GitHub repository:
 
 ```bash
-git clone git@github.com:nemerosa/ontrack.git yontrack
+git clone git@github.com:yontrack/yontrack.git yontrack
 cd yontrack
 ```
 
