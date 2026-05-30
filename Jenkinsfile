@@ -300,7 +300,7 @@ pipeline {
                     // Creating the release in GitHub
                     createGitHubRelease(
                             credentialId: 'github-token',
-                            repository: 'nemerosa/ontrack',
+                            repository: 'yontrack/yontrack',
                             name: env.VERSION,
                             tag: env.VERSION,
                             commitish: env.GIT_COMMIT,
