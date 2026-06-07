@@ -71,6 +71,7 @@ export default function StandardBuildFilterProvider({branch, buildFilterForm}) {
                             <SelectValidationStamp
                                 branch={branch}
                                 useName={true}
+                                allowClear={true}
                             />
                         </Form.Item>
                     </Col>
@@ -94,6 +95,7 @@ export default function StandardBuildFilterProvider({branch, buildFilterForm}) {
                             <SelectValidationStamp
                                 branch={branch}
                                 useName={true}
+                                allowClear={true}
                             />
                         </Form.Item>
                     </Col>
@@ -180,6 +182,7 @@ export default function StandardBuildFilterProvider({branch, buildFilterForm}) {
                             <SelectValidationStamp
                                 branch={branch}
                                 useName={true}
+                                allowClear={true}
                             />
                         </Form.Item>
                     </Col>

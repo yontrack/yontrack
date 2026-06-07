@@ -1,8 +1,7 @@
 import {Select, Space, Typography} from "antd";
-import {useEffect, useState} from "react";
 import {gql} from "graphql-request";
 import ValidationStampImage from "@components/validationStamps/ValidationStampImage";
-import {useGraphQLClient} from "@components/providers/ConnectionContextProvider";
+import {useQuery} from "@components/services/GraphQL";
 
 export default function SelectValidationStamp({
                                                   disabled,
@@ -13,53 +12,46 @@ export default function SelectValidationStamp({
                                                   width,
                                               }) {
 
-    const client = useGraphQLClient()
-
-    const [validationStamps, setValidationStamps] = useState([])
-    const [options, setOptions] = useState([])
-
-    useEffect(() => {
-        if (client && branch) {
-            client.request(
-                gql`
-                    query GetValidationStamps($branchId: Int!) {
-                        branches(id: $branchId) {
-                            validationStamps {
+    const {data: validationStamps = []} = useQuery(
+        gql`
+            query GetValidationStamps($branchId: Int!) {
+                branches(id: $branchId) {
+                    validationStamps {
+                        id
+                        name
+                        image
+                        description
+                        annotatedDescription
+                        dataType {
+                            descriptor {
                                 id
-                                name
-                                image
-                                description
-                                annotatedDescription
-                                dataType {
-                                    descriptor {
-                                        id
-                                    }
-                                    config
-                                }
                             }
+                            config
                         }
                     }
-                `,
-                {branchId: Number(branch.id)}
-            ).then(data => {
-                setValidationStamps(data.branches[0].validationStamps)
-                setOptions(data.branches[0].validationStamps.map(vs => {
-                    return {
-                        value: useName ? vs.name : vs.id,
-                        label: <Space>
-                            <ValidationStampImage validationStamp={vs}/>
-                            <Typography.Text>{vs.name}</Typography.Text>
-                        </Space>
-                    }
-                }))
-            })
+                }
+            }
+        `,
+        {
+            variables: {branchId: branch ? Number(branch.id) : undefined},
+            deps: [branch?.id],
+            condition: !!branch,
+            dataFn: (data) => [...data.branches[0].validationStamps].sort((a, b) => a.name.localeCompare(b.name)),
         }
-    }, [client, branch]);
+    )
+
+    const options = (validationStamps ?? []).map(vs => ({
+        value: useName ? vs.name : vs.id,
+        label: <Space>
+            <ValidationStampImage validationStamp={vs}/>
+            <Typography.Text>{vs.name}</Typography.Text>
+        </Space>
+    }))
 
     const onLocalChange = (value) => {
         if (onChange) onChange(value)
         if (onValidationStampSelected) {
-            const vs = validationStamps.find(it => {
+            const vs = (validationStamps ?? []).find(it => {
                 if (useName) {
                     return it.name === value
                 } else {
