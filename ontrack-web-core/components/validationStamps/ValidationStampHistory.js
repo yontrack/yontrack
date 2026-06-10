@@ -1,7 +1,6 @@
 import {useEffect, useState} from "react";
 import {Button, Popover, Skeleton, Space, Spin, Table, Typography} from "antd";
-import {gql} from "graphql-request";
-import {useGraphQLClient} from "@components/providers/ConnectionContextProvider";
+import {useQuery} from "@components/services/GraphQL";
 import BuildLink from "@components/builds/BuildLink";
 import Decorations from "@components/framework/decorations/Decorations";
 import ValidationRunLink from "@components/validationRuns/ValidationRunLink";
@@ -22,10 +21,8 @@ const {Column} = Table
 
 export default function ValidationStampHistory({validationStamp}) {
 
-    const client = useGraphQLClient()
     const router = useRouter()
 
-    const [loading, setLoading] = useState(true)
     const [runs, setRuns] = useState([])
 
     const [pagination, setPagination] = useState({
@@ -38,105 +35,106 @@ export default function ValidationStampHistory({validationStamp}) {
         passed: null,
     })
 
-    useEffect(() => {
-        if (client && validationStamp) {
-            setLoading(true)
-            client.request(
-                gql`
-                    query GetValidationStampHistory(
-                        $id: Int!,
-                        $offset: Int!,
-                        $size: Int!,
-                        $passed: Boolean,
+    const {data: rawData, loading} = useQuery(
+        `
+            query GetValidationStampHistory(
+                $id: Int!,
+                $offset: Int!,
+                $size: Int!,
+                $passed: Boolean,
+            ) {
+                validationStamp(id: $id) {
+                    branch {
+                        scmBranchInfo {
+                            changeLogs
+                        }
+                    }
+                    validationRunsPaginated(
+                        offset: $offset,
+                        size: $size,
+                        passed: $passed,
                     ) {
-                        validationStamp(id: $id) {
-                            branch {
-                                scmBranchInfo {
-                                    changeLogs
+                        pageInfo {
+                            nextPage {
+                                offset
+                                size
+                            }
+                        }
+                        pageItems {
+                            id
+                            description
+                            annotatedDescription
+                            runOrder
+                            lastStatus {
+                                statusID {
+                                    id
+                                    name
+                                    passed
+                                }
+                                description
+                                annotatedDescription
+                            }
+                            build {
+                                id
+                                name
+                                releaseProperty {
+                                    value
+                                }
+                                decorations {
+                                    decorationType
+                                    error
+                                    data
+                                    feature {
+                                        id
+                                    }
                                 }
                             }
-                            validationRunsPaginated(
-                                offset: $offset,
-                                size: $size,
-                                passed: $passed,
-                            ) {
-                                pageInfo {
-                                    nextPage {
-                                        offset
-                                        size
-                                    }
-                                }
-                                pageItems {
+                            creation {
+                                user
+                                time
+                            }
+                            runInfo {
+                                runTime
+                                sourceType
+                                sourceUri
+                                triggerType
+                                triggerData
+                            }
+                            data {
+                                descriptor {
                                     id
-                                    description
-                                    annotatedDescription
-                                    runOrder
-                                    lastStatus {
-                                        statusID {
-                                            id
-                                            name
-                                            passed
-                                        }
-                                        description
-                                        annotatedDescription
-                                    }
-                                    build {
-                                        id
-                                        name
-                                        releaseProperty {
-                                            value
-                                        }
-                                        decorations {
-                                            decorationType
-                                            error
-                                            data
-                                            feature {
-                                                id
-                                            }
-                                        }
-                                    }
-                                    creation {
-                                        user
-                                        time
-                                    }
-                                    runInfo {
-                                        runTime
-                                        sourceType
-                                        sourceUri
-                                        triggerType
-                                        triggerData
-                                    }
-                                    data {
-                                        descriptor {
-                                            id
-                                            displayName
-                                        }
-                                        data
-                                    }
+                                    displayName
                                 }
+                                data
                             }
                         }
                     }
-                `,
-                {
-                    id: Number(validationStamp.id),
-                    offset: pagination.offset,
-                    size: pagination.size,
-                    passed: filter.passed,
                 }
-            ).then(data => {
-                setScmChangeLogEnabled(data.validationStamp.branch.scmBranchInfo?.changeLogs)
-                setPageInfo(data.validationStamp.validationRunsPaginated.pageInfo)
-                if (pagination.offset > 0) {
-                    setRuns([...runs, ...data.validationStamp.validationRunsPaginated.pageItems])
-                } else {
-                    setRuns(data.validationStamp.validationRunsPaginated.pageItems)
-                }
-            }).finally(() => {
-                setLoading(false)
-            })
+            }
+        `,
+        {
+            variables: {
+                id: validationStamp ? Number(validationStamp.id) : undefined,
+                offset: pagination.offset,
+                size: pagination.size,
+                passed: filter.passed,
+            },
+            deps: [validationStamp, pagination, filter],
+            condition: !!validationStamp,
         }
-    }, [client, validationStamp, pagination, filter]);
+    )
+
+    useEffect(() => {
+        if (rawData) {
+            setScmChangeLogEnabled(rawData.validationStamp.branch.scmBranchInfo?.changeLogs)
+            setPageInfo(rawData.validationStamp.validationRunsPaginated.pageInfo)
+            if (pagination.offset > 0) {
+                setRuns(prev => [...prev, ...rawData.validationStamp.validationRunsPaginated.pageItems])
+            } else {
+                setRuns(rawData.validationStamp.validationRunsPaginated.pageItems)
+            }
+        }
+    }, [rawData]) // eslint-disable-line react-hooks/exhaustive-deps
 
     const onLoadMore = () => {
         if (pageInfo.nextPage) {
