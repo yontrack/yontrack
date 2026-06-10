@@ -71,6 +71,7 @@ export default function SelectValidationStamp({
             allowClear={allowClear}
             mode={multiple ? "multiple" : undefined}
             style={{width}}
+            showSearch={true}
         />
     )
 }
