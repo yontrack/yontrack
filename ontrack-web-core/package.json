@@ -29,7 +29,7 @@
     "graphql-ws": "^6.0.5",
     "lodash": "^4.17.23",
     "lodash.debounce": "^4.0.8",
-    "next": "^13.5.11",
+    "next": "^16.2.6",
     "next-auth": "^4.24.11",
     "react": "18.3.1",
     "react-ace": "^10.1.0",
