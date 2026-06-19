@@ -26,6 +26,7 @@ export default function ValidationStampHeader({
                 onClick={selectable && onSelect ? onSelect : undefined}
                 selectable={selectable}
                 selected={selected}
+                imageSize={26}
             />
         </>
     )

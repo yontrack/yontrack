@@ -38,8 +38,7 @@ export default function ProxyImage({id, restUri, alt, width, height, onClick, to
                         data-testid={id}
                         src={dataUrl}
                         alt={alt}
-                        width={width}
-                        height={height}
+                        style={{width: `${width}px`, height: `${height}px`}}
                         onClick={onClick}
                         className={actionClassName(onClick, disabled)}
                     />
