@@ -4,6 +4,11 @@ pipeline {
 
     parameters {
         booleanParam(
+                name: 'RELEASE',
+                defaultValue: false,
+                description: 'Perform release operations (Docker Hub push, GitHub Release, Documentation)'
+        )
+        booleanParam(
                 name: 'JUST_BUILD_AND_PUSH',
                 defaultValue: false,
                 description: 'Just create the Docker images and push them'
@@ -237,6 +242,9 @@ pipeline {
                     expression {
                         params.JUST_BUILD_AND_PUSH
                     }
+                    expression {
+                        params.RELEASE
+                    }
                 }
             }
             environment {
@@ -273,6 +281,9 @@ pipeline {
                 anyOf {
                     branch 'main'
                     branch 'release/*'
+                    expression {
+                        params.RELEASE
+                    }
                 }
             }
             steps {
@@ -317,6 +328,9 @@ pipeline {
                 anyOf {
                     branch 'main'
                     branch 'release/*'
+                    expression {
+                        params.RELEASE
+                    }
                 }
             }
             steps {
