@@ -39,6 +39,7 @@ export const gqlBuilds = gql`
                         id
                         creation {
                             time
+                            user
                         }
                         promotionLevel {
                             id

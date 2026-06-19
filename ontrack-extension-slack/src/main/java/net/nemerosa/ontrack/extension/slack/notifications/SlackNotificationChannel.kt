@@ -86,6 +86,9 @@ class SlackNotificationChannel(
     override val displayName: String = "Slack"
 
     override val enabled: Boolean
-        get() =
+        get() = try {
             cachedSettingsService.getCachedSettings(SlackSettings::class.java).enabled
+        } catch (_: Exception) {
+            false
+        }
 }
