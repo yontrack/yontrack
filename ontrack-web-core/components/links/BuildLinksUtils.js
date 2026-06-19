@@ -115,14 +115,14 @@ export const buildQueryDownstreamOnly = `
         ${gqlBuildNodeInfo}
     `
 
-function buildDownstreamTreeData(build, qualifier) {
+function buildDownstreamTreeData(build, qualifier, pathKey = `${build.id}`) {
     return {
-        key: build.id,
+        key: pathKey,
         title: build.name,
         qualifier: qualifier,
         build: build,
-        children: build.usingQualified ? build.usingQualified.pageItems.map(link =>
-            buildDownstreamTreeData(link.build, link.qualifier)
+        children: build.usingQualified ? build.usingQualified.pageItems.map((link, index) =>
+            buildDownstreamTreeData(link.build, link.qualifier, `${pathKey}:${index}`)
         ) : []
     }
 }

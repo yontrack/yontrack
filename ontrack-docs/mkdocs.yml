@@ -85,6 +85,9 @@ nav:
       - Changelogs: content/integrations/changelogs/changelogs.md
       - Workflows: content/integrations/workflows/workflows.md
       - Environments: content/integrations/environments/environments.md
+  - Dashboards:
+      - Widgets:
+          - Build dependencies tree: content/dashboards/widgets/build-dependencies-tree.md
   - Reference:
       - API:
           - GraphQL API: content/api/graphql.md
