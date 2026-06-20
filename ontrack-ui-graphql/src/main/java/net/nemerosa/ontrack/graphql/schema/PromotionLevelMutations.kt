@@ -3,6 +3,7 @@ package net.nemerosa.ontrack.graphql.schema
 import jakarta.validation.constraints.NotNull
 import jakarta.validation.constraints.Pattern
 import net.nemerosa.ontrack.common.api.APIDescription
+import net.nemerosa.ontrack.graphql.support.ListRef
 import net.nemerosa.ontrack.graphql.support.TypedMutationProvider
 import net.nemerosa.ontrack.model.exceptions.BranchNotFoundException
 import net.nemerosa.ontrack.model.security.SecurityService
@@ -42,12 +43,28 @@ class PromotionLevelMutations(
                 outputType = PromotionLevel::class
             ) { input ->
                 val branch = structureService.getBranch(ID.of(input.branchId))
-                structureService.newPromotionLevel(
+                val newPL = structureService.newPromotionLevel(
                     PromotionLevel.of(
                         branch,
                         NameDescription.nd(input.name, input.description)
                     )
                 )
+                if (!input.fields.isNullOrEmpty()) {
+                    val fields = input.fields.mapIndexed { index, fieldInput ->
+                        PromotionLevelField(
+                            id = 0,
+                            name = fieldInput.name,
+                            displayName = fieldInput.displayName,
+                            description = fieldInput.description,
+                            type = fieldInput.type,
+                            required = fieldInput.required,
+                            options = fieldInput.options ?: emptyList(),
+                            position = index,
+                        )
+                    }
+                    structureService.setPromotionLevelFields(newPL.id, fields)
+                }
+                newPL
             },
             /**
              * Updating an existing promotion level
@@ -115,6 +132,27 @@ class PromotionLevelMutations(
                         Reordering(ids)
                     )
                 }
+            },
+            /**
+             * Setting configurable fields on a promotion level
+             */
+            unitMutation<SetPromotionLevelFieldsInput>(
+                name = "setPromotionLevelFields",
+                description = "Replaces all configurable field definitions on a promotion level"
+            ) { input ->
+                val fields = input.fields.mapIndexed { index, fieldInput ->
+                    PromotionLevelField(
+                        id = 0,
+                        name = fieldInput.name,
+                        displayName = fieldInput.displayName,
+                        description = fieldInput.description,
+                        type = fieldInput.type,
+                        required = fieldInput.required,
+                        options = fieldInput.options ?: emptyList(),
+                        position = index,
+                    )
+                }
+                structureService.setPromotionLevelFields(ID.of(input.promotionLevelId), fields)
             }
         )
 
@@ -171,6 +209,9 @@ data class CreatePromotionLevelByIdInput(
     val name: String,
     @APIDescription("Promotion level description")
     val description: String,
+    @ListRef(embedded = true)
+    @APIDescription("Optional field definitions to set at creation time")
+    val fields: List<PromotionLevelFieldInput>? = null,
 )
 
 data class UpdatePromotionLevelByIdInput(
@@ -203,3 +244,26 @@ data class ReorderPromotionLevelByIdInput(
     val newName: String,
 )
 
+data class SetPromotionLevelFieldsInput(
+    @APIDescription("Promotion level ID")
+    val promotionLevelId: Int,
+    @ListRef(embedded = true)
+    @APIDescription("Field definitions (replaces all existing fields)")
+    val fields: List<PromotionLevelFieldInput>,
+)
+
+data class PromotionLevelFieldInput(
+    @APIDescription("Technical name used as key")
+    val name: String,
+    @APIDescription("Human-readable label")
+    val displayName: String,
+    @APIDescription("Optional description")
+    val description: String?,
+    @APIDescription("Field type")
+    val type: PromotionLevelFieldType,
+    @APIDescription("Whether the field is required when creating a promotion run")
+    val required: Boolean,
+    @ListRef
+    @APIDescription("Allowed values for CHOICE fields")
+    val options: List<String>?,
+)

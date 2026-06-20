@@ -34,6 +34,27 @@ These rules apply unconditionally. Follow them in every change, without exceptio
 - When fixing a GitHub issue: **always** create a branch named `claude/<short-description>-pipeline` before making any changes (use `/fix-issue` skill)
 - **Never** create a pull request unless explicitly asked
 
+### Development Process (TDD)
+
+Follow this order for every non-trivial change:
+
+1. **Write tests first**, then implement:
+   - Prefer unit tests (`*Test.kt`) for pure logic
+   - Use integration tests (`*IT.kt`) for database/service interactions
+   - Use KDSL acceptance tests (`ontrack-kdsl-acceptance/`) for API-level scenarios
+   - Use UI tests (`ontrack-web-tests/`) for frontend flows
+
+2. **Implement** the feature/fix to make the tests pass
+
+3. **Run the tests** to verify:
+
+   | Scope               | Gradle task              |
+   |---------------------|--------------------------|
+   | Unit tests          | `./gradlew test`         |
+   | Integration tests   | `./gradlew integrationTest` |
+   | KDSL API tests      | `./gradlew kdslAcceptanceTest` |
+   | UI tests            | `./gradlew uiTest`       |
+
 ### Tests
 - **Always** use `Roles.*` constants for role names in tests — never string literals
 

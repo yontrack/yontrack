@@ -1,5 +1,6 @@
 package net.nemerosa.ontrack.repository
 
+import com.fasterxml.jackson.databind.JsonNode
 import net.nemerosa.ontrack.model.structure.*
 import net.nemerosa.ontrack.repository.support.AbstractJdbcRepository
 import org.springframework.stereotype.Repository
@@ -37,13 +38,48 @@ class PromotionRunJdbcRepository(
                 id(rs, "promotionlevelid"),
                 actualBuild.branch
             )
+        val runId = id(rs)
         return PromotionRun(
-            id = id(rs),
+            id = runId,
             build = actualBuild,
             promotionLevel = actualPL,
             signature = readSignature(rs),
             description = rs.getString("description"),
+            fieldValues = getPromotionRunFieldValues(runId),
         )
+    }
+
+    override fun getPromotionRunFieldValues(promotionRunId: ID): List<PromotionRunFieldValue> =
+        namedParameterJdbcTemplate!!.query(
+            """
+                SELECT field_name, field_value
+                FROM PROMOTION_RUN_FIELD_VALUES
+                WHERE PROMOTION_RUN_ID = :promotionRunId
+            """.trimIndent(),
+            mapOf("promotionRunId" to promotionRunId.value)
+        ) { rs, _ ->
+            val valueJson: String? = rs.getString("field_value")
+            val value: JsonNode? = valueJson?.let { readJson(it) }
+            PromotionRunFieldValue(
+                name = rs.getString("field_name"),
+                value = value,
+            )
+        }
+
+    override fun savePromotionRunFieldValues(promotionRunId: ID, fieldValues: List<PromotionRunFieldValue>) {
+        fieldValues.forEach { fv ->
+            namedParameterJdbcTemplate!!.update(
+                """
+                    INSERT INTO PROMOTION_RUN_FIELD_VALUES (PROMOTION_RUN_ID, FIELD_NAME, FIELD_VALUE)
+                    VALUES (:promotionRunId, :fieldName, CAST(:fieldValue AS JSONB))
+                """.trimIndent(),
+                mapOf(
+                    "promotionRunId" to promotionRunId.value,
+                    "fieldName" to fv.name,
+                    "fieldValue" to fv.value?.let { writeJson(it) },
+                )
+            )
+        }
     }
 
     override fun getLastPromotionRunForProject(project: Project, promotionName: String): PromotionRun? =

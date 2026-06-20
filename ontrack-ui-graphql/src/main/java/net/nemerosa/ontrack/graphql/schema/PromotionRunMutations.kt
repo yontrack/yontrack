@@ -1,6 +1,8 @@
 package net.nemerosa.ontrack.graphql.schema
 
+import com.fasterxml.jackson.databind.JsonNode
 import net.nemerosa.ontrack.common.api.APIDescription
+import net.nemerosa.ontrack.graphql.support.ListRef
 import net.nemerosa.ontrack.graphql.support.TypedMutationProvider
 import net.nemerosa.ontrack.model.exceptions.BranchNotFoundException
 import net.nemerosa.ontrack.model.exceptions.BuildNotFoundException
@@ -8,6 +10,7 @@ import net.nemerosa.ontrack.model.security.SecurityService
 import net.nemerosa.ontrack.model.structure.Build
 import net.nemerosa.ontrack.model.structure.ID
 import net.nemerosa.ontrack.model.structure.PromotionRun
+import net.nemerosa.ontrack.model.structure.PromotionRunFieldValue
 import net.nemerosa.ontrack.model.structure.StructureService
 import org.springframework.stereotype.Component
 import java.time.LocalDateTime
@@ -72,13 +75,16 @@ class PromotionRunMutations(
                 this
             }
         }
+        val fieldValues = input.fieldValues?.map { fvi ->
+            PromotionRunFieldValue(name = fvi.name, value = fvi.value)
+        } ?: emptyList()
         return structureService.newPromotionRun(
             PromotionRun.of(
                 build = build,
                 promotionLevel = promotionLevel,
                 signature = signature,
                 description = input.description,
-            )
+            ).withFieldValues(fieldValues)
         )
     }
 
@@ -93,6 +99,7 @@ interface PromotionRunInput {
     val dateTime: LocalDateTime?
     val promotion: String
     val description: String?
+    val fieldValues: List<PromotionRunFieldValueInput>?
 }
 
 class CreatePromotionRunInput(
@@ -108,6 +115,9 @@ class CreatePromotionRunInput(
     override val dateTime: LocalDateTime?,
     @APIDescription("Promotion description")
     override val description: String?,
+    @ListRef(embedded = true)
+    @APIDescription("Values for the configurable fields of the promotion level")
+    override val fieldValues: List<PromotionRunFieldValueInput>?,
 ) : PromotionRunInput
 
 class CreatePromotionRunByIdInput(
@@ -119,9 +129,19 @@ class CreatePromotionRunByIdInput(
     override val dateTime: LocalDateTime?,
     @APIDescription("Promotion description")
     override val description: String?,
+    @ListRef(embedded = true)
+    @APIDescription("Values for the configurable fields of the promotion level")
+    override val fieldValues: List<PromotionRunFieldValueInput>?,
 ) : PromotionRunInput
 
 class DeletePromotionRunInput(
     @APIDescription("Promotion run ID")
     val promotionRunId: Int,
+)
+
+data class PromotionRunFieldValueInput(
+    @APIDescription("Field name (key)")
+    val name: String,
+    @APIDescription("Field value as JSON")
+    val value: JsonNode?,
 )

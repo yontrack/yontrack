@@ -1,9 +1,12 @@
 package net.nemerosa.ontrack.repository
 
+import com.fasterxml.jackson.databind.node.ArrayNode
 import net.nemerosa.ontrack.model.structure.Branch
 import net.nemerosa.ontrack.model.structure.ID
 import net.nemerosa.ontrack.model.structure.Project
 import net.nemerosa.ontrack.model.structure.PromotionLevel
+import net.nemerosa.ontrack.model.structure.PromotionLevelField
+import net.nemerosa.ontrack.model.structure.PromotionLevelFieldType
 import net.nemerosa.ontrack.repository.support.AbstractJdbcRepository
 import org.springframework.stereotype.Repository
 import java.sql.ResultSet
@@ -124,12 +127,77 @@ class PromotionLevelJdbcRepository(
             branchJdbcRepositoryAccessor.getBranch(id(rs), project)
         }
 
-    override fun toPromotionLevel(rs: ResultSet, branch: Branch?) = PromotionLevel(
-        id = id(rs),
-        name = rs.getString("name"),
-        description = rs.getString("description"),
-        branch = branch ?: branchJdbcRepositoryAccessor.getBranch(id(rs, "branchid")),
-        isImage = !rs.getString("imagetype").isNullOrBlank(),
-        signature = readSignature(rs),
-    )
+    override fun toPromotionLevel(rs: ResultSet, branch: Branch?): PromotionLevel {
+        val plId = id(rs)
+        return PromotionLevel(
+            id = plId,
+            name = rs.getString("name"),
+            description = rs.getString("description"),
+            branch = branch ?: branchJdbcRepositoryAccessor.getBranch(id(rs, "branchid")),
+            isImage = !rs.getString("imagetype").isNullOrBlank(),
+            signature = readSignature(rs),
+            fields = getPromotionLevelFields(plId),
+        )
+    }
+
+    override fun getPromotionLevelFields(promotionLevelId: ID): List<PromotionLevelField> =
+        namedParameterJdbcTemplate!!.query(
+            """
+                SELECT *
+                FROM PROMOTION_LEVEL_FIELDS
+                WHERE PROMOTION_LEVEL_ID = :promotionLevelId
+                ORDER BY POSITION
+            """.trimIndent(),
+            mapOf("promotionLevelId" to promotionLevelId.value)
+        ) { rs, _ ->
+            val optionsJson = rs.getString("options")
+            val options = if (optionsJson != null) {
+                val node = readJson(optionsJson)
+                (node as? ArrayNode)?.map { it.asText() } ?: emptyList()
+            } else {
+                emptyList()
+            }
+            PromotionLevelField(
+                id = rs.getInt("id"),
+                name = rs.getString("name"),
+                displayName = rs.getString("display_name"),
+                description = rs.getString("description"),
+                type = PromotionLevelFieldType.valueOf(rs.getString("field_type")),
+                required = rs.getBoolean("required"),
+                options = options,
+                position = rs.getInt("position"),
+            )
+        }
+
+    override fun setPromotionLevelFields(promotionLevelId: ID, fields: List<PromotionLevelField>) {
+        namedParameterJdbcTemplate!!.update(
+            "DELETE FROM PROMOTION_LEVEL_FIELDS WHERE PROMOTION_LEVEL_ID = :promotionLevelId",
+            mapOf("promotionLevelId" to promotionLevelId.value)
+        )
+        fields.forEachIndexed { index, field ->
+            val optionsJson = if (field.type == PromotionLevelFieldType.CHOICE && field.options.isNotEmpty()) {
+                writeJson(field.options)
+            } else {
+                null
+            }
+            namedParameterJdbcTemplate!!.update(
+                """
+                    INSERT INTO PROMOTION_LEVEL_FIELDS
+                        (PROMOTION_LEVEL_ID, NAME, DISPLAY_NAME, DESCRIPTION, FIELD_TYPE, REQUIRED, OPTIONS, POSITION)
+                    VALUES
+                        (:promotionLevelId, :name, :displayName, :description, :fieldType, :required, CAST(:options AS JSONB), :position)
+                """.trimIndent(),
+                mapOf(
+                    "promotionLevelId" to promotionLevelId.value,
+                    "name" to field.name,
+                    "displayName" to field.displayName,
+                    "description" to field.description,
+                    "fieldType" to field.type.name,
+                    "required" to field.required,
+                    "options" to optionsJson,
+                    "position" to index,
+                )
+            )
+        }
+    }
 }

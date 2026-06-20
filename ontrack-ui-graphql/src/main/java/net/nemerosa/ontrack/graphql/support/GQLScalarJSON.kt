@@ -54,7 +54,11 @@ object GQLScalarJSON {
 
                 override fun parseValue(input: Any): JsonNode =
                     when (input) {
-                        is String -> mapper.readTree(input)
+                        is String -> try {
+                            mapper.readTree(input)
+                        } catch (_: Exception) {
+                            TextNode(input)
+                        }
                         is JsonNode -> input
                         else -> input.asJson()
                     }

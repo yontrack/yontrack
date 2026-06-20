@@ -10,6 +10,14 @@ export class PromotionInfoSection {
         this.build = build
     }
 
+    async promote(pl, fieldValues = {}) {
+        const promoteButton = this.section.getByTestId(`build-promote-${this.build.id}-${pl.id}`)
+        await expect(promoteButton).toBeVisible()
+        await promoteButton.click()
+        const dialog = new PromotionRunDialog(this.page)
+        await dialog.createPromotionRun(fieldValues)
+    }
+
     async repromote(run) {
         const runLink = this.section.getByTestId(`build-promote-${this.build.id}-${run.promotionLevel.id}`)
         await expect(runLink).toBeVisible()
@@ -28,6 +36,12 @@ export class PromotionInfoSection {
         await expect(deleteButton).toBeVisible()
         await deleteButton.click()
         await confirmBox(this.page, "Deleting a promotion", {okText: "Confirm deletion"})
+    }
+
+    async hoverPromotionRun(promotionLevel) {
+        const trigger = this.section.getByTestId(`build-promotion-run-trigger-${promotionLevel.id}`).first()
+        await expect(trigger).toBeVisible()
+        await trigger.hover()
     }
 
 }

@@ -1,8 +1,10 @@
 package net.nemerosa.ontrack.repository
 
 import net.nemerosa.ontrack.model.structure.Branch
+import net.nemerosa.ontrack.model.structure.ID
 import net.nemerosa.ontrack.model.structure.Project
 import net.nemerosa.ontrack.model.structure.PromotionLevel
+import net.nemerosa.ontrack.model.structure.PromotionLevelField
 
 interface PromotionLevelRepository {
 
@@ -20,5 +22,9 @@ interface PromotionLevelRepository {
         project: Project,
         promotionLevelName: String,
     ): List<Branch>
+
+    fun getPromotionLevelFields(promotionLevelId: ID): List<PromotionLevelField>
+
+    fun setPromotionLevelFields(promotionLevelId: ID, fields: List<PromotionLevelField>)
 
 }

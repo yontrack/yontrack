@@ -4256,6 +4256,11 @@ type Mutation {
     "Input for the mutation"
     input: SetPromotionLevelAutoPromotionPropertyByIdInput
   ): SetPromotionLevelAutoPromotionPropertyByIdPayload
+  "Replaces all configurable field definitions on a promotion level"
+  setPromotionLevelFields(
+    "Input for the mutation"
+    input: SetPromotionLevelFieldsInput
+  ): SetPromotionLevelFieldsPayload
   "Set the message property on a promotion level identified by name."
   setPromotionLevelMessageProperty(
     "Input for the mutation"
@@ -5125,6 +5130,8 @@ type PromotionLevel implements Authorizable & ProjectEntity {
     type: String
   ): [Decoration!]!
   description: String
+  "Configurable fields defined on this promotion level"
+  fields: [PromotionLevelField!]!
   id: ID!
   "Flag to indicate if an image is associated"
   image: Boolean
@@ -5176,6 +5183,26 @@ type PromotionLevel implements Authorizable & ProjectEntity {
   userMenuActions: [UserMenuAction!]!
 }
 
+"Configurable field definition on a promotion level"
+type PromotionLevelField {
+  "Optional description"
+  description: String
+  "Human-readable label"
+  displayName: String!
+  "Internal ID"
+  id: Int!
+  "Technical name (used as key)"
+  name: String!
+  "Allowed values for CHOICE fields"
+  options: [String!]!
+  "Display order"
+  position: Int!
+  "Whether this field is required"
+  required: Boolean!
+  "Field type"
+  type: PromotionLevelFieldType!
+}
+
 type PromotionRun implements Authorizable & ProjectEntity {
   "Description with links."
   annotatedDescription: String
@@ -5200,6 +5227,8 @@ type PromotionRun implements Authorizable & ProjectEntity {
     type: String
   ): [Decoration!]!
   description: String
+  "Values for the configurable fields of the promotion level"
+  fieldValues: [PromotionRunFieldValue!]!
   id: ID!
   "List of information components attached to this entity"
   information: [EntityInformation!]!
@@ -5223,6 +5252,14 @@ type PromotionRun implements Authorizable & ProjectEntity {
   ): [Property!]!
   "List of actions available for this entity"
   userMenuActions: [UserMenuAction!]!
+}
+
+"A field value stored on a promotion run"
+type PromotionRunFieldValue {
+  "Field name (key)"
+  name: String!
+  "Field value as JSON (null for optional unfilled fields)"
+  value: JSON
 }
 
 type PromotionRunPaginated {
@@ -6788,6 +6825,12 @@ type SetPromotionLevelAutoPromotionPropertyPayload implements Payload {
   errors: [UserError]
   "Promotion level updated"
   promotionLevel: PromotionLevel
+}
+
+"Output type for the setPromotionLevelFields mutation."
+type SetPromotionLevelFieldsPayload implements Payload {
+  "List of errors"
+  errors: [UserError]
 }
 
 "Output type for the setPromotionLevelMessagePropertyById mutation."
@@ -8359,6 +8402,15 @@ enum ProjectEntityType {
   VALIDATION_STAMP
 }
 
+"Type of a configurable field on a promotion level"
+enum PromotionLevelFieldType {
+  BOOLEAN
+  CHOICE
+  LINK
+  NUMBER
+  TEXT
+}
+
 "Result of a dispaching on a queue"
 enum QueueDispatchResultType {
   IGNORED
@@ -8894,6 +8946,8 @@ input CreatePromotionRunByIdInput {
   dateTime: LocalDateTime
   "Promotion description"
   description: String
+  "Values for the configurable fields of the promotion level"
+  fieldValues: [PromotionRunFieldValueInput!]
   "Promotion name"
   promotion: String!
 }
@@ -8908,6 +8962,8 @@ input CreatePromotionRunInput {
   dateTime: LocalDateTime
   "Promotion description"
   description: String
+  "Values for the configurable fields of the promotion level"
+  fieldValues: [PromotionRunFieldValueInput!]
   "Project name"
   project: String!
   "Promotion name"
@@ -10107,6 +10163,28 @@ input ProjectEntityIDInput {
   type: ProjectEntityType!
 }
 
+input PromotionLevelFieldInput {
+  "Optional description"
+  description: String
+  "Human-readable label"
+  displayName: String!
+  "Technical name used as key"
+  name: String!
+  "Allowed values for CHOICE fields"
+  options: [String!]
+  "Whether the field is required when creating a promotion run"
+  required: Boolean!
+  "Field type"
+  type: PromotionLevelFieldType!
+}
+
+input PromotionRunFieldValueInput {
+  "Field name (key)"
+  name: String!
+  "Field value as JSON"
+  value: JSON
+}
+
 input PropertyFilter {
   "type field"
   type: String
@@ -10970,6 +11048,14 @@ input SetPromotionLevelAutoPromotionPropertyInput {
   promotionLevels: [String!]
   "List of needed validation stamps"
   validationStamps: [String!]
+}
+
+"Input type for the setPromotionLevelFields mutation."
+input SetPromotionLevelFieldsInput {
+  "Field definitions (replaces all existing fields)"
+  fields: [PromotionLevelFieldInput!]!
+  "Promotion level ID"
+  promotionLevelId: Int!
 }
 
 "Input type for the setPromotionLevelMessagePropertyById mutation."

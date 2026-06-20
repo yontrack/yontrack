@@ -12,6 +12,7 @@ dependencies {
     testImplementation("org.springframework.boot:spring-boot-starter")
     testImplementation("org.springframework:spring-web")
     testImplementation(project(":ontrack-kdsl"))
+    testImplementation("com.apollographql.apollo:apollo-api:4.1.1")
     testImplementation("commons-io:commons-io")
     testImplementation("commons-codec:commons-codec")
 
@@ -85,6 +86,12 @@ val kdslAcceptanceTest by tasks.registering(Test::class) {
     useJUnitPlatform()
     mustRunAfter("test")
     include("**/ACC*.class")
+    val testFilter = System.getProperty("test.filter")
+    if (testFilter != null) {
+        filter {
+            includeTestsMatching(testFilter)
+        }
+    }
     minHeapSize = "512m"
     maxHeapSize = "3072m"
     dependsOn(kdslAcceptanceTestComposeUp)

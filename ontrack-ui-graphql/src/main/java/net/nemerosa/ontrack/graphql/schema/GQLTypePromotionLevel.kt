@@ -119,6 +119,20 @@ class GQLTypePromotionLevel(
                             }
                     )
             )
+            // Configurable fields
+            .field {
+                it.name("fields")
+                    .description("Configurable fields defined on this promotion level")
+                    .type(listType(GQLTypePromotionLevelField.PROMOTION_LEVEL_FIELD))
+                    .dataFetcher { env ->
+                        val pl = env.getSource<PromotionLevel>()!!
+                        if (pl.fields.isNotEmpty()) {
+                            pl.fields
+                        } else {
+                            structureService.getPromotionLevel(pl.id).fields
+                        }
+                    }
+            }
             // OK
             .build()
 

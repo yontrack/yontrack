@@ -41,11 +41,31 @@ export const gqlBuilds = gql`
                             time
                             user
                         }
+                        description
+                        annotatedDescription
+                        fieldValues {
+                            name
+                            value
+                        }
+                        build {
+                            id
+                            name
+                        }
                         promotionLevel {
                             id
                             name
                             description
                             image
+                            fields {
+                                name
+                                displayName
+                                type
+                            }
+                        }
+                        authorizations {
+                            name
+                            action
+                            authorized
                         }
                     }
                     validations {

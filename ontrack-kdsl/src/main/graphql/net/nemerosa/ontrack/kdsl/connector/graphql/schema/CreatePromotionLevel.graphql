@@ -2,11 +2,13 @@ mutation CreatePromotionLevel(
     $branchId: Int!,
     $name: String!,
     $description: String!,
+    $fields: [PromotionLevelFieldInput!],
 ) {
     createPromotionLevelById(input: {
         branchId: $branchId,
         name: $name,
         description: $description,
+        fields: $fields,
     }) {
         promotionLevel {
             ...PromotionLevelFragment

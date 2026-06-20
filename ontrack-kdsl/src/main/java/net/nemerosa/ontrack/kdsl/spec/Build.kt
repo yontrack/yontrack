@@ -9,6 +9,7 @@ import net.nemerosa.ontrack.kdsl.connector.graphql.paginate
 import net.nemerosa.ontrack.kdsl.connector.graphql.schema.*
 import net.nemerosa.ontrack.kdsl.connector.graphql.schema.type.LinksBuildInputItem
 import net.nemerosa.ontrack.kdsl.connector.graphql.schema.type.ProjectEntityType
+import net.nemerosa.ontrack.kdsl.connector.graphql.schema.type.PromotionRunFieldValueInput
 import net.nemerosa.ontrack.kdsl.connector.graphqlConnector
 import net.nemerosa.ontrack.kdsl.connector.support.PaginatedList
 import net.nemerosa.ontrack.kdsl.connector.support.emptyPaginatedList
@@ -42,12 +43,14 @@ class Build(
         promotion: String,
         description: String = "",
         dateTime: LocalDateTime? = null,
+        fieldValues: List<PromotionRunFieldValueInput> = emptyList(),
     ): PromotionRun = graphqlConnector.mutate(
         CreatePromotionRunMutation(
             id.toInt(),
             promotion,
             description,
             Optional.presentIfNotNull(dateTime),
+            Optional.presentIfNotNull(fieldValues.ifEmpty { null }),
         )
     ) {
         it?.createPromotionRunById?.payloadUserErrors?.convert()

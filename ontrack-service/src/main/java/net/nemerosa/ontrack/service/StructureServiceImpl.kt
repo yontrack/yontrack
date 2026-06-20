@@ -54,6 +54,8 @@ class StructureServiceImpl(
     private val buildLinkListenerService: BuildLinkListenerService,
     private val coreBuildFilterRepository: CoreBuildFilterRepository,
     private val metricsExportService: MetricsExportService,
+    private val promotionRunRepository: PromotionRunRepository,
+    private val promotionLevelRepository: PromotionLevelRepository,
 ) : StructureService {
 
     private val logger = LoggerFactory.getLogger(StructureService::class.java)
@@ -587,7 +589,8 @@ class StructureServiceImpl(
     override fun getPromotionLevel(promotionLevelId: ID): PromotionLevel {
         val promotionLevel = structureRepository.getPromotionLevel(promotionLevelId)
         securityService.checkProjectFunction(promotionLevel.branch.project.id(), ProjectView::class.java)
-        return promotionLevel
+        val fields = promotionLevelRepository.getPromotionLevelFields(promotionLevelId)
+        return promotionLevel.withFields(fields)
     }
 
     override fun findPromotionLevelByID(promotionLevelId: ID): PromotionLevel? =
@@ -659,6 +662,12 @@ class StructureServiceImpl(
         structureRepository.reorderPromotionLevels(branchId, reordering)
         // Event
         eventPostService.post(eventFactory.reorderPromotionLevels(branch))
+    }
+
+    override fun setPromotionLevelFields(promotionLevelId: ID, fields: List<PromotionLevelField>) {
+        val promotionLevel = getPromotionLevel(promotionLevelId)
+        securityService.checkProjectFunction(promotionLevel, PromotionLevelEdit::class.java)
+        promotionLevelRepository.setPromotionLevelFields(promotionLevelId, fields)
     }
 
     override fun newPromotionLevelFromPredefined(
@@ -759,22 +768,51 @@ class StructureServiceImpl(
         )
         // Checks the authorization
         securityService.checkProjectFunction(promotionRun.build.branch.project.id(), PromotionRunCreate::class.java)
+        // Validates the field values against the promotion level's field definitions
+        validatePromotionRunFieldValues(promotionRun)
         // Checks the preconditions for the creation of the promotion run
         promotionRunCheckService.checkPromotionRunCreation(promotionRun)
-        // If the promotion run's time is not defined, takes the current date
-        val promotionRunToSave: PromotionRun = promotionRun
         // Actual creation
-        val newPromotionRun = structureRepository.newPromotionRun(promotionRunToSave)
+        val newPromotionRun = structureRepository.newPromotionRun(promotionRun)
+        // Save field values
+        if (promotionRun.fieldValues.isNotEmpty()) {
+            promotionRunRepository.savePromotionRunFieldValues(newPromotionRun.id, promotionRun.fieldValues)
+        }
         // Event
         eventPostService.post(eventFactory.newPromotionRun(newPromotionRun))
         // OK
-        return newPromotionRun
+        return newPromotionRun.withFieldValues(promotionRun.fieldValues)
+    }
+
+    private fun validatePromotionRunFieldValues(promotionRun: PromotionRun) {
+        val fields = promotionLevelRepository.getPromotionLevelFields(promotionRun.promotionLevel.id)
+        val valuesByName = promotionRun.fieldValues.associateBy { it.name }
+        for (field in fields) {
+            val fv = valuesByName[field.name]
+            val fvValue = fv?.value
+            if (field.required && (fv == null || fvValue == null || fvValue.isNull)) {
+                throw PromotionRunFieldRequiredException(field.name)
+            }
+            val value = fv?.value ?: continue
+            when (field.type) {
+                PromotionLevelFieldType.TEXT -> if (!value.isTextual) throw PromotionRunFieldTypeException(field.name, "TEXT")
+                PromotionLevelFieldType.NUMBER -> if (!value.isNumber) throw PromotionRunFieldTypeException(field.name, "NUMBER")
+                PromotionLevelFieldType.BOOLEAN -> if (!value.isBoolean) throw PromotionRunFieldTypeException(field.name, "BOOLEAN")
+                PromotionLevelFieldType.CHOICE -> {
+                    if (!value.isTextual) throw PromotionRunFieldTypeException(field.name, "CHOICE")
+                    val chosen = value.asText()
+                    if (chosen !in field.options) throw PromotionRunFieldChoiceException(field.name, chosen, field.options)
+                }
+                PromotionLevelFieldType.LINK -> if (!value.isTextual) throw PromotionRunFieldTypeException(field.name, "LINK")
+            }
+        }
     }
 
     override fun getPromotionRun(promotionRunId: ID): PromotionRun {
         val promotionRun = structureRepository.getPromotionRun(promotionRunId)
         securityService.checkProjectFunction(promotionRun.build.branch.project.id(), ProjectView::class.java)
-        return promotionRun
+        val fieldValues = promotionRunRepository.getPromotionRunFieldValues(promotionRunId)
+        return promotionRun.withFieldValues(fieldValues)
     }
 
     override fun findPromotionRunByID(promotionRunId: ID): PromotionRun? =

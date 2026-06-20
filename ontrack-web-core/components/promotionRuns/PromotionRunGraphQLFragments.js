@@ -25,6 +25,19 @@ export const gqlPromotionRunContentFragment = gql`
             id
             name
             image
+            fields {
+                name
+                displayName
+                description
+                type
+                required
+                options
+                position
+            }
+        }
+        fieldValues {
+            name
+            value
         }
     }
 `

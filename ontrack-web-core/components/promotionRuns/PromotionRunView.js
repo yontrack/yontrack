@@ -17,6 +17,7 @@ import NotificationRecordingsTable from "@components/extension/notifications/Not
 import {useQuery} from "@components/services/GraphQL";
 import PromotionRunDeleteCommand from "@components/promotionRuns/PromotionRunDeleteCommand";
 import AutoVersioningPromotionRunTrail from "@components/extension/auto-versioning/AutoVersioningPromotionRunTrail";
+import PromotionRunFieldValues from "@components/promotionRuns/PromotionRunFieldValues";
 
 export default function PromotionRunView({id}) {
 
@@ -55,6 +56,11 @@ export default function PromotionRunView({id}) {
                         id
                         name
                         image
+                        fields {
+                            name
+                            displayName
+                            type
+                        }
                         branch {
                             id
                             name
@@ -63,6 +69,10 @@ export default function PromotionRunView({id}) {
                                 name
                             }
                         }
+                    }
+                    fieldValues {
+                        name
+                        value
                     }
                 }
             }
@@ -139,6 +149,13 @@ export default function PromotionRunView({id}) {
                                                 </Typography.Text>
                                             </Space>
                                         </Typography.Paragraph>
+                                    }
+                                    {
+                                        run.fieldValues?.length > 0 &&
+                                        <PromotionRunFieldValues
+                                            fields={run.promotionLevel.fields}
+                                            fieldValues={run.fieldValues}
+                                        />
                                     }
                                 </Space>
                             </Card>

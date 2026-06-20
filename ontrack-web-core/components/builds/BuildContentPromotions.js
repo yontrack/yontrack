@@ -14,6 +14,7 @@ import EntityNotificationsBadge from "@components/extension/notifications/Entity
 import {promotionLevelUri, promotionRunUri} from "@components/common/Links";
 import Link from "next/link";
 import TimestampText from "@components/common/TimestampText";
+import PromotionRunFieldValues from "@components/promotionRuns/PromotionRunFieldValues";
 
 const query = `
     query BuildPromotions($buildId: Int!) {
@@ -47,6 +48,15 @@ const query = `
                 annotatedDescription
                 promotionLevel {
                     id
+                    fields {
+                        name
+                        displayName
+                        type
+                    }
+                }
+                fieldValues {
+                    name
+                    value
                 }
             }
         }
@@ -83,13 +93,24 @@ export default function BuildContentPromotions({build}) {
                 label: <Space className={`promotion-run-pl-${run.promotionLevel.id}`}>
                     {/* Information about the promotion */}
                     <Popover content={
-                        <Space direction="vertical">
-                            <Typography.Text>Promoted by {run.creation?.user}</Typography.Text>
-                            <TimestampText value={run.creation?.time}/>
-                            <AnnotatedDescription entity={run}/>
-                        </Space>
+                        <div data-testid={`build-promotion-run-popover-${run.id}`}>
+                            <Space direction="vertical">
+                                <Typography.Text>Promoted by {run.creation?.user}</Typography.Text>
+                                <TimestampText value={run.creation?.time}/>
+                                <AnnotatedDescription entity={run}/>
+                                {
+                                    run.fieldValues?.length > 0 &&
+                                    <PromotionRunFieldValues
+                                        fields={run.promotionLevel.fields}
+                                        fieldValues={run.fieldValues}
+                                    />
+                                }
+                            </Space>
+                        </div>
                     }>
-                        {run.creation?.time ? dayjs(run.creation.time).format("YYYY MMM DD, HH:mm") : ''}
+                        <span data-testid={`build-promotion-run-trigger-${run.promotionLevel.id}`}>
+                            {run.creation?.time ? dayjs(run.creation.time).format("YYYY MMM DD, HH:mm") : ''}
+                        </span>
                     </Popover>
                     {/* Repeating the promotion */}
                     {

@@ -734,12 +734,25 @@ public class StructureJdbcRepository extends AbstractJdbcRepository implements S
     protected PromotionRun toPromotionRun(ResultSet rs,
                                           Function<ID, Build> buildLoader,
                                           Function<ID, PromotionLevel> promotionLevelLoader) throws SQLException {
+        ID runId = id(rs);
+        List<PromotionRunFieldValue> fieldValues = getPromotionRunFieldValues(runId);
         return PromotionRun.of(
                 buildLoader.apply(id(rs, "buildId")),
                 promotionLevelLoader.apply(id(rs, "promotionLevelId")),
                 readSignature(rs),
                 rs.getString("description")
-        ).withId(id(rs));
+        ).withId(runId).withFieldValues(fieldValues);
+    }
+
+    private List<PromotionRunFieldValue> getPromotionRunFieldValues(ID promotionRunId) {
+        return getNamedParameterJdbcTemplate().query(
+                "SELECT field_name, field_value FROM PROMOTION_RUN_FIELD_VALUES WHERE PROMOTION_RUN_ID = :promotionRunId",
+                params("promotionRunId", promotionRunId.getValue()),
+                (rs, rowNum) -> new PromotionRunFieldValue(
+                        rs.getString("field_name"),
+                        readJson(rs.getString("field_value"))
+                )
+        );
     }
 
     @Override

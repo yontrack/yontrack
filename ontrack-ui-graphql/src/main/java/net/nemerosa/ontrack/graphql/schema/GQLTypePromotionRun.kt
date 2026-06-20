@@ -6,6 +6,7 @@ import graphql.schema.GraphQLObjectType
 import graphql.schema.GraphQLTypeReference
 import net.nemerosa.ontrack.extension.api.ExtensionManager
 import net.nemerosa.ontrack.graphql.schema.authorizations.GQLInterfaceAuthorizableService
+import net.nemerosa.ontrack.graphql.support.listType
 import net.nemerosa.ontrack.model.structure.ProjectEntityType
 import net.nemerosa.ontrack.model.structure.PromotionRun
 import net.nemerosa.ontrack.model.structure.Signature
@@ -54,7 +55,14 @@ class GQLTypePromotionRun(
                     .description("Associated promotion level")
                     .type(GraphQLNonNull(GraphQLTypeReference(GQLTypePromotionLevel.PROMOTION_LEVEL)))
                     .build()
-            ) // OK
+            ) // Field values
+            .field {
+                it.name("fieldValues")
+                    .description("Values for the configurable fields of the promotion level")
+                    .type(listType(GQLTypePromotionRunFieldValue.PROMOTION_RUN_FIELD_VALUE))
+                    .dataFetcher { env -> env.getSource<PromotionRun>()!!.fieldValues }
+            }
+            // OK
             .build()
 
     override fun getSignature(entity: PromotionRun): Signature? = entity.signature

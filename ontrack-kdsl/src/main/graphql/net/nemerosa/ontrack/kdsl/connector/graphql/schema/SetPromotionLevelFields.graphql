@@ -1,0 +1,11 @@
+mutation SetPromotionLevelFields(
+    $promotionLevelId: Int!,
+    $fields: [PromotionLevelFieldInput!]!,
+) {
+    setPromotionLevelFields(input: {
+        promotionLevelId: $promotionLevelId,
+        fields: $fields,
+    }) {
+        ...PayloadUserErrors
+    }
+}

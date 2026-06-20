@@ -19,7 +19,8 @@ data class PromotionRun(
     )
     val promotionLevel: PromotionLevel,
     override val signature: Signature,
-    override val description: String?
+    override val description: String?,
+    val fieldValues: List<PromotionRunFieldValue> = emptyList(),
 ) : ProjectEntity {
 
     override val project: Project
@@ -32,7 +33,10 @@ data class PromotionRun(
     override val entityDisplayName: String
         get() = "Promotion run ${build.branch.project.name}/${build.branch.name}/${build.name}/${promotionLevel.name}"
 
-    fun withId(id: ID) = PromotionRun(id, build, promotionLevel, signature, description)
+    fun withId(id: ID) = PromotionRun(id, build, promotionLevel, signature, description, fieldValues)
+
+    fun withFieldValues(fieldValues: List<PromotionRunFieldValue>) =
+        PromotionRun(id, build, promotionLevel, signature, description, fieldValues)
 
     companion object {
         @JvmStatic

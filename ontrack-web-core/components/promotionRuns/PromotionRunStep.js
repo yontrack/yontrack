@@ -10,6 +10,7 @@ import PromotionRunDeleteAction from "@components/promotionRuns/PromotionRunDele
 import Link from "next/link";
 import {PromotionLevelImage} from "@components/promotionLevels/PromotionLevelImage";
 import React from "react";
+import PromotionRunFieldValues from "@components/promotionRuns/PromotionRunFieldValues";
 
 /**
  * Representation of a promotion run to place in a list of steps.
@@ -28,6 +29,13 @@ export default function PromotionRunStep({run, onChange}) {
                             <Typography.Text>Promoted by {run.creation.user}</Typography.Text>
                             <TimestampText value={run.creation.time}/>
                             <AnnotatedDescription entity={run}/>
+                            {
+                                run.fieldValues?.length > 0 &&
+                                <PromotionRunFieldValues
+                                    fields={run.promotionLevel.fields}
+                                    fieldValues={run.fieldValues}
+                                />
+                            }
                             <EntityNotificationsBadge
                                 entityType="PROMOTION_RUN"
                                 entityId={run.id}

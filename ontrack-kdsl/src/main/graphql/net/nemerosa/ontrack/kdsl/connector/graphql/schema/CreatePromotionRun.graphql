@@ -3,12 +3,14 @@ mutation CreatePromotionRun(
     $promotion: String!,
     $description: String!,
     $dateTime: LocalDateTime,
+    $fieldValues: [PromotionRunFieldValueInput!],
 ) {
     createPromotionRunById(input: {
         buildId: $buildId,
         promotion: $promotion,
         description: $description,
         dateTime: $dateTime,
+        fieldValues: $fieldValues,
     }) {
         promotionRun {
             ...PromotionRunFragment

@@ -2,7 +2,8 @@ package net.nemerosa.ontrack.service
 
 import net.nemerosa.ontrack.it.AbstractDSLTestSupport
 import net.nemerosa.ontrack.it.AsAdminTest
-import net.nemerosa.ontrack.model.structure.PromotionRunService
+import net.nemerosa.ontrack.json.asJson
+import net.nemerosa.ontrack.model.structure.*
 import net.nemerosa.ontrack.test.TestUtils.uid
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -123,6 +124,50 @@ class PromotionRunServiceIT : AbstractDSLTestSupport() {
 
                 assertFalse(promotionRunService.isBuildPromoted(build1, pl), "Build is not promoted")
                 assertTrue(promotionRunService.isBuildPromoted(build2, pl), "Build is promoted")
+            }
+        }
+    }
+
+    @Test
+    fun `Field values are loaded when fetching promotion runs for a build`() {
+        project {
+            branch {
+                val pl = promotionLevel()
+                structureService.setPromotionLevelFields(
+                    pl.id,
+                    listOf(
+                        PromotionLevelField(0, "ticket", "Ticket", null, PromotionLevelFieldType.TEXT, required = false, emptyList(), 0),
+                    )
+                )
+                build {
+                    structureService.newPromotionRun(
+                        PromotionRun.of(
+                            build = this,
+                            promotionLevel = structureService.getPromotionLevel(pl.id),
+                            signature = Signature.anonymous(),
+                            description = null,
+                        ).withFieldValues(listOf(PromotionRunFieldValue("ticket", "PROJ-42".asJson())))
+                    )
+
+                    // getPromotionRunsForBuild
+                    val runs = structureService.getPromotionRunsForBuild(id)
+                    val fv = runs.firstOrNull()?.fieldValues?.firstOrNull { it.name == "ticket" }
+                    assertNotNull(fv, "ticket field value must be present in getPromotionRunsForBuild")
+                    assertEquals("PROJ-42", fv.value?.asText())
+
+                    // getLastPromotionRunsForBuild
+                    val promotionLevels = structureService.getPromotionLevelListForBranch(branch.id)
+                    val lastRuns = structureService.getLastPromotionRunsForBuild(this, promotionLevels)
+                    val lastFv = lastRuns.firstOrNull()?.fieldValues?.firstOrNull { it.name == "ticket" }
+                    assertNotNull(lastFv, "ticket field value must be present in getLastPromotionRunsForBuild")
+                    assertEquals("PROJ-42", lastFv.value?.asText())
+
+                    // getPromotionRunsForBuildAndPromotionLevel
+                    val plRuns = structureService.getPromotionRunsForBuildAndPromotionLevel(this, structureService.getPromotionLevel(pl.id))
+                    val plFv = plRuns.firstOrNull()?.fieldValues?.firstOrNull { it.name == "ticket" }
+                    assertNotNull(plFv, "ticket field value must be present in getPromotionRunsForBuildAndPromotionLevel")
+                    assertEquals("PROJ-42", plFv.value?.asText())
+                }
             }
         }
     }

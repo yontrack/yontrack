@@ -63,7 +63,9 @@ public class StructureServiceImplTest {
                 statsRepository,
                 mock(BuildLinkListenerService.class),
                 coreBuildFilterRepository,
-                mock(MetricsExportService.class)
+                mock(MetricsExportService.class),
+                mock(PromotionRunRepository.class),
+                mock(PromotionLevelRepository.class)
         );
         // Model
         Project project = Project.of(nd("P", "Project")).withId(ID.of(1));

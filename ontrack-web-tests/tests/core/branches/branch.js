@@ -83,6 +83,12 @@ class BranchPage {
         return promotionsPage
     }
 
+    async hoverPromotionRun(promotionLevel) {
+        const trigger = this.page.locator(`.promotion-run-pl-${promotionLevel.id}`).first()
+        await expect(trigger).toBeVisible()
+        await trigger.hover()
+    }
+
     async deleteBranch() {
         const button = this.page.getByRole('button', {name: 'Delete branch'})
         await expect(button).toBeVisible()

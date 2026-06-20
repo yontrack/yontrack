@@ -1,0 +1,9 @@
+query GetPromotionRunFieldValues($id: Int!) {
+    promotionRuns(id: $id) {
+        id
+        fieldValues {
+            name
+            value
+        }
+    }
+}

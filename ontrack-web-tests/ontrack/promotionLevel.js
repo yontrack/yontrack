@@ -50,5 +50,27 @@ const promotionLevelInstance = (branch, data) => {
     // Notifications methods
     registerNotificationExtensions(promotionLevel)
 
+    promotionLevel.setFields = async (fields) => {
+        await graphQLCallMutation(
+            promotionLevel.ontrack.connection,
+            'setPromotionLevelFields',
+            gql`
+                mutation SetPromotionLevelFields($promotionLevelId: Int!, $fields: [PromotionLevelFieldInput!]!) {
+                    setPromotionLevelFields(input: {
+                        promotionLevelId: $promotionLevelId,
+                        fields: $fields,
+                    }) {
+                        errors { message }
+                    }
+                }
+            `,
+            {
+                promotionLevelId: Number(promotionLevel.id),
+                fields,
+            }
+        )
+        return promotionLevel
+    }
+
     return promotionLevel
 }

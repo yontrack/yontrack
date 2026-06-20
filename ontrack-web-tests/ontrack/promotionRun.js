@@ -57,6 +57,44 @@ export const createPromotionRun = async (build, promotionLevel, params) => {
 
 }
 
+export const createPromotionRunWithFieldValues = async (build, promotionLevel, fieldValues) => {
+
+    const data = await graphQLCallMutation(
+        build.ontrack.connection,
+        'createPromotionRunById',
+        gql`
+            mutation PromoteBuildWithFields(
+                $buildId: Int!,
+                $promotion: String!,
+                $fieldValues: [PromotionRunFieldValueInput!],
+            ) {
+                createPromotionRunById(input: {
+                    buildId: $buildId,
+                    promotion: $promotion,
+                    fieldValues: $fieldValues,
+                }) {
+                    promotionRun {
+                        ...PromotionRunData
+                    }
+                    errors {
+                        message
+                    }
+                }
+            }
+
+            ${promotionRunFragment}
+        `,
+        {
+            buildId: Number(build.id),
+            promotion: promotionLevel.name,
+            fieldValues,
+        }
+    )
+
+    return promotionRunInstance(build.ontrack, build, promotionLevel, data.createPromotionRunById.promotionRun)
+
+}
+
 export const getBuildPromotionRuns = async (build, promotionLevel) => {
     const data = await graphQLCall(
         build.ontrack.connection,

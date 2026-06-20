@@ -73,6 +73,7 @@ nav:
   - Concepts:
       - Model: content/concepts/model/index.md
       - Build links: content/concepts/model/build-links.md
+      - Promotion level fields: content/concepts/model/promotion-level-fields.md
   - Configuration:
       - CI Configuration: content/configuration/ci-config.md
       - Configuration as Code: content/configuration/casc.md

@@ -57,6 +57,8 @@ They can typically group several validation stamps together, rely on other promo
 
 Promotion level names can be anything, but you have to agree at your organization level on their meanings. They will often be used to talk about quality throughout all your projects. Something often used is to use abstract names, like medal names, like gold, silver, bronze, etc. But again, this is up to you.
 
+Promotion levels can have [configurable fields](promotion-level-fields.md) that users must fill in when promoting a build.
+
 ## Validation runs
 
 When linked to a [build](#builds), a [validation stamp](#validation-stamps) can be passed, failed, in warning, etc. It
@@ -76,7 +78,7 @@ some data, of the same type as the validation stamp.
 
 A promotion level can be granted to a [build](#builds). This is called a _promotion_ or _promotion run_. This can happen several times for a given promotion level and a given build.
 
-A promotion is either granted or not granted at all. There is no notion of data associated with a promotion.
+A promotion is either granted or not granted. When [promotion level fields](promotion-level-fields.md) are configured, field values can be associated with each promotion run.
 
 ## Properties
 

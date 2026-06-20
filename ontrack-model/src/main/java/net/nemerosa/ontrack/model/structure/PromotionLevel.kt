@@ -13,7 +13,8 @@ data class PromotionLevel(
         val branch: Branch,
         @JsonProperty("image")
         val isImage: Boolean,
-        override val signature: Signature
+        override val signature: Signature,
+        val fields: List<PromotionLevelField> = emptyList(),
 ) : ProjectEntity {
 
     companion object {
@@ -43,13 +44,15 @@ data class PromotionLevel(
     override val entityDisplayName: String
         get() = "Promotion level ${branch.project.name}/${branch.name}/$name"
 
-    fun withDescription(description: String?) = PromotionLevel(id, name, description, branch, isImage, signature)
+    fun withDescription(description: String?) = PromotionLevel(id, name, description, branch, isImage, signature, fields)
 
-    fun withSignature(signature: Signature) = PromotionLevel(id, name, description, branch, isImage, signature)
+    fun withSignature(signature: Signature) = PromotionLevel(id, name, description, branch, isImage, signature, fields)
 
-    fun withId(id: ID) = PromotionLevel(id, name, description, branch, isImage, signature)
+    fun withId(id: ID) = PromotionLevel(id, name, description, branch, isImage, signature, fields)
 
-    fun withImage(isImage: Boolean) = PromotionLevel(id, name, description, branch, isImage, signature)
+    fun withImage(isImage: Boolean) = PromotionLevel(id, name, description, branch, isImage, signature, fields)
+
+    fun withFields(fields: List<PromotionLevelField>) = PromotionLevel(id, name, description, branch, isImage, signature, fields)
 
     fun update(nameDescription: NameDescription): PromotionLevel = PromotionLevel(
             id,
@@ -57,6 +60,7 @@ data class PromotionLevel(
             nameDescription.description,
             branch,
             isImage,
-            signature
+            signature,
+            fields
     )
 }

@@ -226,6 +226,8 @@ interface StructureService {
 
     fun reorderPromotionLevels(branchId: ID, reordering: Reordering)
 
+    fun setPromotionLevelFields(promotionLevelId: ID, fields: List<PromotionLevelField>)
+
     fun newPromotionLevelFromPredefined(branch: Branch, predefinedPromotionLevel: PredefinedPromotionLevel): PromotionLevel
 
     fun getOrCreatePromotionLevel(branch: Branch, promotionLevelId: Int?, promotionLevelName: String?): PromotionLevel

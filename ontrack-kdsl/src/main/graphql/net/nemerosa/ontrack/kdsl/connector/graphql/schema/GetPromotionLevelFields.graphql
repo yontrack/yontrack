@@ -1,0 +1,13 @@
+query GetPromotionLevelFields($id: Int!) {
+    promotionLevel(id: $id) {
+        fields {
+            name
+            displayName
+            description
+            type
+            required
+            options
+            position
+        }
+    }
+}

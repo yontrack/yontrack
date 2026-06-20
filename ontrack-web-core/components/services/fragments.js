@@ -21,6 +21,16 @@ export const gqlPromotionLevelFragment = gql`
         name
         description
         image
+        fields {
+            id
+            name
+            displayName
+            description
+            type
+            required
+            options
+            position
+        }
         authorizations {
             name
             action
@@ -323,9 +333,13 @@ export const gqlPromotionLevelByIdQuery = gql`
             information {
                 ...informationFragment
             }
+            decorations {
+                ...decorationContent
+            }
         }
     }
     ${gqlPromotionLevelFragment}
     ${gqlPropertiesFragment}
     ${gqlInformationFragment}
+    ${gqlDecorationFragment}
 `
