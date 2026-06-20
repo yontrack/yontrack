@@ -242,9 +242,9 @@ pipeline {
                     expression {
                         params.JUST_BUILD_AND_PUSH
                     }
-                    expression {
-                        params.RELEASE
-                    }
+                }
+                expression {
+                    params.RELEASE
                 }
             }
             environment {
@@ -281,9 +281,9 @@ pipeline {
                 anyOf {
                     branch 'main'
                     branch 'release/*'
-                    expression {
-                        params.RELEASE
-                    }
+                }
+                expression {
+                    params.RELEASE
                 }
             }
             steps {
@@ -328,9 +328,9 @@ pipeline {
                 anyOf {
                     branch 'main'
                     branch 'release/*'
-                    expression {
-                        params.RELEASE
-                    }
+                }
+                expression {
+                    params.RELEASE
                 }
             }
             steps {
