@@ -10,4 +10,6 @@ data class CIPromotionConfig(
     val promotions: List<String> = emptyList(),
     @APIDescription("List of promotion levels this promotion depends on")
     val dependsOn: List<String> = emptyList(),
+    @APIDescription("List of field definitions for this promotion")
+    val fields: List<CIPromotionFieldConfig> = emptyList(),
 )

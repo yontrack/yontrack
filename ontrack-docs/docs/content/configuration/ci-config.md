@@ -323,6 +323,46 @@ The semantic of `dependsOn` is different from `promotions`:
 * `promotions` define the list of other promotions that participate in the auto-promotion of this promotion ("if BRONZE is granted and the listed validations are OK, then SILVER is granted automatically")
 * `dependsOn` defines the list of promotions that must be completed before the promotion can be completed ("trying to promote to SILVER without having completed BRONZE" will fail)
 
+###### Fields
+
+A promotion level can define a list of [fields](../concepts/model/promotion-level-fields.md) that must be filled in when a build is promoted. Fields are defined under the `fields` key of a promotion:
+
+```yaml
+branch:
+  promotions:
+    BRONZE:
+      validations:
+        - build
+      fields:
+        - name: ticket
+          displayName: Ticket
+          description: "JIRA ticket reference"
+          type: TEXT
+          required: true
+        - name: env
+          displayName: Environment
+          type: CHOICE
+          options:
+            - staging
+            - prod
+        - name: hotfix
+          displayName: Hotfix?
+          type: BOOLEAN
+```
+
+Each field supports the following properties:
+
+| Property      | Required | Description                                                                 |
+|---------------|----------|-----------------------------------------------------------------------------|
+| `name`        | Yes      | Technical identifier for the field (unique per promotion level)             |
+| `displayName` | Yes      | Human-readable label shown in the UI                                        |
+| `description` | No       | Optional description shown as a tooltip                                     |
+| `type`        | Yes      | One of `TEXT`, `NUMBER`, `BOOLEAN`, `CHOICE`, `LINK`                        |
+| `required`    | No       | Whether the field must be filled in before promoting (default: `false`)     |
+| `options`     | No       | List of allowed values — only valid when `type` is `CHOICE`                 |
+
+When the CI config is applied multiple times (e.g. on different branches), fields are merged by their `name`: existing fields are updated, new fields are added, and no fields are removed.
+
 #### Build configuration
 
 The `build` configuration is optional.

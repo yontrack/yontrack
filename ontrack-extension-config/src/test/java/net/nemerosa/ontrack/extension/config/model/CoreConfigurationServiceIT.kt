@@ -239,4 +239,57 @@ class CoreConfigurationServiceIT : AbstractDSLTestSupport() {
         }
     }
 
+    @Test
+    @AsAdminTest
+    fun `Fields defined in CI config are applied to promotion levels`() {
+        val branch = configTestSupport.configureBranch(
+            yaml = """
+                version: v1
+                configuration:
+                  defaults:
+                    branch:
+                      promotions:
+                        BRONZE:
+                          fields:
+                            - name: ticket
+                              displayName: Ticket
+                              description: "JIRA ticket reference"
+                              type: TEXT
+                              required: true
+                            - name: env
+                              displayName: Environment
+                              type: CHOICE
+                              options:
+                                - staging
+                                - prod
+            """.trimIndent(),
+            ci = "generic",
+            scm = "mock",
+            env = EnvFixtures.generic(),
+        )
+
+        val bronzeRef = structureService.findPromotionLevelByName(branch.project.name, branch.name, "BRONZE")
+            .getOrNull()
+            ?: fail("Missing BRONZE promotion")
+        val bronze = structureService.getPromotionLevel(bronzeRef.id)
+
+        assertEquals(2, bronze.fields.size)
+
+        val ticketField = bronze.fields.find { it.name == "ticket" }
+        assertNotNull(ticketField) {
+            assertEquals("Ticket", it.displayName)
+            assertEquals("JIRA ticket reference", it.description)
+            assertEquals(net.nemerosa.ontrack.model.structure.PromotionLevelFieldType.TEXT, it.type)
+            assertTrue(it.required)
+            assertEquals(emptyList(), it.options)
+        }
+
+        val envField = bronze.fields.find { it.name == "env" }
+        assertNotNull(envField) {
+            assertEquals("Environment", it.displayName)
+            assertEquals(net.nemerosa.ontrack.model.structure.PromotionLevelFieldType.CHOICE, it.type)
+            assertEquals(listOf("staging", "prod"), it.options)
+        }
+    }
+
 }

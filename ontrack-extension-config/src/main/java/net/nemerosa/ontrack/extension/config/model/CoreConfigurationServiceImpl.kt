@@ -228,6 +228,8 @@ class CoreConfigurationServiceImpl(
                     NameDescription(name = config.name, description = config.description)
                 )
             )
+            // Fields
+            structureService.setPromotionLevelFields(pl.id, config.fields)
             // Auto promotion property is not accessible through the API (general extension not visible)
             promotionLevelConfigurators.forEach { configurator ->
                 configurator.configure(pl, config)

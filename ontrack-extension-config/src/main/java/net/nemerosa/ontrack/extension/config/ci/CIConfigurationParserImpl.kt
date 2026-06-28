@@ -116,6 +116,18 @@ class CIConfigurationParserImpl(
                 validations = config.validations,
                 promotions = config.promotions,
                 dependencies = config.dependsOn,
+                fields = config.fields.mapIndexed { index, field ->
+                    PromotionLevelField(
+                        id = 0,
+                        name = field.name,
+                        displayName = field.displayName,
+                        description = field.description,
+                        type = field.type,
+                        required = field.required,
+                        options = field.options,
+                        position = index,
+                    )
+                },
             )
         }
     }

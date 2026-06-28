@@ -5,6 +5,8 @@ import net.nemerosa.ontrack.extension.config.model.*
 import net.nemerosa.ontrack.it.AbstractDSLTestSupport
 import net.nemerosa.ontrack.json.asJson
 import net.nemerosa.ontrack.model.structure.PromotionLevelConfiguration
+import net.nemerosa.ontrack.model.structure.PromotionLevelField
+import net.nemerosa.ontrack.model.structure.PromotionLevelFieldType
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import kotlin.test.assertEquals
@@ -171,6 +173,83 @@ class CIConfigurationParserIT : AbstractDSLTestSupport() {
                                 PromotionLevelConfiguration(
                                     name = "target-environment",
                                     dependencies = listOf("GOLD"),
+                                ),
+                            )
+                        )
+                    )
+                )
+            ),
+            config
+        )
+    }
+
+    @Test
+    fun `Parsing of promotion with fields`() {
+        val config = parser.parseConfig(
+            """
+                version: v1
+                configuration:
+                  defaults:
+                    branch:
+                      promotions:
+                        BRONZE:
+                          fields:
+                            - name: ticket
+                              displayName: Ticket
+                              description: "JIRA ticket reference"
+                              type: TEXT
+                              required: true
+                            - name: env
+                              displayName: Environment
+                              type: CHOICE
+                              options:
+                                - staging
+                                - prod
+                            - name: hotfix
+                              displayName: Hotfix?
+                              type: BOOLEAN
+            """.trimIndent()
+        )
+        assertEquals(
+            ConfigurationInput(
+                configuration = RootConfiguration(
+                    defaults = Configuration(
+                        branch = BranchConfiguration(
+                            promotions = listOf(
+                                PromotionLevelConfiguration(
+                                    name = "BRONZE",
+                                    fields = listOf(
+                                        PromotionLevelField(
+                                            id = 0,
+                                            name = "ticket",
+                                            displayName = "Ticket",
+                                            description = "JIRA ticket reference",
+                                            type = PromotionLevelFieldType.TEXT,
+                                            required = true,
+                                            options = emptyList(),
+                                            position = 0,
+                                        ),
+                                        PromotionLevelField(
+                                            id = 0,
+                                            name = "env",
+                                            displayName = "Environment",
+                                            description = null,
+                                            type = PromotionLevelFieldType.CHOICE,
+                                            required = false,
+                                            options = listOf("staging", "prod"),
+                                            position = 1,
+                                        ),
+                                        PromotionLevelField(
+                                            id = 0,
+                                            name = "hotfix",
+                                            displayName = "Hotfix?",
+                                            description = null,
+                                            type = PromotionLevelFieldType.BOOLEAN,
+                                            required = false,
+                                            options = emptyList(),
+                                            position = 2,
+                                        ),
+                                    ),
                                 ),
                             )
                         )
