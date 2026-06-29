@@ -238,7 +238,8 @@ abstract class AbstractServiceTestSupport : AbstractITTestSupport() {
         build: Build,
         promotionLevel: PromotionLevel,
         description: String?,
-        signature: Signature = of("test")
+        signature: Signature = of("test"),
+        fieldValues: List<PromotionRunFieldValue> = emptyList(),
     ): PromotionRun {
         return structureService.newPromotionRun(
             of(
@@ -246,7 +247,7 @@ abstract class AbstractServiceTestSupport : AbstractITTestSupport() {
                 promotionLevel,
                 signature,
                 description
-            )
+            ).withFieldValues(fieldValues)
         )
     }
 

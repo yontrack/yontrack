@@ -15,7 +15,7 @@ import org.springframework.stereotype.Component
 @Component
 @APIDescription("Gets some meta information from a project entity.")
 @Documentation(MetaInfoPropertyTemplatingSourceConfig::class)
-@DocumentationExampleCode("${'$'}{build.release}")
+@DocumentationExampleCode($$"${build.meta?name=key}")
 class MetaInfoPropertyTemplatingSource(
     private val propertyService: PropertyService,
 ) : AbstractTemplatingSource(

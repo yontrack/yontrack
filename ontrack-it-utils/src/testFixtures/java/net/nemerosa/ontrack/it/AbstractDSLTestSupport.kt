@@ -221,11 +221,19 @@ abstract class AbstractDSLTestSupport : AbstractServiceTestSupport() {
     fun Branch.promotionLevel(
         name: String = uid("P"),
         description: String = "",
+        fields: List<PromotionLevelField> = emptyList(),
         init: PromotionLevel.() -> Unit = {}
-    ): PromotionLevel =
-        doCreatePromotionLevel(this, NameDescription.nd(name, description)).apply {
+    ): PromotionLevel {
+        val pl = doCreatePromotionLevel(this, NameDescription.nd(name, description))
+        return if (fields.isNotEmpty()) {
+            structureService.setPromotionLevelFields(pl.id, fields)
+            structureService.getPromotionLevel(pl.id)
+        } else {
+            pl
+        }.apply {
             init()
         }
+    }
 
     /**
      * Creates and returns a validation stamp
@@ -324,9 +332,10 @@ abstract class AbstractDSLTestSupport : AbstractServiceTestSupport() {
     fun Build.promote(
         promotionLevel: PromotionLevel,
         description: String = "",
-        signature: Signature = Signature.of("test")
+        signature: Signature = Signature.of("test"),
+        fieldValues: List<PromotionRunFieldValue> = emptyList(),
     ) =
-        doPromote(this, promotionLevel, description, signature)
+        doPromote(this, promotionLevel, description, signature, fieldValues)
 
     fun Build.promote(promotionLevel: PromotionLevel, description: String = "", time: LocalDateTime) =
         promote(promotionLevel, description, signature = Signature.Companion.of(time, "test"))
