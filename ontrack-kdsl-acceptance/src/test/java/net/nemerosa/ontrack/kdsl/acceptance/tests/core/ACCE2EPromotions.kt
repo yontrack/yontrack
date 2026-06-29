@@ -32,7 +32,6 @@ class ACCE2EPromotions : AbstractACCDSLTestSupport() {
             val expectedChartJson = mapOf(
                 "categories" to listOf("Mean", "90th percentile", "Maximum"),
                 "dates" to listOf(
-                    "2024-01-26",
                     "2024-02-02",
                     "2024-02-09",
                     "2024-02-16",
@@ -40,7 +39,8 @@ class ACCE2EPromotions : AbstractACCDSLTestSupport() {
                     "2024-03-01",
                     "2024-03-08",
                     "2024-03-15",
-                    "2024-03-22"
+                    "2024-03-22",
+                    "2024-03-29",
                 ),
                 "data" to mapOf(
                     "mean" to listOf("NaN", "NaN", 432000, "NaN", 108000, "NaN", "NaN", "NaN", "NaN"),

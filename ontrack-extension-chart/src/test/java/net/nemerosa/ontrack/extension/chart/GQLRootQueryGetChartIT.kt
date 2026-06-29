@@ -1,6 +1,5 @@
 package net.nemerosa.ontrack.extension.chart
 
-import net.nemerosa.ontrack.common.Time
 import net.nemerosa.ontrack.graphql.AbstractQLKTITSupport
 import net.nemerosa.ontrack.json.asJson
 import net.nemerosa.ontrack.model.structure.Signature
@@ -52,7 +51,7 @@ internal class GQLRootQueryGetChartIT: AbstractQLKTITSupport() {
                         assertEquals(
                             mapOf(
                                 "categories" to listOf("Mean", "90th percentile", "Maximum"),
-                                "dates" to listOf("2022-04-12", "2022-04-19", "2022-04-26", "2022-05-03", "2022-05-10"),
+                                "dates" to listOf("2022-04-19", "2022-04-26", "2022-05-03", "2022-05-10", "2022-05-17"),
                                 "data" to mapOf(
                                     "mean" to listOf(1.5,12.142857142857142,12.285714285714286,7.571428571428571,17.5),
                                     "percentile90" to listOf(2.0,34.0,34.0,21.0,34.0),

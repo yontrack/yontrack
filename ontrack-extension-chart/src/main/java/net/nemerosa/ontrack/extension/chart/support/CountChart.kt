@@ -20,7 +20,7 @@ data class CountChart(
             // Chart
             return CountChart(
                 dates = intervals.map {
-                    intervalPeriod.format(it.start)
+                    intervalPeriod.format(it.end)
                 },
                 data = computeData(items, intervals)
             )

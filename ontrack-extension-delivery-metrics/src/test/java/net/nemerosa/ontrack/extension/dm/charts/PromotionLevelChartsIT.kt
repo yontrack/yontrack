@@ -204,7 +204,7 @@ internal class PromotionLevelChartsIT : AbstractDSLTestSupport() {
                                 "Maximum",
                             ),
                             "dates" to (-4L..-1).map { n ->
-                                now.plusWeeks(n).format(DateTimeFormatter.ISO_DATE)
+                                now.plusWeeks(n + 1).format(DateTimeFormatter.ISO_DATE)
                             },
                             "data" to mapOf(
                                 "mean" to listOf(
@@ -338,7 +338,7 @@ internal class PromotionLevelChartsIT : AbstractDSLTestSupport() {
                     assertEquals(
                         mapOf(
                             "dates" to (-4L..-1).map { n ->
-                                now.plusWeeks(n).format(DateTimeFormatter.ISO_DATE)
+                                now.plusWeeks(n + 1).format(DateTimeFormatter.ISO_DATE)
                             },
                             "data" to listOf(
                                 57.142857142857146,

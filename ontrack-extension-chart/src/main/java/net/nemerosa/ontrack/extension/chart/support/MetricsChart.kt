@@ -60,7 +60,7 @@ class MetricsChart(
             // Chart
             return MetricsChart(
                     dates = intervals.map {
-                        intervalPeriod.format(it.start)
+                        intervalPeriod.format(it.end)
                     },
                     metricNames = names ?: metricNames.sorted(),
                     metricColors = colors,

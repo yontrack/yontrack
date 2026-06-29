@@ -45,7 +45,7 @@ internal class ValidationStampFrequencyChartProviderIT : AbstractQLKTITSupport()
                     // Checks the chart data
                     assertEquals(
                         mapOf(
-                            "dates" to listOf("2022-04-12", "2022-04-19", "2022-04-26", "2022-05-03", "2022-05-10"),
+                            "dates" to listOf("2022-04-19", "2022-04-26", "2022-05-03", "2022-05-10", "2022-05-17"),
                             "data" to listOf(2.0, 7.0, 7.0, 7.0, 2.0)
                         ).asJson(),
                         chart.asJson()
