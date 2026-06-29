@@ -1,6 +1,7 @@
 package net.nemerosa.ontrack.extension.notifications.core
 
 import com.fasterxml.jackson.databind.JsonNode
+import com.fasterxml.jackson.databind.node.TextNode
 import net.nemerosa.ontrack.common.Time
 import net.nemerosa.ontrack.common.api.APIDescription
 import net.nemerosa.ontrack.common.parseDuration
@@ -20,8 +21,10 @@ import net.nemerosa.ontrack.json.*
 import net.nemerosa.ontrack.model.docs.Documentation
 import net.nemerosa.ontrack.model.events.Event
 import net.nemerosa.ontrack.model.events.EventTemplatingService
+import net.nemerosa.ontrack.model.events.PlainEventRenderer
 import net.nemerosa.ontrack.model.security.SecurityService
 import net.nemerosa.ontrack.model.structure.*
+import net.nemerosa.ontrack.model.utils.patchList
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
@@ -62,6 +65,7 @@ class YontrackPromotionNotificationChannel(
             branch = patchNullableString(changes, a::branch),
             build = patchNullableString(changes, a::build),
             promotion = patchString(changes, a::promotion),
+            fields = patchList(changes, a::fields) { it.name },
             waitForPromotion = patchBoolean(changes, a::waitForPromotion),
             waitForPromotionTimeout = if (changes.has(a::waitForPromotionTimeout.name)) {
                 val durationValue = changes.get(a::waitForPromotionTimeout.name).asText()
@@ -92,6 +96,20 @@ class YontrackPromotionNotificationChannel(
 
         logger.info("Promoting build ${build.name} to ${promotionLevel.name}...")
 
+        val resolvedFields = config.fields.map { field ->
+            PromotionRunFieldValue(
+                name = field.name,
+                value = TextNode(
+                    eventTemplatingService.render(
+                        template = field.value,
+                        event = event,
+                        context = context,
+                        renderer = PlainEventRenderer.INSTANCE,
+                    )
+                ),
+            )
+        }
+
         val run = securityService.asAdmin {
             structureService.newPromotionRun(
                 PromotionRun.of(
@@ -99,7 +117,7 @@ class YontrackPromotionNotificationChannel(
                     promotionLevel = promotionLevel,
                     signature = securityService.currentSignature,
                     description = description,
-                )
+                ).withFieldValues(resolvedFields)
             )
         }
 

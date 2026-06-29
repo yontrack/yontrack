@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 
 @AsAdminTest
 class YontrackPromotionNotificationChannelIT : AbstractNotificationTestSupport() {
@@ -89,6 +90,48 @@ class YontrackPromotionNotificationChannelIT : AbstractNotificationTestSupport()
                             "Promotion of $name",
                             it.description
                         )
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `Promotion using a notification with fields`() {
+        project {
+            branch {
+                val pl = promotionLevel()
+                val targetPl = promotionLevel()
+
+                eventSubscriptionService.subscribe(
+                    name = uid("s"),
+                    projectEntity = pl,
+                    channel = yontrackPromotionNotificationChannel,
+                    channelConfig = YontrackPromotionNotificationChannelConfig(
+                        promotion = targetPl.name,
+                        fields = listOf(
+                            YontrackPromotionNotificationChannelConfigField(
+                                name = "report",
+                                value = $$"Build: ${build}",
+                            )
+                        ),
+                    ),
+                    keywords = null,
+                    origin = "test",
+                    contentTemplate = null,
+                    eventTypes = arrayOf(EventFactory.NEW_PROMOTION_RUN),
+                )
+
+                build {
+                    promote(pl)
+
+                    // Checks that the target promotion has been set with the field value
+                    val run = structureService.getPromotionRunsForBuildAndPromotionLevel(this, targetPl).firstOrNull()
+                    assertNotNull(run, "Build has been promoted") {
+                        val reportField = it.fieldValues.find { fv -> fv.name == "report" }
+                        assertNotNull(reportField, "report field is set") { fv ->
+                            assertEquals("Build: $name", fv.value?.asText())
+                        }
                     }
                 }
             }

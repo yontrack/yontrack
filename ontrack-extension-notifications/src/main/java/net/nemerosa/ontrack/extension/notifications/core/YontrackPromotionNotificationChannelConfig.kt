@@ -3,6 +3,7 @@ package net.nemerosa.ontrack.extension.notifications.core
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize
 import com.fasterxml.jackson.databind.annotation.JsonSerialize
 import net.nemerosa.ontrack.common.api.APIDescription
+import net.nemerosa.ontrack.model.docs.DocumentationList
 import net.nemerosa.ontrack.model.json.DurationDeserializer
 import net.nemerosa.ontrack.model.json.DurationSerializer
 import java.time.Duration
@@ -16,6 +17,9 @@ data class YontrackPromotionNotificationChannelConfig(
     val build: String? = null,
     @APIDescription("Name of the promotion level to use.")
     val promotion: String,
+    @APIDescription("Fields to set on the promotion run")
+    @DocumentationList
+    val fields: List<YontrackPromotionNotificationChannelConfigField> = emptyList(),
     @APIDescription("Waiting for the promotion level associated notifications to be completed")
     val waitForPromotion: Boolean = false,
     @APIDescription("Timeout when waiting for the promotion level associated notifications to be completed")

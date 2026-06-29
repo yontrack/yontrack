@@ -1,4 +1,5 @@
-import {Form, Input, Switch} from "antd";
+import {Button, Form, Input, Space, Switch, Typography} from "antd";
+import {FaPlus, FaTrash} from "react-icons/fa";
 import {prefixedFormName} from "@components/form/formUtils";
 import DurationPicker from "@components/common/DurationPicker";
 
@@ -34,6 +35,65 @@ export default function YontrackPromotionNotificationChannelForm({prefix}) {
             >
                 <Input/>
             </Form.Item>
+            <Form.List
+                name={prefixedFormName(prefix, 'fields')}
+                label="Fields"
+                extra="Fields to set on the promotion run."
+            >
+                {(fields, {add, remove}) => (
+                    <>
+                        <div
+                            style={{
+                                display: 'flex',
+                                rowGap: 16,
+                                flexDirection: 'column',
+                            }}
+                        >
+                            {fields.map(({key, name, ...restField}) => (
+                                <>
+                                    <Space key={key}>
+                                        <Form.Item
+                                            {...restField}
+                                            name={[name, 'name']}
+                                            rules={[
+                                                {
+                                                    required: true,
+                                                    message: 'Field name is required.',
+                                                },
+                                            ]}
+                                        >
+                                            <Input placeholder="Name"/>
+                                        </Form.Item>
+                                        <Form.Item
+                                            {...restField}
+                                            name={[name, 'value']}
+                                            rules={[
+                                                {
+                                                    required: true,
+                                                    message: 'Field value is required.',
+                                                },
+                                            ]}
+                                        >
+                                            <Input placeholder="[template] Value"/>
+                                        </Form.Item>
+                                        <FaTrash
+                                            onClick={() => {
+                                                remove(name)
+                                            }}
+                                        />
+                                    </Space>
+                                </>
+                            ))}
+                            <Button type="dashed" onClick={() => add()} block>
+                                <Space>
+                                    <FaPlus/>
+                                    <Typography.Text>Add field</Typography.Text>
+                                </Space>
+                            </Button>
+                        </div>
+                    </>
+                )}
+            </Form.List>
             <Form.Item
                 name={prefixedFormName(prefix, 'waitForPromotion')}
                 label="Wait for promotion"
