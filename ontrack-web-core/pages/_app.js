@@ -16,6 +16,7 @@ import 'ace-builds/src-noconflict/ace';
 import 'ace-builds/src-noconflict/mode-yaml';
 import 'ace-builds/src-noconflict/mode-json';
 import 'ace-builds/src-noconflict/theme-github';
+import 'ace-builds/src-noconflict/ext-searchbox';
 import MessageContextProvider from "@components/providers/MessageProvider";
 import AuthProvider from "@components/providers/AuthProvider";
 import LoadingAggregator from "@components/providers/LoadingAggregator";
