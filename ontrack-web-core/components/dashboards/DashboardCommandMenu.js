@@ -2,6 +2,7 @@ import {useContext, useEffect, useState} from "react";
 import {UserContext} from "@components/providers/UserProvider";
 import {
     FaCheck,
+    FaCode,
     FaCopy,
     FaEdit,
     FaLock,
@@ -15,6 +16,7 @@ import {
 import {Button, Dropdown, message, Space, Typography} from "antd";
 import {DashboardContext} from "@components/dashboards/DashboardContextProvider";
 import SaveDashboardDialog, {useSaveDashboardDialog} from "@components/dashboards/SaveDashboardDialog";
+import DashboardYamlExportDialog, {useDashboardYamlExportDialog} from "@components/dashboards/DashboardYamlExportDialog";
 import {useRouter} from "next/router";
 import copy from "copy-to-clipboard";
 import Link from "next/link";
@@ -34,6 +36,8 @@ export default function DashboardCommandMenu() {
             }
         }
     })
+
+    const yamlExportDialog = useDashboardYamlExportDialog()
 
     const copyDashboard = () => {
         const selectedDashboard = context?.dashboard
@@ -140,6 +144,16 @@ export default function DashboardCommandMenu() {
             })
         }
 
+        // Exporting as YAML
+        if (context?.dashboard && context.dashboard.userScope !== 'BUILT_IN') {
+            menu.push({
+                key: 'exportYaml',
+                icon: <FaCode/>,
+                label: "Export as YAML",
+                onClick: () => yamlExportDialog.start(context.dashboard),
+            })
+        }
+
         // Editing current
         if (context?.dashboard && context.dashboard.authorizations.edit) {
             menu.push({
@@ -195,7 +209,7 @@ export default function DashboardCommandMenu() {
         // OK
         setItems(menu)
 
-    }, [context.dashboards?.length, context?.dashboard, user]);
+    }, [context.dashboards?.length, context?.dashboard, user, yamlExportDialog]);
 
     return (
         <>
@@ -210,6 +224,7 @@ export default function DashboardCommandMenu() {
                 </Button>
             </Dropdown>
             <SaveDashboardDialog saveDashboardDialog={saveDashboardDialog}/>
+            <DashboardYamlExportDialog dialog={yamlExportDialog}/>
         </>
     )
 }

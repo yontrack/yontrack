@@ -8934,6 +8934,8 @@ input CreatePromotionLevelByIdInput {
   branchId: Int!
   "Promotion level description"
   description: String!
+  "Optional field definitions to set at creation time"
+  fields: [PromotionLevelFieldInput!]
   "Promotion level name"
   name: String!
 }

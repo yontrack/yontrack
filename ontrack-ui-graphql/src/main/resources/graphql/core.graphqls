@@ -153,6 +153,8 @@ type Dashboard {
     userScope: DashboardContextUserScope!
     widgets: [WidgetInstance!]!
     authorizations: DashboardAuthorizations!
+    """Exports this dashboard as a YAML snippet ready to use with applyDashboards"""
+    asYaml: String!
 }
 
 extend type Query {
@@ -173,6 +175,13 @@ extend type Mutation {
     deleteDashboard(input: DeleteDashboardInput!): DeletionPayload
     """Selects a dashboard"""
     selectDashboard(input: SelectDashboardInput!): SelectDashboardPayload
+    """Applies a YAML list of dashboard definitions, creating or updating SHARED dashboards"""
+    applyDashboards(input: ApplyDashboardsInput!): ApplyDashboardsPayload!
+}
+
+input ApplyDashboardsInput {
+    """YAML list of dashboard definitions"""
+    yaml: String!
 }
 
 input WidgetInstanceInput {
@@ -234,4 +243,11 @@ type DeletionPayload implements PayloadInterface {
 type SelectDashboardPayload implements PayloadInterface {
     "List of errors"
     errors: [PayloadUserError]
+}
+
+type ApplyDashboardsPayload implements PayloadInterface {
+    "List of errors"
+    errors: [PayloadUserError]
+    """Dashboards that were created or updated"""
+    dashboards: [Dashboard!]!
 }

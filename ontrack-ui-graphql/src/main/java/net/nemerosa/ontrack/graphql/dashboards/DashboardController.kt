@@ -12,6 +12,8 @@ import org.springframework.graphql.data.method.annotation.QueryMapping
 import org.springframework.graphql.data.method.annotation.SchemaMapping
 import org.springframework.stereotype.Controller
 
+data class ApplyDashboardsInput(val yaml: String)
+
 @Controller
 class DashboardController(
     private val dashboardService: DashboardService,
@@ -63,5 +65,17 @@ class DashboardController(
         } catch (any: UserException) {
             SelectDashboardPayload(any.toPayloadErrors())
         }
+
+    @MutationMapping
+    fun applyDashboards(@Argument input: ApplyDashboardsInput): ApplyDashboardsPayload =
+        try {
+            val dashboards = dashboardService.applyDashboards(input.yaml)
+            ApplyDashboardsPayload(dashboards = dashboards)
+        } catch (any: UserException) {
+            ApplyDashboardsPayload(any.toPayloadErrors())
+        }
+
+    @SchemaMapping(typeName = "Dashboard", field = "asYaml")
+    fun asYaml(dashboard: Dashboard): String = dashboardService.dashboardAsYaml(dashboard)
 
 }

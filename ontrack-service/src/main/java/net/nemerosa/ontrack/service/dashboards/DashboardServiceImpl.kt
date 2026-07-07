@@ -1,9 +1,12 @@
 package net.nemerosa.ontrack.service.dashboards
 
+import net.nemerosa.ontrack.json.asJson
+import net.nemerosa.ontrack.json.parse
 import net.nemerosa.ontrack.model.dashboards.*
 import net.nemerosa.ontrack.model.preferences.PreferencesService
 import net.nemerosa.ontrack.model.security.SecurityService
 import net.nemerosa.ontrack.model.security.isGlobalFunctionGranted
+import net.nemerosa.ontrack.yaml.Yaml
 import org.springframework.stereotype.Service
 import java.util.*
 
@@ -155,6 +158,70 @@ class DashboardServiceImpl(
                 it.dashboardUuid = accessible.uuid
             }
         }
+    }
+
+    override fun findDashboardByUuid(uuid: String): Dashboard? =
+        dashboardStorageService.findDashboardByUuid(uuid)
+
+    override fun upsertSharedDashboard(definition: DashboardDefinition): Dashboard {
+        val definitionUuid = definition.uuid
+        val existing = if (!definitionUuid.isNullOrBlank()) {
+            dashboardStorageService.findDashboardByUuid(definitionUuid)
+        } else {
+            dashboardStorageService.findSharedDashboards().find { it.name == definition.name }
+        }
+        val resolvedUuid = existing?.uuid
+            ?: definition.uuid?.takeIf { it.isNotBlank() }
+            ?: UUID.nameUUIDFromBytes("dashboard:${definition.name}".toByteArray(Charsets.UTF_8)).toString()
+        val widgets = definition.widgets.mapIndexed { idx, w ->
+            WidgetInstance(
+                uuid = w.uuid?.takeIf { it.isNotBlank() }
+                    ?: UUID.nameUUIDFromBytes("widget:$resolvedUuid:$idx".toByteArray(Charsets.UTF_8)).toString(),
+                key = w.key,
+                config = w.config,
+                layout = w.layout,
+            )
+        }
+        val dashboard = Dashboard(
+            uuid = resolvedUuid,
+            name = definition.name,
+            userScope = DashboardContextUserScope.SHARED,
+            widgets = widgets,
+        )
+        dashboardStorageService.saveDashboard(dashboard)
+        return dashboard
+    }
+
+    override fun applyDashboards(yaml: String): List<Dashboard> {
+        securityService.checkGlobalFunction(DashboardSharing::class.java)
+        val yamlUtil = Yaml()
+        val documents = yamlUtil.read(yaml)
+        val definitions = documents.flatMap { doc ->
+            if (doc.isArray) {
+                doc.map { it.parse<DashboardDefinition>() }
+            } else {
+                listOf(doc.parse())
+            }
+        }
+        return definitions.map { upsertSharedDashboard(it) }
+    }
+
+    override fun dashboardAsYaml(dashboard: Dashboard): String {
+        val definition = DashboardDefinition(
+            uuid = dashboard.uuid,
+            name = dashboard.name,
+            widgets = dashboard.widgets.map { w ->
+                WidgetDefinition(
+                    uuid = w.uuid,
+                    key = w.key,
+                    config = w.config,
+                    layout = w.layout,
+                )
+            },
+        )
+        val yamlUtil = Yaml()
+        val json = listOf(definition.asJson())
+        return yamlUtil.write(json)
     }
 
     override fun getAuthorizations(dashboard: Dashboard): DashboardAuthorizations {

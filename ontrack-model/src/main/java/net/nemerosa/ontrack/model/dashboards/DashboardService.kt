@@ -37,4 +37,26 @@ interface DashboardService {
      */
     fun getAuthorizations(dashboard: Dashboard): DashboardAuthorizations
 
+    /**
+     * Finds a dashboard by UUID regardless of scope. Returns null if not found.
+     */
+    fun findDashboardByUuid(uuid: String): Dashboard?
+
+    /**
+     * Upserts a SHARED dashboard from a definition. Idempotent: matches by UUID then by name.
+     * Generates a deterministic UUID from the name when none is supplied. Never deletes others.
+     */
+    fun upsertSharedDashboard(definition: DashboardDefinition): Dashboard
+
+    /**
+     * Applies a YAML list of dashboard definitions, creating or updating SHARED dashboards.
+     * Requires [DashboardSharing] permission. Never deletes dashboards not in the list.
+     */
+    fun applyDashboards(yaml: String): List<Dashboard>
+
+    /**
+     * Serializes a dashboard to the YAML format accepted by [applyDashboards].
+     */
+    fun dashboardAsYaml(dashboard: Dashboard): String
+
 }

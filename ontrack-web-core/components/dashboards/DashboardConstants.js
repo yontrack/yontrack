@@ -5,6 +5,7 @@ export const gqlDashboardFragment = gql`
         uuid
         name
         userScope
+        asYaml
         authorizations {
             edit
             share
