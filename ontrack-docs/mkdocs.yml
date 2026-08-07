@@ -91,7 +91,19 @@ nav:
       - Dashboards as Code: content/dashboards/dashboards-as-code.md
       - Widgets:
           - Overview: content/dashboards/widgets/index.md
+          - Last active projects: content/dashboards/widgets/last-active-projects.md
+          - All projects: content/dashboards/widgets/all-project-list.md
+          - Project list: content/dashboards/widgets/project-list.md
+          - Favourite projects: content/dashboards/widgets/favourite-projects.md
+          - Favourite branches: content/dashboards/widgets/favourite-branches.md
+          - Branch statuses: content/dashboards/widgets/branch-statuses.md
+          - Last validations for a branch: content/dashboards/widgets/last-validations-for-branch.md
+          - Validations of last promoted build: content/dashboards/widgets/validations-last-promotion-build.md
+          - Project promotion: content/dashboards/widgets/project-promotion.md
           - Build dependencies tree: content/dashboards/widgets/build-dependencies-tree.md
+          - Promotion charts: content/dashboards/widgets/promotion-charts.md
+          - Validation charts: content/dashboards/widgets/validation-charts.md
+          - End-to-end lead time: content/dashboards/widgets/e2e-lead-time-chart.md
   - Reference:
       - API:
           - GraphQL API: content/api/graphql.md
