@@ -87,6 +87,8 @@ nav:
       - Workflows: content/integrations/workflows/workflows.md
       - Environments: content/integrations/environments/environments.md
   - Dashboards:
+      - Overview: content/dashboards/index.md
+      - Dashboards as Code: content/dashboards/dashboards-as-code.md
       - Widgets:
           - Build dependencies tree: content/dashboards/widgets/build-dependencies-tree.md
   - Reference:
