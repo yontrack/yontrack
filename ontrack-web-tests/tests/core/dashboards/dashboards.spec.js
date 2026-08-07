@@ -52,6 +52,56 @@ test('export a dashboard as YAML', async ({page, ontrack}) => {
     await expect(page.getByRole('dialog')).not.toBeVisible()
 })
 
+test('import dashboards as YAML via the UI', async ({page, ontrack}) => {
+    const dashboardName = `import-dash-${Date.now()}`
+    const yaml = `- name: "${dashboardName}"\n  widgets: []`
+
+    await login(page, ontrack)
+
+    // Open the Dashboard dropdown menu
+    await page.getByRole('button', {name: 'Dashboard', exact: true}).click()
+
+    // Click "Import dashboards as YAML"
+    await page.getByText('Import dashboards as YAML').click()
+
+    // The import dialog should appear
+    const modal = page.getByRole('dialog')
+    await expect(modal).toBeVisible()
+
+    // Fill in the YAML
+    await modal.locator('textarea').fill(yaml)
+
+    // Click Import
+    await modal.getByRole('button', {name: 'Import'}).click()
+
+    // Dialog should close after successful import
+    await expect(page.getByRole('dialog')).not.toBeVisible()
+
+    // The new dashboard should appear in the menu
+    await page.getByRole('button', {name: 'Dashboard', exact: true}).click()
+    await expect(page.getByText(dashboardName)).toBeVisible()
+})
+
+test('import dialog shows validation error for empty YAML', async ({page, ontrack}) => {
+    await login(page, ontrack)
+
+    // Open the Dashboard dropdown menu
+    await page.getByRole('button', {name: 'Dashboard', exact: true}).click()
+
+    // Click "Import dashboards as YAML"
+    await page.getByText('Import dashboards as YAML').click()
+
+    const modal = page.getByRole('dialog')
+    await expect(modal).toBeVisible()
+
+    // Submit without filling in the YAML field
+    await modal.getByRole('button', {name: 'Import'}).click()
+
+    // Dialog should remain open with a validation error
+    await expect(modal).toBeVisible()
+    await expect(modal.getByText('YAML content is required.')).toBeVisible()
+})
+
 test('export as YAML is not available for built-in dashboards', async ({page, ontrack}) => {
     await login(page, ontrack)
 

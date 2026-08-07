@@ -9,6 +9,7 @@ import {
     FaPlus,
     FaRegCopy,
     FaTrash,
+    FaUpload,
     FaUserLock,
     FaUsers,
     FaWindowRestore
@@ -17,6 +18,7 @@ import {Button, Dropdown, message, Space, Typography} from "antd";
 import {DashboardContext} from "@components/dashboards/DashboardContextProvider";
 import SaveDashboardDialog, {useSaveDashboardDialog} from "@components/dashboards/SaveDashboardDialog";
 import DashboardYamlExportDialog, {useDashboardYamlExportDialog} from "@components/dashboards/DashboardYamlExportDialog";
+import DashboardYamlImportDialog, {useDashboardYamlImportDialog} from "@components/dashboards/DashboardYamlImportDialog";
 import {useRouter} from "next/router";
 import copy from "copy-to-clipboard";
 import Link from "next/link";
@@ -38,6 +40,10 @@ export default function DashboardCommandMenu() {
     })
 
     const yamlExportDialog = useDashboardYamlExportDialog()
+
+    const yamlImportDialog = useDashboardYamlImportDialog({
+        onSuccess: () => context.refresh(),
+    })
 
     const copyDashboard = () => {
         const selectedDashboard = context?.dashboard
@@ -154,6 +160,14 @@ export default function DashboardCommandMenu() {
             })
         }
 
+        // Importing from YAML
+        menu.push({
+            key: 'importYaml',
+            icon: <FaUpload/>,
+            label: "Import dashboards as YAML",
+            onClick: () => yamlImportDialog.start({}),
+        })
+
         // Editing current
         if (context?.dashboard && context.dashboard.authorizations.edit) {
             menu.push({
@@ -209,7 +223,7 @@ export default function DashboardCommandMenu() {
         // OK
         setItems(menu)
 
-    }, [context.dashboards?.length, context?.dashboard, user, yamlExportDialog]);
+    }, [context.dashboards?.length, context?.dashboard, user, yamlExportDialog, yamlImportDialog]);
 
     return (
         <>
@@ -225,6 +239,7 @@ export default function DashboardCommandMenu() {
             </Dropdown>
             <SaveDashboardDialog saveDashboardDialog={saveDashboardDialog}/>
             <DashboardYamlExportDialog dialog={yamlExportDialog}/>
+            <DashboardYamlImportDialog dialog={yamlImportDialog}/>
         </>
     )
 }
