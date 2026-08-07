@@ -100,6 +100,20 @@ class MockSCMTester(
             )
         }
 
+        /**
+         * Gets the content of a file on a branch, null if not existing.
+         */
+        fun getRepositoryFile(branch: String = "main", path: String): String? =
+            mockSCMExtension.repository(repositoryName).getFile(branch, path)
+
+        /**
+         * Gets a branch of the repository, null if not existing.
+         *
+         * @param namePattern Exact branch name or prefix followed by a `*`
+         */
+        fun getRepositoryBranch(namePattern: String): MockBranch? =
+            mockSCMExtension.repository(repositoryName).getBranch(namePattern)
+
         fun Build.withRepositoryCommit(message: String, property: Boolean = true): String {
             val branchProperty = propertyService.getPropertyValue(branch, MockSCMBranchPropertyType::class.java)
             return if (branchProperty != null) {

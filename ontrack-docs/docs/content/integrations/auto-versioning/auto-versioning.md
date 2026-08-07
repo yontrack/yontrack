@@ -458,9 +458,10 @@ to the target branch. Two modes are available:
 
 `PUSH`
 
-:   Yontrack applies the version change directly on the target branch, committing and pushing the
-    change without creating a pull request. [Post-processing](#post-processing) (if configured) still
-    runs before the merge. No approval flow is involved.
+:   Yontrack still creates a dedicated upgrade branch and applies the version change on it, so that
+    [post-processing](#post-processing) (if configured) can run against it. This branch is then merged
+    directly into the target branch, without creating a pull request, and **deleted** afterwards. No
+    approval flow is involved.
 
 :   !!! warning "No target-side validation"
 

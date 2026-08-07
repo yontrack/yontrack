@@ -55,6 +55,8 @@ object AutoVersioningTestFixtures {
         prBodyTemplate: String? = null,
         prBodyTemplateFormat: String? = null,
         schedule: LocalDateTime? = null,
+        upgradeBranchPattern: String = "feature/version-<version>",
+        pushMode: AutoVersioningPushMode = AutoVersioningPushMode.PR,
     ) = AutoVersioningOrder(
         uuid = UUID.randomUUID().toString(),
         sourceProject = sourceProject,
@@ -70,7 +72,7 @@ object AutoVersioningTestFixtures {
         targetPropertyType = null,
         targetVersion = targetVersion,
         autoApproval = true,
-        upgradeBranchPattern = "feature/version-<version>",
+        upgradeBranchPattern = upgradeBranchPattern,
         postProcessing = null,
         postProcessingConfig = NullNode.instance,
         validationStamp = null,
@@ -81,6 +83,7 @@ object AutoVersioningTestFixtures {
         prBodyTemplateFormat = prBodyTemplateFormat,
         additionalPaths = emptyList(),
         schedule = schedule,
+        pushMode = pushMode,
     )
 
     fun sampleConfig() = AutoVersioningConfig(

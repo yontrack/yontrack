@@ -87,6 +87,11 @@ class MockSCMExtension(
         private val branches = mutableListOf<MockBranch>()
 
         private val files = mutableMapOf<String, MutableMap<String, String>>()
+
+        /**
+         * Branches created using [createBranch], indexed by the name of the created branch,
+         * and associated with the branch they were created from.
+         */
         private val createdBranches = mutableMapOf<String, String>()
         private val createdPullRequests = mutableListOf<MockPullRequest>()
 
@@ -142,10 +147,11 @@ class MockSCMExtension(
 
         fun deleteBranch(branch: String) {
             createdBranches.remove(branch)
+            files.remove(branch)
         }
 
         fun createBranch(sourceBranch: String, newBranch: String): String {
-            createdBranches[sourceBranch] = newBranch
+            createdBranches[newBranch] = sourceBranch
             return newBranch
         }
 
@@ -209,15 +215,17 @@ class MockSCMExtension(
             actualBranch == branchPattern
         }
 
+        /**
+         * Looks for a branch, either one which carries some commits, or one which has been
+         * created using [createBranch] and not deleted since.
+         *
+         * @param namePattern Exact branch name or prefix followed by a `*`
+         */
         fun getBranch(namePattern: String): MockBranch? {
-            val branch = if (namePattern.endsWith("*")) {
-                createdBranches.entries.firstOrNull { (name, _) ->
-                    branchMatches(name, namePattern)
-                }?.value
-            } else {
-                createdBranches[name]
-            }
-            return branch?.let { MockBranch(it) }
+            val name = (branches.map { it.name } + createdBranches.keys)
+                .firstOrNull { branchMatches(it, namePattern) }
+                ?: return null
+            return branches.find { it.name == name } ?: MockBranch(name)
         }
 
         fun findIssue(key: String) = issues[key]

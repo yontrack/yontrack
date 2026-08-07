@@ -244,6 +244,9 @@ class AutoVersioningProcessingServiceImpl(
                 head = upgradeBranch,
                 base = scmBranch,
             )
+            // The upgrade branch was only needed to hold the change & to run the post-processing,
+            // and it has now been merged into the target branch: it can be deleted.
+            deleteUpgradeBranch(scm, upgradeBranch)
             // Audit
             autoVersioningAuditService.onPushed(
                 order = order,
@@ -263,6 +266,22 @@ class AutoVersioningProcessingServiceImpl(
             autoVersioningEventService.sendError(order, "Failed to directly push", e)
             throw e
         }
+
+    /**
+     * Deletion of the intermediate upgrade branch, on a best effort basis.
+     *
+     * The version change has already been merged into the target branch, so a failure to
+     * clean the upgrade branch must not turn a successful auto-versioning into an error. Any
+     * leftover branch is anyway deleted before being recreated by the next auto-versioning
+     * order using the same branch name.
+     */
+    private fun deleteUpgradeBranch(scm: SCM, upgradeBranch: String) {
+        try {
+            scm.deleteBranch(upgradeBranch)
+        } catch (e: Exception) {
+            logger.warn("Could not delete the upgrade branch $upgradeBranch after the direct push", e)
+        }
+    }
 
     private fun prPush(
         order: AutoVersioningOrder,

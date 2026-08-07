@@ -100,6 +100,7 @@ class ACCAutoVersioningDirectPush : AbstractACCAutoVersioningTestSupport() {
                             fileContains("post-processing.properties", branch = "main") {
                                 "postProcessingStamp = $postProcessingStamp"
                             }
+                            hasNoBranch("feature/auto-upgrade-${dependency.project.name}-2.0.0-*")
                         }
                     }
                 }
