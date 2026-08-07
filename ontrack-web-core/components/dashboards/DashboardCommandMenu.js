@@ -223,7 +223,8 @@ export default function DashboardCommandMenu() {
         // OK
         setItems(menu)
 
-    }, [context.dashboards?.length, context?.dashboard, user, yamlExportDialog, yamlImportDialog]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [context.dashboards?.length, context?.dashboard, user]);
 
     return (
         <>

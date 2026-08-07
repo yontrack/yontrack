@@ -14,7 +14,7 @@ export default function ProjectListWidget({projectNames}) {
     const [projects, setProjects] = useState([])
 
     const {setTitle} = useContext(DashboardWidgetCellContext)
-    setTitle("Project list")
+    useEffect(() => { setTitle("Project list") }, [])
 
     const fetchProject = async (name) => {
         const data = await client.request(

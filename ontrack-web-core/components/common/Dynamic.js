@@ -1,5 +1,5 @@
 import {Spin} from "antd";
-import {lazy, Suspense} from "react";
+import {lazy, Suspense, useMemo} from "react";
 import {ErrorBoundary} from "react-error-boundary";
 import InlineError from "@components/common/InlineError";
 
@@ -11,7 +11,8 @@ function LoadingError({path}) {
 
 export default function useDynamic({path, props}, dependencies = []) {
 
-    const Component = lazy(() => import(`../${path}`))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const Component = useMemo(() => lazy(() => import(`../${path}`)), [path])
 
     const logError = (error) => {
         console.log(error)

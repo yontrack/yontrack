@@ -102,6 +102,55 @@ test('import dialog shows validation error for empty YAML', async ({page, ontrac
     await expect(modal.getByText('YAML content is required.')).toBeVisible()
 })
 
+test('dashboard displays project list and branch status widgets correctly', async ({page, ontrack}) => {
+    const dashboardName = `widget-test-${Date.now()}`
+
+    // Create two projects and a branch on the first one
+    const project1 = await ontrack.createProject()
+    const project2 = await ontrack.createProject()
+    const branch = await project1.createBranch()
+
+    const yaml = [
+        `- name: "${dashboardName}"`,
+        `  widgets:`,
+        `    - key: "home/ProjectList"`,
+        `      layout: {x: 0, y: 0, w: 6, h: 25}`,
+        `      config:`,
+        `        projectNames:`,
+        `          - "${project1.name}"`,
+        `          - "${project2.name}"`,
+        `    - key: "home/BranchStatuses"`,
+        `      layout: {x: 6, y: 0, w: 6, h: 25}`,
+        `      config:`,
+        `        branches:`,
+        `          - project: "${project1.name}"`,
+        `            branch: "${branch.name}"`,
+    ].join('\n')
+
+    await login(page, ontrack)
+
+    // Import the dashboard via the UI dialog
+    await page.getByRole('button', {name: 'Dashboard', exact: true}).click()
+    await page.getByText('Import dashboards as YAML').click()
+    const modal = page.getByRole('dialog')
+    await expect(modal).toBeVisible()
+    await modal.locator('textarea').fill(yaml)
+    await modal.getByRole('button', {name: 'Import'}).click()
+    await expect(page.getByRole('dialog')).not.toBeVisible()
+
+    // Select the newly imported dashboard
+    await page.getByRole('button', {name: 'Dashboard', exact: true}).click()
+    await page.getByText(dashboardName).click()
+
+    // Project list widget: both project names should appear as links
+    // project1.name also appears in the branch statuses widget, so use .first()
+    await expect(page.getByRole('link', {name: project1.name}).first()).toBeVisible()
+    await expect(page.getByRole('link', {name: project2.name})).toBeVisible()
+
+    // Branch statuses widget: the branch should appear in the table
+    await expect(page.getByRole('link', {name: branch.name})).toBeVisible()
+})
+
 test('export as YAML is not available for built-in dashboards', async ({page, ontrack}) => {
     await login(page, ontrack)
 

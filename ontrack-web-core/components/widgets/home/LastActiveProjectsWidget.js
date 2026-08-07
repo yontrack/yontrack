@@ -1,4 +1,4 @@
-import {useContext} from "react";
+import {useContext, useEffect} from "react";
 import {useEventForRefresh} from "@components/common/EventsContext";
 import {gql} from "graphql-request";
 import {gqlDecorationFragment} from "@components/services/fragments";
@@ -14,7 +14,7 @@ export default function LastActiveProjectsWidget({count}) {
     const favouritesRefresh = useEventForRefresh("project.favourite")
 
     const {setTitle} = useContext(DashboardWidgetCellContext)
-    setTitle(`Last ${count} active projects`)
+    useEffect(() => { setTitle(`Last ${count} active projects`) }, [count])
 
     const {data: projects} = useQuery(
         gql`
