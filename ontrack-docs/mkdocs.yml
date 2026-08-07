@@ -90,6 +90,7 @@ nav:
       - Overview: content/dashboards/index.md
       - Dashboards as Code: content/dashboards/dashboards-as-code.md
       - Widgets:
+          - Overview: content/dashboards/widgets/index.md
           - Build dependencies tree: content/dashboards/widgets/build-dependencies-tree.md
   - Reference:
       - API:
