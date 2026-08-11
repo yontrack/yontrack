@@ -8,7 +8,10 @@ export default function ValidationRunStatusNone({
     return (
         <>
             <Space size={8} className={disabled ? undefined : "ot-command"} onClick={onClick}>
-                <ValidationRunStatusIcon statusID={{id: 'NONE'}}/>
+                {/* NONE is not in the status config table and resolves to the
+                    neutral fallback mark. The name is given explicitly so the
+                    accessible name is not the raw "NONE" id. */}
+                <ValidationRunStatusIcon statusID={{id: 'NONE', name: 'No status'}}/>
             </Space>
         </>
     )
