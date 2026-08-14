@@ -1,5 +1,6 @@
 package net.nemerosa.ontrack.service.dashboards
 
+import com.fasterxml.jackson.databind.node.NullNode
 import net.nemerosa.ontrack.json.asJson
 import net.nemerosa.ontrack.json.parse
 import net.nemerosa.ontrack.model.dashboards.*
@@ -178,7 +179,7 @@ class DashboardServiceImpl(
                 uuid = w.uuid?.takeIf { it.isNotBlank() }
                     ?: UUID.nameUUIDFromBytes("widget:$resolvedUuid:$idx".toByteArray(Charsets.UTF_8)).toString(),
                 key = w.key,
-                config = w.config,
+                config = w.config ?: NullNode.instance,
                 layout = w.layout,
             )
         }
@@ -207,20 +208,21 @@ class DashboardServiceImpl(
     }
 
     override fun dashboardAsYaml(dashboard: Dashboard): String {
+        // No UUID is exported: they are identifiers local to one Yontrack installation and
+        // are regenerated deterministically when the YAML is applied back (see [upsertSharedDashboard]).
         val definition = DashboardDefinition(
-            uuid = dashboard.uuid,
             name = dashboard.name,
             widgets = dashboard.widgets.map { w ->
                 WidgetDefinition(
-                    uuid = w.uuid,
                     key = w.key,
-                    config = w.config,
                     layout = w.layout,
+                    config = w.config.takeIf { !it.isNull },
                 )
             },
         )
         val yamlUtil = Yaml()
-        val json = listOf(definition.asJson())
+        // The export is a collection of one dashboard, directly usable by [applyDashboards]
+        val json = listOf(listOf(definition).asJson())
         return yamlUtil.write(json)
     }
 

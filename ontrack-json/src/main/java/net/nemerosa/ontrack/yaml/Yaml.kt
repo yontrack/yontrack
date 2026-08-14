@@ -12,6 +12,8 @@ class Yaml {
 
     private val yamlFactory = YAMLFactory().apply {
         enable(YAMLGenerator.Feature.LITERAL_BLOCK_STYLE)
+        // The document start marker is written explicitly, as a separator only (see [write])
+        disable(YAMLGenerator.Feature.WRITE_DOC_START_MARKER)
     }
 
     private val mapper = ObjectMapper(yamlFactory).apply {
@@ -28,11 +30,18 @@ class Yaml {
             .readAll()
     }
 
+    /**
+     * Writes a list of documents. Documents are separated by a `---` marker, which is
+     * therefore absent when writing one single document.
+     */
     fun write(json: List<JsonNode>): String {
         val writer = StringWriter()
-        json.forEach {
+        json.forEachIndexed { index, node ->
+            if (index > 0) {
+                writer.append("---\n")
+            }
             val generator = yamlFactory.createGenerator(writer)
-            generator.writeObject(it)
+            generator.writeObject(node)
             writer.append('\n')
         }
         return writer.toString()

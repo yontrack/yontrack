@@ -92,6 +92,25 @@ Pass the YAML string as the `$yaml` variable. The mutation returns the list of c
 
 ## Exporting dashboards
 
+The exported YAML is **ready to use**: it is a list containing the one exported dashboard, in exactly the format described above, and can be pasted as-is into a `dashboards.yml` file or fed straight back into `applyDashboards`.
+
+```yaml
+- name: "CI/CD Pipeline Status"
+  widgets:
+  - key: "home/LastActiveProjects"
+    layout:
+      x: 0
+      "y": 0
+      w: 6
+      h: 25
+    config:
+      count: 10
+```
+
+The `y` key is quoted because a bare `y` is a boolean in YAML 1.1; you can write it unquoted in your own files.
+
+UUIDs are deliberately **omitted** from the export. They identify dashboards and widgets within a single Yontrack installation, so leaving them out keeps the file portable across environments. Re-applying an export matches the existing shared dashboard by `name` (see [Upsert semantics](#upsert-semantics)) and creates it, with a deterministic UUID, where it does not exist yet.
+
 ### Via the UI
 
 Select any non-built-in dashboard, then open the **Dashboard** menu → **Export as YAML**. The dialog shows the YAML representation, which can be copied and stored in version control.

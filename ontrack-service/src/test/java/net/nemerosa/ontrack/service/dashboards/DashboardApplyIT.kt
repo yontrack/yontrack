@@ -1,13 +1,17 @@
 package net.nemerosa.ontrack.service.dashboards
 
 import net.nemerosa.ontrack.it.AbstractDSLTestSupport
+import net.nemerosa.ontrack.json.getRequiredTextField
 import net.nemerosa.ontrack.model.dashboards.DashboardContextUserScope
 import net.nemerosa.ontrack.model.dashboards.DashboardService
 import net.nemerosa.ontrack.model.security.Roles
 import net.nemerosa.ontrack.test.TestUtils.uid
+import net.nemerosa.ontrack.yaml.Yaml
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
+import java.util.*
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -150,8 +154,85 @@ class DashboardApplyIT : AbstractDSLTestSupport() {
 
             val restored = dashboardService.userDashboards().filter { it.name == name }
             assertEquals(1, restored.size, "Exactly one dashboard after round-trip")
-            assertEquals(dashboard.uuid, restored[0].uuid, "UUID preserved via explicit uuid in export")
+            assertEquals(dashboard.uuid, restored[0].uuid, "UUID deterministically derived from the name")
             assertEquals(10, restored[0].widgets[0].config.path("count").asInt())
+        }
+    }
+
+    @Test
+    fun `dashboardAsYaml exports a ready-to-use collection of one dashboard`() {
+        val name = uid("exp_")
+        asAccountWithGlobalRole(Roles.GLOBAL_ADMINISTRATOR) {
+            dashboardService.applyDashboards(
+                """
+                - name: "$name"
+                  widgets:
+                    - key: "home/LastActiveProjects"
+                      layout: {x: 0, y: 0, w: 6, h: 25}
+                      config: {count: 10}
+                """.trimIndent()
+            )
+            val dashboard = dashboardService.userDashboards().first { it.name == name }
+            val yaml = dashboardService.dashboardAsYaml(dashboard)
+
+            assertTrue(yaml.startsWith("- name:"), "Export is a collection, with no document start marker:\n$yaml")
+            assertFalse("uuid" in yaml, "Export contains no UUID:\n$yaml")
+
+            // The export must parse back as a list of one definition
+            val documents = Yaml().read(yaml)
+            assertEquals(1, documents.size, "One single YAML document")
+            val list = documents.first()
+            assertTrue(list.isArray, "Root of the document is a list")
+            assertEquals(1, list.size(), "List of one dashboard")
+            assertEquals(name, list.first().getRequiredTextField("name"))
+        }
+    }
+
+    @Test
+    fun `dashboardAsYaml re-applies onto the same dashboard when its UUID is not derived from its name`() {
+        val name = uid("nid_")
+        val uuid = UUID.randomUUID().toString()
+        asAccountWithGlobalRole(Roles.GLOBAL_ADMINISTRATOR) {
+            dashboardService.applyDashboards(
+                """
+                - uuid: "$uuid"
+                  name: "$name"
+                  widgets:
+                    - key: "home/LastActiveProjects"
+                      layout: {x: 0, y: 0, w: 6, h: 25}
+                      config: {count: 10}
+                """.trimIndent()
+            )
+            val dashboard = dashboardService.userDashboards().first { it.name == name }
+            assertEquals(uuid, dashboard.uuid, "Explicit UUID used at creation time")
+
+            // Re-applying the export (which carries no UUID) must match the existing dashboard by name
+            dashboardService.applyDashboards(dashboardService.dashboardAsYaml(dashboard))
+
+            val restored = dashboardService.userDashboards().filter { it.name == name }
+            assertEquals(1, restored.size, "No duplicate created by the export")
+            assertEquals(uuid, restored[0].uuid, "Existing dashboard updated in place")
+        }
+    }
+
+    @Test
+    fun `dashboardAsYaml omits the config of a widget without configuration`() {
+        val name = uid("nocfg_")
+        asAccountWithGlobalRole(Roles.GLOBAL_ADMINISTRATOR) {
+            dashboardService.applyDashboards(
+                """
+                - name: "$name"
+                  widgets:
+                    - key: "home/LastActiveProjects"
+                      layout: {x: 0, y: 0, w: 6, h: 25}
+                """.trimIndent()
+            )
+            val dashboard = dashboardService.userDashboards().first { it.name == name }
+            val yaml = dashboardService.dashboardAsYaml(dashboard)
+            assertFalse("config" in yaml, "No null config in the export:\n$yaml")
+            // Still usable
+            dashboardService.applyDashboards(yaml)
+            assertEquals(1, dashboardService.userDashboards().count { it.name == name })
         }
     }
 
