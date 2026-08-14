@@ -7,6 +7,7 @@ import net.nemerosa.ontrack.model.json.schema.DynamicJsonSchemaProvider
 import net.nemerosa.ontrack.model.json.schema.JsonType
 import net.nemerosa.ontrack.model.json.schema.JsonTypeBuilder
 import org.springframework.stereotype.Component
+import org.springframework.util.ClassUtils
 import kotlin.reflect.full.findAnnotation
 import kotlin.reflect.full.starProjectedType
 
@@ -27,11 +28,14 @@ class NotificationDynamicJsonSchemaProvider(
         channel: NotificationChannel<*, *>,
         builder: JsonTypeBuilder,
     ): JsonType {
-        val docClass = channel::class.findAnnotation<Documentation>()
-            ?: error("${channel::class} does not have a Documentation annotation")
+        // A channel may be proxied by Spring (when it is transactional, for example) and a proxy
+        // class carries none of the annotations of the channel it stands for.
+        val channelClass = ClassUtils.getUserClass(channel).kotlin
+        val docClass = channelClass.findAnnotation<Documentation>()
+            ?: error("$channelClass does not have a Documentation annotation")
         return builder.toType(
             type = docClass.value.starProjectedType,
-            description = getAPITypeDescription(channel::class)
+            description = getAPITypeDescription(channelClass)
         )
     }
 

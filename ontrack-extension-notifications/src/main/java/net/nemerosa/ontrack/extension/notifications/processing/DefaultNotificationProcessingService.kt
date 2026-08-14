@@ -19,11 +19,15 @@ import org.apache.commons.lang3.exception.ExceptionUtils
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
-import org.springframework.transaction.annotation.Transactional
 import java.util.*
 
+/**
+ * This service deliberately carries no transaction of its own: all its database work goes through
+ * [transactionHelper], and an ambient transaction would pin a connection for the whole processing -
+ * including the remote call performed by the channel - while every record write opened a second,
+ * simultaneous one.
+ */
 @Service
-@Transactional
 class DefaultNotificationProcessingService(
     private val notificationChannelRegistry: NotificationChannelRegistry,
     private val notificationRecordingService: NotificationRecordingService,
@@ -119,10 +123,14 @@ class DefaultNotificationProcessingService(
             current
         }
 
-        return try {
+        // The outcome is decided by the channel alone. Recording it comes afterwards and is
+        // best-effort: failing to save the record must never turn a notification which was
+        // actually sent into an error, nor mask the real failure of one which was not.
+        var failure: Throwable? = null
+        val result = try {
             meterRegistry.incrementForProcessing(NotificationsMetrics.event_processing_channel_publishing, item)
 
-            val result = channel.publish(
+            val published = channel.publish(
                 recordId = recordId,
                 config = config,
                 event = item.event,
@@ -130,33 +138,56 @@ class DefaultNotificationProcessingService(
                 template = item.template,
                 outputProgressCallback = outputProgressCallback,
             )
-            meterRegistry.incrementForProcessing(NotificationsMetrics.event_processing_channel_result, item, result)
+            meterRegistry.incrementForProcessing(NotificationsMetrics.event_processing_channel_result, item, published)
+            published
+        } catch (any: Throwable) {
+            logger.error("Error processing notification", any)
+            meterRegistry.incrementForProcessing(NotificationsMetrics.event_processing_channel_error, item)
+            failure = any
+            NotificationResult.error(any.message ?: any::class.java.name, output)
+        }
+
+        val error = failure
+        if (error != null) {
+            recordError(
+                recordId = recordId,
+                item = item,
+                validatedConfig = config.asJson(),
+                error = error,
+                output = output, // Using the current output, even for errors
+            )
+        } else {
             recordResult(
                 recordId = recordId,
                 item = item,
                 validatedConfig = config.asJson(),
                 result = result,
             )
-            result
-        } catch (any: Throwable) {
-            logger.error("Error processing notification", any)
-            meterRegistry.incrementForProcessing(NotificationsMetrics.event_processing_channel_error, item)
-            recordError(
-                recordId = recordId,
-                item = item,
-                validatedConfig = config.asJson(),
-                error = any,
-                output = output, // Using the current output, even for errors
-            )
-            NotificationResult.error(any.message ?: any::class.java.name, output)
         }
+
+        return result
     }
 
+    /**
+     * Saves a notification record, never throwing.
+     *
+     * The recording of a notification is only its trace: losing it (typically because the database
+     * is unavailable) must not break the processing of the notification itself.
+     */
     private fun record(
+        item: Notification,
         record: NotificationRecord,
     ) {
-        transactionHelper.inNewTransaction {
-            notificationRecordingService.record(record)
+        try {
+            transactionHelper.inNewTransaction {
+                notificationRecordingService.record(record)
+            }
+        } catch (any: Throwable) {
+            logger.error(
+                "Could not record the notification (id=${record.id}, channel=${record.channel})",
+                any
+            )
+            meterRegistry.incrementForProcessing(NotificationsMetrics.event_processing_recording_error, item)
         }
     }
 
@@ -167,6 +198,7 @@ class DefaultNotificationProcessingService(
         result: NotificationResult<*>,
     ) {
         record(
+            item,
             NotificationRecord(
                 id = recordId,
                 source = item.source,
@@ -187,6 +219,7 @@ class DefaultNotificationProcessingService(
         output: Any?,
     ) {
         record(
+            item,
             NotificationRecord(
                 id = recordId,
                 source = item.source,
@@ -206,6 +239,7 @@ class DefaultNotificationProcessingService(
         invalidChannelConfig: JsonNode,
     ) {
         record(
+            item,
             NotificationRecord(
                 id = recordId,
                 source = item.source,

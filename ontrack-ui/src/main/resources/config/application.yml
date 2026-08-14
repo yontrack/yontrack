@@ -12,6 +12,14 @@ spring:
     url: "jdbc:postgresql://localhost/ontrack"
     username: ontrack
     password: ontrack
+    # The default pool of 10 connections is well below the steady-state working set: the queue
+    # listeners alone (notifications, workflows, auto-versioning) hold about 27 consumer threads,
+    # on top of the workflow engine's own IO threads.
+    hikari:
+      maximum-pool-size: 30
+      minimum-idle: 5
+      connection-timeout: 30000
+      leak-detection-threshold: 60000
   # Rabbit MQ configuration
   rabbitmq:
     host: localhost

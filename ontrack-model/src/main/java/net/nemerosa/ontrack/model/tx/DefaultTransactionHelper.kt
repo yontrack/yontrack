@@ -11,6 +11,7 @@ import org.springframework.transaction.support.TransactionTemplate
 @Profile(RunProfile.PROD)
 class DefaultTransactionHelper(
     private val platformTransactionManager: PlatformTransactionManager,
+    private val transactionRetry: TransactionRetry,
 ) : TransactionHelper {
 
     override fun <T : Any> inNewTransaction(code: () -> T): T =
@@ -23,10 +24,13 @@ class DefaultTransactionHelper(
         code: () -> T?,
         allowNull: Boolean
     ): T? {
-        val transactionTemplate = TransactionTemplate(platformTransactionManager)
-        transactionTemplate.propagationBehavior = TransactionDefinition.PROPAGATION_REQUIRES_NEW
-        val result = transactionTemplate.execute {
-            code()
+        // Each attempt must open a brand new transaction, so the template is created inside the retry
+        val result = transactionRetry.withRetry {
+            val transactionTemplate = TransactionTemplate(platformTransactionManager)
+            transactionTemplate.propagationBehavior = TransactionDefinition.PROPAGATION_REQUIRES_NEW
+            transactionTemplate.execute {
+                code()
+            }
         }
         if (!allowNull && result == null) {
             error("Unexpected transaction result: null")

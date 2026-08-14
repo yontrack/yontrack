@@ -1,8 +1,21 @@
 package net.nemerosa.ontrack.model.utils
 
 import kotlinx.coroutines.*
+import org.slf4j.LoggerFactory
 import org.springframework.security.core.context.SecurityContextHolder
 import kotlin.coroutines.CoroutineContext
+
+private val logger = LoggerFactory.getLogger("net.nemerosa.ontrack.model.utils.Coroutines")
+
+/**
+ * Last-resort handler for coroutines launched without a parent scope.
+ *
+ * Without it, an uncaught failure is dumped raw on the standard error by the default thread
+ * handler, escaping the application logs altogether.
+ */
+private val loggingExceptionHandler = CoroutineExceptionHandler { context, throwable ->
+    logger.error("Uncaught error in coroutine [$context]", throwable)
+}
 
 /**
  * Launches some code as a coroutine while preserving the Spring security context.
@@ -18,7 +31,7 @@ fun launchWithSecurityContext(
 ): Job {
     val securityContext = SecurityContextHolder.getContext()
     return try {
-        CoroutineScope(context).launch {
+        CoroutineScope(context + loggingExceptionHandler).launch {
             SecurityContextHolder.setContext(securityContext)
             code()
         }

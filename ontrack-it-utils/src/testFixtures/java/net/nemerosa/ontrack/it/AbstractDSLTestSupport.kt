@@ -16,6 +16,7 @@ import net.nemerosa.ontrack.model.structure.*
 import net.nemerosa.ontrack.model.support.SettingsRepository
 import net.nemerosa.ontrack.model.tx.DefaultTransactionHelper
 import net.nemerosa.ontrack.model.tx.TransactionHelper
+import net.nemerosa.ontrack.model.tx.TransactionRetry
 import net.nemerosa.ontrack.test.TestUtils
 import net.nemerosa.ontrack.test.TestUtils.uid
 import net.nemerosa.ontrack.test.email
@@ -64,11 +65,14 @@ abstract class AbstractDSLTestSupport : AbstractServiceTestSupport() {
     @Autowired
     private lateinit var platformTransactionManager: PlatformTransactionManager
 
+    @Autowired
+    private lateinit var transactionRetry: TransactionRetry
+
     private lateinit var transactionHelper: TransactionHelper
 
     @BeforeEach
     fun setupTxHelper() {
-        transactionHelper = DefaultTransactionHelper(platformTransactionManager)
+        transactionHelper = DefaultTransactionHelper(platformTransactionManager, transactionRetry)
     }
 
     protected fun <T : Any> inNewTransaction(code: () -> T): T = transactionHelper.inNewTransaction(code)

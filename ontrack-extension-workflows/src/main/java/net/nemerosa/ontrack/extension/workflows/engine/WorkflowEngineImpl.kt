@@ -1,14 +1,14 @@
 package net.nemerosa.ontrack.extension.workflows.engine
 
 import com.fasterxml.jackson.databind.JsonNode
-import kotlinx.coroutines.Deferred
-import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withTimeoutOrNull
 import net.nemerosa.ontrack.extension.queue.dispatching.QueueDispatcher
 import net.nemerosa.ontrack.extension.queue.source.createQueueSource
 import net.nemerosa.ontrack.extension.workflows.WorkflowConfigurationProperties
 import net.nemerosa.ontrack.extension.workflows.definition.Workflow
+import net.nemerosa.ontrack.extension.workflows.definition.WorkflowNode
 import net.nemerosa.ontrack.extension.workflows.definition.WorkflowParentNode
 import net.nemerosa.ontrack.extension.workflows.definition.WorkflowValidation
 import net.nemerosa.ontrack.extension.workflows.definition.totalTimeout
@@ -20,6 +20,7 @@ import net.nemerosa.ontrack.model.security.SecurityService
 import net.nemerosa.ontrack.model.templating.TemplatingContextData
 import net.nemerosa.ontrack.model.trigger.TriggerData
 import net.nemerosa.ontrack.model.tx.DefaultTransactionHelper
+import net.nemerosa.ontrack.model.tx.TransactionRetry
 import net.nemerosa.ontrack.model.utils.launchAsyncWithSecurityContext
 import net.nemerosa.ontrack.model.utils.launchWithSecurityContext
 import org.slf4j.Logger
@@ -28,7 +29,6 @@ import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.stereotype.Component
 import org.springframework.transaction.PlatformTransactionManager
 import java.time.Duration
-import kotlin.coroutines.CoroutineContext
 
 @Component
 class WorkflowEngineImpl(
@@ -40,11 +40,14 @@ class WorkflowEngineImpl(
     private val workflowConfigurationProperties: WorkflowConfigurationProperties,
     private val securityService: SecurityService,
     platformTransactionManager: PlatformTransactionManager,
+    private val transactionRetry: TransactionRetry,
 ) : WorkflowEngine {
 
     private val logger: Logger = LoggerFactory.getLogger(WorkflowEngineImpl::class.java)
 
-    private val transactionHelper = DefaultTransactionHelper(platformTransactionManager)
+    // Nodes run on their own threads, outside of any ambient transaction, so real new transactions
+    // are always needed here - even in test mode where the TransactionHelper bean is a pass-through.
+    private val transactionHelper = DefaultTransactionHelper(platformTransactionManager, transactionRetry)
 
     override fun startWorkflow(
         workflow: Workflow,
@@ -153,60 +156,71 @@ class WorkflowEngineImpl(
         }
         // Starting the job for the node
         launchWithSecurityContext {
-            // Call must be authenticated
-            checkAuthentication("Workflow node process not authenticated")
-            debug("NODE PROCESSING", instance, workflowNodeId)
-            // Changes the node's status to WAITING
-            debug("NODE WAITING", instance, workflowNodeId)
-            nodeWaiting(workflowInstanceId, workflowNodeId)
-            // Waiting for the parent nodes to be OK
-            val okToStart = if (node.parents.isNotEmpty()) {
-                val securityContext = SecurityContextHolder.getContext()
-                val parentStatuses = try {
-                    val parentJobs = node.parents.map {
-                        createParentJob(
-                            coroutineContext = coroutineContext,
-                            instance = instance,
-                            workflowNodeId = workflowNodeId,
-                            parentDef = it
-                        )
-                    }
-                    debug("NODE WAITING FOR PARENTS", instance, workflowNodeId)
-                    parentJobs.awaitAll()
-                } finally {
-                    SecurityContextHolder.setContext(securityContext)
-                }
-                debug("NODE WAITED FOR PARENTS", instance, workflowNodeId)
-                // TODO OK to start depending on the conditions
-                val parentsOK = parentStatuses.all { it.status == WorkflowInstanceNodeStatus.SUCCESS }
-                // Checking the instance state again
-                if (parentsOK) {
-                    !getWorkflowInstanceTx(workflowInstanceId).status.finished
-                } else {
-                    val statusSummary = parentStatuses.joinToString(",") {
-                        "${it.parentDef.id}=${it.status}"
-                    }
-                    debugParent("NODE PARENTS STATUSES: $statusSummary", instance, workflowNodeId)
-                    false
-                }
-            } else {
-                // No parent
-                true
-            }
-            // Starting the node execution
-            if (okToStart) {
-                debug("NODE STARTED", instance, workflowNodeId)
-                nodeStarted(workflowInstanceId, workflowNodeId)
-                // Loading a fresh instance before starting
-                val freshInstance = getWorkflowInstanceTx(workflowInstanceId)
-                // Starts the node execution
-                nodeExecution(freshInstance, workflowNodeId)
-            } else {
-                debug("NODE PARENT NOT OK", instance, workflowNodeId)
-                nodeCancelled(workflowInstanceId, workflowNodeId, "Parents conditions were not met.")
+            try {
+                runNode(instance, workflowInstanceId, workflowNodeId, node)
+            } catch (cancellation: CancellationException) {
+                // Cancellation is not a node failure - letting the coroutine machinery deal with it
+                throw cancellation
+            } catch (any: Throwable) {
+                // Nothing must ever escape this coroutine: an uncaught error here would leave the
+                // node in a non-terminal state forever (and the instance running forever).
+                error("NODE UNCAUGHT ERROR", instance, workflowNodeId, any)
+                nodeErrorSafe(instance, workflowInstanceId, workflowNodeId, any)
             }
         }
         debug("NODE LAUNCHED", instance, workflowNodeId)
+    }
+
+    /**
+     * Actual processing of a node, once it has been accepted by [processNode].
+     *
+     * Extracted from the coroutine body so that the failure paths can be unit tested.
+     */
+    private suspend fun runNode(
+        instance: WorkflowInstance,
+        workflowInstanceId: String,
+        workflowNodeId: String,
+        node: WorkflowNode,
+    ) {
+        // Call must be authenticated
+        checkAuthentication("Workflow node process not authenticated")
+        debug("NODE PROCESSING", instance, workflowNodeId)
+        // Changes the node's status to WAITING
+        debug("NODE WAITING", instance, workflowNodeId)
+        nodeWaiting(workflowInstanceId, workflowNodeId)
+        // Waiting for the parent nodes to be OK
+        val okToStart = if (node.parents.isNotEmpty()) {
+            debug("NODE WAITING FOR PARENTS", instance, workflowNodeId)
+            val parentStatuses = awaitParents(instance, workflowNodeId, node.parents)
+            debug("NODE WAITED FOR PARENTS", instance, workflowNodeId)
+            // TODO OK to start depending on the conditions
+            val parentsOK = parentStatuses.all { it.status == WorkflowInstanceNodeStatus.SUCCESS }
+            // Checking the instance state again
+            if (parentsOK) {
+                !getWorkflowInstanceTx(workflowInstanceId).status.finished
+            } else {
+                val statusSummary = parentStatuses.joinToString(",") {
+                    "${it.parentDef.id}=${it.status}"
+                }
+                debugParent("NODE PARENTS STATUSES: $statusSummary", instance, workflowNodeId)
+                false
+            }
+        } else {
+            // No parent
+            true
+        }
+        // Starting the node execution
+        if (okToStart) {
+            debug("NODE STARTED", instance, workflowNodeId)
+            nodeStarted(workflowInstanceId, workflowNodeId)
+            // Loading a fresh instance before starting
+            val freshInstance = getWorkflowInstanceTx(workflowInstanceId)
+            // Starts the node execution
+            nodeExecution(freshInstance, workflowNodeId)
+        } else {
+            debug("NODE PARENT NOT OK", instance, workflowNodeId)
+            nodeCancelled(workflowInstanceId, workflowNodeId, "Parents conditions were not met.")
+        }
     }
 
     private fun getWorkflowInstanceTx(workflowInstanceId: String) = transactionHelper.inNewTransaction {
@@ -214,35 +228,67 @@ class WorkflowEngineImpl(
             ?: error("Could not find the workflow instance: $workflowInstanceId")
     }
 
-    private fun createParentJob(
-        coroutineContext: CoroutineContext,
+    /**
+     * Waits for all the [parents] of a node to reach a final status.
+     *
+     * A single polling loop, using a single batched query per iteration, is used for all the parents:
+     * one coroutine and one query per parent would multiply the load on the connection pool by the
+     * number of parents, for the whole duration of the parents' execution.
+     *
+     * Each parent keeps its own deadline, based on its total timeout. A parent which has not
+     * finished by then is reported as [WorkflowInstanceNodeStatus.TIMEOUT].
+     */
+    private suspend fun awaitParents(
         instance: WorkflowInstance,
         workflowNodeId: String,
-        parentDef: WorkflowParentNode
-    ): Deferred<WorkflowParentStatus> {
-        val parentNode = instance.workflow.getNode(parentDef.id)
-        val parentTimeoutSeconds = parentNode.totalTimeout(instance.workflow)
-        val parentTimeoutMs = parentTimeoutSeconds * 1_000L
-        return launchAsyncWithSecurityContext(context = coroutineContext) {
-            debugParent("NODE PARENT WAIT ${parentDef.id} START", instance, workflowNodeId)
-            val status = withTimeoutOrNull(parentTimeoutMs) {
-                var parentFinished = false
-                var parentStatus: WorkflowInstanceNodeStatus? = null
-                while (!parentFinished) {
-                    debugParent("NODE PARENT WAIT ${parentDef.id} STATUS", instance, workflowNodeId)
-                    parentStatus = getNodeStatus(instance.id, parentDef.id)
-                        ?: error("Could not find status for parent node: ${instance.id} / ${parentDef.id}")
-                    if (parentStatus.finished) {
-                        parentFinished = true
-                    } else {
-                        debugParent("NODE PARENT WAIT ${parentDef.id} DELAY", instance, workflowNodeId)
-                        delay(workflowConfigurationProperties.parentWaitingInterval.toMillis())
+        parents: List<WorkflowParentNode>,
+    ): List<WorkflowParentStatus> {
+        // The Spring security context is held in a thread local while a coroutine can resume on any
+        // thread of its dispatcher after a `delay`. It must therefore be restored at every resumption,
+        // and on the way out, or the rest of the node processing would run unauthenticated.
+        val securityContext = SecurityContextHolder.getContext()
+        try {
+            val start = System.currentTimeMillis()
+            // Deadline of each parent, based on its own total timeout
+            val deadlines = parents.associate { parentDef ->
+                val parentNode = instance.workflow.getNode(parentDef.id)
+                parentDef.id to start + parentNode.totalTimeout(instance.workflow) * 1_000L
+            }
+            val finalStatuses = mutableMapOf<String, WorkflowInstanceNodeStatus>()
+            val pending = parents.map { it.id }.toMutableSet()
+            while (pending.isNotEmpty()) {
+                debugParent("NODE PARENTS WAIT ${pending.joinToString(",")} STATUS", instance, workflowNodeId)
+                // One query for all the parents which are still pending
+                val statuses = getNodeStatuses(instance.id, pending.toList())
+                val now = System.currentTimeMillis()
+                val iterator = pending.iterator()
+                while (iterator.hasNext()) {
+                    val parentId = iterator.next()
+                    val status = statuses[parentId]
+                    when {
+                        status != null && status.finished -> {
+                            finalStatuses[parentId] = status
+                            iterator.remove()
+                        }
+                        // A missing row or a still-running parent both expire on the deadline
+                        now >= (deadlines[parentId] ?: now) -> {
+                            debugParent("NODE PARENT WAIT $parentId TIMEOUT", instance, workflowNodeId)
+                            finalStatuses[parentId] = WorkflowInstanceNodeStatus.TIMEOUT
+                            iterator.remove()
+                        }
                     }
                 }
-                debugParent("NODE PARENT WAIT ${parentDef.id} DONE $parentStatus", instance, workflowNodeId)
-                parentStatus
+                if (pending.isNotEmpty()) {
+                    debugParent("NODE PARENTS WAIT ${pending.joinToString(",")} DELAY", instance, workflowNodeId)
+                    delay(workflowConfigurationProperties.parentWaitingInterval.toMillis())
+                    SecurityContextHolder.setContext(securityContext)
+                }
             }
-            WorkflowParentStatus(parentDef, status ?: WorkflowInstanceNodeStatus.TIMEOUT)
+            return parents.map { parentDef ->
+                WorkflowParentStatus(parentDef, finalStatuses[parentDef.id] ?: WorkflowInstanceNodeStatus.TIMEOUT)
+            }
+        } finally {
+            SecurityContextHolder.setContext(securityContext)
         }
     }
 
@@ -301,10 +347,13 @@ class WorkflowEngineImpl(
                     }
                 }
             }
+        } catch (cancellation: CancellationException) {
+            // Cancellation is not a node failure
+            throw cancellation
         } catch (any: Throwable) {
             // Stores the node error status
             error("NODE UNCAUGHT ERROR", instance, nodeId, any)
-            nodeError(instance.id, nodeId, any.message, null)
+            nodeError(instance.id, nodeId, any.errorMessage(), null)
         }
     }
 
@@ -312,9 +361,17 @@ class WorkflowEngineImpl(
         securityService.currentUser ?: error(message)
     }
 
-    private fun getNodeStatus(instanceId: String, nodeId: String): WorkflowInstanceNodeStatus? =
-        transactionHelper.inNewTransactionNullable {
-            workflowInstanceRepository.getNodeStatus(instanceId, nodeId)
+    /**
+     * A single read does not need its own transaction: going through the transaction helper here
+     * would hold a pooled connection for a whole `REQUIRES_NEW` transaction on every polling tick.
+     * The retry is still needed though - this is the read which fails first when the pool is starved.
+     */
+    private fun getNodeStatuses(
+        instanceId: String,
+        nodeIds: Collection<String>,
+    ): Map<String, WorkflowInstanceNodeStatus> =
+        transactionRetry.withRetry {
+            workflowInstanceRepository.getNodeStatuses(instanceId, nodeIds)
         }
 
     private fun nodeWaiting(workflowInstanceId: String, workflowNodeId: String) {
@@ -362,6 +419,32 @@ class WorkflowEngineImpl(
             workflowInstanceRepository.stopInstance(instanceId)
         }
     }
+
+    /**
+     * Marks a node in error, without ever throwing.
+     *
+     * This is the last resort when the node processing failed: if the database is still unavailable
+     * after the retries, there is nothing left to do but log it loudly - throwing here would put us
+     * back into the very situation we are guarding against.
+     */
+    private fun nodeErrorSafe(
+        instance: WorkflowInstance,
+        instanceId: String,
+        nodeId: String,
+        failure: Throwable,
+    ) {
+        try {
+            nodeError(instanceId, nodeId, failure.errorMessage(), null)
+        } catch (secondary: Throwable) {
+            error("NODE ERROR STATUS COULD NOT BE SAVED", instance, nodeId, secondary)
+        }
+    }
+
+    /**
+     * Message to store for a failure. Some exceptions (NPE and the like) carry no message at all,
+     * and the node error must never end up being recorded as `null`.
+     */
+    private fun Throwable.errorMessage(): String = message ?: this::class.java.name
 
     override fun findWorkflowInstance(id: String): WorkflowInstance? =
         transactionHelper.inNewTransactionNullable {

@@ -100,6 +100,46 @@ class WorkflowInstanceRepositoryIT : AbstractDSLTestSupport() {
     }
 
     @Test
+    fun `Getting the statuses of several nodes at once`() {
+        val instance = createInstance(
+            workflow = WorkflowParser.parseYamlWorkflow(WorkflowFixtures.simpleLinearWorkflowYaml),
+            event = serializableEventService.dehydrate(
+                MockEventType.mockEvent("Some text")
+            ),
+            contexts = emptyMap(),
+            triggerData = workflowTestSupport.testTriggerData(),
+        )
+        workflowInstanceRepository.createInstance(instance)
+        workflowInstanceRepository.nodeSuccess(instance.id, "start", null, null)
+
+        val statuses = workflowInstanceRepository.getNodeStatuses(instance.id, listOf("start", "end", "unknown"))
+
+        assertEquals(
+            mapOf(
+                "start" to WorkflowInstanceNodeStatus.SUCCESS,
+                "end" to WorkflowInstanceNodeStatus.CREATED,
+            ),
+            statuses,
+            "Unknown nodes are simply absent from the result"
+        )
+    }
+
+    @Test
+    fun `Getting the statuses of no node at all`() {
+        val instance = createInstance(
+            workflow = WorkflowParser.parseYamlWorkflow(WorkflowFixtures.simpleLinearWorkflowYaml),
+            event = serializableEventService.dehydrate(
+                MockEventType.mockEvent("Some text")
+            ),
+            contexts = emptyMap(),
+            triggerData = workflowTestSupport.testTriggerData(),
+        )
+        workflowInstanceRepository.createInstance(instance)
+
+        assertEquals(emptyMap(), workflowInstanceRepository.getNodeStatuses(instance.id, emptyList()))
+    }
+
+    @Test
     fun `Filtering workflows by ID takes precedence`() {
         val instances = (1..2).map {
             createInstance(

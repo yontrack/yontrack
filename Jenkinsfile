@@ -44,8 +44,8 @@ pipeline {
     }
 
     options {
-        // Max. 1 hour
-        timeout(time: 1, unit: 'HOURS')
+        // Max. 2 hours
+        timeout(time: 2, unit: 'HOURS')
         // General Jenkins job properties
         buildDiscarder(logRotator(numToKeepStr: '40'))
         // Timestamps

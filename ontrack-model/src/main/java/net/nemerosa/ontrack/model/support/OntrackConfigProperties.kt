@@ -78,6 +78,12 @@ class OntrackConfigProperties {
     var templating = TemplatingProperties()
 
     /**
+     * Transaction settings
+     */
+    @Valid
+    var tx = TransactionProperties()
+
+    /**
      * Key-store type
      */
     @APIDescription("Key store type to use to store encryption keys")
@@ -96,6 +102,27 @@ class OntrackConfigProperties {
         logger.info("[search] Index creation error ignoring = ${search.index.ignoreExisting}")
         logger.info("[document] Documents engine = ${documents.engine}")
         logger.info("[templating] Errors = ${templating.errors}")
+    }
+
+    /**
+     * Transaction settings
+     */
+    @APIName("Transaction configuration")
+    @APIDescription("Management of the ad-hoc transactions and of their retries in case of transient database failures.")
+    class TransactionProperties {
+
+        @Min(0)
+        @APIDescription("Number of times an ad-hoc transaction is retried when it fails because of a transient database issue, like a connection loss or an exhausted connection pool. Set to 0 to disable the retries.")
+        var retries: Int = 3
+
+        @APIDescription("Time to wait before the first retry of a transaction. This delay is doubled at each attempt, up to `retryMaxDelay`.")
+        @DurationUnit(ChronoUnit.SECONDS)
+        var retryDelay: Duration = Duration.ofSeconds(1)
+
+        @APIDescription("Maximum time to wait between two retries of a transaction.")
+        @DurationUnit(ChronoUnit.SECONDS)
+        var retryMaxDelay: Duration = Duration.ofSeconds(10)
+
     }
 
     /**

@@ -298,6 +298,34 @@ class WorkflowInstanceRepository(
             String::class.java
         )?.let { WorkflowInstanceNodeStatus.valueOf(it) }
 
+    /**
+     * Gets the statuses of several nodes at once.
+     *
+     * Used when a node waits for all its parents: one query per waiting node instead of
+     * one query per parent keeps the pressure on the connection pool under control.
+     *
+     * @return Statuses indexed by node ID. Unknown nodes are simply absent from the map.
+     */
+    fun getNodeStatuses(instanceId: String, nodeIds: Collection<String>): Map<String, WorkflowInstanceNodeStatus> {
+        if (nodeIds.isEmpty()) return emptyMap()
+        val result = mutableMapOf<String, WorkflowInstanceNodeStatus>()
+        namedParameterJdbcTemplate!!.query(
+            """
+                SELECT NODE_ID, STATUS
+                FROM WKF_INSTANCE_NODES
+                WHERE INSTANCE_ID = :instanceId
+                AND NODE_ID IN (:nodeIds)
+            """.trimIndent(),
+            mapOf(
+                "instanceId" to instanceId,
+                "nodeIds" to nodeIds,
+            ),
+        ) { rs, _ ->
+            result[rs.getString("NODE_ID")] = WorkflowInstanceNodeStatus.valueOf(rs.getString("STATUS"))
+        }
+        return result
+    }
+
     fun getNodeOutput(instanceId: String, nodeId: String): JsonNode? =
         namedParameterJdbcTemplate!!.query(
             """

@@ -167,4 +167,14 @@ object NotificationsMetrics {
     )
     const val event_processing_channel_error = "${prefix}_event_processing_channel_error"
 
+    @APIDescription("Number of notification records which could not be saved. The notification itself is not impacted: only its trace in the notification recordings is lost.")
+    @MetricsMeterDocumentation(
+        type = MetricsMeterType.COUNT,
+        tags = [
+            MetricsMeterTag("event", "Event type"),
+            MetricsMeterTag("channel", "Notification channel"),
+        ]
+    )
+    const val event_processing_recording_error = "${prefix}_event_processing_recording_error"
+
 }

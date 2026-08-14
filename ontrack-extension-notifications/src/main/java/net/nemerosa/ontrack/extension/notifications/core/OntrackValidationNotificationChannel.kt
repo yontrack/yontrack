@@ -17,6 +17,7 @@ import net.nemerosa.ontrack.model.exceptions.ProjectNotFoundException
 import net.nemerosa.ontrack.model.security.SecurityService
 import net.nemerosa.ontrack.model.structure.*
 import org.springframework.stereotype.Component
+import org.springframework.transaction.annotation.Transactional
 import kotlin.jvm.optionals.getOrNull
 
 @Component
@@ -51,6 +52,11 @@ class OntrackValidationNotificationChannel(
         )
     }
 
+    /**
+     * The validation run and its run info must be created together, so this channel carries its own
+     * transaction (the notification processing service does not provide any).
+     */
+    @Transactional
     override fun publish(
         recordId: String,
         config: OntrackValidationNotificationChannelConfig,
