@@ -12,6 +12,7 @@ import net.nemerosa.ontrack.test.TestUtils.uid
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.test.fail
@@ -233,6 +234,8 @@ class DashboardControllerIT : AbstractQLKTITSupport() {
                 assertTrue(yaml.contains(name), "YAML should contain dashboard name")
                 assertTrue(yaml.contains("LastActiveProjects"), "YAML should contain widget key")
                 assertTrue(yaml.contains("count"), "YAML should contain widget config field")
+                assertTrue(yaml.startsWith("- name:"), "YAML should be a ready-to-use collection:\n$yaml")
+                assertFalse(yaml.contains("uuid"), "YAML should not contain any UUID:\n$yaml")
             }
         }
     }

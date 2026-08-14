@@ -47,6 +47,10 @@ test('export a dashboard as YAML', async ({page, ontrack}) => {
     await expect(aceContent).toContainText(dashboardName)
     await expect(aceContent).toContainText('LastActiveProjects')
 
+    // The export must be ready to use: a collection of one dashboard, with no UUID
+    await expect(aceContent).toContainText('- name:')
+    await expect(aceContent).not.toContainText('uuid')
+
     // Close the modal via the footer button (not the × icon)
     await modal.locator('button').filter({hasText: 'Close'}).click()
     await expect(page.getByRole('dialog')).not.toBeVisible()
