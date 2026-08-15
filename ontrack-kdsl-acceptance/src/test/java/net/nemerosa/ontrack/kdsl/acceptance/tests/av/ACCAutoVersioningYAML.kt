@@ -13,7 +13,6 @@ class ACCAutoVersioningYAML : AbstractACCAutoVersioningTestSupport() {
             withAutoVersioning {
                 repositoryFile("requirements.yaml") {
                     """
-                        ---
                         apiVersion: apps/v1
                         kind: Deployment
                         metadata:
@@ -60,7 +59,6 @@ class ACCAutoVersioningYAML : AbstractACCAutoVersioningTestSupport() {
                             )
                             fileContains("requirements.yaml") {
                                 """
-                                    ---
                                     apiVersion: "apps/v1"
                                     kind: "Deployment"
                                     metadata:
@@ -131,7 +129,6 @@ class ACCAutoVersioningYAML : AbstractACCAutoVersioningTestSupport() {
                             )
                             fileContains("requirements.yaml") {
                                 """
-                                    ---
                                     apiVersion: "argoproj.io/v1alpha1"
                                     kind: "Application"
                                     metadata:
