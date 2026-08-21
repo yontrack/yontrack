@@ -593,7 +593,7 @@ restrict it to a list of branch names using regular expressions. For example:
 ```yaml
 version: v1
 configuration:
-  default:
+  defaults:
     branch:
       autoVersioning:
         branchFilter:

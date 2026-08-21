@@ -972,15 +972,74 @@ list of these metrics.
 
 ## Integrations
 
-While using the [CI config injection](../../configuration/ci-config.md#auto-versioning) for the configuration of the
-auto-versioning, there are several other ways to set it up.
+The recommended way to set up auto-versioning is the
+[CI config injection](../../configuration/ci-config.md#auto-versioning): the `autoVersioning` extension of the
+`.yontrack/ci.yaml` file is sent to Yontrack by whichever client your pipeline already uses, and the configuration
+lives with the code it applies to.
+
+All the clients below support this, and all of them can also trigger the
+[auto-versioning check](#auto-versioning-checks):
+
+* [GitHub Actions](#github-actions)
+* [Jenkins pipeline](#jenkins-pipeline)
+* [Yontrack CLI](#yontrack-cli)
+
+### GitHub Actions
+
+The [`nemerosa/ontrack-github-actions-cli-config`](https://github.com/nemerosa/ontrack-github-actions-cli-config)
+action sends the `.yontrack/ci.yaml` file — including its
+[`autoVersioning` section](../../configuration/ci-config.md#auto-versioning) — to Yontrack:
+
+```yaml
+  - name: "Yontrack configuration"
+    id: yontrack-config
+    uses: nemerosa/ontrack-github-actions-cli-config@v{{ ontrack_github_actions_cli_config_version }}
+    env:
+      YONTRACK_URL: ${{ '{{' }} vars.YONTRACK_URL {{ '}}' }}
+      YONTRACK_TOKEN: ${{ '{{' }} secrets.YONTRACK_TOKEN {{ '}}' }}
+    with:
+      github-token: ${{ '{{' }} secrets.GITHUB_TOKEN {{ '}}' }}
+```
+
+with, in `.yontrack/ci.yaml`:
+
+```yaml
+version: v1
+configuration:
+  defaults:
+    branch:
+      autoVersioning:
+        configurations:
+          - sourceProject: my-library
+            sourceBranch: 'release/1\..*'
+            sourcePromotion: IRON
+            targetPath: gradle.properties
+            targetProperty: my-library-version
+```
+
+The action also installs the [Yontrack CLI](#yontrack-cli) on the `PATH` (as `yontrack`) and exports the project,
+branch and build it has just configured, so later steps can run the
+[auto-versioning check](#auto-versioning-checks) without repeating them:
+
+```yaml
+  - name: "Auto-versioning check"
+    run: yontrack build auto-versioning-check
+```
+
+!!! note
+
+    See [feeding Yontrack from GitHub](../../start/feeding/github.md) for the complete setup of this action.
 
 ### Jenkins pipeline
 
-By using the [Jenkins Yontrack pipeline library](https://github.com/nemerosa/ontrack-jenkins-cli-pipeline), you can
-set up the auto-versioning configuration for a branch.
+The [Jenkins Yontrack pipeline library](https://github.com/nemerosa/ontrack-jenkins-cli-pipeline) sends the
+`.yontrack/ci.yaml` file using:
 
-For example:
+```groovy
+ontrackCliCIConfig()
+```
+
+It can also set up the auto-versioning configuration of a branch from a dedicated file:
 
 ```groovy
 ontrackCliAutoVersioning {
@@ -1014,6 +1073,43 @@ The [auto-versioning check](#auto-versioning-checks) is called using:
 ```groovy
 ontrackCliAutoVersioningCheck()
 ```
+
+### Yontrack CLI
+
+The [Yontrack CLI](https://github.com/nemerosa/ontrack-cli) drives auto-versioning from any pipeline, and is the client
+the [GitHub Actions](#github-actions) and [Jenkins](#jenkins-pipeline) integrations above use under the hood.
+
+Sending the `.yontrack/ci.yaml` file, `autoVersioning` section included:
+
+```shell
+ontrack-cli ci config --file .yontrack/ci.yaml
+```
+
+Setting the auto-versioning configuration of a branch from a dedicated file, without going through the CI config:
+
+```shell
+ontrack-cli branch auto-versioning \
+  --project my-project \
+  --branch main \
+  --yaml .ontrack/auto-versioning.yaml
+```
+
+`--yaml` defaults to `.ontrack/auto-versioning.yaml`, and the file uses the same `dependencies` root and legacy
+parameter aliases as the [Jenkins](#jenkins-pipeline) one.
+
+Running the [auto-versioning check](#auto-versioning-checks) on a build:
+
+```shell
+ontrack-cli build auto-versioning-check \
+  --project my-project \
+  --branch main \
+  --build 1234
+```
+
+!!! note
+
+    `auto-versioning-check` can be shortened to `av-check`. The CLI is also published under the `yontrack` name — this
+    is the one the [GitHub action](#github-actions) puts on the `PATH`.
 
 ## Examples
 
