@@ -577,11 +577,15 @@ branch:
   autoVersioning:
     configurations:
       - sourceProject: yontrack
-        sourceBranch: '&latest'
+        sourceBranch: 'release/.*'
         sourcePromotion: RELEASE
         targetPath: versions.properties
         targetProperty: yontrack
 ```
+
+`sourceBranch` is a regular expression selecting the latest matching branch of the source project. See
+[selecting the source branch](../integrations/auto-versioning/auto-versioning.md#selecting-the-source-branch) for the
+other available strategies.
 
 If the auto-versioning configuration must not be applied to all branches, you can use the `branchFilter` property to
 restrict it to a list of branch names using regular expressions. For example:
@@ -595,12 +599,18 @@ configuration:
         branchFilter:
           includes:
             - main
-            - 'release\\.*'
+            - 'release/.*'
           excludes:
-            - 'release\\1\..*'
+            - 'release/1\..*'
 ```
 
 This restricts the auto-versioning configuration to the `main` and `release/*` branches, but not the `release/1.*` ones.
+
+!!! note
+
+    The `branchFilter` regular expressions are matched, in full and ignoring the case, against the **SCM branch name**
+    of the branch being configured. When a branch is excluded, any auto-versioning configuration it may already have is
+    removed.
 
 #### Auto-versioning check
 
