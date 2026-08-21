@@ -126,3 +126,28 @@ export function setLocalChartOptions(id, {interval, period}) {
         JSON.stringify({interval, period})
     )
 }
+
+/**
+ * Gets the grid layout stored for a page.
+ *
+ * The id of the layout, like "page-promotion-level-layout", is used as the key.
+ *
+ * @returns the layout, or undefined if not set or not readable
+ */
+export function getLocalGridLayout(id) {
+    const json = localStorage.getItem(id)
+    if (json) {
+        try {
+            return JSON.parse(json)
+        } catch (ignored) {
+            // Corrupted entry: the default layout must be used instead
+            return undefined
+        }
+    } else {
+        return undefined
+    }
+}
+
+export function setLocalGridLayout(id, layout) {
+    localStorage.setItem(id, JSON.stringify(layout))
+}
