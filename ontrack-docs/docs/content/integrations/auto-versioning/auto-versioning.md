@@ -1017,8 +1017,8 @@ configuration:
             targetProperty: my-library-version
 ```
 
-The action also installs the [Yontrack CLI](#yontrack-cli) on the `PATH` (as `yontrack`) and exports the project,
-branch and build it has just configured, so later steps can run the
+The action also installs the [Yontrack CLI](#yontrack-cli) on the `PATH` and exports the project, branch and build
+it has just configured, so later steps can run the
 [auto-versioning check](#auto-versioning-checks) without repeating them:
 
 ```yaml
@@ -1082,13 +1082,13 @@ the [GitHub Actions](#github-actions) and [Jenkins](#jenkins-pipeline) integrati
 Sending the `.yontrack/ci.yaml` file, `autoVersioning` section included:
 
 ```shell
-ontrack-cli ci config --file .yontrack/ci.yaml
+yontrack ci config --file .yontrack/ci.yaml
 ```
 
 Setting the auto-versioning configuration of a branch from a dedicated file, without going through the CI config:
 
 ```shell
-ontrack-cli branch auto-versioning \
+yontrack branch auto-versioning \
   --project my-project \
   --branch main \
   --yaml .ontrack/auto-versioning.yaml
@@ -1100,7 +1100,7 @@ parameter aliases as the [Jenkins](#jenkins-pipeline) one.
 Running the [auto-versioning check](#auto-versioning-checks) on a build:
 
 ```shell
-ontrack-cli build auto-versioning-check \
+yontrack build auto-versioning-check \
   --project my-project \
   --branch main \
   --build 1234
@@ -1108,8 +1108,8 @@ ontrack-cli build auto-versioning-check \
 
 !!! note
 
-    `auto-versioning-check` can be shortened to `av-check`. The CLI is also published under the `yontrack` name — this
-    is the one the [GitHub action](#github-actions) puts on the `PATH`.
+    `auto-versioning-check` can be shortened to `av-check`. The CLI is also still published under its former
+    `ontrack-cli` name.
 
 ## Examples
 

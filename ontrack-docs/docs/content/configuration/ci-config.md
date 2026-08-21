@@ -140,7 +140,7 @@ It expects the `.yontrack/ci.yaml` file to be present in the root of the reposit
 You can use the [Yontrack CLI](https://github.com/nemerosa/ontrack-cli) to configure Yontrack from your CI pipelines:
 
 ```shell
-ontrack-cli ci config \
+yontrack ci config \
   --file .yontrack/ci.yaml \
   --env ... \
   --env ...
