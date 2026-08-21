@@ -118,6 +118,49 @@ test('graph of links between builds', async ({page, ontrack}) => {
     await buildLinks.expectBuildGraphNodeVisible(target)
 })
 
+test('closed tree view alert stays closed after a reload', async ({page, ontrack}) => {
+    // Provisioning
+    const project = await ontrack.createProject()
+    const branch = await project.createBranch()
+    const build = await branch.createBuild()
+
+    // Link, so that the links page has something to display
+    const targetProject = await ontrack.createProject()
+    const targetBranch = await targetProject.createBranch()
+    const target = await targetBranch.createBuild()
+    await build.linkTo(target)
+
+    // Login
+    await login(page, ontrack)
+
+    // Navigating to the links, in tree view
+    const buildPage = new BuildPage(page, build)
+    await buildPage.goTo()
+    const buildLinks = await buildPage.goToLinks()
+    await buildLinks.switchView()
+    await buildLinks.expectOnTreeView()
+
+    // The alert is displayed
+    await buildLinks.expectTreeViewAlert({visible: true})
+
+    // A reload on its own does not hide it
+    await page.reload()
+    await buildLinks.expectOnTreeView()
+    await buildLinks.expectTreeViewAlert({visible: true})
+
+    // Closing it hides it
+    await buildLinks.closeTreeViewAlert()
+    await buildLinks.expectTreeViewAlert({visible: false})
+
+    // After a reload, the tree view is restored (also from the local storage)...
+    await page.reload()
+    await buildLinks.expectOnTreeView()
+    await buildLinks.expectBuildTreeNodeVisible(build)
+
+    // ... and the alert stays closed
+    await buildLinks.expectTreeViewAlert({visible: false})
+})
+
 test('deleting a build', async ({page, ontrack}) => {
     // Provisioning
     const project = await ontrack.createProject()

@@ -93,6 +93,53 @@ test("SCM change log", async ({page, ontrack}) => {
     await doTestSCMChangeLog(page, ontrack)
 })
 
+/**
+ * Goes straight to the change log page for a project using the JIRA mock issue service.
+ */
+const goToJiraChangeLog = async (page, ontrack) => {
+    const configName = generate("mock-")
+    await ontrack.configurations.jira.createConfig({
+        name: configName,
+        url: "mock://jira",
+        user: "",
+        password: "",
+    })
+
+    const {from, to} = await provisionChangeLog(ontrack, 'jira', `jira//${configName}`)
+
+    await login(page, ontrack)
+    const branchPage = new BranchPage(page, from.branch)
+    await branchPage.goTo()
+    await branchPage.selectBuild(from)
+    await branchPage.selectBuild(to)
+
+    const changeLogPage = await branchPage.goToChangeLog()
+    await changeLogPage.waitForIssuesLoaded()
+    return changeLogPage
+}
+
+test('SCM change log export format is restored after a reload', async ({page, ontrack}) => {
+    const changeLogPage = await goToJiraChangeLog(page, ontrack)
+
+    // Selecting the Markdown format, which is stored in the local storage
+    await changeLogPage.selectExportFormat('Markdown')
+
+    // Reloading the page: the format must be restored from the local storage
+    await changeLogPage.reload()
+
+    // Exporting without selecting the format again: it must still be Markdown
+    await changeLogPage.launchExport()
+    await changeLogPage.checkExportedContent(
+        trimIndent(
+            `
+                * [ISS-21](mock://jira/ISS/ISS-21) Some new feature
+                * [ISS-22](mock://jira/ISS/ISS-22) Some fixes are needed
+                * [ISS-23](mock://jira/ISS/ISS-23) Some nicer UI
+            `
+        )
+    )
+})
+
 test('JIRA SCM change log', async ({page, ontrack, context}) => {
     await context.grantPermissions(['clipboard-read'])
     // Creates the JIRA mock configuration

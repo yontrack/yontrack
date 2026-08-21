@@ -106,6 +106,17 @@ export class SCMChangeLogPage {
         await expect(this.page.getByText("Change log from")).toBeVisible()
     }
 
+    /**
+     * Reloads the change log page, waiting for it to be fully loaded again.
+     *
+     * Used to check that the preferences stored in the local storage are restored.
+     */
+    async reload() {
+        await this.page.reload()
+        await this.checkDisplayed()
+        await this.waitForIssuesLoaded()
+    }
+
     async checkBuildFrom({name}) {
         const container = this.page.locator('#from')
         await expect(container.getByText(`From ${name}`, {exact: true})).toBeVisible()
