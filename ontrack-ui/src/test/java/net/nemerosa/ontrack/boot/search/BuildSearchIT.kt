@@ -94,21 +94,19 @@ class BuildSearchIT : AbstractSearchTestSupport() {
                     release("$value-$value2")
                 }
 
-                // Checks that we find one build on an exact match
+                // Checks that an exact match ranks the matching build first. Both builds are
+                // returned, since they share the same prefix and the index is an autocomplete one.
                 var results = searchService.paginatedSearch(
                     SearchRequest(
                         token = "$value-$value1",
                         type = "build",
                     )
                 )
-                val build1Result =
-                    results.items.single()
                 assertEquals(
                     "$value-$value1",
-                    build1Result.title,
+                    results.items.first().title,
                     "Build 1 as first result"
                 )
-
 
                 // Checks that we find two builds on the prefix match
                 results = waitFor(
@@ -135,6 +133,36 @@ class BuildSearchIT : AbstractSearchTestSupport() {
             }
         }
 
+    }
+
+    @Test
+    @AsAdminTest
+    fun `Exact match on a release label is case insensitive`() {
+        val value = uid("V")
+        val value1 = uid("V1")
+        val value2 = uid("V2")
+        project {
+            branch {
+                build("Build 1") {
+                    release("$value-$value1")
+                }
+                build("Build 2") {
+                    release("$value-$value2")
+                }
+
+                val results = searchService.paginatedSearch(
+                    SearchRequest(
+                        token = "$value-$value1".lowercase(),
+                        type = "build",
+                    )
+                )
+                assertEquals(
+                    "$value-$value1",
+                    results.items.first().title,
+                    "Build 1 as first result, whatever the case of the token"
+                )
+            }
+        }
     }
 
 }

@@ -28,12 +28,12 @@ class ACCDSLSearch : AbstractACCDSLTestSupport() {
                     this
                 }
 
-                // Checks that we find one build on an exact match
+                // Checks that an exact match ranks the matching build first. Both builds are
+                // returned, since they share the same prefix and the index is an autocomplete one.
                 var results = ontrack.search("build", "$value-$value1")
-                val build1Result = results.items.single()
                 assertEquals(
                     "$value-$value1",
-                    build1Result.title,
+                    results.items.first().title,
                     "Build 1 as first result"
                 )
 

@@ -36,8 +36,8 @@ class BuildSearchProvider(
         }.run {
             mappings { mappings ->
                 mappings
-                    .autoCompleteText(BuildSearchItem::name)
-                    .autoCompleteText(BuildSearchItem::displayName)
+                    .autoCompleteTextWithExactMatch(BuildSearchItem::name)
+                    .autoCompleteTextWithExactMatch(BuildSearchItem::displayName)
                     .text(BuildSearchItem::description)
             }
         }
@@ -46,14 +46,23 @@ class BuildSearchProvider(
         q: Query.Builder,
         token: String
     ): ObjectBuilder<Query> {
-        return q.multiMatch { m ->
-            m.query(token)
-                .type(TextQueryType.BestFields)
-                .fields(
-                    BuildSearchItem::name to 3.0,
-                    BuildSearchItem::displayName to 3.0,
-                    BuildSearchItem::description to null,
-                )
+        return q.bool { b ->
+            b
+                .should { s ->
+                    s.multiMatch { m ->
+                        m.query(token)
+                            .type(TextQueryType.BestFields)
+                            .fields(
+                                BuildSearchItem::name to 3.0,
+                                BuildSearchItem::displayName to 3.0,
+                                BuildSearchItem::description to null,
+                            )
+                    }
+                }
+                // A build whose name or display name is exactly the token is what the user is
+                // looking for: it must outrank the builds merely sharing a prefix with it.
+                .should { s -> s.exactMatch(BuildSearchItem::name, token) }
+                .should { s -> s.exactMatch(BuildSearchItem::displayName, token) }
         }
     }
 

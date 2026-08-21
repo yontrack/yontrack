@@ -16,6 +16,10 @@ import org.springframework.stereotype.Component
 
 /**
  * When migrating to V5, we need to remove all the indexes and start an indexation from scratch.
+ *
+ * The same mechanism is used whenever the mapping of an index changes: an existing index is never
+ * updated in place by [SearchIndexService.initIndex], so bumping [KEY] resets all the indexes once
+ * and repopulates them using the new mappings.
  */
 @Component
 class ElasticSearchV5Migration(
@@ -70,7 +74,12 @@ class ElasticSearchV5Migration(
 
     companion object {
         private val store: String = ElasticSearchV5Migration::class.java.name
-        private const val KEY = "migration"
+
+        /**
+         * Bumped whenever the mapping of an index changes, to force a one-off reset of all the
+         * indexes. Last bumped for the exact match sub-fields of the build index.
+         */
+        private const val KEY = "migration-2"
     }
 
     data class ElasticSearchV5MigrationStatus(val migrated: Boolean)

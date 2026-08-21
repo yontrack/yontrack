@@ -163,6 +163,8 @@ class ElasticSearchIndexService(
             .document(item.fields)
             .build()
         client.index(indexRequest)
+        // Refreshes the index
+        immediateRefreshIfRequested(indexer)
     }
 
     override fun <T : SearchItem> deleteSearchIndex(indexer: SearchIndexer<T>, id: String) {
