@@ -112,6 +112,12 @@ configuration:
                           targetProperty: "image.tag"
                           targetVersion: "${build}"
                           autoApproval: true
+                          prTitleTemplate: "Deploying ${sourceProject} version ${VERSION}"
+                          prBodyTemplateFormat: "markdown"
+                          prBodyTemplate: |
+                            Deployment of ${sourceProject} version ${VERSION}.
+
+                            ${av.semanticChangelog?issues=true&emojis=true}
                       - id: "deploy"
                         description: "Marking the deployment as finished"
                         executorId: "slot-pipeline-deployed"

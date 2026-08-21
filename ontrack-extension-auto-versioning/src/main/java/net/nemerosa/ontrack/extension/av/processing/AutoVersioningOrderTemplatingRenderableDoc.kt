@@ -2,6 +2,7 @@ package net.nemerosa.ontrack.extension.av.processing
 
 import net.nemerosa.ontrack.common.api.APIDescription
 import net.nemerosa.ontrack.extension.scm.changelog.ChangeLogTemplatingServiceConfig
+import net.nemerosa.ontrack.extension.scm.changelog.SemanticChangeLogTemplatingServiceConfig
 import net.nemerosa.ontrack.model.templating.TemplatingRenderableDoc
 import net.nemerosa.ontrack.model.templating.TemplatingRenderableDocField
 import org.springframework.stereotype.Component
@@ -24,6 +25,11 @@ class AutoVersioningOrderTemplatingRenderableDoc : TemplatingRenderableDoc {
             name = "changelog",
             description = "Changelog for the project & version being updated",
             config = ChangeLogTemplatingServiceConfig::class,
-        )
+        ),
+        TemplatingRenderableDocField(
+            name = "semanticChangelog",
+            description = "Semantic changelog (grouped by conventional commit type) for the project & version being updated",
+            config = SemanticChangeLogTemplatingServiceConfig::class,
+        ),
     )
 }

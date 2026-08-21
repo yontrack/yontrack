@@ -282,4 +282,137 @@ class AutoVersioningTemplatingServiceIT : AbstractAutoVersioningTestSupport() {
         }
     }
 
+    @Test
+    fun `Generating a PR body with a change log when there is no source promotion`() {
+        asAdmin {
+            mockSCMTester.withMockSCMRepository {
+                project {
+                    branch {
+                        configureMockSCMBranch()
+
+                        build {}
+                        /* val from = */ build {
+                            // Links this build to the expected current version
+                            releaseProperty(this, "1.0.0")
+                            // Mock termination commit
+                            repositoryIssue("ISS-20", "Last issue before the change log", type = "defect")
+                            withRepositoryCommit("ISS-20 Last commit before the change log")
+                        }
+                        build {
+                            repositoryIssue("ISS-21", "Some new feature", type = "feature")
+                            withRepositoryCommit("ISS-21 Some commits for a feature")
+                        }
+                        val to = build {
+                            releaseProperty(this, "2.0.0")
+                            repositoryIssue("ISS-22", "Some fixes are needed", type = "defect")
+                            withRepositoryCommit("ISS-22 Fixing some bugs")
+                        }
+
+                        // Target of the auto-versioning
+                        project {
+                            branch {
+                                // No source promotion: this is the order a deployment workflow node creates
+                                val order = createOrder(
+                                    sourceProject = to.project.name,
+                                    sourceBuildId = to.id(),
+                                    sourcePromotion = null,
+                                    targetVersion = "2.0.0",
+                                    prBodyTemplate = "${'$'}{av.changelog}",
+                                )
+
+                                val avRenderer = autoVersioningTemplatingService.createAutoVersioningTemplateRenderer(
+                                    order = order,
+                                    currentVersions = mapOf("gradle.properties" to "1.0.0")
+                                )
+
+                                val (_, body) = autoVersioningTemplatingService.generatePRInfo(
+                                    order = order,
+                                    avRenderer = avRenderer,
+                                )
+
+                                assertEquals(
+                                    """
+                                        * ISS-21 Some new feature
+                                        * ISS-22 Some fixes are needed
+                                    """.trimIndent(),
+                                    body.trim()
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `Generating a PR body with a semantic change log`() {
+        asAdmin {
+            mockSCMTester.withMockSCMRepository {
+                project {
+                    branch {
+                        configureMockSCMBranch()
+
+                        build {}
+                        /* val from = */ build {
+                            releaseProperty(this, "1.0.0")
+                            repositoryIssue("ISS-20", "Last issue before the change log", type = "defect")
+                            withRepositoryCommit("ISS-20 Last commit before the change log")
+                        }
+                        build {
+                            repositoryIssue("ISS-21", "Some new feature", type = "feature")
+                            withRepositoryCommit("feat(UI): Some commits for a feature ISS-21")
+                        }
+                        val to = build {
+                            releaseProperty(this, "2.0.0")
+                            repositoryIssue("ISS-22", "Some fixes are needed", type = "defect")
+                            withRepositoryCommit("fix: Fixing some bugs ISS-22")
+                        }
+
+                        // Target of the auto-versioning
+                        project {
+                            branch {
+                                val order = createOrder(
+                                    sourceProject = to.project.name,
+                                    sourceBuildId = to.id(),
+                                    sourcePromotion = null,
+                                    targetVersion = "2.0.0",
+                                    prBodyTemplate = "${'$'}{av.semanticChangelog?issues=true&emojis=true}",
+                                )
+
+                                val avRenderer = autoVersioningTemplatingService.createAutoVersioningTemplateRenderer(
+                                    order = order,
+                                    currentVersions = mapOf("gradle.properties" to "1.0.0")
+                                )
+
+                                val (_, body) = autoVersioningTemplatingService.generatePRInfo(
+                                    order = order,
+                                    avRenderer = avRenderer,
+                                )
+
+                                assertEquals(
+                                    """
+                                        📋 Issues:
+
+                                        * ISS-21 Some new feature
+                                        * ISS-22 Some fixes are needed
+
+                                        ✨ Features:
+
+                                        * UI - Some commits for a feature ISS-21
+
+                                        🐛 Fixes:
+
+                                        * Fixing some bugs ISS-22
+                                    """.trimIndent(),
+                                    body.trim()
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
 }
