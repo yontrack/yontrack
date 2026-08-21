@@ -20,10 +20,11 @@ class SCMChangeLogExportServiceImpl(
         input: SCMChangeLogExportInput?,
     ): String {
         // No change log, no export
-        if (changeLog?.issues == null) return ""
+        if (changeLog == null) return ""
 
         // No issues, no change log
-        if (changeLog.issues.issues.isEmpty()) return ""
+        val changeLogIssues = changeLog.issues
+        if (changeLogIssues == null || changeLogIssues.issues.isEmpty()) return ""
 
         // Default input
         val actualInput = input ?: SCMChangeLogExportInput()
@@ -45,7 +46,7 @@ class SCMChangeLogExportServiceImpl(
 
         // Grouping the issues according to the specification
         val groupedIssues = groupIssues(
-            issues = changeLog.issues.issues,
+            issues = changeLogIssues.issues,
             input = actualInput,
         ) { issue: Issue ->
             configuredIssueService.issueServiceExtension.getIssueTypes(

@@ -178,22 +178,17 @@ export default function ScmChangeLogView({from, to}) {
 
     useEffect(() => {
         if (changeLog) {
+            // A boundary build cell, showing a skeleton for as long as the build is not known
+            const boundaryCell = (id, label, build) => ({
+                id,
+                content: build.creation ?
+                    <ChangeLogBuild id={id} title={`${label} ${buildKnownName(build)}`} build={build}/> :
+                    <GridCell id={id} title={label} loading={loading}/>,
+            })
             setItems(
                 [
-                    {
-                        id: "from",
-                        content: changeLog.buildFrom.creation ?
-                            <ChangeLogBuild id="from" title={`From ${buildKnownName(changeLog.buildFrom)}`}
-                                            build={changeLog.buildFrom}/> :
-                            <GridCell id="from" title="From" loading={loading}/>,
-                    },
-                    {
-                        id: "to",
-                        content: changeLog.buildTo.creation ?
-                            <ChangeLogBuild id="to" title={`To ${buildKnownName(changeLog.buildTo)}`}
-                                            build={changeLog.buildTo}/> :
-                            <GridCell id="to" title="To" loading={loading}/>,
-                    },
+                    boundaryCell("from", "From", changeLog.buildFrom),
+                    boundaryCell("to", "To", changeLog.buildTo),
                     {
                         id: "links",
                         content: <ChangeLogLinks id="links" loading={loading}

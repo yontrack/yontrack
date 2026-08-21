@@ -105,32 +105,6 @@ class SCMChangeLogServiceImpl(
 
         // Getting the issue service
         val configuredIssueService: ConfiguredIssueService? = scm.getConfiguredIssueService()
-        val issuesChangeLog: SCMChangeLogIssues? = if (configuredIssueService != null) {
-            // Index of issues
-            val index = mutableMapOf<String, Issue>()
-            // For all commits in this commit log
-            commits.forEach { commit ->
-                val keys = configuredIssueService.extractIssueKeysFromMessage(commit.message)
-                keys.forEach { key ->
-                    val exisingIssue = index[key]
-                    if (exisingIssue == null) {
-                        val issue = configuredIssueService.getIssue(key)
-                        if (issue != null) {
-                            index[key] = issue
-                        }
-                    }
-                }
-            }
-            // OK
-            val issues = index.values.sortedBy { it.key }
-            val issueServiceConfiguration = configuredIssueService.issueServiceConfigurationRepresentation
-            SCMChangeLogIssues(
-                issueServiceConfiguration,
-                issues
-            )
-        } else {
-            null
-        }
 
         // OK
         return SCMChangeLog(
@@ -139,7 +113,35 @@ class SCMChangeLogServiceImpl(
             fromCommit = fromCommit,
             toCommit = toCommit,
             commits = decoratedCommits,
-            issues = issuesChangeLog,
+            // Resolving the issues means calling a remote issue service, which can be slow.
+            // This is done only if & when the issues are actually needed.
+            issuesProvider = { configuredIssueService?.let { getIssues(it, commits) } },
+        )
+    }
+
+    private fun getIssues(
+        configuredIssueService: ConfiguredIssueService,
+        commits: List<SCMCommit>,
+    ): SCMChangeLogIssues {
+        // Index of issues
+        val index = mutableMapOf<String, Issue>()
+        // For all commits in this commit log
+        commits.forEach { commit ->
+            val keys = configuredIssueService.extractIssueKeysFromMessage(commit.message)
+            keys.forEach { key ->
+                val exisingIssue = index[key]
+                if (exisingIssue == null) {
+                    val issue = configuredIssueService.getIssue(key)
+                    if (issue != null) {
+                        index[key] = issue
+                    }
+                }
+            }
+        }
+        // OK
+        return SCMChangeLogIssues(
+            configuredIssueService.issueServiceConfigurationRepresentation,
+            index.values.sortedBy { it.key }
         )
     }
 

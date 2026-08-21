@@ -68,14 +68,21 @@ const doTestSCMChangeLog = async (
      * Issues
      */
 
-    // The issues are loaded asynchronously: waiting for the loading to be complete
-    await changeLogPage.checkIssuesLoaded()
+    // The issues are loaded asynchronously, separately from the commits
+    await changeLogPage.waitForIssuesLoaded()
 
-    // Expecting the issues to be displayed
-    for (const key of Object.keys(issues)) {
+    // ISS-20 is before the change log boundary, so it must NOT be displayed
+    const absentKey = "ISS-20"
+
+    // Expecting the issues of the change log to be displayed. Checking these first
+    // makes sure the issues are really there before checking for the absent one.
+    for (const key of Object.keys(issues).filter(it => it !== absentKey)) {
         const {summary} = issues[key]
-        await changeLogPage.checkIssue({key, summary, visible: (key !== "ISS-20")})
+        await changeLogPage.checkIssue({key, summary, visible: true})
     }
+
+    // ... and only then, that the issue outside of the change log is not displayed
+    await changeLogPage.checkIssue({key: absentKey, summary: issues[absentKey].summary, visible: false})
 
     // Returning the change log page for more tests
     return changeLogPage

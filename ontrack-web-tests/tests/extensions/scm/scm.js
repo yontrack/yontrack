@@ -150,7 +150,7 @@ export class SCMChangeLogPage {
      * wait for their loading to be complete before asserting on their content
      * (in particular before asserting that an issue is NOT displayed).
      */
-    async checkIssuesLoaded() {
+    async waitForIssuesLoaded() {
         // While the issues are being loaded, the cell title is "Loading..."
         await expect(this.page.locator('#issues .ant-card-head-title')).toHaveText('Issues')
     }

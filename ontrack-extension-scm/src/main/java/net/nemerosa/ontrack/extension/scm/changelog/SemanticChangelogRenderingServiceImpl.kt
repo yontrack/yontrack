@@ -29,7 +29,7 @@ class SemanticChangelogRenderingServiceImpl(
 
             var hasIssues = false
             if (config.issues) {
-                hasIssues = changelog.issues?.issues != null && changelog.issues.issues.isNotEmpty()
+                hasIssues = !changelog.issues?.issues.isNullOrEmpty()
                 if (hasIssues) {
                     val issues = renderChangeLogIssues(renderer, changelog)
                     val issuesSection = if (config.emojis) {

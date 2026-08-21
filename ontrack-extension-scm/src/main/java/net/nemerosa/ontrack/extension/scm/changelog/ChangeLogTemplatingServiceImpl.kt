@@ -86,7 +86,7 @@ class ChangeLogTemplatingServiceImpl(
         renderer: EventRenderer,
     ): String {
         // Issues
-        val hasIssues = changeLog.issues?.issues != null && changeLog.issues.issues.isNotEmpty()
+        val hasIssues = !changeLog.issues?.issues.isNullOrEmpty()
         val issues = renderChangeLogIssues(renderer, changeLog)
         // Commits
         val commits: String by lazy { renderChangeLogCommits(changeLog, renderer) }

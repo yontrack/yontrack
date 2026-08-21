@@ -17,7 +17,7 @@ export default function ChangeLogIssues({id, from, to}) {
      * The issues are loaded separately from the rest of the change log because,
      * unlike the commits, getting them can be slow (remote issue service).
      */
-    const {data: issues, loading, error} = useQuery(
+    const {data: issues, loading: fetching, error, finished} = useQuery(
         gql`
             query ChangeLogIssues($from: Int!, $to: Int!) {
                 scmChangeLog(from: $from, to: $to) {
@@ -48,6 +48,10 @@ export default function ChangeLogIssues({id, from, to}) {
     )
 
     const issueServiceId = issues?.issueServiceConfiguration?.serviceId
+
+    // `useQuery` starts with `fetching` false and only flips it inside its effect, so
+    // `finished` is what tells us the issues have actually been resolved at least once.
+    const loading = fetching || !finished
 
     const templateRenderers = useTemplateRenderers()
 
@@ -216,7 +220,7 @@ export default function ChangeLogIssues({id, from, to}) {
             >
                 {
                     error &&
-                    <Alert type="error" showIcon message={error}/>
+                    <Alert type="error" showIcon message="The issues could not be loaded."/>
                 }
                 {
                     issueServiceId &&
