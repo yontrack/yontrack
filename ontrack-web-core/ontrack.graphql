@@ -109,6 +109,13 @@ type AddSlotWorkflowPayload implements Payload {
   slotWorkflow: SlotWorkflow
 }
 
+type ApplyDashboardsPayload implements PayloadInterface {
+  "Dashboards that were created or updated"
+  dashboards: [Dashboard!]!
+  "List of errors"
+  errors: [PayloadUserError]
+}
+
 "A named authorization"
 type Authorization {
   "Action to authorize"
@@ -1142,6 +1149,8 @@ type CreateWebhookPayload implements Payload {
 }
 
 type Dashboard {
+  "Exports this dashboard as a YAML snippet ready to use with applyDashboards"
+  asYaml: String!
   authorizations: DashboardAuthorizations!
   name: String!
   userScope: DashboardContextUserScope!
@@ -3152,6 +3161,8 @@ type Mutation {
     "Input for the mutation"
     input: AddSlotWorkflowInput
   ): AddSlotWorkflowPayload
+  "Applies a YAML list of dashboard definitions, creating or updating SHARED dashboards"
+  applyDashboards(input: ApplyDashboardsInput!): ApplyDashboardsPayload!
   "Bulk update of a promotion level"
   bulkUpdatePromotionLevelById(
     "Input for the mutation"
@@ -8511,6 +8522,11 @@ input AddSlotWorkflowInput {
   workflowYaml: String!
 }
 
+input ApplyDashboardsInput {
+  "YAML list of dashboard definitions"
+  yaml: String!
+}
+
 "Filter when querying auto versioning processing orders"
 input AutoVersioningAuditQueryFilter {
   "Name of the target branch"
@@ -11521,6 +11537,11 @@ input StandardBuildFilter {
   sinceValidationStamp: String
   "... with status"
   sinceValidationStampStatus: String
+  """
+  The build display name (its release label when set, its name otherwise) must match this regular expression.
+  The matching is case insensitive and partial - use ^ and $ to anchor the pattern.
+  """
+  withDisplayName: String
   "Builds with this promotion level"
   withPromotionLevel: String
   "With property"
