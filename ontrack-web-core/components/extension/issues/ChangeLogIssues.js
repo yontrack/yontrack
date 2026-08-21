@@ -10,6 +10,7 @@ import IssueChangeLogExportRequestDialog, {
     useIssueChangeLogExportRequestDialog
 } from "@components/extension/issues/IssueChangeLogExportRequestDialog";
 import {useMutation, useQuery} from "@components/services/GraphQL";
+import {getLocalChangeLogIssuesExport, setLocalChangeLogIssuesExport} from "@components/storage/local";
 
 export default function ChangeLogIssues({id, from, to}) {
 
@@ -63,15 +64,15 @@ export default function ChangeLogIssues({id, from, to}) {
     })
 
     useEffect(() => {
-        const storedPreferences = localStorage.getItem('change-log-issues-export')
+        const storedPreferences = getLocalChangeLogIssuesExport()
         if (storedPreferences) {
-            setPreferences(JSON.parse(storedPreferences))
+            setPreferences(storedPreferences)
         }
     }, []);
 
     const savePreferences = (values) => {
         setPreferences(values)
-        localStorage.setItem('change-log-issues-export', JSON.stringify(values))
+        setLocalChangeLogIssuesExport(values)
     }
 
     const selectFormat = (id) => {

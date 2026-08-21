@@ -1,17 +1,17 @@
 import {Alert} from "antd";
 import {useEffect, useState} from "react";
+import {getLocalCloseableAlertClosed, setLocalCloseableAlertClosed} from "@components/storage/local";
 
 export default function CloseableAlert({id, message, type = "warning"}) {
 
-    const key = `closeable-alert-${id}`
+    // Starting as closed, so that the alert does not flash before the local storage is read
     const [closed, setClosed] = useState(true)
     useEffect(() => {
-        const closed = localStorage.getItem(key) === 'yes'
-        setClosed(localStorage.getItem(key) === 'yes')
-    }, [key])
+        setClosed(getLocalCloseableAlertClosed(id))
+    }, [id])
 
     const onClose = () => {
-        localStorage.setItem(key, 'yes')
+        setLocalCloseableAlertClosed(id, true)
         setClosed(true)
     }
 

@@ -127,6 +127,52 @@ export function setLocalChartOptions(id, {interval, period}) {
     )
 }
 
+const closeableAlert = (id) => `closeable-alert-${id}`
+
+/**
+ * Gets the closed state of a closeable alert.
+ *
+ * The id of the alert is used to build the key.
+ *
+ * @returns true if the alert has been closed by the user
+ */
+export function getLocalCloseableAlertClosed(id) {
+    return localStorage.getItem(closeableAlert(id)) === 'yes'
+}
+
+export function setLocalCloseableAlertClosed(id, closed) {
+    if (closed) {
+        localStorage.setItem(closeableAlert(id), 'yes')
+    } else {
+        localStorage.removeItem(closeableAlert(id))
+    }
+}
+
+const changeLogIssuesExport = 'change-log-issues-export'
+
+/**
+ * Gets the export preferences (format & grouping) used for the change log issues.
+ *
+ * @returns the preferences, or undefined if not set or not readable
+ */
+export function getLocalChangeLogIssuesExport() {
+    const json = localStorage.getItem(changeLogIssuesExport)
+    if (json) {
+        try {
+            return JSON.parse(json)
+        } catch (ignored) {
+            // Corrupted entry: the defaults must be used instead
+            return undefined
+        }
+    } else {
+        return undefined
+    }
+}
+
+export function setLocalChangeLogIssuesExport(preferences) {
+    localStorage.setItem(changeLogIssuesExport, JSON.stringify(preferences))
+}
+
 /**
  * Gets the grid layout stored for a page.
  *
