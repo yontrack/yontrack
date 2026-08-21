@@ -140,7 +140,7 @@ Workflow statuses are saved by default for 14 days.
 
 To change this value, you can go to _System > Settings > Workflows_.
 
-This can also be defined as code using <<casc,CasC>>:
+This can also be defined as code using [CasC](../../configuration/casc.md):
 
 ```yaml
 ontrack:

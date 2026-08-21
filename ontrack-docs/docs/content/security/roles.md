@@ -84,7 +84,7 @@ validation runs statuses.
 
 A project **PROJECT_MANAGER** cumulates the functions of a PROMOTER and of a
 VALIDATION_MANAGER. He can additionally manage branches (creation / edition / deletion) and the common
-build filters. He can also assign <<usage-labels,labels>> to the project.
+build filters. He can also assign labels to the project.
 
 A project **READ_ONLY** user can view this project, but cannot perform any action on it.
 
