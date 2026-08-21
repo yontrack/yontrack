@@ -28,9 +28,14 @@ test('filtering builds on their display name', async ({page, ontrack}) => {
     await dialog.setDisplayName("^(1\\.2|2\\.0)")
     await dialog.ok()
 
-    await branchPage.checkBuildPresent("1.2.0")
+    // The build list identifies builds by their name, the label being shown next to it.
+    // build-1 is selected although its name does not match: only its label does.
+    await branchPage.checkBuildPresent("build-1")
+    await branchPage.checkBuildLabel("1.2.0")
+    // 2.0.0-plain has no label and is selected on its name
     await branchPage.checkBuildPresent("2.0.0-plain")
-    await branchPage.checkBuildNotPresent("9.9.9")
+    // build-3 is labelled 9.9.9 and must be excluded
+    await branchPage.checkBuildNotPresent("build-3")
 })
 
 test('an invalid display name regex is rejected by the filter form', async ({page, ontrack}) => {

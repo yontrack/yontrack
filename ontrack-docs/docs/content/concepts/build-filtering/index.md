@@ -63,7 +63,9 @@ criteria you fill in are combined: a build is kept only when it satisfies every 
 A build has a name, given when the build is created. It can also be given a
 [release label](../../generated/properties/property-net.nemerosa.ontrack.extension.general.ReleasePropertyType.md),
 typically a version number like `1.2.0`. The *display name* of a build is its release label when it
-has one, and its name otherwise - it is what Yontrack shows for the build across the UI.
+has one, and its name otherwise - it is the name Yontrack uses to designate the build, for example
+in build links and change logs. The build list of a branch shows the build name, with the label
+displayed next to it when there is one.
 
 The `With display name` criterion keeps only the builds whose display name matches a regular
 expression. Because it works on the display name and not on the name alone, a single filter

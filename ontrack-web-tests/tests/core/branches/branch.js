@@ -63,12 +63,16 @@ class BranchPage {
         return dialog
     }
 
-    async checkBuildPresent(displayName) {
-        await expect(this.page.getByRole('link', {name: displayName, exact: true})).toBeVisible()
+    async checkBuildPresent(buildName) {
+        await expect(this.page.getByRole('link', {name: buildName, exact: true})).toBeVisible()
     }
 
-    async checkBuildNotPresent(displayName) {
-        await expect(this.page.getByRole('link', {name: displayName, exact: true})).not.toBeVisible()
+    async checkBuildNotPresent(buildName) {
+        await expect(this.page.getByRole('link', {name: buildName, exact: true})).not.toBeVisible()
+    }
+
+    async checkBuildLabel(label) {
+        await expect(this.page.getByText(label, {exact: true})).toBeVisible()
     }
 
     async checkNoDisabledBanner() {
