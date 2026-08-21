@@ -21,6 +21,7 @@ interface CoreBuildFilterRepository {
     fun standardFilter(
         branch: Branch,
         data: StandardBuildFilterData,
+        displayNameProperty: BuildDisplayNameProperty?,
         propertyTypeAccessor: (String) -> PropertyType<*>
     ): List<Build>
 
@@ -29,6 +30,7 @@ interface CoreBuildFilterRepository {
         data: StandardBuildFilterData,
         offset: Int,
         size: Int,
+        displayNameProperty: BuildDisplayNameProperty?,
         propertyTypeAccessor: (String) -> PropertyType<*>,
     ): PaginatedList<Build>
 

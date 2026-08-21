@@ -30,6 +30,33 @@ export default function StandardBuildFilterProvider({branch, buildFilterForm}) {
 
     const tabs = [
         {
+            key: 'build',
+            label: "Build",
+            children: <>
+                {/* With display name */}
+                <Form.Item
+                    name={['data', 'withDisplayName']}
+                    label="With display name"
+                    extra="The build display name - its release label when set, its name otherwise - must match this regular expression. The matching is case insensitive and partial: use ^ and $ to anchor the pattern."
+                    rules={[
+                        {
+                            validator: async (_, value) => {
+                                if (value) {
+                                    try {
+                                        new RegExp(value)
+                                    } catch (ignored) {
+                                        throw new Error("Not a valid regular expression")
+                                    }
+                                }
+                            },
+                        },
+                    ]}
+                >
+                    <Input/>
+                </Form.Item>
+            </>
+        },
+        {
             key: 'promotion',
             label: "Promotion",
             children: <>

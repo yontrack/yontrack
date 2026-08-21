@@ -129,6 +129,11 @@ class BuildFilterServiceImpl(
             data = data.withLinkedToPromotion(linkedToPromotion)
             return this
         }
+
+        override fun withWithDisplayName(withDisplayName: String): StandardFilterProviderDataBuilder {
+            data = data.withWithDisplayName(withDisplayName)
+            return this
+        }
     }
 
     override fun standardFilterProviderData(count: Int): StandardFilterProviderDataBuilder {

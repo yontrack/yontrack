@@ -30,4 +30,12 @@ interface BuildDisplayNameService {
      */
     fun setDisplayName(build: Build, displayName: String, override: Boolean)
 
+    /**
+     * Property holding the display name of a build, or null when the display name cannot be
+     * resolved from a property.
+     *
+     * Like [getFirstBuildDisplayName], this considers only the first display name provider.
+     */
+    val displayNameProperty: BuildDisplayNameProperty?
+
 }

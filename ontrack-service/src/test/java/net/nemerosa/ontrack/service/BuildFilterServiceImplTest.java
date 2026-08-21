@@ -3,6 +3,7 @@ package net.nemerosa.ontrack.service;
 import net.nemerosa.ontrack.model.buildfilter.BuildFilterProviderData;
 import net.nemerosa.ontrack.model.buildfilter.BuildFilterService;
 import net.nemerosa.ontrack.model.security.SecurityService;
+import net.nemerosa.ontrack.model.structure.BuildDisplayNameService;
 import net.nemerosa.ontrack.model.structure.PropertyService;
 import net.nemerosa.ontrack.model.structure.StandardBuildFilterData;
 import net.nemerosa.ontrack.model.structure.StructureService;
@@ -31,7 +32,8 @@ public class BuildFilterServiceImplTest {
                         new StandardBuildFilterProvider(
                                 structureService,
                                 mock(PropertyService.class),
-                                mock(CoreBuildFilterRepository.class)
+                                mock(CoreBuildFilterRepository.class),
+                                mock(BuildDisplayNameService.class)
                         )
                 ),
                 buildFilterRepository,

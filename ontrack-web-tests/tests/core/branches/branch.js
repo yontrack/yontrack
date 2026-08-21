@@ -4,6 +4,7 @@ const {SCMChangeLogPage} = require("../../extensions/scm/scm");
 const {PromotionsPage} = require("../promotionLevels/PromotionsPage");
 const {confirmBox} = require("../../support/confirm");
 const {BranchLinksPage} = require("./BranchLinksPage");
+const {BuildFilterDialog} = require("./BuildFilterDialog");
 const {AutoVersioningConfigPage} = require("../../extensions/auto-versioning/AutoVersioningConfigPage");
 
 class BranchPage {
@@ -52,6 +53,22 @@ class BranchPage {
         const dialog = new ValidationRunHistoryDialog(this.page, run)
         await dialog.waitFor()
         return dialog
+    }
+
+    async newStandardBuildFilter() {
+        await this.page.getByRole('button', {name: "Build filter"}).click()
+        await this.page.getByText("Standard filter...").click()
+        const dialog = new BuildFilterDialog(this.page)
+        await dialog.waitFor()
+        return dialog
+    }
+
+    async checkBuildPresent(displayName) {
+        await expect(this.page.getByRole('link', {name: displayName, exact: true})).toBeVisible()
+    }
+
+    async checkBuildNotPresent(displayName) {
+        await expect(this.page.getByRole('link', {name: displayName, exact: true})).not.toBeVisible()
     }
 
     async checkNoDisabledBanner() {

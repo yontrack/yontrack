@@ -35,4 +35,6 @@ public interface StandardFilterDataBuilder<T extends StandardFilterDataBuilder<T
     T withLinkedTo(String linkedTo);
 
     T withLinkedToPromotion(String linkedToPromotion);
+
+    T withWithDisplayName(String withDisplayName);
 }

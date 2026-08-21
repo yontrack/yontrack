@@ -11,6 +11,8 @@ import net.nemerosa.ontrack.repository.CoreBuildFilterInvalidException
 import net.nemerosa.ontrack.repository.CoreBuildFilterRepository
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
+import java.util.regex.Pattern
+import java.util.regex.PatternSyntaxException
 
 @Component
 @Transactional
@@ -18,6 +20,7 @@ class StandardBuildFilterProvider(
     private val structureService: StructureService,
     private val propertyService: PropertyService,
     private val coreBuildFilterRepository: CoreBuildFilterRepository,
+    private val buildDisplayNameService: BuildDisplayNameService,
 ) : AbstractBuildFilterProvider<StandardBuildFilterData>() {
 
     override val type: String = StandardBuildFilterProvider::class.java.name
@@ -30,7 +33,8 @@ class StandardBuildFilterProvider(
         try {
             coreBuildFilterRepository.standardFilter(
                 branch,
-                data ?: StandardBuildFilterData.of(10)
+                data ?: StandardBuildFilterData.of(10),
+                buildDisplayNameService.displayNameProperty,
             ) { type -> propertyService.getPropertyTypeByName<Any>(type) }
         } catch (_: CoreBuildFilterInvalidException) {
             emptyList()
@@ -46,7 +50,8 @@ class StandardBuildFilterProvider(
             branch,
             data ?: StandardBuildFilterData.of(size),
             offset,
-            size
+            size,
+            buildDisplayNameService.displayNameProperty,
         ) { type -> propertyService.getPropertyTypeByName<Any>(type) }
     } catch (_: CoreBuildFilterInvalidException) {
         PaginatedList.empty()
@@ -70,6 +75,7 @@ class StandardBuildFilterProvider(
             .withLinkedFromPromotion(data.getTextField("linkedFromPromotion"))
             .withLinkedTo(data.getTextField("linkedTo"))
             .withLinkedToPromotion(data.getTextField("linkedToPromotion"))
+            .withWithDisplayName(data.getTextField("withDisplayName"))
 
     override fun validateData(branch: Branch, data: StandardBuildFilterData?): String? =
         if (data != null) {
@@ -85,8 +91,29 @@ class StandardBuildFilterProvider(
                 ?: validateProperty(data.sinceProperty, "Since property")
                 // With property
                 ?: validateProperty(data.withProperty, "With property")
+                // With display name
+                ?: validateRegex(data.withDisplayName, "With display name")
         } else {
             null
+        }
+
+    /**
+     * Checks that [regex] can be compiled as a regular expression.
+     *
+     * Note that this cannot catch every pattern rejected by the database, since the
+     * filtering is ultimately performed by Postgres, whose regular expression dialect
+     * differs from the JVM one. The repository layer is the safety net for those.
+     */
+    private fun validateRegex(regex: String?, field: String): String? =
+        if (regex.isNullOrBlank()) {
+            null
+        } else {
+            try {
+                Pattern.compile(regex)
+                null
+            } catch (ex: PatternSyntaxException) {
+                """Invalid regular expression for filter "$field": ${ex.description}."""
+            }
         }
 
     private fun validateProperty(property: String?, field: String): String? {

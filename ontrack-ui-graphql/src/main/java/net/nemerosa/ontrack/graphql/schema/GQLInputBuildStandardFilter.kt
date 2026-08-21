@@ -68,6 +68,14 @@ class GQLInputBuildStandardFilter(
                     "The build must be linked TO a build having this promotion (requires \"linkedTo\")"
                 )
             )
+            .field(
+                formField(
+                    "withDisplayName",
+                    "The build display name (its release label when set, its name otherwise) " +
+                            "must match this regular expression.\n" +
+                            "The matching is case insensitive and partial - use ^ and $ to anchor the pattern."
+                )
+            )
             .build()
     }
 

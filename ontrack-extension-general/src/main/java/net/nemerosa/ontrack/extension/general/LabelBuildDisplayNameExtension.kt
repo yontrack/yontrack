@@ -19,6 +19,11 @@ class LabelBuildDisplayNameExtension(
         return displayProperty.getLabel(labelProperty)
     }
 
+    override val displayNameProperty = BuildDisplayNameProperty(
+        propertyTypeName = ReleasePropertyType::class.java.name,
+        jsonField = ReleaseProperty::name.name,
+    )
+
     override fun mustProvideBuildName(build: Build): Boolean {
         val displayProperty: BuildLinkDisplayProperty? =
             propertyService.getProperty(build.project, BuildLinkDisplayPropertyType::class.java).value

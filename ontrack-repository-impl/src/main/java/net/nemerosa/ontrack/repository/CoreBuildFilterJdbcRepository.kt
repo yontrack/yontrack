@@ -9,7 +9,9 @@ import net.nemerosa.ontrack.repository.support.AbstractJdbcRepository
 import net.nemerosa.ontrack.repository.support.createSQL
 import org.apache.commons.lang3.StringUtils
 import org.apache.commons.lang3.StringUtils.isNotBlank
+import org.springframework.dao.DataAccessException
 import org.springframework.stereotype.Repository
+import java.sql.SQLException
 import java.util.*
 import javax.sql.DataSource
 import kotlin.math.max
@@ -211,17 +213,20 @@ class CoreBuildFilterJdbcRepository(
     override fun standardFilter(
         branch: Branch,
         data: StandardBuildFilterData,
+        displayNameProperty: BuildDisplayNameProperty?,
         propertyTypeAccessor: (String) -> PropertyType<*>,
     ): List<Build> {
         val count = min(data.count, ontrackConfigProperties.buildFilterCountMax)
         val params = mutableMapOf<String, Any?>()
 
-        val base = buildStandardFilterQuery(branch, data, params, propertyTypeAccessor)
+        val base = buildStandardFilterQuery(branch, data, params, displayNameProperty, propertyTypeAccessor)
         val query = appendOrderOffsetAndCount(base, 0, count, params)
 
         val sql = "SELECT DISTINCT(B.ID) $query"
 
-        return loadBuilds(sql, params)
+        return catchingInvalidRegex {
+            loadBuilds(sql, params)
+        }
     }
 
     override fun standardFilterPagination(
@@ -229,24 +234,29 @@ class CoreBuildFilterJdbcRepository(
         data: StandardBuildFilterData,
         offset: Int,
         size: Int,
+        displayNameProperty: BuildDisplayNameProperty?,
         propertyTypeAccessor: (String) -> PropertyType<*>,
     ): PaginatedList<Build> {
         val count = minOf(size, ontrackConfigProperties.buildFilterCountMax)
         val params = mutableMapOf<String, Any?>()
 
-        val base = buildStandardFilterQuery(branch, data, params, propertyTypeAccessor)
+        val base = buildStandardFilterQuery(branch, data, params, displayNameProperty, propertyTypeAccessor)
 
         // Count
         @Suppress("SqlSourceToSinkFlow")
-        val total = namedParameterJdbcTemplate!!.queryForObject(
-            "SELECT COUNT(B.ID) $base",
-            params,
-            Int::class.java
-        ) ?: 0
+        val total = catchingInvalidRegex {
+            namedParameterJdbcTemplate!!.queryForObject(
+                "SELECT COUNT(B.ID) $base",
+                params,
+                Int::class.java
+            ) ?: 0
+        }
 
         // List
         val sql = appendOrderOffsetAndCount(base, offset, count, params)
-        val builds = loadBuilds("SELECT DISTINCT(B.ID) $sql", params)
+        val builds = catchingInvalidRegex {
+            loadBuilds("SELECT DISTINCT(B.ID) $sql", params)
+        }
 
         // OK
         return PaginatedList.Companion.create(
@@ -282,6 +292,7 @@ class CoreBuildFilterJdbcRepository(
         branch: Branch,
         data: StandardBuildFilterData,
         params: MutableMap<String, Any?>,
+        displayNameProperty: BuildDisplayNameProperty?,
         propertyTypeAccessor: (String) -> PropertyType<*>,
     ): String {
         // Query root
@@ -487,6 +498,33 @@ class CoreBuildFilterJdbcRepository(
             }
         }
 
+        // withDisplayName
+        val withDisplayName = data.withDisplayName
+        if (!withDisplayName.isNullOrBlank()) {
+            try {
+                withDisplayName.toRegex()
+            } catch (_: Exception) {
+                throw CoreBuildFilterInvalidException(
+                    """Invalid regular expression for the build display name: "$withDisplayName"."""
+                )
+            }
+            params["withDisplayName"] = withDisplayName
+            if (displayNameProperty != null) {
+                // The display name is the value of a property, defaulting to the build name
+                tables.add(
+                    " LEFT JOIN PROPERTIES PDN ON PDN.BUILD = B.ID AND PDN.TYPE = :displayNamePropertyType"
+                )
+                params["displayNamePropertyType"] = displayNameProperty.propertyTypeName
+                params["displayNamePropertyField"] = displayNameProperty.jsonField
+                criteria.add(
+                    "COALESCE(NULLIF(PDN.JSON->>:displayNamePropertyField, ''), B.NAME) ~* :withDisplayName"
+                )
+            } else {
+                // No property holding a display name: the build name is the display name
+                criteria.add("B.NAME ~* :withDisplayName")
+            }
+        }
+
         // Since build?
         if (sinceBuildId != null) {
             criteria.add("B.ID >= :sinceBuildId")
@@ -496,6 +534,28 @@ class CoreBuildFilterJdbcRepository(
         // Final SQL
         return createSQL(tables, criteria)
     }
+
+    /**
+     * Runs [block], converting a regular expression rejected by the database into a
+     * [CoreBuildFilterInvalidException], which callers translate into an empty list of builds.
+     *
+     * A pattern is already checked before the query is built, but the JVM and Postgres regular
+     * expression dialects differ, so a pattern accepted by the former can still be rejected by
+     * the latter.
+     */
+    private fun <T> catchingInvalidRegex(block: () -> T): T =
+        try {
+            block()
+        } catch (ex: DataAccessException) {
+            val sqlState = (ex.mostSpecificCause as? SQLException)?.sqlState
+            if (sqlState == PG_INVALID_REGULAR_EXPRESSION) {
+                throw CoreBuildFilterInvalidException(
+                    "Invalid regular expression in the build filter."
+                )
+            } else {
+                throw ex
+            }
+        }
 
     private fun appendOrderOffsetAndCount(
         sql: String,
@@ -750,5 +810,12 @@ class CoreBuildFilterJdbcRepository(
             params("promotionLevelId", promotionLevelId),
             Int::class.java
         )
+    }
+
+    companion object {
+        /**
+         * Postgres SQL state for an invalid regular expression.
+         */
+        private const val PG_INVALID_REGULAR_EXPRESSION = "2201B"
     }
 }
