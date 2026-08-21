@@ -25,7 +25,7 @@ export default function ValidationStabilityChartWidget({project, branch, validat
                 </>
             )
         }
-    }, [validationStampObject]);
+    }, [validationStampObject, interval, period]);
 
     return (
         <>

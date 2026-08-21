@@ -170,3 +170,57 @@ test('export as YAML is not available for built-in dashboards', async ({page, on
     // "Export as YAML" should NOT appear for built-in dashboards
     await expect(page.getByText('Export as YAML')).not.toBeVisible()
 })
+
+test('changing the chart options of a widget updates its title', async ({page, ontrack}) => {
+    const dashboardName = `chart-widget-${Date.now()}`
+
+    // Provisioning
+    const project = await ontrack.createProject()
+    const branch = await project.createBranch()
+    const promotionLevel = await branch.createPromotionLevel()
+
+    const dashboardYaml = ({interval, period}) => [
+        `- name: "${dashboardName}"`,
+        `  widgets:`,
+        `    - key: "home/PromotionLeadTimeChart"`,
+        `      layout: {x: 0, y: 0, w: 12, h: 25}`,
+        `      config:`,
+        `        project: "${project.name}"`,
+        `        branch: "${branch.name}"`,
+        `        promotionLevel: "${promotionLevel.name}"`,
+        `        interval: "${interval}"`,
+        `        period: "${period}"`,
+    ].join('\n')
+
+    // Creating the dashboard, with its chart widget using the default options
+    const data = await graphQLCallMutation(
+        ontrack.connection,
+        'applyDashboards',
+        applyDashboardsMutation,
+        {yaml: dashboardYaml({interval: '3m', period: '1w'})}
+    )
+    const dashboardUuid = data.applyDashboards.dashboards[0].uuid
+
+    await login(page, ontrack)
+
+    // Displaying the dashboard using its URL: selecting it from the menu would
+    // make it the dashboard of the user for the next tests as well
+    await page.goto(`${ontrack.connection.ui}/?dashboard=${dashboardUuid}`)
+
+    // The title of the widget displays the chart options
+    const widgetTitle = page.locator('.ant-card-head').filter({hasText: 'Lead time to'})
+    await expect(widgetTitle).toContainText(/3m\s*\/\s*1w/)
+
+    // Importing the same dashboard again, with other chart options: the widgets
+    // are kept in place, only their configuration changes
+    await page.getByRole('button', {name: 'Dashboard', exact: true}).click()
+    await page.getByText('Import dashboards as YAML').click()
+    const modal = page.getByRole('dialog')
+    await expect(modal).toBeVisible()
+    await modal.locator('textarea').fill(dashboardYaml({interval: '1m', period: '1d'}))
+    await modal.getByRole('button', {name: 'Import'}).click()
+    await expect(page.getByRole('dialog')).not.toBeVisible()
+
+    // The title of the widget displays the new chart options
+    await expect(widgetTitle).toContainText(/1m\s*\/\s*1d/)
+})

@@ -25,7 +25,7 @@ export default function PromotionTTRChartWidget({project, branch, promotionLevel
                 </>
             )
         }
-    }, [promotionLevelObject]);
+    }, [promotionLevelObject, interval, period]);
 
     return (
         <>

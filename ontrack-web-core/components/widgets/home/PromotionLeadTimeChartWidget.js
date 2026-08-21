@@ -25,7 +25,7 @@ export default function PromotionLeadTimeChartWidget({project, branch, promotion
                 </>
             )
         }
-    }, [promotionLevelObject]);
+    }, [promotionLevelObject, interval, period]);
 
     return (
         <>

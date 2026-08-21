@@ -25,7 +25,7 @@ export default function PromotionStabilityChartWidget({project, branch, promotio
                 </>
             )
         }
-    }, [promotionLevelObject]);
+    }, [promotionLevelObject, interval, period]);
 
     return (
         <>

@@ -25,7 +25,7 @@ export default function ValidationMetricsChartWidget({project, branch, validatio
                 </>
             )
         }
-    }, [validationStampObject]);
+    }, [validationStampObject, interval, period]);
 
     return (
         <>
