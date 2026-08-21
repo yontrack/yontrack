@@ -1,7 +1,7 @@
 // @ts-check
 const {login} = require("../../core/login");
 const {BranchPage} = require("../../core/branches/branch");
-const {provisionChangeLog, commits, issues} = require("./scm");
+const {provisionChangeLog, commits, issues, SCMChangeLogPage} = require("./scm");
 const {generate, trimIndent} = require("@ontrack/utils");
 const {ontrack} = require("@ontrack/ontrack");
 const {test} = require("../../fixtures/connection");
@@ -91,6 +91,58 @@ const doTestSCMChangeLog = async (
 
 test("SCM change log", async ({page, ontrack}) => {
     await doTestSCMChangeLog(page, ontrack)
+})
+
+test("SCM change log using the build names", async ({page, ontrack}) => {
+    const {from, to} = await provisionChangeLog(ontrack)
+
+    await login(page, ontrack)
+
+    // Going to the change log page using the names of the builds only
+    const changeLogPage = new SCMChangeLogPage(page, ontrack)
+    await changeLogPage.goToByName({
+        project: from.branch.project.name,
+        from: from.name,
+        to: to.name,
+    })
+
+    // The very same change log page is displayed
+    await changeLogPage.checkDisplayed()
+    await changeLogPage.checkBuildFrom(from)
+    await changeLogPage.checkBuildTo(to)
+    await changeLogPage.checkCommitMessage(commits[4], {present: true})
+
+    await changeLogPage.waitForIssuesLoaded()
+    await changeLogPage.checkIssue({key: "ISS-23", summary: issues["ISS-23"].summary, visible: true})
+})
+
+test("SCM change log using the build names for a project which does not exist", async ({page, ontrack}) => {
+    await login(page, ontrack)
+
+    const changeLogPage = new SCMChangeLogPage(page, ontrack)
+    await changeLogPage.goToByName({
+        project: "no-such-project",
+        from: "1.0.0",
+        to: "2.0.0",
+    })
+
+    await changeLogPage.checkError("Project name not found: no-such-project")
+})
+
+test("SCM change log using the build names for a build which does not exist", async ({page, ontrack}) => {
+    const {from} = await provisionChangeLog(ontrack)
+    const project = from.branch.project.name
+
+    await login(page, ontrack)
+
+    const changeLogPage = new SCMChangeLogPage(page, ontrack)
+    await changeLogPage.goToByName({
+        project,
+        from: from.name,
+        to: "no-such-build",
+    })
+
+    await changeLogPage.checkError(`Build not found: ${project}/no-such-build`)
 })
 
 /**

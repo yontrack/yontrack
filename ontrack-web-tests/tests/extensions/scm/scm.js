@@ -98,12 +98,34 @@ export async function provisionChangeLog(
 
 export class SCMChangeLogPage {
 
-    constructor(page) {
+    constructor(page, ontrack) {
         this.page = page
+        this.ontrack = ontrack
     }
 
     async checkDisplayed() {
         await expect(this.page.getByText("Change log from")).toBeVisible()
+    }
+
+    /**
+     * Goes to the change log page using the names (or display names) of the builds
+     * instead of their IDs.
+     */
+    async goToByName({project, from, to, fromBranch, toBranch}) {
+        const params = new URLSearchParams({from, to})
+        if (fromBranch) params.set('fromBranch', fromBranch)
+        if (toBranch) params.set('toBranch', toBranch)
+        await this.page.goto(
+            `${this.ontrack.connection.ui}/extension/scm/${encodeURIComponent(project)}/changelog?${params.toString()}`
+        )
+    }
+
+    /**
+     * Checks that the change log could not be displayed, and that the reason is shown.
+     */
+    async checkError(message) {
+        await expect(this.page.getByText("This change log cannot be displayed.")).toBeVisible()
+        await expect(this.page.getByText(message, {exact: true})).toBeVisible()
     }
 
     /**

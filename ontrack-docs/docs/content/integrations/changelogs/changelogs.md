@@ -81,6 +81,50 @@ for the [branch changelog](#using-the-ui).
 
     You cannot generate changelogs between different projects.
 
+### Using a permalink
+
+The changelog page can be linked to directly, which is useful for release notes, chat messages or CI jobs.
+
+Using the IDs of the two builds:
+
+```
+/extension/scm/changelog?from=1146&to=1149
+```
+
+Using the name of the project and the names of the two builds, which can be written without knowing any ID:
+
+```
+/extension/scm/my-project/changelog?from=1.2.0&to=1.3.0
+```
+
+In this second form, each boundary is looked for using
+the [display name](../../generated/properties/property-net.nemerosa.ontrack.extension.general.ReleasePropertyType.md)
+of the builds first, and then using their name.
+
+The boundaries can be given in any order: the changelog is always computed from the oldest build to the most recent one.
+
+If the project, one of the branches or one of the builds cannot be found, the reason is displayed on the page.
+
+#### Selecting the branch of a boundary
+
+Build names are unique inside a branch, not inside a project. When several builds of the project match a boundary, the
+most recent one is used.
+
+The branch of each boundary can be given to remove this ambiguity:
+
+```
+/extension/scm/my-project/changelog?from=1.2.0&fromBranch=release-1.2&to=1.3.0&toBranch=release-1.3
+```
+
+!!! warning
+
+    When a branch is given, the _name_ of the build is looked for in this branch only, but its _display name_ is still
+    looked for in the whole project. A boundary given as a display name can therefore be resolved into a build which is
+    not on the branch which has been given.
+
+    Giving a branch also changes the order of the matching: without a branch, the display name is matched first, and
+    then the build name. With a branch, the build name is matched first, and then the display name.
+
 ### Using templating
 
 The most powerful way to generate changelogs is to use [templating](../../appendix/templating.md).

@@ -18,6 +18,8 @@ dependencies {
     testImplementation(testFixtures(project(":ontrack-it-utils")))
     testImplementation(testFixtures(project(":ontrack-model")))
     testImplementation(testFixtures(project(":ontrack-ui-graphql")))
+    // Needed to set display names on builds (release property)
+    testImplementation(project(":ontrack-extension-general"))
 
     testFixturesImplementation(testFixtures(project(":ontrack-it-utils")))
     testFixturesImplementation(project(":ontrack-test-utils"))

@@ -1,8 +1,6 @@
 package net.nemerosa.ontrack.extension.scm.graphql
 
 import graphql.schema.GraphQLFieldDefinition
-import kotlinx.coroutines.runBlocking
-import net.nemerosa.ontrack.extension.scm.changelog.DependencyLink
 import net.nemerosa.ontrack.extension.scm.changelog.SCMChangeLogService
 import net.nemerosa.ontrack.graphql.schema.GQLRootQuery
 import net.nemerosa.ontrack.graphql.support.intArgument
@@ -41,25 +39,12 @@ class GQLRootQuerySCMChangeLog(
             val from: Int = env.getArgument(ARG_FROM)!!
             val to: Int = env.getArgument(ARG_TO)!!
             val projects: List<String>? = env.getArgument(ARG_PROJECTS)
-            var buildFrom = structureService.getBuild(ID.of(from))
-            var buildTo = structureService.getBuild(ID.of(to))
 
-            // Inverting the boundaries so that "buildTo" is the most recent
-            if (buildTo.signature.time < buildFrom.signature.time) {
-                val tmp = buildFrom
-                buildFrom = buildTo
-                buildTo = tmp
-            }
-
-            runBlocking {
-                scmChangeLogService.getChangeLog(
-                    from = buildFrom,
-                    to = buildTo,
-                    dependencies = projects
-                        ?.map { DependencyLink.parse(it) }
-                        ?: emptyList(),
-                )
-            }
+            scmChangeLogService.getChangeLogForBoundaries(
+                from = structureService.getBuild(ID.of(from)),
+                to = structureService.getBuild(ID.of(to)),
+                projects = projects,
+            )
         }
         .build()
 

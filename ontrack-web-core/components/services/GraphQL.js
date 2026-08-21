@@ -150,6 +150,22 @@ export async function callGraphQL({
         await signOut()
     } else {
         console.error(res)
-        throw new Error("Issue with GraphQL call.");
+        let body
+        try {
+            body = await res.json()
+        } catch (ignored) {
+            // Keeping the generic message below
+        }
+        throw new Error(graphQLErrorMessage(body));
     }
+}
+
+export const genericGraphQLErrorMessage = "Issue with GraphQL call."
+
+/**
+ * The GraphQL errors are returned by the API route as a serialized `ClientError`. This extracts
+ * the message of the first error, so that the reason of the failure can be displayed to the user.
+ */
+export function graphQLErrorMessage(body) {
+    return body?.error?.response?.errors?.[0]?.message ?? genericGraphQLErrorMessage
 }
