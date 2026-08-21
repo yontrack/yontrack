@@ -10,11 +10,12 @@ import SafeHTMLComponent from "@components/common/SafeHTMLComponent";
 
 const {Column} = Table
 
-export default function GitChangeLogCommits({id, commits, diffLink}) {
+export default function GitChangeLogCommits({id, loading, commits, diffLink}) {
     return (
         <>
             <GridCell
                 id={id}
+                loading={loading}
                 title={
                     <>
                         Commits (<Link href={diffLink}>diff</Link>)

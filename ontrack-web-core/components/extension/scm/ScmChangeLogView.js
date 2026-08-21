@@ -5,16 +5,16 @@ import ChangeLogBuild from "@components/extension/scm/ChangeLogBuild";
 import Head from "next/head";
 import {buildKnownName, title} from "@components/common/Titles";
 import MainPage from "@components/layouts/MainPage";
-import LoadingContainer from "@components/common/LoadingContainer";
 import {downToBranchBreadcrumbs, homeBreadcrumbs} from "@components/common/Breadcrumbs";
 import {CloseCommand} from "@components/common/Commands";
 import {branchUri, homeUri} from "@components/common/Links";
 import GridTable from "@components/grid/GridTable";
 import GridTableContextProvider from "@components/grid/GridTableContext";
+import GridCell from "@components/grid/GridCell";
 import GitChangeLogCommits from "@components/extension/git/GitChangeLogCommits";
 import ChangeLogIssues from "@components/extension/issues/ChangeLogIssues";
 import ChangeLogLinks from "@components/extension/scm/ChangeLogLinks";
-import {Empty, Skeleton, Typography} from "antd";
+import {Empty, Typography} from "antd";
 
 export default function ScmChangeLogView({from, to}) {
 
@@ -152,21 +152,6 @@ export default function ScmChangeLogView({from, to}) {
                                     }
                                 }
                             }
-                            issues {
-                                issueServiceConfiguration {
-                                    serviceId
-                                }
-                                issues {
-                                    displayKey
-                                    summary
-                                    url
-                                    status {
-                                        name
-                                    }
-                                    updateTime
-                                    rawIssue
-                                }
-                            }
                         }
                     }
                     ${gqlBuildData}
@@ -197,47 +182,39 @@ export default function ScmChangeLogView({from, to}) {
                 [
                     {
                         id: "from",
-                        content: <Skeleton loading={loading}>
-                            {
-                                changeLog.buildFrom.creation &&
-                                <ChangeLogBuild id="from" title={`From ${buildKnownName(changeLog.buildFrom)}`}
-                                                build={changeLog.buildFrom}/>
-                            }
-                        </Skeleton>,
+                        content: changeLog.buildFrom.creation ?
+                            <ChangeLogBuild id="from" title={`From ${buildKnownName(changeLog.buildFrom)}`}
+                                            build={changeLog.buildFrom}/> :
+                            <GridCell id="from" title="From" loading={loading}/>,
                     },
                     {
                         id: "to",
-                        content: <Skeleton loading={loading}>
-                            {
-                                changeLog.buildTo.creation &&
-                                <ChangeLogBuild id="to" title={`To ${buildKnownName(changeLog.buildTo)}`}
-                                                build={changeLog.buildTo}/>
-                            }
-                        </Skeleton>,
+                        content: changeLog.buildTo.creation ?
+                            <ChangeLogBuild id="to" title={`To ${buildKnownName(changeLog.buildTo)}`}
+                                            build={changeLog.buildTo}/> :
+                            <GridCell id="to" title="To" loading={loading}/>,
                     },
                     {
                         id: "links",
-                        content: <Skeleton loading={loading}>
-                            <ChangeLogLinks id="links" linkChanges={changeLog.linkChanges}/>
-                        </Skeleton>,
+                        content: <ChangeLogLinks id="links" loading={loading}
+                                                 linkChanges={changeLog.linkChanges}/>,
                     },
                     {
                         id: "commits",
-                        content: <Skeleton loading={loading}>
-                            <GitChangeLogCommits id="commits" commits={changeLog.commits}
-                                                 diffLink={changeLog.diffLink}/>
-                        </Skeleton>,
+                        content: <GitChangeLogCommits id="commits" loading={loading}
+                                                      commits={changeLog.commits}
+                                                      diffLink={changeLog.diffLink}/>,
                     },
                     {
+                        // The issues are loaded by the component itself, in parallel
+                        // of the rest of the change log.
                         id: "issues",
-                        content: <Skeleton loading={loading}>
-                            <ChangeLogIssues id="issues" from={from} to={to} issues={changeLog.issues}/>
-                        </Skeleton>,
+                        content: <ChangeLogIssues id="issues" from={from} to={to}/>,
                     },
                 ]
             )
         }
-    }, [changeLog]);
+    }, [changeLog, loading]);
 
     return (
         <>
@@ -268,16 +245,16 @@ export default function ScmChangeLogView({from, to}) {
             >
                 {
                     changeLog && items &&
+                    // Each cell manages its own loading state, so that the issues
+                    // can be loaded in parallel of the rest of the change log.
                     <GridTableContextProvider isExpandable={false} isDraggable={false}>
-                        <LoadingContainer loading={loading} tip="Loading change log">
-                            <GridTable
-                                rowHeight={30}
-                                layout={defaultLayout}
-                                items={items}
-                                isResizable={false}
-                                isDraggable={false}
-                            />
-                        </LoadingContainer>
+                        <GridTable
+                            rowHeight={30}
+                            layout={defaultLayout}
+                            items={items}
+                            isResizable={false}
+                            isDraggable={false}
+                        />
                     </GridTableContextProvider>
                 }
                 {

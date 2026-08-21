@@ -2,25 +2,52 @@ import GridCell from "@components/grid/GridCell";
 import {Dynamic} from "@components/common/Dynamic";
 import {useEffect, useState} from "react";
 import {useTemplateRenderers} from "@components/extension/issues/SelectTemplateRenderer";
-import {Button, Dropdown, Input, Modal, Space, Spin} from "antd";
+import {Alert, Button, Dropdown, Input, Modal, Space, Spin} from "antd";
 import {FaCheck, FaCopy, FaDownload, FaTools} from "react-icons/fa";
 import copy from "copy-to-clipboard";
 import {gql} from "graphql-request";
 import IssueChangeLogExportRequestDialog, {
     useIssueChangeLogExportRequestDialog
 } from "@components/extension/issues/IssueChangeLogExportRequestDialog";
-import {useMutation} from "@components/services/GraphQL";
+import {useMutation, useQuery} from "@components/services/GraphQL";
 
-export default function ChangeLogIssues({id, from, to, issues}) {
+export default function ChangeLogIssues({id, from, to}) {
 
-    const [issueServiceId, setIssueServiceId] = useState('')
-    useEffect(() => {
-        if (issues) {
-            setIssueServiceId(issues.issueServiceConfiguration.serviceId)
+    /**
+     * The issues are loaded separately from the rest of the change log because,
+     * unlike the commits, getting them can be slow (remote issue service).
+     */
+    const {data: issues, loading, error} = useQuery(
+        gql`
+            query ChangeLogIssues($from: Int!, $to: Int!) {
+                scmChangeLog(from: $from, to: $to) {
+                    issues {
+                        issueServiceConfiguration {
+                            serviceId
+                        }
+                        issues {
+                            displayKey
+                            summary
+                            url
+                            status {
+                                name
+                            }
+                            updateTime
+                            rawIssue
+                        }
+                    }
+                }
+            }
+        `,
+        {
+            variables: {from, to},
+            deps: [from, to],
+            condition: !!from && !!to,
+            dataFn: data => data.scmChangeLog?.issues,
         }
-    }, [issues])
+    )
 
-    // const client = useGraphQLClient()
+    const issueServiceId = issues?.issueServiceConfiguration?.serviceId
 
     const templateRenderers = useTemplateRenderers()
 
@@ -169,12 +196,13 @@ export default function ChangeLogIssues({id, from, to, issues}) {
             <GridCell
                 id={id}
                 title="Issues"
+                loading={loading}
                 extra={
                     <>
                         <Dropdown.Button
                             type="primary"
                             trigger="click"
-                            disabled={exporting}
+                            disabled={loading || exporting}
                             menu={{items}}
                             onClick={onExport}
                         >
@@ -186,6 +214,10 @@ export default function ChangeLogIssues({id, from, to, issues}) {
                     </>
                 }
             >
+                {
+                    error &&
+                    <Alert type="error" showIcon message={error}/>
+                }
                 {
                     issueServiceId &&
                     <Dynamic

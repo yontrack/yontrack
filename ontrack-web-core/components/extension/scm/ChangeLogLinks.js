@@ -6,11 +6,11 @@ import ChangeLogSignLink from "@components/extension/scm/ChangeLogSignLink";
 
 const {Column} = Table
 
-export default function ChangeLogLinks({id, linkChanges = []}) {
+export default function ChangeLogLinks({id, loading, linkChanges = []}) {
 
     return (
         <>
-            <GridCell id={id} title="Links" padding={0}>
+            <GridCell id={id} title="Links" loading={loading} padding={0}>
                 <Table
                     dataSource={linkChanges}
                     size="small"

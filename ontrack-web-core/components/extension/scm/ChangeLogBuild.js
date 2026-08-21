@@ -5,10 +5,10 @@ import BuildLink from "@components/builds/BuildLink";
 import Timestamp from "@components/common/Timestamp";
 import PromotionRun from "@components/promotionRuns/PromotionRun";
 
-export default function ChangeLogBuild({id, title, build}) {
+export default function ChangeLogBuild({id, title, loading, build}) {
     return (
         <>
-            <GridCell id={id} title={title} padding={true}>
+            <GridCell id={id} title={title} loading={loading} padding={true}>
                 <Space direction="vertical">
                     <Space>
                         <BranchLink branch={build.branch}/>

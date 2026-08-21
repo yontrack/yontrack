@@ -145,6 +145,16 @@ export class SCMChangeLogPage {
         }
     }
 
+    /**
+     * The issues are loaded separately from the rest of the change log, so we must
+     * wait for their loading to be complete before asserting on their content
+     * (in particular before asserting that an issue is NOT displayed).
+     */
+    async checkIssuesLoaded() {
+        // While the issues are being loaded, the cell title is "Loading..."
+        await expect(this.page.locator('#issues .ant-card-head-title')).toHaveText('Issues')
+    }
+
     async checkIssue({key, summary, visible}) {
         const container = this.page.locator('#issues')
         const link = container.getByRole('link', {name: key});

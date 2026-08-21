@@ -68,6 +68,9 @@ const doTestSCMChangeLog = async (
      * Issues
      */
 
+    // The issues are loaded asynchronously: waiting for the loading to be complete
+    await changeLogPage.checkIssuesLoaded()
+
     // Expecting the issues to be displayed
     for (const key of Object.keys(issues)) {
         const {summary} = issues[key]
