@@ -90,4 +90,46 @@ class ValidationRunServiceIT : AbstractDSLTestSupport() {
         }
     }
 
+    /**
+     * #1629 - a validation run whose status has been changed to FIXED must be considered as passed.
+     */
+    @Test
+    fun `Checking for a passed build when the last validation has been fixed`() {
+        asAdmin {
+            project {
+                branch {
+                    val vs = validationStamp()
+                    build {
+                        val run = validate(vs, validationRunStatusID = ValidationRunStatusID.STATUS_FAILED)
+                        assertFalse(validationRunService.isValidationRunPassed(this, vs))
+                        val investigated =
+                            run.validationStatus(ValidationRunStatusID.STATUS_INVESTIGATING, "Investigating")
+                        assertFalse(validationRunService.isValidationRunPassed(this, vs))
+                        investigated.validationStatus(ValidationRunStatusID.STATUS_FIXED, "Fixed")
+                        assertTrue(validationRunService.isValidationRunPassed(this, vs))
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * #1629 - a status which is not flagged as passed must not be considered as passed.
+     */
+    @Test
+    fun `Checking for a passed build when the last validation is defective`() {
+        asAdmin {
+            project {
+                branch {
+                    val vs = validationStamp()
+                    build {
+                        validate(vs, validationRunStatusID = ValidationRunStatusID.STATUS_FAILED)
+                            .validationStatus(ValidationRunStatusID.STATUS_DEFECTIVE, "Defective")
+                        assertFalse(validationRunService.isValidationRunPassed(this, vs))
+                    }
+                }
+            }
+        }
+    }
+
 }

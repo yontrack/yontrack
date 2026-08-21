@@ -8,6 +8,7 @@ import net.nemerosa.ontrack.model.structure.BranchCloneRequest
 import net.nemerosa.ontrack.model.structure.Build
 import net.nemerosa.ontrack.model.structure.CopyService
 import net.nemerosa.ontrack.model.structure.PromotionLevel
+import net.nemerosa.ontrack.model.structure.ValidationRunStatusID
 import net.nemerosa.ontrack.test.TestUtils
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -346,6 +347,117 @@ class AutoPromotionPropertyIT : AbstractDSLTestSupport() {
                             listOf(iron.id),
                             it.promotionLevels.map { pl -> pl.id }
                     )
+                }
+            }
+        }
+    }
+
+    /**
+     * #1629 - a validation which was failed and is later fixed must count as passed
+     * and grant the auto promotion.
+     */
+    @Test
+    fun `Auto promotion granted when a failed validation becomes fixed`() {
+        project {
+            branch {
+                val vs = validationStamp("VS")
+                val pl = promotionLevel("PL")
+                setProperty(
+                    pl,
+                    AutoPromotionPropertyType::class.java,
+                    AutoPromotionProperty(listOf(vs), "", "", emptyList())
+                )
+                build("1") {
+                    // The validation fails: no promotion
+                    val run = validate(vs, validationRunStatusID = ValidationRunStatusID.STATUS_FAILED)
+                    checkBuildIsNotPromoted(this, pl)
+                    // The validation is being investigated: still no promotion
+                    val investigated =
+                        run.validationStatus(ValidationRunStatusID.STATUS_INVESTIGATING, "Investigating")
+                    checkBuildIsNotPromoted(this, pl)
+                    // The validation is fixed: the promotion is granted
+                    investigated.validationStatus(ValidationRunStatusID.STATUS_FIXED, "Fixed")
+                    checkBuildIsPromoted(this, pl)
+                }
+            }
+        }
+    }
+
+    /**
+     * #1629 - a fixed validation is not enough when another prerequisite is not met.
+     */
+    @Test
+    fun `No auto promotion when a validation is fixed but another one is still failed`() {
+        project {
+            branch {
+                val vs1 = validationStamp("VS1")
+                val vs2 = validationStamp("VS2")
+                val pl = promotionLevel("PL")
+                setProperty(
+                    pl,
+                    AutoPromotionPropertyType::class.java,
+                    AutoPromotionProperty(listOf(vs1, vs2), "", "", emptyList())
+                )
+                build("1") {
+                    validate(vs2, validationRunStatusID = ValidationRunStatusID.STATUS_FAILED)
+                    validate(vs1, validationRunStatusID = ValidationRunStatusID.STATUS_FAILED)
+                        .validationStatus(ValidationRunStatusID.STATUS_INVESTIGATING, "Investigating")
+                        .validationStatus(ValidationRunStatusID.STATUS_FIXED, "Fixed")
+                    // VS2 is still failed
+                    checkBuildIsNotPromoted(this, pl)
+                }
+            }
+        }
+    }
+
+    /**
+     * #1629 - a status change to a status which is not passed must not grant the promotion.
+     */
+    @Test
+    fun `No auto promotion when the validation status changes to a non passed status`() {
+        project {
+            branch {
+                val vs = validationStamp("VS")
+                val pl = promotionLevel("PL")
+                setProperty(
+                    pl,
+                    AutoPromotionPropertyType::class.java,
+                    AutoPromotionProperty(listOf(vs), "", "", emptyList())
+                )
+                build("1") {
+                    validate(vs, validationRunStatusID = ValidationRunStatusID.STATUS_FAILED)
+                        .validationStatus(ValidationRunStatusID.STATUS_EXPLAINED, "Explained")
+                    checkBuildIsNotPromoted(this, pl)
+                }
+            }
+        }
+    }
+
+    /**
+     * #1629 - a validation fixed earlier must still count when the last missing
+     * prerequisite is met later on.
+     */
+    @Test
+    fun `Auto promotion granted on a later validation when an earlier one was fixed`() {
+        project {
+            branch {
+                val vs1 = validationStamp("VS1")
+                val vs2 = validationStamp("VS2")
+                val pl = promotionLevel("PL")
+                setProperty(
+                    pl,
+                    AutoPromotionPropertyType::class.java,
+                    AutoPromotionProperty(listOf(vs1, vs2), "", "", emptyList())
+                )
+                build("1") {
+                    // VS1 fails, then is fixed - VS2 has not run yet
+                    validate(vs1, validationRunStatusID = ValidationRunStatusID.STATUS_FAILED)
+                        .validationStatus(ValidationRunStatusID.STATUS_INVESTIGATING, "Investigating")
+                        .validationStatus(ValidationRunStatusID.STATUS_FIXED, "Fixed")
+                    checkBuildIsNotPromoted(this, pl)
+                    // VS2 passes: the fixed VS1 still counts and the promotion is granted
+                    validate(vs2, validationRunStatusID = ValidationRunStatusID.STATUS_PASSED)
+                    checkBuildIsPromoted(this, pl)
                 }
             }
         }

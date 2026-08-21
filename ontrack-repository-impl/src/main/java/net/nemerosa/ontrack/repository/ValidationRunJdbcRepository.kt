@@ -34,7 +34,7 @@ class ValidationRunJdbcRepository(
         return run.withData(data)
     }
 
-    override fun isValidationRunPassed(build: Build, validationStamp: ValidationStamp): Boolean {
+    override fun getLastValidationRunStatusId(build: Build, validationStamp: ValidationStamp): String? {
         return namedParameterJdbcTemplate!!.queryForList(
             """
                     SELECT VRS.VALIDATIONRUNSTATUSID
@@ -50,7 +50,7 @@ class ValidationRunJdbcRepository(
                 "validationStampId" to validationStamp.id(),
             ),
             String::class.java
-        ).firstOrNull() == ValidationRunStatusID.PASSED
+        ).firstOrNull()
     }
 
 }

@@ -16,8 +16,12 @@ without having to do it explicitly.
 
 In order to configure the auto promotion, go to the promotion level and set
 the "Auto promotion" property. You then associate the list of validation stamps
-that must be `PASSED` or promotion levels which must be granted on a build in
+that must have passed or promotion levels which must be granted on a build in
 order to get this build automatically promoted.
+
+NOTE: A validation is considered as having passed when the status of its last run
+is `PASSED` or `FIXED` - a validation which failed and was later fixed counts
+towards the auto promotion.
 
 The list of validation stamps can be defined by:
 

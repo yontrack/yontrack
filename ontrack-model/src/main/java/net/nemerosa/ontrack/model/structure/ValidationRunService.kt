@@ -20,6 +20,9 @@ interface ValidationRunService {
      * Checks if the last run for the given [build] and [validation stamp][validationStamp], if
      * it exists, is passed or not.
      *
+     * A run is passed when the ID of its last status is flagged as
+     * [passed][ValidationRunStatusID.isPassed] - this covers `PASSED` but also `FIXED`.
+     *
      * If there was no run at all or the last one is not passed, the function returns `false`.
      */
     fun isValidationRunPassed(build: Build, validationStamp: ValidationStamp): Boolean

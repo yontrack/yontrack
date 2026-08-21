@@ -9,7 +9,8 @@ import net.nemerosa.ontrack.model.structure.PromotionRun.Companion.of
 import org.springframework.stereotype.Component
 
 /**
- * When a new validation run is created with a Passed status, or when a promotion is granted, we check all auto promoted promotion levels
+ * When a new validation run is created with a passed status, when the status of an existing validation run
+ * becomes passed (`FIXED` for example), or when a promotion is granted, we check all auto promoted promotion levels
  * to know if each of their validation stamps is now passed.
  */
 @Component
@@ -23,7 +24,8 @@ class AutoPromotionEventListener(
 
     override fun onEvent(event: Event) {
         when {
-            event.eventType === EventFactory.NEW_VALIDATION_RUN -> onNewValidationRun(event)
+            event.eventType === EventFactory.NEW_VALIDATION_RUN ||
+                    event.eventType === EventFactory.NEW_VALIDATION_RUN_STATUS -> onValidationRunStatus(event)
             event.eventType === EventFactory.DELETE_VALIDATION_STAMP -> onDeleteValidationStamp(event)
             event.eventType === EventFactory.NEW_PROMOTION_RUN -> onNewPromotionRun(event)
             event.eventType === EventFactory.DELETE_PROMOTION_LEVEL -> onDeletePromotionLevel(event)
@@ -108,10 +110,16 @@ class AutoPromotionEventListener(
         }
     }
 
-    private fun onNewValidationRun(event: Event) {
+    /**
+     * Called when a validation run is created or when the status of an existing run changes.
+     *
+     * The auto promotions are checked only when the new status is a passed one - `PASSED` but
+     * also `FIXED` (see #1629).
+     */
+    private fun onValidationRunStatus(event: Event) {
         // Passed validation?
         val validationRun = event.getEntity<ValidationRun>(ProjectEntityType.VALIDATION_RUN)
-        if (validationRun.lastStatus.statusID == ValidationRunStatusID.STATUS_PASSED) {
+        if (validationRun.isPassed) {
             processEvent(event)
         }
     }

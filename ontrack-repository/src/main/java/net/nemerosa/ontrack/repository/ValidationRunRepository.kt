@@ -22,11 +22,11 @@ interface ValidationRunRepository {
     ): ValidationRun
 
     /**
-     * Checks if the last run for the given [build] and [validation stamp][validationStamp], if
-     * it exists, is passed or not.
+     * Gets the ID of the status of the last run for the given [build] and
+     * [validation stamp][validationStamp].
      *
-     * If there was no run at all or the last one is not passed, the function returns `false`.
+     * If there was no run at all, the function returns `null`.
      */
-    fun isValidationRunPassed(build: Build, validationStamp: ValidationStamp): Boolean
+    fun getLastValidationRunStatusId(build: Build, validationStamp: ValidationStamp): String?
 
 }

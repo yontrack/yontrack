@@ -12,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional
 class ValidationRunServiceImpl(
     private val securityService: SecurityService,
     private val validationRunRepository: ValidationRunRepository,
+    private val validationRunStatusService: ValidationRunStatusService,
 ) : ValidationRunService {
 
     override fun updateValidationRunData(run: ValidationRun, data: ValidationRunData<*>?): ValidationRun {
@@ -20,7 +21,14 @@ class ValidationRunServiceImpl(
     }
 
     override fun isValidationRunPassed(build: Build, validationStamp: ValidationStamp): Boolean {
-        return validationRunRepository.isValidationRunPassed(build, validationStamp)
+        // Gets the status of the last run, if any
+        val statusId = validationRunRepository.getLastValidationRunStatusId(build, validationStamp)
+            ?: return false
+        // A status is passed when it is flagged as such (PASSED, but also FIXED).
+        // An unknown status is never passed - it must not fail the caller.
+        return validationRunStatusService.getValidationRunStatusList()
+            .find { it.id == statusId }
+            ?.isPassed == true
     }
 
 }
