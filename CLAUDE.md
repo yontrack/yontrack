@@ -41,6 +41,7 @@ Every change follows this lifecycle, end to end — don't stop after step 2:
 4. **Delete the local branch** — `git branch -d <branch>` once it is merged
 
 - **Never** create a pull request — work lands by merging into `main` and pushing directly
+- **Never** close the GitHub issue — Damien does that after the change lands
 - If the merge is not a clean fast-forward, stop and ask before creating a merge commit or rebasing
 
 ### Development Process (TDD)
