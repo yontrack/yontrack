@@ -1,3 +1,8 @@
+/**
+ * Default period used by the charts.
+ */
+export const DEFAULT_CHART_PERIOD = '1w'
+
 export const periods = [{
     id: '1d',
     name: 'One day',

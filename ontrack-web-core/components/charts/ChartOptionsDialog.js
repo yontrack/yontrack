@@ -4,11 +4,14 @@ import FormDialog, {useFormDialog} from "@components/form/FormDialog";
 import SelectChartInterval from "@components/charts/SelectChartInterval";
 import {Form} from "antd";
 import SelectChartPeriod from "@components/charts/SelectChartPeriod";
+import {DEFAULT_CHART_INTERVAL} from "@components/charts/ChartInterval";
+import {DEFAULT_CHART_PERIOD} from "@components/charts/ChartPeriod";
+import {getLocalChartOptions, setLocalChartOptions} from "@components/storage/local";
 
 const ChartOptionsCommandContext = createContext({
     dialog: {},
-    interval: "3m",
-    period: "1w",
+    interval: DEFAULT_CHART_INTERVAL,
+    period: DEFAULT_CHART_PERIOD,
 })
 
 export const useChartOptionsCommand = () => {
@@ -35,7 +38,7 @@ export const useChartOptionsCommand = () => {
 export const ChartOptionsDialog = ({chartOptionsDialog}) => {
     return (
         <>
-            <FormDialog dialog={chartOptionsDialog}>
+            <FormDialog id="chart-options-dialog" dialog={chartOptionsDialog}>
                 <Form.Item name="interval"
                            label="Interval"
                            rules={[
@@ -65,15 +68,14 @@ export const ChartOptionsDialog = ({chartOptionsDialog}) => {
 
 export default function StoredChartOptionsCommandContextProvider({id, children}) {
 
-    const [interval, setInterval] = useState("3m")
-    const [period, setPeriod] = useState("1w")
+    const [interval, setInterval] = useState(DEFAULT_CHART_INTERVAL)
+    const [period, setPeriod] = useState(DEFAULT_CHART_PERIOD)
 
     useEffect(() => {
-        const value = localStorage.getItem(id)
-        if (value) {
-            const json = JSON.parse(value)
-            setInterval(json.interval ?? "3m")
-            setPeriod(json.period ?? "1w")
+        const options = getLocalChartOptions(id)
+        if (options) {
+            setInterval(options.interval ?? DEFAULT_CHART_INTERVAL)
+            setPeriod(options.period ?? DEFAULT_CHART_PERIOD)
         }
     }, []);
 
@@ -81,7 +83,7 @@ export default function StoredChartOptionsCommandContextProvider({id, children})
         setInterval(interval)
         setPeriod(period)
         // Saves the values into the local storage
-        localStorage.setItem(id, JSON.stringify({interval, period}))
+        setLocalChartOptions(id, {interval, period})
     }
 
     const dialog = useFormDialog({

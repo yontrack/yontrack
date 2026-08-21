@@ -1,7 +1,7 @@
 import {Select, Typography} from "antd";
 import {intervals} from "@components/charts/ChartInterval";
 
-export default function SelectChartInterval({value, onChange}) {
+export default function SelectChartInterval({value, onChange, ...props}) {
 
     const options = intervals.map(it => ({
         value: it.id,
@@ -14,6 +14,7 @@ export default function SelectChartInterval({value, onChange}) {
     return (
         <>
             <Select
+                {...props}
                 options={options}
                 value={value}
                 onChange={onChange}

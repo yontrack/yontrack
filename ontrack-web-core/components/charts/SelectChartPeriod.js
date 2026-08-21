@@ -1,7 +1,7 @@
 import {Select, Typography} from "antd";
 import {periods} from "@components/charts/ChartPeriod";
 
-export default function SelectChartPeriod({value, onChange}) {
+export default function SelectChartPeriod({value, onChange, ...props}) {
 
     const options = periods.map(it => ({
         value: it.id,
@@ -14,6 +14,7 @@ export default function SelectChartPeriod({value, onChange}) {
     return (
         <>
             <Select
+                {...props}
                 options={options}
                 value={value}
                 onChange={onChange}

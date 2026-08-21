@@ -42,7 +42,6 @@ export default function ValidationStampView({id}) {
     const sectionHistory = "section-history"
 
     const [defaultLayout, setDefaultLayout] = useState([])
-    const [items, setItems] = useState([])
 
     const [refreshCount, refresh] = useRefresh()
 
@@ -50,6 +49,10 @@ export default function ValidationStampView({id}) {
 
     const validationStampImageUpdated = useEventForRefresh("validationStamp.image")
     const {validationStamp, loading} = useValidationStampById({id, refreshCount, deps: [validationStampImageUpdated]})
+
+    const {command, interval, period} = useChartOptionsCommand()
+
+    const metricsChart = validationStamp?.charts?.find(it => it.id === 'validation-stamp-metrics')
 
     useEffect(() => {
         if (validationStamp) {
@@ -71,7 +74,6 @@ export default function ValidationStampView({id}) {
             setCommands(commands)
 
             // Charts
-            const metricsChart = validationStamp.charts.find(it => it.id === 'validation-stamp-metrics')
             const layout = [
                 {i: sectionHistory, x: 0, y: 0, w: 12, h: 12},
             ]
@@ -90,85 +92,92 @@ export default function ValidationStampView({id}) {
                 )
             }
 
-            const items = [
-                {
-                    id: sectionHistory,
-                    content: <GridCell
-                        id={sectionHistory}
-                        title="Validation history"
-                    >
-                        <ValidationStampHistory
-                            validationStamp={validationStamp}
-                        />
-                    </GridCell>,
-                },
-                {
-                    id: chartLeadTime,
-                    content: <GridCell
-                        id={chartLeadTime}
-                        title="Lead time to validation"
-                        extra={command}
-                    >
-                        <ValidationStampLeadTimeChart
-                            validationStamp={validationStamp}
-                            interval={interval}
-                            period={period}
-                        />
-                    </GridCell>,
-                },
-                {
-                    id: chartFrequency,
-                    content: <GridCell
-                        id={chartFrequency}
-                        title="Frequency to validation"
-                        extra={command}
-                    >
-                        <ValidationStampFrequencyChart
-                            validationStamp={validationStamp}
-                            interval={interval}
-                            period={period}
-                        />
-                    </GridCell>,
-                },
-                {
-                    id: chartStability,
-                    content: <GridCell
-                        id={chartStability}
-                        title="Stability of validation"
-                        extra={command}
-                    >
-                        <ValidationStampStabilityChart
-                            validationStamp={validationStamp}
-                            interval={interval}
-                            period={period}
-                        />
-                    </GridCell>,
-                },
-            ]
-
-            if (metricsChart) {
-                items.push({
-                    id: chartMetrics,
-                    content: <GridCell
-                        id={chartMetrics}
-                        title="Validation metrics"
-                        extra={command}
-                    >
-                        <ValidationStampMetricsChart
-                            validationStamp={validationStamp}
-                            interval={interval}
-                            period={period}
-                        />
-                    </GridCell>,
-                })
-            }
-
             setDefaultLayout(layout)
-            setItems(items)
         }
     }, [validationStamp])
 
-    const {command, interval, period} = useChartOptionsCommand()
+    // The items are computed at each rendering, so that the charts always use
+    // the current chart options (interval & period)
+    const getItems = () => {
+        if (!validationStamp) return []
+
+        const items = [
+            {
+                id: sectionHistory,
+                content: <GridCell
+                    id={sectionHistory}
+                    title="Validation history"
+                >
+                    <ValidationStampHistory
+                        validationStamp={validationStamp}
+                    />
+                </GridCell>,
+            },
+            {
+                id: chartLeadTime,
+                content: <GridCell
+                    id={chartLeadTime}
+                    title="Lead time to validation"
+                    extra={command}
+                >
+                    <ValidationStampLeadTimeChart
+                        validationStamp={validationStamp}
+                        interval={interval}
+                        period={period}
+                    />
+                </GridCell>,
+            },
+            {
+                id: chartFrequency,
+                content: <GridCell
+                    id={chartFrequency}
+                    title="Frequency to validation"
+                    extra={command}
+                >
+                    <ValidationStampFrequencyChart
+                        validationStamp={validationStamp}
+                        interval={interval}
+                        period={period}
+                    />
+                </GridCell>,
+            },
+            {
+                id: chartStability,
+                content: <GridCell
+                    id={chartStability}
+                    title="Stability of validation"
+                    extra={command}
+                >
+                    <ValidationStampStabilityChart
+                        validationStamp={validationStamp}
+                        interval={interval}
+                        period={period}
+                    />
+                </GridCell>,
+            },
+        ]
+
+        if (metricsChart) {
+            items.push({
+                id: chartMetrics,
+                content: <GridCell
+                    id={chartMetrics}
+                    title="Validation metrics"
+                    extra={command}
+                >
+                    <ValidationStampMetricsChart
+                        validationStamp={validationStamp}
+                        interval={interval}
+                        period={period}
+                    />
+                </GridCell>,
+            })
+        }
+
+        return items
+    }
+
+    const items = getItems()
 
     return (
         <>

@@ -98,3 +98,31 @@ export const useLocalWorkflowShowDetails = () => {
         },
     }
 }
+
+/**
+ * Gets the chart options (interval & period) stored for a set of charts.
+ *
+ * The id of the set of charts, like "validation-charts", is used as the key.
+ *
+ * @returns {{interval, period}} or undefined if not set or not readable
+ */
+export function getLocalChartOptions(id) {
+    const json = localStorage.getItem(id)
+    if (json) {
+        try {
+            return JSON.parse(json)
+        } catch (ignored) {
+            // Corrupted entry: the defaults must be used instead
+            return undefined
+        }
+    } else {
+        return undefined
+    }
+}
+
+export function setLocalChartOptions(id, {interval, period}) {
+    localStorage.setItem(
+        id,
+        JSON.stringify({interval, period})
+    )
+}

@@ -1,3 +1,8 @@
+/**
+ * Default interval used by the charts.
+ */
+export const DEFAULT_CHART_INTERVAL = '3m'
+
 export const intervals = [{
     id: '1w',
     name: 'One week',
