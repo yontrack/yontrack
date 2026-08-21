@@ -553,6 +553,90 @@ expect.
 
 ### Extensions
 
+Extensions are set directly as keys of the `project`, `branch` or `build` configurations, using their ID:
+
+| Extension                                                 | ID                    | Level   |
+|-----------------------------------------------------------|-----------------------|---------|
+| [Auto-disabling of branches](#auto-disabling-of-branches) | `auto-disabling`      | Project |
+| [Environments](#environments)                             | `environments`        | Project |
+| [Auto-versioning](#auto-versioning)                       | `autoVersioning`      | Branch  |
+| [Notifications](#notifications)                           | `notificationsConfig` | Branch  |
+| [Workflows](#workflows)                                   | `workflows`           | Branch  |
+| [Auto-versioning check](#auto-versioning-check)           | `autoVersioningCheck` | Build   |
+
+An extension can only be used at the level(s) it supports; using it anywhere else is rejected when the CI configuration
+is parsed.
+
+!!! note
+
+    The extensions available on a given Yontrack instance depend on the extensions which are installed and enabled.
+    Use the [JSON schema](#json-schema) to see the exact list and the configuration they accept.
+
+#### Auto-disabling of branches
+
+This extension is set at the project level to configure
+the [pattern-based auto-disabling](../operations/stale-branches.md#pattern-based-auto-disabling) of the branches of this
+project.
+
+Syntax:
+
+```yaml
+project:
+  auto-disabling:
+    patterns: [ list of patterns ]
+```
+
+Each pattern has the following optional properties:
+
+| Property   | Description                                                                                                                            |
+|------------|----------------------------------------------------------------------------------------------------------------------------------------|
+| `includes` | List of regular expressions matched against the **Yontrack branch names**. If empty, all branches match.                               |
+| `excludes` | List of regular expressions matched against the **Yontrack branch names**. A branch matching any of them is excluded.                  |
+| `mode`     | What to do with the matching branches: `KEEP`, `DISABLE` or `KEEP_LAST`. Defaults to `KEEP`.                                           |
+| `keepLast` | With `DISABLE` and `KEEP_LAST`, number of the most recent matching branches (semantic version order) to keep enabled. Defaults to `2`. |
+
+Branches are matched against the patterns in order, and the mode of the first matching pattern is applied.
+See [stale branch management](../operations/stale-branches.md#pattern-based-auto-disabling) for the exact semantics of
+the modes.
+
+For example, to disable all the `v*` branches but the most recent one:
+
+```yaml
+version: v1
+configuration:
+  defaults:
+    project:
+      auto-disabling:
+        patterns:
+          - includes:
+              - 'v.*'
+            mode: DISABLE
+            keepLast: 1
+```
+
+!!! note
+
+    Because this is a **project-level** configuration, it is applied again every time the CI configuration runs, from
+    any branch. To make sure the policy is set from one authoritative branch only, put it in
+    a [custom configuration](#conditions) guarded by a `branch` condition:
+
+    ```yaml
+    version: v1
+    configuration:
+      custom:
+        configs:
+          - conditions:
+              - name: branch
+                config: main
+            project:
+              auto-disabling:
+                patterns:
+                  - includes:
+                      - 'v.*'
+                    mode: DISABLE
+                    keepLast: 1
+    ```
+
 #### Auto-versioning
 
 This extension is set at the branch level to set
@@ -639,7 +723,16 @@ automatically after the build is created.
 
 This extension is set at the project level to configure [environments](../integrations/environments/environments.md) and slots for this project.
 
-See the [environments reference](../integrations/environments/environments.md#configuration) for some examples.
+Syntax:
+
+```yaml
+project:
+  environments:
+    environments: [ list of environments ]
+    slots: [ list of slots ]
+```
+
+See the [environments reference](../integrations/environments/environments.md#ci-configuration) for some examples.
 
 #### Notifications
 

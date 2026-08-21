@@ -8,7 +8,7 @@ import net.nemerosa.ontrack.model.docs.SelfDocumented
 data class AutoDisablingBranchPatternsPropertyItem(
     @APIDescription("List of regular expressions against Ontrack branch names. If none, matches all branches.")
     val includes: List<String> = emptyList(),
-    @APIDescription("List of regular expressions against Ontrack branch names. If none, matches no branch.")
+    @APIDescription("List of regular expressions against Ontrack branch names. If none, no branch is excluded.")
     val excludes: List<String> = emptyList(),
     @APIDescription("Expected behaviour when matching a branch")
     val mode: AutoDisablingBranchPatternsMode = AutoDisablingBranchPatternsMode.KEEP,
