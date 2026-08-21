@@ -26,6 +26,11 @@ These rules apply unconditionally. Follow them in every change, without exceptio
 
 ### Frontend
 - **Never** access `localStorage` directly — always use the wrapper functions in `@components/storage/local`
+- **Never** introduce a new usage of the deprecated `useGraphQLClient` hook — always use `useQuery`,
+  `useMutation` or `callGraphQL` from `@components/services/GraphQL`. This holds even inside a file
+  that still uses `useGraphQLClient` elsewhere.
+- **Always** import `useQuery` from `@components/services/GraphQL` — the identically named hook in
+  `@components/services/useQuery` is deprecated (it wraps `useGraphQLClient`)
 
 ### Property Types
 - **Never** rename a `PropertyType` class after it is deployed — its fully qualified class name (FQCN) is its persistent storage ID
@@ -439,28 +444,49 @@ val orderedBranches = branches.sortedWith(ordering)
 
 ### GraphQL Calls
 
-Always use the `useGraphQLClient` hook:
+Always use `useQuery` / `useMutation` / `callGraphQL` from `@components/services/GraphQL`.
 
+The `useGraphQLClient` hook is **deprecated**. Never introduce a new usage of it, even when
+editing a file that still uses it elsewhere. Existing usages are migrated on their own schedule
+with the `/migrate-use-graphql-client` skill — do not migrate a file unless asked to.
+
+Beware of the import path: `@components/services/useQuery` exports a hook of the same name which is
+also deprecated (it wraps `useGraphQLClient`). The one to use is the one in
+`@components/services/GraphQL`.
+
+**Reading data** — `useQuery` replaces the `useState` + `useEffect` + `client.request()` triad:
 ```javascript
-import {useGraphQLClient} from "@components/providers/ConnectionContextProvider"
+import {useQuery} from "@components/services/GraphQL"
 
-// In a component:
-const client = useGraphQLClient()
-
-// In useEffect:
-useEffect(() => {
-    if (client) {
-        client.request(query, variables).then(data => { /* ... */ })
+const {data, loading, error, finished} = useQuery(
+    gql`
+        query MyQuery($id: Int!) {
+            myEntity(id: $id) { name }
+        }
+    `,
+    {
+        variables: {id},
+        deps: [id],                     // the old deps, minus `client`
+        condition: !!id,                // omit if always true
+        initialData: null,
+        dataFn: data => data.myEntity,  // omit if no transformation is needed
     }
-}, [client, dep1, dep2])
+)
+```
 
-// In an async handler (mutation):
-const onAction = async () => {
-    const data = await client.request(gql`mutation { ... }`)
-    if (processGraphQLErrors(data, 'mutationName')) {
-        // success
-    }
-}
+`useQuery` starts with `loading` false and only flips it inside its effect. When a component must
+never render as "loaded" before the first fetch resolves, use `loading || !finished`.
+
+**Mutations** — `client.request()` inside an async handler becomes either:
+```javascript
+// Simple one-shot mutation:
+const data = await callGraphQL({query: MUTATION, variables})
+
+// ... or, when the hook's loading/error state is useful:
+const {mutate, loading, error} = useMutation(MUTATION, {
+    userNodeName: 'myMutationName',
+    onSuccess: (userNode) => { /* ... */ },
+})
 ```
 
 ### Permissions
@@ -699,7 +725,7 @@ Note: `ProjectEdit extends ProjectConfig` — so checking `ProjectConfig` in `ca
 | Flyway migrations          | `ontrack-database/src/main/resources/db/migration/`                           |
 | Spring Boot config         | `ontrack-ui/src/main/resources/config/application.yml`                        |
 | GraphQL schema (generated) | `ontrack-web-core/ontrack.graphql`                                            |
-| Frontend GraphQL hook      | `ontrack-web-core/components/providers/ConnectionContextProvider.js`          |
+| Frontend GraphQL hooks     | `ontrack-web-core/components/services/GraphQL.js`                             |
 | Frontend event bus         | `ontrack-web-core/components/common/EventsContext.js`                         |
 | Frontend local storage     | `ontrack-web-core/components/storage/local.js`                                |
 | Frontend ref data          | `ontrack-web-core/components/providers/RefDataProvider.js`                    |
