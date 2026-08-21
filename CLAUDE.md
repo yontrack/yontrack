@@ -31,8 +31,17 @@ These rules apply unconditionally. Follow them in every change, without exceptio
 - **Never** rename a `PropertyType` class after it is deployed — its fully qualified class name (FQCN) is its persistent storage ID
 
 ### Workflow
-- When fixing a GitHub issue: **always** create a branch named `claude/<short-description>-pipeline` before making any changes (use `/fix-issue` skill)
-- **Never** create a pull request unless explicitly asked
+
+Every change follows this lifecycle, end to end — don't stop after step 2:
+
+1. **Branch locally** — before making any change, create a branch named `claude/<short-description>-pipeline`
+   (use the `/fix-issue` skill when working from a GitHub issue)
+2. **Implement and test** on that branch, following the TDD order below, and commit there
+3. **Land on `main`** — merge the branch into `main`, then `git push origin main`
+4. **Delete the local branch** — `git branch -d <branch>` once it is merged
+
+- **Never** create a pull request — work lands by merging into `main` and pushing directly
+- If the merge is not a clean fast-forward, stop and ask before creating a merge commit or rebasing
 
 ### Development Process (TDD)
 
