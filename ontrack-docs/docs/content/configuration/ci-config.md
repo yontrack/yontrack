@@ -198,6 +198,32 @@ The following elements will be configured automatically in Yontrack:
 * a [build](#build-configuration) will be created and associated with the detected SCM commit. The name of the build is
   generated using a timestamp. If a `VERSION` [environment variable](#environment-variables) is defined, its value will
   be used as the build release label.
+* the project is set up for the **automatic creation of validation stamps and promotion levels**, so that
+  the [validations](#validations) and [promotions](#promotions) declared in the CI configuration do not need to be
+  predefined beforehand.
+
+!!! note "Auto-creation of validation stamps and promotion levels"
+
+    Concretely, the project gets
+    the [auto validation stamps](../generated/properties/property-net.nemerosa.ontrack.extension.general.AutoValidationStampPropertyType.md)
+    property with both `autoCreate` and `autoCreateIfNotPredefined` enabled, and
+    the [auto promotion levels](../generated/properties/property-net.nemerosa.ontrack.extension.general.AutoPromotionLevelPropertyType.md)
+    property with `autoCreate` enabled.
+
+    This is done on **every** run of the CI configuration, so editing these two properties in the UI has no lasting
+    effect. To use different values, set them explicitly as
+    [project properties](#properties) — they are applied after the automatic setup and therefore take precedence:
+
+    ```yaml
+    version: v1
+    configuration:
+      defaults:
+        project:
+          properties:
+            net.nemerosa.ontrack.extension.general.AutoValidationStampPropertyType:
+              autoCreate: true
+              autoCreateIfNotPredefined: false
+    ```
 
 The `configuration` section can have two sub-sections:
 

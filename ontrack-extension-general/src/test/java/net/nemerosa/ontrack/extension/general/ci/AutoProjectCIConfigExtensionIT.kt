@@ -39,4 +39,35 @@ class AutoProjectCIConfigExtensionIT : AbstractDSLTestSupport() {
         }
     }
 
+    @Test
+    @AsAdminTest
+    fun `Auto validations can be overridden by an explicit project property`() {
+        val project = configTestSupport.configureProject(
+            yaml = """
+                version: v1
+                configuration:
+                    defaults:
+                        project:
+                            properties:
+                                net.nemerosa.ontrack.extension.general.AutoValidationStampPropertyType:
+                                    autoCreate: true
+                                    autoCreateIfNotPredefined: false
+            """.trimIndent(),
+            ci = "generic",
+            scm = "mock",
+            env = EnvFixtures.generic()
+        )
+        assertNotNull(
+            getProperty(project, AutoValidationStampPropertyType::class.java),
+            "Auto validation stamps property is set"
+        ) {
+            assertEquals(true, it.isAutoCreate)
+            assertEquals(
+                false,
+                it.isAutoCreateIfNotPredefined,
+                "The explicit project property wins over the automatic setup"
+            )
+        }
+    }
+
 }
