@@ -19,7 +19,7 @@
     "cookies-next": "^4.3.0",
     "copy-to-clipboard": "^3.3.3",
     "dayjs": "^1.11.13",
-    "dompurify": "3.2.4",
+    "dompurify": "3.4.11",
     "elkjs": "^0.10.0",
     "eslint": "^8.57.1",
     "eslint-config-next": "13.5.11",
