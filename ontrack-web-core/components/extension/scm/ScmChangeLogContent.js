@@ -1,4 +1,3 @@
-import {useEffect, useState} from "react";
 import ChangeLogBuild from "@components/extension/scm/ChangeLogBuild";
 import Head from "next/head";
 import {buildKnownName, title} from "@components/common/Titles";
@@ -32,44 +31,42 @@ export default function ScmChangeLogContent({changeLog, loading, error}) {
         {i: "issues", x: 0, y: 22, w: 12, h: 10},
     ]
 
-    const [items, setItems] = useState([])
+    // A boundary build cell, showing a skeleton for as long as the build is not known
+    const boundaryCell = (id, label, build) => ({
+        id,
+        content: build.creation ?
+            <ChangeLogBuild id={id} title={`${label} ${buildKnownName(build)}`} build={build}/> :
+            <GridCell id={id} title={label} loading={loading}/>,
+    })
 
-    useEffect(() => {
-        if (changeLog) {
-            // A boundary build cell, showing a skeleton for as long as the build is not known
-            const boundaryCell = (id, label, build) => ({
-                id,
-                content: build.creation ?
-                    <ChangeLogBuild id={id} title={`${label} ${buildKnownName(build)}`} build={build}/> :
-                    <GridCell id={id} title={label} loading={loading}/>,
-            })
-            setItems(
-                [
-                    boundaryCell("from", "From", changeLog.buildFrom),
-                    boundaryCell("to", "To", changeLog.buildTo),
-                    {
-                        id: "links",
-                        content: <ChangeLogLinks id="links" loading={loading}
-                                                 linkChanges={changeLog.linkChanges}/>,
-                    },
-                    {
-                        id: "commits",
-                        content: <GitChangeLogCommits id="commits" loading={loading}
-                                                      commits={changeLog.commits}
-                                                      diffLink={changeLog.diffLink}/>,
-                    },
-                    {
-                        // The issues are loaded by the component itself, in parallel
-                        // of the rest of the change log.
-                        id: "issues",
-                        content: <ChangeLogIssues id="issues"
-                                                  from={Number(changeLog.buildFrom?.id)}
-                                                  to={Number(changeLog.buildTo?.id)}/>,
-                    },
-                ]
-            )
-        }
-    }, [changeLog, loading]);
+    // Computed directly from props (not via useState+useEffect) so that GridTable
+    // always receives its full item list on the very same render as `defaultLayout` -
+    // otherwise react-grid-layout mounts with 0 children, and when the items are
+    // filled in a tick later it falls back to its stale (empty) internal layout,
+    // collapsing every widget into a default 1x1 slot at the top-left corner (#1634).
+    const items = changeLog ? [
+        boundaryCell("from", "From", changeLog.buildFrom),
+        boundaryCell("to", "To", changeLog.buildTo),
+        {
+            id: "links",
+            content: <ChangeLogLinks id="links" loading={loading}
+                                     linkChanges={changeLog.linkChanges}/>,
+        },
+        {
+            id: "commits",
+            content: <GitChangeLogCommits id="commits" loading={loading}
+                                          commits={changeLog.commits}
+                                          diffLink={changeLog.diffLink}/>,
+        },
+        {
+            // The issues are loaded by the component itself, in parallel
+            // of the rest of the change log.
+            id: "issues",
+            content: <ChangeLogIssues id="issues"
+                                      from={Number(changeLog.buildFrom?.id)}
+                                      to={Number(changeLog.buildTo?.id)}/>,
+        },
+    ] : []
 
     return (
         <>
