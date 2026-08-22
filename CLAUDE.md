@@ -31,6 +31,14 @@ These rules apply unconditionally. Follow them in every change, without exceptio
   that still uses `useGraphQLClient` elsewhere.
 - **Always** import `useQuery` from `@components/services/GraphQL` — the identically named hook in
   `@components/services/useQuery` is deprecated (it wraps `useGraphQLClient`)
+- **Never** store a value in `useState` + `useEffect` when it's purely derived from props/state —
+  compute it directly in the render body instead (e.g. `const items = changeLog ? [...] : []`, not
+  `useState([])` filled by a `useEffect`). Beyond being an unnecessary extra render, a value that's
+  briefly wrong/empty on first render before the effect fires can break children that make first-render
+  assumptions — e.g. `GridTable`'s `items` starting empty while `layout` was already fully populated
+  made `react-grid-layout` sync its internal layout against 0 children, permanently collapsing every
+  widget to a default 1x1 slot once the items arrived a tick later (issue #1634). See `BuildContent`
+  for the correct pattern: compute `items` as a plain `const` from already-available props.
 
 ### Property Types
 - **Never** rename a `PropertyType` class after it is deployed — its fully qualified class name (FQCN) is its persistent storage ID
