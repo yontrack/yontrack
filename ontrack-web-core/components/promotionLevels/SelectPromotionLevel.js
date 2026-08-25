@@ -13,6 +13,7 @@ export default function SelectPromotionLevel({
                                                  disabled = false,
                                                  placeholder = "Promotion level",
                                                  multiple = false,
+                                                 dataTestId,
                                              }) {
 
     const client = useGraphQLClient()
@@ -52,6 +53,7 @@ export default function SelectPromotionLevel({
 
     return (
         <Select
+            data-testid={dataTestId}
             disabled={disabled}
             placeholder={placeholder}
             options={options}

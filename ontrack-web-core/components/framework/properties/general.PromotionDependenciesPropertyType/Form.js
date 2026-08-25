@@ -2,9 +2,7 @@ import LoadingContainer from "@components/common/LoadingContainer";
 import {Form} from "antd";
 import {prefixedFormName} from "@components/form/formUtils";
 import SelectPromotionLevel from "@components/promotionLevels/SelectPromotionLevel";
-import {
-    usePromotionLevelBranch
-} from "@components/framework/properties/general.PromotionDependenciesPropertyType/UsePromotionLevelBranch";
+import {usePromotionLevelBranch} from "@components/promotionLevels/UsePromotionLevelBranch";
 
 export default function PropertyForm({prefix, entity}) {
 

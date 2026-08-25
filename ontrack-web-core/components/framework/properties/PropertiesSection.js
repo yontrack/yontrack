@@ -90,6 +90,7 @@ export default function PropertiesSection({entityType, entityId}) {
                     .filter(it => it.value)
                     .map(property => {
                         return {
+                            id: `property-${getExtensionShortName(property.type.typeName)}`,
                             title: <PropertyTitle entityType={entityType} entityId={entityId} property={property}/>,
                             icon: <PropertyIcon property={property}/>,
                             content: <PropertyComponent

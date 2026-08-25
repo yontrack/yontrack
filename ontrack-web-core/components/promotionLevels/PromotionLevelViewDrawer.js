@@ -6,6 +6,7 @@ export default function PromotionLevelViewDrawer({promotionLevel, loading}) {
     return (
         <>
             <InfoViewDrawer
+                id="promotion-level-info"
                 title="Promotion level information"
                 tooltip="Displays information about the promotion level"
                 width="33%"

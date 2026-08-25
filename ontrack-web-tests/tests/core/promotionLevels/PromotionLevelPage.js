@@ -1,6 +1,7 @@
 import {expect} from "@playwright/test";
 import {AbstractImagePage} from "../common/AbstractImagePage";
 import {AutoVersioningTrail} from "../../extensions/auto-versioning/AutoVersioningTrail";
+import {PropertiesSection} from "../properties/PropertiesSection";
 
 export class PromotionLevelPage extends AbstractImagePage {
 
@@ -16,6 +17,16 @@ export class PromotionLevelPage extends AbstractImagePage {
     async goTo() {
         await this.page.goto(`${this.promotionLevel.ontrack.connection.ui}/promotionLevel/${this.promotionLevel.id}`)
         await expect(this.page.getByText(this.promotionLevel.name)).toBeVisible()
+    }
+
+    /**
+     * Opens the information drawer and returns its properties section.
+     */
+    async openProperties() {
+        const button = this.page.getByTestId('promotion-level-info')
+        await expect(button).toBeVisible()
+        await button.click()
+        return new PropertiesSection(this.page)
     }
 
     async getAVTrail() {

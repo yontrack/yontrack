@@ -50,6 +50,41 @@ const promotionLevelInstance = (branch, data) => {
     // Notifications methods
     registerNotificationExtensions(promotionLevel)
 
+    promotionLevel.setAutoPromotionProperty = async ({validationStamps = [], promotionLevels = [], include = "", exclude = ""} = {}) => {
+        await graphQLCallMutation(
+            promotionLevel.ontrack.connection,
+            'setPromotionLevelAutoPromotionPropertyById',
+            gql`
+                mutation SetAutoPromotionProperty(
+                    $id: Int!,
+                    $validationStamps: [String!],
+                    $promotionLevels: [String!],
+                    $include: String,
+                    $exclude: String,
+                ) {
+                    setPromotionLevelAutoPromotionPropertyById(input: {
+                        id: $id,
+                        validationStamps: $validationStamps,
+                        promotionLevels: $promotionLevels,
+                        include: $include,
+                        exclude: $exclude,
+                    }) {
+                        errors { message }
+                    }
+                }
+            `,
+            {
+                id: Number(promotionLevel.id),
+                // the mutation takes names, not IDs
+                validationStamps: validationStamps.map(it => it.name ?? it),
+                promotionLevels: promotionLevels.map(it => it.name ?? it),
+                include,
+                exclude,
+            }
+        )
+        return promotionLevel
+    }
+
     promotionLevel.setFields = async (fields) => {
         await graphQLCallMutation(
             promotionLevel.ontrack.connection,

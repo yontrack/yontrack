@@ -1,6 +1,4 @@
-import {
-    usePromotionLevelBranch
-} from "@components/framework/properties/general.PromotionDependenciesPropertyType/UsePromotionLevelBranch";
+import {usePromotionLevelBranch} from "@components/promotionLevels/UsePromotionLevelBranch";
 import LoadingContainer from "@components/common/LoadingContainer";
 import {Space} from "antd";
 import PromotionLevelByName from "@components/promotionLevels/PromotionLevelByName";

@@ -111,7 +111,7 @@ export default function PropertyDialog({dialog}) {
 
     return (
         <>
-            <FormDialog dialog={dialog} width={800}>
+            <FormDialog id="property-dialog" dialog={dialog} width={800}>
                 <Form.Item
                     name="propertyType"
                     label="Property"
