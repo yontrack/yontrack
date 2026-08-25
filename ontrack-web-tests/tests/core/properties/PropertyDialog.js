@@ -36,6 +36,7 @@ export class PropertyDialog {
 
     async cancel() {
         await this.dialog.getByRole('button', {name: 'Cancel'}).click()
-        await expect(this.dialog).toHaveCount(0)
+        // the antd Modal keeps its panel mounted after closing, so it's hidden, not gone
+        await expect(this.dialog).toBeHidden()
     }
 }

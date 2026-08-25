@@ -14,7 +14,7 @@ export default function PropertyEditButton({entityType, entityId, property}) {
     return (
         <>
             <InlineCommand
-                className="property-edit"
+                id="property-edit"
                 icon={<FaPencilAlt/>}
                 title="Edit this property"
                 onClick={startDialog}

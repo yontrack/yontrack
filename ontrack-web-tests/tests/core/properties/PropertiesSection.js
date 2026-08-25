@@ -18,17 +18,13 @@ export class PropertiesSection {
         return this.page.getByTestId(`property-${shortTypeName}`)
     }
 
-    async checkPropertyVisible(shortTypeName) {
-        await expect(this.property(shortTypeName)).toBeVisible()
-    }
-
     /**
      * Opens the edit dialog for the given property.
      */
     async editProperty(shortTypeName) {
         const property = this.property(shortTypeName)
         await expect(property).toBeVisible()
-        const editButton = property.locator('.property-edit')
+        const editButton = property.getByTestId('property-edit')
         await expect(editButton).toBeVisible()
         await editButton.click()
         const dialog = new PropertyDialog(this.page)

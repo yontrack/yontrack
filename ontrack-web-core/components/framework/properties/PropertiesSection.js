@@ -59,6 +59,7 @@ export default function PropertiesSection({entityType, entityId}) {
                         ) ?? property.value
                         return {
                             ...property,
+                            shortName,
                             clientValue: newValue,
                         }
                     } else {
@@ -90,7 +91,7 @@ export default function PropertiesSection({entityType, entityId}) {
                     .filter(it => it.value)
                     .map(property => {
                         return {
-                            id: `property-${getExtensionShortName(property.type.typeName)}`,
+                            id: `property-${property.shortName}`,
                             title: <PropertyTitle entityType={entityType} entityId={entityId} property={property}/>,
                             icon: <PropertyIcon property={property}/>,
                             content: <PropertyComponent

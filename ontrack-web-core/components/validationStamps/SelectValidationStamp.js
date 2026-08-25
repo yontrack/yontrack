@@ -10,7 +10,7 @@ export default function SelectValidationStamp({
                                                   allowClear = false,
                                                   multiple = false,
                                                   width,
-                                                  dataTestId,
+                                                  id,
                                               }) {
 
     const {data: validationStamps = []} = useQuery(
@@ -65,7 +65,8 @@ export default function SelectValidationStamp({
 
     return (
         <Select
-            data-testid={dataTestId}
+            id={id}
+            data-testid={id}
             disabled={disabled}
             options={options}
             value={value}

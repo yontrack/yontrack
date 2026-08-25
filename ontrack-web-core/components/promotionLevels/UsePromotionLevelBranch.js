@@ -35,6 +35,7 @@ export const usePromotionLevelBranch = ({promotionLevelId}) => {
         }
     )
     // `useQuery` reports `loading` as false until its effect runs: without `finished`, the caller
-    // would briefly render as if the branch were known to be absent.
-    return {branch, loading: loading || !finished, error}
+    // would briefly render as if the branch were known to be absent. When there is no promotion
+    // level to look up at all, nothing is ever fetched and `finished` never flips, so guard on it.
+    return {branch, loading: !!promotionLevelId && (loading || !finished), error}
 }

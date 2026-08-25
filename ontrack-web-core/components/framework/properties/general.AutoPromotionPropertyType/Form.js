@@ -23,7 +23,7 @@ export default function PropertyForm({prefix, entity}) {
                         name={prefixedFormName(prefix, 'validationStamps')}
                     >
                         <SelectValidationStamp
-                            dataTestId="auto-promotion-validation-stamps"
+                            id="auto-promotion-validation-stamps"
                             branch={branch}
                             multiple={true}
                             useName={false}
@@ -52,7 +52,7 @@ export default function PropertyForm({prefix, entity}) {
                         name={prefixedFormName(prefix, 'promotionLevels')}
                     >
                         <SelectPromotionLevel
-                            dataTestId="auto-promotion-promotion-levels"
+                            id="auto-promotion-promotion-levels"
                             branch={branch}
                             multiple={true}
                             useName={false}
