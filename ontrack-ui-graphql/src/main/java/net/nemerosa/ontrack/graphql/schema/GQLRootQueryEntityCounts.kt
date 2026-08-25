@@ -38,13 +38,25 @@ class GQLTypeEntityCounts(
         GraphQLObjectType.newObject()
             .name(typeName)
             .description("Representation of the entity counts")
-            .field {
-                it.name("projects")
-                    .description("Number of projects")
-                    .type(GraphQLNonNull(GraphQLInt))
-                    .dataFetcher { statsService.projectCount }
-            }
+            .countField("projects", "Number of projects") { statsService.projectCount }
+            .countField("branches", "Number of branches") { statsService.branchCount }
+            .countField("promotionLevels", "Number of promotion levels") { statsService.promotionLevelCount }
+            .countField("validationStamps", "Number of validation stamps") { statsService.validationStampCount }
+            .countField("builds", "Number of builds") { statsService.buildCount }
+            .countField("promotionRuns", "Number of promotion runs") { statsService.promotionRunCount }
+            .countField("validationRuns", "Number of validation runs") { statsService.validationRunCount }
             .build()
+
+    private fun GraphQLObjectType.Builder.countField(
+        name: String,
+        description: String,
+        count: () -> Int,
+    ) = field {
+        it.name(name)
+            .description(description)
+            .type(GraphQLNonNull(GraphQLInt))
+            .dataFetcher { count() }
+    }
 
 }
 
