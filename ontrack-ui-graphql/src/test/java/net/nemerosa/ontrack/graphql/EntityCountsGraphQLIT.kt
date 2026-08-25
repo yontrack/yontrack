@@ -22,4 +22,47 @@ class EntityCountsGraphQLIT: AbstractQLKTITSupport() {
         }
     }
 
+    @Test
+    fun `Counts for all project entities`() {
+        asAdmin {
+            project {
+                branch {
+                    val pl = promotionLevel()
+                    val vs = validationStamp()
+                    build {
+                        promote(pl)
+                        validate(vs)
+                    }
+                }
+            }
+            run("""{
+                entityCounts {
+                    projects
+                    branches
+                    promotionLevels
+                    validationStamps
+                    builds
+                    promotionRuns
+                    validationRuns
+                }
+            }""").let { data ->
+                val counts = data.path("entityCounts")
+                listOf(
+                    "projects",
+                    "branches",
+                    "promotionLevels",
+                    "validationStamps",
+                    "builds",
+                    "promotionRuns",
+                    "validationRuns",
+                ).forEach { field ->
+                    assertTrue(
+                        counts.path(field).asInt() > 0,
+                        "At least one entity counted for $field"
+                    )
+                }
+            }
+        }
+    }
+
 }

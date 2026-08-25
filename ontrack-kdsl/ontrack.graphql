@@ -1867,8 +1867,20 @@ type EnableSubscriptionPayload implements Payload {
 
 "Representation of the entity counts"
 type EntityCounts {
+  "Number of branches"
+  branches: Int!
+  "Number of builds"
+  builds: Int!
   "Number of projects"
   projects: Int!
+  "Number of promotion levels"
+  promotionLevels: Int!
+  "Number of promotion runs"
+  promotionRuns: Int!
+  "Number of validation runs"
+  validationRuns: Int!
+  "Number of validation stamps"
+  validationStamps: Int!
 }
 
 "Extra information component about an entity"
