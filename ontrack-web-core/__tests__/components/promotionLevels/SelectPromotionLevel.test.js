@@ -1,9 +1,9 @@
 import {render, screen, waitFor} from "@testing-library/react";
-import SelectValidationStamp from "@components/validationStamps/SelectValidationStamp";
+import SelectPromotionLevel from "@components/promotionLevels/SelectPromotionLevel";
 
 const branch = {id: "42"}
 
-describe('SelectValidationStamp', () => {
+describe('SelectPromotionLevel', () => {
 
     let consoleError
 
@@ -26,22 +26,22 @@ describe('SelectValidationStamp', () => {
             }),
         })
 
-        render(<SelectValidationStamp branch={branch}/>)
+        render(<SelectPromotionLevel branch={branch}/>)
 
         await waitFor(() => expect(screen.queryByText("Error")).not.toBeNull())
         expect(screen.queryByRole('combobox')).toBeNull()
     })
 
-    it('renders the dropdown when the validation stamps load', async () => {
+    it('renders the dropdown when the promotion levels load', async () => {
         global.fetch = jest.fn().mockResolvedValue({
             ok: true,
             status: 200,
             json: async () => ({
-                branches: [{validationStamps: []}],
+                branches: [{promotionLevels: []}],
             }),
         })
 
-        render(<SelectValidationStamp branch={branch}/>)
+        render(<SelectPromotionLevel branch={branch}/>)
 
         await waitFor(() => expect(screen.queryByRole('combobox')).not.toBeNull())
         expect(screen.queryByText("Error")).toBeNull()

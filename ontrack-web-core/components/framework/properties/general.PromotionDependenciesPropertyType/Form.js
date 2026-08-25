@@ -6,11 +6,11 @@ import {usePromotionLevelBranch} from "@components/promotionLevels/UsePromotionL
 
 export default function PropertyForm({prefix, entity}) {
 
-    const {branch, loading} = usePromotionLevelBranch({promotionLevelId: entity.entityId})
+    const {branch, loading, error} = usePromotionLevelBranch({promotionLevelId: entity.entityId})
 
     return (
         <>
-            <LoadingContainer loading={loading}>
+            <LoadingContainer loading={loading} error={error}>
                 {
                     branch &&
                     <Form.Item

@@ -57,6 +57,9 @@ export default function SelectPromotionLevel({
                 setError(ex.message || genericGraphQLErrorMessage)
                 setOptions([])
             })
+        } else {
+            // nothing to load from: drop any error left over from a previous branch
+            setError(undefined)
         }
     }, [client, branch]);
 

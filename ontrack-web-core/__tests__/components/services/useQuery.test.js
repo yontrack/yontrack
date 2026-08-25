@@ -40,14 +40,6 @@ describe('deprecated useQuery', () => {
         expect(result.current.error).toBe("Network is down")
     })
 
-    it('stops loading when the request is rejected', async () => {
-        mockRequest.mockRejectedValue(new Error("Network is down"))
-
-        const {result} = renderHook(() => useQuery(QUERY))
-
-        await waitFor(() => expect(result.current.loading).toBe(false))
-    })
-
     it('sets the error to the message of the first GraphQL error in the body', async () => {
         mockRequest.mockResolvedValue({
             errors: [

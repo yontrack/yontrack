@@ -30,6 +30,10 @@ export const useQuery = (query, {
                 setLoading(true)
                 try {
                     const data = await client.request(query, variables)
+                    if (!data) {
+                        // On a 401, `callGraphQL` signs the user out and resolves with nothing
+                        return
+                    }
                     const errors = getGraphQLErrors(data)
                     if (errors && errors.length > 0) {
                         // `getGraphQLErrors` returns the messages themselves, not error objects

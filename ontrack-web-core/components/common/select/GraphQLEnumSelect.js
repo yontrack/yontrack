@@ -1,5 +1,6 @@
 import {useQuery} from "@components/services/useQuery";
 import {Select} from "antd";
+import InlineError from "@components/common/InlineError";
 
 export default function GraphQLEnumSelect({
                                               id,
@@ -13,7 +14,7 @@ export default function GraphQLEnumSelect({
                                               entryLabel,
                                               width = '12em',
                                           }) {
-    const {data: options, loading} = useQuery(
+    const {data: options, loading, error} = useQuery(
         query,
         {
             variables: queryVariables,
@@ -24,6 +25,10 @@ export default function GraphQLEnumSelect({
             }))
         }
     )
+
+    if (error) {
+        return <InlineError message={error}/>
+    }
 
     return (
         <>
