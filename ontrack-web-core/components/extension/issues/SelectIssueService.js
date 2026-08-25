@@ -1,10 +1,11 @@
 import {Select, Space, Typography} from "antd";
 import {gql} from "graphql-request";
 import {useQuery} from "@components/services/useQuery";
+import InlineError from "@components/common/InlineError";
 
 export default function SelectIssueService({id, value, onChange, self}) {
 
-    const {data: options, loading} = useQuery(
+    const {data: options, loading, error} = useQuery(
         gql`
             query GetIssueServicesConfigurations {
                 issueServiceConfigurations {
@@ -37,6 +38,10 @@ export default function SelectIssueService({id, value, onChange, self}) {
             deps: [self]
         }
     )
+
+    if (error) {
+        return <InlineError message={error}/>
+    }
 
     return (
         <>

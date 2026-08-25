@@ -2,6 +2,7 @@ import {useGraphQLClient} from "@components/providers/ConnectionContextProvider"
 import {useEffect, useState} from "react";
 import {getGraphQLErrors} from "@components/services/graphql-utils";
 import {useReloadState} from "@components/common/StateUtils";
+import {genericGraphQLErrorMessage} from "@components/services/GraphQL";
 
 /**
  * @deprecated Use the `GraphQL/useQuery` hook instead.
@@ -31,12 +32,17 @@ export const useQuery = (query, {
                     const data = await client.request(query, variables)
                     const errors = getGraphQLErrors(data)
                     if (errors && errors.length > 0) {
-                        setError(errors[0].message)
+                        // `getGraphQLErrors` returns the messages themselves, not error objects
+                        setError(errors[0])
                     } else if (dataFn) {
                         setData(dataFn(data))
                     } else {
                         setData(data)
                     }
+                } catch (ex) {
+                    // Without this, a rejected request left `error` empty and the caller had
+                    // nothing to render: the failure was indistinguishable from having no data.
+                    setError(ex.message || genericGraphQLErrorMessage)
                 } finally {
                     setLoading(false)
                 }

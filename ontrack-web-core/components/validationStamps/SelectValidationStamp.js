@@ -2,6 +2,7 @@ import {Select, Space, Typography} from "antd";
 import {gql} from "graphql-request";
 import ValidationStampImage from "@components/validationStamps/ValidationStampImage";
 import {useQuery} from "@components/services/GraphQL";
+import InlineError from "@components/common/InlineError";
 
 export default function SelectValidationStamp({
                                                   disabled,
@@ -13,7 +14,7 @@ export default function SelectValidationStamp({
                                                   id,
                                               }) {
 
-    const {data: validationStamps = []} = useQuery(
+    const {data: validationStamps = [], error} = useQuery(
         gql`
             query GetValidationStamps($branchId: Int!) {
                 branches(id: $branchId) {
@@ -61,6 +62,12 @@ export default function SelectValidationStamp({
             })
             onValidationStampSelected(vs)
         }
+    }
+
+    // A failed lookup used to render as an empty dropdown, indistinguishable from a branch
+    // with no validation stamps.
+    if (error) {
+        return <InlineError message={error}/>
     }
 
     return (
