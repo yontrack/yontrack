@@ -83,7 +83,7 @@ configuration:
             tags:
               - release
         slots:
-          - project: ontrack
+          - project: yontrack
             environments:
               - name: self.dev.yontrack.com
                 admissionRules:
