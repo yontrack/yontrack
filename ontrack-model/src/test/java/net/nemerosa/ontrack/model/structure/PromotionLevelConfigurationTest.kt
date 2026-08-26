@@ -48,31 +48,34 @@ class PromotionLevelConfigurationTest {
         assertEquals("Ticket (other)", merged.fields.first().displayName)
     }
 
+    /**
+     * `mergeList` calls `merge` as `later.merge(earlier)` - see `BranchConfiguration.merge` - so the
+     * receiver below is always the layer which gets the last word.
+     */
+    private fun merged(later: Boolean?, earlier: Boolean?) =
+        PromotionLevelConfiguration(name = "BRONZE", autoRevoke = later)
+            .merge(PromotionLevelConfiguration(name = "BRONZE", autoRevoke = earlier))
+            .autoRevoke
+
     @Test
     fun `merge - autoRevoke is unspecified when no layer sets it`() {
-        val merged = PromotionLevelConfiguration(name = "BRONZE")
-            .merge(PromotionLevelConfiguration(name = "BRONZE"))
-        assertNull(merged.autoRevoke)
+        assertNull(merged(later = null, earlier = null))
     }
 
     @Test
     fun `merge - a later layer can turn autoRevoke on`() {
-        val merged = PromotionLevelConfiguration(name = "BRONZE")
-            .merge(PromotionLevelConfiguration(name = "BRONZE", autoRevoke = true))
-        assertEquals(true, merged.autoRevoke)
+        assertEquals(true, merged(later = true, earlier = null))
+        assertEquals(true, merged(later = true, earlier = false))
     }
 
     @Test
     fun `merge - a later layer can turn autoRevoke off`() {
-        val merged = PromotionLevelConfiguration(name = "BRONZE", autoRevoke = true)
-            .merge(PromotionLevelConfiguration(name = "BRONZE", autoRevoke = false))
-        assertEquals(false, merged.autoRevoke)
+        assertEquals(false, merged(later = false, earlier = true))
     }
 
     @Test
-    fun `merge - a layer which does not mention autoRevoke keeps the initial value`() {
-        val merged = PromotionLevelConfiguration(name = "BRONZE", autoRevoke = true)
-            .merge(PromotionLevelConfiguration(name = "BRONZE"))
-        assertEquals(true, merged.autoRevoke)
+    fun `merge - a later layer which does not mention autoRevoke keeps the earlier value`() {
+        assertEquals(true, merged(later = null, earlier = true))
+        assertEquals(false, merged(later = null, earlier = false))
     }
 }

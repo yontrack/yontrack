@@ -8,6 +8,7 @@ import net.nemerosa.ontrack.extension.general.AutoPromotionPropertyType
 import net.nemerosa.ontrack.extension.general.MetaInfoPropertyType
 import net.nemerosa.ontrack.extension.general.PromotionDependenciesPropertyType
 import net.nemerosa.ontrack.extension.scm.mock.MockSCMTester
+import net.nemerosa.ontrack.model.structure.Branch
 import net.nemerosa.ontrack.it.AbstractDSLTestSupport
 import net.nemerosa.ontrack.it.AsAdminTest
 import org.junit.jupiter.api.BeforeEach
@@ -122,6 +123,139 @@ class CoreConfigurationServiceIT : AbstractDSLTestSupport() {
                 "1.0.2",
                 it.getValue("appVersion")
             )
+        }
+    }
+
+    /**
+     * #1639 - `autoRevoke` is nullable across the CI config layers: a layer which does not mention the flag
+     * must leave the value set by an earlier one alone, instead of silently pushing it back to `false`.
+     */
+    @Test
+    @AsAdminTest
+    fun `Auto revoke is off when the promotion does not mention it`() {
+        val branch = configTestSupport.configureBranch(
+            yaml = """
+                version: v1
+                configuration:
+                  defaults:
+                    branch:
+                      validations:
+                        unit-test: {}
+                      promotions:
+                        BRONZE:
+                          validations:
+                            - unit-test
+            """.trimIndent(),
+            ci = "generic",
+            scm = "mock",
+            env = EnvFixtures.generic(scmBranch = "main"),
+        )
+        assertAutoRevoke(branch, expected = false)
+    }
+
+    @Test
+    @AsAdminTest
+    fun `Auto revoke is on when the promotion sets it`() {
+        val branch = configTestSupport.configureBranch(
+            yaml = """
+                version: v1
+                configuration:
+                  defaults:
+                    branch:
+                      validations:
+                        unit-test: {}
+                      promotions:
+                        BRONZE:
+                          validations:
+                            - unit-test
+                          autoRevoke: true
+            """.trimIndent(),
+            ci = "generic",
+            scm = "mock",
+            env = EnvFixtures.generic(scmBranch = "main"),
+        )
+        assertAutoRevoke(branch, expected = true)
+    }
+
+    @Test
+    @AsAdminTest
+    fun `Auto revoke set in the defaults survives a layer which does not mention it`() {
+        val branch = configTestSupport.configureBranch(
+            yaml = """
+                version: v1
+                configuration:
+                  defaults:
+                    branch:
+                      validations:
+                        unit-test: {}
+                        long-it: {}
+                      promotions:
+                        BRONZE:
+                          validations:
+                            - unit-test
+                          autoRevoke: true
+                  custom:
+                    configs:
+                      - conditions:
+                          - name: branch
+                            config: main
+                        branch:
+                          promotions:
+                            BRONZE:
+                              validations:
+                                - long-it
+            """.trimIndent(),
+            ci = "generic",
+            scm = "mock",
+            env = EnvFixtures.generic(scmBranch = "main"),
+        )
+        assertAutoRevoke(branch, expected = true)
+    }
+
+    @Test
+    @AsAdminTest
+    fun `A later layer can turn auto revoke off`() {
+        val branch = configTestSupport.configureBranch(
+            yaml = """
+                version: v1
+                configuration:
+                  defaults:
+                    branch:
+                      validations:
+                        unit-test: {}
+                      promotions:
+                        BRONZE:
+                          validations:
+                            - unit-test
+                          autoRevoke: true
+                  custom:
+                    configs:
+                      - conditions:
+                          - name: branch
+                            config: main
+                        branch:
+                          promotions:
+                            BRONZE:
+                              autoRevoke: false
+            """.trimIndent(),
+            ci = "generic",
+            scm = "mock",
+            env = EnvFixtures.generic(scmBranch = "main"),
+        )
+        assertAutoRevoke(branch, expected = false)
+    }
+
+    /**
+     * Checks the `autoRevoke` flag which actually made it to the auto promotion property stored on the
+     * `BRONZE` promotion of the [branch].
+     */
+    private fun assertAutoRevoke(branch: Branch, expected: Boolean) {
+        val bronze = structureService.findPromotionLevelByName(branch.project.name, branch.name, "BRONZE")
+            .getOrNull()
+            ?: fail("Missing BRONZE promotion")
+        val property = propertyService.getPropertyValue(bronze, AutoPromotionPropertyType::class.java)
+        assertNotNull(property) {
+            assertEquals(expected, it.autoRevoke, "Auto revoke on the stored property")
         }
     }
 
