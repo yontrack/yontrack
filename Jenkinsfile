@@ -109,7 +109,13 @@ pipeline {
                     env.ONTRACK_TEST_EXTENSION_BITBUCKET_CLOUD_IGNORE = params.SKIP_BITBUCKET_CLOUD_IT
                     env.ONTRACK_TEST_EXTENSION_GITHUB_IGNORE = params.SKIP_GITHUB_IT
                     // Reads version information
-                    env.VERSION = readFile(file: 'build/version.txt')
+                    String version = readFile(file: 'build/version.txt').trim()
+                    // Non-release builds on the release branches are release candidates
+                    boolean releaseBranch = env.BRANCH_NAME == 'main' || env.BRANCH_NAME?.startsWith('release/')
+                    if (!params.RELEASE && releaseBranch) {
+                        version = "${version}-rc-${env.BUILD_NUMBER}"
+                    }
+                    env.VERSION = version
                     env.GIT_COMMIT = sh(
                             returnStdout: true,
                             script: 'git rev-parse HEAD'
