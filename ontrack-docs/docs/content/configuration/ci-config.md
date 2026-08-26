@@ -351,7 +351,7 @@ The semantic of `dependsOn` is different from `promotions`:
 
 ###### Auto revocation
 
-By default, a promotion which has been granted stays granted, even if the validations which triggered it later fail. Setting `autoRevoke` to `true` on a promotion revokes it as soon as one of its prerequisites - a required validation stamp or a required promotion - is no longer valid:
+By default, a promotion which has been granted stays granted, even if the validations which triggered it later fail. Setting `autoRevoke` to `true` on a promotion revokes it as soon as one of its prerequisites - a required validation stamp or a required promotion - is no longer valid. See [auto promotion](../concepts/model/auto-promotion.md#revoking-a-promotion) for the full behaviour.
 
 ```yaml
 branch:

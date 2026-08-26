@@ -43,6 +43,17 @@ These rules apply unconditionally. Follow them in every change, without exceptio
 ### Property Types
 - **Never** rename a `PropertyType` class after it is deployed — its fully qualified class name (FQCN) is its persistent storage ID
 
+### Documentation
+- **Never** edit `ontrack-docs/src/docs/asciidoc/` — that tree is dead. No asciidoc plugin remains in the
+  build, so nothing there is ever published. User documentation lives in **mkdocs** under
+  `ontrack-docs/docs/content/`, and a new page must be added to the `nav:` in `ontrack-docs/mkdocs.yml`
+  or it will not be reachable.
+- **Never** hand-edit `ontrack-docs/docs/content/generated/` — it is gitignored and rebuilt by the
+  `ontrack-docs` integration tests from `@APIDescription` and the event/metric/property declarations.
+  To change generated docs, change the annotations, then run `./gradlew :ontrack-docs:integrationTest`.
+- Verify docs changes with `./gradlew :ontrack-docs:buildDocs`, which renders the site into
+  `ontrack-docs/site/` and surfaces broken links and missing nav entries.
+
 ### Workflow
 
 Every change follows this lifecycle, end to end — don't stop after step 2:
@@ -740,6 +751,8 @@ Note: `ProjectEdit extends ProjectConfig` — so checking `ProjectConfig` in `ca
 | Property UI components     | `ontrack-web-core/components/framework/properties/{fqcn}/`                    |
 | Post-processing UI         | `ontrack-web-core/components/framework/auto-versioning-post-processing/{id}/` |
 | Dev guide docs             | `doc/dev-guide/`                                                              |
+| User docs (mkdocs)         | `ontrack-docs/docs/content/` + nav in `ontrack-docs/mkdocs.yml`               |
+| Generated docs (never edit)| `ontrack-docs/docs/content/generated/`                                        |
 
 ---
 
