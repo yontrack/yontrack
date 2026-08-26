@@ -10,6 +10,10 @@ const createJestConfig = nextJest({
 const config = {
     coverageProvider: 'v8',
     testEnvironment: 'jsdom',
+    // The default 5s budget is tight for the component tests: the first `render()` in a worker pays
+    // antd's cssinjs cold start, which on a contended CI agent can blow past 5s before the test's own
+    // `waitFor` (1s) ever gets a chance to run.
+    testTimeout: 20000,
     // Add more setup options before each test is run
     // setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
     // Reports for JUnit
