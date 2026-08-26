@@ -1,10 +1,10 @@
 package net.nemerosa.ontrack.model.events
 
 import net.nemerosa.ontrack.model.events.Event.Companion.of
+import net.nemerosa.ontrack.model.events.EventFactory.Companion.AUTO_PROMOTION_REVOKED
 import net.nemerosa.ontrack.model.events.EventFactory.Companion.DELETE_BRANCH
 import net.nemerosa.ontrack.model.events.EventFactory.Companion.DELETE_BUILD
 import net.nemerosa.ontrack.model.events.EventFactory.Companion.DELETE_CONFIGURATION
-import net.nemerosa.ontrack.model.events.EventFactory.Companion.AUTO_PROMOTION_REVOKED
 import net.nemerosa.ontrack.model.events.EventFactory.Companion.DELETE_PROJECT
 import net.nemerosa.ontrack.model.events.EventFactory.Companion.DELETE_PROMOTION_LEVEL
 import net.nemerosa.ontrack.model.events.EventFactory.Companion.DELETE_PROMOTION_RUN

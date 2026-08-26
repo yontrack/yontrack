@@ -57,7 +57,7 @@ class AutoPromotionPrerequisites(
      * Checks if the [build] is promoted to the [promotionLevel], discounting the
      * [excludedPromotionRunId] promotion run if any.
      */
-    fun isPromoted(build: Build, promotionLevel: PromotionLevel, excludedPromotionRunId: Int? = null): Boolean =
+    private fun isPromoted(build: Build, promotionLevel: PromotionLevel, excludedPromotionRunId: Int?): Boolean =
         if (excludedPromotionRunId == null) {
             promotionRunService.isBuildPromoted(build, promotionLevel)
         } else {

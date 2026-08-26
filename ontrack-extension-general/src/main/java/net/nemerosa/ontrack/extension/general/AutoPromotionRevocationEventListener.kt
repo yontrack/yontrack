@@ -65,19 +65,36 @@ class AutoPromotionRevocationEventListener(
     private fun onValidationRunStatus(event: Event) {
         val validationRun = event.getEntity<ValidationRun>(ProjectEntityType.VALIDATION_RUN)
         if (!validationRun.isPassed) {
-            revokeEligiblePromotions(event, excludedPromotionRunId = null)
+            val validationStamp = validationRun.validationStamp
+            revokeEligiblePromotions(
+                event = event,
+                excludedPromotionRunId = null,
+                // Only the promotion levels which actually require this stamp: something became invalid for
+                // them. Re-judging the others would revoke promotions this event says nothing about - a
+                // build promoted by hand over a stamp which never ran, for instance.
+                requires = { property -> property.contains(validationStamp) },
+            )
         }
     }
 
     private fun onDeletePromotionRun(event: Event) {
+        val promotionLevel = event.getEntity<PromotionLevel>(ProjectEntityType.PROMOTION_LEVEL)
         // `StructureServiceImpl.deletePromotionRun` posts this event *before* deleting the run, and
         // `EventPostServiceImpl.post` calls the listeners synchronously: the run is therefore still in the
         // database at this point. Excluding it by ID is what makes the cascade see the state the deletion
         // is about to produce.
-        revokeEligiblePromotions(event, excludedPromotionRunId = event.getIntValue("PROMOTION_RUN_ID"))
+        revokeEligiblePromotions(
+            event = event,
+            excludedPromotionRunId = event.getIntValue("PROMOTION_RUN_ID"),
+            requires = { property -> property.contains(promotionLevel) },
+        )
     }
 
-    private fun revokeEligiblePromotions(event: Event, excludedPromotionRunId: Int?) {
+    private fun revokeEligiblePromotions(
+        event: Event,
+        excludedPromotionRunId: Int?,
+        requires: (AutoPromotionProperty) -> Boolean,
+    ) {
         val branch = event.getEntity<Branch>(ProjectEntityType.BRANCH)
         val build = event.getEntity<Build>(ProjectEntityType.BUILD)
         // `deletePromotionRun` requires `PromotionRunDelete`, which the user who flipped a validation to
@@ -97,6 +114,7 @@ class AutoPromotionRevocationEventListener(
                         promotionLevels = promotionLevels,
                         validationStamps = validationStamps,
                         excludedPromotionRunId = excludedPromotionRunId,
+                        requires = requires,
                     )
                 } catch (ex: Exception) {
                     logger.error(
@@ -119,11 +137,14 @@ class AutoPromotionRevocationEventListener(
         promotionLevels: List<PromotionLevel>,
         validationStamps: List<ValidationStamp>,
         excludedPromotionRunId: Int?,
+        requires: (AutoPromotionProperty) -> Boolean,
     ) {
         val property = propertyService.getPropertyValue(promotionLevel, AutoPromotionPropertyType::class.java)
             ?: return
         // Opting out, or a property with nothing to check, means nothing to revoke
         if (!property.autoRevoke || property.isEmpty()) return
+        // Nothing this event invalidated is a prerequisite of this promotion level
+        if (!requires(property)) return
         // Runs to revoke, discounting the one being deleted. When a promotion level carries several runs,
         // the earlier delete events still see the remaining ones and the cascade only fires on the last one.
         val runs = structureService.getPromotionRunsForBuildAndPromotionLevel(build, promotionLevel)

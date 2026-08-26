@@ -12,7 +12,6 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
@@ -205,6 +204,47 @@ class AutoPromotionRevocationIT : AbstractDSLTestSupport() {
     }
 
     @Test
+    fun `A failing validation which is not a prerequisite revokes nothing`() {
+        project {
+            branch {
+                val required = validationStamp("REQUIRED")
+                val unrelated = validationStamp("UNRELATED")
+                val pl = promotionLevel("PL")
+                autoPromotion(pl, validationStamps = listOf(required), autoRevoke = true)
+                build("1") {
+                    // Promoted by hand, over a prerequisite which never ran
+                    promote(pl, description = "Manual")
+                    // A failure on a stamp the property says nothing about must not re-judge the build
+                    validate(unrelated, validationRunStatusID = ValidationRunStatusID.STATUS_FAILED)
+                    assertPromoted(this, pl)
+                    assertTrue(testEventListener.revokedPromotionLevelIds(this).isEmpty())
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `Deleting a promotion which is not a prerequisite revokes nothing`() {
+        project {
+            branch {
+                val bronze = promotionLevel("BRONZE")
+                val unrelated = promotionLevel("UNRELATED")
+                val silver = promotionLevel("SILVER")
+                autoPromotion(silver, promotionLevels = listOf(bronze), autoRevoke = true)
+                build("1") {
+                    // Promoted by hand, over a prerequisite which was never granted
+                    promote(silver, description = "Manual")
+                    // Deleting a promotion the property says nothing about must not re-judge the build
+                    val run = promote(unrelated)
+                    deletePromotionRun(run)
+                    assertPromoted(this, silver)
+                    assertTrue(testEventListener.revokedPromotionLevelIds(this).isEmpty())
+                }
+            }
+        }
+    }
+
+    @Test
     fun `Deleting a required validation stamp does not revoke`() {
         project {
             branch {
@@ -327,8 +367,8 @@ class AutoPromotionRevocationIT : AbstractDSLTestSupport() {
     }
 
     private fun assertNotPromoted(build: Build, promotionLevel: PromotionLevel) {
-        assertFalse(
-            promotionRuns(build, promotionLevel).isNotEmpty(),
+        assertTrue(
+            promotionRuns(build, promotionLevel).isEmpty(),
             "Build ${build.name} is no longer promoted to ${promotionLevel.name}"
         )
     }
