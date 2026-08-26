@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.kdsl.spec.extension.general
 
-import net.nemerosa.ontrack.json.parse
+import com.fasterxml.jackson.databind.JsonNode
 import net.nemerosa.ontrack.kdsl.spec.PromotionLevel
 import net.nemerosa.ontrack.kdsl.spec.deleteProperty
 import net.nemerosa.ontrack.kdsl.spec.getProperty
@@ -8,15 +8,44 @@ import net.nemerosa.ontrack.kdsl.spec.setProperty
 
 /**
  * Sets an auto promotion property on a promotion level.
+ *
+ * Note that the property is _written_ using lists of validation stamp & promotion level IDs but
+ * is _read back_ from the API using lists of complete validation stamps & promotion levels. The
+ * getter takes care of the conversion so that the same [AutoPromotionProperty] type can be used
+ * on both sides.
  */
 var PromotionLevel.autoPromotion: AutoPromotionProperty?
-    get() = getProperty(AUTO_PROMOTION_PROPERTY)?.parse()
+    get() = getProperty(AUTO_PROMOTION_PROPERTY)?.let { node ->
+        AutoPromotionProperty(
+            validationStamps = node.path("validationStamps").parseIds(),
+            include = node.path("include").asText(""),
+            exclude = node.path("exclude").asText(""),
+            promotionLevels = node.path("promotionLevels").parseIds(),
+            autoRevoke = node.path("autoRevoke").asBoolean(false),
+        )
+    }
     set(value) {
         if (value != null) {
             setProperty(AUTO_PROMOTION_PROPERTY, value)
         } else {
             deleteProperty(AUTO_PROMOTION_PROPERTY)
         }
+    }
+
+/**
+ * Reads a list of entity IDs, accepting both a list of raw IDs and a list of entities carrying an `id` field.
+ */
+private fun JsonNode.parseIds(): List<UInt> =
+    if (isArray) {
+        map { item ->
+            if (item.isObject) {
+                item.path("id").asInt().toUInt()
+            } else {
+                item.asInt().toUInt()
+            }
+        }
+    } else {
+        emptyList()
     }
 
 const val AUTO_PROMOTION_PROPERTY = "net.nemerosa.ontrack.extension.general.AutoPromotionPropertyType"
