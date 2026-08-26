@@ -3,6 +3,7 @@ package net.nemerosa.ontrack.extension.general
 import com.fasterxml.jackson.databind.JsonNode
 import net.nemerosa.ontrack.extension.support.AbstractPropertyType
 import net.nemerosa.ontrack.json.asJson
+import net.nemerosa.ontrack.json.getBooleanField
 import net.nemerosa.ontrack.json.getTextField
 import net.nemerosa.ontrack.model.json.schema.JsonEmptyType
 import net.nemerosa.ontrack.model.json.schema.JsonSchemaIgnore
@@ -47,7 +48,8 @@ class AutoPromotionPropertyType(
                 validationStamps = readValidationStamps(node),
                 include = "",
                 exclude = "",
-                promotionLevels = emptyList()
+                promotionLevels = emptyList(),
+                autoRevoke = false,
             )
         } else {
             val validationStamps = node.path("validationStamps")
@@ -58,7 +60,8 @@ class AutoPromotionPropertyType(
                 validationStamps = validationStampList,
                 include = node.getTextField("include") ?: "",
                 exclude = node.getTextField("exclude") ?: "",
-                promotionLevels = promotionLevelList
+                promotionLevels = promotionLevelList,
+                autoRevoke = node.getBooleanField("autoRevoke") ?: false,
             )
         }
     }
@@ -109,6 +112,7 @@ class AutoPromotionPropertyType(
                         pl.name
                     ).getOrNull()
                 },
+            value.autoRevoke,
         )
     }
 
@@ -120,7 +124,8 @@ class AutoPromotionPropertyType(
             "validationStamps" to value.validationStamps.map { it.id() },
             "include" to value.include,
             "exclude" to value.exclude,
-            "promotionLevels" to value.promotionLevels.map { it.id() }
+            "promotionLevels" to value.promotionLevels.map { it.id() },
+            "autoRevoke" to value.autoRevoke,
         ).asJson()
     }
 

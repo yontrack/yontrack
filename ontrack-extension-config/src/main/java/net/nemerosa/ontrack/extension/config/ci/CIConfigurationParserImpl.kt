@@ -128,6 +128,7 @@ class CIConfigurationParserImpl(
                         position = index,
                     )
                 },
+                autoRevoke = config.autoRevoke,
             )
         }
     }

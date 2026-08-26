@@ -1,0 +1,18 @@
+mutation CreateValidationRunById(
+    $buildId: Int!,
+    $validationStamp: String!,
+    $validationRunStatus: String,
+    $description: String,
+) {
+    createValidationRunById(input: {
+        buildId: $buildId,
+        validationStamp: $validationStamp,
+        validationRunStatus: $validationRunStatus,
+        description: $description,
+    }) {
+        validationRun {
+            ...ValidationRunFragment
+        }
+        ...PayloadUserErrors
+    }
+}

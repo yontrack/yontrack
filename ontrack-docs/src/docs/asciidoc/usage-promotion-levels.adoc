@@ -35,6 +35,48 @@ promotions.
 
 The list of promotion levels can be set independently of the list of validation stamps.
 
+[[promotion-levels-auto-promotion-revocation]]
+===== Revoking an auto promotion
+
+By default, a promotion which has been granted stays granted, even if the validations
+which triggered it later fail.
+
+By enabling the "Revoke the promotion when a prerequisite is no longer valid" option
+on the auto promotion property, the promotion is _revoked_ as soon as one of its
+prerequisites - a required validation stamp or a required promotion - stops being
+valid.
+
+This option is opt-in and disabled by default. Three of its behaviours are worth
+knowing before enabling it.
+
+IMPORTANT: Revoking a promotion *deletes* it, but does not undo its effects: any
+notification or workflow already triggered by the promotion remains fired. Deleting
+the promotion run removes the promotion, not the auto-versioning pull requests it
+opened, the notifications it sent or the workflows it started.
+
+NOTE: Enabling the option does not re-evaluate the builds which are already promoted.
+Revocation is forward-looking: it only reacts to a prerequisite actually becoming
+invalid from that point on.
+
+The three surprising behaviours:
+
+* *Manual deletions cascade.* A prerequisite is no longer valid whoever made it
+untrue. Deleting a `BRONZE` promotion by hand in the UI also deletes every
+downstream promotion which required it and has the option enabled - in the same
+click. This is also what makes "undo a mis-promotion" work down the whole chain.
+* *A newly added prerequisite which fails revokes an old promotion.* If a validation
+stamp matching the `include` regular expression is added, and a run for it later
+fails on a build which was already promoted, the promotion is revoked. Nothing
+happens when the property is edited - only when a real failing run appears.
+* *Every run of the promotion level is revoked*, including the ones created manually.
+Enabling the option declares the promotion level fully auto-managed; leaving a manual
+run standing would show the build as promoted while its prerequisites are red.
+
+A revocation posts an `auto_promotion_revoked` event in addition to the
+`delete_promotion_run` event of the run itself: the first says why the promotion is
+gone, the second says that it is. Subscribe to `auto_promotion_revoked` to be told
+about automatic revocations specifically, as opposed to a human deleting a promotion.
+
 [[promotion-levels-checks]]
 ==== Promotion checks
 

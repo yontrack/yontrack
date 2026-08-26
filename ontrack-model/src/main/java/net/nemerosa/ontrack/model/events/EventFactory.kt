@@ -63,6 +63,12 @@ interface EventFactory {
 
     fun deletePromotionRun(promotionRun: PromotionRun): Event
 
+    /**
+     * An auto promotion has been revoked on a [build] because one of the prerequisites of the
+     * [promotionLevel] is no longer valid. Posted in addition to [deletePromotionRun].
+     */
+    fun autoPromotionRevoked(build: Build, promotionLevel: PromotionLevel): Event
+
     fun newValidationStamp(validationStamp: ValidationStamp): Event
 
     fun imageValidationStamp(validationStamp: ValidationStamp): Event
@@ -363,6 +369,20 @@ interface EventFactory {
                 eventBranch("Branch"),
                 eventBuild("Promoted build"),
                 eventPromotionLevel("Promotion level"),
+            ),
+        )
+
+        val AUTO_PROMOTION_REVOKED: EventType = SimpleEventType(
+            id = "auto_promotion_revoked",
+            template = "Promotion \${promotionLevel} of build \${build} has been revoked for branch \${branch} in \${project} because one of its prerequisites is no longer valid.",
+            description = "When an auto promotion is revoked because one of its prerequisites - a required " +
+                    "validation stamp or a required promotion - is no longer valid. This event is posted in " +
+                    "addition to the deletion of the promotion run itself.",
+            context = eventContext(
+                eventProject("Project"),
+                eventBranch("Branch"),
+                eventBuild("Build whose promotion has been revoked"),
+                eventPromotionLevel("Revoked promotion level"),
             ),
         )
 

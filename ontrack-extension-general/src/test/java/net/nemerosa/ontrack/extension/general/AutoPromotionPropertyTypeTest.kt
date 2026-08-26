@@ -8,6 +8,7 @@ import net.nemerosa.ontrack.model.structure.NameDescription.Companion.nd
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class AutoPromotionPropertyTypeTest {
@@ -104,6 +105,70 @@ class AutoPromotionPropertyTypeTest {
         )
         val node = type.forStorage(autoPromotionProperty)
         val restored = type.fromStorage(node)
+        assertEquals(autoPromotionProperty, restored)
+    }
+
+    @Test
+    fun `From storage - autoRevoke defaults to false when absent`() {
+        every { structureService.getValidationStamp(ID.of(1)) } returns validationStamp1
+        val autoPromotionProperty = type.fromStorage(
+            mapOf(
+                "validationStamps" to listOf(1),
+                "include" to "",
+                "exclude" to ""
+            ).asJson()
+        )
+        assertFalse(autoPromotionProperty.autoRevoke, "autoRevoke defaults to false")
+    }
+
+    @Test
+    fun `From storage - backward compatibility - autoRevoke defaults to false`() {
+        every { structureService.getValidationStamp(ID.of(1)) } returns validationStamp1
+        every { structureService.getValidationStamp(ID.of(2)) } returns validationStamp2
+        val autoPromotionProperty = type.fromStorage(
+            listOf(1, 2).asJson()
+        )
+        assertFalse(autoPromotionProperty.autoRevoke, "autoRevoke defaults to false")
+    }
+
+    @Test
+    fun `From storage - autoRevoke is read when present`() {
+        every { structureService.getValidationStamp(ID.of(1)) } returns validationStamp1
+        val autoPromotionProperty = type.fromStorage(
+            mapOf(
+                "validationStamps" to listOf(1),
+                "include" to "",
+                "exclude" to "",
+                "autoRevoke" to true
+            ).asJson()
+        )
+        assertTrue(autoPromotionProperty.autoRevoke, "autoRevoke is read")
+    }
+
+    @Test
+    fun `For storage - autoRevoke is written`() {
+        val autoPromotionProperty = AutoPromotionProperty(
+            validationStamps = listOf(validationStamp1),
+            include = "",
+            exclude = "",
+            promotionLevels = emptyList(),
+            autoRevoke = true,
+        )
+        val node = type.forStorage(autoPromotionProperty)
+        assertTrue(node.path("autoRevoke").asBoolean(), "autoRevoke is stored")
+    }
+
+    @Test
+    fun `For and from storage - autoRevoke round trip`() {
+        every { structureService.getValidationStamp(ID.of(1)) } returns validationStamp1
+        val autoPromotionProperty = AutoPromotionProperty(
+            validationStamps = listOf(validationStamp1),
+            include = "include",
+            exclude = "exclude",
+            promotionLevels = emptyList(),
+            autoRevoke = true,
+        )
+        val restored = type.fromStorage(type.forStorage(autoPromotionProperty))
         assertEquals(autoPromotionProperty, restored)
     }
 

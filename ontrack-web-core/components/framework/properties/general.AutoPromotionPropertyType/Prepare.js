@@ -8,5 +8,8 @@ export default function prepare(value) {
         ...value,
         validationStamps: value.validationStamps?.map(vs => String(vs.id)) ?? [],
         promotionLevels: value.promotionLevels?.map(pl => String(pl.id)) ?? [],
+        // Properties stored before autoRevoke existed have no such field, and an undefined value would
+        // leave the checkbox uncontrolled.
+        autoRevoke: value.autoRevoke ?? false,
     }
 }

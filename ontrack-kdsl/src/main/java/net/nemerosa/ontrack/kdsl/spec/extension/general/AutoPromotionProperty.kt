@@ -38,4 +38,10 @@ data class AutoPromotionProperty(
      * List of needed promotion levels
      */
     val promotionLevels: List<UInt> = emptyList(),
+    /**
+     * When enabled, the promotion is revoked as soon as one of its prerequisites - a required validation
+     * stamp or a required promotion - is no longer valid. Revoking a promotion deletes it, but does not
+     * undo its effects: any notification or workflow already triggered by the promotion remains fired.
+     */
+    val autoRevoke: Boolean = false,
 )

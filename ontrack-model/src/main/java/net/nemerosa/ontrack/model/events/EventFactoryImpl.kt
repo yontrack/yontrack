@@ -4,6 +4,7 @@ import net.nemerosa.ontrack.model.events.Event.Companion.of
 import net.nemerosa.ontrack.model.events.EventFactory.Companion.DELETE_BRANCH
 import net.nemerosa.ontrack.model.events.EventFactory.Companion.DELETE_BUILD
 import net.nemerosa.ontrack.model.events.EventFactory.Companion.DELETE_CONFIGURATION
+import net.nemerosa.ontrack.model.events.EventFactory.Companion.AUTO_PROMOTION_REVOKED
 import net.nemerosa.ontrack.model.events.EventFactory.Companion.DELETE_PROJECT
 import net.nemerosa.ontrack.model.events.EventFactory.Companion.DELETE_PROMOTION_LEVEL
 import net.nemerosa.ontrack.model.events.EventFactory.Companion.DELETE_PROMOTION_RUN
@@ -80,6 +81,7 @@ class EventFactoryImpl : EventFactory {
 
         register(NEW_PROMOTION_RUN)
         register(DELETE_PROMOTION_RUN)
+        register(AUTO_PROMOTION_REVOKED)
 
         register(NEW_VALIDATION_RUN)
         register(NEW_VALIDATION_RUN_STATUS)
@@ -234,6 +236,14 @@ class EventFactoryImpl : EventFactory {
             .with(promotionRun.build)
             .with("PROMOTION_RUN_ID", promotionRun.id.toString())
             .with(promotionRun.promotionLevel)
+            .build()
+    }
+
+    override fun autoPromotionRevoked(build: Build, promotionLevel: PromotionLevel): Event {
+        return of(AUTO_PROMOTION_REVOKED)
+            .withBranch(build.branch)
+            .with(build)
+            .with(promotionLevel)
             .build()
     }
 

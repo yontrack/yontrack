@@ -6,6 +6,7 @@ import graphql.schema.GraphQLList
 import graphql.schema.GraphQLNonNull
 import net.nemerosa.ontrack.graphql.schema.MutationInput
 import net.nemerosa.ontrack.graphql.schema.PropertyMutationProvider
+import net.nemerosa.ontrack.graphql.schema.optionalBooleanInputField
 import net.nemerosa.ontrack.graphql.schema.optionalStringInputField
 import net.nemerosa.ontrack.model.structure.ProjectEntity
 import net.nemerosa.ontrack.model.structure.PromotionLevel
@@ -39,6 +40,13 @@ class AutoPromotionPropertyMutationProvider(
             .description("List of needed promotion levels")
             .type(GraphQLList(GraphQLNonNull(GraphQLString)))
             .build(),
+        optionalBooleanInputField(
+            AutoPromotionProperty::autoRevoke.name,
+            "When enabled, the promotion is revoked as soon as one of its prerequisites - a required " +
+                    "validation stamp or a required promotion - is no longer valid. Revoking a promotion " +
+                    "deletes it, but does not undo its effects: any notification or workflow already " +
+                    "triggered by the promotion remains fired. Defaults to false when absent."
+        ),
     )
 
     override fun readInput(entity: ProjectEntity, input: MutationInput): AutoPromotionProperty {
@@ -58,6 +66,10 @@ class AutoPromotionPropertyMutationProvider(
                 include = input.getInput<String>(AutoPromotionProperty::include.name) ?: "",
                 exclude = input.getInput<String>(AutoPromotionProperty::exclude.name) ?: "",
                 promotionLevels = promotionLevels,
+                // Absent means false, matching the full-replace semantics of this mutation - an omitted
+                // `include` already becomes "". Preserving one field on absence would make the contract
+                // inconsistent with every other property mutation.
+                autoRevoke = input.getInput<Boolean>(AutoPromotionProperty::autoRevoke.name) ?: false,
             )
         } else {
             throw IllegalStateException("Parent entity must be a promotion level")

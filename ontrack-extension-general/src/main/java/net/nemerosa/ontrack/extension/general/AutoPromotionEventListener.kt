@@ -17,9 +17,9 @@ import org.springframework.stereotype.Component
 class AutoPromotionEventListener(
     private val structureService: StructureService,
     private val promotionRunService: PromotionRunService,
-    private val validationRunService: ValidationRunService,
     private val propertyService: PropertyService,
-    private val securityService: SecurityService
+    private val securityService: SecurityService,
+    private val autoPromotionPrerequisites: AutoPromotionPrerequisites,
 ) : EventListener {
 
     override fun onEvent(event: Event) {
@@ -70,12 +70,7 @@ class AutoPromotionEventListener(
             val keptValidationStamps = property.validationStamps
                 .filter { validationStamp: ValidationStamp -> (validationStampId != validationStamp.id()) }
             if (keptValidationStamps.size < property.validationStamps.size) {
-                val editedProperty = AutoPromotionProperty(
-                    keptValidationStamps,
-                    property.include,
-                    property.exclude,
-                    property.promotionLevels
-                )
+                val editedProperty = property.copy(validationStamps = keptValidationStamps)
                 securityService.asAdmin {
                     propertyService.editProperty(
                         promotionLevel,
@@ -93,12 +88,7 @@ class AutoPromotionEventListener(
             val keptPromotionLevels =
                 property.promotionLevels.filter { pl: PromotionLevel -> (promotionLevelId != pl.id()) }
             if (keptPromotionLevels.size < property.promotionLevels.size) {
-                val editedProperty = AutoPromotionProperty(
-                    property.validationStamps,
-                    property.include,
-                    property.exclude,
-                    keptPromotionLevels
-                )
+                val editedProperty = property.copy(promotionLevels = keptPromotionLevels)
                 securityService.asAdmin {
                     propertyService.editProperty(
                         promotionLevel,
@@ -163,27 +153,14 @@ class AutoPromotionEventListener(
             // Check to be done only if the promotion level is not attributed yet
             val isPromoted = promotionRunService.isBuildPromoted(build, promotionLevel)
             if (!isPromoted) {
-                // Checks the status of each validation stamp
-                val allVSPassed =
-                    validationStamps
-                        // Keeps only the ones selectable for the autopromotion property
-                        .filter { vs -> property.contains(vs) }
-                        // They must all pass
-                        .all { validationStamp: ValidationStamp ->
-                            isValidationStampPassed(
-                                build,
-                                validationStamp
-                            )
-                        }
-                // Checks that all needed promotions are granted
-                val allPLPassed =
-                    promotionLevels
-                        // Keeps only the ones selectable for the autopromotion property
-                        .filter { pl -> property.contains(pl) }
-                        // They must all be granted
-                        .all { pl: PromotionLevel -> promotionRunService.isBuildPromoted(build, pl) }
-                // Promotion is needed
-                if (allVSPassed && allPLPassed) {
+                // Promotion is needed when all the prerequisites are satisfied
+                if (autoPromotionPrerequisites.areSatisfied(
+                        build = build,
+                        property = property,
+                        branchPromotionLevels = promotionLevels,
+                        branchValidationStamps = validationStamps,
+                    )
+                ) {
                     // Promotes
                     // Makes sure to raise the auth level because the one
                     // having made a validation might not be granted to
@@ -202,8 +179,5 @@ class AutoPromotionEventListener(
             }
         }
     }
-
-    private fun isValidationStampPassed(build: Build, validationStamp: ValidationStamp): Boolean =
-        validationRunService.isValidationRunPassed(build, validationStamp)
 
 }

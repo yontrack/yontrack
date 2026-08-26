@@ -2,6 +2,7 @@ package net.nemerosa.ontrack.model.structure
 
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 
 class PromotionLevelConfigurationTest {
 
@@ -45,5 +46,33 @@ class PromotionLevelConfigurationTest {
         val merged = base.merge(other)
         assertEquals(1, merged.fields.size)
         assertEquals("Ticket (other)", merged.fields.first().displayName)
+    }
+
+    @Test
+    fun `merge - autoRevoke is unspecified when no layer sets it`() {
+        val merged = PromotionLevelConfiguration(name = "BRONZE")
+            .merge(PromotionLevelConfiguration(name = "BRONZE"))
+        assertNull(merged.autoRevoke)
+    }
+
+    @Test
+    fun `merge - a later layer can turn autoRevoke on`() {
+        val merged = PromotionLevelConfiguration(name = "BRONZE")
+            .merge(PromotionLevelConfiguration(name = "BRONZE", autoRevoke = true))
+        assertEquals(true, merged.autoRevoke)
+    }
+
+    @Test
+    fun `merge - a later layer can turn autoRevoke off`() {
+        val merged = PromotionLevelConfiguration(name = "BRONZE", autoRevoke = true)
+            .merge(PromotionLevelConfiguration(name = "BRONZE", autoRevoke = false))
+        assertEquals(false, merged.autoRevoke)
+    }
+
+    @Test
+    fun `merge - a layer which does not mention autoRevoke keeps the initial value`() {
+        val merged = PromotionLevelConfiguration(name = "BRONZE", autoRevoke = true)
+            .merge(PromotionLevelConfiguration(name = "BRONZE"))
+        assertEquals(true, merged.autoRevoke)
     }
 }

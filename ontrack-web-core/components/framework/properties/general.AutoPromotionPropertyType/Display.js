@@ -43,6 +43,12 @@ export default function Display({property}) {
                         </Space>
                     </>
                 }
+                {
+                    property.value.autoRevoke &&
+                    <Typography.Text type="secondary">
+                        Revoked when a prerequisite is no longer valid
+                    </Typography.Text>
+                }
             </Space>
         </>
     )

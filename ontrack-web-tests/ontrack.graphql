@@ -11050,6 +11050,8 @@ input SetProjectStalePropertyInput {
 
 "Input type for the setPromotionLevelAutoPromotionPropertyById mutation."
 input SetPromotionLevelAutoPromotionPropertyByIdInput {
+  "When enabled, the promotion is revoked as soon as one of its prerequisites - a required validation stamp or a required promotion - is no longer valid. Revoking a promotion deletes it, but does not undo its effects: any notification or workflow already triggered by the promotion remains fired. Defaults to false when absent."
+  autoRevoke: Boolean
   "Regular expression to exclude validation stamps by name"
   exclude: String
   "ID of the promotion level"
@@ -11064,6 +11066,8 @@ input SetPromotionLevelAutoPromotionPropertyByIdInput {
 
 "Input type for the setPromotionLevelAutoPromotionProperty mutation."
 input SetPromotionLevelAutoPromotionPropertyInput {
+  "When enabled, the promotion is revoked as soon as one of its prerequisites - a required validation stamp or a required promotion - is no longer valid. Revoking a promotion deletes it, but does not undo its effects: any notification or workflow already triggered by the promotion remains fired. Defaults to false when absent."
+  autoRevoke: Boolean
   "Branch name"
   branch: String!
   "Regular expression to exclude validation stamps by name"

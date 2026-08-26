@@ -60,6 +60,32 @@ class Build(
         ?: throw GraphQLMissingDataException("Did not get back the created promotion run")
 
     /**
+     * Creates a validation run on a build.
+     *
+     * @param validationStamp Name of the validation stamp
+     * @param status Status of the run, defaults to the stamp's own default when null
+     * @param description Description of the run
+     * @return Validation run
+     */
+    fun validate(
+        validationStamp: String,
+        status: String? = null,
+        description: String? = null,
+    ): ValidationRun = graphqlConnector.mutate(
+        CreateValidationRunByIdMutation(
+            id.toInt(),
+            validationStamp,
+            Optional.presentIfNotNull(status),
+            Optional.presentIfNotNull(description),
+        )
+    ) {
+        it?.createValidationRunById?.payloadUserErrors?.convert()
+    }
+        ?.checkData { it.createValidationRunById?.validationRun }
+        ?.validationRunFragment?.toValidationRun(this)
+        ?: throw GraphQLMissingDataException("Did not get back the created validation run")
+
+    /**
      * Gets the list of validation runs for this build and a given validation stamp name (can be a regular expression).
      *
      * @param validationStamp Validation stamp name (can be a regular expression).

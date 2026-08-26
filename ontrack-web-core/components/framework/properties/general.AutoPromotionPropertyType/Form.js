@@ -1,4 +1,4 @@
-import {Form, Input} from "antd";
+import {Checkbox, Form, Input} from "antd";
 import {prefixedFormName} from "@components/form/formUtils";
 import SelectValidationStamp from "@components/validationStamps/SelectValidationStamp";
 import SelectPromotionLevel from "@components/promotionLevels/SelectPromotionLevel";
@@ -59,6 +59,16 @@ export default function PropertyForm({prefix, entity}) {
                         />
                     </Form.Item>
                 }
+                <Form.Item
+                    label="Auto revoke"
+                    extra="Revoking a promotion deletes it, but does not undo its effects: any notification or workflow already triggered by the promotion remains fired."
+                    name={prefixedFormName(prefix, 'autoRevoke')}
+                    valuePropName="checked"
+                >
+                    <Checkbox id="auto-promotion-auto-revoke" data-testid="auto-promotion-auto-revoke">
+                        Revoke the promotion when a prerequisite is no longer valid
+                    </Checkbox>
+                </Form.Item>
             </LoadingContainer>
         </>
     )

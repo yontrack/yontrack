@@ -1,5 +1,5 @@
 import {generate} from "@ontrack/utils";
-import {graphQLCallMutation} from "@ontrack/graphql";
+import {graphQLCall, graphQLCallMutation} from "@ontrack/graphql";
 import {gql} from "graphql-request";
 import {registerNotificationExtensions} from "@ontrack/extensions/notifications/notifications";
 
@@ -50,7 +50,7 @@ const promotionLevelInstance = (branch, data) => {
     // Notifications methods
     registerNotificationExtensions(promotionLevel)
 
-    promotionLevel.setAutoPromotionProperty = async ({validationStamps = [], promotionLevels = []} = {}) => {
+    promotionLevel.setAutoPromotionProperty = async ({validationStamps = [], promotionLevels = [], autoRevoke = false} = {}) => {
         await graphQLCallMutation(
             promotionLevel.ontrack.connection,
             'setPromotionLevelAutoPromotionPropertyById',
@@ -59,11 +59,13 @@ const promotionLevelInstance = (branch, data) => {
                     $id: Int!,
                     $validationStamps: [String!],
                     $promotionLevels: [String!],
+                    $autoRevoke: Boolean,
                 ) {
                     setPromotionLevelAutoPromotionPropertyById(input: {
                         id: $id,
                         validationStamps: $validationStamps,
                         promotionLevels: $promotionLevels,
+                        autoRevoke: $autoRevoke,
                     }) {
                         errors { message }
                     }
@@ -74,9 +76,30 @@ const promotionLevelInstance = (branch, data) => {
                 // the mutation takes names, not IDs
                 validationStamps: validationStamps.map(it => it.name),
                 promotionLevels: promotionLevels.map(it => it.name),
+                autoRevoke,
             }
         )
         return promotionLevel
+    }
+
+    promotionLevel.getAutoPromotionProperty = async () => {
+        const data = await graphQLCall(
+            promotionLevel.ontrack.connection,
+            gql`
+                query GetAutoPromotionProperty($id: Int!) {
+                    promotionLevel(id: $id) {
+                        properties {
+                            type { typeName }
+                            value
+                        }
+                    }
+                }
+            `,
+            {id: Number(promotionLevel.id)}
+        )
+        return data.promotionLevel.properties.find(
+            p => p.type.typeName === 'net.nemerosa.ontrack.extension.general.AutoPromotionPropertyType'
+        )?.value
     }
 
     promotionLevel.setFields = async (fields) => {

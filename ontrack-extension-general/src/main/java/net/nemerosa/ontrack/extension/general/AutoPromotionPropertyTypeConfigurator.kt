@@ -13,6 +13,8 @@ class AutoPromotionPropertyTypeConfigurator(
         pl: PromotionLevel,
         config: PromotionLevelConfiguration
     ) {
+        // `autoRevoke` alone has no prerequisite to check, so it is silently ignored here - consistent with
+        // `AutoPromotionProperty.isEmpty()`
         if (config.validations.isEmpty() && config.promotions.isEmpty()) {
             propertyService.deleteProperty(pl, AutoPromotionPropertyType::class.java)
         } else {
@@ -28,7 +30,9 @@ class AutoPromotionPropertyTypeConfigurator(
                             .getOrNull()
                     },
                     include = "",
-                    exclude = ""
+                    exclude = "",
+                    // A stored property is a resolved value: there is no "unspecified" state for it
+                    autoRevoke = config.autoRevoke ?: false,
                 )
             )
         }

@@ -40,6 +40,14 @@ class AutoPromotionPropertyTest {
     }
 
     @Test
+    fun `A property carrying only autoRevoke stays empty`() {
+        assertTrue(
+            AutoPromotionProperty(emptyList(), "", "", emptyList(), autoRevoke = true).isEmpty(),
+            "autoRevoke alone has nothing to check and does not make the property eligible"
+        )
+    }
+
+    @Test
     fun `Checks that a validation stamp is contained`() {
         val vs1 = ValidationStamp.of(
                 branch,

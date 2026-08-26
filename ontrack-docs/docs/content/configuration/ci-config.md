@@ -349,6 +349,32 @@ The semantic of `dependsOn` is different from `promotions`:
 * `promotions` define the list of other promotions that participate in the auto-promotion of this promotion ("if BRONZE is granted and the listed validations are OK, then SILVER is granted automatically")
 * `dependsOn` defines the list of promotions that must be completed before the promotion can be completed ("trying to promote to SILVER without having completed BRONZE" will fail)
 
+###### Auto revocation
+
+By default, a promotion which has been granted stays granted, even if the validations which triggered it later fail. Setting `autoRevoke` to `true` on a promotion revokes it as soon as one of its prerequisites - a required validation stamp or a required promotion - is no longer valid:
+
+```yaml
+branch:
+  promotions:
+    - BRONZE:
+        validations:
+          - build
+        autoRevoke: true
+```
+
+!!! warning
+
+    Revoking a promotion **deletes** it, but does not undo its effects: any notification or workflow already triggered by the promotion remains fired.
+
+`autoRevoke` is not set by default, and a layer which does not mention it leaves the value set by the previous layer untouched. It is ignored when the promotion declares neither `validations` nor `promotions`, since there is then no prerequisite to check.
+
+Two behaviours are worth knowing before enabling it:
+
+* deleting a promotion by hand also deletes every downstream promotion which required it and has `autoRevoke` enabled - a prerequisite is no longer valid whoever made it untrue
+* adding a new prerequisite which then fails on an already-promoted build revokes that old promotion; nothing happens on the configuration change itself, only when a real failing run appears
+
+Enabling `autoRevoke` does not re-evaluate the builds which are already promoted: revocation is forward-looking.
+
 ###### Fields
 
 A promotion level can define a list of [fields](../concepts/model/promotion-level-fields.md) that must be filled in when a build is promoted. Fields are defined under the `fields` key of a promotion:

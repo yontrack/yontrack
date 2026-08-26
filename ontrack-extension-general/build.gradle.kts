@@ -12,6 +12,7 @@ dependencies {
     implementation(project(":ontrack-extension-indicators"))
     implementation(project(":ontrack-extension-config"))
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core")
+    implementation("io.micrometer:micrometer-core")
 
     testImplementation(testFixtures(project(":ontrack-model")))
     testImplementation(testFixtures(project(":ontrack-ui-graphql")))
