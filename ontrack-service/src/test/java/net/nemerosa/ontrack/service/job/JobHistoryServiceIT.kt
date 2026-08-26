@@ -9,7 +9,6 @@ import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import java.time.Duration
 import java.time.LocalDateTime
-import kotlin.random.Random
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlin.test.fail
@@ -99,10 +98,12 @@ class JobHistoryServiceIT : AbstractDSLTestSupport() {
         val jobKey = JobFixtures.jobKey()
         repeat(21) {
             val start = now.minusDays(it.toLong()).plusHours(12)
+            // Deterministic durations, always strictly positive, and varying inside each period
+            val durationMinutes = (it % 7 + 1).toLong()
             jobHistoryService.record(
                 jobKey = jobKey,
                 startedAt = start,
-                endedAt = start.plusMinutes(Random.nextLong(60)),
+                endedAt = start.plusMinutes(durationMinutes),
                 error = if (it % 2 == 0) "Error $it" else null,
             )
         }
