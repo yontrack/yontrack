@@ -1,0 +1,5 @@
+-- 79. Auto-versioning version rule
+
+ALTER TABLE AV_AUDIT
+    ADD COLUMN VERSION_RULE        VARCHAR(120),
+    ADD COLUMN VERSION_RULE_CONFIG JSONB;

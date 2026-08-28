@@ -30,6 +30,10 @@ data class AutoVersioningOrder(
     val upgradeBranchPattern: String,
     val postProcessing: String?,
     val postProcessingConfig: JsonNode?,
+    @APIDescription("ID of the version rule to check the version to set against the version already present in the target files")
+    val versionRule: String? = null, // Nullable so that in-flight orders stay deserializable across the upgrade
+    @APIDescription("Configuration of the version rule")
+    val versionRuleConfig: JsonNode? = null,
     val validationStamp: String?,
     val autoApprovalMode: AutoApprovalMode,
     val reviewers: List<String>,

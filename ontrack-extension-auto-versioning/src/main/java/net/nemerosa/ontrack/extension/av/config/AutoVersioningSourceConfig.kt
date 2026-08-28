@@ -44,6 +44,10 @@ data class AutoVersioningSourceConfig(
     val postProcessing: String? = null,
     @APIDescription("Configuration of the post processing")
     val postProcessingConfig: JsonNode? = null,
+    @APIDescription("ID of the rule checking the version to set against the version already present in the target files. No check is performed when this is not set.")
+    val versionRule: String? = null,
+    @APIDescription("Configuration of the version rule")
+    val versionRuleConfig: JsonNode? = null,
     @APIDescription("Validation stamp to create on auto versioning (optional)")
     val validationStamp: String? = null,
     @APIDescription("Auto approval mode")
@@ -180,6 +184,8 @@ data class AutoVersioningSourceConfig(
             upgradeBranchPattern = upgradeBranchPattern,
             postProcessing = postProcessing,
             postProcessingConfig = postProcessingConfig?.takeIf { !it.isNull },
+            versionRule = versionRule,
+            versionRuleConfig = versionRuleConfig?.takeIf { !it.isNull },
             validationStamp = validationStamp,
             autoApprovalMode = autoApprovalMode,
             buildLinkCreation = buildLinkCreation,

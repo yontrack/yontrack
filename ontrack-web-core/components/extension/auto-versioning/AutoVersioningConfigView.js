@@ -59,6 +59,8 @@ export default function AutoVersioningConfigView({branchId}) {
                                     versionSource
                                     postProcessing
                                     postProcessingConfig
+                                    versionRule
+                                    versionRuleConfig
                                     qualifier
                                     upgradeBranchPattern
                                     validationStamp

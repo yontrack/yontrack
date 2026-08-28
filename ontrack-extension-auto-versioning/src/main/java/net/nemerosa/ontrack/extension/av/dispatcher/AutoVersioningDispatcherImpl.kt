@@ -131,6 +131,8 @@ class AutoVersioningDispatcherImpl(
                     ?: AutoVersioningSourceConfig.DEFAULT_UPGRADE_BRANCH_PATTERN,
                 postProcessing = config.postProcessing,
                 postProcessingConfig = config.postProcessingConfig,
+                versionRule = config.versionRule,
+                versionRuleConfig = config.versionRuleConfig,
                 validationStamp = config.validationStamp,
                 autoApprovalMode = config.autoApprovalMode ?: AutoVersioningSourceConfig.DEFAULT_AUTO_APPROVAL_MODE,
                 reviewers = config.reviewers ?: emptyList(),

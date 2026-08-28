@@ -51,6 +51,26 @@ object AutoVersioningEvents {
         ),
     )
 
+    val AUTO_VERSIONING_REJECTED: EventType = SimpleEventType(
+        id = "auto-versioning-rejected",
+        template = $$"""
+            Auto versioning of ${project}/${branch} for dependency ${xProject} version "${VERSION}" has been rejected.
+
+            ${MESSAGE}
+        """.trimIndent(),
+        description = "When an auto versioning request is rejected by the version rule of its configuration, typically because the version to set would be older than the version already present in the target files.",
+        context = eventContext(
+            eventProject("Target project"),
+            eventBranch("Target branch"),
+            eventXPromotionRun("Source promotion run"),
+            eventXBuild("Source build"),
+            eventXBranch("Source branch"),
+            eventXProject("Source project"),
+            eventValue("VERSION", "Version having been rejected"),
+            eventValue("MESSAGE", "Reason for the rejection"),
+        ),
+    )
+
     val AUTO_VERSIONING_POST_PROCESSING_ERROR: EventType = SimpleEventType(
         id = "auto-versioning-post-processing-error",
         template = $$"""

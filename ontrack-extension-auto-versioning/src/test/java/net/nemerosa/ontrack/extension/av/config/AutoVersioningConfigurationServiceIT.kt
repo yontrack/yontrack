@@ -3,6 +3,7 @@ package net.nemerosa.ontrack.extension.av.config
 import net.nemerosa.ontrack.extension.av.AbstractAutoVersioningTestSupport
 import net.nemerosa.ontrack.extension.av.AutoVersioningTestFixtures
 import net.nemerosa.ontrack.extension.av.event.AutoVersioningEvents
+import net.nemerosa.ontrack.extension.av.versionrules.VersionRuleNotFoundException
 import net.nemerosa.ontrack.extension.notifications.mock.MockNotificationChannel
 import net.nemerosa.ontrack.extension.notifications.mock.MockNotificationChannelConfig
 import net.nemerosa.ontrack.extension.notifications.subscriptions.EventSubscription
@@ -18,6 +19,7 @@ import net.nemerosa.ontrack.test.TestUtils.uid
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -39,6 +41,64 @@ internal class AutoVersioningConfigurationServiceIT : AbstractAutoVersioningTest
                 listOf(target),
                 targets
             )
+        }
+    }
+
+    @Test
+    fun `Setting a configuration with an unknown version rule is rejected`() {
+        asAdmin {
+            project {
+                branch {
+                    assertFailsWith<VersionRuleNotFoundException> {
+                        autoVersioningConfigurationService.setupAutoVersioning(
+                            this,
+                            AutoVersioningConfig(
+                                configurations = listOf(
+                                    AutoVersioningTestFixtures.sourceConfig(
+                                        versionRule = "no-such-rule",
+                                    )
+                                )
+                            )
+                        )
+                    }
+                    assertNull(
+                        autoVersioningConfigurationService.getAutoVersioning(this),
+                        "Configuration has not been saved"
+                    )
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `Setting a configuration with a known version rule is accepted`() {
+        asAdmin {
+            project {
+                branch {
+                    autoVersioningConfigurationService.setupAutoVersioning(
+                        this,
+                        AutoVersioningConfig(
+                            configurations = listOf(
+                                AutoVersioningTestFixtures.sourceConfig(
+                                    versionRule = "semver",
+                                    versionRuleConfig = mapOf("onUnparseable" to "ACCEPT").asJson(),
+                                )
+                            )
+                        )
+                    )
+                    val config = assertNotNull(
+                        autoVersioningConfigurationService.getAutoVersioning(this),
+                        "Configuration has been saved"
+                    )
+                    val source = config.configurations.first()
+                    assertEquals("semver", source.versionRule)
+                    assertEquals(
+                        "ACCEPT",
+                        source.versionRuleConfig?.path("onUnparseable")?.asText(),
+                        "Version rule configuration has been kept after the deserialization"
+                    )
+                }
+            }
         }
     }
 
@@ -208,6 +268,7 @@ internal class AutoVersioningConfigurationServiceIT : AbstractAutoVersioningTest
                                 "auto-versioning-success",
                                 "auto-versioning-post-processing-error",
                                 "auto-versioning-pr-merge-timeout-error",
+                                "auto-versioning-rejected",
                             ),
                             keywords = "${source.name} ${project.name} $name",
                             channel = "mock",
@@ -482,6 +543,7 @@ internal class AutoVersioningConfigurationServiceIT : AbstractAutoVersioningTest
                                     "auto-versioning-success",
                                     "auto-versioning-post-processing-error",
                                     "auto-versioning-pr-merge-timeout-error",
+                                    "auto-versioning-rejected",
                                 ),
                                 keywords = "${source.name} ${project.name} $name",
                                 channel = "mock",
@@ -634,6 +696,7 @@ internal class AutoVersioningConfigurationServiceIT : AbstractAutoVersioningTest
                                     "auto-versioning-success",
                                     "auto-versioning-post-processing-error",
                                     "auto-versioning-pr-merge-timeout-error",
+                                    "auto-versioning-rejected",
                                 ),
                                 keywords = "${source.name} ${project.name} $name",
                                 channel = "mock",

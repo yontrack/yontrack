@@ -15,6 +15,8 @@ data class AutoVersioningSourceConfig(
     val upgradeBranchPattern: String? = null,
     val postProcessing: String? = null,
     val postProcessingConfig: JsonNode? = null,
+    val versionRule: String? = null,
+    val versionRuleConfig: JsonNode? = null,
     val validationStamp: String? = null,
     val autoApprovalMode: AutoApprovalMode? = AutoApprovalMode.CLIENT,
     val notifications: List<AutoVersioningNotification>? = null,

@@ -13,6 +13,10 @@ import net.nemerosa.ontrack.extension.av.postprocessing.PostProcessingInfo
 import net.nemerosa.ontrack.extension.av.postprocessing.PostProcessingNotFoundException
 import net.nemerosa.ontrack.extension.av.postprocessing.PostProcessingRegistry
 import net.nemerosa.ontrack.extension.av.properties.FilePropertyType
+import net.nemerosa.ontrack.extension.av.versionrules.AutoVersioningVersionRule
+import net.nemerosa.ontrack.extension.av.versionrules.AutoVersioningVersionRuleContext
+import net.nemerosa.ontrack.extension.av.versionrules.AutoVersioningVersionRuleRegistry
+import net.nemerosa.ontrack.extension.av.versionrules.VersionRuleNotFoundException
 import net.nemerosa.ontrack.extension.scm.changelog.SCMCommit
 import net.nemerosa.ontrack.extension.scm.service.SCM
 import net.nemerosa.ontrack.extension.scm.service.SCMDetector
@@ -40,6 +44,7 @@ class AutoVersioningProcessingServiceImpl(
     private val autoVersioningTemplatingService: AutoVersioningTemplatingService,
     private val versionSourceFactory: VersionSourceFactory,
     private val structureService: StructureService,
+    private val autoVersioningVersionRuleRegistry: AutoVersioningVersionRuleRegistry,
 ) : AutoVersioningProcessingService {
 
     private val logger: Logger = LoggerFactory.getLogger(AutoVersioningProcessingServiceImpl::class.java)
@@ -99,6 +104,8 @@ class AutoVersioningProcessingServiceImpl(
             val currentVersions = mutableMapOf<String, String>()
             // Caching the updated content of each path
             val updatedContent = mutableMapOf<String, List<String>>()
+            // Paths having been updated, audited only once the whole order is known to go through
+            val auditedPaths = mutableListOf<String>()
             // For each target path
             val targetPathUpdated: List<Boolean> = try {
                 order.allPaths.flatMap { configPath ->
@@ -133,12 +140,19 @@ class AutoVersioningProcessingServiceImpl(
                             ?: throw AutoVersioningVersionNotFoundException(targetPath)
                         // If different version
                         if (currentVersion != order.targetVersion) {
+                            // Checks the version change against the configured version rule. The
+                            // first rejection aborts the whole order: a partially applied
+                            // multi-path change would leave the repository in a state nobody
+                            // configured.
+                            checkVersionRule(order, targetPath, currentVersion, targetVersion)
                             // Storing the version
                             currentVersions[targetPath] = currentVersion
                             // Changes the version
                             val updatedLines = configPath.replaceVersion(lines, targetVersion)
-                            // Audit
-                            autoVersioningAuditService.onProcessingUpdatingFile(order, upgradeBranch, targetPath)
+                            // Audit, deferred: a later path may still reject the whole order, and
+                            // the audit must not report a file update, nor an upgrade branch,
+                            // which never happened
+                            auditedPaths += targetPath
                             // Updating the cache
                             updatedContent[targetPath] = updatedLines
                             // Changed
@@ -149,6 +163,13 @@ class AutoVersioningProcessingServiceImpl(
                         }
                     }
                 }
+            } catch (e: AutoVersioningVersionRejectedException) {
+                logger.debug("Processing auto versioning order rejected: {}", order)
+                // No SCM cleanup is needed: the upgrade branch is created lazily, on the first
+                // upload, which never happens when the order is rejected.
+                autoVersioningAuditService.onProcessingAborted(order, e.reason)
+                autoVersioningEventService.sendRejected(order, e.reason)
+                return AutoVersioningProcessingOutcome.REJECTED
             } catch (e: Exception) {
                 autoVersioningEventService.sendError(
                     order,
@@ -159,6 +180,11 @@ class AutoVersioningProcessingServiceImpl(
             }
             // At least one path was changed
             if (targetPathUpdated.any { it }) {
+
+                // Audit of the updated files, now that every path has been accepted
+                auditedPaths.forEach { targetPath ->
+                    autoVersioningAuditService.onProcessingUpdatingFile(order, upgradeBranch, targetPath)
+                }
 
                 // Uploading the file contents
                 try {
@@ -228,6 +254,58 @@ class AutoVersioningProcessingServiceImpl(
             return AutoVersioningProcessingOutcome.NO_CONFIG
         }
     }
+
+    /**
+     * Runs the version rule configured on the [order], if any, against the change of version
+     * for one [targetPath].
+     *
+     * @throws AutoVersioningVersionRejectedException when the rule rejects the change
+     * @throws VersionRuleNotFoundException when the configured rule ID is not known (backstop for
+     * a rule having disappeared between the configuration and the processing)
+     */
+    private fun checkVersionRule(
+        order: AutoVersioningOrder,
+        targetPath: String,
+        currentVersion: String,
+        targetVersion: String,
+    ) {
+        val ruleId = order.versionRule
+        if (ruleId.isNullOrBlank()) return
+        val rule = autoVersioningVersionRuleRegistry.findVersionRuleById<Any>(ruleId)
+            ?: throw VersionRuleNotFoundException(ruleId)
+        runVersionRule(rule, order, targetPath, currentVersion, targetVersion)
+    }
+
+    private fun <T> runVersionRule(
+        rule: AutoVersioningVersionRule<T>,
+        order: AutoVersioningOrder,
+        targetPath: String,
+        currentVersion: String,
+        targetVersion: String,
+    ) {
+        val config = rule.parseAndValidate(order.versionRuleConfig)
+        val result = rule.check(
+            config = config,
+            context = AutoVersioningVersionRuleContext(
+                order = order,
+                path = targetPath,
+                currentVersion = currentVersion,
+                targetVersion = targetVersion,
+            )
+        )
+        val rejectionReason = result.rejectionReason
+        if (rejectionReason != null) {
+            throw AutoVersioningVersionRejectedException(
+                """Version change rejected by the "${rule.id}" rule for the "$targetPath" path. $rejectionReason"""
+            )
+        }
+    }
+
+    /**
+     * Internal control-flow exception used to abort the processing of the whole order as soon as
+     * one path is rejected, before anything is written to the SCM.
+     */
+    private class AutoVersioningVersionRejectedException(val reason: String) : RuntimeException(reason)
 
     private fun directPush(
         order: AutoVersioningOrder,

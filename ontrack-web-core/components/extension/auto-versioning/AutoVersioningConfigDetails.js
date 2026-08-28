@@ -1,5 +1,6 @@
 import {Descriptions, Typography} from "antd";
 import AutoVersioningPostProcessing from "@components/extension/auto-versioning/AutoVersioningPostProcessing";
+import AutoVersioningVersionRule from "@components/extension/auto-versioning/AutoVersioningVersionRule";
 import AutoVersioningConfigNotifications from "@components/extension/auto-versioning/AutoVersioningConfigNotifications";
 import AutoVersioningAdditionalPaths from "@components/extension/auto-versioning/AutoVersioningAdditionalPaths";
 import AutoVersioningSchedule from "@components/extension/auto-versioning/AutoVersioningSchedule";
@@ -142,6 +143,16 @@ export default function AutoVersioningConfigDetails({source, additionalItems = [
             children: <AutoVersioningPostProcessing
                 type={source.postProcessing}
                 config={source.postProcessingConfig}
+            />,
+            span: 3,
+        },
+        {
+            key: 'versionRule',
+            label: <FieldLabel fieldName="versionRule"
+                               description="Rule checking the version to set against the version already present in the target files"/>,
+            children: <AutoVersioningVersionRule
+                rule={source.versionRule}
+                config={source.versionRuleConfig}
             />,
             span: 3,
         },
