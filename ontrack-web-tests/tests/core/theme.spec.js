@@ -1,5 +1,5 @@
 const {expect} = require('@playwright/test');
-const {login, logout} = require("./login");
+const {login} = require("./login");
 const {test} = require("../fixtures/connection");
 const {graphQLCallMutation} = require("@ontrack/graphql");
 
@@ -34,13 +34,24 @@ const expectTheme = async (page, theme) =>
     expect(page.locator('html')).toHaveAttribute('data-theme', theme)
 
 /**
- * These tests change a *server-side* preference on the shared account, and the
- * suite runs single-worker and non-parallel - so without this every spec file
- * scheduled after this one would drive the UI in whatever theme the last test
- * left behind. The management token is issued for the same account the UI logs
- * in as, so resetting through the API puts it back exactly.
+ * The theme is a *server-side* preference on the shared account, so these tests
+ * are not self-contained the way a normal spec is - they mutate state that
+ * outlives the browser context.
+ *
+ * Reset on both sides of every test, and deliberately so:
+ *
+ *   - `beforeEach` makes each test independent of whatever ran before it,
+ *     including a previous run that crashed or was interrupted part-way. Without
+ *     it, a leftover `DARK` makes the very first assertion below fail with no
+ *     hint that the cause is stale state rather than the code under test.
+ *   - `afterEach` keeps the rest of the suite clean: the runner is single-worker
+ *     and non-parallel, so every spec file scheduled after this one would
+ *     otherwise drive the UI in whatever theme the last test left behind.
+ *
+ * The management token is issued for the same account the UI logs in as, so
+ * resetting through the API puts back exactly what the UI changed.
  */
-test.afterEach(async ({ontrack}) => {
+const resetThemeMode = async (ontrack) => {
     await graphQLCallMutation(
         ontrack.connection,
         'setPreferences',
@@ -50,7 +61,10 @@ test.afterEach(async ({ontrack}) => {
             }
         }`,
     )
-})
+}
+
+test.beforeEach(async ({ontrack}) => resetThemeMode(ontrack))
+test.afterEach(async ({ontrack}) => resetThemeMode(ontrack))
 
 test('Switching to dark mode takes effect immediately and survives a reload', async ({page, ontrack}) => {
     await page.emulateMedia({colorScheme: 'light'})
@@ -116,17 +130,25 @@ test('Auto mode follows the operating system preference', async ({page, ontrack}
     await expectTheme(page, 'dark')
 })
 
-test('The sign-in page respects the theme, before any user is known', async ({page, ontrack}) => {
+test('The custom sign-in page respects the theme, before any user is known', async ({page, ontrack}) => {
     await page.emulateMedia({colorScheme: 'light'})
     await login(page, ontrack)
     await selectTheme(page, "Dark")
     await expectTheme(page, 'dark')
-
-    // The sign-in page is a separate App Router root, outside the provider stack,
-    // with no preference to read - it goes off the cookie mirror alone.
-    // Closed first: `logout` reopens the menu itself, and the drawer mask would
-    // swallow that click.
     await closeUserMenu(page)
-    await logout(page)
+
+    // Navigated to directly, rather than by signing out.
+    //
+    // The custom page is opt-in - `YONTRACK_UI_AUTH_SIGNIN_CUSTOM=true` - and
+    // without it `signOut()` lands on next-auth's own built-in page at
+    // /api/auth/signin, whose HTML next-auth renders outside our layouts. That
+    // page cannot carry `data-theme` at all (it follows the OS via
+    // `theme.colorScheme: 'auto'` in authOptions instead), so asserting on it
+    // here would be asserting the wrong thing.
+    //
+    // This is the page §7 of the ticket is about: a separate App Router root with
+    // its own <html>, outside the provider stack, with no user preference to read
+    // - so the cookie mirror is the only source, which is exactly what is checked.
+    await page.goto(`${ontrack.connection.ui}/auth/signin`)
     await expectTheme(page, 'dark')
 })
