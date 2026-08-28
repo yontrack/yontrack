@@ -16,6 +16,8 @@ fun AutoVersioningSourceConfigFragment.toAutoVersioningSourceConfig() =
         upgradeBranchPattern = upgradeBranchPattern,
         postProcessing = postProcessing,
         postProcessingConfig = postProcessingConfig,
+        versionRule = versionRule,
+        versionRuleConfig = versionRuleConfig,
         validationStamp = validationStamp,
         autoApprovalMode = when (autoApprovalMode) {
             net.nemerosa.ontrack.kdsl.connector.graphql.schema.type.AutoApprovalMode.CLIENT -> AutoApprovalMode.CLIENT

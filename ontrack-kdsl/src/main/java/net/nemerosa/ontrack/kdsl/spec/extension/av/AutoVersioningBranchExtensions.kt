@@ -28,6 +28,8 @@ fun Branch.setAutoVersioningConfig(
                     ),
                     postProcessing = Optional.presentIfNotNull(config.postProcessing),
                     postProcessingConfig = Optional.presentIfNotNull(config.postProcessingConfig),
+                    versionRule = Optional.presentIfNotNull(config.versionRule),
+                    versionRuleConfig = Optional.presentIfNotNull(config.versionRuleConfig),
                     sourceBranch = config.sourceBranch,
                     sourceProject = config.sourceProject,
                     sourcePromotion = config.sourcePromotion,

@@ -197,6 +197,23 @@ class AutoVersioningProcessingServiceVersionRuleIT : AbstractAutoVersioningTestS
                 getRepositoryFile(path = "other.properties"),
                 "The rejected path has not been changed"
             )
+
+            val entry = assertNotNull(
+                autoVersioningAuditQueryService.findByUUID(target, order.uuid),
+                "Audit entry found"
+            )
+            assertEquals(
+                AutoVersioningAuditState.PROCESSING_ABORTED,
+                entry.mostRecentState.state,
+            )
+            assertTrue(
+                entry.audit.none { it.state == AutoVersioningAuditState.PROCESSING_UPDATING_FILE },
+                "The audit does not report a file update for a rejected order"
+            )
+            assertNull(
+                entry.upgradeBranch,
+                "The audit does not point at an upgrade branch which was never created"
+            )
         }
     }
 

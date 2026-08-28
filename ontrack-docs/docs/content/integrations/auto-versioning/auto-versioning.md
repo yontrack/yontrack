@@ -576,6 +576,12 @@ The rejection is deliberately _not_ reported as an auto-versioning error: nothin
 the error channel would make real failures harder to see. A fired guard does mean that someone re-promoted an old
 build, though, which is worth being notified about — see [notifications](#notifications).
 
+!!! warning
+
+    Version rules apply to the auto-versioning triggered by a promotion, which is configured on the target branch.
+    Auto-versioning driven by an [`auto-versioning` workflow node](../workflows/workflows.md) carries its own version
+    explicitly and is not covered by the rule of the target branch.
+
 ## The upgrade branch
 
 Whatever the [push mode](#push-mode), Yontrack always creates a dedicated _upgrade branch_ holding the version change,
@@ -853,6 +859,12 @@ The `scope` is a list of events this notification should be sent for:
 * `ERROR` — covers both processing errors and post-processing errors
 * `PR_TIMEOUT`
 * `REJECTED` — the change was refused by a [version rule](#version-rules)
+
+!!! note
+
+    The scopes are turned into notification subscriptions when the configuration is saved, so a branch configured
+    with `ALL` before `REJECTED` existed keeps its original list of events. Save its auto-versioning configuration
+    again to pick the new event up.
 
 The `notificationTemplate` property is used if you want to send a custom message instead of the default ones.
 

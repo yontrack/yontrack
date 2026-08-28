@@ -61,10 +61,17 @@ data class SemanticVersion(
         fun parse(value: String?): SemanticVersion? {
             if (value.isNullOrBlank()) return null
             val m = PATTERN.matchEntire(value.trim()) ?: return null
+            // The pattern accepts an unbounded run of digits, so a number too large to be an Int
+            // (a timestamp-based version, for example) is not a version we can compare: it is
+            // reported as unparseable rather than throwing, so that the caller keeps the choice
+            // of what to do with it.
+            val major = m.groupValues[1].toIntOrNull() ?: return null
+            val minor = m.groupValues[2].takeIf { it.isNotEmpty() }?.let { it.toIntOrNull() ?: return null } ?: 0
+            val patch = m.groupValues[3].takeIf { it.isNotEmpty() }?.let { it.toIntOrNull() ?: return null } ?: 0
             return SemanticVersion(
-                major = m.groupValues[1].toInt(),
-                minor = m.groupValues[2].takeIf { it.isNotEmpty() }?.toInt() ?: 0,
-                patch = m.groupValues[3].takeIf { it.isNotEmpty() }?.toInt() ?: 0,
+                major = major,
+                minor = minor,
+                patch = patch,
                 prerelease = m.groupValues[4].takeIf { it.isNotEmpty() },
                 build = m.groupValues[5].takeIf { it.isNotEmpty() },
             )
@@ -92,8 +99,9 @@ data class SemanticVersion(
         }
 
         private fun compareIdentifier(a: String, b: String): Int {
-            val na = a.toIntOrNull()
-            val nb = b.toIntOrNull()
+            // Big integers: prerelease identifiers are not bounded by the semver.org grammar
+            val na = a.toBigIntegerOrNull()
+            val nb = b.toBigIntegerOrNull()
             return when {
                 na != null && nb != null -> na.compareTo(nb)
                 na != null -> -1

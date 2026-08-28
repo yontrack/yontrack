@@ -62,6 +62,12 @@ class GQLTypeAutoVersioningOrder(
                     .description("JSON configuration for the post processing")
                     .type(GQLScalarJSON.INSTANCE)
             }
+            .stringField(AutoVersioningOrder::versionRule, "Version rule type")
+            .field {
+                it.name("versionRuleConfig")
+                    .description("JSON configuration for the version rule")
+                    .type(GQLScalarJSON.INSTANCE)
+            }
             .stringField(
                 AutoVersioningOrder::validationStamp,
                 "Ontrack validation stamp associated with this auto versioning (used for checks)"

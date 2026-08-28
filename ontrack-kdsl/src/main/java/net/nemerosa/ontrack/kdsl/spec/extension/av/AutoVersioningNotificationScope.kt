@@ -5,6 +5,7 @@ enum class AutoVersioningNotificationScope {
     ALL,
     SUCCESS,
     ERROR,
-    PR_TIMEOUT;
+    PR_TIMEOUT,
+    REJECTED;
 
 }

@@ -279,6 +279,10 @@ type AutoVersioningOrder {
   uuid: String!
   "Ontrack validation stamp associated with this auto versioning (used for checks)"
   validationStamp: String
+  "Version rule type"
+  versionRule: String
+  "JSON configuration for the version rule"
+  versionRuleConfig: JSON
 }
 
 "Configuration of the auto versioning for one source."
@@ -335,6 +339,10 @@ type AutoVersioningSourceConfig {
   upgradeBranchPattern: String
   "Validation stamp to create on auto versioning (optional)"
   validationStamp: String
+  "ID of the rule checking the version to set against the version already present in the target files. No check is performed when this is not set."
+  versionRule: String
+  "Configuration of the version rule"
+  versionRuleConfig: JSON
   "Source of the version for the build. By default, uses the build label is the source project is configured so, or the build name itself. This allows the customization of this behavior."
   versionSource: String
 }
@@ -8281,6 +8289,7 @@ enum AutoVersioningNotificationScope {
   ALL
   ERROR
   PR_TIMEOUT
+  REJECTED
   SUCCESS
 }
 
@@ -8625,6 +8634,10 @@ input AutoVersioningSourceConfigInput {
   upgradeBranchPattern: String
   "Validation stamp to create on auto versioning (optional)"
   validationStamp: String
+  "ID of the rule checking the version to set against the version already present in the target files. No check is performed when this is not set."
+  versionRule: String
+  "Configuration of the version rule"
+  versionRuleConfig: JSON
   "Source of the version for the build. By default, uses the build label is the source project is configured so, or the build name itself. This allows the customization of this behavior."
   versionSource: String
 }

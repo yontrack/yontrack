@@ -3,6 +3,8 @@ fragment AutoVersioningSourceConfigFragment on AutoVersioningSourceConfig {
     autoApprovalMode
     postProcessing
     postProcessingConfig
+    versionRule
+    versionRuleConfig
     sourceBranch
     sourceProject
     sourcePromotion

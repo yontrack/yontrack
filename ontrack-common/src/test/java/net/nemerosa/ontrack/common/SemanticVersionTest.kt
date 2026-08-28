@@ -72,6 +72,22 @@ class SemanticVersionTest {
     }
 
     @Test
+    fun `Numbers too large to be compared are not versions`() {
+        // Timestamp-based versioning: matches the shape of a version, but cannot be held as an Int.
+        // It must be reported as unparseable rather than throwing.
+        assertNull(SemanticVersion.parse("20260828120000"))
+        assertNull(SemanticVersion.parse("1.20260828120000"))
+        assertNull(SemanticVersion.parse("1.0.20260828120000"))
+        assertEquals(SemanticVersion(2147483647), SemanticVersion.parse("2147483647"))
+        assertNull(SemanticVersion.parse("2147483648"))
+    }
+
+    @Test
+    fun `Large numeric prerelease identifiers are compared numerically`() {
+        assertOrdered("1.0.0-20260828120000", "1.0.0-20260828120001")
+    }
+
+    @Test
     fun `Comparison on the numeric parts`() {
         assertOrdered("1.0.0", "2.0.0")
         assertOrdered("2.0.0", "2.1.0")

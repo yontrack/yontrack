@@ -104,6 +104,8 @@ class AutoVersioningProcessingServiceImpl(
             val currentVersions = mutableMapOf<String, String>()
             // Caching the updated content of each path
             val updatedContent = mutableMapOf<String, List<String>>()
+            // Paths having been updated, audited only once the whole order is known to go through
+            val auditedPaths = mutableListOf<String>()
             // For each target path
             val targetPathUpdated: List<Boolean> = try {
                 order.allPaths.flatMap { configPath ->
@@ -147,8 +149,10 @@ class AutoVersioningProcessingServiceImpl(
                             currentVersions[targetPath] = currentVersion
                             // Changes the version
                             val updatedLines = configPath.replaceVersion(lines, targetVersion)
-                            // Audit
-                            autoVersioningAuditService.onProcessingUpdatingFile(order, upgradeBranch, targetPath)
+                            // Audit, deferred: a later path may still reject the whole order, and
+                            // the audit must not report a file update, nor an upgrade branch,
+                            // which never happened
+                            auditedPaths += targetPath
                             // Updating the cache
                             updatedContent[targetPath] = updatedLines
                             // Changed
@@ -176,6 +180,11 @@ class AutoVersioningProcessingServiceImpl(
             }
             // At least one path was changed
             if (targetPathUpdated.any { it }) {
+
+                // Audit of the updated files, now that every path has been accepted
+                auditedPaths.forEach { targetPath ->
+                    autoVersioningAuditService.onProcessingUpdatingFile(order, upgradeBranch, targetPath)
+                }
 
                 // Uploading the file contents
                 try {
