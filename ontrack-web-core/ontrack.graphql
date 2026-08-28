@@ -4802,6 +4802,8 @@ type Preferences {
   dashboardUuid: String
   "Selected branch view"
   selectedBranchViewKey: String
+  "Theme selected for the web UI"
+  themeMode: ThemeMode!
 }
 
 type Project implements Authorizable & ProjectEntity {
@@ -8478,6 +8480,13 @@ enum SlotPipelineStatus {
   RUNNING
 }
 
+"Theme selected by a user for the web UI"
+enum ThemeMode {
+  DARK
+  LIGHT
+  SYSTEM
+}
+
 "Defines how validation runs should be sorted"
 enum ValidationRunSortingMode {
   ID
@@ -10718,6 +10727,8 @@ input SetPreferencesInput {
   dashboardUuid: String
   "Selected branch view"
   selectedBranchViewKey: String
+  "Theme selected for the web UI"
+  themeMode: ThemeMode
 }
 
 "Input type for the setProjectAutoPromotionLevelPropertyById mutation."

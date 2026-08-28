@@ -30,7 +30,7 @@ export default function ThemeSwitch() {
         value,
         label: (
             <Tooltip title={help}>
-                <Space size={4} data-testid={`theme-switch-${value}`}>
+                <Space size={4}>
                     {icon}
                     {label}
                 </Space>
