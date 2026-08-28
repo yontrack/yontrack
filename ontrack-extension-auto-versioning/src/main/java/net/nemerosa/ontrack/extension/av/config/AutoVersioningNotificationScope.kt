@@ -7,7 +7,8 @@ enum class AutoVersioningNotificationScope {
     ALL,
     SUCCESS,
     ERROR,
-    PR_TIMEOUT;
+    PR_TIMEOUT,
+    REJECTED;
 
     companion object {
         fun toEvents(scope: List<AutoVersioningNotificationScope>): Set<String> {
@@ -19,9 +20,12 @@ enum class AutoVersioningNotificationScope {
                         AutoVersioningEvents.AUTO_VERSIONING_PR_MERGE_TIMEOUT_ERROR.id,
                         AutoVersioningEvents.AUTO_VERSIONING_ERROR.id,
                         AutoVersioningEvents.AUTO_VERSIONING_POST_PROCESSING_ERROR.id,
+                        AutoVersioningEvents.AUTO_VERSIONING_REJECTED.id,
                     )
 
                     SUCCESS -> result.add(AutoVersioningEvents.AUTO_VERSIONING_SUCCESS.id)
+
+                    REJECTED -> result.add(AutoVersioningEvents.AUTO_VERSIONING_REJECTED.id)
 
                     PR_TIMEOUT -> result.add(AutoVersioningEvents.AUTO_VERSIONING_PR_MERGE_TIMEOUT_ERROR.id)
 

@@ -6,6 +6,7 @@ import net.nemerosa.ontrack.extension.av.AutoVersioningTestFixtures.createOrder
 import net.nemerosa.ontrack.extension.av.audit.AutoVersioningAuditTestFixtures.assertAudit
 import net.nemerosa.ontrack.extension.av.audit.AutoVersioningAuditTestFixtures.audit
 import net.nemerosa.ontrack.extension.av.dispatcher.AutoVersioningOrder
+import net.nemerosa.ontrack.json.asJson
 import net.nemerosa.ontrack.model.structure.Branch
 import org.apache.commons.lang3.exception.ExceptionUtils
 import org.junit.jupiter.api.Test
@@ -21,6 +22,31 @@ class AutoVersioningAuditServiceIT : AbstractAutoVersioningTestSupport() {
 
     @Autowired
     private lateinit var autoVersioningAuditQueryService: AutoVersioningAuditQueryService
+
+    @Test
+    fun `The version rule is kept when the order is stored and read back`() {
+        val source = project()
+        project {
+            branch {
+                val order = createOrder(
+                    sourceProject = source.name,
+                    versionRule = "semver",
+                    versionRuleConfig = mapOf("onUnparseable" to "ACCEPT").asJson(),
+                )
+                autoVersioningAuditService.onCreated(order)
+                val entry = assertNotNull(
+                    autoVersioningAuditQueryService.findByUUID(this, order.uuid),
+                    "Entry found"
+                )
+                assertEquals("semver", entry.order.versionRule)
+                assertEquals(
+                    "ACCEPT",
+                    entry.order.versionRuleConfig?.path("onUnparseable")?.asText(),
+                    "Version rule configuration is kept, so that a rescheduled order keeps its guard"
+                )
+            }
+        }
+    }
 
     @Test
     fun `Successful auto versioning with no post processing`() {

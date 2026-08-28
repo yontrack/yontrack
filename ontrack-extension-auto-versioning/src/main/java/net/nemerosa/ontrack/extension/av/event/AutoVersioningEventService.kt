@@ -18,6 +18,16 @@ interface AutoVersioningEventService {
     )
 
     /**
+     * Broadcasts an event about a version change having been rejected by the version rule.
+     *
+     * @param reason Reason for the rejection, as returned by the rule
+     */
+    fun sendRejected(
+        order: AutoVersioningOrder,
+        reason: String,
+    )
+
+    /**
      * Broadcasts an error event about a PR not being able to be merged in time.
      */
     fun sendPRMergeTimeoutError(

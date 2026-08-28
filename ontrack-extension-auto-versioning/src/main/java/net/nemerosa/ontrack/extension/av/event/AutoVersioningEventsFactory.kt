@@ -20,6 +20,16 @@ interface AutoVersioningEventsFactory {
         error: Exception,
     ): Event
 
+    /**
+     * Event sent when the version change of an [order] is rejected by its version rule.
+     *
+     * @param reason Reason for the rejection, as returned by the rule
+     */
+    fun rejected(
+        order: AutoVersioningOrder,
+        reason: String,
+    ): Event
+
     fun prMergeTimeoutError(
         order: AutoVersioningOrder,
         pr: SCMPullRequest,

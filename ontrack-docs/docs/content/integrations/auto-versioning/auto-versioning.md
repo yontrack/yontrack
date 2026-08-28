@@ -509,6 +509,73 @@ Both changes are part of the same PR.
 [Post-processing](#post-processing) is still possible, and runs after all changes have been applied (default path &
 additional paths).
 
+## Version rules
+
+In some setups, an _old_ build can be promoted again — by relaunching an old job which runs a validation and then a
+promotion. That promotion triggers an auto-versioning request carrying an _older_ version, and, by default,
+auto-versioning applies it: it only checks that the version to set is _different_ from the one already in the target
+file, so the file is rolled backwards.
+
+A _version rule_ guards against this. It is checked against the version actually present in the target file, and it is
+**opt-in**: with no rule configured, nothing changes.
+
+```yaml
+configurations:
+  - # ...
+    versionRule: semver
+```
+
+Two parameters drive the check:
+
+* `versionRule` — ID of the rule. When absent, no check is performed.
+* `versionRuleConfig` — configuration of the rule.
+
+An unknown `versionRule` ID is rejected when the configuration is set, not when the next promotion happens.
+
+### The `semver` rule
+
+The only built-in rule is `semver`. It parses both the version already present in the target file and the version to
+set as [semantic versions](https://semver.org), and rejects the change when the new version has a _lower_ precedence
+than the current one.
+
+The parsing is lenient: a leading `v` or `V` is accepted, and a missing minor or patch number is read as `0`, so
+`v1.2` and `1.2.0` are the same version. Prereleases follow the semver precedence rules — `1.0.0-rc.1` comes before
+`1.0.0`, and `1.0.0-beta.2` before `1.0.0-beta.11`. Build metadata (`1.2.3+build.1`) is ignored for the comparison.
+
+When one of the two versions cannot be parsed as a semantic version, the change is **rejected by default**:
+
+```yaml
+configurations:
+  - # ...
+    versionRule: semver
+    versionRuleConfig:
+      onUnparseable: REJECT # default, can be ACCEPT
+```
+
+Failing closed is deliberate: failing open would remove the guard exactly when versions look unusual, which is the case
+most likely to be mis-ordered. A rejection is visible in the auto-versioning audit, and therefore diagnosable. Projects
+using versions which are not semantic versions at all — SHA-based versions, for example — can set `onUnparseable` to
+`ACCEPT`, which restores the default behaviour for those versions while still catching genuine downgrades between two
+parseable ones.
+
+### What a rejection does
+
+The rule is evaluated for every path being updated — the default path and each of the
+[additional paths](#additional-paths) — but only for those where the version actually changes. An unchanged version is
+not a downgrade, and the existing "same version" short-circuit still applies first.
+
+The first rejection aborts the **whole** request:
+
+* nothing is written — no upgrade branch, no commit, no pull request, not even for the paths which would have been
+  legitimate upgrades. A partially applied change would leave the repository in a state nobody configured.
+* the auto-versioning audit entry moves to the `PROCESSING_ABORTED` state, with a message naming the rejected path and
+  the reason returned by the rule.
+* an [`auto-versioning-rejected`](../../generated/events/event-auto-versioning-rejected.md) event is fired.
+
+The rejection is deliberately _not_ reported as an auto-versioning error: nothing failed, and mixing rejections into
+the error channel would make real failures harder to see. A fired guard does mean that someone re-promoted an old
+build, though, which is worth being notified about — see [notifications](#notifications).
+
 ## The upgrade branch
 
 Whatever the [push mode](#push-mode), Yontrack always creates a dedicated _upgrade branch_ holding the version change,
@@ -758,6 +825,7 @@ events you can subscribe to:
 * [`auto-versioning-error`](../../generated/events/event-auto-versioning-error.md)
 * [`auto-versioning-post-processing-error`](../../generated/events/event-auto-versioning-post-processing-error.md)
 * [`auto-versioning-pr-merge-timeout-error`](../../generated/events/event-auto-versioning-pr-merge-timeout-error.md)
+* [`auto-versioning-rejected`](../../generated/events/event-auto-versioning-rejected.md)
 * [`auto-versioning-success`](../../generated/events/event-auto-versioning-success.md)
 
 Instead of registering notifications for these events, you can also define specific notifications directly in the
@@ -784,6 +852,7 @@ The `scope` is a list of events this notification should be sent for:
 * `SUCCESS`
 * `ERROR` — covers both processing errors and post-processing errors
 * `PR_TIMEOUT`
+* `REJECTED` — the change was refused by a [version rule](#version-rules)
 
 The `notificationTemplate` property is used if you want to send a custom message instead of the default ones.
 

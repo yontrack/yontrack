@@ -56,6 +56,18 @@ class AutoVersioningEventsFactoryImpl(
             .build()
     }
 
+    override fun rejected(
+        order: AutoVersioningOrder,
+        reason: String,
+    ): Event =
+        Event.of(AutoVersioningEvents.AUTO_VERSIONING_REJECTED)
+            .withBranch(order.branch)
+            .withSourcePromotionRun(order)
+            .with("VERSION", order.targetVersion)
+            .with("PROMOTION", order.sourcePromotion)
+            .with("MESSAGE", close(reason))
+            .build()
+
     override fun prMergeTimeoutError(
         order: AutoVersioningOrder,
         pr: SCMPullRequest,

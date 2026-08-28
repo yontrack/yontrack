@@ -140,6 +140,29 @@ internal class AutoVersioningEventsIT : AbstractDSLTestSupport() {
         }
     }
 
+    @Test
+    fun `Rendering the rejected event`() {
+        withOrder { order, run, target ->
+            val event = autoVersioningEventsFactory.rejected(
+                order = order,
+                reason = "Version \"1.1.0\" is older than the version \"2.0.0\" already present in the target file.",
+            )
+            val text = eventTemplatingService.renderEvent(
+                event,
+                context = emptyMap(),
+                renderer = htmlNotificationEventRenderer
+            )
+            assertEquals(
+                """
+                    Auto versioning of <a href="http://localhost:3000/project/${target.project.id}">${target.project.name}</a>/<a href="http://localhost:3000/branch/${target.id}">${target.name}</a> for dependency <a href="http://localhost:3000/project/${run.project.id}">${run.project.name}</a> version "1.1.0" has been rejected.
+
+                    Version "1.1.0" is older than the version "2.0.0" already present in the target file.
+                """.trimIndent(),
+                text
+            )
+        }
+    }
+
     private fun withOrder(
         code: (order: AutoVersioningOrder, run: PromotionRun, target: Branch) -> Unit
     ) {

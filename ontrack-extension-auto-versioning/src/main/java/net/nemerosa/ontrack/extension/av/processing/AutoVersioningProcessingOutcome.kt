@@ -20,6 +20,12 @@ enum class AutoVersioningProcessingOutcome(
     SAME_VERSION("Auto-versioning process not started because no change in version"),
 
     /**
+     * The order was correct, but the version change was refused by the version rule configured
+     * on the auto-versioning source (typically because it would downgrade the target version).
+     */
+    REJECTED("Auto-versioning process not started because the version change was rejected"),
+
+    /**
      * The order was correct, but the process way not be complete because of a timeout.
      */
     TIMEOUT("Auto-versioning process not started because missing configuration"),
