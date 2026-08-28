@@ -315,7 +315,7 @@ function BranchLinksFlow({branch, loadPullRequests, loadPullRequestsCount}) {
                 hidden: !visible,
                 style: {
                     ...edge.style,
-                    stroke: selected ? 'black' : '#999',
+                    stroke: selected ? 'var(--ot-graph-edge-selected)' : 'var(--ot-graph-edge)',
                     strokeWidth: selected ? 4 : 2,
                 }
             }

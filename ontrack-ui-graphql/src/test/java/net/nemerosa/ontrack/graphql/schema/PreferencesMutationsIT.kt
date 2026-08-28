@@ -2,7 +2,9 @@ package net.nemerosa.ontrack.graphql.schema
 
 import net.nemerosa.ontrack.graphql.AbstractQLKTITSupport
 import net.nemerosa.ontrack.json.getBooleanField
+import net.nemerosa.ontrack.json.getTextField
 import net.nemerosa.ontrack.model.preferences.PreferencesService
+import net.nemerosa.ontrack.model.preferences.ThemeMode
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import kotlin.test.assertEquals
@@ -18,6 +20,66 @@ class PreferencesMutationsIT : AbstractQLKTITSupport() {
             val preferences = getPreferences()
             assertEquals(false, preferences.branchViewVsNames)
             assertEquals(false, preferences.branchViewVsGroups)
+            assertEquals(ThemeMode.SYSTEM, preferences.themeMode)
+        }
+    }
+
+    @Test
+    fun `Setting the theme mode`() {
+        asUser {
+            run(
+                """
+                mutation {
+                    setPreferences(input: {
+                        themeMode: DARK,
+                    }) {
+                        preferences {
+                            themeMode
+                        }
+                    }
+                }
+            """
+            ) { data ->
+                val preferences = data["setPreferences"]["preferences"]
+                assertEquals("DARK", preferences.getTextField("themeMode"))
+                assertEquals(ThemeMode.DARK, getPreferences().themeMode)
+            }
+        }
+    }
+
+    @Test
+    fun `Setting another preference leaves the theme mode alone`() {
+        asUser {
+            run(
+                """
+                mutation {
+                    setPreferences(input: {
+                        themeMode: LIGHT,
+                    }) {
+                        preferences {
+                            themeMode
+                        }
+                    }
+                }
+            """
+            )
+            run(
+                """
+                mutation {
+                    setPreferences(input: {
+                        branchViewVsNames: true,
+                    }) {
+                        preferences {
+                            themeMode
+                        }
+                    }
+                }
+            """
+            ) { data ->
+                val preferences = data["setPreferences"]["preferences"]
+                assertEquals("LIGHT", preferences.getTextField("themeMode"))
+                assertEquals(ThemeMode.LIGHT, getPreferences().themeMode)
+            }
         }
     }
 

@@ -26,8 +26,10 @@ export default function SlotGraphNode({data}) {
                 hoverable={true}
                 onClick={onSlotSelected}
                 style={{
-                    border: selectedSlot?.id === data.slot.id ? 'solid 5px black' : 'solid 2px gray',
-                    backgroundColor: selectedSlot?.id === data.slot.id ? '#D0FFD0' : '#F0F0F0',
+                    border: selectedSlot?.id === data.slot.id
+                        ? 'solid 5px var(--ot-graph-node-border-selected)'
+                        : 'solid 2px var(--ot-graph-node-border)',
+                    backgroundColor: selectedSlot?.id === data.slot.id ? 'var(--ot-graph-node-bg-selected)' : 'var(--ot-graph-node-bg)',
                     // filter: selectedSlot?.id === data.slot.id ? undefined : 'opacity(33%)',
                 }}
             >

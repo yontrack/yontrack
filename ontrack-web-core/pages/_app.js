@@ -16,10 +16,13 @@ import 'ace-builds/src-noconflict/ace';
 import 'ace-builds/src-noconflict/mode-yaml';
 import 'ace-builds/src-noconflict/mode-json';
 import 'ace-builds/src-noconflict/theme-github';
+import 'ace-builds/src-noconflict/theme-github_dark';
 import 'ace-builds/src-noconflict/ext-searchbox';
 import MessageContextProvider from "@components/providers/MessageProvider";
 import AuthProvider from "@components/providers/AuthProvider";
 import LoadingAggregator from "@components/providers/LoadingAggregator";
+import ThemeProvider from "@components/providers/ThemeProvider";
+import ThemePreferenceSync from "@components/theme/ThemePreferenceSync";
 
 export default function App({Component, pageProps}) {
 
@@ -31,23 +34,30 @@ export default function App({Component, pageProps}) {
                 <link rel="shortcut icon" href={`${router.basePath}/favicon.ico`}/>
             </Head>
             <SessionProvider>
-                <MessageContextProvider>
-                    <AuthProvider>
-                        <UserContextProvider>
-                            <PreferencesContextProvider>
-                                <RefDataContextProvider>
-                                    <SearchContextProvider>
-                                        <EventsContextProvider>
-                                            <LoadingAggregator>
-                                                <Component {...pageProps} />
-                                            </LoadingAggregator>
-                                        </EventsContextProvider>
-                                    </SearchContextProvider>
-                                </RefDataContextProvider>
-                            </PreferencesContextProvider>
-                        </UserContextProvider>
-                    </AuthProvider>
-                </MessageContextProvider>
+                {/*
+                  Outermost, above the message provider, so antd's portalled
+                  surfaces - messages, modals, drawers - are themed too.
+                */}
+                <ThemeProvider>
+                    <MessageContextProvider>
+                        <AuthProvider>
+                            <UserContextProvider>
+                                <PreferencesContextProvider>
+                                    <RefDataContextProvider>
+                                        <SearchContextProvider>
+                                            <EventsContextProvider>
+                                                <LoadingAggregator>
+                                                    <ThemePreferenceSync/>
+                                                    <Component {...pageProps} />
+                                                </LoadingAggregator>
+                                            </EventsContextProvider>
+                                        </SearchContextProvider>
+                                    </RefDataContextProvider>
+                                </PreferencesContextProvider>
+                            </UserContextProvider>
+                        </AuthProvider>
+                    </MessageContextProvider>
+                </ThemeProvider>
             </SessionProvider>
         </>
     )

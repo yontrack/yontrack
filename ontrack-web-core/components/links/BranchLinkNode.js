@@ -32,8 +32,10 @@ export default function BranchLinkNode({data}) {
                 title={undefined}
                 size="small"
                 style={{
-                    border: selected ? 'solid 3px black' : 'dashed 1px gray',
-                    backgroundColor: latestOk ? undefined : '#ffcccc'
+                    border: selected
+                        ? 'solid 3px var(--ot-graph-node-border-selected)'
+                        : 'dashed 1px var(--ot-graph-node-border)',
+                    backgroundColor: latestOk ? undefined : 'var(--ot-graph-node-bg-error)'
                 }}
                 data-testid={`ot-branch-link-node-${sourceBranch.project.name}-${targetBranch.project.name}`}
             >

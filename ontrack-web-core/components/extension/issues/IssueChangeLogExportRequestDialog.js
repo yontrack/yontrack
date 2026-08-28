@@ -40,10 +40,10 @@ export default function IssueChangeLogExportRequestDialog({issueChangeLogExportR
                                     title={`Group ${field.name + 1}`}
                                     key={field.key}
                                     headStyle={{
-                                        backgroundColor: '#ccc',
+                                        backgroundColor: 'var(--ot-bg-neutral-subtle)',
                                     }}
                                     bodyStyle={{
-                                        backgroundColor: '#eee',
+                                        backgroundColor: 'var(--ot-bg-subtle)',
                                     }}
                                     extra={
                                         <FaTrash

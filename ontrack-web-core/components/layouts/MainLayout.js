@@ -31,7 +31,7 @@ export default function MainLayout({children}) {
                     !expanded && <Layout>
                         <Header
                             style={{
-                                backgroundColor: "#3F3053",
+                                backgroundColor: "var(--ot-header-bg)",
                                 padding: '0 12px', // Aligned with padding of `MainPage`
                             }}
                         >

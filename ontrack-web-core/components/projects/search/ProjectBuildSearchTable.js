@@ -47,7 +47,7 @@ export default function ProjectBuildSearchTable({
                         {
                             selectedBuilds.map(build => (
                                 <Table.Summary.Row key={build.id} style={{
-                                    backgroundColor: '#eef',
+                                    backgroundColor: 'var(--ot-bg-info-subtle)',
                                 }}>
                                     <Table.Summary.Cell index={0} colSpan={1}>
                                         <BranchLink branch={build.branch}/>

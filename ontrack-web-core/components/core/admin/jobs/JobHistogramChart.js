@@ -2,6 +2,15 @@ import {Bar, BarChart, Cell, ResponsiveContainer, Tooltip, XAxis} from "recharts
 import {useEffect, useState} from "react";
 import dayjs from "dayjs";
 
+// The tooltip is hand-built rather than a themed `<Tooltip/>`, so it carries the
+// same theme tokens the shared chart defaults apply everywhere else.
+const tooltipStyle = {
+    backgroundColor: 'var(--ot-chart-tooltip-bg)',
+    border: '1px solid var(--ot-chart-grid)',
+    color: 'var(--ot-chart-text)',
+    padding: '5px',
+}
+
 function formatDuration(durationMs) {
     if (durationMs < 1000) {
         return `${durationMs} ms`
@@ -15,11 +24,7 @@ const JobHistogramTooltip = ({active, payload}) => {
         const {date, displayValue, displayMinValue, displayMaxValue, count, errorCount} = payload[0].payload;
         if (count > 0) {
             return (
-                <div style={{
-                    backgroundColor: 'white',
-                    border: '1px solid #ccc',
-                    padding: '5px',
-                }}>
+                <div style={tooltipStyle}>
                     <div>{dayjs(date).format('YYYY-MM-DD')}</div>
                     <div>
                         <b>Durations:</b>
@@ -42,12 +47,7 @@ const JobHistogramTooltip = ({active, payload}) => {
                 </div>
             )
         } else {
-            return <div style={{
-                backgroundColor: 'white',
-                border: '1px solid #ccc',
-                padding: '5px',
-                fontStyle: 'italic',
-            }}>
+            return <div style={{...tooltipStyle, fontStyle: 'italic'}}>
                 No measures
             </div>
         }
@@ -81,17 +81,18 @@ export default function JobHistogramChart({histogram}) {
                 width: '145px',
                 maxWidth: '145px',
                 aspectRatio: 4,
-                borderBottom: "solid 1px #ccc",
+                borderBottom: "solid 1px var(--ot-chart-grid)",
             }}>
                 <BarChart
                     data={dataPoints}
                 >
                     <XAxis dataKey="date" hide={true}/>
-                    <Tooltip content={<JobHistogramTooltip/>}/>
+                    <Tooltip content={<JobHistogramTooltip/>} cursor={{fill: 'var(--ot-chart-cursor)'}}/>
                     <Bar name="Duration (avg)" dataKey="value">
                         {
                             dataPoints.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={entry.error ? '#CC3333' : '#33CC33'}/>
+                                <Cell key={`cell-${index}`}
+                                      fill={entry.error ? 'var(--ot-chart-error)' : 'var(--ot-chart-ok)'}/>
                             ))
                         }
                     </Bar>

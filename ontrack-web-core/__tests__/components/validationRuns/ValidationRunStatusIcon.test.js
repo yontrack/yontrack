@@ -2,6 +2,7 @@ import "@testing-library/jest-dom"
 import {render, screen} from "@testing-library/react"
 import ValidationRunStatusIcon from "@components/validationRuns/ValidationRunStatusIcon"
 import {SIZE_VARIANTS, VALIDATION_RUN_STATUS_CONFIG} from "@components/validationRuns/ValidationRunStatusConfig"
+import {ThemeContext} from "@components/providers/ThemeProvider"
 
 const PASSED = {id: 'PASSED', name: 'Passed'}
 const FIXED = {id: 'FIXED', name: 'Fixed'}
@@ -171,6 +172,40 @@ describe('ValidationRunStatusIcon', () => {
             expect(borderColor(light)).toEqual(expected.light.toLowerCase())
             expect(borderColor(dark)).toEqual(expected.dark.toLowerCase())
             expect(expected.light).not.toEqual(expected.dark)
+        })
+    })
+
+    describe('the palette side follows the theme', () => {
+
+        const inTheme = (resolvedTheme, element) => render(
+            <ThemeContext.Provider value={{resolvedTheme, isDark: resolvedTheme === 'dark'}}>
+                {element}
+            </ThemeContext.Provider>
+        )
+
+        const borderColor = (c) => c.querySelector('[role="img"]').style.borderColor.toLowerCase()
+        const expected = VALIDATION_RUN_STATUS_CONFIG.FIXED.color
+
+        it('picks the dark side of the palette under a dark theme', () => {
+            // No `mode` prop: the call sites do not thread the theme through.
+            const {container} = inTheme('dark', <ValidationRunStatusIcon statusID={FIXED}/>)
+            expect(borderColor(container)).toEqual(expected.dark.toLowerCase())
+        })
+
+        it('picks the light side under a light theme', () => {
+            const {container} = inTheme('light', <ValidationRunStatusIcon statusID={FIXED}/>)
+            expect(borderColor(container)).toEqual(expected.light.toLowerCase())
+        })
+
+        it('lets an explicit mode pin the mark against the theme', () => {
+            // For a mark that must stay readable on a fixed-light surface.
+            const {container} = inTheme('dark', <ValidationRunStatusIcon statusID={FIXED} mode="light"/>)
+            expect(borderColor(container)).toEqual(expected.light.toLowerCase())
+        })
+
+        it('falls back to light outside any provider, rather than throwing', () => {
+            const {container} = render(<ValidationRunStatusIcon statusID={FIXED}/>)
+            expect(borderColor(container)).toEqual(expected.light.toLowerCase())
         })
     })
 })

@@ -22,7 +22,7 @@ export default function EnvironmentBuildCountBuildPromotionInfoItemDot({item, bu
                     >
                         <FaServer
                             size={24}
-                            color="black"
+                            color="var(--ot-text-strong)"
                             className={actionClassName(true, item.count === 0)}
                         />
                     </Badge>

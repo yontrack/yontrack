@@ -8,6 +8,7 @@ import net.nemerosa.ontrack.common.api.APIDescription
  *
  * @property branchViewVsNames Displaying the names of the validation stamps
  * @property branchViewVsGroups Grouping validations per status
+ * @property themeMode Light/dark theme selected for the web UI
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 @APIDescription("Preferences of a user")
@@ -20,8 +21,11 @@ data class Preferences(
     var dashboardUuid: String? = null,
     @APIDescription("Selected branch view")
     var selectedBranchViewKey: String? = null,
+    @APIDescription("Theme selected for the web UI")
+    var themeMode: ThemeMode = DEFAULT_THEME_MODE,
 ) {
     companion object {
         const val DEFAULT_BRANCH_VIEW_OPTION = false
+        val DEFAULT_THEME_MODE = ThemeMode.SYSTEM
     }
 }

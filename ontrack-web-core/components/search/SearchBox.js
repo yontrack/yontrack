@@ -53,7 +53,7 @@ export default function SearchBox({style}) {
                 placement="bottomRight"
                 dropdownRender={() => (
                     <div style={{
-                        backgroundColor: 'white',
+                        backgroundColor: 'var(--ot-bg-elevated)',
                         boxShadow: '0 3px 6px -4px rgba(0, 0, 0, 0.12), 0 6px 16px 0 rgba(0, 0, 0, 0.08), 0 9px 28px 8px rgba(0, 0, 0, 0.05)',
                         borderRadius: '8px',
                         maxHeight: '500px',

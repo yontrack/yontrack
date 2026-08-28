@@ -18,7 +18,7 @@ export default function WorkflowInstanceGraphNode({data}) {
                 size="small"
                 style={
                     selected ? {
-                        border: 'solid 2px blue'
+                        border: 'solid 2px var(--ot-graph-node-border-selected)'
                     } : {}
                 }
                 bodyStyle={{

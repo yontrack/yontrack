@@ -7,6 +7,7 @@ export const PreferencesContext = createContext({
     branchViewVsNames: null,
     dashboardUuid: null,
     selectedBranchViewKey: null,
+    themeMode: null,
     setPreferences: () => {
     },
     loaded: false,
@@ -21,6 +22,7 @@ export default function PreferencesContextProvider({children}) {
         branchViewVsNames: null,
         dashboardUuid: null,
         selectedBranchViewKey: null,
+        themeMode: null,
     })
 
     const {data, loading, error, finished} = useQuery(
@@ -31,6 +33,7 @@ export default function PreferencesContextProvider({children}) {
                     branchViewVsNames
                     dashboardUuid
                     selectedBranchViewKey
+                    themeMode
                 }
             }
         `,

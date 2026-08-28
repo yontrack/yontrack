@@ -1,6 +1,7 @@
 import {useGraphQLClient} from "@components/providers/ConnectionContextProvider";
 import {useEffect, useState} from "react";
 import ChartContainer from "@components/charts/ChartContainer";
+import {chartAxisProps, chartGridProps, chartLegendProps, chartTooltipProps} from "@components/charts/chartTheme";
 import {CartesianGrid, ComposedChart, Legend, Line, Tooltip, XAxis, YAxis} from "recharts";
 
 export default function MetricsChart({query, variables}) {
@@ -56,11 +57,11 @@ export default function MetricsChart({query, variables}) {
                 <ComposedChart
                     data={dataPoints}
                 >
-                    <CartesianGrid strokeDasharray="3 3"/>
-                    <XAxis dataKey="date" angle={-45} tickMargin={30} height={80} interval="preserveStart"/>
-                    <YAxis/>
-                    <Tooltip/>
-                    <Legend formatter={legendFormatter} onClick={legendClick} style={{cursor: 'pointer'}}/>
+                    <CartesianGrid strokeDasharray="3 3" {...chartGridProps}/>
+                    <XAxis dataKey="date" angle={-45} tickMargin={30} height={80} interval="preserveStart" {...chartAxisProps}/>
+                    <YAxis {...chartAxisProps}/>
+                    <Tooltip {...chartTooltipProps}/>
+                    <Legend formatter={legendFormatter} onClick={legendClick} style={{cursor: 'pointer'}} {...chartLegendProps}/>
                     {
                         chart && chart.metricNames &&
                         chart.metricNames.map((metricName, metricIndex) => (

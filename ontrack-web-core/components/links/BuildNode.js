@@ -21,9 +21,9 @@ export default function BuildNode({data}) {
                 size="small"
                 style={
                     selected ? {
-                        border: 'solid 3px blue'
+                        border: 'solid 3px var(--ot-graph-node-border-selected)'
                     } : {
-                        border: 'solid 2px #777'
+                        border: 'solid 2px var(--ot-graph-node-border)'
                     }
                 }
                 bodyStyle={{

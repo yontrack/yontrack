@@ -5,6 +5,7 @@ import net.nemerosa.ontrack.common.api.APIDescription
 import net.nemerosa.ontrack.graphql.support.TypedMutationProvider
 import net.nemerosa.ontrack.model.preferences.Preferences
 import net.nemerosa.ontrack.model.preferences.PreferencesService
+import net.nemerosa.ontrack.model.preferences.ThemeMode
 import net.nemerosa.ontrack.model.security.SecurityService
 import org.springframework.security.access.AccessDeniedException
 import org.springframework.stereotype.Component
@@ -39,6 +40,7 @@ class PreferencesMutations(
                 branchViewVsGroups = input.branchViewVsGroups ?: current.branchViewVsGroups,
                 dashboardUuid = input.dashboardUuid ?: current.dashboardUuid,
                 selectedBranchViewKey = input.selectedBranchViewKey ?: current.selectedBranchViewKey,
+                themeMode = input.themeMode ?: current.themeMode,
             )
             // Saves the preferences...
             preferencesService.setPreferences(account, new)
@@ -57,4 +59,6 @@ data class SetPreferencesInput(
     var dashboardUuid: String? = null,
     @APIDescription("Selected branch view")
     var selectedBranchViewKey: String? = null,
+    @APIDescription("Theme selected for the web UI")
+    var themeMode: ThemeMode? = null,
 )

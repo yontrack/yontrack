@@ -68,7 +68,7 @@ export default function ProjectEnvironmentActions() {
                                 vertical={true}
                                 gap={16}
                             >
-                                <FaArrowDown size={48} color="lightgray"/>
+                                <FaArrowDown size={48} color="var(--ot-icon-muted)"/>
                                 {
                                     !currentDeployment &&
                                     <SlotPipelineCreateButton
@@ -111,7 +111,7 @@ export default function ProjectEnvironmentActions() {
                                         />
                                     </Card>
                                 }
-                                <FaArrowDown size={48} color="lightgray"/>
+                                <FaArrowDown size={48} color="var(--ot-icon-muted)"/>
                             </Flex>
                         </LoadingContainer>
                     }

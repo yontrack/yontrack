@@ -41,17 +41,17 @@ export default function AutoVersioningInfo({autoVersioning, branchLink}) {
                         }
                         {/* Most recent state */}
                         <Tooltip
-                            color="#eee"
+                            color="var(--ot-bg-subtle)"
                             title={
                                 <Rows>
                                     <Columns>
-                                        <FaTag color="black"/>
+                                        <FaTag color="var(--ot-text-strong)"/>
                                         <Typography.Text>Version</Typography.Text>
                                         <Typography.Text
                                             strong>{autoVersioning.status.order.targetVersion}</Typography.Text>
                                     </Columns>
                                     <Columns>
-                                        <FaCalendar color="black"/>
+                                        <FaCalendar color="var(--ot-text-strong)"/>
                                         <Typography.Text>Created at</Typography.Text>
                                         <Typography.Text strong>
                                             <Timestamp value={autoVersioning.status.mostRecentState.creation.time}/>

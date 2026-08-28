@@ -3,6 +3,7 @@ import {useEffect, useState} from "react";
 import {formatSeconds} from "@components/common/Duration";
 import {Bar, CartesianGrid, ComposedChart, Legend, Line, Tooltip, XAxis, YAxis} from "recharts";
 import ChartContainer from "@components/charts/ChartContainer";
+import {chartAxisProps, chartGridProps, chartLegendProps, chartTooltipProps} from "@components/charts/chartTheme";
 import {brand} from "@components/common/brand/Colors";
 
 export default function DurationChart({query, variables}) {
@@ -70,14 +71,14 @@ export default function DurationChart({query, variables}) {
                 <ComposedChart
                     data={dataPoints}
                 >
-                    <CartesianGrid strokeDasharray="3 3"/>
-                    <XAxis dataKey="date" angle={-45} tickMargin={30} height={80} interval="preserveStart"/>
-                    <YAxis tickFormatter={durationFormatter}/>
-                    <Tooltip formatter={durationFormatter}/>
-                    <Legend formatter={legendFormatter} onClick={legendClick} style={{cursor: 'pointer'}}/>
-                    <Bar dataKey="mean" fill={brand.colors.lilac} hide={inactiveSeries.includes('mean')}/>
-                    <Line type="monotone" connectNulls={true} dataKey="percentile90" stroke={brand.colors.purple} hide={inactiveSeries.includes('percentile90')}/>
-                    <Line type="monotone" connectNulls={true} dataKey="maximum" stroke={brand.colors.green} hide={inactiveSeries.includes('maximum')}/>
+                    <CartesianGrid strokeDasharray="3 3" {...chartGridProps}/>
+                    <XAxis dataKey="date" angle={-45} tickMargin={30} height={80} interval="preserveStart" {...chartAxisProps}/>
+                    <YAxis tickFormatter={durationFormatter} {...chartAxisProps}/>
+                    <Tooltip formatter={durationFormatter} {...chartTooltipProps}/>
+                    <Legend formatter={legendFormatter} onClick={legendClick} style={{cursor: 'pointer'}} {...chartLegendProps}/>
+                    <Bar dataKey="mean" fill={brand.series.lilac} hide={inactiveSeries.includes('mean')}/>
+                    <Line type="monotone" connectNulls={true} dataKey="percentile90" stroke={brand.series.purple} hide={inactiveSeries.includes('percentile90')}/>
+                    <Line type="monotone" connectNulls={true} dataKey="maximum" stroke={brand.series.green} hide={inactiveSeries.includes('maximum')}/>
                 </ComposedChart>
             </ChartContainer>
         </>

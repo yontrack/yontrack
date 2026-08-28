@@ -12,7 +12,7 @@ export default function EnvironmentCard({environment, showSlots = true}) {
                     height: '100%',
                 }}
                 headStyle={{
-                    background: 'linear-gradient(to right, #f1f1f1, #fafafa)'
+                    background: 'linear-gradient(to right, var(--ot-bg-subtle), var(--ot-bg-subtle-alt))'
                 }}
                 size="small"
                 data-testid={`environment-${environment.id}`}
@@ -32,7 +32,7 @@ export default function EnvironmentCard({environment, showSlots = true}) {
                                     style={{height: '100%'}}
                                     size="small"
                                     bodyStyle={{
-                                        background: 'linear-gradient(to right, #f1f1f1, #fafafa)'
+                                        background: 'linear-gradient(to right, var(--ot-bg-subtle), var(--ot-bg-subtle-alt))'
                                     }}
                                     hoverable={true}
                                 >

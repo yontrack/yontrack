@@ -1,5 +1,26 @@
+/**
+ * The sign-in page is a separate App Router root with its own <html>, so it is
+ * covered by neither `styles/globals.css` nor the `ConfigProvider` in
+ * `pages/_app.js`. Its theme tokens therefore live here.
+ *
+ * There is no user preference to read before authentication: the theme comes
+ * entirely from the cookie mirror and the OS, resolved by the same pre-paint
+ * script the main application uses and stamped on `<html data-theme>`.
+ */
+
+:root {
+    --ot-auth-bg: #F6F2F9;
+    --ot-auth-fg: rgba(0, 0, 0, 0.88);
+}
+
+:root[data-theme="dark"] {
+    --ot-auth-bg: #141414;
+    --ot-auth-fg: rgba(255, 255, 255, 0.85);
+}
+
 body {
-    background-color: #F6F2F9;
+    background-color: var(--ot-auth-bg);
+    color: var(--ot-auth-fg);
 }
 
 .button-container {
@@ -10,6 +31,10 @@ body {
     min-width: 16em;
 }
 
+/*
+ * Brand purple on brand lilac. Deliberately identical in both themes: this is
+ * the identity, and it carries enough contrast either way.
+ */
 .signin-button {
     padding: 0.75rem 1.5rem;
     border: none;

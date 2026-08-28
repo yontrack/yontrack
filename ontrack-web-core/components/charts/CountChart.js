@@ -2,6 +2,7 @@ import {useGraphQLClient} from "@components/providers/ConnectionContextProvider"
 import {useEffect, useState} from "react";
 import {Bar, CartesianGrid, ComposedChart, Legend, Tooltip, XAxis, YAxis} from "recharts";
 import ChartContainer from "@components/charts/ChartContainer";
+import {chartAxisProps, chartGridProps, chartLegendProps, chartTooltipProps} from "@components/charts/chartTheme";
 import {brand} from "@components/common/brand/Colors";
 
 export default function CountChart({
@@ -63,12 +64,12 @@ export default function CountChart({
                 <ComposedChart
                     data={dataPoints}
                 >
-                    <CartesianGrid strokeDasharray="3 3"/>
-                    <XAxis dataKey="date" angle={-45} tickMargin={30} height={80} interval="preserveStart"/>
-                    <YAxis tickFormatter={yTickFormatter} domain={domain}/>
-                    <Tooltip/>
-                    <Legend formatter={legendFormatter} onClick={legendClick} style={{cursor: 'pointer'}}/>
-                    <Bar dataKey="value" fill={brand.colors.lilac} hide={inactiveSeries.includes('value')}/>
+                    <CartesianGrid strokeDasharray="3 3" {...chartGridProps}/>
+                    <XAxis dataKey="date" angle={-45} tickMargin={30} height={80} interval="preserveStart" {...chartAxisProps}/>
+                    <YAxis tickFormatter={yTickFormatter} domain={domain} {...chartAxisProps}/>
+                    <Tooltip {...chartTooltipProps}/>
+                    <Legend formatter={legendFormatter} onClick={legendClick} style={{cursor: 'pointer'}} {...chartLegendProps}/>
+                    <Bar dataKey="value" fill={brand.series.lilac} hide={inactiveSeries.includes('value')}/>
                 </ComposedChart>
             </ChartContainer>
         </>

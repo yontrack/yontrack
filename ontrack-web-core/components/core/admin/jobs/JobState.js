@@ -9,7 +9,7 @@ const jobStateIcons = {
     IDLE: <FaCog color="blue"/>,
     RUNNING: <FaSpinner color="green"/>,
     PAUSED: <FaPauseCircle/>,
-    DISABLED: <FaCogs color="lightgrey"/>,
+    DISABLED: <FaCogs color="var(--ot-icon-muted)"/>,
     INVALID: <FaBan color="red"/>,
 }
 

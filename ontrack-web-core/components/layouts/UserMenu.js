@@ -2,6 +2,7 @@ import {Drawer, Menu, Typography} from "antd";
 import {useContext, useEffect, useState} from "react";
 import {UserContext} from "@components/providers/UserProvider";
 import {
+    FaAdjust,
     FaBars,
     FaBitbucket,
     FaCertificate,
@@ -39,6 +40,7 @@ import SonarqubeIcon from "@components/extension/sonarqube/SonarqubeIcon";
 import {signOut} from "next-auth/react";
 import Link from "next/link";
 import TFCIcon from "@components/extension/tfc/TFCIcon";
+import ThemeSwitch from "@components/layouts/ThemeSwitch";
 
 export function useUserMenu() {
     const [open, setOpen] = useState(false);
@@ -136,6 +138,13 @@ export default function UserMenu({userMenu}) {
             label: "Full view",
             icon: <FaExpandArrowsAlt/>,
             onClick: expandFullView,
+        })
+        // Theme switch. Not selectable and not closing the drawer, so the user
+        // can compare the themes without reopening the menu each time.
+        menu.push({
+            key: 'theme',
+            label: <ThemeSwitch/>,
+            icon: <FaAdjust/>,
         })
         // Separator
         menu.push({

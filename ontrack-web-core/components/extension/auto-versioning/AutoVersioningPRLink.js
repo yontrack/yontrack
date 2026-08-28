@@ -11,7 +11,7 @@ export default function AutoVersioningPRLink({autoVersioningStatusMostRecentStat
                 autoVersioningStatusMostRecentStateData?.prName &&
                 autoVersioningStatusMostRecentStateData?.prLink &&
                 <Columns size={size}>
-                    <FaCodeBranch color="black"/>
+                    <FaCodeBranch color="var(--ot-text-strong)"/>
                     <Typography.Text>PR</Typography.Text>
                     <Typography.Text>
                         <Link

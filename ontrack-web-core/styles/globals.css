@@ -1,4 +1,155 @@
 /**
+ * Theme tokens.
+ *
+ * Every colour below is a custom property so that switching the theme is a
+ * variable swap on `<html data-theme>`, with no re-render and no second
+ * stylesheet. The attribute is set before the first paint by the inline script
+ * in `_document.js`, and kept in sync afterwards by `ThemeProvider`.
+ *
+ * These deliberately do NOT reference antd's own `--ant-*` variables: in
+ * `cssVar` mode antd scopes those to a generated class on each of its component
+ * roots, so they are not readable from application markup. The dark values are
+ * picked to sit correctly on antd's dark surfaces (#141414 base, #1f1f1f
+ * container, #262626 elevated, #424242 border).
+ */
+
+:root {
+    /*
+     * Brand. Not re-designed for dark mode: the identity is the same in both
+     * themes, and the header keeps its purple either way.
+     */
+    --ot-brand-purple: #3F3053;
+    --ot-brand-lilac: #D1B0F5;
+    --ot-brand-green: #9FF58B;
+    --ot-brand-gray: #E6E1E9;
+    --ot-brand-light-gray: #F6F2F9;
+
+    /*
+     * Header. Fixed to the brand purple in both themes, so everything sitting
+     * on it stays light regardless of the theme.
+     */
+    --ot-header-bg: var(--ot-brand-purple);
+    --ot-header-fg: #ffffff;
+    --ot-header-avatar-bg: #ffffff;
+    --ot-header-avatar-fg: #141414;
+
+    /* Surfaces */
+    --ot-bg-elevated: #ffffff;
+    --ot-bg-section-head: lightgrey;
+    --ot-bg-subtle: #f1f1f1;
+    --ot-bg-subtle-alt: #fafafa;
+    --ot-bg-well: rgb(230, 230, 230);
+    --ot-bg-table-form: rgb(240, 240, 240);
+    --ot-bg-form-list-item: #fcfcfc;
+    --ot-bg-git-plot: #eee;
+    --ot-bg-highlight: lightyellow;
+    --ot-bg-auto-refresh: hsl(80, 61%, 80%);
+    --ot-bg-error-subtle: #FEE;
+    --ot-bg-info-subtle: #eef;
+    --ot-bg-neutral-subtle: #DDD;
+
+    /* Borders */
+    --ot-border: rgb(128, 128, 128);
+    --ot-border-subtle: lightgray;
+    --ot-border-strong: black;
+    --ot-border-well: darkgrey;
+    --ot-border-table-form: rgb(200, 200, 200);
+    --ot-border-form-list-item: blue;
+
+    /* Text & icons */
+    --ot-text-strong: #000000;
+    --ot-text-on-accent: #ffffff;
+    --ot-icon-muted: lightgrey;
+
+    /* Graphs (ReactFlow) */
+    --ot-graph-edge: #999;
+    --ot-graph-edge-selected: black;
+    --ot-graph-node-bg: #F0F0F0;
+    --ot-graph-node-bg-selected: #D0FFD0;
+    --ot-graph-node-bg-error: #ffcccc;
+    --ot-graph-node-border: #777;
+    --ot-graph-node-border-selected: #1677ff;
+
+    /* Charts (Recharts) */
+    --ot-chart-grid: #ccc;
+    --ot-chart-axis: #666;
+    --ot-chart-axis-text: #666;
+    --ot-chart-text: rgba(0, 0, 0, 0.88);
+    --ot-chart-tooltip-bg: #ffffff;
+    --ot-chart-cursor: rgba(0, 0, 0, 0.06);
+    --ot-chart-ok: #33CC33;
+    --ot-chart-error: #CC3333;
+
+    /*
+     * Chart series, derived from the brand palette. On light the brand values
+     * are used as-is.
+     */
+    --ot-chart-series-lilac: var(--ot-brand-lilac);
+    --ot-chart-series-purple: var(--ot-brand-purple);
+    --ot-chart-series-green: var(--ot-brand-green);
+}
+
+:root[data-theme="dark"] {
+    /* Header keeps the brand purple - only what sits below it changes. */
+
+    /* Surfaces */
+    --ot-bg-elevated: #1f1f1f;
+    --ot-bg-section-head: #262626;
+    --ot-bg-subtle: #1f1f1f;
+    --ot-bg-subtle-alt: #262626;
+    --ot-bg-well: #262626;
+    --ot-bg-table-form: #1f1f1f;
+    --ot-bg-form-list-item: #1f1f1f;
+    --ot-bg-git-plot: #262626;
+    --ot-bg-highlight: #3a2e10;
+    --ot-bg-auto-refresh: hsl(80, 30%, 24%);
+    --ot-bg-error-subtle: #3a1f1f;
+    --ot-bg-info-subtle: #1c2333;
+    --ot-bg-neutral-subtle: #2a2a2a;
+
+    /* Borders */
+    --ot-border: #434343;
+    --ot-border-subtle: #303030;
+    --ot-border-strong: #595959;
+    --ot-border-well: #424242;
+    --ot-border-table-form: #303030;
+    --ot-border-form-list-item: #1668dc;
+
+    /* Text & icons */
+    --ot-text-strong: rgba(255, 255, 255, 0.85);
+    --ot-text-on-accent: #ffffff;
+    --ot-icon-muted: #595959;
+
+    /* Graphs (ReactFlow) */
+    --ot-graph-edge: #6b6b6b;
+    --ot-graph-edge-selected: #ffffff;
+    --ot-graph-node-bg: #262626;
+    --ot-graph-node-bg-selected: #1e3a24;
+    --ot-graph-node-bg-error: #4a2222;
+    --ot-graph-node-border: #595959;
+    --ot-graph-node-border-selected: #4096ff;
+
+    /* Charts (Recharts) */
+    --ot-chart-grid: #434343;
+    --ot-chart-axis: #8c8c8c;
+    --ot-chart-axis-text: #a6a6a6;
+    --ot-chart-text: rgba(255, 255, 255, 0.85);
+    --ot-chart-tooltip-bg: #1f1f1f;
+    --ot-chart-cursor: rgba(255, 255, 255, 0.08);
+    --ot-chart-ok: #52C41A;
+    --ot-chart-error: #E84749;
+
+    /*
+     * Chart series. Lilac and green are already light enough to read on a dark
+     * surface and are kept as-is; the brand purple is not, so it is lifted to
+     * the same hue at a legible lightness rather than replaced.
+     */
+    --ot-chart-series-lilac: var(--ot-brand-lilac);
+    --ot-chart-series-purple: #A995C4;
+    --ot-chart-series-green: var(--ot-brand-green);
+}
+
+/**
  * To be set on SortableList/Item to prevent text selection during dragging.
  */
 .no-select {
@@ -85,7 +236,7 @@
 
 .ot-info {
     width: 100%;
-    border-left: solid 3px lightgray;
+    border-left: solid 3px var(--ot-border-subtle);
     padding-left: 6px;
 }
 
@@ -95,8 +246,8 @@
 
 .ot-well {
     width: 100%;
-    background-color: rgb(230, 230, 230);
-    border: solid 1px darkgrey;
+    background-color: var(--ot-bg-well);
+    border: solid 1px var(--ot-border-well);
     padding: 6px;
     border-radius: 6px;
 }
@@ -108,8 +259,8 @@
 .ot-standard-table-form {
     width: 100%;
     border-radius: 0;
-    background-color: rgb(240, 240, 240);
-    border-bottom: dotted 1px rgb(200, 200, 200);
+    background-color: var(--ot-bg-table-form);
+    border-bottom: dotted 1px var(--ot-border-table-form);
 }
 
 /**
@@ -127,7 +278,7 @@
  */
 
 .ot-validation-group {
-    border: solid 1px rgb(128, 128, 128);
+    border: solid 1px var(--ot-border);
     border-radius: 4px;
     padding: 4px;
 }
@@ -137,11 +288,11 @@
  */
 
 button.ot-validation-stamp-filter-edition {
-    background-color: lightyellow;
+    background-color: var(--ot-bg-highlight);
 }
 
 .ot-validation-stamp-filter-edition table th.ot-validation-stamp {
-    background-color: lightyellow;
+    background-color: var(--ot-bg-highlight);
 }
 
 /**
@@ -149,7 +300,7 @@ button.ot-validation-stamp-filter-edition {
  */
 
 .ot-dependency {
-    border: solid 1px rgb(128, 128, 128);
+    border: solid 1px var(--ot-border);
     border-radius: 4px;
     padding: 4px;
 }
@@ -161,8 +312,8 @@ button.ot-validation-stamp-filter-edition {
 .ot-form-list-item {
     display: flex;
     margin-bottom: 8px;
-    background-color: #fcfcfc;
-    border: dashed 1px blue;
+    background-color: var(--ot-bg-form-list-item);
+    border: dashed 1px var(--ot-border-form-list-item);
     border-radius: 8px;
     padding-top: 16px;
     padding-left: 16px;
@@ -181,7 +332,7 @@ button.ot-validation-stamp-filter-edition {
  */
 
 .ot-auto-refresh-enabled > button {
-    background-color: hsl(80, 61%, 80%);
+    background-color: var(--ot-bg-auto-refresh);
 }
 
 /**
@@ -194,17 +345,17 @@ button.ot-validation-stamp-filter-edition {
 }
 
 .ot-git-plot-line-author {
-    background-color: #eee;
+    background-color: var(--ot-bg-git-plot);
     padding: 2px;
 }
 
 .ot-git-plot-line-timestamp {
-    background-color: #eee;
+    background-color: var(--ot-bg-git-plot);
     padding: 2px;
 }
 
 .ot-git-plot-line-build {
-    border: solid 1px black;
+    border: solid 1px var(--ot-border-strong);
     border-radius: 4px;
     padding: 2px;
 }
@@ -216,5 +367,76 @@ button.ot-validation-stamp-filter-edition {
 .ot-workflow-node-info-title {
     display: block;
     margin-top: 1em;
-    border-top: solid 1px lightgray;
+    border-top: solid 1px var(--ot-border-subtle);
+}
+
+/**
+ * ReactFlow.
+ *
+ * The version pinned here (reactflow 11.11) has no `colorMode` prop - that
+ * arrived in the `@xyflow/react` 12 rewrite - and its stylesheet hardcodes a
+ * light surface with no custom properties to override. So the handful of
+ * classes that carry a colour are restated here for the dark theme. The
+ * application's own custom nodes are not covered by this: they take their
+ * colours from the `--ot-graph-*` tokens directly.
+ */
+
+:root[data-theme="dark"] .react-flow__edge-path {
+    stroke: var(--ot-graph-edge);
+}
+
+:root[data-theme="dark"] .react-flow__edge.selected .react-flow__edge-path,
+:root[data-theme="dark"] .react-flow__edge:focus .react-flow__edge-path {
+    stroke: var(--ot-graph-edge-selected);
+}
+
+:root[data-theme="dark"] .react-flow__edge-textbg {
+    fill: var(--ot-bg-elevated);
+}
+
+:root[data-theme="dark"] .react-flow__edge-text {
+    fill: var(--ot-text-strong);
+}
+
+:root[data-theme="dark"] .react-flow__handle {
+    background: var(--ot-graph-node-border);
+    border-color: var(--ot-bg-elevated);
+}
+
+:root[data-theme="dark"] .react-flow__node-default,
+:root[data-theme="dark"] .react-flow__node-input,
+:root[data-theme="dark"] .react-flow__node-output,
+:root[data-theme="dark"] .react-flow__node-group {
+    background-color: var(--ot-graph-node-bg);
+    border-color: var(--ot-graph-node-border);
+    color: var(--ot-text-strong);
+}
+
+:root[data-theme="dark"] .react-flow__controls-button {
+    background: var(--ot-bg-elevated);
+    border-bottom-color: var(--ot-border-subtle);
+    fill: var(--ot-text-strong);
+}
+
+:root[data-theme="dark"] .react-flow__controls-button:hover {
+    background: var(--ot-bg-subtle-alt);
+}
+
+:root[data-theme="dark"] .react-flow__minimap {
+    background-color: var(--ot-bg-elevated);
+}
+
+:root[data-theme="dark"] .react-flow__attribution {
+    background: rgba(0, 0, 0, 0.5);
+}
+
+:root[data-theme="dark"] .react-flow__attribution a {
+    color: var(--ot-chart-axis-text);
+}
+
+/* The dotted canvas background, whose default dots are near-black. */
+:root[data-theme="dark"] .react-flow__background pattern circle,
+:root[data-theme="dark"] .react-flow__background pattern path {
+    fill: var(--ot-graph-node-border);
+    stroke: var(--ot-graph-node-border);
 }

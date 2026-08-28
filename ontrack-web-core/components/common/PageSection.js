@@ -22,7 +22,7 @@ export default function PageSection({
             }}
             headStyle={{
                 height: 48,
-                backgroundColor: 'lightgrey'
+                backgroundColor: 'var(--ot-bg-section-head)'
             }}
             bodyStyle={{
                 padding: padding ? 16 : 0,

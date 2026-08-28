@@ -13,7 +13,7 @@ export function DeploymentErrorStep({deployment, errorMessage}) {
             avatar={<FaExclamationTriangle color="red"/>}
             title={deployment.errorMessage}
             description=""
-            style={{background: "#FEE"}}
+            style={{background: "var(--ot-bg-error-subtle)"}}
         />
     } else {
         return undefined
@@ -72,7 +72,7 @@ function DeploymentStatusStep({deployment, status}) {
                 className="ot-list-item"
                 data-testid={`${deployment.id}-status-${status}`}
                 style={{
-                    background: "#DDD",
+                    background: "var(--ot-bg-neutral-subtle)",
                     paddingLeft: "1em",
                 }}
             >

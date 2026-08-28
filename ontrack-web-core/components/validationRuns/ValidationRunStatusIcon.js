@@ -5,6 +5,7 @@ import {
     SHAPE_TOKENS,
     SIZE_VARIANTS,
 } from "@components/validationRuns/ValidationRunStatusConfig"
+import {useTheme} from "@components/providers/ThemeProvider"
 
 /**
  * Renders the mark for a validation run status.
@@ -36,8 +37,9 @@ import {
  * @param {'full'|'compact'} [props.variant] Defaults to 'compact' (~22px), the
  *   size used in dense tables and rows.
  * @param {'light'|'dark'} [props.mode] Which side of the derived palette to
- *   use. Defaults to 'light'. The app has no dark theme yet; when one lands,
- *   wire this to the theme provider rather than to each call site.
+ *   use. Defaults to the active theme, read from the theme provider - callers
+ *   do not thread it through. Pass it explicitly only to pin the mark to one
+ *   side of the palette regardless of the theme (a fixed-light chip, a preview).
  * @param {boolean} [props.tooltip] Force the native `title` tooltip on or off.
  *   Defaults to on for the compact variant only. Pass `false` when the caller
  *   already supplies its own tooltip (an antd Tooltip/Popover), to avoid
@@ -47,10 +49,17 @@ import {
 export default function ValidationRunStatusIcon({
                                                     statusID,
                                                     variant = 'compact',
-                                                    mode = 'light',
+                                                    mode,
                                                     tooltip,
                                                     className,
                                                 }) {
+
+    // The colours are not CSS custom properties like the rest of the app's
+    // palette: the config table is also read by non-CSS consumers (the glyph
+    // `color` prop), and the contrast ratios are documented per side. So the
+    // side is picked here, from the theme, rather than in a stylesheet.
+    const {resolvedTheme} = useTheme()
+    const mergedMode = mode ?? resolvedTheme
 
     const id = statusID?.id
     // Never leave the mark unnamed: fall back to the raw id.
@@ -64,7 +73,7 @@ export default function ValidationRunStatusIcon({
 
     // Root: reversed glyph on a solid disc. Derived: glyph matches the border.
     // Empty: no glyph at all, so no glyph colour either.
-    const glyphColor = isRoot ? config.glyph : config.color[mode]
+    const glyphColor = isRoot ? config.glyph : config.color[mergedMode]
 
     // Tooltip is a convenience for the icon-only variant, never the sole
     // carrier of the name - `aria-label` below is always set either way.
@@ -85,7 +94,7 @@ export default function ValidationRunStatusIcon({
         backgroundColor: isRoot ? config.fill : 'transparent',
         border: isRoot
             ? undefined
-            : `${shape.borderWidth}px ${shape.borderStyle} ${config.color[mode]}`,
+            : `${shape.borderWidth}px ${shape.borderStyle} ${config.color[mergedMode]}`,
         lineHeight: 0,
     }
 

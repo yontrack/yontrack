@@ -11,7 +11,7 @@ const {Text} = Typography;
 
 function NavBarText({text}) {
     return (
-        <Text style={{color: 'white'}}>{text}</Text>
+        <Text style={{color: 'var(--ot-header-fg)'}}>{text}</Text>
     )
 }
 
@@ -61,8 +61,8 @@ export default function NavBar() {
                     <Avatar icon={<FaRegUser id="user-menu"/>}
                             onClick={openUserMenu}
                             style={{
-                                backgroundColor: 'white',
-                                color: 'black',
+                                backgroundColor: 'var(--ot-header-avatar-bg)',
+                                color: 'var(--ot-header-avatar-fg)',
                                 cursor: 'pointer',
                             }}
                     />
