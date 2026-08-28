@@ -34,6 +34,7 @@
     --ot-header-avatar-fg: #141414;
 
     /* Surfaces */
+    --ot-bg-page: #ffffff;
     --ot-bg-elevated: #ffffff;
     --ot-bg-section-head: lightgrey;
     --ot-bg-subtle: #f1f1f1;
@@ -57,6 +58,7 @@
     --ot-border-form-list-item: blue;
 
     /* Text & icons */
+    --ot-text: rgba(0, 0, 0, 0.88);
     --ot-text-strong: #000000;
     --ot-text-on-accent: #ffffff;
     --ot-icon-muted: lightgrey;
@@ -93,6 +95,7 @@
     /* Header keeps the brand purple - only what sits below it changes. */
 
     /* Surfaces */
+    --ot-bg-page: #141414;
     --ot-bg-elevated: #1f1f1f;
     --ot-bg-section-head: #262626;
     --ot-bg-subtle: #1f1f1f;
@@ -116,6 +119,7 @@
     --ot-border-form-list-item: #1668dc;
 
     /* Text & icons */
+    --ot-text: rgba(255, 255, 255, 0.85);
     --ot-text-strong: rgba(255, 255, 255, 0.85);
     --ot-text-on-accent: #ffffff;
     --ot-icon-muted: #595959;
@@ -147,6 +151,20 @@
     --ot-chart-series-lilac: var(--ot-brand-lilac);
     --ot-chart-series-purple: #A995C4;
     --ot-chart-series-green: var(--ot-brand-green);
+}
+
+/**
+ * The page ground.
+ *
+ * antd's reset sets no background on <body>, and antd's own styles are injected
+ * at runtime rather than server-rendered - so without this the page paints white
+ * before those styles land, which in dark mode is exactly the flash the
+ * pre-paint script exists to prevent. This stylesheet is a blocking <link> in
+ * the head, so it applies from the very first paint.
+ */
+body {
+    background-color: var(--ot-bg-page);
+    color: var(--ot-text);
 }
 
 /**
