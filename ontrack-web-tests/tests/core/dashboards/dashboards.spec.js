@@ -224,3 +224,53 @@ test('changing the chart options of a widget updates its title', async ({page, o
     // The title of the widget displays the new chart options
     await expect(widgetTitle).toContainText(/1m\s*\/\s*1d/)
 })
+
+test('the move handle of a widget is displayed only in edition mode', async ({page, ontrack}) => {
+    const dashboardName = `move-handle-${Date.now()}`
+
+    const project = await ontrack.createProject()
+
+    const yaml = [
+        `- name: "${dashboardName}"`,
+        `  widgets:`,
+        `    - key: "home/ProjectList"`,
+        `      layout: {x: 0, y: 0, w: 12, h: 25}`,
+        `      config:`,
+        `        projectNames:`,
+        `          - "${project.name}"`,
+    ].join('\n')
+
+    const data = await graphQLCallMutation(
+        ontrack.connection,
+        'applyDashboards',
+        applyDashboardsMutation,
+        {yaml}
+    )
+    const dashboardUuid = data.applyDashboards.dashboards[0].uuid
+
+    await login(page, ontrack)
+
+    // Displaying the dashboard using its URL, so that it does not become the
+    // dashboard of the user for the next tests
+    await page.goto(`${ontrack.connection.ui}/?dashboard=${dashboardUuid}`)
+
+    // The widget is displayed
+    await expect(page.getByRole('link', {name: project.name})).toBeVisible()
+
+    // Outside of the edition mode, the widget has no move handle: the grid is not
+    // draggable, so the handle would do nothing at all (issue #1641)
+    await expect(page.locator('.ot-rgl-draggable-handle')).toHaveCount(0)
+
+    // Entering the edition mode
+    await page.getByRole('button', {name: 'Dashboard', exact: true}).click()
+    await page.getByText('Edit current dashboard').click()
+    await expect(page.getByText('Dashboard in edition mode')).toBeVisible()
+
+    // The move handle is now available
+    await expect(page.locator('.ot-rgl-draggable-handle').first()).toBeVisible()
+
+    // Leaving the edition mode: the handle is gone again
+    await page.getByRole('button', {name: 'Cancel changes'}).click()
+    await expect(page.getByText('Dashboard in edition mode')).not.toBeVisible()
+    await expect(page.locator('.ot-rgl-draggable-handle')).toHaveCount(0)
+})

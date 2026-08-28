@@ -26,7 +26,7 @@ export default function DashboardWidgetCellWrapper({widget}) {
             <GridCell
                 id={widget.uuid}
                 title={title}
-                isDraggable={dashboardEdition}
+                isDraggable={!!dashboardEdition}
                 extra={
                     <>
                         {!dashboardEdition && extra}

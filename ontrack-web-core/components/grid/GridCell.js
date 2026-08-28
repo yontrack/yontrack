@@ -48,8 +48,11 @@ export default function GridCell({
                                 />
                             </>
                         }
+                        {/* An explicit `isDraggable` on the cell wins over the grid default: a cell
+                            must be able to hide the handle in a grid which is draggable elsewhere,
+                            like a dashboard widget outside of the edition mode. */}
                         <GridCellCommand
-                            condition={isDraggable || draggable}
+                            condition={isDraggable ?? draggable}
                             icon={<FaArrowsAlt/>}
                             title="Use this handle to drag the widget into another position"
                             className="ot-rgl-draggable-handle"
