@@ -3,6 +3,7 @@ import {act, render, screen} from "@testing-library/react"
 import ThemeSwitch from "@components/layouts/ThemeSwitch"
 import ThemeProvider, {useTheme} from "@components/providers/ThemeProvider"
 import {PreferencesContext} from "@components/providers/PreferencesProvider"
+import {MessageContext} from "@components/providers/MessageProvider"
 import {getStoredThemeMode} from "@components/theme/themeStorage"
 
 const stubMatchMedia = (dark) => {
@@ -28,16 +29,18 @@ function Probe() {
     return <span data-testid="resolved">{resolvedTheme}</span>
 }
 
-const renderSwitch = ({setPreferences = jest.fn()} = {}) => {
+const renderSwitch = ({setPreferences = jest.fn(), messageApi = {warning: jest.fn()}} = {}) => {
     render(
         <ThemeProvider>
-            <PreferencesContext.Provider value={{setPreferences, loaded: true}}>
-                <ThemeSwitch/>
-                <Probe/>
-            </PreferencesContext.Provider>
+            <MessageContext.Provider value={{messageApi}}>
+                <PreferencesContext.Provider value={{setPreferences, loaded: true}}>
+                    <ThemeSwitch/>
+                    <Probe/>
+                </PreferencesContext.Provider>
+            </MessageContext.Provider>
         </ThemeProvider>
     )
-    return {setPreferences}
+    return {setPreferences, messageApi}
 }
 
 // The Segmented options are radios; each carries its label as accessible name.
@@ -93,6 +96,45 @@ describe('ThemeSwitch', () => {
         pick('Auto')
         expect(setPreferences).toHaveBeenLastCalledWith({themeMode: 'SYSTEM'})
         expect(getStoredThemeMode()).toEqual('system')
+    })
+
+    describe('when the server rejects the change', () => {
+
+        const failing = () => Promise.reject(new Error('backend down'))
+
+        it('keeps the theme the user just picked rather than snapping it back', async () => {
+            renderSwitch({setPreferences: jest.fn(failing)})
+            pick('Dark')
+            await act(async () => {
+            })
+            expect(resolved()).toEqual('dark')
+        })
+
+        it('says so, instead of failing silently', async () => {
+            // The cookie now disagrees with the server: on the next sign-in the
+            // server wins and the choice vanishes. The user has to be told.
+            const {messageApi} = renderSwitch({setPreferences: jest.fn(failing)})
+            pick('Dark')
+            await act(async () => {
+            })
+            expect(messageApi.warning).toHaveBeenCalled()
+        })
+
+        it('does not leave an unhandled rejection behind', async () => {
+            const onUnhandled = jest.fn()
+            process.on('unhandledRejection', onUnhandled)
+            try {
+                renderSwitch({setPreferences: jest.fn(failing)})
+                pick('Dark')
+                await act(async () => {
+                })
+                // A macrotask: long enough for an unhandled rejection to surface.
+                await new Promise(resolve => setTimeout(resolve, 0))
+                expect(onUnhandled).not.toHaveBeenCalled()
+            } finally {
+                process.off('unhandledRejection', onUnhandled)
+            }
+        })
     })
 
     it('does not let the click reach the surrounding menu', () => {

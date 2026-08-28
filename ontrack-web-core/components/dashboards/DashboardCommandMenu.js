@@ -14,7 +14,7 @@ import {
     FaUsers,
     FaWindowRestore
 } from "react-icons/fa";
-import {Button, Dropdown, message, Space, Typography} from "antd";
+import {Button, Dropdown, Space, Typography} from "antd";
 import {DashboardContext} from "@components/dashboards/DashboardContextProvider";
 import SaveDashboardDialog, {useSaveDashboardDialog} from "@components/dashboards/SaveDashboardDialog";
 import DashboardYamlExportDialog, {useDashboardYamlExportDialog} from "@components/dashboards/DashboardYamlExportDialog";
@@ -22,6 +22,7 @@ import DashboardYamlImportDialog, {useDashboardYamlImportDialog} from "@componen
 import {useRouter} from "next/router";
 import copy from "copy-to-clipboard";
 import Link from "next/link";
+import {useMessageApi} from "@components/providers/MessageProvider";
 
 export default function DashboardCommandMenu() {
 
@@ -29,6 +30,10 @@ export default function DashboardCommandMenu() {
 
     const router = useRouter()
     const context = useContext(DashboardContext)
+
+    // The themed API, not the static `message`: the static one renders into its
+    // own root and never sees the ConfigProvider, so it stays light in dark mode.
+    const messageApi = useMessageApi()
 
     const saveDashboardDialog = useSaveDashboardDialog({
         onSuccess: (_, {__, edition}) => {
@@ -50,7 +55,7 @@ export default function DashboardCommandMenu() {
         if (selectedDashboard) {
             const link = `${window.location.origin}${router.pathname}?dashboard=${selectedDashboard.uuid}`
             if (copy(link)) {
-                message.success(
+                messageApi.success(
                     <Space direction="vertical">
                         <Typography.Paragraph>Dashboard URL copied</Typography.Paragraph>
                         <Typography.Paragraph>

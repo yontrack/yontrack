@@ -97,6 +97,11 @@ export default function DashboardContextProvider({children}) {
     const client = useGraphQLClient()
     const {clearExpandedId, setExpandable} = useContext(GridTableContext)
 
+    // `Modal.useModal()` rather than the static `Modal.confirm`: the static one
+    // renders into a detached root that never sees the ConfigProvider, so it
+    // would stay light while the rest of the app is dark.
+    const [modalApi, modalContextHolder] = Modal.useModal()
+
     const [dashboards, setDashboards] = useState([])
     const [dashboard, setDashboard] = useState()
     const [dashboardRefresh, setDashboardRefresh] = useState(0)
@@ -191,7 +196,7 @@ export default function DashboardContextProvider({children}) {
 
     const deleteDashboard = () => {
         if (dashboard && dashboard.authorizations.delete) {
-            Modal.confirm({
+            modalApi.confirm({
                 title: "Deleting a dashboard",
                 content: `Do you really want to delete the "${dashboard.name}" dashboard?`,
                 okText: "Delete",
@@ -352,6 +357,7 @@ export default function DashboardContextProvider({children}) {
 
     return (
         <>
+            {modalContextHolder}
             <DashboardContext.Provider value={context}>
                 {children}
             </DashboardContext.Provider>

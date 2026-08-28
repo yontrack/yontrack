@@ -8,7 +8,16 @@ import {themeInitScript} from "@components/theme/themeInitScript"
 export default function RootLayout({children}) {
     return (
         <>
-            <html lang="en">
+            {/*
+              `suppressHydrationWarning` because this is an App Router root
+              layout, so React hydrates <html> itself - and by then the inline
+              script below has already stamped `data-theme` and `color-scheme`
+              on it, which the client render does not reproduce. Without this,
+              every sign-in load logs an "extra attributes from the server"
+              warning. It suppresses the warning for this element's attributes
+              only, not for the tree below.
+            */}
+            <html lang="en" suppressHydrationWarning>
             <head>
                 <title>Yontrack - Signin</title>
                 {/*

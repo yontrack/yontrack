@@ -1,12 +1,14 @@
 import {FaBullseye} from "react-icons/fa";
-import {message} from "antd";
+import {useMessageApi} from "@components/providers/MessageProvider";
 import {gql} from "graphql-request";
 import ConfirmCommand from "@components/common/ConfirmCommand";
 
 export default function PromotionLevelBulkUpdateCommand({id}) {
 
+    const messageApi = useMessageApi()
+
     const onSuccess = () => {
-        message.info("Bulk update done.")
+        messageApi.info("Bulk update done.")
     }
 
     return (

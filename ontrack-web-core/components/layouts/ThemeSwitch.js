@@ -1,5 +1,6 @@
 import {Segmented, Space, Tooltip} from "antd"
 import {FaDesktop, FaMoon, FaSun} from "react-icons/fa"
+import {useMessageApi} from "@components/providers/MessageProvider"
 import {usePreferences} from "@components/providers/PreferencesProvider"
 import {useTheme} from "@components/providers/ThemeProvider"
 import {toServerThemeMode} from "@components/theme/themeMode"
@@ -18,12 +19,24 @@ export default function ThemeSwitch() {
 
     const {themeMode, setThemeMode} = useTheme()
     const preferences = usePreferences()
+    const messageApi = useMessageApi()
 
-    const onChange = (mode) => {
+    const onChange = async (mode) => {
         // Applied locally first: the switch must take effect immediately, not
         // after the mutation comes back.
         setThemeMode(mode)
-        preferences.setPreferences({themeMode: toServerThemeMode(mode)})
+        try {
+            await preferences.setPreferences({themeMode: toServerThemeMode(mode)})
+        } catch (error) {
+            // The local choice stands - reverting it under the user mid-click
+            // would be worse. But it must not fail silently: the cookie now
+            // disagrees with the server, and on the next sign-in the server wins
+            // and the choice quietly disappears.
+            messageApi?.warning(
+                "The theme was applied, but could not be saved to your profile. " +
+                "It may not follow you to another browser."
+            )
+        }
     }
 
     const option = (value, label, icon, help) => ({

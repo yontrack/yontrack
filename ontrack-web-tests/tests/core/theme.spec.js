@@ -1,6 +1,7 @@
 const {expect} = require('@playwright/test');
 const {login, logout} = require("./login");
 const {test} = require("../fixtures/connection");
+const {graphQLCallMutation} = require("@ontrack/graphql");
 
 /**
  * The resolved theme is published as `data-theme` on <html>: it is what every
@@ -31,6 +32,25 @@ const closeUserMenu = async (page) => {
 
 const expectTheme = async (page, theme) =>
     expect(page.locator('html')).toHaveAttribute('data-theme', theme)
+
+/**
+ * These tests change a *server-side* preference on the shared account, and the
+ * suite runs single-worker and non-parallel - so without this every spec file
+ * scheduled after this one would drive the UI in whatever theme the last test
+ * left behind. The management token is issued for the same account the UI logs
+ * in as, so resetting through the API puts it back exactly.
+ */
+test.afterEach(async ({ontrack}) => {
+    await graphQLCallMutation(
+        ontrack.connection,
+        'setPreferences',
+        `mutation ResetThemeMode {
+            setPreferences(input: {themeMode: SYSTEM}) {
+                errors { message }
+            }
+        }`,
+    )
+})
 
 test('Switching to dark mode takes effect immediately and survives a reload', async ({page, ontrack}) => {
     await page.emulateMedia({colorScheme: 'light'})
