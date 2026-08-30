@@ -59,9 +59,12 @@ env:
   # nobody touched.
   YONTRACK_CLI_VERSION: "5.1.1"
   # Run-scoped tag used to hand the Docker images from `build` to the jobs that consume them.
+  # Keyed on the run, deliberately not on the attempt: re-running just the failed jobs must
+  # still find the images the original `build` attempt pushed. A re-run of `build` itself
+  # overwrites the same tag, which is what you want for the same commit.
   GHCR_ONTRACK: ghcr.io/${{ github.repository }}/ontrack
   GHCR_ONTRACK_UI: ghcr.io/${{ github.repository }}/ontrack-ui
-  RUN_TAG: run-${{ github.run_id }}-${{ github.run_attempt }}
+  RUN_TAG: run-${{ github.run_id }}
   # See ontrack-docs/build.gradle.kts
   YONTRACK_DOCS_EDIT: edit/${{ github.ref_name }}/ontrack-docs/docs
 
@@ -369,6 +372,10 @@ jobs:
               ontrack-extension-slack
               ontrack-extension-queue
               ontrack-extension-influxdb
+              ontrack-extension-jenkins
+              ontrack-extension-jira
+              ontrack-extension-sonarqube
+              ontrack-extension-stale
           - shard: 2
             modules: >-
               ontrack-ui-graphql
@@ -393,13 +400,9 @@ jobs:
             modules: >-
               ontrack-extension-github
               ontrack-docs
-              ontrack-extension-jenkins
-              ontrack-extension-jira
               ontrack-extension-bitbucket-cloud
               ontrack-extension-hook
               ontrack-extension-tfc
-              ontrack-extension-stale
-              ontrack-extension-sonarqube
               ontrack-extension-elastic
               ontrack-extension-delivery-metrics
               ontrack-extension-gitlab
@@ -544,6 +547,16 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
+      # Linked before anything that can fail, so the validation below can still be recorded
+      # when it does — the CLI reads its configuration from the file this step writes.
+      - name: Link to the Yontrack build
+        uses: nemerosa/ontrack-github-actions-cli-library/ontrack-cli-workflow-build@v1.0.3
+        with:
+          project: ${{ needs.yontrack.outputs.project }}
+          yontrack-url: ${{ vars.YONTRACK_URL }}
+          yontrack-token: ${{ secrets.YONTRACK_TOKEN }}
+          version: ${{ env.YONTRACK_CLI_VERSION }}
+
       - name: Log in to GHCR
         uses: docker/login-action@v3
         with:
@@ -558,14 +571,6 @@ jobs:
           docker pull "$GHCR_ONTRACK_UI:$RUN_TAG"
           docker tag "$GHCR_ONTRACK:$RUN_TAG" "nemerosa/ontrack:$BASE_VERSION"
           docker tag "$GHCR_ONTRACK_UI:$RUN_TAG" "nemerosa/ontrack-ui:$BASE_VERSION"
-
-      - name: Link to the Yontrack build
-        uses: nemerosa/ontrack-github-actions-cli-library/ontrack-cli-workflow-build@v1.0.3
-        with:
-          project: ${{ needs.yontrack.outputs.project }}
-          yontrack-url: ${{ vars.YONTRACK_URL }}
-          yontrack-token: ${{ secrets.YONTRACK_TOKEN }}
-          version: ${{ env.YONTRACK_CLI_VERSION }}
 
       # Both kdslAcceptanceTestComposeUp and the uiTest compose dependencies are guarded behind
       # `isCI` in the Gradle build, so under CI=true the workflow is expected to bring the stack
