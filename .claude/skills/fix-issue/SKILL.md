@@ -5,6 +5,10 @@ user-invocable: true
 allowed-tools:
   - Bash(gh issue view:*)
   - Bash(gh issue list:*)
+  - Bash(gh issue edit:*)
+  - Bash(gh run list:*)
+  - Bash(gh run view:*)
+  - Bash(gh run watch:*)
   - Bash(git checkout:*)
   - Bash(git branch:*)
 ---
@@ -51,7 +55,24 @@ Confirm the branch was created before proceeding.
 
 ---
 
-## Step 4 — Implement the fix
+## Step 4 — Mark the issue as in progress
+
+As soon as the branch exists, move the issue to the work-in-progress status:
+
+```bash
+gh issue edit {number} --add-label "status:wip"
+```
+
+If the issue already carries another `status:*` label (`status:ready`, `status:tomerge`,
+`status:waiting-feedback`, `status:released`), drop it in the same command so only one status is set:
+
+```bash
+gh issue edit {number} --add-label "status:wip" --remove-label "status:<previous>"
+```
+
+---
+
+## Step 5 — Implement the fix
 
 Explore the codebase to understand the affected area. Follow all patterns in CLAUDE.md:
 - Use the existing service/repository layer, don't bypass it
@@ -61,11 +82,35 @@ Explore the codebase to understand the affected area. Follow all patterns in CLA
 
 ---
 
-## Step 5 — Summarise
+## Step 6 — Land on `main` and mark the issue ready
+
+Follow the workflow lifecycle in `CLAUDE.md`: merge the branch into `main`, push, and delete the local
+branch. Then wait for the CI build on `main` for the pushed commit:
+
+```bash
+gh run list --workflow=ci.yml --branch main --limit 1 --json databaseId,headSha,status,conclusion,url
+gh run watch <run-id>
+```
+
+Only when that run's `conclusion` is `success` for the commit you pushed, move the issue to ready:
+
+```bash
+gh issue edit {number} --add-label "status:ready" --remove-label "status:wip"
+```
+
+If the build fails, leave the issue on `status:wip`, report the failure, and fix it. If the build is
+still running and waiting is impractical, leave `status:wip` and say so — never apply `status:ready`
+on an unverified build.
+
+**Never close the issue** — Damien does that himself.
+
+---
+
+## Step 7 — Summarise
 
 After implementing, provide a concise summary:
 - What was changed and in which files
 - What tests cover the fix
-- The branch name (for the user to push when ready)
+- The branch name, whether it landed on `main`, and the resulting issue status label
 
 **Never open a pull request** — leave that to the user.

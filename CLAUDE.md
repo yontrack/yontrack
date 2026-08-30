@@ -60,13 +60,54 @@ Every change follows this lifecycle, end to end — don't stop after step 2:
 
 1. **Branch locally** — before making any change, create a branch named `claude/<short-description>-pipeline`
    (use the `/fix-issue` skill when working from a GitHub issue)
-2. **Implement and test** on that branch, following the TDD order below, and commit there
-3. **Land on `main`** — merge the branch into `main`, then `git push origin main`
-4. **Delete the local branch** — `git branch -d <branch>` once it is merged
+2. **Mark the issue as in progress** — when the change comes from a GitHub issue, move it to
+   `status:wip` as soon as work starts (see *Issue status labels* below)
+3. **Implement and test** on that branch, following the TDD order below, and commit there
+4. **Land on `main`** — merge the branch into `main`, then `git push origin main`
+5. **Delete the local branch** — `git branch -d <branch>` once it is merged
+6. **Wait for the `main` build, then mark the issue ready** — once CI on `main` is green, move the
+   issue to `status:ready` (see *Issue status labels* below)
 
 - **Never** create a pull request — work lands by merging into `main` and pushing directly
 - **Never** close the GitHub issue — Damien does that after the change lands
 - If the merge is not a clean fast-forward, stop and ask before creating a merge commit or rebasing
+
+### Issue status labels
+
+Issues carry exactly one `status:*` label at a time. The two the agent workflow drives are:
+
+| Label          | When to apply                                                              |
+|----------------|----------------------------------------------------------------------------|
+| `status:wip`   | Work has started on the issue (right after creating the branch)             |
+| `status:ready` | The change is merged into `main` **and** the CI build on `main` succeeded    |
+
+Apply them with `gh`, always removing the previous status label in the same command:
+
+```bash
+# Starting work
+gh issue edit <number> --add-label "status:wip"
+
+# After the merge lands and CI on main is green
+gh issue edit <number> --add-label "status:ready" --remove-label "status:wip"
+```
+
+Check the `main` build before applying `status:ready` — the workflow is `CI` (`.github/workflows/ci.yml`),
+which runs on every push:
+
+```bash
+# Latest CI run on main for the commit that was just pushed
+gh run list --workflow=ci.yml --branch main --limit 1 --json headSha,status,conclusion,url
+
+# Block until it finishes (use the run id from the command above)
+gh run watch <run-id>
+```
+
+Only a `conclusion` of `success` for the pushed commit earns `status:ready`. If the build fails, leave
+the issue at `status:wip`, report the failure, and fix it before moving on. If the build is still running
+and waiting is impractical, say so explicitly — never apply `status:ready` on an unverified build.
+
+These `status:*` labels are the issue *lifecycle*; they are distinct from the triage labels described in
+`docs/agents/triage-labels.md` and must never be substituted for them.
 
 ### Development Process (TDD)
 
