@@ -76,6 +76,14 @@ jobs:
 
   setup:
     name: Setup
+    # `on: push` carries no branch filter, so a branch living in this repo is already built by
+    # its push event. Building it again for the pull request doubles every run for no extra
+    # signal: the push run targets the same head SHA, so its checks show on the pull request
+    # anyway, and main requires no status checks. Fork pull requests are the exception — no
+    # push event reaches this repo for them, so `pull_request` is the only trigger they get.
+    #
+    # Every other job needs this one, so skipping it here skips the whole duplicate run.
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     outputs:
