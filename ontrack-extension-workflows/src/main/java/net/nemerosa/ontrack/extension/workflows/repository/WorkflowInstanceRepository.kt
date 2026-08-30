@@ -2,6 +2,7 @@ package net.nemerosa.ontrack.extension.workflows.repository
 
 import com.fasterxml.jackson.databind.JsonNode
 import net.nemerosa.ontrack.common.Time
+import net.nemerosa.ontrack.extension.workflows.definition.Workflow
 import net.nemerosa.ontrack.extension.workflows.engine.WorkflowInstance
 import net.nemerosa.ontrack.extension.workflows.engine.WorkflowInstanceFilter
 import net.nemerosa.ontrack.extension.workflows.engine.WorkflowInstanceNode
@@ -171,19 +172,36 @@ class WorkflowInstanceRepository(
             id: String,
             nodesExecutions: List<WorkflowInstanceNode>,
             contexts: Map<String, TemplatingContextData>,
-        ) = WorkflowInstance(
-            id = id,
-            timestamp = timestamp,
-            workflow = workflow.parse(),
-            event = event.parse(),
-            triggerData = if (triggerId != null && triggerData != null) {
-                TriggerData(id = triggerId, data = triggerData)
-            } else {
-                null
-            },
-            contexts = contexts,
-            nodesExecutions = nodesExecutions,
-        )
+        ): WorkflowInstance {
+            val parsedWorkflow = workflow.parse<Workflow>()
+            return WorkflowInstance(
+                id = id,
+                timestamp = timestamp,
+                workflow = parsedWorkflow,
+                event = event.parse(),
+                triggerData = if (triggerId != null && triggerData != null) {
+                    TriggerData(id = triggerId, data = triggerData)
+                } else {
+                    null
+                },
+                contexts = contexts,
+                nodesExecutions = nodesExecutions.orderedLike(parsedWorkflow),
+            )
+        }
+
+        /**
+         * Node executions come back from the database in no particular order -- the queries have no
+         * ORDER BY, and which index the planner picks decides what order they happen to arrive in.
+         * They are ordered here to match the node declaration order of the workflow, which is the
+         * order [createInstance] builds them in and the order a reader expects to see them.
+         *
+         * Executions with no matching node in the definition (which should not happen) are kept, at
+         * the end, rather than silently dropped.
+         */
+        private fun List<WorkflowInstanceNode>.orderedLike(workflow: Workflow): List<WorkflowInstanceNode> {
+            val rank = workflow.nodes.withIndex().associate { (index, node) -> node.id to index }
+            return sortedBy { rank[it.id] ?: Int.MAX_VALUE }
+        }
     }
 
     private fun toWorkflowInstance(rs: ResultSet): WorkflowInstance {

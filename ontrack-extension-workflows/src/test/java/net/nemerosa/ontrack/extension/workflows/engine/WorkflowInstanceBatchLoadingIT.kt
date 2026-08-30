@@ -130,6 +130,35 @@ class WorkflowInstanceBatchLoadingIT : AbstractWorkflowTestSupport() {
         )
     }
 
+    /**
+     * The node queries have no ORDER BY, so the order rows arrive in depends on which index the
+     * planner picks -- dropping a redundant index in #1654 silently reversed it. The repository
+     * therefore orders executions by the node declaration order of the workflow, and that is
+     * asserted here for both loading paths.
+     *
+     * `simpleLinearWorkflowYaml` declares `start` then `end`, which is the reverse of their
+     * alphabetical order, so this fails if the database order is ever taken as-is again.
+     */
+    @Test
+    fun `Node executions follow the workflow declaration order`() {
+        val instance = newInstance()
+        val declared = instance.workflow.nodes.map { it.id }
+        assertEquals(listOf("start", "end"), declared, "Fixture must not be in alphabetical order")
+
+        assertEquals(
+            declared,
+            assertNotNull(workflowInstanceRepository.findWorkflowInstance(instance.id))
+                .nodesExecutions.map { it.id },
+            "Single loading must follow the declaration order",
+        )
+        assertEquals(
+            declared,
+            assertNotNull(workflowInstanceRepository.findWorkflowInstances(listOf(instance.id)).firstOrNull())
+                .nodesExecutions.map { it.id },
+            "Batched loading must follow the declaration order",
+        )
+    }
+
     @Test
     fun `Unknown ids are skipped`() {
         val instance = newInstance()
