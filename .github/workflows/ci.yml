@@ -81,7 +81,7 @@ jobs:
     outputs:
       version: ${{ steps.version.outputs.version }}
       base_version: ${{ steps.version.outputs.base_version }}
-      secrets_available: ${{ steps.params.outputs.secrets_available }}
+      full_run: ${{ steps.params.outputs.full_run }}
       release: ${{ steps.params.outputs.release }}
       just_build_and_push: ${{ steps.params.outputs.just_build_and_push }}
       skip_kdsl_acceptance: ${{ steps.params.outputs.skip_kdsl_acceptance }}
@@ -124,8 +124,7 @@ jobs:
           IN_SKIP_NEXT_UI_TESTS: ${{ inputs.SKIP_NEXT_UI_TESTS }}
           IN_SKIP_GITHUB_IT: ${{ inputs.SKIP_GITHUB_IT }}
           IN_SKIP_BITBUCKET_CLOUD_IT: ${{ inputs.SKIP_BITBUCKET_CLOUD_IT }}
-          PR_HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
-          THIS_REPO: ${{ github.repository }}
+          ACTOR: ${{ github.actor }}
         run: |
           set -euo pipefail
 
@@ -138,16 +137,25 @@ jobs:
             fi
           }
 
-          # Fork pull requests get no secrets and a read-only GITHUB_TOKEN, so every Yontrack
-          # step, the GHCR push and everything downstream of it has to be skipped for them.
-          if [ "$EVENT_NAME" = "pull_request" ] && [ "$PR_HEAD_REPO" != "$THIS_REPO" ]; then
-            secrets_available=false
+          # Yontrack never runs for a pull request, and neither does anything that needs a
+          # credential: the GHCR hand-off and the jobs that consume its images.
+          #
+          # Dependabot is excluded on the same grounds but for a different reason — GitHub gives
+          # a Dependabot-triggered run a read-only token and no access to Actions secrets, and
+          # that applies to its `push` events as well as its pull requests. Keying this on the
+          # event alone left the Yontrack job failing on every Dependabot branch and taking the
+          # whole run down with it.
+          #
+          # What is left for a pull request is what §6 already described for forks: compile,
+          # unit tests, the Docker image build and the credential-free integration tests.
+          if [ "$EVENT_NAME" = "pull_request" ] || [ "$ACTOR" = "dependabot[bot]" ]; then
+            full_run=false
           else
-            secrets_available=true
+            full_run=true
           fi
 
           {
-            echo "secrets_available=$secrets_available"
+            echo "full_run=$full_run"
             echo "release=$(resolve "$IN_RELEASE" false)"
             echo "just_build_and_push=$(resolve "$IN_JUST_BUILD_AND_PUSH" false)"
             echo "skip_kdsl_acceptance=$(resolve "$IN_SKIP_KDSL_ACCEPTANCE" false)"
@@ -192,7 +200,7 @@ jobs:
   yontrack:
     name: Yontrack
     needs: setup
-    if: needs.setup.outputs.secrets_available == 'true'
+    if: needs.setup.outputs.full_run == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     outputs:
@@ -240,7 +248,7 @@ jobs:
     env:
       VERSION: ${{ needs.setup.outputs.version }}
       BASE_VERSION: ${{ needs.setup.outputs.base_version }}
-      SECRETS_AVAILABLE: ${{ needs.setup.outputs.secrets_available }}
+      FULL_RUN: ${{ needs.setup.outputs.full_run }}
       JUST_BUILD_AND_PUSH: ${{ needs.setup.outputs.just_build_and_push }}
     steps:
       - uses: actions/checkout@v4
@@ -274,7 +282,7 @@ jobs:
           restore-keys: npm-${{ runner.os }}-
 
       - name: Link to the Yontrack build
-        if: env.SECRETS_AVAILABLE == 'true'
+        if: env.FULL_RUN == 'true'
         uses: nemerosa/ontrack-github-actions-cli-library/ontrack-cli-workflow-build@v1.0.3
         with:
           project: ${{ needs.yontrack.outputs.project }}
@@ -298,13 +306,13 @@ jobs:
       # `outcome` is empty only when the step was skipped, so a broken build still records
       # FAILED — which is the case worth seeing in Yontrack.
       - name: Validate BUILD
-        if: ${{ !cancelled() && env.SECRETS_AVAILABLE == 'true' && steps.build.outcome != '' }}
+        if: ${{ !cancelled() && env.FULL_RUN == 'true' && steps.build.outcome != '' }}
         run: |
           yontrack validate --validation BUILD \
             junit --pattern "**/build/test-results/**/*.xml" --fail-when-no-results
 
       - name: Validate UI_UNIT
-        if: ${{ !cancelled() && env.SECRETS_AVAILABLE == 'true' && steps.build.outcome != '' }}
+        if: ${{ !cancelled() && env.FULL_RUN == 'true' && steps.build.outcome != '' }}
         run: |
           yontrack validate --validation UI_UNIT \
             junit --pattern "ontrack-web-core/reports/*.xml" --fail-when-no-results
@@ -333,7 +341,7 @@ jobs:
       # runners they have to be transferred; GHCR is free for public repositories and far
       # faster than `docker save` through upload-artifact.
       - name: Log in to GHCR
-        if: env.SECRETS_AVAILABLE == 'true'
+        if: env.FULL_RUN == 'true'
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
@@ -341,7 +349,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Push the images to GHCR
-        if: env.SECRETS_AVAILABLE == 'true'
+        if: env.FULL_RUN == 'true'
         run: |
           set -euo pipefail
           docker tag "nemerosa/ontrack:$BASE_VERSION" "$GHCR_ONTRACK:$RUN_TAG"
@@ -512,7 +520,7 @@ jobs:
     if: >-
       ${{ !cancelled()
         && needs.build.result == 'success'
-        && needs.setup.outputs.secrets_available == 'true'
+        && needs.setup.outputs.full_run == 'true'
         && needs.setup.outputs.skip_kdsl_acceptance != 'true'
         && needs.setup.outputs.just_build_and_push != 'true' }}
     runs-on: ubuntu-latest
@@ -613,7 +621,7 @@ jobs:
     if: >-
       ${{ !cancelled()
         && needs.build.result == 'success'
-        && needs.setup.outputs.secrets_available == 'true'
+        && needs.setup.outputs.full_run == 'true'
         && needs.setup.outputs.skip_next_ui_tests != 'true'
         && needs.setup.outputs.just_build_and_push != 'true' }}
     runs-on: ubuntu-latest
@@ -740,7 +748,7 @@ jobs:
   ui-tests-report:
     name: UI tests report
     needs: [setup, yontrack, ui-tests]
-    if: ${{ !cancelled() && needs.setup.outputs.secrets_available == 'true' && needs.ui-tests.result != 'skipped' }}
+    if: ${{ !cancelled() && needs.setup.outputs.full_run == 'true' && needs.ui-tests.result != 'skipped' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -807,7 +815,7 @@ jobs:
         && needs.kdsl.result != 'failure'
         && needs.ui-tests.result != 'failure'
         && needs.ui-tests-report.result != 'failure'
-        && needs.setup.outputs.secrets_available == 'true'
+        && needs.setup.outputs.full_run == 'true'
         && needs.setup.outputs.release == 'true'
         && (github.ref_name == 'main'
             || startsWith(github.ref_name, 'release/')
@@ -882,7 +890,7 @@ jobs:
         && needs.kdsl.result != 'failure'
         && needs.ui-tests.result != 'failure'
         && needs.ui-tests-report.result != 'failure'
-        && needs.setup.outputs.secrets_available == 'true'
+        && needs.setup.outputs.full_run == 'true'
         && needs.setup.outputs.release == 'true'
         && (github.ref_name == 'main' || startsWith(github.ref_name, 'release/')) }}
     runs-on: ubuntu-latest
@@ -949,7 +957,7 @@ jobs:
         && needs.kdsl.result != 'failure'
         && needs.ui-tests.result != 'failure'
         && needs.ui-tests-report.result != 'failure'
-        && needs.setup.outputs.secrets_available == 'true'
+        && needs.setup.outputs.full_run == 'true'
         && needs.setup.outputs.release == 'true'
         && (github.ref_name == 'main' || startsWith(github.ref_name, 'release/')) }}
     runs-on: ubuntu-latest
