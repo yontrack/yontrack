@@ -13,6 +13,8 @@ configuration:
           tests: {}
         PLAYWRIGHT:
           tests: {}
+        DOCKER.HUB: {}
+        GITHUB.RELEASE: {}
         DOCUMENTATION: {}
       promotions:
         BRONZE:

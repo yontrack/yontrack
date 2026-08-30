@@ -37,3 +37,8 @@ ontrack-extension-*/node_modules
 # Local Casc configuration
 /casc
 
+
+# `build` above is unanchored, so it also matches the net.nemerosa.ontrack.build *package*
+# directory under buildSrc, silently dropping any new source file added there.
+!buildSrc/src/main/kotlin/net/nemerosa/ontrack/build/
+!buildSrc/src/test/kotlin/net/nemerosa/ontrack/build/

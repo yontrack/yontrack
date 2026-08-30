@@ -1,0 +1,916 @@
+# Yontrack CI.
+#
+# Replaces the former Jenkins multibranch pipeline. Two things shape the layout:
+#
+#  * One Yontrack build per workflow run. The `yontrack` job registers it and every other job
+#    links to it by commit. Calling the `-config` action more than once would register a
+#    different build per job and every validation would then fail with `Build not found`.
+#  * The Jenkins agent ran with the Docker socket mounted and `--network host`, so compose's
+#    published ports resolved as `localhost`. A `container:` job does not reproduce that —
+#    compose publishes on the runner host, not inside the job container — so no job uses one.
+name: CI
+
+on:
+  # The Jenkins job was a multibranch pipeline building every branch, so there is no branch
+  # filter here either. This is also what makes the workflow verifiable from a working branch.
+  push:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      RELEASE:
+        description: Perform release operations (Docker Hub push, GitHub Release, Documentation)
+        type: boolean
+        default: false
+      JUST_BUILD_AND_PUSH:
+        description: Just create the Docker images and push them
+        type: boolean
+        default: false
+      SKIP_KDSL_ACCEPTANCE:
+        description: Skipping KDSL acceptance tests
+        type: boolean
+        default: false
+      SKIP_NEXT_UI_TESTS:
+        description: Skipping legacy acceptance tests
+        type: boolean
+        default: false
+      SKIP_GITHUB_IT:
+        description: Skipping integration tests for GitHub
+        type: boolean
+        default: true
+      SKIP_BITBUCKET_CLOUD_IT:
+        description: Skipping integration tests for Bitbucket Cloud
+        type: boolean
+        default: true
+
+# `disableConcurrentBuilds()`. Jenkins queued rather than cancelled, hence no cancel-in-progress.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  # The versioning plugin appends `-dev` unless CI is set. GitHub sets this already; stated
+  # here so the version shape does not depend on an implicit runner default.
+  CI: "true"
+  # Pinned: an unpinned CLI lets a Yontrack release turn a green pipeline red in a repository
+  # nobody touched.
+  YONTRACK_CLI_VERSION: "5.1.1"
+  # Run-scoped tag used to hand the Docker images from `build` to the jobs that consume them.
+  GHCR_ONTRACK: ghcr.io/${{ github.repository }}/ontrack
+  GHCR_ONTRACK_UI: ghcr.io/${{ github.repository }}/ontrack-ui
+  RUN_TAG: run-${{ github.run_id }}-${{ github.run_attempt }}
+  # See ontrack-docs/build.gradle.kts
+  YONTRACK_DOCS_EDIT: edit/${{ github.ref_name }}/ontrack-docs/docs
+
+jobs:
+
+  # ---------------------------------------------------------------------------------------------
+  # Version and parameters, resolved once for the whole run.
+  # ---------------------------------------------------------------------------------------------
+
+  setup:
+    name: Setup
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      base_version: ${{ steps.version.outputs.base_version }}
+      internal: ${{ steps.params.outputs.internal }}
+      release: ${{ steps.params.outputs.release }}
+      just_build_and_push: ${{ steps.params.outputs.just_build_and_push }}
+      skip_kdsl_acceptance: ${{ steps.params.outputs.skip_kdsl_acceptance }}
+      skip_next_ui_tests: ${{ steps.params.outputs.skip_next_ui_tests }}
+      skip_github_it: ${{ steps.params.outputs.skip_github_it }}
+      skip_bitbucket_cloud_it: ${{ steps.params.outputs.skip_bitbucket_cloud_it }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # findLatestPatchVersion() reads `git tag -l`; without the tags every version
+          # computes as `.0`.
+          fetch-depth: 0
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: zulu
+          java-version: "21"
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      # `inputs` is only populated on workflow_dispatch, so every parameter needs a fallback
+      # for `push` and `pull_request`. The booleans arrive as the strings "true"/"false".
+      - name: Resolve the parameters
+        id: params
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          IN_RELEASE: ${{ inputs.RELEASE }}
+          IN_JUST_BUILD_AND_PUSH: ${{ inputs.JUST_BUILD_AND_PUSH }}
+          IN_SKIP_KDSL_ACCEPTANCE: ${{ inputs.SKIP_KDSL_ACCEPTANCE }}
+          IN_SKIP_NEXT_UI_TESTS: ${{ inputs.SKIP_NEXT_UI_TESTS }}
+          IN_SKIP_GITHUB_IT: ${{ inputs.SKIP_GITHUB_IT }}
+          IN_SKIP_BITBUCKET_CLOUD_IT: ${{ inputs.SKIP_BITBUCKET_CLOUD_IT }}
+          PR_HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          THIS_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          # $1 = value supplied by workflow_dispatch, $2 = default for the other events
+          resolve() {
+            if [ "$EVENT_NAME" = "workflow_dispatch" ] && [ -n "$1" ]; then
+              echo "$1"
+            else
+              echo "$2"
+            fi
+          }
+
+          # Fork pull requests get no secrets and a read-only GITHUB_TOKEN, so every Yontrack
+          # step, the GHCR push and everything downstream of it has to be skipped for them.
+          if [ "$EVENT_NAME" = "pull_request" ] && [ "$PR_HEAD_REPO" != "$THIS_REPO" ]; then
+            internal=false
+          else
+            internal=true
+          fi
+
+          {
+            echo "internal=$internal"
+            echo "release=$(resolve "$IN_RELEASE" false)"
+            echo "just_build_and_push=$(resolve "$IN_JUST_BUILD_AND_PUSH" false)"
+            echo "skip_kdsl_acceptance=$(resolve "$IN_SKIP_KDSL_ACCEPTANCE" false)"
+            echo "skip_next_ui_tests=$(resolve "$IN_SKIP_NEXT_UI_TESTS" false)"
+            echo "skip_github_it=$(resolve "$IN_SKIP_GITHUB_IT" true)"
+            echo "skip_bitbucket_cloud_it=$(resolve "$IN_SKIP_BITBUCKET_CLOUD_IT" true)"
+          } >> "$GITHUB_OUTPUT"
+
+          cat "$GITHUB_OUTPUT"
+
+      - name: Compute the version
+        id: version
+        env:
+          BRANCH_NAME: ${{ github.ref_name }}
+          RELEASE: ${{ steps.params.outputs.release }}
+          RUN_NUMBER: ${{ github.run_number }}
+        run: |
+          set -euo pipefail
+          ./gradlew writeVersion --stacktrace --parallel --console plain
+
+          # What Gradle tags the Docker images with.
+          BASE_VERSION="$(cat build/version.txt)"
+          VERSION="$BASE_VERSION"
+
+          # Non-release builds on the release branches are release candidates.
+          if [ "$RELEASE" != "true" ]; then
+            case "$BRANCH_NAME" in
+              main|release/*) VERSION="${BASE_VERSION}-rc-${RUN_NUMBER}" ;;
+            esac
+          fi
+
+          echo "base_version=$BASE_VERSION" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Base version = $BASE_VERSION"
+          echo "Version      = $VERSION"
+          echo "### Version \`$VERSION\`" >> "$GITHUB_STEP_SUMMARY"
+
+  # ---------------------------------------------------------------------------------------------
+  # Registers the Yontrack build. Runs first and does nothing else.
+  # ---------------------------------------------------------------------------------------------
+
+  yontrack:
+    name: Yontrack
+    needs: setup
+    if: needs.setup.outputs.internal == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      project: ${{ steps.config.outputs.projectName }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Register the build
+        id: config
+        uses: nemerosa/ontrack-github-actions-cli-config@v2.0.0
+        env:
+          YONTRACK_URL: ${{ vars.YONTRACK_URL }}
+          YONTRACK_TOKEN: ${{ secrets.YONTRACK_TOKEN }}
+          # Forwarded to the ci.yaml template as `--env VERSION=...`; the `environment-regex`
+          # condition in .yontrack/ci.yaml keys the release notification off it.
+          VERSION: ${{ needs.setup.outputs.version }}
+        with:
+          version: ${{ env.YONTRACK_CLI_VERSION }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Record the version on the build
+        env:
+          VERSION: ${{ needs.setup.outputs.version }}
+        run: yontrack build set-property release "$VERSION"
+
+  # ---------------------------------------------------------------------------------------------
+  # Compile, unit tests, UI unit tests, Docker images.
+  #
+  # Integration tests are deliberately excluded: `build` -> `check` -> `integrationTest` drags in
+  # 547 IT classes across 34 modules, which is by far the largest cost on a 4 vCPU runner. They
+  # run in the sharded `integration` job instead.
+  #
+  # `buildDocs` is excluded for a different reason: it renders a nav that points at
+  # ontrack-docs/docs/content/generated/, which is gitignored and produced by the ontrack-docs
+  # integration tests. With those tests moved out of this job the site would silently come out
+  # missing every generated section, so the docs are built where their generator runs.
+  # ---------------------------------------------------------------------------------------------
+
+  build:
+    name: Build
+    needs: [setup, yontrack]
+    if: ${{ !cancelled() && needs.setup.result == 'success' && needs.yontrack.result != 'failure' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      VERSION: ${{ needs.setup.outputs.version }}
+      BASE_VERSION: ${{ needs.setup.outputs.base_version }}
+      INTERNAL: ${{ needs.setup.outputs.internal }}
+      JUST_BUILD_AND_PUSH: ${{ needs.setup.outputs.just_build_and_push }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: zulu
+          java-version: "21"
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      # No actions/setup-node: the Gradle node plugin downloads its own Node (23.7.0 for
+      # ontrack-web-core), and a runner-level Node would fight it.
+      - name: Cache the npm downloads
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: npm-${{ runner.os }}-${{ hashFiles('ontrack-web-core/package-lock.json') }}
+          restore-keys: npm-${{ runner.os }}-
+
+      - name: Link to the Yontrack build
+        if: env.INTERNAL == 'true'
+        uses: nemerosa/ontrack-github-actions-cli-library/ontrack-cli-workflow-build@v1.0.3
+        with:
+          project: ${{ needs.yontrack.outputs.project }}
+          yontrack-url: ${{ vars.YONTRACK_URL }}
+          yontrack-token: ${{ secrets.YONTRACK_TOKEN }}
+          version: ${{ env.YONTRACK_CLI_VERSION }}
+
+      - name: Build
+        id: build
+        if: env.JUST_BUILD_AND_PUSH != 'true'
+        run: |
+          ./gradlew build -x integrationTest -x buildDocs \
+            --stacktrace \
+            --parallel \
+            --console plain
+
+      # `outcome` is empty only when the step was skipped, so a broken build still records
+      # FAILED — which is the case worth seeing in Yontrack.
+      - name: Validate BUILD
+        if: ${{ !cancelled() && env.INTERNAL == 'true' && steps.build.outcome != '' }}
+        run: |
+          yontrack validate --validation BUILD \
+            junit --pattern "**/build/test-results/**/*.xml" --fail-when-no-results
+
+      - name: Validate UI_UNIT
+        if: ${{ !cancelled() && env.INTERNAL == 'true' && steps.build.outcome != '' }}
+        run: |
+          yontrack validate --validation UI_UNIT \
+            junit --pattern "ontrack-web-core/reports/*.xml" --fail-when-no-results
+
+      - name: Build the Docker images
+        run: |
+          ./gradlew dockerBuild jibDockerBuild \
+            --stacktrace \
+            --parallel \
+            --console plain
+
+      # On Jenkins one agent shared a Docker daemon and the images just stayed put. Across
+      # runners they have to be transferred; GHCR is free for public repositories and far
+      # faster than `docker save` through upload-artifact.
+      - name: Log in to GHCR
+        if: env.INTERNAL == 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push the images to GHCR
+        if: env.INTERNAL == 'true'
+        run: |
+          set -euo pipefail
+          docker tag "nemerosa/ontrack:$BASE_VERSION" "$GHCR_ONTRACK:$RUN_TAG"
+          docker tag "nemerosa/ontrack-ui:$BASE_VERSION" "$GHCR_ONTRACK_UI:$RUN_TAG"
+          docker push "$GHCR_ONTRACK:$RUN_TAG"
+          docker push "$GHCR_ONTRACK_UI:$RUN_TAG"
+
+  # ---------------------------------------------------------------------------------------------
+  # Integration tests, sharded. Each shard brings up its own compose/docker-compose-it.yml stack
+  # (via the integrationTest -> integrationTestComposeUp dependency) — they are isolated per
+  # runner, so that is safe.
+  # ---------------------------------------------------------------------------------------------
+
+  integration:
+    name: Integration (shard ${{ matrix.shard }})
+    needs: [setup, build]
+    if: ${{ !cancelled() && needs.build.result == 'success' && needs.setup.outputs.just_build_and_push != 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - shard: 1
+            modules: >-
+              ontrack-service
+              ontrack-extension-notifications
+              ontrack-extension-slack
+              ontrack-extension-queue
+              ontrack-extension-influxdb
+          - shard: 2
+            modules: >-
+              ontrack-ui-graphql
+              ontrack-extension-casc
+              ontrack-ui
+              ontrack-repository-impl
+          - shard: 3
+            modules: >-
+              ontrack-extension-general
+              ontrack-extension-environments
+              ontrack-extension-indicators
+              ontrack-extension-chart
+              ontrack-extension-config
+          - shard: 4
+            modules: >-
+              ontrack-extension-auto-versioning
+              ontrack-extension-git
+              ontrack-extension-scm
+              ontrack-extension-workflows
+              ontrack-extension-stash
+          - shard: 5
+            modules: >-
+              ontrack-extension-github
+              ontrack-docs
+              ontrack-extension-jenkins
+              ontrack-extension-jira
+              ontrack-extension-bitbucket-cloud
+              ontrack-extension-hook
+              ontrack-extension-tfc
+              ontrack-extension-stale
+              ontrack-extension-sonarqube
+              ontrack-extension-elastic
+              ontrack-extension-delivery-metrics
+              ontrack-extension-gitlab
+              ontrack-extension-vault
+              ontrack-extension-recordings
+              ontrack-extension-issues
+              ontrack-extension-artifactory
+    env:
+      # Bitbucket Cloud system tests
+      ONTRACK_TEST_EXTENSION_BITBUCKET_CLOUD_WORKSPACE: ${{ secrets.ONTRACK_TEST_EXTENSION_BITBUCKET_CLOUD_WORKSPACE }}
+      ONTRACK_TEST_EXTENSION_BITBUCKET_CLOUD_USER: ${{ secrets.ONTRACK_TEST_EXTENSION_BITBUCKET_CLOUD_USER }}
+      ONTRACK_TEST_EXTENSION_BITBUCKET_CLOUD_TOKEN: ${{ secrets.ONTRACK_TEST_EXTENSION_BITBUCKET_CLOUD_TOKEN }}
+      ONTRACK_TEST_EXTENSION_BITBUCKET_CLOUD_EXPECTED_PROJECT: ONTRACK
+      ONTRACK_TEST_EXTENSION_BITBUCKET_CLOUD_EXPECTED_REPOSITORY: ontrack-pipeline-bitbucket-cloud
+      ONTRACK_TEST_EXTENSION_BITBUCKET_CLOUD_IGNORE: ${{ needs.setup.outputs.skip_bitbucket_cloud_it }}
+      # GitHub system tests. These are plain configuration, not secrets.
+      ONTRACK_TEST_EXTENSION_GITHUB_USER: ${{ secrets.ONTRACK_TEST_EXTENSION_GITHUB_USER }}
+      ONTRACK_TEST_EXTENSION_GITHUB_TOKEN: ${{ secrets.ONTRACK_TEST_EXTENSION_GITHUB_TOKEN }}
+      ONTRACK_TEST_EXTENSION_GITHUB_APP_PEM: ${{ secrets.ONTRACK_TEST_EXTENSION_GITHUB_APP_PEM }}
+      ONTRACK_TEST_EXTENSION_GITHUB_IGNORE: ${{ needs.setup.outputs.skip_github_it }}
+      ONTRACK_TEST_EXTENSION_GITHUB_ORGANIZATION: nemerosa
+      ONTRACK_TEST_EXTENSION_GITHUB_REPOSITORY: ontrack-github-integration-test
+      ONTRACK_TEST_EXTENSION_GITHUB_BRANCH: v1
+      ONTRACK_TEST_EXTENSION_GITHUB_PR: "3"
+      ONTRACK_TEST_EXTENSION_GITHUB_TEAM: ontrack-integration-tests
+      ONTRACK_TEST_EXTENSION_GITHUB_APP_ID: "143291"
+      ONTRACK_TEST_EXTENSION_GITHUB_APP_INSTALLATION: nemerosa
+      ONTRACK_TEST_EXTENSION_GITHUB_PATHS_IMAGES_PROMOTION: images/iron.png
+      ONTRACK_TEST_EXTENSION_GITHUB_PATHS_IMAGES_VALIDATION: images/site.png
+      ONTRACK_TEST_EXTENSION_GITHUB_CHANGELOG_FROM: 5b0db7c7132eaf29820b42aef3a018a47e1f411f
+      ONTRACK_TEST_EXTENSION_GITHUB_CHANGELOG_TO: 36e95eded56bcfead06a55238ccb315fbfe211a8
+      ONTRACK_TEST_EXTENSION_GITHUB_CHANGELOG_MESSAGES: nemerosa/ontrack#978 Promotion image|nemerosa/ontrack#978 Validation image|nemerosa/ontrack#928 Explicitly skipping the jobs|nemerosa/ontrack#928 Sample GitHub ingestion configuration file
+      ONTRACK_TEST_EXTENSION_GITHUB_ISSUES_FROM: 36e95eded56bcfead06a55238ccb315fbfe211a8
+      ONTRACK_TEST_EXTENSION_GITHUB_ISSUES_ISSUE: "1"
+      ONTRACK_TEST_EXTENSION_GITHUB_ISSUES_ISSUE_COMMIT: 901130bc4655a8180c2034f0619768c7343095bb
+      ONTRACK_TEST_EXTENSION_GITHUB_ISSUES_ISSUESUMMARY: Test issue
+      ONTRACK_TEST_EXTENSION_GITHUB_ISSUES_TO: 901130bc4655a8180c2034f0619768c7343095bb
+      ONTRACK_TEST_EXTENSION_GITHUB_ISSUES_MESSAGES: "#1 Commit with issue"
+      ONTRACK_TEST_EXTENSION_GITHUB_ISSUES_ISSUELABELS: type:defect
+      ONTRACK_TEST_EXTENSION_GITHUB_ISSUES_MILESTONE: v1
+      ONTRACK_TEST_EXTENSION_GITHUB_ACTIONS_WORKFLOWID: main.yml
+      ONTRACK_TEST_EXTENSION_GITHUB_ACTIONS_BRANCH: main
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: zulu
+          java-version: "21"
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      # ontrack-docs' documentation ITs shell out to `dot`.
+      - name: Install graphviz
+        if: matrix.shard == 5
+        run: sudo apt-get update && sudo apt-get install --no-install-recommends -y graphviz
+
+      - name: Integration tests
+        env:
+          MODULES: ${{ matrix.modules }}
+        run: |
+          set -euo pipefail
+          TASKS=""
+          for module in $MODULES; do
+            TASKS="$TASKS :$module:integrationTest"
+          done
+          echo "Running:$TASKS"
+          # integrationTest forks a 3072m JVM per module and --parallel will happily run
+          # several at once; two workers is what a 16 GB runner takes alongside the compose
+          # stack without turning into an OOM.
+          # shellcheck disable=SC2086
+          ./gradlew $TASKS \
+            --stacktrace \
+            --parallel \
+            --max-workers 2 \
+            --console plain
+
+      - name: Upload the test results
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-results-shard-${{ matrix.shard }}
+          path: "**/build/test-results/integrationTest/**/*.xml"
+          if-no-files-found: ignore
+          retention-days: 7
+
+  # ---------------------------------------------------------------------------------------------
+  # KDSL acceptance tests.
+  # ---------------------------------------------------------------------------------------------
+
+  kdsl:
+    name: KDSL acceptance tests
+    needs: [setup, yontrack, build]
+    if: >-
+      ${{ !cancelled()
+        && needs.build.result == 'success'
+        && needs.setup.outputs.internal == 'true'
+        && needs.setup.outputs.skip_kdsl_acceptance != 'true'
+        && needs.setup.outputs.just_build_and_push != 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      BASE_VERSION: ${{ needs.setup.outputs.base_version }}
+      # The compose files resolve the images as nemerosa/ontrack:${ONTRACK_VERSION:-latest}.
+      ONTRACK_VERSION: ${{ needs.setup.outputs.base_version }}
+      # Non empty is enough to activate the GitHub tests
+      ONTRACK_TEST_EXTENSION_GITHUB_ORGANIZATION: ${{ secrets.ONTRACK_ACCEPTANCE_GITHUB_ORGANIZATION }}
+      ONTRACK_ACCEPTANCE_GITHUB_ORGANIZATION: ${{ secrets.ONTRACK_ACCEPTANCE_GITHUB_ORGANIZATION }}
+      ONTRACK_ACCEPTANCE_GITHUB_TOKEN: ${{ secrets.ONTRACK_ACCEPTANCE_GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: zulu
+          java-version: "21"
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Restore the Docker images
+        run: |
+          set -euo pipefail
+          docker pull "$GHCR_ONTRACK:$RUN_TAG"
+          docker pull "$GHCR_ONTRACK_UI:$RUN_TAG"
+          docker tag "$GHCR_ONTRACK:$RUN_TAG" "nemerosa/ontrack:$BASE_VERSION"
+          docker tag "$GHCR_ONTRACK_UI:$RUN_TAG" "nemerosa/ontrack-ui:$BASE_VERSION"
+
+      - name: Link to the Yontrack build
+        uses: nemerosa/ontrack-github-actions-cli-library/ontrack-cli-workflow-build@v1.0.3
+        with:
+          project: ${{ needs.yontrack.outputs.project }}
+          yontrack-url: ${{ vars.YONTRACK_URL }}
+          yontrack-token: ${{ secrets.YONTRACK_TOKEN }}
+          version: ${{ env.YONTRACK_CLI_VERSION }}
+
+      # Both kdslAcceptanceTestComposeUp and the uiTest compose dependencies are guarded behind
+      # `isCI` in the Gradle build, so under CI=true the workflow is expected to bring the stack
+      # up itself.
+      - name: Start the environment
+        run: |
+          ./gradlew :ontrack-kdsl-acceptance:kdslAcceptanceTestComposeUp \
+            --stacktrace --console plain
+
+      - name: KDSL acceptance tests
+        id: kdsl
+        run: |
+          ./gradlew :ontrack-kdsl-acceptance:kdslAcceptanceTest \
+            --stacktrace \
+            --parallel \
+            --console plain
+
+      - name: Validate KDSL.ACCEPTANCE
+        if: ${{ !cancelled() && steps.kdsl.outcome != '' }}
+        run: |
+          yontrack validate --validation KDSL.ACCEPTANCE \
+            junit --pattern "ontrack-kdsl-acceptance/build/test-results/**/*.xml" --fail-when-no-results
+
+      - name: Upload the KDSL logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kdsl-logs
+          path: ontrack-kdsl-acceptance/build/logs/**
+          if-no-files-found: ignore
+          retention-days: 7
+
+  # ---------------------------------------------------------------------------------------------
+  # Playwright UI tests, one runner per authentication variant.
+  # ---------------------------------------------------------------------------------------------
+
+  ui-tests:
+    name: UI tests (${{ matrix.variant }})
+    needs: [setup, build]
+    if: >-
+      ${{ !cancelled()
+        && needs.build.result == 'success'
+        && needs.setup.outputs.internal == 'true'
+        && needs.setup.outputs.skip_next_ui_tests != 'true'
+        && needs.setup.outputs.just_build_and_push != 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - variant: main
+            compose: kdslAcceptanceTestComposeUp
+            task: uiTest
+          - variant: ldap
+            compose: kdslLdapComposeUp
+            task: uiLdapTest
+          - variant: oidc
+            compose: kdslOidcComposeUp
+            task: uiOidcTest
+    env:
+      BASE_VERSION: ${{ needs.setup.outputs.base_version }}
+      ONTRACK_VERSION: ${{ needs.setup.outputs.base_version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: zulu
+          java-version: "21"
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Cache the Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('ontrack-web-tests/package-lock.json') }}
+          restore-keys: playwright-${{ runner.os }}-
+
+      # Only Playwright's *system* dependencies are installed here. The browsers themselves and
+      # Node come from the Gradle node plugin (20.2.0 for ontrack-web-tests).
+      - name: Install the Playwright system dependencies
+        working-directory: ontrack-web-tests
+        run: npx --yes playwright install-deps chromium
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Restore the Docker images
+        run: |
+          set -euo pipefail
+          docker pull "$GHCR_ONTRACK:$RUN_TAG"
+          docker pull "$GHCR_ONTRACK_UI:$RUN_TAG"
+          docker tag "$GHCR_ONTRACK:$RUN_TAG" "nemerosa/ontrack:$BASE_VERSION"
+          docker tag "$GHCR_ONTRACK_UI:$RUN_TAG" "nemerosa/ontrack-ui:$BASE_VERSION"
+
+      - name: Start the environment
+        run: |
+          ./gradlew ":ontrack-kdsl-acceptance:${{ matrix.compose }}" \
+            --stacktrace --console plain
+
+      - name: UI tests
+        run: |
+          ./gradlew ":ontrack-web-tests:${{ matrix.task }}" \
+            --stacktrace \
+            --console plain
+
+      # The three variants land on one PLAYWRIGHT stamp, so the reports are collected and
+      # validated once in ui-tests-report rather than three times from here.
+      - name: Upload the JUnit report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-junit-${{ matrix.variant }}
+          path: ontrack-web-tests/reports/${{ matrix.variant }}/junit/*.xml
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Upload the HTML report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-html-${{ matrix.variant }}
+          path: ontrack-web-tests/reports/${{ matrix.variant }}/html/**
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Upload the KDSL logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kdsl-logs-ui-${{ matrix.variant }}
+          path: ontrack-kdsl-acceptance/build/logs/**
+          if-no-files-found: ignore
+          retention-days: 7
+
+  # ---------------------------------------------------------------------------------------------
+  # One PLAYWRIGHT validation for the three variants. Validating from each matrix job would
+  # create three runs on the same stamp and the promotion would then read whichever landed last.
+  # ---------------------------------------------------------------------------------------------
+
+  ui-tests-report:
+    name: UI tests report
+    needs: [setup, yontrack, ui-tests]
+    if: ${{ !cancelled() && needs.setup.outputs.internal == 'true' && needs.ui-tests.result != 'skipped' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Collect the JUnit reports
+        uses: actions/download-artifact@v4
+        with:
+          pattern: playwright-junit-*
+          path: playwright-junit
+
+      # Rebuild the layout the stamp's glob expects: reports/<variant>/junit/*.xml
+      - name: Lay the reports out
+        run: |
+          set -euo pipefail
+          for dir in playwright-junit/playwright-junit-*; do
+            [ -d "$dir" ] || continue
+            variant="${dir##*playwright-junit-}"
+            mkdir -p "ontrack-web-tests/reports/$variant/junit"
+            cp "$dir"/*.xml "ontrack-web-tests/reports/$variant/junit/" || true
+          done
+          find ontrack-web-tests/reports -name '*.xml' -print
+
+      - name: Link to the Yontrack build
+        uses: nemerosa/ontrack-github-actions-cli-library/ontrack-cli-workflow-build@v1.0.3
+        with:
+          project: ${{ needs.yontrack.outputs.project }}
+          yontrack-url: ${{ vars.YONTRACK_URL }}
+          yontrack-token: ${{ secrets.YONTRACK_TOKEN }}
+          version: ${{ env.YONTRACK_CLI_VERSION }}
+
+      - name: Validate PLAYWRIGHT
+        run: |
+          yontrack validate --validation PLAYWRIGHT \
+            junit --pattern "ontrack-web-tests/reports/*/junit/*.xml" --fail-when-no-results
+
+  # ---------------------------------------------------------------------------------------------
+  # Publication.
+  # ---------------------------------------------------------------------------------------------
+
+  docker-hub:
+    name: Docker Hub
+    needs: [setup, yontrack, build, integration, kdsl, ui-tests, ui-tests-report]
+    if: >-
+      ${{ !cancelled()
+        && needs.build.result == 'success'
+        && needs.integration.result != 'failure'
+        && needs.kdsl.result != 'failure'
+        && needs.ui-tests.result != 'failure'
+        && needs.ui-tests-report.result != 'failure'
+        && needs.setup.outputs.internal == 'true'
+        && needs.setup.outputs.release == 'true'
+        && (github.ref_name == 'main'
+            || startsWith(github.ref_name, 'release/')
+            || (startsWith(github.ref_name, 'feature/') && endsWith(github.ref_name, 'publication'))
+            || needs.setup.outputs.just_build_and_push == 'true') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      VERSION: ${{ needs.setup.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_HUB_USR }}
+          password: ${{ secrets.DOCKER_HUB_PSW }}
+
+      - name: Link to the Yontrack build
+        uses: nemerosa/ontrack-github-actions-cli-library/ontrack-cli-workflow-build@v1.0.3
+        with:
+          project: ${{ needs.yontrack.outputs.project }}
+          yontrack-url: ${{ vars.YONTRACK_URL }}
+          yontrack-token: ${{ secrets.YONTRACK_TOKEN }}
+          version: ${{ env.YONTRACK_CLI_VERSION }}
+
+      - name: Push the images
+        id: push
+        if: ${{ !cancelled() }}
+        run: |
+          set -euo pipefail
+          docker pull "$GHCR_ONTRACK:$RUN_TAG"
+          docker pull "$GHCR_ONTRACK_UI:$RUN_TAG"
+
+          # Legacy organization
+          docker tag "$GHCR_ONTRACK:$RUN_TAG" "nemerosa/ontrack:$VERSION"
+          docker tag "$GHCR_ONTRACK_UI:$RUN_TAG" "nemerosa/ontrack-ui:$VERSION"
+          docker push "nemerosa/ontrack:$VERSION"
+          docker push "nemerosa/ontrack-ui:$VERSION"
+
+          # Yontrack organization
+          docker tag "$GHCR_ONTRACK:$RUN_TAG" "yontrack/yontrack:$VERSION"
+          docker tag "$GHCR_ONTRACK_UI:$RUN_TAG" "yontrack/yontrack-ui:$VERSION"
+          docker push "yontrack/yontrack:$VERSION"
+          docker push "yontrack/yontrack-ui:$VERSION"
+
+      - name: Validate DOCKER.HUB
+        if: ${{ !cancelled() && steps.push.outcome != '' }}
+        run: |
+          if [ "${{ steps.push.outcome }}" = "success" ]; then
+            yontrack validate --validation DOCKER.HUB --status PASSED
+          else
+            yontrack validate --validation DOCKER.HUB --status FAILED
+          fi
+
+  release:
+    name: GitHub release
+    needs: [setup, yontrack, build, integration, kdsl, ui-tests, ui-tests-report]
+    if: >-
+      ${{ !cancelled()
+        && needs.build.result == 'success'
+        && needs.integration.result != 'failure'
+        && needs.kdsl.result != 'failure'
+        && needs.ui-tests.result != 'failure'
+        && needs.ui-tests-report.result != 'failure'
+        && needs.setup.outputs.internal == 'true'
+        && needs.setup.outputs.release == 'true'
+        && (github.ref_name == 'main' || startsWith(github.ref_name, 'release/')) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+      packages: read
+    env:
+      VERSION: ${{ needs.setup.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Link to the Yontrack build
+        uses: nemerosa/ontrack-github-actions-cli-library/ontrack-cli-workflow-build@v1.0.3
+        with:
+          project: ${{ needs.yontrack.outputs.project }}
+          yontrack-url: ${{ vars.YONTRACK_URL }}
+          yontrack-token: ${{ secrets.YONTRACK_TOKEN }}
+          version: ${{ env.YONTRACK_CLI_VERSION }}
+
+      - name: Create the GitHub release
+        id: release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          # The change log since the last build promoted to RELEASE.
+          yontrack build changelog export --from-promotion RELEASE --format markdown > changelog.md
+          cat changelog.md
+          gh release create "$VERSION" \
+            --title "$VERSION" \
+            --target "$GITHUB_SHA" \
+            --notes-file changelog.md
+
+      - name: Validate GITHUB.RELEASE
+        if: ${{ !cancelled() && steps.release.outcome != '' }}
+        run: |
+          if [ "${{ steps.release.outcome }}" = "success" ]; then
+            yontrack validate --validation GITHUB.RELEASE --status PASSED
+          else
+            yontrack validate --validation GITHUB.RELEASE --status FAILED
+          fi
+
+  # ---------------------------------------------------------------------------------------------
+  # Documentation.
+  #
+  # The Jenkins Documentation stage never built the site: buildDocs is wired into `build`, so it
+  # relied on `./gradlew build` having produced ontrack-docs/site/. On a separate runner this job
+  # builds it itself — including the ontrack-docs integration tests, which are what write
+  # docs/content/generated/ (gitignored, and referenced from ~11 places in the mkdocs nav).
+  # ---------------------------------------------------------------------------------------------
+
+  docs:
+    name: Documentation
+    needs: [setup, yontrack, build, integration, kdsl, ui-tests, ui-tests-report]
+    if: >-
+      ${{ !cancelled()
+        && needs.build.result == 'success'
+        && needs.integration.result != 'failure'
+        && needs.kdsl.result != 'failure'
+        && needs.ui-tests.result != 'failure'
+        && needs.ui-tests-report.result != 'failure'
+        && needs.setup.outputs.internal == 'true'
+        && needs.setup.outputs.release == 'true'
+        && (github.ref_name == 'main' || startsWith(github.ref_name, 'release/')) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      VERSION: ${{ needs.setup.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: zulu
+          java-version: "21"
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      # python3 and venv are already on ubuntu-latest, which createVenv/installDeps need.
+      - name: Install graphviz and s3cmd
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y graphviz s3cmd
+
+      - name: Build the documentation
+        run: |
+          ./gradlew :ontrack-docs:integrationTest :ontrack-docs:buildDocs \
+            --stacktrace \
+            --console plain
+
+      - name: Link to the Yontrack build
+        uses: nemerosa/ontrack-github-actions-cli-library/ontrack-cli-workflow-build@v1.0.3
+        with:
+          project: ${{ needs.yontrack.outputs.project }}
+          yontrack-url: ${{ vars.YONTRACK_URL }}
+          yontrack-token: ${{ secrets.YONTRACK_TOKEN }}
+          version: ${{ env.YONTRACK_CLI_VERSION }}
+
+      - name: Upload the documentation
+        id: upload
+        env:
+          AMS3_DELIVERY_USR: ${{ secrets.AMS3_DELIVERY_USR }}
+          AMS3_DELIVERY_PSW: ${{ secrets.AMS3_DELIVERY_PSW }}
+        run: |
+          set -euo pipefail
+          s3cmd \
+            --access_key="${AMS3_DELIVERY_USR}" \
+            --secret_key="${AMS3_DELIVERY_PSW}" \
+            --host=fra1.digitaloceanspaces.com \
+            --host-bucket='%(bucket)s.fra1.digitaloceanspaces.com' \
+            put \
+            ontrack-docs/site/* \
+            "s3://yontrack-docs/release/${VERSION}/docs/site/" \
+            --acl-public \
+            --add-header=Cache-Control:max-age=86400 \
+            --recursive
+
+      - name: Validate DOCUMENTATION
+        if: ${{ !cancelled() && steps.upload.outcome != '' }}
+        run: |
+          if [ "${{ steps.upload.outcome }}" = "success" ]; then
+            yontrack validate --validation DOCUMENTATION --status PASSED
+          else
+            yontrack validate --validation DOCUMENTATION --status FAILED
+          fi
