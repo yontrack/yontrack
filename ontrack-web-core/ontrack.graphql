@@ -499,6 +499,8 @@ type Branch implements Authorizable & ProjectEntity {
   ): [ValidationStamp!]!
   "Given a list of validation names, returns for each one the last validation run or null if the validation does not exist."
   validationStatuses(names: [String!]!): [ValidationRun!]!
+  "Workflows which have been launched by a notification on an event for this entity, most recent first. Resolved by scanning the 100 most recent workflow notification records for this entity, so the list may be truncated on entities which accumulate many of them, like a project or a branch."
+  workflowInstances: [WorkflowInstance!]!
 }
 
 "Information about a branch"
@@ -693,6 +695,8 @@ type Build implements Authorizable & ProjectEntity {
     "List of validation stamps"
     validationStamps: [String!]
   ): [Validation!]!
+  "Workflows which have been launched by a notification on an event for this entity, most recent first. Resolved by scanning the 100 most recent workflow notification records for this entity, so the list may be truncated on entities which accumulate many of them, like a project or a branch."
+  workflowInstances: [WorkflowInstance!]!
 }
 
 "Gathering information about the auto versioning around this build"
@@ -4953,6 +4957,8 @@ type Project implements Authorizable & ProjectEntity {
     "Validation stamp where to look for validation runs (regular expression, defaults to all)"
     validationStamp: String
   ): ValidationRunPaginated
+  "Workflows which have been launched by a notification on an event for this entity, most recent first. Resolved by scanning the 100 most recent workflow notification records for this entity, so the list may be truncated on entities which accumulate many of them, like a project or a branch."
+  workflowInstances: [WorkflowInstance!]!
 }
 
 type ProjectAuthorization {
@@ -5214,6 +5220,8 @@ type PromotionLevel implements Authorizable & ProjectEntity {
   ): [Property!]!
   "List of actions available for this entity"
   userMenuActions: [UserMenuAction!]!
+  "Workflows which have been launched by a notification on an event for this entity, most recent first. Resolved by scanning the 100 most recent workflow notification records for this entity, so the list may be truncated on entities which accumulate many of them, like a project or a branch."
+  workflowInstances: [WorkflowInstance!]!
 }
 
 "Configurable field definition on a promotion level"
@@ -5285,6 +5293,8 @@ type PromotionRun implements Authorizable & ProjectEntity {
   ): [Property!]!
   "List of actions available for this entity"
   userMenuActions: [UserMenuAction!]!
+  "Workflows which have been launched by a notification on an event for this entity, most recent first. Resolved by scanning the 100 most recent workflow notification records for this entity, so the list may be truncated on entities which accumulate many of them, like a project or a branch."
+  workflowInstances: [WorkflowInstance!]!
 }
 
 "A field value stored on a promotion run"
@@ -7904,6 +7914,8 @@ type ValidationRun implements Authorizable & ProjectEntity {
   ): [ValidationRunStatus!]!
   "Associated validation stamp"
   validationStamp: ValidationStamp!
+  "Workflows which have been launched by a notification on an event for this entity, most recent first. Resolved by scanning the 100 most recent workflow notification records for this entity, so the list may be truncated on entities which accumulate many of them, like a project or a branch."
+  workflowInstances: [WorkflowInstance!]!
 }
 
 "Data associated with a validation run"
@@ -8008,6 +8020,8 @@ type ValidationStamp implements Authorizable & ProjectEntity {
     "Size of the page"
     size: Int = 20
   ): ValidationRunPaginated
+  "Workflows which have been launched by a notification on an event for this entity, most recent first. Resolved by scanning the 100 most recent workflow notification records for this entity, so the list may be truncated on entities which accumulate many of them, like a project or a branch."
+  workflowInstances: [WorkflowInstance!]!
 }
 
 "Validation stamp filter"

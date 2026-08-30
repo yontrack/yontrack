@@ -134,6 +134,22 @@ Clicking on a workflow displays more details about its current status, node per 
 When using the _workflow notification channel_, the workflow status link is also accessible from the _Information >
 Notification recordings_, when selecting the notification.
 
+### Workflows of a promotion
+
+Both routes above need the _notification recording_ access right. The workflows triggered by a promotion are also shown
+directly on the **promotion run page**, to anyone who can view the project.
+
+The _Workflows_ section is the primary content of that page. It lists every workflow the promotion has triggered, most
+recent first, one card per run. Each card carries the workflow name, its status, its duration and a link to the full
+workflow instance page, plus a strip of its nodes: one column per depth in the workflow graph, so nodes which can run
+concurrently share a column. When a workflow fails, the error output of the first failed node is shown on the card
+itself.
+
+The strip is a summary, not a graph — a column boundary is not an edge, and wide columns are clamped (failed nodes are
+never clamped away). Use _Open workflow_ to read the exact graph.
+
+Enable _auto refresh_ on the section to watch a running workflow progress in place.
+
 ## Workflows settings
 
 Workflow statuses are saved by default for 14 days.

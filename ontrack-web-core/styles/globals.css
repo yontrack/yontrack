@@ -458,3 +458,47 @@ button.ot-validation-stamp-filter-edition {
     fill: var(--ot-graph-node-border);
     stroke: var(--ot-graph-node-border);
 }
+
+/**
+ * Workflow node strip (see WorkflowInstanceNodesProgress).
+ *
+ * One column per graph depth, laid out left to right, with a hairline separating the columns.
+ * There is deliberately no joining arrow: a column boundary is not an edge.
+ */
+.ot-workflow-nodes-progress {
+    display: flex;
+    flex-direction: row;
+    align-items: stretch;
+    flex-wrap: wrap;
+    gap: 0;
+    overflow-x: auto;
+}
+
+.ot-workflow-nodes-progress-column {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 4px;
+    padding: 4px 12px;
+    min-width: 0;
+}
+
+.ot-workflow-nodes-progress-column + .ot-workflow-nodes-progress-column {
+    border-left: 1px solid var(--ot-border-subtle);
+}
+
+.ot-workflow-node-chip {
+    max-width: 220px;
+}
+
+/**
+ * Error output of a failed node, inlined on the workflow card (see WorkflowInstanceNodeError).
+ */
+.ot-workflow-node-error {
+    /* Typography.Text renders an inline span, on which max-height and overflow have no effect */
+    display: block;
+    max-height: 8em;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+}

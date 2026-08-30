@@ -150,8 +150,15 @@ class WorkflowNotificationChannel(
         )
     ).asJson()
 
-    override val type: String = "workflow"
+    override val type: String = TYPE
     override val displayName: String = "Workflow"
     override val enabled: Boolean = true
+
+    companion object {
+        /**
+         * ID of the workflow notification channel.
+         */
+        const val TYPE = "workflow"
+    }
 
 }

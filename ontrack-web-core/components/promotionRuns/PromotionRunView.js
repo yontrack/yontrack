@@ -1,23 +1,23 @@
-import {useEffect, useState} from "react";
 import {gql} from "graphql-request";
 import Head from "next/head";
 import {buildKnownName, pageTitle, promotionLevelTitleName} from "@components/common/Titles";
 import MainPage from "@components/layouts/MainPage";
 import {downToBuildBreadcrumbs} from "@components/common/Breadcrumbs";
-import {Card, Skeleton, Space, Typography} from "antd";
+import {Collapse, Skeleton, Space, Typography} from "antd";
 import PromotionLevelLink from "@components/promotionLevels/PromotionLevelLink";
 import {CloseCommand} from "@components/common/Commands";
 import {buildUri} from "@components/common/Links";
-import BuildLink from "@components/builds/BuildLink";
-import TimestampText from "@components/common/TimestampText";
-import AnnotatedDescription from "@components/common/AnnotatedDescription";
-import PageSection from "@components/common/PageSection";
 import {isAuthorized} from "@components/common/authorizations";
 import NotificationRecordingsTable from "@components/extension/notifications/NotificationRecordingsTable";
 import {useQuery} from "@components/services/GraphQL";
 import PromotionRunDeleteCommand from "@components/promotionRuns/PromotionRunDeleteCommand";
 import AutoVersioningPromotionRunTrail from "@components/extension/auto-versioning/AutoVersioningPromotionRunTrail";
-import PromotionRunFieldValues from "@components/promotionRuns/PromotionRunFieldValues";
+import PromotionRunSummary from "@components/promotionRuns/PromotionRunSummary";
+import PromotionRunWorkflows from "@components/promotionRuns/PromotionRunWorkflows";
+import {
+    AutoVersioningTrailPanelLabel,
+    NotificationsPanelLabel
+} from "@components/promotionRuns/PromotionRunPanelLabels";
 
 export default function PromotionRunView({id}) {
 
@@ -46,6 +46,7 @@ export default function PromotionRunView({id}) {
                         branch {
                             id
                             name
+                            displayName
                             project {
                                 id
                                 name
@@ -87,20 +88,37 @@ export default function PromotionRunView({id}) {
         }
     )
 
-    const [commands, setCommands] = useState([])
+    const commands = run ? [
+        ...(isAuthorized(run, 'promotion_run', 'delete') ?
+            [<PromotionRunDeleteCommand key="delete" run={run}/>] : []),
+        <CloseCommand key="close" href={buildUri(run.build)}/>,
+    ] : []
 
-    useEffect(() => {
-        if (run) {
-            const commands = []
-            if (isAuthorized(run, 'promotion_run', 'delete')) {
-                commands.push(<PromotionRunDeleteCommand key="delete" run={run}/>)
-            }
-            commands.push(
-                <CloseCommand key="close" href={buildUri(run.build)}/>
-            )
-            setCommands(commands)
-        }
-    }, [run])
+    // The two tables are secondary, on-demand content: they sit in panels collapsed by default,
+    // below the workflows. antd's Collapse is lazy, so neither table is queried until expanded.
+    const secondaryPanels = run ? [
+        {
+            key: 'auto-versioning-trail',
+            label: <AutoVersioningTrailPanelLabel promotionRunId={run.id}/>,
+            children: <AutoVersioningPromotionRunTrail promotionRunId={run.id}/>,
+        },
+        {
+            key: 'notifications',
+            label: <NotificationsPanelLabel promotionRunId={run.id}/>,
+            children: <div id="promotion-run-notifications" data-testid="promotion-run-notifications">
+                <Typography.Paragraph type="secondary" style={{padding: 8}}>
+                    List of notifications sent for this promotion.
+                </Typography.Paragraph>
+                <NotificationRecordingsTable
+                    entity={{
+                        type: 'PROMOTION_RUN',
+                        id: run.id,
+                    }}
+                    sourceId="entity-subscription"
+                />
+            </div>,
+        },
+    ] : []
 
     return (
         <>
@@ -126,58 +144,13 @@ export default function PromotionRunView({id}) {
                     {
                         run &&
                         <Space direction="vertical" className="ot-line">
-                            <Card>
-                                <Space direction="vertical">
-                                    <Typography.Paragraph>
-                                        Build <BuildLink build={run.build}/> has been promoted to <PromotionLevelLink
-                                        promotionLevel={run.promotionLevel}/>.
-                                    </Typography.Paragraph>
-                                    {
-                                        run.description &&
-                                        <Typography.Paragraph>
-                                            <AnnotatedDescription entity={run}/>
-                                        </Typography.Paragraph>
-                                    }
-                                    {
-                                        run.creation &&
-                                        <Typography.Paragraph>
-                                            <Space>
-                                                <Typography.Text type="secondary">Timestamp:</Typography.Text>
-                                                <TimestampText value={run.creation.time}/>
-                                                <Typography.Text disabled>
-                                                    ({run.creation.user})
-                                                </Typography.Text>
-                                            </Space>
-                                        </Typography.Paragraph>
-                                    }
-                                    {
-                                        run.fieldValues?.length > 0 &&
-                                        <PromotionRunFieldValues
-                                            fields={run.promotionLevel.fields}
-                                            fieldValues={run.fieldValues}
-                                        />
-                                    }
-                                </Space>
-                            </Card>
-                            {
-                                run &&
-                                <AutoVersioningPromotionRunTrail promotionRunId={run.id}/>
-                            }
-                            <PageSection
-                                id="promotion-run-notifications"
-                                title="Notifications"
-                            >
-                                <Typography.Paragraph type="secondary" style={{padding: 8}}>
-                                    List of notifications sent for this promotion.
-                                </Typography.Paragraph>
-                                <NotificationRecordingsTable
-                                    entity={{
-                                        type: 'PROMOTION_RUN',
-                                        id: run.id,
-                                    }}
-                                    sourceId="entity-subscription"
-                                />
-                            </PageSection>
+                            <PromotionRunSummary run={run}/>
+                            <PromotionRunWorkflows promotionRunId={run.id}/>
+                            <Collapse
+                                className="ot-line"
+                                data-testid="promotion-run-secondary"
+                                items={secondaryPanels}
+                            />
                         </Space>
                     }
                 </Skeleton>
