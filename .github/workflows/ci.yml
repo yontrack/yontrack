@@ -58,6 +58,25 @@ env:
   # Pinned: an unpinned CLI lets a Yontrack release turn a green pipeline red in a repository
   # nobody touched.
   YONTRACK_CLI_VERSION: "5.1.1"
+  # Run info reported with every validation. The Jenkins shared library computed this silently;
+  # the Go CLI is purely declarative and sends `runInfo: null` unless the flags are spelled out,
+  # which is how the migration dropped it (#1655) and left a hole in
+  # `ontrack_run_VALIDATION_RUN_time_seconds`. Held as one string because the four values are the
+  # same at every call site — a URL, an event name and a SHA, none of which contain whitespace,
+  # so the unquoted expansion below is safe. The run time is per-step and is added there.
+  #
+  # The source type matches what the GitHub ingestion already records (WorkflowRunInfo.TYPE), so
+  # a run reported by this workflow and one reported by a webhook read the same way in the UI.
+  #
+  # Every call site builds its own `run_time_flag` and leaves it empty when the measured step has
+  # no recorded start — a step skipped by its own `if`, or one whose job died before it began.
+  # Recording the validation matters more than timing it, so a missing start drops the flag
+  # instead of failing the step on `$(( ... - ))` and losing the stamp altogether.
+  YONTRACK_RUN_INFO: >-
+    --source-type github-workflow
+    --source-uri ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+    --trigger-type ${{ github.event_name }}
+    --trigger-data ${{ github.sha }}
   # Run-scoped tag used to hand the Docker images from `build` to the jobs that consume them.
   # Keyed on the run, deliberately not on the attempt: re-running just the failed jobs must
   # still find the images the original `build` attempt pushed. A re-run of `build` itself
@@ -303,6 +322,10 @@ jobs:
         if: env.JUST_BUILD_AND_PUSH != 'true'
         run: |
           set -euo pipefail
+          # First line of the measured step on purpose: GitHub exposes no step duration to
+          # expressions, and an output already written survives the step failing — so a broken
+          # build still reports how long it ran for.
+          echo "started=$(date +%s)" >> "$GITHUB_OUTPUT"
           # The versioning plugin's own tests. They gate the version computation every other
           # job depends on, and `build` does not reach into buildSrc on its own.
           ./gradlew :buildSrc:test --stacktrace --console plain
@@ -313,17 +336,40 @@ jobs:
 
       # `outcome` is empty only when the step was skipped, so a broken build still records
       # FAILED — which is the case worth seeing in Yontrack.
+      #
+      # BUILD and UI_UNIT both report the duration of the one `build` step, because both test sets
+      # run inside the same `./gradlew build` and neither has a span of its own. Jenkins did the
+      # same: `adaptRunInfo()` gave every validation in a stage that stage's duration.
+      #
+      # `--run-time` goes after the `junit` subcommand: `validateJUnitTestsCmd` redeclares the five
+      # run-info flags on itself, so that is where they are read from.
       - name: Validate BUILD
         if: ${{ !cancelled() && env.FULL_RUN == 'true' && steps.build.outcome != '' }}
+        env:
+          STARTED: ${{ steps.build.outputs.started }}
         run: |
+          run_time_flag=""
+          if [ -n "${STARTED:-}" ]; then
+            run_time_flag="--run-time $(( $(date +%s) - STARTED ))"
+          fi
+          # shellcheck disable=SC2086  # deliberate: see YONTRACK_RUN_INFO
           yontrack validate --validation BUILD \
-            junit --pattern "**/build/test-results/**/*.xml" --fail-when-no-results
+            junit --pattern "**/build/test-results/**/*.xml" --fail-when-no-results \
+            $run_time_flag $YONTRACK_RUN_INFO
 
       - name: Validate UI_UNIT
         if: ${{ !cancelled() && env.FULL_RUN == 'true' && steps.build.outcome != '' }}
+        env:
+          STARTED: ${{ steps.build.outputs.started }}
         run: |
+          run_time_flag=""
+          if [ -n "${STARTED:-}" ]; then
+            run_time_flag="--run-time $(( $(date +%s) - STARTED ))"
+          fi
+          # shellcheck disable=SC2086  # deliberate: see YONTRACK_RUN_INFO
           yontrack validate --validation UI_UNIT \
-            junit --pattern "ontrack-web-core/reports/*.xml" --fail-when-no-results
+            junit --pattern "ontrack-web-core/reports/*.xml" --fail-when-no-results \
+            $run_time_flag $YONTRACK_RUN_INFO
 
       # Jenkins archived these; without them a unit-test failure is only visible as a class
       # name in the log, with no stack trace.
@@ -599,16 +645,27 @@ jobs:
       - name: KDSL acceptance tests
         id: kdsl
         run: |
+          echo "started=$(date +%s)" >> "$GITHUB_OUTPUT"
           ./gradlew :ontrack-kdsl-acceptance:kdslAcceptanceTest \
             --stacktrace \
             --parallel \
             --console plain
 
+      # The measured span is the tests only; bringing the environment up is a separate step and
+      # is not part of what the stamp is about.
       - name: Validate KDSL.ACCEPTANCE
         if: ${{ !cancelled() && steps.kdsl.outcome != '' }}
+        env:
+          STARTED: ${{ steps.kdsl.outputs.started }}
         run: |
+          run_time_flag=""
+          if [ -n "${STARTED:-}" ]; then
+            run_time_flag="--run-time $(( $(date +%s) - STARTED ))"
+          fi
+          # shellcheck disable=SC2086  # deliberate: see YONTRACK_RUN_INFO
           yontrack validate --validation KDSL.ACCEPTANCE \
-            junit --pattern "ontrack-kdsl-acceptance/build/test-results/**/*.xml" --fail-when-no-results
+            junit --pattern "ontrack-kdsl-acceptance/build/test-results/**/*.xml" --fail-when-no-results \
+            $run_time_flag $YONTRACK_RUN_INFO
 
       - name: Upload the KDSL logs
         if: failure()
@@ -714,10 +771,33 @@ jobs:
             --stacktrace --console plain
 
       - name: UI tests
+        id: test
         run: |
+          echo "started=$(date +%s)" >> "$GITHUB_OUTPUT"
           ./gradlew ":ontrack-web-tests:${{ matrix.task }}" \
             --stacktrace \
             --console plain
+
+      # PLAYWRIGHT is validated from ui-tests-report, which has no span of its own worth
+      # reporting — collecting artefacts takes seconds where the tests take minutes. Each variant
+      # therefore hands its own duration over inside its report artefact, and the reporting job
+      # takes the slowest, which is the wall clock of the three parallel legs.
+      - name: Record the run time
+        if: ${{ !cancelled() && steps.test.outcome != '' }}
+        # Bookkeeping for a nice-to-have number: it must never be what turns a passing UI test
+        # run red.
+        continue-on-error: true
+        env:
+          STARTED: ${{ steps.test.outputs.started }}
+        run: |
+          set -euo pipefail
+          if [ -z "${STARTED:-}" ]; then
+            echo "The UI tests never started; nothing to record."
+            exit 0
+          fi
+          mkdir -p "ontrack-web-tests/reports/${{ matrix.variant }}/junit"
+          echo "$(( $(date +%s) - STARTED ))" \
+            > "ontrack-web-tests/reports/${{ matrix.variant }}/junit/run-time.txt"
 
       # The three variants land on one PLAYWRIGHT stamp, so the reports are collected and
       # validated once in ui-tests-report rather than three times from here.
@@ -726,7 +806,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: playwright-junit-${{ matrix.variant }}
-          path: ontrack-web-tests/reports/${{ matrix.variant }}/junit/*.xml
+          path: |
+            ontrack-web-tests/reports/${{ matrix.variant }}/junit/*.xml
+            ontrack-web-tests/reports/${{ matrix.variant }}/junit/run-time.txt
           if-no-files-found: ignore
           retention-days: 7
 
@@ -802,11 +884,24 @@ jobs:
         env:
           LAYOUT_OUTCOME: ${{ steps.layout.outcome }}
         run: |
+          # The slowest of the three variants, written by each leg into its artefact. Left empty
+          # when no artefact arrived at all — a made-up duration is worse than none, so the flag
+          # is then omitted and the rest of the run info still goes out.
+          run_time="$(cat playwright-junit/playwright-junit-*/run-time.txt 2>/dev/null \
+            | sort -n | tail -n 1 || true)"
+          run_time_flag=""
+          if [ -n "$run_time" ]; then
+            run_time_flag="--run-time $run_time"
+          fi
           if [ "$LAYOUT_OUTCOME" != "success" ]; then
-            yontrack validate --validation PLAYWRIGHT --status FAILED
+            # shellcheck disable=SC2086  # deliberate: see YONTRACK_RUN_INFO
+            yontrack validate --validation PLAYWRIGHT --status FAILED \
+              $run_time_flag $YONTRACK_RUN_INFO
           else
+            # shellcheck disable=SC2086  # deliberate: see YONTRACK_RUN_INFO
             yontrack validate --validation PLAYWRIGHT \
-              junit --pattern "ontrack-web-tests/reports/*/junit/*.xml" --fail-when-no-results
+              junit --pattern "ontrack-web-tests/reports/*/junit/*.xml" --fail-when-no-results \
+              $run_time_flag $YONTRACK_RUN_INFO
           fi
 
   # ---------------------------------------------------------------------------------------------
@@ -862,6 +957,7 @@ jobs:
         if: ${{ !cancelled() }}
         run: |
           set -euo pipefail
+          echo "started=$(date +%s)" >> "$GITHUB_OUTPUT"
           docker pull "$GHCR_ONTRACK:$RUN_TAG"
           docker pull "$GHCR_ONTRACK_UI:$RUN_TAG"
 
@@ -881,12 +977,20 @@ jobs:
         if: ${{ !cancelled() && steps.push.outcome != '' }}
         env:
           PUSH_OUTCOME: ${{ steps.push.outcome }}
+          STARTED: ${{ steps.push.outputs.started }}
         run: |
-          if [ "$PUSH_OUTCOME" = "success" ]; then
-            yontrack validate --validation DOCKER.HUB --status PASSED
-          else
-            yontrack validate --validation DOCKER.HUB --status FAILED
+          run_time_flag=""
+          if [ -n "${STARTED:-}" ]; then
+            run_time_flag="--run-time $(( $(date +%s) - STARTED ))"
           fi
+          if [ "$PUSH_OUTCOME" = "success" ]; then
+            status=PASSED
+          else
+            status=FAILED
+          fi
+          # shellcheck disable=SC2086  # deliberate: see YONTRACK_RUN_INFO
+          yontrack validate --validation DOCKER.HUB --status "$status" \
+            $run_time_flag $YONTRACK_RUN_INFO
 
   release:
     name: GitHub release
@@ -927,6 +1031,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
+          echo "started=$(date +%s)" >> "$GITHUB_OUTPUT"
           # The change log since the last build promoted to RELEASE.
           yontrack build changelog export --from-promotion RELEASE --format markdown > changelog.md
           cat changelog.md
@@ -939,12 +1044,20 @@ jobs:
         if: ${{ !cancelled() && steps.release.outcome != '' }}
         env:
           RELEASE_OUTCOME: ${{ steps.release.outcome }}
+          STARTED: ${{ steps.release.outputs.started }}
         run: |
-          if [ "$RELEASE_OUTCOME" = "success" ]; then
-            yontrack validate --validation GITHUB.RELEASE --status PASSED
-          else
-            yontrack validate --validation GITHUB.RELEASE --status FAILED
+          run_time_flag=""
+          if [ -n "${STARTED:-}" ]; then
+            run_time_flag="--run-time $(( $(date +%s) - STARTED ))"
           fi
+          if [ "$RELEASE_OUTCOME" = "success" ]; then
+            status=PASSED
+          else
+            status=FAILED
+          fi
+          # shellcheck disable=SC2086  # deliberate: see YONTRACK_RUN_INFO
+          yontrack validate --validation GITHUB.RELEASE --status "$status" \
+            $run_time_flag $YONTRACK_RUN_INFO
 
   # ---------------------------------------------------------------------------------------------
   # Documentation.
@@ -1000,8 +1113,13 @@ jobs:
           sudo apt-get update
           sudo apt-get install --no-install-recommends -y graphviz s3cmd
 
+      # DOCUMENTATION is validated on the upload, but the stamp is about producing *and*
+      # publishing the site, so the clock starts at the build — as the enclosing Jenkins stage
+      # duration did.
       - name: Build the documentation
+        id: docs
         run: |
+          echo "started=$(date +%s)" >> "$GITHUB_OUTPUT"
           ./gradlew :ontrack-docs:integrationTest :ontrack-docs:buildDocs \
             --stacktrace \
             --console plain
@@ -1037,9 +1155,17 @@ jobs:
         if: ${{ !cancelled() && steps.upload.outcome != '' }}
         env:
           UPLOAD_OUTCOME: ${{ steps.upload.outcome }}
+          STARTED: ${{ steps.docs.outputs.started }}
         run: |
-          if [ "$UPLOAD_OUTCOME" = "success" ]; then
-            yontrack validate --validation DOCUMENTATION --status PASSED
-          else
-            yontrack validate --validation DOCUMENTATION --status FAILED
+          run_time_flag=""
+          if [ -n "${STARTED:-}" ]; then
+            run_time_flag="--run-time $(( $(date +%s) - STARTED ))"
           fi
+          if [ "$UPLOAD_OUTCOME" = "success" ]; then
+            status=PASSED
+          else
+            status=FAILED
+          fi
+          # shellcheck disable=SC2086  # deliberate: see YONTRACK_RUN_INFO
+          yontrack validate --validation DOCUMENTATION --status "$status" \
+            $run_time_flag $YONTRACK_RUN_INFO
