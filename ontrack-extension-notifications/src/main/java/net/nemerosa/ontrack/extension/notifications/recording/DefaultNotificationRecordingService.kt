@@ -69,6 +69,10 @@ class DefaultNotificationRecordingService(
         }
 
         if (filter.eventEntityId != null) {
+            // This predicate is served by the partial expression indexes of
+            // V80__1653_notification_record_entity_index.sql. Rewording it silently makes those
+            // indexes unusable and turns this lookup back into a full scan of STORAGE --
+            // NotificationRecordEntityIndexIT guards the match.
             queries += "(data::jsonb->'event'->'entities'->'${filter.eventEntityId.type.name}'->>'id')::int = :eventEntityId"
             queryVariables["eventEntityId"] = filter.eventEntityId.id
         }

@@ -451,6 +451,15 @@ class WorkflowEngineImpl(
             workflowInstanceRepository.findWorkflowInstance(id)
         }
 
+    override fun findWorkflowInstances(ids: Collection<String>): List<WorkflowInstance> {
+        if (ids.isEmpty()) return emptyList()
+        val instancesById = transactionHelper.inNewTransaction {
+            workflowInstanceRepository.findWorkflowInstances(ids).associateBy { it.id }
+        }
+        // Restores the caller's order, dropping the ids which no longer resolve
+        return ids.mapNotNull { instancesById[it] }
+    }
+
     override fun stopWorkflow(workflowInstanceId: String) {
         transactionHelper.inNewTransaction {
             workflowInstanceRepository.stopInstance(workflowInstanceId)

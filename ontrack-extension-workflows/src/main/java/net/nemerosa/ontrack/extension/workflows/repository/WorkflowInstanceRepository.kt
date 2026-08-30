@@ -86,6 +86,106 @@ class WorkflowInstanceRepository(
             toWorkflowInstance(rs)
         }.firstOrNull()
 
+    /**
+     * Loads several instances at once.
+     *
+     * [findWorkflowInstance] costs three queries per instance (the instance, its nodes, its
+     * contexts). Loading a list of instances one by one therefore does not scale, so this issues
+     * exactly three queries whatever the number of ids.
+     *
+     * Ids which no longer resolve are simply absent from the result; the order of the result is not
+     * significant (see [WorkflowEngine.findWorkflowInstances], which restores the caller's order).
+     */
+    fun findWorkflowInstances(ids: Collection<String>): List<WorkflowInstance> {
+        if (ids.isEmpty()) return emptyList()
+
+        // The instance rows are read first, and the two child queries are then scoped to the ids
+        // actually found. Reading the children first would open a window: under READ COMMITTED each
+        // statement takes its own snapshot, so an instance committed between the child queries and
+        // the instance query would come back with no nodes at all -- and an instance with no nodes
+        // computes as STARTED (see WorkflowInstance.computeStatus), which would show a live
+        // workflow as freshly started rather than simply not resolving it. An instance and its
+        // nodes are written in the same transaction, so once the instance row is visible its
+        // children are too.
+        val rows = namedParameterJdbcTemplate!!.query(
+            """
+                SELECT *
+                FROM WKF_INSTANCES
+                WHERE ID IN (:ids)
+            """.trimIndent(),
+            mapOf("ids" to ids.toSet()),
+        ) { rs, _ ->
+            rs.getString("ID") to rs.toInstanceRow()
+        }
+
+        if (rows.isEmpty()) return emptyList()
+        val foundIds = rows.map { it.first }.toSet()
+        val params = mapOf("ids" to foundIds)
+
+        val nodesByInstance = namedParameterJdbcTemplate!!.query(
+            """
+                SELECT *
+                FROM WKF_INSTANCE_NODES
+                WHERE INSTANCE_ID IN (:ids)
+            """.trimIndent(),
+            params,
+        ) { rsn, _ ->
+            rsn.getString("INSTANCE_ID") to toWorkflowInstanceNode(rsn)
+        }.groupBy({ it.first }, { it.second })
+
+        val contextsByInstance = namedParameterJdbcTemplate!!.query(
+            """
+                SELECT *
+                FROM WKF_INSTANCE_CONTEXT
+                WHERE INSTANCE_ID IN (:ids)
+            """.trimIndent(),
+            params,
+        ) { rsn, _ ->
+            rsn.getString("INSTANCE_ID") to (rsn.getString("CONTEXT_ID")!! to TemplatingContextData(
+                id = rsn.getString("HANDLER_ID"),
+                data = readJson(rsn, "DATA"),
+            ))
+        }.groupBy({ it.first }, { it.second })
+
+        return rows.map { (instanceId, row) ->
+            row.toWorkflowInstance(
+                id = instanceId,
+                nodesExecutions = nodesByInstance[instanceId] ?: emptyList(),
+                contexts = contextsByInstance[instanceId]?.toMap() ?: emptyMap(),
+            )
+        }
+    }
+
+    /**
+     * A `WKF_INSTANCES` row, held while the child rows are being loaded. The `ResultSet` cannot be
+     * kept across the child queries, so the columns are read up front.
+     */
+    private data class InstanceRow(
+        val triggerId: String?,
+        val triggerData: JsonNode?,
+        val timestamp: LocalDateTime,
+        val workflow: JsonNode,
+        val event: JsonNode,
+    ) {
+        fun toWorkflowInstance(
+            id: String,
+            nodesExecutions: List<WorkflowInstanceNode>,
+            contexts: Map<String, TemplatingContextData>,
+        ) = WorkflowInstance(
+            id = id,
+            timestamp = timestamp,
+            workflow = workflow.parse(),
+            event = event.parse(),
+            triggerData = if (triggerId != null && triggerData != null) {
+                TriggerData(id = triggerId, data = triggerData)
+            } else {
+                null
+            },
+            contexts = contexts,
+            nodesExecutions = nodesExecutions,
+        )
+    }
+
     private fun toWorkflowInstance(rs: ResultSet): WorkflowInstance {
         val instanceId = rs.getString("ID")
         val nodesExecutions = namedParameterJdbcTemplate!!.query(
@@ -115,25 +215,30 @@ class WorkflowInstanceRepository(
                 data = readJson(rsn, "DATA"),
             )
         }.toMap()
-        val triggerId = rs.getString("TRIGGER_ID")
-        val triggerData = readJson(rs, "TRIGGER_DATA")
-        return WorkflowInstance(
-            id = instanceId,
-            timestamp = dateTimeFromDB(rs.getString("TIMESTAMP"))!!,
-            workflow = readJson(rs, "WORKFLOW").parse(),
-            event = readJson(rs, "EVENT").parse(),
-            triggerData = if (triggerId != null && triggerData != null) {
-                TriggerData(
-                    id = triggerId,
-                    data = triggerData,
-                )
-            } else {
-                null
-            },
-            contexts = contexts,
-            nodesExecutions = nodesExecutions,
-        )
+        return toWorkflowInstance(rs, nodesExecutions, contexts)
     }
+
+    /**
+     * Maps a `WKF_INSTANCES` row, with its nodes and contexts already loaded. Shared by the
+     * single-instance and the batched paths so that both build the exact same object.
+     */
+    private fun toWorkflowInstance(
+        rs: ResultSet,
+        nodesExecutions: List<WorkflowInstanceNode>,
+        contexts: Map<String, TemplatingContextData>,
+    ): WorkflowInstance = rs.toInstanceRow().toWorkflowInstance(
+        id = rs.getString("ID"),
+        nodesExecutions = nodesExecutions,
+        contexts = contexts,
+    )
+
+    private fun ResultSet.toInstanceRow() = InstanceRow(
+        triggerId = getString("TRIGGER_ID"),
+        triggerData = readJson(this, "TRIGGER_DATA"),
+        timestamp = dateTimeFromDB(getString("TIMESTAMP"))!!,
+        workflow = readJson(this, "WORKFLOW"),
+        event = readJson(this, "EVENT"),
+    )
 
     private fun toWorkflowInstanceNode(rsn: ResultSet) = WorkflowInstanceNode(
         id = rsn.getString("NODE_ID"),

@@ -68,9 +68,11 @@ class GQLProjectEntityWorkflowInstancesFieldContributor(
                 // Records outlive schema changes, so a record whose output cannot be parsed is skipped
                 record.result.output?.parseOrNull<WorkflowNotificationChannelOutput>()?.workflowInstanceId
             }.distinct()
-        }.mapNotNull { instanceId ->
-            // Records outlive instances, so an instance which no longer exists is skipped
-            workflowEngine.findWorkflowInstance(instanceId)
+        }.let { instanceIds ->
+            // Loaded in one batch: resolving them one by one would cost three queries and a
+            // transaction each. Records outlive instances, so ids which no longer resolve are
+            // skipped, and the record order (most recent first) is preserved.
+            workflowEngine.findWorkflowInstances(instanceIds)
         }
 
     companion object {
