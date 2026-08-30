@@ -78,7 +78,7 @@ jobs:
     outputs:
       version: ${{ steps.version.outputs.version }}
       base_version: ${{ steps.version.outputs.base_version }}
-      internal: ${{ steps.params.outputs.internal }}
+      secrets_available: ${{ steps.params.outputs.secrets_available }}
       release: ${{ steps.params.outputs.release }}
       just_build_and_push: ${{ steps.params.outputs.just_build_and_push }}
       skip_kdsl_acceptance: ${{ steps.params.outputs.skip_kdsl_acceptance }}
@@ -128,13 +128,13 @@ jobs:
           # Fork pull requests get no secrets and a read-only GITHUB_TOKEN, so every Yontrack
           # step, the GHCR push and everything downstream of it has to be skipped for them.
           if [ "$EVENT_NAME" = "pull_request" ] && [ "$PR_HEAD_REPO" != "$THIS_REPO" ]; then
-            internal=false
+            secrets_available=false
           else
-            internal=true
+            secrets_available=true
           fi
 
           {
-            echo "internal=$internal"
+            echo "secrets_available=$secrets_available"
             echo "release=$(resolve "$IN_RELEASE" false)"
             echo "just_build_and_push=$(resolve "$IN_JUST_BUILD_AND_PUSH" false)"
             echo "skip_kdsl_acceptance=$(resolve "$IN_SKIP_KDSL_ACCEPTANCE" false)"
@@ -179,7 +179,7 @@ jobs:
   yontrack:
     name: Yontrack
     needs: setup
-    if: needs.setup.outputs.internal == 'true'
+    if: needs.setup.outputs.secrets_available == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     outputs:
@@ -227,7 +227,7 @@ jobs:
     env:
       VERSION: ${{ needs.setup.outputs.version }}
       BASE_VERSION: ${{ needs.setup.outputs.base_version }}
-      INTERNAL: ${{ needs.setup.outputs.internal }}
+      SECRETS_AVAILABLE: ${{ needs.setup.outputs.secrets_available }}
       JUST_BUILD_AND_PUSH: ${{ needs.setup.outputs.just_build_and_push }}
     steps:
       - uses: actions/checkout@v4
@@ -251,7 +251,7 @@ jobs:
           restore-keys: npm-${{ runner.os }}-
 
       - name: Link to the Yontrack build
-        if: env.INTERNAL == 'true'
+        if: env.SECRETS_AVAILABLE == 'true'
         uses: nemerosa/ontrack-github-actions-cli-library/ontrack-cli-workflow-build@v1.0.3
         with:
           project: ${{ needs.yontrack.outputs.project }}
@@ -263,6 +263,10 @@ jobs:
         id: build
         if: env.JUST_BUILD_AND_PUSH != 'true'
         run: |
+          set -euo pipefail
+          # The versioning plugin's own tests. They gate the version computation every other
+          # job depends on, and `build` does not reach into buildSrc on its own.
+          ./gradlew :buildSrc:test --stacktrace --console plain
           ./gradlew build -x integrationTest -x buildDocs \
             --stacktrace \
             --parallel \
@@ -271,13 +275,13 @@ jobs:
       # `outcome` is empty only when the step was skipped, so a broken build still records
       # FAILED — which is the case worth seeing in Yontrack.
       - name: Validate BUILD
-        if: ${{ !cancelled() && env.INTERNAL == 'true' && steps.build.outcome != '' }}
+        if: ${{ !cancelled() && env.SECRETS_AVAILABLE == 'true' && steps.build.outcome != '' }}
         run: |
           yontrack validate --validation BUILD \
             junit --pattern "**/build/test-results/**/*.xml" --fail-when-no-results
 
       - name: Validate UI_UNIT
-        if: ${{ !cancelled() && env.INTERNAL == 'true' && steps.build.outcome != '' }}
+        if: ${{ !cancelled() && env.SECRETS_AVAILABLE == 'true' && steps.build.outcome != '' }}
         run: |
           yontrack validate --validation UI_UNIT \
             junit --pattern "ontrack-web-core/reports/*.xml" --fail-when-no-results
@@ -293,7 +297,7 @@ jobs:
       # runners they have to be transferred; GHCR is free for public repositories and far
       # faster than `docker save` through upload-artifact.
       - name: Log in to GHCR
-        if: env.INTERNAL == 'true'
+        if: env.SECRETS_AVAILABLE == 'true'
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
@@ -301,7 +305,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Push the images to GHCR
-        if: env.INTERNAL == 'true'
+        if: env.SECRETS_AVAILABLE == 'true'
         run: |
           set -euo pipefail
           docker tag "nemerosa/ontrack:$BASE_VERSION" "$GHCR_ONTRACK:$RUN_TAG"
@@ -378,7 +382,8 @@ jobs:
       ONTRACK_TEST_EXTENSION_BITBUCKET_CLOUD_EXPECTED_PROJECT: ONTRACK
       ONTRACK_TEST_EXTENSION_BITBUCKET_CLOUD_EXPECTED_REPOSITORY: ontrack-pipeline-bitbucket-cloud
       ONTRACK_TEST_EXTENSION_BITBUCKET_CLOUD_IGNORE: ${{ needs.setup.outputs.skip_bitbucket_cloud_it }}
-      # GitHub system tests. These are plain configuration, not secrets.
+      # GitHub system tests: credentials first, then the fixture values below, which are plain
+      # configuration and deliberately not secrets.
       ONTRACK_TEST_EXTENSION_GITHUB_USER: ${{ secrets.ONTRACK_TEST_EXTENSION_GITHUB_USER }}
       ONTRACK_TEST_EXTENSION_GITHUB_TOKEN: ${{ secrets.ONTRACK_TEST_EXTENSION_GITHUB_TOKEN }}
       ONTRACK_TEST_EXTENSION_GITHUB_APP_PEM: ${{ secrets.ONTRACK_TEST_EXTENSION_GITHUB_APP_PEM }}
@@ -461,7 +466,7 @@ jobs:
     if: >-
       ${{ !cancelled()
         && needs.build.result == 'success'
-        && needs.setup.outputs.internal == 'true'
+        && needs.setup.outputs.secrets_available == 'true'
         && needs.setup.outputs.skip_kdsl_acceptance != 'true'
         && needs.setup.outputs.just_build_and_push != 'true' }}
     runs-on: ubuntu-latest
@@ -550,7 +555,7 @@ jobs:
     if: >-
       ${{ !cancelled()
         && needs.build.result == 'success'
-        && needs.setup.outputs.internal == 'true'
+        && needs.setup.outputs.secrets_available == 'true'
         && needs.setup.outputs.skip_next_ui_tests != 'true'
         && needs.setup.outputs.just_build_and_push != 'true' }}
     runs-on: ubuntu-latest
@@ -560,13 +565,10 @@ jobs:
       matrix:
         include:
           - variant: main
-            compose: kdslAcceptanceTestComposeUp
             task: uiTest
           - variant: ldap
-            compose: kdslLdapComposeUp
             task: uiLdapTest
           - variant: oidc
-            compose: kdslOidcComposeUp
             task: uiOidcTest
     env:
       BASE_VERSION: ${{ needs.setup.outputs.base_version }}
@@ -582,6 +584,13 @@ jobs:
           java-version: "21"
 
       - uses: gradle/actions/setup-gradle@v4
+
+      - name: Cache the npm downloads
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: npm-${{ runner.os }}-${{ hashFiles('ontrack-web-tests/package-lock.json') }}
+          restore-keys: npm-${{ runner.os }}-
 
       - name: Cache the Playwright browsers
         uses: actions/cache@v4
@@ -611,9 +620,13 @@ jobs:
           docker tag "$GHCR_ONTRACK:$RUN_TAG" "nemerosa/ontrack:$BASE_VERSION"
           docker tag "$GHCR_ONTRACK_UI:$RUN_TAG" "nemerosa/ontrack-ui:$BASE_VERSION"
 
+      # Only uiTest guards its compose dependency behind `isCI`, so only that variant needs the
+      # stack started here. uiLdapTest and uiOidcTest dependOn their own composeUp
+      # unconditionally (ontrack-web-tests/build.gradle.kts) and would otherwise start it twice.
       - name: Start the environment
+        if: matrix.variant == 'main'
         run: |
-          ./gradlew ":ontrack-kdsl-acceptance:${{ matrix.compose }}" \
+          ./gradlew :ontrack-kdsl-acceptance:kdslAcceptanceTestComposeUp \
             --stacktrace --console plain
 
       - name: UI tests
@@ -659,13 +672,16 @@ jobs:
   ui-tests-report:
     name: UI tests report
     needs: [setup, yontrack, ui-tests]
-    if: ${{ !cancelled() && needs.setup.outputs.internal == 'true' && needs.ui-tests.result != 'skipped' }}
+    if: ${{ !cancelled() && needs.setup.outputs.secrets_available == 'true' && needs.ui-tests.result != 'skipped' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
 
       - name: Collect the JUnit reports
+        id: collect
+        if: ${{ !cancelled() }}
+        continue-on-error: true
         uses: actions/download-artifact@v4
         with:
           pattern: playwright-junit-*
@@ -673,6 +689,9 @@ jobs:
 
       # Rebuild the layout the stamp's glob expects: reports/<variant>/junit/*.xml
       - name: Lay the reports out
+        id: layout
+        if: ${{ !cancelled() && steps.collect.outcome != '' }}
+        continue-on-error: true
         run: |
           set -euo pipefail
           for dir in playwright-junit/playwright-junit-*; do
@@ -684,6 +703,7 @@ jobs:
           find ontrack-web-tests/reports -name '*.xml' -print
 
       - name: Link to the Yontrack build
+        if: ${{ !cancelled() }}
         uses: nemerosa/ontrack-github-actions-cli-library/ontrack-cli-workflow-build@v1.0.3
         with:
           project: ${{ needs.yontrack.outputs.project }}
@@ -691,10 +711,19 @@ jobs:
           yontrack-token: ${{ secrets.YONTRACK_TOKEN }}
           version: ${{ env.YONTRACK_CLI_VERSION }}
 
+      # If the reports never made it here the stamp still has to say so, rather than the job
+      # dying quietly and leaving PLAYWRIGHT absent from the build.
       - name: Validate PLAYWRIGHT
+        if: ${{ !cancelled() && steps.layout.outcome != '' }}
+        env:
+          LAYOUT_OUTCOME: ${{ steps.layout.outcome }}
         run: |
-          yontrack validate --validation PLAYWRIGHT \
-            junit --pattern "ontrack-web-tests/reports/*/junit/*.xml" --fail-when-no-results
+          if [ "$LAYOUT_OUTCOME" != "success" ]; then
+            yontrack validate --validation PLAYWRIGHT --status FAILED
+          else
+            yontrack validate --validation PLAYWRIGHT \
+              junit --pattern "ontrack-web-tests/reports/*/junit/*.xml" --fail-when-no-results
+          fi
 
   # ---------------------------------------------------------------------------------------------
   # Publication.
@@ -710,7 +739,7 @@ jobs:
         && needs.kdsl.result != 'failure'
         && needs.ui-tests.result != 'failure'
         && needs.ui-tests-report.result != 'failure'
-        && needs.setup.outputs.internal == 'true'
+        && needs.setup.outputs.secrets_available == 'true'
         && needs.setup.outputs.release == 'true'
         && (github.ref_name == 'main'
             || startsWith(github.ref_name, 'release/')
@@ -766,8 +795,10 @@ jobs:
 
       - name: Validate DOCKER.HUB
         if: ${{ !cancelled() && steps.push.outcome != '' }}
+        env:
+          PUSH_OUTCOME: ${{ steps.push.outcome }}
         run: |
-          if [ "${{ steps.push.outcome }}" = "success" ]; then
+          if [ "$PUSH_OUTCOME" = "success" ]; then
             yontrack validate --validation DOCKER.HUB --status PASSED
           else
             yontrack validate --validation DOCKER.HUB --status FAILED
@@ -783,7 +814,7 @@ jobs:
         && needs.kdsl.result != 'failure'
         && needs.ui-tests.result != 'failure'
         && needs.ui-tests-report.result != 'failure'
-        && needs.setup.outputs.internal == 'true'
+        && needs.setup.outputs.secrets_available == 'true'
         && needs.setup.outputs.release == 'true'
         && (github.ref_name == 'main' || startsWith(github.ref_name, 'release/')) }}
     runs-on: ubuntu-latest
@@ -822,8 +853,10 @@ jobs:
 
       - name: Validate GITHUB.RELEASE
         if: ${{ !cancelled() && steps.release.outcome != '' }}
+        env:
+          RELEASE_OUTCOME: ${{ steps.release.outcome }}
         run: |
-          if [ "${{ steps.release.outcome }}" = "success" ]; then
+          if [ "$RELEASE_OUTCOME" = "success" ]; then
             yontrack validate --validation GITHUB.RELEASE --status PASSED
           else
             yontrack validate --validation GITHUB.RELEASE --status FAILED
@@ -848,7 +881,7 @@ jobs:
         && needs.kdsl.result != 'failure'
         && needs.ui-tests.result != 'failure'
         && needs.ui-tests-report.result != 'failure'
-        && needs.setup.outputs.internal == 'true'
+        && needs.setup.outputs.secrets_available == 'true'
         && needs.setup.outputs.release == 'true'
         && (github.ref_name == 'main' || startsWith(github.ref_name, 'release/')) }}
     runs-on: ubuntu-latest
@@ -908,8 +941,10 @@ jobs:
 
       - name: Validate DOCUMENTATION
         if: ${{ !cancelled() && steps.upload.outcome != '' }}
+        env:
+          UPLOAD_OUTCOME: ${{ steps.upload.outcome }}
         run: |
-          if [ "${{ steps.upload.outcome }}" = "success" ]; then
+          if [ "$UPLOAD_OUTCOME" = "success" ]; then
             yontrack validate --validation DOCUMENTATION --status PASSED
           else
             yontrack validate --validation DOCUMENTATION --status FAILED
