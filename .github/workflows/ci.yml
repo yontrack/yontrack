@@ -92,6 +92,16 @@ jobs:
           # computes as `.0`.
           fetch-depth: 0
 
+      # The nemerosa/ontrack-build image carried a global git identity, and the tests rely on
+      # it: GitRepo.commit() runs `git commit` in a freshly `git init`ed repo, which fails
+      # outright on a runner with no user.name/user.email. init.defaultBranch matches what the
+      # image set, so the branch names the tests assert on stay the same.
+      - name: Configure git
+        run: |
+          git config --global user.email "yontrack@nemerosa.net"
+          git config --global user.name "Yontrack"
+          git config --global init.defaultBranch main
+
       - uses: actions/setup-java@v4
         with:
           distribution: zulu
@@ -234,6 +244,16 @@ jobs:
         with:
           fetch-depth: 0
 
+      # The nemerosa/ontrack-build image carried a global git identity, and the tests rely on
+      # it: GitRepo.commit() runs `git commit` in a freshly `git init`ed repo, which fails
+      # outright on a runner with no user.name/user.email. init.defaultBranch matches what the
+      # image set, so the branch names the tests assert on stay the same.
+      - name: Configure git
+        run: |
+          git config --global user.email "yontrack@nemerosa.net"
+          git config --global user.name "Yontrack"
+          git config --global init.defaultBranch main
+
       - uses: actions/setup-java@v4
         with:
           distribution: zulu
@@ -285,6 +305,19 @@ jobs:
         run: |
           yontrack validate --validation UI_UNIT \
             junit --pattern "ontrack-web-core/reports/*.xml" --fail-when-no-results
+
+      # Jenkins archived these; without them a unit-test failure is only visible as a class
+      # name in the log, with no stack trace.
+      - name: Upload the test reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-test-reports
+          path: |
+            **/build/reports/tests/**
+            **/build/test-results/**/*.xml
+          if-no-files-found: ignore
+          retention-days: 7
 
       - name: Build the Docker images
         run: |
@@ -415,6 +448,16 @@ jobs:
         with:
           fetch-depth: 0
 
+      # The nemerosa/ontrack-build image carried a global git identity, and the tests rely on
+      # it: GitRepo.commit() runs `git commit` in a freshly `git init`ed repo, which fails
+      # outright on a runner with no user.name/user.email. init.defaultBranch matches what the
+      # image set, so the branch names the tests assert on stay the same.
+      - name: Configure git
+        run: |
+          git config --global user.email "yontrack@nemerosa.net"
+          git config --global user.name "Yontrack"
+          git config --global init.defaultBranch main
+
       - uses: actions/setup-java@v4
         with:
           distribution: zulu
@@ -483,6 +526,16 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      # The nemerosa/ontrack-build image carried a global git identity, and the tests rely on
+      # it: GitRepo.commit() runs `git commit` in a freshly `git init`ed repo, which fails
+      # outright on a runner with no user.name/user.email. init.defaultBranch matches what the
+      # image set, so the branch names the tests assert on stay the same.
+      - name: Configure git
+        run: |
+          git config --global user.email "yontrack@nemerosa.net"
+          git config --global user.name "Yontrack"
+          git config --global init.defaultBranch main
 
       - uses: actions/setup-java@v4
         with:
@@ -577,6 +630,16 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      # The nemerosa/ontrack-build image carried a global git identity, and the tests rely on
+      # it: GitRepo.commit() runs `git commit` in a freshly `git init`ed repo, which fails
+      # outright on a runner with no user.name/user.email. init.defaultBranch matches what the
+      # image set, so the branch names the tests assert on stay the same.
+      - name: Configure git
+        run: |
+          git config --global user.email "yontrack@nemerosa.net"
+          git config --global user.name "Yontrack"
+          git config --global init.defaultBranch main
 
       - uses: actions/setup-java@v4
         with:
@@ -892,6 +955,16 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      # The nemerosa/ontrack-build image carried a global git identity, and the tests rely on
+      # it: GitRepo.commit() runs `git commit` in a freshly `git init`ed repo, which fails
+      # outright on a runner with no user.name/user.email. init.defaultBranch matches what the
+      # image set, so the branch names the tests assert on stay the same.
+      - name: Configure git
+        run: |
+          git config --global user.email "yontrack@nemerosa.net"
+          git config --global user.name "Yontrack"
+          git config --global init.defaultBranch main
 
       - uses: actions/setup-java@v4
         with:
