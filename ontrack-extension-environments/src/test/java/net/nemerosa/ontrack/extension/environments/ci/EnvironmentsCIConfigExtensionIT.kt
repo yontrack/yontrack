@@ -8,6 +8,7 @@ import net.nemerosa.ontrack.extension.environments.service.SlotService
 import net.nemerosa.ontrack.extension.environments.workflows.SlotWorkflowService
 import net.nemerosa.ontrack.graphql.AbstractQLKTITSupport
 import net.nemerosa.ontrack.it.AsAdminTest
+import net.nemerosa.ontrack.test.TestUtils.uid
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import kotlin.test.assertEquals
@@ -30,9 +31,10 @@ class EnvironmentsCIConfigExtensionIT : AbstractQLKTITSupport() {
     @Test
     @AsAdminTest
     fun `Injection of environments based on the CI configuration`() {
-        environmentService.findAll().forEach {
-            environmentService.delete(it)
-        }
+        // Every name this test asserts on is unique to this run, so the test neither reads nor
+        // destroys global environment state. See #1657.
+        val environmentName = uid("env-")
+        val configuredProjectName = uid("cfg-")
 
         val deployedProject = project()
 
@@ -44,7 +46,7 @@ class EnvironmentsCIConfigExtensionIT : AbstractQLKTITSupport() {
                     project:
                       environments:
                         environments:
-                          - name: self.yontrack.com
+                          - name: $environmentName
                             description: Production environment for Yontrack itself
                             order: 200
                             tags:
@@ -53,7 +55,7 @@ class EnvironmentsCIConfigExtensionIT : AbstractQLKTITSupport() {
                         slots:
                           - project: ${deployedProject.name}
                             environments:
-                              - name: self.yontrack.com
+                              - name: $environmentName
                                 admissionRules:
                                   - ruleId: promotion
                                     ruleConfig:
@@ -79,24 +81,32 @@ class EnvironmentsCIConfigExtensionIT : AbstractQLKTITSupport() {
             """.trimIndent(),
             ci = "generic",
             scm = "mock",
-            env = EnvFixtures.generic()
+            env = EnvFixtures.generic(
+                extraEnv = mapOf("PROJECT_NAME" to configuredProjectName),
+            )
         )
 
-        assertNotNull(environmentService.findByName("self.yontrack.com")) {
+        assertNotNull(environmentService.findByName(environmentName), "Environment has been injected") {
             assertEquals("Production environment for Yontrack itself", it.description)
             assertEquals(200, it.order)
             assertEquals(listOf("yontrack", "release"), it.tags)
         }
 
-        val slot = slotService.findSlotsByProject(deployedProject).single()
-        assertEquals("self.yontrack.com", slot.environment.name)
+        val slots = slotService.findSlotsByProject(deployedProject)
+        assertEquals(
+            1, slots.size,
+            "Expected exactly one slot for project ${deployedProject.name}, got ${slots.map { it.environment.name }}"
+        )
+        val slot = slots.first()
+        assertEquals(environmentName, slot.environment.name)
 
         assertEquals(2, slotService.getAdmissionRuleConfigs(slot).size)
 
-        val workflow = slotWorkflowService.getSlotWorkflowsBySlot(slot).single()
+        val workflows = slotWorkflowService.getSlotWorkflowsBySlot(slot)
+        assertEquals(1, workflows.size, "Expected exactly one slot workflow, got ${workflows.map { it.workflow.name }}")
+        val workflow = workflows.first()
         assertEquals("Creation", workflow.workflow.name)
         assertEquals(SlotPipelineStatus.CANDIDATE, workflow.trigger)
-
     }
 
 }
