@@ -431,6 +431,19 @@ jobs:
           docker push "$GHCR_ONTRACK:$RUN_TAG"
           docker push "$GHCR_ONTRACK_UI:$RUN_TAG"
 
+          # `:run-<id>` is scoped to this run and means nothing once it ends. `:$VERSION` is
+          # durable and version-shaped, so one identifier spans CI, the Yontrack build name,
+          # the gitops diff and the running pod — which is what lets a BRONZE rc build be
+          # deployed to an environment at all.
+          #
+          # This never collides across branches: on main and release/* the version carries the
+          # `-rc-<run_number>` suffix, on a release run it is the release itself, and on a
+          # feature branch VersionCalculator already appends the branch name and short commit.
+          docker tag "nemerosa/ontrack:$BASE_VERSION" "$GHCR_ONTRACK:$VERSION"
+          docker tag "nemerosa/ontrack-ui:$BASE_VERSION" "$GHCR_ONTRACK_UI:$VERSION"
+          docker push "$GHCR_ONTRACK:$VERSION"
+          docker push "$GHCR_ONTRACK_UI:$VERSION"
+
   # ---------------------------------------------------------------------------------------------
   # Integration tests, sharded. Each shard brings up its own compose/docker-compose-it.yml stack
   # (via the integrationTest -> integrationTestComposeUp dependency) — they are isolated per
