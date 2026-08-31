@@ -63,15 +63,20 @@ env:
   # which is how the migration dropped it (#1655) and left a hole in
   # `ontrack_run_VALIDATION_RUN_time_seconds`. Held as one string because the four values are the
   # same at every call site — a URL, an event name and a SHA, none of which contain whitespace,
-  # so the unquoted expansion below is safe. The run time is per-step and is added there.
+  # so the unquoted expansion below is safe. The run time is per-job and is added at each site.
   #
   # The source type matches what the GitHub ingestion already records (WorkflowRunInfo.TYPE), so
   # a run reported by this workflow and one reported by a webhook read the same way in the UI.
   #
-  # Every call site builds its own `run_time_flag` and leaves it empty when the measured step has
-  # no recorded start — a step skipped by its own `if`, or one whose job died before it began.
-  # Recording the validation matters more than timing it, so a missing start drops the flag
-  # instead of failing the step on `$(( ... - ))` and losing the stamp altogether.
+  # Each job records its start in a first `run:` step and every validation in that job measures
+  # from there, so the reported time covers the job rather than one step of it — checkout,
+  # toolchain setup and cache restore included. Two spans stay outside it and cannot be brought
+  # in: the runner's own "Set up job", which precedes every step, and anything the job does after
+  # the validation has been recorded.
+  #
+  # Every call site still builds its own `run_time_flag` and leaves it empty when there is no
+  # recorded start. Recording the validation matters more than timing it, so a missing start drops
+  # the flag instead of failing the step on `$(( ... - ))` and losing the stamp altogether.
   YONTRACK_RUN_INFO: >-
     --source-type github-workflow
     --source-uri ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
@@ -278,6 +283,14 @@ jobs:
       FULL_RUN: ${{ needs.setup.outputs.full_run }}
       JUST_BUILD_AND_PUSH: ${{ needs.setup.outputs.just_build_and_push }}
     steps:
+      # The run time reported for this job's validations is measured from here. A `run:` step is
+      # the earliest point a workflow can observe: the runner's own "Set up job" precedes every
+      # step and is not visible to any of them. Everything after this — checkout, toolchain setup,
+      # cache restore — is part of what the job costs and is counted.
+      - name: Record the job start
+        id: job_start
+        run: echo "started=$(date +%s)" >> "$GITHUB_OUTPUT"
+
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -322,10 +335,6 @@ jobs:
         if: env.JUST_BUILD_AND_PUSH != 'true'
         run: |
           set -euo pipefail
-          # First line of the measured step on purpose: GitHub exposes no step duration to
-          # expressions, and an output already written survives the step failing — so a broken
-          # build still reports how long it ran for.
-          echo "started=$(date +%s)" >> "$GITHUB_OUTPUT"
           # The versioning plugin's own tests. They gate the version computation every other
           # job depends on, and `build` does not reach into buildSrc on its own.
           ./gradlew :buildSrc:test --stacktrace --console plain
@@ -337,16 +346,18 @@ jobs:
       # `outcome` is empty only when the step was skipped, so a broken build still records
       # FAILED — which is the case worth seeing in Yontrack.
       #
-      # BUILD and UI_UNIT both report the duration of the one `build` step, because both test sets
-      # run inside the same `./gradlew build` and neither has a span of its own. Jenkins did the
-      # same: `adaptRunInfo()` gave every validation in a stage that stage's duration.
+      # BUILD and UI_UNIT report the same duration — the job up to this point. Both test sets run
+      # inside the one `./gradlew build`, so neither has a span of its own to report anyway.
+      # Jenkins did the same: `adaptRunInfo()` gave every validation in a stage that stage's
+      # duration. What is left out here is what the job does afterwards: building and pushing the
+      # Docker images, which takes longer than the build itself and which neither stamp is about.
       #
       # `--run-time` goes after the `junit` subcommand: `validateJUnitTestsCmd` redeclares the five
       # run-info flags on itself, so that is where they are read from.
       - name: Validate BUILD
         if: ${{ !cancelled() && env.FULL_RUN == 'true' && steps.build.outcome != '' }}
         env:
-          STARTED: ${{ steps.build.outputs.started }}
+          STARTED: ${{ steps.job_start.outputs.started }}
         run: |
           run_time_flag=""
           if [ -n "${STARTED:-}" ]; then
@@ -360,7 +371,7 @@ jobs:
       - name: Validate UI_UNIT
         if: ${{ !cancelled() && env.FULL_RUN == 'true' && steps.build.outcome != '' }}
         env:
-          STARTED: ${{ steps.build.outputs.started }}
+          STARTED: ${{ steps.job_start.outputs.started }}
         run: |
           run_time_flag=""
           if [ -n "${STARTED:-}" ]; then
@@ -588,6 +599,14 @@ jobs:
       ONTRACK_ACCEPTANCE_GITHUB_ORGANIZATION: ${{ secrets.ONTRACK_ACCEPTANCE_GITHUB_ORGANIZATION }}
       ONTRACK_ACCEPTANCE_GITHUB_TOKEN: ${{ secrets.ONTRACK_ACCEPTANCE_GITHUB_TOKEN }}
     steps:
+      # The run time reported for this job's validations is measured from here. A `run:` step is
+      # the earliest point a workflow can observe: the runner's own "Set up job" precedes every
+      # step and is not visible to any of them. Everything after this — checkout, toolchain setup,
+      # cache restore — is part of what the job costs and is counted.
+      - name: Record the job start
+        id: job_start
+        run: echo "started=$(date +%s)" >> "$GITHUB_OUTPUT"
+
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -645,18 +664,17 @@ jobs:
       - name: KDSL acceptance tests
         id: kdsl
         run: |
-          echo "started=$(date +%s)" >> "$GITHUB_OUTPUT"
           ./gradlew :ontrack-kdsl-acceptance:kdslAcceptanceTest \
             --stacktrace \
             --parallel \
             --console plain
 
-      # The measured span is the tests only; bringing the environment up is a separate step and
-      # is not part of what the stamp is about.
+      # The measured span is the whole job — restoring the images and bringing the environment up
+      # included. They are what an acceptance test run costs here, not overhead beside it.
       - name: Validate KDSL.ACCEPTANCE
         if: ${{ !cancelled() && steps.kdsl.outcome != '' }}
         env:
-          STARTED: ${{ steps.kdsl.outputs.started }}
+          STARTED: ${{ steps.job_start.outputs.started }}
         run: |
           run_time_flag=""
           if [ -n "${STARTED:-}" ]; then
@@ -705,6 +723,14 @@ jobs:
       BASE_VERSION: ${{ needs.setup.outputs.base_version }}
       ONTRACK_VERSION: ${{ needs.setup.outputs.base_version }}
     steps:
+      # The run time reported for this job's validations is measured from here. A `run:` step is
+      # the earliest point a workflow can observe: the runner's own "Set up job" precedes every
+      # step and is not visible to any of them. Everything after this — checkout, toolchain setup,
+      # cache restore — is part of what the job costs and is counted.
+      - name: Record the job start
+        id: job_start
+        run: echo "started=$(date +%s)" >> "$GITHUB_OUTPUT"
+
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -773,14 +799,13 @@ jobs:
       - name: UI tests
         id: test
         run: |
-          echo "started=$(date +%s)" >> "$GITHUB_OUTPUT"
           ./gradlew ":ontrack-web-tests:${{ matrix.task }}" \
             --stacktrace \
             --console plain
 
       # PLAYWRIGHT is validated from ui-tests-report, which has no span of its own worth
       # reporting — collecting artefacts takes seconds where the tests take minutes. Each variant
-      # therefore hands its own duration over inside its report artefact, and the reporting job
+      # therefore hands its own job duration over inside its report artefact, and the reporting job
       # takes the slowest, which is the wall clock of the three parallel legs.
       - name: Record the run time
         if: ${{ !cancelled() && steps.test.outcome != '' }}
@@ -788,7 +813,7 @@ jobs:
         # run red.
         continue-on-error: true
         env:
-          STARTED: ${{ steps.test.outputs.started }}
+          STARTED: ${{ steps.job_start.outputs.started }}
         run: |
           set -euo pipefail
           if [ -z "${STARTED:-}" ]; then
@@ -929,6 +954,14 @@ jobs:
     env:
       VERSION: ${{ needs.setup.outputs.version }}
     steps:
+      # The run time reported for this job's validations is measured from here. A `run:` step is
+      # the earliest point a workflow can observe: the runner's own "Set up job" precedes every
+      # step and is not visible to any of them. Everything after this — checkout, toolchain setup,
+      # cache restore — is part of what the job costs and is counted.
+      - name: Record the job start
+        id: job_start
+        run: echo "started=$(date +%s)" >> "$GITHUB_OUTPUT"
+
       - uses: actions/checkout@v4
 
       - name: Log in to GHCR
@@ -957,7 +990,6 @@ jobs:
         if: ${{ !cancelled() }}
         run: |
           set -euo pipefail
-          echo "started=$(date +%s)" >> "$GITHUB_OUTPUT"
           docker pull "$GHCR_ONTRACK:$RUN_TAG"
           docker pull "$GHCR_ONTRACK_UI:$RUN_TAG"
 
@@ -977,7 +1009,7 @@ jobs:
         if: ${{ !cancelled() && steps.push.outcome != '' }}
         env:
           PUSH_OUTCOME: ${{ steps.push.outcome }}
-          STARTED: ${{ steps.push.outputs.started }}
+          STARTED: ${{ steps.job_start.outputs.started }}
         run: |
           run_time_flag=""
           if [ -n "${STARTED:-}" ]; then
@@ -1013,6 +1045,14 @@ jobs:
     env:
       VERSION: ${{ needs.setup.outputs.version }}
     steps:
+      # The run time reported for this job's validations is measured from here. A `run:` step is
+      # the earliest point a workflow can observe: the runner's own "Set up job" precedes every
+      # step and is not visible to any of them. Everything after this — checkout, toolchain setup,
+      # cache restore — is part of what the job costs and is counted.
+      - name: Record the job start
+        id: job_start
+        run: echo "started=$(date +%s)" >> "$GITHUB_OUTPUT"
+
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -1031,7 +1071,6 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          echo "started=$(date +%s)" >> "$GITHUB_OUTPUT"
           # The change log since the last build promoted to RELEASE.
           yontrack build changelog export --from-promotion RELEASE --format markdown > changelog.md
           cat changelog.md
@@ -1044,7 +1083,7 @@ jobs:
         if: ${{ !cancelled() && steps.release.outcome != '' }}
         env:
           RELEASE_OUTCOME: ${{ steps.release.outcome }}
-          STARTED: ${{ steps.release.outputs.started }}
+          STARTED: ${{ steps.job_start.outputs.started }}
         run: |
           run_time_flag=""
           if [ -n "${STARTED:-}" ]; then
@@ -1086,6 +1125,14 @@ jobs:
     env:
       VERSION: ${{ needs.setup.outputs.version }}
     steps:
+      # The run time reported for this job's validations is measured from here. A `run:` step is
+      # the earliest point a workflow can observe: the runner's own "Set up job" precedes every
+      # step and is not visible to any of them. Everything after this — checkout, toolchain setup,
+      # cache restore — is part of what the job costs and is counted.
+      - name: Record the job start
+        id: job_start
+        run: echo "started=$(date +%s)" >> "$GITHUB_OUTPUT"
+
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -1113,13 +1160,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install --no-install-recommends -y graphviz s3cmd
 
-      # DOCUMENTATION is validated on the upload, but the stamp is about producing *and*
-      # publishing the site, so the clock starts at the build — as the enclosing Jenkins stage
-      # duration did.
       - name: Build the documentation
-        id: docs
         run: |
-          echo "started=$(date +%s)" >> "$GITHUB_OUTPUT"
           ./gradlew :ontrack-docs:integrationTest :ontrack-docs:buildDocs \
             --stacktrace \
             --console plain
@@ -1155,7 +1197,7 @@ jobs:
         if: ${{ !cancelled() && steps.upload.outcome != '' }}
         env:
           UPLOAD_OUTCOME: ${{ steps.upload.outcome }}
-          STARTED: ${{ steps.docs.outputs.started }}
+          STARTED: ${{ steps.job_start.outputs.started }}
         run: |
           run_time_flag=""
           if [ -n "${STARTED:-}" ]; then
