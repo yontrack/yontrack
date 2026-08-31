@@ -57,18 +57,25 @@ Confirm the branch was created before proceeding.
 
 ## Step 4 — Mark the issue as in progress
 
-As soon as the branch exists, move the issue to the work-in-progress status:
+As soon as the branch exists, move the issue to the work-in-progress status. An issue carries exactly
+one `status:*` label at a time, so **always remove the current one in the same command** — never add
+`status:wip` on its own.
+
+Most issues start on `status:todo`, which is the usual label to drop:
 
 ```bash
-gh issue edit {number} --add-label "status:wip"
+gh issue edit {number} --add-label "status:wip" --remove-label "status:todo"
 ```
 
-If the issue already carries another `status:*` label (`status:ready`, `status:tomerge`,
-`status:waiting-feedback`, `status:released`), drop it in the same command so only one status is set:
+If Step 1 showed a different `status:*` label (`status:ready`, `status:tomerge`,
+`status:waiting-feedback`, `status:released`), remove that one instead:
 
 ```bash
 gh issue edit {number} --add-label "status:wip" --remove-label "status:<previous>"
 ```
+
+The `--json ...,labels` output from Step 1 already tells you which one is set — use it rather than
+guessing.
 
 ---
 

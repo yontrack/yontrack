@@ -84,8 +84,8 @@ Issues carry exactly one `status:*` label at a time. The two the agent workflow 
 Apply them with `gh`, always removing the previous status label in the same command:
 
 ```bash
-# Starting work
-gh issue edit <number> --add-label "status:wip"
+# Starting work (issues normally start on status:todo — check the issue's actual label first)
+gh issue edit <number> --add-label "status:wip" --remove-label "status:todo"
 
 # After the merge lands and CI on main is green
 gh issue edit <number> --add-label "status:ready" --remove-label "status:wip"
