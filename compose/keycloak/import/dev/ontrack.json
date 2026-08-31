@@ -61,7 +61,16 @@
       "publicClient": false,
       "baseUrl": "http://localhost:3000",
       "redirectUris": [
-        "http://localhost:*/api/auth/callback/keycloak"
+        "http://localhost:3000/api/auth/callback/keycloak",
+        "http://localhost:3100/api/auth/callback/keycloak",
+        "http://localhost:3200/api/auth/callback/keycloak",
+        "http://localhost:3300/api/auth/callback/keycloak",
+        "http://localhost:3400/api/auth/callback/keycloak",
+        "http://localhost:3500/api/auth/callback/keycloak",
+        "http://localhost:3600/api/auth/callback/keycloak",
+        "http://localhost:3700/api/auth/callback/keycloak",
+        "http://localhost:3800/api/auth/callback/keycloak",
+        "http://localhost:3900/api/auth/callback/keycloak"
       ],
       "webOrigins": [
         "+"
