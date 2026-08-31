@@ -115,7 +115,7 @@ configuration:
                           targetPath: "yontrack-helmfile.d/values/yontrack-self/yontrack.yaml"
                           targetPropertyType: "yaml-path"
                           targetProperty: "image.tag"
-                          targetVersion: "${build}"
+                          targetVersion: "${build.release}"
                           autoApproval: true
                           prTitleTemplate: "Deploying ${sourceProject} version ${VERSION}"
                           prBodyTemplateFormat: "markdown"
