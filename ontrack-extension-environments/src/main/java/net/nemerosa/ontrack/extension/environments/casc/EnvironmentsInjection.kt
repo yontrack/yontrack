@@ -11,6 +11,7 @@ import net.nemerosa.ontrack.extension.environments.workflows.SlotWorkflowService
 import net.nemerosa.ontrack.extension.workflows.definition.Workflow
 import net.nemerosa.ontrack.model.files.FileRef
 import net.nemerosa.ontrack.model.files.FileRefService
+import net.nemerosa.ontrack.model.security.SecurityService
 import net.nemerosa.ontrack.model.structure.Project
 import net.nemerosa.ontrack.model.structure.StructureService
 import net.nemerosa.ontrack.model.support.ImageHelper
@@ -26,6 +27,7 @@ class EnvironmentsInjection(
     private val slotService: SlotService,
     private val slotWorkflowService: SlotWorkflowService,
     private val fileRefService: FileRefService,
+    private val securityService: SecurityService,
 ) {
 
     private val logger: Logger = LoggerFactory.getLogger(EnvironmentsInjection::class.java)
@@ -109,7 +111,13 @@ class EnvironmentsInjection(
         slots.forEach { slotCasc ->
 
             val qualifier = slotCasc.qualifier
-            val project = structureService.findProjectByName(slotCasc.project).getOrNull()
+            // Resolved as admin so that "not found" below means the project really does not exist,
+            // rather than merely being invisible to the current user. Authorization is still
+            // enforced by the slot mutations themselves, which all check ProjectView on the slot's
+            // project (see checkSlotAccess).
+            val project = securityService.asAdmin {
+                structureService.findProjectByName(slotCasc.project).getOrNull()
+            }
 
             // Checking that there is no double declaration of environments
             val duplicateNames = slotCasc.environments
@@ -120,7 +128,7 @@ class EnvironmentsInjection(
             if (duplicateNames.isNotEmpty()) {
                 throw EnvironmentsCascException(
                     """
-                        Duplicate environment names found in slot ${project}[${slotCasc.qualifier}]:
+                        Duplicate environment names found in slot ${slotCasc.project}[${slotCasc.qualifier}]:
                         ${duplicateNames.joinToString("\n")}
                     """.trimIndent()
                 )
@@ -150,7 +158,7 @@ class EnvironmentsInjection(
                             runSlotAdmissionRules(slot, a)
                             runSlotWorkflows(slot, a)
                         } else {
-                            logger.warn("[casc][slot] Slot ${project.name}[$qualifier] environment not found -> ${a.name}")
+                            logger.error("[casc][slot] Slot ${project.name}[$qualifier] skipped: environment \"${a.name}\" does not exist.")
                         }
                     }
                     onModification { a, existing ->
@@ -169,7 +177,7 @@ class EnvironmentsInjection(
                     }
                 }
             } else {
-                logger.warn("[casc][slot] Project cannot be found")
+                logger.error("[casc][slot] Slot ${slotCasc.project}[$qualifier] skipped: project does not exist.")
             }
         }
     }

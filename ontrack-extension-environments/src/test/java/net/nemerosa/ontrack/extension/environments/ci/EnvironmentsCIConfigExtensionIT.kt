@@ -109,4 +109,80 @@ class EnvironmentsCIConfigExtensionIT : AbstractQLKTITSupport() {
         assertEquals(SlotPipelineStatus.CANDIDATE, workflow.trigger)
     }
 
+    @Test
+    @AsAdminTest
+    fun `Slot referencing an unknown environment is skipped without failing the injection`() {
+        val environmentName = uid("env-")
+        val unknownEnvironmentName = uid("missing-env-")
+        val configuredProjectName = uid("cfg-")
+
+        val deployedProject = project()
+
+        configTestSupport.configureProject(
+            yaml = """
+                version: v1
+                configuration:
+                  defaults:
+                    project:
+                      environments:
+                        environments:
+                          - name: $environmentName
+                            order: 200
+                        slots:
+                          - project: ${deployedProject.name}
+                            environments:
+                              - name: $unknownEnvironmentName
+            """.trimIndent(),
+            ci = "generic",
+            scm = "mock",
+            env = EnvFixtures.generic(
+                extraEnv = mapOf("PROJECT_NAME" to configuredProjectName),
+            )
+        )
+
+        // The rest of the injection still ran...
+        assertNotNull(environmentService.findByName(environmentName), "Declared environment has been injected")
+
+        // ... but the slot naming an environment that does not exist is skipped rather than created.
+        val slots = slotService.findSlotsByProject(deployedProject)
+        assertEquals(
+            0, slots.size,
+            "No slot created for an unresolvable environment, got ${slots.map { it.environment.name }}"
+        )
+    }
+
+    @Test
+    @AsAdminTest
+    fun `Slot referencing an unknown project is skipped without failing the injection`() {
+        val environmentName = uid("env-")
+        val unknownProjectName = uid("missing-p-")
+        val configuredProjectName = uid("cfg-")
+
+        configTestSupport.configureProject(
+            yaml = """
+                version: v1
+                configuration:
+                  defaults:
+                    project:
+                      environments:
+                        environments:
+                          - name: $environmentName
+                            order: 200
+                        slots:
+                          - project: $unknownProjectName
+                            environments:
+                              - name: $environmentName
+            """.trimIndent(),
+            ci = "generic",
+            scm = "mock",
+            env = EnvFixtures.generic(
+                extraEnv = mapOf("PROJECT_NAME" to configuredProjectName),
+            )
+        )
+
+        // The unresolvable slot is skipped without aborting the injection: the environment declared
+        // alongside it is still created.
+        assertNotNull(environmentService.findByName(environmentName), "Declared environment has been injected")
+    }
+
 }
