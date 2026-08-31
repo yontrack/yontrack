@@ -576,11 +576,37 @@ The rejection is deliberately _not_ reported as an auto-versioning error: nothin
 the error channel would make real failures harder to see. A fired guard does mean that someone re-promoted an old
 build, though, which is worth being notified about — see [notifications](#notifications).
 
+### Version rules in a workflow node
+
+Auto-versioning driven by an [`auto-versioning` workflow node](../workflows/workflows.md) supports the same two
+parameters, declared on the node itself:
+
+```yaml
+nodes:
+  - id: av
+    executorId: auto-versioning
+    data:
+      targetProject: my-gitops
+      targetBranch: main
+      targetPath: gradle.properties
+      targetProperty: version
+      targetVersion: ${build}
+      versionRule: semver
+      versionRuleConfig:
+        onUnparseable: REJECT
+```
+
+A rejection behaves exactly as above: nothing is written, the audit entry moves to `PROCESSING_ABORTED`, the
+`auto-versioning-rejected` event is fired, and the node ends in error.
+
+Unlike the branch configuration, the rule ID is *not* checked when the workflow is saved: an unknown `versionRule` on a
+node surfaces when the node runs, as an auto-versioning error.
+
 !!! warning
 
-    Version rules apply to the auto-versioning triggered by a promotion, which is configured on the target branch.
-    Auto-versioning driven by an [`auto-versioning` workflow node](../workflows/workflows.md) carries its own version
-    explicitly and is not covered by the rule of the target branch.
+    The rule has to be declared on the node. A workflow node reads nothing from the target branch's auto-versioning
+    configuration — including its `versionRule` — so a branch guarded for its promotion-driven auto-versioning is
+    *not* automatically guarded for the workflows targeting it.
 
 ## The upgrade branch
 

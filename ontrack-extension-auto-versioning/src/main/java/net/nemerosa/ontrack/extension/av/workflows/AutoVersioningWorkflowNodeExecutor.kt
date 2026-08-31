@@ -114,6 +114,8 @@ class AutoVersioningWorkflowNodeExecutor(
             upgradeBranchPattern = resolvedData.upgradeBranchPattern,
             postProcessing = resolvedData.postProcessing,
             postProcessingConfig = resolvedData.postProcessingConfig,
+            versionRule = resolvedData.versionRule,
+            versionRuleConfig = resolvedData.versionRuleConfig,
             validationStamp = resolvedData.validationStamp,
             autoApprovalMode = resolvedData.autoApprovalMode,
             reviewers = resolvedData.reviewers,

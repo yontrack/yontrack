@@ -1,6 +1,7 @@
 package net.nemerosa.ontrack.extension.av.workflows
 
 import com.fasterxml.jackson.databind.JsonNode
+import net.nemerosa.ontrack.common.api.APIDescription
 import net.nemerosa.ontrack.extension.av.config.AutoApprovalMode
 import net.nemerosa.ontrack.extension.av.config.AutoVersioningPushMode
 import net.nemerosa.ontrack.extension.av.config.AutoVersioningSourceConfig
@@ -19,6 +20,10 @@ data class AutoVersioningWorkflowNodeExecutorData(
     val upgradeBranchPattern: String = AutoVersioningSourceConfig.DEFAULT_UPGRADE_BRANCH_PATTERN,
     val postProcessing: String? = null,
     val postProcessingConfig: JsonNode? = null,
+    @APIDescription("ID of the rule checking the version to set against the version already present in the target files. No check is performed when this is not set.")
+    val versionRule: String? = null,
+    @APIDescription("Configuration of the version rule")
+    val versionRuleConfig: JsonNode? = null,
     val validationStamp: String? = null,
     val autoApprovalMode: AutoApprovalMode = AutoApprovalMode.DEFAULT_AUTO_APPROVAL_MODE,
     val reviewers: List<String> = emptyList(),
@@ -42,6 +47,8 @@ data class AutoVersioningWorkflowNodeExecutorData(
         upgradeBranchPattern = upgradeBranchPattern,
         postProcessing = postProcessing,
         postProcessingConfig = postProcessingConfig,
+        versionRule = versionRule,
+        versionRuleConfig = versionRuleConfig,
         validationStamp = validationStamp,
         autoApprovalMode = autoApprovalMode,
         reviewers = reviewers,
