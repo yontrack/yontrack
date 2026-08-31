@@ -100,8 +100,12 @@ this safe to land first).
 `:<version>` (e.g. `5.0.42-rc-123`), so one identifier spans CI, the Yontrack build name,
 the gitops diff and the running pod. Keep `:run-<id>` exactly as it is.
 
+The packages stay **private**. An earlier draft made them public so the cluster would
+need no pull secret; keeping them private costs one sealed `imagePullSecret` in gitops
+(issue 3) and is the deliberate trade.
+
 **Acceptance**: both `ontrack` and `ontrack-ui` carry `:<version>` in GHCR after every
-full run; both packages are public; pulling with no credentials works.
+full run; `:run-<id>` still works for the jobs that consume it.
 
 ### 3. Align and repoint the demo environment — [yontrack/yontrack-infra-gitops#26](https://github.com/yontrack/yontrack-infra-gitops/issues/26)
 
@@ -110,6 +114,8 @@ structurally thinner.
 
 - Point at GHCR: override `image.repository` and `ontrack.ui.image` (the chart's two
   image keys share a single `image.tag`)
+- Add an `imagePullSecret` for GHCR — the packages are private, so the demo namespace
+  needs a sealed secret holding a read-only `read:packages` token
 - Add the CPU/memory limits and requests self has
 - Add `persistence.size`
 - Enable the MCP release (`helmfile.mcp.enabled`)
@@ -119,8 +125,8 @@ structurally thinner.
 Keep deliberately different: Keycloak auth (lets a visitor log in without provisioning an
 Auth0 user) and the smaller Postgres volume.
 
-**Acceptance**: demo runs a GHCR-hosted rc image with self's resource shape; no backup
-schedule; `task render-yontrack` output committed.
+**Acceptance**: demo runs a GHCR-hosted rc image with self's resource shape, pulled with
+the sealed `imagePullSecret`; no backup schedule; `task render-yontrack` output committed.
 
 ### 4. Declare the demo environment and slot — [yontrack/yontrack#1662](https://github.com/yontrack/yontrack/issues/1662)
 
