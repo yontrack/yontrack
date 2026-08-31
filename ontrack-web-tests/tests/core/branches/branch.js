@@ -20,8 +20,58 @@ class BranchPage {
         await expect(this.page.getByTestId('loading-builds')).toBeHidden()
     }
 
-    async goTo() {
-        await this.page.goto(`${this.branch.ontrack.connection.ui}/branch/${this.branch.id}`)
+    async goTo({view} = {}) {
+        const query = view === undefined ? '' : `?view=${encodeURIComponent(view)}`
+        await this.page.goto(`${this.branch.ontrack.connection.ui}/branch/${this.branch.id}${query}`)
+        await this.checkOnPage()
+    }
+
+    contentViewMenuButton() {
+        return this.page.getByRole('button', {name: 'View', exact: true})
+    }
+
+    // The menu of the content views is rendered in a portal, and only while the dropdown is open
+    contentViewMenu() {
+        return this.page.getByTestId('branch-content-views')
+    }
+
+    contentViewMenuItem(name) {
+        return this.contentViewMenu().getByRole('menuitem', {name, exact: true})
+    }
+
+    async openContentViewMenu() {
+        const button = this.contentViewMenuButton()
+        await expect(button).toBeVisible()
+        await button.click()
+        await expect(this.contentViewMenu()).toBeVisible()
+    }
+
+    async closeContentViewMenu() {
+        await this.page.keyboard.press('Escape')
+        await expect(this.contentViewMenu()).toBeHidden()
+    }
+
+    async checkContentViews(names) {
+        await this.openContentViewMenu()
+        for (const name of names) {
+            await expect(this.contentViewMenuItem(name)).toBeVisible()
+        }
+        await this.closeContentViewMenu()
+    }
+
+    async checkContentViewSelected(name) {
+        await this.openContentViewMenu()
+        const item = this.contentViewMenuItem(name)
+        await expect(item).toBeVisible()
+        await expect(item).toHaveClass(/ant-dropdown-menu-item-selected/)
+        await this.closeContentViewMenu()
+    }
+
+    async selectContentView(name) {
+        await this.openContentViewMenu()
+        const item = this.contentViewMenuItem(name)
+        await expect(item).toBeVisible()
+        await item.click()
         await this.checkOnPage()
     }
 

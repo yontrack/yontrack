@@ -11,8 +11,24 @@ import EditValidationStampFilterDialog, {
     useEditValidationStampFilterDialog
 } from "@components/branches/filters/validationStamps/EditValidationStampFilterDialog";
 import {usePreferences} from "@components/providers/PreferencesProvider";
-import {useGraphQLClient} from "@components/providers/ConnectionContextProvider";
+import {callGraphQL, useQuery} from "@components/services/GraphQL";
 import {useRefresh} from "@components/common/RefreshUtils";
+
+const gqlUpdateValidationStampFilter = gql`
+    mutation UpdateValidationStampFilter(
+        $id: Int!,
+        $vsNames: [String!]!,
+    ) {
+        updateValidationStampFilter(input: {
+            id: $id,
+            vsNames: $vsNames,
+        }) {
+            errors {
+                message
+            }
+        }
+    }
+`
 
 // noinspection JSUnusedLocalSymbols
 export const ValidationStampFilterContext = createContext({
@@ -51,47 +67,54 @@ export const ValidationStampFilterContext = createContext({
 
 export default function ValidationStampFilterContextProvider({branch, children}) {
 
-    const client = useGraphQLClient()
-
     const [refreshCount, refresh] = useRefresh()
-    const [validationStampNames, setValidationStampNames] = useState([])
-    const [filters, setFilters] = useState([])
-    useEffect(() => {
-        if (client && branch) {
-            client.request(
-                gql`
-                    query GetValidationStampFilters(
-                        $branchId: Int!,
-                    ) {
-                        branch(id: $branchId) {
-                            validationStampFilters(all: true) {
-                                ...validationStampFilterContent
-                            }
-                            validationStamps {
-                                name
-                            }
-                        }
+
+    const {data} = useQuery(
+        gql`
+            query GetValidationStampFilters(
+                $branchId: Int!,
+            ) {
+                branch(id: $branchId) {
+                    validationStampFilters(all: true) {
+                        ...validationStampFilterContent
                     }
+                    validationStamps {
+                        name
+                    }
+                }
+            }
 
-                    ${gqlValidationStampFilterFragment}
-                `, {
-                    branchId: Number(branch.id),
-                }
-            ).then(data => {
-                setFilters(data.branch.validationStampFilters)
-                // Validation stamp names
-                setValidationStampNames(data.branch.validationStamps.map(it => it.name))
-                // Selection of the initial filter
-                // TODO Checks also the permalink
-                const initialFilter = getLocallySelectedValidationFilter(branch.id)
-                if (initialFilter) {
-                    setSelectedFilter(initialFilter)
-                }
-            })
+            ${gqlValidationStampFilterFragment}
+        `,
+        {
+            variables: {
+                branchId: Number(branch?.id),
+            },
+            deps: [branch, refreshCount],
+            condition: !!branch,
+            initialData: null,
+            dataFn: data => data.branch,
         }
-    }, [client, branch, refreshCount])
+    )
 
+    // Validation stamp names
+    const validationStampNames = data?.validationStamps?.map(it => it.name) ?? []
+
+    // The filters are seeded by the query, then edited in place by the dialogs below
+    const [filters, setFilters] = useState([])
     const [selectedFilter, setSelectedFilter] = useState()
+
+    useEffect(() => {
+        if (data) {
+            setFilters(data.validationStampFilters)
+            // Selection of the initial filter
+            // TODO Checks also the permalink
+            const initialFilter = getLocallySelectedValidationFilter(branch.id)
+            if (initialFilter) {
+                setSelectedFilter(initialFilter)
+            }
+        }
+    }, [data])
 
     const selectFilter = (filter) => {
         // TODO exitInlineEdit() // Stops any current edition
@@ -100,26 +123,13 @@ export default function ValidationStampFilterContextProvider({branch, children})
     }
 
     const updateFilter = (vsNames) => {
-        client.request(
-            gql`
-                mutation UpdateValidationStampFilter(
-                    $id: Int!,
-                    $vsNames: [String!]!,
-                ) {
-                    updateValidationStampFilter(input: {
-                        id: $id,
-                        vsNames: $vsNames,
-                    }) {
-                        errors {
-                            message
-                        }
-                    }
-                }
-            `, {
+        callGraphQL({
+            query: gqlUpdateValidationStampFilter,
+            variables: {
                 id: selectedFilter.id,
                 vsNames,
-            }
-        ).then(data => {
+            },
+        }).then(() => {
             setSelectedFilter({
                 ...selectedFilter,
                 vsNames,
@@ -165,8 +175,8 @@ export default function ValidationStampFilterContextProvider({branch, children})
     const newValidationStampFilterDialog = useNewValidationStampFilterDialog({
         onSuccess: (values) => {
             // Creates the filter
-            client.request(
-                gql`
+            callGraphQL({
+                query: gql`
                     mutation CreateValidationStampFilter(
                         $name: String!
                     ) {
@@ -183,8 +193,9 @@ export default function ValidationStampFilterContextProvider({branch, children})
                     }
 
                     ${gqlValidationStampFilterFragment}
-                `, values
-            ).then(data => {
+                `,
+                variables: values,
+            }).then(data => {
                 setFilters([
                     ...filters,
                     data.createValidationStampFilter.validationStampFilter,
@@ -200,27 +211,13 @@ export default function ValidationStampFilterContextProvider({branch, children})
 
     const editValidationStampFilterDialog = useEditValidationStampFilterDialog({
         onSuccess: (values, {filter}) => {
-            client.request(
-                gql`
-                    mutation UpdateValidationStampFilter(
-                        $id: Int!,
-                        $vsNames: [String!]!,
-                    ) {
-                        updateValidationStampFilter(input: {
-                            id: $id,
-                            vsNames: $vsNames,
-                        }) {
-                            errors {
-                                message
-                            }
-                        }
-                    }
-                `,
-                {
+            callGraphQL({
+                query: gqlUpdateValidationStampFilter,
+                variables: {
                     id: filter.id,
                     vsNames: values.vsNames,
-                }
-            ).then(() => {
+                },
+            }).then(() => {
                 const updatedFilter = {
                     ...filter,
                     vsNames: values.vsNames,
@@ -242,8 +239,8 @@ export default function ValidationStampFilterContextProvider({branch, children})
     }
 
     const deleteFilter = async (filter) => {
-        client.request(
-            gql`
+        callGraphQL({
+            query: gql`
                 mutation DeleteValidationStampFilter($id: Int!) {
                     deleteValidationStampFilterById(input: {
                         id: $id,
@@ -254,10 +251,10 @@ export default function ValidationStampFilterContextProvider({branch, children})
                     }
                 }
             `,
-            {
-                id: Number(filter.id)
-            }
-        ).then(refresh)
+            variables: {
+                id: Number(filter.id),
+            },
+        }).then(refresh)
     }
 
     // Preferences

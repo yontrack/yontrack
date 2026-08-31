@@ -22,6 +22,8 @@ import LoadingContainer from "@components/common/LoadingContainer";
 import BranchInfoViewDrawer from "@components/branches/BranchInfoViewDrawer";
 import BranchContent from "@components/branches/BranchContent";
 import {useEventForRefresh} from "@components/common/EventsContext";
+import BranchContentViewSelector from "@components/branches/BranchContentViewSelector";
+import useBranchContentViewSelection from "@components/branches/views/useBranchContentViewSelection";
 
 export default function BranchView({id}) {
 
@@ -63,6 +65,9 @@ export default function BranchView({id}) {
         }
     )
 
+    // Selection of the branch content view
+    const {views, selectedViewKey, selectBranchContentView} = useBranchContentViewSelection()
+
     const [commands, setCommands] = useState([])
 
     useEffect(() => {
@@ -91,6 +96,12 @@ export default function BranchView({id}) {
                 )
             }
             commands.push(
+                <BranchContentViewSelector
+                    key="contentView"
+                    views={views}
+                    selectedViewKey={selectedViewKey}
+                    onSelect={selectBranchContentView}
+                />,
                 <Command
                     key="promotionLevels"
                     icon={<FaMedal/>}
@@ -118,7 +129,7 @@ export default function BranchView({id}) {
             )
             setCommands(commands)
         }
-    }, [branch, loading])
+    }, [branch, loading, views, selectedViewKey, selectBranchContentView])
 
     return (
         <>
@@ -139,7 +150,7 @@ export default function BranchView({id}) {
                     {
                         branch && <>
                             <BranchInfoViewDrawer branch={branch} loadingBranch={loading}/>
-                            <BranchContent branch={branch}/>
+                            <BranchContent branch={branch} viewKey={selectedViewKey}/>
                         </>
                     }
                 </LoadingContainer>
