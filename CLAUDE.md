@@ -54,6 +54,23 @@ These rules apply unconditionally. Follow them in every change, without exceptio
 - Verify docs changes with `./gradlew :ontrack-docs:buildDocs`, which renders the site into
   `ontrack-docs/site/` and surfaces broken links and missing nav entries.
 
+### Running Yontrack locally
+
+- **Always** start Yontrack with `scripts/dev-stack.sh up` — never launch the middleware, the backend
+  or the frontend by hand. One `up` starts all three, waits until each answers, installs the npm
+  dependencies on a fresh checkout, and prints the URLs it allocated.
+- **Never** assume `localhost:3000` or `localhost:8080`. Each checkout gets its own ports so that
+  several worktrees can run at once: the main working copy keeps the historical ports, and a linked
+  worktree offsets every port. Read the actual ones from `.yontrack-dev/instance.env` in the
+  checkout, or from the output of `scripts/dev-stack.sh status`.
+- When something fails to start, the stack is deliberately left running — read
+  `scripts/dev-stack.sh logs backend` (or `frontend`, or `infra`) rather than restarting blindly.
+- After a Kotlin change, `scripts/dev-stack.sh restart backend` — a full `down`/`up` needlessly pays
+  for the containers again.
+- `scripts/dev-stack.sh down` keeps the data; only `down --clean` drops the volumes. Never use
+  `--clean` on a stack you did not create.
+- Log in through Keycloak with `admin`/`admin`.
+
 ### Workflow
 
 Every change follows this lifecycle, end to end — don't stop after step 2:
