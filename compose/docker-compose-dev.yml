@@ -1,3 +1,11 @@
+# Middleware for the local development stack.
+#
+# Every published port is parameterised so that several checkouts can run
+# their own stack side by side; the defaults reproduce the historical ports,
+# so running this file directly behaves exactly as it always has.
+#
+# Started and stopped through scripts/dev-stack.sh -- see DEVELOPMENT.md.
+
 services:
 
   postgresql:
@@ -7,15 +15,19 @@ services:
       POSTGRES_USER: ontrack
       POSTGRES_PASSWORD: ontrack
     ports:
-      - "5432:5432"
+      - "${YONTRACK_DEV_POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ontrack -d ontrack" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:9.2.0
     ports:
-      - "9200:9200"
-      - "9300:9300"
+      - "${YONTRACK_DEV_ELASTIC_PORT:-9200}:9200"
     environment:
       - "discovery.type=single-node"
       - bootstrap.memory_lock=true
@@ -25,6 +37,10 @@ services:
       memlock:
         soft: -1
         hard: -1
+    # Indices are persisted so that a `down` followed by an `up` leaves the
+    # search index consistent with the database, which is also persisted.
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
     healthcheck:
       test: [ "CMD-SHELL", "curl -f http://localhost:9200/_cluster/health?wait_for_status=yellow&timeout=1s || exit 1" ]
       interval: 10s
@@ -37,49 +53,48 @@ services:
       - influxdb
     image: influxdb:1.11.8
     ports:
-      - "8086:8086"
+      - "${YONTRACK_DEV_INFLUXDB_PORT:-8086}:8086"
 
   kibana:
+    profiles:
+      - kibana
     image: docker.elastic.co/kibana/kibana:9.2.0
     ports:
-      - "5601:5601"
+      - "${YONTRACK_DEV_KIBANA_PORT:-5601}:5601"
     environment:
       ELASTICSEARCH_HOSTS: http://elasticsearch:9200
 
-  postgresql-keycloak:
-    image: postgres:17
-    environment:
-      POSTGRES_DB: keycloak
-      POSTGRES_USER: keycloak
-      POSTGRES_PASSWORD: keycloak
-    ports:
-      - "6543:5432"
-    volumes:
-      - keycloak_postgres_data:/var/lib/postgresql/data
-
+  # Keycloak keeps no state between runs: it has no database, so the
+  # development realm below is re-imported on every start and edits to it take
+  # effect immediately. Anything created by hand in the admin console is lost
+  # on a restart, which is the intended trade.
   keycloak:
     image: quay.io/keycloak/keycloak:26.2.5
     environment:
       KC_BOOTSTRAP_ADMIN_USERNAME: admin
       KC_BOOTSTRAP_ADMIN_PASSWORD: admin
-      KC_DB: postgres
-      KC_DB_URL_HOST: postgresql-keycloak
-      KC_DB_URL_PORT: 5432
-      KC_DB_URL_DATABASE: keycloak
-      KC_DB_USERNAME: keycloak
-      KC_DB_PASSWORD: keycloak
+      KC_HOSTNAME: "${YONTRACK_DEV_KEYCLOAK_URL:-http://localhost:8008}"
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
+      KC_HOSTNAME_STRICT: "false"
+      KC_HTTP_ENABLED: "true"
+      KC_HEALTH_ENABLED: "true"
     ports:
-      - "8008:8080"
+      - "${YONTRACK_DEV_KEYCLOAK_PORT:-8008}:8080"
     command:
       - start-dev
       - --import-realm
     volumes:
       - ./keycloak/import/dev:/opt/keycloak/data/import
       - ./keycloak/themes/yontrack:/opt/keycloak/themes/yontrack
-    depends_on:
-      - postgresql-keycloak
+    healthcheck:
+      # The Keycloak image ships no curl, so probe the management port over
+      # bash's own TCP redirection.
+      test: [ "CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/9000 && printf 'GET /health/ready HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n' >&3 && grep -q '200 OK' <&3" ]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
 
-  # Rabbit MQ
   rabbit:
     image: rabbitmq:4.1.3-management
     hostname: rabbit
@@ -87,9 +102,15 @@ services:
       RABBITMQ_DEFAULT_USER: ontrack
       RABBITMQ_DEFAULT_PASS: ontrack
     ports:
-      - "15672:15672"
-      - "5672:5672"
+      - "${YONTRACK_DEV_RABBIT_MGMT_PORT:-15672}:15672"
+      - "${YONTRACK_DEV_RABBIT_PORT:-5672}:5672"
+    healthcheck:
+      test: [ "CMD", "rabbitmq-diagnostics", "-q", "ping" ]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 20s
 
 volumes:
-  keycloak_postgres_data:
   postgres_data:
+  elasticsearch_data:

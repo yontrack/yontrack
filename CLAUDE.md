@@ -138,11 +138,17 @@ Follow this order for every non-trivial change:
 ## Build & Run
 
 ```bash
-# Start dev infrastructure (Postgres, Elasticsearch, RabbitMQ, Keycloak)
-./gradlew devComposeUp
+# Start the whole dev stack: middleware, backend and frontend, waiting until
+# all three answer. Safe to run from a worktree - each checkout gets its own
+# ports. Prints the URLs it allocated. See DEVELOPMENT.md.
+scripts/dev-stack.sh up
 
-# Stop dev infrastructure
-./gradlew devComposeDown
+# Stop it again (add --clean to drop the volumes too)
+scripts/dev-stack.sh down
+
+# Restart one tier after a change, read a tier's log
+scripts/dev-stack.sh restart backend
+scripts/dev-stack.sh logs backend
 
 # Run all unit tests
 ./gradlew test
@@ -153,12 +159,6 @@ Follow this order for every non-trivial change:
 # Full build
 ./gradlew build
 
-# Start backend (after devComposeUp) - use IntelliJ run config "Application (kdsl)"
-# Backend runs on http://localhost:8080
-
-# Start frontend - from ontrack-web-core/
-npm run dev
-# Frontend runs on http://localhost:3000
 ```
 
 ---

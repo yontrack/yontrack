@@ -42,3 +42,6 @@ ontrack-extension-*/node_modules
 # directory under buildSrc, silently dropping any new source file added there.
 !buildSrc/src/main/kotlin/net/nemerosa/ontrack/build/
 !buildSrc/src/test/kotlin/net/nemerosa/ontrack/build/
+
+# Local development stack state (scripts/dev-stack.sh)
+.yontrack-dev/

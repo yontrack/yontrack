@@ -95,10 +95,26 @@ configure<ComposeExtension> {
         useComposeFiles.addAll(listOf("compose/docker-compose-local.yml"))
         setProjectName("local")
     }
-    createNested("dev").apply {
-        useComposeFiles.addAll(listOf("compose/docker-compose-dev.yml"))
-        setProjectName("dev")
-    }
+}
+
+// The development stack is driven by scripts/dev-stack.sh rather than by the
+// compose plugin: it supervises the backend and the frontend as well as the
+// middleware, and it has to keep working when the build itself does not.
+// These tasks are thin delegations so that there is a single implementation
+// of the slot and port arithmetic.
+
+val devStackScript = "$rootDir/scripts/dev-stack.sh"
+
+tasks.register<Exec>("devStackUp") {
+    group = "development"
+    description = "Starts the local development stack (middleware, backend, frontend)"
+    commandLine(devStackScript, "up")
+}
+
+tasks.register<Exec>("devStackDown") {
+    group = "development"
+    description = "Stops the local development stack"
+    commandLine(devStackScript, "down")
 }
 
 tasks.named("localComposeUp") {
