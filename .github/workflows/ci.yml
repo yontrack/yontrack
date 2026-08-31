@@ -1000,8 +1000,10 @@ jobs:
 
       # The three variants land on one PLAYWRIGHT stamp, so the reports are collected and
       # validated once in ui-tests-report rather than three times from here.
+      # always(), not !cancelled(): a leg killed by timeout-minutes counts as cancelled, and
+      # skipping the upload there is what left the report job with a partial, all-green set.
       - name: Upload the JUnit report
-        if: ${{ !cancelled() }}
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: playwright-junit-${{ matrix.variant }}
@@ -1082,6 +1084,7 @@ jobs:
         if: ${{ !cancelled() && steps.layout.outcome != '' }}
         env:
           LAYOUT_OUTCOME: ${{ steps.layout.outcome }}
+          UI_TESTS_RESULT: ${{ needs.ui-tests.result }}
         run: |
           # The slowest of the three variants, written by each leg into its artefact. Left empty
           # when no artefact arrived at all — a made-up duration is worse than none, so the flag
@@ -1092,7 +1095,11 @@ jobs:
           if [ -n "$run_time" ]; then
             run_time_flag="--run-time $run_time"
           fi
-          if [ "$LAYOUT_OUTCOME" != "success" ]; then
+          # A variant that fails or times out uploads nothing, and a partial set of artefacts is
+          # indistinguishable from a complete one: the reports that *did* arrive are all green,
+          # so validating them alone stamped PLAYWRIGHT passed while a whole variant had died.
+          # The matrix result decides, not what turned up.
+          if [ "$LAYOUT_OUTCOME" != "success" ] || [ "$UI_TESTS_RESULT" != "success" ]; then
             # shellcheck disable=SC2086  # deliberate: see YONTRACK_RUN_INFO
             yontrack validate --validation PLAYWRIGHT --status FAILED \
               $run_time_flag $YONTRACK_RUN_INFO
