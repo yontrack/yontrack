@@ -82,6 +82,10 @@ env:
     --source-uri ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
     --trigger-type ${{ github.event_name }}
     --trigger-data ${{ github.sha }}
+  # How many legs the `integration` matrix has. Held here because integration-report has to know
+  # what a *complete* set of shard artefacts looks like — see the check there. Keep in step with
+  # the matrix; getting it wrong fails the INTEGRATION stamp loudly, which is the safe direction.
+  INTEGRATION_SHARDS: "5"
   # Run-scoped tag used to hand the Docker images from `build` to the jobs that consume them.
   # Keyed on the run, deliberately not on the attempt: re-running just the failed jobs must
   # still find the images the original `build` attempt pushed. A re-run of `build` itself
@@ -354,6 +358,11 @@ jobs:
       #
       # `--run-time` goes after the `junit` subcommand: `validateJUnitTestsCmd` redeclares the five
       # run-info flags on itself, so that is where they are read from.
+      #
+      # The glob names `test-results/test` rather than the whole of `test-results`: this job runs
+      # `build -x integrationTest`, so the integration results are not in this workspace anyway,
+      # and the wider glob only read as if BUILD still covered them. They land on INTEGRATION,
+      # reported from integration-report (#1656).
       - name: Validate BUILD
         if: ${{ !cancelled() && env.FULL_RUN == 'true' && steps.build.outcome != '' }}
         env:
@@ -365,7 +374,7 @@ jobs:
           fi
           # shellcheck disable=SC2086  # deliberate: see YONTRACK_RUN_INFO
           yontrack validate --validation BUILD \
-            junit --pattern "**/build/test-results/**/*.xml" --fail-when-no-results \
+            junit --pattern "**/build/test-results/test/*.xml" --fail-when-no-results \
             $run_time_flag $YONTRACK_RUN_INFO
 
       - name: Validate UI_UNIT
@@ -436,6 +445,7 @@ jobs:
     timeout-minutes: 120
     strategy:
       fail-fast: false
+      # Keep INTEGRATION_SHARDS at the top of this file equal to the number of legs below.
       matrix:
         include:
           - shard: 1
@@ -520,6 +530,14 @@ jobs:
       ONTRACK_TEST_EXTENSION_GITHUB_ACTIONS_WORKFLOWID: main.yml
       ONTRACK_TEST_EXTENSION_GITHUB_ACTIONS_BRANCH: main
     steps:
+      # The run time reported for this job is measured from here. A `run:` step is the earliest
+      # point a workflow can observe: the runner's own "Set up job" precedes every step and is not
+      # visible to any of them. Everything after this — checkout, toolchain setup, cache restore —
+      # is part of what the job costs and is counted.
+      - name: Record the job start
+        id: job_start
+        run: echo "started=$(date +%s)" >> "$GITHUB_OUTPUT"
+
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -547,6 +565,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install --no-install-recommends -y graphviz
 
       - name: Integration tests
+        id: test
         env:
           MODULES: ${{ matrix.modules }}
         run: |
@@ -566,14 +585,156 @@ jobs:
             --max-workers 2 \
             --console plain
 
+      # INTEGRATION is validated from integration-report, which has no span of its own worth
+      # reporting — collecting artefacts takes seconds where the tests take tens of minutes. Each
+      # shard therefore hands its own job duration over inside its artefact, and the reporting job
+      # takes the slowest, which is the wall clock of the parallel shards.
+      - name: Record the run time
+        if: ${{ !cancelled() && steps.test.outcome != '' }}
+        # Bookkeeping for a nice-to-have number: it must never be what turns a passing shard red.
+        continue-on-error: true
+        env:
+          STARTED: ${{ steps.job_start.outputs.started }}
+        run: |
+          set -euo pipefail
+          if [ -z "${STARTED:-}" ]; then
+            echo "The integration tests never started; nothing to record."
+            exit 0
+          fi
+          mkdir -p build
+          echo "$(( $(date +%s) - STARTED ))" > build/integration-run-time.txt
+
+      # Uploaded whatever the outcome: these are what integration-report validates INTEGRATION
+      # from, so a *passing* shard has to publish its results too. Under `if: failure()` the
+      # aggregator would have seen an empty set on every green run (#1656).
       - name: Upload the test results
-        if: failure()
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
         with:
           name: integration-results-shard-${{ matrix.shard }}
-          path: "**/build/test-results/integrationTest/**/*.xml"
+          path: |
+            **/build/test-results/integrationTest/**/*.xml
+            build/integration-run-time.txt
           if-no-files-found: ignore
           retention-days: 7
+
+  # ---------------------------------------------------------------------------------------------
+  # One INTEGRATION validation for all the shards. Validating from each matrix job would create
+  # one run per shard on the same stamp and the promotion would then read whichever landed last.
+  #
+  # The shards run on separate runners, so their JUnit reports are never in one workspace: they
+  # are collected here from the artefacts instead. Until this job existed the integration results
+  # were reported nowhere at all and BRONZE was granted with them red (#1656).
+  # ---------------------------------------------------------------------------------------------
+
+  integration-report:
+    name: Integration tests report
+    needs: [setup, yontrack, integration]
+    if: ${{ !cancelled() && needs.setup.outputs.full_run == 'true' && needs.integration.result != 'skipped' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Collect the test results
+        id: collect
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          pattern: integration-results-shard-*
+          path: integration-results
+
+      # Flattened deliberately. upload-artifact roots each artefact at the least common ancestor
+      # of the files it matched, so the depth the reports land at varies with how many modules a
+      # shard produced them for; collecting them into one flat directory keeps the stamp's glob
+      # independent of that.
+      #
+      # The name is the shard plus the report's own name — `TEST-<fqcn>.xml`, already unique across
+      # modules — rather than the flattened path, which for the longest test class in the suite
+      # comes to 242 bytes against ext4's 255-byte limit: one longer class name and `cp` would
+      # start failing with ENAMETOOLONG, turning a passing run into a FAILED stamp.
+      #
+      # Failing here is what makes the stamp FAILED below, so both checks are deliberate errors.
+      - name: Lay the reports out
+        id: layout
+        if: ${{ !cancelled() && steps.collect.outcome != '' }}
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          mkdir -p integration-junit
+          while IFS= read -r xml; do
+            # integration-results/integration-results-shard-3/... -> shard-3
+            rest="${xml#integration-results/}"
+            shard="${rest%%/*}"
+            cp "$xml" "integration-junit/${shard#integration-results-}_$(basename "$xml")"
+          done < <(find integration-results -name '*.xml')
+          ls integration-junit
+
+          # Every shard uploads whatever its outcome, so a missing artefact means a leg vanished,
+          # not that it had nothing to report. A stamp computed from four fifths of the suite is
+          # the same silence #1656 is about, so an incomplete set is as bad as an empty one.
+          shards="$(find integration-results -mindepth 1 -maxdepth 1 -type d \
+            -name 'integration-results-shard-*' | wc -l)"
+          echo "Collected $shards of $INTEGRATION_SHARDS shard artefacts."
+          [ -n "$(ls -A integration-junit)" ]
+          [ "$shards" -eq "$INTEGRATION_SHARDS" ]
+
+      - name: Link to the Yontrack build
+        if: ${{ !cancelled() }}
+        uses: nemerosa/ontrack-github-actions-cli-library/ontrack-cli-workflow-build@v1.0.3
+        with:
+          project: ${{ needs.yontrack.outputs.project }}
+          yontrack-url: ${{ vars.YONTRACK_URL }}
+          yontrack-token: ${{ secrets.YONTRACK_TOKEN }}
+          version: ${{ env.YONTRACK_CLI_VERSION }}
+
+      # If the reports never made it here the stamp still has to say so, rather than the job dying
+      # quietly and leaving INTEGRATION absent from the build — which is exactly the hole BRONZE
+      # used to be granted through.
+      - name: Validate INTEGRATION
+        if: ${{ !cancelled() && steps.layout.outcome != '' }}
+        env:
+          LAYOUT_OUTCOME: ${{ steps.layout.outcome }}
+          # The matrix as a whole: `failure` as soon as one shard is red.
+          SHARDS_RESULT: ${{ needs.integration.result }}
+        run: |
+          # The slowest of the shards, written by each leg into its artefact. Left empty when no
+          # artefact arrived at all — a made-up duration is worse than none, so the flag is then
+          # omitted and the rest of the run info still goes out.
+          run_time="$(find integration-results -name 'integration-run-time.txt' -exec cat {} + \
+            2>/dev/null | sort -n | tail -n 1 || true)"
+          run_time_flag=""
+          if [ -n "$run_time" ]; then
+            run_time_flag="--run-time $run_time"
+          fi
+
+          # A red shard whose reports all look green — killed by an OOM, or a compose stack that
+          # never came up — would otherwise pass the stamp on results that were never produced.
+          # The JUnit path is kept wherever there *is* a failing test to explain the red, because
+          # it reports FAILED with the test counts, which `--status FAILED` cannot carry.
+          #
+          # The counts are read off the `<testsuite>` header attributes rather than by looking for
+          # `<failure>` elements: Gradle captures the tests' stdout into `<system-out>`, so a test
+          # that logs a document of its own could otherwise pass for a failure and explain away a
+          # red shard that had nothing to do with it.
+          unexplained=false
+          if [ "$LAYOUT_OUTCOME" = "success" ] && [ "$SHARDS_RESULT" != "success" ] \
+            && ! grep -lE '(failures|errors)="[1-9]' integration-junit/*.xml > /dev/null 2>&1; then
+            unexplained=true
+            echo "The shards reported $SHARDS_RESULT with no failing test to account for it."
+          fi
+
+          if [ "$LAYOUT_OUTCOME" != "success" ] || [ "$unexplained" = "true" ]; then
+            # shellcheck disable=SC2086  # deliberate: see YONTRACK_RUN_INFO
+            yontrack validate --validation INTEGRATION --status FAILED \
+              $run_time_flag $YONTRACK_RUN_INFO
+          else
+            # shellcheck disable=SC2086  # deliberate: see YONTRACK_RUN_INFO
+            yontrack validate --validation INTEGRATION \
+              junit --pattern "integration-junit/*.xml" --fail-when-no-results \
+              $run_time_flag $YONTRACK_RUN_INFO
+          fi
 
   # ---------------------------------------------------------------------------------------------
   # KDSL acceptance tests.
@@ -935,11 +1096,12 @@ jobs:
 
   docker-hub:
     name: Docker Hub
-    needs: [setup, yontrack, build, integration, kdsl, ui-tests, ui-tests-report]
+    needs: [setup, yontrack, build, integration, integration-report, kdsl, ui-tests, ui-tests-report]
     if: >-
       ${{ !cancelled()
         && needs.build.result == 'success'
         && needs.integration.result != 'failure'
+        && needs.integration-report.result != 'failure'
         && needs.kdsl.result != 'failure'
         && needs.ui-tests.result != 'failure'
         && needs.ui-tests-report.result != 'failure'
@@ -1026,11 +1188,12 @@ jobs:
 
   release:
     name: GitHub release
-    needs: [setup, yontrack, build, integration, kdsl, ui-tests, ui-tests-report]
+    needs: [setup, yontrack, build, integration, integration-report, kdsl, ui-tests, ui-tests-report]
     if: >-
       ${{ !cancelled()
         && needs.build.result == 'success'
         && needs.integration.result != 'failure'
+        && needs.integration-report.result != 'failure'
         && needs.kdsl.result != 'failure'
         && needs.ui-tests.result != 'failure'
         && needs.ui-tests-report.result != 'failure'
@@ -1109,11 +1272,12 @@ jobs:
 
   docs:
     name: Documentation
-    needs: [setup, yontrack, build, integration, kdsl, ui-tests, ui-tests-report]
+    needs: [setup, yontrack, build, integration, integration-report, kdsl, ui-tests, ui-tests-report]
     if: >-
       ${{ !cancelled()
         && needs.build.result == 'success'
         && needs.integration.result != 'failure'
+        && needs.integration-report.result != 'failure'
         && needs.kdsl.result != 'failure'
         && needs.ui-tests.result != 'failure'
         && needs.ui-tests-report.result != 'failure'

@@ -9,6 +9,8 @@ configuration:
           tests: {}
         UI_UNIT:
           tests: {}
+        INTEGRATION:
+          tests: {}
         KDSL.ACCEPTANCE:
           tests: {}
         PLAYWRIGHT:
@@ -21,6 +23,7 @@ configuration:
           validations:
             - BUILD
             - UI_UNIT
+            - INTEGRATION
             - KDSL.ACCEPTANCE
             - PLAYWRIGHT
         RELEASE:
