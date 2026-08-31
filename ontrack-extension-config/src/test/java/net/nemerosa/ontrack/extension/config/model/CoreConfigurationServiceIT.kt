@@ -11,6 +11,7 @@ import net.nemerosa.ontrack.extension.scm.mock.MockSCMTester
 import net.nemerosa.ontrack.model.structure.Branch
 import net.nemerosa.ontrack.it.AbstractDSLTestSupport
 import net.nemerosa.ontrack.it.AsAdminTest
+import net.nemerosa.ontrack.test.TestUtils.uid
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -28,9 +29,15 @@ class CoreConfigurationServiceIT : AbstractDSLTestSupport() {
     @Autowired
     private lateinit var mockSCMTester: MockSCMTester
 
+    /**
+     * One name per test instance (JUnit builds a new one per method), so no two tests - and no two
+     * modules of the same CI shard - configure the same project. See #1657.
+     */
+    private val configuredProjectName = uid("cfg-")
+
     @BeforeEach
     fun init() {
-        mockSCMTester.registerRepository("yontrack")
+        mockSCMTester.registerRepository(configuredProjectName)
     }
 
     @Test
@@ -47,7 +54,7 @@ class CoreConfigurationServiceIT : AbstractDSLTestSupport() {
             """.trimIndent(),
             ci = "generic",
             scm = "mock",
-            env = EnvFixtures.generic(),
+            env = EnvFixtures.generic(configuredProjectName),
         )
 
         val name = build.name
@@ -78,7 +85,7 @@ class CoreConfigurationServiceIT : AbstractDSLTestSupport() {
             """.trimIndent(),
             ci = "generic",
             scm = "mock",
-            env = EnvFixtures.generic() + mapOf("APP_VERSION" to "1.0.2"),
+            env = EnvFixtures.generic(configuredProjectName) + mapOf("APP_VERSION" to "1.0.2"),
         )
 
         // Getting the meta-info
@@ -110,7 +117,7 @@ class CoreConfigurationServiceIT : AbstractDSLTestSupport() {
             """.trimIndent(),
             ci = "generic",
             scm = "mock",
-            env = EnvFixtures.generic() + mapOf("APP_VERSION" to "1.0.2"),
+            env = EnvFixtures.generic(configuredProjectName) + mapOf("APP_VERSION" to "1.0.2"),
         )
 
         // Getting the meta-info
@@ -148,7 +155,7 @@ class CoreConfigurationServiceIT : AbstractDSLTestSupport() {
             """.trimIndent(),
             ci = "generic",
             scm = "mock",
-            env = EnvFixtures.generic(scmBranch = "main"),
+            env = EnvFixtures.generic(configuredProjectName, scmBranch = "main"),
         )
         assertAutoRevoke(branch, expected = false)
     }
@@ -172,7 +179,7 @@ class CoreConfigurationServiceIT : AbstractDSLTestSupport() {
             """.trimIndent(),
             ci = "generic",
             scm = "mock",
-            env = EnvFixtures.generic(scmBranch = "main"),
+            env = EnvFixtures.generic(configuredProjectName, scmBranch = "main"),
         )
         assertAutoRevoke(branch, expected = true)
     }
@@ -207,7 +214,7 @@ class CoreConfigurationServiceIT : AbstractDSLTestSupport() {
             """.trimIndent(),
             ci = "generic",
             scm = "mock",
-            env = EnvFixtures.generic(scmBranch = "main"),
+            env = EnvFixtures.generic(configuredProjectName, scmBranch = "main"),
         )
         assertAutoRevoke(branch, expected = true)
     }
@@ -240,7 +247,7 @@ class CoreConfigurationServiceIT : AbstractDSLTestSupport() {
             """.trimIndent(),
             ci = "generic",
             scm = "mock",
-            env = EnvFixtures.generic(scmBranch = "main"),
+            env = EnvFixtures.generic(configuredProjectName, scmBranch = "main"),
         )
         assertAutoRevoke(branch, expected = false)
     }
@@ -297,7 +304,7 @@ class CoreConfigurationServiceIT : AbstractDSLTestSupport() {
             """.trimIndent(),
             ci = "generic",
             scm = "mock",
-            env = EnvFixtures.generic(scmBranch = "main"),
+            env = EnvFixtures.generic(configuredProjectName, scmBranch = "main"),
         )
 
         // Checking the validations
@@ -353,7 +360,7 @@ class CoreConfigurationServiceIT : AbstractDSLTestSupport() {
             """.trimIndent(),
             ci = "generic",
             scm = "mock",
-            env = EnvFixtures.generic(),
+            env = EnvFixtures.generic(configuredProjectName),
         )
 
         val gold = structureService.findPromotionLevelByName(branch.project.name, branch.name, "GOLD")
@@ -399,7 +406,7 @@ class CoreConfigurationServiceIT : AbstractDSLTestSupport() {
             """.trimIndent(),
             ci = "generic",
             scm = "mock",
-            env = EnvFixtures.generic(),
+            env = EnvFixtures.generic(configuredProjectName),
         )
 
         val bronzeRef = structureService.findPromotionLevelByName(branch.project.name, branch.name, "BRONZE")

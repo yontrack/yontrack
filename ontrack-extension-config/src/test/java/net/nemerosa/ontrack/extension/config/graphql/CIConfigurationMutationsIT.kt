@@ -14,6 +14,7 @@ import net.nemerosa.ontrack.it.AsAdminTest
 import net.nemerosa.ontrack.json.asJson
 import net.nemerosa.ontrack.model.structure.BuildDisplayNameService
 import net.nemerosa.ontrack.model.structure.ID
+import net.nemerosa.ontrack.test.TestUtils.uid
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -30,16 +31,23 @@ class CIConfigurationMutationsIT : AbstractQLKTITSupport() {
     @Autowired
     private lateinit var mockSCMTester: MockSCMTester
 
+    /**
+     * One name per test instance (JUnit builds a new one per method), so no two tests - and no two
+     * modules of the same CI shard - configure the same project. See #1657.
+     */
+    private val configuredProjectName = uid("cfg-")
+
     @BeforeEach
     fun init() {
-        mockSCMTester.registerRepository("yontrack")
+        mockSCMTester.registerRepository(configuredProjectName)
     }
 
     @Test
     @AsAdminTest
     fun `Default configuration`() {
         configTestSupport.withConfigAndBuild(
-            """
+            projectName = configuredProjectName,
+            yaml = """
                 version: v1
                 configuration: {}
             """.trimIndent()
@@ -72,7 +80,8 @@ class CIConfigurationMutationsIT : AbstractQLKTITSupport() {
     @AsAdminTest
     fun `Configuration of the branch only`() {
         configTestSupport.withBranchConfig(
-            """
+            projectName = configuredProjectName,
+            yaml = """
                 version: v1
                 configuration: {}
             """.trimIndent(),
@@ -90,7 +99,8 @@ class CIConfigurationMutationsIT : AbstractQLKTITSupport() {
     @AsAdminTest
     fun `Branch validations`() {
         configTestSupport.withConfigAndBranch(
-            """
+            projectName = configuredProjectName,
+            yaml = """
                 version: v1
                 configuration:
                   defaults:
@@ -122,7 +132,8 @@ class CIConfigurationMutationsIT : AbstractQLKTITSupport() {
     @AsAdminTest
     fun `Branch promotions`() {
         configTestSupport.withConfigAndBranch(
-            """
+            projectName = configuredProjectName,
+            yaml = """
                 version: v1
                 configuration:
                   defaults:
@@ -186,7 +197,8 @@ class CIConfigurationMutationsIT : AbstractQLKTITSupport() {
     @AsAdminTest
     fun `Branch validations with positive condition`() {
         configTestSupport.withConfigAndBranch(
-            """
+            projectName = configuredProjectName,
+            yaml = """
                 version: v1
                 configuration:
                   defaults:
@@ -249,7 +261,8 @@ class CIConfigurationMutationsIT : AbstractQLKTITSupport() {
     @AsAdminTest
     fun `Project issue service identifier`() {
         configTestSupport.withConfigAndProject(
-            """
+            projectName = configuredProjectName,
+            yaml = """
                 version: v1
                 configuration:
                   defaults:
@@ -278,7 +291,7 @@ class CIConfigurationMutationsIT : AbstractQLKTITSupport() {
             configTestSupport.configureBranch(
                 ci = "generic",
                 scm = "mock",
-                env = EnvFixtures.generic(scmBranch = "PR-2")
+                env = EnvFixtures.generic(configuredProjectName, scmBranch = "PR-2")
             )
         }
     }

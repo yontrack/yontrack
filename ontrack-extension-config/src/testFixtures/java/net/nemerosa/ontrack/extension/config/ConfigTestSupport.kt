@@ -7,10 +7,17 @@ import net.nemerosa.ontrack.extension.config.model.EffectiveConfiguration
 import net.nemerosa.ontrack.graphql.GraphQLTestSupport
 import net.nemerosa.ontrack.json.parse
 import net.nemerosa.ontrack.model.structure.*
+import net.nemerosa.ontrack.test.TestUtils.uid
 import org.springframework.stereotype.Component
 import kotlin.jvm.optionals.getOrNull
 import kotlin.test.assertNotNull
 
+/**
+ * The `projectName` of the helpers below defaults to a value unique to the call rather than to a
+ * shared constant, so two tests - or two modules of the same CI shard - never configure the same
+ * project row. Pass it explicitly when the test needs the name, for instance to register a mock SCM
+ * repository under it. See #1657.
+ */
 @Component
 class ConfigTestSupport(
     private val structureService: StructureService,
@@ -59,8 +66,9 @@ class ConfigTestSupport(
         ci: String? = DEFAULT_CI,
         scm: String? = DEFAULT_SCM,
         scmBranch: String = "release/5.1",
+        projectName: String = uid("cfg-"),
         extraEnv: Map<String, String> = emptyMap(),
-        env: Map<String, String> = EnvFixtures.generic(scmBranch, extraEnv),
+        env: Map<String, String> = EnvFixtures.generic(projectName, scmBranch, extraEnv),
         code: (payload: JsonNode) -> Unit,
     ) {
         graphQLTestSupport.run(
@@ -105,8 +113,9 @@ class ConfigTestSupport(
         ci: String? = DEFAULT_CI,
         scm: String? = DEFAULT_SCM,
         scmBranch: String = "release/5.1",
+        projectName: String = uid("cfg-"),
         extraEnv: Map<String, String> = emptyMap(),
-        env: Map<String, String> = EnvFixtures.generic(scmBranch, extraEnv),
+        env: Map<String, String> = EnvFixtures.generic(projectName, scmBranch, extraEnv),
         code: (payload: JsonNode) -> Unit,
     ) {
         graphQLTestSupport.run(
@@ -153,10 +162,11 @@ class ConfigTestSupport(
         """.trimIndent(),
         ci: String? = DEFAULT_CI,
         scm: String? = DEFAULT_SCM,
-        expectedProjectName: String = "yontrack",
         scmBranch: String = "release/5.1",
+        projectName: String = uid("cfg-"),
+        expectedProjectName: String = projectName,
         extraEnv: Map<String, String> = emptyMap(),
-        env: Map<String, String> = EnvFixtures.generic(scmBranch, extraEnv),
+        env: Map<String, String> = EnvFixtures.generic(projectName, scmBranch, extraEnv),
         code: (project: Project, payload: JsonNode) -> Unit,
     ) =
         withConfig(yaml, ci = ci, scm = scm, scmBranch = scmBranch, env = env, extraEnv = extraEnv) { payload ->
@@ -173,10 +183,11 @@ class ConfigTestSupport(
         ci: String? = DEFAULT_CI,
         scm: String? = DEFAULT_SCM,
         scmBranch: String = "release/5.1",
+        projectName: String = uid("cfg-"),
         extraEnv: Map<String, String> = emptyMap(),
-        env: Map<String, String> = EnvFixtures.generic(scmBranch, extraEnv),
+        env: Map<String, String> = EnvFixtures.generic(projectName, scmBranch, extraEnv),
         branch: String = NameDescription.escapeName(scmBranch),
-        expectedProjectName: String = "yontrack",
+        expectedProjectName: String = projectName,
         code: (branch: Branch, payload: JsonNode) -> Unit,
     ) =
         withConfigAndProject(
@@ -202,9 +213,10 @@ class ConfigTestSupport(
         ci: String? = DEFAULT_CI,
         scm: String? = DEFAULT_SCM,
         scmBranch: String = "release/5.1",
+        projectName: String = uid("cfg-"),
         extraEnv: Map<String, String> = emptyMap(),
-        env: Map<String, String> = EnvFixtures.generic(scmBranch, extraEnv),
-        expectedProjectName: String = "yontrack",
+        env: Map<String, String> = EnvFixtures.generic(projectName, scmBranch, extraEnv),
+        expectedProjectName: String = projectName,
         code: (build: Build, payload: JsonNode) -> Unit,
     ) =
         withConfigAndBranch(

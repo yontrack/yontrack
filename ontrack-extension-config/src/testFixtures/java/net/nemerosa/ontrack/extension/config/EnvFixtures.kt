@@ -2,11 +2,18 @@ package net.nemerosa.ontrack.extension.config
 
 object EnvFixtures {
 
+    /**
+     * The project name has no default on purpose. It used to be the fixed string `yontrack`, which
+     * every caller then shared as one project row against the shard's database - across modules,
+     * which a sharded CI run may execute concurrently. Two flakes came out of that (#1657), so the
+     * name is now the caller's to choose, and it should be unique to the run.
+     */
     fun generic(
+        projectName: String,
         scmBranch: String = TEST_BRANCH,
         extraEnv: Map<String, String> = emptyMap(),
     ) = mapOf(
-        "PROJECT_NAME" to "yontrack",
+        "PROJECT_NAME" to projectName,
         "BRANCH_NAME" to scmBranch,
         "BUILD_NUMBER" to TEST_BUILD_NUMBER,
         "BUILD_REVISION" to TEST_COMMIT,

@@ -40,6 +40,7 @@ class JenkinsCIEngineIT : AbstractDSLTestSupport() {
     @Test
     @AsAdminTest
     fun `Jenkins generating the project name from an environment variable`() {
+        val projectNameFromEnv = uid("prj-")
         configTestSupport.withConfigAndProject(
             """
                 version: v1
@@ -47,10 +48,11 @@ class JenkinsCIEngineIT : AbstractDSLTestSupport() {
             """.trimIndent(),
             ci = null,
             env = EnvFixtures.jenkins(
-                extraEnv = mapOf("PROJECT_NAME" to "yontrack"),
-            )
+                extraEnv = mapOf("PROJECT_NAME" to projectNameFromEnv),
+            ),
+            expectedProjectName = projectNameFromEnv,
         ) { project, _ ->
-            assertEquals("yontrack", project.name)
+            assertEquals(projectNameFromEnv, project.name)
         }
     }
 

@@ -26,6 +26,7 @@ dependencies {
     testRuntimeOnly(project(":ontrack-service"))
     testRuntimeOnly(project(":ontrack-repository-impl"))
 
+    testFixturesImplementation(project(":ontrack-test-utils"))
     testFixturesImplementation("org.jetbrains.kotlin:kotlin-test")
     testFixturesImplementation("org.springframework.boot:spring-boot-starter-test")
     testFixturesImplementation(testFixtures(project(":ontrack-ui-graphql")))

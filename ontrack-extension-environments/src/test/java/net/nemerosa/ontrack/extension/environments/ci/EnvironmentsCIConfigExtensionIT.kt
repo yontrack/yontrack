@@ -81,9 +81,7 @@ class EnvironmentsCIConfigExtensionIT : AbstractQLKTITSupport() {
             """.trimIndent(),
             ci = "generic",
             scm = "mock",
-            env = EnvFixtures.generic(
-                extraEnv = mapOf("PROJECT_NAME" to configuredProjectName),
-            )
+            env = EnvFixtures.generic(configuredProjectName)
         )
 
         assertNotNull(environmentService.findByName(environmentName), "Environment has been injected") {
@@ -135,9 +133,7 @@ class EnvironmentsCIConfigExtensionIT : AbstractQLKTITSupport() {
             """.trimIndent(),
             ci = "generic",
             scm = "mock",
-            env = EnvFixtures.generic(
-                extraEnv = mapOf("PROJECT_NAME" to configuredProjectName),
-            )
+            env = EnvFixtures.generic(configuredProjectName)
         )
 
         // The rest of the injection still ran...
@@ -175,9 +171,7 @@ class EnvironmentsCIConfigExtensionIT : AbstractQLKTITSupport() {
             """.trimIndent(),
             ci = "generic",
             scm = "mock",
-            env = EnvFixtures.generic(
-                extraEnv = mapOf("PROJECT_NAME" to configuredProjectName),
-            )
+            env = EnvFixtures.generic(configuredProjectName)
         )
 
         // The unresolvable slot is skipped without aborting the injection: the environment declared

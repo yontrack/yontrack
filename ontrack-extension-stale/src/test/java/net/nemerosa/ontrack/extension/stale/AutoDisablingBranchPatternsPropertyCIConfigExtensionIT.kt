@@ -5,6 +5,7 @@ import net.nemerosa.ontrack.extension.config.EnvFixtures
 import net.nemerosa.ontrack.it.AbstractDSLTestSupport
 import net.nemerosa.ontrack.it.AsAdminTest
 import net.nemerosa.ontrack.model.security.Roles
+import net.nemerosa.ontrack.test.TestUtils.uid
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import kotlin.test.assertEquals
@@ -13,6 +14,13 @@ import kotlin.test.assertNull
 
 @AsAdminTest
 class AutoDisablingBranchPatternsPropertyCIConfigExtensionIT : AbstractDSLTestSupport() {
+
+    /**
+     * One name per test instance (JUnit builds a new one per method), so no two tests - and no two
+     * modules of the same CI shard - configure the same project. See #1657.
+     */
+    private val configuredProjectName = uid("cfg-")
+
 
     @Autowired
     private lateinit var configTestSupport: ConfigTestSupport
@@ -34,7 +42,7 @@ class AutoDisablingBranchPatternsPropertyCIConfigExtensionIT : AbstractDSLTestSu
             """.trimIndent(),
             ci = "generic",
             scm = "mock",
-            env = EnvFixtures.generic(scmBranch = "any")
+            env = EnvFixtures.generic(configuredProjectName, scmBranch = "any")
         )
 
         assertNotNull(getProperty(project, AutoDisablingBranchPatternsPropertyType::class.java)) {
@@ -67,7 +75,7 @@ class AutoDisablingBranchPatternsPropertyCIConfigExtensionIT : AbstractDSLTestSu
             """.trimIndent(),
             ci = "generic",
             scm = "mock",
-            env = EnvFixtures.generic(scmBranch = "main")
+            env = EnvFixtures.generic(configuredProjectName, scmBranch = "main")
         )
 
         assertNotNull(getProperty(project, AutoDisablingBranchPatternsPropertyType::class.java)) {
@@ -101,7 +109,7 @@ class AutoDisablingBranchPatternsPropertyCIConfigExtensionIT : AbstractDSLTestSu
                 """.trimIndent(),
                 ci = "generic",
                 scm = "mock",
-                env = EnvFixtures.generic(scmBranch = "v24")
+                env = EnvFixtures.generic(configuredProjectName, scmBranch = "v24")
             )
         }
 
@@ -135,7 +143,7 @@ class AutoDisablingBranchPatternsPropertyCIConfigExtensionIT : AbstractDSLTestSu
             """.trimIndent(),
             ci = "generic",
             scm = "mock",
-            env = EnvFixtures.generic(scmBranch = "any")
+            env = EnvFixtures.generic(configuredProjectName, scmBranch = "any")
         )
 
         assertNull(getProperty(project, AutoDisablingBranchPatternsPropertyType::class.java))

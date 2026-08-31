@@ -50,7 +50,7 @@ class AutoVersioningBranchCIConfigExtensionIT : AbstractQLKTITSupport() {
             """.trimIndent(),
             ci = "generic",
             scm = "mock",
-            env = genericEnv(configuredProjectName)
+            env = EnvFixtures.generic(configuredProjectName)
         )
         assertNotNull(
             autoVersioningConfigurationService.getAutoVersioning(branch),
@@ -109,7 +109,7 @@ class AutoVersioningBranchCIConfigExtensionIT : AbstractQLKTITSupport() {
                     """.trimIndent(),
                     ci = "generic",
                     scm = "mock",
-                    env = genericEnv(configuredProjectName, scmBranch = "main")
+                    env = EnvFixtures.generic(configuredProjectName, scmBranch = "main")
                 )
 
                 val vs = structureService.findValidationStampByName(
@@ -156,7 +156,7 @@ class AutoVersioningBranchCIConfigExtensionIT : AbstractQLKTITSupport() {
                 """.trimIndent(),
             ci = "generic",
             scm = "mock",
-            env = genericEnv(configuredProjectName)
+            env = EnvFixtures.generic(configuredProjectName)
         )
         assertNotNull(
             autoVersioningConfigurationService.getAutoVersioning(branch),
@@ -210,7 +210,7 @@ class AutoVersioningBranchCIConfigExtensionIT : AbstractQLKTITSupport() {
             yaml,
             ci = "generic",
             scm = "mock",
-            env = genericEnv(configuredProjectName, scmBranch = "develop")
+            env = EnvFixtures.generic(configuredProjectName, scmBranch = "develop")
         )
         assertNotNull(
             autoVersioningConfigurationService.getAutoVersioning(developBranch),
@@ -232,7 +232,7 @@ class AutoVersioningBranchCIConfigExtensionIT : AbstractQLKTITSupport() {
             yaml,
             ci = "generic",
             scm = "mock",
-            env = genericEnv(configuredProjectName, scmBranch = "release-1.0")
+            env = EnvFixtures.generic(configuredProjectName, scmBranch = "release-1.0")
         )
         assertNotNull(
             autoVersioningConfigurationService.getAutoVersioning(releaseBranch),
@@ -283,7 +283,7 @@ class AutoVersioningBranchCIConfigExtensionIT : AbstractQLKTITSupport() {
                 yaml,
                 ci = "generic",
                 scm = "mock",
-                env = genericEnv(configuredProjectName, scmBranch = scmBranch)
+                env = EnvFixtures.generic(configuredProjectName, scmBranch = scmBranch)
             )
             val config = autoVersioningConfigurationService.getAutoVersioning(branch)
             if (present) {
@@ -318,7 +318,7 @@ class AutoVersioningBranchCIConfigExtensionIT : AbstractQLKTITSupport() {
             """.trimIndent(),
             ci = "generic",
             scm = "mock",
-            env = genericEnv(configuredProjectName)
+            env = EnvFixtures.generic(configuredProjectName)
         )
         assertNotNull(
             autoVersioningConfigurationService.getAutoVersioning(branch),
@@ -350,7 +350,7 @@ class AutoVersioningBranchCIConfigExtensionIT : AbstractQLKTITSupport() {
             """.trimIndent(),
             ci = "generic",
             scm = "mock",
-            env = genericEnv(configuredProjectName)
+            env = EnvFixtures.generic(configuredProjectName)
         )
         assertNotNull(
             autoVersioningConfigurationService.getAutoVersioning(branch),
@@ -360,19 +360,5 @@ class AutoVersioningBranchCIConfigExtensionIT : AbstractQLKTITSupport() {
             assertEquals(AutoVersioningPushMode.PUSH, avConfig.pushMode)
         }
     }
-
-    /**
-     * [EnvFixtures.generic] pins `PROJECT_NAME` to the fixed string `yontrack`, so every test using it
-     * shares one project row against the shard's database - including the tests of other modules running
-     * in the same CI shard, which Gradle may run concurrently. Each test here names its own project
-     * instead, unique to the run. See #1657.
-     */
-    private fun genericEnv(
-        projectName: String,
-        scmBranch: String = EnvFixtures.TEST_BRANCH,
-    ) = EnvFixtures.generic(
-        scmBranch = scmBranch,
-        extraEnv = mapOf("PROJECT_NAME" to projectName),
-    )
 
 }

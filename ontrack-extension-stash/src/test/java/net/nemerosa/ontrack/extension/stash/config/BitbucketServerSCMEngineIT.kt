@@ -22,6 +22,13 @@ import kotlin.test.assertNotNull
 
 class BitbucketServerSCMEngineIT : AbstractDSLTestSupport() {
 
+    /**
+     * One name per test instance (JUnit builds a new one per method), so no two tests - and no two
+     * modules of the same CI shard - configure the same project. See #1657.
+     */
+    private val configuredProjectName = uid("cfg-")
+
+
     @Autowired
     private lateinit var stashConfigurationService: StashConfigurationService
 
@@ -42,7 +49,7 @@ class BitbucketServerSCMEngineIT : AbstractDSLTestSupport() {
             configTestSupport.configureBuild(
                 ci = "generic",
                 scm = "bitbucket-server",
-                env = BitbucketServerSCMEnvFixtures.bitbucketServerEnv(),
+                env = BitbucketServerSCMEnvFixtures.bitbucketServerEnv(configuredProjectName),
             )
         }
     }
@@ -53,7 +60,7 @@ class BitbucketServerSCMEngineIT : AbstractDSLTestSupport() {
         val config = bitbucketServerConfig()
         val project = configTestSupport.configureProject(
             ci = "generic",
-            env = BitbucketServerSCMEnvFixtures.bitbucketServerEnv(),
+            env = BitbucketServerSCMEnvFixtures.bitbucketServerEnv(configuredProjectName),
         )
         assertNotNull(
             propertyService.getPropertyValue(project, StashProjectConfigurationPropertyType::class.java),
@@ -92,7 +99,7 @@ class BitbucketServerSCMEngineIT : AbstractDSLTestSupport() {
             """.trimIndent(),
             ci = "generic",
             scm = null,
-            env = BitbucketServerSCMEnvFixtures.bitbucketServerEnv(),
+            env = BitbucketServerSCMEnvFixtures.bitbucketServerEnv(configuredProjectName),
         )
         assertNotNull(
             propertyService.getPropertyValue(project, StashProjectConfigurationPropertyType::class.java),
@@ -132,7 +139,7 @@ class BitbucketServerSCMEngineIT : AbstractDSLTestSupport() {
             """.trimIndent(),
             ci = "generic",
             scm = null,
-            env = BitbucketServerSCMEnvFixtures.bitbucketServerEnv(),
+            env = BitbucketServerSCMEnvFixtures.bitbucketServerEnv(configuredProjectName),
         )
         assertNotNull(
             propertyService.getPropertyValue(project, StashProjectConfigurationPropertyType::class.java),
@@ -160,7 +167,7 @@ class BitbucketServerSCMEngineIT : AbstractDSLTestSupport() {
         val branch = configTestSupport.configureBranch(
             ci = "generic",
             scm = null,
-            env = BitbucketServerSCMEnvFixtures.bitbucketServerEnv(),
+            env = BitbucketServerSCMEnvFixtures.bitbucketServerEnv(configuredProjectName),
         )
         assertNotNull(
             propertyService.getPropertyValue(branch, GitBranchConfigurationPropertyType::class.java),
@@ -193,7 +200,7 @@ class BitbucketServerSCMEngineIT : AbstractDSLTestSupport() {
             val build = configTestSupport.configureBuild(
                 ci = "generic",
                 scm = null,
-                env = BitbucketServerSCMEnvFixtures.bitbucketServerEnv(),
+                env = BitbucketServerSCMEnvFixtures.bitbucketServerEnv(configuredProjectName),
             )
             assertNotNull(
                 propertyService.getPropertyValue(build, GitCommitPropertyType::class.java),
@@ -224,7 +231,7 @@ class BitbucketServerSCMEngineIT : AbstractDSLTestSupport() {
                 """.trimIndent(),
                 ci = "generic",
                 scm = null,
-                env = BitbucketServerSCMEnvFixtures.bitbucketServerEnv(),
+                env = BitbucketServerSCMEnvFixtures.bitbucketServerEnv(configuredProjectName),
             )
             assertNotNull(
                 propertyService.getPropertyValue(project, StashProjectConfigurationPropertyType::class.java),
@@ -251,6 +258,7 @@ class BitbucketServerSCMEngineIT : AbstractDSLTestSupport() {
                 ci = "generic",
                 scm = null,
                 env = BitbucketServerSCMEnvFixtures.bitbucketServerEnv(
+                    configuredProjectName,
                     extraEnv = mapOf(
                         EnvConstants.YONTRACK_LEGACY_SCM_ISSUES to "jira//JIRA",
                     )
@@ -281,6 +289,7 @@ class BitbucketServerSCMEngineIT : AbstractDSLTestSupport() {
                 ci = "generic",
                 scm = null,
                 env = BitbucketServerSCMEnvFixtures.bitbucketServerEnv(
+                    configuredProjectName,
                     extraEnv = mapOf(
                         EnvConstants.YONTRACK_CI_SCM_ISSUES to "jira//JIRA",
                     )
@@ -316,6 +325,7 @@ class BitbucketServerSCMEngineIT : AbstractDSLTestSupport() {
                 ci = "generic",
                 scm = null,
                 env = BitbucketServerSCMEnvFixtures.bitbucketServerEnv(
+                    configuredProjectName,
                     extraEnv = mapOf(
                         EnvConstants.YONTRACK_CI_SCM_ISSUES to "jira//OTHER",
                     )

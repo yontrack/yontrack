@@ -6,6 +6,7 @@ import net.nemerosa.ontrack.extension.notifications.subscriptions.EventSubscript
 import net.nemerosa.ontrack.extension.workflows.AbstractWorkflowTestSupport
 import net.nemerosa.ontrack.extension.workflows.notifications.WorkflowNotificationChannel
 import net.nemerosa.ontrack.it.AsAdminTest
+import net.nemerosa.ontrack.test.TestUtils.uid
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import kotlin.test.assertEquals
@@ -13,6 +14,13 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
 class WorkflowsBranchCIConfigExtensionIT : AbstractWorkflowTestSupport() {
+
+    /**
+     * One name per test instance (JUnit builds a new one per method), so no two tests - and no two
+     * modules of the same CI shard - configure the same project. See #1657.
+     */
+    private val configuredProjectName = uid("cfg-")
+
 
     @Autowired
     private lateinit var configTestSupport: ConfigTestSupport
@@ -67,7 +75,7 @@ class WorkflowsBranchCIConfigExtensionIT : AbstractWorkflowTestSupport() {
             """.trimIndent(),
             ci = "generic",
             scm = "mock",
-            env = EnvFixtures.generic(scmBranch = "release/5.0"),
+            env = EnvFixtures.generic(configuredProjectName, scmBranch = "release/5.0"),
         )
 
         // Getting the promotions
@@ -156,7 +164,7 @@ class WorkflowsBranchCIConfigExtensionIT : AbstractWorkflowTestSupport() {
             """.trimIndent(),
             ci = "generic",
             scm = "mock",
-            env = EnvFixtures.generic(scmBranch = "release/5.0"),
+            env = EnvFixtures.generic(configuredProjectName, scmBranch = "release/5.0"),
         )
 
         // We check that we have the subscription
@@ -194,7 +202,7 @@ class WorkflowsBranchCIConfigExtensionIT : AbstractWorkflowTestSupport() {
             """.trimIndent(),
             ci = "generic",
             scm = "mock",
-            env = EnvFixtures.generic(scmBranch = "release/5.0"),
+            env = EnvFixtures.generic(configuredProjectName, scmBranch = "release/5.0"),
         )
 
         // We check that we have the NEW subscription
