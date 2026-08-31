@@ -138,7 +138,7 @@ export default function BranchView({id}) {
             </Head>
             <MainPage
                 title={
-                    <Space>
+                    <Space data-testid="branch-title">
                         {branch?.name}
                         {!loading && branch !== null && <BranchFavourite branch={branch}/>}
                     </Space>

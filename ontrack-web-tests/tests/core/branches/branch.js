@@ -15,7 +15,10 @@ class BranchPage {
     }
 
     async checkOnPage() {
-        await expect(this.page.getByText(this.branch.name)).toBeVisible()
+        // Scoped to the page header on purpose: after a client-side navigation, Next mirrors the
+        // document title — which carries the branch name — into its route announcer, so looking for
+        // the name anywhere on the page matches twice
+        await expect(this.page.getByTestId('branch-title')).toContainText(this.branch.name)
         // Loading finished
         await expect(this.page.getByTestId('loading-builds')).toBeHidden()
     }
