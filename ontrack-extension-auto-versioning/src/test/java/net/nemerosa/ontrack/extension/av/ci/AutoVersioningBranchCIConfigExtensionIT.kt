@@ -8,6 +8,7 @@ import net.nemerosa.ontrack.extension.config.EnvFixtures
 import net.nemerosa.ontrack.extension.scm.mock.MockSCMTester
 import net.nemerosa.ontrack.graphql.AbstractQLKTITSupport
 import net.nemerosa.ontrack.it.AsAdminTest
+import net.nemerosa.ontrack.test.TestUtils.uid
 import net.nemerosa.ontrack.test.assertIs
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -31,6 +32,7 @@ class AutoVersioningBranchCIConfigExtensionIT : AbstractQLKTITSupport() {
     @Test
     @AsAdminTest
     fun `Auto-versioning setup`() {
+        val configuredProjectName = uid("cfg-")
         val branch = configTestSupport.configureBranch(
             """
                 version: v1
@@ -48,7 +50,7 @@ class AutoVersioningBranchCIConfigExtensionIT : AbstractQLKTITSupport() {
             """.trimIndent(),
             ci = "generic",
             scm = "mock",
-            env = EnvFixtures.generic()
+            env = genericEnv(configuredProjectName)
         )
         assertNotNull(
             autoVersioningConfigurationService.getAutoVersioning(branch),
@@ -69,6 +71,7 @@ class AutoVersioningBranchCIConfigExtensionIT : AbstractQLKTITSupport() {
     @Test
     @AsAdminTest
     fun `Auto-versioning check`() {
+        val configuredProjectName = uid("cfg-")
         project {
             val dependency = this
             branch("main") {
@@ -77,7 +80,7 @@ class AutoVersioningBranchCIConfigExtensionIT : AbstractQLKTITSupport() {
                     promote(pl)
                 }
             }
-            mockSCMTester.withMockSCMRepository(name = "yontrack") {
+            mockSCMTester.withMockSCMRepository(name = configuredProjectName) {
 
                 repositoryFile(
                     branch = "main",
@@ -106,9 +109,7 @@ class AutoVersioningBranchCIConfigExtensionIT : AbstractQLKTITSupport() {
                     """.trimIndent(),
                     ci = "generic",
                     scm = "mock",
-                    env = EnvFixtures.generic(
-                        scmBranch = "main",
-                    )
+                    env = genericEnv(configuredProjectName, scmBranch = "main")
                 )
 
                 val vs = structureService.findValidationStampByName(
@@ -137,6 +138,7 @@ class AutoVersioningBranchCIConfigExtensionIT : AbstractQLKTITSupport() {
     @Test
     @AsAdminTest
     fun `Auto-versioning is not disabled by default`() {
+        val configuredProjectName = uid("cfg-")
         val branch = configTestSupport.configureBranch(
             """
                 version: v1
@@ -154,7 +156,7 @@ class AutoVersioningBranchCIConfigExtensionIT : AbstractQLKTITSupport() {
                 """.trimIndent(),
             ci = "generic",
             scm = "mock",
-            env = EnvFixtures.generic()
+            env = genericEnv(configuredProjectName)
         )
         assertNotNull(
             autoVersioningConfigurationService.getAutoVersioning(branch),
@@ -176,6 +178,7 @@ class AutoVersioningBranchCIConfigExtensionIT : AbstractQLKTITSupport() {
     @Test
     @AsAdminTest
     fun `Enabling an auto-versioning config only for release branches`() {
+        val configuredProjectName = uid("cfg-")
         val yaml = """
             version: v1
             configuration:
@@ -207,7 +210,7 @@ class AutoVersioningBranchCIConfigExtensionIT : AbstractQLKTITSupport() {
             yaml,
             ci = "generic",
             scm = "mock",
-            env = EnvFixtures.generic(scmBranch = "develop")
+            env = genericEnv(configuredProjectName, scmBranch = "develop")
         )
         assertNotNull(
             autoVersioningConfigurationService.getAutoVersioning(developBranch),
@@ -229,7 +232,7 @@ class AutoVersioningBranchCIConfigExtensionIT : AbstractQLKTITSupport() {
             yaml,
             ci = "generic",
             scm = "mock",
-            env = EnvFixtures.generic(scmBranch = "release-1.0")
+            env = genericEnv(configuredProjectName, scmBranch = "release-1.0")
         )
         assertNotNull(
             autoVersioningConfigurationService.getAutoVersioning(releaseBranch),
@@ -251,6 +254,7 @@ class AutoVersioningBranchCIConfigExtensionIT : AbstractQLKTITSupport() {
     @Test
     @AsAdminTest
     fun `Branch filter for the auto-versioning configuration`() {
+        val configuredProjectName = uid("cfg-")
         val yaml = """
             version: v1
             configuration:
@@ -279,7 +283,7 @@ class AutoVersioningBranchCIConfigExtensionIT : AbstractQLKTITSupport() {
                 yaml,
                 ci = "generic",
                 scm = "mock",
-                env = EnvFixtures.generic(scmBranch = scmBranch)
+                env = genericEnv(configuredProjectName, scmBranch = scmBranch)
             )
             val config = autoVersioningConfigurationService.getAutoVersioning(branch)
             if (present) {
@@ -297,6 +301,7 @@ class AutoVersioningBranchCIConfigExtensionIT : AbstractQLKTITSupport() {
     @Test
     @AsAdminTest
     fun `pushMode is not set by default`() {
+        val configuredProjectName = uid("cfg-")
         val branch = configTestSupport.configureBranch(
             """
                 version: v1
@@ -313,7 +318,7 @@ class AutoVersioningBranchCIConfigExtensionIT : AbstractQLKTITSupport() {
             """.trimIndent(),
             ci = "generic",
             scm = "mock",
-            env = EnvFixtures.generic()
+            env = genericEnv(configuredProjectName)
         )
         assertNotNull(
             autoVersioningConfigurationService.getAutoVersioning(branch),
@@ -327,6 +332,7 @@ class AutoVersioningBranchCIConfigExtensionIT : AbstractQLKTITSupport() {
     @Test
     @AsAdminTest
     fun `pushMode can be set to PUSH`() {
+        val configuredProjectName = uid("cfg-")
         val branch = configTestSupport.configureBranch(
             """
                 version: v1
@@ -344,7 +350,7 @@ class AutoVersioningBranchCIConfigExtensionIT : AbstractQLKTITSupport() {
             """.trimIndent(),
             ci = "generic",
             scm = "mock",
-            env = EnvFixtures.generic()
+            env = genericEnv(configuredProjectName)
         )
         assertNotNull(
             autoVersioningConfigurationService.getAutoVersioning(branch),
@@ -354,5 +360,19 @@ class AutoVersioningBranchCIConfigExtensionIT : AbstractQLKTITSupport() {
             assertEquals(AutoVersioningPushMode.PUSH, avConfig.pushMode)
         }
     }
+
+    /**
+     * [EnvFixtures.generic] pins `PROJECT_NAME` to the fixed string `yontrack`, so every test using it
+     * shares one project row against the shard's database - including the tests of other modules running
+     * in the same CI shard, which Gradle may run concurrently. Each test here names its own project
+     * instead, unique to the run. See #1657.
+     */
+    private fun genericEnv(
+        projectName: String,
+        scmBranch: String = EnvFixtures.TEST_BRANCH,
+    ) = EnvFixtures.generic(
+        scmBranch = scmBranch,
+        extraEnv = mapOf("PROJECT_NAME" to projectName),
+    )
 
 }
