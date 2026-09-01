@@ -19,6 +19,17 @@ name: Demo smoke
 on:
   workflow_dispatch:
     inputs:
+      # Always sent by the `github-workflow` notification channel, whether or not it is asked
+      # for: GitHub's API gives no way to learn the run ID of a dispatch, so Yontrack passes a
+      # correlation ID and then finds the run by the artifact named after it below. GitHub
+      # rejects any input a workflow does not declare, so omitting this fails the dispatch with
+      # `422 Unexpected inputs provided: ["id"]`.
+      # See ontrack-docs/docs/content/integrations/notifications/github-workflow.md.
+      id:
+        description: 'Correlation ID, set by Yontrack. "manual" when dispatched by hand.'
+        required: true
+        default: manual
+        type: string
       version:
         description: 'Version deployed to the demo (e.g. 5.3.0-rc-41), which the demo must report'
         required: true
@@ -64,6 +75,20 @@ jobs:
       - name: Record the job start
         id: job_start
         run: echo "started=$(date +%s)" >> "$GITHUB_OUTPUT"
+
+      # How Yontrack finds this run: it polls the run's artifacts for this name, 10 times at
+      # 10s intervals, and gives up after that. So this goes before the checkout - `fetch-depth:
+      # 0` on this repository is far too slow to sit inside that window - and needs no checkout
+      # of its own, since the file is empty and only its name carries the ID.
+      - name: Correlation preparation
+        run: touch inputs.properties
+
+      - name: Correlation file archiving
+        uses: actions/upload-artifact@v4
+        with:
+          name: inputs-${{ inputs.id }}.properties
+          path: inputs.properties
+          if-no-files-found: error
 
       # The seed builds one project out of the commits since the last release tag, so it needs
       # tags and history. Without this it degrades quietly to an empty changelog project.

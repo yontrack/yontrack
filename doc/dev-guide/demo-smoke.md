@@ -55,6 +55,25 @@ the workflow's own defaults, `yontrack` and `main`, which is what the slot is sc
 
 It can also be dispatched by hand from the Actions tab with a version.
 
+### The `id` input
+
+The workflow declares an `id` input it never reads. That is the `github-workflow` channel's
+correlation contract, and it is not optional: GitHub's API gives no way to learn the run ID of a
+dispatch, so Yontrack always sends an `id` input and then finds the run by an artifact named
+`inputs-<id>.properties`. Two consequences, both of which this workflow got wrong on its first
+attempt:
+
+- **A workflow that does not declare `id` cannot be dispatched at all.** GitHub rejects any
+  undeclared input, and the notification fails with
+  `422 Unexpected inputs provided: ["id"]` - which surfaces on the slot's workflow node, not
+  here, because the run never starts.
+- **The artifact has to be published quickly.** Yontrack polls the run's artifacts 10 times at
+  10-second intervals. The correlation steps therefore run *before* the checkout, since
+  `fetch-depth: 0` on this repository does not fit inside 100 seconds. They need no checkout:
+  the file is empty and only its name carries the ID.
+
+See [the channel's documentation](../../ontrack-docs/docs/content/integrations/notifications/github-workflow.md).
+
 | Secret / variable | Meaning |
 |---|---|
 | `vars.YONTRACK_URL`, `secrets.YONTRACK_TOKEN` | The Yontrack instance the validation is reported to |
