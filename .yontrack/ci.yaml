@@ -108,6 +108,16 @@ configuration:
                     ruleConfig:
                       promotion: "BRONZE"
                 workflows:
+                  # A pipeline is created in CANDIDATE and stays there until something
+                  # asks for the deployment to start. Without this, the RUNNING workflow
+                  # below never triggers and the pipeline sits as a candidate forever.
+                  - trigger: "CANDIDATE"
+                    name: "Starting the deployment"
+                    nodes:
+                      - id: "deploying"
+                        description: "Moving the pipeline to running"
+                        executorId: "slot-pipeline-deploying"
+                        data: {}
                   - trigger: "RUNNING"
                     name: "Deploying"
                     nodes:
@@ -151,6 +161,16 @@ configuration:
                     ruleConfig:
                       promotion: "RELEASE"
                 workflows:
+                  # Same as the demo slot: without a CANDIDATE workflow asking for the
+                  # deployment to start, the pipeline never leaves the candidate state
+                  # and the RUNNING workflow below never triggers.
+                  - trigger: "CANDIDATE"
+                    name: "Starting the deployment"
+                    nodes:
+                      - id: "deploying"
+                        description: "Moving the pipeline to running"
+                        executorId: "slot-pipeline-deploying"
+                        data: {}
                   - trigger: "RUNNING"
                     name: "Deploying"
                     nodes:
