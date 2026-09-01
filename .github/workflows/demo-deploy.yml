@@ -1,0 +1,69 @@
+name: Demo deployment
+
+# Deploys a build to the demo environment, nightly and on demand.
+#
+# Deliberately not triggered by the BRONZE promotion itself: the demo is a
+# showcase, not a mirror of every green build, and redeploying it wipes whatever
+# a visitor was looking at. One scheduled deployment a night, plus a button.
+#
+# The logic lives in scripts/demo-deploy.sh so that scripts/demo-deploy-test.sh
+# can exercise it against a stubbed CLI.
+
+on:
+  schedule:
+    # 02:00 UTC, before the working day in Europe.
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    inputs:
+      build:
+        description: 'Build to deploy (e.g. 5.3.0-rc-41). Defaults to the latest BRONZE on main.'
+        required: false
+        type: string
+
+# One deployment at a time. Queue rather than cancel: a half-started pipeline is
+# worse than a slightly late one.
+concurrency:
+  group: demo-deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  YONTRACK_CLI_VERSION: '5.1.1'
+
+jobs:
+  deploy:
+    name: Deploy to the demo
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      # Installed directly rather than through ontrack-github-actions-cli-config,
+      # which registers a build as a side effect. This workflow deploys an
+      # existing build; it must not create one.
+      - name: Install the Yontrack CLI
+        run: |
+          set -euo pipefail
+          curl -sSfL -o /usr/local/bin/yontrack \
+            "https://github.com/nemerosa/ontrack-cli/releases/download/${YONTRACK_CLI_VERSION}/yontrack-linux-amd64"
+          chmod +x /usr/local/bin/yontrack
+          # --cli only: the bare `version` also asks the server, which is not
+          # configured yet at this point.
+          yontrack version --cli
+
+      - name: Configure the CLI
+        env:
+          YONTRACK_URL: ${{ vars.YONTRACK_URL }}
+          YONTRACK_TOKEN: ${{ secrets.YONTRACK_TOKEN }}
+        run: |
+          set -euo pipefail
+          yontrack config create prod "$YONTRACK_URL" --token "$YONTRACK_TOKEN" --override
+
+      - name: Deploy
+        id: deploy
+        env:
+          DEMO_BUILD: ${{ inputs.build }}
+          DEMO_MANUAL: ${{ github.event_name == 'workflow_dispatch' }}
+        run: scripts/demo-deploy.sh
