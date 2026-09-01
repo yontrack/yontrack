@@ -84,11 +84,9 @@ Every change follows this lifecycle, end to end — don't stop after step 2:
 5. **Delete the local branch** — `git branch -d <branch>` once it is merged
 6. **Wait for the `main` build, then mark the issue ready** — once CI on `main` is green, move the
    issue to `status:ready` (see *Issue status labels* below)
-7. **Close the issue** — once it is `status:ready`, close it with a comment recording what landed:
-   the commit(s), and the measured outcome where the change claimed one. Leave the `status:ready`
-   label in place; closing does not replace it
 
 - **Never** create a pull request — work lands by merging into `main` and pushing directly
+- **Never** close the GitHub issue — Damien does that after the change lands
 - If the merge is not a clean fast-forward, stop and ask before creating a merge commit or rebasing
 
 ### Issue status labels

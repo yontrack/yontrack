@@ -109,14 +109,7 @@ If the build fails, leave the issue on `status:wip`, report the failure, and fix
 still running and waiting is impractical, leave `status:wip` and say so — never apply `status:ready`
 on an unverified build.
 
-Then close the issue, with a comment recording what landed — the commit(s), and the measured
-outcome where the change claimed one:
-
-```bash
-gh issue close {number} --comment "..."
-```
-
-Leave the `status:ready` label in place; closing does not replace it.
+**Never close the issue** — Damien does that himself.
 
 ---
 
