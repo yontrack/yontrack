@@ -754,8 +754,8 @@ jobs:
   # ---------------------------------------------------------------------------------------------
 
   kdsl:
-    name: KDSL acceptance tests
-    needs: [setup, yontrack, build]
+    name: KDSL acceptance tests (shard ${{ matrix.shard }})
+    needs: [setup, build]
     if: >-
       ${{ !cancelled()
         && needs.build.result == 'success'
@@ -764,7 +764,21 @@ jobs:
         && needs.setup.outputs.just_build_and_push != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      # Two shards takes this job from ~10 minutes to ~6.5, which is where the parallel band's own
+      # floor already is - the slowest `integration` leg. A third shard would gain under a minute
+      # and hand the constraint to a job this does not touch. See #1679.
+      #
+      # Which class runs where is decided inside the test JVM by ShardingFilter, from the classes
+      # the launcher discovered: nothing here lists them, so a new ACC class is always picked up.
+      matrix:
+        shard: [1, 2]
     env:
+      # Read off the matrix rather than restated, so adding a leg is a one-line change and cannot
+      # leave the shards computing a partition of the wrong size.
+      SHARD_INDEX: ${{ matrix.shard }}
+      SHARD_TOTAL: ${{ strategy.job-total }}
       BASE_VERSION: ${{ needs.setup.outputs.base_version }}
       # The compose files resolve the images as nemerosa/ontrack:${ONTRACK_VERSION:-latest}.
       ONTRACK_VERSION: ${{ needs.setup.outputs.base_version }}
@@ -802,16 +816,6 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
-      # Linked before anything that can fail, so the validation below can still be recorded
-      # when it does — the CLI reads its configuration from the file this step writes.
-      - name: Link to the Yontrack build
-        uses: nemerosa/ontrack-github-actions-cli-library/ontrack-cli-workflow-build@v1.0.3
-        with:
-          project: ${{ needs.yontrack.outputs.project }}
-          yontrack-url: ${{ vars.YONTRACK_URL }}
-          yontrack-token: ${{ secrets.YONTRACK_TOKEN }}
-          version: ${{ env.YONTRACK_CLI_VERSION }}
-
       - name: Log in to GHCR
         uses: docker/login-action@v3
         with:
@@ -829,7 +833,9 @@ jobs:
 
       # Both kdslAcceptanceTestComposeUp and the uiTest compose dependencies are guarded behind
       # `isCI` in the Gradle build, so under CI=true the workflow is expected to bring the stack
-      # up itself.
+      # up itself. Each shard runs on its own runner and therefore brings up its own stack, which
+      # is what makes the shards independent — the suite shares one admin user and one set of
+      # global settings, so two shards could not have shared an instance.
       - name: Start the environment
         run: |
           ./gradlew :ontrack-kdsl-acceptance:kdslAcceptanceTestComposeUp \
@@ -839,41 +845,148 @@ jobs:
         id: kdsl
         run: |
           ./gradlew :ontrack-kdsl-acceptance:kdslAcceptanceTest \
+            -Dshard.index="$SHARD_INDEX" \
+            -Dshard.total="$SHARD_TOTAL" \
             --stacktrace \
             --parallel \
             --console plain
 
-      # The measured span is the whole job — restoring the images and bringing the environment up
-      # included. They are what an acceptance test run costs here, not overhead beside it.
-      - name: Validate KDSL.ACCEPTANCE
+      # KDSL.ACCEPTANCE is validated from kdsl-report, which has no span of its own worth reporting.
+      # Each shard therefore hands its own job duration over inside its artefact and the reporting
+      # job takes the slowest, which is the wall clock of the parallel shards. The measured span is
+      # the whole job — restoring the images and bringing the environment up included. They are what
+      # an acceptance test run costs here, not overhead beside it.
+      - name: Record the run time
         if: ${{ !cancelled() && steps.kdsl.outcome != '' }}
+        # Bookkeeping for a nice-to-have number: it must never be what turns a passing shard red.
+        continue-on-error: true
         env:
           STARTED: ${{ steps.job_start.outputs.started }}
         run: |
-          run_time_flag=""
-          if [ -n "${STARTED:-}" ]; then
-            run_time_flag="--run-time $(( $(date +%s) - STARTED ))"
+          set -euo pipefail
+          if [ -z "${STARTED:-}" ]; then
+            echo "The KDSL acceptance tests never started; nothing to record."
+            exit 0
           fi
-          # shellcheck disable=SC2086  # deliberate: see YONTRACK_RUN_INFO
-          yontrack validate --validation KDSL.ACCEPTANCE \
-            junit --pattern "ontrack-kdsl-acceptance/build/test-results/**/*.xml" --fail-when-no-results \
-            $run_time_flag $YONTRACK_RUN_INFO
+          mkdir -p build
+          echo "$(( $(date +%s) - STARTED ))" > build/kdsl-run-time.txt
+
+      # always(), not !cancelled(): a shard killed by timeout-minutes counts as cancelled, and
+      # skipping the upload there would leave the report job with a partial, all-green set.
+      - name: Upload the test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kdsl-results-shard-${{ matrix.shard }}
+          path: |
+            ontrack-kdsl-acceptance/build/test-results/kdslAcceptanceTest/**/*.xml
+            build/kdsl-run-time.txt
+          if-no-files-found: ignore
+          retention-days: 7
 
       - name: Upload the KDSL logs
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: kdsl-logs
+          name: kdsl-logs-shard-${{ matrix.shard }}
           path: ontrack-kdsl-acceptance/build/logs/**
           if-no-files-found: ignore
           retention-days: 7
 
   # ---------------------------------------------------------------------------------------------
-  # Playwright UI tests, one runner per authentication variant.
+  # One KDSL.ACCEPTANCE validation for all the shards. Validating from each matrix job would create
+  # one run per shard on the same stamp and the promotion would then read whichever landed last.
+  #
+  # The shards run on separate runners, so their JUnit reports are never in one workspace: they are
+  # collected here from the artefacts instead.
+  # ---------------------------------------------------------------------------------------------
+
+  kdsl-report:
+    name: KDSL acceptance tests report
+    needs: [setup, yontrack, kdsl]
+    if: ${{ !cancelled() && needs.setup.outputs.full_run == 'true' && needs.kdsl.result != 'skipped' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Collect the test results
+        id: collect
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          pattern: kdsl-results-shard-*
+          path: kdsl-results
+
+      # Flattened deliberately, for the same reason integration-report flattens: upload-artifact
+      # roots each artefact at the least common ancestor of the files it matched, so the depth the
+      # reports land at varies with what a shard produced. The name is the shard plus the report's
+      # own name — `TEST-<fqcn>.xml`, already unique — rather than the flattened path.
+      - name: Lay the reports out
+        id: layout
+        if: ${{ !cancelled() && steps.collect.outcome != '' }}
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          mkdir -p kdsl-junit
+          while IFS= read -r xml; do
+            # kdsl-results/kdsl-results-shard-2/... -> shard-2
+            rest="${xml#kdsl-results/}"
+            shard="${rest%%/*}"
+            cp "$xml" "kdsl-junit/${shard#kdsl-results-}_$(basename "$xml")"
+          done < <(find kdsl-results -name '*.xml')
+          ls kdsl-junit
+          [ -n "$(ls -A kdsl-junit)" ]
+
+      - name: Link to the Yontrack build
+        if: ${{ !cancelled() }}
+        uses: nemerosa/ontrack-github-actions-cli-library/ontrack-cli-workflow-build@v1.0.3
+        with:
+          project: ${{ needs.yontrack.outputs.project }}
+          yontrack-url: ${{ vars.YONTRACK_URL }}
+          yontrack-token: ${{ secrets.YONTRACK_TOKEN }}
+          version: ${{ env.YONTRACK_CLI_VERSION }}
+
+      # If the reports never made it here the stamp still has to say so, rather than the job dying
+      # quietly and leaving KDSL.ACCEPTANCE absent from the build.
+      - name: Validate KDSL.ACCEPTANCE
+        if: ${{ !cancelled() && steps.layout.outcome != '' }}
+        env:
+          LAYOUT_OUTCOME: ${{ steps.layout.outcome }}
+          # The matrix as a whole: `failure` as soon as one shard is red, and not `success` when a
+          # shard was cancelled by its timeout. A shard that dies uploads nothing and a partial set
+          # of artefacts is indistinguishable from a complete one — the reports that *did* arrive
+          # are all green — so the matrix result decides, not what turned up.
+          SHARDS_RESULT: ${{ needs.kdsl.result }}
+        run: |
+          # The slowest of the shards, written by each leg into its artefact. Left empty when no
+          # artefact arrived at all — a made-up duration is worse than none, so the flag is then
+          # omitted and the rest of the run info still goes out.
+          run_time="$(find kdsl-results -name 'kdsl-run-time.txt' -exec cat {} + \
+            2>/dev/null | sort -n | tail -n 1 || true)"
+          run_time_flag=""
+          if [ -n "$run_time" ]; then
+            run_time_flag="--run-time $run_time"
+          fi
+
+          if [ "$LAYOUT_OUTCOME" != "success" ] || [ "$SHARDS_RESULT" != "success" ]; then
+            # shellcheck disable=SC2086  # deliberate: see YONTRACK_RUN_INFO
+            yontrack validate --validation KDSL.ACCEPTANCE --status FAILED \
+              $run_time_flag $YONTRACK_RUN_INFO
+          else
+            # shellcheck disable=SC2086  # deliberate: see YONTRACK_RUN_INFO
+            yontrack validate --validation KDSL.ACCEPTANCE \
+              junit --pattern "kdsl-junit/*.xml" --fail-when-no-results \
+              $run_time_flag $YONTRACK_RUN_INFO
+          fi
+
+  # ---------------------------------------------------------------------------------------------
+  # Playwright UI tests, one runner per authentication variant, and per shard of the main suite.
   # ---------------------------------------------------------------------------------------------
 
   ui-tests:
-    name: UI tests (${{ matrix.variant }})
+    name: UI tests (${{ matrix.label }})
     needs: [setup, build]
     if: >-
       ${{ !cancelled()
@@ -885,14 +998,34 @@ jobs:
     timeout-minutes: 30
     strategy:
       fail-fast: false
+      # Two dimensions, and they mean different things. `variant` is the authentication mode the
+      # stack runs in; `shard` is a partition of one suite across runners, as in `integration`.
+      # Only `main` is sharded: ldap and oidc run `--grep '@auth'` and take three minutes.
+      #
+      # Two shards takes `main` from ~10 minutes to ~6.5, which is where the parallel band's own
+      # floor already is - the slowest `integration` leg. See #1679.
       matrix:
         include:
           - variant: main
+            label: main 1/2
             task: uiTest
+            shard: 1
+            shards: 2
+          - variant: main
+            label: main 2/2
+            task: uiTest
+            shard: 2
+            shards: 2
           - variant: ldap
+            label: ldap
             task: uiLdapTest
+            shard: 1
+            shards: 1
           - variant: oidc
+            label: oidc
             task: uiOidcTest
+            shard: 1
+            shards: 1
     env:
       BASE_VERSION: ${{ needs.setup.outputs.base_version }}
       ONTRACK_VERSION: ${{ needs.setup.outputs.base_version }}
@@ -970,10 +1103,15 @@ jobs:
           ./gradlew :ontrack-kdsl-acceptance:kdslAcceptanceTestComposeUp \
             --stacktrace --console plain
 
+      # Playwright reads --shard from the command line only, so the Gradle build appends it to the
+      # npm arguments from these properties. At 1 of 1 - ldap and oidc - it is left off entirely and
+      # the whole suite runs, exactly as before.
       - name: UI tests
         id: test
         run: |
           ./gradlew ":ontrack-web-tests:${{ matrix.task }}" \
+            -Dshard.index=${{ matrix.shard }} \
+            -Dshard.total=${{ matrix.shards }} \
             --stacktrace \
             --console plain
 
@@ -998,15 +1136,18 @@ jobs:
           echo "$(( $(date +%s) - STARTED ))" \
             > "ontrack-web-tests/reports/${{ matrix.variant }}/junit/run-time.txt"
 
-      # The three variants land on one PLAYWRIGHT stamp, so the reports are collected and
-      # validated once in ui-tests-report rather than three times from here.
+      # All the legs land on one PLAYWRIGHT stamp, so the reports are collected and validated once
+      # in ui-tests-report rather than once per leg.
       # always(), not !cancelled(): a leg killed by timeout-minutes counts as cancelled, and
       # skipping the upload there is what left the report job with a partial, all-green set.
+      #
+      # Every artefact below carries the shard as well as the variant: two legs of the same variant
+      # would otherwise be uploading under one name.
       - name: Upload the JUnit report
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-junit-${{ matrix.variant }}
+          name: playwright-junit-${{ matrix.variant }}-${{ matrix.shard }}
           path: |
             ontrack-web-tests/reports/${{ matrix.variant }}/junit/*.xml
             ontrack-web-tests/reports/${{ matrix.variant }}/junit/run-time.txt
@@ -1017,7 +1158,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-html-${{ matrix.variant }}
+          name: playwright-html-${{ matrix.variant }}-${{ matrix.shard }}
           path: ontrack-web-tests/reports/${{ matrix.variant }}/html/**
           if-no-files-found: ignore
           retention-days: 7
@@ -1026,14 +1167,15 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: kdsl-logs-ui-${{ matrix.variant }}
+          name: kdsl-logs-ui-${{ matrix.variant }}-${{ matrix.shard }}
           path: ontrack-kdsl-acceptance/build/logs/**
           if-no-files-found: ignore
           retention-days: 7
 
   # ---------------------------------------------------------------------------------------------
-  # One PLAYWRIGHT validation for the three variants. Validating from each matrix job would
-  # create three runs on the same stamp and the promotion would then read whichever landed last.
+  # One PLAYWRIGHT validation for every leg of the matrix. Validating from each matrix job would
+  # create one run per leg on the same stamp and the promotion would then read whichever landed
+  # last.
   # ---------------------------------------------------------------------------------------------
 
   ui-tests-report:
@@ -1055,6 +1197,11 @@ jobs:
           path: playwright-junit
 
       # Rebuild the layout the stamp's glob expects: reports/<variant>/junit/*.xml
+      #
+      # The artefacts are named `<variant>-<shard>`, and the shard is dropped here so the reports
+      # land under the variant they belong to rather than inventing a `main-1` variant. The two
+      # shards of `main` do not collide: the Gradle build names their reports report-1.xml and
+      # report-2.xml.
       - name: Lay the reports out
         id: layout
         if: ${{ !cancelled() && steps.collect.outcome != '' }}
@@ -1063,7 +1210,8 @@ jobs:
           set -euo pipefail
           for dir in playwright-junit/playwright-junit-*; do
             [ -d "$dir" ] || continue
-            variant="${dir##*playwright-junit-}"
+            leg="${dir##*playwright-junit-}"
+            variant="${leg%-*}"
             mkdir -p "ontrack-web-tests/reports/$variant/junit"
             cp "$dir"/*.xml "ontrack-web-tests/reports/$variant/junit/" || true
           done
@@ -1086,7 +1234,7 @@ jobs:
           LAYOUT_OUTCOME: ${{ steps.layout.outcome }}
           UI_TESTS_RESULT: ${{ needs.ui-tests.result }}
         run: |
-          # The slowest of the three variants, written by each leg into its artefact. Left empty
+          # The slowest of the legs, written by each one into its artefact. Left empty
           # when no artefact arrived at all — a made-up duration is worse than none, so the flag
           # is then omitted and the rest of the run info still goes out.
           run_time="$(cat playwright-junit/playwright-junit-*/run-time.txt 2>/dev/null \
@@ -1116,13 +1264,14 @@ jobs:
 
   docker-hub:
     name: Docker Hub
-    needs: [setup, yontrack, build, integration, integration-report, kdsl, ui-tests, ui-tests-report]
+    needs: [setup, yontrack, build, integration, integration-report, kdsl, kdsl-report, ui-tests, ui-tests-report]
     if: >-
       ${{ !cancelled()
         && needs.build.result == 'success'
         && needs.integration.result != 'failure'
         && needs.integration-report.result != 'failure'
         && needs.kdsl.result != 'failure'
+        && needs.kdsl-report.result != 'failure'
         && needs.ui-tests.result != 'failure'
         && needs.ui-tests-report.result != 'failure'
         && needs.setup.outputs.full_run == 'true'
@@ -1208,13 +1357,14 @@ jobs:
 
   release:
     name: GitHub release
-    needs: [setup, yontrack, build, integration, integration-report, kdsl, ui-tests, ui-tests-report]
+    needs: [setup, yontrack, build, integration, integration-report, kdsl, kdsl-report, ui-tests, ui-tests-report]
     if: >-
       ${{ !cancelled()
         && needs.build.result == 'success'
         && needs.integration.result != 'failure'
         && needs.integration-report.result != 'failure'
         && needs.kdsl.result != 'failure'
+        && needs.kdsl-report.result != 'failure'
         && needs.ui-tests.result != 'failure'
         && needs.ui-tests-report.result != 'failure'
         && needs.setup.outputs.full_run == 'true'
@@ -1292,13 +1442,14 @@ jobs:
 
   docs:
     name: Documentation
-    needs: [setup, yontrack, build, integration, integration-report, kdsl, ui-tests, ui-tests-report]
+    needs: [setup, yontrack, build, integration, integration-report, kdsl, kdsl-report, ui-tests, ui-tests-report]
     if: >-
       ${{ !cancelled()
         && needs.build.result == 'success'
         && needs.integration.result != 'failure'
         && needs.integration-report.result != 'failure'
         && needs.kdsl.result != 'failure'
+        && needs.kdsl-report.result != 'failure'
         && needs.ui-tests.result != 'failure'
         && needs.ui-tests-report.result != 'failure'
         && needs.setup.outputs.full_run == 'true'

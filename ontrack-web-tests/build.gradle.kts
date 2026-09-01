@@ -29,6 +29,19 @@ val playwrightSetup by tasks.registering(NpmTask::class) {
 
 // Testing
 
+// Splitting the suite across CI runners. Playwright reads `--shard` from the command line only —
+// there is no equivalent setting in playwright.config.js — so it is appended to the npm arguments
+// here. Unset means the whole suite, which is every local run.
+//
+// Playwright balances the shards on test *count*, walking the spec files in path order. Measured
+// against the per-test durations of a real run, that lands within a few seconds of an optimal
+// duration-balanced split, and unlike a hand-written list of files it takes in every new spec on
+// its own.
+val shardIndex: Int = System.getProperty("shard.index")?.toIntOrNull() ?: 1
+val shardTotal: Int = System.getProperty("shard.total")?.toIntOrNull() ?: 1
+val isSharded = shardTotal > 1
+val shardSuffix = if (isSharded) "-$shardIndex" else ""
+
 val uiTest by tasks.registering(NpmTask::class) {
     dependsOn(playwrightSetup)
     if (!isCI) {
@@ -36,8 +49,16 @@ val uiTest by tasks.registering(NpmTask::class) {
         finalizedBy(":ontrack-kdsl-acceptance:kdslAcceptanceTestComposeDown")
     }
 
-    args.set(listOf("run", "test"))
-    environment.put("JUNIT_REPORT_PATH", "reports/main/junit/report.xml")
+    args.set(
+        if (isSharded) {
+            listOf("run", "test", "--", "--shard=$shardIndex/$shardTotal")
+        } else {
+            listOf("run", "test")
+        }
+    )
+    // Both shards write into reports/main/junit, so the report carries the shard in its name. The
+    // stamp's glob is reports/*/junit/*.xml and is unaffected.
+    environment.put("JUNIT_REPORT_PATH", "reports/main/junit/report$shardSuffix.xml")
     environment.put("HTML_REPORT_PATH", "reports/main/html")
 }
 

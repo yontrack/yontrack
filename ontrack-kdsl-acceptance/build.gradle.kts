@@ -18,6 +18,10 @@ dependencies {
 
     testImplementation("org.influxdb:influxdb-java")
     testImplementation(testFixtures(project(":ontrack-extension-github")))
+
+    // Already on the test runtime classpath for every module; needed at compile time here for
+    // ShardingFilter, which implements one of its interfaces.
+    testImplementation("org.junit.platform:junit-platform-launcher")
 }
 
 // Pre-acceptance tests: starting the environment
@@ -99,6 +103,11 @@ val kdslAcceptanceTest by tasks.registering(Test::class) {
             includeTestsMatching(testFilter)
         }
     }
+    // Splitting the suite across CI runners. The partition itself is computed inside the test JVM by
+    // ShardingFilter, from the classes the launcher actually discovered — nothing here enumerates
+    // them. Left at 1 of 1 when unset, which is every local run, and the filter is then inert.
+    systemProperty("shard.index", System.getProperty("shard.index") ?: "1")
+    systemProperty("shard.total", System.getProperty("shard.total") ?: "1")
     minHeapSize = "512m"
     maxHeapSize = "3072m"
     dependsOn(kdslAcceptanceTestComposeUp)
