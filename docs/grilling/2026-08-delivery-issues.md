@@ -2,6 +2,12 @@
 
 Outcome of the grilling session on [2026-08-delivery.md](2026-08-delivery.md).
 
+> **Corrected 2026-09-01.** As drafted, this document claimed the Yontrack build *name* was
+> the rc version (`5.0.42-rc-123`) and therefore the GHCR tag. It is not: build names are
+> opaque timestamp-run pairs (`20260901055547-123`), and the version lives in the `release`
+> property. Sections 1, 2, 5 and 16 and the "Build identity" summary have been corrected.
+> Consequence: slot auto-versioning templates `${build.release}`, never `${build}`.
+
 
 All 19 issues carry the label `initiative: 2026-08-delivery` and cross-reference their
 dependencies, including across repositories.
@@ -43,9 +49,11 @@ GOLD *triggers* publication; RELEASE *records* that it succeeded. A promotion wh
 validations are its own triggers would be circular, which is why both levels exist.
 
 **Build identity** — the build that gets released is an rc build, because nothing may be
-rebuilt. Its Yontrack build name stays `5.0.42-rc-123` forever; the `release` property
-(the display name) is rewritten to `5.0.42` at GOLD; every published artifact carries
-`5.0.42` and is produced by re-tagging or copying what BRONZE already built.
+rebuilt. Its Yontrack build *name* is an opaque timestamp-run pair (`20260901055547-123`)
+and never changes; the version lives in the `release` property (the display name), which
+holds `5.0.42-rc-123` from BRONZE and is rewritten to `5.0.42` at GOLD; every published
+artifact carries `5.0.42` and is produced by re-tagging or copying what BRONZE already
+built.
 
 **Images** — GHCR, with a durable `:5.0.42-rc-123` tag alongside the existing run-scoped
 `:run-<id>`. Packages public, so the cluster needs no pull secret. Demo therefore pulls
@@ -79,16 +87,15 @@ is green, and issues 14 and 15 have to land together — 14 builds the new publi
 ### 1. Fix the `self` slot's target version — [yontrack/yontrack#1660](https://github.com/yontrack/yontrack/issues/1660)
 
 `.yontrack/ci.yaml` sets the self slot's auto-versioning `targetVersion: "${build}"`.
-That works today only by accident: a released build's *name* is the version, because a
-release was its own CI run. Once GOLD releases an rc build, `${build}` is
-`5.2.3-rc-140` and self would be pointed at a Docker Hub tag that does not exist.
+`${build}` renders the build *name*, which is an opaque timestamp-run pair
+(`20260901055547-140`) — not a version, and not a tag of any kind.
 
 `${build.release}` renders the `release` property (`ReleasePropertyTemplatingSource`,
-field `release` on `BUILD`), which by then holds `5.2.3`.
+field `release` on `BUILD`), which `ci.yml` sets on every build
+(`yontrack build set-property release "$VERSION"`) and which holds the version self needs.
 
 **Acceptance**: `targetVersion: "${build.release}"`; a release through the *current*
-pipeline still deploys self correctly (the value is unchanged today, which is what makes
-this safe to land first).
+pipeline still deploys self correctly.
 
 ---
 
@@ -97,8 +104,8 @@ this safe to land first).
 ### 2. Publish a durable version tag to GHCR — [yontrack/yontrack#1661](https://github.com/yontrack/yontrack/issues/1661)
 
 `ci.yml` pushes `:run-<run_id>` for intra-run hand-off only. Add a second tag,
-`:<version>` (e.g. `5.0.42-rc-123`), so one identifier spans CI, the Yontrack build name,
-the gitops diff and the running pod. Keep `:run-<id>` exactly as it is.
+`:<version>` (e.g. `5.0.42-rc-123`), so one identifier spans CI, the Yontrack `release`
+property, the gitops diff and the running pod. Keep `:run-<id>` exactly as it is.
 
 The packages stay **private**. An earlier draft made them public so the cluster would
 need no pull secret; keeping them private costs one sealed `imagePullSecret` in gitops
@@ -141,8 +148,9 @@ other branch does not.
 
 The slot's `RUNNING` workflow, mirroring self's: `auto-versioning` of
 `yontrack-helmfile.d/values/yontrack-demo/yontrack.yaml` → `image.tag` with
-`targetVersion: "${build}"` (the rc name — this is the GHCR tag), then
-`slot-pipeline-deployed`.
+`targetVersion: "${build.release}"` (the version — this is the GHCR tag), then
+`slot-pipeline-deployed`. Both slots template the same way; they differ only in target
+path.
 
 **Acceptance**: starting a pipeline for a BRONZE build opens and auto-merges a gitops PR
 bumping the demo tag, and the pipeline reaches deployed.
@@ -325,10 +333,10 @@ publication validations.
 
 ### 16. ADR: build identity through the release — [yontrack/yontrack#1674](https://github.com/yontrack/yontrack/issues/1674)
 
-The one decision here that is genuinely expensive to reverse: an immutable rc build name
-with a rewritten display name, and artifacts named for the base version. Worth an ADR
-because a future reader *will* wonder why build `5.0.42-rc-123` is the thing tagged
-`5.0.42` everywhere else.
+The one decision here that is genuinely expensive to reverse: an immutable opaque build
+name carrying a mutable display name, and artifacts named for the base version. Worth an
+ADR because a future reader *will* wonder why the build whose display name read
+`5.0.42-rc-123` is the thing tagged `5.0.42` everywhere else.
 
 ### 17. `CONTEXT.md`: environment, slot, deployment — [yontrack/yontrack#1675](https://github.com/yontrack/yontrack/issues/1675)
 
