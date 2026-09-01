@@ -80,14 +80,23 @@ Every change follows this lifecycle, end to end — don't stop after step 2:
 2. **Mark the issue as in progress** — when the change comes from a GitHub issue, move it to
    `status:wip` as soon as work starts (see *Issue status labels* below)
 3. **Implement and test** on that branch, following the TDD order below, and commit there
-4. **Land on `main`** — merge the branch into `main`, then `git push origin main`
-5. **Delete the local branch** — `git branch -d <branch>` once it is merged
-6. **Wait for the `main` build, then mark the issue ready** — once CI on `main` is green, move the
+4. **Show it in the demo** — a user-visible feature adds itself to `DemoContent` in
+   `ontrack-demo-seed` (see *Definition of done* below); say which way you decided either way
+5. **Land on `main`** — merge the branch into `main`, then `git push origin main`
+6. **Delete the local branch** — `git branch -d <branch>` once it is merged
+7. **Wait for the `main` build, then mark the issue ready** — once CI on `main` is green, move the
    issue to `status:ready` (see *Issue status labels* below)
 
 - **Never** create a pull request — work lands by merging into `main` and pushing directly
 - **Never** close the GitHub issue — Damien does that after the change lands
 - If the merge is not a clean fast-forward, stop and ask before creating a merge commit or rebasing
+
+### Definition of done
+
+**A feature is not done until the demo seed shows it.** A user-visible feature adds itself to
+`DemoContent` in `ontrack-demo-seed`, so that the demo demonstrates the feature it ships with. This is
+a checklist item, not automation: a rule guessing which features need a demo would be wrong in both
+directions, so decide, and say which way you decided. `doc/dev-guide/demo-seed.md` says how.
 
 ### Issue status labels
 

@@ -26,6 +26,7 @@ include(":ontrack-docs")
 // KDSL
 include(":ontrack-kdsl")
 include(":ontrack-kdsl-acceptance")
+include(":ontrack-demo-seed")
 
 // Core extensions
 include(":ontrack-extension-artifactory")

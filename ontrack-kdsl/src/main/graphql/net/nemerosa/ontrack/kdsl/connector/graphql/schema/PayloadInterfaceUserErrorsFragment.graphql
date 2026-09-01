@@ -1,0 +1,9 @@
+# Payloads implement one of two error interfaces. This is the other one, next to
+# PayloadUserErrorsFragment, for the mutations whose payload implements PayloadInterface.
+fragment PayloadInterfaceUserErrors on PayloadInterface {
+    errors {
+        message
+        exception
+        location
+    }
+}

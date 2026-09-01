@@ -1,0 +1,7 @@
+query UserDashboards {
+    userDashboards {
+        uuid
+        name
+        userScope
+    }
+}

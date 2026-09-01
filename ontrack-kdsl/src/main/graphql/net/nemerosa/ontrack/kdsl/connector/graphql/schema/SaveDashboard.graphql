@@ -1,0 +1,19 @@
+mutation SaveDashboard(
+    $uuid: String!,
+    $name: String!,
+    $userScope: DashboardContextUserScope!,
+    $widgets: [WidgetInstanceInput!]!,
+) {
+    saveDashboard(input: {
+        uuid: $uuid,
+        name: $name,
+        userScope: $userScope,
+        select: false,
+        widgets: $widgets,
+    }) {
+        ...PayloadInterfaceUserErrors
+        dashboard {
+            uuid
+        }
+    }
+}

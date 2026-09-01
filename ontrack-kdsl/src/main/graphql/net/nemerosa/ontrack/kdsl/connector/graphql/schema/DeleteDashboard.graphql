@@ -1,0 +1,7 @@
+mutation DeleteDashboard(
+    $uuid: String!,
+) {
+    deleteDashboard(input: {uuid: $uuid}) {
+        ...PayloadInterfaceUserErrors
+    }
+}
