@@ -15,6 +15,10 @@ configuration:
           tests: {}
         PLAYWRIGHT:
           tests: {}
+        # Reported by .github/workflows/demo-smoke.yml, which the demo slot dispatches once
+        # it has marked the deployment done. No promotion requires it yet: SILVER, which will,
+        # is #1667.
+        DEMO.SMOKE: {}
         DOCKER.HUB: {}
         GITHUB.RELEASE: {}
         DOCUMENTATION: {}
@@ -148,6 +152,32 @@ configuration:
                         data: {}
                         parents:
                           - id: "auto-versioning"
+                      # "Deployed" here means the gitops PR merged, not that the pods are
+                      # serving - ArgoCD has not even synced yet. demo-smoke.yml starts by
+                      # polling the demo until the version it is given is the version
+                      # answering, which is the check that closes that gap. See #1666.
+                      #
+                      # Only the version is passed: `${build}` would render the build's
+                      # display name rather than its name, so the workflow resolves the build
+                      # itself. `project` and `branch` are left to the workflow's own defaults
+                      # (yontrack/main), which is also what this slot is scoped to.
+                      - id: "smoke"
+                        description: "Smoke-testing the demo deployment"
+                        parents:
+                          - id: "deploy"
+                        executorId: "notification"
+                        data:
+                          channel: "github-workflow"
+                          channelConfig:
+                            config: github.com
+                            owner: yontrack
+                            repository: yontrack
+                            workflowId: demo-smoke.yml
+                            reference: main
+                            callMode: ASYNC
+                            inputs:
+                              - name: version
+                                value: "${build.release}"
               - name: self.dev.yontrack.com
                 admissionRules:
                   - name: "branchPattern"

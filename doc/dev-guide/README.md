@@ -10,5 +10,6 @@
   * [Properties](components/properties/README.md)
 * Delivery
   * [Demo seed and reset](demo-seed.md) - resetting the demo environment through the Yontrack API
+  * [Demo smoke test](demo-smoke.md) - verifying the demo deployment and reporting DEMO.SMOKE
 * Workflows
   * [Claude Pick Workflow](claude-pick-workflow.md) - Let Claude autonomously pick and implement issues

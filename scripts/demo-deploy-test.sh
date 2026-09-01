@@ -16,46 +16,9 @@ export DEMO_DEPLOY_LIB_ONLY
 # shellcheck source=demo-deploy.sh
 source "$SCRIPT_DIR/demo-deploy.sh"
 
-tests_run=0
-tests_failed=0
-
-assert_eq() {
-    local expected="$1" actual="$2" message="$3"
-    tests_run=$((tests_run + 1))
-    if [ "$expected" != "$actual" ]; then
-        tests_failed=$((tests_failed + 1))
-        echo "FAIL: $message"
-        echo "      expected: '$expected'"
-        echo "      actual:   '$actual'"
-    fi
-}
-
-assert_contains() {
-    local haystack="$1" needle="$2" message="$3"
-    tests_run=$((tests_run + 1))
-    case "$haystack" in
-        *"$needle"*) ;;
-        *)
-            tests_failed=$((tests_failed + 1))
-            echo "FAIL: $message"
-            echo "      expected to contain: '$needle'"
-            echo "      actual:              '$haystack'"
-            ;;
-    esac
-}
-
-assert_not_contains() {
-    local haystack="$1" needle="$2" message="$3"
-    tests_run=$((tests_run + 1))
-    case "$haystack" in
-        *"$needle"*)
-            tests_failed=$((tests_failed + 1))
-            echo "FAIL: $message"
-            echo "      expected NOT to contain: '$needle'"
-            echo "      actual:                  '$haystack'"
-            ;;
-    esac
-}
+# Assertions, shared with the other shell suites.
+# shellcheck source=shell-test-lib.sh
+source "$SCRIPT_DIR/shell-test-lib.sh"
 
 # ===========================================================================
 # The stub
@@ -175,24 +138,24 @@ assert_eq "deploy" "$r" "dd_should_deploy: an unchanged build is still deployed 
 dd_should_deploy 100 "" false && r=deploy || r=skip
 assert_eq "deploy" "$r" "dd_should_deploy: a slot that has never deployed anything deploys"
 
-# --- dd_exact_pattern ------------------------------------------------------
+# --- yontrack_exact_pattern (scripts/yontrack-build.sh) ---------------------
 
 # `--with-display-name` is matched case-insensitively and *partially* by the
 # server, so a bare version would match more builds than the one asked for.
 
-assert_eq '^5\.3\.0-rc-45$' "$(dd_exact_pattern 5.3.0-rc-45)" \
-    "dd_exact_pattern anchors the pattern and escapes the dots"
+assert_eq '^5\.3\.0-rc-45$' "$(yontrack_exact_pattern 5.3.0-rc-45)" \
+    "yontrack_exact_pattern anchors the pattern and escapes the dots"
 
-assert_eq '^20260801010101-55$' "$(dd_exact_pattern 20260801010101-55)" \
-    "dd_exact_pattern leaves a plain build name alone apart from the anchors"
+assert_eq '^20260801010101-55$' "$(yontrack_exact_pattern 20260801010101-55)" \
+    "yontrack_exact_pattern leaves a plain build name alone apart from the anchors"
 
 # The dots are the ones that matter in practice: unescaped, 5.3.0-rc-4 would
 # match 5x3x0-rc-4, and unanchored it would match 5.3.0-rc-45.
-assert_contains "$(dd_exact_pattern 5.3.0-rc-4)" '5\.3\.0-rc-4' \
-    "dd_exact_pattern escapes every dot"
+assert_contains "$(yontrack_exact_pattern 5.3.0-rc-4)" '5\.3\.0-rc-4' \
+    "yontrack_exact_pattern escapes every dot"
 
-assert_eq '^a\*b\+c\[d\]$' "$(dd_exact_pattern 'a*b+c[d]')" \
-    "dd_exact_pattern escapes the other regex metacharacters too"
+assert_eq '^a\*b\+c\[d\]$' "$(yontrack_exact_pattern 'a*b+c[d]')" \
+    "yontrack_exact_pattern escapes the other regex metacharacters too"
 
 # --- acceptance: the nightly deploys the latest promoted build -------------
 
@@ -323,11 +286,4 @@ assert_not_contains "$(calls)" "slot pipeline start" "unreadable build: starts n
 
 # --- report ----------------------------------------------------------------
 
-echo
-if [ "$tests_failed" -eq 0 ]; then
-    echo "OK: $tests_run assertions passed"
-    exit 0
-else
-    echo "FAILED: $tests_failed of $tests_run assertions failed"
-    exit 1
-fi
+report_tests

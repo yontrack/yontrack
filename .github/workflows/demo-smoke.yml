@@ -1,0 +1,228 @@
+name: Demo smoke
+
+# Verifies the demo deployment and reports DEMO.SMOKE on the build that was deployed.
+#
+# Dispatched by the demo slot's RUNNING workflow through the `github-workflow` notification
+# channel - see .yontrack/ci.yaml - once the slot has marked the deployment done. That moment
+# is when the gitops PR merged, which is well before ArgoCD has synced and the pods are
+# serving, so the first thing this workflow does is wait for the version it was told about to
+# be the version answering. That poll is the most valuable check here: "the version I asked
+# for is the version answering" is the whole deployment contract.
+#
+# Deliberately thin after that. The heavy suites already ran for BRONZE; re-running them here
+# would test the deployment rather than the code, and a fat smoke suite becomes the flaky
+# thing that blocks releases.
+#
+# The polling and the assertions live in scripts/demo-smoke.sh so that
+# scripts/demo-smoke-test.sh can exercise them against a stubbed HTTP client.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version deployed to the demo (e.g. 5.3.0-rc-41), which the demo must report'
+        required: true
+        type: string
+      project:
+        description: 'Yontrack project holding the build'
+        required: false
+        default: yontrack
+        type: string
+      branch:
+        description: 'Yontrack branch holding the build'
+        required: false
+        default: main
+        type: string
+
+# One smoke run at a time, and queue rather than cancel: the seed wipes the demo, so two
+# overlapping runs would reset the instance under each other's feet.
+concurrency:
+  group: demo-smoke
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  YONTRACK_CLI_VERSION: '5.2.0'
+  # The demo, not the Yontrack instance the validation is reported to. Everything the smoke
+  # test asks of it goes through /graphql: the chart's ingress routes only /graphql and /hook
+  # to the backend, so /rest/* lands on the Next UI and answers 404.
+  DEMO_URL: ${{ vars.DEMO_URL || 'https://demo.dev.yontrack.com' }}
+  DEMO_SEEDED_PROJECT: petclinic
+  DEMO_PROJECT: ${{ inputs.project }}
+  DEMO_BRANCH: ${{ inputs.branch }}
+  DEMO_VERSION: ${{ inputs.version }}
+
+jobs:
+  smoke:
+    name: Smoke-test the demo
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      # The run time reported for the validation is measured from here.
+      - name: Record the job start
+        id: job_start
+        run: echo "started=$(date +%s)" >> "$GITHUB_OUTPUT"
+
+      # The seed builds one project out of the commits since the last release tag, so it needs
+      # tags and history. Without this it degrades quietly to an empty changelog project.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Installed directly rather than through ontrack-github-actions-cli-config, which
+      # registers a build as a side effect. This workflow validates an existing build; it must
+      # not create one.
+      - name: Install the Yontrack CLI
+        run: |
+          set -euo pipefail
+          curl -sSfL -o /usr/local/bin/yontrack \
+            "https://github.com/nemerosa/ontrack-cli/releases/download/${YONTRACK_CLI_VERSION}/yontrack-linux-amd64"
+          chmod +x /usr/local/bin/yontrack
+          # --cli only: the bare `version` also asks the server, which is not configured yet.
+          yontrack version --cli
+
+      - name: Configure the CLI
+        env:
+          YONTRACK_URL: ${{ vars.YONTRACK_URL }}
+          YONTRACK_TOKEN: ${{ secrets.YONTRACK_TOKEN }}
+        run: |
+          set -euo pipefail
+          yontrack config create prod "$YONTRACK_URL" --token "$YONTRACK_TOKEN" --override
+
+      # DEMO.SMOKE is reported with `yontrack validate --build`, which takes the build *name*.
+      # The slot workflow can only pass the version: `${build}` renders the display name, which
+      # is the release property, and no templating source exposes the raw name. Resolved first,
+      # and outside the smoke steps, so that a failure here reads as "Yontrack does not know
+      # this version" rather than as a broken demo.
+      - name: Resolve the build
+        id: resolve
+        run: scripts/demo-smoke.sh resolve
+
+      # ------------------------------------------------------------------------------------
+      # 1. The version that was deployed is the version answering.
+      # ------------------------------------------------------------------------------------
+
+      - name: Wait for the deployed version
+        id: poll
+        env:
+          DEMO_TOKEN: ${{ secrets.DEMO_TOKEN }}
+          DEMO_POLL_TIMEOUT: '600'
+        run: scripts/demo-smoke.sh poll
+
+      # ------------------------------------------------------------------------------------
+      # 2. Reset and seed. The demo's state is a function of the build, not an accumulation.
+      # ------------------------------------------------------------------------------------
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: zulu
+          java-version: '21'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Build the seed program
+        run: ./gradlew :ontrack-demo-seed:installDist --console plain
+
+      - name: Reset and seed the demo
+        id: seed
+        env:
+          # The seed talks to the demo, not to the Yontrack instance the CLI is configured
+          # against. Scoped to this step for that reason.
+          YONTRACK_URL: ${{ env.DEMO_URL }}
+          YONTRACK_TOKEN: ${{ secrets.DEMO_TOKEN }}
+        run: ontrack-demo-seed/build/install/ontrack-demo-seed/bin/ontrack-demo-seed
+
+      # ------------------------------------------------------------------------------------
+      # 3. Assert, thinly.
+      # ------------------------------------------------------------------------------------
+
+      - name: Check the seeded dataset over GraphQL
+        id: assert
+        env:
+          DEMO_TOKEN: ${{ secrets.DEMO_TOKEN }}
+        run: scripts/demo-smoke.sh assert
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: ontrack-web-tests/package-lock.json
+
+      - name: Install Playwright
+        working-directory: ontrack-web-tests
+        run: |
+          set -euo pipefail
+          npm ci
+          npx playwright install --with-deps chromium
+
+      # Keycloak login plus one entity page: what only a real deployment can break - the realm
+      # the chart provisions, and the UI pod reaching the backend pod.
+      - name: Check the UI signs in and renders
+        id: playwright
+        working-directory: ontrack-web-tests
+        env:
+          DEMO_USERNAME: ${{ secrets.DEMO_USERNAME }}
+          DEMO_PASSWORD: ${{ secrets.DEMO_PASSWORD }}
+        run: npm run test-demo
+
+      - name: Upload the Playwright report
+        if: ${{ !cancelled() && steps.playwright.outcome != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: demo-smoke-playwright
+          path: |
+            ontrack-web-tests/reports/demo
+            ontrack-web-tests/test-results
+          retention-days: 7
+          if-no-files-found: ignore
+
+      # ------------------------------------------------------------------------------------
+      # 4. Report, whatever happened.
+      # ------------------------------------------------------------------------------------
+
+      # `!cancelled()` and not `success()`: a demo that never came up must land a FAILED
+      # DEMO.SMOKE on the build rather than leave the stamp absent, which is indistinguishable
+      # from "not deployed yet" and is how a broken demo times out silently.
+      - name: Validate DEMO.SMOKE
+        if: ${{ !cancelled() && steps.resolve.outputs.build != '' }}
+        env:
+          STARTED: ${{ steps.job_start.outputs.started }}
+          POLL: ${{ steps.poll.outcome }}
+          SEED: ${{ steps.seed.outcome }}
+          ASSERT: ${{ steps.assert.outcome }}
+          PLAYWRIGHT: ${{ steps.playwright.outcome }}
+          BUILD: ${{ steps.resolve.outputs.build }}
+        run: |
+          set -uo pipefail
+          run_time_flag=""
+          if [ -n "${STARTED:-}" ]; then
+            run_time_flag="--run-time $(( $(date +%s) - STARTED ))"
+          fi
+          # A skipped step is a failure here: it means an earlier one stopped the run.
+          if [ "$POLL" = "success" ] && [ "$SEED" = "success" ] \
+            && [ "$ASSERT" = "success" ] && [ "$PLAYWRIGHT" = "success" ]; then
+            status=PASSED
+          else
+            status=FAILED
+          fi
+          {
+            echo "### Demo smoke \`$DEMO_VERSION\` - \`$status\`"
+            echo
+            echo "| Step | Outcome |"
+            echo "|---|---|"
+            echo "| Version \`$DEMO_VERSION\` answering | ${POLL:-skipped} |"
+            echo "| Reset and seed | ${SEED:-skipped} |"
+            echo "| Seeded dataset over GraphQL | ${ASSERT:-skipped} |"
+            echo "| UI signs in and renders | ${PLAYWRIGHT:-skipped} |"
+          } >> "$GITHUB_STEP_SUMMARY"
+          # shellcheck disable=SC2086  # deliberate: run info is a set of flags, not one word
+          yontrack validate \
+            --project "$DEMO_PROJECT" --branch "$DEMO_BRANCH" --build "$BUILD" \
+            --validation DEMO.SMOKE --status "$status" \
+            $run_time_flag \
+            --source-type github-workflow \
+            --source-uri "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" \
+            --trigger-type "${GITHUB_EVENT_NAME}" \
+            --trigger-data "$DEMO_VERSION"
