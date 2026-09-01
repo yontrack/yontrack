@@ -87,7 +87,7 @@ configuration:
             description: Public demo, running the last BRONZE build on main
             order: 50
             tags:
-              - demo
+              - release
           - name: self.dev.yontrack.com
             order: 100
             tags:
