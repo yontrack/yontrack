@@ -766,9 +766,12 @@ jobs:
     timeout-minutes: 30
     strategy:
       fail-fast: false
-      # Two shards takes this job from ~10 minutes to ~6.5, which is where the parallel band's own
-      # floor already is - the slowest `integration` leg. A third shard would gain under a minute
-      # and hand the constraint to a job this does not touch. See #1679.
+      # Two shards takes this job from ~10 minutes to 7.1 and 7.6, measured. Most of a shard is not
+      # test execution: the suite runs in 366s and the rest - Gradle configuration, compiling the
+      # test source set, the image pull, `compose up` - is ~260s that every shard pays again. A
+      # third shard would reach ~6.3, but the band would then be set by the slowest `integration`
+      # leg at 6.7, so it buys ~0.9 minutes of critical path for a whole runner. See #1679 and
+      # docs/adr/0005-test-suites-are-sharded-by-rule-not-by-list.md.
       #
       # Which class runs where is decided inside the test JVM by ShardingFilter, from the classes
       # the launcher discovered: nothing here lists them, so a new ACC class is always picked up.
@@ -1002,8 +1005,9 @@ jobs:
       # stack runs in; `shard` is a partition of one suite across runners, as in `integration`.
       # Only `main` is sharded: ldap and oidc run `--grep '@auth'` and take three minutes.
       #
-      # Two shards takes `main` from ~10 minutes to ~6.5, which is where the parallel band's own
-      # floor already is - the slowest `integration` leg. See #1679.
+      # Two shards takes `main` from ~10 minutes to 6.1 and 6.6, measured, which is about where the
+      # parallel band's own floor is - the slowest `integration` leg was 6.7 in the same run. See
+      # #1679 and docs/adr/0005-test-suites-are-sharded-by-rule-not-by-list.md.
       matrix:
         include:
           - variant: main

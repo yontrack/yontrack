@@ -67,13 +67,25 @@ deciding the verdict: the matrix result is what says a leg died, because a shard
 killed by `timeout-minutes` counts as cancelled, uploads nothing, and leaves a
 partial set of artefacts that are all green.
 
-Two shards, not more, and the number is not a target to keep raising. Roughly a
-third of each job is fixed overhead — image pull and `compose up` — that every
-shard pays again, and the parallel band costs the slowest job in it, which is an
-`integration` leg at about six minutes. Two shards bring both suites to about six
-and a half. A third would reach five and three quarters and buy under a minute of
-critical path, because the constraint would have moved to a job the split does
-not touch.
+Two shards, not more, and the number is not a target to keep raising. The figures
+below are measured from the first sharded run rather than projected, because the
+projection that justified two shards was wrong in an instructive way.
+
+What a shard duplicates is not only the image pull and `compose up`. It is also
+Gradle's configuration and the compilation of the test source set, and together
+those come to about 260 seconds on the KDSL job — well over half of it. The
+suite's own execution is 366 seconds, so two shards run about 6 minutes each in
+tests plus overhead and land at 7.1 and 7.6 minutes; the UI shards, which have far
+less to compile, come in at 6.1 and 6.6. The parallel band costs the slowest job in
+it, and the slowest `integration` leg was 6.7 minutes in the same run.
+
+So a third KDSL shard would take its execution to roughly 122 seconds, and the job
+to about 6.3 minutes — but the band would then be set by `integration` at 6.7, and
+the critical path would improve by about 0.9 minutes for one more runner and one
+more Compose stack. That is the reason to stop at two, and it is a weaker reason
+than the original estimate of "under a minute against a 6.0 minute floor" made it
+look: the gain is real, it is simply bought at a poor rate, and it evaporates
+entirely unless `integration` is resharded in the same breath.
 
 The `ui-tests` matrix now carries two independent fields. `variant` is the
 authentication mode the stack runs in; `shard` is a partition of one suite across
@@ -81,6 +93,11 @@ runners. Only `main` is sharded, so ldap and oidc sit at shard 1 of 1, and every
 artefact is named for both — two legs of one variant would otherwise upload under
 the same name.
 
-Balance is unverified for KDSL and will stay that way until the artefacts have
-accumulated: there were no per-class durations anywhere when this was written,
-because the suite's JUnit results were consumed inline and never published.
+The KDSL balance was unverifiable when the split was chosen — the suite's JUnit
+results were consumed inline and never published, so no per-class durations existed
+anywhere — and the artefacts the reporting job now needs are also what made it
+measurable. The first sharded run puts the two shards at 171 and 195 seconds
+against a best-possible 183 and 183: a 7% imbalance, and within 12 seconds of
+optimal on the slow side. Dealing sorted names out round-robin did what it was
+chosen to do, visibly so on the three ~60 second GitHub ingestion classes, which
+are adjacent once sorted and alternated rather than clumping.
