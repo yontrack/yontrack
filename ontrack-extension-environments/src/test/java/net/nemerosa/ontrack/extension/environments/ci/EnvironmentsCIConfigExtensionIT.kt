@@ -53,7 +53,14 @@ class EnvironmentsCIConfigExtensionIT : AbstractQLKTITSupport() {
                               - yontrack
                               - release
                         slots:
-                          - project: ${deployedProject.name}
+                          # Quoted, and it matters: `project()` names projects with digits only
+                          # (`uid` is mmssSSS + a counter), so an unquoted name starting with 0
+                          # and made only of octal digits is read as an octal number by
+                          # SnakeYAML - 0557637467 arrives as "96419639". The project then does
+                          # not resolve, defineSlots skips the slot without failing, and this
+                          # test sees zero slots. Roughly 3% of runs, whenever the minute is
+                          # 00-09 and every other digit happens to be 0-7.
+                          - project: "${deployedProject.name}"
                             environments:
                               - name: $environmentName
                                 admissionRules:
@@ -127,7 +134,7 @@ class EnvironmentsCIConfigExtensionIT : AbstractQLKTITSupport() {
                           - name: $environmentName
                             order: 200
                         slots:
-                          - project: ${deployedProject.name}
+                          - project: "${deployedProject.name}"
                             environments:
                               - name: $unknownEnvironmentName
             """.trimIndent(),
