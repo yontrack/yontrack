@@ -107,6 +107,35 @@ configuration:
                     ruleId: "promotion"
                     ruleConfig:
                       promotion: "BRONZE"
+                workflows:
+                  - trigger: "RUNNING"
+                    name: "Deploying"
+                    nodes:
+                      - id: "auto-versioning"
+                        description: "Updating version"
+                        executorId: "auto-versioning"
+                        data:
+                          targetProject: "yontrack-infra-gitops"
+                          targetBranch: "main"
+                          targetPath: "yontrack-helmfile.d/values/yontrack-demo/yontrack.yaml"
+                          targetPropertyType: "yaml-path"
+                          targetProperty: "image.tag"
+                          # The rc build name IS the GHCR tag, so ${build} is correct here.
+                          # The self slot needs ${build.release} instead - see #1660.
+                          targetVersion: "${build}"
+                          autoApproval: true
+                          prTitleTemplate: "Deploying ${sourceProject} version ${VERSION} to the demo"
+                          prBodyTemplateFormat: "markdown"
+                          prBodyTemplate: |
+                            Deployment of ${sourceProject} version ${VERSION} to the demo environment.
+
+                            ${av.semanticChangelog?issues=true&emojis=true}
+                      - id: "deploy"
+                        description: "Marking the deployment as finished"
+                        executorId: "slot-pipeline-deployed"
+                        data: {}
+                        parents:
+                          - id: "auto-versioning"
               - name: self.dev.yontrack.com
                 admissionRules:
                   - name: "branchPattern"
