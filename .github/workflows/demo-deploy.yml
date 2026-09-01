@@ -30,7 +30,7 @@ permissions:
   contents: read
 
 env:
-  YONTRACK_CLI_VERSION: '5.1.1'
+  YONTRACK_CLI_VERSION: '5.2.0'
 
 jobs:
   deploy:

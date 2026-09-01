@@ -85,22 +85,37 @@ emit() {
 }
 
 if [ "${1:-}" = "build" ] && [ "${2:-}" = "search" ]; then
-    if [ -f "$DD_STUB_DIR/latest_fails" ]; then
-        echo "no build found" >&2
-        exit 1
-    fi
-    emit latest.json
+    case "$*" in
+        *--with-display-name*)
+            if [ -f "$DD_STUB_DIR/resolve_empty" ]; then exit 0; fi
+            emit resolve.json
+            ;;
+        *)
+            if [ -f "$DD_STUB_DIR/latest_fails" ]; then
+                echo "no build found" >&2
+                exit 1
+            fi
+            emit latest.json
+            ;;
+    esac
     exit 0
 fi
 
-if [ "${1:-}" = "graphql" ]; then
-    query="$*"
-    case "$query" in
-        *ResolveBuild*)      emit resolve.json ;;
-        *DemoSlot*)          emit slot.json ;;
-        *StartDemoPipeline*) emit start.json ;;
-        *)                   echo "unexpected query: $query" >&2; exit 1 ;;
-    esac
+if [ "${1:-}" = "slot" ] && [ "${2:-}" = "get" ]; then
+    if [ -f "$DD_STUB_DIR/slot_fails" ]; then
+        echo "no slot for project" >&2
+        exit 1
+    fi
+    emit slot.json
+    exit 0
+fi
+
+if [ "${1:-}" = "slot" ] && [ "${2:-}" = "pipeline" ] && [ "${3:-}" = "start" ]; then
+    if [ -f "$DD_STUB_DIR/start_fails" ]; then
+        echo "1) Build is not eligible" >&2
+        exit 1
+    fi
+    emit start.json
     exit 0
 fi
 
@@ -126,28 +141,21 @@ JSON
 
     cat > "$DD_STUB_DIR/slot.json" <<'JSON'
 {
-  "environmentByName": {
-    "slots": [
-      {
-        "id": "slot-demo-yontrack",
-        "lastDeployedPipeline": {
-          "build": {"id": "90", "displayName": "5.3.0-rc-90"}
-        }
-      }
-    ]
+  "id": "slot-demo-yontrack",
+  "lastDeployedPipeline": {
+    "id": "pipeline-0",
+    "number": 6,
+    "build": {"id": "90", "name": "20260801010101-90", "displayName": "5.3.0-rc-90"}
   }
 }
 JSON
 
     cat > "$DD_STUB_DIR/start.json" <<'JSON'
-{"startSlotPipeline": {"pipeline": {"id": "pipeline-1", "number": 7}, "errors": null}}
+{"id": "pipeline-1", "number": 7, "build": null}
 JSON
 
     cat > "$DD_STUB_DIR/resolve.json" <<'JSON'
-{
-  "byDisplayName": [{"id": "77", "name": "20260801010101-77", "displayName": "5.3.0-rc-77"}],
-  "byName": []
-}
+{"Id":"77","Name":"20260801010101-77","DisplayName":"5.3.0-rc-77"}
 JSON
 }
 
@@ -167,28 +175,33 @@ assert_eq "deploy" "$r" "dd_should_deploy: an unchanged build is still deployed 
 dd_should_deploy 100 "" false && r=deploy || r=skip
 assert_eq "deploy" "$r" "dd_should_deploy: a slot that has never deployed anything deploys"
 
-# --- dd_numeric ------------------------------------------------------------
+# --- dd_exact_pattern ------------------------------------------------------
 
-dd_numeric 123 && r=ok || r=no
-assert_eq "ok" "$r" "dd_numeric accepts a plain integer"
+# `--with-display-name` is matched case-insensitively and *partially* by the
+# server, so a bare version would match more builds than the one asked for.
 
-dd_numeric "12x" && r=ok || r=no
-assert_eq "no" "$r" "dd_numeric rejects a non-integer"
+assert_eq '^5\.3\.0-rc-45$' "$(dd_exact_pattern 5.3.0-rc-45)" \
+    "dd_exact_pattern anchors the pattern and escapes the dots"
 
-dd_numeric "" && r=ok || r=no
-assert_eq "no" "$r" "dd_numeric rejects an empty string"
+assert_eq '^20260801010101-55$' "$(dd_exact_pattern 20260801010101-55)" \
+    "dd_exact_pattern leaves a plain build name alone apart from the anchors"
 
-dd_numeric '1 OR 1=1' && r=ok || r=no
-assert_eq "no" "$r" "dd_numeric rejects anything that could be injected into the query"
+# The dots are the ones that matter in practice: unescaped, 5.3.0-rc-4 would
+# match 5x3x0-rc-4, and unanchored it would match 5.3.0-rc-45.
+assert_contains "$(dd_exact_pattern 5.3.0-rc-4)" '5\.3\.0-rc-4' \
+    "dd_exact_pattern escapes every dot"
+
+assert_eq '^a\*b\+c\[d\]$' "$(dd_exact_pattern 'a*b+c[d]')" \
+    "dd_exact_pattern escapes the other regex metacharacters too"
 
 # --- acceptance: the nightly deploys the latest promoted build -------------
 
 setup_stub
 out="$(dd_main 2>&1)"; rc=$?
 assert_eq "0" "$rc" "nightly: succeeds"
-assert_contains "$(calls)" "StartDemoPipeline" "nightly: starts a pipeline"
-assert_contains "$(calls)" "buildId: 100" "nightly: starts it for the latest promoted build"
-assert_contains "$(calls)" "slotId=slot-demo-yontrack" "nightly: targets the demo slot"
+assert_contains "$(calls)" "slot pipeline start" "nightly: starts a pipeline"
+assert_contains "$(calls)" "--build 20260901055547-100" "nightly: starts it for the latest promoted build"
+assert_contains "$(calls)" "--environment demo.dev.yontrack.com" "nightly: targets the demo environment"
 assert_contains "$(calls)" "--with-promotion BRONZE" "nightly: resolves against the BRONZE promotion"
 assert_contains "$out" "5.3.0-rc-100" "nightly: reports the build it deployed"
 
@@ -211,35 +224,26 @@ assert_contains "$(cat "$GITHUB_OUTPUT")" "deployed=true" "outputs: flags that i
 assert_contains "$(cat "$GITHUB_OUTPUT")" "build=5.3.0-rc-100" "outputs: names the build"
 unset GITHUB_OUTPUT
 
-# A payload carrying neither a pipeline nor an error means nothing was started,
-# whatever the HTTP status said.
-setup_stub
-cat > "$DD_STUB_DIR/start.json" <<'JSON'
-{"startSlotPipeline": {"pipeline": null, "errors": []}}
-JSON
-out="$(dd_main 2>&1)"; rc=$?
-assert_eq "1" "$rc" "no pipeline in the payload: fails rather than reporting success"
+# A payload carrying neither a pipeline nor an error used to be checked here.
+# `slot pipeline start` now rejects it itself, and is tested for it in the CLI,
+# so asserting it again from a stub would only be testing the stub.
 
 # --- acceptance: a second nightly with no new build exits early ------------
 
 setup_stub
 cat > "$DD_STUB_DIR/slot.json" <<'JSON'
 {
-  "environmentByName": {
-    "slots": [
-      {
-        "id": "slot-demo-yontrack",
-        "lastDeployedPipeline": {
-          "build": {"id": "100", "displayName": "5.3.0-rc-100"}
-        }
-      }
-    ]
+  "id": "slot-demo-yontrack",
+  "lastDeployedPipeline": {
+    "id": "pipeline-0",
+    "number": 6,
+    "build": {"id": "100", "name": "20260901055547-100", "displayName": "5.3.0-rc-100"}
   }
 }
 JSON
 out="$(dd_main 2>&1)"; rc=$?
 assert_eq "0" "$rc" "unchanged nightly: succeeds"
-assert_not_contains "$(calls)" "StartDemoPipeline" "unchanged nightly: starts no pipeline"
+assert_not_contains "$(calls)" "slot pipeline start" "unchanged nightly: starts no pipeline"
 assert_contains "$out" "already" "unchanged nightly: says why it stopped"
 
 # --- acceptance: a manual dispatch deploys even when unchanged -------------
@@ -247,53 +251,45 @@ assert_contains "$out" "already" "unchanged nightly: says why it stopped"
 setup_stub
 cat > "$DD_STUB_DIR/slot.json" <<'JSON'
 {
-  "environmentByName": {
-    "slots": [
-      {
-        "id": "slot-demo-yontrack",
-        "lastDeployedPipeline": {
-          "build": {"id": "100", "displayName": "5.3.0-rc-100"}
-        }
-      }
-    ]
+  "id": "slot-demo-yontrack",
+  "lastDeployedPipeline": {
+    "id": "pipeline-0",
+    "number": 6,
+    "build": {"id": "100", "name": "20260901055547-100", "displayName": "5.3.0-rc-100"}
   }
 }
 JSON
 out="$(DEMO_MANUAL=true dd_main 2>&1)"; rc=$?
 assert_eq "0" "$rc" "manual redeploy: succeeds"
-assert_contains "$(calls)" "buildId: 100" "manual redeploy: redeploys the same build"
+assert_contains "$(calls)" "--build 20260901055547-100" "manual redeploy: redeploys the same build"
 
 # --- acceptance: a manual dispatch with an explicit display name -----------
 
 setup_stub
 out="$(DEMO_MANUAL=true DEMO_BUILD=5.3.0-rc-77 dd_main 2>&1)"; rc=$?
 assert_eq "0" "$rc" "explicit build: succeeds"
-assert_contains "$(calls)" "ResolveBuild" "explicit build: resolves the display name"
-assert_contains "$(calls)" "buildId: 77" "explicit build: deploys the named build"
+assert_contains "$(calls)" "--with-display-name" "explicit build: resolves the display name"
+assert_contains "$(calls)" "--build 20260801010101-77" "explicit build: deploys the named build"
 assert_not_contains "$(calls)" "--with-promotion" "explicit build: does not fall back to the latest promoted build"
 
-# An explicit name is matched on the build name too, the way Yontrack's own
-# display-name lookup falls back.
+# A build with no release property has its own name as its display name, so the
+# same lookup finds it - the server matches `withDisplayName` against the
+# release property falling back to the build name.
 setup_stub
 cat > "$DD_STUB_DIR/resolve.json" <<'JSON'
-{
-  "byDisplayName": [],
-  "byName": [{"id": "55", "name": "20260801010101-55", "displayName": "20260801010101-55"}]
-}
+{"Id":"55","Name":"20260801010101-55","DisplayName":"20260801010101-55"}
 JSON
 out="$(DEMO_MANUAL=true DEMO_BUILD=20260801010101-55 dd_main 2>&1)"; rc=$?
 assert_eq "0" "$rc" "explicit build by name: succeeds"
-assert_contains "$(calls)" "buildId: 55" "explicit build by name: falls back to the build name"
+assert_contains "$(calls)" "--build 20260801010101-55" "explicit build by name: falls back to the build name"
 
 # --- failure modes ---------------------------------------------------------
 
 setup_stub
-cat > "$DD_STUB_DIR/resolve.json" <<'JSON'
-{"byDisplayName": [], "byName": []}
-JSON
+touch "$DD_STUB_DIR/resolve_empty"
 out="$(DEMO_MANUAL=true DEMO_BUILD=nope dd_main 2>&1)"; rc=$?
 assert_eq "1" "$rc" "unknown build: fails"
-assert_not_contains "$(calls)" "StartDemoPipeline" "unknown build: starts no pipeline"
+assert_not_contains "$(calls)" "slot pipeline start" "unknown build: starts no pipeline"
 
 setup_stub
 rm -f "$DD_STUB_DIR/latest.json"
@@ -301,29 +297,29 @@ touch "$DD_STUB_DIR/latest_fails"
 out="$(dd_main 2>&1)"; rc=$?
 assert_eq "1" "$rc" "no promoted build: fails rather than deploying nothing"
 
+# A refused deployment is the CLI's failure to report now: `slot pipeline start`
+# checks the payload errors itself and exits non-zero.
 setup_stub
-cat > "$DD_STUB_DIR/start.json" <<'JSON'
-{"startSlotPipeline": {"pipeline": null, "errors": [{"message": "Build is not eligible"}]}}
-JSON
+touch "$DD_STUB_DIR/start_fails"
 out="$(dd_main 2>&1)"; rc=$?
-assert_eq "1" "$rc" "payload errors: fails the job"
-assert_contains "$out" "Build is not eligible" "payload errors: surfaces the message"
+assert_eq "1" "$rc" "refused deployment: fails the job"
+assert_contains "$out" "Build is not eligible" "refused deployment: surfaces the message"
 
+# Likewise a missing slot: `slot get` fails rather than returning an empty list
+# for the caller to notice.
 setup_stub
-cat > "$DD_STUB_DIR/slot.json" <<'JSON'
-{"environmentByName": {"slots": []}}
-JSON
+touch "$DD_STUB_DIR/slot_fails"
 out="$(dd_main 2>&1)"; rc=$?
 assert_eq "1" "$rc" "no slot: fails"
-assert_not_contains "$(calls)" "StartDemoPipeline" "no slot: starts no pipeline"
+assert_not_contains "$(calls)" "slot pipeline start" "no slot: starts no pipeline"
 
 setup_stub
 cat > "$DD_STUB_DIR/latest.json" <<'JSON'
-{"Id":"not-a-number","Name":"weird","DisplayName":"weird"}
+{"unexpected": "shape"}
 JSON
 out="$(dd_main 2>&1)"; rc=$?
-assert_eq "1" "$rc" "non-numeric build id: fails before building a query"
-assert_not_contains "$(calls)" "StartDemoPipeline" "non-numeric build id: starts no pipeline"
+assert_eq "1" "$rc" "unreadable build: fails rather than deploying something unnamed"
+assert_not_contains "$(calls)" "slot pipeline start" "unreadable build: starts no pipeline"
 
 # --- report ----------------------------------------------------------------
 
