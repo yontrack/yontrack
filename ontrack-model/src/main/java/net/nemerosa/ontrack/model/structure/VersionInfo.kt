@@ -15,7 +15,7 @@ data class VersionInfo(
      */
     val full: String,
     /**
-     * Base version string, without the build number
+     * Git branch the build was produced from
      */
     val branch: String,
     /**

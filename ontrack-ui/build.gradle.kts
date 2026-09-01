@@ -81,10 +81,31 @@ dependencies {
     runtimeOnly(project(":ontrack-extension-config"))
 }
 
+// `project.version` only ever holds the base version (5.3.0). The release-candidate suffix is
+// computed by the CI shell *after* Gradle has run - see the "Compute the version" step in
+// .github/workflows/ci.yml - so without this the running application reports 5.3.0 and has no
+// way of knowing which build it actually is. The `build` job already exports VERSION, and
+// bootBuildInfo runs inside its `dockerBuild jibDockerBuild` step, so the value is in scope.
+//
+// Everything falls back for a local build, where none of these variables exists: the version
+// keeps its `-dev` suffix and the git fields stay "n/a", as they were before.
+val fullVersion = providers.environmentVariable("VERSION").orElse(provider { project.version.toString() })
+val gitBranch = providers.environmentVariable("GITHUB_REF_NAME").orElse("n/a")
+val buildNumber = providers.environmentVariable("GITHUB_RUN_NUMBER").orElse("n/a")
+val gitCommit = providers.environmentVariable("GITHUB_SHA").orElse("n/a")
+
 configure<SpringBootExtension> {
     buildInfo {
         properties {
             time = null
+            // Read back as VersionInfo.display by EnvServiceImpl.
+            version = fullVersion
+            // EnvServiceImpl reads these four by name; leaving them unset is what made
+            // VersionInfo.full/branch/build/commit report "n/a" on every deployed instance.
+            additional.put("full", fullVersion)
+            additional.put("branch", gitBranch)
+            additional.put("build", buildNumber)
+            additional.put("commit", gitCommit)
         }
     }
 }
