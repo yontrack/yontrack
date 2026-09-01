@@ -192,6 +192,34 @@ assert_contains "$(calls)" "slotId=slot-demo-yontrack" "nightly: targets the dem
 assert_contains "$(calls)" "--with-promotion BRONZE" "nightly: resolves against the BRONZE promotion"
 assert_contains "$out" "5.3.0-rc-100" "nightly: reports the build it deployed"
 
+# The pipeline it started has to be named in the log: it is the only handle on
+# what happens next, and a deployment that stalls downstream is otherwise
+# invisible from the workflow run.
+assert_contains "$out" "pipeline-1" "nightly: logs the pipeline id"
+assert_contains "$out" "#7" "nightly: logs the pipeline number"
+
+# --- the pipeline is exposed as a step output ------------------------------
+
+setup_stub
+GITHUB_OUTPUT="$DD_STUB_DIR/github_output"
+export GITHUB_OUTPUT
+: > "$GITHUB_OUTPUT"
+out="$(dd_main 2>&1)"; rc=$?
+assert_eq "0" "$rc" "outputs: succeeds"
+assert_contains "$(cat "$GITHUB_OUTPUT")" "pipeline=pipeline-1" "outputs: exposes the pipeline id"
+assert_contains "$(cat "$GITHUB_OUTPUT")" "deployed=true" "outputs: flags that it deployed"
+assert_contains "$(cat "$GITHUB_OUTPUT")" "build=5.3.0-rc-100" "outputs: names the build"
+unset GITHUB_OUTPUT
+
+# A payload carrying neither a pipeline nor an error means nothing was started,
+# whatever the HTTP status said.
+setup_stub
+cat > "$DD_STUB_DIR/start.json" <<'JSON'
+{"startSlotPipeline": {"pipeline": null, "errors": []}}
+JSON
+out="$(dd_main 2>&1)"; rc=$?
+assert_eq "1" "$rc" "no pipeline in the payload: fails rather than reporting success"
+
 # --- acceptance: a second nightly with no new build exits early ------------
 
 setup_stub

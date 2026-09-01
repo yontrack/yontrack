@@ -172,15 +172,27 @@ dd_main() {
     fi
 
     dd_log "Starting a deployment of $build_name on $slot_id"
-    local start_json errors
+    local start_json errors pipeline_id pipeline_number
     start_json="$(dd_start_pipeline "$slot_id" "$build_id")" || return 1
     errors="$(echo "$start_json" | jq -r '(.startSlotPipeline.errors // []) | map(.message) | join("; ")')"
     [ -n "$errors" ] && { dd_fail "Could not start the deployment: $errors"; return 1; }
 
-    dd_log "Deployment of $build_name started."
+    # Starting the pipeline is only the beginning: the slot's own workflow then
+    # has to auto-version the gitops repository and mark the deployment done.
+    # Naming the pipeline here is the only handle this run leaves on that, so a
+    # deployment that stalls later can still be traced back.
+    pipeline_id="$(echo "$start_json" | jq -r '.startSlotPipeline.pipeline.id // empty')"
+    pipeline_number="$(echo "$start_json" | jq -r '.startSlotPipeline.pipeline.number // empty')"
+    [ -z "$pipeline_id" ] && {
+        dd_fail "No pipeline was started, and no error was reported either"
+        return 1
+    }
+
+    dd_log "Deployment of $build_name started: pipeline #$pipeline_number ($pipeline_id)"
     dd_output deployed true
     dd_output build "$build_name"
-    dd_summary "Deploying \`$build_name\` to the demo."
+    dd_output pipeline "$pipeline_id"
+    dd_summary "Deploying \`$build_name\` to the demo - pipeline #$pipeline_number."
     return 0
 }
 
