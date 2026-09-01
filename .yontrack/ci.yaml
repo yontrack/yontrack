@@ -83,6 +83,11 @@ configuration:
     project:
       environments:
         environments:
+          - name: demo.dev.yontrack.com
+            description: Public demo, running the last BRONZE build on main
+            order: 50
+            tags:
+              - demo
           - name: self.dev.yontrack.com
             order: 100
             tags:
@@ -90,6 +95,18 @@ configuration:
         slots:
           - project: yontrack
             environments:
+              - name: demo.dev.yontrack.com
+                admissionRules:
+                  - name: "branchPattern"
+                    ruleId: "branchPattern"
+                    ruleConfig:
+                      includes:
+                        - "main"
+                      lastBranchOnly: true
+                  - name: "promotion"
+                    ruleId: "promotion"
+                    ruleConfig:
+                      promotion: "BRONZE"
               - name: self.dev.yontrack.com
                 admissionRules:
                   - name: "branchPattern"
