@@ -120,9 +120,11 @@ configuration:
                           targetPath: "yontrack-helmfile.d/values/yontrack-demo/yontrack.yaml"
                           targetPropertyType: "yaml-path"
                           targetProperty: "image.tag"
-                          # The rc build name IS the GHCR tag, so ${build} is correct here.
-                          # The self slot needs ${build.release} instead - see #1660.
-                          targetVersion: "${build}"
+                          # The build NAME is a timestamp-run pair (20260901055547-36), never
+                          # a tag. The `release` property, which ci.yml sets on every build, is
+                          # the version - 5.3.0-rc-36 on main - and that IS the durable GHCR tag
+                          # pushed by #1661. Same reasoning as the self slot, see #1660.
+                          targetVersion: "${build.release}"
                           autoApproval: true
                           prTitleTemplate: "Deploying ${sourceProject} version ${VERSION} to the demo"
                           prBodyTemplateFormat: "markdown"
