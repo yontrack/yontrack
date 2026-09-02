@@ -107,6 +107,48 @@ test('a stage card selects its latest build', async ({page, ontrack}) => {
     await pipelinePage.checkInspectorPromotion(bronze)
 })
 
+test('a stage card loads up to its latest build when it is below the loaded page', async ({page, ontrack}) => {
+    const project = await ontrack.createProject()
+    const branch = await project.createBranch()
+    const bronze = await branch.createPromotionLevel("BRONZE")
+    const gold = await branch.createPromotionLevel("GOLD")
+
+    // Only the oldest build reached GOLD, and the page size is 10, so its card is not loaded
+    const oldest = await branch.createBuild()
+    await oldest.promote(gold)
+    for (let i = 0; i < 12; i++) {
+        const build = await branch.createBuild()
+        await build.promote(bronze)
+    }
+
+    await login(page, ontrack)
+    const pipelinePage = new BranchPipelinePage(page, branch)
+    await pipelinePage.goTo()
+
+    // Picking it loads further pages up to it rather than doing nothing - and, crucially, the
+    // selection is not corrected back to the most recent build while those pages are in flight
+    await pipelinePage.selectStageBuild(gold)
+    await pipelinePage.checkBuildSelected(oldest)
+    await pipelinePage.checkInspectorPromotion(gold)
+})
+
+test('a branch with no builds shows neither a pipeline band nor an inspector', async ({page, ontrack}) => {
+    const project = await ontrack.createProject()
+    const branch = await project.createBranch()
+    // Levels configured, but nothing has ever been built
+    await branch.createPromotionLevel("BRONZE")
+
+    await login(page, ontrack)
+    const pipelinePage = new BranchPipelinePage(page, branch)
+    await pipelinePage.goTo()
+
+    // A full band of "never reached" stages above an empty timeline states the obvious loudly; the
+    // empty state below says the one thing worth saying
+    await pipelinePage.checkNoPipelineBand()
+    await pipelinePage.checkNoBuilds()
+    await pipelinePage.checkNoInspector()
+})
+
 test('a branch with no promotion levels shows no pipeline band', async ({page, ontrack}) => {
     const project = await ontrack.createProject()
     const branch = await project.createBranch()

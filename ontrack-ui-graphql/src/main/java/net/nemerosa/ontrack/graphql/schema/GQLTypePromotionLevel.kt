@@ -74,15 +74,7 @@ class GQLTypePromotionLevel(
                 it.name("promotedBuildCount")
                     .description("Number of distinct builds which have been promoted to this level")
                     .type(GraphQLNonNull(Scalars.GraphQLInt))
-                    .dataFetcher { env ->
-                        val pl: PromotionLevel = env.getSource()!!
-                        // Distinct BUILDS, not promotion runs: the same build can be promoted again
-                        // to the same level (a repair action offered by the UI), and counting the
-                        // runs would tell the user a branch reached a level more often than it did.
-                        structureService.getPromotionRunsForPromotionLevel(pl.id)
-                            .mapTo(mutableSetOf()) { run -> run.build.id() }
-                            .size
-                    }
+                    .dataFetcher(promotionLevelPromotedBuildCountFetcher())
             }
             // Paginated promotion runs
             .field(
@@ -151,6 +143,23 @@ class GQLTypePromotionLevel(
             }
             // OK
             .build()
+
+    /**
+     * Counts the distinct BUILDS which reached a promotion level, not its promotion runs: the same
+     * build can be promoted again to the same level - a repair action the UI offers - and counting
+     * the runs would tell the user a branch reached a level more often than it did.
+     *
+     * Like the paginated runs field beside it, this resolves from the full list of runs in memory.
+     * Pushing the count down to the repository would be the better answer on a level with many
+     * thousands of runs, and is the change to make if this ever shows up in a profile.
+     */
+    private fun promotionLevelPromotedBuildCountFetcher(): DataFetcher<Int> =
+        DataFetcher { environment: DataFetchingEnvironment ->
+            val promotionLevel: PromotionLevel = environment.getSource()!!
+            structureService.getPromotionRunsForPromotionLevel(promotionLevel.id)
+                .mapTo(mutableSetOf()) { run -> run.build.id() }
+                .size
+        }
 
     private fun promotionLevelPromotionRunsFetcher(): DataFetcher<List<PromotionRun>> =
             DataFetcher { environment: DataFetchingEnvironment ->

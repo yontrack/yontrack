@@ -6,7 +6,9 @@ import PipelineStageCard from "@components/branches/views/pipeline/PipelineStage
  *
  * Scrolls horizontally rather than wrapping or shrinking. A twelve-level pipeline is a long thing
  * and it reads as one; cards which got narrower as levels were added would make the same branch look
- * different on Tuesday because someone added a level on Monday.
+ * different on Tuesday because someone added a level on Monday. The scrollbar is made VISIBLE
+ * through `ot-scroll-x` rather than left to the platform's overlay one, which macOS hides until
+ * something scrolls - a twelve-stage pipeline would otherwise look like a three-stage one, cropped.
  *
  * A branch with NO promotion levels renders nothing at all - not an empty state. There is no
  * pipeline to be empty of: the branch simply does not work that way, and a panel inviting the user
@@ -25,11 +27,11 @@ export default function PipelineStages({promotionLevels, onSelectBuild}) {
     return (
         <div
             data-testid="pipeline-stages"
+            className="ot-scroll-x"
             style={{
                 display: 'flex',
                 gap: token.marginSM,
-                overflowX: 'auto',
-                // Room for the scrollbar to appear without the cards jumping when it does
+                // Room for the scrollbar without the cards jumping when it appears
                 paddingBottom: token.paddingXS,
             }}
         >

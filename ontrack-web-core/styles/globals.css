@@ -202,6 +202,39 @@ body {
 }
 
 /**
+ * A strip which scrolls sideways, with the scrollbar VISIBLE rather than overlaid.
+ *
+ * `overflow-x: auto` on its own is not an affordance on macOS, where the platform hides
+ * overlay scrollbars until something scrolls: a twelve-stage pipeline would look like a
+ * three-stage one that had been cropped. Styling `::-webkit-scrollbar` opts the element out
+ * of overlay scrollbars entirely, so the track is always there to be seen and dragged.
+ *
+ * Colours come from the theme's own variables, not from a hard-coded grey, so the bar does
+ * not glow white on the dark theme.
+ */
+.ot-scroll-x {
+    overflow-x: auto;
+    scrollbar-width: thin;
+}
+
+.ot-scroll-x::-webkit-scrollbar {
+    height: 8px;
+}
+
+.ot-scroll-x::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.ot-scroll-x::-webkit-scrollbar-thumb {
+    background-color: var(--ot-border);
+    border-radius: 4px;
+}
+
+.ot-scroll-x::-webkit-scrollbar-thumb:hover {
+    background-color: var(--ot-border-subtle);
+}
+
+/**
  * For any component which must span 100% of the horizontal AND vertical space
  */
 .ot-block {

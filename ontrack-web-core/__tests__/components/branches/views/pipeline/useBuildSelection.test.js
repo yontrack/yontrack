@@ -18,8 +18,8 @@ jest.mock("next/router", () => ({
     }),
 }))
 
-function Probe({builds}) {
-    const {selectedBuildId, selectedBuild, selectBuild} = useBuildSelection({builds})
+function Probe({builds, resolving = false}) {
+    const {selectedBuildId, selectedBuild, selectBuild} = useBuildSelection({builds, resolving})
     // Stands in for a timeline card, which captures the callback once and keeps it
     const captured = useRef(selectBuild)
     return (
@@ -37,10 +37,13 @@ const builds = [
     {id: "1", name: "one"},
 ]
 
-const renderProbe = ({query = {}, initialBuilds = builds} = {}) => {
+const renderProbe = ({query = {}, initialBuilds = builds, resolving = false} = {}) => {
     mockRouter.query = {id: "42", ...query}
-    const {rerender} = render(<Probe builds={initialBuilds}/>)
-    return {rerender: (nextBuilds) => rerender(<Probe builds={nextBuilds}/>)}
+    const {rerender} = render(<Probe builds={initialBuilds} resolving={resolving}/>)
+    return {
+        rerender: (nextBuilds, nextResolving = resolving) =>
+            rerender(<Probe builds={nextBuilds} resolving={nextResolving}/>),
+    }
 }
 
 const selected = () => screen.getByTestId('selected').textContent
@@ -138,6 +141,42 @@ describe('useBuildSelection', () => {
                 {
                     pathname: "/branch/[id]",
                     query: {id: "42", build: "9"},
+                },
+                undefined,
+                {shallow: true},
+            )
+        })
+
+    })
+
+    describe('while the view is loading up to a requested build', () => {
+
+        it('holds the request instead of falling back', () => {
+            // A `?build=` naming an older build, or a stage card naming the latest build at its
+            // level: the build is not in the page YET, which is a different thing from having
+            // dropped out of it
+            renderProbe({query: {build: "99"}, resolving: true})
+            expect(selected()).toBe("3")
+            // ... and above all does not erase the request the pages are being loaded for
+            expect(mockRouter.replace).not.toHaveBeenCalled()
+        })
+
+        it('selects the build once it arrives', () => {
+            const {rerender} = renderProbe({query: {build: "1"}, resolving: true})
+            rerender([...builds, {id: "1", name: "one"}], false)
+            expect(selected()).toBe("1")
+            expect(mockRouter.replace).not.toHaveBeenCalled()
+        })
+
+        it('corrects the URL once the loading gives up on a build which is not there', () => {
+            // No further page to load: the build was deleted, or the filter excludes it
+            const {rerender} = renderProbe({query: {build: "99"}, resolving: true})
+            rerender(builds, false)
+            expect(selected()).toBe("3")
+            expect(mockRouter.replace).toHaveBeenCalledWith(
+                {
+                    pathname: "/branch/[id]",
+                    query: {id: "42", build: "3"},
                 },
                 undefined,
                 {shallow: true},

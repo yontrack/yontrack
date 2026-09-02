@@ -45,3 +45,6 @@ ontrack-extension-*/node_modules
 
 # Local development stack state (scripts/dev-stack.sh)
 .yontrack-dev/
+
+# Kotlin compiler daemon session files
+.kotlin/

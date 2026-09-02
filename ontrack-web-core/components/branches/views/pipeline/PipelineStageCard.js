@@ -1,8 +1,5 @@
-import {Popover, Space, theme, Typography} from "antd";
-import Link from "next/link";
-import {PromotionLevelImage} from "@components/promotionLevels/PromotionLevelImage";
-import AnnotatedDescription from "@components/common/AnnotatedDescription";
-import {promotionLevelUri} from "@components/common/Links";
+import {Space, theme, Typography} from "antd";
+import PromotionLevel from "@components/promotionLevels/PromotionLevel";
 import TimestampText from "@components/common/TimestampText";
 import {buildKnownName} from "@components/common/Titles";
 
@@ -16,6 +13,10 @@ import {buildKnownName} from "@components/common/Titles";
  *
  * There is no gold/silver/bronze gradient and no tier: promotion levels in Yontrack carry an
  * ordinal position and nothing else. The uploaded image wins, `GeneratedIcon` is the fallback.
+ *
+ * The medal, its description popover and its link are `PromotionLevel`, the composition every other
+ * host already uses. A promotion has to read identically everywhere, so this card arranges the
+ * shared piece rather than restating it.
  *
  * @param promotionLevel The level this stage stands for
  * @param promotedBuildCount How many distinct builds reached it
@@ -47,23 +48,19 @@ export default function PipelineStageCard({
                 borderRadius: token.borderRadiusLG,
                 border: `1px solid ${token.colorBorderSecondary}`,
                 backgroundColor: token.colorBgContainer,
+                // A long level name clips rather than pushing the fixed-width card out of shape
+                overflow: 'hidden',
                 // Dimmed rather than absent: the stage is part of the pipeline's shape even when no
                 // build has ever reached it.
                 opacity: reached ? 1 : 0.45,
             }}
         >
             <Space direction="vertical" size={token.marginXXS} style={{width: '100%'}}>
-                <Space size={token.marginXS}>
-                    <PromotionLevelImage promotionLevel={promotionLevel} size={26}/>
-                    <Popover
-                        title={promotionLevel.name}
-                        content={<AnnotatedDescription entity={promotionLevel}/>}
-                    >
-                        <Link href={promotionLevelUri(promotionLevel)}>
-                            <Typography.Text strong ellipsis={true}>{promotionLevel.name}</Typography.Text>
-                        </Link>
-                    </Popover>
-                </Space>
+                <PromotionLevel
+                    promotionLevel={promotionLevel}
+                    size={26}
+                    displayText={true}
+                />
                 <Typography.Text type="secondary" style={{fontSize: token.fontSizeSM}}>
                     {promotedBuildCount === 1 ? "1 build" : `${promotedBuildCount} builds`}
                 </Typography.Text>

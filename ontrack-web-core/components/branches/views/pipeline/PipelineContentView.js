@@ -1,4 +1,5 @@
-import {useContext, useEffect, useState} from "react";
+import {useContext, useEffect} from "react";
+import {useRouter} from "next/router";
 import {Space} from "antd";
 import {useQuery} from "@components/services/GraphQL";
 import {useEventForRefresh} from "@components/common/EventsContext";
@@ -6,8 +7,9 @@ import {useRefresh} from "@components/common/RefreshUtils";
 import useRangeSelection from "@components/common/RangeSelection";
 import {ValidationStampFilterContext} from "@components/branches/filters/validationStamps/ValidationStampFilterContext";
 import useBuildFilterSelection from "@components/branches/views/useBuildFilterSelection";
+import useBranchBuildsPage from "@components/branches/views/useBranchBuildsPage";
 import useBuildSelection from "@components/branches/views/pipeline/useBuildSelection";
-import {needsMoreBuilds} from "@components/branches/views/pipeline/buildSelection";
+import {buildSelectionParam, needsMoreBuilds} from "@components/branches/views/pipeline/buildSelection";
 import {gqlPipelineBranchFacts, gqlPipelineBuilds} from "@components/branches/views/pipeline/pipelineQueries";
 import PipelineToolbar from "@components/branches/views/pipeline/PipelineToolbar";
 import PipelineStats from "@components/branches/views/pipeline/PipelineStats";
@@ -23,21 +25,15 @@ import BuildInspector from "@components/branches/views/pipeline/BuildInspector";
  * release have to go through (pipeline), what has been built lately (timeline), and what is true of
  * the one build I am looking at (inspector).
  *
- * Like every content view it fetches its own data, so adding a fifth view never means editing a
- * shared fetcher. What it does NOT own is the validation stamp filter, which lives above the view
- * switch precisely so that a user's filter follows them from one view to the next.
+ * What it does NOT own is the validation stamp filter, which lives above the view switch precisely
+ * so that a user's filter follows them from one view to the next.
  *
  * @param branch Branch being displayed
  */
 export default function PipelineContentView({branch}) {
 
+    const router = useRouter()
     const vsfContext = useContext(ValidationStampFilterContext)
-
-    // Pagination status
-    const [pagination, setPagination] = useState({
-        offset: 0,
-        size: 10,
-    })
 
     // Same filter, same storage and same permalink semantics as the builds view
     const {selectedBuildFilter, onSelectedBuildFilter, onPermalinkBuildFilter} =
@@ -59,79 +55,40 @@ export default function PipelineContentView({branch}) {
 
     const promotionLevels = facts?.promotionLevels ?? []
     const validationStamps = facts?.validationStamps ?? []
+    const totalBuilds = facts?.allBuilds?.pageInfo?.totalSize
     const latestBuild = facts?.allBuilds?.pageItems?.[0]
 
-    // The page of builds shown by the timeline, under the active filter
-    const {data: buildsPage, loading, finished} = useQuery(
-        gqlPipelineBuilds,
-        {
-            variables: {
-                branchId: Number(branch.id),
-                offset: pagination.offset,
-                size: pagination.size,
-                filterType: selectedBuildFilter?.type,
-                // GraphQL type for the filter data is expected to be a string
-                filterData: selectedBuildFilter ? JSON.stringify(selectedBuildFilter.data) : undefined,
-            },
-            deps: [branch, pagination, selectedBuildFilter, reloadCount, buildCreated],
-            initialData: null,
-            dataFn: data => data.branches[0].buildsPaginated,
-        }
-    )
+    // The page of builds shown by the timeline, on the same terms as the builds view's table
+    const {builds, pageInfo, loadingBuilds, loadMore} = useBranchBuildsPage({
+        branch,
+        query: gqlPipelineBuilds,
+        selectedBuildFilter,
+    })
 
-    // `useQuery` only reports the loading as started from within its effect, so a view which showed
-    // as loaded before the first fetch resolved would render an empty state over a branch which has
-    // builds. Same guard the builds view makes.
-    const loadingBuilds = loading || !finished
-
-    const pageInfo = buildsPage?.pageInfo
-
-    // Accumulation of the builds across the pages. A plain `const` will not do here: "load more"
-    // appends, so the list is state built up over several responses rather than derived from the
-    // latest one.
-    const [builds, setBuilds] = useState([])
-    // `pagination` is read but deliberately not a dependency: the effect must run once per RESPONSE,
-    // not once per request. Adding it would append the same page again the moment the offset moved,
-    // before the page it named had arrived.
+    // A build asked for but not in the loaded page yet - a `?build=` deep link to an older build, or
+    // a stage card naming the latest build at its level - is LOADED UP TO rather than ignored. Both
+    // routes go through the URL, which is why one rule covers them: selecting writes `?build=`, and
+    // this reads it back.
+    const requestedBuildId = router.query?.[buildSelectionParam]
+    const resolving = needsMoreBuilds(builds, requestedBuildId, pageInfo)
+    // `loadMore` is deliberately not a dependency: it is a fresh closure on every render, so listing
+    // it would run this effect on every render instead of on the two things that actually decide
+    // whether another page is due. It is idempotent for the page already in flight, which is what
+    // makes calling the closure of an earlier render safe.
     useEffect(() => {
-        if (buildsPage) {
-            if (pagination.offset > 0) {
-                setBuilds(previous => [...previous, ...buildsPage.pageItems])
-            } else {
-                setBuilds(buildsPage.pageItems)
-            }
+        if (resolving && !loadingBuilds) {
+            loadMore()
         }
-    }, [buildsPage])
+    }, [resolving, loadingBuilds])
 
-    const onLoadMore = () => {
-        if (pageInfo?.nextPage) {
-            setPagination(pageInfo.nextPage)
-        }
-    }
-
-    const {selectedBuildId, selectBuild} = useBuildSelection({builds})
-
-    // A stage card names the latest build at its level, which for a low level can sit far below the
-    // loaded page. Asking for it loads up to it rather than doing nothing.
-    const [pendingBuildId, setPendingBuildId] = useState(null)
-    useEffect(() => {
-        if (needsMoreBuilds(builds, pendingBuildId, pageInfo)) {
-            if (!loadingBuilds) {
-                setPagination(pageInfo.nextPage)
-            }
-        } else if (pendingBuildId) {
-            // Either it arrived, or there is nothing left to load and it never will
-            setPendingBuildId(null)
-        }
-    }, [builds, pendingBuildId, pageInfo, loadingBuilds])
-
-    const onSelectBuild = (buildId) => {
-        selectBuild(buildId)
-        setPendingBuildId(buildId)
-    }
+    // While `resolving`, the selection holds its request instead of falling back to the most recent
+    // build and rewriting the URL - the pages being loaded are being loaded for that request.
+    const {selectedBuildId, selectBuild} = useBuildSelection({builds, resolving})
 
     // Range selection, feeding the change log button in the toolbar
     const rangeSelection = useRangeSelection()
+
+    const hasBuilds = builds.length > 0
 
     return (
         <Space direction="vertical" size={16} className="ot-line">
@@ -145,24 +102,29 @@ export default function PipelineContentView({branch}) {
                 loading={loadingBuilds}
             />
             <PipelineStats
-                totalBuilds={facts?.allBuilds?.pageInfo?.totalSize}
+                totalBuilds={totalBuilds}
                 latestBuild={latestBuild}
                 loading={loadingFacts || !finishedFacts}
             />
-            {/* Renders nothing at all on a branch with no promotion levels */}
-            <PipelineStages
-                promotionLevels={promotionLevels}
-                onSelectBuild={onSelectBuild}
-            />
+            {/* Nothing at all on a branch with no promotion levels, and nothing on a branch with no
+                builds either: a full band of "never reached" stages above an empty timeline states
+                the obvious loudly, and the empty state below says the one thing worth saying. */}
+            {
+                hasBuilds &&
+                <PipelineStages
+                    promotionLevels={promotionLevels}
+                    onSelectBuild={selectBuild}
+                />
+            }
             <BuildTimeline
                 builds={builds}
                 loading={loadingBuilds}
                 pageInfo={pageInfo}
-                onLoadMore={onLoadMore}
+                onLoadMore={loadMore}
                 promotionLevels={promotionLevels}
                 selectedFilter={vsfContext.selectedFilter}
                 selectedBuildId={selectedBuildId}
-                onSelect={onSelectBuild}
+                onSelect={selectBuild}
                 rangeSelection={rangeSelection}
             />
             {/* Nothing to inspect when the branch has no build; the timeline says so on its own */}

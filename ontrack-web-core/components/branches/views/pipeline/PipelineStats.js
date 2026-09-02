@@ -1,12 +1,6 @@
-import {Popover, Skeleton, Space, theme, Typography} from "antd";
-import dayjs from "dayjs";
-import relativeTime from "dayjs/plugin/relativeTime";
-import utc from "dayjs/plugin/utc";
+import {Skeleton, Space, theme, Typography} from "antd";
+import TimestampText from "@components/common/TimestampText";
 import {buildVersion} from "@components/branches/views/pipeline/pipelineFacts";
-import {weekDayFormat} from "@components/common/TimestampText";
-
-dayjs.extend(utc)
-dayjs.extend(relativeTime)
 
 /**
  * Three facts about the branch, and nothing else.
@@ -29,9 +23,6 @@ export default function PipelineStats({totalBuilds, latestBuild, loading}) {
     // its answer is stale the moment an unreleased build lands.
     const version = buildVersion(latestBuild)
 
-    const time = latestBuild?.creation?.time
-    const localTime = time ? dayjs.utc(time).local() : null
-
     const stat = (id, label, children) => (
         <Space direction="vertical" size={0} data-testid={`pipeline-stat-${id}`}>
             <Typography.Text type="secondary" style={{fontSize: token.fontSizeSM}}>{label}</Typography.Text>
@@ -50,12 +41,12 @@ export default function PipelineStats({totalBuilds, latestBuild, loading}) {
                     version && stat('latest-version', "Latest version", version)
                 }
                 {
-                    localTime && stat(
+                    // The age is what a scanning reader wants; the absolute time stays on hover
+                    latestBuild?.creation?.time &&
+                    stat(
                         'latest-build',
                         "Latest build",
-                        <Popover content={localTime.format(weekDayFormat)}>
-                            <span>{localTime.fromNow()}</span>
-                        </Popover>,
+                        <TimestampText value={latestBuild.creation.time} relative={true}/>,
                     )
                 }
             </Space>

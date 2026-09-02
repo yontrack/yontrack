@@ -87,7 +87,9 @@ describe('a branch with twelve promotion levels', () => {
     it('renders every stage and lets the band scroll rather than shrinking the cards', () => {
         withEvents(<PipelineStages promotionLevels={levels}/>)
         levels.forEach(it => expect(screen.getByTestId(`pipeline-stage-${it.id}`)).toBeVisible())
-        expect(screen.getByTestId('pipeline-stages')).toHaveStyle({overflowX: 'auto'})
+        // `ot-scroll-x` scrolls AND keeps the scrollbar visible: macOS hides the overlay one until
+        // something scrolls, which would make a twelve-stage band look like a cropped three-stage one
+        expect(screen.getByTestId('pipeline-stages')).toHaveClass('ot-scroll-x')
     })
 
 })

@@ -1,14 +1,13 @@
-import {Empty, Popover, Space, theme, Typography} from "antd";
-import Link from "next/link";
+import {Empty, Space, theme, Typography} from "antd";
 import PageSection from "@components/common/PageSection";
-import {PromotionLevelImage} from "@components/promotionLevels/PromotionLevelImage";
+import PromotionLevel from "@components/promotionLevels/PromotionLevel";
 import AnnotatedDescription from "@components/common/AnnotatedDescription";
 import TimestampText from "@components/common/TimestampText";
 import EntityNotificationsBadge from "@components/extension/notifications/EntityNotificationsBadge";
 import BuildPromoteAction from "@components/builds/BuildPromoteAction";
 import PromotionRunFieldValues from "@components/promotionRuns/PromotionRunFieldValues";
 import {isAuthorized} from "@components/common/authorizations";
-import {promotionLevelUri, promotionRunUri} from "@components/common/Links";
+import {promotionRunUri} from "@components/common/Links";
 import {nextPromotionLevel, topPromotionRuns} from "@components/branches/views/pipeline/pipelineFacts";
 
 /**
@@ -49,16 +48,19 @@ export default function BuildInspectorPromotions({build, onChange}) {
                 }
                 {
                     runs.map(run =>
-                        <Space key={run.id} size={token.marginXS} wrap>
-                            <PromotionLevelImage promotionLevel={run.promotionLevel} size={24}/>
-                            <Popover
-                                title={run.promotionLevel?.name}
-                                content={<AnnotatedDescription entity={run.promotionLevel}/>}
-                            >
-                                <Link href={promotionLevelUri(run.promotionLevel)}>
-                                    <Typography.Text strong>{run.promotionLevel?.name}</Typography.Text>
-                                </Link>
-                            </Popover>
+                        <Space
+                            key={run.id}
+                            size={token.marginXS}
+                            wrap
+                            data-testid={`inspector-promotion-${run.promotionLevel?.id}`}
+                        >
+                            {/* The shared composition, so a promotion reads the same here as on the
+                                build page and in the builds table */}
+                            <PromotionLevel
+                                promotionLevel={run.promotionLevel}
+                                size={24}
+                                displayText={true}
+                            />
                             <Typography.Text type="secondary">
                                 <TimestampText value={run.creation?.time}/>
                                 {run.creation?.user && ` by ${run.creation.user}`}

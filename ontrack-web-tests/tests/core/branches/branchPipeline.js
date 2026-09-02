@@ -97,6 +97,11 @@ class BranchPipelinePage {
         await expect(this.timelineCard(build)).toHaveAttribute('aria-pressed', 'false')
     }
 
+    async checkNoBuilds() {
+        await expect(this.page.getByText("No build to show on this branch.")).toBeVisible()
+        await expect(this.page.getByTestId('build-timeline')).toBeHidden()
+    }
+
     // --- Inspector ---------------------------------------------------------
 
     inspector() {
@@ -106,7 +111,9 @@ class BranchPipelinePage {
     async checkInspectorPromotion(promotionLevel, {present = true} = {}) {
         const panel = this.page.getByTestId('inspector-promotions')
         await expect(panel).toBeVisible()
-        const entry = panel.getByRole('link', {name: promotionLevel.name, exact: true})
+        // By id rather than by the level's name: the name also appears on the stage card above and
+        // in the promote button below, so a name lookup would pass for the wrong reason
+        const entry = panel.getByTestId(`inspector-promotion-${promotionLevel.id}`)
         if (present) {
             await expect(entry).toBeVisible()
         } else {
@@ -122,6 +129,10 @@ class BranchPipelinePage {
         const panel = this.page.getByTestId('inspector-validations')
         await expect(panel).toBeVisible()
         await expect(panel.getByTestId(`inspector-validation-${validationStamp.id}`)).toBeVisible()
+    }
+
+    async checkNoInspector() {
+        await expect(this.inspector()).toBeHidden()
     }
 
     async checkNoValidationsPanel() {

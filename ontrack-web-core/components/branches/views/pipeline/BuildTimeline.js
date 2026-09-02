@@ -58,11 +58,12 @@ export default function BuildTimeline({
         <Space direction="vertical" size={token.marginXS} className="ot-line">
             <div
                 data-testid="build-timeline"
+                // Visible scrollbar, not the platform's overlay one - see `ot-scroll-x`
+                className="ot-scroll-x"
                 style={{
                     display: 'flex',
                     alignItems: 'stretch',
                     gap: token.marginSM,
-                    overflowX: 'auto',
                     paddingBottom: token.paddingXS,
                 }}
             >

@@ -1,6 +1,10 @@
 import {useCallback, useEffect, useRef} from "react";
 import {useRouter} from "next/router";
-import {buildSelectionParam, findBuildById, resolveSelectedBuildId} from "@components/branches/views/pipeline/buildSelection";
+import {
+    buildSelectionParam,
+    findBuildById,
+    resolveSelectedBuildId,
+} from "@components/branches/views/pipeline/buildSelection";
 
 /**
  * Selection of the build inspected by the pipeline view.
@@ -9,14 +13,22 @@ import {buildSelectionParam, findBuildById, resolveSelectedBuildId} from "@compo
  * build a user is looking at can be linked to. A page load is not a selection though, so the default
  * - the most recent build - is NOT written back; only an explicit choice, or a correction, is.
  *
- * A CORRECTION is what happens when the build named by the URL is not in the loaded page: after a
- * filter change, most obviously. The selection falls back to the most recent build and the URL is
- * made to say so, because a `?build=` naming something the timeline is not showing would be a
- * permalink to a view nobody can reproduce.
+ * A CORRECTION is what happens when the build named by the URL is not in the loaded page after a
+ * filter change: the selection falls back to the most recent build and the URL is made to say so,
+ * because a `?build=` naming something the timeline is not showing would be a permalink to a view
+ * nobody can reproduce.
+ *
+ * "NOT IN THE PAGE" AND "NOT LOADED YET" ARE DIFFERENT THINGS, and the difference is what `resolving`
+ * carries. A deep link to an older build, or a stage card naming the latest build at its level, both
+ * point below the first page; the view answers by loading further pages, and correcting the URL
+ * meanwhile would erase the very request those pages are being loaded for. The caller decides which
+ * case it is - it is the one that knows whether there are more pages - and this hook stays quiet
+ * while it says so.
  *
  * @param builds Loaded builds, most recent first
+ * @param resolving Whether the caller is still loading pages to reach the requested build
  */
-export default function useBuildSelection({builds}) {
+export default function useBuildSelection({builds, resolving = false}) {
 
     const router = useRouter()
 
@@ -51,10 +63,11 @@ export default function useBuildSelection({builds}) {
         writeBuildParam(buildId)
     }, [writeBuildParam])
 
-    // Corrects a `?build=` which no longer names a visible build. Guarded on there being a request
-    // AND a resolution: while the first page is still loading there is nothing to correct against,
-    // and blanking the parameter then would throw away the deep link the user just followed.
-    const staleRequest = requestedId !== undefined && requestedId !== null &&
+    // Guarded on there being a request AND a resolution: while the first page is still loading there
+    // is nothing to correct against, and blanking the parameter then would throw away the deep link
+    // the user just followed.
+    const staleRequest = !resolving &&
+        requestedId !== undefined && requestedId !== null &&
         selectedBuildId !== null && String(requestedId) !== selectedBuildId
     useEffect(() => {
         if (staleRequest) {
