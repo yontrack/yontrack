@@ -15,6 +15,12 @@ configuration:
           tests: {}
         PLAYWRIGHT:
           tests: {}
+        # Reported by the `docs` job in ci.yml, which now runs on every full run: the site
+        # built and was archived as a run artefact for the release to carry forward (#1668).
+        # Distinct from DOCUMENTATION below, which records the S3 publication at release time
+        # and keeps that name because every past release's history hangs off it. Not part of
+        # BRONZE yet - that switch is #1669.
+        DOCS: {}
         # Reported by .github/workflows/demo-smoke.yml, which the demo slot dispatches once
         # it has marked the deployment done. SILVER, below, requires it.
         DEMO.SMOKE: {}

@@ -1442,27 +1442,48 @@ jobs:
   # relied on `./gradlew build` having produced ontrack-docs/site/. On a separate runner this job
   # builds it itself — including the ontrack-docs integration tests, which are what write
   # docs/content/generated/ (gitignored, and referenced from ~11 places in the mkdocs nav).
+  #
+  # It runs on *every* full run, not only at release time (#1668). Nothing may be rebuilt at
+  # release time, so the site is built once while the build is being made and carried forward as
+  # a GitHub Actions artefact; `release.yml` (#1672) downloads that artefact and pushes it to S3
+  # under the final version. The 90-day retention is therefore a real release deadline — a build
+  # left at GOLD-pending longer than that loses its docs, which `release.yml` reports explicitly
+  # rather than papering over with a rebuild. See doc/dev-guide/docs-artifact.md.
+  #
+  # `just_build_and_push` skips it, like every test job: that dispatch exists to get an image out
+  # without running anything else, and once #1669 lands, running the docs build there would make
+  # such a run wait on the very thing the operator asked to skip.
+  #
+  # Two stamps, deliberately:
+  #
+  #  * `DOCS` — the site built and was archived. Reported on every full run; gates BRONZE (#1669).
+  #  * `DOCUMENTATION` — the S3 publication, release-only. The name is load-bearing: it carries
+  #    the validation history of every past release and renaming it would orphan all of it. It
+  #    stays here until #1673 moves the publication out of `ci.yml` altogether.
+  #
+  # `needs` is [setup, yontrack] and nothing more. The job runs its own
+  # `:ontrack-docs:integrationTest :ontrack-docs:buildDocs` from scratch and consumes no output of
+  # `build`, `integration`, `kdsl` or `ui-tests`, so waiting on them only delayed it. Being
+  # genuinely parallel is what makes gating BRONZE on `DOCS` nearly free in wall-clock.
   # ---------------------------------------------------------------------------------------------
 
   docs:
     name: Documentation
-    needs: [setup, yontrack, build, integration, integration-report, kdsl, kdsl-report, ui-tests, ui-tests-report]
+    needs: [setup, yontrack]
     if: >-
       ${{ !cancelled()
-        && needs.build.result == 'success'
-        && needs.integration.result != 'failure'
-        && needs.integration-report.result != 'failure'
-        && needs.kdsl.result != 'failure'
-        && needs.kdsl-report.result != 'failure'
-        && needs.ui-tests.result != 'failure'
-        && needs.ui-tests-report.result != 'failure'
+        && needs.setup.result == 'success'
+        && needs.yontrack.result != 'failure'
         && needs.setup.outputs.full_run == 'true'
-        && needs.setup.outputs.release == 'true'
-        && (github.ref_name == 'main' || startsWith(github.ref_name, 'release/')) }}
+        && needs.setup.outputs.just_build_and_push != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 60
     env:
       VERSION: ${{ needs.setup.outputs.version }}
+      # The S3 publication below, and only it, is still release-only.
+      RELEASING: >-
+        ${{ needs.setup.outputs.release == 'true'
+          && (github.ref_name == 'main' || startsWith(github.ref_name, 'release/')) }}
     steps:
       # The run time reported for this job's validations is measured from here. A `run:` step is
       # the earliest point a workflow can observe: the runner's own "Set up job" precedes every
@@ -1494,17 +1515,19 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
 
       # python3 and venv are already on ubuntu-latest, which createVenv/installDeps need.
-      - name: Install graphviz and s3cmd
+      - name: Install graphviz
         run: |
           sudo apt-get update
-          sudo apt-get install --no-install-recommends -y graphviz s3cmd
+          sudo apt-get install --no-install-recommends -y graphviz
 
-      - name: Build the documentation
-        run: |
-          ./gradlew :ontrack-docs:integrationTest :ontrack-docs:buildDocs \
-            --stacktrace \
-            --console plain
+      # s3cmd is only needed by the release-only publication step, so it is not paid for on the
+      # runs that just build and archive the site.
+      - name: Install s3cmd
+        if: ${{ env.RELEASING == 'true' }}
+        run: sudo apt-get install --no-install-recommends -y s3cmd
 
+      # Before the build, not after: a docs build that fails must still be able to report a
+      # FAILED `DOCS` stamp, and `yontrack validate` needs the build to have been resolved.
       - name: Link to the Yontrack build
         uses: nemerosa/ontrack-github-actions-cli-library/ontrack-cli-workflow-build@v1.0.3
         with:
@@ -1513,8 +1536,68 @@ jobs:
           yontrack-token: ${{ secrets.YONTRACK_TOKEN }}
           version: ${{ env.YONTRACK_CLI_VERSION }}
 
+      - name: Build the documentation
+        id: build_docs
+        run: |
+          ./gradlew :ontrack-docs:integrationTest :ontrack-docs:buildDocs \
+            --stacktrace \
+            --console plain
+
+      # The rendered site, carried forward to the release. `if-no-files-found: error` is the
+      # point of the step: an empty artefact would only be discovered months later, by
+      # `release.yml`, on the one day it cannot be fixed by rebuilding.
+      #
+      # The path is the directory, so the site's own files sit at the root of the artefact —
+      # `index.html` at the top, not `site/index.html`. The name is fixed rather than versioned:
+      # `release.yml` reaches the artefact through the CI run recorded on the build (#1671) and
+      # resolves the *base* version, which is not the version this run was named for.
+      #
+      # `overwrite` because the name is fixed and v4 rejects a duplicate with a 409: without it,
+      # re-running just this job after a transient failure would die here and DOCS could never go
+      # green for that run.
+      #
+      # 90 days is a request, not a guarantee - GitHub clamps it to the repository's own artefact
+      # retention setting, so the effective release deadline is whichever is shorter.
+      - name: Archive the documentation
+        id: artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: docs-site
+          path: ontrack-docs/site
+          if-no-files-found: error
+          overwrite: true
+          retention-days: 90
+
+      - name: Validate DOCS
+        if: ${{ !cancelled() && steps.build_docs.outcome != '' }}
+        env:
+          BUILD_OUTCOME: ${{ steps.build_docs.outcome }}
+          ARTIFACT_OUTCOME: ${{ steps.artifact.outcome }}
+          STARTED: ${{ steps.job_start.outputs.started }}
+        run: |
+          run_time_flag=""
+          if [ -n "${STARTED:-}" ]; then
+            run_time_flag="--run-time $(( $(date +%s) - STARTED ))"
+          fi
+          if [ "$BUILD_OUTCOME" = "success" ] && [ "$ARTIFACT_OUTCOME" = "success" ]; then
+            status=PASSED
+          else
+            status=FAILED
+          fi
+          # shellcheck disable=SC2086  # deliberate: see YONTRACK_RUN_INFO
+          yontrack validate --validation DOCS --status "$status" \
+            $run_time_flag $YONTRACK_RUN_INFO
+
+      # `!cancelled()` deliberately, to drop the implicit `success()`: `Validate DOCS` runs just
+      # above, and a Yontrack outage failing that step must not quietly skip the publication. What
+      # the publication actually depends on is spelled out instead - the site built and archived.
       - name: Upload the documentation
         id: upload
+        if: >-
+          ${{ !cancelled()
+            && env.RELEASING == 'true'
+            && steps.build_docs.outcome == 'success'
+            && steps.artifact.outcome == 'success' }}
         env:
           AMS3_DELIVERY_USR: ${{ secrets.AMS3_DELIVERY_USR }}
           AMS3_DELIVERY_PSW: ${{ secrets.AMS3_DELIVERY_PSW }}
@@ -1533,7 +1616,7 @@ jobs:
             --recursive
 
       - name: Validate DOCUMENTATION
-        if: ${{ !cancelled() && steps.upload.outcome != '' }}
+        if: ${{ !cancelled() && env.RELEASING == 'true' && steps.upload.outcome != '' }}
         env:
           UPLOAD_OUTCOME: ${{ steps.upload.outcome }}
           STARTED: ${{ steps.job_start.outputs.started }}
