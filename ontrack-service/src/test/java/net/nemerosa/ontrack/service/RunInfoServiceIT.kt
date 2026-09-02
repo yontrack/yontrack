@@ -63,6 +63,51 @@ class RunInfoServiceIT : AbstractDSLTestSupport() {
         assertNull(info, "No run info")
     }
 
+    /**
+     * The Go CLI's `RunInfo.RunTime` is a plain `int` with no `omitempty`, so every caller that
+     * does not measure a duration sends `runTime: 0` rather than omitting the field - there is no
+     * way for it to express "not measured". Recording that verbatim would mean a build stamped by
+     * `ci.yml` reads as "ran in 0 seconds" and, worse, emits a 0.0 sample into
+     * `ontrack_run_build_time_seconds` on every run.
+     *
+     * Zero is therefore normalised to no run time at all. Nothing is lost: a genuine zero-second
+     * duration is not a measurement anyone can act on, and the UI already treats it as absent.
+     */
+    @Test
+    fun `A run time of zero records no run time at all`() {
+        val build = doCreateBuild()
+        val info = asUser().withProjectFunction(build, BuildCreate::class.java).call {
+            runInfoService.setRunInfo(
+                build,
+                RunInfoInput(
+                    sourceType = "github-workflow",
+                    sourceUri = "https://github.com/yontrack/yontrack/actions/runs/1234",
+                    triggerType = "push",
+                    triggerData = "cafebabe",
+                    runTime = 0,
+                )
+            )
+        }
+        assertNull(info.runTime, "Zero run time is not recorded")
+        // ... and it stays absent when read back
+        val reloaded = asUserWithView(build).call { runInfoService.getRunInfo(build) }
+        assertNotNull(reloaded, "Run info is recorded")
+        assertNull(reloaded.runTime, "Zero run time is not recorded")
+        assertEquals("https://github.com/yontrack/yontrack/actions/runs/1234", reloaded.sourceUri)
+    }
+
+    /**
+     * The counterpart to the test above: a real duration is untouched.
+     */
+    @Test
+    fun `A non-zero run time is recorded as it is`() {
+        val build = doCreateBuild()
+        val info = asUser().withProjectFunction(build, BuildCreate::class.java).call {
+            runInfoService.setRunInfo(build, RunInfoInput(runTime = 1))
+        }
+        assertEquals(1, info.runTime)
+    }
+
     @Test
     fun `Sets and gets the run info for a build`() {
         val build = doCreateBuild()

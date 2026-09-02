@@ -956,6 +956,81 @@ class BuildGraphQLIT : AbstractQLKTITSupport() {
         }
     }
 
+    /**
+     * The shape `ci.yml` uses to stamp the CI run onto the build it has already registered:
+     * `yontrack build setup` re-runs `createBuildOrGet` on an existing build, carrying nothing
+     * but the run info.
+     *
+     * `runTime` is 0 here on purpose, because that is what the CLI actually sends: its run time
+     * is a plain Go `int` with no `omitempty`, so leaving `--run-time` off the command line puts
+     * a zero on the wire rather than omitting the field. The server normalises that back to no
+     * run time at all (see `RunInfoServiceIT`), which is what this asserts - the run is still
+     * going when this is recorded, and what the release needs is the URL, not a duration.
+     */
+    @Test
+    fun `Setting the run info on an existing build in get mode`() {
+        asAdmin {
+            project project@{
+                branch branch@{
+                    val existing = build(name = "1")
+                    val runInfo = RunInfoInput(
+                        sourceType = "github-workflow",
+                        sourceUri = "https://github.com/yontrack/yontrack/actions/runs/1234",
+                        triggerType = "push",
+                        triggerData = "cafebabe",
+                        runTime = 0,
+                    )
+                    val data = run(
+                        """
+                        mutation CreateBuildOrGet(${"$"}runInfo: RunInfoInput) {
+                            createBuildOrGet(input: {
+                                projectName: "${this@project.name}",
+                                branchName: "${this@branch.name}",
+                                name: "1",
+                                runInfo: ${"$"}runInfo
+                            }) {
+                                build {
+                                    id
+                                    runInfo {
+                                        sourceType
+                                        sourceUri
+                                        triggerType
+                                        triggerData
+                                        runTime
+                                    }
+                                }
+                                errors {
+                                    message
+                                    exception
+                                }
+                            }
+                        }
+                    """, mapOf(
+                            "runInfo" to runInfo.asMap()
+                        )
+                    )
+                    // Checks the data
+                    val node = assertNoUserError(data, "createBuildOrGet")
+                    val build = node["build"]
+                    assertEquals(existing.id(), build["id"].asInt(), "Same build, not a new one")
+                    // Run info
+                    val actualRunInfo = build.path("runInfo")
+                    assertEquals("github-workflow", actualRunInfo.path("sourceType").asText())
+                    assertEquals(
+                        "https://github.com/yontrack/yontrack/actions/runs/1234",
+                        actualRunInfo.path("sourceUri").asText()
+                    )
+                    assertEquals("push", actualRunInfo.path("triggerType").asText())
+                    assertEquals("cafebabe", actualRunInfo.path("triggerData").asText())
+                    assertTrue(
+                        actualRunInfo.path("runTime").isNull,
+                        "The CLI's zero run time is recorded as no run time"
+                    )
+                }
+            }
+        }
+    }
+
     @Test
     fun `Filtered build links`() {
         // Reference project with two builds to reference

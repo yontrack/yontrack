@@ -41,7 +41,7 @@ class RunInfoServiceImpl(
         val runInfo = runInfoRepository.setRunInfo(
             entity.runnableEntityType,
             entity.id(),
-            input,
+            input.withoutZeroRunTime(),
             securityService.currentSignature
         )
         exportRunInfoTime(entity, runInfo)
@@ -55,6 +55,33 @@ class RunInfoServiceImpl(
             runnableEntity.id()
         )
     }
+
+    /**
+     * A run time of zero means "not measured", not "instantaneous".
+     *
+     * The Go CLI - the writer behind every `yontrack validate` and `yontrack build setup` call -
+     * carries the run time as a plain `int` with no `omitempty`, so it sends `runTime: 0` whenever
+     * the caller did not pass `--run-time`. It has no way to express the absence. Storing that
+     * verbatim would show "Ran in 0 second" on the entity and, worse, feed a 0.0 sample into
+     * `ontrack_run_<type>_time_seconds` for every unmeasured run, which is the very metric hole
+     * the run-info reporting exists to close.
+     *
+     * Normalising here rather than at each call site covers every writer at once - GraphQL, REST
+     * and the ingestion. Nothing of value is lost: a genuine sub-second run reported as zero is
+     * not a duration anyone can act on.
+     */
+    private fun RunInfoInput.withoutZeroRunTime(): RunInfoInput =
+        if (runTime == 0) {
+            RunInfoInput(
+                sourceType = sourceType,
+                sourceUri = sourceUri,
+                triggerType = triggerType,
+                triggerData = triggerData,
+                runTime = null,
+            )
+        } else {
+            this
+        }
 
     private fun exportRunInfoTime(entity: RunnableEntity, runInfo: RunInfo) {
         val time = runInfo.runTime

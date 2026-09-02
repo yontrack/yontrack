@@ -2,10 +2,16 @@ import {Typography} from "antd";
 import Duration from "@components/common/Duration";
 
 export default function RunInfoTime({info, mode = "complete"}) {
+    // Truthiness, so that 0 counts as no run time. The Go CLI cannot express "not measured" and
+    // sends 0 instead, and rows written before the server normalised that away still hold it;
+    // either way "Ran in 0 second" is noise rather than a duration. Same check as
+    // ValidationRunCell.
+    const hasTime = Boolean(info?.runTime)
+
     return (
         <>
             {
-                info && info.runTime !== null && mode === "complete" &&
+                hasTime && mode === "complete" &&
                 <Typography.Text>
                     Ran in <Duration
                     seconds={info.runTime}
@@ -15,7 +21,7 @@ export default function RunInfoTime({info, mode = "complete"}) {
                 </Typography.Text>
             }
             {
-                info && info.runTime !== null && mode === "minimal" &&
+                hasTime && mode === "minimal" &&
                 <Typography.Text>
                     <Duration
                         seconds={info.runTime}

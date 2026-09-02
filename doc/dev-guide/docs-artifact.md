@@ -47,12 +47,53 @@ the shape that workflow is being written against, and changing it later means ch
 - **Layout**: the site's own files at the root of the artefact — `index.html` at the top, not
   `site/index.html`.
 - **Which run**: found through the CI run recorded in the build's run info
-  ([#1671](https://github.com/yontrack/yontrack/issues/1671)).
+  ([#1671](https://github.com/yontrack/yontrack/issues/1671)) — see below.
 - **Never empty**: the upload uses `if-no-files-found: error`. An empty artefact would only be
   discovered months later, by the release, on the one day it cannot be fixed by rebuilding.
 - **Overwritable**: `overwrite: true`, so re-running the `docs` job alone after a transient failure
   works. Without it, `upload-artifact@v4` rejects the second upload with a 409 and `DOCS` could
   never go green for that run.
+
+## Finding the run an artefact belongs to
+
+The release runs days after the CI run that produced the artefact, so it has to resolve that run
+from the build rather than from anything in its own context. The `yontrack` job records it as the
+build's **run info** — builds are `RunnableEntity`s, so this is the model Yontrack already has for
+"where did this come from", and it is the same shape every validation in `ci.yml` reports:
+
+| Field         | Value                                                        |
+|---------------|--------------------------------------------------------------|
+| `sourceType`  | `github-workflow` — what the GitHub ingestion also records    |
+| `sourceUri`   | the run's URL, `.../actions/runs/<run_id>`                    |
+| `triggerType` | the event that started it (`push`, `workflow_dispatch`, ...)  |
+| `triggerData` | the commit SHA                                                |
+
+`runTime` is null: the run is still going when this is recorded, and the point of it is the URL.
+Getting that null takes a small server-side rule, because the CLI cannot send one — its run time is
+a plain Go `int` with no `omitempty`, so omitting `--run-time` puts `0` on the wire rather than
+nothing. Yontrack normalises a zero run time to none at all (`RunInfoServiceImpl`), so "not
+measured" does not read as "instantaneous" and does not feed a 0.0 sample into
+`ontrack_run_build_time_seconds` on every run.
+
+Read it back through GraphQL:
+
+```graphql
+{
+  build(id: 1234) {
+    runInfo {
+      sourceType
+      sourceUri
+      triggerType
+      triggerData
+    }
+  }
+}
+```
+
+The run id is the last path segment of `sourceUri`, which is what
+`gh api repos/yontrack/yontrack/actions/runs/<run_id>/artifacts` needs. Searching Actions for the
+commit SHA would be guesswork — several runs can share a SHA, and only one of them built the
+artefact this build was stamped from.
 
 ## The retention deadline
 
