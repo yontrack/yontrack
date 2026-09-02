@@ -16,8 +16,7 @@ configuration:
         PLAYWRIGHT:
           tests: {}
         # Reported by .github/workflows/demo-smoke.yml, which the demo slot dispatches once
-        # it has marked the deployment done. No promotion requires it yet: SILVER, which will,
-        # is #1667.
+        # it has marked the deployment done. SILVER, below, requires it.
         DEMO.SMOKE: {}
         DOCKER.HUB: {}
         GITHUB.RELEASE: {}
@@ -30,6 +29,18 @@ configuration:
             - INTEGRATION
             - KDSL.ACCEPTANCE
             - PLAYWRIGHT
+        # No workflow node of its own: BRONZE is what admits a build to the demo slot, the
+        # slot deploys it and dispatches demo-smoke.yml, and DEMO.SMOKE landing green is the
+        # last prerequisite - so auto-promotion grants SILVER by itself. SILVER therefore
+        # means "running on the demo and verified there", which is what GOLD gets decided on.
+        SILVER:
+          promotions:
+            - BRONZE
+          validations:
+            - DEMO.SMOKE
+        # Still on BRONZE, deliberately. Once RELEASE requires GOLD requires SILVER, nothing
+        # can be released until the demo pipeline works end to end; that switch belongs with
+        # the new publication path (#1673), not here.
         RELEASE:
           promotions:
             - BRONZE
@@ -84,6 +95,28 @@ configuration:
               type: 'SUCCESS'
             contentTemplate: |
               Build ${build} has been promoted to ${promotionLevel}.
+          # The message that hands the decision over: BRONZE says the build is green, SILVER
+          # says it is running on the demo and was verified there - the point at which someone
+          # has something to look at and a GOLD call to make.
+          #
+          # `${build}` renders the build's display name, which is its `release` property: the
+          # version, as a link to the build. `${build.release}` renders that same string but
+          # nothing at all on a build without the property, so the link is the safer form. The
+          # demo URL is spelled out - no templating source turns an environment into a URL.
+          - name: On SILVER
+            promotion: SILVER
+            events:
+              - new_promotion_run
+            channel: slack
+            channelConfig:
+              channel: '#notifications'
+              type: 'SUCCESS'
+            contentTemplate: |
+              ${build} is deployed to the demo and has passed its smoke tests.
+
+              Demo: https://demo.dev.yontrack.com
+
+              Have a look, then decide on GOLD.
     project:
       environments:
         environments:

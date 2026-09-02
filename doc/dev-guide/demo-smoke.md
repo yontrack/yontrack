@@ -3,7 +3,10 @@
 The demo slot marks itself deployed when the gitops PR merges. That is well before ArgoCD has
 synced and the pods are serving, so "deployed" on its own says nothing about whether the demo
 works. `.github/workflows/demo-smoke.yml` closes that gap and reports `DEMO.SMOKE` on the
-build. No promotion requires that stamp yet - `SILVER`, which will, is issue #1667.
+build.
+
+`SILVER` requires that stamp, on top of `BRONZE`, so a green run of this workflow is what
+promotes the build to `SILVER` - see [`SILVER`](#silver) below.
 
 ## What it does
 
@@ -20,6 +23,33 @@ Step 2 is the valuable one. Everything that can go wrong between the merged PR a
 pod - ArgoCD not synced, image not pullable, old pod still up, new pod crash-looping - looks
 the same from outside: the demo answers with the previous version, or with nothing. One poll
 with one deadline covers them all.
+
+## `SILVER`
+
+`.yontrack/ci.yaml` declares `SILVER` as `promotions: [BRONZE]` plus
+`validations: [DEMO.SMOKE]`. It needs no workflow node of its own, and nothing dispatches it:
+auto-promotion grants it as soon as both prerequisites hold, and `DEMO.SMOKE` is always the
+later of the two.
+
+```
+BRONZE -> the demo slot admits the build -> deploy -> demo-smoke.yml -> DEMO.SMOKE -> SILVER
+```
+
+So `BRONZE` means "the build is green" and `SILVER` means "it is running on the demo and was
+verified there" - which is what someone needs before deciding on `GOLD`. A Slack notification
+on `SILVER` to `#notifications` carries the demo URL and the version and says exactly that.
+The `BRONZE` notification stays: knowing a build is green is useful on its own.
+
+Two things this does *not* do:
+
+- `GOLD` is not configured yet. It arrives with the new publication path (issue #1673).
+- `RELEASE` still requires `BRONZE`, not `SILVER`. Making the release train depend on the demo
+  pipeline is a deliberate switch that lands with #1673 too - until then a broken demo must
+  not be able to block a release.
+
+A failed `DEMO.SMOKE` needs no handling of its own either. Auto-promotion looks at the *last*
+run of a stamp, so a `FAILED` one simply does not grant `SILVER`, and the existing
+"On validation error" subscription already puts it in `#notifications`.
 
 ## Deliberately thin
 
