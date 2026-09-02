@@ -16,8 +16,8 @@ describe('RunInfo', () => {
         expect(container.querySelector('.ant-divider')).toBeInTheDocument()
     })
 
-    // A build's run info is recorded while the run is still going, so it carries a source and
-    // no run time. A divider with nothing on its right is a stray mark, not a separator.
+    // A reporter with no duration to measure records a source and no run time. A divider with
+    // nothing on its right is a stray mark, not a separator.
     it('does not draw a divider when there is no run time', () => {
         const {container} = render(<RunInfo info={{...source, runTime: null}}/>)
         expect(screen.getByText('github-workflow')).toBeInTheDocument()

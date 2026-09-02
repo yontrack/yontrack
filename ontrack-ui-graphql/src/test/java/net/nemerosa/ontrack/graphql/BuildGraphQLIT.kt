@@ -957,15 +957,14 @@ class BuildGraphQLIT : AbstractQLKTITSupport() {
     }
 
     /**
-     * The shape `ci.yml` uses to stamp the CI run onto the build it has already registered:
-     * `yontrack build setup` re-runs `createBuildOrGet` on an existing build, carrying nothing
-     * but the run info.
+     * `createBuildOrGet` in get mode still applies the run info it is given, which is how
+     * `yontrack build setup` stamps a build that already exists. Nothing covered that path
+     * before: the other get-mode tests here only check that the same build comes back.
      *
-     * `runTime` is 0 here on purpose, because that is what the CLI actually sends: its run time
-     * is a plain Go `int` with no `omitempty`, so leaving `--run-time` off the command line puts
-     * a zero on the wire rather than omitting the field. The server normalises that back to no
-     * run time at all (see `RunInfoServiceIT`), which is what this asserts - the run is still
-     * going when this is recorded, and what the release needs is the URL, not a duration.
+     * `runTime` is 0 on purpose, because that is what the CLI puts on the wire when the caller
+     * passes no `--run-time`: its run time is a plain Go `int` with no `omitempty`, so it cannot
+     * express the absence. The server normalises that back to no run time at all (see
+     * `RunInfoServiceIT`), which is what this asserts.
      */
     @Test
     fun `Setting the run info on an existing build in get mode`() {

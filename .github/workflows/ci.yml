@@ -77,8 +77,9 @@ env:
   # Every call site still builds its own `run_time_flag` and leaves it empty when there is no
   # recorded start. Recording the validation matters more than timing it, so a missing start drops
   # the flag instead of failing the step on `$(( ... - ))` and losing the stamp altogether. The
-  # dropped flag arrives as `runTime: 0` rather than as nothing - see the build step below - and
-  # Yontrack stores that as no run time, so an untimed validation leaves the duration metric alone
+  # dropped flag arrives as `runTime: 0` rather than as nothing - the CLI carries the run time as a
+  # plain Go `int` with no `omitempty`, so it cannot express the absence - and Yontrack normalises
+  # that zero back to no run time, so an untimed validation leaves the duration metric alone
   # instead of feeding it a zero.
   YONTRACK_RUN_INFO: >-
     --source-type github-workflow
@@ -264,34 +265,6 @@ jobs:
         env:
           VERSION: ${{ needs.setup.outputs.version }}
         run: yontrack build set-property release "$VERSION"
-
-      # Run info on the build itself, not only on its validations. `release.yml` has to find the
-      # CI run a build came out of - days after that run finished - to download the docs artefact
-      # from it. A build is a `RunnableEntity` (`RunnableEntityType.build`), so run info is the
-      # model that already exists for "where did this come from"; a property invented for the
-      # purpose would carry the same URL with none of the UI, the source-type icon or the
-      # ingestion alignment.
-      #
-      # `build setup` is the CLI's only path to it. It calls `createBuildOrGet`, which applies the
-      # run info to an existing build - and the build does already exist, `Register the build`
-      # made it - so this re-get is a no-op carrying nothing but the stamp. Unlike the other build
-      # subcommands it marks the three name flags required, so they are spelled out from what the
-      # action exported rather than left to the CLI's own environment fallback.
-      #
-      # No `--run-time`, unlike every validation call site: the run is still going, and the point
-      # here is the URL. A duration for the whole workflow would have to be recorded by a job that
-      # outlives every other one, which is a different thing from what #1671 asks for. Leaving the
-      # flag off does not omit the field - the CLI's run time is a plain Go `int` with no
-      # `omitempty`, so a zero goes on the wire - but Yontrack normalises a zero run time back to
-      # none at all, precisely so that this reads as "not measured" rather than "instantaneous".
-      - name: Record the run info on the build
-        run: |
-          # shellcheck disable=SC2086  # deliberate: see YONTRACK_RUN_INFO
-          yontrack build setup \
-            --project "$YONTRACK_PROJECT_NAME" \
-            --branch "$YONTRACK_BRANCH_NAME" \
-            --build "$YONTRACK_BUILD_NAME" \
-            $YONTRACK_RUN_INFO
 
   # ---------------------------------------------------------------------------------------------
   # Compile, unit tests, UI unit tests, Docker images.

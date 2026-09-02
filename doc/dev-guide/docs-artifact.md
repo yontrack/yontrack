@@ -46,8 +46,7 @@ the shape that workflow is being written against, and changing it later means ch
   (`5.0.42`), which is not the version the CI run was named for (`5.0.42-rc-123`).
 - **Layout**: the site's own files at the root of the artefact — `index.html` at the top, not
   `site/index.html`.
-- **Which run**: found through the CI run recorded in the build's run info
-  ([#1671](https://github.com/yontrack/yontrack/issues/1671)) — see below.
+- **Which run**: found through the GitHub workflow run property on the build — see below.
 - **Never empty**: the upload uses `if-no-files-found: error`. An empty artefact would only be
   discovered months later, by the release, on the one day it cannot be fixed by rebuilding.
 - **Overwritable**: `overwrite: true`, so re-running the `docs` job alone after a transient failure
@@ -57,43 +56,41 @@ the shape that workflow is being written against, and changing it later means ch
 ## Finding the run an artefact belongs to
 
 The release runs days after the CI run that produced the artefact, so it has to resolve that run
-from the build rather than from anything in its own context. The `yontrack` job records it as the
-build's **run info** — builds are `RunnableEntity`s, so this is the model Yontrack already has for
-"where did this come from", and it is the same shape every validation in `ci.yml` reports:
+from the build rather than from anything in its own context. It is already recorded: `yontrack ci
+config` — the `Register the build` step — sets the **GitHub workflow run property** on every build
+through `GitHubCIEngine.configureBuild`, and that property is the source to read.
 
-| Field         | Value                                                        |
-|---------------|--------------------------------------------------------------|
-| `sourceType`  | `github-workflow` — what the GitHub ingestion also records    |
-| `sourceUri`   | the run's URL, `.../actions/runs/<run_id>`                    |
-| `triggerType` | the event that started it (`push`, `workflow_dispatch`, ...)  |
-| `triggerData` | the commit SHA                                                |
+| Field       | Value                                                       |
+|-------------|-------------------------------------------------------------|
+| `runId`     | the run id, as a number — what the `gh` API needs            |
+| `url`       | the run's URL, `.../actions/runs/<runId>`                    |
+| `name`      | the workflow name (`CI`)                                     |
+| `runNumber` | the run number, as shown in the Actions UI                   |
+| `event`     | the event that started it (`push`, `workflow_dispatch`, ...) |
 
-`runTime` is null: the run is still going when this is recorded, and the point of it is the URL.
-Getting that null takes a small server-side rule, because the CLI cannot send one — its run time is
-a plain Go `int` with no `omitempty`, so omitting `--run-time` puts `0` on the wire rather than
-nothing. Yontrack normalises a zero run time to none at all (`RunInfoServiceImpl`), so "not
-measured" does not read as "instantaneous" and does not feed a 0.0 sample into
-`ontrack_run_build_time_seconds` on every run.
-
-Read it back through GraphQL:
+Build has a field of its own for it, so no property-type name has to be spelled out:
 
 ```graphql
 {
   build(id: 1234) {
-    runInfo {
-      sourceType
-      sourceUri
-      triggerType
-      triggerData
+    buildGitHubWorkflowRunProperty {
+      value
     }
   }
 }
 ```
 
-The run id is the last path segment of `sourceUri`, which is what
-`gh api repos/yontrack/yontrack/actions/runs/<run_id>/artifacts` needs. Searching Actions for the
-commit SHA would be guesswork — several runs can share a SHA, and only one of them built the
-artefact this build was stamped from.
+`value` is the property's JSON — the run id is `value.workflows[0].runId`, ready to drop into
+`gh api repos/yontrack/yontrack/actions/runs/<runId>/artifacts`. Taking the number from here beats
+parsing it out of a URL, and searching Actions for the commit SHA would be guesswork anyway:
+several runs can share a SHA, and only one of them built the artefact this build was stamped from.
+
+**Run info** — the uniform model shared with validation runs — is deliberately *not* set on the
+build. [#1671](https://github.com/yontrack/yontrack/issues/1671) added a step to `ci.yml` to do
+exactly that before noticing the property above was already there, recording the same run since
+long before, and recording it better: the run id as a number rather than as a path segment to parse
+out of a URL. Two mechanisms carrying one fact is a maintenance cost with no reader, so the step
+came out again.
 
 ## The retention deadline
 

@@ -66,9 +66,10 @@ class RunInfoServiceIT : AbstractDSLTestSupport() {
     /**
      * The Go CLI's `RunInfo.RunTime` is a plain `int` with no `omitempty`, so every caller that
      * does not measure a duration sends `runTime: 0` rather than omitting the field - there is no
-     * way for it to express "not measured". Recording that verbatim would mean a build stamped by
-     * `ci.yml` reads as "ran in 0 seconds" and, worse, emits a 0.0 sample into
-     * `ontrack_run_build_time_seconds` on every run.
+     * way for it to express "not measured". Recording that verbatim would mean an untimed run
+     * reads as "ran in 0 seconds" and, worse, emits a 0.0 sample into
+     * `ontrack_run_<type>_time_seconds` - which is exactly what `ci.yml` does at every validation
+     * call site that has no recorded start to measure from.
      *
      * Zero is therefore normalised to no run time at all. Nothing is lost: a genuine zero-second
      * duration is not a measurement anyone can act on, and the UI already treats it as absent.
