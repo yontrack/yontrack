@@ -502,3 +502,31 @@ button.ot-validation-stamp-filter-edition {
     white-space: pre-wrap;
     word-break: break-word;
 }
+
+/**
+ * Pulse marking an in-flight state - a notification still being delivered, a
+ * run still going. Opacity only: the animation carries no colour of its own, so
+ * the element keeps whatever Ant Design token its caller painted it with.
+ *
+ * MOTION POLICY - this is the first `prefers-reduced-motion` guard in the
+ * codebase and it is the pattern to follow for every animation added after it.
+ * The animation is declared INSIDE `@media (prefers-reduced-motion: no-preference)`,
+ * never outside with an override to cancel it: a user who has asked their OS for
+ * less motion must never see the first frame. The `@keyframes` block sits outside
+ * the guard, which is harmless - keyframes with nothing referencing them do not
+ * animate anything.
+ */
+@media (prefers-reduced-motion: no-preference) {
+    .ot-pulse {
+        animation: ot-pulse 1.6s ease-in-out infinite;
+    }
+}
+
+@keyframes ot-pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.45;
+    }
+}

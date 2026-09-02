@@ -2,17 +2,30 @@ import {useGraphQLClient} from "@components/providers/ConnectionContextProvider"
 import {useEffect, useState} from "react";
 import LoadingInline from "@components/common/LoadingInline";
 import {gql} from "graphql-request";
-import NotificationStatusBadge from "@components/extension/notifications/NotificationStatusBadge";
-import {Badge, Space} from "antd";
+import {Badge} from "antd";
+import NotificationBadgeCluster from "@components/primitives/NotificationBadgeCluster";
+import {bucketNotificationTypes} from "@components/extension/notifications/notificationBuckets";
 
+/**
+ * Fetches an entity's notification records and hands the counts to the badges.
+ *
+ * This component owns the QUERY only. How the counts look is
+ * `NotificationBadgeCluster`'s job, and how one count looks is `StatePill`'s, so
+ * the badges read identically wherever they are used.
+ *
+ * Two presentations, picked by whether `children` is given:
+ *   - with children, a single antd `Badge` corner count decorating them - this
+ *     is the promotion medal in the builds table, where three pills would not fit;
+ *   - without, the full cluster - one pill per bucket.
+ *
+ * They COUNT NOTIFICATION RECORDS, not workflows; see
+ * `docs/adr/0002-promotion-run-badges-count-notifications.md`.
+ */
 export default function EntityNotificationsBadge({entityType, entityId, href, showText = false, children}) {
 
     const client = useGraphQLClient()
     const [loading, setLoading] = useState(true)
-    const [statuses, setStatuses] = useState({})
-
-    const [badgeCount, setBadgeCount] = useState(0)
-    const [badgeColour, setBadgeColour] = useState('')
+    const [counts, setCounts] = useState({success: 0, running: 0, error: 0})
 
     useEffect(() => {
         if (client) {
@@ -39,48 +52,36 @@ export default function EntityNotificationsBadge({entityType, entityId, href, sh
                 {entityType, entityId: Number(entityId)}
             ).then(data => {
                 const types = data.notificationRecords?.pageItems?.map(record => record.result.type) ?? []
-                let success = 0
-                let running = 0
-                let error = 0
-                types.forEach(type => {
-                    switch (type) {
-                        case 'OK':
-                            success++
-                            break
-                        case 'ONGOING':
-                        case 'ASYNC':
-                            running++
-                            break
-                        default:
-                            error++
-                            break
-                    }
-                })
-                setStatuses({success, running, error})
-                if (error) {
-                    setBadgeCount(error)
-                    setBadgeColour("red")
-                } else if (running) {
-                    setBadgeCount(running)
-                    setBadgeColour("blue")
-                } else if (success) {
-                    setBadgeCount(success)
-                    setBadgeColour("green")
-                }
+                setCounts(bucketNotificationTypes(types))
             }).finally(() => {
                 setLoading(false)
             })
         }
     }, [client, entityType, entityId])
 
+    // The corner count shows the most severe non-empty bucket: on a 22px medal
+    // there is only room for one number, and "something failed" is the one worth
+    // the space.
+    const worstBucket =
+        counts.error ? {count: counts.error, colour: "red"} :
+            counts.running ? {count: counts.running, colour: "blue"} :
+                counts.success ? {count: counts.success, colour: "green"} :
+                    {count: 0, colour: ""}
+
     return (
         <>
             {
-                children && <>
-                    <Badge overflowCount={10} showZero={false} count={badgeCount} title="" color={badgeColour} size="small">
-                        {children}
-                    </Badge>
-                </>
+                children &&
+                <Badge
+                    overflowCount={10}
+                    showZero={false}
+                    count={worstBucket.count}
+                    title=""
+                    color={worstBucket.colour}
+                    size="small"
+                >
+                    {children}
+                </Badge>
             }
             {
                 !children &&
@@ -88,30 +89,11 @@ export default function EntityNotificationsBadge({entityType, entityId, href, sh
                     loading={loading}
                     text=""
                 >
-                    <Space size={1}>
-                        <NotificationStatusBadge
-                            status="success"
-                            count={statuses.success}
-                            title={`${statuses.success} notification(s) have succeeded.`}
-                            href={href}
-                            showText={showText}
-                        />
-                        <NotificationStatusBadge
-                            status="processing"
-                            spin={true}
-                            count={statuses.running}
-                            title={`${statuses.running} notification(s) are still running.`}
-                            href={href}
-                            showText={showText}
-                        />
-                        <NotificationStatusBadge
-                            status="error"
-                            count={statuses.error}
-                            title={`${statuses.error} notification(s) have failed.`}
-                            href={href}
-                            showText={showText}
-                        />
-                    </Space>
+                    <NotificationBadgeCluster
+                        counts={counts}
+                        href={href}
+                        showText={showText}
+                    />
                 </LoadingInline>
             }
         </>

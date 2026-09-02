@@ -1,23 +1,24 @@
-import {restValidationStampImageUri} from "@components/common/Links";
-import {useEventForRefresh} from "@components/common/EventsContext";
-import ProxyImage from "@components/common/ProxyImage";
-import GeneratedIcon from "@components/common/icons/GeneratedIcon";
+import EntityIcon from "@components/primitives/EntityIcon";
 
-export default function ValidationStampImage({validationStamp, size = 16}) {
-
-    const refreshCount = useEventForRefresh("validationStamp.image")
-
-    return (
-        validationStamp.image ?
-            <ProxyImage
-                id={`validation-stamp-image-${validationStamp.id}`}
-                restUri={`${restValidationStampImageUri(validationStamp)}?key=${refreshCount}`}
-                alt={validationStamp.name}
-                width={size}
-                height={size}
-            /> : <GeneratedIcon
-                name={validationStamp.name}
-                colorIndex={validationStamp.id}
-            />
-    )
+/**
+ * The icon for a validation stamp.
+ *
+ * A thin wrapper over `EntityIcon`, which owns the image-first rule and the
+ * fallback. Note that the fallback now honours `size`: this component used to
+ * drop it on the way to `GeneratedIcon`, so a 24px stamp header silently shrank
+ * to 16px for any stamp with no uploaded image.
+ *
+ * `ValidationChip` deliberately does NOT go through here - it substitutes a
+ * data-type glyph for the initials tile, because a list of chips is scanned
+ * rather than read and two-letter tiles stop being distinguishable in one.
+ */
+export default function ValidationStampImage({validationStamp, size = 16, disabled = false, onClick, tooltipText}) {
+    return <EntityIcon
+        kind="validationStamp"
+        entity={validationStamp}
+        size={size}
+        disabled={disabled}
+        onClick={onClick}
+        tooltipText={tooltipText}
+    />
 }

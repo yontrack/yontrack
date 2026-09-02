@@ -82,6 +82,13 @@ export const gqlValidationRunTableContent = gql`
             image
             description
             annotatedDescription
+            # Feeds the fallback glyph on a ValidationChip when the stamp has no
+            # uploaded image - see ValidationDataTypeGlyphs.
+            dataType {
+                descriptor {
+                    id
+                }
+            }
         }
         data {
             descriptor {

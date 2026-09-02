@@ -1,6 +1,7 @@
 import {Popover, Space, Table, Typography} from "antd";
 import React from "react";
-import ValidationStamp from "@components/validationStamps/ValidationStamp";
+import ValidationChip from "@components/primitives/ValidationChip";
+import {validationStampUri} from "@components/common/Links";
 import ValidationRunLink from "@components/validationRuns/ValidationRunLink";
 import ValidationRunStatus from "@components/validationRuns/ValidationRunStatus";
 import AnnotatedDescription from "@components/common/AnnotatedDescription";
@@ -45,7 +46,26 @@ export default function ValidationRunTable({
         {
             title: "Validation",
             key: 'validation',
-            render: (_, run) => <ValidationStamp validationStamp={run.validationStamp} tooltipPlacement="rightBottom"/>,
+            // The chip, not a plain stamp: it tints its outline with the run's
+            // state, so the column can be scanned by colour. The status is
+            // spelled out by the "Status" column two along, so the chip's own
+            // pill is suppressed rather than saying it twice - the state stays
+            // in the chip's accessible name either way.
+            render: (_, run) => <Popover
+                title={run.validationStamp.name}
+                content={<AnnotatedDescription entity={run.validationStamp}/>}
+                placement="rightBottom"
+            >
+                <span>
+                    <ValidationChip
+                        id={`validation-chip-${run.id}`}
+                        validationStamp={run.validationStamp}
+                        statusID={run.lastStatus?.statusID}
+                        displayStatus={false}
+                        href={validationStampUri(run.validationStamp)}
+                    />
+                </span>
+            </Popover>,
             filters: filtering?.validationStamps,
             filterSearch: true,
             filterMultiple: false,

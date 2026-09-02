@@ -1,26 +1,18 @@
-import {restPromotionLevelImageUri} from "@components/common/Links";
-import {useEventForRefresh} from "@components/common/EventsContext";
-import ProxyImage from "@components/common/ProxyImage";
-import GeneratedIcon from "@components/common/icons/GeneratedIcon";
+import EntityIcon from "@components/primitives/EntityIcon";
 
-export const PromotionLevelImage = ({promotionLevel, size = 24, disabled = false}) => {
-
-    const refreshCount = useEventForRefresh("promotionLevel.image")
-
-    return (
-        promotionLevel.image ?
-            <ProxyImage
-                id={`promotion-level-image-${promotionLevel.id}`}
-                restUri={`${restPromotionLevelImageUri(promotionLevel)}?key=${refreshCount}`}
-                alt={promotionLevel.name}
-                width={size}
-                height={size}
-                disabled={disabled}
-            /> : <GeneratedIcon
-                name={promotionLevel.name}
-                colorIndex={promotionLevel.id}
-                size={size}
-                disabled={disabled}
-            />
-    )
-}
+/**
+ * The icon for a promotion level.
+ *
+ * A thin wrapper over `EntityIcon`, which owns the image-first rule and the
+ * fallback. Kept as a named component because it reads better at the call sites
+ * and because there are many of them; it must not grow behaviour of its own.
+ */
+export const PromotionLevelImage = ({promotionLevel, size = 24, disabled = false, onClick, tooltipText}) =>
+    <EntityIcon
+        kind="promotionLevel"
+        entity={promotionLevel}
+        size={size}
+        disabled={disabled}
+        onClick={onClick}
+        tooltipText={tooltipText}
+    />
