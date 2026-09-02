@@ -1,6 +1,7 @@
 import {getTextColorForBackground, numberToColorHsl} from "@components/common/colors/Colors";
 import {theme, Tooltip} from "antd";
 import {actionClassName} from "@components/common/ClassUtils";
+import {iconBoxStyle} from "@components/common/icons/iconBox";
 
 /**
  * The identity fallback for an entity that has no uploaded image: a coloured
@@ -53,18 +54,7 @@ export default function GeneratedIcon({id, name, colorIndex, onClick, tooltipTex
                     role="img"
                     aria-label={name}
                     style={{
-                        // Flex centring rather than line-height: line-height
-                        // drifts off-centre once the font size is a fraction of
-                        // the box, which is exactly what it is here.
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        boxSizing: 'border-box',
-                        width: `${size}px`,
-                        height: `${size}px`,
-                        // Never squashed by a flex parent - a squashed tile
-                        // clips its own initials.
-                        flex: `0 0 ${size}px`,
+                        ...iconBoxStyle(size),
                         backgroundColor: bgColor,
                         color: textColor,
                         fontFamily: token.fontFamily,

@@ -57,7 +57,7 @@ export const ENTITY_ICON_KINDS = {
 
 /**
  * @param {Object} props
- * @param {'promotionLevel'|'validationStamp'|string} props.kind
+ * @param {'promotionLevel'|'validationStamp'} props.kind
  * @param {{id: any, name: string, image?: boolean}} [props.entity]
  * @param {number} [props.size] Box size in px, applied to BOTH the image and the
  *   fallback. The fallback silently ignoring it was a real defect: a 32px medal
@@ -81,8 +81,10 @@ export default function EntityIcon({
 
     const config = ENTITY_ICON_KINDS[kind]
 
-    // Unconditional: an unknown kind must not change the hook order. It resolves
-    // to a name no event is ever fired under, which is exactly the no-op wanted.
+    // Unconditional, and defensive on `config`: a kind outside the union above
+    // is a typo or a kind since removed, and an icon is never worth crashing a
+    // page over. It resolves to an event name nothing is ever fired under,
+    // which is exactly the no-op wanted, without changing the hook order.
     const refreshCount = useEventForRefresh(config?.refreshEvent ?? `entityIcon.unknown.${kind}`)
 
     if (!entity) return null

@@ -1,4 +1,5 @@
 import {gql} from "graphql-request";
+import {gqlValidationChipStamp} from "@components/primitives/ValidationChipFragments";
 
 export const gqlValidationRunContent = gql`
     fragment ValidationRunContent on ValidationRun {
@@ -53,6 +54,7 @@ export const gqlValidationRunContent = gql`
 `
 
 export const gqlValidationRunTableContent = gql`
+    ${gqlValidationChipStamp}
     fragment ValidationRunTableContent on ValidationRun {
         id
         key: id
@@ -77,18 +79,9 @@ export const gqlValidationRunTableContent = gql`
             }
         }
         validationStamp {
-            id
-            name
-            image
+            ...ValidationChipStamp
             description
             annotatedDescription
-            # Feeds the fallback glyph on a ValidationChip when the stamp has no
-            # uploaded image - see ValidationDataTypeGlyphs.
-            dataType {
-                descriptor {
-                    id
-                }
-            }
         }
         data {
             descriptor {

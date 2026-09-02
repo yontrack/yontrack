@@ -1,5 +1,5 @@
 import React from "react";
-import {render, screen, waitFor} from "@testing-library/react";
+import {fireEvent, render, screen, waitFor} from "@testing-library/react";
 
 // Ant Design uses window.matchMedia for responsive features; jsdom doesn't provide it
 Object.defineProperty(window, 'matchMedia', {
@@ -134,6 +134,23 @@ describe('ValidationChip', () => {
             // ... but the state must still be announced.
             expect(screen.getByTestId('chip')).toHaveAccessibleName('SMOKE — Passed')
         })
+
+        // The pill is not a coloured rectangle with a word in it: it repeats the
+        // status's own glyph, so the state survives greyscale.
+        it('repeats the status glyph inside the pill', () => {
+            const {container} = renderChip({
+                validationStamp: stamp(),
+                statusID: {id: 'PASSED', name: 'Passed'},
+            })
+            expect(container.querySelector('[data-testid="chip-status"] svg')).toBeInTheDocument()
+        })
+
+        it('draws no glyph for a state that has none', () => {
+            // 'no run' is a glyphless mark on purpose - the absence must never
+            // borrow a real status's glyph.
+            const {container} = renderChip({validationStamp: stamp()})
+            expect(container.querySelector('[data-testid="chip-status"] svg')).not.toBeInTheDocument()
+        })
     })
 
     describe('the stamp name', () => {
@@ -149,14 +166,53 @@ describe('ValidationChip', () => {
         })
     })
 
-    it('is named for both the stamp and its state', () => {
+    // A label here would replace the very text that already says it: `role="img"`
+    // prunes its own subtree, so the name and the status would be hidden behind
+    // a label repeating them.
+    it('leaves itself unlabelled while it says everything in text', () => {
         renderChip({validationStamp: stamp(), statusID: {id: 'FAILED', name: 'Failed'}})
-        expect(screen.getByTestId('chip')).toHaveAccessibleName('SMOKE — Failed')
+        const chip = screen.getByTestId('chip')
+        expect(chip).not.toHaveAttribute('aria-label')
+        expect(chip).not.toHaveAttribute('role')
+        expect(chip).toHaveTextContent('SMOKE')
+        expect(chip).toHaveTextContent('Failed')
     })
 
     it('says so when there is no run yet', () => {
         renderChip({validationStamp: stamp()})
-        expect(screen.getByTestId('chip')).toHaveAccessibleName('SMOKE — No run')
+        expect(screen.getByTestId('chip')).toHaveTextContent('No run')
+    })
+
+    it('names itself once it stops saying everything in text', () => {
+        renderChip({validationStamp: stamp(), statusID: {id: 'FAILED', name: 'Failed'}, displayText: false})
+        expect(screen.getByTestId('chip')).toHaveAccessibleName('SMOKE — Failed')
+    })
+
+    describe('when it is clickable', () => {
+
+        it('is a button, not an image', () => {
+            renderChip({validationStamp: stamp(), statusID: {id: 'PASSED', name: 'Passed'}, onClick: jest.fn()})
+            expect(screen.getByRole('button')).toHaveAccessibleName('SMOKE — Passed')
+        })
+
+        it('is reachable from the keyboard', () => {
+            renderChip({validationStamp: stamp(), onClick: jest.fn()})
+            expect(screen.getByRole('button')).toHaveAttribute('tabindex', '0')
+        })
+
+        it.each(['Enter', ' '])('activates on %s', (key) => {
+            const onClick = jest.fn()
+            renderChip({validationStamp: stamp(), onClick})
+            fireEvent.keyDown(screen.getByRole('button'), {key})
+            expect(onClick).toHaveBeenCalledTimes(1)
+        })
+
+        it('activates on a click', () => {
+            const onClick = jest.fn()
+            renderChip({validationStamp: stamp(), onClick})
+            fireEvent.click(screen.getByRole('button'))
+            expect(onClick).toHaveBeenCalledTimes(1)
+        })
     })
 
     it('links when given an href', () => {

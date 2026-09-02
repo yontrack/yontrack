@@ -2,6 +2,7 @@
 
 import {theme} from "antd"
 import {getValidationDataTypeGlyph} from "@components/primitives/ValidationDataTypeGlyphs"
+import {iconBoxStyle} from "@components/common/icons/iconBox"
 
 /**
  * The icon a validation stamp with no uploaded image gets on a `ValidationChip`:
@@ -33,13 +34,7 @@ export default function ValidationStampGlyph({validationStamp, size = 22}) {
             role="img"
             aria-label={validationStamp?.name}
             style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                boxSizing: 'border-box',
-                width: `${size}px`,
-                height: `${size}px`,
-                flex: `0 0 ${size}px`,
+                ...iconBoxStyle(size),
                 borderRadius: token.borderRadiusSM,
                 backgroundColor: token.colorFillQuaternary,
                 color: token.colorTextSecondary,

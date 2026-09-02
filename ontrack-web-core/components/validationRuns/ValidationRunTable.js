@@ -52,7 +52,7 @@ export default function ValidationRunTable({
             // pill is suppressed rather than saying it twice - the state stays
             // in the chip's accessible name either way.
             render: (_, run) => <Popover
-                title={run.validationStamp.name}
+                title={run.validationStamp?.name}
                 content={<AnnotatedDescription entity={run.validationStamp}/>}
                 placement="rightBottom"
             >
@@ -62,7 +62,7 @@ export default function ValidationRunTable({
                         validationStamp={run.validationStamp}
                         statusID={run.lastStatus?.statusID}
                         displayStatus={false}
-                        href={validationStampUri(run.validationStamp)}
+                        href={run.validationStamp ? validationStampUri(run.validationStamp) : undefined}
                     />
                 </span>
             </Popover>,

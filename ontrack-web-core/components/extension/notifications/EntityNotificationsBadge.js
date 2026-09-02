@@ -3,7 +3,7 @@ import {useEffect, useState} from "react";
 import LoadingInline from "@components/common/LoadingInline";
 import {gql} from "graphql-request";
 import {Badge} from "antd";
-import NotificationBadgeCluster from "@components/primitives/NotificationBadgeCluster";
+import NotificationBadgeCluster, {mostSevereNotificationBucket} from "@components/primitives/NotificationBadgeCluster";
 import {bucketNotificationTypes} from "@components/extension/notifications/notificationBuckets";
 
 /**
@@ -59,14 +59,11 @@ export default function EntityNotificationsBadge({entityType, entityId, href, sh
         }
     }, [client, entityType, entityId])
 
-    // The corner count shows the most severe non-empty bucket: on a 22px medal
-    // there is only room for one number, and "something failed" is the one worth
-    // the space.
-    const worstBucket =
-        counts.error ? {count: counts.error, colour: "red"} :
-            counts.running ? {count: counts.running, colour: "blue"} :
-                counts.success ? {count: counts.success, colour: "green"} :
-                    {count: 0, colour: ""}
+    // On a 22px medal there is only room for one number, so the corner count
+    // shows the most severe non-empty bucket. Which bucket that is, and what
+    // colour it takes, is decided in `NotificationBadgeCluster` alongside the
+    // buckets themselves - the two presentations must not disagree.
+    const worst = mostSevereNotificationBucket(counts)
 
     return (
         <>
@@ -75,9 +72,9 @@ export default function EntityNotificationsBadge({entityType, entityId, href, sh
                 <Badge
                     overflowCount={10}
                     showZero={false}
-                    count={worstBucket.count}
+                    count={worst?.count ?? 0}
                     title=""
-                    color={worstBucket.colour}
+                    color={worst?.badgeColour}
                     size="small"
                 >
                     {children}

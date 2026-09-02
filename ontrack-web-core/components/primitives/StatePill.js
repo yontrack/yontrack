@@ -131,7 +131,11 @@ export default function StatePill({
             title={title}
             className={pulse ? 'ot-pulse' : undefined}
             // `title` fires on neither keyboard focus nor touch, so it can never
-            // be the only place the meaning lives.
+            // be the only place the meaning lives - hence the label. It needs a
+            // role to go with it: `aria-label` on a bare span (implicit
+            // `role="generic"`) is not reliably exposed, which would leave the
+            // sentence with nowhere to live at all.
+            role={title ? 'img' : undefined}
             aria-label={title}
             style={{
                 display: 'inline-flex',

@@ -1,5 +1,6 @@
 import {gql} from "graphql-request";
 import {gqlDecorationFragment} from "@components/services/fragments";
+import {gqlValidationChipStamp} from "@components/primitives/ValidationChipFragments";
 
 export const gqlBuilds = gql`
     query LoadBuilds(
@@ -70,18 +71,9 @@ export const gqlBuilds = gql`
                     }
                     validations {
                         validationStamp {
-                            id
-                            name
+                            ...ValidationChipStamp
                             description
                             annotatedDescription
-                            image
-                            # Feeds the fallback glyph on a ValidationChip when the
-                            # stamp has no uploaded image - see ValidationDataTypeGlyphs.
-                            dataType {
-                                descriptor {
-                                    id
-                                }
-                            }
                         }
                         validationRuns(count: 1) {
                             id
@@ -114,4 +106,5 @@ export const gqlBuilds = gql`
     }
     
     ${gqlDecorationFragment}
+    ${gqlValidationChipStamp}
 `

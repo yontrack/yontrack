@@ -22,7 +22,10 @@ import {useTheme} from "@components/providers/ThemeProvider"
  */
 
 /**
- * @typedef {{color: string, background: string, border: string}} ValidationStateColors
+ * The same triple `StatePill` paints itself with - referenced rather than
+ * restated, so the two cannot drift.
+ *
+ * @typedef {import('@components/primitives/StatePill').PillColors} ValidationStateColors
  */
 
 /**

@@ -5,7 +5,7 @@ import Link from "next/link"
 import EntityIcon from "@components/primitives/EntityIcon"
 import StatePill from "@components/primitives/StatePill"
 import ValidationStampGlyph from "@components/primitives/ValidationStampGlyph"
-import {NONE_STATUS_ID} from "@components/validationRuns/ValidationRunStatusConfig"
+import {getValidationRunStatusConfig, NONE_STATUS_ID} from "@components/validationRuns/ValidationRunStatusConfig"
 import {useValidationStateColors} from "@components/primitives/validationStateColors"
 
 /**
@@ -16,10 +16,12 @@ import {useValidationStateColors} from "@components/primitives/validationStateCo
  * beside them never changes. That way a column of chips scans by hue, and a
  * stamp does not appear to become a different stamp when it starts failing.
  *
- * Colour alone is never the whole story: the pill spells the status out, and the
- * chip's accessible name is always "STAMP — Status", present whether or not the
- * pill is rendered. That is the same contract `ValidationRunStatusIcon` honours,
- * and it is why `displayStatus={false}` still names the state.
+ * COLOUR IS NEVER THE ONLY CARRIER. The pill spells the status out in words and
+ * repeats the status's own glyph from `ValidationRunStatusConfig`, so the state
+ * survives greyscale and colour blindness. When the caller suppresses the name
+ * or the pill, the chip becomes an opaque mark and takes an `aria-label` of
+ * "STAMP — Status" instead; while both are visible it does NOT, because a label
+ * there would hide the very text that already says it.
  *
  * WHERE THE HUES COME FROM. Radius, type and the neutral surfaces are Ant Design
  * tokens; the status hues come from `ValidationRunStatusConfig` by way of
@@ -60,14 +62,40 @@ export default function ValidationChip({
     // no run at all says so in words rather than being silently neutral.
     const hasRun = statusId !== NONE_STATUS_ID
     const statusName = hasRun ? (statusID?.name || statusId) : 'No run'
+    const accessibleName = `${validationStamp.name} \u2014 ${statusName}`
+
+    // Whenever the caller hides the name or the state, the chip stops being
+    // self-describing and has to say so through a label instead.
+    const isOpaque = !displayText || !displayStatus
+
+    // The status's own glyph, repeated inside the pill so the state does not
+    // depend on hue alone. react-icons types IconType as returning ReactNode,
+    // which TypeScript only accepts as a JSX component from TS 5.1 onward - the
+    // same cast `ValidationRunStatusIcon.js` makes, for the same reason.
+    const StatusGlyph = /** @type {((props: import('react-icons').IconBaseProps) => import('react').ReactElement) | null} */ (
+        getValidationRunStatusConfig(statusId).Icon
+    )
 
     const chip = (
         <span
             data-testid={id}
             data-status={statusId}
-            role="img"
-            aria-label={`${validationStamp.name} — ${statusName}`}
+            // Only an image when some of what it says is not readable as text.
+            // `role="img"` prunes its own subtree from the accessibility tree,
+            // so setting it while the name and the status ARE spelled out would
+            // hide them behind a label that only repeats them. And an image is
+            // not something you click: a chip with a handler is a button, and
+            // has to be reachable and operable from the keyboard like one.
+            role={onClick ? 'button' : (isOpaque ? 'img' : undefined)}
+            aria-label={onClick || isOpaque ? accessibleName : undefined}
+            tabIndex={onClick ? 0 : undefined}
             onClick={onClick}
+            onKeyDown={onClick ? (event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault()
+                    onClick()
+                }
+            } : undefined}
             className={onClick ? "ot-action" : undefined}
             style={{
                 display: 'inline-flex',
@@ -107,6 +135,15 @@ export default function ValidationChip({
                     id={id ? `${id}-status` : undefined}
                     text={statusName}
                     colors={colors}
+                    icon={StatusGlyph && <StatusGlyph
+                        size={Math.round(token.fontSizeSM * 0.95)}
+                        // Tabler is drawn for 24px at stroke 2; bumped here for
+                        // the same legibility reason the status marks bump it.
+                        strokeWidth={2.25}
+                        // Decorative - the word beside it is the real carrier.
+                        aria-hidden="true"
+                        focusable="false"
+                    />}
                 />
             }
         </span>
