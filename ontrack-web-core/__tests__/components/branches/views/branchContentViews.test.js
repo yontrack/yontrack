@@ -4,13 +4,23 @@ import {
     getBranchContentView,
 } from "@components/branches/views/branchContentViews"
 
-// The builds content view drags the whole builds table in; only the registry is under test here
+// Each content view drags its whole region tree in; only the registry is under test here
 jest.mock("../../../../components/branches/views/BuildsContentView", () => () => <div/>)
+jest.mock("../../../../components/branches/views/pipeline/PipelineContentView", () => () => <div/>)
 
 describe('branch content view registry', () => {
 
-    it('registers the builds view, and only that one for now', () => {
-        expect(branchContentViews.map(it => it.key)).toEqual(['builds'])
+    it('registers the builds and the pipeline views', () => {
+        expect(branchContentViews.map(it => it.key)).toEqual(['builds', 'pipeline'])
+    })
+
+    it('names the pipeline view for what it reads, not for how it draws', () => {
+        expect(getBranchContentView('pipeline').name).toBe("Pipeline")
+    })
+
+    it('still defaults to the builds view, so no existing user is moved', () => {
+        // Making the pipeline view the default is a separate, deliberate decision
+        expect(defaultBranchContentViewKey).toBe('builds')
     })
 
     it('names the legacy view "Builds", never "Table"', () => {

@@ -4,8 +4,9 @@ import {fireEvent, render, screen} from "@testing-library/react"
 import {PreferencesContext} from "@components/providers/PreferencesProvider"
 import useBranchContentViewSelection from "@components/branches/views/useBranchContentViewSelection"
 
-// The builds content view drags the whole builds table in; only the registry is under test here
+// Each content view drags its whole region tree in; only the selection is under test here
 jest.mock("../../../../components/branches/views/BuildsContentView", () => () => <div/>)
+jest.mock("../../../../components/branches/views/pipeline/PipelineContentView", () => () => <div/>)
 
 const mockRouter = {
     pathname: "/branch/[id]",

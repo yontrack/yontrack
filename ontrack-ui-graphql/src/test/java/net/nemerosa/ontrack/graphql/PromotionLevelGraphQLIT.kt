@@ -315,4 +315,67 @@ class PromotionLevelGraphQLIT : AbstractQLKTITSupport() {
         }
     }
 
+    @Test
+    fun `Number of builds promoted to a promotion level`() {
+        project {
+            branch {
+                val pl = promotionLevel()
+                // One build promoted several times, which must count once
+                build {
+                    (1..3).forEach { no ->
+                        promote(pl, description = "Run n°$no")
+                    }
+                }
+                // Two builds promoted once
+                build { promote(pl) }
+                build { promote(pl) }
+                // ... and one build never promoted at all
+                build()
+                run(
+                    """
+                        query PromotedBuildCount(${'$'}id: Int!) {
+                            promotionLevel(id: ${'$'}id) {
+                                promotedBuildCount
+                                promotionRunsPaginated(size: 0) {
+                                    pageInfo {
+                                        totalSize
+                                    }
+                                }
+                            }
+                        }
+                    """,
+                    mapOf("id" to pl.id()),
+                ).apply {
+                    val field = path("promotionLevel")
+                    // Three distinct builds reached the level...
+                    assertEquals(3, field["promotedBuildCount"].asInt())
+                    // ... over five promotion runs, which is the count NOT to display
+                    assertEquals(5, field["promotionRunsPaginated"]["pageInfo"]["totalSize"].asInt())
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `No build promoted to a promotion level`() {
+        project {
+            branch {
+                val pl = promotionLevel()
+                build()
+                run(
+                    """
+                        query PromotedBuildCount(${'$'}id: Int!) {
+                            promotionLevel(id: ${'$'}id) {
+                                promotedBuildCount
+                            }
+                        }
+                    """,
+                    mapOf("id" to pl.id()),
+                ).apply {
+                    assertEquals(0, path("promotionLevel")["promotedBuildCount"].asInt())
+                }
+            }
+        }
+    }
+
 }

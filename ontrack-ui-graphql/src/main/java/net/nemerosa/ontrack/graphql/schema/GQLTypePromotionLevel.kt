@@ -3,6 +3,7 @@ package net.nemerosa.ontrack.graphql.schema
 import graphql.Scalars
 import graphql.schema.DataFetcher
 import graphql.schema.DataFetchingEnvironment
+import graphql.schema.GraphQLNonNull
 import graphql.schema.GraphQLObjectType
 import graphql.schema.GraphQLTypeReference
 import net.nemerosa.ontrack.common.and
@@ -67,6 +68,21 @@ class GQLTypePromotionLevel(
                         .type(listType(promotionRun.typeRef))
                         .arguments(listArguments())
                         .dataFetcher(promotionLevelPromotionRunsFetcher())
+            }
+            // Number of builds which reached this promotion level
+            .field {
+                it.name("promotedBuildCount")
+                    .description("Number of distinct builds which have been promoted to this level")
+                    .type(GraphQLNonNull(Scalars.GraphQLInt))
+                    .dataFetcher { env ->
+                        val pl: PromotionLevel = env.getSource()!!
+                        // Distinct BUILDS, not promotion runs: the same build can be promoted again
+                        // to the same level (a repair action offered by the UI), and counting the
+                        // runs would tell the user a branch reached a level more often than it did.
+                        structureService.getPromotionRunsForPromotionLevel(pl.id)
+                            .mapTo(mutableSetOf()) { run -> run.build.id() }
+                            .size
+                    }
             }
             // Paginated promotion runs
             .field(

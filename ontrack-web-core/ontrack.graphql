@@ -5187,6 +5187,8 @@ type PromotionLevel implements Authorizable & ProjectEntity {
   name: String
   "Makes a promotion conditional based on the fact that a previous promotion has been granted."
   previousPromotionConditionProperty: Property
+  "Number of distinct builds which have been promoted to this level"
+  promotedBuildCount: Int!
   "List of promotions a promotion depends on before being applied."
   promotionDependenciesProperty: Property
   "List of runs for this promotion"
@@ -5833,6 +5835,25 @@ type Query {
     projects: [String!],
     "ID of the build to"
     to: Int!
+  ): SCMChangeLog
+  "Query to get a change log between two builds, using their names or display names."
+  scmChangeLogByName(
+    "Name or display name of the build from"
+    from: String!,
+    "Name of the branch of the build from, used to disambiguate its name"
+    fromBranch: String,
+    "Name of the project"
+    project: String!,
+    """
+    List of projects to follow one by one for a get deep change log. Each item
+    in the list is either a project name, or a project name and qualifier separated
+    by a colon (:).
+    """
+    projects: [String!],
+    "Name or display name of the build to"
+    to: String!,
+    "Name of the branch of the build to, used to disambiguate its name"
+    toBranch: String
   ): SCMChangeLog
   "Performs a search in Ontrack"
   search(

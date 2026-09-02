@@ -499,6 +499,8 @@ type Branch implements Authorizable & ProjectEntity {
   ): [ValidationStamp!]!
   "Given a list of validation names, returns for each one the last validation run or null if the validation does not exist."
   validationStatuses(names: [String!]!): [ValidationRun!]!
+  "Workflows which have been launched by a notification on an event for this entity, most recent first. Resolved by scanning the 100 most recent workflow notification records for this entity, so the list may be truncated on entities which accumulate many of them, like a project or a branch."
+  workflowInstances: [WorkflowInstance!]!
 }
 
 "Information about a branch"
@@ -693,6 +695,8 @@ type Build implements Authorizable & ProjectEntity {
     "List of validation stamps"
     validationStamps: [String!]
   ): [Validation!]!
+  "Workflows which have been launched by a notification on an event for this entity, most recent first. Resolved by scanning the 100 most recent workflow notification records for this entity, so the list may be truncated on entities which accumulate many of them, like a project or a branch."
+  workflowInstances: [WorkflowInstance!]!
 }
 
 "Gathering information about the auto versioning around this build"
@@ -4810,6 +4814,8 @@ type Preferences {
   dashboardUuid: String
   "Selected branch view"
   selectedBranchViewKey: String
+  "Theme selected for the web UI"
+  themeMode: ThemeMode!
 }
 
 type Project implements Authorizable & ProjectEntity {
@@ -4951,6 +4957,8 @@ type Project implements Authorizable & ProjectEntity {
     "Validation stamp where to look for validation runs (regular expression, defaults to all)"
     validationStamp: String
   ): ValidationRunPaginated
+  "Workflows which have been launched by a notification on an event for this entity, most recent first. Resolved by scanning the 100 most recent workflow notification records for this entity, so the list may be truncated on entities which accumulate many of them, like a project or a branch."
+  workflowInstances: [WorkflowInstance!]!
 }
 
 type ProjectAuthorization {
@@ -5179,6 +5187,8 @@ type PromotionLevel implements Authorizable & ProjectEntity {
   name: String
   "Makes a promotion conditional based on the fact that a previous promotion has been granted."
   previousPromotionConditionProperty: Property
+  "Number of distinct builds which have been promoted to this level"
+  promotedBuildCount: Int!
   "List of promotions a promotion depends on before being applied."
   promotionDependenciesProperty: Property
   "List of runs for this promotion"
@@ -5212,6 +5222,8 @@ type PromotionLevel implements Authorizable & ProjectEntity {
   ): [Property!]!
   "List of actions available for this entity"
   userMenuActions: [UserMenuAction!]!
+  "Workflows which have been launched by a notification on an event for this entity, most recent first. Resolved by scanning the 100 most recent workflow notification records for this entity, so the list may be truncated on entities which accumulate many of them, like a project or a branch."
+  workflowInstances: [WorkflowInstance!]!
 }
 
 "Configurable field definition on a promotion level"
@@ -5283,6 +5295,8 @@ type PromotionRun implements Authorizable & ProjectEntity {
   ): [Property!]!
   "List of actions available for this entity"
   userMenuActions: [UserMenuAction!]!
+  "Workflows which have been launched by a notification on an event for this entity, most recent first. Resolved by scanning the 100 most recent workflow notification records for this entity, so the list may be truncated on entities which accumulate many of them, like a project or a branch."
+  workflowInstances: [WorkflowInstance!]!
 }
 
 "A field value stored on a promotion run"
@@ -5821,6 +5835,25 @@ type Query {
     projects: [String!],
     "ID of the build to"
     to: Int!
+  ): SCMChangeLog
+  "Query to get a change log between two builds, using their names or display names."
+  scmChangeLogByName(
+    "Name or display name of the build from"
+    from: String!,
+    "Name of the branch of the build from, used to disambiguate its name"
+    fromBranch: String,
+    "Name of the project"
+    project: String!,
+    """
+    List of projects to follow one by one for a get deep change log. Each item
+    in the list is either a project name, or a project name and qualifier separated
+    by a colon (:).
+    """
+    projects: [String!],
+    "Name or display name of the build to"
+    to: String!,
+    "Name of the branch of the build to, used to disambiguate its name"
+    toBranch: String
   ): SCMChangeLog
   "Performs a search in Ontrack"
   search(
@@ -7902,6 +7935,8 @@ type ValidationRun implements Authorizable & ProjectEntity {
   ): [ValidationRunStatus!]!
   "Associated validation stamp"
   validationStamp: ValidationStamp!
+  "Workflows which have been launched by a notification on an event for this entity, most recent first. Resolved by scanning the 100 most recent workflow notification records for this entity, so the list may be truncated on entities which accumulate many of them, like a project or a branch."
+  workflowInstances: [WorkflowInstance!]!
 }
 
 "Data associated with a validation run"
@@ -8006,6 +8041,8 @@ type ValidationStamp implements Authorizable & ProjectEntity {
     "Size of the page"
     size: Int = 20
   ): ValidationRunPaginated
+  "Workflows which have been launched by a notification on an event for this entity, most recent first. Resolved by scanning the 100 most recent workflow notification records for this entity, so the list may be truncated on entities which accumulate many of them, like a project or a branch."
+  workflowInstances: [WorkflowInstance!]!
 }
 
 "Validation stamp filter"
@@ -8485,6 +8522,13 @@ enum SlotPipelineStatus {
   CANDIDATE
   DONE
   RUNNING
+}
+
+"Theme selected by a user for the web UI"
+enum ThemeMode {
+  DARK
+  LIGHT
+  SYSTEM
 }
 
 "Defines how validation runs should be sorted"
@@ -10731,6 +10775,8 @@ input SetPreferencesInput {
   dashboardUuid: String
   "Selected branch view"
   selectedBranchViewKey: String
+  "Theme selected for the web UI"
+  themeMode: ThemeMode
 }
 
 "Input type for the setProjectAutoPromotionLevelPropertyById mutation."

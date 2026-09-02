@@ -1,7 +1,10 @@
 import dayjs from "dayjs";
 
-import * as utc from 'dayjs/plugin/utc';
-import * as timezone from 'dayjs/plugin/timezone';
+// Default imports, not `import * as`: a namespace object is not callable, and `dayjs.extend`
+// silently worked only because the bundler's interop handed one back. Under Jest it does not, and
+// the module throws on load.
+import utc from 'dayjs/plugin/utc';
+import timezone from 'dayjs/plugin/timezone';
 
 dayjs.extend(utc);
 dayjs.extend(timezone);

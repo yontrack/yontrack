@@ -1,12 +1,11 @@
 import {useEffect, useState} from "react";
 import {gql} from "graphql-request";
-import {useRouter} from "next/router";
 import {gqlBuilds} from "@components/branches/branchQueries";
 import BranchBuilds from "@components/branches/BranchBuilds";
 import useRangeSelection from "@components/common/RangeSelection";
-import {getLocallySelectedBuildFilter, setLocallySelectedBuildFilter,} from "@components/storage/local";
 import {useEventForRefresh} from "@components/common/EventsContext";
 import {useQuery} from "@components/services/GraphQL";
+import useBuildFilterSelection from "@components/branches/views/useBuildFilterSelection";
 import {useRefresh} from "@components/common/RefreshUtils";
 
 // Stands in for the page info until the first page of builds has been loaded. `nextPage` is an empty
@@ -24,47 +23,15 @@ const emptyPageInfo = {nextPage: {}}
  */
 export default function BuildsContentView({branch}) {
 
-    // Router (used for permalinks)
-    const router = useRouter()
-
     // Pagination status
     const [pagination, setPagination] = useState({
         offset: 0,
         size: 10,
     })
 
-    // Initially selected build filter
-    let initialBuildFilter = undefined
-    const {buildFilter} = router.query
-    if (buildFilter) {
-        try {
-            initialBuildFilter = JSON.parse(buildFilter)
-            // Clears the permalink, leaving the other parameters (like the content view) alone
-            const {buildFilter: _, ...query} = router.query
-            router.replace({pathname: router.pathname, query}, undefined, {shallow: true})
-        } catch (ignored) {
-        }
-    } else {
-        initialBuildFilter = getLocallySelectedBuildFilter(branch.id)
-    }
-
-    // Selected build filter
-    const [selectedBuildFilter, setSelectedBuildFilter] = useState(initialBuildFilter)
-    const onSelectedBuildFilter = (resource) => {
-        setLocallySelectedBuildFilter(branch.id, resource)
-        setSelectedBuildFilter(resource)
-    }
-    const onPermalinkBuildFilter = (resource) => {
-        if (resource) {
-            router.replace({
-                pathname: router.pathname,
-                query: {
-                    ...router.query,
-                    buildFilter: JSON.stringify(resource),
-                },
-            }, undefined, {shallow: true})
-        }
-    }
+    // Selected build filter, shared with the other content views so switching view keeps it
+    const {selectedBuildFilter, onSelectedBuildFilter, onPermalinkBuildFilter} =
+        useBuildFilterSelection({branch})
 
     // Build created
     const buildCreated = useEventForRefresh("build.created")

@@ -18,6 +18,24 @@ the branch view. Content views are peers on a single axis of choice — a conten
 view never offers a sub-selector for other content views.
 _Avoid_: view mode, layout, tab
 
+**Pipeline view**:
+The branch content view that reads a branch as its promotion pipeline — what is
+release-ready right now — with the full build list one click away in the view
+menu. Named for what it reads, not for how it draws.
+_Avoid_: timeline view, card view, Option C
+
+**Build timeline**:
+The strip of build cards in the pipeline view, most recent first. It shows the
+same builds, under the same filter and the same "load more", as the builds view's
+table.
+_Avoid_: build strip, build feed
+
+**Build inspector**:
+The pair of panels in the pipeline view showing the promotions and validations of
+the selected build, so a build can be read without leaving the branch. It shares
+display primitives with the build view's widgets, not compositions.
+_Avoid_: build detail, build preview, build panel
+
 **Promotion level**:
 A named, ordered rung a build can reach on a branch. The set is configured per
 branch and its size varies widely between projects; levels carry an ordinal

@@ -1,5 +1,6 @@
-import {FaListUl} from "react-icons/fa";
+import {FaListUl, FaStream} from "react-icons/fa";
 import BuildsContentView from "@components/branches/views/BuildsContentView";
+import PipelineContentView from "@components/branches/views/pipeline/PipelineContentView";
 
 /**
  * Registry of the branch content views: the interchangeable renderings which can fill the content
@@ -24,6 +25,12 @@ export const branchContentViews = [
         name: "Builds",
         icon: <FaListUl/>,
         component: BuildsContentView,
+    },
+    {
+        key: 'pipeline',
+        name: "Pipeline",
+        icon: <FaStream/>,
+        component: PipelineContentView,
     },
 ]
 
