@@ -14,7 +14,7 @@ export default function BranchContentViewSelector({views, selectedViewKey, onSel
     // The loud half - the invitation to give feedback - is the alert inside the view itself.
     // No link here: this sits inside a clickable menu item which closes on click, so a nested
     // link would fight both the item's own handler and the menu closing.
-    const label = view => view.experimental
+    const viewLabel = view => view.experimental
         ? <Space size={6}>
             {view.name}
             <Tooltip title="This view is experimental. Feedback is welcome.">
@@ -27,7 +27,7 @@ export default function BranchContentViewSelector({views, selectedViewKey, onSel
 
     const items = views.map(view => ({
         key: view.key,
-        label: label(view),
+        label: viewLabel(view),
         icon: view.icon,
         onClick: () => onSelect(view.key),
     }))

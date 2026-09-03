@@ -35,8 +35,9 @@ class BranchPipelinePage {
     // --- Experimental alert -------------------------------------------------
 
     experimentalAlert() {
-        // The wrapper div carries the test id; the alert itself is gone from the DOM once dismissed
-        return this.page.getByTestId('pipeline-experimental-alert').getByRole('alert')
+        // The test id is on the alert's message, so the whole band goes when it is dismissed
+        return this.page.getByRole('alert')
+            .filter({has: this.page.getByTestId('pipeline-experimental-alert')})
     }
 
     async checkExperimentalAlert() {
@@ -49,7 +50,7 @@ class BranchPipelinePage {
 
     async dismissExperimentalAlert() {
         // Ant's own close affordance: an icon button with no accessible name of its own
-        await this.page.getByTestId('pipeline-experimental-alert').locator('.ant-alert-close-icon').click()
+        await this.experimentalAlert().locator('.ant-alert-close-icon').click()
         await this.checkNoExperimentalAlert()
     }
 

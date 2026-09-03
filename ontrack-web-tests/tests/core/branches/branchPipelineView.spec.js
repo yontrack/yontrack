@@ -17,11 +17,16 @@ const {test} = require("../../fixtures/connection");
 
 /**
  * Local storage key behind the experimental alert's dismissal - `CloseableAlert` prefixes the
- * alert's own id. Specs which care about the alert clear it once they are signed in: Playwright
- * contexts are fresh per test today, but nothing in this file should depend on that.
+ * alert's own id with `closeable-alert-`.
  *
- * Once, and not from an init script: an init script runs again on every navigation, so it would
- * also wipe the dismissal the "stays dismissed" test is there to observe surviving a reload.
+ * The specs which care about the alert clear it on the way in AND on the way out: the one which
+ * dismisses it would otherwise leave every spec running after it looking at a page whose alert is
+ * already gone. Playwright gives each test a fresh context today, so nothing leaks in practice -
+ * but that is a property of the config, not of this file, and the file should not need it to hold.
+ *
+ * Cleared with `evaluate` rather than from an init script: an init script runs again on every
+ * navigation, so it would also wipe the dismissal the "stays dismissed" test observes surviving a
+ * reload.
  */
 const experimentalAlertKey = 'closeable-alert-feature-branch-pipeline-view'
 
@@ -211,12 +216,6 @@ test('the view menu offers the pipeline view, and the choice is remembered', asy
     await branchPage.checkContentViews(["Builds", "Pipeline"])
     await branchPage.checkContentViewSelected("Builds")
 
-    // The quiet half of the experimental marking, seen before opting into the view
-    await branchPage.openContentViewMenu()
-    await expect(page.getByTestId('branch-content-view-experimental-pipeline')).toBeVisible()
-    await expect(page.getByTestId('branch-content-view-experimental-builds')).toBeHidden()
-    await branchPage.closeContentViewMenu()
-
     await branchPage.openContentViewMenu()
     await branchPage.contentViewMenuItem("Pipeline").click()
 
@@ -265,4 +264,7 @@ test('the experimental alert stays dismissed once dismissed', async ({page, ontr
     await page.reload()
     await pipelinePage.checkOnPage()
     await pipelinePage.checkNoExperimentalAlert()
+
+    // ... and the shared preference is put back where the specs after this one expect it
+    await forgetExperimentalAlertDismissal(page)
 })

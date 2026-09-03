@@ -109,22 +109,24 @@ export default function PipelineContentView({branch}) {
                 is the localStorage key #1648 has to clean up when it removes both markers.
                 `info` rather than `warning`: this view is not risky, it is new, and a yellow band
                 on a read-only view we are inviting people to adopt argues against adopting it. */}
-            <div data-testid="pipeline-experimental-alert">
-                <CloseableAlert
-                    id="feature-branch-pipeline-view"
-                    type="info"
-                    message={
-                        <Typography.Text>
-                            The Pipeline view is experimental and still being refined. Your feedback
-                            is welcome — tell us what works and what does not in{' '}
-                            <a href="https://github.com/yontrack/yontrack/discussions"
-                               target="_blank" rel="noreferrer">
-                                GitHub Discussions
-                            </a>.
-                        </Typography.Text>
-                    }
-                />
-            </div>
+            <CloseableAlert
+                id="feature-branch-pipeline-view"
+                type="info"
+                message={
+                    // The test id goes on the message rather than on a wrapper around the alert:
+                    // a wrapper is a child element of the enclosing `Space` whatever it renders, so
+                    // it would keep its 16px slot once the alert is dismissed and leave every user
+                    // who dismisses a permanent gap here.
+                    <Typography.Text data-testid="pipeline-experimental-alert">
+                        The Pipeline view is experimental and still being refined. Your feedback
+                        is welcome — tell us what works and what does not in{' '}
+                        <a href="https://github.com/yontrack/yontrack/discussions"
+                           target="_blank" rel="noreferrer">
+                            GitHub Discussions
+                        </a>.
+                    </Typography.Text>
+                }
+            />
             <PipelineStats
                 totalBuilds={totalBuilds}
                 latestBuild={latestBuild}
