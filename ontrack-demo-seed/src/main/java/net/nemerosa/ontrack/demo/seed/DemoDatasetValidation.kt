@@ -1,5 +1,7 @@
 package net.nemerosa.ontrack.demo.seed
 
+import java.time.LocalDateTime
+
 /**
  * Checks a dataset against the rules Yontrack would enforce, before anything is deleted.
  *
@@ -22,6 +24,12 @@ fun DemoDataset.validate() {
     }
 
     val buildRefs = mutableSetOf<BuildRef>()
+
+    // Creation times are resolved against one arbitrary but fixed instant: `DaysAgo` is
+    // monotonic in it, so which instant it is does not change the order it yields. Only a
+    // branch mixing `DaysAgo` and `At` builds could read differently under another one, and
+    // a branch doing that has no stable order to check in the first place.
+    val reference = LocalDateTime.of(2000, 1, 1, 0, 0)
 
     projects.forEach { project ->
         checkName(project.name, "Project")
@@ -48,6 +56,19 @@ fun DemoDataset.validate() {
                     }
                 }
             }
+            // Yontrack orders the builds of a branch by creation ORDER, newest first: the
+            // build created last is the one every view shows first, whatever creation time
+            // it carries. A dataset declaring its builds newest first therefore reads
+            // backwards everywhere - the pipeline timeline and the builds table alike.
+            branch.builds.map { it.creation.resolve(reference) }
+                .zipWithNext()
+                .forEachIndexed { index, (previous, next) ->
+                    if (next < previous) {
+                        problems += "Builds of ${project.name}/${branch.name} must be declared " +
+                                "oldest first: ${branch.builds[index + 1].name} is older than " +
+                                "${branch.builds[index].name}."
+                    }
+                }
         }
     }
 

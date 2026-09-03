@@ -13,9 +13,14 @@ class DemoSeedTest {
 
     private val clock = Clock.fixed(Instant.parse("2026-09-01T10:15:30Z"), ZoneOffset.UTC)
 
+    /**
+     * In `git log` order — the newest commit first — because that is what
+     * [GitChangelogSource] yields, and the seed has to turn that into a branch which reads
+     * the right way round.
+     */
     private val changelog = listOf(
-        ChangelogEntry("a1b2c3d", "#1664 Drive the demo deployment through the CLI", LocalDateTime.of(2026, 8, 30, 14, 0)),
         ChangelogEntry("e4f5a6b", "#1680 Report the full version in the running application", LocalDateTime.of(2026, 8, 31, 9, 30)),
+        ChangelogEntry("a1b2c3d", "#1664 Drive the demo deployment through the CLI", LocalDateTime.of(2026, 8, 30, 14, 0)),
     )
 
     private fun seed(target: DemoTarget) = DemoSeed(target, clock, log = {})
@@ -81,6 +86,29 @@ class DemoSeedTest {
                 "Build for commit ${entry.id}",
             )
         }
+    }
+
+    /**
+     * Yontrack orders the builds of a branch by creation ORDER, newest first — the build
+     * created last is the one every view shows first, whatever creation time it carries.
+     * `git log` yields the newest commit first, so seeding the entries as they come makes
+     * the branch read backwards: the pipeline timeline showed the oldest commit leftmost
+     * and the builds table showed it on top (#1647).
+     */
+    @Test
+    fun `the changelog builds are created oldest commit first, so the branch reads newest first`() {
+        val target = InMemoryDemoTarget()
+
+        seed(target).run(DemoContent.dataset(changelog))
+
+        val snapshot = target.snapshot()
+        val newest = snapshot.indexOf("build ${changelog.first().id} ")
+        val oldest = snapshot.indexOf("build ${changelog.last().id} ")
+        assertTrue(oldest >= 0 && newest >= 0, "Both commits have a build")
+        assertTrue(
+            oldest < newest,
+            "The oldest commit is created first, so Yontrack shows the newest one first",
+        )
     }
 
     @Test
@@ -204,6 +232,37 @@ class DemoSeedTest {
             )
         }
         assertTrue("BRONZE" in error.message.orEmpty())
+    }
+
+    /**
+     * The same rule, enforced on the whole dataset rather than only on the changelog: a
+     * branch whose builds are declared newest first reads backwards in every view.
+     */
+    @Test
+    fun `a branch whose builds are declared newest first is refused`() {
+        val error = assertFailsWith<IllegalArgumentException> {
+            seed(InMemoryDemoTarget()).run(
+                DemoDataset(
+                    projects = listOf(
+                        ProjectSpec(
+                            name = "one",
+                            description = "",
+                            branches = listOf(
+                                BranchSpec(
+                                    name = "main",
+                                    description = "",
+                                    builds = listOf(
+                                        BuildSpec(name = "2", description = "", creation = BuildCreation.DaysAgo(1)),
+                                        BuildSpec(name = "1", description = "", creation = BuildCreation.DaysAgo(5)),
+                                    ),
+                                ),
+                            ),
+                        ),
+                    ),
+                )
+            )
+        }
+        assertTrue("oldest first" in error.message.orEmpty(), error.message.orEmpty())
     }
 
     @Test

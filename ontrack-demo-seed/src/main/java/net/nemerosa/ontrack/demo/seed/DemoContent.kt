@@ -307,7 +307,11 @@ object DemoContent {
                 description = "Commits since the last release.",
                 promotionLevels = fullPromotions,
                 validationStamps = listOf(buildStamp, unitTests),
-                builds = changelog.map { entry ->
+                // Reversed: the entries arrive newest commit first, as `git log` prints them,
+                // and Yontrack orders the builds of a branch by creation ORDER rather than by
+                // creation time. Seeded as they come, the last commit created would be the
+                // oldest one and every view would read the branch backwards (#1647).
+                builds = changelog.reversed().map { entry ->
                     BuildSpec(
                         name = entry.id,
                         description = entry.message,
