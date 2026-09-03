@@ -4,3 +4,13 @@ management:
     web:
       exposure:
         include: "*"
+
+ontrack:
+  config:
+    extension:
+      workflows:
+        mock:
+          # The "Simulated gate" node executor, used by the integration and KDSL acceptance
+          # tests. It is off by default everywhere else and must be switched on explicitly -
+          # see WorkflowConfigurationProperties.MockExecutorConfigProperties.
+          enabled: true

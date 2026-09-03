@@ -40,6 +40,9 @@ import javax.sql.DataSource
         "spring.rabbitmq.password=ontrack",
         "spring.graphql.schema.locations=classpath:graphql/",
         "ontrack.config.search.index.ignoreExisting=true",
+        // The "Simulated gate" workflow node executor is off by default and is not picked up from
+        // application-dev.yml here: these tests boot their own configuration, not the UI application.
+        "ontrack.config.extension.workflows.mock.enabled=true",
     ]
 )
 abstract class AbstractITTestSupport {

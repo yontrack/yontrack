@@ -19,4 +19,23 @@ class WorkflowConfigurationProperties {
     @DurationUnit(ChronoUnit.SECONDS)
     var asyncCheckInterval: Duration = Duration.ofSeconds(1)
 
+    @APIDescription("\"Simulated gate\" node executor properties")
+    var mock = MockExecutorConfigProperties()
+
+    /**
+     * Nested rather than a flat `mockExecutorEnabled`, so that the generated documentation
+     * publishes a usable environment variable: the doc generator uppercases a camel-case field
+     * without splitting it, and only the dots of a nested property become underscores.
+     */
+    class MockExecutorConfigProperties {
+        @APIDescription(
+            "Enables the \"Simulated gate\" workflow node executor, which reports a pre-configured outcome " +
+                    "without performing any real action. Disabled by default; always enabled in the `dev` " +
+                    "profile (the value shown opposite is the one the documentation build runs with). Enable it only on " +
+                    "demonstration or test instances - never on an instance tracking real deliveries, where it " +
+                    "would let a workflow report a gate as passed without anything having been verified."
+        )
+        var enabled: Boolean = false
+    }
+
 }

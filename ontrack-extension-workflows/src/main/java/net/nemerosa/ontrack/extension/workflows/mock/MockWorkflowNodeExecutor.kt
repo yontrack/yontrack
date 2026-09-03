@@ -3,7 +3,6 @@ package net.nemerosa.ontrack.extension.workflows.mock
 import com.fasterxml.jackson.databind.JsonNode
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
-import net.nemerosa.ontrack.common.RunProfile
 import net.nemerosa.ontrack.common.api.APIDescription
 import net.nemerosa.ontrack.extension.support.AbstractExtension
 import net.nemerosa.ontrack.extension.workflows.WorkflowsExtensionFeature
@@ -20,12 +19,21 @@ import net.nemerosa.ontrack.model.events.EventTemplatingService
 import net.nemerosa.ontrack.model.events.PlainEventRenderer
 import net.nemerosa.ontrack.model.events.SerializableEventService
 import net.nemerosa.ontrack.model.templating.TemplatingService
-import org.springframework.context.annotation.Profile
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.stereotype.Component
+import java.util.concurrent.ConcurrentHashMap
 
 @Component
-@Profile(RunProfile.DEV)
-@APIDescription("Executor used to mock some actions for the nodes. Mostly used for testing.")
+@ConditionalOnProperty(
+    prefix = "ontrack.config.extension.workflows.mock",
+    name = ["enabled"],
+    havingValue = "true",
+    matchIfMissing = false,
+)
+@APIDescription(
+    "Simulates a step with a configurable outcome, without performing any real action. " +
+            "Intended for demonstrations and testing - do not enable on an instance tracking real deliveries."
+)
 @Documentation(MockNodeData::class)
 @Documentation(MockNodeOutput::class, section = "output")
 @DocumentationExampleCode(
@@ -46,12 +54,22 @@ class MockWorkflowNodeExecutor(
 
     companion object {
         const val EVENT_MOCK = "mock"
+
+        /**
+         * Ceiling for [MockNodeData.waitMs]. The wait is a blocking one, occupying the workflow
+         * executor thread, so an unbounded value would let anyone able to author a workflow park
+         * those threads for as long as they like. The highest wait used anywhere in the tests and
+         * in the demo seed is 2s, so this leaves ample room.
+         */
+        const val MAX_WAIT_MS = 60_000L
+
+        fun clampWaitMs(waitMs: Long): Long = waitMs.coerceIn(0L, MAX_WAIT_MS)
     }
 
     override val id: String = "mock"
-    override val displayName: String = "Mock"
+    override val displayName: String = "Simulated gate"
 
-    private val texts = mutableMapOf<String, List<String>>()
+    private val texts = ConcurrentHashMap<String, List<String>>()
 
     fun getTextsByInstanceId(instanceId: String): List<String> = texts[instanceId] ?: emptyList()
 
@@ -82,9 +100,10 @@ class MockWorkflowNodeExecutor(
             error("Error in $workflowNodeId node")
         }
         // Waiting time
-        if (nodeData.waitMs > 0) {
+        val waitMs = clampWaitMs(nodeData.waitMs)
+        if (waitMs > 0) {
             runBlocking {
-                delay(nodeData.waitMs)
+                delay(waitMs)
             }
         }
 
@@ -112,8 +131,9 @@ class MockWorkflowNodeExecutor(
         val text = "Processed: $replacedText for $context"
 
         // Recording
-        val old = texts[workflowInstance.id]
-        texts[workflowInstance.id] = if (old != null) old + text else listOf(text)
+        texts.compute(workflowInstance.id) { _, old ->
+            if (old != null) old + text else listOf(text)
+        }
         // OK
         return WorkflowNodeExecutorResult.success(
             MockNodeOutput(

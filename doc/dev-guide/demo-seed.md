@@ -51,6 +51,21 @@ differs from the demo's by a few characters. It therefore refuses to run against
 that is not a `demo.` host or a local instance. Naming another instance is possible through
 `DEMO_SEED_URL_PATTERN`, which is the difference between a decision and an accident.
 
+### What the target instance must have
+
+The dataset is not self-contained: it can only reference features the target instance
+actually runs. The CANARY promotion workflow is built on the **Simulated gate** node
+executor (`executorId: mock`), which is off by default and enabled by
+`ontrack.config.extension.workflows.mock.enabled`. It is on automatically in the `dev`
+profile, so the local dev stack needs nothing; a `prod`-profile instance — the demo
+included — must set the property, which for the demo means
+`ONTRACK_CONFIG_EXTENSION_WORKFLOWS_MOCK_ENABLED` in its Helm values.
+
+Without it the reset fails partway through, after the deletions, with
+`Workflow node executor ID "mock" not found` — the dataset validation cannot catch this,
+because it checks the dataset against Yontrack's rules, not against the target's
+configuration.
+
 ### The changelog project
 
 One project is seeded from the real changelog since the last release — every commit between
