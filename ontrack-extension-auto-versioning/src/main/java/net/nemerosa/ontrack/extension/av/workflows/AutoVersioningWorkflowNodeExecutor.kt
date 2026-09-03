@@ -6,6 +6,8 @@ import net.nemerosa.ontrack.extension.av.audit.AutoVersioningAuditService
 import net.nemerosa.ontrack.extension.av.dispatcher.AutoVersioningOrder
 import net.nemerosa.ontrack.extension.av.processing.AutoVersioningProcessingOutcome
 import net.nemerosa.ontrack.extension.av.processing.AutoVersioningProcessingService
+import net.nemerosa.ontrack.extension.av.versionrules.AutoVersioningVersionRuleRegistry
+import net.nemerosa.ontrack.extension.av.versionrules.validateVersionRule
 import net.nemerosa.ontrack.extension.workflows.engine.WorkflowInstance
 import net.nemerosa.ontrack.extension.workflows.execution.AbstractTypedWorkflowNodeExecutor
 import net.nemerosa.ontrack.extension.workflows.execution.WorkflowNodeExecutorResult
@@ -35,6 +37,7 @@ class AutoVersioningWorkflowNodeExecutor(
     private val eventTemplatingService: EventTemplatingService,
     private val serializableEventService: SerializableEventService,
     private val autoVersioningAuditService: AutoVersioningAuditService,
+    private val autoVersioningVersionRuleRegistry: AutoVersioningVersionRuleRegistry,
 ) : AbstractTypedWorkflowNodeExecutor<AutoVersioningWorkflowNodeExecutorData>(
     feature = extensionFeature,
     id = "auto-versioning",
@@ -43,7 +46,8 @@ class AutoVersioningWorkflowNodeExecutor(
 ) {
 
     override fun validate(data: JsonNode) {
-        data.parse<AutoVersioningWorkflowNodeExecutorData>()
+        val parsed = data.parse<AutoVersioningWorkflowNodeExecutorData>()
+        autoVersioningVersionRuleRegistry.validateVersionRule(parsed.versionRule, parsed.versionRuleConfig)
     }
 
     override fun execute(

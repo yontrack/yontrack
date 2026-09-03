@@ -5,6 +5,7 @@ import net.nemerosa.ontrack.extension.workflows.acl.WorkflowRegistration
 import net.nemerosa.ontrack.extension.workflows.definition.Workflow
 import net.nemerosa.ontrack.extension.workflows.definition.WorkflowValidation
 import net.nemerosa.ontrack.extension.workflows.definition.WorkflowValidation.Companion.validateWorkflow
+import net.nemerosa.ontrack.extension.workflows.execution.WorkflowNodeExecutorService
 import net.nemerosa.ontrack.model.security.SecurityService
 import net.nemerosa.ontrack.model.support.StorageService
 import org.springframework.stereotype.Service
@@ -14,6 +15,7 @@ import java.util.*
 class WorkflowRegistryImpl(
     private val storageService: StorageService,
     private val securityService: SecurityService,
+    private val workflowNodeExecutorService: WorkflowNodeExecutorService,
 ) : WorkflowRegistry {
 
     companion object {
@@ -32,8 +34,21 @@ class WorkflowRegistryImpl(
                 return WorkflowValidation.error(name, ex)
             }
         }
-        // Validation
-        return validateWorkflow(workflowObj)
+        // Structural validation
+        val validation = validateWorkflow(workflowObj)
+        if (validation.error) {
+            return validation
+        }
+        // Validation of the data of each node, so that the preview shown by the edition dialog
+        // reports exactly what the saving would reject.
+        // The catch is as broad as the parsing one above on purpose: this method reports problems, it
+        // never throws them, and an executor is free to reject its data with any exception it likes.
+        return try {
+            workflowNodeExecutorService.validateWorkflowNodes(workflowObj)
+            validation
+        } catch (ex: Exception) {
+            WorkflowValidation.error(workflowObj.name, ex)
+        }
     }
 
     override fun saveJsonWorkflow(workflow: JsonNode): String {
@@ -51,6 +66,7 @@ class WorkflowRegistryImpl(
     private fun saveWorkflow(workflow: Workflow): String {
         // Validation
         validateWorkflow(workflow).throwErrorIfAny()
+        workflowNodeExecutorService.validateWorkflowNodes(workflow)
         // Generating an ID
         val id = UUID.randomUUID().toString()
         // Record to save

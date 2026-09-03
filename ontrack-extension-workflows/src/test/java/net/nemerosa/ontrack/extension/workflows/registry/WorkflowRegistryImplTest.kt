@@ -1,10 +1,19 @@
 package net.nemerosa.ontrack.extension.workflows.registry
 
 import com.fasterxml.jackson.databind.JsonNode
+import io.mockk.every
 import io.mockk.mockk
+import net.nemerosa.ontrack.extension.api.ExtensionManager
 import net.nemerosa.ontrack.extension.workflows.definition.WorkflowValidationException
+import net.nemerosa.ontrack.extension.workflows.engine.WorkflowInstance
+import net.nemerosa.ontrack.extension.workflows.execution.WorkflowNodeExecutor
+import net.nemerosa.ontrack.extension.workflows.execution.WorkflowNodeExecutorConfigException
+import net.nemerosa.ontrack.extension.workflows.execution.WorkflowNodeExecutorResult
+import net.nemerosa.ontrack.extension.workflows.execution.WorkflowNodeExecutorServiceImpl
 import net.nemerosa.ontrack.it.MockSecurityService
 import net.nemerosa.ontrack.json.asJson
+import net.nemerosa.ontrack.model.extension.Extension
+import net.nemerosa.ontrack.model.extension.ExtensionFeature
 import net.nemerosa.ontrack.model.support.StorageService
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -20,9 +29,37 @@ class WorkflowRegistryImplTest {
 
     @BeforeEach
     fun setUp() {
-        storageService = mockk()
+        storageService = mockk(relaxed = true)
         val securityService = MockSecurityService()
-        workflowRegistry = WorkflowRegistryImpl(storageService, securityService)
+        val extensionManager = mockk<ExtensionManager>()
+        every { extensionManager.getExtensions(WorkflowNodeExecutor::class.java) } returns listOf(TestNodeExecutor())
+        workflowRegistry = WorkflowRegistryImpl(
+            storageService,
+            securityService,
+            WorkflowNodeExecutorServiceImpl(extensionManager),
+        )
+    }
+
+    /**
+     * Stands for the executors whose validation is stricter than the parsing of their data: the `text`
+     * of a `mock` node is required.
+     */
+    private class TestNodeExecutor : WorkflowNodeExecutor, Extension {
+        override val feature: ExtensionFeature get() = mockk()
+        override val id: String = "mock"
+        override val displayName: String = "Mock"
+
+        override fun validate(data: JsonNode) {
+            if (data.path("text").asText().isNullOrBlank()) {
+                throw WorkflowNodeExecutorConfigException("Text is required for mock node executor")
+            }
+        }
+
+        override fun execute(
+            workflowInstance: WorkflowInstance,
+            workflowNodeId: String,
+            workflowNodeExecutorResultFeedback: (output: JsonNode?) -> Unit,
+        ): WorkflowNodeExecutorResult = error("Not used in this test")
     }
 
     @Test
@@ -184,6 +221,65 @@ class WorkflowRegistryImplTest {
         val validation = workflowRegistry.validateJsonWorkflow(json)
         assertFalse(validation.error)
         assertTrue(validation.errors.isEmpty())
+    }
+
+
+    @Test
+    fun `Node data is validated on validation`() {
+        val json = mapOf(
+            "name" to "Bad node data",
+            "nodes" to listOf(
+                mapOf(
+                    "id" to "start",
+                    "executorId" to "mock",
+                    "data" to mapOf(
+                        "text" to ""
+                    ),
+                    "parents" to emptyList<JsonNode>()
+                )
+            )
+        ).asJson()
+        val validation = workflowRegistry.validateJsonWorkflow(json)
+        assertTrue(validation.error)
+        assertEquals("Text is required for mock node executor", validation.errors.firstOrNull())
+    }
+
+    @Test
+    fun `An unknown executor is reported on validation`() {
+        val json = mapOf(
+            "name" to "Unknown executor",
+            "nodes" to listOf(
+                mapOf(
+                    "id" to "start",
+                    "executorId" to "no-such-executor",
+                    "data" to mapOf(
+                        "text" to "Start"
+                    ),
+                    "parents" to emptyList<JsonNode>()
+                )
+            )
+        ).asJson()
+        val validation = workflowRegistry.validateJsonWorkflow(json)
+        assertTrue(validation.error)
+        assertTrue(
+            """"no-such-executor" not found""" in (validation.errors.firstOrNull() ?: ""),
+            "Unknown executor is reported: ${validation.errors}"
+        )
+    }
+
+    @Test
+    fun `Node data is validated on saving`() {
+        val yaml = """
+            name: Bad node data
+            nodes:
+                - id: start
+                  executorId: mock
+                  data:
+                    text: ""
+        """.trimIndent()
+        assertFailsWith<WorkflowNodeExecutorConfigException> {
+            workflowRegistry.saveYamlWorkflow(yaml)
+        }
     }
 
 }

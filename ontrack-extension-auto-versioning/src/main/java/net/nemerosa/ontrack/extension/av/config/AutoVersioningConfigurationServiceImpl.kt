@@ -1,7 +1,7 @@
 package net.nemerosa.ontrack.extension.av.config
 
 import net.nemerosa.ontrack.extension.av.versionrules.AutoVersioningVersionRuleRegistry
-import net.nemerosa.ontrack.extension.av.versionrules.VersionRuleNotFoundException
+import net.nemerosa.ontrack.extension.av.versionrules.validateVersionRule
 import net.nemerosa.ontrack.extension.notifications.subscriptions.EventSubscription
 import net.nemerosa.ontrack.extension.notifications.subscriptions.EventSubscriptionService
 import net.nemerosa.ontrack.model.security.ProjectConfig
@@ -39,19 +39,12 @@ class AutoVersioningConfigurationServiceImpl(
     }
 
     /**
-     * A typo in the ID of a _safety_ rule must not wait until the next promotion to surface, so
-     * the IDs are checked here, where the registry is available (the [AutoVersioningSourceConfig]
+     * The rules are checked here, where the registry is available (the [AutoVersioningSourceConfig]
      * is a pure data class and cannot do this in its own `validate` method).
      */
     private fun validateVersionRules(config: AutoVersioningConfig) {
         config.configurations.forEach { source ->
-            val versionRule = source.versionRule
-            if (!versionRule.isNullOrBlank()) {
-                val rule = autoVersioningVersionRuleRegistry.findVersionRuleById<Any>(versionRule)
-                    ?: throw VersionRuleNotFoundException(versionRule)
-                // Validates the configuration of the rule as well
-                rule.parseAndValidate(source.versionRuleConfig)
-            }
+            autoVersioningVersionRuleRegistry.validateVersionRule(source.versionRule, source.versionRuleConfig)
         }
     }
 

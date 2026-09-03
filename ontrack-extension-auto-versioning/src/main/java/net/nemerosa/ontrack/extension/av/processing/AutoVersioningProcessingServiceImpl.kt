@@ -17,6 +17,7 @@ import net.nemerosa.ontrack.extension.av.versionrules.AutoVersioningVersionRule
 import net.nemerosa.ontrack.extension.av.versionrules.AutoVersioningVersionRuleContext
 import net.nemerosa.ontrack.extension.av.versionrules.AutoVersioningVersionRuleRegistry
 import net.nemerosa.ontrack.extension.av.versionrules.VersionRuleNotFoundException
+import net.nemerosa.ontrack.extension.av.versionrules.getVersionRuleById
 import net.nemerosa.ontrack.extension.scm.changelog.SCMCommit
 import net.nemerosa.ontrack.extension.scm.service.SCM
 import net.nemerosa.ontrack.extension.scm.service.SCMDetector
@@ -271,8 +272,7 @@ class AutoVersioningProcessingServiceImpl(
     ) {
         val ruleId = order.versionRule
         if (ruleId.isNullOrBlank()) return
-        val rule = autoVersioningVersionRuleRegistry.findVersionRuleById<Any>(ruleId)
-            ?: throw VersionRuleNotFoundException(ruleId)
+        val rule = autoVersioningVersionRuleRegistry.getVersionRuleById<Any>(ruleId)
         runVersionRule(rule, order, targetPath, currentVersion, targetVersion)
     }
 

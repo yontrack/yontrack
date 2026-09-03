@@ -3,6 +3,7 @@ package net.nemerosa.ontrack.extension.av.config
 import net.nemerosa.ontrack.extension.av.AbstractAutoVersioningTestSupport
 import net.nemerosa.ontrack.extension.av.AutoVersioningTestFixtures
 import net.nemerosa.ontrack.extension.av.event.AutoVersioningEvents
+import net.nemerosa.ontrack.extension.av.versionrules.VersionRuleConfigException
 import net.nemerosa.ontrack.extension.av.versionrules.VersionRuleNotFoundException
 import net.nemerosa.ontrack.extension.notifications.mock.MockNotificationChannel
 import net.nemerosa.ontrack.extension.notifications.mock.MockNotificationChannelConfig
@@ -56,6 +57,33 @@ internal class AutoVersioningConfigurationServiceIT : AbstractAutoVersioningTest
                                 configurations = listOf(
                                     AutoVersioningTestFixtures.sourceConfig(
                                         versionRule = "no-such-rule",
+                                    )
+                                )
+                            )
+                        )
+                    }
+                    assertNull(
+                        autoVersioningConfigurationService.getAutoVersioning(this),
+                        "Configuration has not been saved"
+                    )
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `Setting a configuration with a version rule configuration which cannot be parsed is rejected`() {
+        asAdmin {
+            project {
+                branch {
+                    assertFailsWith<VersionRuleConfigException> {
+                        autoVersioningConfigurationService.setupAutoVersioning(
+                            this,
+                            AutoVersioningConfig(
+                                configurations = listOf(
+                                    AutoVersioningTestFixtures.sourceConfig(
+                                        versionRule = "semver",
+                                        versionRuleConfig = mapOf("onUnparseable" to "NO_SUCH_POLICY").asJson(),
                                     )
                                 )
                             )

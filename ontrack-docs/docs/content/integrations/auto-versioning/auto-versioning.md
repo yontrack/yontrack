@@ -599,8 +599,10 @@ nodes:
 A rejection behaves exactly as above: nothing is written, the audit entry moves to `PROCESSING_ABORTED`, the
 `auto-versioning-rejected` event is fired, and the node ends in error.
 
-Unlike the branch configuration, the rule ID is *not* checked when the workflow is saved: an unknown `versionRule` on a
-node surfaces when the node runs, as an auto-versioning error.
+Like the branch configuration, the rule is checked when the workflow is *saved*: an unknown `versionRule`, or a
+`versionRuleConfig` the rule cannot parse, is rejected there and then. This holds whichever way the workflow is saved —
+as a deployment workflow on a slot, as a [notification](../notifications/index.md) channel, or in the workflow
+registry — so a guard which is not usable never reaches the run it was meant to protect.
 
 !!! warning
 

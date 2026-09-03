@@ -6,13 +6,9 @@ import net.nemerosa.ontrack.extension.notifications.channels.AbstractNotificatio
 import net.nemerosa.ontrack.extension.notifications.channels.NoTemplate
 import net.nemerosa.ontrack.extension.notifications.channels.NotificationResult
 import net.nemerosa.ontrack.extension.notifications.recording.NotificationRecord
-import net.nemerosa.ontrack.extension.notifications.subscriptions.EventSubscriptionConfigException
 import net.nemerosa.ontrack.extension.notifications.trigger.NotificationRecordTrigger
 import net.nemerosa.ontrack.extension.notifications.trigger.NotificationRecordTriggerData
-import net.nemerosa.ontrack.extension.workflows.definition.Workflow
-import net.nemerosa.ontrack.extension.workflows.definition.WorkflowNode
 import net.nemerosa.ontrack.extension.workflows.definition.WorkflowValidation
-import net.nemerosa.ontrack.extension.workflows.definition.WorkflowValidationException
 import net.nemerosa.ontrack.extension.workflows.engine.WorkflowEngine
 import net.nemerosa.ontrack.extension.workflows.engine.WorkflowInstanceStatus
 import net.nemerosa.ontrack.extension.workflows.execution.WorkflowNodeExecutorService
@@ -46,32 +42,13 @@ class WorkflowNotificationChannel(
         // Basic controls
         WorkflowValidation.validateWorkflow(config.workflow).throwErrorIfAny()
         // Controlling each node
-        config.workflow.nodes.forEach { node ->
-            validationWorkflowNode(config.workflow, node)
-        }
+        workflowNodeExecutorService.validateWorkflowNodes(config.workflow)
     }
 
     override fun mergeConfig(
         a: WorkflowNotificationChannelConfig,
         changes: JsonNode
     ): WorkflowNotificationChannelConfig = changes.parse()
-
-    private fun validationWorkflowNode(workflow: Workflow, node: WorkflowNode) {
-        val executor = workflowNodeExecutorService.findExecutor(node.executorId)
-            ?: throw WorkflowValidationException(
-                name = workflow.name,
-                message = """Workflow node executor ID "${node.executorId}" not found"""
-            )
-        try {
-            executor.validate(node.data)
-        } catch (ex: EventSubscriptionConfigException) {
-            throw EventSubscriptionConfigException(
-                innerMessage = """
-                    Configuration for the notification in node "${node.id}" is not valid > ${ex.innerMessage}
-                """.trimIndent(),
-            )
-        }
-    }
 
     override fun publish(
         recordId: String,
