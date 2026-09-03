@@ -101,6 +101,11 @@ configuration:
           - name: On GOLD
             nodes:
               - id: release
+                # The node timeout wraps the whole execution and defaults to 5 minutes, which is
+                # about what release.yml takes - so it has to be raised too, and above the
+                # channel's own timeout below, or the node would kill the wait first and report a
+                # bare "Timeout" instead of the channel saying which run it gave up on.
+                timeout: 1500
                 executorId: notification
                 data:
                   channel: github-workflow
@@ -113,6 +118,9 @@ configuration:
                     # In Sync mode so that the checks are attached to the prommotion.
                     # If not, any failure of the release.yml workflow would not be visible.
                     callMode: SYNC
+                    # How long to wait for release.yml in SYNC mode. The default is 30 seconds,
+                    # far below the ~5 minutes the release takes: 20 minutes leaves ample margin.
+                    timeoutSeconds: 1200
                     inputs:
                       - name: version
                         value: "${build.release}"
