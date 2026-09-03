@@ -35,6 +35,22 @@ until the demo pipeline works**. That is the intended constraint, not a side eff
 That is the whole manual part. The `GOLD` promotion workflow dispatches `release.yml` through the
 `github-workflow` notification channel, passing the version.
 
+### Why `GOLD` uses `dependsOn`, not `promotions`
+
+In `.yontrack/ci.yaml`, `GOLD` is declared as `dependsOn: [SILVER]`. Writing what looks like the
+same thing — `promotions: [SILVER]`, the way `SILVER` and `RELEASE` are declared — would break the
+gate completely:
+
+| Key | Configurator | Effect |
+|---|---|---|
+| `promotions` | `AutoPromotionPropertyTypeConfigurator` | Auto-promotion: granted **automatically** once the listed promotions and validations hold |
+| `dependsOn` | `PromotionDependenciesPropertyTypeConfigurator` | A prerequisite: nothing grants it, and granting it by hand is **refused** unless the listed promotions hold |
+
+`GOLD` with `promotions: [SILVER]` would be auto-granted the instant `SILVER` landed —
+`AutoPromotionPrerequisites.areSatisfied` is true when every listed prerequisite holds, and `SILVER`
+would be the only one — so every build that passed the demo smoke tests would publish itself to
+Docker Hub. `dependsOn` gives the intended shape: manual only, and still refused before `SILVER`.
+
 ## What `release.yml` does
 
 | # | Step | Stamp |

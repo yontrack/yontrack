@@ -56,11 +56,22 @@ configuration:
             - BRONZE
           validations:
             - DEMO.SMOKE
-        # The human gate, and the only promotion in this chain granted by hand. No validations:
-        # what it records is that someone looked at the demo running this exact build and wrote
-        # the release notes for it. Its workflow below dispatches the publication (#1673).
+        # The human gate, and the only promotion in this chain granted by hand: what it records
+        # is that someone looked at the demo running this exact build and wrote the release notes
+        # for it. Its workflow below dispatches the publication (#1673).
+        #
+        # `dependsOn`, NOT `promotions`, and the difference is the whole point. `promotions:
+        # [SILVER]` - the obvious way to write "GOLD comes after SILVER" - is what
+        # `AutoPromotionPropertyTypeConfigurator` turns into an auto-promotion property, and
+        # `AutoPromotionPrerequisites.areSatisfied` would then hold the instant SILVER was
+        # granted: GOLD would fire by itself and publish every build that passed the demo smoke
+        # tests, which is the opposite of a human gate.
+        #
+        # `dependsOn` sets the promotion *dependencies* property instead. Nothing grants GOLD on
+        # its own, and `PromotionRunDependenciesCheckExtension` refuses to grant it by hand on a
+        # build that is not at SILVER. Manual, and still ordered.
         GOLD:
-          promotions:
+          dependsOn:
             - SILVER
         # A receipt, not a trigger. GOLD starts release.yml, release.yml reports these four, and
         # auto-promotion then grants RELEASE - so RELEASE means "publication completed". Keying
