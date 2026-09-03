@@ -75,6 +75,7 @@ nav:
       - Build links: content/concepts/model/build-links.md
       - Promotion level fields: content/concepts/model/promotion-level-fields.md
       - Auto promotion: content/concepts/model/auto-promotion.md
+      - Branch views: content/concepts/branch-views/index.md
       - Build filtering: content/concepts/build-filtering/index.md
   - Configuration:
       - CI Configuration: content/configuration/ci-config.md
