@@ -110,7 +110,9 @@ configuration:
                     repository: yontrack
                     workflowId: release.yml
                     reference: main
-                    callMode: ASYNC
+                    # In Sync mode so that the checks are attached to the prommotion.
+                    # If not, any failure of the release.yml workflow would not be visible.
+                    callMode: SYNC
                     inputs:
                       - name: version
                         value: "${build.release}"
