@@ -17,14 +17,6 @@ on:
   pull_request:
   workflow_dispatch:
     inputs:
-      RELEASE:
-        description: Perform release operations (Docker Hub push, GitHub Release, Documentation)
-        type: boolean
-        default: false
-      JUST_BUILD_AND_PUSH:
-        description: Just create the Docker images and push them
-        type: boolean
-        default: false
       SKIP_KDSL_ACCEPTANCE:
         description: Skipping KDSL acceptance tests
         type: boolean
@@ -122,8 +114,6 @@ jobs:
       version: ${{ steps.version.outputs.version }}
       base_version: ${{ steps.version.outputs.base_version }}
       full_run: ${{ steps.params.outputs.full_run }}
-      release: ${{ steps.params.outputs.release }}
-      just_build_and_push: ${{ steps.params.outputs.just_build_and_push }}
       skip_kdsl_acceptance: ${{ steps.params.outputs.skip_kdsl_acceptance }}
       skip_next_ui_tests: ${{ steps.params.outputs.skip_next_ui_tests }}
       skip_github_it: ${{ steps.params.outputs.skip_github_it }}
@@ -158,8 +148,6 @@ jobs:
         id: params
         env:
           EVENT_NAME: ${{ github.event_name }}
-          IN_RELEASE: ${{ inputs.RELEASE }}
-          IN_JUST_BUILD_AND_PUSH: ${{ inputs.JUST_BUILD_AND_PUSH }}
           IN_SKIP_KDSL_ACCEPTANCE: ${{ inputs.SKIP_KDSL_ACCEPTANCE }}
           IN_SKIP_NEXT_UI_TESTS: ${{ inputs.SKIP_NEXT_UI_TESTS }}
           IN_SKIP_GITHUB_IT: ${{ inputs.SKIP_GITHUB_IT }}
@@ -196,8 +184,6 @@ jobs:
 
           {
             echo "full_run=$full_run"
-            echo "release=$(resolve "$IN_RELEASE" false)"
-            echo "just_build_and_push=$(resolve "$IN_JUST_BUILD_AND_PUSH" false)"
             echo "skip_kdsl_acceptance=$(resolve "$IN_SKIP_KDSL_ACCEPTANCE" false)"
             echo "skip_next_ui_tests=$(resolve "$IN_SKIP_NEXT_UI_TESTS" false)"
             echo "skip_github_it=$(resolve "$IN_SKIP_GITHUB_IT" true)"
@@ -210,7 +196,6 @@ jobs:
         id: version
         env:
           BRANCH_NAME: ${{ github.ref_name }}
-          RELEASE: ${{ steps.params.outputs.release }}
           RUN_NUMBER: ${{ github.run_number }}
         run: |
           set -euo pipefail
@@ -220,12 +205,16 @@ jobs:
           BASE_VERSION="$(cat build/version.txt)"
           VERSION="$BASE_VERSION"
 
-          # Non-release builds on the release branches are release candidates.
-          if [ "$RELEASE" != "true" ]; then
-            case "$BRANCH_NAME" in
-              main|release/*) VERSION="${BASE_VERSION}-rc-${RUN_NUMBER}" ;;
-            esac
-          fi
+          # Every build on a release branch is a release candidate: this workflow no longer
+          # produces a release version at all. `release.yml` publishes an rc build under its base
+          # version, which is where `5.0.42` comes from now (#1672).
+          #
+          # `release/*` stays here even though the release train is main-only: such a branch is
+          # still built, and its GHCR tags have to keep the `-rc-<run>` suffix that keeps them
+          # from colliding with a published version.
+          case "$BRANCH_NAME" in
+            main|release/*) VERSION="${BASE_VERSION}-rc-${RUN_NUMBER}" ;;
+          esac
 
           echo "base_version=$BASE_VERSION" >> "$GITHUB_OUTPUT"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
@@ -289,7 +278,6 @@ jobs:
       VERSION: ${{ needs.setup.outputs.version }}
       BASE_VERSION: ${{ needs.setup.outputs.base_version }}
       FULL_RUN: ${{ needs.setup.outputs.full_run }}
-      JUST_BUILD_AND_PUSH: ${{ needs.setup.outputs.just_build_and_push }}
     steps:
       # The run time reported for this job's validations is measured from here. A `run:` step is
       # the earliest point a workflow can observe: the runner's own "Set up job" precedes every
@@ -340,7 +328,6 @@ jobs:
 
       - name: Build
         id: build
-        if: env.JUST_BUILD_AND_PUSH != 'true'
         run: |
           set -euo pipefail
           # The versioning plugin's own tests. They gate the version computation every other
@@ -457,7 +444,7 @@ jobs:
   integration:
     name: Integration (shard ${{ matrix.shard }})
     needs: [setup, build]
-    if: ${{ !cancelled() && needs.build.result == 'success' && needs.setup.outputs.just_build_and_push != 'true' }}
+    if: ${{ !cancelled() && needs.build.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 120
     strategy:
@@ -764,8 +751,7 @@ jobs:
       ${{ !cancelled()
         && needs.build.result == 'success'
         && needs.setup.outputs.full_run == 'true'
-        && needs.setup.outputs.skip_kdsl_acceptance != 'true'
-        && needs.setup.outputs.just_build_and_push != 'true' }}
+        && needs.setup.outputs.skip_kdsl_acceptance != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
@@ -999,8 +985,7 @@ jobs:
       ${{ !cancelled()
         && needs.build.result == 'success'
         && needs.setup.outputs.full_run == 'true'
-        && needs.setup.outputs.skip_next_ui_tests != 'true'
-        && needs.setup.outputs.just_build_and_push != 'true' }}
+        && needs.setup.outputs.skip_next_ui_tests != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
@@ -1267,179 +1252,6 @@ jobs:
           fi
 
   # ---------------------------------------------------------------------------------------------
-  # Publication.
-  # ---------------------------------------------------------------------------------------------
-
-  docker-hub:
-    name: Docker Hub
-    needs: [setup, yontrack, build, integration, integration-report, kdsl, kdsl-report, ui-tests, ui-tests-report]
-    if: >-
-      ${{ !cancelled()
-        && needs.build.result == 'success'
-        && needs.integration.result != 'failure'
-        && needs.integration-report.result != 'failure'
-        && needs.kdsl.result != 'failure'
-        && needs.kdsl-report.result != 'failure'
-        && needs.ui-tests.result != 'failure'
-        && needs.ui-tests-report.result != 'failure'
-        && needs.setup.outputs.full_run == 'true'
-        && needs.setup.outputs.release == 'true'
-        && (github.ref_name == 'main'
-            || startsWith(github.ref_name, 'release/')
-            || (startsWith(github.ref_name, 'feature/') && endsWith(github.ref_name, 'publication'))
-            || needs.setup.outputs.just_build_and_push == 'true') }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    env:
-      VERSION: ${{ needs.setup.outputs.version }}
-    steps:
-      # The run time reported for this job's validations is measured from here. A `run:` step is
-      # the earliest point a workflow can observe: the runner's own "Set up job" precedes every
-      # step and is not visible to any of them. Everything after this — checkout, toolchain setup,
-      # cache restore — is part of what the job costs and is counted.
-      - name: Record the job start
-        id: job_start
-        run: echo "started=$(date +%s)" >> "$GITHUB_OUTPUT"
-
-      - uses: actions/checkout@v4
-
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKER_HUB_USR }}
-          password: ${{ secrets.DOCKER_HUB_PSW }}
-
-      - name: Link to the Yontrack build
-        uses: nemerosa/ontrack-github-actions-cli-library/ontrack-cli-workflow-build@v1.0.3
-        with:
-          project: ${{ needs.yontrack.outputs.project }}
-          yontrack-url: ${{ vars.YONTRACK_URL }}
-          yontrack-token: ${{ secrets.YONTRACK_TOKEN }}
-          version: ${{ env.YONTRACK_CLI_VERSION }}
-
-      - name: Push the images
-        id: push
-        if: ${{ !cancelled() }}
-        run: |
-          set -euo pipefail
-          docker pull "$GHCR_ONTRACK:$RUN_TAG"
-          docker pull "$GHCR_ONTRACK_UI:$RUN_TAG"
-
-          # Legacy organization
-          docker tag "$GHCR_ONTRACK:$RUN_TAG" "nemerosa/ontrack:$VERSION"
-          docker tag "$GHCR_ONTRACK_UI:$RUN_TAG" "nemerosa/ontrack-ui:$VERSION"
-          docker push "nemerosa/ontrack:$VERSION"
-          docker push "nemerosa/ontrack-ui:$VERSION"
-
-          # Yontrack organization
-          docker tag "$GHCR_ONTRACK:$RUN_TAG" "yontrack/yontrack:$VERSION"
-          docker tag "$GHCR_ONTRACK_UI:$RUN_TAG" "yontrack/yontrack-ui:$VERSION"
-          docker push "yontrack/yontrack:$VERSION"
-          docker push "yontrack/yontrack-ui:$VERSION"
-
-      - name: Validate DOCKER.HUB
-        if: ${{ !cancelled() && steps.push.outcome != '' }}
-        env:
-          PUSH_OUTCOME: ${{ steps.push.outcome }}
-          STARTED: ${{ steps.job_start.outputs.started }}
-        run: |
-          run_time_flag=""
-          if [ -n "${STARTED:-}" ]; then
-            run_time_flag="--run-time $(( $(date +%s) - STARTED ))"
-          fi
-          if [ "$PUSH_OUTCOME" = "success" ]; then
-            status=PASSED
-          else
-            status=FAILED
-          fi
-          # shellcheck disable=SC2086  # deliberate: see YONTRACK_RUN_INFO
-          yontrack validate --validation DOCKER.HUB --status "$status" \
-            $run_time_flag $YONTRACK_RUN_INFO
-
-  release:
-    name: GitHub release
-    needs: [setup, yontrack, build, integration, integration-report, kdsl, kdsl-report, ui-tests, ui-tests-report]
-    if: >-
-      ${{ !cancelled()
-        && needs.build.result == 'success'
-        && needs.integration.result != 'failure'
-        && needs.integration-report.result != 'failure'
-        && needs.kdsl.result != 'failure'
-        && needs.kdsl-report.result != 'failure'
-        && needs.ui-tests.result != 'failure'
-        && needs.ui-tests-report.result != 'failure'
-        && needs.setup.outputs.full_run == 'true'
-        && needs.setup.outputs.release == 'true'
-        && (github.ref_name == 'main' || startsWith(github.ref_name, 'release/')) }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    permissions:
-      contents: write
-      packages: read
-    env:
-      VERSION: ${{ needs.setup.outputs.version }}
-    steps:
-      # The run time reported for this job's validations is measured from here. A `run:` step is
-      # the earliest point a workflow can observe: the runner's own "Set up job" precedes every
-      # step and is not visible to any of them. Everything after this — checkout, toolchain setup,
-      # cache restore — is part of what the job costs and is counted.
-      - name: Record the job start
-        id: job_start
-        run: echo "started=$(date +%s)" >> "$GITHUB_OUTPUT"
-
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Link to the Yontrack build
-        uses: nemerosa/ontrack-github-actions-cli-library/ontrack-cli-workflow-build@v1.0.3
-        with:
-          project: ${{ needs.yontrack.outputs.project }}
-          yontrack-url: ${{ vars.YONTRACK_URL }}
-          yontrack-token: ${{ secrets.YONTRACK_TOKEN }}
-          version: ${{ env.YONTRACK_CLI_VERSION }}
-
-      - name: Create the GitHub release
-        id: release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          # The change log since the last build promoted to RELEASE.
-          yontrack build changelog export --from-promotion RELEASE --format markdown > changelog.md
-          cat changelog.md
-          gh release create "$VERSION" \
-            --title "$VERSION" \
-            --target "$GITHUB_SHA" \
-            --notes-file changelog.md
-
-      - name: Validate GITHUB.RELEASE
-        if: ${{ !cancelled() && steps.release.outcome != '' }}
-        env:
-          RELEASE_OUTCOME: ${{ steps.release.outcome }}
-          STARTED: ${{ steps.job_start.outputs.started }}
-        run: |
-          run_time_flag=""
-          if [ -n "${STARTED:-}" ]; then
-            run_time_flag="--run-time $(( $(date +%s) - STARTED ))"
-          fi
-          if [ "$RELEASE_OUTCOME" = "success" ]; then
-            status=PASSED
-          else
-            status=FAILED
-          fi
-          # shellcheck disable=SC2086  # deliberate: see YONTRACK_RUN_INFO
-          yontrack validate --validation GITHUB.RELEASE --status "$status" \
-            $run_time_flag $YONTRACK_RUN_INFO
-
-  # ---------------------------------------------------------------------------------------------
   # Documentation.
   #
   # The Jenkins Documentation stage never built the site: buildDocs is wired into `build`, so it
@@ -1454,16 +1266,11 @@ jobs:
   # left at GOLD-pending longer than that loses its docs, which `release.yml` reports explicitly
   # rather than papering over with a rebuild. See doc/dev-guide/docs-artifact.md.
   #
-  # `just_build_and_push` skips it, like every test job: that dispatch exists to get an image out
-  # without running anything else, and once #1669 lands, running the docs build there would make
-  # such a run wait on the very thing the operator asked to skip.
-  #
-  # Two stamps, deliberately:
-  #
-  #  * `DOCS` — the site built and was archived. Reported on every full run; gates BRONZE (#1669).
-  #  * `DOCUMENTATION` — the S3 publication, release-only. The name is load-bearing: it carries
-  #    the validation history of every past release and renaming it would orphan all of it. It
-  #    stays here until #1673 moves the publication out of `ci.yml` altogether.
+  # One stamp: `DOCS`, meaning the site built and was archived. Reported on every full run, and
+  # gates BRONZE (#1669). `DOCUMENTATION` — the S3 publication — used to be reported here too and
+  # now lives in `release.yml`, which is the only thing that publishes anything (#1673). It keeps
+  # that name there: it carries the validation history of every past release, and renaming it
+  # would orphan all of it.
   #
   # `needs` is [setup, yontrack] and nothing more. The job runs its own
   # `:ontrack-docs:integrationTest :ontrack-docs:buildDocs` from scratch and consumes no output of
@@ -1478,16 +1285,9 @@ jobs:
       ${{ !cancelled()
         && needs.setup.result == 'success'
         && needs.yontrack.result != 'failure'
-        && needs.setup.outputs.full_run == 'true'
-        && needs.setup.outputs.just_build_and_push != 'true' }}
+        && needs.setup.outputs.full_run == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 60
-    env:
-      VERSION: ${{ needs.setup.outputs.version }}
-      # The S3 publication below, and only it, is still release-only.
-      RELEASING: >-
-        ${{ needs.setup.outputs.release == 'true'
-          && (github.ref_name == 'main' || startsWith(github.ref_name, 'release/')) }}
     steps:
       # The run time reported for this job's validations is measured from here. A `run:` step is
       # the earliest point a workflow can observe: the runner's own "Set up job" precedes every
@@ -1523,12 +1323,6 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install --no-install-recommends -y graphviz
-
-      # s3cmd is only needed by the release-only publication step, so it is not paid for on the
-      # runs that just build and archive the site.
-      - name: Install s3cmd
-        if: ${{ env.RELEASING == 'true' }}
-        run: sudo apt-get install --no-install-recommends -y s3cmd
 
       # Before the build, not after: a docs build that fails must still be able to report a
       # FAILED `DOCS` stamp, and `yontrack validate` needs the build to have been resolved.
@@ -1590,50 +1384,4 @@ jobs:
           fi
           # shellcheck disable=SC2086  # deliberate: see YONTRACK_RUN_INFO
           yontrack validate --validation DOCS --status "$status" \
-            $run_time_flag $YONTRACK_RUN_INFO
-
-      # `!cancelled()` deliberately, to drop the implicit `success()`: `Validate DOCS` runs just
-      # above, and a Yontrack outage failing that step must not quietly skip the publication. What
-      # the publication actually depends on is spelled out instead - the site built and archived.
-      - name: Upload the documentation
-        id: upload
-        if: >-
-          ${{ !cancelled()
-            && env.RELEASING == 'true'
-            && steps.build_docs.outcome == 'success'
-            && steps.artifact.outcome == 'success' }}
-        env:
-          AMS3_DELIVERY_USR: ${{ secrets.AMS3_DELIVERY_USR }}
-          AMS3_DELIVERY_PSW: ${{ secrets.AMS3_DELIVERY_PSW }}
-        run: |
-          set -euo pipefail
-          s3cmd \
-            --access_key="${AMS3_DELIVERY_USR}" \
-            --secret_key="${AMS3_DELIVERY_PSW}" \
-            --host=fra1.digitaloceanspaces.com \
-            --host-bucket='%(bucket)s.fra1.digitaloceanspaces.com' \
-            put \
-            ontrack-docs/site/* \
-            "s3://yontrack-docs/release/${VERSION}/docs/site/" \
-            --acl-public \
-            --add-header=Cache-Control:max-age=86400 \
-            --recursive
-
-      - name: Validate DOCUMENTATION
-        if: ${{ !cancelled() && env.RELEASING == 'true' && steps.upload.outcome != '' }}
-        env:
-          UPLOAD_OUTCOME: ${{ steps.upload.outcome }}
-          STARTED: ${{ steps.job_start.outputs.started }}
-        run: |
-          run_time_flag=""
-          if [ -n "${STARTED:-}" ]; then
-            run_time_flag="--run-time $(( $(date +%s) - STARTED ))"
-          fi
-          if [ "$UPLOAD_OUTCOME" = "success" ]; then
-            status=PASSED
-          else
-            status=FAILED
-          fi
-          # shellcheck disable=SC2086  # deliberate: see YONTRACK_RUN_INFO
-          yontrack validate --validation DOCUMENTATION --status "$status" \
             $run_time_flag $YONTRACK_RUN_INFO

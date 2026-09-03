@@ -9,8 +9,7 @@ Nothing may be rebuilt at release time. A release republishes what an earlier CI
 produced — images are re-tagged, not rebuilt — and the documentation is no different: it has to be
 built once, while the build is being made, and carried forward. So the job runs on **every full
 run** rather than only when `RELEASE=true`, and archives `ontrack-docs/site/` instead of pushing it
-straight to S3. The one exception is a `JUST_BUILD_AND_PUSH` dispatch, which skips every test job
-and skips this one too.
+straight to S3.
 
 The job builds the site itself. `buildDocs` is excluded from `./gradlew build`, because the mkdocs
 nav points at `ontrack-docs/docs/content/generated/` — gitignored, and written by the `ontrack-docs`
@@ -22,15 +21,16 @@ integration tests. The site is therefore built where its generator runs:
 
 ## The two stamps
 
-| Stamp           | When                | Means                                                    |
-|-----------------|---------------------|----------------------------------------------------------|
-| `DOCS`          | every full run      | The site built and was archived as a run artefact         |
-| `DOCUMENTATION` | release only        | The site was published to S3 under the released version   |
+| Stamp           | Reported by   | When           | Means                                                  |
+|-----------------|---------------|----------------|--------------------------------------------------------|
+| `DOCS`          | `ci.yml`      | every full run | The site built and was archived as a run artefact       |
+| `DOCUMENTATION` | `release.yml` | at GOLD        | The site was published to S3 under the released version |
 
 They are two names for two different events, and `DOCUMENTATION` keeps its name deliberately: it
 carries the validation history of every past release, and renaming it would orphan all of it. The
-S3 publication stays in `ci.yml` only until [#1673](https://github.com/yontrack/yontrack/issues/1673)
-moves it into `release.yml`.
+S3 publication moved out of `ci.yml` into `release.yml` with
+[#1673](https://github.com/yontrack/yontrack/issues/1673), which is where every publication now
+lives.
 
 `DOCS` gates `BRONZE` ([#1669](https://github.com/yontrack/yontrack/issues/1669)). That is nearly
 free in wall-clock because the job declares `needs: [setup, yontrack]` and nothing else — it
@@ -38,9 +38,8 @@ consumes no output of `build`, `integration`, `kdsl` or `ui-tests`, so it runs a
 
 ## The artefact contract
 
-`release.yml` ([#1672](https://github.com/yontrack/yontrack/issues/1672)) has not landed yet, so
-today the artefact is produced and read by nobody. It is nonetheless already an interface — this is
-the shape that workflow is being written against, and changing it later means changing both sides:
+`release.yml` ([#1672](https://github.com/yontrack/yontrack/issues/1672)) downloads this artefact,
+so its shape is an interface between two workflows: changing it means changing both sides.
 
 - **Name**: `docs-site`. Fixed, not versioned — the release resolves the *base* version
   (`5.0.42`), which is not the version the CI run was named for (`5.0.42-rc-123`).
@@ -110,7 +109,8 @@ gh api "repos/yontrack/yontrack/actions/artifacts?per_page=3" \
 Lower that setting and this page silently becomes wrong: artefacts would expire before the deadline
 it describes, and the first symptom is a release that cannot find its docs.
 
-`release.yml` is meant to fail explicitly on a missing artefact — "docs artifact expired for
-`<version>`; re-run CI on `<sha>` to regenerate" — rather than quietly publishing a release with no
-docs or rebuilding something nobody reviewed. Re-running CI is the deliberate, human-triggered
+`release.yml` fails explicitly on a missing artefact — "docs artifact expired for `<version>`;
+re-run CI on `<sha>` to regenerate" — rather than quietly publishing a release with no docs or
+rebuilding something nobody reviewed. It checks this **before** it publishes anything, so an
+expired artefact costs nothing but a re-run. Re-running CI is the deliberate, human-triggered
 exception to "nothing is rebuilt at release time".

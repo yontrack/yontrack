@@ -24,9 +24,16 @@ configuration:
         # Reported by .github/workflows/demo-smoke.yml, which the demo slot dispatches once
         # it has marked the deployment done. SILVER, below, requires it.
         DEMO.SMOKE: {}
+        # The four publication stamps, all reported by .github/workflows/release.yml, which the
+        # GOLD workflow below dispatches. They are what RELEASE is granted on: GOLD triggers the
+        # publication, RELEASE records that it succeeded (#1672, #1673).
         DOCKER.HUB: {}
         GITHUB.RELEASE: {}
         DOCUMENTATION: {}
+        # A check rather than a publication: the release page is hand-written end-user prose in
+        # the wiki, produced before GOLD is granted (#1670), and this records that it is there
+        # and reachable from the index. The GitHub release links to it.
+        WIKI: {}
       promotions:
         # DOCS sits here so that a docs build breaking is seen on the commit that broke it,
         # rather than at release time when it blocks the release. It costs BRONZE nothing:
@@ -49,16 +56,53 @@ configuration:
             - BRONZE
           validations:
             - DEMO.SMOKE
-        # Still on BRONZE, deliberately. Once RELEASE requires GOLD requires SILVER, nothing
-        # can be released until the demo pipeline works end to end; that switch belongs with
-        # the new publication path (#1673), not here.
+        # The human gate, and the only promotion in this chain granted by hand. No validations:
+        # what it records is that someone looked at the demo running this exact build and wrote
+        # the release notes for it. Its workflow below dispatches the publication (#1673).
+        GOLD:
+          promotions:
+            - SILVER
+        # A receipt, not a trigger. GOLD starts release.yml, release.yml reports these four, and
+        # auto-promotion then grants RELEASE - so RELEASE means "publication completed". Keying
+        # it on GOLD plus its own triggers' results is why both levels exist: a promotion whose
+        # validations were its own triggers would be circular.
+        #
+        # Nothing can be released now until the demo pipeline works end to end, since RELEASE
+        # requires GOLD requires SILVER requires DEMO.SMOKE. That is the intended constraint,
+        # not a side effect (#1673).
         RELEASE:
           promotions:
-            - BRONZE
+            - GOLD
           validations:
+            - DOCKER.HUB
             - GITHUB.RELEASE
             - DOCUMENTATION
+            - WIKI
       workflows:
+        # Granting GOLD is what publishes. The build name cannot be passed - `${build}` renders
+        # the display name, which is the `release` property, and no templating source exposes
+        # the raw name - so the version goes across and release.yml resolves the build itself,
+        # exactly as the demo slot does for demo-smoke.yml.
+        #
+        # `release_version` is left out on purpose: an override is for a human at the Actions
+        # button, and a promotion has no way to mean one.
+        GOLD:
+          - name: On GOLD
+            nodes:
+              - id: release
+                executorId: notification
+                data:
+                  channel: github-workflow
+                  channelConfig:
+                    config: github.com
+                    owner: yontrack
+                    repository: yontrack
+                    workflowId: release.yml
+                    reference: main
+                    callMode: ASYNC
+                    inputs:
+                      - name: version
+                        value: "${build.release}"
         RELEASE:
           - name: On internal release
             nodes:

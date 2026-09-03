@@ -1,0 +1,391 @@
+name: Release
+
+# Publishes a Yontrack release, and reports the four validations that grant RELEASE.
+#
+# A workflow of its own rather than a branch of ci.yml. Every publication job in ci.yml used to
+# hang off `needs: [setup, yontrack, build, integration, ...]`, and a GOLD release runs against a
+# commit whose CI finished days earlier and must re-run none of it. Expressing "all those needs,
+# but skipped" is how you rebuild by accident.
+#
+# Dispatched by the GOLD promotion workflow through the `github-workflow` notification channel -
+# see .yontrack/ci.yaml. GOLD *triggers* publication; RELEASE *records* that it succeeded. A
+# promotion whose validations are its own triggers would be circular, which is why both levels
+# exist.
+#
+# Nothing here is built. The images are re-tagged from the GHCR tags CI already pushed, and the
+# documentation is a run artefact CI already archived. What ships is the rc build itself,
+# published under its base version - see the build-identity ADR in docs/adr/.
+#
+# The logic lives in scripts/release.sh so that scripts/release-test.sh can exercise it against
+# stubbed clients. Most of that logic is about refusing to run, which is the part worth testing:
+# publishing is the one step in this pipeline that cannot be undone.
+
+on:
+  workflow_dispatch:
+    inputs:
+      # Always sent by the `github-workflow` notification channel, whether or not it is asked
+      # for: GitHub's API gives no way to learn the run ID of a dispatch, so Yontrack passes a
+      # correlation ID and then finds the run by the artifact named after it below. GitHub
+      # rejects any input a workflow does not declare, so omitting this fails the dispatch with
+      # `422 Unexpected inputs provided: ["id"]`.
+      id:
+        description: 'Correlation ID, set by Yontrack. "manual" when dispatched by hand.'
+        required: true
+        default: manual
+        type: string
+      version:
+        description: 'Version being released, as the build shows it (e.g. 5.3.0-rc-100)'
+        required: true
+        type: string
+      release_version:
+        description: 'Publish under this version instead of the base version. Leave empty unless you mean it.'
+        required: false
+        type: string
+      project:
+        description: 'Yontrack project holding the build'
+        required: false
+        default: yontrack
+        type: string
+      branch:
+        description: 'Yontrack branch holding the build'
+        required: false
+        default: main
+        type: string
+
+# One release at a time, and queue rather than cancel: a release cancelled halfway has pushed
+# some of its artefacts and not others, which is the state this workflow is written to avoid.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: write # the git tag and the GitHub release
+  packages: read # pulling the rc images from GHCR
+  actions: read # reading the docs artefact off the CI run
+
+env:
+  # Pinned: an unpinned CLI lets a Yontrack release turn a green pipeline red in a repository
+  # nobody touched.
+  YONTRACK_CLI_VERSION: '5.2.0'
+  RELEASE_PROJECT: ${{ inputs.project }}
+  RELEASE_BRANCH: ${{ inputs.branch }}
+  RELEASE_REPOSITORY: ${{ github.repository }}
+  RELEASE_BUILD_VERSION: ${{ inputs.version }}
+  RELEASE_VERSION: ${{ inputs.release_version }}
+  REL_WIKI_DIR: wiki
+  GHCR_ONTRACK: ghcr.io/${{ github.repository }}/ontrack
+  GHCR_ONTRACK_UI: ghcr.io/${{ github.repository }}/ontrack-ui
+  # Run info reported with every validation, spelled out because the Go CLI sends `runInfo: null`
+  # unless it is. Same shape as ci.yml's, so a validation reported here and one reported there
+  # read the same way in the UI. The run time is per-step and is added at each call site.
+  YONTRACK_RUN_INFO: >-
+    --source-type github-workflow
+    --source-uri ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+    --trigger-type ${{ github.event_name }}
+    --trigger-data ${{ inputs.version }}
+
+jobs:
+  release:
+    name: Release ${{ inputs.version }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      # The run time reported for the validations is measured from here.
+      - name: Record the job start
+        id: job_start
+        run: echo "started=$(date +%s)" >> "$GITHUB_OUTPUT"
+
+      # How Yontrack finds this run: it polls the run's artifacts for this name, 10 times at 10s
+      # intervals, and gives up after that. So this goes before the checkout - `fetch-depth: 0`
+      # on this repository is far too slow to sit inside that window - and needs no checkout of
+      # its own, since the file is empty and only its name carries the ID.
+      - name: Correlation preparation
+        run: touch inputs.properties
+
+      - name: Correlation file archiving
+        uses: actions/upload-artifact@v4
+        with:
+          name: inputs-${{ inputs.id }}.properties
+          path: inputs.properties
+          if-no-files-found: error
+
+      # `fetch-depth: 0` for the tags: the "already released" guard reads `git tag -l`, and
+      # without the tags every version looks unpublished.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Installed directly rather than through ontrack-github-actions-cli-config, which registers
+      # a build as a side effect. This workflow publishes an existing build; it must not create
+      # one.
+      - name: Install the Yontrack CLI
+        run: |
+          set -euo pipefail
+          curl -sSfL -o /usr/local/bin/yontrack \
+            "https://github.com/nemerosa/ontrack-cli/releases/download/${YONTRACK_CLI_VERSION}/yontrack-linux-amd64"
+          chmod +x /usr/local/bin/yontrack
+          # --cli only: the bare `version` also asks the server, which is not configured yet.
+          yontrack version --cli
+
+      - name: Configure the CLI
+        env:
+          YONTRACK_URL: ${{ vars.YONTRACK_URL }}
+          YONTRACK_TOKEN: ${{ secrets.YONTRACK_TOKEN }}
+        run: |
+          set -euo pipefail
+          yontrack config create prod "$YONTRACK_URL" --token "$YONTRACK_TOKEN" --override
+
+      # ------------------------------------------------------------------------------------
+      # Everything that can refuse the release runs before anything is published.
+      # ------------------------------------------------------------------------------------
+
+      # Resolves the build, works out the version to publish, and hard-fails if the git tag or
+      # any of the four Docker Hub tags already exists.
+      - name: Resolve the release
+        id: resolve
+        env:
+          YONTRACK_URL: ${{ vars.YONTRACK_URL }}
+          YONTRACK_TOKEN: ${{ secrets.YONTRACK_TOKEN }}
+        run: scripts/release.sh resolve
+
+      # Before the images, before the release, before anything: an expired artefact means this
+      # build cannot be released without re-running CI, and that is much cheaper to learn now
+      # than after Docker Hub has the tag.
+      - name: Check the documentation artefact
+        id: docs_check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REL_RUN_ID: ${{ steps.resolve.outputs.run_id }}
+          REL_VERSION: ${{ steps.resolve.outputs.version }}
+          REL_SHA: ${{ steps.resolve.outputs.sha }}
+        run: scripts/release.sh docs
+
+      # The wiki is a repository of its own with no Actions integration, so a plain clone. It is
+      # public, so no credential is needed to read it.
+      - name: Check out the wiki
+        run: git clone --depth 1 "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}.wiki.git" wiki
+
+      # Checked here rather than after the publication the issue lists it under: the GitHub
+      # release body links this page, so a missing one would make the release a dead end, and
+      # every other step is easier to not-do than to undo. WIKI stays a check, not a publication
+      # step - the page is written by a human before GOLD is granted.
+      - name: Check the wiki release page
+        id: wiki
+        env:
+          REL_VERSION: ${{ steps.resolve.outputs.version }}
+        run: scripts/release.sh wiki
+
+      - name: Validate WIKI
+        if: ${{ !cancelled() && steps.wiki.outcome != '' }}
+        env:
+          WIKI_OUTCOME: ${{ steps.wiki.outcome }}
+          STARTED: ${{ steps.job_start.outputs.started }}
+          BUILD: ${{ steps.resolve.outputs.build }}
+        run: |
+          set -uo pipefail
+          run_time_flag=""
+          if [ -n "${STARTED:-}" ]; then
+            run_time_flag="--run-time $(( $(date +%s) - STARTED ))"
+          fi
+          if [ "$WIKI_OUTCOME" = "success" ]; then status=PASSED; else status=FAILED; fi
+          # shellcheck disable=SC2086  # deliberate: see YONTRACK_RUN_INFO
+          yontrack validate \
+            --project "$RELEASE_PROJECT" --branch "$RELEASE_BRANCH" --build "$BUILD" \
+            --validation WIKI --status "$status" \
+            $run_time_flag $YONTRACK_RUN_INFO
+
+      # ------------------------------------------------------------------------------------
+      # Publication. Nothing below builds anything.
+      # ------------------------------------------------------------------------------------
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_HUB_USR }}
+          password: ${{ secrets.DOCKER_HUB_PSW }}
+
+      # Re-tagged from the durable `:<rc version>` GHCR tag CI pushed (#1661), not from
+      # `:run-<id>`: that one is scoped to a run that ended days ago and means nothing now.
+      - name: Push the images to Docker Hub
+        id: push
+        env:
+          RC_VERSION: ${{ steps.resolve.outputs.rc_version }}
+          VERSION: ${{ steps.resolve.outputs.version }}
+        run: |
+          set -euo pipefail
+          docker pull "$GHCR_ONTRACK:$RC_VERSION"
+          docker pull "$GHCR_ONTRACK_UI:$RC_VERSION"
+
+          # Legacy organization
+          docker tag "$GHCR_ONTRACK:$RC_VERSION" "nemerosa/ontrack:$VERSION"
+          docker tag "$GHCR_ONTRACK_UI:$RC_VERSION" "nemerosa/ontrack-ui:$VERSION"
+          docker push "nemerosa/ontrack:$VERSION"
+          docker push "nemerosa/ontrack-ui:$VERSION"
+
+          # Yontrack organization
+          docker tag "$GHCR_ONTRACK:$RC_VERSION" "yontrack/yontrack:$VERSION"
+          docker tag "$GHCR_ONTRACK_UI:$RC_VERSION" "yontrack/yontrack-ui:$VERSION"
+          docker push "yontrack/yontrack:$VERSION"
+          docker push "yontrack/yontrack-ui:$VERSION"
+
+      - name: Validate DOCKER.HUB
+        if: ${{ !cancelled() && steps.push.outcome != '' }}
+        env:
+          PUSH_OUTCOME: ${{ steps.push.outcome }}
+          STARTED: ${{ steps.job_start.outputs.started }}
+          BUILD: ${{ steps.resolve.outputs.build }}
+        run: |
+          set -uo pipefail
+          run_time_flag=""
+          if [ -n "${STARTED:-}" ]; then
+            run_time_flag="--run-time $(( $(date +%s) - STARTED ))"
+          fi
+          if [ "$PUSH_OUTCOME" = "success" ]; then status=PASSED; else status=FAILED; fi
+          # shellcheck disable=SC2086  # deliberate: see YONTRACK_RUN_INFO
+          yontrack validate \
+            --project "$RELEASE_PROJECT" --branch "$RELEASE_BRANCH" --build "$BUILD" \
+            --validation DOCKER.HUB --status "$status" \
+            $run_time_flag $YONTRACK_RUN_INFO
+
+      # The site as the `docs` job of ci.yml archived it, on the run recorded on the build.
+      # `Check the documentation artefact` above has already established it is there, so a
+      # failure here is a download failure and reads as one.
+      - name: Download the documentation
+        id: docs_download
+        uses: actions/download-artifact@v4
+        with:
+          name: docs-site
+          path: docs-site
+          run-id: ${{ steps.resolve.outputs.run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install s3cmd
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y s3cmd
+
+      - name: Upload the documentation
+        id: upload
+        env:
+          AMS3_DELIVERY_USR: ${{ secrets.AMS3_DELIVERY_USR }}
+          AMS3_DELIVERY_PSW: ${{ secrets.AMS3_DELIVERY_PSW }}
+          VERSION: ${{ steps.resolve.outputs.version }}
+        run: |
+          set -euo pipefail
+          s3cmd \
+            --access_key="${AMS3_DELIVERY_USR}" \
+            --secret_key="${AMS3_DELIVERY_PSW}" \
+            --host=fra1.digitaloceanspaces.com \
+            --host-bucket='%(bucket)s.fra1.digitaloceanspaces.com' \
+            put \
+            docs-site/* \
+            "s3://yontrack-docs/release/${VERSION}/docs/site/" \
+            --acl-public \
+            --add-header=Cache-Control:max-age=86400 \
+            --recursive
+
+      - name: Validate DOCUMENTATION
+        if: ${{ !cancelled() && steps.upload.outcome != '' }}
+        env:
+          UPLOAD_OUTCOME: ${{ steps.upload.outcome }}
+          STARTED: ${{ steps.job_start.outputs.started }}
+          BUILD: ${{ steps.resolve.outputs.build }}
+        run: |
+          set -uo pipefail
+          run_time_flag=""
+          if [ -n "${STARTED:-}" ]; then
+            run_time_flag="--run-time $(( $(date +%s) - STARTED ))"
+          fi
+          if [ "$UPLOAD_OUTCOME" = "success" ]; then status=PASSED; else status=FAILED; fi
+          # shellcheck disable=SC2086  # deliberate: see YONTRACK_RUN_INFO
+          yontrack validate \
+            --project "$RELEASE_PROJECT" --branch "$RELEASE_BRANCH" --build "$BUILD" \
+            --validation DOCUMENTATION --status "$status" \
+            $run_time_flag $YONTRACK_RUN_INFO
+
+      # `--target` is the commit the build was made from, read off the build itself: this
+      # workflow runs on `main` as it is today, which is not where the release is.
+      - name: Create the GitHub release
+        id: release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.resolve.outputs.version }}
+          SHA: ${{ steps.resolve.outputs.sha }}
+          REL_VERSION: ${{ steps.resolve.outputs.version }}
+          REL_BUILD_ID: ${{ steps.resolve.outputs.build_id }}
+        run: |
+          set -euo pipefail
+          scripts/release.sh body > release-body.md
+          cat release-body.md
+          gh release create "$VERSION" \
+            --title "$VERSION" \
+            --target "$SHA" \
+            --notes-file release-body.md
+
+      - name: Validate GITHUB.RELEASE
+        if: ${{ !cancelled() && steps.release.outcome != '' }}
+        env:
+          RELEASE_OUTCOME: ${{ steps.release.outcome }}
+          STARTED: ${{ steps.job_start.outputs.started }}
+          BUILD: ${{ steps.resolve.outputs.build }}
+        run: |
+          set -uo pipefail
+          run_time_flag=""
+          if [ -n "${STARTED:-}" ]; then
+            run_time_flag="--run-time $(( $(date +%s) - STARTED ))"
+          fi
+          if [ "$RELEASE_OUTCOME" = "success" ]; then status=PASSED; else status=FAILED; fi
+          # shellcheck disable=SC2086  # deliberate: see YONTRACK_RUN_INFO
+          yontrack validate \
+            --project "$RELEASE_PROJECT" --branch "$RELEASE_BRANCH" --build "$BUILD" \
+            --validation GITHUB.RELEASE --status "$status" \
+            $run_time_flag $YONTRACK_RUN_INFO
+
+      # ------------------------------------------------------------------------------------
+      # The build's identity, last.
+      # ------------------------------------------------------------------------------------
+
+      # The build *name* never changes - it is an opaque timestamp-run pair. What changes is the
+      # display name, which is the `release` property: `5.3.0-rc-100` until here, `5.3.0` from
+      # now on, matching every artefact just published. See the build-identity ADR in docs/adr/.
+      #
+      # Last, deliberately. Every step above resolves the build by the display name it had when
+      # GOLD was granted, and rewriting it earlier would make a re-run of any of them fail to
+      # find the build at all.
+      - name: Rewrite the release property
+        env:
+          VERSION: ${{ steps.resolve.outputs.version }}
+          BUILD: ${{ steps.resolve.outputs.build }}
+        run: |
+          set -euo pipefail
+          yontrack build set-property \
+            --project "$RELEASE_PROJECT" --branch "$RELEASE_BRANCH" --build "$BUILD" \
+            release "$VERSION"
+
+      - name: Summarise
+        if: ${{ !cancelled() && steps.resolve.outcome == 'success' }}
+        env:
+          VERSION: ${{ steps.resolve.outputs.version }}
+          RC_VERSION: ${{ steps.resolve.outputs.rc_version }}
+          WIKI: ${{ steps.wiki.outcome }}
+          PUSH: ${{ steps.push.outcome }}
+          UPLOAD: ${{ steps.upload.outcome }}
+          RELEASED: ${{ steps.release.outcome }}
+        run: |
+          {
+            echo "### Release \`$VERSION\` (from \`$RC_VERSION\`)"
+            echo
+            echo "| Step | Outcome |"
+            echo "|---|---|"
+            echo "| Wiki release page | ${WIKI:-skipped} |"
+            echo "| Docker Hub | ${PUSH:-skipped} |"
+            echo "| Documentation | ${UPLOAD:-skipped} |"
+            echo "| GitHub release | ${RELEASED:-skipped} |"
+          } >> "$GITHUB_STEP_SUMMARY"

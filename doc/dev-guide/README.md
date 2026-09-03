@@ -12,5 +12,6 @@
   * [Demo seed and reset](demo-seed.md) - resetting the demo environment through the Yontrack API
   * [Demo smoke test](demo-smoke.md) - verifying the demo deployment and reporting DEMO.SMOKE
   * [Documentation artefact](docs-artifact.md) - building the docs on every run and carrying them to the release
+  * [Releasing](release.md) - GOLD publishes, RELEASE records that it did
 * Workflows
   * [Claude Pick Workflow](claude-pick-workflow.md) - Let Claude autonomously pick and implement issues
