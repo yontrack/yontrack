@@ -5,7 +5,8 @@ reports the four validations that grant `RELEASE`.
 
 Nothing is rebuilt. The images are re-tagged from the GHCR tags CI already pushed, the
 documentation is the artefact CI already archived, and what ships is the release candidate itself
-under its base version — see the build-identity ADR in [`docs/adr/`](../../docs/adr/).
+under its base version — see
+[ADR 0006](../../docs/adr/0006-build-identity-through-the-release.md).
 
 ## The chain
 
@@ -94,4 +95,4 @@ satisfied by default. Those inputs were the remaining ways to put an unreviewed 
 
 * [Demo smoke test](demo-smoke.md) — how a build reaches `SILVER`
 * [Documentation artefact](docs-artifact.md) — how the docs reach the release
-* [`docs/adr/`](../../docs/adr/) — the build-identity ADR, on why the released build is an rc build
+* [ADR 0006](../../docs/adr/0006-build-identity-through-the-release.md) — why the released build is an rc build

@@ -14,7 +14,7 @@ name: Release
 #
 # Nothing here is built. The images are re-tagged from the GHCR tags CI already pushed, and the
 # documentation is a run artefact CI already archived. What ships is the rc build itself,
-# published under its base version - see the build-identity ADR in docs/adr/.
+# published under its base version - see docs/adr/0006-build-identity-through-the-release.md.
 #
 # The logic lives in scripts/release.sh so that scripts/release-test.sh can exercise it against
 # stubbed clients. Most of that logic is about refusing to run, which is the part worth testing:
@@ -354,7 +354,7 @@ jobs:
 
       # The build *name* never changes - it is an opaque timestamp-run pair. What changes is the
       # display name, which is the `release` property: `5.3.0-rc-100` until here, `5.3.0` from
-      # now on, matching every artefact just published. See the build-identity ADR in docs/adr/.
+      # now on, matching every artefact just published. See docs/adr/0006.
       #
       # Last, deliberately. Every step above resolves the build by the display name it had when
       # GOLD was granted, and rewriting it earlier would make a re-run of any of them fail to

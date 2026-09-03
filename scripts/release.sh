@@ -65,7 +65,7 @@ rel_summary() { [ -n "${GITHUB_STEP_SUMMARY:-}" ] && echo "$1" >> "$GITHUB_STEP_
 
 # The version an rc version is a candidate for: `5.3.0-rc-100` -> `5.3.0`.
 #
-# This one line is the build-identity decision made concrete (see the ADR in docs/adr/). Nothing is
+# This one line is the build-identity decision made concrete (see docs/adr/0006). Nothing is
 # rebuilt for a release, so what ships is the rc build, published under the version its
 # artefacts are named for.
 #
