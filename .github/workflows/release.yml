@@ -176,7 +176,10 @@ jobs:
         run: scripts/release.sh wiki
 
       - name: Validate WIKI
-        if: ${{ !cancelled() && steps.wiki.outcome != '' }}
+        if: >-
+          ${{ !cancelled()
+            && steps.resolve.outputs.build != ''
+            && (steps.wiki.outcome == 'success' || steps.wiki.outcome == 'failure') }}
         env:
           WIKI_OUTCOME: ${{ steps.wiki.outcome }}
           STARTED: ${{ steps.job_start.outputs.started }}
@@ -236,7 +239,10 @@ jobs:
           docker push "yontrack/yontrack-ui:$VERSION"
 
       - name: Validate DOCKER.HUB
-        if: ${{ !cancelled() && steps.push.outcome != '' }}
+        if: >-
+          ${{ !cancelled()
+            && steps.resolve.outputs.build != ''
+            && (steps.push.outcome == 'success' || steps.push.outcome == 'failure') }}
         env:
           PUSH_OUTCOME: ${{ steps.push.outcome }}
           STARTED: ${{ steps.job_start.outputs.started }}
@@ -292,7 +298,10 @@ jobs:
             --recursive
 
       - name: Validate DOCUMENTATION
-        if: ${{ !cancelled() && steps.upload.outcome != '' }}
+        if: >-
+          ${{ !cancelled()
+            && steps.resolve.outputs.build != ''
+            && (steps.upload.outcome == 'success' || steps.upload.outcome == 'failure') }}
         env:
           UPLOAD_OUTCOME: ${{ steps.upload.outcome }}
           STARTED: ${{ steps.job_start.outputs.started }}
@@ -329,8 +338,41 @@ jobs:
             --target "$SHA" \
             --notes-file release-body.md
 
+      # ------------------------------------------------------------------------------------
+      # The build's identity, before the last stamp.
+      # ------------------------------------------------------------------------------------
+
+      # The build *name* never changes - it is an opaque timestamp-run pair. What changes is the
+      # display name, which is the `release` property: `5.3.0-rc-100` until here, `5.3.0` from
+      # now on, matching every artefact just published. See docs/adr/0006.
+      #
+      # This sits *before* `Validate GITHUB.RELEASE` and not after, which matters more than it
+      # looks. That stamp is the last of the four RELEASE needs, so auto-promotion grants RELEASE
+      # synchronously on it - and everything keyed off RELEASE then reads the display name as it
+      # is at that instant. Rewriting afterwards would have the `#internal-releases` message
+      # announce `5.3.0-rc-100`, and would have the self slot auto-version `image.tag` to
+      # `5.3.0-rc-100` from `${build.release}` - a tag that exists on GHCR and never on Docker
+      # Hub, which is where self pulls from.
+      #
+      # It is still after every publication step: the artefacts have to exist under the version
+      # before the build claims to be it. And it is safe this late because only `resolve` looks
+      # the build up by display name; every step after it uses the build *name*, which is
+      # immutable.
+      - name: Rewrite the release property
+        env:
+          VERSION: ${{ steps.resolve.outputs.version }}
+          BUILD: ${{ steps.resolve.outputs.build }}
+        run: |
+          set -euo pipefail
+          yontrack build set-property \
+            --project "$RELEASE_PROJECT" --branch "$RELEASE_BRANCH" --build "$BUILD" \
+            release "$VERSION"
+
       - name: Validate GITHUB.RELEASE
-        if: ${{ !cancelled() && steps.release.outcome != '' }}
+        if: >-
+          ${{ !cancelled()
+            && steps.resolve.outputs.build != ''
+            && (steps.release.outcome == 'success' || steps.release.outcome == 'failure') }}
         env:
           RELEASE_OUTCOME: ${{ steps.release.outcome }}
           STARTED: ${{ steps.job_start.outputs.started }}
@@ -347,27 +389,6 @@ jobs:
             --project "$RELEASE_PROJECT" --branch "$RELEASE_BRANCH" --build "$BUILD" \
             --validation GITHUB.RELEASE --status "$status" \
             $run_time_flag $YONTRACK_RUN_INFO
-
-      # ------------------------------------------------------------------------------------
-      # The build's identity, last.
-      # ------------------------------------------------------------------------------------
-
-      # The build *name* never changes - it is an opaque timestamp-run pair. What changes is the
-      # display name, which is the `release` property: `5.3.0-rc-100` until here, `5.3.0` from
-      # now on, matching every artefact just published. See docs/adr/0006.
-      #
-      # Last, deliberately. Every step above resolves the build by the display name it had when
-      # GOLD was granted, and rewriting it earlier would make a re-run of any of them fail to
-      # find the build at all.
-      - name: Rewrite the release property
-        env:
-          VERSION: ${{ steps.resolve.outputs.version }}
-          BUILD: ${{ steps.resolve.outputs.build }}
-        run: |
-          set -euo pipefail
-          yontrack build set-property \
-            --project "$RELEASE_PROJECT" --branch "$RELEASE_BRANCH" --build "$BUILD" \
-            release "$VERSION"
 
       - name: Summarise
         if: ${{ !cancelled() && steps.resolve.outcome == 'success' }}

@@ -339,11 +339,19 @@ configuration:
                             channel: "#notifications"
   custom:
     configs:
+      # Keeps the public release announcement off feature branches, whose versions carry a branch
+      # name and a short commit.
+      #
+      # The `-rc-<run>` alternative is load-bearing since #1673: `EnvironmentRegexCondition` uses
+      # `Regex.matches()`, a FULL match, and `ci.yml` no longer produces a bare `5.3.0` for any
+      # build at all - every build on main and release/* is a candidate now, and the release is
+      # published from one of them by release.yml. Without the alternative this block matches
+      # nothing, and the `#releases` subscription below silently stops being configured.
       - conditions:
           - name: environment-regex
             config:
               name: VERSION
-              regex: '\d+\.\d+\.\d+'
+              regex: '\d+\.\d+\.\d+(-rc-\d+)?'
         branch:
           notificationsConfig:
             notifications:

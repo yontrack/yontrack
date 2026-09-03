@@ -83,11 +83,24 @@ refuses anything that is not then three dot-separated numbers. A build with no
 `release` property has its own name as its display name, and that guard is what
 stops a timestamp being published as a version.
 
-**A release cannot be found by its rc name afterwards.** The rewrite is the last
-step of `release.yml` for that reason: every step before it resolves the build by
-the display name `GOLD` was granted on, so rewriting earlier would break a re-run
-of any of them. After a successful release, a re-dispatch with the rc version
-fails at resolution rather than doing damage, which is the safe direction.
+**The rewrite is squeezed between the last publication and the last stamp**, and
+both sides of that are load-bearing. It comes after every publication step
+because the artefacts must exist under the version before the build claims to be
+it. It comes *before* `Validate GITHUB.RELEASE` because that stamp is the last of
+the four `RELEASE` needs: auto-promotion grants `RELEASE` synchronously on it,
+and everything keyed off `RELEASE` reads the display name as it stands at that
+instant. Rewriting afterwards would have the `#internal-releases` message
+announce `5.3.0-rc-100`, and would have the `self` slot auto-version `image.tag`
+to `5.3.0-rc-100` from `${build.release}` — a tag that exists on GHCR and never
+on Docker Hub, which is where `self` pulls from.
+
+That it can be this late at all is a property of the identity split: only the
+`resolve` step looks the build up by its display name, and every step after it
+addresses the build by *name*, which never changes.
+
+**A release cannot be found by its rc name afterwards.** After a successful
+release, a re-dispatch with the rc version fails at resolution rather than doing
+damage, which is the safe direction.
 
 **The guards matter more than they look.** Since the published version is derived
 rather than assigned, the same version can in principle be derived twice — two
