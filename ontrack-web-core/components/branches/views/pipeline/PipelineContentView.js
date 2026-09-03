@@ -1,7 +1,8 @@
 import {useContext, useEffect} from "react";
 import {useRouter} from "next/router";
-import {Space} from "antd";
+import {Space, Typography} from "antd";
 import {useQuery} from "@components/services/GraphQL";
+import CloseableAlert from "@components/common/CloseableAlert";
 import {useEventForRefresh} from "@components/common/EventsContext";
 import {useRefresh} from "@components/common/RefreshUtils";
 import useRangeSelection from "@components/common/RangeSelection";
@@ -101,6 +102,29 @@ export default function PipelineContentView({branch}) {
                 rangeSelection={rangeSelection}
                 loading={loadingBuilds}
             />
+            {/* The loud half of the experimental marking: dismissible, and carrying the invitation
+                to give feedback. It lives here rather than in `BranchContent` - which holds only
+                what belongs to the branch rather than to any one content view - and rather than in
+                the toolbar, which is controls acting on the view, not commentary about it. Its id
+                is the localStorage key #1648 has to clean up when it removes both markers.
+                `info` rather than `warning`: this view is not risky, it is new, and a yellow band
+                on a read-only view we are inviting people to adopt argues against adopting it. */}
+            <div data-testid="pipeline-experimental-alert">
+                <CloseableAlert
+                    id="feature-branch-pipeline-view"
+                    type="info"
+                    message={
+                        <Typography.Text>
+                            The Pipeline view is experimental and still being refined. Your feedback
+                            is welcome — tell us what works and what does not in{' '}
+                            <a href="https://github.com/yontrack/yontrack/discussions"
+                               target="_blank" rel="noreferrer">
+                                GitHub Discussions
+                            </a>.
+                        </Typography.Text>
+                    }
+                />
+            </div>
             <PipelineStats
                 totalBuilds={totalBuilds}
                 latestBuild={latestBuild}

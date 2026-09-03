@@ -15,6 +15,20 @@ const {test} = require("../../fixtures/connection");
  * the Jest tests, which can cover them far faster.
  */
 
+/**
+ * Local storage key behind the experimental alert's dismissal - `CloseableAlert` prefixes the
+ * alert's own id. Specs which care about the alert clear it once they are signed in: Playwright
+ * contexts are fresh per test today, but nothing in this file should depend on that.
+ *
+ * Once, and not from an init script: an init script runs again on every navigation, so it would
+ * also wipe the dismissal the "stays dismissed" test is there to observe surviving a reload.
+ */
+const experimentalAlertKey = 'closeable-alert-feature-branch-pipeline-view'
+
+const forgetExperimentalAlertDismissal = async (page) => {
+    await page.evaluate((key) => localStorage.removeItem(key), experimentalAlertKey)
+}
+
 const branchWithAPipeline = async (ontrack) => {
     const project = await ontrack.createProject()
     const branch = await project.createBranch()
@@ -197,6 +211,12 @@ test('the view menu offers the pipeline view, and the choice is remembered', asy
     await branchPage.checkContentViews(["Builds", "Pipeline"])
     await branchPage.checkContentViewSelected("Builds")
 
+    // The quiet half of the experimental marking, seen before opting into the view
+    await branchPage.openContentViewMenu()
+    await expect(page.getByTestId('branch-content-view-experimental-pipeline')).toBeVisible()
+    await expect(page.getByTestId('branch-content-view-experimental-builds')).toBeHidden()
+    await branchPage.closeContentViewMenu()
+
     await branchPage.openContentViewMenu()
     await branchPage.contentViewMenuItem("Pipeline").click()
 
@@ -213,4 +233,36 @@ test('the view menu offers the pipeline view, and the choice is remembered', asy
     // preference where the specs running after this one expect to find it
     await branchPage.selectContentView("Builds")
     await branchPage.checkBuildPresent(recent.name)
+})
+
+test('the pipeline view says it is experimental and invites feedback', async ({page, ontrack}) => {
+    const {branch} = await branchWithAPipeline(ontrack)
+
+    await login(page, ontrack)
+    await forgetExperimentalAlertDismissal(page)
+    const pipelinePage = new BranchPipelinePage(page, branch)
+    await pipelinePage.goTo()
+
+    await pipelinePage.checkExperimentalAlert()
+    await expect(pipelinePage.experimentalAlert()).toContainText("experimental")
+    // The invitation is the point of the alert, so the link is part of what is checked
+    await expect(pipelinePage.experimentalAlert().getByRole('link', {name: "GitHub Discussions"}))
+        .toHaveAttribute('href', 'https://github.com/yontrack/yontrack/discussions')
+})
+
+test('the experimental alert stays dismissed once dismissed', async ({page, ontrack}) => {
+    const {branch} = await branchWithAPipeline(ontrack)
+
+    await login(page, ontrack)
+    await forgetExperimentalAlertDismissal(page)
+    const pipelinePage = new BranchPipelinePage(page, branch)
+    await pipelinePage.goTo()
+
+    await pipelinePage.checkExperimentalAlert()
+    await pipelinePage.dismissExperimentalAlert()
+
+    // Dismissal is persisted, not merely hidden for this render
+    await page.reload()
+    await pipelinePage.checkOnPage()
+    await pipelinePage.checkNoExperimentalAlert()
 })

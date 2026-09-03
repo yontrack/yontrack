@@ -15,6 +15,7 @@ import PipelineContentView from "@components/branches/views/pipeline/PipelineCon
  * * `name` — label shown in the view selector
  * * `icon` — icon shown in the view selector
  * * `component` — the React component filling the content region, receiving only the `branch`
+ * * `experimental` — optional, marks a view still being refined; the selector badges it
  *
  * This list is static on purpose: there is no extension point for contributing views yet. The entry
  * shape is nevertheless one a server-driven list could populate later.
@@ -31,6 +32,7 @@ export const branchContentViews = [
         name: "Pipeline",
         icon: <FaStream/>,
         component: PipelineContentView,
+        experimental: true,
     },
 ]
 

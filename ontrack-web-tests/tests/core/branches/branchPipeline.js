@@ -32,6 +32,27 @@ class BranchPipelinePage {
         await expect(this.page.getByTestId('pipeline-stats')).toBeVisible()
     }
 
+    // --- Experimental alert -------------------------------------------------
+
+    experimentalAlert() {
+        // The wrapper div carries the test id; the alert itself is gone from the DOM once dismissed
+        return this.page.getByTestId('pipeline-experimental-alert').getByRole('alert')
+    }
+
+    async checkExperimentalAlert() {
+        await expect(this.experimentalAlert()).toBeVisible()
+    }
+
+    async checkNoExperimentalAlert() {
+        await expect(this.experimentalAlert()).toBeHidden()
+    }
+
+    async dismissExperimentalAlert() {
+        // Ant's own close affordance: an icon button with no accessible name of its own
+        await this.page.getByTestId('pipeline-experimental-alert').locator('.ant-alert-close-icon').click()
+        await this.checkNoExperimentalAlert()
+    }
+
     // --- Stats -------------------------------------------------------------
 
     stat(id) {

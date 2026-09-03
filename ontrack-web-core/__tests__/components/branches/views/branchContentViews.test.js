@@ -27,6 +27,12 @@ describe('branch content view registry', () => {
         expect(getBranchContentView('builds').name).toBe("Builds")
     })
 
+    it('marks the pipeline view as experimental, and only that one', () => {
+        // The badge is what invites the feedback which should inform making this view the default
+        expect(getBranchContentView('pipeline').experimental).toBe(true)
+        expect(getBranchContentView('builds').experimental).toBeFalsy()
+    })
+
     it('gives every entry the shape a server-driven list could later populate', () => {
         branchContentViews.forEach(view => {
             expect(typeof view.key).toBe('string')
