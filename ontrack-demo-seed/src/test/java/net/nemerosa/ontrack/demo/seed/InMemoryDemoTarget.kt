@@ -121,7 +121,7 @@ class InMemoryDemoTarget : DemoTarget {
         val validationStamps = mutableListOf<String>()
         val builds = mutableListOf<InMemoryBuild>()
 
-        override fun createPromotionLevel(name: String, description: String) {
+        override fun createPromotionLevel(name: String, description: String, workflow: WorkflowSpec?) {
             checkName(name, "Promotion level")
             require(name !in promotionLevels) { "Promotion level $name already exists in ${project.name}/${this.name}" }
             promotionLevels += name

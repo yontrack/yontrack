@@ -31,7 +31,15 @@ data class BranchSpec(
 data class PromotionLevelSpec(
     val name: String,
     val description: String,
+    val workflow: WorkflowSpec? = null,
 )
+
+/**
+ * A workflow run on every promotion run created on the promotion level it is attached to.
+ *
+ * @property yaml The workflow definition, in the format `ontrack.workflows.saveYamlWorkflow` accepts.
+ */
+data class WorkflowSpec(val yaml: String)
 
 data class ValidationStampSpec(
     val name: String,

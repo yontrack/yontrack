@@ -110,7 +110,7 @@ class DemoSeed(
         builds: MutableMap<BuildRef, DemoBuild>,
     ) {
         val branch = project.createBranch(spec.name, spec.description)
-        spec.promotionLevels.forEach { branch.createPromotionLevel(it.name, it.description) }
+        spec.promotionLevels.forEach { branch.createPromotionLevel(it.name, it.description, it.workflow) }
         spec.validationStamps.forEach { branch.createValidationStamp(it.name, it.description) }
         spec.builds.forEach { buildSpec ->
             val creation = buildSpec.creation.resolve(now)

@@ -32,6 +32,7 @@ object DemoContent {
     const val BRONZE = "BRONZE"
     const val SILVER = "SILVER"
     const val GOLD = "GOLD"
+    const val CANARY = "CANARY"
 
     const val BUILD = "BUILD"
     const val UNIT_TESTS = "UNIT.TESTS"
@@ -66,6 +67,57 @@ object DemoContent {
     private val bronze = PromotionLevelSpec(BRONZE, "The build is green and can be looked at.")
     private val silver = PromotionLevelSpec(SILVER, "The build is deployed somewhere and was verified there.")
     private val gold = PromotionLevelSpec(GOLD, "A human approved the build for release.")
+
+    /**
+     * Same shape for both variants — one starting node, two parallel checks and a node
+     * joining them — so the demo shows what a passing and a failing workflow run each look
+     * like on a promotion run.
+     *
+     * @param performanceGateFails Whether the performance-gate node reports failure, which
+     * blocks the join node from running.
+     */
+    private fun canaryWorkflow(performanceGateFails: Boolean) = WorkflowSpec(
+        """
+            name: Canary verification
+            nodes:
+              - id: start
+                executorId: mock
+                data:
+                    text: Start canary verification
+              - id: smoke-tests
+                parents: [{id: start}]
+                executorId: mock
+                data:
+                    text: Run smoke tests
+                    waitMs: 500
+              - id: performance-gate
+                parents: [{id: start}]
+                executorId: mock
+                data:
+                    text: Check performance budget
+                    waitMs: 500
+                    error: $performanceGateFails
+              - id: promote-canary
+                parents: [{id: smoke-tests}, {id: performance-gate}]
+                executorId: mock
+                data:
+                    text: Promote canary to full rollout
+        """.trimIndent()
+    )
+
+    /** Used on [MAIN]: the performance gate passes and the canary is promoted. */
+    private val canaryPass = PromotionLevelSpec(
+        CANARY,
+        "Automated canary verification workflow.",
+        workflow = canaryWorkflow(performanceGateFails = false),
+    )
+
+    /** Used on [MAINTENANCE]: the performance gate fails and the canary is blocked. */
+    private val canaryFail = PromotionLevelSpec(
+        CANARY,
+        "Automated canary verification workflow.",
+        workflow = canaryWorkflow(performanceGateFails = true),
+    )
 
     private val buildStamp = ValidationStampSpec(BUILD, "Compilation and packaging.")
     private val unitTests = ValidationStampSpec(UNIT_TESTS, "Unit tests.")
@@ -129,7 +181,7 @@ object DemoContent {
             BranchSpec(
                 name = MAIN,
                 description = "Main development branch.",
-                promotionLevels = fullPromotions,
+                promotionLevels = fullPromotions + canaryPass,
                 validationStamps = fullValidationStamps,
                 builds = listOf(
                     BuildSpec(
@@ -211,12 +263,26 @@ object DemoContent {
                         ),
                         links = listOf(BuildRef(LIBRARY, MAIN, "42")),
                     ),
+                    BuildSpec(
+                        name = "107",
+                        release = "1.4.6",
+                        description = "Owner export as CSV, canary rollout.",
+                        creation = DaysAgo(0),
+                        promotionLevels = listOf(BRONZE, SILVER, CANARY, GOLD),
+                        validations = listOf(
+                            ValidationSpec(BUILD, PASSED),
+                            ValidationSpec(UNIT_TESTS, PASSED),
+                            ValidationSpec(INTEGRATION_TESTS, PASSED),
+                            ValidationSpec(SECURITY_SCAN, PASSED),
+                        ),
+                        links = listOf(BuildRef(LIBRARY, MAIN, "42")),
+                    ),
                 ),
             ),
             BranchSpec(
                 name = MAINTENANCE,
                 description = "Maintenance of the previous minor version.",
-                promotionLevels = fullPromotions,
+                promotionLevels = fullPromotions + canaryFail,
                 validationStamps = fullValidationStamps,
                 builds = listOf(
                     BuildSpec(
@@ -237,6 +303,19 @@ object DemoContent {
                         description = "Security patch for the session cookie.",
                         creation = DaysAgo(4),
                         promotionLevels = listOf(BRONZE, SILVER),
+                        validations = listOf(
+                            ValidationSpec(BUILD, PASSED),
+                            ValidationSpec(UNIT_TESTS, PASSED),
+                            ValidationSpec(INTEGRATION_TESTS, PASSED),
+                            ValidationSpec(SECURITY_SCAN, PASSED),
+                        ),
+                    ),
+                    BuildSpec(
+                        name = "89",
+                        release = "1.3.9",
+                        description = "Second session cookie backport, canary rollout.",
+                        creation = DaysAgo(2),
+                        promotionLevels = listOf(BRONZE, SILVER, CANARY),
                         validations = listOf(
                             ValidationSpec(BUILD, PASSED),
                             ValidationSpec(UNIT_TESTS, PASSED),

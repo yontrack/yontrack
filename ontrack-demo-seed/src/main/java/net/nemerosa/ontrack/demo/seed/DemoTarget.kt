@@ -65,7 +65,7 @@ interface DemoProject {
 
 interface DemoBranch {
     val name: String
-    fun createPromotionLevel(name: String, description: String)
+    fun createPromotionLevel(name: String, description: String, workflow: WorkflowSpec? = null)
     fun createValidationStamp(name: String, description: String)
     fun createBuild(name: String, description: String, creation: LocalDateTime): DemoBuild
 }

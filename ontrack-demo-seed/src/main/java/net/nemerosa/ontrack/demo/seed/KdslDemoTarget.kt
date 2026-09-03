@@ -13,7 +13,9 @@ import net.nemerosa.ontrack.kdsl.connector.graphql.schema.type.DashboardContextU
 import net.nemerosa.ontrack.kdsl.spec.extension.environments.Environment
 import net.nemerosa.ontrack.kdsl.spec.extension.environments.Slot
 import net.nemerosa.ontrack.kdsl.spec.extension.environments.environments
+import net.nemerosa.ontrack.kdsl.spec.extension.notifications.NotificationsMgt
 import net.nemerosa.ontrack.kdsl.spec.setProperty
+import net.nemerosa.ontrack.yaml.Yaml
 import java.time.LocalDateTime
 
 /**
@@ -78,6 +80,12 @@ class KdslDemoTarget(private val ontrack: Ontrack) : DemoTarget {
          * The release property carries the version a build shows as its display name.
          */
         const val RELEASE_PROPERTY = "net.nemerosa.ontrack.extension.general.ReleasePropertyType"
+
+        /**
+         * The event a promotion level's workflow subscription listens to, so that promoting a
+         * build runs the workflow.
+         */
+        const val NEW_PROMOTION_RUN_EVENT = "new_promotion_run"
     }
 }
 
@@ -104,8 +112,16 @@ private class KdslDemoBranch(val branch: Branch) : DemoBranch {
 
     override val name: String get() = branch.name
 
-    override fun createPromotionLevel(name: String, description: String) {
-        branch.createPromotionLevel(name, description)
+    override fun createPromotionLevel(name: String, description: String, workflow: WorkflowSpec?) {
+        val promotionLevel = branch.createPromotionLevel(name, description)
+        workflow?.let {
+            NotificationsMgt(promotionLevel.connector).subscribe(
+                channel = "workflow",
+                channelConfig = mapOf("workflow" to Yaml().read(it.yaml).first()),
+                events = listOf(KdslDemoTarget.NEW_PROMOTION_RUN_EVENT),
+                projectEntity = promotionLevel,
+            )
+        }
     }
 
     override fun createValidationStamp(name: String, description: String) {
