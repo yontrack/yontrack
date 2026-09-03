@@ -80,6 +80,28 @@ _Avoid_: placeholder, default icon, fallback image
 Picking two builds on a branch in order to see what changed between them.
 _Avoid_: build comparison, diff selection
 
+### Deployment
+
+**Environment**:
+A named, ordered place a build can be deployed to — `staging`, `production`, a
+demo instance. Environments are global rather than per-project, carry tags, and
+their order is how far through delivery they sit, not a ranking.
+_Avoid_: stage, target, tier
+
+**Slot**:
+The junction of one project and one environment: where builds of that project
+are deployed into that environment. A slot is what carries the admission rules
+deciding which builds are eligible and the workflows run when one is deployed. A
+project may have more than one slot in an environment, told apart by a qualifier.
+_Avoid_: deployment target, environment slot, deployment config
+
+**Slot pipeline**:
+One build's passage through one slot — the record of a single deployment,
+numbered within its slot and moving from candidate through running to done or
+cancelled. A slot has many pipelines over time; each names exactly one build.
+_Avoid_: deployment, release pipeline, and above all the bare *pipeline*, which
+already means the branch's promotion pipeline in *pipeline view*
+
 ### Notifications
 
 **Notification record**:
