@@ -12,9 +12,25 @@ import BuildPromoteDialog, {useBuildPromoteDialog} from "@components/builds/Buil
  *            where the next promotion is the panel's call to action rather than a hover target.
  *
  * The caller decides its own layout; the dialog, the mutation and the authorization check stay here.
+ *
+ * `promotionLevel` is the level this affordance IS FOR - it names the tooltip, the label and the
+ * test id, and it pre-fills the dialog. It is optional, because an affordance can be for promoting
+ * the build without being for promoting it to one particular level. In that case pass
+ * `defaultPromotionLevel` instead: the dialog opens pre-filled with it, but nothing claims the
+ * promotion is restricted to it. The dialog's level field has always been editable, so a label
+ * naming a level was describing a restriction the dialog never had.
  */
-export default function BuildPromoteAction({build, promotionLevel, tooltip, onPromotion, presentation = 'icon'}) {
-    const actualTooltip = tooltip ? tooltip : `Promotes the build to ${promotionLevel.name}`
+export default function BuildPromoteAction({
+                                               build,
+                                               promotionLevel,
+                                               defaultPromotionLevel,
+                                               tooltip,
+                                               onPromotion,
+                                               presentation = 'icon',
+                                           }) {
+    const actualTooltip = tooltip
+        ? tooltip
+        : (promotionLevel ? `Promotes the build to ${promotionLevel.name}` : "Promotes the build")
 
     const dialog = useBuildPromoteDialog({
         onSuccess: onPromotion,
@@ -23,11 +39,15 @@ export default function BuildPromoteAction({build, promotionLevel, tooltip, onPr
     const onPromote = () => {
         dialog.start({
             build,
-            promotionLevel,
+            // The level the dialog STARTS on, which is the one this affordance is for when it is
+            // for one at all, and otherwise merely a sensible default the user may change.
+            promotionLevel: promotionLevel ?? defaultPromotionLevel,
         })
     }
 
-    const testId = `build-promote-${build.id}-${promotionLevel.id}`
+    const testId = promotionLevel
+        ? `build-promote-${build.id}-${promotionLevel.id}`
+        : `build-promote-${build.id}`
 
     return (
         <>
@@ -36,7 +56,9 @@ export default function BuildPromoteAction({build, promotionLevel, tooltip, onPr
                     <Button data-testid={testId} onClick={onPromote} title={actualTooltip}>
                         <Space size={8}>
                             <FaRegThumbsUp/>
-                            <Typography.Text>Promote to {promotionLevel.name}</Typography.Text>
+                            <Typography.Text>
+                                {promotionLevel ? `Promote to ${promotionLevel.name}` : "Promote..."}
+                            </Typography.Text>
                         </Space>
                     </Button> :
                     <Popover content={actualTooltip}>

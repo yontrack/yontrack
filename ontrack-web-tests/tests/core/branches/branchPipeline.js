@@ -101,6 +101,10 @@ class BranchPipelinePage {
         return this.page.getByTestId(`timeline-build-${build.id}`)
     }
 
+    timelineMedal(build, promotionLevel) {
+        return this.page.getByTestId(`timeline-medal-${build.id}-${promotionLevel.id}`)
+    }
+
     async checkBuildPresent(build) {
         await expect(this.timelineCard(build)).toBeVisible()
     }
@@ -146,13 +150,14 @@ class BranchPipelinePage {
     async checkInspectorPromotion(promotionLevel, {present = true} = {}) {
         const panel = this.page.getByTestId('inspector-promotions')
         await expect(panel).toBeVisible()
-        // By id rather than by the level's name: the name also appears on the stage card above and
-        // in the promote button below, so a name lookup would pass for the wrong reason
-        const entry = panel.getByTestId(`inspector-promotion-${promotionLevel.id}`)
+        const entry = this.inspectorPromotionRows(promotionLevel)
         if (present) {
-            await expect(entry).toBeVisible()
+            // `first()` because a build promoted twice to one level has two rows here, and the
+            // question this method asks - did the build reach this level - is answered by either
+            await expect(entry.first()).toBeVisible()
         } else {
-            await expect(entry).toBeHidden()
+            // Not `toBeHidden`, which passes on the FIRST of several matches being hidden
+            await expect(entry).toHaveCount(0)
         }
     }
 
@@ -189,6 +194,71 @@ class BranchPipelinePage {
         const buildPage = new BuildPage(this.page, build)
         await buildPage.assertName(build.name)
         return buildPage
+    }
+
+    // --- Inspector: promotion run actions ------------------------------------
+
+    /**
+     * A promotion row in the inspector, addressed by its level.
+     *
+     * The per-run controls are found by test id PREFIX inside that row rather than by run id: a
+     * caller which has just promoted a build through the API knows the level it asked for, not the
+     * id of the run the server made.
+     */
+    inspectorPromotionRows(promotionLevel) {
+        // By attribute, not by test id: rows are identified by RUN, and one level may have several
+        return this.page.locator(`[data-promotion-level="${promotionLevel.id}"]`)
+    }
+
+    inspectorPromotionRow(promotionLevel) {
+        return this.inspectorPromotionRows(promotionLevel).first()
+    }
+
+    inspectorPromotionActions(promotionLevel) {
+        return this.inspectorPromotionRow(promotionLevel).locator('.ot-row-actions')
+    }
+
+    inspectorRunLink(promotionLevel) {
+        return this.inspectorPromotionRow(promotionLevel)
+            .locator('[data-testid^="inspector-promotion-run-link-"]')
+    }
+
+    inspectorDeleteRun(promotionLevel) {
+        return this.inspectorPromotionRow(promotionLevel)
+            .locator('[data-testid^="build-promotion-delete-"]')
+    }
+
+    inspectorRepromote(build, promotionLevel) {
+        return this.inspectorPromotionRow(promotionLevel)
+            .getByTestId(`build-promote-${build.id}-${promotionLevel.id}`)
+    }
+
+    async checkInspectorRunActionsRevealedOnFocus(promotionLevel) {
+        const actions = this.inspectorPromotionActions(promotionLevel)
+        // Quiet to begin with...
+        await expect(actions).toHaveCSS('opacity', '0')
+        // ... and revealed by KEYBOARD focus, not only by a pointer: these controls are in the tab
+        // order, and one that is focused but invisible is a keyboard trap in all but name
+        await this.inspectorRunLink(promotionLevel).focus()
+        await expect(actions).toHaveCSS('opacity', '1')
+    }
+
+    async deleteInspectorPromotion(promotionLevel) {
+        await this.inspectorPromotionRow(promotionLevel).hover()
+        await this.inspectorDeleteRun(promotionLevel).click()
+        await this.page.getByRole('button', {name: "Confirm deletion"}).click()
+    }
+
+    async checkNoInspectorPromotion(promotionLevel) {
+        // Counted, so this cannot pass while a second run at the same level is still on screen
+        await expect(this.inspectorPromotionRows(promotionLevel)).toHaveCount(0)
+    }
+
+    /**
+     * The panel's own promote affordance, which names no level.
+     */
+    promoteButton(build) {
+        return this.page.getByTestId(`build-promote-${build.id}`)
     }
 
     async checkNoInspector() {

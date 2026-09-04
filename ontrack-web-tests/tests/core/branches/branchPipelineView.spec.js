@@ -264,6 +264,81 @@ test('the inspector header follows the selection', async ({page, ontrack}) => {
     await pipelinePage.checkInspectorNames(old)
 })
 
+test('a promotion run can be deleted from the inspector', async ({page, ontrack}) => {
+    const {branch, recent, silver} = await branchWithAPipeline(ontrack)
+
+    await login(page, ontrack)
+    const pipelinePage = new BranchPipelinePage(page, branch)
+    await pipelinePage.goTo()
+    await pipelinePage.selectBuild(recent)
+
+    await pipelinePage.checkInspectorPromotion(silver)
+    await pipelinePage.deleteInspectorPromotion(silver)
+
+    // The panel reloads itself, so the row goes without a page refresh
+    await pipelinePage.checkNoInspectorPromotion(silver)
+
+    // ... and so does the TIMELINE, which is a separate query: the card must not keep a medal for a
+    // run that no longer exists while the stage card beside it already says otherwise
+    await expect(pipelinePage.timelineMedal(recent, silver)).toHaveCount(0)
+})
+
+test('a promotion run row leads to the run, and reveals its actions on focus', async ({page, ontrack}) => {
+    const {branch, recent, silver} = await branchWithAPipeline(ontrack)
+
+    await login(page, ontrack)
+    const pipelinePage = new BranchPipelinePage(page, branch)
+    await pipelinePage.goTo()
+    await pipelinePage.selectBuild(recent)
+
+    // Hover-revealed actions must answer to the keyboard too
+    await pipelinePage.checkInspectorRunActionsRevealedOnFocus(silver)
+
+    await pipelinePage.inspectorRunLink(silver).click()
+    await expect(page).toHaveURL(/\/promotionRun\/\d+$/)
+})
+
+test('a build can be promoted again to a level it already reached', async ({page, ontrack}) => {
+    // The panel renders one row per RUN, so a second promotion to one level is a second row
+    const {branch, recent, silver} = await branchWithAPipeline(ontrack)
+
+    await login(page, ontrack)
+    const pipelinePage = new BranchPipelinePage(page, branch)
+    await pipelinePage.goTo()
+    await pipelinePage.selectBuild(recent)
+
+    await expect(pipelinePage.inspectorPromotionRows(silver)).toHaveCount(1)
+
+    await pipelinePage.inspectorPromotionRow(silver).hover()
+    await pipelinePage.inspectorRepromote(recent, silver).click()
+    await page.getByRole('button', {name: "OK"}).click()
+
+    // A second RUN at the same level, hence a second row - which is why rows are keyed by run
+    await expect(pipelinePage.inspectorPromotionRows(silver)).toHaveCount(2)
+})
+
+test('the promote button names no level, and the dialog picks the lowest unreached one', async ({page, ontrack}) => {
+    const {branch, recent, gold} = await branchWithAPipeline(ontrack)
+
+    await login(page, ontrack)
+    const pipelinePage = new BranchPipelinePage(page, branch)
+    await pipelinePage.goTo()
+    await pipelinePage.selectBuild(recent)
+
+    const promote = pipelinePage.promoteButton(recent)
+    await expect(promote).toBeVisible()
+    await expect(promote).toContainText("Promote...")
+    await expect(promote).not.toContainText("Promote to")
+
+    // The level is the dialog's default, not the button's promise: GOLD is the lowest the build
+    // has not reached, and the field it lands in is editable
+    await promote.click()
+    await expect(page.getByText("Promotion level to promote to")).toBeVisible()
+    // Scoped to the dialog: the page may grow another Select, and a promotion level with a CHOICE
+    // field would put a second one inside this very dialog
+    await expect(page.locator('.ant-modal .ant-select-selection-item')).toContainText(gold.name)
+})
+
 test('the pipeline view says it is experimental and invites feedback', async ({page, ontrack}) => {
     const {branch} = await branchWithAPipeline(ontrack)
 

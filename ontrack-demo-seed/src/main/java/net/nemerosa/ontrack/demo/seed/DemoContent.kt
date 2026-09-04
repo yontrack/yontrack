@@ -243,7 +243,12 @@ object DemoContent {
                         release = "1.4.4",
                         description = "Pet type reference data cached.",
                         creation = DaysAgo(3),
-                        promotionLevels = listOf(BRONZE, SILVER),
+                        // SILVER twice, and the only build here promoted twice to one level. It is
+                        // what the pipeline view's promotions panel needs in order to show anything
+                        // at all about re-promotion: one row per RUN, each with its own actions.
+                        // It also makes the stage cards' claim checkable - they count promoted
+                        // BUILDS, so the SILVER card must still say 5 builds, not 6 runs.
+                        promotionLevels = listOf(BRONZE, SILVER, SILVER),
                         validations = listOf(
                             ValidationSpec(BUILD, PASSED),
                             ValidationSpec(UNIT_TESTS, PASSED),

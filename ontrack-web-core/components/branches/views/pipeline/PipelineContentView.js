@@ -60,11 +60,21 @@ export default function PipelineContentView({branch}) {
     const latestBuild = facts?.allBuilds?.pageItems?.[0]
 
     // The page of builds shown by the timeline, on the same terms as the builds view's table
-    const {builds, pageInfo, loadingBuilds, loadMore} = useBranchBuildsPage({
+    const {builds, pageInfo, loadingBuilds, loadMore, reload: reloadBuilds} = useBranchBuildsPage({
         branch,
         query: gqlPipelineBuilds,
         selectedBuildFilter,
     })
+
+    // Promoting a build, or deleting one of its promotion runs, changes all three regions: the stage
+    // card's count, the inspector's own list, and the MEDALS ON THE TIMELINE CARD. `reload` alone
+    // covers only the branch facts - the page of builds is a query of its own - so a deleted run
+    // would keep its medal on the card until a full page refresh, with the stage card beside it
+    // already saying otherwise.
+    const onBuildChanged = () => {
+        reload()
+        reloadBuilds()
+    }
 
     // A build asked for but not in the loaded page yet - a `?build=` deep link to an older build, or
     // a stage card naming the latest build at its level - is LOADED UP TO rather than ignored. Both
@@ -158,7 +168,7 @@ export default function PipelineContentView({branch}) {
                 buildId={selectedBuildId}
                 selectedFilter={vsfContext.selectedFilter}
                 showValidations={validationStamps.length > 0}
-                onChange={reload}
+                onChange={onBuildChanged}
             />
         </Space>
     )

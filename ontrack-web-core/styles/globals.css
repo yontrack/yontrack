@@ -255,6 +255,49 @@ body {
 }
 
 /**
+ * Row actions which stay out of the way until the row is being used.
+ *
+ * `:focus-within` as well as `:hover` is not a nicety: these actions are reachable by Tab, and an
+ * action which is focused but invisible is a keyboard trap in all but name. Opacity rather than
+ * `display: none` or `visibility: hidden` for the same reason - both of those take the actions out
+ * of the tab order entirely, so the row would be operable by mouse only.
+ */
+.ot-row-actions {
+    transition: opacity 0.15s ease-in-out;
+}
+
+/**
+ * Hidden only where there IS a pointer to hover with. On a touch device nothing ever hovers, so
+ * hiding these would leave a delete icon that is invisible and yet perfectly tappable at the right
+ * edge of every row - a stray tap on a control the user never saw. There, they simply stay visible.
+ *
+ * `pointer-events: none` while hidden for the same reason on the desktop side: an invisible target
+ * must not be clickable in the instant before the row is hovered.
+ */
+@media (hover: hover) {
+    .ot-row-actions {
+        opacity: 0;
+        pointer-events: none;
+    }
+
+    .ot-row-hover:hover .ot-row-actions,
+    .ot-row-hover:focus-within .ot-row-actions {
+        opacity: 1;
+        pointer-events: auto;
+    }
+}
+
+/**
+ * Anyone who has asked not to be shown motion gets the actions appearing instantly rather than not
+ * at all: the fade is decoration, the reveal is the function.
+ */
+@media (prefers-reduced-motion: reduce) {
+    .ot-row-actions {
+        transition: none;
+    }
+}
+
+/**
  * Disabled icon
  */
 .ot-disabled {

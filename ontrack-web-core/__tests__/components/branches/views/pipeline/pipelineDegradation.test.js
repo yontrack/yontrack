@@ -133,14 +133,16 @@ describe('a build with no promotions', () => {
         expect(screen.getByText("This build has not been promoted.")).toBeVisible()
     })
 
-    it('still offers the first level when the user may promote', () => {
+    it('still offers a promotion when the user may promote', () => {
+        // The button names no level: the dialog it opens has always let the user pick one, and the
+        // lowest unreached level is its default rather than its limit
         withEvents(<BuildInspectorPromotions
             build={build({
                 branch: {promotionLevels: [level(1), level(2)]},
                 authorizations: [{name: 'build', action: 'promote', authorized: true}],
             })}
         />)
-        expect(screen.getByText("Promote to LEVEL-1")).toBeVisible()
+        expect(screen.getByText("Promote...")).toBeVisible()
     })
 
     it('hides the promote affordance from a user who cannot promote', () => {
@@ -151,10 +153,15 @@ describe('a build with no promotions', () => {
                 authorizations: [{name: 'build', action: 'promote', authorized: false}],
             })}
         />)
-        expect(screen.queryByText("Promote to LEVEL-1")).not.toBeInTheDocument()
+        // The button's label no longer names a level, so asserting the absence of "Promote to
+        // LEVEL-1" would pass whatever the permission
+        expect(screen.queryByText("Promote...")).not.toBeInTheDocument()
     })
 
-    it('offers no promotion once every level is reached', () => {
+    it('still offers a promotion once every level is reached', () => {
+        // Inverted deliberately. It used to hold because the button WAS the next level, so with no
+        // next level there was nothing to offer. Now the button is not about one level: there is
+        // no next rung to climb, and promoting again is still something the user can do.
         withEvents(<BuildInspectorPromotions
             build={build({
                 branch: {promotionLevels: [level(1)]},
@@ -162,7 +169,7 @@ describe('a build with no promotions', () => {
                 authorizations: [{name: 'build', action: 'promote', authorized: true}],
             })}
         />)
-        expect(screen.queryByText(/^Promote to/)).not.toBeInTheDocument()
+        expect(screen.getByText("Promote...")).toBeVisible()
     })
 
 })

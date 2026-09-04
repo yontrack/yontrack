@@ -114,12 +114,19 @@ const BuildTimelineCard = forwardRef(function BuildTimelineCard({
                     <Space size={token.marginXXS}>
                         {
                             shown.map(run =>
-                                <PromotionLevelImage
+                                // The wrapper carries the test id: `PromotionLevelImage` is a thin
+                                // shared wrapper which must not grow props of its own, and a medal
+                                // needs to be addressable to check that it goes when its run does.
+                                <span
                                     key={run.id}
-                                    promotionLevel={run.promotionLevel}
-                                    size={20}
-                                    tooltipText={run.promotionLevel?.name}
-                                />
+                                    data-testid={`timeline-medal-${build.id}-${run.promotionLevel?.id}`}
+                                >
+                                    <PromotionLevelImage
+                                        promotionLevel={run.promotionLevel}
+                                        size={20}
+                                        tooltipText={run.promotionLevel?.name}
+                                    />
+                                </span>
                             )
                         }
                         {
