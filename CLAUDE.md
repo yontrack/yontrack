@@ -70,6 +70,9 @@ These rules apply unconditionally. Follow them in every change, without exceptio
 - `scripts/dev-stack.sh down` keeps the data; only `down --clean` drops the volumes. Never use
   `--clean` on a stack you did not create.
 - Log in through Keycloak with `admin`/`admin`.
+- The API itself is Bearer/OIDC only — `curl -u admin:admin` gets a 401. To call it, seed the
+  demo, or run a Playwright spec against the stack, mint a token first:
+  `docs/agents/local-api-access.md`.
 
 ### Workflow
 
@@ -842,6 +845,11 @@ Issues live as GitHub issues in `yontrack/yontrack`, managed via the `gh` CLI. S
 ### Triage labels
 
 The five canonical triage roles, each label string equal to its name. See `docs/agents/triage-labels.md`.
+
+### Local API access
+
+The dev stack's API takes no basic auth. How to mint a token, seed the demo and point the
+Playwright suite at a running stack: `docs/agents/local-api-access.md`.
 
 ### Domain docs
 
