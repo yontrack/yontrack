@@ -179,6 +179,24 @@ configuration:
           # version, as a link to the build. `${build.release}` renders that same string but
           # nothing at all on a build without the property, so the link is the safer form. The
           # demo URL is spelled out - no templating source turns an environment into a URL.
+          #
+          # The change log is what the GOLD call is actually made on, and `promotionRun` spans the
+          # right interval for free: its "from build" is the last build promoted to the SAME level,
+          # so on a SILVER run that is SILVER to SILVER, with no parameter needed to say so.
+          #
+          # It goes LAST because it can render nothing. `SemanticPromotionRunChangeLogTemplatingSource`
+          # takes no `empty` parameter - the plain `changelog` source does - and returns "" whenever
+          # there is no previous SILVER to measure from. Trailing it lets the message simply end;
+          # anywhere higher leaves a hole above the call to action.
+          #
+          # `issues=true` is doing most of the work here, and deliberately.
+          # `SemanticChangelogRenderingServiceImpl` drops every commit carrying no conventional-commit
+          # type, silently, and this repository types about one commit in eight - but it references an
+          # issue on nearly every one. So the issues section is the substance and the type sections are
+          # the garnish, until #1690 changes that. Do NOT tidy the resulting bare `doc` section up with
+          # `sections=doc=Documentation`: the mapped title gets no emoji, the sort that follows compares
+          # titles and ignores emojis, so the two Documentation keys collide and one group's commits are
+          # dropped outright. Fix the commit subjects instead (#1691).
           - name: On SILVER
             promotion: SILVER
             events:
@@ -193,6 +211,8 @@ configuration:
               Demo: https://demo.dev.yontrack.com
 
               Have a look, then decide on GOLD.
+
+              ${promotionRun.semanticChangelog?issues=true&emojis=true}
     project:
       environments:
         environments:
