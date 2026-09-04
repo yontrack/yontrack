@@ -18,6 +18,8 @@ open class ChangeLogTemplatingServiceConfig(
     val defaultQualifierFallback: Boolean = false,
     @APIDescription("Defines how to render commits for a change log")
     val commitsOption: ChangeLogTemplatingCommitsOption = ChangeLogTemplatingCommitsOption.NONE,
+    @APIDescription(COMMIT_MESSAGE_MAX_LENGTH_DESCRIPTION)
+    val commitsMaxLength: Int = COMMIT_MESSAGE_DEFAULT_MAX_LENGTH,
 ) {
     @APIDescription("Comma-separated list of project links to follow one by one for a get deep change log. Each item in the list is either a project name, or a project name and qualifier separated by a colon (:).")
     @ListRef

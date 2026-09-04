@@ -9,6 +9,7 @@ import net.nemerosa.ontrack.extension.scm.SCMExtensionConfigProperties
 import net.nemerosa.ontrack.extension.scm.SCMExtensionFeature
 import net.nemerosa.ontrack.extension.scm.changelog.SCMChangeLogEnabled
 import net.nemerosa.ontrack.extension.scm.changelog.SCMCommitFilter
+import net.nemerosa.ontrack.extension.scm.changelog.shortCommitMessage
 import net.nemerosa.ontrack.extension.scm.service.SCMDetector
 import net.nemerosa.ontrack.extension.support.AbstractExtension
 import net.nemerosa.ontrack.job.Schedule
@@ -154,7 +155,9 @@ class ScmCommitSearchExtension(
             ?: return null
         return SearchResult(
             title = "[${project.name}] ${item.id}",
-            description = "${item.author}: ${item.message}",
+            // The whole message is indexed - so that a search matches the body too - but only its
+            // subject is displayed.
+            description = "${item.author}: ${shortCommitMessage(item.message)}",
             accuracy = score,
             type = searchResultType,
             data = mapOf(

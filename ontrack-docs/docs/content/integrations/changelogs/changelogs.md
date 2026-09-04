@@ -203,6 +203,34 @@ ${promotionRun.semanticChangelog?issues=true&emojis=true&dependencies=library}
 ${promotionRun.semanticChangelog?issues=true&emojis=true&dependencies=library,core}
 ```
 
+## Commit messages
+
+Wherever a changelog renders a commit, it renders only the **first line** of its message - the
+subject - and truncates it at 100 characters, ellipsis included. Commit messages, in particular the
+ones written by coding agents, routinely run to dozens of lines, and a changelog is a list of
+subjects.
+
+This applies to the changelog page, to the changelogs rendered through
+[templating](#using-templating) and the [API](#using-the-api), and to the description of a commit in
+the search results.
+
+The full message is never lost: it is stored as-is, indexed in full by the search - so that looking
+for a phrase in the body of a commit still finds it - and displayed in full on the commit page, one
+click away from the changelog.
+
+The maximum length can be changed for the changelogs rendered through templating or the API, using
+the `commitsMaxLength` option, common to classic and semantic changelogs:
+
+```
+${promotionRun.changelog?commitsOption=ALWAYS&commitsMaxLength=250}
+```
+
+Setting `commitsMaxLength` to `0` disables the truncation - the subject is then rendered in full,
+however long it is. It does *not* bring the body of the message back: only the first line is ever
+rendered in a changelog.
+
+The length used on the changelog page and in the search results is not configurable.
+
 ## Configuration of changelogs
 
 Besides the [recursivity options](#recursive-changelogs), the two types of changelogs have their own configuration.
@@ -214,9 +242,10 @@ the `commitsOption` parameter.
 
 | Option        | Type    | Default value | Description                                                 |
 |---------------|---------|---------------|-------------------------------------------------------------|
-| empty         | String  | _Empty_       | String to use to render an empty or non existent change log |
-| title         | Boolean | _false_       | Include a title for the changelog                           |
-| commitsOption | (1)     | NONE          | Option to display commits                                   |
+| empty            | String  | _Empty_       | String to use to render an empty or non existent change log                       |
+| title            | Boolean | _false_       | Include a title for the changelog                                                 |
+| commitsOption    | (1)     | NONE          | Option to display commits                                                         |
+| commitsMaxLength | Int     | 100           | Maximum length of a [commit message](#commit-messages), 0 to disable the truncation |
 
 (1) the possible values for `commitsOption` are:
 
@@ -231,10 +260,11 @@ specification.
 
 | Option   | Type     | Default value | Description                                            |
 |----------|----------|---------------|--------------------------------------------------------|
-| issues   | Boolean  | _false_       | Must a section for changelog actual issues be present? |
-| sections | List (1) | _Empty_       | Mapping types to section titles                        |
-| exclude  | List (2) | _Empty_       | Types to exclude from the changelog                    |
-| emojis   | Boolean  | _false_       | Use emojis in the section titles                       |
+| issues           | Boolean  | _false_       | Must a section for changelog actual issues be present?                              |
+| sections         | List (1) | _Empty_       | Mapping types to section titles                                                     |
+| exclude          | List (2) | _Empty_       | Types to exclude from the changelog                                                 |
+| emojis           | Boolean  | _false_       | Use emojis in the section titles                                                    |
+| commitsMaxLength | Int      | 100           | Maximum length of a [commit message](#commit-messages), 0 to disable the truncation |
 
 (1) use the `sections` option to redefine the title of a given semantic type. For example, if you want to use `Other`
 for `chore` and `Bugs` for `fix`, you can use the following configuration:

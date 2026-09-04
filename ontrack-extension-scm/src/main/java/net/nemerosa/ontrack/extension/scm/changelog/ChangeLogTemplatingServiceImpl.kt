@@ -46,6 +46,7 @@ class ChangeLogTemplatingServiceImpl(
                 renderChangeLogItems(
                     changeLog = scmChangeLog,
                     commitsOption = config.commitsOption,
+                    commitsMaxLength = config.commitsMaxLength,
                     renderer = renderer
                 )
             } ?: config.empty
@@ -83,13 +84,14 @@ class ChangeLogTemplatingServiceImpl(
     private fun renderChangeLogItems(
         changeLog: SCMChangeLog,
         commitsOption: ChangeLogTemplatingCommitsOption,
+        commitsMaxLength: Int,
         renderer: EventRenderer,
     ): String {
         // Issues
         val hasIssues = !changeLog.issues?.issues.isNullOrEmpty()
         val issues = renderChangeLogIssues(renderer, changeLog)
         // Commits
-        val commits: String by lazy { renderChangeLogCommits(changeLog, renderer) }
+        val commits: String by lazy { renderChangeLogCommits(changeLog, commitsMaxLength, renderer) }
         // Everything together
         return when (commitsOption) {
             ChangeLogTemplatingCommitsOption.NONE -> issues
@@ -106,19 +108,20 @@ class ChangeLogTemplatingServiceImpl(
 
     private fun renderChangeLogCommits(
         changeLog: SCMChangeLog,
+        commitsMaxLength: Int,
         renderer: EventRenderer
     ): String = renderer.renderList(
         changeLog.commits.map { commit ->
-            renderChangeLogCommit(commit.commit, renderer)
+            renderChangeLogCommit(commit.commit, commitsMaxLength, renderer)
         }
     )
 
-    private fun renderChangeLogCommit(commit: SCMCommit, renderer: EventRenderer): String {
+    private fun renderChangeLogCommit(commit: SCMCommit, commitsMaxLength: Int, renderer: EventRenderer): String {
         val link = renderer.renderLink(
             text = commit.shortId,
             href = commit.link,
         )
-        return "$link ${commit.message}"
+        return "$link ${shortCommitMessage(commit.message, commitsMaxLength)}"
     }
 
 }

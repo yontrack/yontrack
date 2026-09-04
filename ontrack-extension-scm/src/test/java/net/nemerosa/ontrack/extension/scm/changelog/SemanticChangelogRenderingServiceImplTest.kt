@@ -278,6 +278,75 @@ class SemanticChangelogRenderingServiceImplTest {
         )
     }
 
+    @Test
+    fun `Commit subjects are truncated and their bodies left out`() {
+        val changelog = SCMChangeLog(
+            from = BuildFixtures.testBuild(),
+            to = BuildFixtures.testBuild(),
+            fromCommit = "abcd123",
+            toCommit = "abcd456",
+            commits = listOf(
+                "feat(My feature): " + "a".repeat(120),
+                "fix: Fixing some bugs\n\nWith a long body explaining at length what the commit does.",
+            ).toCommits(project),
+            issues = SCMChangeLogIssues(
+                issueServiceConfiguration = mockk(),
+                issues = emptyList()
+            )
+        )
+
+        val text = semanticChangelogRenderingService.render(
+            changelog = changelog,
+            config = SemanticChangeLogTemplatingServiceConfig(),
+            suffix = null,
+            renderer = PlainEventRenderer.INSTANCE
+        )
+        assertEquals(
+            """
+                Features:
+
+                * My feature - ${"a".repeat(99)}…
+
+                Fixes:
+
+                * Fixing some bugs
+            """.trimIndent().trim(),
+            text.trim()
+        )
+    }
+
+    @Test
+    fun `Commit subject truncation can be disabled`() {
+        val changelog = SCMChangeLog(
+            from = BuildFixtures.testBuild(),
+            to = BuildFixtures.testBuild(),
+            fromCommit = "abcd123",
+            toCommit = "abcd456",
+            commits = listOf(
+                "fix: " + "a".repeat(120) + "\n\nWith a body.",
+            ).toCommits(project),
+            issues = SCMChangeLogIssues(
+                issueServiceConfiguration = mockk(),
+                issues = emptyList()
+            )
+        )
+
+        val text = semanticChangelogRenderingService.render(
+            changelog = changelog,
+            config = SemanticChangeLogTemplatingServiceConfig(commitsMaxLength = 0),
+            suffix = null,
+            renderer = PlainEventRenderer.INSTANCE
+        )
+        assertEquals(
+            """
+                Fixes:
+
+                * ${"a".repeat(120)}
+            """.trimIndent().trim(),
+            text.trim()
+        )
+    }
+
     private fun List<String>.toCommits(project: Project): List<SCMDecoratedCommit> =
         map { message ->
             SCMDecoratedCommit(

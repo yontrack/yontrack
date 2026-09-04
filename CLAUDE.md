@@ -162,6 +162,23 @@ Follow this order for every non-trivial change:
 ### Tests
 - **Always** use `Roles.*` constants for role names in tests — never string literals
 
+### Commit messages
+- A commit subject that starts with a conventional-commit type is the only kind that appears in a
+  semantic change log. `SemanticChangelogRenderingServiceImpl` **drops every untyped commit
+  silently** — no "other" section, no count — and the SILVER notification renders one to support
+  the GOLD decision. An untyped subject is invisible there.
+- The known types are the only ones with a title and an emoji:
+  `build`, `chore`, `ci`, `docs`, `feat`, `fix`, `style`, `refactor`, `perf`, `test`.
+  Anything else is accepted and rendered as a raw section title, so a typo makes its own section
+  rather than failing.
+- **Never** write `doc:` — the type is `docs:`. Both are in the history, which produces a bare
+  `doc` section beside `📝 Documentation`, and the two cannot be merged from the template side:
+  mapping with `?sections=doc=Documentation` gives the mapped title no emoji, and the sort that
+  follows compares titles while ignoring emojis, so the keys collide and one group's commits are
+  dropped outright.
+- Adopting typed subjects across the repository is #1690; until then most commits are absent from
+  every semantic change log, and the `issues=true` section carries the content instead.
+
 ---
 
 ## Build & Run

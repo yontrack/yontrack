@@ -16,4 +16,7 @@ interface SemanticChangeLogConfig {
     @APIDescription("Use emojis in the section titles")
     val emojis: Boolean
 
+    @APIDescription(COMMIT_MESSAGE_MAX_LENGTH_DESCRIPTION)
+    val commitsMaxLength: Int
+
 }
