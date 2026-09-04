@@ -48,3 +48,6 @@ ontrack-extension-*/node_modules
 
 # Kotlin compiler daemon session files
 .kotlin/
+
+# Local MCP server configuration, written by the IDE and pointing at a port on this machine
+.mcp.json
