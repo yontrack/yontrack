@@ -109,3 +109,35 @@ export function nextPromotionLevel(promotionLevels, promotionRuns) {
     const reached = new Set((promotionRuns ?? []).map(run => String(run.promotionLevel?.id)))
     return (promotionLevels ?? []).find(level => !reached.has(String(level.id))) ?? null
 }
+
+/**
+ * The decorations to draw on a timeline card, and how many did not fit.
+ *
+ * Decorations are the one element on a fixed-width card with no length ceiling of their own: any
+ * extension may contribute one, and how many an instance has is a deployment fact core cannot know.
+ * So the row is clipped like the promotion medals are.
+ *
+ * Unlike promotion levels, decorations carry no ordinal. There is nothing to rank on - core has no
+ * business deciding that one extension's decoration matters more than another's - so the order the
+ * backend returns is the order shown, and the ones that overflow are the last of it.
+ *
+ * The ceiling is FOUR rather than three because a deployed build already carries three: the build
+ * link, the release, and the environments one. At three, the environments decoration - the one this
+ * row was added for - would be the first thing dropped by any extension contributing a fourth, and
+ * it sorts last so it would be dropped first. Four is headroom, not a limit anyone reasoned to.
+ *
+ * It counts decorations CONTRIBUTED, not glyphs drawn, and the two differ: `BuildLinkDecorationExtension`
+ * contributes one for every build and draws nothing when the build has no links. So a link-less build
+ * spends a slot on an invisible decoration, and `+1` can name something that would have drawn nothing.
+ * Counting glyphs instead would mean core interpreting each extension's `data` to guess what it will
+ * render, which is exactly the coupling the decoration seam exists to prevent - so it counts what it
+ * can honestly see.
+ *
+ * @param {Array<{decorationType?: string}>} [decorations] The build's decorations, in server order.
+ * @param {number} [max] How many decorations fit on a card.
+ * @returns {{shown: Array<any>, overflow: number}}
+ */
+export function visibleDecorations(decorations, max = 4) {
+    const all = decorations ?? []
+    return {shown: all.slice(0, max), overflow: Math.max(0, all.length - max)}
+}

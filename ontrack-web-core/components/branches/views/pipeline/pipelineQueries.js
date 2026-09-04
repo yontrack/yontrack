@@ -1,4 +1,5 @@
 import {gql} from "graphql-request";
+import {gqlDecorationFragment} from "@components/services/fragments";
 import {gqlValidationChipStamp} from "@components/primitives/ValidationChipFragments";
 
 /**
@@ -118,6 +119,11 @@ export const gqlPipelineBuilds = gql`
                     creation {
                         time
                     }
+                    # Core field, so the card shows a build's environments - and anything else an
+                    # extension decorates a build with - without this view naming any extension.
+                    decorations {
+                        ...decorationContent
+                    }
                     promotionRuns(lastPerLevel: true) {
                         id
                         creation {
@@ -149,6 +155,7 @@ export const gqlPipelineBuilds = gql`
 
     ${gqlPipelinePromotionLevel}
     ${gqlValidationChipStamp}
+    ${gqlDecorationFragment}
 `
 
 /**

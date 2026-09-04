@@ -63,6 +63,10 @@ export const createPipeline = async ({
     )
 
     return {
-        pipeline: data.startSlotPipeline.pipeline
+        pipeline: data.startSlotPipeline.pipeline,
+        // The branch and the build this fixture created along the way: a caller which wants to look
+        // at the deployment from somewhere else in the UI needs to name them
+        branch,
+        build,
     }
 }

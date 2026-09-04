@@ -50,6 +50,12 @@ describe('pipeline view queries', () => {
         expect(gqlPipelineBranchFacts).toContain('allBuilds: buildsPaginated(size: 1)')
     })
 
+    it('the timeline reads decorations through the core field, not an extension one', () => {
+        // `decorations` is core, so the view gets a build's environments with no core-to-extension
+        // coupling and keeps working on an instance without the environments extension
+        expect(gqlPipelineBuilds).toContain('...decorationContent')
+    })
+
     it('the chips carry the stamp data type they fall back on', () => {
         expect(gqlPipelineBuilds).toContain('...ValidationChipStamp')
         expect(gqlPipelineBuildInspection).toContain('...ValidationChipStamp')

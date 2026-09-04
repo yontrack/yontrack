@@ -119,6 +119,18 @@ class BranchPipelinePage {
         await expect(this.timelineCard(build)).toHaveAttribute('aria-pressed', 'false')
     }
 
+    /**
+     * The decorations drawn on a build's card - what an extension says about the build, the
+     * environments it is deployed in among them.
+     */
+    buildDecorations(build) {
+        return this.page.getByTestId(`timeline-build-decorations-${build.id}`)
+    }
+
+    async checkNoBuildDecorations(build) {
+        await expect(this.buildDecorations(build)).toBeHidden()
+    }
+
     async checkNoBuilds() {
         await expect(this.page.getByText("No build to show on this branch.")).toBeVisible()
         await expect(this.page.getByTestId('build-timeline')).toBeHidden()

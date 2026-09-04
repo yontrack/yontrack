@@ -36,6 +36,12 @@ import BuildInspectorValidations from "@components/branches/views/pipeline/Build
 // The notification badges fetch on mount; the inspector's panels are not what is under test
 jest.mock("../../../../../components/extension/notifications/EntityNotificationsBadge", () => () => null)
 
+// A decoration resolves its renderer by dynamic import from the extension it belongs to. What the
+// card owes the user here is the row and its overflow rule, not any one extension's glyph.
+jest.mock("../../../../../components/framework/decorations/Decoration", () => (
+    ({decoration}) => <span data-testid={`decoration-${decoration.decorationType}`}/>
+))
+
 const withEvents = (element) => render(
     <EventsContext.Provider value={{fireEvent: jest.fn(), subscribeToEvent: jest.fn()}}>
         {element}
@@ -202,6 +208,65 @@ describe('a project which does not use releases', () => {
             loading={false}
         />)
         expect(screen.getByTestId('pipeline-stat-latest-version')).toHaveTextContent("5.3.0")
+    })
+
+})
+
+describe('a build with decorations', () => {
+
+    const decoration = (type) => ({decorationType: type, data: [], feature: {id: "test"}})
+
+    it('shows nothing at all when the build carries none', () => {
+        // An empty decoration row would claim the build has something to say about itself
+        withEvents(<BuildTimelineCard build={build({decorations: []})} promotionLevels={[]}/>)
+        expect(screen.queryByTestId('timeline-build-decorations-1')).not.toBeInTheDocument()
+    })
+
+    it('shows nothing at all on an instance whose backend never sent the field', () => {
+        withEvents(<BuildTimelineCard build={build()} promotionLevels={[]}/>)
+        expect(screen.queryByTestId('timeline-build-decorations-1')).not.toBeInTheDocument()
+    })
+
+    it('renders every decoration the extension side contributes, unfiltered', () => {
+        // Core does not know which decoration is the environments one and must not learn
+        withEvents(<BuildTimelineCard
+            build={build({decorations: [decoration("environments"), decoration("release")]})}
+            promotionLevels={[]}
+        />)
+        expect(screen.getByTestId('decoration-environments')).toBeInTheDocument()
+        expect(screen.getByTestId('decoration-release')).toBeInTheDocument()
+    })
+
+    it('clips at the ceiling and counts the rest, the card being fixed-width', () => {
+        withEvents(<BuildTimelineCard
+            build={build({decorations: ["a", "b", "c", "d", "e", "f"].map(decoration)})}
+            promotionLevels={[]}
+        />)
+        expect(screen.getByTestId('decoration-a')).toBeInTheDocument()
+        expect(screen.getByTestId('decoration-d')).toBeInTheDocument()
+        expect(screen.queryByTestId('decoration-e')).not.toBeInTheDocument()
+        expect(screen.getByText("+2")).toBeVisible()
+    })
+
+    it('shows all three of a deployed build without an overflow marker', () => {
+        // What the demo actually produces: build link, release, environments
+        withEvents(<BuildTimelineCard
+            build={build({decorations: ["buildLink", "release", "environments"].map(decoration)})}
+            promotionLevels={[]}
+        />)
+        expect(screen.getByTestId('decoration-environments')).toBeInTheDocument()
+        expect(screen.queryByText(/^\+\d+$/)).not.toBeInTheDocument()
+    })
+
+    it('keeps the decoration links out of the selection button', () => {
+        // A decoration is a link; an interactive descendant of a button is invalid and would make
+        // one click both navigate and re-select
+        withEvents(<BuildTimelineCard
+            build={build({decorations: [decoration("environments")]})}
+            promotionLevels={[]}
+        />)
+        const button = screen.getByTestId('timeline-build-1')
+        expect(button).not.toContainElement(screen.getByTestId('decoration-environments'))
     })
 
 })

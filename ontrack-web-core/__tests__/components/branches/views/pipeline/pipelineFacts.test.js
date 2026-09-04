@@ -5,6 +5,7 @@ import {
     topPromotionRuns,
     validationStatusId,
     validationStrip,
+    visibleDecorations,
 } from "@components/branches/views/pipeline/pipelineFacts"
 
 describe('buildVersion', () => {
@@ -157,6 +158,49 @@ describe('nextPromotionLevel', () => {
     it('is nothing on a branch with no promotion levels', () => {
         expect(nextPromotionLevel([], [])).toBeNull()
         expect(nextPromotionLevel(undefined, undefined)).toBeNull()
+    })
+
+})
+
+describe('visibleDecorations', () => {
+
+    const decoration = (type) => ({decorationType: type, data: []})
+
+    it('keeps every decoration when they fit', () => {
+        const {shown, overflow} = visibleDecorations([decoration("a"), decoration("b")])
+        expect(shown.map(it => it.decorationType)).toEqual(["a", "b"])
+        expect(overflow).toBe(0)
+    })
+
+    it('clips at the ceiling and counts the rest', () => {
+        // The card is fixed-width by design, and decorations are the one element on it with no
+        // length ceiling of their own
+        const {shown, overflow} = visibleDecorations(
+            ["a", "b", "c", "d", "e"].map(decoration),
+        )
+        expect(shown.map(it => it.decorationType)).toEqual(["a", "b", "c", "d"])
+        expect(overflow).toBe(1)
+    })
+
+    it('fits the three a deployed build already carries, with room for a fourth', () => {
+        // The build link, the release and the environments one. The environments decoration sorts
+        // last, so a tighter ceiling would drop the very thing this row exists to show.
+        const deployed = ["buildLink", "release", "environments"].map(decoration)
+        expect(visibleDecorations(deployed).overflow).toBe(0)
+        expect(visibleDecorations([...deployed, decoration("other")]).shown)
+            .toHaveLength(4)
+    })
+
+    it('keeps the server order rather than ranking, there being nothing to rank on', () => {
+        // Unlike promotion levels, decorations carry no ordinal: core cannot know which extension's
+        // decoration matters more, so the order the backend returns is the order shown
+        const {shown} = visibleDecorations([decoration("z"), decoration("a")], 2)
+        expect(shown.map(it => it.decorationType)).toEqual(["z", "a"])
+    })
+
+    it('says nothing for a build with no decorations', () => {
+        expect(visibleDecorations([])).toEqual({shown: [], overflow: 0})
+        expect(visibleDecorations(undefined)).toEqual({shown: [], overflow: 0})
     })
 
 })

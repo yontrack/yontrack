@@ -4,11 +4,13 @@ import {PromotionLevelImage} from "@components/promotionLevels/PromotionLevelIma
 import RangeSelector from "@components/common/RangeSelector";
 import TimestampText from "@components/common/TimestampText";
 import ValidationStrip from "@components/branches/views/pipeline/ValidationStrip";
+import Decoration from "@components/framework/decorations/Decoration";
 import {
     buildVersion,
     filterValidations,
     topPromotionRuns,
     validationStrip,
+    visibleDecorations,
 } from "@components/branches/views/pipeline/pipelineFacts";
 
 /**
@@ -21,6 +23,12 @@ import {
  * The RANGE SELECTOR is a sibling of that button rather than a child of it: a control nested inside
  * a button is invalid, and the two affordances mean different things - one picks the build to
  * inspect, the other marks a change log boundary.
+ *
+ * THE DECORATIONS ROW is a sibling for the same reason - a decoration is a link, and an interactive
+ * descendant of a button is invalid: one click would both navigate and re-select. That is why the
+ * card chrome (border, surface, padding) lives on the container and the button is transparent: the
+ * button covers the part of the card which means "inspect this build", and the row below it sits
+ * inside the same card without being part of that action.
  *
  * @param build The build to draw
  * @param promotionLevels The branch's levels, lowest first, used to rank the medals
@@ -45,11 +53,26 @@ const BuildTimelineCard = forwardRef(function BuildTimelineCard({
     const version = buildVersion(build)
     const {shown, overflow} = topPromotionRuns(build.promotionRuns, promotionLevels)
     const {bars, passed, total} = validationStrip(filterValidations(build.validations, selectedFilter))
+    const {shown: decorations, overflow: decorationOverflow} = visibleDecorations(build.decorations)
 
     return (
         <div
             ref={ref}
-            style={{position: 'relative', flex: `0 0 ${width}px`, width}}
+            style={{
+                position: 'relative',
+                flex: `0 0 ${width}px`,
+                width,
+                // The timeline stretches every card to the tallest one. The container is what paints
+                // the card, so its children have to grow into that height - otherwise the surface
+                // below a short card's content looks like card and does not select the build.
+                display: 'flex',
+                flexDirection: 'column',
+                borderRadius: token.borderRadiusLG,
+                border: `1px solid ${selected ? token.colorPrimary : token.colorBorderSecondary}`,
+                // Selection is carried by the border AND the surface, so it survives a theme
+                // where the primary hue is close to the border one.
+                backgroundColor: selected ? token.colorPrimaryBg : token.colorBgContainer,
+            }}
         >
             <button
                 type="button"
@@ -57,17 +80,20 @@ const BuildTimelineCard = forwardRef(function BuildTimelineCard({
                 aria-pressed={selected}
                 onClick={() => onSelect?.(build.id)}
                 style={{
+                    display: 'block',
+                    // Takes the slack the stretched container has, so all of it stays clickable
+                    flex: '1 1 auto',
                     width: '100%',
                     textAlign: 'left',
                     cursor: 'pointer',
+                    // The border and the surface are the container's; the button keeps its own
+                    // padding, so that everything it covers stays clickable.
                     padding: token.paddingSM,
                     // The right padding leaves the range selector its corner
                     paddingRight: token.paddingSM + token.controlHeightSM,
-                    borderRadius: token.borderRadiusLG,
-                    border: `1px solid ${selected ? token.colorPrimary : token.colorBorderSecondary}`,
-                    // Selection is carried by the border AND the surface, so it survives a theme
-                    // where the primary hue is close to the border one.
-                    backgroundColor: selected ? token.colorPrimaryBg : token.colorBgContainer,
+                    border: 'none',
+                    background: 'none',
+                    color: 'inherit',
                     fontFamily: token.fontFamily,
                 }}
             >
@@ -111,6 +137,44 @@ const BuildTimelineCard = forwardRef(function BuildTimelineCard({
                     <ValidationStrip bars={bars} passed={passed} total={total}/>
                 </Space>
             </button>
+            {
+                // Guards the case where the backend sends no decorations at all - an older instance,
+                // or one running no decorating extension. It is NOT the empty-looking-row case:
+                // `BuildLinkDecorationExtension` contributes a decoration for EVERY build and then
+                // renders nothing when the build has no links, and core cannot tell the two apart
+                // without reading an extension's data. Such a row costs its own padding and no more,
+                // equally on every card, which is why that is left alone rather than guessed at.
+                decorations.length > 0 &&
+                <Space
+                    data-testid={`timeline-build-decorations-${build.id}`}
+                    size={token.marginXXS}
+                    wrap
+                    // Aligned on the button's own padding, the two making one card
+                    style={{
+                        paddingLeft: token.paddingSM,
+                        paddingRight: token.paddingSM,
+                        paddingBottom: token.paddingSM,
+                    }}
+                >
+                    {
+                        // Every decoration, unfiltered. Picking out the environments one would mean
+                        // core code naming an extension, which is the coupling this seam avoids.
+                        decorations.map(decoration =>
+                            <Decoration key={decoration.decorationType} decoration={decoration}/>
+                        )
+                    }
+                    {
+                        decorationOverflow > 0 &&
+                        <Typography.Text
+                            type="secondary"
+                            style={{fontSize: token.fontSizeSM}}
+                            title={`${decorationOverflow} more decoration(s)`}
+                        >
+                            +{decorationOverflow}
+                        </Typography.Text>
+                    }
+                </Space>
+            }
             <span
                 style={{position: 'absolute', top: token.paddingSM, right: token.paddingXS}}
                 // The two affordances are distinct: marking a change log boundary must not also
