@@ -234,6 +234,36 @@ test('the view menu offers the pipeline view, and the choice is remembered', asy
     await branchPage.checkBuildPresent(recent.name)
 })
 
+test('the inspector names the selected build and leads to its page', async ({page, ontrack}) => {
+    // The panel is partial by design, so the way out to the full record is part of what it owes the
+    // reader - and a header naming the build is what stops the two sections belonging to nothing
+    const {branch, recent} = await branchWithAPipeline(ontrack)
+
+    await login(page, ontrack)
+    const pipelinePage = new BranchPipelinePage(page, branch)
+    await pipelinePage.goTo()
+
+    await pipelinePage.selectBuild(recent)
+    await pipelinePage.checkInspectorNames(recent)
+
+    // Only a browser can say the link actually lands on the build
+    await pipelinePage.goToBuildFromInspector(recent)
+})
+
+test('the inspector header follows the selection', async ({page, ontrack}) => {
+    const {branch, old, recent} = await branchWithAPipeline(ontrack)
+
+    await login(page, ontrack)
+    const pipelinePage = new BranchPipelinePage(page, branch)
+    await pipelinePage.goTo()
+
+    await pipelinePage.selectBuild(recent)
+    await pipelinePage.checkInspectorNames(recent)
+
+    await pipelinePage.selectBuild(old)
+    await pipelinePage.checkInspectorNames(old)
+})
+
 test('the pipeline view says it is experimental and invites feedback', async ({page, ontrack}) => {
     const {branch} = await branchWithAPipeline(ontrack)
 

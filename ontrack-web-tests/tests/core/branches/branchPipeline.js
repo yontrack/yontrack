@@ -1,5 +1,6 @@
 const {expect} = require("@playwright/test");
 const {SCMChangeLogPage} = require("../../extensions/scm/scm");
+const {BuildPage} = require("../builds/BuildPage");
 
 /**
  * The pipeline branch content view.
@@ -163,6 +164,31 @@ class BranchPipelinePage {
         const panel = this.page.getByTestId('inspector-validations')
         await expect(panel).toBeVisible()
         await expect(panel.getByTestId(`inspector-validation-${validationStamp.id}`)).toBeVisible()
+    }
+
+    /**
+     * The inspector's header: which build the panel is describing, and the way out to its page.
+     */
+    inspectorBuildTitle() {
+        return this.page.getByTestId('inspector-build-title')
+    }
+
+    async checkInspectorNames(build) {
+        const title = this.inspectorBuildTitle()
+        await expect(title).toBeVisible()
+        await expect(title).toContainText(build.name)
+    }
+
+    async goToBuildFromInspector(build) {
+        await this.inspectorBuildTitle().getByRole('link').click()
+        // The URL and the build's own name, rather than `BuildPage.checkOnBuildPage`: that method
+        // asserts an unscoped `getByText("Promotions")`, which is ambiguous on the build page of a
+        // branch that HAS promotion levels - the command bar carries a "Promotions" link too. This
+        // view's fixtures always create levels, so it would be a coin toss here.
+        await expect(this.page).toHaveURL(new RegExp(`/build/${build.id}$`))
+        const buildPage = new BuildPage(this.page, build)
+        await buildPage.assertName(build.name)
+        return buildPage
     }
 
     async checkNoInspector() {
