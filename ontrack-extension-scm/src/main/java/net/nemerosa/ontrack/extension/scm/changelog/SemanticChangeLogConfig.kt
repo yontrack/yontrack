@@ -16,7 +16,7 @@ interface SemanticChangeLogConfig {
     @APIDescription("Use emojis in the section titles")
     val emojis: Boolean
 
-    @APIDescription("Maximum length of a commit message in a change log, ellipsis included. Only the first line of a commit message is ever rendered; set this to 0 to render that line in full.")
+    @APIDescription(COMMIT_MESSAGE_MAX_LENGTH_DESCRIPTION)
     val commitsMaxLength: Int
 
 }

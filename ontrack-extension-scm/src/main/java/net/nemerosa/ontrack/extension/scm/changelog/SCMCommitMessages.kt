@@ -10,6 +10,12 @@ package net.nemerosa.ontrack.extension.scm.changelog
 const val COMMIT_MESSAGE_DEFAULT_MAX_LENGTH = 100
 
 /**
+ * Description of the `commitsMaxLength` option, shared by every change log configuration.
+ */
+const val COMMIT_MESSAGE_MAX_LENGTH_DESCRIPTION =
+    "Maximum length of a commit message in a change log, ellipsis included. Only the first line of a commit message is ever rendered; set this to 0 to render that line in full."
+
+/**
  * Subject of a commit message, as rendered in a change log: the first line of the message,
  * truncated when too long.
  *

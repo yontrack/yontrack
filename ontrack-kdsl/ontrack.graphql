@@ -6248,7 +6248,10 @@ type SCMCommitInfo {
 "SCMDecoratedCommit"
 type SCMDecoratedCommit {
   "Annotated message with links"
-  annotatedMessage: String!
+  annotatedMessage(
+    "Maximum length of the message, ellipsis included. Only the first line of the commit message is returned; set this to 0 to get the whole message."
+    maxLength: Int = 100
+  ): String!
   "Any build linked to this commit"
   build: Build
   "commit field"

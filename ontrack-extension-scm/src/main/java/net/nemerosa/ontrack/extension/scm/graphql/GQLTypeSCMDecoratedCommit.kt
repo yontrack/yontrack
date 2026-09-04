@@ -47,6 +47,12 @@ class GQLTypeSCMDecoratedCommit(
                         val maxLength = env.getArgument<Int>(ARG_MAX_LENGTH) ?: COMMIT_MESSAGE_DEFAULT_MAX_LENGTH
                         // Shortening _before_ annotating: the annotated message is HTML, and cutting
                         // it as a string would break the links it contains.
+                        //
+                        // Note that 0 means more here than it does for the `commitsMaxLength` of a
+                        // change log: a change log is a list of subjects, so 0 only lifts the length
+                        // limit there, whereas a caller asking a single commit for its message
+                        // without any limit wants the whole of it, body included. This is what the
+                        // commit page does.
                         val message = if (maxLength <= 0) {
                             commit.message
                         } else {
