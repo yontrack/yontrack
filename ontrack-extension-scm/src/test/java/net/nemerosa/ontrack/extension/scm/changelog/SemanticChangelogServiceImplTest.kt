@@ -32,6 +32,42 @@ class SemanticChangelogServiceImplTest {
     }
 
     @Test
+    fun `No type, keeping only the first line`() {
+        assertEquals(
+            SemanticCommit(
+                type = null,
+                scope = null,
+                subject = "ISS-123 Commit with issue",
+            ),
+            service.parseSemanticCommit(
+                """
+                    ISS-123 Commit with issue
+
+                    With a long body explaining at length what the commit does.
+                """.trimIndent()
+            )
+        )
+    }
+
+    @Test
+    fun `Type only, keeping only the first line`() {
+        assertEquals(
+            SemanticCommit(
+                type = "feat",
+                scope = null,
+                subject = "Commit for some feature",
+            ),
+            service.parseSemanticCommit(
+                """
+                    feat: Commit for some feature
+
+                    With a long body explaining at length what the commit does.
+                """.trimIndent()
+            )
+        )
+    }
+
+    @Test
     fun `Type and scope`() {
         assertEquals(
             SemanticCommit(

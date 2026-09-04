@@ -1,10 +1,13 @@
 package net.nemerosa.ontrack.extension.scm.graphql
 
+import graphql.Scalars.GraphQLInt
 import graphql.Scalars.GraphQLString
 import graphql.schema.GraphQLObjectType
 import graphql.schema.GraphQLTypeReference
+import net.nemerosa.ontrack.extension.scm.changelog.COMMIT_MESSAGE_DEFAULT_MAX_LENGTH
 import net.nemerosa.ontrack.extension.scm.changelog.SCMChangeLogEnabled
 import net.nemerosa.ontrack.extension.scm.changelog.SCMDecoratedCommit
+import net.nemerosa.ontrack.extension.scm.changelog.shortCommitMessage
 import net.nemerosa.ontrack.extension.scm.service.SCMDetector
 import net.nemerosa.ontrack.graphql.schema.GQLType
 import net.nemerosa.ontrack.graphql.schema.GQLTypeBuild
@@ -32,19 +35,33 @@ class GQLTypeSCMDecoratedCommit(
             .field {
                 it.name("annotatedMessage")
                     .description("Annotated message with links")
+                    .argument { arg ->
+                        arg.name(ARG_MAX_LENGTH)
+                            .description("Maximum length of the message, ellipsis included. Only the first line of the commit message is returned; set this to 0 to get the whole message.")
+                            .type(GraphQLInt)
+                            .defaultValueProgrammatic(COMMIT_MESSAGE_DEFAULT_MAX_LENGTH)
+                    }
                     .type(GraphQLString.toNotNull())
                     .dataFetcher { env ->
                         val (project, commit) = env.getSource<SCMDecoratedCommit>()!!
+                        val maxLength = env.getArgument<Int>(ARG_MAX_LENGTH) ?: COMMIT_MESSAGE_DEFAULT_MAX_LENGTH
+                        // Shortening _before_ annotating: the annotated message is HTML, and cutting
+                        // it as a string would break the links it contains.
+                        val message = if (maxLength <= 0) {
+                            commit.message
+                        } else {
+                            shortCommitMessage(commit.message, maxLength)
+                        }
                         val scm = scmDetector.getSCM(project)
                         if (scm != null && scm is SCMChangeLogEnabled) {
                             val annotator = scm.getConfiguredIssueService()?.messageAnnotator
                             if (annotator != null) {
-                                MessageAnnotationUtils.annotate(commit.message, listOf(annotator))
+                                MessageAnnotationUtils.annotate(message, listOf(annotator))
                             } else {
-                                commit.message
+                                message
                             }
                         } else {
-                            commit.message
+                            message
                         }
                     }
             }
@@ -66,5 +83,9 @@ class GQLTypeSCMDecoratedCommit(
             }
 
             .build()
+
+    companion object {
+        const val ARG_MAX_LENGTH = "maxLength"
+    }
 
 }

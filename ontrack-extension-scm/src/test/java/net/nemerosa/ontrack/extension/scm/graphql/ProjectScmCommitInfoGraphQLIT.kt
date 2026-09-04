@@ -65,6 +65,91 @@ class ProjectScmCommitInfoGraphQLIT : AbstractQLKTITSupport() {
 
     @Test
     @AsAdminTest
+    fun `The annotated message is reduced to its subject by default`() {
+        mockSCMTester.withMockSCMRepository {
+            project {
+                branch {
+                    configureMockSCMBranch()
+
+                    build("1.01") {
+                        repositoryIssue("ISS-20", "Some issue")
+                        val commitId = withRepositoryCommit(
+                            "ISS-20 Some commit\n\nWith a long body explaining at length what the commit does."
+                        )
+
+                        run(
+                            """
+                                {
+                                    project(id: ${project.id}) {
+                                        scmCommitInfo(commitId: "$commitId") {
+                                            scmDecoratedCommit {
+                                                annotatedMessage
+                                            }
+                                        }
+                                    }
+                                }
+                            """
+                        ) { data ->
+                            assertEquals(
+                                """<a href="mock://Mock issues/issue/ISS-20">ISS-20</a> Some commit""",
+                                data.path("project")
+                                    .path("scmCommitInfo")
+                                    .path("scmDecoratedCommit")
+                                    .path("annotatedMessage").asText()
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    @AsAdminTest
+    fun `The whole annotated message can be asked for with a zero max length`() {
+        mockSCMTester.withMockSCMRepository {
+            project {
+                branch {
+                    configureMockSCMBranch()
+
+                    build("1.01") {
+                        repositoryIssue("ISS-20", "Some issue")
+                        val message =
+                            "ISS-20 Some commit\n\nWith a long body explaining at length what the commit does."
+                        val commitId = withRepositoryCommit(message)
+
+                        run(
+                            """
+                                {
+                                    project(id: ${project.id}) {
+                                        scmCommitInfo(commitId: "$commitId") {
+                                            scmDecoratedCommit {
+                                                annotatedMessage(maxLength: 0)
+                                            }
+                                        }
+                                    }
+                                }
+                            """
+                        ) { data ->
+                            assertEquals(
+                                message.replace(
+                                    "ISS-20",
+                                    """<a href="mock://Mock issues/issue/ISS-20">ISS-20</a>"""
+                                ),
+                                data.path("project")
+                                    .path("scmCommitInfo")
+                                    .path("scmDecoratedCommit")
+                                    .path("annotatedMessage").asText()
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    @AsAdminTest
     fun `Getting the branch info info for a commit in a project`() {
         mockSCMTester.withMockSCMRepository {
             project {

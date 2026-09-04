@@ -51,7 +51,7 @@ class SemanticChangelogRenderingServiceImpl(
                     append(
                         renderer.renderList(
                             commits.map { commit ->
-                                renderCommit(commit, renderer)
+                                renderCommit(commit, config.commitsMaxLength, renderer)
                             }
                         )
                     )
@@ -64,6 +64,7 @@ class SemanticChangelogRenderingServiceImpl(
 
     fun renderCommit(
         commit: SemanticCommit,
+        commitsMaxLength: Int,
         renderer: EventRenderer
     ): String {
         return buildString {
@@ -71,7 +72,7 @@ class SemanticChangelogRenderingServiceImpl(
                 append(renderer.renderStrong(commit.scope))
                 append(" - ")
             }
-            append(commit.subject)
+            append(shortCommitMessage(commit.subject, commitsMaxLength))
         }
     }
 

@@ -18,6 +18,8 @@ open class ChangeLogTemplatingServiceConfig(
     val defaultQualifierFallback: Boolean = false,
     @APIDescription("Defines how to render commits for a change log")
     val commitsOption: ChangeLogTemplatingCommitsOption = ChangeLogTemplatingCommitsOption.NONE,
+    @APIDescription("Maximum length of a commit message in a change log, ellipsis included. Only the first line of a commit message is ever rendered; set this to 0 to render that line in full.")
+    val commitsMaxLength: Int = COMMIT_MESSAGE_DEFAULT_MAX_LENGTH,
 ) {
     @APIDescription("Comma-separated list of project links to follow one by one for a get deep change log. Each item in the list is either a project name, or a project name and qualifier separated by a colon (:).")
     @ListRef

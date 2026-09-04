@@ -31,7 +31,9 @@ export default function SCMCommitInfoView({projectName, commit}) {
                                 message
                                 link
                             }
-                            annotatedMessage
+                            # This page is where the change log links to for the whole story,
+                            # so it asks for the message in full, body included.
+                            annotatedMessage(maxLength: 0)
                         }
                         branchInfos {
                             type

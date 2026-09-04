@@ -7,6 +7,7 @@ import graphql.schema.GraphQLTypeReference
 import net.nemerosa.ontrack.extension.scm.changelog.SemanticChangeLogTemplatingServiceConfig
 import net.nemerosa.ontrack.graphql.schema.GQLInputType
 import net.nemerosa.ontrack.graphql.schema.booleanInputField
+import net.nemerosa.ontrack.graphql.schema.intInputField
 import net.nemerosa.ontrack.graphql.schema.optionalStringListInputField
 import net.nemerosa.ontrack.graphql.schema.stringListInputField
 import net.nemerosa.ontrack.json.asJson
@@ -42,6 +43,7 @@ class GQLInputSemanticChangeLogTemplatingServiceConfig : GQLInputType<SemanticCh
             )
             .field(stringListInputField(SemanticChangeLogTemplatingServiceConfig::exclude, nullable = true))
             .field(booleanInputField(SemanticChangeLogTemplatingServiceConfig::emojis, nullable = true))
+            .field(intInputField(SemanticChangeLogTemplatingServiceConfig::commitsMaxLength, nullable = true))
             .build()
 
 

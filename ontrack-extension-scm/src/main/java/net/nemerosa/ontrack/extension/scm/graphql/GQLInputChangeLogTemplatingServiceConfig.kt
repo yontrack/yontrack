@@ -28,6 +28,7 @@ class GQLInputChangeLogTemplatingServiceConfig : GQLInputType<ChangeLogTemplatin
             .field(booleanInputField(ChangeLogTemplatingServiceConfig::allQualifiers, nullable = true))
             .field(booleanInputField(ChangeLogTemplatingServiceConfig::defaultQualifierFallback, nullable = true))
             .field(enumInputField(ChangeLogTemplatingServiceConfig::commitsOption, nullable = true))
+            .field(intInputField(ChangeLogTemplatingServiceConfig::commitsMaxLength, nullable = true))
             .build()
 
     override fun convert(argument: Any?): ChangeLogTemplatingServiceConfig =
