@@ -133,11 +133,26 @@ export function nextPromotionLevel(promotionLevels, promotionRuns) {
  * render, which is exactly the coupling the decoration seam exists to prevent - so it counts what it
  * can honestly see.
  *
- * @param {Array<{decorationType?: string}>} [decorations] The build's decorations, in server order.
- * @param {number} [max] How many decorations fit on a card.
+ * A decoration whose WHOLE payload is a string the card already prints - in practice the release
+ * decoration, whose data is the version on the card's first line - is dropped before any of that.
+ * The rule is about the value, not about the extension: core never names
+ * `ReleaseDecorationExtension`, it only declines to say the same thing twice on one card, and any
+ * other extension whose decoration reduces to the version dedupes for free. Dropping is the right
+ * direction because the version's place is the card's title, not a tag under it - the build name is
+ * an opaque timestamp-run pair and the release property is the version a human reads
+ * (see docs/adr/0006-build-identity-through-the-release.md).
+ *
+ * @param {Array<{decorationType?: string, data?: any}>} [decorations] The build's decorations, in
+ *   server order.
+ * @param {{version?: string|null, max?: number}} [options] `version` is the text the card already
+ *   shows as its title, if any; `max` is how many decorations fit on a card.
  * @returns {{shown: Array<any>, overflow: number}}
  */
-export function visibleDecorations(decorations, max = 4) {
-    const all = decorations ?? []
+export function visibleDecorations(decorations, {version = null, max = 4} = {}) {
+    const all = (decorations ?? []).filter(decoration =>
+        // Only an exact, whole-payload string match. A decoration carrying an object may well
+        // mention the version somewhere inside it and still have plenty else to say.
+        !(version && typeof decoration.data === 'string' && decoration.data === version)
+    )
     return {shown: all.slice(0, max), overflow: Math.max(0, all.length - max)}
 }

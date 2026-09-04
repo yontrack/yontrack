@@ -214,7 +214,7 @@ describe('a project which does not use releases', () => {
 
 describe('a build with decorations', () => {
 
-    const decoration = (type) => ({decorationType: type, data: [], feature: {id: "test"}})
+    const decoration = (type, data = []) => ({decorationType: type, data, feature: {id: "test"}})
 
     it('shows nothing at all when the build carries none', () => {
         // An empty decoration row would claim the build has something to say about itself
@@ -246,6 +246,31 @@ describe('a build with decorations', () => {
         expect(screen.getByTestId('decoration-d')).toBeInTheDocument()
         expect(screen.queryByTestId('decoration-e')).not.toBeInTheDocument()
         expect(screen.getByText("+2")).toBeVisible()
+    })
+
+    it('drops the release decoration that merely repeats the card title', () => {
+        // The card's first line already IS the release property. Dropped by value, not by naming the
+        // extension - core filtering on a decoration type would be the coupling this seam avoids.
+        withEvents(<BuildTimelineCard
+            build={build({
+                displayName: "1.4.4",
+                decorations: [decoration("buildLink", {buildId: 1}), decoration("release", "1.4.4")],
+            })}
+            promotionLevels={[]}
+        />)
+        expect(screen.getByTestId('decoration-buildLink')).toBeInTheDocument()
+        expect(screen.queryByTestId('decoration-release')).not.toBeInTheDocument()
+    })
+
+    it('keeps a release decoration that says something the title does not', () => {
+        withEvents(<BuildTimelineCard
+            build={build({
+                displayName: "1.4.4",
+                decorations: [decoration("release", "1.4.5")],
+            })}
+            promotionLevels={[]}
+        />)
+        expect(screen.getByTestId('decoration-release')).toBeInTheDocument()
     })
 
     it('shows all three of a deployed build without an overflow marker', () => {

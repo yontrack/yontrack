@@ -47,9 +47,22 @@ which is the coupling the decoration seam exists to avoid. All decorations rende
 A future "Missing environments" report against the pipeline view is answered by this
 document, not by a new band.
 
-Rendering all decorations means `ReleaseDecorationExtension` prints the version the card
-already prints on its first line via `buildVersion`. Accepted. If it grates in use, the fix
-is dropping the card's version line, not filtering decorations.
+Rendering all decorations meant `ReleaseDecorationExtension` printed the version the card
+already prints on its first line via `buildVersion`. It grated as soon as it was seen, and the
+remedy first written down here — dropping the card's version line — was the wrong way round:
+ADR 0006 has the build name as an opaque timestamp-run pair and the release property as the
+version a human reads, so demoting the version to a tag would take the one identifier people
+scan by off the headline of the view built for scanning.
+
+Instead `visibleDecorations` drops any decoration whose **whole payload is a string equal to the
+title the card already shows**. That is a rule about the value, not about the extension: core
+still names nothing, and any other extension whose decoration reduces to the version dedupes
+for free. Two costs are accepted with it. The chip carried a copy-to-clipboard affordance
+(`Typography.Text copyable`) which goes with it, and it cannot be moved onto the card's title,
+because antd renders that control as a `button` and the title lives inside the card's selection
+button — the same invalid nesting that keeps the decoration row outside it. And a decoration
+that legitimately carries the version string for some other reason would be dropped too;
+that is a heuristic on payload shape, accepted as cheaper than the alternatives.
 
 Because a decoration is a link and an interactive descendant of a `button` is invalid, the
 decoration row on `BuildTimelineCard` is a sibling of the selection button rather than a child

@@ -53,7 +53,9 @@ const BuildTimelineCard = forwardRef(function BuildTimelineCard({
     const version = buildVersion(build)
     const {shown, overflow} = topPromotionRuns(build.promotionRuns, promotionLevels)
     const {bars, passed, total} = validationStrip(filterValidations(build.validations, selectedFilter))
-    const {shown: decorations, overflow: decorationOverflow} = visibleDecorations(build.decorations)
+    // `version` so that a decoration saying only what the title says is not drawn twice
+    const {shown: decorations, overflow: decorationOverflow} =
+        visibleDecorations(build.decorations, {version})
 
     return (
         <div

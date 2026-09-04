@@ -194,13 +194,60 @@ describe('visibleDecorations', () => {
     it('keeps the server order rather than ranking, there being nothing to rank on', () => {
         // Unlike promotion levels, decorations carry no ordinal: core cannot know which extension's
         // decoration matters more, so the order the backend returns is the order shown
-        const {shown} = visibleDecorations([decoration("z"), decoration("a")], 2)
+        const {shown} = visibleDecorations([decoration("z"), decoration("a")], {max: 2})
         expect(shown.map(it => it.decorationType)).toEqual(["z", "a"])
     })
 
     it('says nothing for a build with no decorations', () => {
         expect(visibleDecorations([])).toEqual({shown: [], overflow: 0})
         expect(visibleDecorations(undefined)).toEqual({shown: [], overflow: 0})
+    })
+
+    describe('dropping what the card already says', () => {
+
+        const releaseOf = (value) => ({decorationType: "release", data: value})
+
+        it('drops a decoration whose whole payload is the version already shown', () => {
+            const {shown} = visibleDecorations(
+                [decoration("buildLink"), releaseOf("1.4.4")],
+                {version: "1.4.4"},
+            )
+            expect(shown.map(it => it.decorationType)).toEqual(["buildLink"])
+        })
+
+        it('keeps a decoration whose payload is a different string', () => {
+            const {shown} = visibleDecorations([releaseOf("1.4.5")], {version: "1.4.4"})
+            expect(shown.map(it => it.decorationType)).toEqual(["release"])
+        })
+
+        it('keeps decorations whose payload is not a string at all', () => {
+            // `BuildLinkDecorationExtension` carries an object; nothing about it can equal the
+            // version, and a payload-shaped comparison must not trip over that
+            const {shown} = visibleDecorations(
+                [{decorationType: "buildLink", data: {buildId: 1, linksCount: 0}}],
+                {version: "1.4.4"},
+            )
+            expect(shown.map(it => it.decorationType)).toEqual(["buildLink"])
+        })
+
+        it('drops nothing when the card shows no version', () => {
+            // A project with no release property: the card's first line is the build name, and a
+            // decoration repeating the name is not the case this rule is about
+            const name = "20260901055547-36"
+            const {shown} = visibleDecorations([releaseOf(name)], {version: null})
+            expect(shown.map(it => it.decorationType)).toEqual(["release"])
+        })
+
+        it('drops before clipping, so the freed slot is usable', () => {
+            // Otherwise deduplicating would not buy the card any room, only a shorter row
+            const {shown, overflow} = visibleDecorations(
+                [releaseOf("1.4.4"), ...["a", "b", "c", "d"].map(decoration)],
+                {version: "1.4.4"},
+            )
+            expect(shown.map(it => it.decorationType)).toEqual(["a", "b", "c", "d"])
+            expect(overflow).toBe(0)
+        })
+
     })
 
 })
