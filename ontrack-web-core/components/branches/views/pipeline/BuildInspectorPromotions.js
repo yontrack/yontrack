@@ -62,12 +62,15 @@ export default function BuildInspectorPromotions({build, onChange}) {
                             // run id.
                             data-testid={`inspector-promotion-run-${run.id}`}
                             data-promotion-level={run.promotionLevel?.id}
+                            // The actions sit immediately after the run they act on, not at the far
+                            // edge of the panel: this panel is as wide as half the page, and
+                            // `space-between` put a delete icon a screen-width away from the row it
+                            // belonged to. Ragged right, because being next to the run matters more
+                            // than the icons lining up with each other.
                             style={{
                                 display: 'flex',
                                 alignItems: 'center',
-                                justifyContent: 'space-between',
                                 gap: token.marginXS,
-                                width: '100%',
                             }}
                         >
                             <Space size={token.marginXS} wrap>
