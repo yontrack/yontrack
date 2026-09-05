@@ -1,0 +1,131 @@
+name: Demo screenshots
+
+# Captures the screenshots the wiki release notes use, from the demo.
+#
+# On demand only. The demo runs the exact build being released against a seeded, reproducible
+# dataset, which makes it the natural source of these images - but this is a second system and
+# it deliberately gates nothing: no validation stamp, no promotion, nothing dispatches it. It
+# is run by whoever is writing the release notes, and the images come back as an artifact for
+# them to drop into the wiki.
+#
+# It does not seed. `demo-smoke.yml` already resets and seeds the demo deterministically on the
+# way to SILVER, and one system owning the demo's state is worth more than a guarantee here. If
+# the demo has drifted since - someone was demonstrating against it - dispatch `demo-smoke.yml`
+# first and then this.
+#
+# See doc/dev-guide/demo-screenshots.md.
+
+on:
+  workflow_dispatch:
+    inputs:
+      # Two versions, because at the moment release notes are written these differ. A build
+      # holds `5.3.0-rc-41` from BRONZE and is rewritten to `5.3.0` only at GOLD, and the notes
+      # are authored *before* GOLD is granted. So the demo answers with the rc version while the
+      # wiki page - and therefore the images - must be named for the base version.
+      version:
+        description: 'Version the demo is running, and must report (e.g. 5.3.0-rc-41)'
+        required: true
+        type: string
+      release:
+        description: 'Version to name the files after (e.g. 5.3.0). Defaults to the above.'
+        required: false
+        default: ''
+        type: string
+
+# Its own group, not demo-smoke's. Sharing that one would let a capture queue a SILVER smoke run
+# behind it, and this is the system that must never hold up the pipeline for polish. The cost is
+# the other way round: a seed landing mid-capture leaves some images showing the old dataset.
+# That is a visible, recoverable failure on a workflow a human is watching - re-run it - whereas
+# a delayed promotion is neither.
+concurrency:
+  group: demo-screenshots
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  DEMO_URL: ${{ vars.DEMO_URL || 'https://demo.dev.yontrack.com' }}
+  # What the demo must report, checked below.
+  DEMO_VERSION: ${{ inputs.version }}
+  # What the files are named for.
+  SCREENSHOT_VERSION: ${{ inputs.release || inputs.version }}
+
+jobs:
+  screenshots:
+    name: Capture the demo screenshots
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      # No `fetch-depth: 0`: unlike demo-smoke this workflow never seeds, so it needs neither
+      # tags nor history.
+      - uses: actions/checkout@v4
+
+      # Which build the images are of, checked rather than assumed - otherwise the run produces
+      # a plausible set of images of whatever happens to be deployed. `poll` with a zero timeout
+      # is a single check rather than a wait: the demo is already deployed by the time anyone is
+      # writing release notes, so there is nothing to wait for.
+      - name: Check the demo is running that version
+        env:
+          DEMO_TOKEN: ${{ secrets.DEMO_TOKEN }}
+          DEMO_POLL_TIMEOUT: '0'
+        run: scripts/demo-smoke.sh poll
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: ontrack-web-tests/package-lock.json
+
+      - name: Install Playwright
+        working-directory: ontrack-web-tests
+        run: |
+          set -euo pipefail
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Capture the screenshots
+        working-directory: ontrack-web-tests
+        env:
+          DEMO_USERNAME: ${{ secrets.DEMO_USERNAME }}
+          DEMO_PASSWORD: ${{ secrets.DEMO_PASSWORD }}
+        run: npm run screenshots
+
+      - name: List what was captured
+        if: ${{ !cancelled() }}
+        working-directory: ontrack-web-tests
+        run: |
+          set -uo pipefail
+          {
+            echo "### Demo screenshots \`${SCREENSHOT_VERSION}\` (demo running \`${DEMO_VERSION}\`)"
+            echo
+            if [ -d reports/screenshots ] && [ -n "$(ls -A reports/screenshots 2>/dev/null)" ]; then
+              echo "| File |"
+              echo "|---|"
+              for f in reports/screenshots/*.png; do
+                echo "| \`$(basename "$f")\` |"
+              done
+            else
+              echo "No screenshot was captured."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # Uploaded even on failure: a run that captured four of five images is still worth having,
+      # and the fifth is the one to look at in the trace.
+      - name: Upload the screenshots
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: demo-screenshots-${{ inputs.release || inputs.version }}
+          path: ontrack-web-tests/reports/screenshots
+          retention-days: 30
+          if-no-files-found: warn
+
+      - name: Upload the Playwright trace
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: demo-screenshots-trace
+          path: ontrack-web-tests/test-results
+          retention-days: 7
+          if-no-files-found: ignore

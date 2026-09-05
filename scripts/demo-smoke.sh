@@ -26,7 +26,10 @@
 #   DEMO_PROJECT         Yontrack project holding the build (default: yontrack)
 #   DEMO_BRANCH          Yontrack branch holding the build (default: main)
 #   DEMO_SEEDED_PROJECT  seeded project to assert (default: petclinic)
-#   DEMO_POLL_TIMEOUT    how long to wait for the version, in seconds (default: 600)
+#   DEMO_POLL_TIMEOUT    how long to wait for the version, in seconds (default: 600).
+#                        0 makes `poll` a single check rather than a wait - the loop
+#                        always attempts once before testing the deadline, which is
+#                        what .github/workflows/demo-screenshots.yml relies on.
 #   DEMO_POLL_INTERVAL   seconds between two attempts (default: 15)
 #
 # Everything goes through /graphql. The ingress only routes /graphql and /hook to the

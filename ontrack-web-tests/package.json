@@ -8,6 +8,8 @@
     "playwright-setup": "npx playwright install-deps chromium",
     "test": "npx playwright test --retries 3",
     "test-demo": "npx playwright test --config playwright.demo.config.js",
+    "screenshots": "npx playwright test --config playwright.screenshots.config.js",
+    "screenshots-guard": "npx playwright test --config playwright.screenshots.config.js --project guard",
     "test-ldap": "npx playwright test --retries 3 --grep '@auth'",
     "test-oidc": "npx playwright test --retries 3 --grep '@auth'"
   },
