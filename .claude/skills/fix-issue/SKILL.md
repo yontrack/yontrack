@@ -87,6 +87,15 @@ Explore the codebase to understand the affected area. Follow all patterns in CLA
 - Add or update unit tests (`*Test.kt`) and/or integration tests (`*IT.kt`) as appropriate
 - Follow naming conventions for the module being changed
 
+Commit on the branch, prefixing every subject with the issue number — one `#<number>` at the very
+start, then a space:
+
+```
+#{number} Some message
+```
+
+See *Commit messages* in CLAUDE.md for what that prefix costs in the semantic change log.
+
 ---
 
 ## Step 6 — Land on `main` and mark the issue ready

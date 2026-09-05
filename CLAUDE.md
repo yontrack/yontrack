@@ -82,7 +82,9 @@ Every change follows this lifecycle, end to end — don't stop after step 2:
    (use the `/fix-issue` skill when working from a GitHub issue)
 2. **Mark the issue as in progress** — when the change comes from a GitHub issue, move it to
    `status:wip` as soon as work starts (see *Issue status labels* below)
-3. **Implement and test** on that branch, following the TDD order below, and commit there
+3. **Implement and test** on that branch, following the TDD order below, and commit there —
+   prefixing every commit subject with the issue number (`#1234 Some message`), see
+   *Commit messages* below
 4. **Show it in the demo** — a user-visible feature adds itself to `DemoContent` in
    `ontrack-demo-seed` (see *Definition of done* below); say which way you decided either way
 5. **Land on `main`** — merge the branch into `main`, then `git push origin main`
@@ -163,10 +165,29 @@ Follow this order for every non-trivial change:
 - **Always** use `Roles.*` constants for role names in tests — never string literals
 
 ### Commit messages
+
+- **Always** prefix the subject with the issue number when the commit is done for a GitHub issue:
+
+  ```
+  #1234 Some message
+  ```
+
+  One `#<number>`, at the very start, followed by a space. Commits with no issue behind them take
+  no prefix.
+
+- Know what that prefix costs, because it is a deliberate trade and not an oversight. The
+  semantic change log parses a subject with `^(\w+)(?:\(([^)]+)\))?!?: (.+)$`, anchored at
+  position 0, so a leading `#1234` cannot match a conventional-commit type — and
+  `SemanticChangelogRenderingServiceImpl` then **drops every untyped commit silently**, via
+  `.filter { !it.type.isNullOrBlank() }`. No "other" section, no count. An issue-prefixed subject
+  is invisible in the change log the SILVER notification renders to support the GOLD decision;
+  the `issues=true` section carries the content instead.
+
+  Issue *linking* is unaffected either way: `GitHubIssueServiceExtension.extractIssueKeysFromMessage`
+  scans the whole message with `while (matcher.find())`, so `#1234` is picked up wherever it sits.
+
 - A commit subject that starts with a conventional-commit type is the only kind that appears in a
-  semantic change log. `SemanticChangelogRenderingServiceImpl` **drops every untyped commit
-  silently** — no "other" section, no count — and the SILVER notification renders one to support
-  the GOLD decision. An untyped subject is invisible there.
+  semantic change log. Use one on any commit that carries no issue number.
 - The known types are the only ones with a title and an emoji:
   `build`, `chore`, `ci`, `docs`, `feat`, `fix`, `style`, `refactor`, `perf`, `test`.
   Anything else is accepted and rendered as a raw section title, so a typo makes its own section
