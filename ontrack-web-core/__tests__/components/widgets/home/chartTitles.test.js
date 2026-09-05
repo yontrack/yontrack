@@ -51,10 +51,12 @@ const hrefs = () => screen.getAllByRole('link').map(link => link.getAttribute('h
  * These two components are the whole of the linking logic: the four promotion chart widgets and
  * the two validation chart widgets are pure call sites, so pinning the titles here covers all six.
  *
- * The fallback cases matter as much as the linked ones. The widgets pass the promotion level or
- * validation stamp straight from a GraphQL query which starts out empty and can resolve to a
- * deleted entity, so a title that assumed `branch` were present would crash the whole dashboard
- * cell rather than merely look unfinished (see #1694 for that missing-target behaviour itself).
+ * The fallback cases matter as much as the linked ones. `usePromotionLevel` starts on `{}`, which is
+ * truthy, so the promotion widgets really do render this title once with nothing resolved - a title
+ * that assumed `branch` were present would crash the whole dashboard cell rather than merely look
+ * unfinished. The validation half cannot reach that state today (its hook starts `undefined` and the
+ * widgets skip the title entirely), so its fallback case is a contract test, pinning the two titles
+ * as symmetrical against #1694 changing either hook.
  */
 describe('PromotionChartTitle', () => {
 

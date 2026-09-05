@@ -42,16 +42,27 @@ const SECURITY_SCAN = 'SECURITY.SCAN'
  */
 const DASHBOARD_UUID = '1c1f9c3e-8bfa-4a1f-8a0b-4e2f0b0d1a01'
 
+/**
+ * `DemoContent`'s BranchStatuses widget. Every widget cell carries its uuid as a test id, and the
+ * readiness check below has to be scoped to this one: other widgets on the dashboard now link to
+ * the same project, so an unscoped `petclinic` link would be satisfied by a title that renders long
+ * before the branch table has any rows.
+ */
+const BRANCH_STATUSES_UUID = '1c1f9c3e-8bfa-4a1f-8a0b-4e2f0b0d1a11'
+
 const catalogue = [
     {
         slug: 'dashboard',
-        description: 'The demo dashboard - branch statuses, deployments and recent projects',
+        description: 'The demo dashboard - branch statuses, deployments, recent projects and a promotion chart',
         path: `/?dashboard=${DASHBOARD_UUID}`,
         ready: async (page) => {
             // The BranchStatuses widget's configured title, and then a row inside it: the title
-            // renders before the branches have loaded.
-            await expect(page.getByText('Sample application', {exact: true}).first()).toBeVisible()
-            await expect(page.getByRole('link', {name: SERVICE, exact: true}).first()).toBeVisible()
+            // renders before the branches have loaded. Both are scoped to that widget - the
+            // promotion chart widget's title links to the same project from its own, much smaller,
+            // query, so an unscoped link would report the dashboard ready with the table empty.
+            const branchStatuses = page.getByTestId(BRANCH_STATUSES_UUID)
+            await expect(branchStatuses.getByText('Sample application', {exact: true}).first()).toBeVisible()
+            await expect(branchStatuses.getByRole('link', {name: SERVICE, exact: true}).first()).toBeVisible()
         },
     },
     {

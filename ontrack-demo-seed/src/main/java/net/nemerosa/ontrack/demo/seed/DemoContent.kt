@@ -503,8 +503,10 @@ object DemoContent {
                     "project" to SERVICE,
                     "branch" to MAIN,
                     "promotionLevel" to GOLD,
-                    "interval" to "3m",
-                    "period" to "1w",
+                    // Not the chart defaults (3m / 1w): the demo's oldest build is 20 days old, so
+                    // a three-month window bucketed by week would draw one mostly empty chart.
+                    "interval" to "1m",
+                    "period" to "3d",
                 ).asJson(),
                 layout = DemoWidgetLayout(x = 6, y = 50, w = 6, h = 20),
             ),

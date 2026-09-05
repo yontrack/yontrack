@@ -20,7 +20,7 @@ the seed — keep it in sync by hand whenever that file changes.
 | Maintenance branch alongside `main`         | `petclinic` / `release-1.3`                                          | Its own promotion ladder and its own (failing) `CANARY` workflow                           |
 | Build dependency graph                      | `petclinic-ui` / `main`, builds `58` and `59`                        | Links down to `petclinic` builds, which link down to `common-library` builds               |
 | Environments and deployments                | `staging` and `production` environments                              | `petclinic` `105` deployed on staging, `104` deployed on production                        |
-| Shared dashboard                            | Dashboard picker → "Yontrack demo"                                    | `BranchStatuses`, `EnvironmentList` and `LastActiveProjects` widgets                        |
+| Shared dashboard                            | Dashboard picker → "Yontrack demo"                                    | `BranchStatuses`, `EnvironmentList`, `LastActiveProjects` and `PromotionFrequencyChart` widgets |
 | Self-hosted changelog                       | `yontrack` / `main`                                                   | One build per commit since the last release, always current, `BRONZE` only                 |
 
 ## Projects
