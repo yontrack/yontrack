@@ -17,6 +17,7 @@ export const useValidationStampByName = (project, branch, validationStamp) => {
                     branch {
                         id
                         name
+                        displayName
                         project {
                             id
                             name

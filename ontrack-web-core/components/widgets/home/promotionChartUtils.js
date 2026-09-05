@@ -24,6 +24,7 @@ export const usePromotionLevel = (project, branch, promotionLevel) => {
                             branch {
                                 id
                                 name
+                                displayName
                                 project {
                                     id
                                     name

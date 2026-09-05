@@ -493,6 +493,21 @@ object DemoContent {
                 config = mapOf("count" to 10).asJson(),
                 layout = DemoWidgetLayout(x = 6, y = 30, w = 6, h = 20),
             ),
+            // The one chart widget of the demo: the family was missing entirely, so nothing in the
+            // demo showed a chart title - the place where the promotion level, branch and project
+            // are now links.
+            DemoWidget(
+                uuid = "1c1f9c3e-8bfa-4a1f-8a0b-4e2f0b0d1a14",
+                key = "home/PromotionFrequencyChart",
+                config = mapOf(
+                    "project" to SERVICE,
+                    "branch" to MAIN,
+                    "promotionLevel" to GOLD,
+                    "interval" to "3m",
+                    "period" to "1w",
+                ).asJson(),
+                layout = DemoWidgetLayout(x = 6, y = 50, w = 6, h = 20),
+            ),
         ),
     )
 }

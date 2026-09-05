@@ -1,8 +1,8 @@
 import {useContext, useEffect} from "react";
 import {DashboardWidgetCellContext} from "@components/dashboards/DashboardWidgetCellContextProvider";
 import {usePromotionLevel} from "@components/widgets/home/promotionChartUtils";
-import {PromotionLevelImage} from "@components/promotionLevels/PromotionLevelImage";
-import {Space, Typography} from "antd";
+import PromotionLevelLink from "@components/promotionLevels/PromotionLevelLink";
+import {Space} from "antd";
 import ChartOptions from "@components/charts/ChartOptions";
 import ProjectLink from "@components/projects/ProjectLink";
 import BranchLink from "@components/branches/BranchLink";
@@ -35,14 +35,14 @@ export default function E2ELeadTimeChartWidget({
                         <Space size={4}>
                             Lead time from
                             <ProjectLink project={promotionLevelObject.branch.project}/>/<BranchLink
-                            branch={promotionLevelObject.branch}/>/<PromotionLevelImage
-                            promotionLevel={promotionLevelObject}/>
-                            <Typography.Text strong>{promotionLevelObject.name}</Typography.Text>
+                            branch={promotionLevelObject.branch}/>/<PromotionLevelLink
+                            promotionLevel={promotionLevelObject}
+                            text={<b>{promotionLevelObject.name}</b>}/>
                             to
                             <ProjectLink project={targetPromotionLevelObject.branch.project}/>/<BranchLink
-                            branch={targetPromotionLevelObject.branch}/>/<PromotionLevelImage
-                            promotionLevel={targetPromotionLevelObject}/>
-                            <Typography.Text strong>{targetPromotionLevelObject.name}</Typography.Text>
+                            branch={targetPromotionLevelObject.branch}/>/<PromotionLevelLink
+                            promotionLevel={targetPromotionLevelObject}
+                            text={<b>{targetPromotionLevelObject.name}</b>}/>
                             &nbsp;<ChartOptions interval={interval} period={period}/>
                         </Space>
                     }
