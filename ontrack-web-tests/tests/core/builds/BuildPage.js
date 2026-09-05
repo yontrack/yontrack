@@ -17,12 +17,39 @@ export class BuildPage {
         await this.checkOnBuildPage()
     }
 
+    /**
+     * The gate almost every build-page spec goes through.
+     *
+     * Each section is asserted through its own `data-testid`, not by a bare `getByText`: an
+     * unscoped string locator matches by SUBSTRING over the whole page, so it asserts "this word is
+     * somewhere in the DOM" rather than "this section is on screen". A branch page carries both a
+     * "Promotions" command link and, in the pipeline view, an `inspector-promotions` panel, which
+     * made the old locator resolve to two elements and fail in strict mode (issue #1692).
+     *
+     * The failure was not the transient overlap it looked like. `expect` RETRIES past a strict-mode
+     * violation, so a branch page still in the tree while the build page loads heals itself - that
+     * was reproduced here by holding back the build page's chunk, and the assertion still passed.
+     * Both matches surviving the full 30s means the browser never left the branch page at all, and
+     * the unscoped locator reported that as an ambiguity instead of as "the build page is not
+     * here". Scoping does not paper over the navigation; it makes the failure say the true thing.
+     *
+     * Asserting the title INSIDE the section also waits out that section's own "Loading..." head,
+     * so a pass means the section is there and loaded.
+     */
     async checkOnBuildPage() {
-        await expect(this.page.getByText("Promotions")).toBeVisible()
-        await expect(this.page.getByText("Validations")).toBeVisible()
-        await expect(this.page.getByText("Downstream links")).toBeVisible()
-        await expect(this.page.getByText("Upstream links")).toBeVisible()
+        await this.checkSection('promotions', "Promotions")
+        await this.checkSection('validations', "Validations")
+        await this.checkSection('links-using', "Downstream links")
+        await this.checkSection('links-usedby', "Upstream links")
         await this.assertName(this.build.name)
+    }
+
+    /**
+     * One of the build page's sections, addressed by the `id` its `GridCell` publishes as a
+     * `data-testid`, and carrying `title` in its head.
+     */
+    async checkSection(id, title) {
+        await expect(this.page.getByTestId(id).getByText(title)).toBeVisible()
     }
 
     async goToLinks() {

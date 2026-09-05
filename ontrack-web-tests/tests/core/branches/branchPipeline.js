@@ -186,13 +186,13 @@ class BranchPipelinePage {
 
     async goToBuildFromInspector(build) {
         await this.inspectorBuildTitle().getByRole('link').click()
-        // The URL and the build's own name, rather than `BuildPage.checkOnBuildPage`: that method
-        // asserts an unscoped `getByText("Promotions")`, which is ambiguous on the build page of a
-        // branch that HAS promotion levels - the command bar carries a "Promotions" link too. This
-        // view's fixtures always create levels, so it would be a coin toss here.
         await expect(this.page).toHaveURL(new RegExp(`/build/${build.id}$`))
         const buildPage = new BuildPage(this.page, build)
-        await buildPage.assertName(build.name)
+        // This navigation is the one that caught #1692 - an unscoped `getByText("Promotions")`
+        // matching this view's own command link and inspector panel. Now that `checkOnBuildPage`
+        // is scoped to the build page's sections it is the right gate here, and this is the spec
+        // that keeps it honest.
+        await buildPage.checkOnBuildPage()
         return buildPage
     }
 
