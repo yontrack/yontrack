@@ -12,8 +12,10 @@ import java.util.concurrent.TimeUnit
  * @property id Short commit hash, used as the build name — deterministic, unlike a counter
  * that would shift as soon as one commit lands.
  * @property message Commit subject, shown as the build description.
- * @property time Author time, used as the build creation time so the branch reads in the
- * order the work actually happened.
+ * @property time Committer time, used as the build creation time. Committer rather than
+ * author time because the branch models what landed on `main`: a build happens when its
+ * commit arrives, not when its author started writing it. Author time reads earlier than
+ * everything a pull request was rebased over, which puts the branch out of order.
  */
 data class ChangelogEntry(
     val id: String,
@@ -29,6 +31,13 @@ data class ChangelogEntry(
  * curated dataset.
  */
 fun interface ChangelogSource {
+
+    /**
+     * Newest first, and strictly so: the seed declares one build per entry in this order,
+     * and a dataset whose builds are not declared oldest first is rejected before anything
+     * is deleted. An implementation orders its entries itself rather than passing on
+     * whatever order it read them in.
+     */
     fun entries(): List<ChangelogEntry>
 }
 
@@ -58,7 +67,12 @@ class GitChangelogSource(
             warn("Could not read the git log since $tag - the changelog project will have no build.")
             return emptyList()
         }
-        return parseLog(log).take(max)
+        // Sorted rather than trusted: `git log` orders by commit date only as far as the
+        // parent-before-child constraint allows, so its output is not reliably monotonic.
+        // The seed declares the builds of the changelog branch in this order and Yontrack
+        // orders builds by creation ORDER, so an entry out of place reads as a branch
+        // running backwards - and the dataset validation rejects it outright.
+        return parseLog(log).sortedByDescending { it.time }.take(max)
     }
 
     companion object {
@@ -79,7 +93,7 @@ class GitChangelogSource(
          * Unit separators rather than a printable character: a commit subject can contain
          * anything, including whatever separator looked safe.
          */
-        private const val FORMAT = "%h%x1f%s%x1f%aI"
+        private const val FORMAT = "%h%x1f%s%x1f%cI"
 
         /** The `%x1f` git emits, on this side. */
         private const val SEPARATOR = '\u001F'

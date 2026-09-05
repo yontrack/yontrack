@@ -82,6 +82,35 @@ class GitChangelogSourceTest {
     }
 
     @Test
+    fun `entries come back newest first whatever order the log is in`() {
+        val log = listOf(
+            line("510acda0", "Rebased on merge", "2026-09-04T19:45:21+02:00"),
+            line("6fc965c9", "Landed while it was open", "2026-09-04T20:36:57+02:00"),
+        ).joinToString("\n")
+        val source = GitChangelogSource(
+            directory = File("."),
+            git = { command -> if (command.first() == "describe") "5.3.0" else log },
+        )
+
+        assertEquals(listOf("6fc965c9", "510acda0"), source.entries().map { it.id })
+    }
+
+    @Test
+    fun `the most recent commits are kept, not the ones the log happens to print first`() {
+        val log = listOf(
+            line("old", "Rebased on merge", "2026-09-01T10:00:00Z"),
+            line("new", "Landed while it was open", "2026-09-02T10:00:00Z"),
+        ).joinToString("\n")
+        val source = GitChangelogSource(
+            directory = File("."),
+            max = 1,
+            git = { command -> if (command.first() == "describe") "5.3.0" else log },
+        )
+
+        assertEquals(listOf("new"), source.entries().map { it.id })
+    }
+
+    @Test
     fun `only the most recent commits are kept`() {
         val log = (1..10).joinToString("\n") { line("commit$it", "Message $it", "2026-09-01T07:30:00Z") }
         val source = GitChangelogSource(
