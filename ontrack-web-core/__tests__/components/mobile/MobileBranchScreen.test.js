@@ -1,5 +1,5 @@
 import "@testing-library/jest-dom"
-import {fireEvent, render, screen} from "@testing-library/react"
+import {act, fireEvent, render, screen, within} from "@testing-library/react"
 
 let queryResult = {data: null, loading: false, error: null, finished: true}
 /** The options the screen handed `useQuery` on its last render. */
@@ -11,12 +11,15 @@ let queryOptions
  * whole screen. This lets a test fail one without the other.
  */
 let deploymentsResult = null
+/** The options the deployments query was handed on its last render. */
+let deploymentsOptions
 
 const isDeployments = (query) => String(query).includes('MobileBranchDeployments')
 
 jest.mock("../../../components/services/GraphQL", () => ({
     useQuery: (query, options) => {
         if (isDeployments(query)) {
+            deploymentsOptions = options
             return deploymentsResult ?? queryResult
         }
         queryOptions = options
@@ -46,7 +49,10 @@ const build = (id, name, {displayName, time, promotions = [], deployments = []} 
     })),
 })
 
-const branch = (builds = [], {nextPage = null, disabled = false, favourite = false} = {}) => setResult({
+const branch = (
+    builds = [],
+    {nextPage = null, disabled = false, favourite = false, promotionLevels = []} = {},
+) => setResult({
     data: {
         branch: {
             id: 10,
@@ -55,6 +61,7 @@ const branch = (builds = [], {nextPage = null, disabled = false, favourite = fal
             disabled,
             favourite,
             project: {id: 1, name: 'petclinic'},
+            promotionLevels: promotionLevels.map(([id, name]) => ({id, name, image: false})),
             buildsPaginated: {
                 pageInfo: {nextPage},
                 pageItems: builds,
@@ -63,10 +70,15 @@ const branch = (builds = [], {nextPage = null, disabled = false, favourite = fal
     },
 })
 
+/** A branch offering the two promotion levels the search tests filter on. */
+const promotable = (builds = [], options = {}) =>
+    branch(builds, {promotionLevels: [[500, 'BRONZE'], [501, 'SILVER']], ...options})
+
 describe('the mobile branch screen', () => {
 
     beforeEach(() => {
         queryOptions = undefined
+        deploymentsOptions = undefined
         deploymentsResult = null
     })
 
@@ -188,6 +200,217 @@ describe('the mobile branch screen', () => {
             branch([build(100, '1')])
             render(<MobileBranchScreen id="10"/>)
             expect(screen.queryByTestId('mobile-builds-more')).not.toBeInTheDocument()
+        })
+    })
+
+    describe('searching the builds', () => {
+
+        /*
+         * The name box is debounced, so these tests have to let the timer fire -
+         * only inside this block, because relative timestamps elsewhere in the
+         * file read the real clock.
+         */
+        beforeEach(() => jest.useFakeTimers())
+        afterEach(() => jest.useRealTimers())
+
+        /** Types into the name box, then lets the debounce fire. */
+        const searchFor = async (text) => {
+            fireEvent.change(screen.getByTestId('mobile-builds-filter'), {target: {value: text}})
+            await act(async () => {
+                jest.advanceTimersByTime(1000)
+            })
+        }
+
+        /**
+         * Picks a promotion level from the dropdown.
+         *
+         * The click goes to the option antd actually listens on. The dropdown
+         * also renders a parallel, visually hidden `role="option"` tree for
+         * screen readers, which carries the same text and no handler - clicking
+         * that one would select nothing and the test would pass for the wrong
+         * reason.
+         */
+        const promotedTo = async (name) => {
+            await act(async () => {
+                fireEvent.mouseDown(
+                    within(screen.getByTestId('mobile-builds-promotion')).getByRole('combobox')
+                )
+            })
+            const option = Array.from(document.querySelectorAll('.ant-select-item-option'))
+                .find(item => item.textContent.includes(name))
+            await act(async () => {
+                fireEvent.click(option)
+            })
+        }
+
+        /**
+         * Clears it again.
+         *
+         * The clear affordance acts on `mousedown`, not on `click` - it has to,
+         * or the selector would take focus and reopen the dropdown under the
+         * user's finger.
+         */
+        const anyPromotion = async () => {
+            await act(async () => {
+                fireEvent.mouseDown(document.querySelector('.ant-select-clear'))
+            })
+        }
+
+        it('asks for no filter at all until something is searched for', () => {
+            // The unfiltered screen must ask exactly the query it asked before
+            // this search existed: `buildsPaginated` builds its own default
+            // filter when it is given none.
+            promotable([build(100, '1')])
+            render(<MobileBranchScreen id="10"/>)
+            expect(queryOptions.variables.filter).toBeNull()
+        })
+
+        it('searches on the server, not in the browser', async () => {
+            // The browser holds one page of a branch that can have thousands of
+            // builds, so a client-side filter could never reach the one the page
+            // size left out - which is the only case the search exists for.
+            promotable([build(100, '1')])
+            render(<MobileBranchScreen id="10"/>)
+            await searchFor('1.4')
+            expect(queryOptions.variables.filter).toEqual({
+                withDisplayName: '1\\.4',
+                withPromotionLevel: null,
+            })
+        })
+
+        it('takes what was typed literally', async () => {
+            // `withDisplayName` is a regular expression and a version is mostly
+            // dots - see `namePatterns`. Asserted there in full; here only that
+            // the screen goes through it at all.
+            promotable([build(100, '1')])
+            render(<MobileBranchScreen id="10"/>)
+            await searchFor('1.4.0')
+            expect(queryOptions.variables.filter.withDisplayName).toEqual('1\\.4\\.0')
+        })
+
+        it('offers the branch own promotion levels to search on', async () => {
+            promotable([build(100, '1')])
+            render(<MobileBranchScreen id="10"/>)
+            await act(async () => {
+                fireEvent.mouseDown(
+                    within(screen.getByTestId('mobile-builds-promotion')).getByRole('combobox')
+                )
+            })
+            const offered = Array.from(document.querySelectorAll('.ant-select-item-option'))
+                .map(item => item.textContent)
+            expect(offered.some(text => text.includes('BRONZE'))).toBe(true)
+            expect(offered.some(text => text.includes('SILVER'))).toBe(true)
+        })
+
+        it('searches by promotion level, by name rather than by id', async () => {
+            // `withPromotionLevel` is matched as `PL.NAME = ?`; an id would
+            // simply find nothing, quietly.
+            promotable([build(100, '1')])
+            render(<MobileBranchScreen id="10"/>)
+            await promotedTo('BRONZE')
+            expect(queryOptions.variables.filter).toEqual({
+                withDisplayName: null,
+                withPromotionLevel: 'BRONZE',
+            })
+        })
+
+        it('combines the two', async () => {
+            promotable([build(100, '1')])
+            render(<MobileBranchScreen id="10"/>)
+            await searchFor('1.4')
+            await promotedTo('BRONZE')
+            expect(queryOptions.variables.filter).toEqual({
+                withDisplayName: '1\\.4',
+                withPromotionLevel: 'BRONZE',
+            })
+        })
+
+        it('goes back to the default list when both are cleared', async () => {
+            promotable([build(100, '1')])
+            render(<MobileBranchScreen id="10"/>)
+            await searchFor('1.4')
+            await promotedTo('BRONZE')
+            await searchFor('')
+            await anyPromotion()
+            expect(queryOptions.variables.filter).toBeNull()
+        })
+
+        it('names both controls for a screen reader', () => {
+            /*
+             * Pinned because it is not obvious and could break silently on an
+             * antd upgrade: `aria-label` is an unknown prop to rc-select, which
+             * spreads those onto its outer wrapper. antd forwards this one to
+             * the inner `role="combobox"` input as well - which is the element
+             * a screen reader actually announces. Asserted by role and name
+             * together, so the day it stops being forwarded this fails.
+             */
+            promotable([build(100, '1')])
+            render(<MobileBranchScreen id="10"/>)
+            expect(screen.getByRole('textbox', {name: 'Filter the builds by name'}))
+                .toBeInTheDocument()
+            expect(screen.getByRole('combobox', {name: 'Filter the builds by promotion'}))
+                .toBeInTheDocument()
+        })
+
+        it('offers no promotion control on a branch that has none', () => {
+            // `withPromotionLevel` is an exact name match, so a branch with no
+            // level offers no choice - and an empty dropdown reads as broken
+            // rather than as inapplicable.
+            branch([build(100, '1')])
+            render(<MobileBranchScreen id="10"/>)
+            expect(screen.queryByTestId('mobile-builds-promotion')).not.toBeInTheDocument()
+        })
+
+        it('starts again at the first page when the search changes', async () => {
+            // Otherwise someone who pressed "Load more" five times and then typed
+            // would ask a phone network for fifty filtered builds in one go.
+            promotable([build(100, '1')], {nextPage: {offset: MOBILE_BUILD_PAGE_SIZE}})
+            render(<MobileBranchScreen id="10"/>)
+            fireEvent.click(screen.getByTestId('mobile-builds-more'))
+            expect(queryOptions.variables.size).toEqual(MOBILE_BUILD_PAGE_SIZE * 2)
+            await searchFor('1.4')
+            expect(queryOptions.variables.size).toEqual(MOBILE_BUILD_PAGE_SIZE)
+        })
+
+        it('asks for the deployments of the same filtered page', async () => {
+            // The two queries are a page of one list, keyed by build id. Asked
+            // for under different terms they are pages of two different lists,
+            // and every badge on the screen would silently disappear.
+            promotable([build(100, '1')])
+            render(<MobileBranchScreen id="10"/>)
+            await searchFor('1.4')
+            expect(deploymentsOptions.variables.filter).toEqual(queryOptions.variables.filter)
+            expect(deploymentsOptions.variables.size).toEqual(queryOptions.variables.size)
+        })
+
+        it('says a name matched nothing, rather than that the branch is empty', async () => {
+            promotable([build(100, '1')])
+            render(<MobileBranchScreen id="10"/>)
+            promotable([])
+            await searchFor('9.9.9')
+            expect(screen.getByTestId('mobile-builds-empty'))
+                .toHaveTextContent('No build matches "9.9.9".')
+        })
+
+        it('says a promotion matched nothing', async () => {
+            // A different sentence from the one above, because it asks for a
+            // different next move: nothing to retype, just nothing that far.
+            promotable([build(100, '1')])
+            render(<MobileBranchScreen id="10"/>)
+            promotable([])
+            await promotedTo('SILVER')
+            expect(screen.getByTestId('mobile-builds-empty'))
+                .toHaveTextContent('No build has been promoted to SILVER.')
+        })
+
+        it('says so when the two together matched nothing', async () => {
+            promotable([build(100, '1')])
+            render(<MobileBranchScreen id="10"/>)
+            promotable([])
+            await searchFor('9.9.9')
+            await promotedTo('SILVER')
+            expect(screen.getByTestId('mobile-builds-empty'))
+                .toHaveTextContent('No build named "9.9.9" has been promoted to SILVER.')
         })
     })
 

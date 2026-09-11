@@ -27,13 +27,17 @@ import {PromotionLevelImage} from "@components/promotionLevels/PromotionLevelIma
 import {mobileBuildUri} from "@components/mobile/mobileRoutes"
 
 /**
- * The size of a promotion medal on a card.
+ * The size a promotion medal is drawn at on a phone.
  *
  * Bigger than the desktop's 16px: on a phone that is a coloured dot. It is
  * paired with the level's name for the same reason - the acceptance criterion is
  * that promotions read without zooming, and only text does that reliably.
+ *
+ * Exported because the branch screen's promotion picker draws the same medals
+ * and must draw them the same size - a level shown at one size in the list and
+ * another in the control that filters by it reads as two different things.
  */
-const MEDAL_SIZE = 20
+export const MEDAL_SIZE = 20
 
 /**
  * @param {Object} build A build with `displayName`, `creation` and

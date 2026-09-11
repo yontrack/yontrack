@@ -3,16 +3,18 @@
 /**
  * The name filter every long mobile list carries, and the box it is typed into.
  *
- * An instance holds hundreds of projects and a project holds hundreds of
- * branches, which is more than anyone scrolls through on a phone. Both lists
- * therefore filter by name, and both filter **on the server**: the browser only
- * ever holds the answer to the last query, so a client-side filter could narrow
- * that but never reach a row the server had not already sent.
+ * An instance holds hundreds of projects, a project holds hundreds of branches
+ * and a branch holds thousands of builds - all more than anyone scrolls through
+ * on a phone. Every one of those lists filters by name, and every one filters
+ * **on the server**: the browser only ever holds the answer to the last query,
+ * so a client-side filter could narrow that but never reach a row the server had
+ * not already sent.
  *
- * The two screens differ in what they send - the project list has an `ILIKE`
- * pattern, the branch list a regular expression (see `branchNamePattern`) - but
- * not in how the typing is handled, which is what lives here. The subtleties
- * below were each a defect worth a comment, and they should exist once.
+ * The screens differ in what they send - the project list an `ILIKE` pattern,
+ * the branch list and the build search a regular expression (see `namePatterns`)
+ * - but not in how the typing is handled, which is what lives here. The
+ * subtleties below were each a defect worth a comment, and they should exist
+ * once.
  */
 
 import {useEffect, useMemo, useState} from "react"

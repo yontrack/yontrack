@@ -458,3 +458,17 @@ html, body {
        old list. */
     pointer-events: none;
 }
+
+/*
+ * A screen's filters: the branch screen's name box and promotion picker.
+ *
+ * Stacked rather than side by side - at 375px two controls on a line leave
+ * neither enough room to show what is in it - and closer together than the
+ * screen's own blocks, because they are one thing being adjusted rather than
+ * two sections being read.
+ */
+.ot-mobile-filters {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}

@@ -1,4 +1,4 @@
-import {branchNamePattern} from "@components/mobile/entities/branchNamePattern"
+import {branchNamePattern, buildDisplayNamePattern} from "@components/mobile/entities/namePatterns"
 
 describe('the branch name filter', () => {
 
@@ -56,5 +56,52 @@ describe('the branch name filter', () => {
             const pattern = branchNamePattern(name)
             expect(new RegExp(pattern.replace('(?i)', ''), 'i').test(name)).toBe(true)
         })
+    })
+})
+
+describe('the build name filter', () => {
+
+    it('is nothing at all until something is typed', () => {
+        // Same reason as above, and the same consequence: the repository skips
+        // the criterion entirely when `withDisplayName` is null or blank.
+        expect(buildDisplayNamePattern('')).toBeNull()
+        expect(buildDisplayNamePattern('   ')).toBeNull()
+        expect(buildDisplayNamePattern(undefined)).toBeNull()
+    })
+
+    it('ignores the spaces around what was typed', () => {
+        expect(buildDisplayNamePattern('  rc  ')).toEqual('rc')
+    })
+
+    it('carries no case flag, because the server already ignores case', () => {
+        // The one difference from the branch filter, and it is the server's:
+        // `withDisplayName` is matched with `~*` rather than `~`, so a `(?i)`
+        // here would be a prefix that says nothing.
+        expect(buildDisplayNamePattern('1.4.0')).not.toContain('(?i)')
+    })
+
+    it('takes what was typed literally', () => {
+        // A version is mostly dots, and a dot in a regular expression matches
+        // anything - `1.4.0` would otherwise find `104x0`. And a lone `(` is
+        // worse than either: the repository rejects the pattern and the provider
+        // answers with an empty page, so the screen says "No build matches"
+        // about a search that never ran.
+        expect(buildDisplayNamePattern('1.4.0')).toEqual('1\\.4\\.0')
+        expect(buildDisplayNamePattern('1.4.0-rc.1+build')).toEqual('1\\.4\\.0-rc\\.1\\+build')
+        expect(buildDisplayNamePattern('build(2)')).toEqual('build\\(2\\)')
+        expect(buildDisplayNamePattern('^a$')).toEqual('\\^a\\$')
+    })
+
+    it('produces a pattern that actually matches what was typed', () => {
+        const names = ['1.4.0', '1.4.0-rc.1+build', '20260901055547-36']
+        names.forEach(name => {
+            expect(new RegExp(buildDisplayNamePattern(name), 'i').test(name)).toBe(true)
+        })
+    })
+
+    it('does not match a version it only looks like', () => {
+        // The point of the escaping, stated as the behaviour a user would
+        // notice: typing a version must not bring back a different one.
+        expect(new RegExp(buildDisplayNamePattern('1.4.0')).test('104x0')).toBe(false)
     })
 })

@@ -185,6 +185,69 @@ test.describe('the mobile UI on a phone', () => {
         expect(overflows).toBe(false)
     })
 
+    test('a build is found on a branch by name, by promotion, and by both', async ({page, ontrack}) => {
+        // The whole of #1723: two controls on the branch screen, scoped to that
+        // branch. Everything else `StandardBuildFilter` offers stays on the
+        // desktop - reproducing `BuildFilterDialog` on a phone is the trap.
+        const project = await ontrack.createProject()
+        const branch = await project.createBranch()
+        const promotionLevel = await branch.createPromotionLevel()
+
+        const promoted = await branch.createBuild()
+        await promoted.setRelease('1.4.0')
+        await promoted.promote(promotionLevel)
+
+        const plain = await branch.createBuild()
+        await plain.setRelease('9.9.9')
+
+        await page.setViewportSize({width: 375, height: 812})
+        await signInOnPhone(page, ontrack)
+        await page.goto(`${ontrack.connection.ui}/mobile/branch/${branch.id}`)
+
+        const promotedCard = page.getByTestId(`mobile-build-${promoted.id}`)
+        const plainCard = page.getByTestId(`mobile-build-${plain.id}`)
+
+        // Both builds to start with: the search narrows a list that is already
+        // there rather than being the way to see one.
+        await expect(promotedCard).toBeVisible()
+        await expect(plainCard).toBeVisible()
+
+        // By name - matched against the display name, which is the release
+        // label here rather than the timestamp-run pair the build is called.
+        await page.getByTestId('mobile-builds-filter').fill('1.4.0')
+        await expect(promotedCard).toBeVisible()
+        await expect(plainCard).toBeHidden()
+
+        // Clearing gives the whole list back.
+        await page.getByTestId('mobile-builds-filter').fill('')
+        await expect(plainCard).toBeVisible()
+
+        // By promotion level, on its own.
+        await page.getByTestId('mobile-builds-promotion').click()
+        await page.locator('.ant-select-item-option').filter({hasText: promotionLevel.name}).click()
+        await expect(promotedCard).toBeVisible()
+        await expect(plainCard).toBeHidden()
+
+        // And the two together, which here can match nothing - the screen says
+        // that, rather than claiming the branch has no build.
+        await page.getByTestId('mobile-builds-filter').fill('9.9.9')
+        await expect(page.getByTestId('mobile-builds-empty'))
+            .toContainText(`No build named "9.9.9" has been promoted to ${promotionLevel.name}.`)
+
+        // Clearing both gives the default latest-builds list back - the last of
+        // the four acceptance criteria, and the one a search is useless without.
+        await page.getByTestId('mobile-builds-filter').fill('')
+        await page.getByTestId('mobile-builds-promotion').hover()
+        await page.locator('.ant-select-clear').click()
+        await expect(promotedCard).toBeVisible()
+        await expect(plainCard).toBeVisible()
+
+        // Two more controls, and still nothing scrolls sideways at 375px.
+        const overflows = await page.evaluate(() =>
+            document.documentElement.scrollWidth > document.documentElement.clientWidth)
+        expect(overflows).toBe(false)
+    })
+
     test('the build screen carries the promotions, deployments and validations', async ({page, ontrack}) => {
         // The decision surface: everything needed to answer "should I promote or
         // deploy this?", on one phone screen.

@@ -117,7 +117,7 @@ the interstitial, which may well be right, but should be a choice rather than an
 | Home | `/mobile` | The user's favourite projects and branches |
 | Projects | `/mobile/projects` | Every project, filterable by name, with the favourite toggle |
 | Project | `/mobile/project/[id]` | The project's branches, limited and filterable |
-| Branch | `/mobile/branch/[id]` | The branch's latest builds, as cards |
+| Branch | `/mobile/branch/[id]` | The branch's latest builds, as cards, searchable |
 | Build | `/mobile/build/[id]` | The decision surface: promotions, deployments, validations |
 | Interstitial | `/mobile/desktop-only` | A route with no mobile equivalent |
 
@@ -215,6 +215,55 @@ it happened, how far it has been promoted, and where it is deployed.
 hand means owning a second copy of the list and keeping it in step with the favourite
 toggle's refetches; refetching a longer first page cannot drift.
 
+#### Searching the builds
+
+The branch screen carries **two controls and only two** (`MobileBuildFilter`): the build's
+name, and one promotion level. Both map straight onto the existing `StandardBuildFilter`, so
+there is no server work behind the search:
+
+- the name becomes `withDisplayName` — matched against the release label when a build has
+  one and against its own name otherwise, which is exactly what the card shows;
+- the promotion becomes `withPromotionLevel`, matched by the repository as `PL.NAME = ?`.
+  Exact, which is why the control is a list of the branch's own levels rather than a second
+  text box — and why it is **absent** on a branch that has none, where an empty dropdown
+  would read as broken rather than as inapplicable.
+
+`StandardBuildFilter` offers a dozen more fields — dates, build links, properties, the
+`since*` variants, validation stamps, named and shared filters — and `BuildFilterDialog` is
+what showing all of them looks like. Reproducing that on a phone is the trap the two-control
+rule exists to avoid. There is likewise no cross-project or cross-branch build search on
+mobile: global search stays desktop-only for 5.4.
+
+Three details are worth knowing:
+
+- **`count` is deliberately not sent.** It is the filter's own cap, and on the paginated path
+  `standardFilterPagination` sizes the page from the `size` argument and never reads it. The
+  cap the phone needs is already there as `MOBILE_BUILD_PAGE_SIZE`; a `count` beside it would
+  be a number with no effect that a later reader would trust.
+- **The filter goes to the deployments query too.** `useMobileBranchDeployments` fetches a
+  second page of the same list and the screen joins the two by build id. Asked for under
+  different terms they are pages of two *different* lists, and every deployment badge on a
+  filtered screen would silently disappear.
+- **A new filter starts again at the first page.** Otherwise someone who pressed "Load more"
+  five times and then typed would ask a phone network for fifty filtered builds in one
+  request. The reset is done while rendering rather than in an effect: an effect would let
+  one request go out for the new filter at the old size before resetting it, which is the
+  request being avoided.
+
+When nothing matches, the screen says which of the two is responsible — "No build matches
+…", "No build has been promoted to …", or both — because the difference between "no build is
+called that" and "no build got that far" is the difference between retyping and going
+somewhere else.
+
+**The demo seed needs nothing new for this**, and that is a decision rather than an
+oversight — the definition of done in `CLAUDE.md` asks for one either way. `petclinic/main`
+in `DemoContent` already carries seven builds released `1.4.0` to `1.4.6` across `BRONZE`,
+`SILVER`, `GOLD` and `CANARY`: typing `1.4.3` narrows to one, picking `GOLD` narrows to
+three, and the two together match nothing — all four acceptance criteria, on the dataset that
+is already there. Adding builds only to exercise a filter would pad the demo rather than
+demonstrate anything, and `doc/dev-guide/demo-seed.md` says how to run the seed against a
+local stack if you want to see it.
+
 ### The build screen
 
 `/mobile/build/[id]` is the **decision surface**: everything needed to answer "should I
@@ -272,13 +321,14 @@ the two action issues land, each `onClick` becomes its dialog and the caption go
 
 ### Filtering a long list
 
-An instance holds hundreds of projects and a project holds hundreds of branches, which is
-more than anyone scrolls through on a phone. Both lists filter by name, and both filter **on
-the server**: the browser only holds the answer to the last query, so a client-side filter
-could narrow that but never reach a row the server had not already sent. The typing itself —
-the debounce, the two values, the trim — lives once, in `useMobileFilter`.
+An instance holds hundreds of projects, a project holds hundreds of branches and a branch
+holds thousands of builds — all more than anyone scrolls through on a phone. Every one of
+those lists filters by name, and every one filters **on the server**: the browser only holds
+the answer to the last query, so a client-side filter could narrow that but never reach a row
+the server had not already sent. The typing itself — the debounce, the two values, the trim —
+lives once, in `useMobileFilter`.
 
-What the two screens send differs, and the difference matters:
+What each screen sends differs, and the difference matters:
 
 - `projects(pattern:)` is an `ILIKE '%…%'` ordered by name. The server refuses `pattern`
   alongside any *other* argument, and it tells "no pattern" from "empty pattern" by whether
@@ -295,6 +345,13 @@ What the two screens send differs, and the difference matters:
   A row therefore carries its name under its display name whenever the two differ, or a
   branch showing as `PRJ-1234` would look as though it had ignored a filter that in fact
   matched `feature/PRJ-1234-search`.
+- `StandardBuildFilter.withDisplayName` is a regular expression too, and escaped the same
+  way — a version is mostly dots, and `1.4.0` must not find `104x0`. It carries **no** `(?i)`,
+  though, because the repository matches this one with `~*` rather than `~`: the flag would
+  be a prefix that says nothing.
+
+Both escapings live in `components/mobile/entities/namePatterns.js`, beside each other, so
+the one asymmetry between them is visible rather than rediscovered.
 
 ### The list shape
 

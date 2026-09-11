@@ -13,7 +13,7 @@
  * list is: a project can hold hundreds of branches, and a phone shows a handful
  * of rows. The limit keeps the screen honest about that rather than pretending
  * to be a full list, and the filter is how a user reaches the branch the limit
- * left out. Both run on the server - see `MobileFilter` and `branchNamePattern`.
+ * left out. Both run on the server - see `MobileFilter` and `namePatterns`.
  */
 
 import {gql} from "graphql-request"
@@ -24,7 +24,7 @@ import MobileAsyncContent from "@components/mobile/layout/MobileAsyncContent"
 import MobileEmpty from "@components/mobile/layout/MobileEmpty"
 import {MobileEntityGroup, MobileEntityRow} from "@components/mobile/entities/MobileEntityList"
 import {MobileFilterInput, useMobileFilter} from "@components/mobile/entities/MobileFilter"
-import {branchNamePattern} from "@components/mobile/entities/branchNamePattern"
+import {branchNamePattern} from "@components/mobile/entities/namePatterns"
 import MobileFavourite from "@components/mobile/favourites/MobileFavourite"
 import {useFavouriteRefresh} from "@components/mobile/favourites/useFavouriteRefresh"
 import {mobileBranchUri} from "@components/mobile/mobileRoutes"

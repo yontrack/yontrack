@@ -9,9 +9,13 @@
  * per build instead. See `MobileBuildCard` for what a card carries and what it
  * deliberately leaves to the build screen.
  *
- * Everything else the desktop branch page offers - build filters, the validation
- * stamp filters, branch links, the delivery map, the change log - is out of
- * scope here and reached through the interstitial.
+ * The screen carries a **deliberately minimal build search**: a name and one
+ * promotion level, and nothing else `StandardBuildFilter` supports - see
+ * `MobileBuildFilter`.
+ *
+ * Everything else the desktop branch page offers - the rest of the build
+ * filters, the validation stamp filters, branch links, the delivery map, the
+ * change log - is out of scope here and reached through the interstitial.
  */
 
 import {useState} from "react"
@@ -25,6 +29,7 @@ import MobileEmpty from "@components/mobile/layout/MobileEmpty"
 import MobileFavourite from "@components/mobile/favourites/MobileFavourite"
 import {useFavouriteRefresh} from "@components/mobile/favourites/useFavouriteRefresh"
 import MobileBuildCard from "@components/mobile/builds/MobileBuildCard"
+import {MobileBuildFilterControls, useMobileBuildFilter} from "@components/mobile/builds/MobileBuildFilter"
 import {useMobileBranchDeployments} from "@components/mobile/builds/useMobileDeployments"
 import {mobileProjectUri} from "@components/mobile/mobileRoutes"
 
@@ -48,11 +53,30 @@ export default function MobileBranchScreen({id}) {
      */
     const [size, setSize] = useState(MOBILE_BUILD_PAGE_SIZE)
 
+    const filter = useMobileBuildFilter()
+
+    /*
+     * A new filter starts again at the first page. Without this, someone who
+     * pressed "Load more" five times and then typed would get fifty filtered
+     * builds in one request - and the page size exists because a phone network
+     * is what is fetching it.
+     *
+     * Adjusted during the render rather than in an effect, which is what React
+     * prescribes for state that has to follow something else: an effect would
+     * let one request go out for the new filter at the old size before resetting
+     * it, and that request is exactly the one this guards against.
+     */
+    const [pagedFor, setPagedFor] = useState(filter.signature)
+    if (pagedFor !== filter.signature) {
+        setPagedFor(filter.signature)
+        setSize(MOBILE_BUILD_PAGE_SIZE)
+    }
+
     const {refresh, onToggled} = useFavouriteRefresh()
 
     const query = useQuery(
         gql`
-            query MobileBranch($id: Int!, $size: Int!) {
+            query MobileBranch($id: Int!, $size: Int!, $filter: StandardBuildFilter) {
                 branch(id: $id) {
                     id
                     name
@@ -63,7 +87,16 @@ export default function MobileBranchScreen({id}) {
                         id
                         name
                     }
-                    buildsPaginated(offset: 0, size: $size) {
+                    # What the promotion control offers. The branch's own levels,
+                    # not the ones the builds on this page happen to carry: a
+                    # level nobody has reached recently is precisely the one
+                    # worth filtering on.
+                    promotionLevels {
+                        id
+                        name
+                        image
+                    }
+                    buildsPaginated(offset: 0, size: $size, filter: $filter) {
                         pageInfo {
                             nextPage {
                                 offset
@@ -95,8 +128,13 @@ export default function MobileBranchScreen({id}) {
             }
         `,
         {
-            variables: {id: Number(id), size},
-            deps: [id, size, refresh],
+            /*
+             * `null` when nothing is filtered, so an unfiltered screen asks the
+             * server exactly what it asked before this search existed - the
+             * field then builds its own default filter, as it always did.
+             */
+            variables: {id: Number(id), size, filter: filter.input},
+            deps: [id, size, filter.signature, refresh],
         }
     )
 
@@ -106,11 +144,12 @@ export default function MobileBranchScreen({id}) {
      * an instance with no environments licence, which would fail the document
      * above and take the whole screen with it rather than one badge strip.
      */
-    const deploymentsByBuild = useMobileBranchDeployments(id, size)
+    const deploymentsByBuild = useMobileBranchDeployments(id, size, filter)
 
     const branch = query.data?.branch
     const builds = branch?.buildsPaginated?.pageItems ?? []
     const hasMore = Boolean(branch?.buildsPaginated?.pageInfo?.nextPage)
+    const promotionLevels = branch?.promotionLevels ?? []
 
     const branchName = branch ? (branch.displayName || branch.name) : "Branch"
 
@@ -138,6 +177,7 @@ export default function MobileBranchScreen({id}) {
                 branch?.disabled &&
                 <Tag color="default" data-testid="mobile-branch-disabled">Disabled</Tag>
             }
+            <MobileBuildFilterControls filter={filter} promotionLevels={promotionLevels}/>
             <MobileAsyncContent
                 state={query}
                 /*
@@ -153,7 +193,14 @@ export default function MobileBranchScreen({id}) {
                 empty={
                     <MobileEmpty
                         testId="mobile-builds-empty"
-                        description="This branch has no build yet."
+                        description={
+                            // Two different facts, and telling them apart is the
+                            // difference between "search for something else" and
+                            // "there is nothing here to find".
+                            filter.filtering
+                                ? filter.noMatch
+                                : "This branch has no build yet."
+                        }
                     />
                 }
             >
