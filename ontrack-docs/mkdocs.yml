@@ -63,6 +63,7 @@ nav:
           - content/start/feeding.md
           - GitHub: content/start/feeding/github.md
           - Jenkins: content/start/feeding/jenkins.md
+  - Mobile UI: content/mobile/index.md
   - Security:
       - OIDC: content/security/oidc.md
       - LDAP: content/security/ldap.md

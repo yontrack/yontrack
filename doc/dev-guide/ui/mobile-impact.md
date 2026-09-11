@@ -178,4 +178,6 @@ run in a phone browser context.
 ## See also
 
 - [The mobile UI](mobile-ui.md) — the shell, the redirect, the route map and the screens
+- `ontrack-docs/docs/content/mobile/index.md` — the user-facing page, published as *Mobile
+  UI*. A change that alters what a user can do from a phone alters that page too
 - [Demo seed and reset](../demo-seed.md) — the other half of the Definition of done

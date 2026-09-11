@@ -9,6 +9,12 @@ phone sees. The mobile screens themselves are documented as they land.
 > [Judging mobile impact](mobile-impact.md) is the shorter page for that: what the two UIs
 > share, what the mobile UI reads, and which changes reach it.
 
+> The **user-facing** page is `ontrack-docs/docs/content/mobile/index.md`, published in the
+> mkdocs site as *Mobile UI*: what the mobile UI does and deliberately does not do, the
+> redirect, and the two ways across the boundary. A screen that changes what a user can do
+> from a phone changes that page too — this one is the reference for *building* the mobile
+> UI, and the two are deliberately not copies of each other.
+
 ## Why two UIs rather than one responsive one
 
 The desktop UI has no responsive design at all: no `useBreakpoint`, no layout media queries,
