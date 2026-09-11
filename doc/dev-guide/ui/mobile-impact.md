@@ -105,6 +105,7 @@ and it is also what makes the check cheap — this is the whole list.
 | Branch | `branch(id:)`, `Branch.builds(filter: StandardBuildFilter, size:)` with `withDisplayName` and `withPromotionLevel`, `Branch.promotionLevels` |
 | Build | `build(id:)` — `displayName`, `description`, `creation`, `branch`, `authorizations`, `promotionRuns(lastPerLevel: true)`, `validations(size:)` with its runs' `lastStatus` |
 | Build and branch | `Build.currentDeployments`, in a query of its own |
+| Account | `user { account { name fullName email } }` and `info { version { display } }`, both through the shared providers rather than a query of its own |
 | Favourites | the four `favourite`/`unfavourite` mutations |
 
 Two things about that list are worth knowing before changing anything on it:

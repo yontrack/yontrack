@@ -3,6 +3,7 @@ import {
     isRedirectExempt,
     mobileBranchUri,
     mobileBuildUri,
+    MOBILE_ACCOUNT,
     MOBILE_HOME,
     mobileEquivalent,
     mobileProjectUri,
@@ -55,6 +56,35 @@ describe('mobileEquivalent', () => {
         '/extension/scm/my-project/changelog',
     ])('has no mobile equivalent for %s yet', (pathname) => {
         expect(mobileEquivalent(pathname)).toBeNull()
+    })
+
+    it('does not answer the desktop user profile with the account screen', () => {
+        // `/core/admin/userProfile` is API tokens and groups; `/mobile/account`
+        // is who you are and a sign-out button. The two share a name and nothing
+        // else, and redirecting a phone there would answer a link about tokens
+        // with a sign-out button. It keeps falling through to the interstitial
+        // as "an administration page".
+        expect(mobileEquivalent('/core/admin/userProfile')).toBeNull()
+        expect(describeDesktopRoute('/core/admin/userProfile')).toEqual('an administration page')
+    })
+
+    it.each([
+        '/',
+        '/project/12',
+        '/branch/34',
+        '/build/56',
+        '/core/admin/userProfile',
+    ])('never answers %s with the account screen', (pathname) => {
+        // The account screen is the mobile UI's own and stands in for no desktop
+        // route: nothing on the desktop UI is "who you are plus a sign-out
+        // button", and the redirect must never land someone on it.
+        expect(mobileEquivalent(pathname)).not.toEqual(MOBILE_ACCOUNT)
+    })
+
+    it('is reached only from inside the mobile UI', () => {
+        // Under `/mobile`, so the redirect leaves it alone entirely.
+        expect(MOBILE_ACCOUNT).toEqual('/mobile/account')
+        expect(isRedirectExempt(MOBILE_ACCOUNT)).toBe(true)
     })
 })
 

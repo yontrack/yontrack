@@ -78,20 +78,59 @@ html, body {
     display: block;
     /*
      * Neither mark shrinks, however long the signed-in name is - a squashed
-     * wordmark is worse than a truncated name, which `.ot-mobile-user` already
-     * handles.
+     * wordmark is worse than a truncated name, which `.ot-mobile-user-name`
+     * already handles.
      */
     flex: 0 0 auto;
 }
 
+/*
+ * The signed-in name, which is also the door to the account screen.
+ *
+ * The whole header row is the tap target rather than the glyph: `align-self:
+ * stretch` takes the header's own height - 48px, comfortably over the 44px
+ * minimum - and the padding widens it past the text. 13px of text with no
+ * affordance is a label; the chevron is what says it opens something.
+ */
 .ot-mobile-user {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    align-self: stretch;
+    padding: 0 4px 0 8px;
     /* Never pushes the brand off the screen, however long the name is. */
+    min-width: 0;
+    font-size: 13px;
+    /* Inherits the header's own foreground rather than the link colour, which
+       is picked to read on a page surface and not on the brand purple. */
+    color: inherit;
+    text-decoration: none;
+    /* Removes the grey flash iOS paints over a tapped link. */
+    -webkit-tap-highlight-color: transparent;
+}
+
+.ot-mobile-user-name {
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-size: 13px;
     opacity: 0.85;
+}
+
+.ot-mobile-user-chevron {
+    /* Never squashed by a long name beside it. */
+    flex: 0 0 auto;
+    font-size: 11px;
+    opacity: 0.65;
+}
+
+/*
+ * The account screen - see `app/mobile/account/AccountScreen.js`.
+ */
+
+.ot-mobile-account-email {
+    /* An address is longer than a phone is wide more often than not. */
+    overflow-wrap: anywhere;
 }
 
 .ot-mobile-main {

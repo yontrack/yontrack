@@ -59,4 +59,34 @@ describe('the mobile header', () => {
         renderAs({})
         expect(screen.queryByTestId('mobile-user')).not.toBeInTheDocument()
     })
+
+    describe('the signed-in name as a door', () => {
+
+        it('is the way to the account screen', () => {
+            // Which is the only way out of the mobile UI's session: a phone
+            // session is long-lived, and once the app is installed as a PWA
+            // there is no address bar to reach `/api/auth/signout` with.
+            renderAs({fullName: "Administrator"})
+            expect(screen.getByTestId('mobile-user')).toHaveAttribute('href', '/mobile/account')
+        })
+
+        it('says where it goes, not only whose name it carries', () => {
+            // "Administrator, link" says nothing about the destination. The
+            // visible name is kept inside the label, so the two do not diverge.
+            renderAs({fullName: "Administrator"})
+            expect(screen.getByTestId('mobile-user')).toHaveAccessibleName(/Administrator/)
+            expect(screen.getByTestId('mobile-user')).toHaveAccessibleName(/account/i)
+        })
+
+        it('marks itself as a door rather than as a label', () => {
+            // 13px at 0.85 opacity with no affordance does not read as tappable.
+            renderAs({fullName: "Administrator"})
+            expect(screen.getByTestId('mobile-user-chevron')).toBeInTheDocument()
+        })
+
+        it('does not announce the chevron beside the name', () => {
+            renderAs({fullName: "Administrator"})
+            expect(screen.getByTestId('mobile-user-chevron')).toHaveAttribute('aria-hidden', 'true')
+        })
+    })
 })

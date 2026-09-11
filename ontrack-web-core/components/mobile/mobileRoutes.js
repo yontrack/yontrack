@@ -24,6 +24,17 @@ export const MOBILE_HOME = MOBILE_PREFIX
 export const MOBILE_PROJECTS = `${MOBILE_PREFIX}/projects`
 
 /**
+ * Who is signed in, and the way to stop being signed in.
+ *
+ * Reached by tapping the name in the header, and from nowhere else. It
+ * deliberately appears in neither `EQUIVALENTS` nor `MOBILE_NAV_ITEMS`: it
+ * stands in for no desktop route - `/core/admin/userProfile` is API tokens and
+ * groups, which is a different page that happens to share a name - and two
+ * thumb-level destinations are what the bottom bar carries.
+ */
+export const MOBILE_ACCOUNT = `${MOBILE_PREFIX}/account`
+
+/**
  * One project's screen: its branches.
  *
  * @param {string|number} id

@@ -128,6 +128,7 @@ the interstitial, which may well be right, but should be a choice rather than an
 | Project | `/mobile/project/[id]` | The project's branches, limited and filterable |
 | Branch | `/mobile/branch/[id]` | The branch's latest builds, as cards, searchable |
 | Build | `/mobile/build/[id]` | The decision surface: promotions, deployments, validations |
+| Account | `/mobile/account` | Who is signed in, the version, and sign out |
 | Interstitial | `/mobile/desktop-only` | A route with no mobile equivalent |
 
 Home → project → branch → build is the path the mobile UI exists for, and all of it stays
@@ -333,6 +334,82 @@ the desktop UI on the build's own page, through the same `switchToDesktopUI` coo
 navigate pair the interstitial uses — and a caption under them says so. The alternative was a
 button that does nothing, which is worse than one that is honest about where it goes. When
 the two action issues land, each `onClick` becomes its dialog and the caption goes.
+
+### The account screen
+
+`/mobile/account` is who is signed in, the version, and **sign out** — and nothing else. It is
+reached by tapping the signed-in name in the header, and from nowhere else.
+
+Until it landed there was no way to sign out of the mobile UI at all: `signOut` appeared
+nowhere under `components/mobile/` or `app/mobile/`, the only deliberate call being the
+desktop `UserMenu`, which the mobile shell shares no layout component with. On a phone the
+session ended when it expired and not before — and that matters more here than on the desktop,
+because a phone session is long-lived and, once the mobile UI is installed as a PWA, there is
+no address bar to reach `/api/auth/signout` with by hand.
+
+**A screen, not a drawer and not a bare header button.** A drawer is the desktop pattern, and
+importing `UserMenu` would cross the boundary above. A screen is what every other mobile
+surface already is — `MobileScreen` needs no new shape for it — it has a URL a UI test can
+address, and a mis-tap costs a navigation rather than a session. It is **not** a fourth
+bottom-nav tab either: two thumb-level destinations are what the bar carries, and a tab is
+earned by a screen someone returns to rather than by a settings page. `activeMobileNavKey`
+answers `null` for it, exactly as for the interstitial, because it belongs to neither
+destination.
+
+**Reaching it.** `.ot-mobile-user` was 13px at 0.85 opacity with no affordance: it did not read
+as tappable and was well under a 44px target. It is now the control — a `Link` padded to the
+full header height, so the tap target is the header row rather than the glyph, with a chevron
+marking it as a door. The name stays in the header; on a shared or long-lived phone session it
+is still the one thing worth the space.
+
+**What it holds.** The identity — full name and username as the screen's head, email as
+context, all three already on `UserContext` — and the version (`useRefData().version`) as
+secondary text at the foot. The version earns its row because of the PWA: no address bar, no
+user menu, and "what version are you on?" is the first question on any support thread. It is
+also where the desktop user menu puts it. The desktop's own user-profile page
+(`/core/admin/userProfile`) is API tokens and groups; neither belongs on a phone and neither
+comes here.
+
+**Sign out fires immediately**, as the desktop's does. Two taps and a full screen of context is
+already the confirmation; a modal on a screen the user deliberately navigated to is friction
+that makes a phone app feel like a form.
+
+**It lands them on `/mobile`** — `signOut({callbackUrl: MOBILE_HOME})`, not the default.
+`signOut()` with no argument defaults `callbackUrl` to the *current* URL, so signing out of
+`/mobile/build/12` would leave that build as the callback and signing back in would return to
+it: on a shared phone, the wrong souvenir. `/mobile` is redirect-exempt so the middleware
+leaves it alone, `AuthProvider` sends the unauthenticated visitor to the sign-in page on its
+own, and signing back in lands on the mobile home. `mobile.spec.js` asserts that last hop
+rather than restating the default, which is the only way the decision stays made.
+
+**No route-map entry.** `/mobile/account` stands in for no desktop route, and
+`/core/admin/userProfile` is deliberately *not* mapped to it: the two share a name and nothing
+else, and redirecting a phone there would answer a link about API tokens with a sign-out
+button. It keeps falling through to the interstitial as "an administration page".
+
+#### Sign-out is local, deliberately
+
+`signOut` drops Yontrack's own session and **leaves the identity provider's alone** — there is
+no `events.signOut` in `authOptions` and no `end_session_endpoint` call, so the Keycloak SSO
+cookie survives and the next sign-in is silent. That is exactly as true of the desktop UI
+today.
+
+Making it a real sign-out is **#1734**, and it stays there: it is a shared auth change touching
+both UIs, both provider configurations and the 401 handler, with a back-channel/front-channel
+fork that deserves its own decision rather than riding in on a phone screen.
+
+**Nothing is said to the user about it here.** The desktop makes no such statement, and a
+caveat the user can do nothing about reads as a malfunction. It is recorded here and in #1734,
+where it is actionable. The one place it shows up in code is `mobile.spec.js`: signing back in
+after a sign-out may never be asked for credentials, so the helper that does it copes with
+both.
+
+The `yontrack-ui=desktop` cookie is left entirely alone by sign out. It is a *device* choice
+and signing out is a *user* action; clearing it would move the next person to pick up the phone
+between UIs as a side effect of someone else's logout.
+
+This screen is also where **#1732**'s dark/light control lands — a row between the identity head
+and sign out. That issue's open question was where the control lives, and this is the answer.
 
 ### Filtering a long list
 

@@ -45,4 +45,11 @@ describe('activeMobileNavKey', () => {
     it('lights nothing on a screen that belongs to no tab', () => {
         expect(activeMobileNavKey('/mobile/desktop-only')).toBeNull()
     })
+
+    it('lights nothing on the account screen', () => {
+        // It belongs to neither destination, exactly as the interstitial does -
+        // and it is deliberately not a fourth tab: two thumb-level destinations
+        // are what the bar carries, and a settings page does not earn one.
+        expect(activeMobileNavKey('/mobile/account')).toBeNull()
+    })
 })

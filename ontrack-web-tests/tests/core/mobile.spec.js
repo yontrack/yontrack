@@ -1,5 +1,5 @@
 const {devices, expect} = require('@playwright/test');
-const {login} = require("./login");
+const {login, signInButton} = require("./login");
 const {selectUserMenu} = require("./userMenu");
 const {test} = require("../fixtures/connection");
 
@@ -33,6 +33,32 @@ const signInOnPhone = (page, ontrack) => login(page, ontrack, undefined, undefin
     // top of that.
     ready: page => page.getByTestId('mobile-screen-title'),
 })
+
+/**
+ * Signs back in from wherever a sign-out landed, without navigating first.
+ *
+ * `login` starts with a `goto`, which would decide the callback the test is
+ * there to assert: where the sign-out put the user is exactly the question.
+ *
+ * The provider's own form is not guaranteed to appear. Yontrack's sign-out is
+ * local - it ends Yontrack's session and leaves the identity provider's alone,
+ * on the desktop UI as much as here, and making it a real sign-out is #1734 -
+ * so the provider can answer silently and hand the session straight back.
+ */
+const signBackInOnPhone = async (page, ontrack) => {
+    await (await signInButton(page)).click()
+
+    const usernameField = page.getByRole("textbox", {exact: false, name: "Username"})
+    // Either the provider asks, or it has already answered and the screen is up.
+    await expect(usernameField.or(page.getByTestId('mobile-screen-title')).first()).toBeVisible()
+
+    if (await usernameField.isVisible()) {
+        const {username, password} = ontrack.connection.credentials
+        await usernameField.fill(username)
+        await page.getByRole("textbox", {exact: false, name: "Password"}).fill(password)
+        await page.getByRole("button", {name: "Sign In", exact: true}).click()
+    }
+}
 
 test.describe('the mobile UI on a phone', () => {
 
@@ -365,6 +391,60 @@ test.describe('the mobile UI on a phone', () => {
         // home would tell the user what became of their link.
         await expect(page).toHaveURL(/\/mobile\/desktop-only\?target=%2Fsearch$/)
         await expect(page.getByTestId('desktop-only-destination')).toContainText('the search page')
+    })
+
+    test('the signed-in name in the header is the door to the account screen', async ({page, ontrack}) => {
+        // The narrowest phone the acceptance names, where a tap target is
+        // tightest.
+        await page.setViewportSize({width: 375, height: 812})
+
+        await signInOnPhone(page, ontrack)
+        await page.goto(`${ontrack.connection.ui}/mobile`)
+
+        // It used to be 13px of text at 0.85 opacity with no affordance at all.
+        // The whole header row is the target now, not the glyph.
+        const name = page.getByTestId('mobile-user')
+        const box = await name.boundingBox()
+        expect(box.height).toBeGreaterThanOrEqual(44)
+
+        await name.click()
+        await expect(page).toHaveURL(/\/mobile\/account$/)
+
+        // Who is signed in, and what they would read out on a support thread -
+        // the PWA has no address bar and no user menu to find it in.
+        await expect(page.getByTestId('mobile-screen-title')).not.toBeEmpty()
+        await expect(page.getByTestId('mobile-account-version')).not.toBeEmpty()
+
+        // It belongs to neither bottom-bar destination, exactly as the
+        // interstitial does - and is deliberately not a fourth tab.
+        for (const tab of ['mobile-nav-home', 'mobile-nav-projects']) {
+            await expect(page.getByTestId(tab)).not.toHaveAttribute('aria-current', 'page')
+        }
+    })
+
+    test('signing out comes back to the mobile home, not to where they were', async ({page, ontrack}) => {
+        // The assertion that actually pins the `callbackUrl` decision. With
+        // `signOut()` and no argument the callback defaults to the current URL,
+        // so signing out of a branch screen would bring the *next* person to
+        // pick up the phone straight back to it.
+        const project = await ontrack.createProject()
+        const branch = await project.createBranch()
+
+        await signInOnPhone(page, ontrack)
+
+        await page.goto(`${ontrack.connection.ui}/mobile/branch/${branch.id}`)
+        await expect(page.getByTestId('mobile-screen-title')).toContainText(branch.name)
+
+        // Two taps, and no confirmation to get past on the second.
+        await page.getByTestId('mobile-user').click()
+        await page.getByTestId('mobile-account-sign-out').click()
+
+        // Out of the app, and on somewhere they can sign back in from - which
+        // the helper asserts for us.
+        await signInButton(page)
+
+        await signBackInOnPhone(page, ontrack)
+        await expect(page).toHaveURL(/\/mobile$/)
     })
 
     test('a phone can switch to the desktop UI and back again', async ({page, ontrack}) => {

@@ -51,7 +51,15 @@ export const logout = async (page) => {
     await signInButton(page)
 }
 
-const signInButton = async (page) => {
+/**
+ * The identity provider's button on the sign-in page, once it is there.
+ *
+ * Exported so a test that has just signed *out* can assert it has landed
+ * somewhere it can sign back in from, and drive it without `login` navigating
+ * somewhere of its own first - where the sign-out landed is frequently the very
+ * thing being asserted.
+ */
+export const signInButton = async (page) => {
     let button = page.getByRole("button", {name: "Sign in", exact: false});
     await expect(button).toBeVisible()
     await page.waitForTimeout(500)
