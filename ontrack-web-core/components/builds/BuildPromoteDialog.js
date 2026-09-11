@@ -1,10 +1,18 @@
 import FormDialog, {useFormDialog} from "@components/form/FormDialog";
-import {Checkbox, DatePicker, Form, Input, InputNumber, Select} from "antd";
+import {DatePicker, Form, Input} from "antd";
 import SelectPromotionLevel from "@components/promotionLevels/SelectPromotionLevel";
 import dayjs from "dayjs";
 import {gql} from "graphql-request";
 import {useEffect, useState} from "react";
 import {useGraphQLClient} from "@components/providers/ConnectionContextProvider";
+import {
+    gqlPromotionLevelFieldSet,
+    orderedPromotionLevelFields,
+    promotionLevelFieldInput,
+    promotionLevelFieldRules,
+    promotionLevelFieldValuePropName,
+    toPromotionRunFieldValues,
+} from "@components/promotionLevels/promotionLevelFields";
 
 const {TextArea} = Input;
 
@@ -18,17 +26,14 @@ export function useBuildPromoteDialog(config) {
             })
         },
         prepareValues: (values, context) => {
-            const fieldValues = values.fieldValues
-                ? Object.entries(values.fieldValues)
-                    .filter(([, v]) => v !== undefined && v !== null && v !== '')
-                    .map(([name, value]) => ({name, value}))
-                : []
             return {
                 buildId: Number(context.build.id),
                 promotion: values.promotionLevel,
                 description: values.description,
                 dateTime: values.dateTime,
-                fieldValues: fieldValues.length > 0 ? fieldValues : undefined,
+                // Shared with the mobile promote sheet - see
+                // `components/promotionLevels/promotionLevelFields.js`.
+                fieldValues: toPromotionRunFieldValues(values.fieldValues),
             }
         },
         query: gql`
@@ -73,17 +78,12 @@ export default function BuildPromoteDialog({buildPromoteDialog}) {
                             promotionLevels {
                                 name
                                 fields {
-                                    name
-                                    displayName
-                                    description
-                                    type
-                                    required
-                                    options
-                                    position
+                                    ...PromotionLevelFieldSet
                                 }
                             }
                         }
                     }
+                    ${gqlPromotionLevelFieldSet}
                 `,
                 {branchId: Number(branch.id)}
             ).then(data => {
@@ -96,7 +96,7 @@ export default function BuildPromoteDialog({buildPromoteDialog}) {
         }
     }, [client, branch])
 
-    const currentFields = (selectedPromotion && promotionLevelFields[selectedPromotion]) || []
+    const currentFields = orderedPromotionLevelFields(selectedPromotion && promotionLevelFields[selectedPromotion])
 
     return (
         <>
@@ -130,31 +130,20 @@ export default function BuildPromoteDialog({buildPromoteDialog}) {
                         name={['fieldValues', field.name]}
                         label={field.displayName}
                         tooltip={field.description}
-                        rules={field.required ? [{required: true, message: `${field.displayName} is required.`}] : []}
-                        valuePropName={field.type === 'BOOLEAN' ? 'checked' : 'value'}
+                        rules={promotionLevelFieldRules(field)}
+                        valuePropName={promotionLevelFieldValuePropName(field)}
                     >
-                        {renderFieldInput(field)}
+                        {/*
+                          The type-to-input mapping is shared with the mobile
+                          promote sheet, deliberately: a field type added here
+                          and not there is a required field a phone cannot fill,
+                          and so a promotion level a phone cannot use. See
+                          `components/promotionLevels/promotionLevelFields.js`.
+                        */}
+                        {promotionLevelFieldInput(field)}
                     </Form.Item>
                 ))}
             </FormDialog>
         </>
     )
-}
-
-function renderFieldInput(field) {
-    switch (field.type) {
-        case 'TEXT':
-            return <Input/>
-        case 'NUMBER':
-            return <InputNumber style={{width: '100%'}}/>
-        case 'BOOLEAN':
-            return <Checkbox/>
-        case 'CHOICE':
-            return <Select options={field.options.map(o => ({label: o, value: o}))}
-                           getPopupContainer={trigger => trigger.parentElement}/>
-        case 'LINK':
-            return <Input placeholder="https://..."/>
-        default:
-            return <Input/>
-    }
 }
