@@ -38,19 +38,6 @@ jest.mock("../../../components/services/GraphQL", () => ({
     callGraphQL: (...args) => callGraphQL(...args),
 }))
 
-/*
- * The rule summary is a `Dynamic`: a lazily imported component chosen by rule
- * id. Stubbed here so these tests assert what the sheet *hands* the shared
- * mapping - the rule's id and its configuration - rather than re-testing the
- * desktop components behind it. That the real mapping phrases a promotion rule
- * as "GOLD promotion is required" is asserted in `mobile.spec.js`, against a
- * real slot.
- */
-jest.mock("../../../components/extension/environments/SlotAdmissionRuleSummary", () => ({
-    __esModule: true,
-    default: ({ruleId, ruleConfig}) => <span>{`${ruleId}:${JSON.stringify(ruleConfig)}`}</span>,
-}))
-
 import MobileDeploySheet from "@components/mobile/builds/MobileDeploySheet"
 
 const build = {id: 100}
@@ -116,14 +103,16 @@ describe('the mobile deploy sheet', () => {
         expect(screen.getByTestId('mobile-deploy-ineligible-slot-2')).toBeInTheDocument()
     })
 
-    it('says why an ineligible slot refuses, rule by rule', () => {
+    it('says why an ineligible slot refuses, rule by rule and in words', () => {
+        // The desktop UI's own phrasing, through the rule components the mobile
+        // lookup names - not a rule id the user would have to interpret.
         withSlots(ineligible(slot('slot-2', 'production'), [
             rule('r1', 'promotion', {promotion: 'GOLD'}),
             rule('r2', 'branchPattern', {includes: ['main']}),
         ]))
         openSheet()
-        expect(screen.getByTestId('mobile-deploy-reason-r1')).toHaveTextContent('promotion:{"promotion":"GOLD"}')
-        expect(screen.getByTestId('mobile-deploy-reason-r2')).toHaveTextContent('branchPattern')
+        expect(screen.getByTestId('mobile-deploy-reason-r1')).toHaveTextContent('GOLD promotion is required')
+        expect(screen.getByTestId('mobile-deploy-reason-r2')).toHaveTextContent('main')
     })
 
     it('offers no way to deploy to a slot which refuses the build', () => {

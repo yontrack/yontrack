@@ -23,13 +23,10 @@
  * A slot with three rules of which one refuses would otherwise be explained by
  * listing all three, two of which are satisfied.
  *
- * **The rule is drawn by the shared summary component**, `SlotAdmissionRuleSummary`,
- * which maps a rule id onto the component that phrases it - "GOLD promotion is
- * required". It is the same kind of sharing the promote sheet does with the
- * promotion level field mapping (#1724): the *mapping* is shared so a rule type
- * added on the desktop is phrased here too, and only the layout around it is the
- * mobile UI's own. A second copy of that mapping would drift silently, and the
- * mobile half would fall back to naming a rule the user cannot interpret.
+ * **The rule is drawn by the desktop's own summary component** - "GOLD promotion
+ * is required" - reached through `admissionRuleComponents`, which is where the
+ * mobile UI keeps its rule-id lookup and which explains at length why it cannot
+ * simply call `SlotAdmissionRuleSummary` like the desktop pipeline page does.
  *
  * @param {Object} build The build being deployed - its `id` is the whole input.
  * @param {boolean} open Whether the sheet is up.
@@ -44,7 +41,7 @@ import {Alert, Button, Drawer, Skeleton, Tag, Typography} from "antd"
 import {FaPlay, FaServer} from "react-icons/fa"
 import {callGraphQL, useQuery} from "@components/services/GraphQL"
 import {slotNameWithoutProject} from "@components/extension/environments/SlotName"
-import SlotAdmissionRuleSummary from "@components/extension/environments/SlotAdmissionRuleSummary"
+import {MobileAdmissionRuleSummary} from "@components/mobile/deployments/admissionRuleComponents"
 import MobileEmpty from "@components/mobile/layout/MobileEmpty"
 
 export default function MobileDeploySheet({build, open, onClose, onStarted}) {
@@ -265,10 +262,7 @@ function MobileDeployList({build, onClose, onStarted}) {
                                                     className="ot-mobile-caption"
                                                     data-testid={`mobile-deploy-reason-${rule.id}`}
                                                 >
-                                                    <SlotAdmissionRuleSummary
-                                                        ruleId={rule.ruleId}
-                                                        ruleConfig={rule.ruleConfig}
-                                                    />
+                                                    <MobileAdmissionRuleSummary rule={rule}/>
                                                 </Typography.Text>
                                             ))
                                         }

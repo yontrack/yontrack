@@ -15,11 +15,10 @@
  * `SlotPipelineStatusActions` carries all four buttons side by side, which is
  * the difference between a control surface and a decision surface.
  *
- * **The rules are drawn by the shared components.** `SlotAdmissionRuleSummary`
- * and `SlotAdmissionRuleCheck` map a rule id onto the components which phrase it
- * and report on it - the same mapping the desktop pipeline page uses. Only the
- * layout around them is the mobile UI's own, exactly as the promote sheet shares
- * the promotion level field mapping and nothing else (#1724).
+ * **The rules are drawn by the desktop's own components**, reached through
+ * `admissionRuleComponents` - the mobile UI's rule-id lookup, which exists
+ * because the desktop's runtime one resolves into the wrong webpack layer under
+ * `/mobile`. Only the layout around them is the mobile UI's own.
  *
  * **What the screen refetches, and why it refetches rather than patching.**
  * Whether a rule now passes, and whether the deployment can now run, are
@@ -46,7 +45,7 @@ import MobileDeploymentInputSheet from "@components/mobile/deployments/MobileDep
 import MobileDeploymentOverrideSheet from "@components/mobile/deployments/MobileDeploymentOverrideSheet"
 import {mobileBuildUri, mobileProjectUri} from "@components/mobile/mobileRoutes"
 import {slotNameWithoutProject} from "@components/extension/environments/SlotName"
-import SlotAdmissionRuleSummary from "@components/extension/environments/SlotAdmissionRuleSummary"
+import {MobileAdmissionRuleSummary} from "@components/mobile/deployments/admissionRuleComponents"
 import SlotPipelineStatusLabel from "@components/extension/environments/SlotPipelineStatusLabel"
 import CheckIcon from "@components/common/CheckIcon"
 import TimestampText from "@components/common/TimestampText"
@@ -336,10 +335,7 @@ export default function MobileDeploymentScreen({id}) {
                                                         id={`mobile-deployment-rule-${config.id}`}
                                                         value={rule.check?.ok}
                                                     />
-                                                    <SlotAdmissionRuleSummary
-                                                        ruleId={config.ruleId}
-                                                        ruleConfig={config.ruleConfig}
-                                                    />
+                                                    <MobileAdmissionRuleSummary rule={config}/>
                                                 </span>
                                                 <span className="ot-mobile-row-context">
                                                     {rule.check?.ok ? 'Passed' : 'Blocking'}

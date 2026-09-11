@@ -25,7 +25,7 @@ rather than everything badly, and it says so when a user arrives somewhere it do
 |---|---|
 | Services, GraphQL fragments and mutations | Every layout component |
 | The promotion level field mapping (`promotionLevelFields`) | The promote dialog and the promote sheet around it |
-| The admission rule component mapping (`SlotAdmissionRuleSummary`, `SlotAdmissionRuleDataForm`) | The deployment dialogs and the sheets around them |
+| The admission rule components themselves (`.../environments-slot-admission-rule/*`) | The rule-id lookup: `Dynamic` resolves into the wrong webpack layer under `/mobile` |
 | Authorization helpers | `MainLayout`, `MainPage`, `MainPageBar`, `NavBar`, `UserMenu` |
 | Theme tokens (`styles/globals.css`) and the pre-paint theme script | The mobile shell: `MobileLayout`, `MobileHeader`, `MobileBottomNav` |
 | The next-auth session and the `/api/protected/graphql` proxy | The provider stack — see below |
@@ -457,22 +457,50 @@ passed`) and points at the list below.
 deployment can now run, are answers only the server has. A counter in the query's `deps`, as
 the build screen's promotion uses — the mobile provider stack has no `EventsContextProvider`.
 
-##### What is shared: the rule mapping, and only that
+##### `Dynamic` does not work under `/mobile`, and that is load-bearing
 
-Three shared components draw a rule, all of them `Dynamic` lookups keyed by rule id:
-`SlotAdmissionRuleSummary` phrases it ("GOLD promotion is required"), `SlotAdmissionRuleDataForm`
-draws the fields it wants, and `CheckIcon` draws its verdict.
+The desktop UI chooses a rule's components **at runtime**: `SlotAdmissionRuleSummary` and
+`SlotAdmissionRuleDataForm` both go through `components/common/Dynamic.js`, which is
+``lazy(() => import(`../${path}`))``. That template literal makes webpack build a *context
+module* over `components/`, and the context it builds belongs to the **Pages Router** layer —
+which is where the whole desktop UI lives. `/mobile` is an App Router root, compiled in a
+separate layer with its own React copy, so a component pulled in through that context renders
+against a React whose dispatcher is null:
 
-This is the deployment side of the choice the promote sheet makes for promotion level fields.
-Two copies of that mapping would drift the first time a rule type is added, and the mobile half
-would fail **silently**: the phrasing would go missing from the reason list, or the field would
-simply not be there and a deployment would stay stuck with no visible cause. The layout around
-them stays the mobile UI's own, as everywhere else in this document.
+```
+TypeError: Cannot read properties of null (reading 'useMemo')
+    at Text (antd/lib/typography/Text.js)
+```
 
-The input sheet also leaves the **value shape** to the mapping. Each rule's form names its
+`Dynamic`'s own `ErrorBoundary` catches it and draws "Error" where the content should be, so
+the failure is quiet: nothing throws out of the screen, and the reason a deployment is refused
+is simply replaced by a red cross. Nothing about the rule, the data or the screen is wrong —
+the module arrives from the wrong compilation.
+
+**This is true of every use of `Dynamic`, not only these.** Properties, widgets and
+auto-versioning post-processing all resolve the same way, so any future mobile screen needing a
+component chosen at runtime needs a static map instead.
+
+##### What is shared: the rule components, and a table that cannot drift
+
+`components/mobile/deployments/admissionRuleComponents.js` is that static map. It imports the
+**desktop's own** rule components — the same files `Dynamic` would have resolved — so how a rule
+is phrased and which fields it asks for stay in one place; `CheckIcon` is shared outright. What
+is duplicated is only the *lookup table*, and only because a static import is the one thing that
+resolves in the right layer.
+
+A duplicated table drifts, which is exactly why the promote sheet shares its field mapping
+rather than copying it. So it is pinned: `admissionRuleComponents.test.js` reads
+`components/framework/environments-slot-admission-rule/` **off disk** and fails when a rule
+there has a `Summary.js` or a `DataForm.js` the mobile table does not name. A rule type added
+for the desktop becomes a failing test rather than a phone that silently cannot explain itself.
+Both lookups also fall back rather than rendering nothing — the rule's configured name for a
+summary, and "this rule cannot be answered from a phone" for a form.
+
+The input sheet leaves the **value shape** to those components too. Each rule's form names its
 fields under the rule config's id, so the form's own values are already `{[configId]: {…}}` and
 go to `updatePipelineData` untouched. Reshaping them here would mean knowing what each rule's
-data looks like, which is exactly what the mapping exists to avoid.
+data looks like, which is what using the rule's own form avoids.
 
 ##### Authorization
 

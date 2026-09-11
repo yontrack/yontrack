@@ -28,7 +28,7 @@ import {useState} from "react"
 import {gql} from "graphql-request"
 import {Alert, Button, Drawer, Form, Input, Space} from "antd"
 import {callGraphQL} from "@components/services/GraphQL"
-import SlotAdmissionRuleSummary from "@components/extension/environments/SlotAdmissionRuleSummary"
+import {MobileAdmissionRuleSummary} from "@components/mobile/deployments/admissionRuleComponents"
 
 export default function MobileDeploymentOverrideSheet({deployment, rule, open, onClose, onOverridden}) {
     return (
@@ -121,10 +121,7 @@ function MobileDeploymentOverrideForm({deployment, rule, onClose, onOverridden})
 
             {/* Which rule, phrased the way the list behind phrases it. */}
             <Form.Item label="Rule">
-                <SlotAdmissionRuleSummary
-                    ruleId={rule.admissionRuleConfig.ruleId}
-                    ruleConfig={rule.admissionRuleConfig.ruleConfig}
-                />
+                <MobileAdmissionRuleSummary rule={rule.admissionRuleConfig}/>
             </Form.Item>
 
             <Form.Item

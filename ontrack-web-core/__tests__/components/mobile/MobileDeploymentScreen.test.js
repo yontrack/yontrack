@@ -40,21 +40,6 @@ jest.mock("../../../components/services/GraphQL", () => ({
     callGraphQL: (...args) => callGraphQL(...args),
 }))
 
-/*
- * Both are `Dynamic`: lazily imported components chosen by rule id. Stubbed so
- * these tests assert what the screen hands the shared mapping rather than
- * re-testing the desktop components behind it - `mobile.spec.js` exercises the
- * real ones against a real slot.
- */
-jest.mock("../../../components/extension/environments/SlotAdmissionRuleSummary", () => ({
-    __esModule: true,
-    default: ({ruleId, ruleConfig}) => <span>{`${ruleId}:${JSON.stringify(ruleConfig)}`}</span>,
-}))
-jest.mock("../../../components/extension/environments/SlotAdmissionRuleDataForm", () => ({
-    __esModule: true,
-    default: ({configId}) => <input aria-label={`data-${configId}`}/>,
-}))
-
 import MobileDeploymentScreen from "@/app/mobile/deployment/[id]/DeploymentScreen"
 
 /** The shape `isAuthorized` reads. */
@@ -168,11 +153,11 @@ describe('the mobile deployment screen', () => {
             expect(screen.getByTestId('mobile-deployment-rule-r2-nok')).toBeInTheDocument()
         })
 
-        it('phrases each rule through the shared mapping', () => {
+        it('phrases each rule in the desktop UI\'s own words', () => {
             deployment({rules: [rule('r1', {ruleId: 'promotion', ruleConfig: {promotion: 'GOLD'}})]})
             render(<MobileDeploymentScreen id="pipeline-1"/>)
             expect(screen.getByTestId('mobile-deployment-rule-r1'))
-                .toHaveTextContent('promotion:{"promotion":"GOLD"}')
+                .toHaveTextContent('GOLD promotion is required')
         })
 
         it('says when a rule was overridden, and by whom', () => {

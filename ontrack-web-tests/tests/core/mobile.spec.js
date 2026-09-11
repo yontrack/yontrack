@@ -452,13 +452,14 @@ test.describe('the mobile UI on a phone', () => {
         const stagingSlot = await staging.createSlot({project})
         const approvalId = await ontrack.environments.addManualApproval({slot: stagingSlot})
 
-        // And where it cannot: a slot wanting a promotion this build has not got.
+        // And where it cannot: a slot wanting a promotion the branch does not even
+        // declare, which is the demo's own broken-slot case and the one a user is
+        // most likely to be baffled by.
         const production = await ontrack.environments.createEnvironment({order: 200})
         const productionSlot = await production.createSlot({project})
         await ontrack.environments.addPromotionRule({slot: productionSlot, promotion: 'GOLD'})
 
         const branch = await project.createBranch()
-        await branch.createPromotionLevel('GOLD')
         const build = await branch.createBuild()
         await build.setRelease('1.4.0')
 

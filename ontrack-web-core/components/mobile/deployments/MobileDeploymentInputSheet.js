@@ -8,15 +8,11 @@
  * arrives the deployment cannot run, so a phone that could not answer it could
  * start a deployment and then be unable to finish starting it.
  *
- * **The fields are the shared ones.** Which controls a rule asks for is decided
- * by `SlotAdmissionRuleDataForm`, which maps a rule id onto the component that
- * draws its form - the same mapping the desktop `SlotPipelineInputDialog` uses.
- * This is the deployment side of the choice `MobilePromoteSheet` makes for
- * promotion level fields (#1724): the *mapping* is shared, so a rule type added
- * on the desktop can be answered here too, and only the layout around it is the
- * mobile UI's own. Two copies of that mapping would drift the first time a rule
- * is added, and the mobile half would fail silently - the field would simply not
- * be there, and the deployment would stay stuck with no visible reason.
+ * **The fields are the desktop's own.** Which controls a rule asks for is the
+ * rule's own `DataForm`, the very component the desktop `SlotPipelineInputDialog`
+ * draws - reached through `admissionRuleComponents`, which is where the mobile UI
+ * keeps its rule-id lookup and which explains why it cannot use the desktop's
+ * runtime one.
  *
  * **The value shape is the server's, not ours.** Each rule's form names its
  * fields under the rule config's id, so the form's own values are already
@@ -39,7 +35,7 @@ import {useState} from "react"
 import {gql} from "graphql-request"
 import {Alert, Button, Drawer, Form, Space, Typography} from "antd"
 import {callGraphQL} from "@components/services/GraphQL"
-import SlotAdmissionRuleDataForm from "@components/extension/environments/SlotAdmissionRuleDataForm"
+import {MobileAdmissionRuleDataForm} from "@components/mobile/deployments/admissionRuleComponents"
 
 export default function MobileDeploymentInputSheet({deployment, ruleConfigId, open, onClose, onSaved}) {
     return (
@@ -150,11 +146,7 @@ function MobileDeploymentInputForm({deployment, ruleConfigId, onClose, onSaved})
                                 {input.config.description}
                             </Typography.Paragraph>
                         }
-                        <SlotAdmissionRuleDataForm
-                            configId={input.config.id}
-                            ruleId={input.config.ruleId}
-                            ruleConfig={input.config.ruleConfig}
-                        />
+                        <MobileAdmissionRuleDataForm config={input.config}/>
                     </div>
                 ))
             }
