@@ -37,7 +37,8 @@ the second one is not the one you are looking at.
 | The promotion level field mapping (`promotionLevelFields`) | The promote dialog and the promote sheet around it |
 | Authorization helpers (`isAuthorized`, the `authorizations` field) | `MainLayout`, `MainPage`, `MainPageBar`, `NavBar`, `UserMenu` |
 | Theme tokens (`styles/globals.css`) and the pre-paint theme script | The mobile shell: `MobileLayout`, `MobileHeader`, `MobileBottomNav` |
-| A handful of display primitives — `ValidationChip`, `PromotionLevelImage`, `TimestampText`, `EntityIcon` | The provider stack: `/mobile` is its own App Router root and assembles its own |
+| A handful of display primitives — `ValidationChip`, `PromotionLevelImage`, `TimestampText`, `EntityIcon`, `CheckIcon`, `SlotPipelineStatusLabel` | The provider stack: `/mobile` is its own App Router root and assembles its own |
+| The admission rule component mapping — `SlotAdmissionRuleSummary`, `SlotAdmissionRuleDataForm` | The deployment dialogs, and the mobile sheets and screen around them |
 | The next-auth session and the `/api/protected/graphql` proxy | Every screen, and the lists and cards they are built from |
 
 The boundary is deliberately sharp, and the layout half of it is the load-bearing one:
@@ -61,9 +62,17 @@ change reaches the mobile UI; the right column is where it cannot.
   `components/promotionLevels/promotionLevelFields.js`, so adding a type there covers both.
   Adding one to the desktop dialog alone would leave a required field unfillable on a phone,
   and so a promotion level unusable from one.
-- **A new admission-rule or deployment surface.** The build screen's deploy entry point is
-  gated on `slotPipeline/create`, and both the build screen and the branch screen read
-  `Build.currentDeployments`.
+- **A new admission rule, or a change to how one is drawn.** This is the deployment twin of
+  the promotion level field type above. The mobile deploy sheet phrases a rule that refuses a
+  build through `SlotAdmissionRuleSummary`, and the mobile deployment screen draws the rule's
+  own input through `SlotAdmissionRuleDataForm` — the same `Dynamic` lookups the desktop
+  pipeline page uses. A rule added with a `Check` and no `Summary`, or with no `DataForm` for
+  a rule that needs data, leaves a phone unable to say why an environment refuses or unable to
+  answer it at all.
+- **A new deployment surface.** The build screen's deploy entry point is gated on
+  `slotPipeline/create`; both the build screen and the branch screen read
+  `Build.currentDeployments`, and the build screen also reads
+  `Build.slotPipelines(status: CANDIDATE)` and `eligibleSlotsForBuild`.
 - **A new authorization**, or a change to an existing one, on anything the mobile UI acts on.
   `MobileBuildActions` gates its two entry points off `build/promote` and
   `slotPipeline/create`, read exactly as the desktop UI reads them. A new right gating an
@@ -110,7 +119,9 @@ and it is also what makes the check cheap — this is the whole list.
 | Project | `project(id:)`, `Project.branches(name:, count:, order:)` |
 | Branch | `branch(id:)`, `Branch.builds(filter: StandardBuildFilter, size:)` with `withDisplayName` and `withPromotionLevel`, `Branch.promotionLevels` |
 | Build | `build(id:)` — `displayName`, `description`, `creation`, `branch`, `authorizations`, `promotionRuns(lastPerLevel: true)`, `validations(size:)` with its runs' `lastStatus` |
-| Build and branch | `Build.currentDeployments`, in a query of its own |
+| Build and branch | `Build.currentDeployments` and `Build.slotPipelines(status:)`, in a query of their own |
+| Build, deploying | `eligibleSlotsForBuild(buildId:)` — `eligible`, `nonEligibleRules`, `slot`; `startSlotPipeline` |
+| Deployment | `slotPipelineById(id:)` — `status`, `slot` with its `authorizations`, `admissionRules`, `requiredInputs`, `runAction`; `updatePipelineData`, `overridePipelineRule`, `startSlotPipelineDeployment` |
 | Account | `user { account { name fullName email } }` and `info { version { display } }`, both through the shared providers rather than a query of its own |
 | Favourites | the four `favourite`/`unfavourite` mutations |
 
@@ -119,8 +130,9 @@ Two things about that list are worth knowing before changing anything on it:
 - **`Build.currentDeployments` is asked for separately, deliberately.** It is contributed by
   the environments extension and is *absent from the schema* on an instance without the
   licence, so naming it in the main query would fail validation and take the whole screen
-  down. Any future field an extension contributes conditionally needs the same treatment —
-  see `useMobileDeployments`.
+  down. `Build.slotPipelines` comes from the same contributor and rides in the same query, for
+  the same reason and with the same isolation. Any future field an extension contributes
+  conditionally needs the same treatment — see `useMobileDeployments`.
 - **The filter goes to the deployments query too.** Asked for under different terms, the two
   queries are pages of two different lists and the badges silently vanish.
 

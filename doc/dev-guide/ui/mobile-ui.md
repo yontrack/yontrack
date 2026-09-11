@@ -25,6 +25,7 @@ rather than everything badly, and it says so when a user arrives somewhere it do
 |---|---|
 | Services, GraphQL fragments and mutations | Every layout component |
 | The promotion level field mapping (`promotionLevelFields`) | The promote dialog and the promote sheet around it |
+| The admission rule component mapping (`SlotAdmissionRuleSummary`, `SlotAdmissionRuleDataForm`) | The deployment dialogs and the sheets around them |
 | Authorization helpers | `MainLayout`, `MainPage`, `MainPageBar`, `NavBar`, `UserMenu` |
 | Theme tokens (`styles/globals.css`) and the pre-paint theme script | The mobile shell: `MobileLayout`, `MobileHeader`, `MobileBottomNav` |
 | The next-auth session and the `/api/protected/graphql` proxy | The provider stack — see below |
@@ -129,6 +130,7 @@ the interstitial, which may well be right, but should be a choice rather than an
 | Project | `/mobile/project/[id]` | The project's branches, limited and filterable |
 | Branch | `/mobile/branch/[id]` | The branch's latest builds, as cards, searchable |
 | Build | `/mobile/build/[id]` | The decision surface: promotions, deployments, validations |
+| Deployment | `/mobile/deployment/[id]` | One deployment waiting to run: its admission rules, and what can be done about them |
 | Account | `/mobile/account` | Who is signed in, the theme, the version, and sign out |
 | Interstitial | `/mobile/desktop-only` | A route with no mobile equivalent |
 
@@ -329,12 +331,9 @@ rather than one that fails — and the second is answered `false` on an instance
 environments licence, so the deploy entry point disappears there without the component
 knowing anything about licences.
 
-**What they do today.** Promoting happens here, on the phone — the sheet below (#1724).
-Deploying (#1725) is still its own issue, and until it lands that button switches this device
-to the desktop UI on the build's own page, through the same `switchToDesktopUI` cookie-then-
-navigate pair the interstitial uses. The caption under the buttons says so, and says it about
-the deploy button **alone**: it used to cover both, and telling a user who can only promote
-that their promotion happens on the desktop stopped being true.
+**Both happen here.** Promoting is the sheet below (#1724) and deploying is the one after it
+(#1725). Neither sends the device to the desktop UI any more, and the caption that used to say
+so is gone with the last thing it was true of.
 
 #### Promoting, from the phone
 
@@ -387,6 +386,150 @@ rather than this one; and a *required* field on a demo level would break the see
 since the demo's auto-promotion and workflow-driven promotions create runs with no field
 values, which is exactly what `validatePromotionRunFieldValues` refuses. See
 [demo-seed.md](../demo-seed.md).
+
+#### Deploying, from the phone
+
+Two surfaces, because the deployment lifecycle has two moments a person is in it:
+`MobileDeploySheet` over the build screen starts one, and `/mobile/deployment/[id]` is where
+one that is waiting gets acted on. Both are #1725.
+
+**Where the scope stops.** The lifecycle is `CANDIDATE → RUNNING → DONE`, plus `CANCELLED`.
+The phone covers starting a deployment and acting on one that is waiting, and nothing else:
+
+- **Marking a deployment done** is driven by CI, not by a person on a phone.
+- **Cancelling one** is a destructive action behind a thumb on a small screen, and stays on
+  the desktop UI for 5.4.
+- Workflow overrides, slot configuration, admission rule configuration, browsing a slot's
+  eligible builds and the pipeline graph are all desktop surfaces.
+
+The desktop `SlotPipelineStatusActions` carries all four buttons side by side, which is the
+difference between a control surface and a decision surface.
+
+##### The deploy sheet: a list, not a dropdown
+
+`BuildStartDeploymentDialog` is a modal around a `Select` of slots, with the chosen slot's
+details and its current pipeline underneath. The mobile sheet is a **card per slot**, each
+carrying its own action or its own explanation.
+
+That is not restyling. The desktop `Select` marks an ineligible slot `disabled`, which on a
+phone is a tap that does nothing and says nothing — and the acceptance criterion is the
+opposite: ineligible slots are shown **with the reason**, so a user is never left wondering
+where an environment went.
+
+**The reason had to come from the server.** `EligibleSlot` carried `eligible` and the slot,
+and nothing else — so a UI could grey a row out but could not say why. It now also carries
+`nonEligibleRules`: the slot's admission rules which actually refuse *this* build, not its
+whole rule set. A slot with three rules of which one refuses would otherwise be explained by
+listing all three, two of which are satisfied.
+
+`eligible` and `nonEligibleRules` are computed in **one** walk over the rules
+(`SlotServiceImpl.eligibleSlot`), because a slot is eligible exactly when nothing refuses:
+computing the two separately would walk the rules twice and let the answers disagree.
+
+The cards are ordered by the environment's own order and then by qualifier, so the list reads
+the way a pipeline runs and two slots of one project in one environment come out stably. A
+badge names the environment **and** the qualifier, through the desktop UI's own
+`slotNameWithoutProject` — the rule that applies everywhere a slot is named (#1731).
+
+##### The deployment screen: the waiting room
+
+A deployment starts as a `CANDIDATE`: nothing has happened to the environment yet, and
+everything that still has to happen is on its own screen. Starting one therefore **navigates**
+there rather than dropping the user back on the build with a new row to notice.
+
+It is reached two ways, and the second is the one that matters: the build screen carries a
+**Waiting to deploy** section listing this build's `CANDIDATE` deployments, which is the only
+thing on a phone that names a deployment *somebody else* started — CI, usually, sitting on a
+manual approval nobody has given. That section is absent rather than empty when nothing is
+waiting: unlike the three sections under it, it is not a facet of the build, and "no
+deployment is waiting" on every build screen would be a line nobody reads.
+
+The screen itself is the status, the run button, and one row per admission rule: its verdict
+as a glyph **and** in words — `Passed` / `Blocking`, so the state survives greyscale, as the
+validation chips do — plus the two things that can be done to a blocking one.
+
+**The run button reads `runAction.ok` and not a count of its own.** A rule can be satisfied by
+an override as well as by passing, and the server computes the answer over every check at once,
+workflow checks included. When it says no, the caption says how far it got (`1 of 3 checks
+passed`) and points at the list below.
+
+**Every action refetches rather than patching.** Whether a rule now passes, and whether the
+deployment can now run, are answers only the server has. A counter in the query's `deps`, as
+the build screen's promotion uses — the mobile provider stack has no `EventsContextProvider`.
+
+##### What is shared: the rule mapping, and only that
+
+Three shared components draw a rule, all of them `Dynamic` lookups keyed by rule id:
+`SlotAdmissionRuleSummary` phrases it ("GOLD promotion is required"), `SlotAdmissionRuleDataForm`
+draws the fields it wants, and `CheckIcon` draws its verdict.
+
+This is the deployment side of the choice the promote sheet makes for promotion level fields.
+Two copies of that mapping would drift the first time a rule type is added, and the mobile half
+would fail **silently**: the phrasing would go missing from the reason list, or the field would
+simply not be there and a deployment would stay stuck with no visible cause. The layout around
+them stays the mobile UI's own, as everywhere else in this document.
+
+The input sheet also leaves the **value shape** to the mapping. Each rule's form names its
+fields under the rule config's id, so the form's own values are already `{[configId]: {…}}` and
+go to `updatePipelineData` untouched. Reshaping them here would mean knowing what each rule's
+data looks like, which is exactly what the mapping exists to avoid.
+
+##### Authorization
+
+Off the slot's own `authorizations`, as everywhere else: `pipeline/create` gates the run and
+the input, `pipeline/override` and the rule's own `canBeOverridden` gate the override. A user
+without the right sees no button rather than one that fails, and reading is never gated —
+someone who may not deploy can still need to know why a deployment is stuck.
+
+`pipeline/create` and not a right of its own is a deliberate approximation: running a
+deployment needs `SlotPipelineStart` and providing input needs `SlotPipelineData`, neither of
+which the slot publishes as an authorization, and every role that grants `SlotPipelineCreate`
+grants both. The server checks each of them for real; the gate only decides what is worth
+offering.
+
+##### The override keeps its warning
+
+An override bypasses a control somebody configured on purpose and is recorded against the user
+who made it, so the sheet says so as plainly as the desktop dialog does and the reason stays
+**required**. A smaller screen is a reason to be shorter, not a reason to be quieter about the
+one irreversible thing on it.
+
+##### Route map
+
+`/extension/environments/pipeline/[id]` maps to `/mobile/deployment/[id]` — the only entity
+pattern whose id is a UUID rather than a number, and exact for the same reason the others are.
+The mobile screen covers what a phone user does with a deployment and not the desktop pipeline
+page's history, workflows or graph, which is the bar the map sets: the screen exists and does
+the job.
+
+##### Testing it, and the licence
+
+Environments are a **licensed** feature, and the mobile deploy journeys run in CI anyway: the
+Playwright stack (`compose/docker-compose-kdsl.yml`) runs the backend under the `dev` profile,
+and `DevLicenseService` enables every licensed feature. That is why the whole of
+`tests/extensions/environments` already runs there. `mobile.spec.js` drives both journeys end
+to end — an eligible slot and an ineligible one with its reason, the approval, the run, and the
+override with its reason — against real slots and real rules, which is also where the shared
+mapping is exercised for real. The component tests stub it, and cover the half a UI test
+running as the suite's admin account cannot: what an unauthorized user does *not* see.
+
+**The demo seed needs nothing new for this, and that is a decision.** The dataset already
+demonstrates the feature as it stands: `service` has a staging slot requiring `SILVER` and a
+production slot requiring `GOLD` plus a staging deployment plus the `main` branch, and `ui`
+has a production slot whose rules name things that do not exist. Open one of those builds on a
+phone, tap Deploy, and the list shows an eligible slot and ineligible ones each naming the rule
+that refuses — four of the six acceptance criteria on data that is already there.
+
+What it does not demonstrate is **input and override**, and both need a `manual` admission
+rule. Seeding one was considered and rejected on the same two grounds as the promotion level
+fields for #1724. Manual approval is a pre-existing slot-configuration feature the seed has
+never shown, so seeding it would be demonstrating *that* feature rather than this one; and it
+cannot be bolted onto an existing slot, because `DemoSlot.deploy` runs each pipeline all the
+way to `DONE` and a rule waiting on a person fails the reset. Showing it would mean a **new**
+slot with no deployment — either a qualifier the seed's dataset model does not carry, or a
+third environment — and the demo's two environments are a composed picture that the delivery
+map reads and `DemoSeedTest` pins. Adding a third to show one rule would rewrite that picture
+as a side effect. See [demo-seed.md](../demo-seed.md).
 
 ### The account screen
 

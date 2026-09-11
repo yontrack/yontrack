@@ -375,15 +375,23 @@ export default function MobileDeploymentScreen({id}) {
                                                     }
                                                     {
                                                         /*
-                                                         * Both halves: the slot
-                                                         * says whether this user
-                                                         * may override at all,
-                                                         * and the rule says
-                                                         * whether *it* may be -
-                                                         * a rule already
-                                                         * overridden, or one
-                                                         * that passes, is
-                                                         * neither.
+                                                         * A rule that passes, or
+                                                         * one already overridden,
+                                                         * is not overridable -
+                                                         * and the same four
+                                                         * conditions the desktop
+                                                         * `SlotPipelineOverrideRuleButton`
+                                                         * checks, in the same
+                                                         * order. `canBeOverridden`
+                                                         * happens to answer the
+                                                         * same right as the
+                                                         * slot's own
+                                                         * `pipeline/override`
+                                                         * today; both are read,
+                                                         * because which one a
+                                                         * rule-specific answer
+                                                         * would arrive on is the
+                                                         * per-rule one.
                                                          */
                                                         canOverride && blocked &&
                                                         !rule.overridden && rule.canBeOverridden &&

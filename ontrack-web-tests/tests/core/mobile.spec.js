@@ -436,6 +436,138 @@ test.describe('the mobile UI on a phone', () => {
         await expect(page.getByTestId('mobile-build-promotions')).toContainText('GOLD')
     })
 
+    test('a build is deployed from a phone, ineligible environments and all', async ({page, ontrack}) => {
+        // The first half of #1725: the list of where this build can go, why it
+        // cannot go somewhere, and the deployment that comes out of tapping one.
+        //
+        // Environments are a licensed feature. The Playwright stack runs the
+        // backend under the `dev` profile (`compose/docker-compose-kdsl.yml`),
+        // and `DevLicenseService` enables every licensed feature - which is why
+        // the whole of `tests/extensions/environments` runs in CI, and why this
+        // journey can too.
+        const project = await ontrack.createProject()
+
+        // Where the build can go: a slot whose only rule needs a person.
+        const staging = await ontrack.environments.createEnvironment({order: 100})
+        const stagingSlot = await staging.createSlot({project})
+        const approvalId = await ontrack.environments.addManualApproval({slot: stagingSlot})
+
+        // And where it cannot: a slot wanting a promotion this build has not got.
+        const production = await ontrack.environments.createEnvironment({order: 200})
+        const productionSlot = await production.createSlot({project})
+        await ontrack.environments.addPromotionRule({slot: productionSlot, promotion: 'GOLD'})
+
+        const branch = await project.createBranch()
+        await branch.createPromotionLevel('GOLD')
+        const build = await branch.createBuild()
+        await build.setRelease('1.4.0')
+
+        await page.setViewportSize({width: 375, height: 812})
+        await signInOnPhone(page, ontrack)
+        await page.goto(`${ontrack.connection.ui}/mobile/build/${build.id}`)
+
+        await page.getByTestId('mobile-build-deploy').click()
+
+        // Both environments are on offer to *read*, which is the point: hiding
+        // the one that refuses leaves a user wondering where it went.
+        const stagingCard = page.getByTestId(`mobile-deploy-slot-${stagingSlot.id}`)
+        const productionCard = page.getByTestId(`mobile-deploy-slot-${productionSlot.id}`)
+        await expect(stagingCard).toContainText(staging.name)
+        await expect(productionCard).toContainText(production.name)
+
+        // And the one that refuses says why, in the words the desktop UI uses -
+        // the rule summaries are the one thing the two UIs share here.
+        await expect(productionCard).toContainText(/not eligible/i)
+        await expect(productionCard).toContainText(/GOLD/)
+        await expect(page.getByTestId(`mobile-deploy-start-${productionSlot.id}`)).toHaveCount(0)
+
+        // Nothing scrolls sideways at 375px, which every mobile surface has to
+        // meet. Asserted after the cards are up: the sheet is empty until the
+        // slots arrive, and an empty sheet overflows nothing.
+        const overflows = await page.evaluate(() =>
+            document.documentElement.scrollWidth > document.documentElement.clientWidth)
+        expect(overflows).toBe(false)
+
+        // Tapping the eligible one lands on the deployment it just created.
+        await page.getByTestId(`mobile-deploy-start-${stagingSlot.id}`).click()
+        await expect(page).toHaveURL(/\/mobile\/deployment\/[0-9a-f-]{36}$/)
+
+        // Which is waiting on the approval, and says so rather than offering a
+        // button that would fail.
+        const rule = page.getByTestId(`mobile-deployment-rule-${approvalId}`)
+        await expect(rule).toContainText('Blocking')
+        await expect(page.getByTestId('mobile-deployment-run')).toBeDisabled()
+        await expect(page.getByTestId('mobile-deployment-run-blocked')).toContainText('0 of 1')
+
+        // The approval itself, through the rule's own form - the same mapping
+        // the desktop input dialog draws.
+        await page.getByTestId(`mobile-deployment-input-open-${approvalId}`).click()
+        await page.getByTestId('manual-approval').click()
+        await page.getByLabel('Approval message').fill('Checked with the release manager.')
+        await page.getByTestId('mobile-deployment-input-submit').click()
+
+        // The screen refetches: whether the rule now passes is the server's
+        // answer and not something the phone works out.
+        await expect(rule).toContainText('Passed')
+        await expect(page.getByTestId('mobile-deployment-run')).toBeEnabled()
+
+        await page.getByTestId('mobile-deployment-run').click()
+        await expect(page.getByTestId('mobile-deployment-status')).toContainText('Running')
+
+        // And a deployment that is no longer waiting offers nothing: finishing
+        // it is CI's job and cancelling it is the desktop UI's.
+        await expect(page.getByTestId('mobile-deployment-run')).toHaveCount(0)
+        await expect(page.getByTestId('mobile-deployment-settled')).toBeVisible()
+    })
+
+    test('a blocked deployment is overridden from a phone, with a reason', async ({page, ontrack}) => {
+        // The second half of #1725, and the case the whole flow exists for: a
+        // deployment somebody else started - CI, usually - sitting on a manual
+        // approval nobody is going to give.
+        const project = await ontrack.createProject()
+        const environment = await ontrack.environments.createEnvironment({})
+        const slot = await environment.createSlot({project})
+        const approvalId = await ontrack.environments.addManualApproval({slot})
+
+        const branch = await project.createBranch()
+        const build = await branch.createBuild()
+        await build.setRelease('1.4.0')
+        const pipeline = await slot.createPipeline({build})
+
+        await page.setViewportSize({width: 375, height: 812})
+        await signInOnPhone(page, ontrack)
+        await page.goto(`${ontrack.connection.ui}/mobile/build/${build.id}`)
+
+        // Reached from the build screen, which is the only way in: nothing else
+        // on a phone names a deployment somebody else started.
+        const row = page.getByTestId(`mobile-build-candidate-${pipeline.id}`)
+        await expect(row).toContainText(environment.name)
+        await row.getByRole('link').click()
+        await expect(page).toHaveURL(new RegExp(`/mobile/deployment/${pipeline.id}$`))
+
+        const rule = page.getByTestId(`mobile-deployment-rule-${approvalId}`)
+        await expect(rule).toContainText('Blocking')
+
+        // The override, which is refused without a reason.
+        await page.getByTestId(`mobile-deployment-override-open-${approvalId}`).click()
+        await expect(page.getByTestId('mobile-deployment-override-warning')).toBeVisible()
+        await page.getByTestId('mobile-deployment-override-submit').click()
+        await expect(page.getByText('Reason is required.')).toBeVisible()
+
+        await page.getByTestId('mobile-deployment-override-message').fill('Hotfix, agreed with ops.')
+        await page.getByTestId('mobile-deployment-override-submit').click()
+
+        // Recorded against a name and readable on the row, which is the whole
+        // point of making the reason mandatory.
+        await expect(rule).toContainText(/overridden/i)
+        await expect(page.getByTestId(`mobile-deployment-override-message-${approvalId}`))
+            .toContainText('Hotfix, agreed with ops.')
+
+        // There is no second override to offer, and the deployment can now run.
+        await expect(page.getByTestId(`mobile-deployment-override-open-${approvalId}`)).toHaveCount(0)
+        await expect(page.getByTestId('mobile-deployment-run')).toBeEnabled()
+    })
+
     test('a favourite branch on the home screen taps through to itself', async ({page, ontrack}) => {
         const project = await ontrack.createProject()
         const branch = await project.createBranch()
