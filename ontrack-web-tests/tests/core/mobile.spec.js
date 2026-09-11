@@ -7,6 +7,30 @@ const {test} = require("../fixtures/connection");
 /**
  * The mobile UI.
  *
+ * This file is the acceptance of the whole mobile UI initiative, and is meant to
+ * be readable as such. The five journeys the mobile UI exists for, and where
+ * each one is pinned:
+ *
+ * | Journey | Tests |
+ * |---|---|
+ * | Locate a project and a branch | "the home screen is the favourites…", "a user gets from the home screen to a build…" |
+ * | See the latest builds, with their promotions and deployments | "a user gets from the home screen to a build…" (promotions), "a deployed build says where it is…" (deployments), "the build screen carries the promotions, deployments and validations" |
+ * | Search for a build | "a build is found on a branch by name, by promotion, and by both" |
+ * | Promote a build | "a build is promoted from a phone, required fields and all" |
+ * | Deploy a build, with approval and override | "a build is deployed from a phone…", "a blocked deployment is overridden from a phone…" |
+ *
+ * And the shell the five run inside, which has four behaviours of its own: the
+ * redirect ("a phone lands on the mobile shell", and its negative "a desktop
+ * browser is left alone" at the foot of the file), the entity route map ("a link
+ * to a desktop project or branch lands on its mobile screen"), the interstitial
+ * ("a route with no mobile equivalent gets the interstitial"), and the desktop
+ * opt-out with its way back ("a phone can switch to the desktop UI and back
+ * again").
+ *
+ * A journey gaining a screen gains a row here rather than a spec file of its
+ * own: the shell, the theme and the account are shared by all of them, and so
+ * are the fixtures and the hooks below.
+ *
  * The user agent is the whole input to the redirect, so most of this file runs
  * under a phone device rather than the suite's default `Desktop Chrome` - which
  * would exercise none of it. The one test that must *not* look like a phone is
@@ -345,6 +369,81 @@ test.describe('the mobile UI on a phone', () => {
         const overflows = await page.evaluate(() =>
             document.documentElement.scrollWidth > document.documentElement.clientWidth)
         expect(overflows).toBe(false)
+    })
+
+    test('a deployed build says where it is, on the card and on its own screen', async ({page, ontrack}) => {
+        // The other half of "the latest builds with their promotions *and
+        // deployments*". Everything else in this file arranges deployments that
+        // are still waiting on somebody; this one arranges a build that is
+        // actually deployed, which is a different field
+        // (`Build.currentDeployments`) and a different strip on the card.
+        //
+        // A pipeline has to reach DONE for it: `findCurrentDeployments` is the
+        // last *DEPLOYED* pipeline of each of the project's slots, so one
+        // stopping at RUNNING leaves the build deployed nowhere.
+        const project = await ontrack.createProject()
+
+        const staging = await ontrack.environments.createEnvironment({order: 100})
+        const stagingSlot = await staging.createSlot({project})
+
+        // A second slot in another environment, qualified. A project can hold
+        // two slots told apart by nothing but the qualifier, and a badge naming
+        // only the environment would draw the same word twice - which is what
+        // `deploymentName` exists to prevent. It is also the end-to-end half of
+        // #1731: `currentDeployments` could not answer with a qualified slot at
+        // all until the `qualifier` argument lost its empty-string default, so a
+        // build deployed into one showed no badge whatsoever.
+        const production = await ontrack.environments.createEnvironment({order: 200})
+        const productionSlot = await ontrack.environments.createSlot({
+            project,
+            environment: production,
+            qualifier: 'eu',
+        })
+
+        const branch = await project.createBranch()
+        const build = await branch.createBuild()
+        await build.setRelease('1.4.0')
+
+        for (const slot of [stagingSlot, productionSlot]) {
+            const pipeline = await slot.createPipeline({build})
+            await ontrack.environments.startPipeline({pipeline})
+            await ontrack.environments.finishPipeline({pipeline})
+        }
+
+        await page.setViewportSize({width: 375, height: 812})
+        await signInOnPhone(page, ontrack)
+
+        // On the branch screen, where a user scanning the latest builds sees it
+        // without opening anything. The strip is its own test id, so this is not
+        // satisfied by the environment's name turning up somewhere else on the
+        // card.
+        await page.goto(`${ontrack.connection.ui}/mobile/branch/${branch.id}`)
+        const badges = page.getByTestId(`mobile-build-${build.id}-deployments`)
+        await expect(badges).toContainText(staging.name)
+        await expect(badges).toContainText(`${production.name} [eu]`)
+
+        // Two badges plus a release name still do not push the card sideways at
+        // 375px. Asserted after they are up: the deployments arrive with a query
+        // of their own, and an empty card overflows nothing.
+        const overflows = await page.evaluate(() =>
+            document.documentElement.scrollWidth > document.documentElement.clientWidth)
+        expect(overflows).toBe(false)
+
+        // And on the build screen, which spells the same thing out as rows - the
+        // positive case of the "not deployed anywhere" the test above pins.
+        await page.getByTestId(`mobile-build-${build.id}`).getByRole('link').click()
+        await expect(page).toHaveURL(new RegExp(`/mobile/build/${build.id}$`))
+
+        const deployments = page.getByTestId('mobile-build-deployments')
+        await expect(deployments).toContainText(staging.name)
+        await expect(deployments).toContainText(`${production.name} [eu]`)
+        await expect(deployments).not.toContainText(/not deployed/i)
+
+        // Highest environment first, which is the order `findCurrentDeployments`
+        // answers in and the one a reader wants: how far the build got.
+        const rows = deployments.locator('[data-testid^="mobile-build-deployment-"]')
+        await expect(rows).toHaveCount(2)
+        await expect(rows.first()).toContainText(`${production.name} [eu]`)
     })
 
     test('the build actions are gated by what the user may do', async ({page, ontrack}) => {

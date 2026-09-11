@@ -183,6 +183,55 @@ export class EnvironmentsExtension {
         }
     }
 
+    /**
+     * Takes a running pipeline all the way to DONE.
+     *
+     * The counterpart of `startPipeline`, and the only way to arrange a build
+     * that is *currently deployed*: `Build.currentDeployments` is the last
+     * DEPLOYED pipeline of each of the project's slots, so a pipeline stopping
+     * at RUNNING leaves the build deployed nowhere. Everything that reads a
+     * deployment badge needs a build that got this far.
+     *
+     * Every other spec so far has finished a pipeline by clicking the desktop
+     * UI's own button, which is fine when the desktop pipeline page is the
+     * subject and useless when it is only the fixture.
+     *
+     * `forcing: false` is sent although the Kotlin input declares that default:
+     * the generated GraphQL input type makes every non-nullable field required
+     * whatever the Kotlin side defaults it to, so omitting it fails validation.
+     */
+    async finishPipeline({pipeline}) {
+        const data = await graphQLCallMutation(
+            this.ontrack.connection,
+            'finishSlotPipelineDeployment',
+            gql`
+                mutation FinishPipeline(
+                    $pipelineId: String!,
+                ) {
+                    finishSlotPipelineDeployment(input: {
+                        pipelineId: $pipelineId,
+                        forcing: false,
+                    }) {
+                        errors {
+                            message
+                        }
+                        finishStatus {
+                            ok
+                        }
+                    }
+                }
+            `,
+            {
+                pipelineId: pipeline.id,
+            }
+        )
+
+        const status = data.finishSlotPipelineDeployment.finishStatus?.ok
+        if (!status) {
+            throw new Error("Cannot finish pipeline")
+        }
+    }
+
     async addAdmissionRule({slot, description = "", ruleId, ruleConfig}) {
         const data = await graphQLCallMutation(
             this.ontrack.connection,
