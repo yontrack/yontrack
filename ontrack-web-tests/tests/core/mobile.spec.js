@@ -376,11 +376,10 @@ test.describe('the mobile UI on a phone', () => {
         // redirect - which is what the cookie is for.
         await expect(page).toHaveURL(/\/search$/)
 
-        // And that cookie dies with the browser session. The way back below is
-        // the intended escape, but at phone width the desktop UI's page bar
-        // overlaps its own user-menu trigger, so it cannot be relied on; ending
-        // the opt-out with the session is what stops a phone being stranded for
-        // good. Playwright reports -1 for a session cookie.
+        // And that cookie dies with the browser session - a second line behind
+        // the way back below, for everything else that could go wrong with a
+        // desktop UI that is not responsive. Playwright reports -1 for a
+        // session cookie.
         const [optOut] = (await page.context().cookies())
             .filter(cookie => cookie.name === 'yontrack-ui')
         expect(optOut.value).toEqual('desktop')
@@ -394,13 +393,12 @@ test.describe('the mobile UI on a phone', () => {
         // be stranded on it - and once the mobile UI is installed as a PWA there
         // is no address bar to escape with.
         //
-        // Widened first, and only for this step. What is under test is the
-        // *contract* - the entry clears the cookie and the redirect resumes -
-        // and the middleware reads the user agent, which is still a phone's.
-        // At 393px the desktop UI's own page bar overlaps its user-menu trigger,
-        // so the click lands on "New project" instead; that is a property of the
-        // non-responsive desktop UI, not of anything this change added.
-        await page.setViewportSize({width: 1280, height: 800})
+        // Driven at the phone's own viewport, which is the point: this used to
+        // need widening to 1280px first, because the desktop header row grew
+        // past its own 64px box and put the home page's "New project" command
+        // on top of the avatar (#1729). The hit target itself is pinned by
+        // `navBar.spec.js`; what this step proves is the whole round trip, from
+        // a phone, at phone width.
         await selectUserMenu(page, "Mobile version")
         await expect(page).toHaveURL(/\/mobile$/)
         await expect(page.getByTestId('mobile-header')).toBeVisible()

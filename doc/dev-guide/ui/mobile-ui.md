@@ -72,13 +72,18 @@ through rather than sending them to the optimizer, which answers `400` for them.
   desktop UI is stranded on it, and once the mobile UI is installed as a PWA there is no
   address bar to escape with.
 
-  It is a **session** cookie, on purpose. The way back is that user-menu entry — and at phone
-  width the desktop UI's own page bar overlaps its user-menu trigger, so a tap there lands on
-  "New project" instead. The escape hatch is not reliably reachable on the devices it exists
-  for, and making the page bar responsive is precisely the retrofit the mobile UI exists to
-  avoid. Ending the opt-out with the browser session turns "stranded for good" into "stranded
-  until the browser restarts". Once the desktop page bar behaves at narrow widths, this can
-  become a long-lived cookie.
+  That user-menu entry **is** tappable at phone width. It was not when the cookie was first
+  written: the desktop header row grew past its own 64px box and painted over the page bar
+  below, so a tap on the avatar opened the home page's "New project" command instead. #1729
+  fixed the header row and the page bar for that one case — the only responsive work the
+  desktop UI carries, and deliberately the last. `tests/core/navBar.spec.js` pins the hit
+  target at 393px and at 375px.
+
+  It is still a **session** cookie, on purpose, and now as a second line rather than as the
+  only one. The desktop UI is not responsive by design, so the escape hatch is the single
+  thing between a phone user and being stranded; ending the opt-out with the browser session
+  turns "stranded for good" into "stranded until the browser restarts" whatever else breaks
+  around it. Making it long-lived is a decision of its own, not a consequence of #1729.
 
 The decision itself is a pure function in `components/mobile/mobileRedirect.js`, so it can be
 tested without a request or the edge runtime. `middleware.js` is the adapter over it.

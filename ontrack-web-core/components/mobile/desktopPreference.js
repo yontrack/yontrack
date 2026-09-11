@@ -20,17 +20,20 @@ import {MOBILE_HOME} from "@components/mobile/mobileRoutes"
  * No `maxAge` and no `expires`: this is a **session** cookie, and deliberately
  * so, even though the choice would be more convenient if it lasted.
  *
- * The way back is the "Mobile version" entry in the desktop user menu - and at
- * phone width the desktop UI's own page bar overlaps its user-menu trigger, so
- * a tap there lands on "New project" instead. The escape hatch is, in practice,
- * not reachable on the devices it exists for. Fixing that means making the
- * desktop page bar responsive, which is exactly the retrofit the mobile UI
- * exists to avoid, and the desktop UI is frozen for 5.4.
+ * The way back is the "Mobile version" entry in the desktop user menu, and that
+ * trigger *is* reachable at phone width: #1729 fixed the desktop header row so
+ * it can no longer overflow its own 64px box and paint over the page bar below,
+ * and `ontrack-web-tests/tests/core/navBar.spec.js` pins the hit target at
+ * 393px and 375px so it stays that way.
  *
- * Ending the choice with the browser session turns "stranded for good" into
- * "stranded until the browser restarts". The cost is that someone who genuinely
- * prefers the desktop UI is redirected again next session; that is the better
- * failure of the two.
+ * The session scoping stays anyway, as a second line rather than the only one.
+ * Nothing about one non-responsive page bar was ever the whole risk: the desktop
+ * UI is not responsive by design, and the escape hatch is the one thing standing
+ * between a phone user and being stranded. Ending the choice with the browser
+ * session turns "stranded for good" into "stranded until the browser restarts",
+ * whatever else breaks. The cost is that someone who genuinely prefers the
+ * desktop UI is redirected again next session; that is the better failure of the
+ * two, and making the cookie long-lived is a decision of its own.
  */
 const options = {
     path: '/',

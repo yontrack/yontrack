@@ -17,8 +17,11 @@ actually made is the whole deliverable. Silence is not that assertion.
 
 ## Why the question exists at all
 
-The desktop UI has no responsive design — no `useBreakpoint`, no layout media queries, no
-antd responsive grid props — across roughly 1260 components. A phone-shaped app for the four
+The desktop UI has no responsive design — no `useBreakpoint`, no antd responsive grid props,
+and exactly one layout media query — across roughly 1260 components. That one query is
+`.ot-navbar` in `styles/globals.css`: the desktop header's avatar opens the user menu, and
+the user menu holds the only way back to `/mobile`, so it has to be tappable on a phone
+(#1729). It is a bounded exception, not the start of a retrofit. A phone-shaped app for the four
 things people actually do from a phone (check a build, promote it, deploy it, find the branch
 they are on) is a smaller and safer thing to build and maintain than a retrofit of all of
 that.

@@ -621,3 +621,83 @@ button.ot-validation-stamp-filter-edition {
         opacity: 0.45;
     }
 }
+
+/**
+ * The desktop UI's shared header row (`NavBar`), and the ONE place the desktop
+ * UI carries a layout media query.
+ *
+ * The desktop UI is deliberately not responsive - a phone gets the mobile UI at
+ * `/mobile` instead, and retrofitting ~1260 components is exactly what that
+ * exists to avoid. This row is the exception, and the reason is narrow: the
+ * avatar here opens the user menu, and the user menu holds the "Mobile version"
+ * entry, which is the only way back to the mobile UI once a phone has opted
+ * into the desktop one. A trigger that cannot be tapped at phone width strands
+ * that user for the life of the browser session (#1719, #1729).
+ *
+ * It is not licence to make anything else responsive. Anything beyond this row
+ * and the page bar below it belongs to the mobile UI, not to a media query.
+ */
+.ot-navbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    width: 100%;
+    /* A flex item's `min-width: auto` refuses to shrink below its content; this
+       is what lets the search box give way instead of the row overflowing. */
+    min-width: 0;
+}
+
+.ot-navbar-brand {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-shrink: 0;
+}
+
+.ot-navbar-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+
+/* The search box is the only thing in the row that gives. A basis rather than a
+   width: antd's `Input` is `width: 100%` and would otherwise eat whatever the
+   row has left, truncating the name beside it even on a 1280px screen. */
+.ot-navbar-actions .ant-input-group-wrapper {
+    flex: 0 1 260px;
+    min-width: 0;
+}
+
+/* The name is a single line that truncates, never a block that wraps: wrapping
+   it is what grew the row past the header's 64px in the first place. It keeps
+   its width against the search box, and the cap keeps a pathological one from
+   pushing the avatar out of the row. */
+.ot-navbar-user {
+    flex: 0 0 auto;
+    max-width: 20ch;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* The trigger itself. Last to give way, and in practice never. */
+.ot-navbar-avatar {
+    flex-shrink: 0;
+}
+
+/**
+ * Phone width. The wordmark and the user's name step aside so that the logo,
+ * the search box and the avatar fit on the header's single 64px line.
+ *
+ * Hiding rather than shrinking: a 120px wordmark and an ellipsised name eat the
+ * width the search box and the avatar need, and neither is load-bearing - the
+ * logo still links home, and the account is the one the user signed in as.
+ */
+@media (max-width: 600px) {
+    .ot-navbar-wordmark,
+    .ot-navbar-user {
+        display: none;
+    }
+}
