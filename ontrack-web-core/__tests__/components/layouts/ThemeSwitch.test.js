@@ -6,6 +6,16 @@ import {PreferencesContext} from "@components/providers/PreferencesProvider"
 import {MessageContext} from "@components/providers/MessageProvider"
 import {getStoredThemeMode} from "@components/theme/themeStorage"
 
+/**
+ * The desktop switch.
+ *
+ * The dual write it performs - local mirror, then profile, then a warning when
+ * only the first landed - now lives in `useThemeModeSetter`, shared with the
+ * mobile row, and is covered once there. What is left here is what is the
+ * switch's own: the three options, the drawer it must not close, and the id the
+ * UI tests locate it by.
+ */
+
 const stubMatchMedia = (dark) => {
     window.matchMedia = jest.fn().mockImplementation(query => ({
         media: query,
@@ -77,64 +87,32 @@ describe('ThemeSwitch', () => {
         expect(document.documentElement.getAttribute('data-theme')).toEqual('dark')
     })
 
-    it('mirrors the choice locally, so the next first paint does not flash', () => {
-        renderSwitch()
-        pick('Dark')
-        expect(getStoredThemeMode()).toEqual('dark')
-    })
-
-    it('persists the choice server-side, so it follows the user across browsers', () => {
+    it('writes both halves of the persistence, through the shared setter', () => {
+        // The mirror for the next first paint, and the profile so the choice
+        // follows the user to their other devices - including their phone, which
+        // now reads the very same value.
         const {setPreferences} = renderSwitch()
         pick('Dark')
-        // Uppercase: the GraphQL `ThemeMode` enum form.
+        expect(getStoredThemeMode()).toEqual('dark')
         expect(setPreferences).toHaveBeenCalledWith({themeMode: 'DARK'})
     })
 
-    it('persists system mode too, rather than treating it as "unset"', () => {
-        const {setPreferences} = renderSwitch()
+    it('warns when only the local half landed, in the copy both UIs share', async () => {
+        // "another browser" was accurate when this was the only switch there
+        // was. What a user loses now is the choice following them to their
+        // phone, and the mobile row raises the very same warning.
+        const {messageApi} = renderSwitch({
+            setPreferences: jest.fn(() => Promise.reject(new Error('backend down'))),
+        })
         pick('Dark')
-        pick('Auto')
-        expect(setPreferences).toHaveBeenLastCalledWith({themeMode: 'SYSTEM'})
-        expect(getStoredThemeMode()).toEqual('system')
-    })
-
-    describe('when the server rejects the change', () => {
-
-        const failing = () => Promise.reject(new Error('backend down'))
-
-        it('keeps the theme the user just picked rather than snapping it back', async () => {
-            renderSwitch({setPreferences: jest.fn(failing)})
-            pick('Dark')
-            await act(async () => {
-            })
-            expect(resolved()).toEqual('dark')
+        await act(async () => {
         })
-
-        it('says so, instead of failing silently', async () => {
-            // The cookie now disagrees with the server: on the next sign-in the
-            // server wins and the choice vanishes. The user has to be told.
-            const {messageApi} = renderSwitch({setPreferences: jest.fn(failing)})
-            pick('Dark')
-            await act(async () => {
-            })
-            expect(messageApi.warning).toHaveBeenCalled()
-        })
-
-        it('does not leave an unhandled rejection behind', async () => {
-            const onUnhandled = jest.fn()
-            process.on('unhandledRejection', onUnhandled)
-            try {
-                renderSwitch({setPreferences: jest.fn(failing)})
-                pick('Dark')
-                await act(async () => {
-                })
-                // A macrotask: long enough for an unhandled rejection to surface.
-                await new Promise(resolve => setTimeout(resolve, 0))
-                expect(onUnhandled).not.toHaveBeenCalled()
-            } finally {
-                process.off('unhandledRejection', onUnhandled)
-            }
-        })
+        expect(messageApi.warning).toHaveBeenCalledWith(
+            "Theme applied, but not saved to your profile — it may not follow you to other devices."
+        )
+        // And the choice stands: reverting a theme under the user mid-click
+        // would be worse.
+        expect(resolved()).toEqual('dark')
     })
 
     it('does not let the click reach the surrounding menu', () => {
