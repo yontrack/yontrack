@@ -1,6 +1,7 @@
 const {devices, expect} = require('@playwright/test');
 const {login, signInButton} = require("./login");
 const {selectUserMenu} = require("./userMenu");
+const {expectTheme, resetThemeMode} = require("./theme");
 const {test} = require("../fixtures/connection");
 
 /**
@@ -12,9 +13,15 @@ const {test} = require("../fixtures/connection");
  * in its own block.
  *
  * The theme assertions read `data-theme` off <html>: it is what every colour
- * token keys off, and it is set before the first paint. They assume the shared
- * account is in the default `system` theme mode, exactly as `theme.spec.js`
- * does - which is also what leaves that mode behind.
+ * token keys off, and it is set before the first paint.
+ *
+ * This file both reads *and writes* the theme mode - the account screen carries
+ * the control, and one of the tests below drives it. The mode is a server-side
+ * preference on the shared account and the runner is single-worker and
+ * non-parallel, so a test leaving `DARK` behind would drive every spec scheduled
+ * after this one in the dark theme. The hooks below reset it on both sides of
+ * every test, out of `./theme`, which `theme.spec.js` shares: there is one
+ * `themeMode` for both UIs, so neither file can rely on the other cleaning up.
  */
 
 /*
@@ -59,6 +66,22 @@ const signBackInOnPhone = async (page, ontrack) => {
         await page.getByRole("button", {name: "Sign In", exact: true}).click()
     }
 }
+
+/**
+ * Picks a mode on the account screen's theme row.
+ *
+ * Scoped to the control's own test id: an unscoped `getByText` would also match
+ * Next's route announcer, which repeats a page title on top of everything else
+ * on the screen.
+ */
+const selectMobileTheme = async (page, label) => {
+    const control = page.getByTestId('mobile-theme-switch')
+    await expect(control).toBeVisible()
+    await control.getByText(label, {exact: true}).click()
+}
+
+test.beforeEach(async ({ontrack}) => resetThemeMode(ontrack))
+test.afterEach(async ({ontrack}) => resetThemeMode(ontrack))
 
 test.describe('the mobile UI on a phone', () => {
 
@@ -424,6 +447,77 @@ test.describe('the mobile UI on a phone', () => {
         // interstitial does - and is deliberately not a fourth tab.
         for (const tab of ['mobile-nav-home', 'mobile-nav-projects']) {
             await expect(page.getByTestId(tab)).not.toHaveAttribute('aria-current', 'page')
+        }
+    })
+
+    test('a phone user can choose dark, and the choice survives a reload', async ({page, ontrack}) => {
+        // Until this row the mobile UI had the whole theme machinery and no way
+        // to reach it: a phone user got whatever the device decided.
+        await page.emulateMedia({colorScheme: 'light'})
+        await signInOnPhone(page, ontrack)
+        await page.goto(`${ontrack.connection.ui}/mobile`)
+
+        // Tapped through to, as a user reaches it - the header name is the door.
+        // Waited for first: the name arrives with `UserContext`, a query after
+        // the header itself paints.
+        const name = page.getByTestId('mobile-user')
+        await expect(name).toBeVisible()
+        await name.click()
+        await expect(page).toHaveURL(/\/mobile\/account$/)
+        await expectTheme(page, 'light')
+
+        await selectMobileTheme(page, "Dark")
+        // Immediately - no reload.
+        await expectTheme(page, 'dark')
+        // And a phone has no hover, so the mode says what it means in the open.
+        await expect(page.getByTestId('mobile-theme-caption')).toHaveText("Always dark")
+
+        await page.reload()
+        await expect(page.getByTestId('mobile-theme-switch')).toBeVisible()
+        await expectTheme(page, 'dark')
+    })
+
+    test('Auto says which theme it is currently resolving to', async ({page, ontrack}) => {
+        // The caption is the whole of Auto's legibility on a touch screen: the
+        // desktop defines the mode in a tooltip, which a phone cannot reach.
+        await page.emulateMedia({colorScheme: 'dark'})
+        await signInOnPhone(page, ontrack)
+        await page.goto(`${ontrack.connection.ui}/mobile/account`)
+
+        await selectMobileTheme(page, "Auto")
+        await expectTheme(page, 'dark')
+        await expect(page.getByTestId('mobile-theme-caption')).toHaveText("Auto — currently dark")
+
+        // And it tracks the operating system live, without a reload - the
+        // provider subscribes to the media query, and the caption reads the
+        // resolved theme rather than the mode.
+        await page.emulateMedia({colorScheme: 'light'})
+        await expectTheme(page, 'light')
+        await expect(page.getByTestId('mobile-theme-caption')).toHaveText("Auto — currently light")
+    })
+
+    test('a theme chosen on the phone is the theme the desktop UI is in', async ({page, ontrack, browser}) => {
+        // The assertion that pins the shared-preference decision. The theme is a
+        // preference of the *user*, not of the device - one `themeMode` on the
+        // account - and without this, "one preference" is a sentence in a spec
+        // that nothing enforces: the day someone adds a mobile-only cookie, no
+        // test notices.
+        await page.emulateMedia({colorScheme: 'light'})
+        await signInOnPhone(page, ontrack)
+        await page.goto(`${ontrack.connection.ui}/mobile/account`)
+        await selectMobileTheme(page, "Dark")
+        await expectTheme(page, 'dark')
+
+        // A brand new context, and a desktop user agent so the redirect leaves
+        // it alone: no cookies, no local storage. Only the server-side
+        // preference can carry the choice across.
+        const context = await browser.newContext({colorScheme: 'light'})
+        try {
+            const desktop = await context.newPage()
+            await login(desktop, ontrack)
+            await expectTheme(desktop, 'dark')
+        } finally {
+            await context.close()
         }
     })
 

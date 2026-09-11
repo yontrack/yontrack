@@ -1,16 +1,22 @@
 const {expect} = require('@playwright/test');
 const {login} = require("./login");
 const {test} = require("../fixtures/connection");
-const {graphQLCallMutation} = require("@ontrack/graphql");
+const {expectTheme, resetThemeMode} = require("./theme");
 
 /**
+ * The desktop theme switch, in the user menu.
+ *
  * The resolved theme is published as `data-theme` on <html>: it is what every
  * colour token keys off, and it is set before the first paint. Asserting on it
  * is therefore asserting on what the user actually sees, without depending on
- * any one component's colours.
+ * any one component's colours - `expectTheme` in `./theme` is that assertion.
  *
  * Every test pins `colorScheme` explicitly: the default mode is `system`, so
  * otherwise the expectations would depend on the machine running the tests.
+ *
+ * The mode is a server-side preference on the shared account, so both hooks
+ * below reset it. `mobile.spec.js` writes the very same value from
+ * `/mobile/account`, which is why the reset lives in `./theme` rather than here.
  */
 
 const themeSwitch = (page) => page.locator('#theme-switch')
@@ -28,39 +34,6 @@ const selectTheme = async (page, label) => {
 const closeUserMenu = async (page) => {
     await page.keyboard.press('Escape')
     await expect(themeSwitch(page)).toBeHidden()
-}
-
-const expectTheme = async (page, theme) =>
-    expect(page.locator('html')).toHaveAttribute('data-theme', theme)
-
-/**
- * The theme is a *server-side* preference on the shared account, so these tests
- * are not self-contained the way a normal spec is - they mutate state that
- * outlives the browser context.
- *
- * Reset on both sides of every test, and deliberately so:
- *
- *   - `beforeEach` makes each test independent of whatever ran before it,
- *     including a previous run that crashed or was interrupted part-way. Without
- *     it, a leftover `DARK` makes the very first assertion below fail with no
- *     hint that the cause is stale state rather than the code under test.
- *   - `afterEach` keeps the rest of the suite clean: the runner is single-worker
- *     and non-parallel, so every spec file scheduled after this one would
- *     otherwise drive the UI in whatever theme the last test left behind.
- *
- * The management token is issued for the same account the UI logs in as, so
- * resetting through the API puts back exactly what the UI changed.
- */
-const resetThemeMode = async (ontrack) => {
-    await graphQLCallMutation(
-        ontrack.connection,
-        'setPreferences',
-        `mutation ResetThemeMode {
-            setPreferences(input: {themeMode: SYSTEM}) {
-                errors { message }
-            }
-        }`,
-    )
 }
 
 test.beforeEach(async ({ontrack}) => resetThemeMode(ontrack))

@@ -128,7 +128,7 @@ the interstitial, which may well be right, but should be a choice rather than an
 | Project | `/mobile/project/[id]` | The project's branches, limited and filterable |
 | Branch | `/mobile/branch/[id]` | The branch's latest builds, as cards, searchable |
 | Build | `/mobile/build/[id]` | The decision surface: promotions, deployments, validations |
-| Account | `/mobile/account` | Who is signed in, the version, and sign out |
+| Account | `/mobile/account` | Who is signed in, the theme, the version, and sign out |
 | Interstitial | `/mobile/desktop-only` | A route with no mobile equivalent |
 
 Home → project → branch → build is the path the mobile UI exists for, and all of it stays
@@ -337,8 +337,8 @@ the two action issues land, each `onClick` becomes its dialog and the caption go
 
 ### The account screen
 
-`/mobile/account` is who is signed in, the version, and **sign out** — and nothing else. It is
-reached by tapping the signed-in name in the header, and from nowhere else.
+`/mobile/account` is who is signed in, the **appearance**, the version, and **sign out** — and
+nothing else. It is reached by tapping the signed-in name in the header, and from nowhere else.
 
 Until it landed there was no way to sign out of the mobile UI at all: `signOut` appeared
 nowhere under `components/mobile/` or `app/mobile/`, the only deliberate call being the
@@ -363,8 +363,8 @@ marking it as a door. The name stays in the header; on a shared or long-lived ph
 is still the one thing worth the space.
 
 **What it holds.** The identity — full name and username as the screen's head, email as
-context, all three already on `UserContext` — and the version (`useRefData().version`) as
-secondary text at the foot. The version earns its row because of the PWA: no address bar, no
+context, all three already on `UserContext` — the **Appearance** section below, and the version
+(`useRefData().version`) as secondary text at the foot. The version earns its row because of the PWA: no address bar, no
 user menu, and "what version are you on?" is the first question on any support thread. It is
 also where the desktop user menu puts it. The desktop's own user-profile page
 (`/core/admin/userProfile`) is API tokens and groups; neither belongs on a phone and neither
@@ -408,8 +408,72 @@ The `yontrack-ui=desktop` cookie is left entirely alone by sign out. It is a *de
 and signing out is a *user* action; clearing it would move the next person to pick up the phone
 between UIs as a side effect of someone else's logout.
 
-This screen is also where **#1732**'s dark/light control lands — a row between the identity head
-and sign out. That issue's open question was where the control lives, and this is the answer.
+#### Appearance: the theme is a user preference, not a device one
+
+The **Appearance** section sits between the identity head and sign out (#1732). Sign out stays
+the last thing on the screen and the only destructive one: a preference placed after it would
+sit on the path a thumb travels past. The section title costs one line and is what makes the
+screen read as *account and preferences* rather than as a sign-out button with something bolted
+above it.
+
+Until it landed, the mobile UI had the whole theme machinery and no affordance at all —
+`ThemeProvider`, `themeMode.js`, the cookie mirror and `ThemePreferenceSync` are all in
+`MobileProviders`, and `themeInitScript` resolves the theme before the first paint — so a phone
+user got whatever the device decided and could not change it. The desktop offers `ThemeSwitch`
+in the user menu; the mobile shell deliberately carries no user menu.
+
+**One `themeMode`, shared.** The mirror cookie is set at `path: '/'` and the server preference is
+a single field on the account, so choosing Dark on the phone darkens that account's desktop UI,
+in every browser — and a user who set Dark on their desktop already found the phone dark. That
+is the intent. The alternative reading — a phone in bed at night is not a desk at noon — would
+mean a second cookie, a second GraphQL field and a migration, to serve a preference nobody has
+asked for. It is also what settles *where* the control belongs: this screen draws a line twice
+already, declining the desktop-version opt-out and leaving `yontrack-ui=desktop` alone on sign
+out, because those are **device** choices. The theme is on the user's side of that line.
+`mobile.spec.js` asserts it directly — a choice made on the phone, read back from a fresh
+desktop context — because otherwise "one preference" is a sentence nothing enforces.
+
+**A new component, `MobileThemeSwitch`, not `ThemeSwitch`.** The desktop one hard-codes
+`id="theme-switch"`, which `theme.spec.js` locates by, and carries a `stopPropagation` whose
+only purpose is keeping the desktop drawer open. Reusing it would cross the boundary above.
+What *is* shared is the **write**: `useThemeModeSetter` in `components/theme/` performs the dual
+write both UIs need — apply locally, then save to the profile, then warn if only the first
+landed — and is called by `ThemeSwitch` and by the mobile row alike. Those two halves are
+precisely the thing that must never drift now that they are one value, and extracting the hook
+carries the desktop's failure-path coverage to the mobile control instead of leaving it
+desktop-only.
+
+**Three modes, not a toggle.** Light / Dark / Auto, as an antd `Segmented`, the same vocabulary
+as the desktop — round-tripping one shared value through two vocabularies cannot work, and a
+user who picked Auto on the desktop would find the phone control showing something untrue.
+`system` is also `DEFAULT_THEME_MODE`, the state every user who has never picked is in, so a
+binary switch could express neither it nor the way back to it.
+
+**A caption, because a phone has no hover.** `ThemeSwitch` puts the only explanation any mode
+ever gets inside a `Tooltip` — "Follow the theme of your operating system" is the one place Auto
+is defined — and on a touch screen that text is unreachable. The tooltips are dropped here and
+replaced by one line of secondary text: `Always light`, `Always dark`, or
+`Auto — currently dark` / `Auto — currently light`. It is present in **every** mode, not only in
+Auto: a caption that appeared and disappeared would change the row's height as the user taps
+across it, which on this screen means sign out moves under their thumb as a side effect of
+choosing a theme. The Auto half tracks the OS live — `ThemeProvider` subscribes to
+`matchMedia('(prefers-color-scheme: dark)')`, so `resolvedTheme` and the caption with it change
+without a reload.
+
+**The failure path is unchanged**: the choice applies locally first and stands even if the
+mutation fails, because reverting a theme under the user mid-tap would be worse — but it does
+not fail silently, since the cookie now disagrees with the server and on the next sign-in the
+server wins. The wording changed for **both** UIs: "Theme applied, but not saved to your profile
+— it may not follow you to other devices." The previous text said "another browser", which was
+accurate when the switch was a desktop control and is not accurate now that what the user loses
+is the choice following them to their phone.
+
+**Test isolation.** The theme is server-side state on the shared account and Playwright runs
+`workers: 1, fullyParallel: false`, so a spec leaving `DARK` behind drives every spec after it
+in the dark theme. `mobile.spec.js` used to only *read* the mode and relied on `theme.spec.js`
+resetting it; this row is what makes it a writer, so the reset moved into `tests/core/theme.js`
+and **both** specs call it in `beforeEach` and `afterEach`. One shared value means neither file
+can rely on the other cleaning up.
 
 ### Filtering a long list
 

@@ -88,6 +88,31 @@ describe('the mobile account screen', () => {
         })
     })
 
+    describe('appearance', () => {
+
+        it('offers the theme control', () => {
+            // The mobile UI has the whole theme machinery mounted and, until
+            // this row, no affordance at all: a phone user got whatever the
+            // device decided.
+            renderScreen({user: ADMIN})
+            expect(screen.getByTestId('mobile-theme-switch')).toBeInTheDocument()
+        })
+
+        it('puts it between the identity and sign out', () => {
+            // Sign out stays the last thing on the screen and the only
+            // destructive one. A preference placed after it would sit on the
+            // path a thumb travels past.
+            renderScreen({user: ADMIN})
+            const section = screen.getByTestId('mobile-account-appearance')
+            const signOut = screen.getByTestId('mobile-account-sign-out')
+            const email = screen.getByTestId('mobile-account-email')
+            expect(email.compareDocumentPosition(section))
+                .toBe(Node.DOCUMENT_POSITION_FOLLOWING)
+            expect(section.compareDocumentPosition(signOut))
+                .toBe(Node.DOCUMENT_POSITION_FOLLOWING)
+        })
+    })
+
     describe('signing out', () => {
 
         it('fires immediately, with no confirmation to get past', () => {

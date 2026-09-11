@@ -1,7 +1,8 @@
 "use client"
 
 /**
- * The account screen: who is signed in, and the way to stop being signed in.
+ * The account screen: who is signed in, how the app looks, and the way to stop
+ * being signed in.
  *
  * **A screen rather than a drawer.** A drawer is the desktop pattern
  * (`UserMenu`), and importing it would cross the boundary the mobile shell is
@@ -11,10 +12,16 @@
  * destinations are what the bar carries, and a tab is earned by a screen someone
  * returns to, not by a settings page.
  *
- * **What it holds, and what it does not.** The identity, the version, and sign
- * out. The desktop's own user-profile page (`/core/admin/userProfile`) is API
- * tokens and groups, and neither belongs on a phone; nothing else from the
- * desktop user menu arrives here.
+ * **What it holds, and what it does not.** The identity, the appearance, the
+ * version, and sign out. The desktop's own user-profile page
+ * (`/core/admin/userProfile`) is API tokens and groups, and neither belongs on a
+ * phone; nothing else from the desktop user menu arrives here.
+ *
+ * The theme control is here because the theme is a preference of the *user*,
+ * not of the device - one `themeMode` on the account, shared with the desktop
+ * UI. That is the same line this screen already draws twice, in declining the
+ * desktop-version opt-out and in leaving the `yontrack-ui=desktop` cookie alone
+ * on sign out; the theme falls on the other side of it.
  *
  * The version earns its row because of the PWA: no address bar, no user menu,
  * and "what version are you on?" is the first question on any support thread.
@@ -41,6 +48,8 @@ import {signOut} from "next-auth/react"
 import {UserContext} from "@components/providers/UserProvider"
 import {useRefData} from "@components/providers/RefDataProvider"
 import MobileScreen from "@components/mobile/layout/MobileScreen"
+import MobileSection from "@components/mobile/layout/MobileSection"
+import MobileThemeSwitch from "@components/mobile/account/MobileThemeSwitch"
 import {MOBILE_HOME} from "@components/mobile/mobileRoutes"
 
 export default function MobileAccountScreen() {
@@ -90,10 +99,16 @@ export default function MobileAccountScreen() {
             }
 
             {/*
-              #1732 - the dark/light control on a phone - adds its row between
-              the identity above and the sign out below. This screen is the
-              answer to that issue's open question of where the control lives.
+              Between the identity above and the sign out below. Sign out stays
+              the last thing on the screen and the only destructive one: a
+              preference placed after it would sit on the path a thumb travels
+              past. The section title is what makes the screen read as *account
+              and preferences* rather than as a sign-out button with something
+              bolted above it.
             */}
+            <MobileSection title="Appearance" testId="mobile-account-appearance">
+                <MobileThemeSwitch/>
+            </MobileSection>
 
             <Button
                 block
