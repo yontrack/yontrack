@@ -403,7 +403,12 @@ test.describe('the mobile UI on a phone', () => {
 
         // It used to be 13px of text at 0.85 opacity with no affordance at all.
         // The whole header row is the target now, not the glyph.
+        //
+        // Waited for first: the name arrives with `UserContext`, a query and a
+        // fetch after the header itself paints, and `boundingBox` answers `null`
+        // for an element that is not there yet rather than waiting for one.
         const name = page.getByTestId('mobile-user')
+        await expect(name).toBeVisible()
         const box = await name.boundingBox()
         expect(box.height).toBeGreaterThanOrEqual(44)
 
