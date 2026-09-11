@@ -107,6 +107,15 @@ Every change follows this lifecycle, end to end — don't stop after step 2:
 a checklist item, not automation: a rule guessing which features need a demo would be wrong in both
 directions, so decide, and say which way you decided. `doc/dev-guide/demo-seed.md` says how.
 
+**A change to the web UI is not done until it has accounted for the mobile UI.** Yontrack serves
+two UIs from one instance — the desktop one at the root and a phone-sized one under `/mobile` — and
+a change to one of them states whether it affects the other, and says which way it decided. Most
+desktop changes have no mobile impact, and "no mobile impact, because …" is a complete answer;
+**silence is not**. Like the demo item this is a checklist item, not automation: a rule guessing
+which desktop changes need a mobile counterpart would be wrong in both directions, so decide, and
+say which way you decided. `doc/dev-guide/ui/mobile-impact.md` says how to judge it — what the two
+UIs share, what the mobile UI reads, and why adding a desktop route is itself a mobile decision.
+
 ### Issue status labels
 
 Issues carry exactly one `status:*` label at a time. The four the agent workflow drives are:

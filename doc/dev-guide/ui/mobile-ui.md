@@ -5,6 +5,10 @@ phone-sized one under `/mobile`. This page describes the shell they share the in
 through — the redirect, the boundary between them, and the route map that decides what a
 phone sees. The mobile screens themselves are documented as they land.
 
+> Working on the **desktop** UI and answering the Definition of done's mobile question?
+> [Judging mobile impact](mobile-impact.md) is the shorter page for that: what the two UIs
+> share, what the mobile UI reads, and which changes reach it.
+
 ## Why two UIs rather than one responsive one
 
 The desktop UI has no responsive design at all: no `useBreakpoint`, no layout media queries,
