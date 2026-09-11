@@ -223,9 +223,16 @@ interface SlotService {
     fun findHighestDeployedSlotPipelinesByBuildAndQualifier(build: Build): Set<SlotPipeline>
 
     /**
-     * Given one build and one qualifier, gets the list of currently deployed pipelines for this build.
+     * Gets the list of currently deployed pipelines for this build.
+     *
+     * @param build Build to get the current deployments for
+     * @param qualifier If not null, keeps only the slots having this exact qualifier. Null - the
+     *                  default - means *any* qualifier, in line with [findSlotsByProject]. Note that
+     *                  the empty string is a qualifier like any other (the default one) and is
+     *                  therefore a filter, not a wildcard.
+     * @return List of deployments, sorted by decreasing environment order
      */
-    fun findCurrentDeployments(build: Build, qualifier: String): List<SlotPipeline>
+    fun findCurrentDeployments(build: Build, qualifier: String? = null): List<SlotPipeline>
 
     /**
      * Finds all the slots for the given project and optional qualifier.

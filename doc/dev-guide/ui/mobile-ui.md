@@ -209,14 +209,20 @@ it happened, how far it has been promoted, and where it is deployed.
   a phone user has; the pipeline history is a desktop surface. **Asked for in a query of its
   own** — see below.
 
-  **Known gap: qualified slots are not shown.** `currentDeployments` declares its `qualifier`
-  argument with a default of `""`, and `findSlotsByProject` treats that as a *strict* filter
-  rather than as "any", so the field only ever answers with unqualified slots — a build
-  deployed into a qualified one shows no badge. The two honest alternatives are both worse
-  for now: `slotPipelines(status: DEPLOYED)` answers with deployments since superseded by a
-  newer build, and reproducing "last deployed pipeline per slot, if it is this build" over
-  `Build.slots` puts a server rule in a second place. Fixing the argument's default is a
-  backend change with its own blast radius.
+  **A badge names the environment *and* the qualifier** — `production [demo]`, through the
+  desktop UI's own `slotNameWithoutProject`. A project can have two slots in one environment,
+  told apart by nothing but the qualifier, so an environment name on its own would draw the
+  same badge twice and say nothing about the difference. `deploymentName` in
+  `useMobileDeployments` is the one place that formats it, for the card and the build screen
+  alike.
+
+  This used to be a known gap rather than a feature: `currentDeployments` declared its
+  `qualifier` argument with a default of `""`, and `findSlotsByProject` treats a qualifier as
+  a *strict* filter rather than as "any", so the field could only ever answer with unqualified
+  slots and a build deployed into a qualified one showed no badge at all. #1731 dropped the
+  default — an omitted `qualifier` now means any qualifier, matching the sibling
+  `Build.slots(qualifier:)` field. Callers that genuinely want one qualifier still pass it
+  explicitly, and `qualifier: ""` still means the default one.
 - Validation status is deliberately absent: per-stamp status is the build screen's job, and a
   strip of validation chips here would rebuild the matrix one card at a time.
 

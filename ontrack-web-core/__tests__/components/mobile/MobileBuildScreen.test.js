@@ -37,10 +37,10 @@ const promotion = (id, levelId, name, {time = '2024-03-01T10:00:00Z', user = 'ad
     promotionLevel: {id: levelId, name, image: false},
 })
 
-const deployment = (id, environmentName) => ({
+const deployment = (id, environmentName, qualifier = '') => ({
     id,
     end: '2024-03-02T10:00:00Z',
-    slot: {id: `slot-${id}`, environment: {id: environmentName, name: environmentName}},
+    slot: {id: `slot-${id}`, qualifier, environment: {id: environmentName, name: environmentName}},
 })
 
 const validation = (stampId, stampName, statusId, {time = '2024-03-01T11:00:00Z'} = {}) => ({
@@ -163,6 +163,21 @@ describe('the mobile build screen', () => {
             build({deployments: [deployment(800, 'production')]})
             render(<MobileBuildScreen id="100"/>)
             expect(screen.getByTestId('mobile-build-deployment-800')).toHaveTextContent('production')
+        })
+
+        it('names the qualifier beside the environment', () => {
+            // A project can have two slots in one environment, told apart by
+            // nothing but the qualifier - so an environment name on its own
+            // would draw the same row twice and say nothing about either.
+            build({deployments: [deployment(800, 'production'), deployment(801, 'production', 'demo')]})
+            render(<MobileBuildScreen id="100"/>)
+            expect(screen.getByTestId('mobile-build-deployment-801')).toHaveTextContent('production [demo]')
+        })
+
+        it('leaves the unqualified deployment unadorned', () => {
+            build({deployments: [deployment(800, 'production')]})
+            render(<MobileBuildScreen id="100"/>)
+            expect(screen.getByTestId('mobile-build-deployment-800')).not.toHaveTextContent('[')
         })
 
         it('says so when it is deployed nowhere', () => {

@@ -373,8 +373,8 @@ class SlotServiceImpl(
         return highestPipelinePerQualifier.values.toSet()
     }
 
-    override fun findCurrentDeployments(build: Build, qualifier: String): List<SlotPipeline> {
-        // Finds the slots for the corresponding project & qualifier
+    override fun findCurrentDeployments(build: Build, qualifier: String?): List<SlotPipeline> {
+        // Finds the slots for the corresponding project & qualifier (null meaning any qualifier)
         val slots: Set<Slot> = findSlotsByProject(build.project, qualifier = qualifier)
         // For each slot, gets the last DEPLOYED pipeline and uses it
         // if for the given build

@@ -2,7 +2,6 @@ package net.nemerosa.ontrack.extension.environments.ui
 
 import graphql.schema.GraphQLFieldDefinition
 import net.nemerosa.ontrack.extension.environments.EnvironmentsLicense
-import net.nemerosa.ontrack.extension.environments.Slot
 import net.nemerosa.ontrack.extension.environments.SlotPipeline
 import net.nemerosa.ontrack.extension.environments.SlotPipelineStatus
 import net.nemerosa.ontrack.extension.environments.service.SlotService
@@ -55,11 +54,21 @@ class GQLBuildSlotPipelinesFieldContributor(
                 GraphQLFieldDefinition.newFieldDefinition()
                     .name("currentDeployments")
                     .description("Gets the list of slots where this build is actually deployed")
-                    .argument(stringArgument(ARG_QUALIFIER, "Qualifier to use", defaultValue = Slot.DEFAULT_QUALIFIER))
+                    /*
+                     * No default value, deliberately. The argument used to default to the *empty*
+                     * qualifier, and `findSlotsByProject` treats a qualifier as a strict filter
+                     * rather than as "any" - so the field could never answer with a deployment into
+                     * a qualified slot, and every such deployment was silently missing from every
+                     * caller (#1731). Omitting the argument now means "any qualifier", which is what
+                     * the sibling `Build.slots(qualifier:)` field and `findSlotsByProject`'s own
+                     * contract already meant. Callers wanting the old behaviour pass `qualifier: ""`
+                     * explicitly, which still filters on the default qualifier.
+                     */
+                    .argument(stringArgument(ARG_QUALIFIER, "Qualifier to filter on. Any qualifier if not provided."))
                     .type(listType(SlotPipeline::class.toTypeRef()))
                     .dataFetcher { env ->
                         val build: Build = env.getSource()!!
-                        val qualifier = env.getArgument<String>(ARG_QUALIFIER) ?: Slot.DEFAULT_QUALIFIER
+                        val qualifier: String? = env.getArgument(ARG_QUALIFIER)
                         slotService.findCurrentDeployments(build, qualifier)
                     }
                     .build(),

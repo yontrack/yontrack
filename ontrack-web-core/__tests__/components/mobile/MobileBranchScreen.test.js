@@ -43,9 +43,13 @@ const build = (id, name, {displayName, time, promotions = [], deployments = []} 
         id: runId,
         promotionLevel: {id: levelId, name: levelName, image: false},
     })),
-    currentDeployments: deployments.map(([pipelineId, environmentName]) => ({
+    currentDeployments: deployments.map(([pipelineId, environmentName, qualifier = '']) => ({
         id: pipelineId,
-        slot: {id: `slot-${pipelineId}`, environment: {id: environmentName, name: environmentName}},
+        slot: {
+            id: `slot-${pipelineId}`,
+            qualifier,
+            environment: {id: environmentName, name: environmentName},
+        },
     })),
 })
 
@@ -153,6 +157,17 @@ describe('the mobile branch screen', () => {
         branch([build(100, '1', {deployments: [[800, 'staging']]})])
         render(<MobileBranchScreen id="10"/>)
         expect(screen.getByTestId('mobile-deployment-800')).toHaveTextContent('staging')
+    })
+
+    it('tells two slots of one environment apart by their qualifier', () => {
+        // The whole point of #1731: `currentDeployments` now answers with
+        // qualified slots too, and two deployments of one build into one
+        // environment would otherwise be the same badge twice.
+        branch([build(100, '1', {deployments: [[800, 'staging'], [801, 'staging', 'demo']]})])
+        render(<MobileBranchScreen id="10"/>)
+        expect(screen.getByTestId('mobile-deployment-800')).toHaveTextContent('staging')
+        expect(screen.getByTestId('mobile-deployment-800')).not.toHaveTextContent('[')
+        expect(screen.getByTestId('mobile-deployment-801')).toHaveTextContent('staging [demo]')
     })
 
     it('keeps the builds when the instance has no environments feature', () => {

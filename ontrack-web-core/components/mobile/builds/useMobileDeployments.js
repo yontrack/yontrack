@@ -24,6 +24,7 @@
 
 import {gql} from "graphql-request"
 import {useQuery} from "@components/services/GraphQL"
+import {slotNameWithoutProject} from "@components/extension/environments/SlotName"
 
 /** The slot fields a deployment badge or row needs. */
 const DEPLOYMENT_FIELDS = `
@@ -31,12 +32,37 @@ const DEPLOYMENT_FIELDS = `
     end
     slot {
         id
+        qualifier
         environment {
             id
             name
         }
     }
 `
+
+/**
+ * What to call a deployment on screen.
+ *
+ * Beside `DEPLOYMENT_FIELDS` rather than beside either of the two components
+ * that draw it, because the fields and the label that reads them are two halves
+ * of one fact: the qualifier is in the label only because the query asks for it.
+ *
+ * The qualifier is not decoration. A project can have **two slots in the same
+ * environment**, told apart by nothing else - so a build deployed into both
+ * would otherwise draw the same badge twice and say nothing about the
+ * difference. `currentDeployments` used to answer with unqualified slots only
+ * (#1731), which is why a mobile badge could get away with the environment name
+ * alone until now.
+ *
+ * The format - `production [demo]` - is the desktop UI's, through the shared
+ * `slotNameWithoutProject`: one rule for naming a slot, in one place.
+ *
+ * @param {Object} pipeline A deployment, as `DEPLOYMENT_FIELDS` selects it.
+ * @returns {string} The empty string when the slot or its environment is
+ *   missing - a badge is not worth crashing a screen over.
+ */
+export const deploymentName = (pipeline) =>
+    pipeline?.slot?.environment?.name ? slotNameWithoutProject(pipeline.slot) : ''
 
 /**
  * One build's current deployments.

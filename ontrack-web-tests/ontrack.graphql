@@ -556,8 +556,8 @@ type Build implements Authorizable & ProjectEntity {
   creation: Signature
   "Gets the list of slots where this build is actually deployed"
   currentDeployments(
-    "Qualifier to use"
-    qualifier: String = ""
+    "Qualifier to filter on. Any qualifier if not provided."
+    qualifier: String
   ): [SlotPipeline!]!
   "List of decorations"
   decorations(

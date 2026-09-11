@@ -25,6 +25,7 @@ import {FaServer} from "react-icons/fa"
 import TimestampText from "@components/common/TimestampText"
 import {PromotionLevelImage} from "@components/promotionLevels/PromotionLevelImage"
 import {mobileBuildUri} from "@components/mobile/mobileRoutes"
+import {deploymentName} from "@components/mobile/builds/useMobileDeployments"
 
 /**
  * The size a promotion medal is drawn at on a phone.
@@ -107,17 +108,15 @@ export default function MobileBuildCard({build, deployments = []}) {
                                     <FaServer/>
                                 </span>
                                 {/*
-                                  No qualifier beside the environment, because
-                                  there can never be one here: `currentDeployments`
-                                  defaults its `qualifier` argument to `""` and
-                                  `findSlotsByProject` treats that as a strict
-                                  filter, so every slot it answers with is the
-                                  unqualified one. That also means a deployment
-                                  into a *qualified* slot is not shown at all -
-                                  see `doc/dev-guide/ui/mobile-ui.md`.
+                                  The qualifier goes beside the environment, and
+                                  has to: a project can have two slots in the
+                                  same environment and nothing but the qualifier
+                                  tells them apart, so a build deployed into both
+                                  would draw the same badge twice. See
+                                  `deploymentName`.
                                 */}
                                 <span className="ot-mobile-badge-text">
-                                    {pipeline.slot?.environment?.name}
+                                    {deploymentName(pipeline)}
                                 </span>
                             </span>
                         )

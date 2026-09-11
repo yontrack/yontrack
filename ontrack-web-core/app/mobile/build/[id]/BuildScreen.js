@@ -29,7 +29,7 @@ import MobileSectionList from "@components/mobile/layout/MobileSectionList"
 import MobileAsyncContent from "@components/mobile/layout/MobileAsyncContent"
 import {MobileEntityRow} from "@components/mobile/entities/MobileEntityList"
 import MobileBuildActions from "@components/mobile/builds/MobileBuildActions"
-import {useMobileBuildDeployments} from "@components/mobile/builds/useMobileDeployments"
+import {deploymentName, useMobileBuildDeployments} from "@components/mobile/builds/useMobileDeployments"
 import TimestampText from "@components/common/TimestampText"
 import {PromotionLevelImage} from "@components/promotionLevels/PromotionLevelImage"
 import ValidationChip from "@components/primitives/ValidationChip"
@@ -243,7 +243,14 @@ export default function MobileBuildScreen({id}) {
                                         name={
                                             <span className="ot-mobile-inline">
                                                 <FaServer aria-hidden="true"/>
-                                                {pipeline.slot?.environment?.name}
+                                                {/*
+                                                  Environment *and* qualifier: a
+                                                  project can have two slots in
+                                                  one environment and only the
+                                                  qualifier tells them apart -
+                                                  see `deploymentName`.
+                                                */}
+                                                {deploymentName(pipeline)}
                                             </span>
                                         }
                                         context={
