@@ -60,6 +60,17 @@ describe('the mobile account screen', () => {
             renderScreen({user: {name: 'admin', fullName: "Administrator"}})
             expect(screen.queryByTestId('mobile-account-email')).not.toBeInTheDocument()
         })
+
+        it('leaves the email out when it is already the username', () => {
+            // An OIDC provider that hands the address over as the username -
+            // which is what the dev stack does - would otherwise print
+            // `admin@example.com` twice, two lines apart, for no gain. The email
+            // is there as *context* for the username, and it is not context for
+            // itself.
+            renderScreen({user: {name: 'admin@example.com', fullName: "Administrator", email: 'admin@example.com'}})
+            expect(screen.queryByTestId('mobile-account-email')).not.toBeInTheDocument()
+            expect(screen.getByTestId('mobile-screen-subtitle')).toHaveTextContent('admin@example.com')
+        })
     })
 
     describe('the version', () => {

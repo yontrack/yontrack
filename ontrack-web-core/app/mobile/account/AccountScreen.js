@@ -60,6 +60,14 @@ export default function MobileAccountScreen() {
      */
     const onSignOut = () => signOut({callbackUrl: MOBILE_HOME})
 
+    /*
+     * The email is context for the username, and it is not context for itself:
+     * an OIDC provider that hands the address over as the username - which is
+     * what the dev stack's Keycloak realm does - would otherwise print it twice,
+     * two lines apart, for no gain.
+     */
+    const email = user?.email !== user?.name ? user?.email : undefined
+
     return (
         <MobileScreen
             // The identity is the screen's head: the full name is what a human
@@ -71,13 +79,13 @@ export default function MobileAccountScreen() {
             subtitle={user?.fullName ? user?.name : undefined}
         >
             {
-                user?.email &&
+                email &&
                 <Typography.Text
                     type="secondary"
                     className="ot-mobile-account-email"
                     data-testid="mobile-account-email"
                 >
-                    {user.email}
+                    {email}
                 </Typography.Text>
             }
 
