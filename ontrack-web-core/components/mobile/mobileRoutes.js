@@ -79,20 +79,6 @@ export const INTERSTITIAL_TARGET_PARAM = 'target'
 export const DESKTOP_HOME = '/'
 
 /**
- * One build's page on the **desktop** UI.
- *
- * The mobile build screen's promote and deploy entry points go there until those
- * actions have mobile screens of their own - see `MobileBuildActions`. Named
- * `desktop*` rather than sitting beside the `mobile*` builders, because handing
- * it to a `<Link>` would send the user out of the mobile UI by accident;
- * `switchToDesktopUI` is the only thing that should take it.
- *
- * @param {string|number} id
- * @returns {string}
- */
-export const desktopBuildUri = (id) => `/build/${id}`
-
-/**
  * Desktop routes with a mobile equivalent.
  *
  * Deliberately short. A route earns an entry only once the mobile screen behind
