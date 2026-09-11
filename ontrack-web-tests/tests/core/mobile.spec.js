@@ -31,6 +31,17 @@ const {test} = require("../fixtures/connection");
  */
 const {defaultBrowserType: _ignored, ...PHONE} = devices['Pixel 5']
 
+/*
+ * A desktop browser, for the one test that has to look at the *other* UI.
+ *
+ * Spelled out rather than left to the default: inside a `test.use(PHONE)` group
+ * the runner merges those options into `browser.newContext()` too, so a context
+ * asking for nothing in particular is still a phone and is still redirected to
+ * `/mobile`. Every field of the phone that decides the redirect has to be
+ * overridden by name, which is what the device descriptor does.
+ */
+const {defaultBrowserType: _alsoIgnored, ...DESKTOP} = devices['Desktop Chrome']
+
 /** Signs in from a phone - which already goes through the redirect. */
 const signInOnPhone = (page, ontrack) => login(page, ontrack, undefined, undefined, {
     // The sign-in page has to be exempt from the redirect, or this never
@@ -511,7 +522,7 @@ test.describe('the mobile UI on a phone', () => {
         // A brand new context, and a desktop user agent so the redirect leaves
         // it alone: no cookies, no local storage. Only the server-side
         // preference can carry the choice across.
-        const context = await browser.newContext({colorScheme: 'light'})
+        const context = await browser.newContext({...DESKTOP, colorScheme: 'light'})
         try {
             const desktop = await context.newPage()
             await login(desktop, ontrack)
