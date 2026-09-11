@@ -24,6 +24,7 @@ rather than everything badly, and it says so when a user arrives somewhere it do
 | Shared | Not shared |
 |---|---|
 | Services, GraphQL fragments and mutations | Every layout component |
+| The promotion level field mapping (`promotionLevelFields`) | The promote dialog and the promote sheet around it |
 | Authorization helpers | `MainLayout`, `MainPage`, `MainPageBar`, `NavBar`, `UserMenu` |
 | Theme tokens (`styles/globals.css`) and the pre-paint theme script | The mobile shell: `MobileLayout`, `MobileHeader`, `MobileBottomNav` |
 | The next-auth session and the `/api/protected/graphql` proxy | The provider stack — see below |
@@ -328,12 +329,64 @@ rather than one that fails — and the second is answered `false` on an instance
 environments licence, so the deploy entry point disappears there without the component
 knowing anything about licences.
 
-**What they do today.** Promoting (#1724) and deploying (#1725) are their own issues; #1722
-delivered the entry points and the gating. Until those land the buttons switch this device to
-the desktop UI on the build's own page, through the same `switchToDesktopUI` cookie-then-
-navigate pair the interstitial uses — and a caption under them says so. The alternative was a
-button that does nothing, which is worse than one that is honest about where it goes. When
-the two action issues land, each `onClick` becomes its dialog and the caption goes.
+**What they do today.** Promoting happens here, on the phone — the sheet below (#1724).
+Deploying (#1725) is still its own issue, and until it lands that button switches this device
+to the desktop UI on the build's own page, through the same `switchToDesktopUI` cookie-then-
+navigate pair the interstitial uses. The caption under the buttons says so, and says it about
+the deploy button **alone**: it used to cover both, and telling a user who can only promote
+that their promotion happens on the desktop stopped being true.
+
+#### Promoting, from the phone
+
+`MobilePromoteSheet` is a bottom sheet over the build screen, on the existing
+`createPromotionRunById` mutation — the mobile UI adds no GraphQL of its own here either. Four
+decisions are worth knowing:
+
+- **The date and time is collapsed.** Someone promoting from their phone is promoting *now*,
+  and a date-time picker in the way of the common case is the whole difference between this
+  and the desktop dialog, which opens on one. While it stays collapsed no `dateTime` is sent
+  at all: the server stamps the run when it receives it. A timestamp captured when the sheet
+  *opened* would be wrong by however long its owner was interrupted, and a sheet on a phone is
+  interrupted often. "Promoted earlier?" opens the picker, initialised to now, for the
+  correction.
+
+- **The promotion level's own fields are rendered through a mapping shared with the desktop
+  dialog** — `components/promotionLevels/promotionLevelFields.js`, and that module is the
+  *only* thing the two promote UIs share. A level can declare typed fields (`TEXT`, `NUMBER`,
+  `BOOLEAN`, `CHOICE`, `LINK`) and some of them are required; the server refuses a run missing
+  one. A field type the phone cannot render is therefore not a cosmetic gap but a promotion
+  level nobody can use from a phone — and two copies of that `switch` would drift the first
+  time a type is added, silently, because the missing field would simply not be there. The
+  layout stays separate, as everywhere else in this document; the type mapping does not have
+  to be. The shared module also falls back to a text box for a type it has never heard of
+  rather than rendering nothing, and it carries the GraphQL fragment both UIs read the fields
+  with, so the query and the mapping cannot drift either.
+
+- **The sheet is capped at 85vh, in two places.** A level declaring five fields makes a form
+  taller than an 812px screen. The drawer is fixed, so a sheet that grows past the window puts
+  its own Promote button where nothing can scroll it back from — the page behind does not
+  move. Capping the *wrapper* alone is not enough: its overflow is `visible`, so the content
+  hangs out of the bottom of it exactly as if there were no cap. Capping the content too makes
+  the drawer's body the scroller and keeps the title in place. `mobile.spec.js` pins the
+  Promote button inside the viewport with a level declaring one field of every type, which is
+  the case that overflows.
+
+- **The screen refetches rather than patching its promotions.** The run's id, its signature
+  and its place among the level's last runs are the server's answer, and
+  `promotionRuns(lastPerLevel: true)` means a second promotion to a level already shown
+  *replaces* a row rather than adding one. A counter in the query's `deps`, as the favourite
+  toggles use.
+
+**The demo seed needs nothing new for this, and that is a decision.** `petclinic/main` in
+`DemoContent` already carries `BRONZE`, `SILVER`, `GOLD` and `CANARY` on branches full of
+builds, so the demo demonstrates the feature as it stands: open a build on a phone, tap
+Promote, pick a level. What it does not demonstrate is the promotion level *fields*, and
+seeding those was considered and rejected twice over. They are a pre-existing server and
+desktop feature the seed has never shown, so seeding them would be demonstrating that feature
+rather than this one; and a *required* field on a demo level would break the seed itself,
+since the demo's auto-promotion and workflow-driven promotions create runs with no field
+values, which is exactly what `validatePromotionRunFieldValues` refuses. See
+[demo-seed.md](../demo-seed.md).
 
 ### The account screen
 

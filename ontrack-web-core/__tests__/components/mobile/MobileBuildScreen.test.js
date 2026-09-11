@@ -1,5 +1,21 @@
 import "@testing-library/jest-dom"
-import {render, screen} from "@testing-library/react"
+import {fireEvent, render, screen, waitFor} from "@testing-library/react"
+
+// antd's Drawer - the promote sheet - reads the responsive breakpoints, and
+// jsdom ships no `matchMedia`. Same stand-in as the other antd component tests.
+Object.defineProperty(window, 'matchMedia', {
+    writable: true,
+    value: jest.fn().mockImplementation(query => ({
+        matches: false,
+        media: query,
+        onchange: null,
+        addListener: jest.fn(),
+        removeListener: jest.fn(),
+        addEventListener: jest.fn(),
+        removeEventListener: jest.fn(),
+        dispatchEvent: jest.fn(),
+    })),
+})
 
 let queryResult = {data: null, loading: false, error: null, finished: true}
 /*
@@ -10,14 +26,29 @@ let queryResult = {data: null, loading: false, error: null, finished: true}
  * not the other, or that isolation is untested.
  */
 let deploymentsResult = null
+/*
+ * The promote sheet asks for the branch's promotion levels, which is a third
+ * query with a shape of its own - handed back here so the promotion can actually
+ * be driven from the screen, as a user drives it.
+ */
+let promotionLevelsResult = null
+/** The `deps` of the build's own query, which is what a refresh changes. */
+let buildQueryDeps = null
+
+const callGraphQL = jest.fn()
 
 jest.mock("../../../components/services/GraphQL", () => ({
-    useQuery: (query) => (
-        deploymentsResult && String(query).includes('MobileBuildDeployments')
-            ? deploymentsResult
-            : queryResult
-    ),
-    callGraphQL: jest.fn(),
+    useQuery: (query, {deps = [], dataFn = data => data, initialData = null} = {}) => {
+        const text = String(query)
+        if (text.includes('MobileBuildDeployments') && deploymentsResult) return deploymentsResult
+        if (text.includes('MobilePromotionLevels')) {
+            const result = promotionLevelsResult ?? {data: null, loading: false, error: null, finished: true}
+            return {...result, data: result.data ? dataFn(result.data) : initialData}
+        }
+        if (text.includes('query MobileBuild(')) buildQueryDeps = deps
+        return queryResult
+    },
+    callGraphQL: (...args) => callGraphQL(...args),
 }))
 
 const switchToDesktopUI = jest.fn()
@@ -82,6 +113,10 @@ const refused = (name, action) => ({name, action, authorized: false})
 beforeEach(() => {
     switchToDesktopUI.mockClear()
     deploymentsResult = null
+    promotionLevelsResult = null
+    buildQueryDeps = null
+    callGraphQL.mockReset()
+    callGraphQL.mockResolvedValue({createPromotionRunById: {errors: null}})
 })
 
 describe('the mobile build screen', () => {
@@ -296,21 +331,69 @@ describe('the mobile build screen', () => {
             expect(screen.queryByTestId('mobile-build-actions')).not.toBeInTheDocument()
         })
 
-        it('takes the user to the desktop build page until the actions land here', () => {
-            // #1724 and #1725 replace this with the dialogs. Until then the
-            // entry point has to actually get the user to somewhere they can
-            // promote, and switching UI is what the initiative already does for
-            // anything it does not cover - cookie first, then navigate.
+        it('promotes on the phone rather than sending the user to the desktop', async () => {
+            // #1724: the promote entry point used to switch this device to the
+            // desktop UI, because there was nowhere here to promote from.
             build({authorizations: [granted('build', 'promote')]})
             render(<MobileBuildScreen id="100"/>)
-            screen.getByTestId('mobile-build-promote').click()
+            fireEvent.click(screen.getByTestId('mobile-build-promote'))
+            expect(await screen.findByTestId('mobile-promote-level')).toBeInTheDocument()
+            expect(switchToDesktopUI).not.toHaveBeenCalled()
+        })
+
+        it('takes the user to the desktop build page to deploy, until #1725 lands', () => {
+            // Still the honest answer for the half of the pair that has no
+            // mobile flow yet: cookie first, then navigate.
+            build({authorizations: [granted('slotPipeline', 'create')]})
+            render(<MobileBuildScreen id="100"/>)
+            fireEvent.click(screen.getByTestId('mobile-build-deploy'))
             expect(switchToDesktopUI).toHaveBeenCalledWith('/build/100')
         })
 
-        it('says that is what the entry points do', () => {
-            build({authorizations: [granted('build', 'promote')]})
+        it('says that is what deploying does', () => {
+            build({authorizations: [granted('slotPipeline', 'create')]})
             render(<MobileBuildScreen id="100"/>)
             expect(screen.getByTestId('mobile-build-actions')).toHaveTextContent(/desktop/i)
+        })
+
+        it('says nothing about the desktop to a user who can only promote', () => {
+            // The caption belonged to both buttons and now belongs to one. A
+            // user offered only the promote button would otherwise be told their
+            // promotion happens somewhere else, which it no longer does.
+            build({authorizations: [granted('build', 'promote')]})
+            render(<MobileBuildScreen id="100"/>)
+            expect(screen.getByTestId('mobile-build-actions')).not.toHaveTextContent(/desktop/i)
+        })
+    })
+
+    describe('promoting from the build screen', () => {
+
+        const promotable = () => {
+            build({authorizations: [granted('build', 'promote')]})
+            promotionLevelsResult = {
+                data: {branches: [{promotionLevels: [{id: 500, name: 'BRONZE', image: false, fields: []}]}]},
+                loading: false,
+                error: null,
+                finished: true,
+            }
+        }
+
+        it('shows the new promotion without the user reloading anything', async () => {
+            // The acceptance criterion. The screen refetches rather than
+            // patching its copy: the run's id and its signature are the
+            // server's answer, not something the phone can invent.
+            promotable()
+            render(<MobileBuildScreen id="100"/>)
+            const before = buildQueryDeps
+
+            fireEvent.click(screen.getByTestId('mobile-build-promote'))
+            const level = await screen.findByTestId('mobile-promote-level')
+            fireEvent.mouseDown(level.querySelector('.ant-select-selector'))
+            fireEvent.click(await screen.findByTitle('BRONZE'))
+            fireEvent.click(screen.getByTestId('mobile-promote-submit'))
+
+            await waitFor(() => expect(callGraphQL).toHaveBeenCalled())
+            await waitFor(() => expect(buildQueryDeps).not.toEqual(before))
         })
     })
 

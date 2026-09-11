@@ -20,6 +20,7 @@
  * every stamp to reach the button.
  */
 
+import {useState} from "react"
 import {gql} from "graphql-request"
 import Link from "next/link"
 import {Typography} from "antd"
@@ -54,6 +55,21 @@ const MEDAL_SIZE = 20
 const CHIP_SIZE = 20
 
 export default function MobileBuildScreen({id}) {
+
+    /*
+     * What a promotion made from this screen does to it.
+     *
+     * The screen refetches rather than patching its own copy of the promotions:
+     * the run's id, its signature and its place among the level's last runs are
+     * the server's answer, not something the phone can invent - and
+     * `promotionRuns(lastPerLevel: true)` means a second promotion to a level
+     * already shown *replaces* a row rather than adding one.
+     *
+     * A counter in the query's `deps`, as the favourite toggles use: the mobile
+     * provider stack has no `EventsContextProvider`, and a phone shows one
+     * screen at a time.
+     */
+    const [refresh, setRefresh] = useState(0)
 
     const query = useQuery(
         gql`
@@ -125,7 +141,7 @@ export default function MobileBuildScreen({id}) {
         `,
         {
             variables: {id: Number(id), validations: VALIDATION_LIMIT + 1},
-            deps: [id],
+            deps: [id, refresh],
         }
     )
 
@@ -193,7 +209,10 @@ export default function MobileBuildScreen({id}) {
                             </Typography.Text>
                         }
 
-                        <MobileBuildActions build={build}/>
+                        <MobileBuildActions
+                            build={build}
+                            onPromotion={() => setRefresh(count => count + 1)}
+                        />
 
                         <MobileSectionList
                             title="Promotions"

@@ -34,6 +34,7 @@ the second one is not the one you are looking at.
 | Shared | Not shared, on purpose |
 |---|---|
 | Services, GraphQL fragments and mutations | **Every layout component** |
+| The promotion level field mapping (`promotionLevelFields`) | The promote dialog and the promote sheet around it |
 | Authorization helpers (`isAuthorized`, the `authorizations` field) | `MainLayout`, `MainPage`, `MainPageBar`, `NavBar`, `UserMenu` |
 | Theme tokens (`styles/globals.css`) and the pre-paint theme script | The mobile shell: `MobileLayout`, `MobileHeader`, `MobileBottomNav` |
 | A handful of display primitives — `ValidationChip`, `PromotionLevelImage`, `TimestampText`, `EntityIcon` | The provider stack: `/mobile` is its own App Router root and assembles its own |
@@ -54,7 +55,12 @@ change reaches the mobile UI; the right column is where it cannot.
   inventory is short enough to check by eye — see below.
 - **A new promotion level field type**, or any change to how a promotion level is drawn. The
   mobile build screen and every build card render the level's medal beside its name, through
-  the shared `PromotionLevelImage`.
+  the shared `PromotionLevelImage`. A field *type* is the one place where the two UIs share
+  logic rather than a primitive: both the desktop promote dialog and the mobile promote sheet
+  render a level's declared fields through
+  `components/promotionLevels/promotionLevelFields.js`, so adding a type there covers both.
+  Adding one to the desktop dialog alone would leave a required field unfillable on a phone,
+  and so a promotion level unusable from one.
 - **A new admission-rule or deployment surface.** The build screen's deploy entry point is
   gated on `slotPipeline/create`, and both the build screen and the branch screen read
   `Build.currentDeployments`.

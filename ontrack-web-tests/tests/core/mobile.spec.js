@@ -360,6 +360,82 @@ test.describe('the mobile UI on a phone', () => {
         await expect(page.getByTestId('mobile-build-promote')).toBeVisible()
     })
 
+    test('a build is promoted from a phone, required fields and all', async ({page, ontrack}) => {
+        // The whole of #1724. A level that declares a required field is the
+        // interesting case: a required field the mobile UI cannot fill makes
+        // that promotion level impossible to use from a phone, which is why the
+        // field mapping is shared with the desktop dialog rather than copied.
+        const project = await ontrack.createProject()
+        const branch = await project.createBranch()
+        const promotionLevel = await branch.createPromotionLevel('GOLD')
+        // Every type the server can declare, so that one of them failing to
+        // render is a failure here rather than a promotion level nobody can use
+        // from a phone.
+        await promotionLevel.setFields([
+            {name: 'ticket', displayName: 'Ticket', type: 'TEXT', required: true},
+            {name: 'count', displayName: 'Count', type: 'NUMBER', required: false},
+            {name: 'approved', displayName: 'Approved', type: 'BOOLEAN', required: false},
+            {name: 'env', displayName: 'Environment', type: 'CHOICE', required: false, options: ['prod', 'staging']},
+            {name: 'ref', displayName: 'Reference', type: 'LINK', required: false},
+        ])
+        const build = await branch.createBuild()
+
+        await page.setViewportSize({width: 375, height: 812})
+        await signInOnPhone(page, ontrack)
+        await page.goto(`${ontrack.connection.ui}/mobile/build/${build.id}`)
+
+        // Where it starts: nothing has promoted this build.
+        await expect(page.getByTestId('mobile-build-promotions')).toContainText(/not been promoted/i)
+
+        await page.getByTestId('mobile-build-promote').click()
+
+        // The time is collapsed - someone promoting from their phone is
+        // promoting now - and the picker is one tap away for the rare
+        // correction.
+        await expect(page.getByTestId('mobile-promote-time-toggle')).toBeVisible()
+        await expect(page.getByTestId('mobile-promote-time')).toHaveCount(0)
+
+        // The level, picked from the branch's own.
+        const level = page.getByTestId('mobile-promote-level')
+        await expect(level).toBeVisible()
+        await level.click()
+        await page.locator('.ant-select-item-option').filter({hasText: 'GOLD'}).click()
+
+        // Every field type got an input a thumb can actually use.
+        await expect(page.getByRole('textbox', {name: 'Ticket'})).toBeVisible()
+        await expect(page.getByRole('spinbutton', {name: 'Count'})).toBeVisible()
+        await expect(page.getByRole('checkbox', {name: 'Approved'})).toBeVisible()
+        await expect(page.getByRole('textbox', {name: 'Reference'})).toHaveAttribute('placeholder', 'https://...')
+
+        // And the sheet stays inside the phone. A level declaring this many
+        // fields makes a form taller than an 812px screen, and a sheet that
+        // grows past the window puts its own Promote button somewhere nothing
+        // can scroll it back from - the drawer is fixed, and the page behind it
+        // does not move. Waited for first: `boundingBox` answers for where an
+        // element is *now*, and the fields arrive with the level's query.
+        const submit = page.getByTestId('mobile-promote-submit')
+        await expect(submit).toBeVisible()
+        await submit.scrollIntoViewIfNeeded()
+        const box = await submit.boundingBox()
+        expect(box.y + box.height).toBeLessThanOrEqual(page.viewportSize().height)
+
+        // Nothing scrolls sideways at 375px either, which is the criterion every
+        // mobile surface has to meet.
+        const overflows = await page.evaluate(() =>
+            document.documentElement.scrollWidth > document.documentElement.clientWidth)
+        expect(overflows).toBe(false)
+
+        // The required field is enforced before anything leaves the phone.
+        await submit.click()
+        await expect(page.getByText('Ticket is required.')).toBeVisible()
+
+        await page.getByRole('textbox', {name: 'Ticket'}).fill('PROJ-42')
+        await page.getByTestId('mobile-promote-submit').click()
+
+        // The screen behind reflects it, with nobody reloading anything.
+        await expect(page.getByTestId('mobile-build-promotions')).toContainText('GOLD')
+    })
+
     test('a favourite branch on the home screen taps through to itself', async ({page, ontrack}) => {
         const project = await ontrack.createProject()
         const branch = await project.createBranch()
