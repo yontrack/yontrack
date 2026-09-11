@@ -109,22 +109,34 @@ directions, so decide, and say which way you decided. `doc/dev-guide/demo-seed.m
 
 ### Issue status labels
 
-Issues carry exactly one `status:*` label at a time. The two the agent workflow drives are:
+Issues carry exactly one `status:*` label at a time. The four the agent workflow drives are:
 
-| Label          | When to apply                                                              |
-|----------------|----------------------------------------------------------------------------|
-| `status:wip`   | Work has started on the issue (right after creating the branch)             |
-| `status:ready` | The change is merged into `main` **and** the CI build on `main` succeeded    |
+| Label            | When to apply                                                             |
+|------------------|---------------------------------------------------------------------------|
+| `status:tospec`  | The issue is being specified — a grilling session has started on it        |
+| `status:todo`    | The spec is settled and the issue is ready to be picked up                 |
+| `status:wip`     | Work has started on the issue (right after creating the branch)            |
+| `status:ready`   | The change is merged into `main` **and** the CI build on `main` succeeded   |
 
 Apply them with `gh`, always removing the previous status label in the same command:
 
 ```bash
-# Starting work (issues normally start on status:todo — check the issue's actual label first)
+# Starting to specify an issue (see *Specifying an issue* below)
+gh issue edit <number> --add-label "status:tospec" --remove-label "status:todo"
+
+# The spec is settled
+gh issue edit <number> --add-label "status:todo" --remove-label "status:tospec" --add-label "ready-for-agent"
+
+# Starting work (check the issue's actual label first)
 gh issue edit <number> --add-label "status:wip" --remove-label "status:todo"
 
 # After the merge lands and CI on main is green
 gh issue edit <number> --add-label "status:ready" --remove-label "status:wip"
 ```
+
+`ready-for-agent` is **not** a status label and is not exclusive with them: it says the issue
+is specified well enough to be handed to an agent, and it travels with the issue from
+`status:todo` onwards rather than being swapped out.
 
 Check the `main` build before applying `status:ready` — the workflow is `CI` (`.github/workflows/ci.yml`),
 which runs on every push:
@@ -143,6 +155,34 @@ and waiting is impractical, say so explicitly — never apply `status:ready` on 
 
 These `status:*` labels are the issue *lifecycle*; they are distinct from the triage labels described in
 `docs/agents/triage-labels.md` and must never be substituted for them.
+
+### Specifying an issue
+
+An issue whose body is a placeholder — "to be specified", an open question, a scope left
+undecided — is specified through a **grilling session** (`/grilling`, or `/grill-me`), not by
+writing a plausible spec in one pass. The session interviews Damien round by round until every
+branch of the decision tree has been visited, and the outcome is a rewritten issue body.
+
+Two label moves bracket it, and they are the agent's job, not Damien's:
+
+1. **At the start**, before the first round of questions, set `status:tospec` if the issue does
+   not already carry it. It is what tells anyone else looking at the board that the issue is
+   being decided right now and is not free to pick up.
+2. **When the rewritten body is published**, move `status:tospec` → `status:todo` and add
+   `ready-for-agent`, in one command.
+
+Neither move happens for a grilling session that is not about a GitHub issue — grilling a
+design, a migration plan or an approach touches no labels.
+
+Two rules carry over from the rest of this guide and are worth repeating because a spec session
+is where they are easiest to forget:
+
+- **Never** close the issue, and never start implementing during the session. Specifying and
+  building are separate; the session ends at a published body.
+- A decision that depends on another issue is recorded as a **native GitHub dependency**, not
+  only as prose — `docs/agents/issue-tracker.md` has the incantation, including that it takes
+  the blocker's numeric database id. Keep the prose line too: the relationship is the
+  machine-readable half, and the sentence is the one an agent picking up the issue reads.
 
 ### Development Process (TDD)
 
