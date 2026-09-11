@@ -1858,6 +1858,8 @@ type EditAccountPayload implements Payload {
 type EligibleSlot {
   "eligible field"
   eligible: Boolean
+  "Admission rules of the slot which refuse this build. Empty when the build is eligible."
+  nonEligibleRules: [SlotAdmissionRuleConfig!]!
   "slot field"
   slot: Slot!
 }

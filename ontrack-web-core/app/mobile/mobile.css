@@ -511,3 +511,65 @@ html, body {
     flex-direction: column;
     gap: 8px;
 }
+
+/*
+ * A row whose subject needs more than one line and whose actions do not fit
+ * beside it - the deployment screen's admission rules. At 375px a rule ("GOLD
+ * promotion is required"), its verdict and two buttons cannot share a line, and
+ * the alternative to stacking them is a row that scrolls sideways.
+ */
+.ot-mobile-row-stacked {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+}
+
+/*
+ * The exception to the one-action rule the list shape otherwise keeps: a
+ * blocking rule can be both answered and overridden, and those are two different
+ * decisions rather than one control with a mode. They only ever appear on a
+ * stacked row, where they get a line of their own.
+ */
+.ot-mobile-row-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.ot-mobile-row-actions > * {
+    flex: 1 1 0;
+}
+
+/*
+ * Why a slot refuses a build - the deploy sheet's ineligible cards. One reason
+ * per line, wrapping: a rule's phrasing is a sentence, and several of them on
+ * one line would be read as one.
+ */
+.ot-mobile-reasons {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+/*
+ * The deployment screen's rule text wraps rather than ellipsising: a rule is a
+ * sentence and a truncated one says the wrong thing, where a truncated entity
+ * name still points at the right entity.
+ */
+.ot-mobile-row-stacked .ot-mobile-row-name,
+.ot-mobile-row-stacked .ot-mobile-row-context {
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
+}
+
+.ot-mobile-row-stacked .ot-mobile-inline {
+    /* The glyph stays on the first line of a wrapping sentence, not centred
+       against the whole block. */
+    align-items: flex-start;
+}
+
+.ot-mobile-row-stacked .ot-mobile-inline > svg {
+    /* Optically on the text's first line rather than on its box's top edge. */
+    margin-top: 4px;
+    flex: 0 0 auto;
+}

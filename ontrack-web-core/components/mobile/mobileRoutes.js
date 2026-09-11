@@ -58,6 +58,17 @@ export const mobileBranchUri = (id) => `${MOBILE_PREFIX}/branch/${id}`
  */
 export const mobileBuildUri = (id) => `${MOBILE_PREFIX}/build/${id}`
 
+/**
+ * One deployment's screen: its admission rules, and what can be done about them.
+ *
+ * A deployment id is a UUID rather than a number - the mobile UI's only
+ * non-numeric entity route.
+ *
+ * @param {string} id
+ * @returns {string}
+ */
+export const mobileDeploymentUri = (id) => `${MOBILE_PREFIX}/deployment/${id}`
+
 /** Where a phone lands when its destination has no mobile equivalent. */
 export const MOBILE_INTERSTITIAL = `${MOBILE_PREFIX}/desktop-only`
 
@@ -110,6 +121,20 @@ const ENTITY_EQUIVALENTS = [
     [/^\/project\/(\d+)$/, mobileProjectUri],
     [/^\/branch\/(\d+)$/, mobileBranchUri],
     [/^\/build\/(\d+)$/, mobileBuildUri],
+    /*
+     * A deployment's id is a UUID and not a number, so this pattern is shaped
+     * rather than numeric - but exact all the same, for the same reason as the
+     * others: anything else under `/extension/environments/pipeline/` is not a
+     * pipeline id, and sending it to a screen that would ask the server an
+     * unanswerable question is worse than the interstitial.
+     *
+     * The mobile screen covers what a phone user does with a deployment -
+     * reading its admission rules, answering them, overriding one, running it -
+     * and not the desktop pipeline page's history, workflows or graph. That is
+     * the bar the route map sets: the screen exists and does the job, rather
+     * than being a placeholder standing in for a page that works.
+     */
+    [/^\/extension\/environments\/pipeline\/([0-9a-fA-F-]{36})$/, mobileDeploymentUri],
 ]
 
 /**

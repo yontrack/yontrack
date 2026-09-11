@@ -3,6 +3,7 @@ import {
     isRedirectExempt,
     mobileBranchUri,
     mobileBuildUri,
+    mobileDeploymentUri,
     MOBILE_ACCOUNT,
     MOBILE_HOME,
     mobileEquivalent,
@@ -38,10 +39,24 @@ describe('mobileEquivalent', () => {
         expect(mobileEquivalent('/build/56')).toEqual('/mobile/build/56')
     })
 
+    it('maps a deployment to its mobile screen, keeping the id', () => {
+        // The one entity route whose id is not a number: a deployment is
+        // identified by a UUID, so the pattern is shaped rather than numeric.
+        const id = '0f3a9b2c-1d4e-4f60-8a7b-9c0d1e2f3a4b'
+        expect(mobileEquivalent(`/extension/environments/pipeline/${id}`))
+            .toEqual(mobileDeploymentUri(id))
+        expect(mobileEquivalent(`/extension/environments/pipeline/${id}`))
+            .toEqual(`/mobile/deployment/${id}`)
+    })
+
     it.each([
         '/project/12/something',
         '/branch/',
         '/project/not-a-number',
+        // Not a pipeline id, so not a deployment screen: the mobile screen would
+        // ask the server a question it cannot answer.
+        '/extension/environments/pipeline/7',
+        '/extension/environments/pipeline/0f3a9b2c-1d4e-4f60-8a7b-9c0d1e2f3a4b/steps',
     ])('does not mistake %s for an entity screen', (pathname) => {
         // The desktop routes are `/project/[id]` and `/branch/[id]` and nothing
         // else. A looser match would send a phone to a mobile screen that then

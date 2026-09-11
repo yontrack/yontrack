@@ -10,39 +10,35 @@
  * so the deploy entry point disappears there without this file knowing anything
  * about licences.
  *
- * **What they do.** Promoting happens here, on the phone, in
- * `MobilePromoteSheet` (#1724). Deploying is still its own issue (#1725), and
- * until it lands that button switches this device to the desktop UI on the
- * build's own page, through `switchToDesktopUI` - the same cookie-then-navigate
- * pair the interstitial uses, and the same answer the initiative gives
- * everywhere it does not cover something yet. The caption below says so, and now
- * says it about the deploy button alone: telling a user who can only promote
- * that their promotion happens on the desktop stopped being true.
+ * **Both happen here now.** Promoting is `MobilePromoteSheet` (#1724) and
+ * deploying is `MobileDeploySheet` (#1725); neither sends the device to the
+ * desktop UI any more, and the caption which used to say so is gone with the
+ * last thing it was true of.
  *
  * @param {Object} build The build, with its `authorizations` and its branch.
  * @param {function} [onPromotion] Called once a promotion has actually been
  *   created, so the screen can refetch.
+ * @param {function} [onDeployment] Called with the new deployment's id once one
+ *   has been created, so the screen can take the user to it.
  */
 
 import {useState} from "react"
-import {Button, Space, Typography} from "antd"
+import {Button, Space} from "antd"
 import {FaRegThumbsUp, FaServer} from "react-icons/fa"
 import {isAuthorized} from "@components/common/authorizations"
-import {switchToDesktopUI} from "@components/mobile/desktopPreference"
-import {desktopBuildUri} from "@components/mobile/mobileRoutes"
 import MobilePromoteSheet from "@components/mobile/builds/MobilePromoteSheet"
+import MobileDeploySheet from "@components/mobile/builds/MobileDeploySheet"
 
-export default function MobileBuildActions({build, onPromotion}) {
+export default function MobileBuildActions({build, onPromotion, onDeployment}) {
 
     const canPromote = isAuthorized(build, 'build', 'promote')
     const canDeploy = isAuthorized(build, 'slotPipeline', 'create')
 
     const [promoting, setPromoting] = useState(false)
+    const [deploying, setDeploying] = useState(false)
 
     // Nothing to show a reader who can do neither - and no empty box either.
     if (!canPromote && !canDeploy) return null
-
-    const openDesktop = () => switchToDesktopUI(desktopBuildUri(build.id))
 
     return (
         <Space direction="vertical" size="small" style={{width: '100%'}} data-testid="mobile-build-actions">
@@ -65,18 +61,12 @@ export default function MobileBuildActions({build, onPromotion}) {
                         block
                         icon={<FaServer/>}
                         data-testid="mobile-build-deploy"
-                        onClick={openDesktop}
+                        onClick={() => setDeploying(true)}
                     >
                         Deploy
                     </Button>
                 }
             </Space.Compact>
-            {
-                canDeploy &&
-                <Typography.Text type="secondary" className="ot-mobile-caption">
-                    Deploying opens the desktop version for now.
-                </Typography.Text>
-            }
             {
                 canPromote &&
                 <MobilePromoteSheet
@@ -84,6 +74,15 @@ export default function MobileBuildActions({build, onPromotion}) {
                     open={promoting}
                     onClose={() => setPromoting(false)}
                     onPromoted={onPromotion}
+                />
+            }
+            {
+                canDeploy &&
+                <MobileDeploySheet
+                    build={build}
+                    open={deploying}
+                    onClose={() => setDeploying(false)}
+                    onStarted={onDeployment}
                 />
             }
         </Space>

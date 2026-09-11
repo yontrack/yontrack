@@ -190,6 +190,55 @@ class SlotGraphQLIT : AbstractQLKTITSupport() {
     }
 
     @Test
+    fun `A non eligible slot says which of its admission rules refuses the build`() {
+        // A list of environments a build cannot go to, with no reason beside them, leaves a user
+        // wondering where an environment went. `eligible` alone cannot answer that: the slot
+        // refuses the build because one of its admission rules does, and only the server knows
+        // which one.
+        slotTestSupport.withSquareSlotsAndOther { project, stagingDefaultSlot, _, productionDefaultSlot, _, _ ->
+            project.branch {
+                build {
+                    run(
+                        """{
+                            eligibleSlotsForBuild(buildId: $id) {
+                                eligible
+                                nonEligibleRules {
+                                    name
+                                    ruleId
+                                }
+                                slot {
+                                    id
+                                }
+                            }
+                        }""".trimIndent()
+                    ) { data ->
+                        val index = data.path("eligibleSlotsForBuild").associateBy {
+                            it.path("slot").path("id").asText()
+                        }
+
+                        // The production default slot admits release branches only, and this build
+                        // is not on one.
+                        val refused = index.getValue(productionDefaultSlot.id)
+                        assertEquals(false, refused.path("eligible").asBoolean())
+                        assertEquals(
+                            listOf("releaseBranchesOnly" to "branchPattern"),
+                            refused.path("nonEligibleRules").map {
+                                it.path("name").asText() to it.path("ruleId").asText()
+                            },
+                            "The rule which refuses the build is named, not merely counted",
+                        )
+
+                        // An eligible slot has nothing to explain.
+                        val admitted = index.getValue(stagingDefaultSlot.id)
+                        assertEquals(true, admitted.path("eligible").asBoolean())
+                        assertEquals(0, admitted.path("nonEligibleRules").size())
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
     fun `Getting a list of pipelines for a build`() {
         slotTestSupport.withSlotPipeline { _ ->
             slotTestSupport.withSlotPipeline { pipeline1 ->

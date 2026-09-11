@@ -23,6 +23,7 @@
 import {useState} from "react"
 import {gql} from "graphql-request"
 import Link from "next/link"
+import {useRouter} from "next/navigation"
 import {Typography} from "antd"
 import {useQuery} from "@components/services/GraphQL"
 import MobileScreen from "@components/mobile/layout/MobileScreen"
@@ -36,7 +37,7 @@ import {PromotionLevelImage} from "@components/promotionLevels/PromotionLevelIma
 import ValidationChip from "@components/primitives/ValidationChip"
 import {gqlValidationChipStamp} from "@components/primitives/ValidationChipFragments"
 import {FaServer} from "react-icons/fa"
-import {mobileBranchUri, mobileProjectUri} from "@components/mobile/mobileRoutes"
+import {mobileBranchUri, mobileDeploymentUri, mobileProjectUri} from "@components/mobile/mobileRoutes"
 
 /**
  * How many validation stamps the screen shows.
@@ -70,6 +71,8 @@ export default function MobileBuildScreen({id}) {
      * screen at a time.
      */
     const [refresh, setRefresh] = useState(0)
+
+    const router = useRouter()
 
     const query = useQuery(
         gql`
@@ -156,7 +159,11 @@ export default function MobileBuildScreen({id}) {
      * an instance with no environments licence, which would fail the document
      * above and take the whole screen with it.
      */
-    const {deployments, unavailable: deploymentsUnavailable} = useMobileBuildDeployments(id)
+    const {
+        deployments,
+        candidates,
+        unavailable: deploymentsUnavailable,
+    } = useMobileBuildDeployments(id, refresh)
 
     const build = query.data?.build
     const project = build?.branch?.project
@@ -212,6 +219,24 @@ export default function MobileBuildScreen({id}) {
                         <MobileBuildActions
                             build={build}
                             onPromotion={() => setRefresh(count => count + 1)}
+                            /*
+                             * A deployment starts as a CANDIDATE: nothing has
+                             * happened to the environment yet, and everything
+                             * that still has to happen - the input a rule wants,
+                             * an override, the run itself - is on the deployment
+                             * screen. Taking the user straight there is the flow
+                             * they asked for by tapping Deploy; landing them
+                             * back on this screen with a new row to notice is
+                             * not.
+                             *
+                             * A `push`, so the back gesture returns to the build
+                             * rather than leaving the phone on a screen it has
+                             * no way out of.
+                             */
+                            onDeployment={pipelineId => {
+                                setRefresh(count => count + 1)
+                                if (pipelineId) router.push(mobileDeploymentUri(pipelineId))
+                            }}
                         />
 
                         <MobileSectionList
@@ -239,6 +264,52 @@ export default function MobileBuildScreen({id}) {
                                 )
                             }
                         </MobileSectionList>
+
+                        {
+                            /*
+                             * Deployments of this build which are still waiting
+                             * on somebody - a manual approval, an override, or
+                             * simply the run.
+                             *
+                             * Absent rather than empty, because unlike the three
+                             * sections below it is not a facet of the build: a
+                             * build with nothing pending has nothing to say
+                             * here, and "no deployment is waiting" on every
+                             * build screen would be a line nobody reads. It is
+                             * also the only way into the deployment screen for a
+                             * deployment somebody else started - CI usually -
+                             * which is half of what #1725 is about.
+                             */
+                            candidates.length > 0 &&
+                            <MobileSectionList
+                                title="Waiting to deploy"
+                                testId="mobile-build-candidates"
+                                isEmpty={false}
+                            >
+                                {
+                                    candidates.map(pipeline =>
+                                        <MobileEntityRow
+                                            key={pipeline.id}
+                                            testId={`mobile-build-candidate-${pipeline.id}`}
+                                            href={mobileDeploymentUri(pipeline.id)}
+                                            name={
+                                                <span className="ot-mobile-inline">
+                                                    <FaServer aria-hidden="true"/>
+                                                    {deploymentName(pipeline)}
+                                                </span>
+                                            }
+                                            context={
+                                                <TimestampText
+                                                    value={pipeline.start}
+                                                    prefix="started"
+                                                    relative
+                                                />
+                                            }
+                                        />
+                                    )
+                                }
+                            </MobileSectionList>
+                        }
 
                         <MobileSectionList
                             title="Deployments"

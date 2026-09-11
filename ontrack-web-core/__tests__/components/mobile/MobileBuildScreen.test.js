@@ -32,6 +32,8 @@ let deploymentsResult = null
  * be driven from the screen, as a user drives it.
  */
 let promotionLevelsResult = null
+/** The deploy sheet's eligible slots, when a test drives the deployment. */
+let eligibleSlotsResult = null
 /** The `deps` of the build's own query, which is what a refresh changes. */
 let buildQueryDeps = null
 
@@ -41,6 +43,11 @@ jest.mock("../../../components/services/GraphQL", () => ({
     useQuery: (query, {deps = [], dataFn = data => data, initialData = null} = {}) => {
         const text = String(query)
         if (text.includes('MobileBuildDeployments') && deploymentsResult) return deploymentsResult
+        if (text.includes('MobileEligibleSlots')) {
+            const result = eligibleSlotsResult ??
+                {data: {eligibleSlotsForBuild: []}, loading: false, error: null, finished: true}
+            return {...result, data: result.data ? dataFn(result.data) : initialData}
+        }
         if (text.includes('MobilePromotionLevels')) {
             const result = promotionLevelsResult ?? {data: null, loading: false, error: null, finished: true}
             return {...result, data: result.data ? dataFn(result.data) : initialData}
@@ -51,9 +58,23 @@ jest.mock("../../../components/services/GraphQL", () => ({
     callGraphQL: (...args) => callGraphQL(...args),
 }))
 
-const switchToDesktopUI = jest.fn()
-jest.mock("../../../components/mobile/desktopPreference", () => ({
-    switchToDesktopUI: (...args) => switchToDesktopUI(...args),
+/*
+ * Starting a deployment takes the user to the deployment screen, which is a
+ * navigation and not a render - so the router is the only way to see that it
+ * happened.
+ */
+const push = jest.fn()
+jest.mock("next/navigation", () => ({
+    useRouter: () => ({push: (...args) => push(...args)}),
+}))
+
+/*
+ * The deploy sheet's own slot list, and the rule summaries inside it. Both are
+ * covered in `MobileDeploySheet.test.js`; here the sheet only has to open.
+ */
+jest.mock("../../../components/extension/environments/SlotAdmissionRuleSummary", () => ({
+    __esModule: true,
+    default: ({ruleId}) => <span>{ruleId}</span>,
 }))
 
 import MobileBuildScreen from "@/app/mobile/build/[id]/BuildScreen"
@@ -87,6 +108,7 @@ const build = ({
                    description,
                    promotions = [],
                    deployments = [],
+                   candidates = [],
                    validations = [],
                    authorizations = [],
                } = {}) => setResult({
@@ -101,6 +123,7 @@ const build = ({
             authorizations,
             promotionRuns: promotions,
             currentDeployments: deployments,
+            slotPipelines: candidates,
             validations,
         },
     },
@@ -111,9 +134,10 @@ const granted = (name, action) => ({name, action, authorized: true})
 const refused = (name, action) => ({name, action, authorized: false})
 
 beforeEach(() => {
-    switchToDesktopUI.mockClear()
+    push.mockClear()
     deploymentsResult = null
     promotionLevelsResult = null
+    eligibleSlotsResult = null
     buildQueryDeps = null
     callGraphQL.mockReset()
     callGraphQL.mockResolvedValue({createPromotionRunById: {errors: null}})
@@ -338,31 +362,87 @@ describe('the mobile build screen', () => {
             render(<MobileBuildScreen id="100"/>)
             fireEvent.click(screen.getByTestId('mobile-build-promote'))
             expect(await screen.findByTestId('mobile-promote-level')).toBeInTheDocument()
-            expect(switchToDesktopUI).not.toHaveBeenCalled()
         })
 
-        it('takes the user to the desktop build page to deploy, until #1725 lands', () => {
-            // Still the honest answer for the half of the pair that has no
-            // mobile flow yet: cookie first, then navigate.
+        it('deploys on the phone rather than sending the user to the desktop', async () => {
+            // #1725: the deploy entry point used to switch this device to the
+            // desktop UI, for the same reason the promote one did.
             build({authorizations: [granted('slotPipeline', 'create')]})
             render(<MobileBuildScreen id="100"/>)
             fireEvent.click(screen.getByTestId('mobile-build-deploy'))
-            expect(switchToDesktopUI).toHaveBeenCalledWith('/build/100')
+            expect(await screen.findByTestId('mobile-deploy-none')).toBeInTheDocument()
         })
 
-        it('says that is what deploying does', () => {
-            build({authorizations: [granted('slotPipeline', 'create')]})
-            render(<MobileBuildScreen id="100"/>)
-            expect(screen.getByTestId('mobile-build-actions')).toHaveTextContent(/desktop/i)
-        })
-
-        it('says nothing about the desktop to a user who can only promote', () => {
-            // The caption belonged to both buttons and now belongs to one. A
-            // user offered only the promote button would otherwise be told their
-            // promotion happens somewhere else, which it no longer does.
-            build({authorizations: [granted('build', 'promote')]})
+        it('says nothing about the desktop at all any more', () => {
+            // The caption under the buttons covered the deploy entry point while
+            // it was the one thing here that still happened somewhere else.
+            build({authorizations: [granted('build', 'promote'), granted('slotPipeline', 'create')]})
             render(<MobileBuildScreen id="100"/>)
             expect(screen.getByTestId('mobile-build-actions')).not.toHaveTextContent(/desktop/i)
+        })
+    })
+
+    describe('deploying from the build screen', () => {
+
+        const deployable = (slots = []) => {
+            build({authorizations: [granted('slotPipeline', 'create')]})
+            eligibleSlotsResult = {
+                data: {eligibleSlotsForBuild: slots},
+                loading: false,
+                error: null,
+                finished: true,
+            }
+        }
+
+        const slot = (id, name) => ({
+            eligible: true,
+            nonEligibleRules: [],
+            slot: {id, qualifier: '', environment: {id: `env-${id}`, name, order: 100}},
+        })
+
+        it('takes the user to the new deployment, which is where the rest happens', async () => {
+            // A deployment starts as a CANDIDATE: nothing has happened to the
+            // environment yet, and the input, the override and the run are all
+            // on its own screen.
+            callGraphQL.mockResolvedValue({
+                startSlotPipeline: {pipeline: {id: 'pipeline-1'}, errors: null},
+            })
+            deployable([slot('slot-1', 'staging')])
+            render(<MobileBuildScreen id="100"/>)
+
+            fireEvent.click(screen.getByTestId('mobile-build-deploy'))
+            fireEvent.click(await screen.findByTestId('mobile-deploy-start-slot-1'))
+
+            await waitFor(() => expect(push).toHaveBeenCalledWith('/mobile/deployment/pipeline-1'))
+        })
+    })
+
+    describe('deployments waiting on somebody', () => {
+
+        const candidate = (id, environmentName) => ({
+            id,
+            end: null,
+            start: '2024-03-02T09:00:00Z',
+            slot: {id: `slot-${id}`, qualifier: '', environment: {id: environmentName, name: environmentName}},
+        })
+
+        it('lists them, and taps through to the deployment', () => {
+            // The only way into a deployment somebody else started - CI, usually
+            // - which is half of what the mobile deployment flow is for.
+            build({candidates: [candidate('pipeline-1', 'production')]})
+            render(<MobileBuildScreen id="100"/>)
+            const row = screen.getByTestId('mobile-build-candidate-pipeline-1')
+            expect(row).toHaveTextContent('production')
+            expect(row.querySelector('a').getAttribute('href')).toEqual('/mobile/deployment/pipeline-1')
+        })
+
+        it('is absent rather than empty when nothing is waiting', () => {
+            // Unlike the three sections below it, this is not a facet of the
+            // build: "no deployment is waiting" on every build screen would be a
+            // line nobody reads.
+            build()
+            render(<MobileBuildScreen id="100"/>)
+            expect(screen.queryByTestId('mobile-build-candidates')).not.toBeInTheDocument()
         })
     })
 

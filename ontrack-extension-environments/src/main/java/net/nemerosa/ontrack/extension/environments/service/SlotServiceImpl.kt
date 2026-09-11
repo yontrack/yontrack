@@ -165,16 +165,36 @@ class SlotServiceImpl(
         eventPostService.post(environmentsEventsFactory.slotUpdated(config.slot))
     }
 
-    override fun isBuildEligible(slot: Slot, build: Build): Boolean {
+    override fun isBuildEligible(slot: Slot, build: Build): Boolean =
+        eligibleSlot(slot, build).eligible
+
+    /**
+     * Whether [build] may enter [slot], **and** the rules which say it may not.
+     *
+     * The shared half of [isBuildEligible] and [getEligibleSlotsForBuild]: "is this build
+     * eligible" and "why is it not" are the same walk over the same admission rules, and
+     * answering the second one separately would mean walking them twice and let the two answers
+     * disagree. A slot is eligible exactly when no rule of its own refuses, which is why
+     * [EligibleSlot.eligible] is derived from the list here rather than computed beside it.
+     */
+    private fun eligibleSlot(slot: Slot, build: Build): EligibleSlot {
         securityService.checkSlotAccess<SlotView>(slot)
-        // Always checking the project
-        if (build.project != slot.project) return false
+        // Always checking the project. Not a rule, and so not something to report as one: a slot
+        // of another project is not on offer at all rather than on offer and refusing.
+        if (build.project != slot.project) {
+            return EligibleSlot(slot = slot, eligible = false)
+        }
         // Gets all the admission rules
         val configs = slotAdmissionRuleConfigRepository.getAdmissionRuleConfigs(slot)
         // All rules must assert that the build is OK for being a candidate
-        return configs.all { config ->
+        val nonEligibleRules = configs.filterNot { config ->
             isBuildEligible(slot, config, build)
         }
+        return EligibleSlot(
+            slot = slot,
+            eligible = nonEligibleRules.isEmpty(),
+            nonEligibleRules = nonEligibleRules,
+        )
     }
 
     override fun getEligibleBuilds(
@@ -343,10 +363,7 @@ class SlotServiceImpl(
 
     override fun getEligibleSlotsForBuild(build: Build): List<EligibleSlot> =
         slotRepository.findSlotsByProject(build.project, qualifier = null).map { slot ->
-            EligibleSlot(
-                slot = slot,
-                eligible = isBuildEligible(slot, build),
-            )
+            eligibleSlot(slot, build)
         }
 
     override fun findSlotByProjectAndEnvironment(environment: Environment, project: Project, qualifier: String): Slot? =

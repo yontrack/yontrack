@@ -65,14 +65,26 @@ export const deploymentName = (pipeline) =>
     pipeline?.slot?.environment?.name ? slotNameWithoutProject(pipeline.slot) : ''
 
 /**
- * One build's current deployments.
+ * One build's deployments: where it *is*, and where it is *waiting to go*.
+ *
+ * The two are one query because they are one licence. `currentDeployments` and
+ * `slotPipelines` are contributed by the same `GQLBuildSlotPipelinesFieldContributor`
+ * and registered together or not at all, so splitting them would buy no extra
+ * isolation and would cost a second round trip on every build screen.
+ *
+ * The candidates are what makes a deployment somebody else started - by CI,
+ * usually - reachable from a phone at all. A deployment waiting for a manual
+ * approval is the case the whole approval flow exists for, and without a row
+ * naming it there is nothing to tap.
  *
  * @param {string|number} id The build's id.
- * @returns {{deployments: Array, unavailable: boolean}} `unavailable` means the
- *   instance has no environments feature - not that the build is deployed
- *   nowhere, which is a different and sayable thing.
+ * @param {number} [refresh] Bumped by a caller which has just changed something
+ *   - started a deployment, say - to ask the server again.
+ * @returns {{deployments: Array, candidates: Array, unavailable: boolean}}
+ *   `unavailable` means the instance has no environments feature - not that the
+ *   build is deployed nowhere, which is a different and sayable thing.
  */
-export function useMobileBuildDeployments(id) {
+export function useMobileBuildDeployments(id, refresh = 0) {
     const query = useQuery(
         gql`
             query MobileBuildDeployments($id: Int!) {
@@ -81,13 +93,23 @@ export function useMobileBuildDeployments(id) {
                     currentDeployments {
                         ${DEPLOYMENT_FIELDS}
                     }
+                    # Deployments of this build which are still waiting on
+                    # somebody. Ordered by the server rather than left to
+                    # whatever the repository returns - decreasing environment
+                    # order, so the furthest one a build is trying to reach is
+                    # the first row rather than the last.
+                    slotPipelines(status: CANDIDATE, sortedByEnvironment: true) {
+                        ${DEPLOYMENT_FIELDS}
+                        start
+                    }
                 }
             }
         `,
-        {variables: {id: Number(id)}, deps: [id]}
+        {variables: {id: Number(id)}, deps: [id, refresh]}
     )
     return {
         deployments: query.data?.build?.currentDeployments ?? [],
+        candidates: query.data?.build?.slotPipelines ?? [],
         unavailable: Boolean(query.error),
     }
 }
