@@ -684,8 +684,10 @@ object DemoContent {
                     // Both read "Not started", because the seed configures slot workflows after the
                     // deployments it asks for - see `DemoSeed`. That is the state worth showing
                     // anyway: a gate nobody has run is very often the reason nothing newer has been
-                    // deployed, and the map is where that becomes visible. Workflows that have RUN
-                    // are shown on the promotion side, by [canaryPass] and [canaryFail].
+                    // deployed, and the map is where that becomes visible - as is, since #1737, the
+                    // mobile deployment screen, which draws all three triggers for the same reason.
+                    // Workflows that have RUN are shown on the promotion side, by [canaryPass] and
+                    // [canaryFail], and reach a phone through the build screen's promotion rows.
                     workflows = listOf(
                         SlotWorkflowSpec(
                             trigger = "CANDIDATE",

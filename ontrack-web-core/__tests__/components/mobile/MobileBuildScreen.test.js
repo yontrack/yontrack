@@ -83,10 +83,23 @@ const setResult = (result) => {
     queryResult = {data: null, loading: false, error: null, finished: true, ...result}
 }
 
-const promotion = (id, levelId, name, {time = '2024-03-01T10:00:00Z', user = 'admin'} = {}) => ({
+const promotion = (id, levelId, name, {
+    time = '2024-03-01T10:00:00Z',
+    user = 'admin',
+    workflowInstances = [],
+} = {}) => ({
     id,
     creation: {time, user},
     promotionLevel: {id: levelId, name, image: false},
+    workflowInstances,
+})
+
+/** One workflow a promotion set off, as the build screen reads it. */
+const workflowInstance = (id, name, status, {durationMs = 1200} = {}) => ({
+    id,
+    status,
+    durationMs,
+    workflow: {name},
 })
 
 const deployment = (id, environmentName, qualifier = '') => ({
@@ -215,6 +228,57 @@ describe('the mobile build screen', () => {
             build()
             render(<MobileBuildScreen id="100"/>)
             expect(screen.getByTestId('mobile-build-promotions')).toHaveTextContent(/not been promoted/i)
+        })
+
+        describe('the workflows a promotion set off', () => {
+
+            it('renders nothing extra on a promotion with none, which is most of them', () => {
+                build({promotions: [promotion(900, 500, 'BRONZE')]})
+                render(<MobileBuildScreen id="100"/>)
+                const row = screen.getByTestId('mobile-build-promotion-900')
+                expect(row.querySelector('.ot-mobile-row-details')).toBeNull()
+                // And the row is left exactly as it was, rather than being
+                // stacked around an empty block.
+                expect(row).toHaveClass('ot-mobile-row')
+                expect(row).not.toHaveClass('ot-mobile-row-stacked')
+            })
+
+            it('gives a promotion one line per workflow, with its status', () => {
+                // One line each and not a count: `MobileEntityRow` allows exactly
+                // one trailing action, so a count would need a disambiguation
+                // screen the moment a promotion fires two workflows.
+                build({
+                    promotions: [
+                        promotion(900, 500, 'SILVER', {
+                            workflowInstances: [
+                                workflowInstance('run-a', 'canary', 'SUCCESS'),
+                                workflowInstance('run-b', 'announce', 'ERROR'),
+                            ],
+                        }),
+                    ],
+                })
+                render(<MobileBuildScreen id="100"/>)
+
+                const first = screen.getByTestId('mobile-build-promotion-workflow-run-a')
+                expect(first).toHaveTextContent('canary')
+                expect(first).toHaveTextContent('Success')
+                const second = screen.getByTestId('mobile-build-promotion-workflow-run-b')
+                expect(second).toHaveTextContent('announce')
+                expect(second).toHaveTextContent('Error')
+            })
+
+            it('taps each of them through to the run itself', () => {
+                build({
+                    promotions: [
+                        promotion(900, 500, 'SILVER', {
+                            workflowInstances: [workflowInstance('run-a', 'canary', 'SUCCESS')],
+                        }),
+                    ],
+                })
+                render(<MobileBuildScreen id="100"/>)
+                expect(screen.getByTestId('mobile-build-promotion-workflow-run-a'))
+                    .toHaveAttribute('href', '/mobile/workflow-instance/run-a')
+            })
         })
     })
 

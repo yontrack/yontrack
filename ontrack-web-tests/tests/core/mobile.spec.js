@@ -4,13 +4,22 @@ const {selectUserMenu} = require("./userMenu");
 const {expectTheme, resetThemeMode} = require("./theme");
 const {test} = require("../fixtures/connection");
 const {expectNoSidewaysScroll} = require("../support/page-utils");
+const {generate} = require("@ontrack/utils");
+const {subscribeToWorkflow, waitForPromotionRunWorkflow} = require("../support/workflows");
+const {
+    overridePipelineWorkflow,
+    waitForPipelineWorkflowToBeFinished,
+    withSlotWorkflow,
+} = require("../extensions/environments/workflows/slotWorkflowsFixtures");
+const {addSlotWorkflow} = require("@ontrack/extensions/environments/workflows");
+const {createPipeline} = require("../extensions/environments/pipelineFixtures");
 
 /**
  * The mobile UI.
  *
  * This file is the acceptance of the whole mobile UI initiative, and is meant to
- * be readable as such. The five journeys the mobile UI exists for, and where
- * each one is pinned:
+ * be readable as such. The journeys the mobile UI exists for, and where each one
+ * is pinned:
  *
  * | Journey | Tests |
  * |---|---|
@@ -20,8 +29,9 @@ const {expectNoSidewaysScroll} = require("../support/page-utils");
  * | Promote a build | "a build is promoted from a phone, required fields and all" |
  * | Deploy a build, with approval and override | "a build is deployed from a phone…", "a blocked deployment is overridden from a phone…" |
  * | See a deployment through, or kill it | "a deployment is completed from a phone…", "a deployment is cancelled from a phone…" |
+ * | See what a workflow did, and where it got stuck | "a promotion carries the workflows it set off…" (promotions, the run itself), "a deployment draws its slot's workflows…" (deployments) |
  *
- * And the shell the five run inside, which has five behaviours of its own: the
+ * And the shell they all run inside, which has five behaviours of its own: the
  * redirect ("a phone lands on the mobile shell", and its negative "a desktop
  * browser is left alone" at the foot of the file), the entity route map ("a link
  * to a desktop project or branch lands on its mobile screen"), the interstitial
@@ -788,6 +798,167 @@ test.describe('the mobile UI on a phone', () => {
         // is no longer in progress.
         await page.goto(`${ontrack.connection.ui}/mobile/build/${build.id}`)
         await expect(page.getByTestId(`mobile-build-unsettled-${pipeline.id}`)).toHaveCount(0)
+    })
+
+    test('a promotion carries the workflows it set off, and the run is readable on a phone', async ({page, ontrack}) => {
+        // The whole of #1737's promotion half, end to end: the nested line on the
+        // build screen, the run behind it, and the node that failed saying why.
+        //
+        // The workflow fails on purpose. A green run proves the list renders; a
+        // failed one proves the thing somebody actually opens a phone for - which
+        // node broke, and with what error.
+        const project = await ontrack.createProject()
+        const branch = await project.createBranch()
+        const promotionLevel = await branch.createPromotionLevel()
+
+        const workflowName = generate("wf-")
+        await subscribeToWorkflow(promotionLevel, {name: workflowName, failing: true})
+
+        const build = await branch.createBuild()
+        await build.setRelease('1.4.0')
+        const run = await build.promote(promotionLevel)
+
+        // The link from a promotion to its workflows runs through the notification
+        // record the promotion leaves behind, and both the notification and the
+        // workflow are asynchronous. The mobile screens ask the server once and do
+        // not poll, so the wait is here rather than in the browser.
+        const instanceId = await waitForPromotionRunWorkflow(page, ontrack, run)
+
+        await page.setViewportSize({width: 375, height: 812})
+        await signInOnPhone(page, ontrack)
+        await page.goto(`${ontrack.connection.ui}/mobile/build/${build.id}`)
+
+        // One nested line under the promotion's own row, rather than a count on it:
+        // `MobileEntityRow` allows exactly one trailing action, and a promotion can
+        // fire more than one workflow.
+        const promotionRow = page.getByTestId(`mobile-build-promotion-${run.id}`)
+        await expect(promotionRow).toContainText(promotionLevel.name)
+        const workflowLine = page.getByTestId(`mobile-build-promotion-workflow-${instanceId}`)
+        await expect(workflowLine).toContainText(workflowName)
+        await expect(workflowLine).toContainText('Error')
+
+        // A nested line inside a row still does not push the card sideways at 375px.
+        await expectNoSidewaysScroll(page)
+
+        await workflowLine.click()
+        await expect(page).toHaveURL(/\/mobile\/workflow-instance\/.+/)
+
+        // The run as a list, not a graph: the desktop draws the DAG with React Flow
+        // in a fixed 600px box, which on a phone would be a pan-and-zoom canvas.
+        await expect(page.getByTestId('mobile-screen-title')).toContainText(workflowName)
+        await expect(page.getByTestId('mobile-workflow-instance-status')).toContainText('Error')
+        await expect(page.getByTestId('mobile-workflow-node-build')).toContainText('Success')
+        await expect(page.getByTestId('mobile-workflow-node-test-unit')).toContainText('Success')
+        await expect(page.getByTestId('mobile-workflow-node-publish')).toContainText('Error')
+
+        // The failing node's error, inline - there is no side panel on a phone to go
+        // and find it in.
+        await expect(page.getByTestId('mobile-workflow-error-publish')).toContainText('Error in publish node')
+
+        // Read-only: no stop, no override, anywhere on the screen.
+        await expect(page.getByRole('button', {name: /stop/i})).toHaveCount(0)
+
+        await expectNoSidewaysScroll(page)
+
+        // And the desktop link to the same run lands here, which is what the route
+        // map is for - an instance id is neither a number nor a UUID, so it needed a
+        // pattern of its own and the redirect had to stop reading its fractional
+        // seconds as a file extension.
+        await page.goto(`${ontrack.connection.ui}/extension/workflows/instances/${instanceId}`)
+        await expect(page).toHaveURL(new RegExp(`/mobile/workflow-instance/`))
+        await expect(page.getByTestId('mobile-screen-title')).toContainText(workflowName)
+
+        // The rest of the workflows pages keep reaching the interstitial: the audit
+        // page and the definitions have no mobile equivalent and should not pretend.
+        await page.goto(`${ontrack.connection.ui}/extension/workflows/audit`)
+        await expect(page).toHaveURL(/\/mobile\/desktop-only\?target=/)
+        await expect(page.getByTestId('desktop-only-destination')).toContainText('a workflow')
+    })
+
+    test('a deployment draws its slot workflows, including one nobody let run', async ({page, ontrack}) => {
+        // #1736 left a phone showing a deployment blocked by a workflow, naming the
+        // reason in that workflow's own words and offering no way to see which
+        // workflow it was. This is that way, and it stops at the section: the run
+        // itself is pinned once, by the journey above, and this suite runs
+        // single-worker and non-parallel so every second here is serial wall clock.
+        const {slot, project, slotWorkflow} = await withSlotWorkflow(ontrack, {trigger: 'CANDIDATE'})
+
+        // A second CANDIDATE workflow which fails, so there is something to override.
+        const blocking = await addSlotWorkflow({
+            slot,
+            trigger: 'CANDIDATE',
+            workflowYaml: `
+                name: Blocking
+                nodes:
+                  - id: check
+                    executorId: mock
+                    data:
+                        text: Error
+                        error: true
+            `,
+        })
+
+        // And one on a trigger this deployment has not reached, which is the point of
+        // drawing all three: a workflow which never ran is configuration, and
+        // frequently the reason nothing ever deployed here.
+        const announce = await addSlotWorkflow({
+            slot,
+            trigger: 'DONE',
+            workflowYaml: `
+                name: Announce
+                nodes:
+                  - id: announce
+                    executorId: mock
+                    data:
+                        text: Announcing
+            `,
+        })
+
+        const {pipeline} = await createPipeline({project, slot})
+        await waitForPipelineWorkflowToBeFinished(page, ontrack, pipeline.id, slotWorkflow)
+        await waitForPipelineWorkflowToBeFinished(page, ontrack, pipeline.id, blocking)
+
+        await overridePipelineWorkflow(ontrack, {
+            pipelineId: pipeline.id,
+            slotWorkflowId: blocking.id,
+            message: 'Known flake, agreed with ops.',
+        })
+
+        await page.setViewportSize({width: 375, height: 812})
+        await signInOnPhone(page, ontrack)
+        await page.goto(`${ontrack.connection.ui}/mobile/deployment/${pipeline.id}`)
+
+        const section = page.getByTestId('mobile-deployment-workflows')
+        await expect(section).toBeVisible()
+
+        // Each row carries its trigger, which is what says *when* the workflow has
+        // its turn - and is the only thing telling the first two apart from the third.
+        const ran = page.getByTestId(`mobile-deployment-workflow-${slotWorkflow.id}`)
+        await expect(ran).toContainText('On candidate')
+        await expect(ran).toContainText('Success')
+
+        const overridden = page.getByTestId(`mobile-deployment-workflow-${blocking.id}`)
+        await expect(overridden).toContainText('On candidate')
+        await expect(overridden).toContainText('Error')
+
+        // Showing that a workflow *was* overridden is not the opposite of read-only:
+        // a row reading Error with no sign that a human deliberately waved it through
+        // would be actively misleading.
+        await expect(page.getByTestId(`mobile-deployment-workflow-overridden-${blocking.id}`))
+            .toContainText('Known flake, agreed with ops.')
+
+        // The one whose turn has not come, present and honest about it.
+        const notStarted = page.getByTestId(`mobile-deployment-workflow-${announce.id}`)
+        await expect(notStarted).toContainText('On deployment done')
+        await expect(page.getByTestId(`mobile-deployment-workflow-status-${announce.id}`))
+            .toContainText('Not started')
+
+        // No action on any of them. Overriding a blocking workflow needs `SlotUpdate`
+        // *and* `SlotPipelineOverride`, a pair the role this screen is built around
+        // does not hold, so the button would be absent for the very user it is for.
+        await expect(section.getByRole('button')).toHaveCount(0)
+
+        await expectNoSidewaysScroll(page)
     })
 
     test('a favourite branch on the home screen taps through to itself', async ({page, ontrack}) => {

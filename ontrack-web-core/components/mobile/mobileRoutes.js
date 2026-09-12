@@ -69,6 +69,21 @@ export const mobileBuildUri = (id) => `${MOBILE_PREFIX}/build/${id}`
  */
 export const mobileDeploymentUri = (id) => `${MOBILE_PREFIX}/deployment/${id}`
 
+/**
+ * One workflow run's screen: its status and its nodes, as a list.
+ *
+ * Keyed on the plain `WorkflowInstance` id, so one screen serves both kinds of
+ * run a phone can reach - the one a promotion set off and the one a slot
+ * workflow ran for a deployment. They are the same type behind the same
+ * `workflowInstance(id:)` root query; what is slot-specific (the trigger, the
+ * override, the check's reason) belongs to the deployment and stays on the
+ * deployment screen.
+ *
+ * @param {string} id
+ * @returns {string}
+ */
+export const mobileWorkflowInstanceUri = (id) => `${MOBILE_PREFIX}/workflow-instance/${id}`
+
 /** Where a phone lands when its destination has no mobile equivalent. */
 export const MOBILE_INTERSTITIAL = `${MOBILE_PREFIX}/desktop-only`
 
@@ -89,6 +104,22 @@ export const DESKTOP_HOME = '/'
 const EQUIVALENTS = {
     [DESKTOP_HOME]: MOBILE_HOME,
 }
+
+/**
+ * A `:` as a browser leaves it in a path, or as one may percent-encode it.
+ *
+ * A workflow instance id is the only entity id in the product carrying a
+ * character a browser is free to encode, and a link pasted into a chat can
+ * arrive spelled either way.
+ */
+const COLON = '(?::|%3[Aa])'
+
+/** `ISO_LOCAL_DATE_TIME-UUID`, which is what `createInstanceId` builds. */
+const WORKFLOW_INSTANCE_PATH = new RegExp(
+    '^/extension/workflows/instances/(' +
+    `\\d{4}-\\d{2}-\\d{2}T\\d{2}${COLON}\\d{2}(?:${COLON}\\d{2}(?:\\.\\d+)?)?` +
+    '-[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$'
+)
 
 /**
  * Desktop routes carrying an entity id, and the mobile screen standing in for
@@ -115,12 +146,33 @@ const ENTITY_EQUIVALENTS = [
      * unanswerable question is worse than the interstitial.
      *
      * The mobile screen covers what a phone user does with a deployment -
-     * reading its admission rules, answering them, overriding one, running it -
-     * and not the desktop pipeline page's history, workflows or graph. That is
-     * the bar the route map sets: the screen exists and does the job, rather
-     * than being a placeholder standing in for a page that works.
+     * reading its admission rules, answering them, overriding one, running it,
+     * completing it, cancelling it - and reading its slot's workflows, which
+     * link on to the instance screen below. It does not carry the desktop
+     * pipeline page's history or its graph. That is the bar the route map sets:
+     * the screen exists and does the job, rather than being a placeholder
+     * standing in for a page that works.
      */
     [/^\/extension\/environments\/pipeline\/([0-9a-fA-F-]{36})$/, mobileDeploymentUri],
+    /*
+     * A workflow instance, whose id is neither a number nor a UUID but an
+     * `ISO_LOCAL_DATE_TIME-UUID` pair - so it needs a pattern of its own, exact
+     * like the others.
+     *
+     * The fractional seconds are what make this route awkward rather than
+     * merely different: `Time.now()` is not truncated, so the id carries one
+     * and the id therefore carries a **dot**. Both of the redirect's
+     * "this is a file, leave it alone" heuristics - `LOOKS_LIKE_A_FILE` below
+     * and the matcher in `middleware.js` - used to read any dot as a file
+     * extension, and would have exempted this path before ever reaching the
+     * table. Both now ask for a real extension instead.
+     *
+     * Only `/instances/[id]` maps. The audit page and the workflow definition
+     * pages still have no mobile equivalent and must still reach the
+     * interstitial, which is what the `/extension/workflows/` description below
+     * is for.
+     */
+    [WORKFLOW_INSTANCE_PATH, mobileWorkflowInstanceUri],
 ]
 
 /**
@@ -148,8 +200,17 @@ const EXEMPT_PREFIXES = [
     '/_next',
 ]
 
-/** A path segment with a dot in it is a file, not a page. */
-const LOOKS_LIKE_A_FILE = /\/[^/]+\.[^/]+$/
+/**
+ * A path ending in a file extension is a file, not a page.
+ *
+ * "A dot anywhere in the last segment" is the obvious reading and is the wrong
+ * one: a workflow instance id carries the fractional seconds of its timestamp,
+ * so `/extension/workflows/instances/2026-09-12T14:27:57.595125-<uuid>` would
+ * be exempted as a file and never reach its mobile screen. An extension is
+ * short and alphanumeric and runs to the end of the path, which a UUID trailing
+ * a dot does not.
+ */
+const LOOKS_LIKE_A_FILE = /\/[^/]+\.[A-Za-z0-9]{1,8}$/
 
 /**
  * Is this path outside the mobile/desktop decision altogether?

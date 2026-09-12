@@ -573,3 +573,46 @@ html, body {
     margin-top: 4px;
     flex: 0 0 auto;
 }
+
+/*
+ * What hangs off a row, under it: the workflows a promotion set off (#1737).
+ *
+ * Indented so it reads as belonging to the row above rather than as a second
+ * list, and each line is its own link - `MobileEntityRow` allows exactly one
+ * trailing action, and a promotion can fire more than one workflow. They wrap
+ * rather than ellipsis: a workflow's name and its status are both the point,
+ * and a truncated status says the wrong thing.
+ */
+.ot-mobile-row-details {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding-left: 16px;
+    border-left: 2px solid var(--ot-border-subtle);
+    margin-left: 4px;
+}
+
+.ot-mobile-row-detail {
+    font-size: 12px;
+    color: inherit;
+    text-decoration: none;
+    -webkit-tap-highlight-color: transparent;
+    /* Comfortably tappable without turning a two-line row into a screenful. */
+    min-height: 28px;
+    display: flex;
+    align-items: center;
+}
+
+.ot-mobile-row-detail:hover {
+    color: var(--ot-mobile-nav-active);
+}
+
+.ot-mobile-row-detail:focus-visible {
+    outline: 2px solid var(--ot-mobile-nav-active);
+    outline-offset: -2px;
+    border-radius: 4px;
+}
+
+.ot-mobile-row-detail .ot-mobile-inline {
+    flex-wrap: wrap;
+}

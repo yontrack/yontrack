@@ -8,6 +8,7 @@ import {
     MOBILE_HOME,
     mobileEquivalent,
     mobileProjectUri,
+    mobileWorkflowInstanceUri,
 } from "@components/mobile/mobileRoutes"
 
 describe('mobileEquivalent', () => {
@@ -49,6 +50,42 @@ describe('mobileEquivalent', () => {
             .toEqual(`/mobile/deployment/${id}`)
     })
 
+    it('maps a workflow instance to its mobile screen, keeping the id', () => {
+        // An instance id is neither a number nor a UUID but an
+        // `ISO_LOCAL_DATE_TIME-UUID` pair, fractional seconds included - which
+        // is what makes it the one entity id carrying a dot.
+        const id = '2026-09-12T14:27:57.595125-eb0102b5-1432-4821-8ae2-0edf5a4a0b3f'
+        expect(mobileEquivalent(`/extension/workflows/instances/${id}`))
+            .toEqual(mobileWorkflowInstanceUri(id))
+        expect(mobileEquivalent(`/extension/workflows/instances/${id}`))
+            .toEqual(`/mobile/workflow-instance/${id}`)
+    })
+
+    it('maps a workflow instance whose colons arrived percent-encoded', () => {
+        // A link pasted into a chat can arrive spelled either way: a colon is
+        // legal in a path and browsers usually leave it, but nothing obliges
+        // them to.
+        const encoded = '2026-09-12T14%3A27%3A57.595125-eb0102b5-1432-4821-8ae2-0edf5a4a0b3f'
+        expect(mobileEquivalent(`/extension/workflows/instances/${encoded}`))
+            .toEqual(`/mobile/workflow-instance/${encoded}`)
+    })
+
+    it('maps a workflow instance whose timestamp has no fractional seconds', () => {
+        // `ISO_LOCAL_DATE_TIME` drops the fraction when the nanosecond field is
+        // zero, which is rare in production and routine in a fixture.
+        const id = '2026-09-12T14:27:57-eb0102b5-1432-4821-8ae2-0edf5a4a0b3f'
+        expect(mobileEquivalent(`/extension/workflows/instances/${id}`))
+            .toEqual(`/mobile/workflow-instance/${id}`)
+    })
+
+    it('leaves the rest of the workflows pages to the interstitial', () => {
+        // Only the instance page has a mobile screen. The audit page and the
+        // definitions do not, and they have to keep reaching the interstitial
+        // under a name a user can read.
+        expect(mobileEquivalent('/extension/workflows/audit')).toBeNull()
+        expect(describeDesktopRoute('/extension/workflows/audit')).toEqual('a workflow')
+    })
+
     it.each([
         '/project/12/something',
         '/branch/',
@@ -57,6 +94,11 @@ describe('mobileEquivalent', () => {
         // ask the server a question it cannot answer.
         '/extension/environments/pipeline/7',
         '/extension/environments/pipeline/0f3a9b2c-1d4e-4f60-8a7b-9c0d1e2f3a4b/steps',
+        // Not an instance id: the screen would ask the server for a run that
+        // cannot exist.
+        '/extension/workflows/instances/7',
+        '/extension/workflows/instances/eb0102b5-1432-4821-8ae2-0edf5a4a0b3f',
+        '/extension/workflows/instances/2026-09-12T14:27:57.595125-eb0102b5-1432-4821-8ae2-0edf5a4a0b3f/nodes',
     ])('does not mistake %s for an entity screen', (pathname) => {
         // The desktop routes are `/project/[id]` and `/branch/[id]` and nothing
         // else. A looser match would send a phone to a mobile screen that then
@@ -122,6 +164,15 @@ describe('isRedirectExempt', () => {
         ['/yontrack-logo.svg', 'a static file'],
     ])('leaves %s alone (%s)', (pathname) => {
         expect(isRedirectExempt(pathname)).toBe(true)
+    })
+
+    it('does not read a dot in the middle of an id as a file extension', () => {
+        // A workflow instance id carries the fractional seconds of its
+        // timestamp. Read as a file it would be exempted here and never reach
+        // its mobile screen - which is also why the `middleware.js` matcher asks
+        // for an extension rather than for a dot.
+        const id = '2026-09-12T14:27:57.595125-eb0102b5-1432-4821-8ae2-0edf5a4a0b3f'
+        expect(isRedirectExempt(`/extension/workflows/instances/${id}`)).toBe(false)
     })
 
     it.each([

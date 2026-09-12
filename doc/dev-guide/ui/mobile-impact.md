@@ -37,7 +37,7 @@ the second one is not the one you are looking at.
 | The promotion level field mapping (`promotionLevelFields`) | The promote dialog and the promote sheet around it |
 | Authorization helpers (`isAuthorized`, the `authorizations` field) | `MainLayout`, `MainPage`, `MainPageBar`, `NavBar`, `UserMenu` |
 | Theme tokens (`styles/globals.css`) and the pre-paint theme script | The mobile shell: `MobileLayout`, `MobileHeader`, `MobileBottomNav` |
-| A handful of display primitives — `ValidationChip`, `PromotionLevelImage`, `TimestampText`, `EntityIcon`, `CheckIcon`, `SlotPipelineStatusLabel` | The provider stack: `/mobile` is its own App Router root and assembles its own |
+| A handful of display primitives — `ValidationChip`, `PromotionLevelImage`, `TimestampText`, `DurationMs`, `EntityIcon`, `CheckIcon`, `SlotPipelineStatusLabel`, `SlotWorkflowTrigger`, `WorkflowInstanceStatus`, `WorkflowInstanceNodeStatus`, and the `workflowNodeDepths` ordering function | The provider stack: `/mobile` is its own App Router root and assembles its own |
 | The admission rule components under `components/framework/environments-slot-admission-rule/` | `Dynamic` itself — its webpack context belongs to the Pages Router layer, so a `/mobile` screen gets a second React and renders "Error". Mobile screens name their components statically |
 | The next-auth session and the `/api/protected/graphql` proxy | Every screen, and the lists and cards they are built from |
 
@@ -82,9 +82,10 @@ change reaches the mobile UI; the right column is where it cannot.
 - **A new or changed desktop route.** The route map decides what a phone following a link to
   it sees — see [Routes](#routes-adding-a-desktop-page-is-a-mobile-decision) below.
 - **A change to a shared display primitive.** `ValidationChip`, `PromotionLevelImage`,
-  `TimestampText` and `EntityIcon` all render inside `/mobile` at phone width. A primitive
-  that grew a desktop-sized affordance, or that started reaching for a provider the mobile
-  stack does not have, breaks a mobile screen and not a desktop one.
+  `TimestampText`, `EntityIcon` and — since #1737 — `WorkflowInstanceStatus`,
+  `WorkflowInstanceNodeStatus` and `SlotWorkflowTrigger` all render inside `/mobile` at phone
+  width. A primitive that grew a desktop-sized affordance, or that started reaching for a
+  provider the mobile stack does not have, breaks a mobile screen and not a desktop one.
 
   That last one has already happened once: `useEventForRefresh` read a context with an empty
   default, and the mobile provider stack has no `EventsContextProvider` — so every promotion
@@ -120,10 +121,11 @@ and it is also what makes the check cheap — this is the whole list.
 | Projects | `projects(pattern:)` |
 | Project | `project(id:)`, `Project.branches(name:, count:, order:)` |
 | Branch | `branch(id:)`, `Branch.builds(filter: StandardBuildFilter, size:)` with `withDisplayName` and `withPromotionLevel`, `Branch.promotionLevels` |
-| Build | `build(id:)` — `displayName`, `description`, `creation`, `branch`, `authorizations`, `promotionRuns(lastPerLevel: true)`, `validations(size:)` with its runs' `lastStatus` |
+| Build | `build(id:)` — `displayName`, `description`, `creation`, `branch`, `authorizations`, `promotionRuns(lastPerLevel: true)` with `workflowInstances`, `validations(size:)` with its runs' `lastStatus` |
 | Build and branch | `Build.currentDeployments` and `Build.slotPipelines(status:)` — asked for twice, aliased, for `CANDIDATE` and for `RUNNING` — in a query of their own |
 | Build, deploying | `eligibleSlotsForBuild(buildId:)` — `eligible`, `nonEligibleRules`, `slot`; `startSlotPipeline` |
-| Deployment | `slotPipelineById(id:)` — `status`, `slot` with its `authorizations`, `admissionRules`, `requiredInputs`, `runAction`, `finishAction`, `errorMessage`, `lastChange`; `updatePipelineData`, `overridePipelineRule`, `startSlotPipelineDeployment`, `finishSlotPipelineDeployment`, `cancelSlotPipeline` |
+| Deployment | `slotPipelineById(id:)` — `status`, `slot` with its `authorizations` and its `workflows(trigger:)` (three aliases) each with `slotWorkflowInstanceForPipeline(pipelineId:)`, `admissionRules`, `requiredInputs`, `runAction`, `finishAction`, `errorMessage`, `lastChange`; `updatePipelineData`, `overridePipelineRule`, `startSlotPipelineDeployment`, `finishSlotPipelineDeployment`, `cancelSlotPipeline` |
+| Workflow run | `workflowInstance(id:)` — `status`, `finished`, `startTime`, `durationMs`, `triggerData`, `workflow { name nodes }`, `nodesExecutions`; and a narrow second query of the same field while the run is unfinished |
 | Account | `user { account { name fullName email } }` and `info { version { display } }`, both through the shared providers rather than a query of its own |
 | Favourites | the four `favourite`/`unfavourite` mutations |
 
@@ -137,6 +139,10 @@ Two things about that list are worth knowing before changing anything on it:
   conditionally needs the same treatment — see `useMobileDeployments`.
 - **The filter goes to the deployments query too.** Asked for under different terms, the two
   queries are pages of two different lists and the badges silently vanish.
+- **`Slot.workflows` and `slotWorkflowInstanceForPipeline` need no split of their own.** The
+  environments licence gates field *contributors* like `Build.slotPipelines`, not these types,
+  so they ride in the deployment screen's own query. `workflowInstances` is contributed by the
+  workflows extension to every project entity and is not licence-gated either.
 
 If your change touches a row of that table, it has mobile impact. If it does not, it very
 probably has none — say so and move on.
@@ -151,6 +157,12 @@ middleware reads it to decide, for a phone, between a mobile screen and the inte
 - `isRedirectExempt(pathname)` — the paths the redirect must not touch at all.
 - `describeDesktopRoute(pathname)` — what to call a desktop route in the interstitial, so it
   can name where the user was going.
+
+**A dot in an id is not a file extension.** `LOOKS_LIKE_A_FILE` here and the `matcher` in
+`middleware.js` both keep static files out of the redirect, and both ask for a real *extension*
+rather than for a dot anywhere: a workflow instance id carries the fractional seconds of its
+timestamp, and reading that as a file would have exempted the whole route (#1737). A new id
+shape with a dot in it is a change to both.
 
 **Adding a desktop route means deciding what a phone following a link to it should see.** A
 route added without an entry silently gets the interstitial. That may well be the right

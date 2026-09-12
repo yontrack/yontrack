@@ -52,6 +52,10 @@ ontrack-extension-*/node_modules
 !buildSrc/src/test/kotlin/net/nemerosa/ontrack/build/
 # The mobile UI's build screen, which is a route named after the entity it shows:
 !ontrack-web-core/app/mobile/build/
+# The mobile UI's workflow run screen, swallowed by the `work*/` rule at the top of this file.
+# The *directory* has to be re-included, not only its files: git never descends into an excluded
+# directory, so a negation on a path inside one has no effect.
+!ontrack-web-core/app/mobile/workflow-instance/
 
 # Local development stack state (scripts/dev-stack.sh)
 .yontrack-dev/

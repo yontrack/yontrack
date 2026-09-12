@@ -44,8 +44,13 @@ export function MobileEntityGroup({title, testId, children}) {
  *   and, once the app is installed as a PWA scoped to `/mobile`, out of the app.
  *   A row with no screen behind it yet takes no `href` - a tap that 404s is
  *   worse than a row that does not move.
+ * @param {React.ReactNode} [details] Lines *below* the row, indented, for what
+ *   hangs off the entity rather than describing it - the workflows a promotion
+ *   set off (#1737). Not `context`, which is one line and ellipsises; and not a
+ *   trailing action, because there can be several of them and each is its own
+ *   link. A row given none is rendered exactly as it was before this existed.
  */
-export function MobileEntityRow({testId, name, context, action, href}) {
+export function MobileEntityRow({testId, name, context, action, href, details}) {
 
     /*
      * The link wraps the text and NOT the whole row: the trailing action is
@@ -63,8 +68,17 @@ export function MobileEntityRow({testId, name, context, action, href}) {
         </>
     )
 
+    /*
+     * A row carrying details stacks rather than laying its parts out on one
+     * line - the same shape the deployment screen's rules use. Without details
+     * the markup and the classes are exactly what they were, so no existing list
+     * moves.
+     */
     return (
-        <li className="ot-mobile-row" data-testid={testId}>
+        <li
+            className={details ? "ot-mobile-row ot-mobile-row-stacked" : "ot-mobile-row"}
+            data-testid={testId}
+        >
             {
                 href ?
                     <Link href={href} className="ot-mobile-row-text ot-mobile-row-link">
@@ -73,6 +87,10 @@ export function MobileEntityRow({testId, name, context, action, href}) {
                     <div className="ot-mobile-row-text">
                         {text}
                     </div>
+            }
+            {
+                details &&
+                <div className="ot-mobile-row-details">{details}</div>
             }
             {
                 action &&

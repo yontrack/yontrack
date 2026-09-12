@@ -61,9 +61,37 @@ const rule = (id, {
     admissionRuleConfig: {id, name: id, description: null, ruleId, ruleConfig},
 })
 
+/**
+ * One configured slot workflow, and its run for this pipeline when it has had
+ * one.
+ */
+const slotWorkflow = (id, trigger, {
+    name = `workflow-${id}`,
+    instance = null,
+    overridden = false,
+    override = null,
+} = {}) => ({
+    id,
+    trigger,
+    workflow: {name},
+    slotWorkflowInstanceForPipeline: instance ? {
+        id: `swi-${id}`,
+        overridden,
+        override,
+        workflowInstance: {
+            id: `2026-09-12T14:27:57.595125-0000000${id}-1432-4821-8ae2-0edf5a4a0b3f`,
+            status: instance.status ?? 'SUCCESS',
+            startTime: '2026-09-12T14:27:57Z',
+            durationMs: instance.durationMs ?? 1000,
+            finished: instance.finished ?? true,
+        },
+    } : null,
+})
+
 const deployment = ({
                         status = 'CANDIDATE',
                         rules = [],
+                        workflows = [],
                         requiredInputs = [],
                         runAction = {ok: true, successCount: 1, totalCount: 1},
                         finishAction = {ok: true, successCount: 1, totalCount: 1},
@@ -84,6 +112,9 @@ const deployment = ({
                     environment: {id: 'env-1', name: 'production'},
                     project: {id: 1, name: 'petclinic'},
                     authorizations,
+                    candidateWorkflows: workflows.filter(it => it.trigger === 'CANDIDATE'),
+                    runningWorkflows: workflows.filter(it => it.trigger === 'RUNNING'),
+                    doneWorkflows: workflows.filter(it => it.trigger === 'DONE'),
                 },
                 admissionRules: rules,
                 requiredInputs: requiredInputs.map(id => ({
@@ -508,6 +539,124 @@ describe('the mobile deployment screen', () => {
             render(<MobileDeploymentScreen id="pipeline-1"/>)
             fireEvent.click(screen.getByTestId('mobile-deployment-override-open-r1'))
             expect(screen.getByTestId('mobile-deployment-override-warning')).toBeInTheDocument()
+        })
+    })
+
+    describe('the workflows', () => {
+
+        it('is absent, not empty, on a slot which declares none', () => {
+            // Most slots have none, and an empty section on every deployment
+            // screen in the product to serve the minority that has one is pure
+            // cost - the same reason *Deployments in progress* is absent on the
+            // build screen.
+            deployment()
+            render(<MobileDeploymentScreen id="pipeline-1"/>)
+            expect(screen.queryByTestId('mobile-deployment-workflows')).not.toBeInTheDocument()
+        })
+
+        it('shows all three triggers, candidate first, whatever the status', () => {
+            // A slot workflow is configuration as much as state: one which never
+            // ran is frequently *why* nothing ever deployed here, so hiding the
+            // triggers whose turn has not come hides exactly that.
+            deployment({
+                status: 'RUNNING',
+                workflows: [
+                    slotWorkflow('c1', 'CANDIDATE', {name: 'gate'}),
+                    slotWorkflow('r1', 'RUNNING', {name: 'smoke'}),
+                    slotWorkflow('d1', 'DONE', {name: 'announce'}),
+                ],
+            })
+            render(<MobileDeploymentScreen id="pipeline-1"/>)
+
+            const rows = screen.getAllByTestId(/^mobile-deployment-workflow-[a-z0-9]+$/)
+            expect(rows.map(row => row.getAttribute('data-testid'))).toEqual([
+                'mobile-deployment-workflow-c1',
+                'mobile-deployment-workflow-r1',
+                'mobile-deployment-workflow-d1',
+            ])
+            expect(screen.getByTestId('mobile-deployment-workflow-c1')).toHaveTextContent('On candidate')
+            expect(screen.getByTestId('mobile-deployment-workflow-r1')).toHaveTextContent('On running')
+            expect(screen.getByTestId('mobile-deployment-workflow-d1')).toHaveTextContent('On deployment done')
+        })
+
+        it('says Not started for a workflow which has never run, and offers no link', () => {
+            deployment({workflows: [slotWorkflow('c1', 'CANDIDATE', {name: 'gate'})]})
+            render(<MobileDeploymentScreen id="pipeline-1"/>)
+
+            const row = screen.getByTestId('mobile-deployment-workflow-c1')
+            expect(row).toHaveTextContent('gate')
+            expect(screen.getByTestId('mobile-deployment-workflow-status-c1'))
+                .toHaveTextContent('Not started')
+            // A tap that 404s is worse than a row that does not move.
+            expect(screen.queryByTestId('mobile-deployment-workflow-link-c1')).not.toBeInTheDocument()
+        })
+
+        it('taps a workflow which has run through to its own run', () => {
+            deployment({
+                workflows: [slotWorkflow('r1', 'RUNNING', {name: 'smoke', instance: {status: 'ERROR'}})],
+            })
+            render(<MobileDeploymentScreen id="pipeline-1"/>)
+
+            expect(screen.getByTestId('mobile-deployment-workflow-status-r1')).toHaveTextContent('Error')
+            expect(screen.getByTestId('mobile-deployment-workflow-link-r1'))
+                .toHaveAttribute(
+                    'href',
+                    '/mobile/workflow-instance/2026-09-12T14:27:57.595125-0000000r1-1432-4821-8ae2-0edf5a4a0b3f',
+                )
+        })
+
+        it('says who overrode a workflow and what they said', () => {
+            // Read-only is a decision about what the phone lets you *do*, not
+            // about what it lets you know: a row reading Error with no sign that
+            // a human deliberately waved it through would be actively
+            // misleading.
+            deployment({
+                workflows: [
+                    slotWorkflow('r1', 'RUNNING', {
+                        name: 'smoke',
+                        instance: {status: 'ERROR'},
+                        overridden: true,
+                        override: {user: 'alice', message: 'Known flake, agreed with ops.'},
+                    }),
+                ],
+            })
+            render(<MobileDeploymentScreen id="pipeline-1"/>)
+
+            const overridden = screen.getByTestId('mobile-deployment-workflow-overridden-r1')
+            expect(overridden).toHaveTextContent('alice')
+            expect(overridden).toHaveTextContent('Known flake, agreed with ops.')
+        })
+
+        it('offers no action on a workflow, whatever the user may do', () => {
+            // Overriding a blocking workflow needs `SlotUpdate` *and*
+            // `SlotPipelineOverride`, a pair the role this screen is built
+            // around does not hold - so it stays on the desktop, and so does
+            // stopping a run.
+            deployment({
+                status: 'RUNNING',
+                workflows: [slotWorkflow('r1', 'RUNNING', {instance: {status: 'RUNNING', finished: false}})],
+            })
+            render(<MobileDeploymentScreen id="pipeline-1"/>)
+
+            const section = screen.getByTestId('mobile-deployment-workflows')
+            expect(section.querySelectorAll('button')).toHaveLength(0)
+        })
+
+        it('does not supersede the caption saying why the button is off', () => {
+            // The caption says *why the button is off* for someone who reads one
+            // line and taps nothing; the section says *what is going on*. Both,
+            // at different distances from the button.
+            deployment({
+                status: 'RUNNING',
+                finishAction: {ok: false},
+                errorMessage: 'Workflow is running',
+                workflows: [slotWorkflow('d1', 'DONE', {instance: {status: 'RUNNING', finished: false}})],
+            })
+            render(<MobileDeploymentScreen id="pipeline-1"/>)
+
+            expect(screen.getByTestId('mobile-deployment-finish-blocked'))
+                .toHaveTextContent('Workflow is running')
+            expect(screen.getByTestId('mobile-deployment-workflows')).toBeInTheDocument()
         })
     })
 

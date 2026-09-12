@@ -11,7 +11,7 @@ says so and hands you the desktop version rather than pretending.
 
 ## What it does
 
-Five things — the ones people actually do from a phone:
+Six things — the ones people actually do from a phone:
 
 **Find a project and a branch.**
 :   The home screen is your [favourite](#favourites) projects and branches. The full
@@ -51,7 +51,22 @@ Five things — the ones people actually do from a phone:
 
     Completing a deployment from a phone is for the abnormal path: on the normal one CI
     finishes them. When a slot workflow is holding the completion up, the screen says so in
-    that workflow's own words and offers no button rather than one that fails.
+    that workflow's own words and offers no button rather than one that fails — and lists the
+    workflow itself, under *Workflows*, so you can see which one it is.
+
+**See what a workflow did.**
+:   A deployment screen lists the [workflows](../integrations/workflows/workflows.md) its
+    environment is configured with — all of them, including the ones whose turn has not come,
+    which read *Not started*: a workflow that has never run is frequently the reason nothing
+    has ever been deployed there. A promotion on a build screen lists the workflows it set off.
+    Tapping any of them opens that run: its status, and its steps in the order they happen,
+    with the error of every step that failed. If somebody overrode a workflow's result, the
+    deployment screen says who and why.
+
+    All of it is **read-only**. You can see what a workflow did; stopping one, or overriding a
+    workflow that is blocking a deployment, stays on the desktop UI. A running workflow's page
+    updates on its own while it runs, and stops once it is over — it is the one screen in the
+    mobile UI that refreshes itself.
 
 A build screen also lists that build's validations, read-only. They are otherwise out of
 scope, but whether a build is green is the question you answer before promoting or
@@ -66,15 +81,18 @@ Everything else, and on purpose. Notably:
 - **Dashboards** and [charts](../dashboards/index.md), and the
   [branch views](../concepts/branch-views/index.md).
 - **Global search**, [change logs](../integrations/changelogs/changelogs.md),
-  [auto-versioning](../integrations/auto-versioning/auto-versioning.md),
-  [workflows](../integrations/workflows/workflows.md) and
+  [auto-versioning](../integrations/auto-versioning/auto-versioning.md) and
   [notifications](../integrations/notifications/index.md).
+- **Configuring [workflows](../integrations/workflows/workflows.md)**, the workflows audit
+  page, and the graph view of a run. Seeing what a workflow a promotion or a deployment set
+  off actually did is in the list above; setting one up, browsing every run on the instance,
+  and reading a run as a diagram are not.
 - **Validation detail.** A build screen says which validations ran and how they did; the
   run itself, the matrix and the per-stamp history stay on the desktop.
 - **Forcing a deployment through**, when a workflow is blocking its completion. That
   bypasses controls somebody configured and is recorded against your name, so it stays on
-  the desktop UI — along with overriding the blocking workflow itself, and deleting a
-  deployment.
+  the desktop UI — along with overriding the blocking workflow itself, stopping a running
+  workflow, and deleting a deployment.
 - **Editing anything** — names, descriptions, properties, links.
 
 This list is not a backlog. The mobile UI exists precisely because the desktop UI is not
@@ -92,8 +110,8 @@ toggle. It is one list of favourites shared by both UIs, not a separate one per 
 
 Yontrack looks at the browser's user agent and sends **phones** to `/mobile`. Nothing to
 install, no separate address to remember, and a link someone shares from their desktop
-session keeps its subject: a link to a project, a branch, a build or a deployment lands on
-that same project, branch, build or deployment in the mobile UI.
+session keeps its subject: a link to a project, a branch, a build, a deployment or a workflow
+run lands on that same project, branch, build, deployment or workflow run in the mobile UI.
 
 Two things follow from the user agent being the whole input:
 

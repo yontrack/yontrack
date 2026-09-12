@@ -29,8 +29,15 @@
  * override against the user, which is the one thing on this screen a bigger
  * screen genuinely buys something for. Overriding a blocking workflow needs
  * `SlotUpdate` *and* `SlotPipelineOverride`, a pair `PROJECT_ROLE_PIPELINES_MANAGER`
- * does not hold. Drawing the workflows themselves is #1737 - this screen shows
- * the reason *string* and stops there.
+ * does not hold, so it stays on the desktop too - and so does stopping one.
+ *
+ * **The workflows themselves are drawn** (#1737), read-only, in their own
+ * section below the checks - all three triggers whatever the status, each with
+ * its run for this pipeline, and each tapping through to that run's own screen.
+ * That does not supersede the blocked caption above it: the caption says *why
+ * the button is off* for someone who reads one line and taps nothing, the
+ * section says *what is going on*. They answer different questions at different
+ * distances from the button. See `MobileDeploymentWorkflows`.
  *
  * **The rules are drawn by the desktop's own components**, reached through
  * `admissionRuleComponents` - the mobile UI's rule-id lookup, which exists
@@ -62,6 +69,7 @@ import MobileDeploymentInputSheet from "@components/mobile/deployments/MobileDep
 import MobileDeploymentOverrideSheet from "@components/mobile/deployments/MobileDeploymentOverrideSheet"
 import MobileDeploymentFinishSheet from "@components/mobile/deployments/MobileDeploymentFinishSheet"
 import MobileDeploymentCancelSheet from "@components/mobile/deployments/MobileDeploymentCancelSheet"
+import MobileDeploymentWorkflows, {gqlMobileSlotWorkflow} from "@components/mobile/deployments/MobileDeploymentWorkflows"
 import {mobileBuildUri, mobileProjectUri} from "@components/mobile/mobileRoutes"
 import {slotNameWithoutProject} from "@components/extension/environments/SlotName"
 import {MobileAdmissionRuleSummary} from "@components/mobile/deployments/admissionRuleComponents"
@@ -121,6 +129,20 @@ export default function MobileDeploymentScreen({id}) {
                             action
                             authorized
                         }
+                        # The slot's workflows, all three triggers, each with its
+                        # run for this pipeline - see \`MobileDeploymentWorkflows\`.
+                        # Read whatever the status: a workflow which never ran is
+                        # configuration, and frequently the reason nothing ever
+                        # deployed here.
+                        candidateWorkflows: workflows(trigger: CANDIDATE) {
+                            ...MobileSlotWorkflow
+                        }
+                        runningWorkflows: workflows(trigger: RUNNING) {
+                            ...MobileSlotWorkflow
+                        }
+                        doneWorkflows: workflows(trigger: DONE) {
+                            ...MobileSlotWorkflow
+                        }
                     }
                     # Every rule and its verdict, which is what makes this screen
                     # a decision rather than a button.
@@ -178,6 +200,7 @@ export default function MobileDeploymentScreen({id}) {
                     }
                 }
             }
+            ${gqlMobileSlotWorkflow}
         `,
         {
             variables: {id},
@@ -603,6 +626,14 @@ export default function MobileDeploymentScreen({id}) {
                                 })
                             }
                         </MobileSectionList>
+
+                        {/*
+                          Below Checks and above the settled caption: a workflow
+                          is not something a person answers, so it sits after the
+                          list whose purpose is action - and before the sentence
+                          that closes the screen off.
+                        */}
+                        <MobileDeploymentWorkflows deployment={deployment}/>
 
                         {
                             /*

@@ -2,43 +2,7 @@ import {login} from "../login";
 import {generate} from "@ontrack/utils";
 import {test} from "../../fixtures/connection";
 import {PromotionRunPage} from "./PromotionRunPage";
-
-/**
- * Subscribes the promotion level to a workflow launched on every promotion.
- *
- * The workflow fans out from a single root so that the node strip has two depth columns.
- */
-const subscribeToWorkflow = async (pl, {name, failing = false}) => {
-    await pl.subscribe({
-        name: `Subscription ${name}`,
-        events: ['new_promotion_run'],
-        channel: 'workflow',
-        channelConfig: {
-            workflow: {
-                name: name,
-                nodes: [
-                    {
-                        id: "build",
-                        executorId: "mock",
-                        data: {text: "Building"},
-                    },
-                    {
-                        id: "test-unit",
-                        parents: [{id: "build"}],
-                        executorId: "mock",
-                        data: {text: "Unit tests"},
-                    },
-                    {
-                        id: "publish",
-                        parents: [{id: "build"}],
-                        executorId: "mock",
-                        data: {text: "Publishing", error: failing},
-                    },
-                ],
-            },
-        },
-    })
-}
+import {subscribeToWorkflow} from "../../support/workflows";
 
 test('the workflows of a promotion are shown on the promotion run page', async ({page, ontrack}) => {
     const project = await ontrack.createProject()

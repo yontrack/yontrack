@@ -18,6 +18,10 @@
  * screen. The issue lists them last, but a validation list can be long, and a
  * user who already knows they want to promote should not have to scroll past
  * every stamp to reach the button.
+ *
+ * **A promotion carries the workflows it set off** (#1737), one nested line
+ * each, tapping through to the run's own screen. A promotion with none - which
+ * is most of them - renders nothing extra. See `MobilePromotionWorkflows`.
  */
 
 import {useState} from "react"
@@ -36,9 +40,16 @@ import TimestampText from "@components/common/TimestampText"
 import {PromotionLevelImage} from "@components/promotionLevels/PromotionLevelImage"
 import ValidationChip from "@components/primitives/ValidationChip"
 import {gqlValidationChipStamp} from "@components/primitives/ValidationChipFragments"
-import {FaServer} from "react-icons/fa"
+import {FaProjectDiagram, FaServer} from "react-icons/fa"
 import SlotPipelineStatusLabel from "@components/extension/environments/SlotPipelineStatusLabel"
-import {mobileBranchUri, mobileDeploymentUri, mobileProjectUri} from "@components/mobile/mobileRoutes"
+import {
+    mobileBranchUri,
+    mobileDeploymentUri,
+    mobileProjectUri,
+    mobileWorkflowInstanceUri,
+} from "@components/mobile/mobileRoutes"
+import DurationMs from "@components/common/DurationMs"
+import WorkflowInstanceStatus from "@components/extension/workflows/WorkflowInstanceStatus"
 
 /**
  * How many validation stamps the screen shows.
@@ -117,6 +128,21 @@ export default function MobileBuildScreen({id}) {
                             id
                             name
                             image
+                        }
+                        # The workflows this promotion set off, if any - one
+                        # nested line each, below the promotion's own row. Most
+                        # promotions have none and render nothing extra.
+                        #
+                        # Resolved through a data loader (#1737), so asking for
+                        # it on every row of the list costs a constant number of
+                        # queries rather than five per row.
+                        workflowInstances {
+                            id
+                            status
+                            durationMs
+                            workflow {
+                                name
+                            }
                         }
                     }
                     # One entry per stamp, with its latest run - which is what
@@ -261,6 +287,18 @@ export default function MobileBuildScreen({id}) {
                                             </span>
                                         }
                                         context={<MobileSignature signature={run.creation}/>}
+                                        /*
+                                         * Decided here and not inside the
+                                         * component: a component returning
+                                         * `null` is still a truthy element, and
+                                         * `MobileEntityRow` would then stack
+                                         * every promotion row in the product
+                                         * around an empty block.
+                                         */
+                                        details={
+                                            run.workflowInstances?.length > 0 &&
+                                            <MobilePromotionWorkflows run={run}/>
+                                        }
                                     />
                                 )
                             }
@@ -421,6 +459,45 @@ export default function MobileBuildScreen({id}) {
                 }
             </MobileAsyncContent>
         </MobileScreen>
+    )
+}
+
+/**
+ * The workflows a promotion set off, one line each, under its row.
+ *
+ * Not a trailing indicator on the row: `MobileEntityRow` allows exactly one
+ * trailing action, so a *count* would need a disambiguation screen the moment a
+ * promotion fires two workflows - and the desktop promotion run page already
+ * answers this by rendering one card per instance rather than one aggregate. Not
+ * a `/mobile/promotion-run/[id]` screen either: it would exist solely to hold a
+ * list this screen can hold directly.
+ *
+ * `null` rather than an empty block for a promotion with no workflow, which is
+ * most of them - `MobileEntityRow` then renders exactly the row it always did.
+ */
+function MobilePromotionWorkflows({run}) {
+    const instances = run.workflowInstances ?? []
+    if (instances.length === 0) return null
+    return (
+        <>
+            {
+                instances.map(instance =>
+                    <Link
+                        key={instance.id}
+                        href={mobileWorkflowInstanceUri(instance.id)}
+                        className="ot-mobile-row-detail"
+                        data-testid={`mobile-build-promotion-workflow-${instance.id}`}
+                    >
+                        <span className="ot-mobile-inline">
+                            <FaProjectDiagram aria-hidden="true"/>
+                            {instance.workflow?.name}
+                            <WorkflowInstanceStatus status={instance.status}/>
+                            <DurationMs ms={instance.durationMs}/>
+                        </span>
+                    </Link>
+                )
+            }
+        </>
     )
 }
 

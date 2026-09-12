@@ -131,6 +131,30 @@ app runs, the unit tests pass and `git status` shows nothing. Only a fresh check
 Each such directory has to be re-included by name in `.gitignore`, and the *directory* itself
 has to be, because git never descends into an excluded one.
 
+It has happened twice. `/mobile/workflow-instance/[id]` was caught by `work*/`, which is there
+for scratch directories. Check `git status` after adding a route directory, or better
+`git check-ignore -v <the new page.js>`, before assuming the files are staged.
+
+**An id with a character a browser encodes needs decoding in `page.js`.** The App Router hands a
+dynamic segment back exactly as it appears in the URL — percent-encoded. Every other mobile
+entity id is a number or a UUID, so this never came up until the workflow instance, whose id is
+`ISO_LOCAL_DATE_TIME-UUID` and therefore carries colons: `params.id` arrives as
+`2026-09-12T14%3A43%3A40.648194679-<uuid>`, which is an id no instance has. Passed on as it
+arrives, the screen answers "this workflow run could not be found" for a run that is right
+there — a failure with no error anywhere and nothing in a log. The page does
+`decodeURIComponent(params.id)`, and `mobileEquivalent` accepts a desktop path spelled either
+way.
+
+**A dot in an id is not a file extension.** Two heuristics keep static files out of the
+redirect: `LOOKS_LIKE_A_FILE` here, and the `matcher` in `middleware.js`, which decides whether
+the middleware runs at all. Both used to read *any* dot in the last path segment as a file. A
+workflow instance id is `ISO_LOCAL_DATE_TIME-UUID` and `Time.now()` is not truncated, so the id
+carries fractional seconds and therefore a dot — and
+`/extension/workflows/instances/2026-09-12T14:27:57.595125-<uuid>` was exempted as a file before
+it ever reached the table. Both now ask for a real **extension**: short, alphanumeric, and
+running to the end of the path, which a UUID trailing a dot does not. The two have to agree, and
+`mobileRoutes.test.js` pins the half that is testable without a request.
+
 **Adding a desktop route means deciding what a phone following a link to it should see.** That
 decision is recorded in this map — a desktop route added without one silently sends phones to
 the interstitial, which may well be right, but should be a choice rather than an oversight.
@@ -144,7 +168,8 @@ the interstitial, which may well be right, but should be a choice rather than an
 | Project | `/mobile/project/[id]` | The project's branches, limited and filterable |
 | Branch | `/mobile/branch/[id]` | The branch's latest builds, as cards, searchable |
 | Build | `/mobile/build/[id]` | The decision surface: promotions, deployments, validations |
-| Deployment | `/mobile/deployment/[id]` | One deployment waiting to run: its admission rules, and what can be done about them |
+| Deployment | `/mobile/deployment/[id]` | One deployment waiting to run: its admission rules, what can be done about them, and its slot's workflows |
+| Workflow run | `/mobile/workflow-instance/[id]` | One workflow run, read-only: its status and its nodes as a depth-ordered list |
 | Account | `/mobile/account` | Who is signed in, the theme, the switch to the desktop version, the version, and sign out |
 | Interstitial | `/mobile/desktop-only` | A route with no mobile equivalent |
 
@@ -650,6 +675,179 @@ slot with no deployment — either a qualifier the seed's dataset model does not
 third environment — and the demo's two environments are a composed picture that the delivery
 map reads and `DemoSeedTest` pins. Adding a third to show one rule would rewrite that picture
 as a side effect. See [demo-seed.md](../demo-seed.md).
+
+### Workflows (#1737)
+
+The mobile UI knew the word "workflow" in exactly two places until #1737 — the interstitial's
+description, and a comment saying the deployment screen deliberately excluded them. #1736 then
+left a phone showing a deployment blocked by a workflow, naming the reason in that workflow's own
+words (*"Workflow is running"*) with no way to see which workflow, what it was doing, or where it
+got stuck.
+
+Three surfaces, and everything on all three is **read-only**: the phone shows what a workflow
+did, and offers no action on it.
+
+#### Where they show up
+
+- **The deployment screen** grows a **Workflows** section, below *Checks* and above the settled
+  caption, one row per configured slot workflow — `MobileDeploymentWorkflows`.
+- **The build screen** gives each promotion **one nested line per workflow instance** it set off —
+  `MobilePromotionWorkflows`, through `MobileEntityRow`'s `details`.
+- **`/mobile/workflow-instance/[id]`** is the run itself.
+
+#### The deployment screen's Workflows section
+
+**All three triggers, always, and not only the ones the current status has reached.** A slot
+workflow is configuration as much as state: `CONTEXT.md` is explicit that it is drawn whether or
+not it ever ran, and that a `CANDIDATE` workflow which never ran "is not dormant, it is why
+nothing has ever deployed there". One that has not had its turn reads **Not started**.
+
+**Its own section rather than rows in Checks.** The Checks list exists so a user can *Answer* and
+*Override*; a workflow row offers neither, and the two speak different vocabularies — `check.ok`
+renders "Passed"/"Blocking" while an instance has five statuses. Putting them together would make
+the one list whose purpose is action half inert.
+
+**Absent, not empty, on a slot with no workflow**, as *Deployments in progress* is on the build
+screen. Most slots have none.
+
+**No query split of the `useMobileDeployments` kind.** `Slot.workflows` and
+`slotWorkflowInstanceForPipeline` are not inside the licence-gated region — the environments
+licence gates field *contributors* like `Build.slotPipelines`, not these types — so they ride in
+the screen's own query. They are protected at runtime by `checkSlotAccess<SlotView>`, which the
+screen already satisfies.
+
+**It does not supersede #1736's blocked caption.** A `RUNNING` deployment whose `DONE` workflow
+has not finished still shows `SlotPipeline.errorMessage` under the absent Complete button, *and*
+shows that workflow below. They answer different questions at different distances from the
+button: the caption says why the button is off for someone who reads one line and taps nothing,
+the section says what is going on.
+
+**Showing that a workflow was overridden is in scope; offering the override is not.**
+`overridePipelineWorkflow` needs `SlotUpdate` **and** `SlotPipelineOverride` — a pair
+`PROJECT_ROLE_PIPELINES_MANAGER` does not hold — so the button would be absent for the very role
+this screen is built around. Read-only is a decision about what the phone lets you *do*, not
+about what it lets you *know*: a row reading `Error` with no sign that a human deliberately waved
+it through would be actively misleading, for the same reason #1736 insists a cancelled deployment
+shows its reason. It is drawn as **text**, not as the desktop's `SlotPipelineOverrideIndicator`,
+which is a hover popover — a phone has no hover.
+
+#### The build screen's promotion lines
+
+One line per instance and **not a trailing indicator on the row**: `MobileEntityRow` allows
+exactly one trailing action, so a *count* would need a disambiguation screen the moment a
+promotion fires two workflows — and the desktop promotion run page already answers this by
+rendering one card per instance rather than one aggregate. No `/mobile/promotion-run/[id]` screen
+either: it would exist solely to hold a list the build screen can hold directly. A promotion with
+no workflow renders nothing extra, which is most of them.
+
+`MobileEntityRow` grew a `details` slot for this. A row given none renders exactly the markup it
+did before, which is what keeps every other list in the UI where it was.
+
+#### The workflow run screen
+
+`/mobile/workflow-instance/[id]` is keyed on the plain `WorkflowInstance` id, so **one screen
+serves both kinds** of run: a promotion's instance and a slot workflow's `workflowInstance` are
+the same type behind the same `workflowInstance(id: String!)` root query. Slot-specific facts —
+the trigger, the override, the reason a check gives — stay on the deployment screen, where they
+belong to the deployment rather than to the run.
+
+**A vertical list, not a graph.** The desktop renders the DAG with React Flow + elkjs at a fixed
+600px; a pan-and-zoom canvas on a phone is worse than no canvas, and the shape of the graph is
+not what someone checking a blocked deployment needs. The nodes are ordered by the desktop's own
+`workflowNodeDepths` — the pure, cycle-safe depth function — then by declaration order inside a
+depth, flattened into one list. No second ordering rule is invented for the phone.
+
+A node row is the node's `description` (falling back to its id), its `executorId` as secondary
+text — that is what says what the node actually *does* — its status, its duration, and its
+`error` inline on **every** failed node, not only the first: there is no side panel on a phone to
+go and find the others in.
+
+**`output` is left out.** It is arbitrary executor-specific JSON that the desktop renders only
+through `Dynamic` component lookups, and `Dynamic` is the one thing that does not work under
+`/mobile`.
+
+**This screen polls, and it is the only one that does.** Every other refresh in the mobile UI is
+a counter bumped after a write; the build and deployment screens are decision surfaces, and a
+list reshuffling under a thumb is worse than a stale one. A `RUNNING` workflow is precisely what
+someone opens on a phone, though, and a frozen page says nothing about whether it is moving — so
+this screen asks again every `POLL_INTERVAL_MS` while `finished` is false, through the desktop's
+own narrow second query (`status`, `endTime`, `durationMs`, `nodesExecutions`) rather than
+re-running the full one, and stops the moment it flips.
+
+**A null instance is a not-found, not an empty.** `MobileAsyncContent` would draw an `Empty`,
+which reads as "this workflow has no content" rather than "no such workflow" — and following a
+stale shared link is exactly how someone gets here.
+
+**No upward link; the OS back gesture is the navigation**, as on every other mobile screen.
+Deriving one would mean two code paths: a slot instance carries `triggerData.data.pipelineId`,
+while a promotion-triggered one carries only an opaque `notification-record` id whose resolution
+needs `NotificationRecordingAccess`. The subtitle names the origin in words instead.
+
+**Known coarseness, accepted:** `WorkflowInstanceNodeStatus` maps both `CANCELLED` and `TIMEOUT`
+to the label "Stopped", distinguishable only by icon. The component is reused unchanged rather
+than diverging the mobile label — the same node reading two different words in two UIs is worse
+than a coarse label. If it grates, the fix belongs in the shared component and benefits both UIs.
+
+#### Authorization, after #1739
+
+Nothing here is gated by the mobile UI, because nothing here is an action and reading is never
+gated in this UI. The server does the gating, and #1739 changed what that means:
+
+- `workflowInstance(id:)` is **no longer unchecked**. `WorkflowInstanceAccessService` resolves an
+  owning project from the instance's event and requires `ProjectView` on it, with `WorkflowAudit`
+  as an override for the instances that name no project at all. A denial answers `null`, exactly
+  like a missing instance — which is why the not-found state above is the right one for both.
+- A **promotion-triggered** instance therefore stays readable by anyone who can see the build: the
+  promotion event carries `PROJECT`, so `ProjectView` on that project is enough. Nothing the build
+  screen offers becomes unreachable.
+- A **slot workflow's** instance is the same story through its pipeline's build event.
+- The deployment section itself is inside a screen the server already protects: every slot-side
+  read goes through `checkSlotAccess<SlotView>`. The promotion lines sit behind the build's own
+  `ProjectView`.
+
+#### Batching `workflowInstances` (the backend half)
+
+`GQLProjectEntityWorkflowInstancesFieldContributor` contributes `workflowInstances` to *every*
+project entity and used to resolve it **per source, with no data loader**: a record query, an
+instance query and a privileged `securityService.asAdmin` block each. A build with five promotion
+levels therefore cost ≈25 extra round trips on the mobile build screen — the surface #1722 built
+as *the* decision surface. Narrowing the field selection does not help: the cost is per entity
+resolved, not per field asked for.
+
+The batched `findWorkflowInstancesByEntities` already existed (≈2 queries total) and was already
+trusted by the delivery map; the field simply did not use it. `WorkflowInstancesDataLoader`
+registers a Spring GraphQL **mapped batch loader** over it, and the field's data fetcher asks for
+that loader. A key the service answers nothing for is filled in with an empty list, because a key
+missing from a mapped batch loader's answer resolves to `null` and the field has always answered
+`[]`.
+
+Two things worth knowing:
+
+- The batch function is `Mono.fromCallable` with **no scheduler**, so it runs on the thread
+  dispatching the GraphQL execution and the caller's security context is the one the lookup runs
+  under. `GQLProjectEntityWorkflowInstancesFieldContributorIT` pins that with a view-only user.
+- The data fetcher is a **named** `dataFetcher` property rather than a lambda inside the builder,
+  because `GraphQLFieldDefinition` does not hand a data fetcher back. That property is the only
+  seam a test can reach, and without it a field that went back to calling the service directly
+  would answer identically and no test would notice.
+
+This is deliberate backend scope growth in a UI issue, called out rather than smuggled in. The
+desktop promotion run page reads the same field and gets faster for free.
+
+#### Testing it
+
+- **Playwright**, two journeys in `mobile.spec.js`: a promotion journey carrying the instance page
+  end to end (subscribe a `workflow`-channel notification with mock nodes → promote → the nested
+  line → tap → the node list and a failed node's error → the desktop link landing here), and a
+  deployment journey stopping at the Workflows section (trigger tags, *Not started*, the override).
+  The asymmetry is deliberate: the instance page is pinned once, not twice, and the suite runs
+  `workers: 1`, `fullyParallel: false`, so every second of waiting is serial wall clock.
+- `subscribeToWorkflow` was **lifted into `tests/support/workflows.js`**: it was privately
+  duplicated in `promotionRunWorkflows.spec.js` and `branchDeliveryMapView.spec.js`, and this would
+  otherwise have been the third copy.
+- **Component tests** carry what a UI test running as the suite's admin cannot: the not-found
+  state, the polling stopping when `finished` flips, the section's absence on a slot with no
+  workflow, and the node ordering.
 
 ### The account screen
 

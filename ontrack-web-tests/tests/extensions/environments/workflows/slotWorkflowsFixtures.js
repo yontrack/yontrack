@@ -1,6 +1,6 @@
 import {createSlot} from "../slotFixtures";
 import {addSlotWorkflow} from "@ontrack/extensions/environments/workflows";
-import {graphQLCall} from "@ontrack/graphql";
+import {graphQLCall, graphQLCallMutation} from "@ontrack/graphql";
 import {gql} from "graphql-request";
 import {waitUntilCondition} from "../../../support/timing";
 
@@ -92,4 +92,36 @@ export const waitForPipelineToBeRunnable = async (page, ontrack, pipelineId) => 
         },
         message: 'Pipeline not ready for deployment within 5 seconds'
     })
+}
+
+/**
+ * Overrides the result of a slot workflow for one pipeline, through the API.
+ *
+ * The desktop UI has a button for this and `slotWorkflows.spec.js` drives it; a spec whose subject
+ * is something else - the mobile deployment screen showing that a workflow *was* overridden - wants
+ * the state and not the journey.
+ */
+export const overridePipelineWorkflow = async (ontrack, {pipelineId, slotWorkflowId, message}) => {
+    await graphQLCallMutation(
+        ontrack.connection,
+        'overridePipelineWorkflow',
+        gql`
+            mutation OverridePipelineWorkflow(
+                $pipelineId: String!,
+                $slotWorkflowId: String!,
+                $message: String!,
+            ) {
+                overridePipelineWorkflow(input: {
+                    pipelineId: $pipelineId,
+                    slotWorkflowId: $slotWorkflowId,
+                    message: $message,
+                }) {
+                    errors {
+                        message
+                    }
+                }
+            }
+        `,
+        {pipelineId, slotWorkflowId, message},
+    )
 }

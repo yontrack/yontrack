@@ -45,10 +45,18 @@ export const config = {
     /*
      * Pages only.
      *
-     * `api` and `_next` are data and build output. The final `.*\..*` excludes
-     * anything with a dot in it - `favicon.ico`, the SVGs, and (once the PWA
-     * lands) the service worker, the manifest and the icons, which the redirect
-     * must not touch or installation breaks.
+     * `api` and `_next` are data and build output. The final `.*\.[A-Za-z0-9]+$`
+     * excludes anything ending in a file extension - `favicon.ico`, the SVGs,
+     * and (once the PWA lands) the service worker, the manifest and the icons,
+     * which the redirect must not touch or installation breaks.
+     *
+     * It asks for an **extension** rather than for a dot anywhere, which is what
+     * it used to do. A workflow instance id is `ISO_LOCAL_DATE_TIME-UUID` and
+     * the timestamp is not truncated, so the id carries fractional seconds and
+     * therefore a dot - `/extension/workflows/instances/2026-09-12T14:27:57.595125-<uuid>`
+     * would have been read as a file and the middleware would never have run on
+     * it. `mobileRoutes.js` makes the same distinction in `LOOKS_LIKE_A_FILE`,
+     * and the two have to agree.
      */
-    matcher: ['/((?!api|_next/static|_next/image|.*\\..*).*)'],
+    matcher: ['/((?!api|_next/static|_next/image|.*\\.[A-Za-z0-9]+$).*)'],
 }

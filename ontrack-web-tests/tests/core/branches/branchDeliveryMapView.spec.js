@@ -6,6 +6,7 @@ const {generate} = require("@ontrack/utils");
 const {graphQLCall} = require("@ontrack/graphql");
 const {gql} = require("graphql-request");
 const {waitUntilCondition} = require("../../support/timing");
+const {subscribeToWorkflow} = require("../../support/workflows");
 
 /**
  * The delivery map branch content view: what a build on this branch has to pass through on its way to
@@ -172,20 +173,13 @@ test('a branch with nothing on its map says so instead of drawing an empty recta
  *
  * One node is enough: what the map draws is the workflow's name, its status and its duration, never
  * the shape of its graph - that is the workflow instance page's job, and the checkpoint links to it.
+ * Hence the explicit `nodes` rather than the shared fan-out.
  */
-const subscribeToWorkflow = async (promotionLevel, name) => {
-    await promotionLevel.subscribe({
-        name: `Subscription ${name}`,
-        events: ['new_promotion_run'],
-        channel: 'workflow',
-        channelConfig: {
-            workflow: {
-                name,
-                nodes: [{id: "check", executorId: "mock", data: {text: "Checking"}}],
-            },
-        },
+const subscribeToSingleNodeWorkflow = async (promotionLevel, name) =>
+    subscribeToWorkflow(promotionLevel, {
+        name,
+        nodes: [{id: "check", executorId: "mock", data: {text: "Checking"}}],
     })
-}
 
 /**
  * The workflow reaches the map through the notification record its run leaves behind, and that run
@@ -218,7 +212,7 @@ test('the workflows a promotion set off are drawn beside it, as consequences', a
     const silver = await branch.createPromotionLevel("SILVER")
 
     const workflowName = generate("wf-")
-    await subscribeToWorkflow(silver, workflowName)
+    await subscribeToSingleNodeWorkflow(silver, workflowName)
 
     const build = await branch.createBuild()
     await build.promote(silver)
@@ -258,7 +252,7 @@ test('a promotion level which has never been promoted draws no workflow', async 
     const silver = await branch.createPromotionLevel("SILVER")
 
     const workflowName = generate("wf-")
-    await subscribeToWorkflow(silver, workflowName)
+    await subscribeToSingleNodeWorkflow(silver, workflowName)
     await branch.createBuild()
 
     await login(page, ontrack)
