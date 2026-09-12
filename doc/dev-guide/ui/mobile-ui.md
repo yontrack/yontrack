@@ -405,19 +405,97 @@ values, which is exactly what `validatePromotionRunFieldValues` refuses. See
 
 Two surfaces, because the deployment lifecycle has two moments a person is in it:
 `MobileDeploySheet` over the build screen starts one, and `/mobile/deployment/[id]` is where
-one that is waiting gets acted on. Both are #1725.
+one that has not settled gets acted on. Both are #1725; #1736 then took the deployment screen
+to the end of the lifecycle.
 
 **Where the scope stops.** The lifecycle is `CANDIDATE → RUNNING → DONE`, plus `CANCELLED`.
-The phone covers starting a deployment and acting on one that is waiting, and nothing else:
+The phone covers all of it — starting a deployment, acting on one that is waiting, completing
+one and cancelling one — and stops at:
 
-- **Marking a deployment done** is driven by CI, not by a person on a phone.
-- **Cancelling one** is a destructive action behind a thumb on a small screen, and stays on
-  the desktop UI for 5.4.
-- Workflow overrides, slot configuration, admission rule configuration, browsing a slot's
-  eligible builds and the pipeline graph are all desktop surfaces.
+- **Forcing a completion** (`forcing: true`). It ships on the desktop as the override-gated
+  `ForceDeploymentCommand` with a mandatory justification: it bypasses controls somebody
+  configured and is recorded as an override against the user, which is the one thing on this
+  screen a bigger screen genuinely buys something for. Most slots declare no `RUNNING`-trigger
+  workflow at all, so `finishAction.ok` is true and the phone completes the common case; when
+  a workflow does block, the phone says so in that workflow's own words and stops there.
+- **Overriding a blocking workflow.** It needs `SlotUpdate` *and* `SlotPipelineOverride`, a
+  pair `PROJECT_ROLE_PIPELINES_MANAGER` does not hold, and drawing a workflow is #1737's
+  subject.
+- **Deleting a deployment**, slot configuration, admission rule configuration, browsing a
+  slot's eligible builds and the pipeline graph are all desktop surfaces.
 
-The desktop `SlotPipelineStatusActions` carries all four buttons side by side, which is the
-difference between a control surface and a decision surface.
+**Completion and cancellation are for the abnormal path**, which is what reverses #1725's
+scope decision rather than contradicting it. #1725 refused the two together but for different
+reasons — completion because "CI does it", cancellation because it is destructive on a small
+screen. The first is an argument about the normal path, and CI does still finish deployments
+on it; the phone is for the other one, where CI died or nobody is coming and the person
+holding a phone is the one who has to act. The second is answered by how the action is
+presented, below.
+
+**The presentation of the cancellation is an acceptance criterion, not styling.** The
+lifecycle action — Start on a `CANDIDATE`, Complete on a `RUNNING` one — is the primary block
+button; cancelling is a separate, `danger`-coloured, secondary-weight button in its own row
+below it. The desktop `SlotPipelineStatusActions` carries all four side by side, which on a
+phone would put a destructive tap a thumb-width from the constructive one — exactly what
+#1725 was right to worry about. An overflow menu was the other option and is worse: it is a
+desktop pattern that hides the action from the person who came for it.
+
+**Cancel is offered on `CANDIDATE` as well as on `RUNNING`**, which the issue title did not
+ask for. A candidate nobody will ever approve is the more common thing to want rid of, and the
+desktop gates cancel on "non-terminal" rather than on `RUNNING`; offering it on one status and
+not the other would be a mobile-only rule with nothing behind it.
+
+##### The blocked caption reads `errorMessage`, not a check count
+
+The run button's caption counts admission rules — `n of m checks passed` — because on a
+`CANDIDATE` the rules below *are* the reason. The Complete button's cannot: `finishDeployment`
+checks authorization, "is this the slot's last pipeline", `RUNNING`, and the slot's
+`RUNNING`-trigger workflows, while **admission rules gate only `CANDIDATE → RUNNING`**. So on
+a `RUNNING` deployment the rule list is all green and a check count would point the user at
+rules which have nothing to do with why the button is off.
+
+`SlotPipeline.errorMessage` is read instead. It is already state-aware — it looks at admission
+rules on a candidate and at workflows on a running deployment — and it returns the failing
+workflow's own words: *Workflow is running*, *Workflow has not started*, *Workflow is in
+error*. Rendered as a reason, not as a pointer to the desktop. Showing the workflows
+themselves is #1737; the split is clean, because `errorMessage` is one field already on the
+type and neither issue blocks the other.
+
+**`finishAction.ok` is not the whole gate, so the mutation's answer is read too.** "Only the
+last pipeline can be deployed." is checked at submit time and is invisible to `finishAction`,
+so a `RUNNING` deployment superseded by a newer pipeline on its slot shows an enabled button
+that then fails. `finishStatus { ok message }` is surfaced exactly as the run action already
+surfaces `deploymentStatus`.
+
+**The confirm sheet names the environment and the build, and asks for nothing else.**
+Completion is an ordinary lifecycle step with fat-finger consequences — it is what feeds
+`currentDeployments`, the delivery map and every downstream `environment` admission rule — but
+it bypasses nobody's control, so it earns a confirmation and not a justification. Cancelling
+does earn one: `cancelSlotPipeline` takes a **required** reason, as on the desktop, because
+that reason is the only record of why an environment's deployment was killed and the desktop
+reads it back beside a `CANCELLED` pipeline. A phone cancelling without one would open a
+mobile-only data gap, which is worse than the friction of a soft keyboard.
+
+##### Reaching an unsettled deployment: *Deployments in progress*
+
+The build screen's section used to be *Waiting to deploy* and listed `slotPipelines(status:
+CANDIDATE)` only. That was enough while the phone stopped at `RUNNING`, and is not enough now:
+`Build.currentDeployments` names only pipelines which reached `DONE`, so a `RUNNING` deployment
+would be reachable from a phone **only while the user stays on the screen that started it** —
+the narrowest possible case, and not the one anyone reaches for a phone for.
+
+It lists `CANDIDATE` and `RUNNING` alike, each row carrying its own `SlotPipelineStatusLabel`,
+because "waiting" is actively wrong for a running row. It stays absent rather than empty when
+nothing is unsettled, as before. Rows stay links with **no inline actions**: one action surface
+per deployment is what lets the deployment screen explain itself, and a Complete button on a
+row has no room to say why it is off.
+
+`slotPipelines(status:)` takes one status, so `useMobileBuildDeployments` asks for the two as
+two aliases of the same field and merges them. Dropping the argument would have worked too,
+and would have dragged back every `DONE` and `CANCELLED` pipeline the build ever had in order
+to throw almost all of them away on a phone. Each list arrives server-sorted by decreasing
+environment order; merging two sorted lists is not sorted, so the merge sorts again on the
+environment `order` the fields now carry.
 
 ##### The deploy sheet: a list, not a dropdown
 

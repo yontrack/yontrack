@@ -108,7 +108,9 @@ class InMemoryDemoTarget(
                 add("  slot ${slot.project.name} \"${slot.description}\"")
                 slot.admissionRules.forEach { add("    rule ${it.name} ${it.ruleId} ${it.config}") }
                 slot.workflows.forEach { add("    workflow on ${it.trigger}: ${it.yaml.lines().first()}") }
-                slot.deployments.forEach { add("    deployed ${it.name}") }
+                slot.deployments.forEach {
+                    add("    ${if (it.stopAt == DeploymentStop.DONE) "deployed" else "deploying"} ${it.build.name}")
+                }
             }
         }
         // Repositories no project points at: the mock SCM holds them on the server, where
@@ -377,7 +379,16 @@ class InMemoryDemoTarget(
 
         val admissionRules = mutableListOf<SlotAdmissionRuleSpec>()
         val workflows = mutableListOf<SlotWorkflowSpec>()
-        val deployments = mutableListOf<InMemoryBuild>()
+        val deployments = mutableListOf<InMemoryDeployment>()
+
+        /**
+         * What the slot is actually *holding*, which is the last deployment that reached
+         * `DONE` and not simply the last one. The server reads the same distinction -
+         * `lastDeployedPipeline` against `currentPipeline` - and a slot with a deployment
+         * still running is exactly where the two part company.
+         */
+        val heldBuilds: List<InMemoryBuild>
+            get() = deployments.filter { it.stopAt == DeploymentStop.DONE }.map { it.build }
 
         override fun addAdmissionRule(spec: SlotAdmissionRuleSpec) {
             require(ADMISSION_RULE_NAME.matches(spec.name)) {
@@ -408,13 +419,13 @@ class InMemoryDemoTarget(
          * one mistake it is easy to make is putting them in an order the server refuses,
          * which on a real instance leaves the demo deleted and the slot empty.
          */
-        override fun deploy(build: DemoBuild) {
+        override fun deploy(build: DemoBuild, stopAt: DeploymentStop) {
             build as InMemoryBuild
             require(build.branch.project == project) {
                 "Cannot deploy ${build.branch.project.name} build on the ${project.name} slot"
             }
             admissionRules.forEach { rule -> check(rule, build) }
-            deployments += build
+            deployments += InMemoryDeployment(build, stopAt)
         }
 
         private fun check(rule: SlotAdmissionRuleSpec, build: InMemoryBuild) {
@@ -435,13 +446,27 @@ class InMemoryDemoTarget(
                     val previousName = rule.config["environmentName"] as? String
                     val previous = environments.find { it.name == previousName }
                         ?.slots?.find { it.project == project }
-                    require(previous?.deployments?.lastOrNull() == build) {
+                    // What the other slot is HOLDING, not what it last started: the server's
+                    // `environment` rule refuses a previous pipeline which has not reached DONE
+                    require(previous?.heldBuilds?.lastOrNull() == build) {
                         "$where only admits what $previousName is holding, which is not ${build.name}."
                     }
                 }
             }
         }
     }
+
+    /**
+     * One deployment recorded on a slot, and how far the seed took it.
+     *
+     * The stop is kept rather than collapsed into "deployed": a deployment left `RUNNING` is
+     * present on the slot - it is what `currentPipeline` answers with, and what a phone can
+     * complete or cancel - but it is not what the slot is holding.
+     */
+    data class InMemoryDeployment(
+        val build: InMemoryBuild,
+        val stopAt: DeploymentStop,
+    )
 
     /**
      * One run of a validation stamp on a build, with the time the seed dated it at — which is

@@ -6,14 +6,31 @@
  * A deployment starts as a `CANDIDATE` and stays there until every admission
  * rule of its slot is satisfied - by input somebody provides, or by an override
  * somebody justifies. This screen is that decision: what the rules are, which of
- * them pass, and the three things a person can do about it - answer one,
- * override one, run the deployment.
+ * them pass, and what a person can do about it - answer one, override one, start
+ * the deployment, complete it, cancel it.
  *
- * **It stops there, deliberately.** Marking a deployment done is driven by CI
- * rather than by a person on a phone, and cancelling one is a destructive action
- * behind a thumb on a small screen; both are left to the desktop UI. The desktop
- * `SlotPipelineStatusActions` carries all four buttons side by side, which is
- * the difference between a control surface and a decision surface.
+ * **Completing and cancelling are here for the abnormal path** (#1736). CI
+ * finishes deployments on the normal one, which is what #1725 was right about;
+ * but the path a phone is actually for is the other one - CI died, or nobody is
+ * coming, and the person holding a phone is the one who has to act.
+ *
+ * **The presentation of the cancellation is the mitigation, not an
+ * implementation detail.** The lifecycle action - Start, then Complete - is the
+ * primary block button; cancelling is a separate, `danger`-coloured,
+ * secondary-weight button in its own row below it. The desktop
+ * `SlotPipelineStatusActions` has all four side by side, which on a phone would
+ * put a destructive tap a thumb-width from the constructive one; an overflow
+ * menu is a desktop pattern that hides the action from the person who came for
+ * it.
+ *
+ * **What it still does not do.** Forcing a completion (`forcing: true`) is the
+ * desktop's override-gated `ForceDeploymentCommand` with a mandatory
+ * justification: it bypasses controls somebody configured and is recorded as an
+ * override against the user, which is the one thing on this screen a bigger
+ * screen genuinely buys something for. Overriding a blocking workflow needs
+ * `SlotUpdate` *and* `SlotPipelineOverride`, a pair `PROJECT_ROLE_PIPELINES_MANAGER`
+ * does not hold. Drawing the workflows themselves is #1737 - this screen shows
+ * the reason *string* and stops there.
  *
  * **The rules are drawn by the desktop's own components**, reached through
  * `admissionRuleComponents` - the mobile UI's rule-id lookup, which exists
@@ -32,8 +49,8 @@
 import {useState} from "react"
 import {gql} from "graphql-request"
 import Link from "next/link"
-import {Alert, Button, Typography} from "antd"
-import {FaExclamationTriangle, FaHandPaper, FaPlay} from "react-icons/fa"
+import {Alert, Button, Space, Typography} from "antd"
+import {FaBan, FaCheck, FaExclamationTriangle, FaHandPaper, FaPlay} from "react-icons/fa"
 import {callGraphQL, useQuery} from "@components/services/GraphQL"
 import {useMessageApi} from "@components/providers/MessageProvider"
 import {isAuthorized} from "@components/common/authorizations"
@@ -43,6 +60,8 @@ import MobileSectionList from "@components/mobile/layout/MobileSectionList"
 import MobileAsyncContent from "@components/mobile/layout/MobileAsyncContent"
 import MobileDeploymentInputSheet from "@components/mobile/deployments/MobileDeploymentInputSheet"
 import MobileDeploymentOverrideSheet from "@components/mobile/deployments/MobileDeploymentOverrideSheet"
+import MobileDeploymentFinishSheet from "@components/mobile/deployments/MobileDeploymentFinishSheet"
+import MobileDeploymentCancelSheet from "@components/mobile/deployments/MobileDeploymentCancelSheet"
 import {mobileBuildUri, mobileProjectUri} from "@components/mobile/mobileRoutes"
 import {slotNameWithoutProject} from "@components/extension/environments/SlotName"
 import {MobileAdmissionRuleSummary} from "@components/mobile/deployments/admissionRuleComponents"
@@ -63,8 +82,14 @@ export default function MobileDeploymentScreen({id}) {
     /** Which rule is being overridden. */
     const [overriding, setOverriding] = useState(null)
 
-    const [running, setRunning] = useState(false)
+    const [starting, setStarting] = useState(false)
     const [error, setError] = useState(null)
+
+    /** Whether the completion's confirm sheet is up, and whether it is in flight. */
+    const [confirmingFinish, setConfirmingFinish] = useState(false)
+    const [finishing, setFinishing] = useState(false)
+    /** Whether the cancellation sheet is up. */
+    const [cancelling, setCancelling] = useState(false)
 
     const query = useQuery(
         gql`
@@ -135,6 +160,22 @@ export default function MobileDeploymentScreen({id}) {
                         successCount
                         totalCount
                     }
+                    # The exact parallel of runAction, for the other end of the
+                    # lifecycle. Null for any status but RUNNING.
+                    finishAction {
+                        ok
+                    }
+                    # Why the deployment cannot move on, in the failing check's
+                    # own words. On a RUNNING deployment that is a slot workflow -
+                    # "Workflow is running", "Workflow has not started",
+                    # "Workflow is in error" - and never an admission rule, which
+                    # gates CANDIDATE to RUNNING only.
+                    errorMessage
+                    # What a cancellation was for, read back exactly as the
+                    # desktop reads it beside a CANCELLED pipeline.
+                    lastChange {
+                        message
+                    }
                 }
             }
         `,
@@ -172,11 +213,39 @@ export default function MobileDeploymentScreen({id}) {
     const canAct = isAuthorized(slot ?? {}, 'pipeline', 'create')
     const canOverride = isAuthorized(slot ?? {}, 'pipeline', 'override')
 
-    /** Only a candidate is waiting for anything: the rest is CI's or the desktop's. */
+    /*
+     * The status decides what is on offer, one row per state:
+     *
+     * | CANDIDATE | input, override, Start + Cancel |
+     * | RUNNING   | Complete + Cancel               |
+     * | DONE      | nothing; the caption says what happened |
+     * | CANCELLED | nothing; the caption says what happened, and why |
+     *
+     * Cancel is offered on CANDIDATE as well as on RUNNING, which the issue title
+     * does not ask for: a candidate nobody will ever approve is the more common
+     * thing to want rid of, and the desktop gates cancel on "non-terminal" rather
+     * than on RUNNING. Offering it on one and not the other would be a mobile-only
+     * rule with nothing behind it.
+     */
     const candidate = deployment?.status === 'CANDIDATE'
+    const isRunning = deployment?.status === 'RUNNING'
+    const unsettled = candidate || isRunning
+
+    /*
+     * Why the lifecycle action is off, in the words that fit the status.
+     *
+     * On a CANDIDATE the rules below ARE the reason, so the caption counts them
+     * and points at the list. On a RUNNING deployment they are all green and have
+     * nothing to do with it - admission rules gate CANDIDATE to RUNNING only - so
+     * a "n of m checks passed" caption would point at the wrong thing entirely.
+     * `errorMessage` is what is read instead: already state-aware, and the failing
+     * workflow's own reason rather than a pointer to the desktop.
+     */
+    const runBlocked = candidate && !deployment?.runAction?.ok
+    const finishBlocked = isRunning && !deployment?.finishAction?.ok
 
     const runDeployment = async () => {
-        setRunning(true)
+        setStarting(true)
         setError(null)
         try {
             const data = await callGraphQL({
@@ -210,7 +279,60 @@ export default function MobileDeploymentScreen({id}) {
         } catch (ex) {
             setError(ex.message)
         } finally {
-            setRunning(false)
+            setStarting(false)
+        }
+    }
+
+    /**
+     * Completing the deployment, once the confirm sheet has been answered.
+     *
+     * `forcing: false`, deliberately: forcing is the desktop's override-gated
+     * command and is out of scope here. When a slot workflow does block the
+     * completion, `finishAction.ok` is false and the button never gets tapped -
+     * the phone says so in that workflow's words and stops there.
+     */
+    const finishDeployment = async () => {
+        setFinishing(true)
+        setError(null)
+        try {
+            const data = await callGraphQL({
+                query: gql`
+                    mutation MobileFinishDeployment($id: String!) {
+                        finishSlotPipelineDeployment(input: {pipelineId: $id, forcing: false}) {
+                            finishStatus {
+                                ok
+                                message
+                            }
+                            errors {
+                                message
+                            }
+                        }
+                    }
+                `,
+                variables: {id: deployment.id},
+            })
+            const payload = data?.finishSlotPipelineDeployment
+            const errors = payload?.errors
+            if (errors && errors.length > 0) {
+                setError(errors[0].message)
+            } else if (payload?.finishStatus?.ok === false) {
+                /*
+                 * A refusal is not a failed request. "Only the last pipeline can
+                 * be deployed." is checked at submit time and is invisible to
+                 * `finishAction`, so a RUNNING deployment superseded by a newer
+                 * pipeline on its slot shows an enabled button that then fails -
+                 * and the user has to be able to read why.
+                 */
+                setError(payload.finishStatus.message || "This deployment cannot be completed.")
+            } else {
+                messageApi?.success("The deployment is done.")
+                reload()
+            }
+        } catch (ex) {
+            setError(ex.message)
+        } finally {
+            setFinishing(false)
+            setConfirmingFinish(false)
         }
     }
 
@@ -273,37 +395,109 @@ export default function MobileDeploymentScreen({id}) {
                         }
 
                         {
-                            candidate && canAct &&
-                            <MobileSection title="Start" testId="mobile-deployment-actions">
-                                <Button
-                                    block
-                                    type="primary"
-                                    size="large"
-                                    icon={<FaPlay/>}
-                                    loading={running}
-                                    // The server's verdict, not a count this
-                                    // screen adds up: a rule can be satisfied by
-                                    // an override as well as by passing.
-                                    disabled={!deployment.runAction?.ok}
-                                    data-testid="mobile-deployment-run"
-                                    onClick={runDeployment}
-                                >
-                                    Start the deployment
-                                </Button>
-                                {
-                                    !deployment.runAction?.ok &&
-                                    <Typography.Text
-                                        type="secondary"
-                                        className="ot-mobile-caption"
-                                        data-testid="mobile-deployment-run-blocked"
-                                    >
+                            /*
+                             * The section is drawn for anyone who can act AND for
+                             * anyone the deployment is blocked for: reading why a
+                             * deployment is stuck is never gated, only doing
+                             * something about it is.
+                             */
+                            unsettled && (canAct || runBlocked || finishBlocked) &&
+                            <MobileSection
+                                title={isRunning ? "Complete" : "Start"}
+                                testId="mobile-deployment-actions"
+                            >
+                                <Space direction="vertical" size="middle" style={{width: '100%'}}>
+                                    <div>
                                         {
-                                            `${deployment.runAction?.successCount ?? 0} of ` +
-                                            `${deployment.runAction?.totalCount ?? 0} checks passed. ` +
-                                            `The rest are below.`
+                                            candidate && canAct &&
+                                            <Button
+                                                block
+                                                type="primary"
+                                                size="large"
+                                                icon={<FaPlay/>}
+                                                loading={starting}
+                                                // The server's verdict, not a count this
+                                                // screen adds up: a rule can be satisfied by
+                                                // an override as well as by passing.
+                                                disabled={!deployment.runAction?.ok}
+                                                data-testid="mobile-deployment-run"
+                                                onClick={runDeployment}
+                                            >
+                                                Start the deployment
+                                            </Button>
                                         }
-                                    </Typography.Text>
-                                }
+                                        {
+                                            isRunning && canAct &&
+                                            <Button
+                                                block
+                                                type="primary"
+                                                size="large"
+                                                icon={<FaCheck/>}
+                                                loading={finishing}
+                                                // `finishAction.ok` is not the whole gate -
+                                                // "Only the last pipeline can be deployed."
+                                                // is checked at submit time and is invisible
+                                                // here - so the mutation's own
+                                                // `finishStatus` is read as well.
+                                                disabled={!deployment.finishAction?.ok}
+                                                data-testid="mobile-deployment-finish"
+                                                onClick={() => setConfirmingFinish(true)}
+                                            >
+                                                Complete the deployment
+                                            </Button>
+                                        }
+                                        {
+                                            runBlocked &&
+                                            <Typography.Text
+                                                type="secondary"
+                                                className="ot-mobile-caption"
+                                                data-testid="mobile-deployment-run-blocked"
+                                            >
+                                                {
+                                                    `${deployment.runAction?.successCount ?? 0} of ` +
+                                                    `${deployment.runAction?.totalCount ?? 0} checks passed. ` +
+                                                    `The rest are below.`
+                                                }
+                                            </Typography.Text>
+                                        }
+                                        {
+                                            finishBlocked &&
+                                            <Typography.Text
+                                                type="secondary"
+                                                className="ot-mobile-caption"
+                                                data-testid="mobile-deployment-finish-blocked"
+                                            >
+                                                {
+                                                    deployment.errorMessage ||
+                                                    "This deployment cannot be completed yet."
+                                                }
+                                            </Typography.Text>
+                                        }
+                                    </div>
+                                    {
+                                        /*
+                                         * Its own row, below the lifecycle button
+                                         * and not beside it, `danger`-coloured and
+                                         * at secondary weight. That separation is
+                                         * an acceptance criterion of #1736 rather
+                                         * than styling: it is what answers #1725's
+                                         * objection to cancelling from a phone.
+                                         */
+                                        canAct &&
+                                        <div data-testid="mobile-deployment-cancel-row">
+                                            <Button
+                                                block
+                                                danger
+                                                size="large"
+                                                icon={<FaBan/>}
+                                                data-testid="mobile-deployment-cancel"
+                                                onClick={() => setCancelling(true)}
+                                            >
+                                                Cancel the deployment
+                                            </Button>
+                                        </div>
+                                    }
+                                </Space>
                             </MobileSection>
                         }
 
@@ -411,14 +605,28 @@ export default function MobileDeploymentScreen({id}) {
                         </MobileSectionList>
 
                         {
-                            !candidate &&
+                            /*
+                             * What happened, and nothing about the desktop version:
+                             * there is nothing left to go there for.
+                             */
+                            !unsettled &&
                             <Typography.Text
                                 type="secondary"
                                 className="ot-mobile-caption"
                                 data-testid="mobile-deployment-settled"
                             >
-                                This deployment is no longer waiting for anything. Completing or
-                                cancelling one is done from CI or from the desktop version.
+                                {
+                                    deployment.status === 'CANCELLED'
+                                        ? "This deployment was cancelled."
+                                        : "This deployment is finished."
+                                }
+                                {
+                                    // The reason it was cancelled for, beside it as
+                                    // the desktop shows it. Mandatory on the way in,
+                                    // so a cancellation made here always has one.
+                                    deployment.status === 'CANCELLED' && deployment.lastChange?.message &&
+                                    ` ${deployment.lastChange.message}`
+                                }
                             </Typography.Text>
                         }
 
@@ -435,6 +643,19 @@ export default function MobileDeploymentScreen({id}) {
                             open={overriding !== null}
                             onClose={() => setOverriding(null)}
                             onOverridden={reload}
+                        />
+                        <MobileDeploymentFinishSheet
+                            deployment={deployment}
+                            open={confirmingFinish}
+                            running={finishing}
+                            onClose={() => setConfirmingFinish(false)}
+                            onConfirm={finishDeployment}
+                        />
+                        <MobileDeploymentCancelSheet
+                            deployment={deployment}
+                            open={cancelling}
+                            onClose={() => setCancelling(false)}
+                            onCancelled={reload}
                         />
                     </div>
                 }

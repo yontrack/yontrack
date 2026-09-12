@@ -764,18 +764,40 @@ object DemoContent {
 
     /**
      * The demo's deployment history, in order. The order is load-bearing: production admits
-     * only what staging is holding at the time, so 1.4.2 has to pass through staging before
+     * only what staging is holding at the time, so 1.4.3 has to pass through staging before
      * it can go to production, and the maintenance build lands on staging afterwards.
      *
-     * It leaves production on 1.4.2 while [MAIN] is already at 1.4.6, and staging occupied
+     * It leaves production on 1.4.3 while [MAIN] is already at 1.4.6, and staging occupied
      * by a maintenance build under test - which is what a real pair of environments usually
      * looks like, and is also the only arrangement in which the delivery map has all three
      * of its slot readings to show.
+     *
+     * The last one stops at [DeploymentStop.RUNNING] and is the only one that does. Without
+     * it the dataset contains no deployment in a state where completing or cancelling one is
+     * possible at all, so the mobile UI's Complete and Cancel (#1736) would ship with nothing
+     * in the demo to try them on.
+     *
+     * It fits without reshaping the composed picture, and every reason is load-bearing:
+     *
+     * * 107 (1.4.6) carries [SILVER], staging's only admission rule, so the pipeline
+     *   legitimately reaches `RUNNING` rather than being stuck as a candidate;
+     * * it is the head of [MAIN] and reads as the next thing that would go to staging;
+     * * being last on the slot it satisfies "only the last pipeline can be deployed", so it
+     *   is actually completable rather than a button that refuses;
+     * * staging's *held* build stays `maintenance/89` - `lastDeployedPipeline` is the last
+     *   DONE one - so the delivery map's slot checkpoint, the environment widget and
+     *   production's `environment` admission rule all read exactly as before.
+     *
+     * None of the three above it could stop at `RUNNING` instead: `STAGING <- main/104` must
+     * be `DONE` for production's `environment` rule to admit 104, production must stay on
+     * 1.4.3 for the delivery map, and `STAGING <- maintenance/89` is what "staging occupied by
+     * a build under test" means.
      */
     private fun deployments() = listOf(
         DeploymentSpec(STAGING, BuildRef(SERVICE, MAIN, "104")),
         DeploymentSpec(PRODUCTION, BuildRef(SERVICE, MAIN, "104")),
         DeploymentSpec(STAGING, BuildRef(SERVICE, MAINTENANCE, "89")),
+        DeploymentSpec(STAGING, BuildRef(SERVICE, MAIN, "107"), stopAt = DeploymentStop.RUNNING),
     )
 
     /**

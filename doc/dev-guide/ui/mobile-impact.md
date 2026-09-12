@@ -121,9 +121,9 @@ and it is also what makes the check cheap — this is the whole list.
 | Project | `project(id:)`, `Project.branches(name:, count:, order:)` |
 | Branch | `branch(id:)`, `Branch.builds(filter: StandardBuildFilter, size:)` with `withDisplayName` and `withPromotionLevel`, `Branch.promotionLevels` |
 | Build | `build(id:)` — `displayName`, `description`, `creation`, `branch`, `authorizations`, `promotionRuns(lastPerLevel: true)`, `validations(size:)` with its runs' `lastStatus` |
-| Build and branch | `Build.currentDeployments` and `Build.slotPipelines(status:)`, in a query of their own |
+| Build and branch | `Build.currentDeployments` and `Build.slotPipelines(status:)` — asked for twice, aliased, for `CANDIDATE` and for `RUNNING` — in a query of their own |
 | Build, deploying | `eligibleSlotsForBuild(buildId:)` — `eligible`, `nonEligibleRules`, `slot`; `startSlotPipeline` |
-| Deployment | `slotPipelineById(id:)` — `status`, `slot` with its `authorizations`, `admissionRules`, `requiredInputs`, `runAction`; `updatePipelineData`, `overridePipelineRule`, `startSlotPipelineDeployment` |
+| Deployment | `slotPipelineById(id:)` — `status`, `slot` with its `authorizations`, `admissionRules`, `requiredInputs`, `runAction`, `finishAction`, `errorMessage`, `lastChange`; `updatePipelineData`, `overridePipelineRule`, `startSlotPipelineDeployment`, `finishSlotPipelineDeployment`, `cancelSlotPipeline` |
 | Account | `user { account { name fullName email } }` and `info { version { display } }`, both through the shared providers rather than a query of its own |
 | Favourites | the four `favourite`/`unfavourite` mutations |
 

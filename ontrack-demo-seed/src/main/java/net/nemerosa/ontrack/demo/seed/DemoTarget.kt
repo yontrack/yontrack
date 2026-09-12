@@ -184,10 +184,11 @@ interface DemoEnvironment {
 
 interface DemoSlot {
     /**
-     * Runs a deployment of [build] on this slot all the way to done, so the environment
-     * shows something.
+     * Runs a deployment of [build] on this slot as far as [stopAt] says - all the way to done
+     * so the environment shows something, or only up to running so that there is a deployment
+     * a person can still complete or cancel.
      */
-    fun deploy(build: DemoBuild)
+    fun deploy(build: DemoBuild, stopAt: DeploymentStop)
 
     /**
      * Configures an admission rule on this slot.

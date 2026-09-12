@@ -302,13 +302,16 @@ private class KdslDemoEnvironment(val environment: Environment) : DemoEnvironmen
 private class KdslDemoSlot(val slot: Slot) : DemoSlot {
 
     /**
-     * Runs the pipeline all the way through, so the slot shows a deployed build rather
-     * than one waiting for something to happen to it.
+     * Runs the pipeline as far as [stopAt] says: all the way through, so the slot shows a
+     * deployed build rather than one waiting for something to happen to it - or only up to
+     * [DeploymentStop.RUNNING], which is the one state in which the deployment can still be
+     * completed or cancelled by a person.
      */
-    override fun deploy(build: DemoBuild) {
-        slot.createPipeline((build as KdslDemoBuild).build)
-            .startDeploying()
-            .finishDeployment()
+    override fun deploy(build: DemoBuild, stopAt: DeploymentStop) {
+        val pipeline = slot.createPipeline((build as KdslDemoBuild).build).startDeploying()
+        if (stopAt == DeploymentStop.DONE) {
+            pipeline.finishDeployment()
+        }
     }
 
     override fun addAdmissionRule(spec: SlotAdmissionRuleSpec) {

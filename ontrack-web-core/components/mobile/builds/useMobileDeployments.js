@@ -36,6 +36,10 @@ const DEPLOYMENT_FIELDS = `
         environment {
             id
             name
+            # What "the furthest environment first" is sorted on when two
+            # server-sorted lists have to be merged into one - see
+            # useMobileBuildDeployments below.
+            order
         }
     }
 `
@@ -72,15 +76,29 @@ export const deploymentName = (pipeline) =>
  * and registered together or not at all, so splitting them would buy no extra
  * isolation and would cost a second round trip on every build screen.
  *
- * The candidates are what makes a deployment somebody else started - by CI,
+ * The unsettled ones are what makes a deployment somebody else started - by CI,
  * usually - reachable from a phone at all. A deployment waiting for a manual
  * approval is the case the whole approval flow exists for, and without a row
  * naming it there is nothing to tap.
  *
+ * **`RUNNING` as well as `CANDIDATE`, and why that takes two fields.** Once a
+ * phone can complete or cancel a deployment (#1736), a running one has to be
+ * reachable after the user has navigated away - and `currentDeployments` names
+ * only pipelines which reached `DONE`, so it never does. `slotPipelines(status:)`
+ * takes **one** status, so the two lists are asked for as two aliases of the same
+ * field and merged here. Dropping the argument altogether would have worked too,
+ * and would have dragged back every `DONE` and `CANCELLED` pipeline the build ever
+ * had to throw almost all of them away on a phone.
+ *
+ * Each list comes back server-sorted by decreasing environment order; merging two
+ * sorted lists is not sorted, so the merge sorts again on the environment `order`
+ * the fields now carry. `sort` is stable, so two deployments in the same
+ * environment keep the server's order - candidates before running ones.
+ *
  * @param {string|number} id The build's id.
  * @param {number} [refresh] Bumped by a caller which has just changed something
  *   - started a deployment, say - to ask the server again.
- * @returns {{deployments: Array, candidates: Array, unavailable: boolean}}
+ * @returns {{deployments: Array, unsettled: Array, unavailable: boolean}}
  *   `unavailable` means the instance has no environments feature - not that the
  *   build is deployed nowhere, which is a different and sayable thing.
  */
@@ -93,23 +111,35 @@ export function useMobileBuildDeployments(id, refresh = 0) {
                     currentDeployments {
                         ${DEPLOYMENT_FIELDS}
                     }
-                    # Deployments of this build which are still waiting on
-                    # somebody. Ordered by the server rather than left to
-                    # whatever the repository returns - decreasing environment
-                    # order, so the furthest one a build is trying to reach is
-                    # the first row rather than the last.
-                    slotPipelines(status: CANDIDATE, sortedByEnvironment: true) {
+                    # Deployments of this build which have not settled yet: one
+                    # waiting on somebody, and one already on its way. Ordered by
+                    # the server rather than left to whatever the repository
+                    # returns - decreasing environment order, so the furthest one
+                    # a build is trying to reach is the first row rather than the
+                    # last.
+                    candidatePipelines: slotPipelines(status: CANDIDATE, sortedByEnvironment: true) {
                         ${DEPLOYMENT_FIELDS}
                         start
+                        status
+                    }
+                    runningPipelines: slotPipelines(status: RUNNING, sortedByEnvironment: true) {
+                        ${DEPLOYMENT_FIELDS}
+                        start
+                        status
                     }
                 }
             }
         `,
         {variables: {id: Number(id)}, deps: [id, refresh]}
     )
+    const build = query.data?.build
+    const unsettled = [
+        ...(build?.candidatePipelines ?? []),
+        ...(build?.runningPipelines ?? []),
+    ].sort((a, b) => (b.slot?.environment?.order ?? 0) - (a.slot?.environment?.order ?? 0))
     return {
-        deployments: query.data?.build?.currentDeployments ?? [],
-        candidates: query.data?.build?.slotPipelines ?? [],
+        deployments: build?.currentDeployments ?? [],
+        unsettled,
         unavailable: Boolean(query.error),
     }
 }

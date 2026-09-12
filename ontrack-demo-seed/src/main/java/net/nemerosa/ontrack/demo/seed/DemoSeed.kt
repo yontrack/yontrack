@@ -115,8 +115,8 @@ class DemoSeed(
         // what is deployed in another slot at that moment
         dataset.deployments.forEach { spec ->
             val ref = spec.build
-            log("Deploying ${ref.build} of ${ref.project}/${ref.branch} to ${spec.environment}")
-            slots.getValue(spec.environment to ref.project).deploy(builds.resolve(ref))
+            log("Deploying ${ref.build} of ${ref.project}/${ref.branch} to ${spec.environment} (${spec.stopAt})")
+            slots.getValue(spec.environment to ref.project).deploy(builds.resolve(ref), spec.stopAt)
         }
 
         // AFTER the deployments, unlike the admission rules. A `CANDIDATE` or `RUNNING` workflow is

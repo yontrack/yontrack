@@ -37,6 +37,7 @@ import {PromotionLevelImage} from "@components/promotionLevels/PromotionLevelIma
 import ValidationChip from "@components/primitives/ValidationChip"
 import {gqlValidationChipStamp} from "@components/primitives/ValidationChipFragments"
 import {FaServer} from "react-icons/fa"
+import SlotPipelineStatusLabel from "@components/extension/environments/SlotPipelineStatusLabel"
 import {mobileBranchUri, mobileDeploymentUri, mobileProjectUri} from "@components/mobile/mobileRoutes"
 
 /**
@@ -161,7 +162,7 @@ export default function MobileBuildScreen({id}) {
      */
     const {
         deployments,
-        candidates,
+        unsettled,
         unavailable: deploymentsUnavailable,
     } = useMobileBuildDeployments(id, refresh)
 
@@ -267,9 +268,9 @@ export default function MobileBuildScreen({id}) {
 
                         {
                             /*
-                             * Deployments of this build which are still waiting
-                             * on somebody - a manual approval, an override, or
-                             * simply the run.
+                             * Deployments of this build which have not settled
+                             * yet - one waiting on somebody, and one already on
+                             * its way.
                              *
                              * Absent rather than empty, because unlike the three
                              * sections below it is not a facet of the build: a
@@ -278,19 +279,28 @@ export default function MobileBuildScreen({id}) {
                              * build screen would be a line nobody reads. It is
                              * also the only way into the deployment screen for a
                              * deployment somebody else started - CI usually -
-                             * which is half of what #1725 is about.
+                             * which is half of what #1725 is about, and the only
+                             * way back into a RUNNING one at all, which is what
+                             * makes completing or cancelling from a phone (#1736)
+                             * more than "I started it here and have not navigated
+                             * away".
+                             *
+                             * Rows stay links with no inline action. One action
+                             * surface per deployment is what lets the deployment
+                             * screen explain itself: a Complete button on a row
+                             * has no room to say why it is off.
                              */
-                            candidates.length > 0 &&
+                            unsettled.length > 0 &&
                             <MobileSectionList
-                                title="Waiting to deploy"
-                                testId="mobile-build-candidates"
+                                title="Deployments in progress"
+                                testId="mobile-build-unsettled"
                                 isEmpty={false}
                             >
                                 {
-                                    candidates.map(pipeline =>
+                                    unsettled.map(pipeline =>
                                         <MobileEntityRow
                                             key={pipeline.id}
-                                            testId={`mobile-build-candidate-${pipeline.id}`}
+                                            testId={`mobile-build-unsettled-${pipeline.id}`}
                                             href={mobileDeploymentUri(pipeline.id)}
                                             name={
                                                 <span className="ot-mobile-inline">
@@ -299,11 +309,20 @@ export default function MobileBuildScreen({id}) {
                                                 </span>
                                             }
                                             context={
-                                                <TimestampText
-                                                    value={pipeline.start}
-                                                    prefix="started"
-                                                    relative
-                                                />
+                                                <span className="ot-mobile-inline">
+                                                    {/*
+                                                      Each row says which of the
+                                                      two it is: "waiting" is
+                                                      actively wrong for a running
+                                                      deployment.
+                                                    */}
+                                                    <SlotPipelineStatusLabel status={pipeline.status}/>
+                                                    <TimestampText
+                                                        value={pipeline.start}
+                                                        prefix="started"
+                                                        relative
+                                                    />
+                                                </span>
                                             }
                                         />
                                     )

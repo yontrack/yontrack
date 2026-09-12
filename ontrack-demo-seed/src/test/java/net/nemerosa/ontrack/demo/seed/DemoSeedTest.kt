@@ -753,15 +753,55 @@ class DemoSeedTest {
             .filter { it.project.name == DemoContent.SERVICE }
             .associateBy { it.environment.name }
 
-        assertEquals("89", slots.getValue(DemoContent.STAGING).deployments.last().name)
+        // What the slot HOLDS, which is its last DONE deployment: staging also carries a
+        // deployment left running on purpose (below), and the slot is not holding that one.
+        assertEquals("89", slots.getValue(DemoContent.STAGING).heldBuilds.last().name)
         assertEquals(
             DemoContent.MAINTENANCE,
-            slots.getValue(DemoContent.STAGING).deployments.last().branch.name,
+            slots.getValue(DemoContent.STAGING).heldBuilds.last().branch.name,
         )
-        assertEquals("104", slots.getValue(DemoContent.PRODUCTION).deployments.last().name)
+        assertEquals("104", slots.getValue(DemoContent.PRODUCTION).heldBuilds.last().name)
         assertEquals(
             DemoContent.MAIN,
-            slots.getValue(DemoContent.PRODUCTION).deployments.last().branch.name,
+            slots.getValue(DemoContent.PRODUCTION).heldBuilds.last().branch.name,
+        )
+    }
+
+    /**
+     * The demo's own answer to "show me the feature you just shipped" for #1736: a deployment
+     * a person can still complete or cancel. Without it the dataset has nothing in a state
+     * where either action is possible at all.
+     *
+     * The three things it must not disturb are asserted beside it, because each is what a
+     * different part of the demo reads: staging keeps holding the maintenance build, the
+     * running one is the LAST pipeline on its slot - "only the last pipeline can be deployed"
+     * - and it is a build staging's own admission rule admits.
+     */
+    @Test
+    fun `the demo leaves one deployment running, so completing or cancelling one can be tried`() {
+        val target = InMemoryDemoTarget()
+        seed(target).run(DemoContent.dataset(changelog))
+
+        val staging = target.environments()
+            .flatMap { (it as InMemoryDemoTarget.InMemoryEnvironment).slots }
+            .single { it.environment.name == DemoContent.STAGING && it.project.name == DemoContent.SERVICE }
+
+        val running = staging.deployments.filter { it.stopAt == DeploymentStop.RUNNING }
+        assertEquals(1, running.size, "Exactly one deployment is left running")
+        assertEquals("107", running.single().build.name)
+        assertEquals(
+            staging.deployments.last(),
+            running.single(),
+            "It is the last pipeline on the slot, so it is the one which can be completed",
+        )
+        assertEquals(
+            "89",
+            staging.heldBuilds.last().name,
+            "Staging still HOLDS the maintenance build, so nothing else in the demo moves",
+        )
+        assertTrue(
+            running.single().build.promotions.any { it.first == DemoContent.SILVER },
+            "It carries SILVER, staging's only admission rule, so it legitimately got that far",
         )
     }
 

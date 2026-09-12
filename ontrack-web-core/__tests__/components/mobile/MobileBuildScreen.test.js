@@ -109,6 +109,7 @@ const build = ({
                    promotions = [],
                    deployments = [],
                    candidates = [],
+                   running = [],
                    validations = [],
                    authorizations = [],
                } = {}) => setResult({
@@ -123,7 +124,8 @@ const build = ({
             authorizations,
             promotionRuns: promotions,
             currentDeployments: deployments,
-            slotPipelines: candidates,
+            candidatePipelines: candidates,
+            runningPipelines: running,
             validations,
         },
     },
@@ -417,32 +419,69 @@ describe('the mobile build screen', () => {
         })
     })
 
-    describe('deployments waiting on somebody', () => {
+    describe('deployments in progress', () => {
 
-        const candidate = (id, environmentName) => ({
+        const unsettled = (id, environmentName, {status = 'CANDIDATE', order = 100} = {}) => ({
             id,
             end: null,
             start: '2024-03-02T09:00:00Z',
-            slot: {id: `slot-${id}`, qualifier: '', environment: {id: environmentName, name: environmentName}},
+            status,
+            slot: {
+                id: `slot-${id}`,
+                qualifier: '',
+                environment: {id: environmentName, name: environmentName, order},
+            },
         })
 
         it('lists them, and taps through to the deployment', () => {
             // The only way into a deployment somebody else started - CI, usually
             // - which is half of what the mobile deployment flow is for.
-            build({candidates: [candidate('pipeline-1', 'production')]})
+            build({candidates: [unsettled('pipeline-1', 'production')]})
             render(<MobileBuildScreen id="100"/>)
-            const row = screen.getByTestId('mobile-build-candidate-pipeline-1')
+            const row = screen.getByTestId('mobile-build-unsettled-pipeline-1')
             expect(row).toHaveTextContent('production')
             expect(row.querySelector('a').getAttribute('href')).toEqual('/mobile/deployment/pipeline-1')
         })
 
-        it('is absent rather than empty when nothing is waiting', () => {
+        it('lists a running deployment too, which is the only way back to one', () => {
+            // `currentDeployments` names pipelines which reached DONE, so a
+            // RUNNING one used to be reachable only while the user stayed on the
+            // screen that started it (#1736).
+            build({running: [unsettled('pipeline-2', 'staging', {status: 'RUNNING'})]})
+            render(<MobileBuildScreen id="100"/>)
+            expect(screen.getByTestId('mobile-build-unsettled-pipeline-2')).toHaveTextContent('staging')
+        })
+
+        it('carries each row\'s own status, because "waiting" is wrong for a running one', () => {
+            build({
+                candidates: [unsettled('pipeline-1', 'production', {order: 200})],
+                running: [unsettled('pipeline-2', 'staging', {status: 'RUNNING', order: 100})],
+            })
+            render(<MobileBuildScreen id="100"/>)
+            expect(screen.getByTestId('mobile-build-unsettled-pipeline-1')).toHaveTextContent('Candidate')
+            expect(screen.getByTestId('mobile-build-unsettled-pipeline-2')).toHaveTextContent('Running')
+        })
+
+        it('puts the furthest environment first, whatever the status', () => {
+            build({
+                candidates: [unsettled('pipeline-1', 'staging', {order: 100})],
+                running: [unsettled('pipeline-2', 'production', {status: 'RUNNING', order: 200})],
+            })
+            render(<MobileBuildScreen id="100"/>)
+            const rows = Array.from(
+                screen.getByTestId('mobile-build-unsettled')
+                    .querySelectorAll('[data-testid^="mobile-build-unsettled-"]')
+            ).map(row => row.getAttribute('data-testid'))
+            expect(rows).toEqual(['mobile-build-unsettled-pipeline-2', 'mobile-build-unsettled-pipeline-1'])
+        })
+
+        it('is absent rather than empty when nothing is in progress', () => {
             // Unlike the three sections below it, this is not a facet of the
             // build: "no deployment is waiting" on every build screen would be a
             // line nobody reads.
             build()
             render(<MobileBuildScreen id="100"/>)
-            expect(screen.queryByTestId('mobile-build-candidates')).not.toBeInTheDocument()
+            expect(screen.queryByTestId('mobile-build-unsettled')).not.toBeInTheDocument()
         })
     })
 

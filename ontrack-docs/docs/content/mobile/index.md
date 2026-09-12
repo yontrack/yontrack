@@ -38,13 +38,20 @@ Five things — the ones people actually do from a phone:
     promoting from a phone means promoting now — with a "Promoted earlier?" link for the
     rare correction.
 
-**Deploy a build, and unblock a deployment.**
+**Deploy a build, and see a deployment through.**
 :   The build screen lists the [environments](../integrations/environments/environments.md)
     the build may go to, and says why one is refusing it rather than hiding it. Starting a
     deployment lands on the deployment's own screen, where you answer its admission rules —
-    a manual approval, say — or override one with a reason, and then run it. A deployment
-    somebody else started, usually CI, is reachable from the same build screen, which is
-    what makes "approve the thing that is waiting" a phone job at all.
+    a manual approval, say — or override one with a reason, and then run it. From there you
+    can also **complete** the deployment, behind a short confirmation, or **cancel** it with
+    a reason. Any deployment of the build which has not settled — one waiting on somebody and
+    one already running — is listed on the build screen under *Deployments in progress*, which
+    is what makes "approve the thing that is waiting" and "finish the thing CI abandoned" phone
+    jobs at all.
+
+    Completing a deployment from a phone is for the abnormal path: on the normal one CI
+    finishes them. When a slot workflow is holding the completion up, the screen says so in
+    that workflow's own words and offers no button rather than one that fails.
 
 A build screen also lists that build's validations, read-only. They are otherwise out of
 scope, but whether a build is green is the question you answer before promoting or
@@ -64,8 +71,10 @@ Everything else, and on purpose. Notably:
   [notifications](../integrations/notifications/index.md).
 - **Validation detail.** A build screen says which validations ran and how they did; the
   run itself, the matrix and the per-stamp history stay on the desktop.
-- **Finishing or cancelling a deployment.** Marking a deployment done is CI's job, and
-  cancelling one is destructive enough to want a bigger screen.
+- **Forcing a deployment through**, when a workflow is blocking its completion. That
+  bypasses controls somebody configured and is recorded against your name, so it stays on
+  the desktop UI — along with overriding the blocking workflow itself, and deleting a
+  deployment.
 - **Editing anything** — names, descriptions, properties, links.
 
 This list is not a backlog. The mobile UI exists precisely because the desktop UI is not

@@ -19,6 +19,7 @@ const {expectNoSidewaysScroll} = require("../support/page-utils");
  * | Search for a build | "a build is found on a branch by name, by promotion, and by both" |
  * | Promote a build | "a build is promoted from a phone, required fields and all" |
  * | Deploy a build, with approval and override | "a build is deployed from a phone…", "a blocked deployment is overridden from a phone…" |
+ * | See a deployment through, or kill it | "a deployment is completed from a phone…", "a deployment is cancelled from a phone…" |
  *
  * And the shell the five run inside, which has five behaviours of its own: the
  * redirect ("a phone lands on the mobile shell", and its negative "a desktop
@@ -623,10 +624,11 @@ test.describe('the mobile UI on a phone', () => {
         await page.getByTestId('mobile-deployment-run').click()
         await expect(page.getByTestId('mobile-deployment-status')).toContainText('Running')
 
-        // And a deployment that is no longer waiting offers nothing: finishing
-        // it is CI's job and cancelling it is the desktop UI's.
+        // And a running deployment offers the other end of the lifecycle rather
+        // than nothing: starting it again is not a thing, completing it is
+        // (#1736). The completion itself is its own journey, below.
         await expect(page.getByTestId('mobile-deployment-run')).toHaveCount(0)
-        await expect(page.getByTestId('mobile-deployment-settled')).toBeVisible()
+        await expect(page.getByTestId('mobile-deployment-finish')).toBeEnabled()
     })
 
     test('a blocked deployment is overridden from a phone, with a reason', async ({page, ontrack}) => {
@@ -649,7 +651,7 @@ test.describe('the mobile UI on a phone', () => {
 
         // Reached from the build screen, which is the only way in: nothing else
         // on a phone names a deployment somebody else started.
-        const row = page.getByTestId(`mobile-build-candidate-${pipeline.id}`)
+        const row = page.getByTestId(`mobile-build-unsettled-${pipeline.id}`)
         await expect(row).toContainText(environment.name)
         await row.getByRole('link').click()
         await expect(page).toHaveURL(new RegExp(`/mobile/deployment/${pipeline.id}$`))
@@ -675,6 +677,117 @@ test.describe('the mobile UI on a phone', () => {
         // There is no second override to offer, and the deployment can now run.
         await expect(page.getByTestId(`mobile-deployment-override-open-${approvalId}`)).toHaveCount(0)
         await expect(page.getByTestId('mobile-deployment-run')).toBeEnabled()
+    })
+
+    test('a deployment is completed from a phone, and the build says where it is', async ({page, ontrack}) => {
+        // The path a phone is actually for (#1736): CI died, or nobody is
+        // coming, and the person holding a phone is the one who has to finish
+        // the deployment. The journey ends where CI's would - the deployment
+        // DONE, and the build carrying the deployment badge that only a pipeline
+        // which reached DONE puts there.
+        const project = await ontrack.createProject()
+        const environment = await ontrack.environments.createEnvironment({})
+        const slot = await environment.createSlot({project})
+
+        const branch = await project.createBranch()
+        const build = await branch.createBuild()
+        await build.setRelease('1.4.0')
+
+        // Started by somebody else and left running, which is the state the
+        // phone has to be able to reach at all: `currentDeployments` names only
+        // pipelines which reached DONE, so before #1736 a RUNNING deployment was
+        // reachable only from the screen that had just started it.
+        const pipeline = await slot.createPipeline({build})
+        await ontrack.environments.startPipeline({pipeline})
+
+        await page.setViewportSize({width: 375, height: 812})
+        await signInOnPhone(page, ontrack)
+        await page.goto(`${ontrack.connection.ui}/mobile/build/${build.id}`)
+
+        // Reached from the build screen's *Deployments in progress*, which lists
+        // running deployments beside candidates and says which is which.
+        const row = page.getByTestId(`mobile-build-unsettled-${pipeline.id}`)
+        await expect(row).toContainText(environment.name)
+        await expect(row).toContainText('Running')
+        await row.getByRole('link').click()
+        await expect(page).toHaveURL(new RegExp(`/mobile/deployment/${pipeline.id}$`))
+
+        // Nothing scrolls sideways at 375px with two full-width buttons stacked,
+        // which every mobile surface has to meet.
+        await expect(page.getByTestId('mobile-deployment-finish')).toBeEnabled()
+        await expectNoSidewaysScroll(page)
+
+        // The confirm sheet names the environment and the build, and asks for
+        // nothing else: completion bypasses nobody's control, so it earns a
+        // confirmation and not a justification.
+        await page.getByTestId('mobile-deployment-finish').click()
+        const confirm = page.getByTestId('mobile-deployment-finish-confirm')
+        await expect(confirm).toContainText(environment.name)
+        await expect(confirm).toContainText('1.4.0')
+
+        await page.getByTestId('mobile-deployment-finish-submit').click()
+
+        // The screen refetches, and a settled deployment says what happened
+        // without mentioning the desktop version - there is nothing left to go
+        // there for.
+        await expect(page.getByTestId('mobile-deployment-status')).toContainText('Deployed')
+        await expect(page.getByTestId('mobile-deployment-finish')).toHaveCount(0)
+        await expect(page.getByTestId('mobile-deployment-cancel')).toHaveCount(0)
+        await expect(page.getByTestId('mobile-deployment-settled')).toContainText(/finished/i)
+
+        // And the build now says where it is, which is the half of the outcome
+        // that lives outside this screen.
+        await page.goto(`${ontrack.connection.ui}/mobile/build/${build.id}`)
+        await expect(page.getByTestId('mobile-build-deployments')).toContainText(environment.name)
+        await expect(page.getByTestId(`mobile-build-unsettled-${pipeline.id}`)).toHaveCount(0)
+    })
+
+    test('a deployment is cancelled from a phone, with a reason', async ({page, ontrack}) => {
+        // The other end of #1736, and a different journey with a different end:
+        // a candidate nobody is ever going to approve. The reason is required,
+        // as on the desktop - it is the only record of why an environment's
+        // deployment was killed, and the desktop reads it back.
+        const project = await ontrack.createProject()
+        const environment = await ontrack.environments.createEnvironment({})
+        const slot = await environment.createSlot({project})
+        await ontrack.environments.addManualApproval({slot})
+
+        const branch = await project.createBranch()
+        const build = await branch.createBuild()
+        await build.setRelease('1.4.0')
+        const pipeline = await slot.createPipeline({build})
+
+        await page.setViewportSize({width: 375, height: 812})
+        await signInOnPhone(page, ontrack)
+        await page.goto(`${ontrack.connection.ui}/mobile/deployment/${pipeline.id}`)
+
+        // The destructive action is not on the lifecycle button's own row, which
+        // is the acceptance criterion rather than a styling note: side by side
+        // puts a destructive tap a thumb-width from the constructive one.
+        const cancelRow = page.getByTestId('mobile-deployment-cancel-row')
+        await expect(cancelRow.getByTestId('mobile-deployment-cancel')).toBeVisible()
+        await expect(cancelRow.getByTestId('mobile-deployment-run')).toHaveCount(0)
+
+        await page.getByTestId('mobile-deployment-cancel').click()
+        await expect(page.getByTestId('mobile-deployment-cancel-warning')).toBeVisible()
+
+        // Refused without a reason, before anything leaves the phone.
+        await page.getByTestId('mobile-deployment-cancel-submit').click()
+        await expect(page.getByText('Reason is required.')).toBeVisible()
+
+        await page.getByTestId('mobile-deployment-cancel-reason').fill('CI died, nobody is coming.')
+        await page.getByTestId('mobile-deployment-cancel-submit').click()
+
+        // Cancelled, with the reason read back beside it as the desktop shows it.
+        await expect(page.getByTestId('mobile-deployment-status')).toContainText('Cancelled')
+        const settled = page.getByTestId('mobile-deployment-settled')
+        await expect(settled).toContainText(/cancelled/i)
+        await expect(settled).toContainText('CI died, nobody is coming.')
+
+        // And it is gone from the build screen's in-progress section, because it
+        // is no longer in progress.
+        await page.goto(`${ontrack.connection.ui}/mobile/build/${build.id}`)
+        await expect(page.getByTestId(`mobile-build-unsettled-${pipeline.id}`)).toHaveCount(0)
     })
 
     test('a favourite branch on the home screen taps through to itself', async ({page, ontrack}) => {

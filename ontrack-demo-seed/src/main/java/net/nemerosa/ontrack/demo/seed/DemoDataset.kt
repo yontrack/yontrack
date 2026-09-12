@@ -256,15 +256,39 @@ data class SlotWorkflowSpec(
 )
 
 /**
- * One deployment run all the way to done, so a slot shows something rather than nothing.
+ * One deployment of a build on a slot, run as far as [stopAt] says.
  *
  * The slot is named by its environment and by the project of the build, which is enough
  * while the demo gives a project at most one slot per environment.
+ *
+ * @property stopAt How far the deployment is taken. [DeploymentStop.DONE] by default, which
+ * is what makes a slot show a deployed build rather than one waiting for something to happen
+ * to it.
  */
 data class DeploymentSpec(
     val environment: String,
     val build: BuildRef,
+    val stopAt: DeploymentStop = DeploymentStop.DONE,
 )
+
+/**
+ * How far [DemoSlot.deploy] takes a deployment.
+ *
+ * The demo needs both: a slot is only *holding* a build once its deployment is [DONE], and a
+ * deployment is only completable or cancellable while it is [RUNNING]. A dataset with nothing
+ * but finished deployments cannot demonstrate the mobile UI's Complete and Cancel at all,
+ * because there is no deployment in a state where either is possible (#1736).
+ */
+enum class DeploymentStop {
+    /**
+     * Started and left running: the deployment is on its way, and completing or cancelling it
+     * is something a person can still do.
+     */
+    RUNNING,
+
+    /** Run all the way through, so the slot holds the build. */
+    DONE,
+}
 
 /**
  * One configured admission rule of a slot.

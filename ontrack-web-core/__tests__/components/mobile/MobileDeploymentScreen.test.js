@@ -18,13 +18,13 @@ Object.defineProperty(window, 'matchMedia', {
 })
 
 /**
- * One deployment on a phone: the waiting room.
+ * One deployment on a phone, from candidate to settled.
  *
- * Everything here is about the three things a person can do to a `CANDIDATE`
- * deployment - answer a rule, override a rule, run it - and about who is allowed
- * to do them. The screen is also where #1725's "actions are absent for
- * unauthorized users" is actually decided, which a UI test running as the
- * suite's admin account cannot show.
+ * Everything here is about what a person can do to a deployment which is still
+ * unsettled - answer a rule, override a rule, start it, complete it, cancel it -
+ * and about who is allowed to do them. The screen is also where "actions are
+ * absent for unauthorized users" is actually decided, which a UI test running as
+ * the suite's admin account cannot show (#1725, #1736).
  */
 
 let queryResult = {data: null, loading: false, error: null, finished: true}
@@ -66,6 +66,9 @@ const deployment = ({
                         rules = [],
                         requiredInputs = [],
                         runAction = {ok: true, successCount: 1, totalCount: 1},
+                        finishAction = {ok: true, successCount: 1, totalCount: 1},
+                        errorMessage = null,
+                        lastChange = null,
                         authorizations = [granted('pipeline', 'create'), granted('pipeline', 'override')],
                     } = {}) => {
     queryResult = {
@@ -87,6 +90,9 @@ const deployment = ({
                     config: {id, name: id, description: null, ruleId: 'manual', ruleConfig: {}},
                 })),
                 runAction,
+                finishAction,
+                errorMessage,
+                lastChange,
             },
         },
         loading: false,
@@ -222,13 +228,180 @@ describe('the mobile deployment screen', () => {
                 .toHaveTextContent('Rule manual is not satisfied')
         })
 
-        it('offers nothing at all on a deployment which is no longer waiting', () => {
-            // RUNNING to DONE is driven by CI, and cancelling is deliberately
-            // left to the desktop UI - so a settled deployment is read-only here.
+        it('offers no start once the deployment is running', () => {
+            // The lifecycle action of a RUNNING deployment is completing it, not
+            // starting it again.
             deployment({status: 'RUNNING'})
             render(<MobileDeploymentScreen id="pipeline-1"/>)
             expect(screen.queryByTestId('mobile-deployment-run')).not.toBeInTheDocument()
-            expect(screen.getByTestId('mobile-deployment-settled')).toBeInTheDocument()
+            expect(screen.getByTestId('mobile-deployment-finish')).toBeInTheDocument()
+        })
+    })
+
+    describe('completing it', () => {
+
+        it('offers the completion on a running deployment', () => {
+            deployment({status: 'RUNNING', finishAction: {ok: true}})
+            render(<MobileDeploymentScreen id="pipeline-1"/>)
+            expect(screen.getByTestId('mobile-deployment-finish')).toBeEnabled()
+        })
+
+        it('offers no completion on a candidate', () => {
+            deployment({status: 'CANDIDATE'})
+            render(<MobileDeploymentScreen id="pipeline-1"/>)
+            expect(screen.queryByTestId('mobile-deployment-finish')).not.toBeInTheDocument()
+        })
+
+        it('gives the blocking workflow\'s own words rather than a check count', () => {
+            // Admission rules gate CANDIDATE to RUNNING and nothing else, so the
+            // rule list of a RUNNING deployment is all green: a "n of m checks
+            // passed" caption would point at rules which have nothing to do with
+            // why the button is off. `errorMessage` is the failing workflow's
+            // own reason.
+            deployment({
+                status: 'RUNNING',
+                finishAction: {ok: false},
+                errorMessage: "Workflow is running",
+            })
+            render(<MobileDeploymentScreen id="pipeline-1"/>)
+            expect(screen.getByTestId('mobile-deployment-finish')).toBeDisabled()
+            expect(screen.getByTestId('mobile-deployment-finish-blocked'))
+                .toHaveTextContent('Workflow is running')
+        })
+
+        it('asks for a confirmation naming the environment and the build', async () => {
+            deployment({status: 'RUNNING'})
+            render(<MobileDeploymentScreen id="pipeline-1"/>)
+            fireEvent.click(screen.getByTestId('mobile-deployment-finish'))
+            const confirm = await screen.findByTestId('mobile-deployment-finish-confirm')
+            expect(confirm).toHaveTextContent('production')
+            expect(confirm).toHaveTextContent('1.4.0')
+            expect(callGraphQL).not.toHaveBeenCalled()
+        })
+
+        it('completes the deployment and asks the server again', async () => {
+            callGraphQL.mockResolvedValue({
+                finishSlotPipelineDeployment: {finishStatus: {ok: true, message: ''}, errors: null},
+            })
+            deployment({status: 'RUNNING'})
+            render(<MobileDeploymentScreen id="pipeline-1"/>)
+            const before = queryDeps
+
+            fireEvent.click(screen.getByTestId('mobile-deployment-finish'))
+            fireEvent.click(await screen.findByTestId('mobile-deployment-finish-submit'))
+
+            await waitFor(() => expect(callGraphQL).toHaveBeenCalled())
+            // `forcing` stays false: forcing is the desktop's override-gated
+            // command and is out of scope here.
+            expect(callGraphQL.mock.calls[0][0].variables).toEqual({id: 'pipeline-1'})
+            expect(callGraphQL.mock.calls[0][0].query).toContain('forcing: false')
+            await waitFor(() => expect(queryDeps).not.toEqual(before))
+        })
+
+        it('shows a refused completion rather than swallowing it', async () => {
+            // "Only the last pipeline can be deployed." is checked at submit time
+            // and is invisible to `finishAction`, so the button can be enabled and
+            // the mutation still refuse.
+            callGraphQL.mockResolvedValue({
+                finishSlotPipelineDeployment: {
+                    finishStatus: {ok: false, message: "Only the last pipeline can be deployed."},
+                    errors: null,
+                },
+            })
+            deployment({status: 'RUNNING'})
+            render(<MobileDeploymentScreen id="pipeline-1"/>)
+
+            fireEvent.click(screen.getByTestId('mobile-deployment-finish'))
+            fireEvent.click(await screen.findByTestId('mobile-deployment-finish-submit'))
+
+            expect(await screen.findByTestId('mobile-deployment-error'))
+                .toHaveTextContent('Only the last pipeline can be deployed.')
+        })
+    })
+
+    describe('cancelling it', () => {
+
+        it('offers the cancellation on a candidate and on a running deployment', () => {
+            deployment({status: 'CANDIDATE'})
+            const {unmount} = render(<MobileDeploymentScreen id="pipeline-1"/>)
+            expect(screen.getByTestId('mobile-deployment-cancel')).toBeInTheDocument()
+            unmount()
+
+            deployment({status: 'RUNNING'})
+            render(<MobileDeploymentScreen id="pipeline-1"/>)
+            expect(screen.getByTestId('mobile-deployment-cancel')).toBeInTheDocument()
+        })
+
+        it('keeps the destructive action off the lifecycle button\'s own row', () => {
+            // The presentation is the mitigation: side by side puts a destructive
+            // tap a thumb-width from the constructive one.
+            deployment({status: 'RUNNING'})
+            render(<MobileDeploymentScreen id="pipeline-1"/>)
+            const row = screen.getByTestId('mobile-deployment-cancel-row')
+            expect(row).toContainElement(screen.getByTestId('mobile-deployment-cancel'))
+            expect(row).not.toContainElement(screen.getByTestId('mobile-deployment-finish'))
+        })
+
+        it('marks the cancellation as destructive and the lifecycle action as primary', () => {
+            deployment({status: 'RUNNING'})
+            render(<MobileDeploymentScreen id="pipeline-1"/>)
+            expect(screen.getByTestId('mobile-deployment-cancel')).toHaveClass('ant-btn-dangerous')
+            expect(screen.getByTestId('mobile-deployment-cancel')).not.toHaveClass('ant-btn-primary')
+            expect(screen.getByTestId('mobile-deployment-finish')).toHaveClass('ant-btn-primary')
+        })
+
+        it('requires a reason before anything leaves the phone', async () => {
+            deployment({status: 'RUNNING'})
+            render(<MobileDeploymentScreen id="pipeline-1"/>)
+            fireEvent.click(screen.getByTestId('mobile-deployment-cancel'))
+            fireEvent.click(await screen.findByTestId('mobile-deployment-cancel-submit'))
+            expect(await screen.findByText('Reason is required.')).toBeInTheDocument()
+            expect(callGraphQL).not.toHaveBeenCalled()
+        })
+
+        it('sends the cancellation with its reason, and asks the server again', async () => {
+            callGraphQL.mockResolvedValue({cancelSlotPipeline: {errors: null}})
+            deployment({status: 'RUNNING'})
+            render(<MobileDeploymentScreen id="pipeline-1"/>)
+            const before = queryDeps
+
+            fireEvent.click(screen.getByTestId('mobile-deployment-cancel'))
+            const reason = await screen.findByTestId('mobile-deployment-cancel-reason')
+            fireEvent.change(reason, {target: {value: 'CI died, nobody is coming.'}})
+            fireEvent.click(screen.getByTestId('mobile-deployment-cancel-submit'))
+
+            await waitFor(() => expect(callGraphQL).toHaveBeenCalled())
+            expect(callGraphQL.mock.calls[0][0].variables).toEqual({
+                pipelineId: 'pipeline-1',
+                reason: 'CI died, nobody is coming.',
+            })
+            await waitFor(() => expect(queryDeps).not.toEqual(before))
+        })
+    })
+
+    describe('a settled deployment', () => {
+
+        it('says the deployment is finished, and offers nothing', () => {
+            deployment({status: 'DONE'})
+            render(<MobileDeploymentScreen id="pipeline-1"/>)
+            expect(screen.getByTestId('mobile-deployment-settled')).toHaveTextContent(/finished/i)
+            expect(screen.queryByTestId('mobile-deployment-run')).not.toBeInTheDocument()
+            expect(screen.queryByTestId('mobile-deployment-finish')).not.toBeInTheDocument()
+            expect(screen.queryByTestId('mobile-deployment-cancel')).not.toBeInTheDocument()
+        })
+
+        it('reads the cancellation reason back beside a cancelled one', () => {
+            deployment({status: 'CANCELLED', lastChange: {message: 'CI died, nobody is coming.'}})
+            render(<MobileDeploymentScreen id="pipeline-1"/>)
+            const settled = screen.getByTestId('mobile-deployment-settled')
+            expect(settled).toHaveTextContent(/cancelled/i)
+            expect(settled).toHaveTextContent('CI died, nobody is coming.')
+        })
+
+        it('no longer points at the desktop version, because there is nothing left to go there for', () => {
+            deployment({status: 'DONE'})
+            render(<MobileDeploymentScreen id="pipeline-1"/>)
+            expect(screen.getByTestId('mobile-deployment-settled')).not.toHaveTextContent(/desktop/i)
         })
     })
 
@@ -349,6 +522,35 @@ describe('the mobile deployment screen', () => {
             render(<MobileDeploymentScreen id="pipeline-1"/>)
             expect(screen.queryByTestId('mobile-deployment-run')).not.toBeInTheDocument()
             expect(screen.queryByTestId('mobile-deployment-input-open-r1')).not.toBeInTheDocument()
+        })
+
+        it('shows neither completion nor cancellation to a user who may not deploy', () => {
+            // Both are off the slot's own `pipeline/create`, as the rest of the
+            // screen is: `EnvironmentsRoleContributor` grants `SlotPipelineFinish`
+            // and `SlotPipelineCancel` from exactly the roles granting
+            // `SlotPipelineCreate`, and the slot publishes neither as an
+            // authorization of its own.
+            deployment({
+                status: 'RUNNING',
+                authorizations: [refused('pipeline', 'create'), granted('pipeline', 'override')],
+            })
+            render(<MobileDeploymentScreen id="pipeline-1"/>)
+            expect(screen.queryByTestId('mobile-deployment-finish')).not.toBeInTheDocument()
+            expect(screen.queryByTestId('mobile-deployment-cancel')).not.toBeInTheDocument()
+        })
+
+        it('still says why a running deployment cannot be completed', () => {
+            // Reading is never gated: a user who may not act can still need to
+            // know what is holding the deployment up.
+            deployment({
+                status: 'RUNNING',
+                finishAction: {ok: false},
+                errorMessage: 'Workflow is in error',
+                authorizations: [refused('pipeline', 'create')],
+            })
+            render(<MobileDeploymentScreen id="pipeline-1"/>)
+            expect(screen.getByTestId('mobile-deployment-finish-blocked'))
+                .toHaveTextContent('Workflow is in error')
         })
 
         it('shows no override to a user who may not override', () => {
