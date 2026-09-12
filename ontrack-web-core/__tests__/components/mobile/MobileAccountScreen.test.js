@@ -8,6 +8,18 @@ jest.mock("next-auth/react", () => ({
     signOut: (...args) => signOut(...args),
 }))
 
+/*
+ * The module, rather than `window.location`: the screen's contract is that the
+ * switch goes *through* `switchToDesktopUI`, which is where the
+ * remember-then-navigate ordering lives and which has its own coverage in
+ * `desktopPreference.test.js`. Mocking it here asserts the seam instead of
+ * re-testing what is behind it - and jsdom refuses to navigate anyway.
+ */
+const switchToDesktopUI = jest.fn()
+jest.mock("../../../components/mobile/desktopPreference", () => ({
+    switchToDesktopUI: (...args) => switchToDesktopUI(...args),
+}))
+
 import MobileAccountScreen from "@/app/mobile/account/AccountScreen"
 
 const renderScreen = ({user = {}, version = '5.4.0'} = {}) => render(
@@ -20,7 +32,10 @@ const renderScreen = ({user = {}, version = '5.4.0'} = {}) => render(
 
 const ADMIN = {name: 'admin', fullName: "Administrator", email: 'admin@example.com'}
 
-beforeEach(() => signOut.mockClear())
+beforeEach(() => {
+    signOut.mockClear()
+    switchToDesktopUI.mockClear()
+})
 
 describe('the mobile account screen', () => {
 
@@ -110,6 +125,58 @@ describe('the mobile account screen', () => {
                 .toBe(Node.DOCUMENT_POSITION_FOLLOWING)
             expect(section.compareDocumentPosition(signOut))
                 .toBe(Node.DOCUMENT_POSITION_FOLLOWING)
+        })
+    })
+
+    describe('this device', () => {
+
+        it('offers the way to the desktop version', () => {
+            // The whole point of the issue: before this row, the only door out
+            // of the mobile UI was the interstitial - reached by following a
+            // link to a page the user did not want in the first place.
+            renderScreen({user: ADMIN})
+            expect(screen.getByTestId('open-desktop-version')).toBeInTheDocument()
+        })
+
+        it('goes through the switch, and lands on the desktop home', () => {
+            // Through `switchToDesktopUI`, so the cookie is written *before* the
+            // navigation - write it after and the middleware bounces the user
+            // straight back, with the button looking broken. The desktop home
+            // and not a computed target: by the time the user is on the account
+            // screen, the screen they came from is gone.
+            renderScreen({user: ADMIN})
+            act(() => screen.getByTestId('open-desktop-version').click())
+            expect(switchToDesktopUI).toHaveBeenCalledWith('/')
+        })
+
+        it('says what the choice costs and where the way back is', () => {
+            // A phone has no hover and, once the app is installed, no address
+            // bar: switching has to read as reversible before it is committed
+            // to.
+            renderScreen({user: ADMIN})
+            const caption = screen.getByTestId('mobile-account-device-caption')
+            expect(caption).toHaveTextContent(/until you close your browser/i)
+            expect(caption).toHaveTextContent(/Mobile version/)
+        })
+
+        it('sits between appearance and sign out', () => {
+            // Sign out stays the last control on the screen and the only
+            // destructive one: a preference placed after it would sit on the
+            // path a thumb travels past. A test rather than a comment.
+            renderScreen({user: ADMIN})
+            const appearance = screen.getByTestId('mobile-account-appearance')
+            const device = screen.getByTestId('mobile-account-device')
+            const signOutButton = screen.getByTestId('mobile-account-sign-out')
+            expect(appearance.compareDocumentPosition(device))
+                .toBe(Node.DOCUMENT_POSITION_FOLLOWING)
+            expect(device.compareDocumentPosition(signOutButton))
+                .toBe(Node.DOCUMENT_POSITION_FOLLOWING)
+        })
+
+        it('does not switch anyone merely for opening the screen', () => {
+            // The device choice is a decision, not a side effect of landing here.
+            renderScreen({user: ADMIN})
+            expect(switchToDesktopUI).not.toHaveBeenCalled()
         })
     })
 

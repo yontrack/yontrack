@@ -75,10 +75,18 @@ through rather than sending them to the optimizer, which answers `400` for them.
 - **A redirect, not a rewrite.** The PWA is scoped to `/mobile`, and a scope only works if
   that path actually appears in the URL. It also makes mobile pages bookmarkable.
 - **A `yontrack-ui=desktop` cookie opts out**, per device rather than per user. It is set by
-  the interstitial's "open the desktop version" and cleared by the "Mobile version" entry in
+  the **This device** section of the account screen and by the interstitial — the same
+  "Open the desktop version" button on both — and cleared by the "Mobile version" entry in
   the desktop user menu. Both halves matter: without the second, a phone that once chose the
   desktop UI is stranded on it, and once the mobile UI is installed as a PWA there is no
   address bar to escape with.
+
+  The two setters are deliberate, and not a duplication. The interstitial's is the
+  **accidental** door: it is reached by following a link to a page the mobile UI does not
+  have, so a user who simply *wants* the desktop UI had to first go somewhere they did not
+  want to go. The account screen's is the **deliberate** one (#1733), and it is the
+  counterpart of the desktop user menu's "Mobile version" entry — the asymmetry was the
+  giveaway, and it is the mobile side where being stranded is worse.
 
   That user-menu entry **is** tappable at phone width. It was not when the cookie was first
   written: the desktop header row grew past its own 64px box and painted over the page bar
@@ -137,7 +145,7 @@ the interstitial, which may well be right, but should be a choice rather than an
 | Branch | `/mobile/branch/[id]` | The branch's latest builds, as cards, searchable |
 | Build | `/mobile/build/[id]` | The decision surface: promotions, deployments, validations |
 | Deployment | `/mobile/deployment/[id]` | One deployment waiting to run: its admission rules, and what can be done about them |
-| Account | `/mobile/account` | Who is signed in, the theme, the version, and sign out |
+| Account | `/mobile/account` | Who is signed in, the theme, the switch to the desktop version, the version, and sign out |
 | Interstitial | `/mobile/desktop-only` | A route with no mobile equivalent |
 
 Home → project → branch → build is the path the mobile UI exists for, and all of it stays
@@ -567,8 +575,9 @@ as a side effect. See [demo-seed.md](../demo-seed.md).
 
 ### The account screen
 
-`/mobile/account` is who is signed in, the **appearance**, the version, and **sign out** — and
-nothing else. It is reached by tapping the signed-in name in the header, and from nowhere else.
+`/mobile/account` is who is signed in, the **appearance**, **this device**, the version, and
+**sign out** — and nothing else. It is reached by tapping the signed-in name in the header, and
+from nowhere else.
 
 Until it landed there was no way to sign out of the mobile UI at all: `signOut` appeared
 nowhere under `components/mobile/` or `app/mobile/`, the only deliberate call being the
@@ -593,7 +602,8 @@ marking it as a door. The name stays in the header; on a shared or long-lived ph
 is still the one thing worth the space.
 
 **What it holds.** The identity — full name and username as the screen's head, email as
-context, all three already on `UserContext` — the **Appearance** section below, and the version
+context, all three already on `UserContext` — the **Appearance** and **This device** sections
+below, and the version
 (`useRefData().version`) as secondary text at the foot. The version earns its row because of the PWA: no address bar, no
 user menu, and "what version are you on?" is the first question on any support thread. It is
 also where the desktop user menu puts it. The desktop's own user-profile page
@@ -657,9 +667,11 @@ a single field on the account, so choosing Dark on the phone darkens that accoun
 in every browser — and a user who set Dark on their desktop already found the phone dark. That
 is the intent. The alternative reading — a phone in bed at night is not a desk at noon — would
 mean a second cookie, a second GraphQL field and a migration, to serve a preference nobody has
-asked for. It is also what settles *where* the control belongs: this screen draws a line twice
-already, declining the desktop-version opt-out and leaving `yontrack-ui=desktop` alone on sign
-out, because those are **device** choices. The theme is on the user's side of that line.
+asked for. It is also what settles *where* the control belongs: the theme is a
+choice of the **user**, and the screen's other line — `yontrack-ui=desktop`, which sign out
+leaves alone — is a choice of the **device**. The two now sit in sections named for the
+difference, **Appearance** and **This device** (#1733); before that one they were told apart by
+the device choice simply being absent, which said nothing to the user.
 `mobile.spec.js` asserts it directly — a choice made on the phone, read back from a fresh
 desktop context — because otherwise "one preference" is a sentence nothing enforces.
 
@@ -697,6 +709,84 @@ server wins. The wording changed for **both** UIs: "Theme applied, but not saved
 — it may not follow you to other devices." The previous text said "another browser", which was
 accurate when the switch was a desktop control and is not accurate now that what the user loses
 is the choice following them to their phone.
+
+#### This device: the deliberate door to the desktop UI
+
+The **This device** section sits between **Appearance** and sign out, and carries one control:
+"Open the desktop version" (#1733).
+
+**Why the account screen, after all.** Until this section landed, `switchToDesktopUI` had
+exactly one caller — the interstitial — which a user reaches by *following a link to a page the
+mobile UI does not have*. Wanting the desktop UI therefore meant first going somewhere you did
+not want to go. The desktop UI has carried a deliberate "Mobile version" entry in its user menu
+since #1719, and the asymmetry was the giveaway: it is the mobile side where being stranded is
+worse, because #1727 installs the mobile UI as a PWA scoped to `/mobile`, after which there is
+no address bar either. This section is that entry's counterpart, and the account screen is the
+`UserMenu`'s counterpart — the menu where the desktop puts "Mobile version", the theme switch
+and sign out together.
+
+**#1730 declined this control, and #1732 cited the declining as precedent.** That reasoning was
+about *bundling*, and it was right at the time: #1730's screen was one verb, and two decisions
+should not share a row by convenience. The screen now has a titled **Appearance** section and
+reads as *account and preferences*. The device/user line survives — as a **section heading**
+rather than as an omission, which states the distinction where the user can read it.
+
+**Not a third bottom-nav tab**, and **not the header**. Two thumb-level destinations are what
+the bar carries, and a tab is earned by a screen someone returns to; this is a switch, not a
+screen. The 48px header already carries the brand lockup and the signed-in name, which is
+itself the door to this screen.
+
+**A section of its own, not a row folded into Appearance.** One title costs one line and is
+what keeps the user/device distinction legible — the same trade "Appearance" already took.
+
+**`DesktopVersionButton`, reused as-is**, not a second component and not a second label: one
+affordance and one string for one action on both surfaces, because two labels is how two
+surfaces drift into saying different things about the same button. `type="default"` here rather
+than the interstitial's `primary` — there it is the recommended way out of a dead end, here it
+is one row among several and sign out is already the loudest thing on the screen. The component
+gained a `size` prop defaulting to **`large`**: antd's default button is 32px, well under what a
+thumb wants, `large` is antd's biggest at 40px and is what this screen's sign out already asks
+for, both callers are phone surfaces, and the interstitial's button got the same fix at no
+cost. (The issue said the *default* was 40px; it is `large` that is, which is why the prop is
+needed at all.) **No icon**: `FaDesktop` is already on this screen, in the theme control's **Auto**
+segment where it means "follow the operating system", and a second one two rows down meaning
+"the desktop UI" would make one glyph mean two things on one screen.
+
+**It lands on `DESKTOP_HOME`**, exactly as `switchToMobileUI` always lands on `MOBILE_HOME`.
+Landing on "the desktop equivalent of the screen behind" would need an inverse mobile→desktop
+map to keep in sync with `mobileRoutes.js`, plus history this screen does not have — by the time
+the user is on `/mobile/account`, the screen they came from is gone. The interstitial has a real
+target only because the middleware handed it one. No inverse route map is built, and none is
+stubbed.
+
+**A caption under it**, one line of secondary text in the same shape as `themeModeCaption`: the
+switch lasts until the browser closes, and the "Mobile version" entry in the desktop user menu
+is the way back. A phone has no hover and an installed app has no address bar, so switching has
+to read as reversible *before* it is committed to. It is deliberately **not** extracted into a
+constant shared with the interstitial, whose sentence is bound to its own verb and to a
+destination it has just named. Two sentences, one fact — and the fact is what must not drift,
+which is why it is recorded here.
+
+**`switchToDesktopUI` is untouched**, and the new control goes through it like the existing one:
+it remains the single place the remember-then-navigate ordering lives, and writing the cookie
+*after* the navigation would have the middleware bounce the user straight back with the button
+looking broken. The cookie stays a **session** cookie; making it long-lived remains a decision
+of its own. Sign out still leaves it alone. `/mobile/account` still stands in for no desktop
+route.
+
+**At the PWA scope boundary**, tapping the control navigates out of `/mobile`, so an installed
+app hands it to the browser. That is the intended behaviour and #1727's own stated reasoning
+for scoping to `/mobile`: leaving the mobile UI is leaving the installed app. This is also why
+the section ships **before or with** #1727 — shipping the installed app while its only exit is
+accidental is the failure it exists to stop.
+
+**`open-desktop-version` now exists on two screens**, deliberately: it is one control with one
+identity, and each acceptance test addresses it from a URL that makes which one unambiguous.
+`mobile.spec.js` pins both doors without either duplicating the other — "a phone reaches the
+desktop version from the account screen" pins the deliberate one and the session-scoped cookie
+it writes, while "a phone can switch to the desktop UI and back again" pins the interstitial
+carrying the user's *actual* destination through the switch, and the way back through the
+desktop user menu.
 
 **Test isolation.** The theme is server-side state on the shared account and Playwright runs
 `workers: 1, fullyParallel: false`, so a spec leaving `DARK` behind drives every spec after it

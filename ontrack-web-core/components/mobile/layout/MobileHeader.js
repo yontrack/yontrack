@@ -16,7 +16,8 @@
  *
  * Everything else the desktop header offers behind the user menu -
  * administration, configurations, GraphiQL - has no mobile counterpart and is
- * not smuggled in here. The account screen is who you are and one verb.
+ * not smuggled in here. The account screen is who you are, what you can set
+ * about this app on this device, and one verb.
  *
  * The identity is the brand's own two marks, `yontrack-logo.svg` and
  * `yontrack-text.svg`, and not the word set in the UI font: the wordmark is a

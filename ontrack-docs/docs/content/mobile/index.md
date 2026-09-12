@@ -100,9 +100,18 @@ you on the home screen loses what you came for.
 
 ## Switching to the desktop version
 
-Tap **Open the desktop version** on that page and you get the desktop UI, at the page you
-were heading for. From then on that browser stays on the desktop UI: every Yontrack page
-you open in it is the desktop one, and the phone redirect stops applying.
+Two ways, and they do the same thing:
+
+- **From the account screen.** Tap your name in the header, and under **This device** tap
+  **Open the desktop version**. This is the one to use when you simply want the desktop UI
+  — to read a change log, to open an administration page, or because you prefer it. It
+  takes you to the desktop home page.
+- **From the Desktop only page**, when you followed a link to something the mobile UI does
+  not cover. Tap **Open the desktop version** there and you land on the page you were
+  actually heading for, rather than on the home page.
+
+From then on that browser stays on the desktop UI: every Yontrack page you open in it is
+the desktop one, and the phone redirect stops applying.
 
 !!! note
 
@@ -126,9 +135,13 @@ ended.
 ## Your account, the theme and the version
 
 Tap your name in the header to reach the account screen. It carries who you are signed in
-as, the light/dark theme, the Yontrack version — the one to quote on a support thread — and
-the way to sign out.
+as, the light/dark theme, the way to
+[open the desktop version](#switching-to-the-desktop-version), the Yontrack version — the
+one to quote on a support thread — and the way to sign out.
 
-The theme is a preference of **your account**, not of the device: choosing dark on your
-phone means the desktop UI is dark too, next time you open it. **Auto** follows whatever
-your phone or laptop is set to, and says which one it is currently resolving to.
+The screen separates the two kinds of choice, because they behave differently.
+**Appearance** is about **your account**: choosing dark on your phone means the desktop UI
+is dark too, next time you open it, and **Auto** follows whatever your phone or laptop is
+set to, saying which one it is currently resolving to. **This device** is about the browser
+you are holding: opening the desktop version there changes nothing for your laptop or for
+anyone else, and it lasts only until you close the browser.

@@ -1,6 +1,14 @@
 /**
  * Switching this device between the two UIs.
  *
+ * Three callers, two directions. `switchToDesktopUI` is driven by the account
+ * screen's **This device** section, which is the deliberate door out of the
+ * mobile UI (#1733), and by the interstitial, which is the accidental one - a
+ * user who followed a link to a page the mobile UI does not have. Both doors are
+ * wanted. `switchToMobileUI` is driven by the "Mobile version" entry in the
+ * desktop user menu, which is the whole way back, because the desktop UI has one
+ * menu.
+ *
  * Both directions are the same pair of steps in the same order: remember the
  * choice, *then* navigate. The order is not cosmetic - the middleware reads that
  * cookie on the very request the navigation makes, so writing it afterwards
@@ -43,8 +51,10 @@ const options = {
 /**
  * Puts this device on the desktop UI, and goes there.
  *
- * @param {string} href The desktop page to land on - the one the user was
- *   heading for, not the home page.
+ * @param {string} href The desktop page to land on: the one the user was heading
+ *   for when the interstitial asks, and `DESKTOP_HOME` when the account screen
+ *   does - that screen has no destination to carry, and inventing one would need
+ *   an inverse route map.
  */
 export function switchToDesktopUI(href) {
     if (typeof document === 'undefined') return

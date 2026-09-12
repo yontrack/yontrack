@@ -1,8 +1,8 @@
 "use client"
 
 /**
- * The account screen: who is signed in, how the app looks, and the way to stop
- * being signed in.
+ * The account screen: who is signed in, how the app looks, which UI this device
+ * is on, and the way to stop being signed in.
  *
  * **A screen rather than a drawer.** A drawer is the desktop pattern
  * (`UserMenu`), and importing it would cross the boundary the mobile shell is
@@ -13,15 +13,27 @@
  * returns to, not by a settings page.
  *
  * **What it holds, and what it does not.** The identity, the appearance, the
- * version, and sign out. The desktop's own user-profile page
+ * device switch, the version, and sign out. The desktop's own user-profile page
  * (`/core/admin/userProfile`) is API tokens and groups, and neither belongs on a
  * phone; nothing else from the desktop user menu arrives here.
  *
- * The theme control is here because the theme is a preference of the *user*,
- * not of the device - one `themeMode` on the account, shared with the desktop
- * UI. That is the same line this screen already draws twice, in declining the
- * desktop-version opt-out and in leaving the `yontrack-ui=desktop` cookie alone
- * on sign out; the theme falls on the other side of it.
+ * **The user/device line is a section heading, not an omission.** The theme is a
+ * preference of the *user* - one `themeMode` on the account, shared with the
+ * desktop UI - and lives under **Appearance**. The `yontrack-ui=desktop` opt-out
+ * is a choice of the *device*, and lives under **This device**, which says so
+ * where the user can read it. The screen used to draw that line by leaving the
+ * opt-out off altogether (#1730, #1732); naming the section states the
+ * distinction instead of hiding it, and gives the next mobile preference an
+ * obvious side to land on.
+ *
+ * **The desktop version is reachable deliberately** (#1733). It used to be
+ * reachable only by accident: `switchToDesktopUI` had one caller, the
+ * interstitial, which a user reaches by following a link to a page the mobile UI
+ * does not have - so wanting the desktop UI meant first going somewhere you did
+ * not want to go. The desktop UI has carried a deliberate "Mobile version" entry
+ * in its user menu since #1719; this is its counterpart, and it matters more on
+ * this side, because #1727 installs the mobile UI as a PWA scoped to `/mobile`
+ * and an installed app has no address bar to escape with.
  *
  * The version earns its row because of the PWA: no address bar, no user menu,
  * and "what version are you on?" is the first question on any support thread.
@@ -50,7 +62,8 @@ import {useRefData} from "@components/providers/RefDataProvider"
 import MobileScreen from "@components/mobile/layout/MobileScreen"
 import MobileSection from "@components/mobile/layout/MobileSection"
 import MobileThemeSwitch from "@components/mobile/account/MobileThemeSwitch"
-import {MOBILE_HOME} from "@components/mobile/mobileRoutes"
+import DesktopVersionButton from "@components/mobile/DesktopVersionButton"
+import {DESKTOP_HOME, MOBILE_HOME} from "@components/mobile/mobileRoutes"
 
 export default function MobileAccountScreen() {
 
@@ -110,11 +123,58 @@ export default function MobileAccountScreen() {
                 <MobileThemeSwitch/>
             </MobileSection>
 
+            {/*
+              Between Appearance and sign out, for the same reason Appearance is
+              between the identity and sign out: sign out stays the last control
+              and the only destructive one, and a preference placed after it
+              would sit on the path a thumb travels past.
+
+              A section of its own rather than a row folded into Appearance: one
+              title costs one line, and it is the line that keeps the
+              user/device distinction legible.
+            */}
+            <MobileSection title="This device" testId="mobile-account-device">
+                <Space direction="vertical" size={4} style={{width: '100%'}}>
+                    {/*
+                      `DESKTOP_HOME`, exactly as `switchToMobileUI` always lands
+                      on `MOBILE_HOME`. Landing on "the desktop equivalent of the
+                      screen behind" would need an inverse route map to keep in
+                      sync with `mobileRoutes.js`, plus history this screen does
+                      not have - by the time the user is here, the screen they
+                      came from is gone. The interstitial has a real target only
+                      because the middleware handed it one.
+
+                      `default` and not `primary`: this is one row among several,
+                      and sign out is already the loudest thing on the screen.
+
+                      No icon. `FaDesktop` is on this screen already, in the
+                      theme control's Auto segment, where it means "follow the
+                      operating system"; a second one two rows down meaning "the
+                      desktop UI" would make one glyph mean two things.
+                    */}
+                    <DesktopVersionButton href={DESKTOP_HOME} block/>
+                    {/*
+                      The same shape as `themeModeCaption`: a phone has no hover,
+                      so what the choice costs and where the way back is have to
+                      be in the open. Deliberately not a constant shared with the
+                      interstitial, whose sentence is bound to a destination it
+                      has just named - two sentences, one fact, and the fact is
+                      what `mobile-ui.md` records.
+                    */}
+                    <Typography.Text type="secondary" data-testid="mobile-account-device-caption">
+                        This device stays on the desktop version until you close
+                        your browser. The “Mobile version” entry in the desktop
+                        user menu brings you back sooner.
+                    </Typography.Text>
+                </Space>
+            </MobileSection>
+
             <Button
                 block
                 danger
-                // Large rather than default: the one action on the screen, and
-                // a 40px antd button is under the 44px a thumb wants.
+                // Large rather than default, as every tap target on this
+                // screen is: antd's default button is 32px, well under what a
+                // thumb wants, and `large` is its biggest at 40px.
                 size="large"
                 icon={<FaSignOutAlt/>}
                 data-testid="mobile-account-sign-out"

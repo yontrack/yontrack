@@ -19,13 +19,16 @@ const {test} = require("../fixtures/connection");
  * | Promote a build | "a build is promoted from a phone, required fields and all" |
  * | Deploy a build, with approval and override | "a build is deployed from a phone…", "a blocked deployment is overridden from a phone…" |
  *
- * And the shell the five run inside, which has four behaviours of its own: the
+ * And the shell the five run inside, which has five behaviours of its own: the
  * redirect ("a phone lands on the mobile shell", and its negative "a desktop
  * browser is left alone" at the foot of the file), the entity route map ("a link
  * to a desktop project or branch lands on its mobile screen"), the interstitial
- * ("a route with no mobile equivalent gets the interstitial"), and the desktop
+ * ("a route with no mobile equivalent gets the interstitial"), the desktop
  * opt-out with its way back ("a phone can switch to the desktop UI and back
- * again").
+ * again"), and the deliberate door to the desktop UI ("a phone reaches the
+ * desktop version from the account screen"), which is the one a user takes when
+ * they *want* the desktop UI rather than having been sent to a page the mobile
+ * UI does not have.
  *
  * A journey gaining a screen gains a row here rather than a spec file of its
  * own: the shell, the theme and the account are shared by all of them, and so
@@ -863,6 +866,37 @@ test.describe('the mobile UI on a phone', () => {
 
         await signBackInOnPhone(page, ontrack)
         await expect(page).toHaveURL(/\/mobile$/)
+    })
+
+    test('a phone reaches the desktop version from the account screen', async ({page, ontrack}) => {
+        // The deliberate door, as against the accidental one below: a user who
+        // wants the desktop UI should not have to first navigate to a page they
+        // did not want in order to find the exit - which is all the interstitial
+        // ever offered, and all an installed PWA would offer.
+        await signInOnPhone(page, ontrack)
+        await page.goto(`${ontrack.connection.ui}/mobile/account`)
+
+        // It says what the choice costs and where the way back is, before the
+        // user commits to it: a phone has no hover, and the installed app has no
+        // address bar.
+        await expect(page.getByTestId('mobile-account-device-caption'))
+            .toContainText('Mobile version')
+
+        await page.getByTestId('open-desktop-version').click()
+
+        // The desktop home, and it actually gets there rather than being bounced
+        // straight back by the redirect - which is what writing the cookie
+        // before navigating is for.
+        await expect(page.getByText("Dashboard", {exact: true})).toBeVisible()
+        await expect(page).not.toHaveURL(/\/mobile/)
+        expect(new URL(page.url()).pathname).toEqual('/')
+
+        // And the choice it wrote is the session-scoped one, not a lasting
+        // preference. Playwright reports -1 for a session cookie.
+        const [optOut] = (await page.context().cookies())
+            .filter(cookie => cookie.name === 'yontrack-ui')
+        expect(optOut.value).toEqual('desktop')
+        expect(optOut.expires).toEqual(-1)
     })
 
     test('a phone can switch to the desktop UI and back again', async ({page, ontrack}) => {
