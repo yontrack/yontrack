@@ -64,6 +64,14 @@ reach.
 ADR 0012 and for the same reason: 9300 is Elasticsearch's own HTTP port one
 slot up. Nothing was using it.
 
+**A privileged port is probed by connecting, not by binding.** The LDAP
+variant publishes 389 and 636, and an unprivileged process cannot bind below
+1024 on Linux at all -- so a bind probe reads those as busy and every slot as
+taken. That is exactly what a CI runner is, and it turned the first version of
+this change red on `main`. Ports below 1024 are therefore probed by opening a
+connection instead: something answers, or nothing does. macOS binds privileged
+ports happily, which is why the local verification passed.
+
 The resolved slot is recorded in `.yontrack-kdsl/instance.env` and reused by
 the next build, so a stack that is already up is never moved out from under
 itself. That file is also how anything outside Gradle discovers the ports,

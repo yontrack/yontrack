@@ -3,6 +3,7 @@ package net.nemerosa.ontrack.build
 import java.io.File
 import java.net.InetSocketAddress
 import java.net.ServerSocket
+import java.net.Socket
 import java.util.zip.CRC32
 
 /**
@@ -123,8 +124,27 @@ object StackSlots {
      */
     fun isMainCheckout(rootDir: File): Boolean = File(rootDir, ".git").isDirectory
 
-    /** True when nothing is listening on the port, on any address. */
+    /** The first port an unprivileged process is allowed to bind on Linux. */
+    const val FIRST_UNPRIVILEGED_PORT = 1024
+
+    private const val CONNECT_TIMEOUT_MS = 200
+
+    /**
+     * True when nothing is listening on the port.
+     *
+     * Binding is the stricter test -- it fails for a listener on any address,
+     * which is what Docker publishes -- and is used wherever it is allowed.
+     * A privileged port cannot be bound by an unprivileged process on Linux
+     * at all, so there a bind failure says nothing about whether the port is
+     * in use: a CI runner would read every slot as taken. Those ports are
+     * probed by connecting instead -- something answers, or nothing does.
+     * The KDSL acceptance stack publishes LDAP on 389 and 636, which is the
+     * only reason this branch exists.
+     */
     fun portFree(port: Int): Boolean =
+        if (port < FIRST_UNPRIVILEGED_PORT) nothingAnswersOn(port) else nothingBoundOn(port)
+
+    fun nothingBoundOn(port: Int): Boolean =
         try {
             ServerSocket().use { socket ->
                 socket.reuseAddress = false
@@ -133,6 +153,14 @@ object StackSlots {
             true
         } catch (ignored: Exception) {
             false
+        }
+
+    fun nothingAnswersOn(port: Int): Boolean =
+        try {
+            Socket().use { it.connect(InetSocketAddress("127.0.0.1", port), CONNECT_TIMEOUT_MS) }
+            false
+        } catch (ignored: Exception) {
+            true
         }
 
     /**

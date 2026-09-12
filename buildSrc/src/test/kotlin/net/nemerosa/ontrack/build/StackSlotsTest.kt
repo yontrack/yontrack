@@ -3,6 +3,7 @@ package net.nemerosa.ontrack.build
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -89,6 +90,40 @@ class StackSlotsTest {
                 }
             }
         }
+    }
+
+    @Test
+    fun `a privileged port is probed by connecting, not by binding`() {
+        // An unprivileged process cannot bind below 1024 on Linux at all, so
+        // a bind probe reads every such port as busy and every slot as taken
+        // -- which is exactly what a CI runner is. The KDSL acceptance stack
+        // publishes LDAP on 389 and 636, so this is not hypothetical.
+        KdslStack.BASE_PORTS.filter { it < StackSlots.FIRST_UNPRIVILEGED_PORT }
+            .also { assertTrue(it.isNotEmpty(), "expected privileged base ports to exist") }
+            .forEach { base ->
+                (0..KdslStack.SLOT_MAX).forEach { slot ->
+                    val port = StackSlots.port(base, slot)
+                    assertTrue(
+                        StackSlots.portFree(port),
+                        "port $port must read as free: nothing local listens on it, " +
+                                "and this process cannot bind it either",
+                    )
+                }
+            }
+    }
+
+    @Test
+    fun `a bound port reads as busy and a free one as free`() {
+        java.net.ServerSocket(0).use { taken ->
+            assertFalse(StackSlots.portFree(taken.localPort), "a bound port is not free")
+            // Both probes have to agree on a port that really is taken: the
+            // privileged branch relies on the connecting one alone.
+            assertFalse(StackSlots.nothingBoundOn(taken.localPort))
+            assertFalse(StackSlots.nothingAnswersOn(taken.localPort))
+        }
+        val free = java.net.ServerSocket(0).use { it.localPort }
+        assertTrue(StackSlots.portFree(free), "a released port is free")
+        assertTrue(StackSlots.nothingAnswersOn(free))
     }
 
     @Test
