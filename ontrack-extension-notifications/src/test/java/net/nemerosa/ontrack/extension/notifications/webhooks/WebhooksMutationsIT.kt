@@ -198,4 +198,32 @@ internal class WebhooksMutationsIT : AbstractNotificationTestSupport() {
         }
     }
 
+    @Test
+    fun `Testing a webhook is not granted to a regular user`() {
+        val name = TestUtils.uid("wh")
+        asAdmin {
+            webhookAdminService.createWebhook(
+                name = name,
+                enabled = true,
+                url = "uri:test",
+                timeout = Duration.ofMinutes(1),
+                authentication = WebhookFixtures.webhookAuthentication(),
+            )
+        }
+        asUser {
+            runWithError(
+                """
+                    mutation {
+                        testWebhook(input: {name: "$name"}) {
+                            errors {
+                                message
+                            }
+                        }
+                    }
+                """,
+                errorMessage = "Global function 'WebhookManagement' is not granted.",
+            )
+        }
+    }
+
 }

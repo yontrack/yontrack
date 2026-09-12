@@ -9,6 +9,15 @@ interface WebhookAdminService {
      */
     val webhooks: List<Webhook>
 
+    /**
+     * Gets a webhook using its name, or null if it does not exist.
+     *
+     * Requires the [WebhookManagement] global function: the returned [Webhook] carries the URL and the
+     * authentication configured by an administrator, and merely confirming a name would let any
+     * authenticated user probe them. Internal callers which legitimately need the webhook on behalf of
+     * a non-administrator - the notification channel, for one - must wrap the call in
+     * `securityService.asAdmin { ... }`, and must not hand the [Webhook] back to that caller.
+     */
     fun findWebhookByName(name: String): Webhook?
 
     fun createWebhook(

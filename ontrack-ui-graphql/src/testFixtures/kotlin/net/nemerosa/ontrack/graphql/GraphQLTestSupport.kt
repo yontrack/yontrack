@@ -37,6 +37,14 @@ class GraphQLTestSupport(
         code(internalRun(query, variables, ::assertNoErrors))
     }
 
+    /**
+     * Runs the [query] and expects exactly one error, matching the given [errorClassification] and
+     * [errorMessage].
+     *
+     * A failing non-nullable field cannot satisfy "exactly one": GraphQL adds a second
+     * `NullValueInNonNullableField` error as the null bubbles up to its parent. Use
+     * [runWithMatchingError] there.
+     */
     fun runWithError(
         query: String,
         variables: Map<String, Any?> = emptyMap(),
@@ -45,39 +53,54 @@ class GraphQLTestSupport(
     ) {
         internalRun(query, variables) { response ->
             val errors = response.errors
-            if (errors.isEmpty()) {
-                fail("Expected some errors")
-            } else if (errors.size > 1) {
-                fail(
-                    "Expected one error but got ${errors.size}.\n\n${
-                        errors.joinToString("\n") {
-                            "* [type = ${it.errorType}] ${it.message}"
-                        }
-                    }")
-            } else {
-                val error: ResponseError = errors.first()
-                val failMessageTitle = if (errorMessage == null) {
-                    if (errorClassification == null) {
-                        "At least one error is expected."
-                    } else {
-                        "At least one error with type = $errorClassification is expected."
-                    }
-                } else if (errorClassification == null) {
-                    "At least one error with message = $errorMessage is expected."
-                } else {
-                    "At least one error with message = $errorMessage and type = $errorClassification is expected."
-                }
-                val failMessage =
-                    "$failMessageTitle\n\nbut error was:\n\n* type = ${error.errorType}\n* message = ${error.message}"
-                if (errorClassification != null) {
-                    assertEquals(errorClassification, error.errorType, failMessage)
-                }
-                if (errorMessage != null) {
-                    assertEquals(errorMessage, error.message, failMessage)
-                }
+            if (errors.size > 1) {
+                fail("Expected one error but got ${errors.size}.\n\n${errors.render()}")
             }
+            assertMatchingError(errors, errorClassification, errorMessage)
         }
     }
+
+    /**
+     * Runs the [query] and expects *at least one* of the returned errors to match the given
+     * [errorClassification] and [errorMessage], ignoring the others.
+     *
+     * This is [runWithError] without its exactly-one requirement - the variant to use when the field
+     * under test is non-nullable, and the null bubbling up adds an error of its own.
+     */
+    fun runWithMatchingError(
+        query: String,
+        variables: Map<String, Any?> = emptyMap(),
+        errorClassification: ErrorClassification? = null,
+        errorMessage: String? = null,
+    ) {
+        internalRun(query, variables) { response ->
+            assertMatchingError(response.errors, errorClassification, errorMessage)
+        }
+    }
+
+    private fun assertMatchingError(
+        errors: List<ResponseError>,
+        errorClassification: ErrorClassification?,
+        errorMessage: String?,
+    ) {
+        if (errors.isEmpty()) {
+            fail("Expected some errors")
+        }
+        val matching = errors.any { error ->
+            (errorClassification == null || errorClassification == error.errorType) &&
+                    (errorMessage == null || errorMessage == error.message)
+        }
+        if (!matching) {
+            val expectation = listOfNotNull(
+                errorMessage?.let { "message = $it" },
+                errorClassification?.let { "type = $it" },
+            ).joinToString(" and ").ifEmpty { "any type or message" }
+            fail("Expected at least one error with $expectation\n\nbut errors were:\n\n${errors.render()}")
+        }
+    }
+
+    private fun List<ResponseError>.render() =
+        joinToString("\n") { "* [type = ${it.errorType}] ${it.message}" }
 
     fun assertNoUserError(data: JsonNode, userNodeName: String): JsonNode {
         val userNode = data.path(userNodeName)

@@ -6,6 +6,7 @@ import net.nemerosa.ontrack.json.asJson
 import net.nemerosa.ontrack.test.TestUtils.uid
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.security.access.AccessDeniedException
 import java.time.Duration
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -152,6 +153,25 @@ internal class WebhookAdminServiceIT : AbstractNotificationTestSupport() {
                 ).asJson(),
                 it.authentication.config
             )
+        }
+    }
+
+    @Test
+    fun `Getting a webhook by name is not granted to a regular user`() {
+        val name = uid("wh")
+        asAdmin {
+            webhookAdminService.createWebhook(
+                name = name,
+                enabled = true,
+                url = "uri:test",
+                timeout = Duration.ofMinutes(1),
+                authentication = WebhookFixtures.webhookAuthentication(),
+            )
+        }
+        asUser {
+            assertFailsWith<AccessDeniedException> {
+                webhookAdminService.findWebhookByName(name)
+            }
         }
     }
 

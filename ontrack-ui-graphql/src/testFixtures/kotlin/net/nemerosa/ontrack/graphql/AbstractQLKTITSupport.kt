@@ -32,6 +32,15 @@ abstract class AbstractQLKTITSupport : AbstractDSLTestSupport() {
         graphQLTestSupport.runWithError(query, variables, errorClassification, errorMessage)
     }
 
+    fun runWithMatchingError(
+        query: String,
+        variables: Map<String, Any?> = emptyMap(),
+        errorClassification: ErrorClassification? = null,
+        errorMessage: String? = null,
+    ) {
+        graphQLTestSupport.runWithMatchingError(query, variables, errorClassification, errorMessage)
+    }
+
     protected fun assertNoUserError(data: JsonNode, userNodeName: String): JsonNode {
         return graphQLTestSupport.assertNoUserError(data, userNodeName)
     }

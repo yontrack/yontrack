@@ -88,4 +88,44 @@ internal class GQLRootQueryWebhooksIT : AbstractNotificationTestSupport() {
         }
     }
 
+    @Test
+    fun `Getting a webhook by name in the list is not granted to a regular user`() {
+        val name = TestUtils.uid("wh")
+        asAdmin {
+            webhookAdminService.createWebhook(
+                name = name,
+                enabled = true,
+                url = "uri:test",
+                timeout = Duration.ofMinutes(1),
+                authentication = WebhookFixtures.webhookAuthentication(),
+            )
+        }
+        asUser {
+            runWithMatchingError(
+                """{
+                    webhooks(name: "$name") {
+                        name
+                        url
+                    }
+                }""",
+                errorMessage = "Global function 'WebhookManagement' is not granted.",
+            )
+        }
+    }
+
+    @Test
+    fun `Getting the list of webhooks is not granted to a regular user`() {
+        asUser {
+            runWithMatchingError(
+                """{
+                    webhooks {
+                        name
+                        url
+                    }
+                }""",
+                errorMessage = "Global function 'WebhookManagement' is not granted.",
+            )
+        }
+    }
+
 }
