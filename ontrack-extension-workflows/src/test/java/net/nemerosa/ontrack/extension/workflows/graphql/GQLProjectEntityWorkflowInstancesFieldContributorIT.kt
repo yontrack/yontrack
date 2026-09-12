@@ -155,6 +155,53 @@ internal class GQLProjectEntityWorkflowInstancesFieldContributorIT : AbstractWor
     }
 
     @Test
+    fun `Several promotion runs asked for at once each get their own workflows`() {
+        // The field resolves through a data loader, which is the whole of #1737's section 4: the
+        // failure a batched resolution brings and a per-source one cannot is mixing the answers up,
+        // so the assertion is that each run keeps its own.
+        val firstInstance = workflowTestSupport.registerLaunchAndWaitForWorkflow(workflowYaml(uid("wf-")))
+        val secondInstance = workflowTestSupport.registerLaunchAndWaitForWorkflow(workflowYaml(uid("wf-")))
+        asAdmin {
+            project {
+                branch {
+                    val pl = promotionLevel()
+                    val first = build().promote(pl)
+                    val second = build().promote(pl)
+                    // A third run with no workflow at all: a key a mapped batch loader answers
+                    // nothing for must still come back as an empty list, not as `null`.
+                    val third = build().promote(pl)
+
+                    recordWorkflowNotification(first, firstInstance)
+                    recordWorkflowNotification(second, secondInstance)
+
+                    run(
+                        """{
+                            branches(id: ${this@branch.id}) {
+                                builds {
+                                    promotionRuns {
+                                        id
+                                        workflowInstances { id }
+                                    }
+                                }
+                            }
+                        }"""
+                    ) { data ->
+                        val instancesByRun = data.path("branches").path(0).path("builds")
+                            .flatMap { build -> build.path("promotionRuns") }
+                            .associate { runNode ->
+                                runNode.path("id").asInt() to
+                                        runNode.path("workflowInstances").map { it.path("id").asText() }
+                            }
+                        assertEquals(listOf(firstInstance), instancesByRun[first.id()])
+                        assertEquals(listOf(secondInstance), instancesByRun[second.id()])
+                        assertEquals(emptyList(), instancesByRun[third.id()])
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
     fun `A user with only view access on the project sees the workflows`() {
         val instanceId = workflowTestSupport.registerLaunchAndWaitForWorkflow(workflowYaml(uid("wf-")))
         asAdmin {
