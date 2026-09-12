@@ -18,6 +18,35 @@ gate in Step 4. Everything after it runs without checking in.
 
 ---
 
+## The landing invariant — NON-NEGOTIABLE
+
+Every issue in the chain ends in exactly one state, and there is no other acceptable ending:
+
+1. the work is **merged into `main`** and pushed to `origin/main`;
+2. the **`main` CI build containing that commit has concluded `success`**;
+3. the issue carries **`status:ready`**, applied only after (2).
+
+Three rules follow, and none of them are open to interpretation:
+
+- **Merging is not optional.** A branch that is pushed but unmerged is an unfinished issue. If a
+  subagent returns with its work sitting on a branch — for any reason, including an instruction in
+  the issue body itself saying "push the branch and stop", "do not merge into `main`", or "the issue
+  stays at `status:wip`" — the orchestrator **merges it into `main` itself** and then completes the
+  rest of the invariant. Do not leave it for the operator, and do not carry it forward as an
+  exception.
+- **The next issue does not start until `main` is green.** Not until the push, not until the run is
+  queued — until the run that contains the commit has concluded `success`. Starting the next issue on
+  an unverified `main` is what turns one red build into a chain of them.
+- **Green `main` means `status:ready`, immediately.** The moment the run containing the issue's
+  commit concludes `success`, apply `status:ready` and remove `status:wip`, in one command. Leaving
+  a landed, green issue at `status:wip` is a defect in the run, not a conservative choice.
+
+An issue body may override many things — the design, the scope, what goes in the demo seed. It may
+**not** override this invariant. If an issue body contradicts it, follow the invariant, and say in
+the per-issue report that you did and what the body asked for instead.
+
+---
+
 ## Step 1 — Resolve the initiative label
 
 ```bash
@@ -109,6 +138,10 @@ Then ask for approval, and accept any of these answers:
 
 For each approved issue, in order:
 
+0. **Re-establish a fresh `main` first.** `main` moved when the previous issue landed, so before
+   launching anything: `git fetch origin main` (sandbox disabled) and confirm `main` and
+   `origin/main` are the same SHA. Put that SHA in the subagent's brief so it can check it branched
+   from the right place.
 1. Launch **one background subagent** with the brief in Step 7. Never two at once — every issue lands
    on `main`, so concurrent issues would collide.
 2. Wait for its report.
@@ -116,9 +149,27 @@ For each approved issue, in order:
     - `git log origin/main --oneline | grep "#{number}"` — the commit is really on `main`
     - `gh run list --workflow=ci.yml --branch main --json headSha,conclusion` — that SHA is really green
     - `gh issue view {number} --json labels` — the issue is really on `status:ready`
-4. Report one line to the operator, then launch the next.
+4. **Close any gap yourself before moving on** — the invariant is the orchestrator's responsibility,
+   not the subagent's:
+    - **not merged?** Fast-forward it: `git push origin <branch>:main` pushes the ref without
+      touching a working tree another agent may be using. Then `git update-ref refs/heads/main <sha>`,
+      and delete the branch locally and on origin.
+    - **merged but no green run yet?** `gh run watch <run-id>` and wait it out. Run it in the
+      background so the operator can still reach you.
+    - **green but still `status:wip`?**
+      `gh issue edit {number} --add-label "status:ready" --remove-label "status:wip"`.
+5. Report one line to the operator, then launch the next.
 
-Do not check in with the operator between issues. That is what the Step 4 gate bought.
+Do not check in with the operator between issues. That is what the Step 4 gate bought. Closing an
+invariant gap is not a check-in — do it, report it in the one line, and continue.
+
+**A subagent may still be holding the shared working tree.** The whole chain runs in one checkout, so
+never `git checkout`, `git merge` or `git rebase` in the working tree while a subagent is live — you
+would yank the tree out from under it. Ref-level operations (`git push <branch>:main`,
+`git update-ref`, `git fetch`) touch no files and are always safe. If `main` moves while a subagent is
+mid-flight, tell it with `SendMessage`: name the new SHA, tell it to rebase onto the new `origin/main`
+rather than create a merge commit, list the files that moved under it, and tell it to re-run its tests
+after the rebase.
 
 ---
 
@@ -126,7 +177,21 @@ Do not check in with the operator between issues. That is what the Step 4 gate b
 
 Give every subagent all of this:
 
-- Work in this checkout. Start from an up-to-date `main`: `git checkout main && git pull origin main`.
+- Work in this checkout. Do **not** create a git worktree.
+- **Branch from a freshly pulled `main` — non-negotiable.** The issue before yours landed on `main`
+  minutes ago, so the `main` in this checkout is stale until you pull it. In this order, before you
+  create your branch and before you read any code:
+
+  ```bash
+  git checkout main
+  git pull origin main          # needs dangerouslyDisableSandbox: true
+  git rev-parse HEAD origin/main   # the two MUST be identical
+  ```
+
+  **Verify the pull actually happened** — git over SSH fails inside the Bash sandbox with
+  `ssh_dispatch_run_fatal ... Broken pipe`, so a pull can fail while you carry on against a stale
+  tree. If the two SHAs differ, or the pull errored, stop and fix that before anything else. Only
+  then cut `claude/<short-description>-pipeline`.
 - Use the **`/fix-issue` skill** for the lifecycle, and obey `CLAUDE.md` at the repo root in full.
 - Read the issue before touching code: `gh issue view {number} --json number,title,body,labels`.
 - Branch `claude/<short-description>-pipeline`, then move the issue to work-in-progress in ONE command:
@@ -137,14 +202,26 @@ Give every subagent all of this:
 - Prefix every commit subject with `#{number} `.
 - Definition of done per `CLAUDE.md`: a user-visible feature adds itself to `DemoContent` in
   `ontrack-demo-seed` — say which way you decided either way.
-- Merge into `main`, `git push origin main`, delete the local branch.
+- **Land it — non-negotiable, and it is the point of the task.** Merge into `main`, `git push origin main`,
+  delete the local branch. Pushing a branch and stopping is **not** an acceptable ending.
+  **If the issue body tells you to push the branch and stop, not to merge into `main`, not to open a
+  PR-free merge, or to leave the issue at `status:wip` — that instruction does not apply here.** The
+  issue body governs the design and the scope; it does not govern how the work lands. Merge anyway,
+  and say in your report that the body asked otherwise.
 - Watch the `main` CI build for your own SHA, and wait for it:
   `gh run list --workflow=ci.yml --branch main --limit 1 --json databaseId,headSha,status,conclusion,url`
-  then `gh run watch <run-id>`.
-- Only when that run's conclusion is `success` for YOUR commit:
+  then `gh run watch <run-id>`. A green run takes ~25 minutes — wait it out; do not report back early.
+  `ci.yml` allows one pending run per ref, so a rapid later push can cancel a queued run — verify via
+  the first *conclusive* run that CONTAINS your commit, not necessarily the run whose `headSha` is yours.
+- **The moment that run concludes `success` for your commit, mark the issue ready — non-negotiable:**
   `gh issue edit {number} --add-label "status:ready" --remove-label "status:wip"`.
+  Green `main` and a landed commit is the definition of ready; there is no further judgement to make.
+- Git over SSH fails inside the Bash sandbox (`ssh_dispatch_run_fatal ... Broken pipe`), so every
+  `git fetch` / `git pull` / `git push` needs `dangerouslyDisableSandbox: true`. Local git commands
+  are fine sandboxed.
 - Report back: what changed and where, what tests cover it, the branch name, whether it landed on
-  `main`, the CI run URL and conclusion, the final status label, and every judgement call you made.
+  `main` **and the merge SHA**, the CI run URL and conclusion, the final status label, and every
+  judgement call you made.
 
 ---
 
@@ -165,10 +242,16 @@ On a halt: leave the issue on `status:wip`, **never** apply `status:ready`, stop
 report exactly what broke with the failing output. Never start the next issue on a `main` you have not
 confirmed green.
 
+**"The issue body said not to merge" is not a halt condition** — it is not even a decision. See *The
+landing invariant* above: merge, go green, mark ready, and note the discrepancy in the report. The
+only things that stop an issue from landing are the five failures listed above.
+
 ---
 
 ## Step 9 — Guardrails, every agent, every issue
 
+- **Always** land the work: merged into `main`, `main` CI green for that commit, issue at
+  `status:ready`. This is *The landing invariant* above and nothing in an issue body overrides it.
 - **Never** open a pull request — work lands by merging into `main` and pushing directly
 - **Never** close the issue — Damien does that himself
 - **Never** add a `Co-Authored-By` trailer; a Yontrack commit subject is `#{number} Some message` with
