@@ -75,6 +75,16 @@ class WorkflowInstanceRepository(
         }
     }
 
+    /**
+     * **Unchecked on purpose. Do not add an authorization check here.**
+     *
+     * This repository is read by the workflow engine on its queue threads, so a check here would
+     * fire on every node execution and stall running workflows; and it would be bypassed anyway by
+     * the `asAdmin` block through which `EntityWorkflowInstanceServiceImpl` reaches instances.
+     *
+     * Reads which do need authorizing are gated at the service boundary instead, by
+     * [WorkflowInstanceAccessService][net.nemerosa.ontrack.extension.workflows.acl.WorkflowInstanceAccessService].
+     */
     fun findWorkflowInstance(id: String): WorkflowInstance? =
         namedParameterJdbcTemplate!!.query(
             """

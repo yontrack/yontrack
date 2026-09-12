@@ -129,7 +129,13 @@ This channel can use the `template` for the mail's body and is using the `workfl
 
 The progress of running workflows can be accessed in _Information > Workflow audit_.
 
-Clicking on a workflow displays more details about its current status, node per node.
+This page, and the list of workflow instances behind it, need the **administrator** right: a workflow
+instance carries the whole event which triggered it, the full workflow definition and the output of
+every node, across all projects.
+
+Clicking on a workflow displays more details about its current status, node per node. An
+administrator can open any of them; anyone else can open a workflow instance only when they can view
+the project its event names.
 
 When using the _workflow notification channel_, the workflow status link is also accessible from the _Information >
 Notification recordings_, when selecting the notification.

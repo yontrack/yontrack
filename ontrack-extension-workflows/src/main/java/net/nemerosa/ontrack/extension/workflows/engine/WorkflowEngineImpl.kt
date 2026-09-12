@@ -446,6 +446,20 @@ class WorkflowEngineImpl(
      */
     private fun Throwable.errorMessage(): String = message ?: this::class.java.name
 
+    /**
+     * **Unchecked on purpose. Do not add an authorization check here.**
+     *
+     * This is the execution path's own accessor: [processNode] and `getWorkflowInstanceTx` read
+     * instances back on the queue threads, under a propagated security context, so a check here
+     * would fire on every node execution rather than only on a UI read - and would stall running
+     * workflows.
+     *
+     * It would also buy nothing: `EntityWorkflowInstanceServiceImpl` reaches instances through an
+     * `asAdmin` block, which a check here would simply pass.
+     *
+     * Reads which do need authorizing are gated at the service boundary instead, by
+     * [WorkflowInstanceAccessService][net.nemerosa.ontrack.extension.workflows.acl.WorkflowInstanceAccessService].
+     */
     override fun findWorkflowInstance(id: String): WorkflowInstance? =
         transactionHelper.inNewTransactionNullable {
             workflowInstanceRepository.findWorkflowInstance(id)

@@ -44,12 +44,18 @@ class SlotWorkflowServiceImpl(
         slotWorkflowRepository.addSlotWorkflow(slotWorkflow)
     }
 
-    override fun findSlotWorkflowById(id: String): SlotWorkflow? {
-        return slotWorkflowRepository.findSlotWorkflowById(id)
-    }
+    override fun findSlotWorkflowById(id: String): SlotWorkflow? =
+        slotWorkflowRepository.findSlotWorkflowById(id)?.also {
+            // A SlotWorkflow carries the full workflow definition, so it is read-protected like any
+            // other slot-side read. The slot is only known once the record is loaded, hence the
+            // check after the lookup rather than before it.
+            securityService.checkSlotAccess<SlotView>(it.slot)
+        }
 
     override fun getSlotWorkflowById(id: String): SlotWorkflow =
-        slotWorkflowRepository.getSlotWorkflowById(id)
+        slotWorkflowRepository.getSlotWorkflowById(id).also {
+            securityService.checkSlotAccess<SlotView>(it.slot)
+        }
 
     override fun getSlotWorkflowsBySlotAndTrigger(slot: Slot, trigger: SlotPipelineStatus): List<SlotWorkflow> {
         securityService.checkSlotAccess<SlotView>(slot)

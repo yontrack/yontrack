@@ -1,6 +1,7 @@
 package net.nemerosa.ontrack.extension.workflows.graphql
 
 import com.fasterxml.jackson.databind.JsonNode
+import net.nemerosa.ontrack.extension.workflows.acl.WorkflowRegistration
 import net.nemerosa.ontrack.extension.workflows.acl.WorkflowStop
 import net.nemerosa.ontrack.extension.workflows.definition.WorkflowValidation
 import net.nemerosa.ontrack.extension.workflows.engine.WorkflowEngine
@@ -62,6 +63,10 @@ class WorkflowsMutations(
             outputDescription = "Workflow instance ID",
             outputType = String::class
         ) { input ->
+            // Declared, not incidental. This mutation is protected today only because
+            // `workflowRegistry.findWorkflow` happens to check the same right; were that lookup to
+            // lose its check, the mutation would open silently.
+            securityService.checkGlobalFunction(WorkflowRegistration::class.java)
             val workflowRecord = workflowRegistry.findWorkflow(input.workflowId)
             if (workflowRecord != null) {
                 var event = workflowEventFactory.workflowStandalone().dehydrate()

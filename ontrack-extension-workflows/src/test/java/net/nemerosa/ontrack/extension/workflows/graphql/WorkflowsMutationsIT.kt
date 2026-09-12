@@ -2,8 +2,10 @@ package net.nemerosa.ontrack.extension.workflows.graphql
 
 import com.fasterxml.jackson.databind.JsonNode
 import net.nemerosa.ontrack.extension.workflows.AbstractWorkflowTestSupport
+import net.nemerosa.ontrack.extension.workflows.acl.WorkflowRegistration
 import net.nemerosa.ontrack.extension.workflows.registry.WorkflowRegistry
 import net.nemerosa.ontrack.json.asJson
+import net.nemerosa.ontrack.test.TestUtils.uid
 import net.nemerosa.ontrack.json.getRequiredBooleanField
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -198,6 +200,75 @@ class WorkflowsMutationsIT : AbstractWorkflowTestSupport() {
                     assertTrue(
                         validation.path("errors").isEmpty,
                         "No error message"
+                    )
+                }
+            }
+        }
+    }
+
+
+    @Test
+    fun `Launching a workflow declares its own check and is denied to a regular user`() {
+        val workflowId = asAdmin {
+            workflowRegistry.saveYamlWorkflow(
+                """
+                    name: ${uid("w-")}
+                    nodes:
+                      - id: start
+                        executorId: mock
+                        data:
+                            text: Start
+                """.trimIndent()
+            )
+        }
+        asUser {
+            runWithError(
+                """
+                    mutation {
+                        launchWorkflow(input: {workflowId: "$workflowId", context: []}) {
+                            workflowInstanceId
+                            errors {
+                                message
+                            }
+                        }
+                    }
+                """,
+                errorMessage = "Global function 'WorkflowRegistration' is not granted.",
+            )
+        }
+    }
+
+    @Test
+    fun `Launching a workflow is granted to a user holding the workflow registration right`() {
+        val workflowId = asAdmin {
+            workflowRegistry.saveYamlWorkflow(
+                """
+                    name: ${uid("w-")}
+                    nodes:
+                      - id: start
+                        executorId: mock
+                        data:
+                            text: Start
+                """.trimIndent()
+            )
+        }
+        asUserWith<WorkflowRegistration> {
+            run(
+                """
+                    mutation {
+                        launchWorkflow(input: {workflowId: "$workflowId", context: []}) {
+                            workflowInstanceId
+                            errors {
+                                message
+                            }
+                        }
+                    }
+                """
+            ) { data ->
+                checkGraphQLUserErrors(data, "launchWorkflow") { node ->
+                    assertTrue(
+                        node.path("workflowInstanceId").asText().isNotBlank(),
+                        "Workflow instance has been created"
                     )
                 }
             }

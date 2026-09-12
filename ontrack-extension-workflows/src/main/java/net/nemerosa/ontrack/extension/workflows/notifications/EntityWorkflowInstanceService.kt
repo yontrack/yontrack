@@ -12,9 +12,15 @@ import net.nemerosa.ontrack.model.structure.ProjectEntityID
  * the `workflowInstances` GraphQL field and the delivery map (#1711), and they must agree on how
  * far back it looks.
  *
- * Reading notification records requires the `NotificationRecordingAccess` global function, while a
- * workflow instance is readable by any authenticated user, so the record half runs as admin. Only
- * instance IDs escape that privileged block - a record itself is never returned here.
+ * Reading notification records requires the `NotificationRecordingAccess` global function, which the
+ * caller of this service need not hold, so the record half runs as admin. Only instance IDs escape
+ * that privileged block - a record itself is never returned here.
+ *
+ * The instances escaping the block are **not** re-filtered against the workflow instance read rules,
+ * and deliberately so: the caller reaches this service through an [entity][ProjectEntityID] which
+ * has already been `ProjectView`-checked upstream, and re-deriving a project from each instance's
+ * event would only re-check what has just been checked - while breaking the behaviour this lookup
+ * exists for, namely that **whoever can see the promotion run can see its workflows**.
  */
 interface EntityWorkflowInstanceService {
 
