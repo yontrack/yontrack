@@ -1,3 +1,13 @@
+# Middleware and application for the KDSL acceptance tests.
+#
+# Every published port is parameterised so that several checkouts can run the
+# acceptance tests side by side; the defaults reproduce the historical ports,
+# so running this file directly behaves exactly as it always has.
+#
+# Started and stopped by the Gradle Docker Compose plugin, which is given the
+# project name and the ports by `KdslStack` in buildSrc -- see
+# docs/adr/0013-parallel-kdsl-acceptance-stacks.md.
+
 services:
 
   # Database
@@ -8,13 +18,12 @@ services:
       POSTGRES_USER: ontrack
       POSTGRES_PASSWORD: ontrack
     ports:
-      - "5432:5432"
+      - "${YONTRACK_KDSL_POSTGRES_PORT:-5432}:5432"
 
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:9.2.0
     ports:
-      - "9200:9200"
-      - "9300:9300"
+      - "${YONTRACK_KDSL_ELASTIC_PORT:-9200}:9200"
     environment:
       - "discovery.type=single-node"
       - bootstrap.memory_lock=true
@@ -39,8 +48,8 @@ services:
       LDAP_ADMIN_PASSWORD: admin
       LDAP_LOG_LEVEL: "256"
     ports:
-      - '389:389'
-      - '636:636'
+      - "${YONTRACK_KDSL_LDAP_PORT:-389}:389"
+      - "${YONTRACK_KDSL_LDAPS_PORT:-636}:636"
     command:
       - --loglevel
       - debug
@@ -53,12 +62,12 @@ services:
     environment:
       KC_BOOTSTRAP_ADMIN_USERNAME: admin
       KC_BOOTSTRAP_ADMIN_PASSWORD: admin
-      KC_HOSTNAME: http://localhost:8008
+      KC_HOSTNAME: "http://localhost:${YONTRACK_KDSL_KEYCLOAK_PORT:-8008}"
       KC_HOSTNAME_BACKCHANNEL_DYNAMIC: true
       KC_HOSTNAME_STRICT: false
       KC_HTTP_ENABLED: true
     ports:
-      - "8008:8080"
+      - "${YONTRACK_KDSL_KEYCLOAK_PORT:-8008}:8080"
     command:
       - start
       - --import-realm
@@ -76,14 +85,14 @@ services:
       RABBITMQ_DEFAULT_USER: ontrack
       RABBITMQ_DEFAULT_PASS: ontrack
     ports:
-      - "15672:15672"
-      - "5672:5672"
+      - "${YONTRACK_KDSL_RABBIT_MGMT_PORT:-15672}:15672"
+      - "${YONTRACK_KDSL_RABBIT_PORT:-5672}:5672"
 
   ontrack:
     image: "nemerosa/ontrack:${ONTRACK_VERSION:-latest}"
     ports:
-      - "8080:8080"
-      - "8800:8800"
+      - "${YONTRACK_KDSL_ONTRACK_PORT:-8080}:8080"
+      - "${YONTRACK_KDSL_ONTRACK_MGMT_PORT:-8800}:8800"
     depends_on:
       postgres:
         condition: service_started
@@ -117,7 +126,7 @@ services:
       SPRING_RABBITMQ_PASSWORD: ontrack
 
       # Authentication
-      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI: http://localhost:8008/realms/ontrack
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI: "http://localhost:${YONTRACK_KDSL_KEYCLOAK_PORT:-8008}/realms/ontrack"
       # We need to skip the host verification (keycloak vs. localhost)
       # DO NOT USE IN PRODUCTION
       SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: http://keycloak:8080/realms/ontrack/protocol/openid-connect/certs
@@ -138,15 +147,15 @@ services:
   ui:
     image: "nemerosa/ontrack-ui:${ONTRACK_VERSION:-latest}"
     ports:
-      - "3000:3000"
+      - "${YONTRACK_KDSL_UI_PORT:-3000}:3000"
     environment:
       ONTRACK_URL: http://ontrack:8080
       NEXTAUTH_SECRET: d18828b20e2a036cc3091959f13bdc080314ff5c3bae4
-      NEXTAUTH_URL: http://localhost:3000
+      NEXTAUTH_URL: "http://localhost:${YONTRACK_KDSL_UI_PORT:-3000}"
       NEXTAUTH_ISSUER: http://keycloak:8080/realms/ontrack
       NEXTAUTH_CLIENT_ID: ontrack-client
       NEXTAUTH_CLIENT_SECRET: ontrack-client-secret
-      NEXTAUTH_ACCOUNT_URL: http://localhost:8008/realms/ontrack/account
+      NEXTAUTH_ACCOUNT_URL: "http://localhost:${YONTRACK_KDSL_KEYCLOAK_PORT:-8008}/realms/ontrack/account"
     depends_on:
       ontrack:
         condition: service_started

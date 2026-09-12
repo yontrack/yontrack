@@ -101,6 +101,32 @@ These rules apply unconditionally. Follow them in every change, without exceptio
   right one.
 - `docs/adr/0012-parallel-integration-test-stacks.md` explains the scheme.
 
+### Running the KDSL acceptance tests locally
+
+The same rules apply, one family further out:
+
+- **Always** run them through `./gradlew :ontrack-kdsl-acceptance:kdslAcceptanceTest` — the task
+  builds the images and brings its own stack up and down. Never start `compose/docker-compose-kdsl*.yml`
+  by hand.
+- **Never** assume `localhost:8080`, `localhost:8800`, `localhost:3000`, `localhost:8008` or
+  `localhost:8086` for an acceptance instance. Read `.yontrack-kdsl/instance.env` — the ports there
+  are the ones to open in a browser, curl, or hand to a Playwright run.
+- The `ontrack.acceptance.*` properties are passed automatically, and an explicit `-D` still wins —
+  that is how you point the suite at an instance you started yourself.
+- Four slots, not ten, and the `-ldap` and `-oidc` variants share the slot of the main one.
+- `docs/adr/0013-parallel-kdsl-acceptance-stacks.md` explains the scheme.
+
+### Three stacks, three instance files
+
+A checkout can have all three up at once, on three different slots, and they each record their own
+ports. Read the file that belongs to the stack you mean:
+
+| Stack             | Started by                              | Ports recorded in        |
+|-------------------|-----------------------------------------|--------------------------|
+| Development       | `scripts/dev-stack.sh up`               | `.yontrack-dev/instance.env`  |
+| Integration tests | `./gradlew integrationTest`             | `.yontrack-it/instance.env`   |
+| KDSL acceptance   | `./gradlew kdslAcceptanceTest`          | `.yontrack-kdsl/instance.env` |
+
 ### Workflow
 
 Every change follows this lifecycle, end to end — don't stop after step 2:

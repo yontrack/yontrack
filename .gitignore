@@ -57,6 +57,8 @@ ontrack-extension-*/node_modules
 .yontrack-dev/
 # Integration test stack state (ItStack in buildSrc)
 .yontrack-it/
+# KDSL acceptance stack state (KdslStack in buildSrc)
+.yontrack-kdsl/
 
 # Kotlin compiler daemon session files
 .kotlin/

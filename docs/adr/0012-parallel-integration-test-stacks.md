@@ -13,8 +13,11 @@ The integration test stack is now an *instance* of its checkout, the way
 [ADR 0004](0004-parallel-dev-stack-instances.md)). A checkout is identified by
 a slug derived from its directory and allocated a *slot* that offsets every
 published port by `slot * 100`, and the Compose project is named after the
-slug rather than being the constant `it`. The arithmetic lives in `ItStack` in
-`buildSrc` and is covered by `ItStackTest`.
+slug rather than being the constant `it`. The arithmetic lives in `StackSlots`
+in `buildSrc`, with `ItStack` defining this family on top of it, and is covered
+by `StackSlotsTest` and `ItStackTest`. The KDSL acceptance stacks were given
+the same treatment on the same foundation -- see
+[ADR 0013](0013-parallel-kdsl-acceptance-stacks.md).
 
 Slot 0 belongs to the main working copy, which therefore keeps the historical
 ports -- and so does every CI runner, which is a fresh clone with nothing else
@@ -68,4 +71,7 @@ sharing one Elasticsearch would write into each other's indices.
 **Reusing `scripts/dev-stack.sh`'s shell implementation** of the arithmetic
 was rejected because the integration stack is driven by Gradle, which would
 have had to shell out at configuration time to learn its own ports. The two
-implementations are small, and each is unit-tested where it lives.
+implementations are small, and each is unit-tested where it lives. The Gradle
+one is shared by every stack the build drives: `StackSlots` holds the
+arithmetic and each family -- `ItStack`, `KdslStack` -- is a set of base ports
+and a slot ceiling on top of it.

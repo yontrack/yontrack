@@ -133,3 +133,45 @@ linked worktree the four `-D` options at the bottom of
 The arithmetic lives in `ItStack` in `buildSrc`, is covered by `ItStackTest`
 (`./gradlew -p buildSrc test`), and is explained in
 `docs/adr/0012-parallel-integration-test-stacks.md`.
+
+## Running the KDSL acceptance tests
+
+```bash
+./gradlew :ontrack-kdsl-acceptance:kdslAcceptanceTest
+```
+
+The task builds the Yontrack and UI images, brings up
+`compose/docker-compose-kdsl.yml` -- a full Yontrack plus its UI, Postgres,
+Elasticsearch, RabbitMQ, Keycloak and InfluxDB -- and tears it down afterwards.
+
+That stack is an instance of the checkout too. The main working copy takes
+slot 0 and keeps the historical ports; a linked worktree hashes into a slot
+from 1 to 3, which offsets every port by `slot * 100`:
+
+| Service        | Slot 0 | Slot 1 |
+|----------------|--------|--------|
+| Yontrack       | 8080   | 8180   |
+| Management     | 8800   | 8900   |
+| UI             | 3000   | 3100   |
+| Keycloak       | 8008   | 8108   |
+| InfluxDB       | 8086   | 8186   |
+| Postgres       | 5432   | 5532   |
+| Elasticsearch  | 9200   | 9300   |
+| RabbitMQ       | 5672   | 5772   |
+
+Four slots rather than the integration stack's ten: the management port's
+range runs into Elasticsearch's beyond that, and an acceptance stack is heavy
+enough that four at once is already more than a laptop will carry.
+
+The resolved ports land in `.yontrack-kdsl/instance.env`, and the task passes
+them to the suite as `ontrack.acceptance.*` system properties -- so running
+the tests needs no configuration. Passing one of those properties explicitly
+still wins, which is how you point the suite at an instance you started
+yourself.
+
+The `-ldap` and `-oidc` variants share the same slot: they are sequenced never
+to be up at the same time.
+
+The arithmetic lives in `KdslStack` in `buildSrc`, is covered by
+`KdslStackTest`, and is explained in
+`docs/adr/0013-parallel-kdsl-acceptance-stacks.md`.
