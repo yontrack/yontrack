@@ -873,6 +873,9 @@ test.describe('the mobile UI on a phone', () => {
         // wants the desktop UI should not have to first navigate to a page they
         // did not want in order to find the exit - which is all the interstitial
         // ever offered, and all an installed PWA would offer.
+        // The narrowest phone the acceptance names, where the screen is
+        // tightest.
+        await page.setViewportSize({width: 375, height: 812})
         await signInOnPhone(page, ontrack)
         await page.goto(`${ontrack.connection.ui}/mobile/account`)
 
@@ -881,6 +884,15 @@ test.describe('the mobile UI on a phone', () => {
         // address bar.
         await expect(page.getByTestId('mobile-account-device-caption'))
             .toContainText('Mobile version')
+
+        // And the section it was inserted into - a heading, a button and a
+        // three-line caption - did not push sign out off the screen. Sign out
+        // stays last, so the answer to this failing is tightening the section
+        // rather than moving it.
+        const signOut = page.getByTestId('mobile-account-sign-out')
+        await expect(signOut).toBeVisible()
+        const box = await signOut.boundingBox()
+        expect(box.y + box.height).toBeLessThanOrEqual(812)
 
         await page.getByTestId('open-desktop-version').click()
 

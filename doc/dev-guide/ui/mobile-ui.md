@@ -737,7 +737,10 @@ screen. The 48px header already carries the brand lockup and the signed-in name,
 itself the door to this screen.
 
 **A section of its own, not a row folded into Appearance.** One title costs one line and is
-what keeps the user/device distinction legible — the same trade "Appearance" already took.
+what keeps the user/device distinction legible — the same trade "Appearance" already took. It
+costs a heading, a button and a three-line caption, which pushes sign out down; the acceptance
+asserts sign out is still above the fold at 375×812, because if it ever is not, the answer is
+tightening the section rather than moving sign out, which stays last.
 
 **`DesktopVersionButton`, reused as-is**, not a second component and not a second label: one
 affordance and one string for one action on both surfaces, because two labels is how two
