@@ -3,6 +3,7 @@ const {login, signInButton} = require("./login");
 const {selectUserMenu} = require("./userMenu");
 const {expectTheme, resetThemeMode} = require("./theme");
 const {test} = require("../fixtures/connection");
+const {expectNoSidewaysScroll} = require("../support/page-utils");
 
 /**
  * The mobile UI.
@@ -284,9 +285,7 @@ test.describe('the mobile UI on a phone', () => {
 
         // And none of it scrolls sideways, which is the acceptance criterion the
         // desktop branch matrix cannot meet at any width.
-        const overflows = await page.evaluate(() =>
-            document.documentElement.scrollWidth > document.documentElement.clientWidth)
-        expect(overflows).toBe(false)
+        await expectNoSidewaysScroll(page)
     })
 
     test('a build is found on a branch by name, by promotion, and by both', async ({page, ontrack}) => {
@@ -347,9 +346,7 @@ test.describe('the mobile UI on a phone', () => {
         await expect(plainCard).toBeVisible()
 
         // Two more controls, and still nothing scrolls sideways at 375px.
-        const overflows = await page.evaluate(() =>
-            document.documentElement.scrollWidth > document.documentElement.clientWidth)
-        expect(overflows).toBe(false)
+        await expectNoSidewaysScroll(page)
     })
 
     test('the build screen carries the promotions, deployments and validations', async ({page, ontrack}) => {
@@ -386,9 +383,7 @@ test.describe('the mobile UI on a phone', () => {
         await expect(page.getByTestId('mobile-build-deployments')).toContainText(/not deployed/i)
 
         // And none of it scrolls sideways at 375px.
-        const overflows = await page.evaluate(() =>
-            document.documentElement.scrollWidth > document.documentElement.clientWidth)
-        expect(overflows).toBe(false)
+        await expectNoSidewaysScroll(page)
     })
 
     test('a deployed build says where it is, on the card and on its own screen', async ({page, ontrack}) => {
@@ -445,9 +440,7 @@ test.describe('the mobile UI on a phone', () => {
         // Two badges plus a release name still do not push the card sideways at
         // 375px. Asserted after they are up: the deployments arrive with a query
         // of their own, and an empty card overflows nothing.
-        const overflows = await page.evaluate(() =>
-            document.documentElement.scrollWidth > document.documentElement.clientWidth)
-        expect(overflows).toBe(false)
+        await expectNoSidewaysScroll(page)
 
         // And on the build screen, which spells the same thing out as rows - the
         // positive case of the "not deployed anywhere" the test above pins.
@@ -540,9 +533,7 @@ test.describe('the mobile UI on a phone', () => {
 
         // Nothing scrolls sideways at 375px either, which is the criterion every
         // mobile surface has to meet.
-        const overflows = await page.evaluate(() =>
-            document.documentElement.scrollWidth > document.documentElement.clientWidth)
-        expect(overflows).toBe(false)
+        await expectNoSidewaysScroll(page)
 
         // The required field is enforced before anything leaves the phone.
         await submit.click()
@@ -604,9 +595,7 @@ test.describe('the mobile UI on a phone', () => {
         // Nothing scrolls sideways at 375px, which every mobile surface has to
         // meet. Asserted after the cards are up: the sheet is empty until the
         // slots arrive, and an empty sheet overflows nothing.
-        const overflows = await page.evaluate(() =>
-            document.documentElement.scrollWidth > document.documentElement.clientWidth)
-        expect(overflows).toBe(false)
+        await expectNoSidewaysScroll(page)
 
         // Tapping the eligible one lands on the deployment it just created.
         await page.getByTestId(`mobile-deploy-start-${stagingSlot.id}`).click()

@@ -1,6 +1,7 @@
 const {expect} = require('@playwright/test');
 const {login} = require("./login");
 const {test} = require("../fixtures/connection");
+const {expectNoSidewaysScroll} = require("../support/page-utils");
 
 /**
  * The desktop UI's shared header, at phone width.
@@ -80,30 +81,41 @@ for (const width of PHONE_WIDTHS) {
         await page.goto(ontrack.connection.ui)
         await expect(page.getByTestId('user-menu-trigger')).toBeVisible()
 
-        const geometry = await page.evaluate(() => {
-            const box = selector => {
-                const el = document.querySelector(selector)
-                if (!el) return null
-                const {x, y, width, height} = el.getBoundingClientRect()
-                return {x, y, width, height}
-            }
-            return {
-                header: box('.ant-layout-header'),
-                navBar: box('[data-testid="nav-bar"]'),
-                pageBar: box('[data-testid="main-page-bar"]'),
-            }
-        })
-
         // The nav row no longer outgrows the 64px box it lives in, so it cannot
         // reach the page bar below - which is what put "New project" on top of
         // the avatar.
-        expect(geometry.navBar.height).toBeLessThanOrEqual(geometry.header.height)
-        expect(geometry.navBar.y + geometry.navBar.height)
-            .toBeLessThanOrEqual(geometry.pageBar.y + 1)
+        //
+        // Read and asserted inside `toPass`: `evaluate` does not auto-wait, and
+        // the home page lays itself out around the header for a while after the
+        // trigger is visible. Retried as a group so that the three boxes being
+        // compared always come off one rendering rather than three.
+        await expect(async () => {
+            const geometry = await page.evaluate(() => {
+                const box = selector => {
+                    const el = document.querySelector(selector)
+                    if (!el) return null
+                    const {x, y, width, height} = el.getBoundingClientRect()
+                    return {x, y, width, height}
+                }
+                return {
+                    header: box('.ant-layout-header'),
+                    navBar: box('[data-testid="nav-bar"]'),
+                    pageBar: box('[data-testid="main-page-bar"]'),
+                }
+            })
+            // Named before they are compared: `box` returns null for an element
+            // that is not there, and a null deref inside `toPass` is retried
+            // until the timeout and then reported as one, which says nothing
+            // about which of the three selectors stopped matching.
+            for (const [name, box] of Object.entries(geometry)) {
+                expect(box, `no element for ${name}`).not.toBeNull()
+            }
+            expect(geometry.navBar.height).toBeLessThanOrEqual(geometry.header.height)
+            expect(geometry.navBar.y + geometry.navBar.height)
+                .toBeLessThanOrEqual(geometry.pageBar.y + 1)
+        }).toPass({timeout: 5000})
 
         // And the page never scrolls sideways at phone width.
-        const overflows = await page.evaluate(() =>
-            document.documentElement.scrollWidth > document.documentElement.clientWidth)
-        expect(overflows).toBe(false)
+        await expectNoSidewaysScroll(page)
     })
 }
