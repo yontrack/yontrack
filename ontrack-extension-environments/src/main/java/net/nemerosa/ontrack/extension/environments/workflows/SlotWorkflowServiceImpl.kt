@@ -16,6 +16,7 @@ import net.nemerosa.ontrack.extension.environments.workflows.executors.forSlotWo
 import net.nemerosa.ontrack.extension.workflows.engine.WorkflowEngine
 import net.nemerosa.ontrack.extension.workflows.engine.WorkflowInstanceStatus
 import net.nemerosa.ontrack.extension.workflows.execution.WorkflowNodeExecutorService
+import net.nemerosa.ontrack.extension.workflows.execution.validateWorkflowFully
 import net.nemerosa.ontrack.model.events.Event
 import net.nemerosa.ontrack.model.events.SerializableEventService
 import net.nemerosa.ontrack.model.security.SecurityService
@@ -39,7 +40,7 @@ class SlotWorkflowServiceImpl(
 
     override fun addSlotWorkflow(slotWorkflow: SlotWorkflow) {
         securityService.checkSlotAccess<SlotUpdate>(slotWorkflow.slot)
-        workflowNodeExecutorService.validateWorkflowNodes(slotWorkflow.workflow)
+        workflowNodeExecutorService.validateWorkflowFully(slotWorkflow.workflow)
         slotWorkflowRepository.addSlotWorkflow(slotWorkflow)
     }
 
@@ -154,7 +155,7 @@ class SlotWorkflowServiceImpl(
 
     override fun updateSlotWorkflow(slotWorkflow: SlotWorkflow) {
         securityService.checkSlotAccess<SlotUpdate>(slotWorkflow.slot)
-        workflowNodeExecutorService.validateWorkflowNodes(slotWorkflow.workflow)
+        workflowNodeExecutorService.validateWorkflowFully(slotWorkflow.workflow)
         slotWorkflowRepository.updateSlotWorkflow(slotWorkflow)
     }
 

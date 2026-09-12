@@ -8,10 +8,10 @@ import net.nemerosa.ontrack.extension.notifications.channels.NotificationResult
 import net.nemerosa.ontrack.extension.notifications.recording.NotificationRecord
 import net.nemerosa.ontrack.extension.notifications.trigger.NotificationRecordTrigger
 import net.nemerosa.ontrack.extension.notifications.trigger.NotificationRecordTriggerData
-import net.nemerosa.ontrack.extension.workflows.definition.WorkflowValidation
 import net.nemerosa.ontrack.extension.workflows.engine.WorkflowEngine
 import net.nemerosa.ontrack.extension.workflows.engine.WorkflowInstanceStatus
 import net.nemerosa.ontrack.extension.workflows.execution.WorkflowNodeExecutorService
+import net.nemerosa.ontrack.extension.workflows.execution.validateWorkflowFully
 import net.nemerosa.ontrack.json.asJson
 import net.nemerosa.ontrack.json.getTextField
 import net.nemerosa.ontrack.json.parse
@@ -39,10 +39,7 @@ class WorkflowNotificationChannel(
 ) {
 
     override fun validateParsedConfig(config: WorkflowNotificationChannelConfig) {
-        // Basic controls
-        WorkflowValidation.validateWorkflow(config.workflow).throwErrorIfAny()
-        // Controlling each node
-        workflowNodeExecutorService.validateWorkflowNodes(config.workflow)
+        workflowNodeExecutorService.validateWorkflowFully(config.workflow)
     }
 
     override fun mergeConfig(

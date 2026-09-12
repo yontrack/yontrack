@@ -6,6 +6,7 @@ import net.nemerosa.ontrack.extension.workflows.definition.Workflow
 import net.nemerosa.ontrack.extension.workflows.definition.WorkflowValidation
 import net.nemerosa.ontrack.extension.workflows.definition.WorkflowValidation.Companion.validateWorkflow
 import net.nemerosa.ontrack.extension.workflows.execution.WorkflowNodeExecutorService
+import net.nemerosa.ontrack.extension.workflows.execution.validateWorkflowFully
 import net.nemerosa.ontrack.model.security.SecurityService
 import net.nemerosa.ontrack.model.support.StorageService
 import org.springframework.stereotype.Service
@@ -65,8 +66,7 @@ class WorkflowRegistryImpl(
 
     private fun saveWorkflow(workflow: Workflow): String {
         // Validation
-        validateWorkflow(workflow).throwErrorIfAny()
-        workflowNodeExecutorService.validateWorkflowNodes(workflow)
+        workflowNodeExecutorService.validateWorkflowFully(workflow)
         // Generating an ID
         val id = UUID.randomUUID().toString()
         // Record to save

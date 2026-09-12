@@ -1,8 +1,7 @@
 package net.nemerosa.ontrack.extension.environments.workflows
 
-import net.nemerosa.ontrack.extension.environments.Slot
-import net.nemerosa.ontrack.extension.environments.SlotPipelineStatus
 import net.nemerosa.ontrack.extension.environments.SlotTestSupport
+import net.nemerosa.ontrack.extension.environments.workflows.SlotWorkflowTestFixtures.slotWorkflow
 import net.nemerosa.ontrack.extension.workflows.definition.Workflow
 import net.nemerosa.ontrack.extension.workflows.definition.WorkflowNode
 import net.nemerosa.ontrack.extension.workflows.definition.WorkflowValidationException
@@ -112,13 +111,6 @@ class SlotWorkflowNodeValidationIT : AbstractDSLTestSupport() {
             )
         }
     }
-
-    private fun slotWorkflow(slot: Slot, workflow: Workflow) =
-        SlotWorkflow(
-            slot = slot,
-            trigger = SlotPipelineStatus.RUNNING,
-            workflow = workflow,
-        )
 
     /**
      * The `mock` executor requires a non-blank text, so this workflow parses but does not validate.

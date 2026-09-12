@@ -13,10 +13,14 @@ interface WorkflowNodeExecutorService {
     /**
      * Validates the data of every node of the [workflow] against the executor it names.
      *
-     * This is the check every _saving_ of a workflow must run: an executor whose configuration is not
-     * usable has to be rejected while the user is still looking at it, not at the moment the node runs.
-     * [net.nemerosa.ontrack.extension.workflows.definition.WorkflowValidation.validateWorkflow] is the
-     * complement of this check: it looks at the structure of the workflow only, never at the node data.
+     * An executor whose configuration is not usable has to be rejected while the user is still looking
+     * at it, not at the moment the node runs.
+     *
+     * **This is only half of what a save must check, so a save path must not call it.** It says nothing
+     * about the shape of the graph, so on its own it accepts a workflow which can never run — the bug
+     * fixed by #1743. [validateWorkflowFully] is the pair, and is what every path persisting a workflow
+     * calls. This one stays public for [net.nemerosa.ontrack.extension.workflows.registry.WorkflowRegistry.validateJsonWorkflow],
+     * which needs the two halves apart in order to report their errors rather than throw them.
      *
      * @param workflow Workflow whose nodes must be validated
      */
