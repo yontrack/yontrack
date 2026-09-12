@@ -23,6 +23,25 @@ class WorkflowRegistryImpl(
         private val STORE = WorkflowRegistry::class.java.name
     }
 
+    /**
+     * Unlike every other method here, this one carries **no authorization check, deliberately** (#1740).
+     *
+     * * Its two callers are the slot workflow dialog, gated on the project-level `SlotUpdate`, and the
+     *   `workflow` notification-channel form, gated on `GlobalSubscriptionsManage` or the project-level
+     *   `ProjectSubscriptionsWrite`. Neither holds `WorkflowRegistration`, which is granted to
+     *   `ADMINISTRATOR` alone, so requiring it here would break both editors for every non-admin who
+     *   uses them today.
+     * * It reveals nothing which is not already served openly: the distinct errors it returns amount to
+     *   an existence oracle over configuration names, and `configurations`, `configurationByName` and
+     *   the per-type configuration queries answer that in one line with no check at all.
+     * * The executors it reaches are side-effect-free by the contract on
+     *   [net.nemerosa.ontrack.extension.workflows.execution.WorkflowNodeExecutor.validate] - no outbound
+     *   call, no write - and the nesting they may fan out into is bounded by the depth guard in
+     *   [net.nemerosa.ontrack.extension.workflows.execution.WorkflowNodeExecutorService.validateWorkflowNodes].
+     *
+     * An executor which breaks that contract is what would turn this into an exposure; the contract is
+     * where to fix it, not here.
+     */
     override fun validateJsonWorkflow(workflow: JsonNode): WorkflowValidation {
         // Parsing of the workflow
         val workflowObj: Workflow = try {

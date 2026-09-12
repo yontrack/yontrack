@@ -22,6 +22,12 @@ interface WorkflowNodeExecutorService {
      * calls. This one stays public for [net.nemerosa.ontrack.extension.workflows.registry.WorkflowRegistry.validateJsonWorkflow],
      * which needs the two halves apart in order to report their errors rather than throw them.
      *
+     * A node may nest another workflow - a `notification` node on the `workflow` channel does - and the
+     * validation of that node comes back here. The implementation counts how deep one validation has
+     * gone and rejects a workflow nested past
+     * [net.nemerosa.ontrack.extension.workflows.execution.WorkflowNodeExecutorServiceImpl.MAX_VALIDATION_DEPTH]
+     * levels, as a validation error like any other.
+     *
      * @param workflow Workflow whose nodes must be validated
      */
     fun validateWorkflowNodes(workflow: Workflow)

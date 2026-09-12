@@ -4,7 +4,9 @@ import net.nemerosa.ontrack.extension.notifications.subscriptions.EventSubscript
 import net.nemerosa.ontrack.extension.notifications.subscriptions.EventSubscriptionConfigException
 import net.nemerosa.ontrack.extension.notifications.subscriptions.EventSubscriptionService
 import net.nemerosa.ontrack.extension.notifications.subscriptions.subscribe
+import net.nemerosa.ontrack.extension.workflows.execution.WorkflowNodeExecutorServiceImpl
 import net.nemerosa.ontrack.extension.workflows.registry.WorkflowParser
+import net.nemerosa.ontrack.extension.workflows.registry.WorkflowRegistry
 import net.nemerosa.ontrack.it.AbstractDSLTestSupport
 import net.nemerosa.ontrack.json.asJson
 import net.nemerosa.ontrack.model.events.EventFactory
@@ -12,6 +14,7 @@ import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertTrue
 
 class WorkflowNotificationChannelValidationIT : AbstractDSLTestSupport() {
 
@@ -20,6 +23,9 @@ class WorkflowNotificationChannelValidationIT : AbstractDSLTestSupport() {
 
     @Autowired
     private lateinit var workflowNotificationChannel: WorkflowNotificationChannel
+
+    @Autowired
+    private lateinit var workflowRegistry: WorkflowRegistry
 
     @Test
     fun `Validation of the workflow before saving, wrong syntax`() {
@@ -370,6 +376,122 @@ class WorkflowNotificationChannelValidationIT : AbstractDSLTestSupport() {
             }
         }
     }
+
+    @Test
+    fun `Validation of the workflow before saving, a workflow nested a couple of levels deep`() {
+        asAdmin {
+            project {
+                branch {
+                    promotionLevel {
+                        // 3 levels: the subscription's own workflow, and two workflows nested into it
+                        // through notifications, which is what the depth guard still allows.
+                        eventSubscriptionService.subscribe(
+                            EventSubscription(
+                                name = "test",
+                                channel = workflowNotificationChannel.type,
+                                channelConfig = mapOf(
+                                    "workflow" to nestedWorkflow(WorkflowNodeExecutorServiceImpl.MAX_VALIDATION_DEPTH)
+                                ).asJson(),
+                                events = setOf(EventFactory.NEW_PROMOTION_RUN.id),
+                                projectEntity = this,
+                                keywords = null,
+                                origin = "test",
+                                disabled = false,
+                                contentTemplate = null,
+                            )
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `Validation of the workflow before saving, workflows nested beyond the maximum depth`() {
+        asAdmin {
+            project {
+                branch {
+                    promotionLevel {
+                        val ex = assertFailsWith<EventSubscriptionConfigException> {
+                            eventSubscriptionService.subscribe(
+                                EventSubscription(
+                                    name = "test",
+                                    channel = workflowNotificationChannel.type,
+                                    channelConfig = mapOf(
+                                        "workflow" to nestedWorkflow(WorkflowNodeExecutorServiceImpl.MAX_VALIDATION_DEPTH + 1)
+                                    ).asJson(),
+                                    events = setOf(EventFactory.NEW_PROMOTION_RUN.id),
+                                    projectEntity = this,
+                                    keywords = null,
+                                    origin = "test",
+                                    disabled = false,
+                                    contentTemplate = null,
+                                )
+                            )
+                        }
+                        assertTrue(
+                            "Workflows cannot be nested more than ${WorkflowNodeExecutorServiceImpl.MAX_VALIDATION_DEPTH} levels deep"
+                                    in (ex.message ?: ""),
+                            "The depth is what the subscription is rejected for: ${ex.message}"
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `Preview of a workflow nested beyond the maximum depth reports the depth as an error`() {
+        asAdmin {
+            // The preview of the edition dialog reports the problem instead of throwing it, exactly like
+            // any other rejection of the workflow's content.
+            val validation = workflowRegistry.validateJsonWorkflow(
+                nestedWorkflow(WorkflowNodeExecutorServiceImpl.MAX_VALIDATION_DEPTH + 1).asJson()
+            )
+            assertTrue(validation.error, "The nesting is reported as an error")
+            assertTrue(
+                validation.errors.any {
+                    "Workflows cannot be nested more than ${WorkflowNodeExecutorServiceImpl.MAX_VALIDATION_DEPTH} levels deep" in it
+                },
+                "The depth is the error which is reported: ${validation.errors}"
+            )
+        }
+    }
+
+    /**
+     * A workflow nesting [levels] workflows into each other, each level reached through a `notification`
+     * node on the `workflow` channel - the hop the depth guard has to count across. The innermost level
+     * holds a single, valid, `mock` node.
+     */
+    private fun nestedWorkflow(levels: Int): Map<String, Any> =
+        if (levels <= 1) {
+            mapOf(
+                "name" to "Level 1",
+                "nodes" to listOf(
+                    mapOf(
+                        "id" to "leaf",
+                        "executorId" to "mock",
+                        "data" to mapOf("text" to "Some text"),
+                    )
+                ),
+            )
+        } else {
+            mapOf(
+                "name" to "Level $levels",
+                "nodes" to listOf(
+                    mapOf(
+                        "id" to "nested",
+                        "executorId" to "notification",
+                        "data" to mapOf(
+                            "channel" to WorkflowNotificationChannel.TYPE,
+                            "channelConfig" to mapOf(
+                                "workflow" to nestedWorkflow(levels - 1)
+                            ),
+                        ),
+                    )
+                ),
+            )
+        }
 
     private fun assertFailsWithEventSubscriptionConfigException(
         message: String,
