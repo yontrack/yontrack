@@ -1,3 +1,13 @@
+# Middleware for the integration tests (`./gradlew integrationTest`).
+#
+# Every published port is parameterised so that several checkouts can run
+# their integration tests side by side; the defaults reproduce the historical
+# ports, so running this file directly behaves exactly as it always has.
+#
+# Started and stopped by the Gradle Docker Compose plugin, which is given the
+# project name and the ports by `ItStack` in buildSrc -- see
+# docs/adr/0012-parallel-integration-test-stacks.md.
+
 services:
 
   # Database
@@ -9,13 +19,12 @@ services:
       POSTGRES_USER    : ontrack
       POSTGRES_PASSWORD: ontrack
     ports:
-      - "5432:5432"
+      - "${YONTRACK_IT_POSTGRES_PORT:-5432}:5432"
 
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:9.2.0
     ports:
-      - "9200:9200"
-      - "9300:9300"
+      - "${YONTRACK_IT_ELASTIC_PORT:-9200}:9200"
     environment:
       - "discovery.type=single-node"
       - "xpack.security.enabled=false"
@@ -41,8 +50,8 @@ services:
       RABBITMQ_DEFAULT_USER: ontrack
       RABBITMQ_DEFAULT_PASS: ontrack
     ports:
-      - "15672:15672"
-      - "5672:5672"
+      - "${YONTRACK_IT_RABBIT_MGMT_PORT:-15672}:15672"
+      - "${YONTRACK_IT_RABBIT_PORT:-5672}:5672"
 
   # Vault
   # Non production setup
@@ -54,4 +63,4 @@ services:
     cap_add:
       - "IPC_LOCK"
     ports:
-      - "8200:8200"
+      - "${YONTRACK_IT_VAULT_PORT:-8200}:8200"

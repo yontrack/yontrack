@@ -78,6 +78,29 @@ These rules apply unconditionally. Follow them in every change, without exceptio
   demo, or run a Playwright spec against the stack, mint a token first:
   `docs/agents/local-api-access.md`.
 
+### Running the integration tests locally
+
+- **Always** run them through `./gradlew integrationTest` (or a single module's
+  `:ontrack-extension-x:integrationTest`). The task brings its own middleware up and tears it down
+  again — never start `compose/docker-compose-it.yml` by hand.
+- **Never** assume `localhost:5432`, `localhost:9200`, `localhost:5672` or `localhost:8200` for the
+  IT middleware. Like the dev stack, each checkout gets its own ports so that several agents can run
+  integration tests at once: the main working copy keeps the historical ports, and a linked worktree
+  offsets every port by `slot * 100`. Read the actual ones from `.yontrack-it/instance.env` in the
+  checkout — it also carries the four `-D` options ready to paste.
+- The tuning is automatic for Gradle: the `integrationTest` task passes `spring.datasource.url`,
+  `spring.rabbitmq.port`, `spring.elasticsearch.uris` and `ontrack.config.vault.uri` to the tests.
+  It is **not** automatic for anything you run yourself — a `psql`, a `curl` against Elasticsearch,
+  a test launched outside Gradle — so read the ports first.
+- A new service in `compose/docker-compose-it.yml` is not wired until its port is added to
+  `ItStack.BASE_PORTS` **and** the property pointing at it is added to
+  `ItStackInstance.systemProperties`, both in `buildSrc`. Add a case to `ItStackTest` with it.
+- The dev stack and the IT stack share their base ports and step around each other by probing, so
+  both can be up in the same checkout — but the IT stack's slot is then not the dev stack's slot,
+  and `.yontrack-dev/instance.env` and `.yontrack-it/instance.env` are two different files. Read the
+  right one.
+- `docs/adr/0012-parallel-integration-test-stacks.md` explains the scheme.
+
 ### Workflow
 
 Every change follows this lifecycle, end to end — don't stop after step 2:

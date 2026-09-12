@@ -1,4 +1,5 @@
 import com.avast.gradle.dockercompose.ComposeExtension
+import net.nemerosa.ontrack.build.ItStack
 
 plugins {
     kotlin("jvm") version "2.2.20"
@@ -86,14 +87,32 @@ subprojects {
 // Docker compose
 // ===================================================================================================================
 
+// The integration test stack is an *instance* of this checkout, the way the
+// development stack is: its Compose project and every port it publishes are
+// derived from a slot, so that several worktrees can run `integrationTest` at
+// the same time. The main working copy takes slot 0 and keeps the historical
+// ports -- which is what every CI runner, a fresh clone, also gets.
+// See docs/adr/0012-parallel-integration-test-stacks.md.
+val itStack = ItStack.resolve(rootDir)
+
 configure<ComposeExtension> {
     createNested("integrationTest").apply {
         useComposeFiles.addAll(listOf("compose/docker-compose-it.yml"))
-        setProjectName("it")
+        setProjectName(itStack.projectName)
+        environment.putAll(itStack.composeEnvironment)
     }
     createNested("local").apply {
         useComposeFiles.addAll(listOf("compose/docker-compose-local.yml"))
         setProjectName("local")
+    }
+}
+
+tasks.named("integrationTestComposeUp") {
+    doFirst {
+        // Recorded before the stack comes up rather than after, so that the
+        // ports are discoverable even when it fails to start.
+        itStack.writeInstanceEnv(rootProject.file(ItStack.INSTANCE_ENV_PATH))
+        logger.lifecycle("[it-stack] ${itStack.describe()}")
     }
 }
 
@@ -175,6 +194,11 @@ configure(javaProjects) {
         maxHeapSize = "3072m"
         dependsOn(":integrationTestComposeUp")
         finalizedBy(":integrationTestComposeDown")
+
+        // Point the tests at this checkout's instance of the stack. Without
+        // these the defaults baked into the code -- localhost:5432 and
+        // friends -- would send every worktree to the same containers.
+        itStack.systemProperties.forEach { (key, value) -> systemProperty(key, value) }
     }
 
     // Synchronization with shutting down the database

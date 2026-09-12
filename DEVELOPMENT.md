@@ -95,3 +95,41 @@ kill $(cat .yontrack-dev/backend.pid)
 > The backend is available on http://localhost:8080 but should not be used
 > directly. The Spring Boot actuator runs at http://localhost:8800/manage, and
 > the application itself on http://localhost:3000.
+
+## Running the integration tests
+
+```bash
+./gradlew integrationTest
+```
+
+The task brings up `compose/docker-compose-it.yml` -- Postgres,
+Elasticsearch, RabbitMQ and Vault -- and tears it down again afterwards.
+
+Like the development stack, that middleware is an *instance* of the checkout,
+so two worktrees can run their integration tests at the same time. The main
+working copy takes slot 0 and keeps the historical ports; a linked worktree
+hashes into a slot from 1 to 9, which offsets every port by `slot * 100`:
+
+| Service        | Slot 0 | Slot 1 |
+|----------------|--------|--------|
+| Postgres       | 5432   | 5532   |
+| Elasticsearch  | 9200   | 9300   |
+| RabbitMQ       | 5672   | 5772   |
+| RabbitMQ admin | 15672  | 15772  |
+| Vault          | 8200   | 8300   |
+
+A slot whose ports are taken is bumped along until a free one is found, which
+is also what lets the integration tests run while a development stack is up in
+the same checkout. The resolved ports are written to
+`.yontrack-it/instance.env`, and the `integrationTest` task passes them to the
+tests as system properties, so `./gradlew integrationTest` needs no
+configuration of any kind.
+
+Running a single integration test **from the IDE** is the one case that does:
+on the main working copy the defaults baked into the tests are right, but in a
+linked worktree the four `-D` options at the bottom of
+`.yontrack-it/instance.env` have to go into the run configuration.
+
+The arithmetic lives in `ItStack` in `buildSrc`, is covered by `ItStackTest`
+(`./gradlew -p buildSrc test`), and is explained in
+`docs/adr/0012-parallel-integration-test-stacks.md`.

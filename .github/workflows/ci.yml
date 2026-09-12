@@ -439,7 +439,8 @@ jobs:
   # ---------------------------------------------------------------------------------------------
   # Integration tests, sharded. Each shard brings up its own compose/docker-compose-it.yml stack
   # (via the integrationTest -> integrationTestComposeUp dependency) — they are isolated per
-  # runner, so that is safe.
+  # runner, so that is safe. A runner is a fresh clone, so it takes slot 0 and the historical
+  # ports; see docs/adr/0012-parallel-integration-test-stacks.md.
   # ---------------------------------------------------------------------------------------------
 
   integration:
