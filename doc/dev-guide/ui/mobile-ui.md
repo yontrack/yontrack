@@ -786,10 +786,12 @@ accidental is the failure it exists to stop.
 **`open-desktop-version` now exists on two screens**, deliberately: it is one control with one
 identity, and each acceptance test addresses it from a URL that makes which one unambiguous.
 `mobile.spec.js` pins both doors without either duplicating the other — "a phone reaches the
-desktop version from the account screen" pins the deliberate one and the session-scoped cookie
-it writes, while "a phone can switch to the desktop UI and back again" pins the interstitial
-carrying the user's *actual* destination through the switch, and the way back through the
-desktop user menu.
+desktop version from the account screen" pins the deliberate one, while "a phone can switch to
+the desktop UI and back again" pins the interstitial carrying the user's *actual* destination
+through the switch, and the way back through the desktop user menu. What the two *do* share is
+the cookie, which is the same decision whichever door wrote it, so both call one
+`expectSessionOptOut` helper: two copies of that assertion would let one door's scoping change
+without the other's test noticing.
 
 **Test isolation.** The theme is server-side state on the shared account and Playwright runs
 `workers: 1, fullyParallel: false`, so a spec leaving `DARK` behind drives every spec after it

@@ -118,6 +118,23 @@ const selectMobileTheme = async (page, label) => {
     await control.getByText(label, {exact: true}).click()
 }
 
+/**
+ * Asserts this browser now carries the desktop opt-out, and that it dies with
+ * the browser session.
+ *
+ * Shared by the two doors below - the deliberate one on the account screen and
+ * the accidental one on the interstitial - because the cookie is the *same*
+ * decision whichever door wrote it, and two copies of the assertion would let
+ * one door's scoping change without the other's test noticing. Playwright
+ * reports -1 for a session cookie.
+ */
+const expectSessionOptOut = async (page) => {
+    const [optOut] = (await page.context().cookies())
+        .filter(cookie => cookie.name === 'yontrack-ui')
+    expect(optOut.value).toEqual('desktop')
+    expect(optOut.expires).toEqual(-1)
+}
+
 test.beforeEach(async ({ontrack}) => resetThemeMode(ontrack))
 test.afterEach(async ({ontrack}) => resetThemeMode(ontrack))
 
@@ -904,11 +921,8 @@ test.describe('the mobile UI on a phone', () => {
         expect(new URL(page.url()).pathname).toEqual('/')
 
         // And the choice it wrote is the session-scoped one, not a lasting
-        // preference. Playwright reports -1 for a session cookie.
-        const [optOut] = (await page.context().cookies())
-            .filter(cookie => cookie.name === 'yontrack-ui')
-        expect(optOut.value).toEqual('desktop')
-        expect(optOut.expires).toEqual(-1)
+        // preference.
+        await expectSessionOptOut(page)
     })
 
     test('a phone can switch to the desktop UI and back again', async ({page, ontrack}) => {
@@ -922,12 +936,8 @@ test.describe('the mobile UI on a phone', () => {
 
         // And that cookie dies with the browser session - a second line behind
         // the way back below, for everything else that could go wrong with a
-        // desktop UI that is not responsive. Playwright reports -1 for a
-        // session cookie.
-        const [optOut] = (await page.context().cookies())
-            .filter(cookie => cookie.name === 'yontrack-ui')
-        expect(optOut.value).toEqual('desktop')
-        expect(optOut.expires).toEqual(-1)
+        // desktop UI that is not responsive.
+        await expectSessionOptOut(page)
 
         // And it stays there.
         await page.goto(ontrack.connection.ui)

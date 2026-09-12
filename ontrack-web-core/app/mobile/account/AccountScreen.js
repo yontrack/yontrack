@@ -125,41 +125,26 @@ export default function MobileAccountScreen() {
 
             {/*
               Between Appearance and sign out, for the same reason Appearance is
-              between the identity and sign out: sign out stays the last control
-              and the only destructive one, and a preference placed after it
-              would sit on the path a thumb travels past.
-
-              A section of its own rather than a row folded into Appearance: one
-              title costs one line, and it is the line that keeps the
-              user/device distinction legible.
+              between the identity and sign out: sign out stays last and stays
+              the only destructive control.
             */}
             <MobileSection title="This device" testId="mobile-account-device">
                 <Space direction="vertical" size={4} style={{width: '100%'}}>
                     {/*
                       `DESKTOP_HOME`, exactly as `switchToMobileUI` always lands
-                      on `MOBILE_HOME`. Landing on "the desktop equivalent of the
-                      screen behind" would need an inverse route map to keep in
-                      sync with `mobileRoutes.js`, plus history this screen does
-                      not have - by the time the user is here, the screen they
-                      came from is gone. The interstitial has a real target only
-                      because the middleware handed it one.
-
-                      `default` and not `primary`: this is one row among several,
-                      and sign out is already the loudest thing on the screen.
-
-                      No icon. `FaDesktop` is on this screen already, in the
-                      theme control's Auto segment, where it means "follow the
-                      operating system"; a second one two rows down meaning "the
-                      desktop UI" would make one glyph mean two things.
+                      on `MOBILE_HOME`: by the time the user is here, the screen
+                      they came from is gone, and computing a desktop equivalent
+                      would need an inverse route map. `default` rather than the
+                      interstitial's `primary`, and no icon - `FaDesktop` already
+                      means "follow the operating system" two rows up.
                     */}
                     <DesktopVersionButton href={DESKTOP_HOME} block/>
                     {/*
-                      The same shape as `themeModeCaption`: a phone has no hover,
-                      so what the choice costs and where the way back is have to
-                      be in the open. Deliberately not a constant shared with the
+                      The same shape as `themeModeCaption`, because a phone has
+                      no hover. Deliberately not a constant shared with the
                       interstitial, whose sentence is bound to a destination it
-                      has just named - two sentences, one fact, and the fact is
-                      what `mobile-ui.md` records.
+                      has just named: two sentences, one fact, and `mobile-ui.md`
+                      records the fact.
                     */}
                     <Typography.Text type="secondary" data-testid="mobile-account-device-caption">
                         This device stays on the desktop version until you close
