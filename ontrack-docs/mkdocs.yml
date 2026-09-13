@@ -129,6 +129,7 @@ nav:
   - Operations:
       - Stale branches: content/operations/stale-branches.md
       - Metrics: content/operations/metrics.md
+      - Management port: content/operations/management-port.md
       - Troubleshooting:
           - Git connectivity: content/operations/git-connectivity.md
           - RabbitMQ: content/operations/rabbitmq.md

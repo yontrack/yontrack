@@ -359,6 +359,7 @@ ds_backend_up() {
             SPRING_ELASTICSEARCH_URIS="http://localhost:$DS_PORT_ELASTIC" \
             SPRING_RABBITMQ_PORT="$DS_PORT_RABBIT" \
             SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI="$DS_URL_ISSUER" \
+            MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info,prometheus,account,graphql,graphqlJson \
             MANAGEMENT_ENDPOINT_ACCOUNT_ACCESS=unrestricted \
             ONTRACK_CONFIG_URL="$DS_URL_UI" \
             ONTRACK_CONFIG_CONFIGURATION_TEST=false \

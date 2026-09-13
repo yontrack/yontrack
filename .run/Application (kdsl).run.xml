@@ -3,6 +3,7 @@
     <option name="ACTIVE_PROFILES" value="dev" />
     <envs>
       <env name="MANAGEMENT_ENDPOINT_ACCOUNT_ACCESS" value="unrestricted" />
+      <env name="MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE" value="health,info,prometheus,account" />
       <env name="ONTRACK_ACCEPTANCE_GITHUB_ORGANIZATION" value="${ONTRACK_ACCEPTANCE_GITHUB_ORGANIZATION}" />
       <env name="ONTRACK_ACCEPTANCE_GITHUB_TOKEN" value="${ONTRACK_ACCEPTANCE_GITHUB_TOKEN}" />
       <env name="ONTRACK_CONFIG_CONFIGURATION_TEST" value="false" />

@@ -59,19 +59,21 @@ management:
   # Listening on a specific port
   server:
     port: 8800
-  # Custom URL for the management end points and definition of exposure
-  # Exposes details about health
+  # The management port is not authenticated (see WebSecurityConfig) and must never be exposed
+  # publicly: only the overall health status is shown (#1772)
   endpoint:
     health:
-      show-details: always
+      show-details: when-authorized
     # Getting a token for an account is used only for testing and must be explicitly granted
     account:
       access: none
   # Custom URL for the management end points
   endpoints:
     web:
+      # Only what the platform probes & scrapes. Anything else (graphql, account, env...) must be
+      # re-enabled explicitly where it is needed - see the "Management port" page of the docs (#1772)
       exposure:
-        include: "*"
+        include: "health,info,prometheus"
       base-path: "/manage"
   # Default settings for the metrics
   prometheus:

@@ -8,6 +8,8 @@ import net.nemerosa.ontrack.model.support.OntrackConfigProperties
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import org.springframework.boot.actuate.autoconfigure.security.servlet.EndpointRequest
+import org.springframework.boot.actuate.endpoint.web.WebServerNamespace
+import org.springframework.boot.web.context.WebServerApplicationContext
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.security.config.annotation.web.builders.HttpSecurity
@@ -18,6 +20,9 @@ import org.springframework.security.oauth2.jwt.NimbusJwtDecoder
 import org.springframework.security.oauth2.jwt.SupplierJwtDecoder
 import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter
 import org.springframework.security.web.SecurityFilterChain
+import org.springframework.security.web.util.matcher.OrRequestMatcher
+import org.springframework.security.web.util.matcher.RequestMatcher
+import org.springframework.web.context.support.WebApplicationContextUtils
 import java.util.function.Supplier
 
 @Configuration
@@ -30,11 +35,26 @@ class WebSecurityConfig(
     private val logger: Logger = LoggerFactory.getLogger(WebSecurityConfig::class.java)
 
     /**
-     * Management end points are accessible on a separate port without any authentication needed
+     * Any request served by the separate management server - the child context Spring Boot starts
+     * when `management.server.port` differs from `server.port`.
+     */
+    private val managementServerRequest = RequestMatcher { request ->
+        WebServerApplicationContext.hasServerNamespace(
+            WebApplicationContextUtils.getWebApplicationContext(request.servletContext),
+            WebServerNamespace.MANAGEMENT.value,
+        )
+    }
+
+    /**
+     * Management end points are accessible on a separate port without any authentication needed.
+     *
+     * The chain covers the whole management server, not only its exposed end points: otherwise a
+     * request for an end point which is not exposed falls through to the API chain and answers
+     * `401`, telling the caller the end point exists behind authentication, instead of `404` (#1772).
      */
     @Bean
     fun actuatorWebSecurity(http: HttpSecurity): SecurityFilterChain {
-        http.securityMatcher(EndpointRequest.toAnyEndpoint())
+        http.securityMatcher(OrRequestMatcher(EndpointRequest.toAnyEndpoint(), managementServerRequest))
             .authorizeHttpRequests { requests ->
                 requests.anyRequest().permitAll()
             }

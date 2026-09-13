@@ -29,7 +29,8 @@ services:
         condition: service_started
     ports:
       - "8080:8080"
-      - "8800:8800"
+      # Management port - local access only, never publish it (#1772)
+      - "127.0.0.1:8800:8800"
 
   # Ontrack UI
   ui:

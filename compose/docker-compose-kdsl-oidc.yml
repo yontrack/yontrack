@@ -115,6 +115,9 @@ services:
       # Configuration for the tests
       ############################################################
 
+      # ... the management endpoints the tests use (prometheus for the metrics, account for
+      # the tokens) - the default exposure is narrower, see #1772
+      MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: "health,info,prometheus,account"
       # ... account tokens can be provisioned
       MANAGEMENT_ENDPOINT_ACCOUNT_ACCESS: unrestricted
       # ... configurations are not tested
