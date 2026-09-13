@@ -97,9 +97,10 @@ exactly why the check is there.
 
 ### Versions
 
-`release.yml` publishes under the **base** version: `5.3.0-rc-100` ships as `5.3.0`. An explicit
-`release_version` input overrides it, for a human at the Actions button — the promotion has no way
-to mean one.
+`release.yml` publishes under the **base** version: `5.3.0-rc-100` ships as `5.3.0`. The image was
+built as `5.3.0` and displays that version (`info.version.display`, while `info.version.full` keeps
+`5.3.0-rc-100`), so it can be published under nothing else: `resolve` refuses a `release_version`
+input that differs from the base version.
 
 The rc version is still needed throughout: it is the GHCR tag the images are re-tagged *from*.
 

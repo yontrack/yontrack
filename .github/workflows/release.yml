@@ -38,7 +38,7 @@ on:
         required: true
         type: string
       release_version:
-        description: 'Publish under this version instead of the base version. Leave empty unless you mean it.'
+        description: 'Version to publish under. Must equal the base version of the rc, which the image displays; leave empty.'
         required: false
         type: string
       project:

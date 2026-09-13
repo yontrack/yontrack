@@ -355,11 +355,18 @@ touch "$REL_STUB_DIR/graphql_transport_fails"
 out="$(rel_resolve 2>&1)"; rc=$?
 assert_eq "1" "$rc" "resolve: fails when Yontrack cannot be reached"
 
-# An explicit override is allowed: the base version is a default, not a rule.
+# An explicit version must be the base version: the image displays the version it was built as,
+# and a release only re-tags it.
 setup_stub
 out="$(RELEASE_VERSION=5.4.0 rel_resolve 2>&1)"; rc=$?
-assert_eq "0" "$rc" "resolve: succeeds with an explicit version"
-assert_contains "$(outputs)" "version=5.4.0" "resolve: an explicit version overrides the base version"
+assert_eq "1" "$rc" "resolve: refuses an explicit version other than the base version"
+assert_contains "$out" "5.3.0" "resolve: names the version the image was built as"
+assert_contains "$out" "5.4.0" "resolve: names the version it refused"
+
+setup_stub
+out="$(RELEASE_VERSION=5.3.0 rel_resolve 2>&1)"; rc=$?
+assert_eq "0" "$rc" "resolve: accepts an explicit version equal to the base version"
+assert_contains "$(outputs)" "version=5.3.0" "resolve: publishes under that version"
 
 setup_stub
 echo "5.3.0" > "$REL_STUB_DIR/tags"

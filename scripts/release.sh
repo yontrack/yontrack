@@ -287,7 +287,16 @@ rel_resolve() {
     [ -z "$build_name" ] && { rel_fail "Could not read a build out of: $json"; return 1; }
 
     local version="${RELEASE_VERSION:-}"
-    [ -n "$version" ] || version="$(rel_base_version "$rc_version")"
+    local base_version
+    base_version="$(rel_base_version "$rc_version")"
+    [ -n "$version" ] || version="$base_version"
+    # The image is re-tagged, never rebuilt, and it displays the base version it was stamped with
+    # at build time (see docs/adr/0006). Publishing it under anything else ships an application
+    # that shows a version it was not released as.
+    [ "$version" = "$base_version" ] || {
+        rel_fail "Cannot publish $rc_version as $version: its image was built as $base_version and displays that version. Only $base_version can be published from this build."
+        return 1
+    }
     rel_valid_version "$version" || {
         rel_fail "'$version' is not a version. A build with no release property has its own name as its display name, which is not something to publish under."
         return 1

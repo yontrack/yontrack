@@ -83,6 +83,17 @@ refuses anything that is not then three dot-separated numbers. A build with no
 `release` property has its own name as its display name, and that guard is what
 stops a timestamp being published as a version.
 
+**The running application displays the base version from birth.** The image
+cannot be renamed after it is built, so it can never learn that it was released
+as `5.3.0`. The version it shows is therefore stamped at build time as the base
+version: `info.version.display` — what the user menu and the mobile account page
+show — is `5.3.0`, while `info.version.full` keeps the candidate identity
+`5.3.0-rc-100`. An rc on the demo shows `5.3.0` before it is released, which is
+accepted; this supersedes #1680, which had the display carry the rc suffix and
+left every released instance showing it (#1746). It follows that a build can only
+be published under its base version, and `release.sh` refuses any
+`release_version` that differs from it.
+
 **The rewrite is squeezed between the last publication and the last stamp**, and
 both sides of that are load-bearing. It comes after every publication step
 because the artefacts must exist under the version before the build claims to be

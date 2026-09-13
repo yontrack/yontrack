@@ -109,8 +109,8 @@ configuration:
         # the raw name - so the version goes across and release.yml resolves the build itself,
         # exactly as the demo slot does for demo-smoke.yml.
         #
-        # `release_version` is left out on purpose: an override is for a human at the Actions
-        # button, and a promotion has no way to mean one.
+        # `release_version` is left out on purpose: release.yml refuses anything but the base
+        # version, which is already the default.
         GOLD:
           - name: On GOLD
             nodes:
