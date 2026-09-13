@@ -7,7 +7,20 @@ All 12 issues carry the label `initiative: bitbucket`, `status:todo` and `ready-
 The `yontrack/yontrack` ones are in milestone `5.5`; the CLI and skills ones have no milestone.
 Dependencies are recorded as native GitHub dependencies, across repositories too.
 
-<!-- issue-table -->
+| # | Issue | Repo | Blocked by |
+|---|---|---|---|
+| 1 | [Bitbucket Cloud test workspace runbook](https://github.com/yontrack/yontrack/issues/1755) | `yontrack/yontrack` | — |
+| 2 | [Bitbucket Cloud configuration and property rework](https://github.com/yontrack/yontrack/issues/1756) | `yontrack/yontrack` | 1 |
+| 3 | [Bitbucket Cloud SCM implementation and change log](https://github.com/yontrack/yontrack/issues/1757) | `yontrack/yontrack` | 2 |
+| 4 | [Auto-versioning pull requests on Bitbucket Cloud](https://github.com/yontrack/yontrack/issues/1758) | `yontrack/yontrack` | 3 |
+| 5 | [CI config SCM engine `bitbucket-cloud`](https://github.com/yontrack/yontrack/issues/1759) | `yontrack/yontrack` | 2 |
+| 6 | [CI config CI engine `bitbucket-pipelines`](https://github.com/yontrack/yontrack/issues/1760) | `yontrack/yontrack` | 5 |
+| 7 | [Bitbucket Pipelines notification channel](https://github.com/yontrack/yontrack/issues/1761) | `yontrack/yontrack` | 2 |
+| 8 | [Auto-versioning post-processing through a Bitbucket pipeline](https://github.com/yontrack/yontrack/issues/1762) | `yontrack/yontrack` | 7 |
+| 9 | [`project set-property bitbucket-cloud --workspace`](https://github.com/yontrack/yontrack-cli/issues/70) | `yontrack/yontrack-cli` | 2 |
+| 10 | [`run-info` defaults for Bitbucket Pipelines](https://github.com/yontrack/yontrack-cli/issues/71) | `yontrack/yontrack-cli` | 6 |
+| 11 | [README: using the CLI in Bitbucket Pipelines](https://github.com/yontrack/yontrack-cli/issues/72) | `yontrack/yontrack-cli` | 6, 9, 10 |
+| 12 | [`yontrack-bitbucket-pipelines` skill](https://github.com/yontrack/yontrack-skills/issues/2) | `yontrack/yontrack-skills` | 11 |
 
 ## Where we start from
 
