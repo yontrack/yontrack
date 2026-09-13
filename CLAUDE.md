@@ -74,9 +74,9 @@ These rules apply unconditionally. Follow them in every change, without exceptio
 - `scripts/dev-stack.sh down` keeps the data; only `down --clean` drops the volumes. Never use
   `--clean` on a stack you did not create.
 - Log in through Keycloak with `admin`/`admin`.
-- The API itself is Bearer/OIDC only — `curl -u admin:admin` gets a 401. To call it, seed the
-  demo, or run a Playwright spec against the stack, mint a token first:
-  `docs/agents/local-api-access.md`.
+- The API itself is Bearer/OIDC only — `curl -u admin:admin` gets a 401. To call it or seed the
+  demo, mint a token first; to run a Playwright spec against the stack, pass it this checkout's
+  ports: `docs/agents/local-api-access.md`.
 
 ### Running the integration tests locally
 

@@ -3,8 +3,9 @@
 The dev stack's API is **Bearer/OIDC only**. `curl -u admin:admin` returns `401` with
 `WWW-Authenticate: Bearer`. There is no basic-auth fallback
 and no pre-made token lying around, so anything that talks to the API — seeding the demo,
-checking what a GraphQL field actually returns, running a Playwright spec — needs a token
-minted first.
+checking what a GraphQL field actually returns — needs a token minted first. A Playwright spec
+is the exception: its fixture gets its own token, see
+[Running Playwright against the dev stack](#running-playwright-against-the-dev-stack).
 
 `admin`/`admin` are the credentials, but they are Keycloak's, not the API's.
 
@@ -65,30 +66,28 @@ against an instance holding work you did not put there. See
 
 ## Running Playwright against the dev stack
 
-`ontrack-web-tests` gets its token from `ONTRACK_MGT_URL/manage/account/<user>`, an actuator
-endpoint that is **not exposed on the dev stack** — it answers `401`. The fixture calls it
-unconditionally, so specs cannot run against the dev stack as-is.
-
-Point `ONTRACK_MGT_URL` at a stub that serves the token from above. No repo change, and the
-fixture is none the wiser:
+`ontrack-web-tests` gets its token from `${ONTRACK_MGT_URL}/manage/account/<user>`, an actuator
+endpoint on the management port. The dev stack exposes it (`scripts/dev-stack.sh` sets
+`MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE` and `MANAGEMENT_ENDPOINT_ACCOUNT_ACCESS`), so no
+token has to be minted by hand — point the fixture at this checkout's ports:
 
 ```bash
-# stub.py — returns the token for any path
-python3 - "$TOKEN" <<'PY' &
-import http.server, socketserver, sys
-T = sys.argv[1].encode()
-class H(http.server.BaseHTTPRequestHandler):
-    def do_GET(self):
-        self.send_response(200); self.send_header('Content-Length', str(len(T))); self.end_headers()
-        self.wfile.write(T)
-    def log_message(self, *a): pass
-socketserver.TCPServer.allow_reuse_address = True
-socketserver.TCPServer(("127.0.0.1", 8899), H).serve_forever()
-PY
-
+source .yontrack-dev/instance.env
 cd ontrack-web-tests
-ONTRACK_MGT_URL=http://127.0.0.1:8899 npx playwright test <spec> --reporter=list
+npm ci   # first time only
+ONTRACK_MGT_URL=http://localhost:${YONTRACK_DEV_MGMT_PORT} \
+ONTRACK_UI_URL=${YONTRACK_DEV_UI_URL} \
+ONTRACK_BACKEND_URL=${YONTRACK_DEV_APP_URL} \
+  npx playwright test <spec> --reporter=list
 ```
+
+Set all three, every time:
+
+- `ONTRACK_MGT_URL` is the management **root**, without `/manage` — the fixture appends it.
+  The API port answers that path with `401`: a `401` means the URL points at the wrong port.
+- The fixture's defaults are the main working copy's ports (`8800`, `3000`, `8080`). From a
+  linked worktree, a missing variable does not fail: if the main copy's stack is up, the spec
+  silently gets its token from — and runs against — **that** stack.
 
 Running one spec this way against a stack you already have up takes seconds, against minutes
 for `./gradlew uiTest`, which builds and starts its own stack. Use the Gradle task for a full
