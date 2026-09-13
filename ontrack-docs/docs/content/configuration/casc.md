@@ -6,7 +6,7 @@ Yontrack supports to be configured as code by default.
 
 ## Using config map or secret
 
-Using the [Yontrack Helm chart](https://github.com/nemerosa/ontrack-chart), you can put your CasC files in secrets and/or config maps.
+Using the [Yontrack Helm chart](https://github.com/yontrack/yontrack-chart), you can put your CasC files in secrets and/or config maps.
 
 For example:
 

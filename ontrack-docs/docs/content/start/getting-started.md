@@ -2,14 +2,14 @@
 
 The recommended way to install Yontrack is to use its Helm chart.
 
-> Please refer to the [Helm chart documentation](https://github.com/nemerosa/ontrack-chart) for more information.
+> Please refer to the [Helm chart documentation](https://github.com/yontrack/yontrack-chart) for more information.
 
 ## Quick start
 
 The Yontrack Helm chart is available as an OCI Helm chart in Docker Hub.
 
 ```
-helm install yontrack oci://registry-1.docker.io/nemerosa/charts/yontrack
+helm install yontrack oci://registry-1.docker.io/yontrack/yontrack-chart
 ```
 
 This installs the following services:

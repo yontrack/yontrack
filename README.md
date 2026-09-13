@@ -58,10 +58,10 @@ changelogs, version bumps in downstream repositories, notifications, workflows.
 
 ## Quick start
 
-Install with the [Helm chart](https://github.com/nemerosa/ontrack-chart):
+Install with the [Helm chart](https://github.com/yontrack/yontrack-chart):
 
 ```bash
-helm install yontrack oci://registry-1.docker.io/nemerosa/charts/yontrack
+helm install yontrack oci://registry-1.docker.io/yontrack/yontrack-chart
 ```
 
 This brings up Yontrack, PostgreSQL, Elasticsearch, RabbitMQ, and a Keycloak instance for

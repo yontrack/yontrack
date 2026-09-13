@@ -2,7 +2,7 @@
 
 !!! note
 
-    See the [Helm chart documentation](https://github.com/nemerosa/ontrack-chart) for a list of all options.
+    See the [Helm chart documentation](https://github.com/yontrack/yontrack-chart) for a list of all options.
 
 While some options can differ from provider to provider, the main options are set through Helm chart values for your Yontrack installation.
 
