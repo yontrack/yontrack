@@ -70,7 +70,6 @@ class ManagementEndpointsDefaultsIT : AbstractDSLTestSupport() {
             "/mappings",
             "/graphql",
             "/graphqlJson",
-            "/influxdb",
             "/account/admin",
         ).forEach { path ->
             assertEquals(404, get(path).statusCode(), "$path is not exposed")

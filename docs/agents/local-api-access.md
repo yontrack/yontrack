@@ -1,7 +1,7 @@
 # Calling the local instance's API
 
 The dev stack's API is **Bearer/OIDC only**. `curl -u admin:admin` returns `401` with
-`WWW-Authenticate: Bearer`, and so does the management port. There is no basic-auth fallback
+`WWW-Authenticate: Bearer`. There is no basic-auth fallback
 and no pre-made token lying around, so anything that talks to the API — seeding the demo,
 checking what a GraphQL field actually returns, running a Playwright spec — needs a token
 minted first.
