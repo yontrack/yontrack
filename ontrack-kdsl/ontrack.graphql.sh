@@ -1,3 +1,4 @@
 #!/bin/bash
 
-curl http://localhost:8800/manage/graphql --output ontrack.graphql
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+exec "$here/../scripts/dev-graphql-schema.sh" "$here/ontrack.graphql"
