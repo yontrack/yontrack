@@ -124,7 +124,7 @@ The Free plan costs nothing and has **50 build minutes a month** and five users.
 
 ### Renewal
 
-The tokens expire on: **<!-- tokens-expiry -->not provisioned yet<!-- /tokens-expiry -->**.
+The tokens expire on: **<!-- tokens-expiry -->2027-09-14<!-- /tokens-expiry -->**.
 
 Before that date, re-run the wizard: create new tokens in stages 4, 6 and 11 (Enter keeps everything else), let it
 replace the secrets, and commit the date it writes above.
