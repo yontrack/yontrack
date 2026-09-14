@@ -16,6 +16,7 @@ dependencies {
     testImplementation(testFixtures(project(":ontrack-it-utils")))
     testImplementation("org.springframework.boot:spring-boot-starter-actuator")
     testImplementation("com.networknt:json-schema-validator")
+    testImplementation("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml")
     testImplementation(testFixtures(project(":ontrack-ui-graphql")))
     testImplementation(testFixtures(project(":ontrack-extension-casc")))
     // testImplementation(project(path = ":ontrack-extension-issues", configuration = "tests"))

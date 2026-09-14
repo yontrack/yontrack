@@ -1,0 +1,60 @@
+# Pipelines of the fixture repository of the Bitbucket Cloud test workspace.
+#
+# Uploaded by ontrack-extension-bitbucket-cloud/scripts/bitbucket-cloud-test-workspace.sh and checked by
+# BitbucketCloudTestFixtureTest.
+#
+# Custom pipelines only. A `default:`, `branches:`, `pull-requests:` or `tags:` section would run on every
+# branch the tests push, and the Free plan has 50 build minutes a month.
+image: atlassian/default-image:4
+
+options:
+  max-time: 5
+
+pipelines:
+  custom:
+    yontrack-echo:
+      - variables:
+          - name: MESSAGE
+            default: hello
+      - step:
+          name: Echo
+          script:
+            - echo "MESSAGE=${MESSAGE}"
+    yontrack-fail:
+      - variables:
+          - name: FAIL
+            default: "false"
+            allowed-values:
+              - "true"
+              - "false"
+      - step:
+          name: Fail on demand
+          script:
+            - echo "FAIL=${FAIL}"
+            - if [ "${FAIL}" = "true" ]; then echo "Failing on demand"; exit 1; fi
+    yontrack-auto-versioning:
+      - variables:
+          - name: REPOSITORY
+          - name: UPGRADE_BRANCH
+          - name: DOCKER_IMAGE
+          - name: DOCKER_COMMAND
+          - name: COMMIT_MESSAGE
+          - name: VERSION
+      - step:
+          name: Post-processing
+          script:
+            - echo "REPOSITORY=${REPOSITORY}"
+            - echo "UPGRADE_BRANCH=${UPGRADE_BRANCH}"
+            - echo "DOCKER_IMAGE=${DOCKER_IMAGE}"
+            - echo "DOCKER_COMMAND=${DOCKER_COMMAND}"
+            - echo "COMMIT_MESSAGE=${COMMIT_MESSAGE}"
+            - echo "VERSION=${VERSION}"
+            # Stands for the Docker command, without the Docker service and its build minutes:
+            # the tests check that post-processing committed to the upgrade branch.
+            - test -n "${UPGRADE_BRANCH}" || (echo "UPGRADE_BRANCH is required" && exit 1)
+            - git fetch origin "${UPGRADE_BRANCH}"
+            - git checkout -B "${UPGRADE_BRANCH}" FETCH_HEAD
+            - echo "${VERSION}" > post-processing.txt
+            - git add post-processing.txt
+            - git -c user.name="Yontrack test" -c user.email="yontrack-test@nemerosa.net" commit -m "${COMMIT_MESSAGE:-Post-processing} [skip ci]"
+            - git push origin "HEAD:${UPGRADE_BRANCH}"

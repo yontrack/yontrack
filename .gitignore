@@ -69,3 +69,6 @@ ontrack-extension-*/node_modules
 
 # Local MCP server configuration, written by the IDE and pointing at a port on this machine
 .mcp.json
+
+# Values captured by ontrack-extension-bitbucket-cloud/scripts/bitbucket-cloud-test-workspace.sh (tokens in clear)
+/.bitbucket-cloud-test.env

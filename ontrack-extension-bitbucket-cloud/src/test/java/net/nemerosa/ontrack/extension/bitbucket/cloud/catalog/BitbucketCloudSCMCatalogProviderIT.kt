@@ -23,7 +23,7 @@ class BitbucketCloudSCMCatalogProviderIT : AbstractBitbucketCloudTestSupport() {
         }
         // Collects the SCM catalog entries
         val entries = bitbucketCloudSCMCatalogProvider.entries
-        val expectedRepository = bitbucketCloudTestEnv.expectedRepository
+        val expectedRepository = bitbucketCloudTestEnv.repository
         val entry = entries.find { it.repository == "${config.workspace}/$expectedRepository" }
         assertNotNull(entry, "Expected SCM source") { source ->
             assertEquals(config.name, source.config)

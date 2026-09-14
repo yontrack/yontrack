@@ -59,8 +59,8 @@ class BitbucketCloudProjectConfigurationPropertyTypeIT : AbstractBitbucketCloudT
 
     @TestOnBitbucketCloud
     fun `Project information in the property decorations`() {
-        val expectedRepository = bitbucketCloudTestEnv.expectedRepository
-        val expectedProject = bitbucketCloudTestEnv.expectedProject
+        val expectedRepository = bitbucketCloudTestEnv.repository
+        val expectedProject = bitbucketCloudTestEnv.project
         asAdmin {
             project {
                 val config = bitbucketCloudTestConfigReal()

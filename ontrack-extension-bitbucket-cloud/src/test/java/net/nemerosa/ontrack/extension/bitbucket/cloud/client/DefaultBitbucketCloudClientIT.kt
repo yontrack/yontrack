@@ -17,14 +17,14 @@ class DefaultBitbucketCloudClientIT {
         val env = bitbucketCloudTestEnv
         client = DefaultBitbucketCloudClient(
             workspace = env.workspace,
-            user = env.user,
-            token = env.token,
+            user = env.bot.email,
+            token = env.bot.token,
         )
     }
 
     @Test
     fun `Getting the list of projects`() {
-        val expectedProject = bitbucketCloudTestEnv.expectedProject
+        val expectedProject = bitbucketCloudTestEnv.project
         val projects = client.projects
         assertNotNull(
             projects.find { it.key == expectedProject },
@@ -35,8 +35,8 @@ class DefaultBitbucketCloudClientIT {
     @Test
     fun `Getting the list of repositories`() {
         val repositories = client.repositories
-        val expectedProject = bitbucketCloudTestEnv.expectedProject
-        val expectedRepository = bitbucketCloudTestEnv.expectedRepository
+        val expectedProject = bitbucketCloudTestEnv.project
+        val expectedRepository = bitbucketCloudTestEnv.repository
         val repository = repositories.find {
             it.slug == expectedRepository
         }
