@@ -87,6 +87,7 @@ nav:
           - Overview: content/integrations/notifications/index.md
           - Jenkins: content/integrations/notifications/jenkins.md
           - GitHub Workflows: content/integrations/notifications/github-workflow.md
+          - Bitbucket Pipelines: content/integrations/notifications/bitbucket-pipelines.md
       - Auto-versioning: content/integrations/auto-versioning/auto-versioning.md
       - Changelogs: content/integrations/changelogs/changelogs.md
       - Workflows: content/integrations/workflows/workflows.md
