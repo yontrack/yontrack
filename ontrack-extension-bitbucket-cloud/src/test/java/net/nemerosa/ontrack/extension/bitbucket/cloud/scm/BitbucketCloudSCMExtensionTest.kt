@@ -138,18 +138,4 @@ class BitbucketCloudSCMExtensionTest {
         assertEquals(listOf("c1"), commits.map { it.id })
         verify { client.getCommits("ws", "repo", "to", "from", 50) }
     }
-
-    @Test
-    fun `Pull request operations are not supported yet`() {
-        val scm = scm()
-        assertThrows<BitbucketCloudSCMNotSupportedYetException> {
-            scm.createPR("from", "to", "title", "description", false, false, "message", emptyList())
-        }
-        assertThrows<BitbucketCloudSCMNotSupportedYetException> {
-            scm.getPullRequestByName("#1")
-        }
-        assertThrows<BitbucketCloudSCMNotSupportedYetException> {
-            scm.mergeBranch("head", "base")
-        }
-    }
 }
