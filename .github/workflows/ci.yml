@@ -1359,8 +1359,12 @@ jobs:
             run_time_flag="--run-time $(( $(date +%s) - STARTED ))"
           fi
           if [ "$OUTCOME" = "success" ]; then
+            # `--build` is spelled out, unlike every other validation in this file. In CLI 5.1.1
+            # `chml` reads the build from its flag only - it calls GetProjectBranchFlags, not
+            # GetProjectBranchBuildFlags - so the YONTRACK_BUILD_NAME the workflow-build action
+            # exports is ignored and the call fails with "Build not found: yontrack/main/".
             # shellcheck disable=SC2086  # deliberate: see YONTRACK_RUN_INFO
-            yontrack validate --validation SECURITY.IMAGE.BACKEND \
+            yontrack validate --validation SECURITY.IMAGE.BACKEND --build "$YONTRACK_BUILD_NAME" \
               chml --critical "$CRITICAL" --high "$HIGH" --medium "$MEDIUM" --low "$LOW" \
               $run_time_flag $YONTRACK_RUN_INFO
           else
@@ -1384,8 +1388,9 @@ jobs:
             run_time_flag="--run-time $(( $(date +%s) - STARTED ))"
           fi
           if [ "$OUTCOME" = "success" ]; then
+            # `--build` spelled out: see SECURITY.IMAGE.BACKEND above.
             # shellcheck disable=SC2086  # deliberate: see YONTRACK_RUN_INFO
-            yontrack validate --validation SECURITY.IMAGE.UI \
+            yontrack validate --validation SECURITY.IMAGE.UI --build "$YONTRACK_BUILD_NAME" \
               chml --critical "$CRITICAL" --high "$HIGH" --medium "$MEDIUM" --low "$LOW" \
               $run_time_flag $YONTRACK_RUN_INFO
           else
