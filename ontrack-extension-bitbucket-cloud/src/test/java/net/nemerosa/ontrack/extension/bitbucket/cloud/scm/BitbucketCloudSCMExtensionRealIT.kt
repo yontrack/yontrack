@@ -266,6 +266,36 @@ class BitbucketCloudSCMExtensionRealIT : AbstractBitbucketCloudTestSupport() {
         }
     }
 
+    /**
+     * Push mode: a test branch merged into another test branch through the local clone, then pushed by Yontrack's
+     * own Git client — never into the main branch of the fixture.
+     */
+    @TestOnBitbucketCloud
+    fun `Merging a branch through the local clone and pushing it`() {
+        withScm { scm, _, _ ->
+            val target = names.branch("merge-target")
+            val source = names.branch("merge-source")
+            scm.createBranch(BitbucketCloudTestFixture.MAIN_BRANCH, target)
+            try {
+                val sourceCommit = scm.createBranch(target, source)
+                val path = "yontrack-test/merge.txt"
+                scm.upload(source, sourceCommit, path, "Merged".toByteArray(), "Change to merge")
+
+                val commit = scm.mergeBranch(source, target)
+
+                assertEquals(commit.id, scm.getBranchLastCommit(target), "Merge commit pushed to the target branch")
+                assertEquals("Merged", scm.download(target, path)?.decodeToString(), "Change merged")
+                assertEquals(
+                    "https://bitbucket.org/${env.workspace}/${env.repository}/commits/${commit.id}",
+                    commit.link
+                )
+            } finally {
+                scm.deleteBranch(source)
+                scm.deleteBranch(target)
+            }
+        }
+    }
+
     private fun createConfig(config: BitbucketCloudConfiguration): BitbucketCloudConfiguration {
         withDisabledConfigurationTest {
             bitbucketCloudConfigurationService.newConfiguration(config)
