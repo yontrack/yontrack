@@ -20,4 +20,5 @@ class BitbucketCloudRepository(
     val updated_on: String,
     val created_on: String,
     val project: BitbucketCloudProject,
+    val mainbranch: BitbucketCloudBranchName? = null,
 )
