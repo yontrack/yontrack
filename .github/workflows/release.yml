@@ -426,3 +426,72 @@ jobs:
             echo "| Documentation | ${UPLOAD:-skipped} |"
             echo "| GitHub release | ${RELEASED:-skipped} |"
           } >> "$GITHUB_STEP_SUMMARY"
+
+  # ------------------------------------------------------------------------------------------
+  # Real Bitbucket pipelines (#1761).
+  #
+  # The Bitbucket Cloud test workspace is on the Free plan - 50 build minutes a month - so the
+  # tests which start real pipelines never run on a push: ci.yml pins
+  # ONTRACK_TEST_EXTENSION_BITBUCKET_CLOUD_PIPELINES to "false". A release is rare enough to
+  # afford them, and this job is the only place which turns the switch on.
+  #
+  # Deliberately a side job: no `needs` between it and `release`, and `continue-on-error`. It
+  # checks an integration, not the artefacts being published, so a slow or unavailable
+  # bitbucket.org, or an exhausted minutes budget, must never hold up or fail a release. A red
+  # run here is a signal to look at, in the run summary.
+  #
+  # It tests the workflow's own commit - `main` as it is today - and not the released one:
+  # the release is a re-tag of an rc which CI tested already.
+  # ------------------------------------------------------------------------------------------
+  bitbucket-pipelines:
+    name: Bitbucket pipelines (real)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    continue-on-error: true
+    permissions:
+      contents: read
+    env:
+      ONTRACK_TEST_EXTENSION_BITBUCKET_CLOUD_WORKSPACE: ${{ secrets.ONTRACK_TEST_EXTENSION_BITBUCKET_CLOUD_WORKSPACE }}
+      ONTRACK_TEST_EXTENSION_BITBUCKET_CLOUD_PROJECT: ${{ secrets.ONTRACK_TEST_EXTENSION_BITBUCKET_CLOUD_PROJECT }}
+      ONTRACK_TEST_EXTENSION_BITBUCKET_CLOUD_REPOSITORY: ${{ secrets.ONTRACK_TEST_EXTENSION_BITBUCKET_CLOUD_REPOSITORY }}
+      ONTRACK_TEST_EXTENSION_BITBUCKET_CLOUD_BOT_EMAIL: ${{ secrets.ONTRACK_TEST_EXTENSION_BITBUCKET_CLOUD_BOT_EMAIL }}
+      ONTRACK_TEST_EXTENSION_BITBUCKET_CLOUD_BOT_TOKEN: ${{ secrets.ONTRACK_TEST_EXTENSION_BITBUCKET_CLOUD_BOT_TOKEN }}
+      ONTRACK_TEST_EXTENSION_BITBUCKET_CLOUD_APPROVER_EMAIL: ${{ secrets.ONTRACK_TEST_EXTENSION_BITBUCKET_CLOUD_APPROVER_EMAIL }}
+      ONTRACK_TEST_EXTENSION_BITBUCKET_CLOUD_APPROVER_TOKEN: ${{ secrets.ONTRACK_TEST_EXTENSION_BITBUCKET_CLOUD_APPROVER_TOKEN }}
+      ONTRACK_TEST_EXTENSION_BITBUCKET_CLOUD_ACCESS_TOKEN: ${{ secrets.ONTRACK_TEST_EXTENSION_BITBUCKET_CLOUD_ACCESS_TOKEN }}
+      ONTRACK_TEST_EXTENSION_BITBUCKET_CLOUD_TOKENS_EXPIRY: ${{ vars.ONTRACK_TEST_EXTENSION_BITBUCKET_CLOUD_TOKENS_EXPIRY }}
+      ONTRACK_TEST_EXTENSION_BITBUCKET_CLOUD_PIPELINES: "true"
+    steps:
+      - uses: actions/checkout@v4
+
+      # Same identity as the integration shards of ci.yml: the Git test utilities commit in
+      # freshly initialised repositories.
+      - name: Configure git
+        run: |
+          git config --global user.email "yontrack@nemerosa.net"
+          git config --global user.name "Yontrack"
+          git config --global init.defaultBranch main
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: zulu
+          java-version: "21"
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      # Only the tests which start pipelines: the rest of the module ran on the rc's CI.
+      # integrationTest brings its own middleware up and down.
+      - name: Real Bitbucket pipeline tests
+        run: |
+          ./gradlew :ontrack-extension-bitbucket-cloud:integrationTest \
+            --tests '*BitbucketPipelinesNotificationChannelRealIT' \
+            --stacktrace \
+            --console plain
+
+      - name: Upload the test results
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: bitbucket-pipelines-results
+          path: ontrack-extension-bitbucket-cloud/build/test-results/integrationTest/
+          if-no-files-found: ignore
