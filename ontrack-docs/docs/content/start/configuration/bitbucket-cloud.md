@@ -40,7 +40,7 @@ For an API token, the Bitbucket scopes:
 
 For an access token: _Repositories: Read_, and _Pull requests: Read_.
 
-Features writing to Bitbucket, like auto-versioning, need the corresponding write scopes
+Features writing to Bitbucket, like [auto-versioning](#auto-versioning), need the corresponding write scopes
 (`write:repository:bitbucket` and `write:pullrequest:bitbucket`, or _Repositories: Write_ and _Pull requests:
 Write_).
 
@@ -125,9 +125,8 @@ A project with the Bitbucket Cloud property has an SCM of engine `bitbucket-clou
 * **change logs** between two builds, whose commits are set by the _Git commit_ property;
 * links to the commits and to the comparison between two commits;
 * branch creation and deletion, file download and upload — one commit per upload;
-* pull request information for branches which are pull requests.
-
-Creating and merging pull requests, as auto-versioning does, is not supported yet.
+* pull request information for branches which are pull requests;
+* pull request creation, approval and merge, and branch merges, for [auto-versioning](#auto-versioning).
 
 ### Change logs
 
@@ -162,9 +161,13 @@ For example, `scm://bitbucket-cloud/bitbucket-cloud/my-workspace/my-repository/c
 
 In the UI, go to _Settings_ > _Bitbucket Cloud_.
 
-| Setting      | Default | Description                                            |
-|--------------|---------|--------------------------------------------------------|
-| `maxCommits` | `1000`  | Maximum number of commits to return for a change log   |
+| Setting             | Default           | Description                                                                                         |
+|---------------------|-------------------|-----------------------------------------------------------------------------------------------------|
+| `maxCommits`        | `1000`            | Maximum number of commits to return for a change log                                                |
+| `mergeStrategy`     | `squash`          | Strategy to merge the auto-versioning pull requests: `merge_commit`, `squash` or `fast_forward`     |
+| `autoMergeTimeout`  | `600000` (10 min) | Milliseconds to wait for an auto-versioning pull request to be mergeable                            |
+| `autoMergeInterval` | `30000` (30 s)    | Milliseconds between two attempts to merge an auto-versioning pull request                          |
+| `autoDeleteBranch`  | `true`            | Deleting the source branch when an auto-versioning pull request is merged                           |
 
 As code:
 
@@ -174,4 +177,53 @@ ontrack:
     settings:
       bitbucket-cloud:
         maxCommits: 1000
+        mergeStrategy: squash
+        autoMergeTimeout: 600000
+        autoMergeInterval: 30000
+        autoDeleteBranch: true
 ```
+
+## Auto-versioning
+
+A project with the Bitbucket Cloud property can be the target of
+[auto-versioning](../../integrations/auto-versioning/auto-versioning.md). Yontrack creates the upgrade branch, commits
+the new version on it, then:
+
+* in `PUSH` mode, merges the upgrade branch into the target branch through its local clone of the repository;
+* in `PR` mode, opens a pull request from the upgrade branch to the target branch, named `PR-<id>`.
+
+The `reviewers` of the auto-versioning configuration are added to the pull request. Give them as account UUIDs
+(`{...}`), or as account IDs, nicknames or display names, which are looked up among the members of the workspace
+— an unknown reviewer fails the pull request creation.
+
+### Auto approval
+
+With `autoApproval: true`, the configuration must have an [auto-merge identity](#auto-merge-identity): Bitbucket
+does not let the author of a pull request approve it. Yontrack then:
+
+1. approves the pull request with the auto-merge identity;
+2. every `autoMergeInterval`, checks that all the builds of the pull request have passed and, if so, asks
+   Bitbucket Cloud to merge it with the `mergeStrategy` and the commit message of the auto-versioning
+   configuration — Bitbucket refuses while its merge checks, like required approvals, do not pass;
+3. gives up after `autoMergeTimeout`, leaving the pull request open.
+
+When `autoDeleteBranch` is set, Bitbucket Cloud deletes the source branch as part of the merge.
+
+An auto-versioning order with auto approval and no auto-merge identity fails before any pull request is created.
+So does an order with the `SCM` auto approval mode: the Bitbucket Cloud API cannot schedule a merge for when the
+checks pass. Its _allow auto-merge when builds pass_ branch restriction only enables the button in the Bitbucket
+UI.
+
+Each attempt costs up to three API requests out of the 1,000 per hour of the token: with the defaults, twenty
+attempts over ten minutes.
+
+### Token scopes
+
+| Identity                                   | Scopes                                                                                                                                   |
+|--------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------|
+| Configuration, API token                   | `read:repository:bitbucket`, `write:repository:bitbucket`, `read:pullrequest:bitbucket`, `write:pullrequest:bitbucket`, and `read:workspace:bitbucket` when reviewers are not given as UUIDs |
+| Configuration, access token                | _Repositories: Write_, _Pull requests: Write_                                                                                            |
+| Auto-merge identity, API token             | `read:user:bitbucket`, `read:repository:bitbucket`, `read:pullrequest:bitbucket`, `write:pullrequest:bitbucket`                          |
+
+The account of the configuration merges the pull requests: it must be allowed to by the branch restrictions of
+the target branch.

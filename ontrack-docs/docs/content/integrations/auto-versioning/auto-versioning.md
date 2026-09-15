@@ -60,7 +60,7 @@ section.
     * the branch and its project must not be disabled, and the configuration itself must not be
       [`disabled`](#disabling-a-configuration)
     * the target project must pass the [project-level rules](#restricting-auto-versioning-at-project-level)
-    * the target project must be configured for a supported SCM (Git, GitHub, GitLab, Bitbucket…)
+    * the target project must be configured for a supported SCM: GitHub, Bitbucket Server or Bitbucket Cloud
     * the promoted branch must be the one selected by the [`sourceBranch` expression](#selecting-the-source-branch)
 
     Every candidate — accepted or rejected, with its rejection reason — is recorded in the
@@ -788,6 +788,22 @@ and the corresponding user must have at least the `Triage` role on the target re
     This `autoMergeToken` must be linked to a user _which is not_ the user used by the GitHub configuration.
     It's because a user cannot approve their own pull requests.
 
+#### Configuration for Bitbucket Cloud
+
+The Bitbucket Cloud configuration used by the Yontrack project must have its
+[auto-merge identity](../../start/configuration/bitbucket-cloud.md#auto-merge-identity) set: `autoMergeEmail` and
+`autoMergeToken`, the email and API token of an Atlassian account _which is not_ the one of the configuration, with
+write access to the target repositories. Without it, an auto-versioning order with auto approval fails before any
+pull request is created.
+
+Yontrack then approves the pull request with this identity, waits until all the builds of the pull request have
+passed and Bitbucket Cloud accepts the merge, and merges it itself. The merge strategy (`squash` by default), the
+time to wait, the interval between two attempts and the deletion of the source branch are
+[Bitbucket Cloud settings](../../start/configuration/bitbucket-cloud.md#settings).
+
+Only the `CLIENT` mode is supported: the Bitbucket Cloud API cannot schedule a merge for when the checks pass,
+so an order in `SCM` mode is rejected.
+
 #### `CLIENT` mode
 
 No specific configuration is needed for the `CLIENT` mode.
@@ -798,6 +814,8 @@ There is some configuration to be done at SCM level.
 
 For GitHub, the target repository — the one defining the project being auto-versioned — must have the
 `Allow auto-merge` feature enabled.
+
+Bitbucket Server and Bitbucket Cloud do not support the `SCM` mode.
 
 ## Build links
 
