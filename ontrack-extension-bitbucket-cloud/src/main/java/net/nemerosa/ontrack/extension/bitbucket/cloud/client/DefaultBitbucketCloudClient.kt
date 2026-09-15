@@ -270,6 +270,39 @@ class DefaultBitbucketCloudClient(
             }
         }
 
+    override fun triggerPipeline(
+        workspace: String,
+        repository: String,
+        branch: String,
+        pipeline: String?,
+        variables: Map<String, String>,
+    ): BitbucketCloudPipeline {
+        val target = mutableMapOf<String, Any>(
+            "type" to "pipeline_ref_target",
+            "ref_type" to "branch",
+            "ref_name" to branch,
+        )
+        if (pipeline != null) {
+            target["selector"] = mapOf("type" to "custom", "pattern" to pipeline)
+        }
+        return template.postForObject(
+            repositoryUri(workspace, repository, "pipelines/"),
+            mapOf(
+                "target" to target,
+                "variables" to variables.map { (key, value) ->
+                    mapOf("key" to key, "value" to value, "secured" to false)
+                },
+            ),
+            BitbucketCloudPipeline::class.java
+        ) ?: throw BitbucketCloudNoResponseException("pipelines")
+    }
+
+    override fun getPipeline(workspace: String, repository: String, uuid: String): BitbucketCloudPipeline =
+        template.getForObject(
+            repositoryUri(workspace, repository, "pipelines/$uuid"),
+            BitbucketCloudPipeline::class.java
+        ) ?: throw BitbucketCloudNoResponseException("pipelines/$uuid")
+
     /**
      * Items of all the pages, following the absolute `next` links.
      */

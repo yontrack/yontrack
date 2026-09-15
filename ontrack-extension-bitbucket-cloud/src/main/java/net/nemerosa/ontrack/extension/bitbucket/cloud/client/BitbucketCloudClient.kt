@@ -2,6 +2,7 @@ package net.nemerosa.ontrack.extension.bitbucket.cloud.client
 
 import net.nemerosa.ontrack.extension.bitbucket.cloud.model.BitbucketCloudCommit
 import net.nemerosa.ontrack.extension.bitbucket.cloud.model.BitbucketCloudMergeOutcome
+import net.nemerosa.ontrack.extension.bitbucket.cloud.model.BitbucketCloudPipeline
 import net.nemerosa.ontrack.extension.bitbucket.cloud.model.BitbucketCloudPullRequest
 import net.nemerosa.ontrack.extension.bitbucket.cloud.model.BitbucketCloudRepository
 import java.time.LocalDateTime
@@ -167,5 +168,28 @@ interface BitbucketCloudClient {
         message: String,
         closeSourceBranch: Boolean,
     ): BitbucketCloudMergeOutcome
+
+    /**
+     * Triggers a pipeline on a branch.
+     *
+     * `POST /2.0/repositories/{workspace}/{repository}/pipelines/`
+     *
+     * @param pipeline Name of a `custom:` pipeline, `null` for the branch's default pipeline
+     * @param variables Non-secured variables
+     */
+    fun triggerPipeline(
+        workspace: String,
+        repository: String,
+        branch: String,
+        pipeline: String?,
+        variables: Map<String, String>,
+    ): BitbucketCloudPipeline
+
+    /**
+     * Gets a pipeline by UUID.
+     *
+     * `GET /2.0/repositories/{workspace}/{repository}/pipelines/{uuid}`
+     */
+    fun getPipeline(workspace: String, repository: String, uuid: String): BitbucketCloudPipeline
 
 }
