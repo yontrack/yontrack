@@ -15,6 +15,7 @@ dependencies {
 
     testImplementation(project(":ontrack-test-utils"))
     testImplementation(project(":ontrack-extension-jenkins"))
+    testImplementation(project(":ontrack-extension-auto-versioning"))
     testImplementation(testFixtures(project(":ontrack-extension-config")))
     testImplementation(testFixtures(project(":ontrack-extension-git")))
     testImplementation(testFixtures(project(":ontrack-it-utils")))

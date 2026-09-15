@@ -10,6 +10,7 @@ import net.nemerosa.ontrack.extension.scm.changelog.SCMChangeLogEnabled
 import net.nemerosa.ontrack.extension.scm.changelog.SCMCommit
 import net.nemerosa.ontrack.extension.scm.changelog.SCMCommitFilter
 import net.nemerosa.ontrack.extension.scm.service.SCMDetector
+import net.nemerosa.ontrack.extension.scm.service.SCMPullRequestStatus
 import net.nemerosa.ontrack.it.AsAdminTest
 import net.nemerosa.ontrack.model.files.FileRefService
 import net.nemerosa.ontrack.model.files.downloadDocument
@@ -183,6 +184,84 @@ class BitbucketCloudSCMExtensionRealIT : AbstractBitbucketCloudTestSupport() {
             } finally {
                 prId?.let { api.declinePullRequest(it) }
                 scm.deleteBranch(branch)
+            }
+        }
+    }
+
+    /**
+     * Auto-versioning pull request between two test branches — never into the main branch of the fixture —
+     * approved by the approver identity, merged by Yontrack, its source branch deleted by the merge.
+     */
+    @TestOnBitbucketCloud
+    fun `Auto-versioning pull request approved by the auto merge identity and merged`() {
+        withScm { scm, _, _ ->
+            val target = names.branch("av-target")
+            val source = names.branch("av-source")
+            val api = BitbucketCloudTestRestApi.of(env)
+            var prId: Int? = null
+            var merged = false
+            scm.createBranch(BitbucketCloudTestFixture.MAIN_BRANCH, target)
+            try {
+                val sourceCommit = scm.createBranch(target, source)
+                val version = "9.9.${System.currentTimeMillis()}"
+                val content = scm.download(source, BitbucketCloudTestFixture.VERSION_FILE)
+                    ?.decodeToString()
+                    ?: fail("Version file")
+                val newContent = content.lines().joinToString("\n") { line ->
+                    if (line.startsWith("${BitbucketCloudTestFixture.VERSION_PROPERTY}=")) {
+                        "${BitbucketCloudTestFixture.VERSION_PROPERTY}=$version"
+                    } else {
+                        line
+                    }
+                }
+                scm.upload(
+                    scmBranch = source,
+                    commit = sourceCommit,
+                    path = BitbucketCloudTestFixture.VERSION_FILE,
+                    content = newContent.toByteArray(),
+                    message = "Upgrading to $version",
+                )
+
+                val pr = scm.createPR(
+                    from = source,
+                    to = target,
+                    title = "Test auto-versioning $source",
+                    description = "Upgrading to $version",
+                    autoApproval = true,
+                    remoteAutoMerge = false,
+                    message = "Auto-versioning to $version",
+                    reviewers = emptyList(),
+                )
+                prId = pr.id.toInt()
+                assertEquals("PR-${pr.id}", pr.name)
+                assertEquals(SCMPullRequestStatus.MERGED, pr.status, "Pull request merged")
+                merged = true
+
+                assertEquals(
+                    newContent.trim(),
+                    scm.download(target, BitbucketCloudTestFixture.VERSION_FILE)?.decodeToString()?.trim(),
+                    "New version merged into the target branch"
+                )
+                assertEquals(
+                    SCMPullRequestStatus.MERGED,
+                    scm.getPullRequestByName(pr.name)?.status,
+                    "Pull request by name"
+                )
+                // The source branch is deleted by the merge, possibly a bit later
+                var sourceLeft = scm.getBranchLastCommit(source)
+                var attempts = 0
+                while (sourceLeft != null && attempts < 5) {
+                    Thread.sleep(2_000)
+                    sourceLeft = scm.getBranchLastCommit(source)
+                    attempts++
+                }
+                assertNull(sourceLeft, "Source branch deleted by the merge")
+            } finally {
+                if (!merged) {
+                    prId?.let { api.declinePullRequest(it) }
+                }
+                scm.deleteBranch(source)
+                scm.deleteBranch(target)
             }
         }
     }

@@ -282,12 +282,14 @@ class BitbucketCloudSCMExtension(
                 ?.let { toSCMPullRequest(it, toStatus(it.state)) }
 
         /**
-         * Through the local clone, as for Bitbucket Server.
+         * Through the local clone, as for Bitbucket Server. The clone is synchronised first: the merge only
+         * fetches, which fails on a repository never cloned yet.
          */
         override fun mergeBranch(head: String, base: String): SCMCommit {
-            val gitCommit = gitRepositoryClientFactory
-                .getClient(gitConfiguration.gitRepository, gitConfigService.gitConnectionConfig)
-                .mergeBranch(head, base)
+            val gitRepoClient =
+                gitRepositoryClientFactory.getClient(gitConfiguration.gitRepository, gitConfigService.gitConnectionConfig)
+            gitRepoClient.sync { logger.info(it) }
+            val gitCommit = gitRepoClient.mergeBranch(head, base)
             return SimpleSCMCommit(
                 id = gitCommit.id,
                 shortId = gitCommit.shortId,
