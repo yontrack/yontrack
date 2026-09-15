@@ -1,9 +1,9 @@
 package net.nemerosa.ontrack.kdsl.spec.extension.bitbucket.cloud.mock
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
+import net.nemerosa.ontrack.json.parse
 import net.nemerosa.ontrack.kdsl.connector.Connected
 import net.nemerosa.ontrack.kdsl.connector.Connector
-import net.nemerosa.ontrack.kdsl.connector.parseOrNull
 import net.nemerosa.ontrack.kdsl.spec.extension.bitbucket.cloud.BitbucketCloudMgt
 import java.net.URLEncoder
 
@@ -18,7 +18,10 @@ class BitbucketCloudMockMgt(connector: Connector) : Connected(connector) {
     fun pipelineRuns(config: String, workspace: String, repository: String): List<MockBitbucketPipelineRun> =
         connector.get(
             "/extension/bitbucket-cloud/mock/pipelines?config=${enc(config)}&workspace=${enc(workspace)}&repository=${enc(repository)}"
-        ).body.parseOrNull<List<MockBitbucketPipelineRun>>() ?: emptyList()
+        ).body.asJson().map {
+            // Element by element: a reified List<T> loses T and yields maps
+            it.parse<MockBitbucketPipelineRun>()
+        }
 
     private fun enc(value: String) = URLEncoder.encode(value, Charsets.UTF_8)
 }
