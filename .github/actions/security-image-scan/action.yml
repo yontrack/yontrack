@@ -1,0 +1,110 @@
+# Scans one Docker image with Trivy, uploads the findings to the GitHub Security tab, and hands
+# the counts per severity back to the caller (#1749).
+#
+# Reporting to Yontrack is deliberately left to the caller: ci.yml validates against the build of
+# its own run, and the nightly rescan (#1751) will report against other builds. What must be
+# shared - installing Trivy, the vulnerability DB cache, the scan itself and what "the count"
+# means - lives here and in scripts/security-image-scan.sh, and nowhere else.
+#
+# The caller must:
+#   * have checked the repository out (the script and .trivyignore.yaml are read from it);
+#   * be logged in to the registry holding the image - Trivy reads the Docker credentials;
+#   * grant `security-events: write` to the job, for the SARIF upload.
+#
+# Calling it more than once in a job is fine: Trivy and the DB cache are set up by the first
+# call only.
+#
+# Not aquasecurity/trivy-action. It can only produce one format per scan, so the JSON for the
+# counts and the SARIF for the Security tab would be two scans - possibly against two DB states -
+# and its version lags behind the Trivy it wraps. setup-trivy plus `trivy convert` scans once.
+#
+# Every action below is pinned by commit SHA, not by tag: the Trivy actions' tags were hijacked in
+# a 2026 supply-chain attack. .github/dependabot.yml keeps the pins up to date.
+name: Security image scan
+description: Scans a Docker image with Trivy and outputs its CHML vulnerability counts
+
+inputs:
+  image:
+    description: Image reference to scan
+    required: true
+  category:
+    description: >-
+      SARIF category, one per image - GitHub replaces the previous analysis of the same category,
+      so two images sharing one would overwrite each other's alerts
+    required: true
+  trivy-version:
+    description: Trivy version to install
+    required: false
+    default: v0.74.0
+  upload-sarif:
+    description: Whether to upload the SARIF report to GitHub code scanning
+    required: false
+    default: "true"
+
+outputs:
+  critical:
+    description: Number of fixable CRITICAL vulnerabilities
+    value: ${{ steps.scan.outputs.critical }}
+  high:
+    description: Number of fixable HIGH vulnerabilities
+    value: ${{ steps.scan.outputs.high }}
+  medium:
+    description: Number of fixable MEDIUM vulnerabilities
+    value: ${{ steps.scan.outputs.medium }}
+  low:
+    description: Number of fixable LOW vulnerabilities
+    value: ${{ steps.scan.outputs.low }}
+  report-dir:
+    description: Directory holding trivy.json and trivy.sarif
+    value: ${{ steps.dirs.outputs.report_dir }}
+
+runs:
+  using: composite
+  steps:
+    - name: Prepare
+      id: dirs
+      shell: bash
+      env:
+        CATEGORY: ${{ inputs.category }}
+      run: |
+        set -euo pipefail
+        if command -v trivy > /dev/null; then
+          echo "installed=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "installed=false" >> "$GITHUB_OUTPUT"
+        fi
+        echo "report_dir=$RUNNER_TEMP/security-image-scan/$CATEGORY" >> "$GITHUB_OUTPUT"
+        echo "date=$(date -u +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
+
+    - name: Install Trivy
+      if: steps.dirs.outputs.installed != 'true'
+      uses: aquasecurity/setup-trivy@81e514348e19b6112ce2a7e3ecbafe19c1e1f567 # v0.3.1
+      with:
+        version: ${{ inputs.trivy-version }}
+        cache: "true"
+
+    # The vulnerability and Java databases, ~1 GB between them, pulled from registries that rate
+    # limit. Keyed on the day: every run after the first of the day restores instead of
+    # downloading, and Trivy still refreshes a DB older than its own 12h window by itself.
+    - name: Cache the Trivy databases
+      if: steps.dirs.outputs.installed != 'true'
+      uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+      with:
+        path: ~/.cache/trivy
+        key: trivy-db-${{ runner.os }}-${{ steps.dirs.outputs.date }}
+        restore-keys: trivy-db-${{ runner.os }}-
+
+    - name: Scan
+      id: scan
+      shell: bash
+      env:
+        IMAGE: ${{ inputs.image }}
+        REPORT_DIR: ${{ steps.dirs.outputs.report_dir }}
+      run: bash "$GITHUB_ACTION_PATH/../../../scripts/security-image-scan.sh" scan "$IMAGE" "$REPORT_DIR"
+
+    - name: Upload the SARIF report
+      if: inputs.upload-sarif == 'true'
+      uses: github/codeql-action/upload-sarif@b96794f015dfd88f77b49b1c93e0fa7110f94c63 # v4.38.0
+      with:
+        sarif_file: ${{ steps.dirs.outputs.report_dir }}/trivy.sarif
+        category: ${{ inputs.category }}

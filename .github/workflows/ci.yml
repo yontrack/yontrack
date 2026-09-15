@@ -1264,6 +1264,152 @@ jobs:
           fi
 
   # ---------------------------------------------------------------------------------------------
+  # Trivy scan of the two Docker images, reported as CHML counts (#1749).
+  #
+  # The run-tagged images `build` pushes: the Jib backend image carries the jars and the UI image
+  # Next's standalone node_modules, so this covers the runtime dependencies of both tiers. It is
+  # where the dependency counts in Yontrack come from - Dependabot alerts are not reported.
+  #
+  # Every full run, on every branch, so that a feature branch bringing in a vulnerable dependency
+  # shows it before it is merged. It needs only `build`, so it runs alongside `integration`, `kdsl`
+  # and `ui-tests` and adds no wall-clock time to the run.
+  #
+  # Findings never fail this job: they only drive the stamps, WARNING from the first HIGH and
+  # FAILED from the first CRITICAL (.yontrack/ci.yaml). A scanner *error* does fail it, and still
+  # records a FAILED stamp so the build does not simply lack one.
+  #
+  # The scan and the counting live in .github/actions/security-image-scan and
+  # scripts/security-image-scan.sh, shared with the nightly rescan (#1751). Accepted risks go in
+  # .trivyignore.yaml, each with a statement and an expiry.
+  # ---------------------------------------------------------------------------------------------
+
+  security-images:
+    name: Security scan of the images
+    needs: [setup, yontrack, build]
+    if: ${{ !cancelled() && needs.build.result == 'success' && needs.setup.outputs.full_run == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # A job-level block replaces the workflow's, so everything this job needs is restated.
+    # `security-events: write` is for the SARIF upload; `packages: read` is for pulling the images.
+    permissions:
+      contents: read
+      packages: read
+      security-events: write
+    steps:
+      # The run time reported for this job's validations is measured from here. A `run:` step is
+      # the earliest point a workflow can observe: the runner's own "Set up job" precedes every
+      # step and is not visible to any of them.
+      - name: Record the job start
+        id: job_start
+        run: echo "started=$(date +%s)" >> "$GITHUB_OUTPUT"
+
+      # Pinned by commit SHA, like every action this job uses - see the composite action's header.
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      # Trivy pulls the images straight from the registry with the Docker credentials, rather than
+      # through the daemon: no `docker pull` of a backend image it only needs to read.
+      - name: Log in to GHCR
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Before the scans, so that a scan that errors can still report its FAILED stamp.
+      - name: Link to the Yontrack build
+        uses: nemerosa/ontrack-github-actions-cli-library/ontrack-cli-workflow-build@v1.0.3
+        with:
+          project: ${{ needs.yontrack.outputs.project }}
+          yontrack-url: ${{ vars.YONTRACK_URL }}
+          yontrack-token: ${{ secrets.YONTRACK_TOKEN }}
+          version: ${{ env.YONTRACK_CLI_VERSION }}
+
+      - name: Scan the backend image
+        id: backend
+        uses: ./.github/actions/security-image-scan
+        with:
+          image: ${{ env.GHCR_ONTRACK }}:${{ env.RUN_TAG }}
+          category: trivy-image-backend
+
+      # !cancelled(), not the implicit success(): an error on the backend image must not leave the
+      # UI image unscanned.
+      - name: Scan the UI image
+        id: ui
+        if: ${{ !cancelled() }}
+        uses: ./.github/actions/security-image-scan
+        with:
+          image: ${{ env.GHCR_ONTRACK_UI }}:${{ env.RUN_TAG }}
+          category: trivy-image-ui
+
+      # `outcome` is empty only when the step was skipped. Anything but success means the scan
+      # itself went wrong, and the counts are then absent rather than zero - a scan that did not
+      # happen must never read as a clean image.
+      - name: Validate SECURITY.IMAGE.BACKEND
+        if: ${{ !cancelled() && steps.backend.outcome != '' }}
+        env:
+          OUTCOME: ${{ steps.backend.outcome }}
+          CRITICAL: ${{ steps.backend.outputs.critical }}
+          HIGH: ${{ steps.backend.outputs.high }}
+          MEDIUM: ${{ steps.backend.outputs.medium }}
+          LOW: ${{ steps.backend.outputs.low }}
+          STARTED: ${{ steps.job_start.outputs.started }}
+        run: |
+          run_time_flag=""
+          if [ -n "${STARTED:-}" ]; then
+            run_time_flag="--run-time $(( $(date +%s) - STARTED ))"
+          fi
+          if [ "$OUTCOME" = "success" ]; then
+            # shellcheck disable=SC2086  # deliberate: see YONTRACK_RUN_INFO
+            yontrack validate --validation SECURITY.IMAGE.BACKEND \
+              chml --critical "$CRITICAL" --high "$HIGH" --medium "$MEDIUM" --low "$LOW" \
+              $run_time_flag $YONTRACK_RUN_INFO
+          else
+            # shellcheck disable=SC2086  # deliberate: see YONTRACK_RUN_INFO
+            yontrack validate --validation SECURITY.IMAGE.BACKEND --status FAILED \
+              $run_time_flag $YONTRACK_RUN_INFO
+          fi
+
+      - name: Validate SECURITY.IMAGE.UI
+        if: ${{ !cancelled() && steps.ui.outcome != '' }}
+        env:
+          OUTCOME: ${{ steps.ui.outcome }}
+          CRITICAL: ${{ steps.ui.outputs.critical }}
+          HIGH: ${{ steps.ui.outputs.high }}
+          MEDIUM: ${{ steps.ui.outputs.medium }}
+          LOW: ${{ steps.ui.outputs.low }}
+          STARTED: ${{ steps.job_start.outputs.started }}
+        run: |
+          run_time_flag=""
+          if [ -n "${STARTED:-}" ]; then
+            run_time_flag="--run-time $(( $(date +%s) - STARTED ))"
+          fi
+          if [ "$OUTCOME" = "success" ]; then
+            # shellcheck disable=SC2086  # deliberate: see YONTRACK_RUN_INFO
+            yontrack validate --validation SECURITY.IMAGE.UI \
+              chml --critical "$CRITICAL" --high "$HIGH" --medium "$MEDIUM" --low "$LOW" \
+              $run_time_flag $YONTRACK_RUN_INFO
+          else
+            # shellcheck disable=SC2086  # deliberate: see YONTRACK_RUN_INFO
+            yontrack validate --validation SECURITY.IMAGE.UI --status FAILED \
+              $run_time_flag $YONTRACK_RUN_INFO
+          fi
+
+      - name: Summarise the counts
+        if: ${{ !cancelled() }}
+        env:
+          BACKEND: ${{ steps.backend.outputs.critical }}/${{ steps.backend.outputs.high }}/${{ steps.backend.outputs.medium }}/${{ steps.backend.outputs.low }}
+          UI: ${{ steps.ui.outputs.critical }}/${{ steps.ui.outputs.high }}/${{ steps.ui.outputs.medium }}/${{ steps.ui.outputs.low }}
+        run: |
+          {
+            echo "### Fixable vulnerabilities in the images (critical/high/medium/low)"
+            echo
+            echo "| Image | Counts |"
+            echo "|-------|--------|"
+            echo "| backend | \`$BACKEND\` |"
+            echo "| UI | \`$UI\` |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # ---------------------------------------------------------------------------------------------
   # Documentation.
   #
   # The Jenkins Documentation stage never built the site: buildDocs is wired into `build`, so it

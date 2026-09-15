@@ -1,0 +1,22 @@
+# Vulnerabilities whose risk is accepted, excluded from the Trivy scans of the Docker images and
+# therefore from the SECURITY.IMAGE.* counts in Yontrack. See #1749.
+#
+# Every entry MUST carry both:
+#
+#   statement   why the risk is accepted - not reachable, not exploitable in this context, no fix
+#               upstream yet... "False positive" alone is not a statement.
+#   expired_at  the date the acceptance lapses (yyyy-mm-dd). Trivy stops honouring an expired
+#               entry by itself, so the finding comes back and has to be looked at again.
+#
+# scripts/security-image-scan.sh refuses to scan when an entry lacks either, so a scan cannot be
+# quietened without saying why and for how long.
+#
+# Example:
+#
+#   vulnerabilities:
+#     - id: CVE-2025-12345
+#       purls:
+#         - "pkg:npm/some-package@1.2.3"
+#       statement: Only reachable through the dev server, which the image does not ship
+#       expired_at: 2026-12-31
+vulnerabilities: []

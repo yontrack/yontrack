@@ -15,6 +15,24 @@ configuration:
           tests: {}
         PLAYWRIGHT:
           tests: {}
+        # Fixable vulnerabilities in the two Docker images, counted by Trivy and reported by the
+        # `security-images` job in ci.yml on every full run (#1749). The images carry the jars and
+        # Next's standalone node_modules, so these are the runtime dependencies of both tiers.
+        #
+        # WARNING from the first HIGH, FAILED from the first CRITICAL. Not in any promotion yet:
+        # they soak first, and are expected to join SILVER later.
+        SECURITY.IMAGE.BACKEND:
+          chml:
+            warningLevel: HIGH
+            warningValue: 1
+            failedLevel: CRITICAL
+            failedValue: 1
+        SECURITY.IMAGE.UI:
+          chml:
+            warningLevel: HIGH
+            warningValue: 1
+            failedLevel: CRITICAL
+            failedValue: 1
         # Reported by the `docs` job in ci.yml, which now runs on every full run: the site
         # built and was archived as a run artefact for the release to carry forward (#1668).
         # Distinct from DOCUMENTATION below, which records the S3 publication at release time

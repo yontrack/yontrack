@@ -1,0 +1,21 @@
+# Version updates. Security updates for npm are enabled in the repository settings and need no
+# entry here; npm *version* updates are deliberately not configured (#1749).
+#
+# github-actions is here to keep the actions pinned by commit SHA up to date - a pin nobody bumps
+# is a pin that ages into a vulnerability of its own. Dependabot rewrites the SHA and the version
+# comment beside it together.
+#
+# The Gradle ecosystem is added by the dependency locking issue (#1752).
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    # "/" covers .github/workflows; the composite actions are one directory each.
+    directories:
+      - "/"
+      - "/.github/actions/*"
+    schedule:
+      interval: weekly
+    groups:
+      github-actions:
+        patterns:
+          - "*"
