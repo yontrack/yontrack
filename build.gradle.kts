@@ -15,12 +15,12 @@ buildscript {
 }
 
 plugins {
-    kotlin("jvm") version "2.2.20"
-    kotlin("plugin.spring") version "2.2.20"
+    kotlin("jvm") version "2.4.20"
+    kotlin("plugin.spring") version "2.4.20"
     id("org.springframework.boot") version "3.5.9" apply false
     id("io.spring.dependency-management") version "1.1.7"
-    id("com.avast.gradle.docker-compose") version "0.17.12"
-    id("com.google.cloud.tools.jib") version "3.5.1" apply false
+    id("com.avast.gradle.docker-compose") version "0.17.21"
+    id("com.google.cloud.tools.jib") version "3.5.4" apply false
     id("com.github.node-gradle.node") version "7.1.0" apply false
     // Versioning logic moved into buildSrc plugin
     id("net.nemerosa.ontrack.versioning")
@@ -56,25 +56,25 @@ subprojects {
 
     version = rootProject.version
 
-    val jjwtVersion = "0.12.6"
-    val greenMailVersion = "1.6.15"
-    val mockkVersion = "1.13.17"
+    val jjwtVersion = "0.13.0"
+    val greenMailVersion = "2.1.13"
+    val mockkVersion = "1.14.11"
 
     dependencyManagement {
         imports {
             mavenBom(org.springframework.boot.gradle.plugin.SpringBootPlugin.BOM_COORDINATES)
         }
         dependencies {
-            dependency("commons-io:commons-io:2.18.0")
-            dependency("org.jsoup:jsoup:1.19.1")
+            dependency("commons-io:commons-io:2.22.0")
+            dependency("org.jsoup:jsoup:1.23.2")
             dependency("org.apache.commons:commons-math3:3.6.1")
-            dependency("org.apache.commons:commons-text:1.13.0")
-            dependency("org.jgrapht:jgrapht-core:1.5.2")
-            dependency("com.opencsv:opencsv:5.10")
-            dependency("com.networknt:json-schema-validator:1.5.5")
-            dependency("org.gitlab4j:gitlab4j-api:6.1.0")
-            dependency("com.slack.api:slack-api-client:1.38.0")
-            dependency("org.springframework.vault:spring-vault-core:3.1.2")
+            dependency("org.apache.commons:commons-text:1.15.0")
+            dependency("org.jgrapht:jgrapht-core:1.5.3")
+            dependency("com.opencsv:opencsv:5.12.0")
+            dependency("com.networknt:json-schema-validator:3.0.7")
+            dependency("org.gitlab4j:gitlab4j-api:6.3.0")
+            dependency("com.slack.api:slack-api-client:1.51.0")
+            dependency("org.springframework.vault:spring-vault-core:4.1.0")
 
             dependency("io.jsonwebtoken:jjwt-api:$jjwtVersion")
             dependency("io.jsonwebtoken:jjwt-impl:$jjwtVersion")
@@ -89,7 +89,7 @@ subprojects {
             dependency("io.mockk:mockk-dsl-jvm:${mockkVersion}")
 
             // Git repository support TODO Will be removed in V6
-            dependency("org.eclipse.jgit:org.eclipse.jgit:6.6.1.202309021850-r")
+            dependency("org.eclipse.jgit:org.eclipse.jgit:7.8.0.202609011348-r")
         }
     }
 

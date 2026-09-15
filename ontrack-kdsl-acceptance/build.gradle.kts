@@ -13,7 +13,7 @@ dependencies {
     testImplementation("org.springframework.boot:spring-boot-starter")
     testImplementation("org.springframework:spring-web")
     testImplementation(project(":ontrack-kdsl"))
-    testImplementation("com.apollographql.apollo:apollo-api:4.1.1")
+    testImplementation("com.apollographql.apollo:apollo-api:5.1.0")
     testImplementation("commons-io:commons-io")
     testImplementation("commons-codec:commons-codec")
 
