@@ -1,0 +1,43 @@
+# Submits the resolved Gradle dependency graph to GitHub (#1750).
+#
+# The GitHub dependency graph does not parse Gradle build files, nor gradle.lockfile: without a
+# build-based submission Dependabot knows nothing of the backend's dependencies, transitive ones
+# included. This runs the build's own resolution and uploads what it resolved.
+#
+# Everything is submitted, test classpaths included. Excluding configurations with
+# `dependency-graph-exclude-configurations` is only worth it if the alerts they raise turn out to
+# be noise.
+#
+# Pinned by commit SHA with the version in a trailing comment; .github/dependabot.yml keeps the
+# pins up to date.
+name: Dependency submission
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  dependency-submission:
+    name: Submit the Gradle dependencies
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      # The dependency submission API takes `contents: write`.
+      contents: write
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Set up Java
+        uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4.9.1
+        with:
+          distribution: zulu
+          java-version: "21"
+
+      # v5 and not v6: from v6 the caching component of gradle/actions is proprietary and using it
+      # accepts Gradle's terms of use. See codeql.yml.
+      - name: Submit the dependency graph
+        uses: gradle/actions/dependency-submission@0723195856401067f7a2779048b490ace7a47d7c # v5.0.2

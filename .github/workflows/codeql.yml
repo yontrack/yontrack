@@ -1,0 +1,200 @@
+# CodeQL static analysis, and SECURITY.CODE in Yontrack (#1750).
+#
+# A workflow of its own rather than a job of ci.yml: the Kotlin analysis needs a Gradle compile
+# traced by CodeQL, which cannot reuse the `build` job's output, so in ci.yml it would lengthen
+# the commit pipeline. Here it runs beside it.
+#
+# Advanced setup rather than GitHub's default setup, because default setup has nowhere to hang
+# the reporting job. Default setup must stay `not-configured`: GitHub refuses uploads from an
+# advanced workflow while it is enabled.
+#
+# Every action is pinned by commit SHA with its version in a trailing comment, like the image
+# scans of #1749. .github/dependabot.yml keeps the pins up to date.
+name: CodeQL
+
+on:
+  push:
+  pull_request:
+  schedule:
+    # Weekly, so that new queries shipped with CodeQL reach code nobody has touched.
+    - cron: "17 4 * * 1"
+
+# A newer push supersedes a pull request's analysis, but never a push's: every push to main has
+# a SECURITY.CODE to report on its build.
+concurrency:
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+env:
+  # Same CLI as ci.yml; see YONTRACK_CLI_VERSION there.
+  YONTRACK_CLI_VERSION: "5.1.1"
+  # The Yontrack project ci.yml registers its builds in.
+  YONTRACK_PROJECT: yontrack
+
+jobs:
+  analyze:
+    name: Analyze (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    permissions:
+      # `actions: read` lets CodeQL read the workflow run; `security-events: write` uploads.
+      actions: read
+      contents: read
+      packages: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - language: java-kotlin
+            build-mode: manual
+          - language: javascript-typescript
+            build-mode: none
+          - language: actions
+            build-mode: none
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Set up Java
+        if: matrix.build-mode == 'manual'
+        uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4.9.1
+        with:
+          distribution: zulu
+          java-version: "21"
+
+      # v5 and not v6: from v6 the caching component of gradle/actions is proprietary and using it
+      # accepts Gradle's terms of use. Not a decision to take in a workflow change.
+      - name: Set up Gradle
+        if: matrix.build-mode == 'manual'
+        uses: gradle/actions/setup-gradle@0723195856401067f7a2779048b490ace7a47d7c # v5.0.2
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@b96794f015dfd88f77b49b1c93e0fa7110f94c63 # v4.38.0
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+
+      # The smallest invocation compiling every main source set: `classes`, in every project that
+      # has it. Test sources are left out, so are the Docker images, the web build and the docs.
+      #
+      # Every compilation has to actually run under the tracer, or its sources are silently
+      # missing from the database:
+      #   * `--no-daemon`, so no Gradle daemon started outside the tracer is reused;
+      #   * `--no-build-cache`, so no compile task comes FROM-CACHE;
+      #   * the Kotlin compiler in process, rather than in a Kotlin daemon that could outlive or
+      #     predate the traced build.
+      - name: Compile the main sources
+        if: matrix.build-mode == 'manual'
+        run: |
+          ./gradlew classes \
+            --no-daemon \
+            --no-build-cache \
+            -Pkotlin.compiler.execution.strategy=in-process \
+            --stacktrace \
+            --console plain
+
+      - name: Perform CodeQL analysis
+        uses: github/codeql-action/analyze@b96794f015dfd88f77b49b1c93e0fa7110f94c63 # v4.38.0
+        with:
+          category: /language:${{ matrix.language }}
+
+  # SECURITY.CODE, on the Yontrack build CI registered for this commit.
+  #
+  # Only on a push to this repository: pull requests, forks and scheduled runs report nothing,
+  # and neither does Dependabot, which ci.yml registers no build for. After *every* analysis, so
+  # that the alerts API has all three languages processed (`analyze` waits for the processing
+  # of its own upload).
+  report:
+    name: Report SECURITY.CODE
+    needs: analyze
+    if: >-
+      ${{ !cancelled()
+      && github.event_name == 'push'
+      && github.repository == 'yontrack/yontrack'
+      && github.actor != 'dependabot[bot]' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      # `actions: read` is for the run's start time, reported as the validation's run time.
+      actions: read
+      contents: read
+      security-events: read
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      # Installed directly rather than through ontrack-github-actions-cli-config, which registers
+      # a build as a side effect. This job reports on the build ci.yml registered; it must not
+      # create one.
+      - name: Install the Yontrack CLI
+        env:
+          YONTRACK_URL: ${{ vars.YONTRACK_URL }}
+          YONTRACK_TOKEN: ${{ secrets.YONTRACK_TOKEN }}
+        run: |
+          set -euo pipefail
+          curl -sSfL -o /usr/local/bin/yontrack \
+            "https://github.com/nemerosa/ontrack-cli/releases/download/${YONTRACK_CLI_VERSION}/yontrack-linux-amd64"
+          chmod +x /usr/local/bin/yontrack
+          yontrack version --cli
+          yontrack config create prod "$YONTRACK_URL" --token "$YONTRACK_TOKEN" --override
+
+      - name: Find the Yontrack build
+        id: build
+        run: scripts/security-code-scan.sh resolve-build "$YONTRACK_PROJECT" "$GITHUB_SHA"
+
+      - name: Count the open CodeQL alerts
+        id: alerts
+        if: steps.build.outputs.found == 'true' && needs.analyze.result == 'success'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: scripts/security-code-scan.sh fetch "$GITHUB_REPOSITORY" "$GITHUB_REF"
+
+      # An analysis that failed leaves the alerts of the previous one in place, so they are not
+      # counted: the stamp is FAILED instead - an analysis that did not happen must never read as
+      # clean code. So is a count that could not be fetched.
+      - name: Validate SECURITY.CODE
+        if: ${{ !cancelled() && steps.build.outputs.found == 'true' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PROJECT: ${{ steps.build.outputs.project }}
+          BRANCH: ${{ steps.build.outputs.branch }}
+          BUILD: ${{ steps.build.outputs.build }}
+          OUTCOME: ${{ steps.alerts.outcome }}
+          CRITICAL: ${{ steps.alerts.outputs.critical }}
+          HIGH: ${{ steps.alerts.outputs.high }}
+          MEDIUM: ${{ steps.alerts.outputs.medium }}
+          LOW: ${{ steps.alerts.outputs.low }}
+          RUN_INFO: >-
+            --source-type github-workflow
+            --source-uri ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+            --trigger-type ${{ github.event_name }}
+            --trigger-data ${{ github.sha }}
+        run: |
+          set -uo pipefail
+          # The whole workflow's duration: the analyses are what this stamp costs. Dropped rather
+          # than failing when it cannot be read - recording the stamp matters more than timing it.
+          run_time_flag=""
+          started="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" --jq .run_started_at 2>/dev/null)" \
+            && started="$(date -u -d "$started" +%s 2>/dev/null)" \
+            && run_time_flag="--run-time $(( $(date +%s) - started ))"
+          # `--project`, `--branch` and `--build` all spelled out: in CLI 5.1.1 `chml` reads the
+          # build from its flag only (yontrack/yontrack-cli#73), and nothing here exports it anyway.
+          if [ "$OUTCOME" = "success" ]; then
+            # shellcheck disable=SC2086  # deliberate: run info is a set of flags, not one word
+            yontrack validate --project "$PROJECT" --branch "$BRANCH" --build "$BUILD" \
+              --validation SECURITY.CODE \
+              chml --critical "$CRITICAL" --high "$HIGH" --medium "$MEDIUM" --low "$LOW" \
+              $run_time_flag $RUN_INFO
+          else
+            # shellcheck disable=SC2086  # deliberate: run info is a set of flags, not one word
+            yontrack validate --project "$PROJECT" --branch "$BRANCH" --build "$BUILD" \
+              --validation SECURITY.CODE --status FAILED \
+              $run_time_flag $RUN_INFO
+          fi
+          {
+            echo "### Open CodeQL security alerts (critical/high/medium/low)"
+            echo
+            echo "Build \`$PROJECT/$BRANCH/$BUILD\`: \`${CRITICAL:-?}/${HIGH:-?}/${MEDIUM:-?}/${LOW:-?}\`"
+          } >> "$GITHUB_STEP_SUMMARY"

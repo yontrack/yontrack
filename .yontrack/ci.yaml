@@ -33,6 +33,18 @@ configuration:
             warningValue: 1
             failedLevel: CRITICAL
             failedValue: 1
+        # Open CodeQL security alerts of the pushed branch, by security severity, counted from the
+        # code-scanning alerts API - so a dismissed false positive lowers the count - and reported
+        # by the `report` job of .github/workflows/codeql.yml once every language is analysed
+        # (#1750). Code-quality alerts, which have no security severity, are not counted.
+        #
+        # Same thresholds as the image scans, and likewise in no promotion yet.
+        SECURITY.CODE:
+          chml:
+            warningLevel: HIGH
+            warningValue: 1
+            failedLevel: CRITICAL
+            failedValue: 1
         # Reported by the `docs` job in ci.yml, which now runs on every full run: the site
         # built and was archived as a run artefact for the release to carry forward (#1668).
         # Distinct from DOCUMENTATION below, which records the S3 publication at release time
