@@ -47,6 +47,7 @@ class BitbucketCloudSCMExtensionTest {
             issueServiceRegistry = mockk(),
             gitRepositoryClientFactory = mockk(),
             gitConfigService = mockk(),
+            ontrackConfigProperties = mockk(),
         )
     }
 

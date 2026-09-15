@@ -117,3 +117,61 @@ A configuration does not name a workspace, and Bitbucket Cloud offers no way to 
 or an access token can read. The catalog therefore lists, for each configuration, all the repositories of the
 workspaces already used by the Bitbucket Cloud properties of the Yontrack projects. A workspace no project uses
 does not appear in the catalog.
+
+## SCM
+
+A project with the Bitbucket Cloud property has an SCM of engine `bitbucket-cloud`. It gives the project:
+
+* **change logs** between two builds, whose commits are set by the _Git commit_ property;
+* links to the commits and to the comparison between two commits;
+* branch creation and deletion, file download and upload — one commit per upload;
+* pull request information for branches which are pull requests.
+
+Creating and merging pull requests, as auto-versioning does, is not supported yet.
+
+### Change logs
+
+The commits between two builds are read from the Bitbucket Cloud API
+(`GET /2.0/repositories/{workspace}/{repository}/commits?include={to}&exclude={from}`). When the two builds are
+given in the reverse order, the order is swapped.
+
+Bitbucket Cloud allows **1,000 API requests per hour per token**, and returns at most 100 commits per request. A
+change log between two builds far apart could therefore use a large part of this allowance, so the number of
+commits it returns is capped by the **max commits** setting (see below): with the default of 1,000, a change log
+costs at most 10 requests.
+
+Going through all the commits of a repository, like when looking for the build of a commit, does not use the
+API: Yontrack reads them from its local clone of the repository.
+
+### File references
+
+Files stored in Bitbucket Cloud can be referenced by `scm://` URIs, wherever Yontrack accepts them:
+
+```
+scm://bitbucket-cloud/<configuration>/<workspace>/<repository>/<path>
+```
+
+* `<configuration>` — name of the Bitbucket Cloud configuration
+* `<workspace>` — slug of the workspace
+* `<repository>` — slug of the repository
+* `<path>` — path to the file, read on the main branch of the repository
+
+For example, `scm://bitbucket-cloud/bitbucket-cloud/my-workspace/my-repository/config/settings.yaml`.
+
+### Settings
+
+In the UI, go to _Settings_ > _Bitbucket Cloud_.
+
+| Setting      | Default | Description                                            |
+|--------------|---------|--------------------------------------------------------|
+| `maxCommits` | `1000`  | Maximum number of commits to return for a change log   |
+
+As code:
+
+```yaml
+ontrack:
+  config:
+    settings:
+      bitbucket-cloud:
+        maxCommits: 1000
+```

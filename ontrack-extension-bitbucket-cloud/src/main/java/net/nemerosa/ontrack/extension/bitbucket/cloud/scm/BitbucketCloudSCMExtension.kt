@@ -29,6 +29,7 @@ import net.nemerosa.ontrack.git.GitRepositoryClientFactory
 import net.nemerosa.ontrack.model.exceptions.InputException
 import net.nemerosa.ontrack.model.settings.CachedSettingsService
 import net.nemerosa.ontrack.model.structure.*
+import net.nemerosa.ontrack.model.support.OntrackConfigProperties
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
@@ -49,6 +50,7 @@ class BitbucketCloudSCMExtension(
     private val issueServiceRegistry: IssueServiceRegistry,
     private val gitRepositoryClientFactory: GitRepositoryClientFactory,
     private val gitConfigService: GitConfigService,
+    private val ontrackConfigProperties: OntrackConfigProperties,
 ) : AbstractExtension(extensionFeature), SCMExtension {
 
     private val logger: Logger = LoggerFactory.getLogger(BitbucketCloudSCMExtension::class.java)
@@ -176,9 +178,17 @@ class BitbucketCloudSCMExtension(
             return commits.map { BitbucketCloudSCMCommit(it, repositoryHtmlURL) }
         }
 
+        /**
+         * Commit from the REST API. Like for Bitbucket Server, not called when the configurations are not tested,
+         * since setting the commit property of a build indexes its commit on the spot.
+         */
         override fun getCommit(id: String): SCMCommit? =
-            client.getCommit(workspace, repositorySlug, id)?.let {
-                BitbucketCloudSCMCommit(it, repositoryHtmlURL)
+            if (ontrackConfigProperties.configurationTest) {
+                client.getCommit(workspace, repositorySlug, id)?.let {
+                    BitbucketCloudSCMCommit(it, repositoryHtmlURL)
+                }
+            } else {
+                null
             }
 
         override fun getConfiguredIssueService(): ConfiguredIssueService? =
