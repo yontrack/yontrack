@@ -88,7 +88,11 @@ nav:
           - Jenkins: content/integrations/notifications/jenkins.md
           - GitHub Workflows: content/integrations/notifications/github-workflow.md
           - Bitbucket Pipelines: content/integrations/notifications/bitbucket-pipelines.md
-      - Auto-versioning: content/integrations/auto-versioning/auto-versioning.md
+      - Auto-versioning:
+          - content/integrations/auto-versioning/auto-versioning.md
+          - Jenkins post-processing: content/integrations/auto-versioning/jenkins.md
+          - GitHub post-processing: content/integrations/auto-versioning/github.md
+          - Bitbucket Cloud post-processing: content/integrations/auto-versioning/bitbucket-cloud.md
       - Changelogs: content/integrations/changelogs/changelogs.md
       - Workflows: content/integrations/workflows/workflows.md
       - Environments: content/integrations/environments/environments.md
