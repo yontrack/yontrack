@@ -11,6 +11,7 @@ import org.springframework.http.HttpHeaders
 import org.springframework.http.MediaType
 import org.springframework.util.LinkedMultiValueMap
 import org.springframework.web.client.HttpClientErrorException
+import org.springframework.web.client.RestClientResponseException
 import org.springframework.web.client.RestTemplate
 import org.springframework.web.util.UriComponentsBuilder
 import java.net.URI
@@ -30,6 +31,12 @@ class DefaultBitbucketCloudClient(
          * Maximum page length accepted by the Bitbucket Cloud commits endpoint.
          */
         const val MAX_PAGE_LENGTH = 100
+
+        /**
+         * Merge responses meaning "not now": merge checks failing (400), a ref changed during the merge (409),
+         * a merge timing out on the Bitbucket side (555).
+         */
+        private val NOT_MERGEABLE_STATUSES = setOf(400, 409, 555)
 
         /**
          * `Authorization` header for a configuration: HTTP basic with the email for an API token,
@@ -170,6 +177,112 @@ class DefaultBitbucketCloudClient(
                 BitbucketCloudPullRequest::class.java
             )
         }
+
+    override fun resolveReviewers(workspace: String, reviewers: List<String>): List<String> {
+        if (reviewers.all { it.isUuid() }) {
+            return reviewers
+        }
+        val members = followPages(
+            UriComponentsBuilder.fromUriString(ROOT_URI)
+                .path("/2.0/workspaces/$workspace/members")
+                .queryParam("pagelen", MAX_PAGE_LENGTH)
+                .build().encode().toUri(),
+            BitbucketCloudWorkspaceMemberList::class,
+        ).mapNotNull { it.user }
+        return reviewers.map { reviewer ->
+            if (reviewer.isUuid()) {
+                reviewer
+            } else {
+                members.firstOrNull { it.account_id == reviewer }?.uuid
+                    ?: members.firstOrNull { it.nickname == reviewer }?.uuid
+                    ?: members.firstOrNull { it.display_name == reviewer }?.uuid
+                    ?: throw BitbucketCloudReviewerNotFoundException(workspace, reviewer)
+            }
+        }
+    }
+
+    private fun String.isUuid() = startsWith("{") && endsWith("}")
+
+    override fun createPullRequest(
+        workspace: String,
+        repository: String,
+        from: String,
+        to: String,
+        title: String,
+        description: String,
+        reviewers: List<String>,
+    ): BitbucketCloudPullRequest =
+        template.postForObject(
+            repositoryUri(workspace, repository, "pullrequests"),
+            mapOf(
+                "title" to title,
+                "description" to description,
+                "source" to mapOf("branch" to mapOf("name" to from)),
+                "destination" to mapOf("branch" to mapOf("name" to to)),
+                "reviewers" to reviewers.map { mapOf("uuid" to it) },
+            ),
+            BitbucketCloudPullRequest::class.java
+        ) ?: throw BitbucketCloudNoResponseException("pullrequests")
+
+    override fun approvePullRequest(workspace: String, repository: String, id: Int) {
+        template.postForEntity(
+            repositoryUri(workspace, repository, "pullrequests/$id/approve"),
+            null,
+            Void::class.java
+        )
+    }
+
+    override fun getPullRequestStatuses(workspace: String, repository: String, id: Int): List<String> =
+        followPages(
+            repositoryUri(workspace, repository, "pullrequests/$id/statuses", "pagelen" to MAX_PAGE_LENGTH),
+            BitbucketCloudCommitStatusList::class,
+        ).mapNotNull { it.state }
+
+    override fun mergePullRequest(
+        workspace: String,
+        repository: String,
+        id: Int,
+        strategy: String,
+        message: String,
+        closeSourceBranch: Boolean,
+    ): BitbucketCloudMergeOutcome =
+        try {
+            val response = template.postForEntity(
+                repositoryUri(workspace, repository, "pullrequests/$id/merge"),
+                mapOf(
+                    "type" to "pullrequest_merge_parameters",
+                    "message" to message,
+                    "close_source_branch" to closeSourceBranch,
+                    "merge_strategy" to strategy,
+                ),
+                Void::class.java
+            )
+            if (response.statusCode.value() == 202) {
+                BitbucketCloudMergeOutcome.PENDING
+            } else {
+                BitbucketCloudMergeOutcome.MERGED
+            }
+        } catch (e: RestClientResponseException) {
+            if (e.statusCode.value() in NOT_MERGEABLE_STATUSES) {
+                BitbucketCloudMergeOutcome.NOT_MERGEABLE
+            } else {
+                throw e
+            }
+        }
+
+    /**
+     * Items of all the pages, following the absolute `next` links.
+     */
+    private fun <T, P : BitbucketCloudPaginatedList<T>> followPages(first: URI, pageType: KClass<P>): List<T> {
+        val results = mutableListOf<T>()
+        var next: URI? = first
+        while (next != null) {
+            val page = template.getForObject(next, pageType.java) ?: break
+            results += page.values
+            next = page.next?.takeIf { it.isNotBlank() }?.let { URI.create(it) }
+        }
+        return results
+    }
 
     /**
      * URI to a resource of a repository. The [path] keeps its slashes (branch names, file paths), only characters

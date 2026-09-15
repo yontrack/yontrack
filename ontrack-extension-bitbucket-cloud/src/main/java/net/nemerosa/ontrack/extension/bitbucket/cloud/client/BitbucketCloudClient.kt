@@ -1,6 +1,7 @@
 package net.nemerosa.ontrack.extension.bitbucket.cloud.client
 
 import net.nemerosa.ontrack.extension.bitbucket.cloud.model.BitbucketCloudCommit
+import net.nemerosa.ontrack.extension.bitbucket.cloud.model.BitbucketCloudMergeOutcome
 import net.nemerosa.ontrack.extension.bitbucket.cloud.model.BitbucketCloudPullRequest
 import net.nemerosa.ontrack.extension.bitbucket.cloud.model.BitbucketCloudRepository
 import java.time.LocalDateTime
@@ -110,5 +111,61 @@ interface BitbucketCloudClient {
      * `GET /2.0/repositories/{workspace}/{repository}/pullrequests/{id}`
      */
     fun getPullRequest(workspace: String, repository: String, id: Int): BitbucketCloudPullRequest?
+
+    /**
+     * Resolves reviewers to account UUIDs, in the same order. A reviewer between braces is already a UUID;
+     * any other is looked up among the members of the workspace by account ID, nickname or display name.
+     *
+     * `GET /2.0/workspaces/{workspace}/members`, only when a reviewer is not a UUID
+     */
+    fun resolveReviewers(workspace: String, reviewers: List<String>): List<String>
+
+    /**
+     * Creates a pull request.
+     *
+     * `POST /2.0/repositories/{workspace}/{repository}/pullrequests`
+     *
+     * @param reviewers Account UUIDs of the reviewers
+     */
+    fun createPullRequest(
+        workspace: String,
+        repository: String,
+        from: String,
+        to: String,
+        title: String,
+        description: String,
+        reviewers: List<String>,
+    ): BitbucketCloudPullRequest
+
+    /**
+     * Approves a pull request as the identity of this client.
+     *
+     * `POST /2.0/repositories/{workspace}/{repository}/pullrequests/{id}/approve`
+     */
+    fun approvePullRequest(workspace: String, repository: String, id: Int)
+
+    /**
+     * States of the commit statuses (builds) of a pull request: `SUCCESSFUL`, `FAILED`, `INPROGRESS` or `STOPPED`.
+     *
+     * `GET /2.0/repositories/{workspace}/{repository}/pullrequests/{id}/statuses`
+     */
+    fun getPullRequestStatuses(workspace: String, repository: String, id: Int): List<String>
+
+    /**
+     * Tries to merge a pull request.
+     *
+     * `POST /2.0/repositories/{workspace}/{repository}/pullrequests/{id}/merge`
+     *
+     * @param strategy `merge_commit`, `squash` or `fast_forward`
+     * @param closeSourceBranch Deleting the source branch once merged
+     */
+    fun mergePullRequest(
+        workspace: String,
+        repository: String,
+        id: Int,
+        strategy: String,
+        message: String,
+        closeSourceBranch: Boolean,
+    ): BitbucketCloudMergeOutcome
 
 }
