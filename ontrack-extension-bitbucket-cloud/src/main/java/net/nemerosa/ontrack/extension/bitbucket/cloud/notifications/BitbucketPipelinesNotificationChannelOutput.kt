@@ -30,7 +30,7 @@ data class BitbucketPipelinesNotificationChannelOutput(
     @APIDescription("URL of the pipeline run, filled in once it is triggered")
     @APILabel("URL")
     val url: String? = null,
-    @APIDescription("Last known state of the pipeline: PENDING or IN_PROGRESS while it runs, then SUCCESSFUL, FAILED, ERROR, STOPPED or EXPIRED. Only followed in SYNC mode.")
+    @APIDescription("Last known state of the pipeline: PARSING, PENDING or IN_PROGRESS while it runs, then SUCCESSFUL, FAILED, ERROR, STOPPED or EXPIRED. Only followed in SYNC mode.")
     @APILabel("State")
     val state: String? = null,
 )
