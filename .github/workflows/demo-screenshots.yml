@@ -59,7 +59,7 @@ jobs:
     steps:
       # No `fetch-depth: 0`: unlike demo-smoke this workflow never seeds, so it needs neither
       # tags nor history.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # Which build the images are of, checked rather than assumed - otherwise the run produces
       # a plausible set of images of whatever happens to be deployed. `poll` with a zero timeout
@@ -71,7 +71,7 @@ jobs:
           DEMO_POLL_TIMEOUT: '0'
         run: scripts/demo-smoke.sh poll
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '20'
           cache: npm
@@ -114,7 +114,7 @@ jobs:
       # and the fifth is the one to look at in the trace.
       - name: Upload the screenshots
         if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: demo-screenshots-${{ inputs.release || inputs.version }}
           path: ontrack-web-tests/reports/screenshots
@@ -123,7 +123,7 @@ jobs:
 
       - name: Upload the Playwright trace
         if: ${{ failure() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: demo-screenshots-trace
           path: ontrack-web-tests/test-results

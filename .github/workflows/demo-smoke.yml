@@ -84,7 +84,7 @@ jobs:
         run: touch inputs.properties
 
       - name: Correlation file archiving
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: inputs-${{ inputs.id }}.properties
           path: inputs.properties
@@ -92,7 +92,7 @@ jobs:
 
       # The seed builds one project out of the commits since the last release tag, so it needs
       # tags and history. Without this it degrades quietly to an empty changelog project.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -140,12 +140,12 @@ jobs:
       # 2. Reset and seed. The demo's state is a function of the build, not an accumulation.
       # ------------------------------------------------------------------------------------
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v6
         with:
           distribution: zulu
           java-version: '21'
 
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v6
 
       - name: Build the seed program
         run: ./gradlew :ontrack-demo-seed:installDist --console plain
@@ -169,7 +169,7 @@ jobs:
           DEMO_TOKEN: ${{ secrets.DEMO_TOKEN }}
         run: scripts/demo-smoke.sh assert
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '20'
           cache: npm
@@ -194,7 +194,7 @@ jobs:
 
       - name: Upload the Playwright report
         if: ${{ !cancelled() && steps.playwright.outcome != '' }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: demo-smoke-playwright
           path: |
