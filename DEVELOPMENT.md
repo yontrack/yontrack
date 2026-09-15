@@ -96,6 +96,50 @@ kill $(cat .yontrack-dev/backend.pid)
 > directly. The Spring Boot actuator runs at http://localhost:8800/manage, and
 > the application itself on http://localhost:3000.
 
+## Dependency locking
+
+Every Gradle configuration of every project is locked, in `STRICT` mode. The
+resolved versions are committed in lockfiles:
+
+* `gradle.lockfile` and `buildscript-gradle.lockfile` (the plugin classpath) at
+  the root and in every project;
+* the same two in `buildSrc`, which is a build of its own.
+
+A dependency whose resolved version no longer matches its lockfile fails the
+build, and so does a configuration with no lock state at all: a new module has
+to commit its lockfiles along with its build file.
+
+After changing a dependency or a plugin version, or adding a module, rewrite
+the lockfiles and commit them with the change:
+
+```bash
+./gradlew resolveAndLockAll --write-locks
+```
+
+`resolveAndLockAll` is registered in every project and resolves every
+resolvable configuration. `./gradlew dependencies --write-locks` is not
+enough: it only covers the root project.
+
+That one command also rewrites the `buildSrc` lockfiles, since `buildSrc` is
+built with the same `--write-locks` before anything else. Its test classpath is
+only resolved by its own task, though, so after changing a `buildSrc`
+dependency run this as well:
+
+```bash
+./gradlew -p buildSrc resolveAndLockAll --write-locks
+```
+
+Dependabot keeps the lockfiles up to date in its Gradle pull requests. Whether
+its updates cover the `buildscript` and `buildSrc` lockfiles as well as the
+per-module ones is not verified yet (#1752). If a Dependabot pull request
+fails the build on a lock state mismatch, check it out and run the two
+commands above.
+
+The setup lives in `DependencyLocking` in `buildSrc` and in the `buildscript`
+blocks of the root and `buildSrc` build scripts. Configurations that cannot be
+locked are listed, with a reason, in `DependencyLocking.EXCLUDED_CONFIGURATIONS`
+- none so far.
+
 ## Running the integration tests
 
 ```bash

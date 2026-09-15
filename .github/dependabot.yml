@@ -5,9 +5,32 @@
 # is a pin that ages into a vulnerability of its own. Dependabot rewrites the SHA and the version
 # comment beside it together.
 #
-# The Gradle ecosystem is added by the dependency locking issue (#1752).
+# gradle keeps the backend's dependencies and plugins up to date, lockfiles included (#1752).
+# Dependabot rewrites the per-module gradle.lockfile files from the root. Whether it also rewrites
+# the buildscript-gradle.lockfile files and the buildSrc lockfiles is not verified yet; when it does
+# not, the pull request fails the STRICT locking and needs a manual
+# `./gradlew resolveAndLockAll --write-locks` on its branch - see DEVELOPMENT.md.
 version: 2
 updates:
+  - package-ecosystem: gradle
+    directory: "/"
+    schedule:
+      interval: weekly
+    # A dependency joins the first group it matches, so "everything else" comes last.
+    groups:
+      # The Spring Boot plugin, which also sets the version of the BOM every project imports.
+      spring-boot:
+        patterns:
+          - "org.springframework.boot*"
+      # The Kotlin plugins and libraries, which have to move together.
+      kotlin:
+        patterns:
+          - "org.jetbrains.kotlin*"
+          - "org.jetbrains.kotlinx*"
+      gradle:
+        patterns:
+          - "*"
+
   - package-ecosystem: github-actions
     # "/" covers .github/workflows; the composite actions are one directory each.
     directories:

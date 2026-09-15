@@ -1,5 +1,18 @@
 import com.avast.gradle.dockercompose.ComposeExtension
+import net.nemerosa.ontrack.build.DependencyLocking
 import net.nemerosa.ontrack.build.ItStack
+
+// Locks the plugin classpath of the root project into buildscript-gradle.lockfile (#1752). It has
+// to be done here, before the plugins below are resolved; the subprojects' plugin classpaths are
+// locked by DependencyLocking.
+buildscript {
+    configurations.classpath {
+        resolutionStrategy.activateDependencyLocking()
+    }
+    dependencyLocking {
+        lockMode.set(LockMode.STRICT)
+    }
+}
 
 plugins {
     kotlin("jvm") version "2.2.20"
@@ -31,6 +44,10 @@ allprojects {
     repositories {
         mavenCentral()
     }
+
+    // STRICT dependency locking of every configuration, and the resolveAndLockAll task (#1752).
+    // Lockfiles are written with `./gradlew resolveAndLockAll --write-locks`, see DEVELOPMENT.md.
+    DependencyLocking.configure(this)
 }
 
 subprojects {
