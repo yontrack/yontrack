@@ -553,6 +553,8 @@ the way they work.
       --scm bitbucket-server
     ```
 
+    The Bitbucket Cloud SCM engine is selected the same way, with `--scm bitbucket-cloud`.
+
 ### Including files
 
 It can be very cumbersome to define the whole CI Configuration in a single file.
