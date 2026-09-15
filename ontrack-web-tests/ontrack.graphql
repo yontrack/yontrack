@@ -10947,8 +10947,10 @@ input SetProjectBitbucketCloudConfigurationPropertyByIdInput {
   indexationInterval: Int
   "Issue identifier to use, for example jira//name where name is the name of the JIRA configuration in Ontrack."
   issueServiceConfigurationIdentifier: String
-  "Bitbucket Cloud repository to use, in the form of `workspace/name`"
+  "Slug of the Bitbucket Cloud repository in the workspace"
   repository: String!
+  "Slug of the Bitbucket Cloud workspace"
+  workspace: String!
 }
 
 "Input type for the setProjectBitbucketCloudConfigurationProperty mutation."
@@ -10961,8 +10963,10 @@ input SetProjectBitbucketCloudConfigurationPropertyInput {
   issueServiceConfigurationIdentifier: String
   "Project name"
   project: String!
-  "Bitbucket Cloud repository to use, in the form of `workspace/name`"
+  "Slug of the Bitbucket Cloud repository in the workspace"
   repository: String!
+  "Slug of the Bitbucket Cloud workspace"
+  workspace: String!
 }
 
 "Input type for the setProjectBitbucketConfigurationPropertyById mutation."

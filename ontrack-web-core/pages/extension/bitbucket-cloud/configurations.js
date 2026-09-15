@@ -1,5 +1,16 @@
-import {Form, Input} from "antd";
+import {Form, Input, Select} from "antd";
 import ConfigurationPage from "@components/configurations/ConfigurationPage";
+
+const authTypeOptions = [
+    {
+        value: 'API_TOKEN',
+        label: 'API token (Atlassian account email + API token)',
+    },
+    {
+        value: 'ACCESS_TOKEN',
+        label: 'Access token (workspace, project or repository access token)',
+    },
+]
 
 export default function BitbucketCloudConfigurationsPage() {
 
@@ -10,14 +21,20 @@ export default function BitbucketCloudConfigurationsPage() {
             dataIndex: "name"
         },
         {
-            title: "Workspace",
-            key: "workspace",
-            dataIndex: "workspace",
+            title: "Authentication",
+            key: "authType",
+            dataIndex: "authType",
+            render: (value) => authTypeOptions.find(it => it.value === value)?.label ?? value,
         },
         {
-            title: "User",
-            key: "user",
-            dataIndex: "user",
+            title: "Email",
+            key: "email",
+            dataIndex: "email",
+        },
+        {
+            title: "Auto-merge email",
+            key: "autoMergeEmail",
+            dataIndex: "autoMergeEmail",
         },
     ]
 
@@ -31,26 +48,60 @@ export default function BitbucketCloudConfigurationsPage() {
             <Input/>
         </Form.Item>,
         <Form.Item
-            key="workspace"
-            name="workspace"
-            label="Bitbucket Cloud workspace"
-            rules={[{required: true, message: 'Workspace is required.',},]}
+            key="authType"
+            name="authType"
+            label="Authentication type"
+            initialValue="API_TOKEN"
+            rules={[{required: true, message: 'Authentication type is required.',},]}
+        >
+            <Select options={authTypeOptions}/>
+        </Form.Item>,
+        <Form.Item
+            key="credentials"
+            noStyle
+            shouldUpdate={(previous, current) => previous.authType !== current.authType}
+        >
+            {({getFieldValue}) =>
+                getFieldValue('authType') === 'ACCESS_TOKEN' ?
+                    <Form.Item
+                        name="token"
+                        label="Access token"
+                        extra="Workspace or project access token (Premium plan), or repository access token. Used as a Bearer token."
+                    >
+                        <Input.Password/>
+                    </Form.Item> :
+                    <>
+                        <Form.Item
+                            name="email"
+                            label="Email"
+                            extra="Email of the Atlassian account owning the API token."
+                            rules={[{required: true, message: 'Email is required for an API token.',},]}
+                        >
+                            <Input/>
+                        </Form.Item>
+                        <Form.Item
+                            name="token"
+                            label="API token"
+                            extra="API token of the Atlassian account, with Bitbucket scopes."
+                        >
+                            <Input.Password/>
+                        </Form.Item>
+                    </>
+            }
+        </Form.Item>,
+        <Form.Item
+            key="autoMergeEmail"
+            name="autoMergeEmail"
+            label="Auto-merge email"
+            extra="Email of the Atlassian account approving pull requests for the auto merge operations."
         >
             <Input/>
         </Form.Item>,
         <Form.Item
-            key="user"
-            name="user"
-            label="User"
-            extra="User used by Yontrack to connect to Bitbucket Cloud."
-        >
-            <Input/>
-        </Form.Item>,
-        <Form.Item
-            key="password"
-            name="password"
-            label="Token"
-            extra="Token used by Yontrack to connect to Bitbucket Cloud."
+            key="autoMergeToken"
+            name="autoMergeToken"
+            label="Auto-merge API token"
+            extra="API token of the account approving pull requests for the auto merge operations."
         >
             <Input.Password/>
         </Form.Item>,

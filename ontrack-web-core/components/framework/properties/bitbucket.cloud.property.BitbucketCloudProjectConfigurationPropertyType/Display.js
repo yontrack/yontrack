@@ -1,5 +1,6 @@
 export default function Display({property}) {
+    const {workspace, repository, repositoryUrl} = property.value
     return (
-        <a href={property.value.repositoryUrl}>{property.value.repositoryUrl}</a>
+        <a href={repositoryUrl}>{workspace}/{repository}</a>
     )
 }
