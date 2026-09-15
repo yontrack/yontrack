@@ -35,6 +35,15 @@ While you may keep using this local Keycloak as an identity provider, in most ca
 
 Once authentication has been setup, you can start configuring [groups](../security/groups.md) and map them to the [groups of your identity provider](../security/group-mappings.md).
 
+## Security updates
+
+Security fixes ship in the next Yontrack release and are not backported to older ones: keep your
+installation on the latest release to receive them.
+
+To report a vulnerability, do not open a public issue — follow the
+[security policy](https://github.com/yontrack/yontrack/security/policy), which uses GitHub's
+private vulnerability reporting.
+
 ## Configuration
 
 Where to go next? Start [configuring](configuration.md) your Yontrack instance.
