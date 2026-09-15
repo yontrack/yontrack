@@ -102,6 +102,7 @@ There are several ways to integrate this Yontrack CI Configuration from your too
 
 * [GitHub actions](#github-actions)
 * [Jenkins pipeline](#jenkins-pipeline)
+* [Bitbucket Pipelines](#bitbucket-pipelines)
 * [Yontrack CLI](#yontrack-cli)
 * [Direct GraphQL call](#direct-graphql-call)
 
@@ -131,6 +132,24 @@ from your Jenkins pipelines:
 
 ```groovy
 ontrackCliCIConfig()
+```
+
+It expects the `.yontrack/ci.yaml` file to be present in the root of the repository.
+
+### Bitbucket Pipelines
+
+In Bitbucket Pipelines, use the [Yontrack CLI](#yontrack-cli) and pass it the pipeline's `BITBUCKET_*` variables. The
+[`bitbucket-pipelines` CI engine](../reference/ci-config/ci-engines/bitbucket-pipelines.md) and the
+[`bitbucket-cloud` SCM engine](../reference/ci-config/scm-engines/bitbucket-cloud.md) are then detected automatically:
+
+```yaml
+pipelines:
+  default:
+    - step:
+        name: Yontrack configuration
+        script:
+          # YONTRACK_URL and YONTRACK_TOKEN are defined as repository or workspace variables
+          - yontrack ci config --file .yontrack/ci.yaml --env-all BITBUCKET_
 ```
 
 It expects the `.yontrack/ci.yaml` file to be present in the root of the repository.

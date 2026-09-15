@@ -115,7 +115,9 @@ nav:
       - Configuration properties: content/generated/configurations/index.md
       - CI Configuration:
           - Conditions: content/generated/ci-config/conditions/index.md
-          - CI Engines: content/reference/ci-config/ci-engines/index.md
+          - CI Engines:
+              - content/reference/ci-config/ci-engines/index.md
+              - Bitbucket Pipelines: content/reference/ci-config/ci-engines/bitbucket-pipelines.md
           - SCM Engines:
               - content/reference/ci-config/scm-engines/index.md
               - GitHub: content/reference/ci-config/scm-engines/github.md
