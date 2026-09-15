@@ -311,6 +311,29 @@ branch:
           warningIfSkipped: true
 ```
 
+Instead of the fully qualified class name of the [validation stamp type](../concepts/model/index.md#validation-stamp-types),
+the following aliases can be used:
+
+| Alias        | Data type                                                     |
+|--------------|---------------------------------------------------------------|
+| `tests`      | [Test summary](../concepts/model/index.md#test-summary)       |
+| `chml`       | [CHML](../concepts/model/index.md#chml)                       |
+| `percentage` | [Percentage](../concepts/model/index.md#percentage)           |
+| `number`     | [Number](../concepts/model/index.md#number)                   |
+| `metrics`    | [Metrics](../concepts/model/index.md#metrics)                 |
+
+For example, to fail a validation as soon as at least one secret is detected (`okIfGreater: false` means that the
+lower the value, the better):
+
+```yaml
+branch:
+  validations:
+    - SECURITY.SECRETS:
+        number:
+          failureThreshold: 0
+          okIfGreater: false
+```
+
 !!! note
 
     Use the [JSON schema](#json-schema) to see which other types are available.
