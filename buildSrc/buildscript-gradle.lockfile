@@ -1,0 +1,31 @@
+# This is a Gradle generated file for dependency locking.
+# Manual edits can break the build and are not advised.
+# This file is expected to be part of source control.
+com.google.code.gson:gson:2.8.9=classpath
+org.gradle.kotlin.kotlin-dsl:org.gradle.kotlin.kotlin-dsl.gradle.plugin:5.2.0=classpath
+org.gradle.kotlin:gradle-kotlin-dsl-plugins:5.2.0=classpath
+org.jetbrains.intellij.deps:trove4j:1.0.20200330=classpath
+org.jetbrains.kotlin:kotlin-assignment:2.0.21=classpath
+org.jetbrains.kotlin:kotlin-build-statistics:2.0.21=classpath
+org.jetbrains.kotlin:kotlin-build-tools-api:2.0.21=classpath
+org.jetbrains.kotlin:kotlin-compiler-embeddable:2.0.21=classpath
+org.jetbrains.kotlin:kotlin-compiler-runner:2.0.21=classpath
+org.jetbrains.kotlin:kotlin-daemon-client:2.0.21=classpath
+org.jetbrains.kotlin:kotlin-daemon-embeddable:2.0.21=classpath
+org.jetbrains.kotlin:kotlin-gradle-plugin-annotations:2.0.21=classpath
+org.jetbrains.kotlin:kotlin-gradle-plugin-api:2.0.21=classpath
+org.jetbrains.kotlin:kotlin-gradle-plugin-idea-proto:2.0.21=classpath
+org.jetbrains.kotlin:kotlin-gradle-plugin-idea:2.0.21=classpath
+org.jetbrains.kotlin:kotlin-gradle-plugin-model:2.0.21=classpath
+org.jetbrains.kotlin:kotlin-gradle-plugin:2.0.21=classpath
+org.jetbrains.kotlin:kotlin-gradle-plugins-bom:2.0.21=classpath
+org.jetbrains.kotlin:kotlin-klib-commonizer-api:2.0.21=classpath
+org.jetbrains.kotlin:kotlin-native-utils:2.0.21=classpath
+org.jetbrains.kotlin:kotlin-sam-with-receiver:2.0.21=classpath
+org.jetbrains.kotlin:kotlin-stdlib:2.0.21=classpath
+org.jetbrains.kotlin:kotlin-tooling-core:2.0.21=classpath
+org.jetbrains.kotlin:kotlin-util-io:2.0.21=classpath
+org.jetbrains.kotlin:kotlin-util-klib:2.0.21=classpath
+org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.6.4=classpath
+org.jetbrains:annotations:13.0=classpath
+empty=
