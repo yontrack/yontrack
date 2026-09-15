@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 import kotlin.test.fail
 
 /**
@@ -36,9 +37,9 @@ class ACCBitbucketCloudExtension : AbstractACCDSLTestSupport() {
         assertEquals(confName, conf.name)
         assertEquals(BitbucketCloudConfiguration.API_TOKEN, conf.authType)
         assertEquals("bot@example.com", conf.email)
-        assertEquals("", conf.token)
+        assertTrue(conf.token.isNullOrBlank(), "Token is not exposed")
         assertEquals("approver@example.com", conf.autoMergeEmail)
-        assertEquals("", conf.autoMergeToken)
+        assertTrue(conf.autoMergeToken.isNullOrBlank(), "Auto merge token is not exposed")
 
         ontrack.configurations.bitbucketCloud.delete(confName)
         assertNull(ontrack.configurations.bitbucketCloud.findByName(confName), "Configuration has been deleted")
@@ -58,7 +59,7 @@ class ACCBitbucketCloudExtension : AbstractACCDSLTestSupport() {
             ?: fail("Could not find the Bitbucket Cloud configuration")
         assertEquals(BitbucketCloudConfiguration.ACCESS_TOKEN, conf.authType)
         assertNull(conf.email)
-        assertEquals("", conf.token)
+        assertTrue(conf.token.isNullOrBlank(), "Token is not exposed")
     }
 
     @Test
