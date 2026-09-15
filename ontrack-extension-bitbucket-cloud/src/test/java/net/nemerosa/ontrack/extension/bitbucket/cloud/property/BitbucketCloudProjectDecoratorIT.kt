@@ -52,12 +52,12 @@ class BitbucketCloudProjectDecoratorIT : AbstractBitbucketCloudTestSupport() {
                 project {
                     val config = bitbucketCloudTestConfigMock()
                     bitbucketCloudConfigurationService.newConfiguration(config)
-                    setBitbucketCloudProperty(config, "my-repository")
+                    setBitbucketCloudProperty(config, "my-repository", workspace = "my-workspace")
                     val list = decorator.getDecorations(this)
                     assertEquals(1, list.size)
                     val decoration = list.first()
                     assertEquals(
-                        "${config.workspace}/my-repository",
+                        "my-workspace/my-repository",
                         decoration.data
                     )
                 }

@@ -22,8 +22,12 @@ class BitbucketCloudConnectorStatusIndicator(
 
     override fun connectorDescription(config: BitbucketCloudConfiguration) = ConnectorDescription(
         connector = Connector(type, config.name),
-        connection = config.workspace
+        connection = CONNECTION,
     )
 
     override val type: String = "bitbucket-cloud"
+
+    companion object {
+        const val CONNECTION = "https://bitbucket.org"
+    }
 }

@@ -21,7 +21,8 @@ class BitbucketCloudProjectConfigurationPropertyMutationProviderIT : AbstractBit
                         setProjectBitbucketCloudConfigurationPropertyById(input: {
                             id: $id,
                             configuration: "${cfg.name}",
-                            repository: "nemerosa/test"
+                            workspace: "nemerosa",
+                            repository: "test"
                         }) {
                             project {
                                 id
@@ -36,7 +37,8 @@ class BitbucketCloudProjectConfigurationPropertyMutationProviderIT : AbstractBit
                     assertEquals(id(), node.path("project").path("id").asInt())
                     assertNotNull(getProperty(this, BitbucketCloudProjectConfigurationPropertyType::class.java)) { property ->
                         assertEquals(cfg.name, property.configuration.name)
-                        assertEquals("nemerosa/test", property.repository)
+                        assertEquals("nemerosa", property.workspace)
+                        assertEquals("test", property.repository)
                         assertEquals(0, property.indexationInterval)
                         assertEquals(null, property.issueServiceConfigurationIdentifier)
                     }
@@ -58,7 +60,8 @@ class BitbucketCloudProjectConfigurationPropertyMutationProviderIT : AbstractBit
                         setProjectBitbucketCloudConfigurationPropertyById(input: {
                             id: $id,
                             configuration: "${cfg.name}",
-                            repository: "nemerosa/test",
+                            workspace: "nemerosa",
+                            repository: "test",
                             indexationInterval: 30
                         }) {
                             project {
@@ -74,7 +77,8 @@ class BitbucketCloudProjectConfigurationPropertyMutationProviderIT : AbstractBit
                     assertEquals(id(), node.path("project").path("id").asInt())
                     assertNotNull(getProperty(this, BitbucketCloudProjectConfigurationPropertyType::class.java)) { property ->
                         assertEquals(cfg.name, property.configuration.name)
-                        assertEquals("nemerosa/test", property.repository)
+                        assertEquals("nemerosa", property.workspace)
+                        assertEquals("test", property.repository)
                         assertEquals(30, property.indexationInterval)
                         assertEquals(null, property.issueServiceConfigurationIdentifier)
                     }
@@ -96,7 +100,8 @@ class BitbucketCloudProjectConfigurationPropertyMutationProviderIT : AbstractBit
                         setProjectBitbucketCloudConfigurationPropertyById(input: {
                             id: $id,
                             configuration: "${cfg.name}",
-                            repository: "nemerosa/test",
+                            workspace: "nemerosa",
+                            repository: "test",
                             issueServiceConfigurationIdentifier: "jira//my-jira"
                         }) {
                             project {
@@ -112,7 +117,8 @@ class BitbucketCloudProjectConfigurationPropertyMutationProviderIT : AbstractBit
                     assertEquals(id(), node.path("project").path("id").asInt())
                     assertNotNull(getProperty(this, BitbucketCloudProjectConfigurationPropertyType::class.java)) { property ->
                         assertEquals(cfg.name, property.configuration.name)
-                        assertEquals("nemerosa/test", property.repository)
+                        assertEquals("nemerosa", property.workspace)
+                        assertEquals("test", property.repository)
                         assertEquals(0, property.indexationInterval)
                         assertEquals("jira//my-jira", property.issueServiceConfigurationIdentifier)
                     }

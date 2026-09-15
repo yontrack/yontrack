@@ -21,7 +21,8 @@ class BitbucketCloudProjectConfigurationPropertyMutationProvider(
 
     override val inputFields: List<GraphQLInputObjectField> = listOf(
         requiredStringInputField("configuration", "Name of the Bitbucket Cloud configuration to use"),
-        requiredStringInputField("repository", "Bitbucket Cloud repository to use, in the form of `workspace/name`"),
+        requiredStringInputField("workspace", "Slug of the Bitbucket Cloud workspace"),
+        requiredStringInputField("repository", "Slug of the Bitbucket Cloud repository in the workspace"),
         optionalIntInputField(
             "indexationInterval",
             "Interval (in minutes) between each indexation of the repository by Ontrack"
@@ -34,6 +35,7 @@ class BitbucketCloudProjectConfigurationPropertyMutationProvider(
 
     override fun readInput(entity: ProjectEntity, input: MutationInput) = BitbucketCloudProjectConfigurationProperty(
         configuration = bitbucketCloudConfigurationService.getConfiguration(input.getRequiredInput("configuration")),
+        workspace = input.getRequiredInput("workspace"),
         repository = input.getRequiredInput("repository"),
         indexationInterval = input.getInput<Int>("indexationInterval") ?: 0,
         issueServiceConfigurationIdentifier = input.getInput("issueServiceConfigurationIdentifier")

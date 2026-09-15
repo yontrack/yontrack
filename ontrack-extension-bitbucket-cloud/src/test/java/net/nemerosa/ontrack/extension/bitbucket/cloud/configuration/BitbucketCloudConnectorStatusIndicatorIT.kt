@@ -4,6 +4,7 @@ import net.nemerosa.ontrack.extension.bitbucket.cloud.AbstractBitbucketCloudTest
 import net.nemerosa.ontrack.extension.bitbucket.cloud.TestOnBitbucketCloud
 import net.nemerosa.ontrack.extension.bitbucket.cloud.bitbucketCloudTestConfigMock
 import net.nemerosa.ontrack.extension.bitbucket.cloud.bitbucketCloudTestConfigReal
+import net.nemerosa.ontrack.extension.bitbucket.cloud.bitbucketCloudTestConfigRealAccessToken
 import net.nemerosa.ontrack.model.support.ConnectorStatus
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -16,8 +17,16 @@ class BitbucketCloudConnectorStatusIndicatorIT : AbstractBitbucketCloudTestSuppo
     private lateinit var bitbucketCloudConnectorStatusIndicator: BitbucketCloudConnectorStatusIndicator
 
     @TestOnBitbucketCloud
-    fun `Connector status indicator OK`() {
+    fun `Connector status indicator OK with an API token`() {
         val config = bitbucketCloudTestConfigReal()
+        doTest(config) {
+            assertNull(it.error, "Bitbucket Cloud connection OK")
+        }
+    }
+
+    @TestOnBitbucketCloud
+    fun `Connector status indicator OK with an access token`() {
+        val config = bitbucketCloudTestConfigRealAccessToken()
         doTest(config) {
             assertNull(it.error, "Bitbucket Cloud connection OK")
         }
@@ -40,7 +49,7 @@ class BitbucketCloudConnectorStatusIndicatorIT : AbstractBitbucketCloudTestSuppo
             val status = statuses.find {
                 it.description.connector.type == "bitbucket-cloud" &&
                         it.description.connector.name == config.name &&
-                        it.description.connection == config.workspace
+                        it.description.connection == BitbucketCloudConnectorStatusIndicator.CONNECTION
             }
             assertNotNull(status) {
                 check(it)

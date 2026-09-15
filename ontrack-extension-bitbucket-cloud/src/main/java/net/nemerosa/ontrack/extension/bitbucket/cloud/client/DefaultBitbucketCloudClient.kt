@@ -1,23 +1,52 @@
 package net.nemerosa.ontrack.extension.bitbucket.cloud.client
 
+import com.fasterxml.jackson.databind.JsonNode
+import net.nemerosa.ontrack.extension.bitbucket.cloud.configuration.BitbucketCloudAuthType
+import net.nemerosa.ontrack.extension.bitbucket.cloud.configuration.BitbucketCloudConfiguration
 import net.nemerosa.ontrack.extension.bitbucket.cloud.model.*
 import org.springframework.boot.web.client.RestTemplateBuilder
+import org.springframework.http.HttpHeaders
 import org.springframework.web.client.RestTemplate
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
+import java.util.*
 import kotlin.reflect.KClass
 
 class DefaultBitbucketCloudClient(
-    override val workspace: String,
-    private val user: String,
-    private val token: String,
+    private val configuration: BitbucketCloudConfiguration,
 ) : BitbucketCloudClient {
 
-    override val projects: List<BitbucketCloudProject>
-        get() = get<BitbucketCloudProjectList>("/2.0/workspaces/$workspace/projects").values
+    companion object {
+        const val ROOT_URI = "https://api.bitbucket.org"
 
-    override val repositories: List<BitbucketCloudRepository>
-        get() = paginate<BitbucketCloudRepository, BitbucketCloudRepositoryList> { page ->
+        /**
+         * `Authorization` header for a configuration: HTTP basic with the email for an API token,
+         * Bearer for an access token.
+         */
+        fun authorizationHeader(configuration: BitbucketCloudConfiguration): String {
+            val token = configuration.token?.takeIf { it.isNotBlank() }
+                ?: error("Bitbucket Cloud configuration ${configuration.name} has no token.")
+            return when (configuration.authType) {
+                BitbucketCloudAuthType.API_TOKEN -> {
+                    val email = configuration.email?.takeIf { it.isNotBlank() }
+                        ?: error("Bitbucket Cloud configuration ${configuration.name} has no email for its API token.")
+                    "Basic " + Base64.getEncoder().encodeToString("$email:$token".toByteArray(Charsets.UTF_8))
+                }
+
+                BitbucketCloudAuthType.ACCESS_TOKEN -> "Bearer $token"
+            }
+        }
+    }
+
+    override fun validate() {
+        when (configuration.authType) {
+            BitbucketCloudAuthType.API_TOKEN -> get<JsonNode>("/2.0/user")
+            BitbucketCloudAuthType.ACCESS_TOKEN -> get<JsonNode>("/2.0/hook_events")
+        }
+    }
+
+    override fun getRepositories(workspace: String): List<BitbucketCloudRepository> =
+        paginate<BitbucketCloudRepository, BitbucketCloudRepositoryList> { page ->
             "/2.0/repositories/$workspace?page=$page"
         }
 
@@ -27,7 +56,7 @@ class DefaultBitbucketCloudClient(
     override fun getRepositoryCreationDate(repository: BitbucketCloudRepository): LocalDateTime? =
         LocalDateTime.parse(repository.created_on, DateTimeFormatter.ISO_OFFSET_DATE_TIME)
 
-    override fun getRepository(repository: String): BitbucketCloudRepository =
+    override fun getRepository(workspace: String, repository: String): BitbucketCloudRepository =
         get("/2.0/repositories/$workspace/$repository")
 
     private inline fun <reified T, reified P : BitbucketCloudPaginatedList<T>> paginate(
@@ -39,21 +68,12 @@ class DefaultBitbucketCloudClient(
         path: (Int) -> String,
     ): List<T> {
         var page = 1
-        var hasNext = true
         val results = mutableListOf<T>()
-        while (hasNext) {
-            // Gets the page
+        do {
             val list = get(pageType, path(page))
-            // Adding the values
             results.addAll(list.values)
-            // Pagination
-            if (list.next != null) {
-                hasNext = true
-                page++
-            } else {
-                hasNext = false
-            }
-        }
+            page++
+        } while (list.next != null)
         return results
     }
 
@@ -63,13 +83,10 @@ class DefaultBitbucketCloudClient(
     private fun <T : Any> get(responseType: KClass<T>, path: String): T =
         template.getForObject(path, responseType.java) ?: throw BitbucketCloudNoResponseException(path)
 
-    private val template: RestTemplate by lazy {
+    internal val template: RestTemplate by lazy {
         RestTemplateBuilder()
-            .rootUri("https://api.bitbucket.org")
-            .basicAuthentication(
-                user,
-                token
-            )
+            .rootUri(ROOT_URI)
+            .defaultHeader(HttpHeaders.AUTHORIZATION, authorizationHeader(configuration))
             .build()
     }
 }

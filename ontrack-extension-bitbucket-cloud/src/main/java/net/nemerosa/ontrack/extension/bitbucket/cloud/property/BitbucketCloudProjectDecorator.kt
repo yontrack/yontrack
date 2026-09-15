@@ -24,7 +24,7 @@ class BitbucketCloudProjectDecorator(
                 listOf(
                     Decoration.of(
                         this,
-                        "${property.configuration.workspace}/${property.repository}"
+                        property.fullName
                     )
                 )
             }

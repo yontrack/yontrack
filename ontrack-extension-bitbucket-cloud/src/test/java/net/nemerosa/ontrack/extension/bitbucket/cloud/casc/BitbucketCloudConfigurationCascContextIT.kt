@@ -1,6 +1,8 @@
 package net.nemerosa.ontrack.extension.bitbucket.cloud.casc
 
 import net.nemerosa.ontrack.extension.bitbucket.cloud.bitbucketCloudTestConfigMock
+import net.nemerosa.ontrack.extension.bitbucket.cloud.configuration.BitbucketCloudAuthType
+import net.nemerosa.ontrack.extension.bitbucket.cloud.configuration.BitbucketCloudConfiguration
 import net.nemerosa.ontrack.extension.bitbucket.cloud.configuration.BitbucketCloudConfigurationService
 import net.nemerosa.ontrack.extension.casc.AbstractCascTestSupport
 import net.nemerosa.ontrack.json.asJson
@@ -27,43 +29,21 @@ class BitbucketCloudConfigurationCascContextIT : AbstractCascTestSupport() {
     @Test
     fun `CasC schema type`() {
         val type = bitbucketCloudConfigurationCascContext.jsonType(jsonTypeBuilder)
+        val items = type.asJson().path("items")
+        assertEquals("BitbucketCloudConfigurationCascData", items.path("title").asText())
         assertEquals(
-            """
-                {
-                  "items": {
-                    "title": "BitbucketCloudConfigurationCascData",
-                    "properties": {
-                      "name": {
-                        "description": "Name of the configuration",
-                        "type": "string"
-                      },
-                      "password": {
-                        "description": "App password used to connect to Bitbucket Cloud",
-                        "type": "string"
-                      },
-                      "user": {
-                        "description": "Name of the user used to connect to Bitbucket Cloud",
-                        "type": "string"
-                      },
-                      "workspace": {
-                        "description": "Slug of the Bitbucket Cloud workspace to connect to",
-                        "type": "string"
-                      }
-                    },
-                    "required": [
-                      "name",
-                      "user",
-                      "workspace"
-                    ],
-                    "additionalProperties": false,
-                    "type": "object"
-                  },
-                  "description": "List of Bitbucket Cloud configurations",
-                  "type": "array"
-                }
-            """.trimIndent().parseAsJson(),
-            type.asJson()
+            setOf("name", "authType", "email", "token", "autoMergeEmail", "autoMergeToken"),
+            items.path("properties").fieldNames().asSequence().toSet()
         )
+        assertEquals(
+            setOf("name", "authType", "token"),
+            items.path("required").map { it.asText() }.toSet()
+        )
+        assertEquals(
+            setOf("API_TOKEN", "ACCESS_TOKEN"),
+            items.path("properties").path("authType").path("enum").map { it.asText() }.toSet()
+        )
+        assertEquals(false, items.path("additionalProperties").asBoolean(true))
     }
 
     @BeforeEach
@@ -77,25 +57,61 @@ class BitbucketCloudConfigurationCascContextIT : AbstractCascTestSupport() {
     }
 
     @Test
-    fun `Bitbucket Cloud configuration CasC`() {
-        val config = bitbucketCloudTestConfigMock()
+    fun `Bitbucket Cloud API token configuration CasC`() {
+        val name = uid("C")
         withDisabledConfigurationTest {
             casc(
                 """
                     ontrack:
                         config:
                             bitbucket-cloud:
-                                - name: ${config.name}
-                                  workspace: ${config.workspace}
-                                  user: ${config.user}
-                                  password: ${config.password}
+                                - name: $name
+                                  authType: API_TOKEN
+                                  email: bot@example.com
+                                  token: secret
+                                  autoMergeEmail: approver@example.com
+                                  autoMergeToken: approver-secret
                 """.trimIndent()
             )
             asAdmin {
-                val savedConfig = bitbucketCloudConfigurationService.getConfiguration(config.name)
-                assertEquals(config.workspace, savedConfig.workspace)
-                assertEquals(config.user, savedConfig.user)
-                assertEquals(config.password, savedConfig.password)
+                assertEquals(
+                    BitbucketCloudConfiguration(
+                        name = name,
+                        authType = BitbucketCloudAuthType.API_TOKEN,
+                        email = "bot@example.com",
+                        token = "secret",
+                        autoMergeEmail = "approver@example.com",
+                        autoMergeToken = "approver-secret",
+                    ),
+                    bitbucketCloudConfigurationService.getConfiguration(name)
+                )
+            }
+        }
+    }
+
+    @Test
+    fun `Bitbucket Cloud access token configuration CasC`() {
+        val name = uid("C")
+        withDisabledConfigurationTest {
+            casc(
+                """
+                    ontrack:
+                        config:
+                            bitbucket-cloud:
+                                - name: $name
+                                  authType: ACCESS_TOKEN
+                                  token: secret
+                """.trimIndent()
+            )
+            asAdmin {
+                assertEquals(
+                    BitbucketCloudConfiguration(
+                        name = name,
+                        authType = BitbucketCloudAuthType.ACCESS_TOKEN,
+                        token = "secret",
+                    ),
+                    bitbucketCloudConfigurationService.getConfiguration(name)
+                )
             }
         }
     }
@@ -107,23 +123,21 @@ class BitbucketCloudConfigurationCascContextIT : AbstractCascTestSupport() {
             asAdmin {
                 bitbucketCloudConfigurationService.newConfiguration(config)
             }
-            val newWorkspace = uid("w")
             casc(
                 """
                     ontrack:
                         config:
                             bitbucket-cloud:
                                 - name: ${config.name}
-                                  workspace: $newWorkspace
-                                  user: ${config.user}
-                                  password: ${config.password}
+                                  authType: API_TOKEN
+                                  email: other@example.com
+                                  token: new-token
                 """.trimIndent()
             )
             asAdmin {
                 val savedConfig = bitbucketCloudConfigurationService.getConfiguration(config.name)
-                assertEquals(newWorkspace, savedConfig.workspace)
-                assertEquals(config.user, savedConfig.user)
-                assertEquals(config.password, savedConfig.password)
+                assertEquals("other@example.com", savedConfig.email)
+                assertEquals("new-token", savedConfig.token)
             }
         }
     }
@@ -131,29 +145,48 @@ class BitbucketCloudConfigurationCascContextIT : AbstractCascTestSupport() {
     @Test
     fun `Bitbucket Cloud configuration CasC - removing and adding a configuration`() {
         withDisabledConfigurationTest {
-            val config1 = bitbucketCloudTestConfigMock(workspace = uid("w"))
+            val config1 = bitbucketCloudTestConfigMock()
             asAdmin {
                 bitbucketCloudConfigurationService.newConfiguration(config1)
             }
-            val config2 = bitbucketCloudTestConfigMock(workspace = uid("w"))
+            val config2 = bitbucketCloudTestConfigMock(authType = BitbucketCloudAuthType.ACCESS_TOKEN)
             casc(
                 """
                     ontrack:
                         config:
                             bitbucket-cloud:
                                 - name: ${config2.name}
-                                  workspace: ${config2.workspace}
-                                  user: ${config2.user}
-                                  password: ${config2.password}
+                                  authType: ACCESS_TOKEN
+                                  token: ${config2.token}
                 """.trimIndent()
             )
             asAdmin {
                 val oldConfig = bitbucketCloudConfigurationService.findConfiguration(config1.name)
                 assertNull(oldConfig, "Old config has been removed")
-                val savedConfig = bitbucketCloudConfigurationService.getConfiguration(config2.name)
-                assertEquals(config2.workspace, savedConfig.workspace)
-                assertEquals(config2.user, savedConfig.user)
-                assertEquals(config2.password, savedConfig.password)
+                assertEquals(config2, bitbucketCloudConfigurationService.getConfiguration(config2.name))
+            }
+        }
+    }
+
+    @Test
+    fun `Rendering does not expose the tokens`() {
+        withDisabledConfigurationTest {
+            val config = bitbucketCloudTestConfigMock().copy(autoMergeEmail = "approver@example.com", autoMergeToken = "xxx")
+            asAdmin {
+                bitbucketCloudConfigurationService.newConfiguration(config)
+                assertEquals(
+                    """
+                        [{
+                            "name": "${config.name}",
+                            "authType": "API_TOKEN",
+                            "email": "user@example.com",
+                            "token": "",
+                            "autoMergeEmail": "approver@example.com",
+                            "autoMergeToken": ""
+                        }]
+                    """.trimIndent().parseAsJson(),
+                    bitbucketCloudConfigurationCascContext.render()
+                )
             }
         }
     }

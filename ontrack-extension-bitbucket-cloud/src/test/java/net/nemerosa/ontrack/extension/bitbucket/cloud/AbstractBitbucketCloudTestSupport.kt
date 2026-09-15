@@ -34,6 +34,7 @@ abstract class AbstractBitbucketCloudTestSupport : AbstractQLKTITSupport() {
     protected fun Project.setBitbucketCloudProperty(
         config: BitbucketCloudConfiguration,
         repository: String,
+        workspace: String = "my-workspace",
         indexationInterval: Int = 0,
         issueServiceConfigurationIdentifier: String? = null,
     ) {
@@ -42,6 +43,7 @@ abstract class AbstractBitbucketCloudTestSupport : AbstractQLKTITSupport() {
             BitbucketCloudProjectConfigurationPropertyType::class.java,
             BitbucketCloudProjectConfigurationProperty(
                 configuration = config,
+                workspace = workspace,
                 repository = repository,
                 indexationInterval = indexationInterval,
                 issueServiceConfigurationIdentifier = issueServiceConfigurationIdentifier,

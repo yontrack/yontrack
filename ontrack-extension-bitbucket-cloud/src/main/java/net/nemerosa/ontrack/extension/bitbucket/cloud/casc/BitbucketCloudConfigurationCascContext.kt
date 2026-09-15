@@ -3,6 +3,7 @@ package net.nemerosa.ontrack.extension.bitbucket.cloud.casc
 import com.fasterxml.jackson.databind.JsonNode
 import net.nemerosa.ontrack.common.api.APIDescription
 import net.nemerosa.ontrack.common.syncForward
+import net.nemerosa.ontrack.extension.bitbucket.cloud.configuration.BitbucketCloudAuthType
 import net.nemerosa.ontrack.extension.bitbucket.cloud.configuration.BitbucketCloudConfiguration
 import net.nemerosa.ontrack.extension.bitbucket.cloud.configuration.BitbucketCloudConfigurationService
 import net.nemerosa.ontrack.extension.casc.context.AbstractCascContext
@@ -71,29 +72,37 @@ class BitbucketCloudConfigurationCascContext(
     }
 
     override fun render(): JsonNode = bitbucketCloudConfigurationService.configurations.map {
-        mapOf(
-            "name" to it.name,
-            "workspace" to it.workspace,
-            "user" to it.user,
-            "password" to "",
+        BitbucketCloudConfigurationCascData(
+            name = it.name,
+            authType = it.authType,
+            email = it.email,
+            token = "",
+            autoMergeEmail = it.autoMergeEmail,
+            autoMergeToken = it.autoMergeToken?.let { "" },
         )
     }.asJson()
 
     data class BitbucketCloudConfigurationCascData(
         @APIDescription("Name of the configuration")
         val name: String,
-        @APIDescription("Slug of the Bitbucket Cloud workspace to connect to")
-        val workspace: String,
-        @APIDescription("Name of the user used to connect to Bitbucket Cloud")
-        val user: String,
-        @APIDescription("App password used to connect to Bitbucket Cloud")
-        val password: String?,
+        @APIDescription("Type of authentication: API_TOKEN (Atlassian account email + API token, every plan) or ACCESS_TOKEN (workspace, project or repository access token, used as a Bearer token)")
+        val authType: BitbucketCloudAuthType,
+        @APIDescription("Atlassian account email, required for the API_TOKEN authentication type")
+        val email: String? = null,
+        @APIDescription("API token or access token")
+        val token: String,
+        @APIDescription("Atlassian account email of the identity approving pull requests for auto-versioning")
+        val autoMergeEmail: String? = null,
+        @APIDescription("API token of the identity approving pull requests for auto-versioning")
+        val autoMergeToken: String? = null,
     ) {
         fun toConfiguration() = BitbucketCloudConfiguration(
             name = name,
-            workspace = workspace,
-            user = user,
-            password = password,
+            authType = authType,
+            email = email,
+            token = token,
+            autoMergeEmail = autoMergeEmail,
+            autoMergeToken = autoMergeToken,
         )
     }
 

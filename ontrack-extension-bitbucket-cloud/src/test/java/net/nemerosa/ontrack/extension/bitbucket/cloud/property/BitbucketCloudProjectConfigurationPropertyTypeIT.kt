@@ -20,6 +20,7 @@ class BitbucketCloudProjectConfigurationPropertyTypeIT : AbstractBitbucketCloudT
                     setBitbucketCloudProperty(
                         config,
                         repository = "my-repository",
+                        workspace = "my-workspace",
                         indexationInterval = 30,
                         issueServiceConfigurationIdentifier = "jira//my-jira",
                     )
@@ -31,6 +32,7 @@ class BitbucketCloudProjectConfigurationPropertyTypeIT : AbstractBitbucketCloudT
                         ).value
                     ) {
                         assertEquals(config.name, it.configuration.name)
+                        assertEquals("my-workspace", it.workspace)
                         assertEquals("my-repository", it.repository)
                         assertEquals(30, it.indexationInterval)
                         assertEquals("jira//my-jira", it.issueServiceConfigurationIdentifier)
@@ -58,14 +60,22 @@ class BitbucketCloudProjectConfigurationPropertyTypeIT : AbstractBitbucketCloudT
     }
 
     @TestOnBitbucketCloud
+    fun `Project information in the property decorations with an access token`() {
+        checkProjectInformation(bitbucketCloudTestConfigRealAccessToken())
+    }
+
+    @TestOnBitbucketCloud
     fun `Project information in the property decorations`() {
+        checkProjectInformation(bitbucketCloudTestConfigReal())
+    }
+
+    private fun checkProjectInformation(config: net.nemerosa.ontrack.extension.bitbucket.cloud.configuration.BitbucketCloudConfiguration) {
         val expectedRepository = bitbucketCloudTestEnv.repository
         val expectedProject = bitbucketCloudTestEnv.project
         asAdmin {
             project {
-                val config = bitbucketCloudTestConfigReal()
                 bitbucketCloudConfigurationService.newConfiguration(config)
-                setBitbucketCloudProperty(config, expectedRepository, 0, null)
+                setBitbucketCloudProperty(config, expectedRepository, workspace = bitbucketCloudTestEnv.workspace)
                 // Gets the property
                 assertNotNull(propertyService.getProperty(this, BitbucketCloudProjectConfigurationPropertyType::class.java).value) {
                     // Gets its decorations
@@ -74,7 +84,7 @@ class BitbucketCloudProjectConfigurationPropertyTypeIT : AbstractBitbucketCloudT
                     assertNotNull(decorations["projectInfo"]) { node ->
                         assertIs<BitbucketCloudProjectConfigurationPropertyType.BitbucketCloudProjectProperty>(node) { info ->
                             assertEquals(expectedProject, info.project.key)
-                            assertEquals("https://bitbucket.org/${config.workspace}/workspace/projects/$expectedProject", info.url)
+                            assertEquals("https://bitbucket.org/${bitbucketCloudTestEnv.workspace}/workspace/projects/$expectedProject", info.url)
                         }
                     }
                 }

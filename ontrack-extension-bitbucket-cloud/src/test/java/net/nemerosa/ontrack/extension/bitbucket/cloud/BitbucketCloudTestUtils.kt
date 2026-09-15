@@ -1,5 +1,6 @@
 package net.nemerosa.ontrack.extension.bitbucket.cloud
 
+import net.nemerosa.ontrack.extension.bitbucket.cloud.configuration.BitbucketCloudAuthType
 import net.nemerosa.ontrack.extension.bitbucket.cloud.configuration.BitbucketCloudConfiguration
 import net.nemerosa.ontrack.test.TestUtils.uid
 import net.nemerosa.ontrack.test.getOptionalEnv
@@ -141,27 +142,39 @@ val bitbucketCloudTestEnv: BitbucketCloudTestEnv by lazy {
 }
 
 /**
- * Creates a real configuration for Bitbucket Cloud, suitable for system tests.
+ * Creates a real configuration for Bitbucket Cloud, suitable for system tests, using the bot's API token.
  */
 fun bitbucketCloudTestConfigReal(name: String = uid("C")) = bitbucketCloudTestEnv.run {
     BitbucketCloudConfiguration(
         name = name,
-        workspace = workspace,
-        user = bot.email,
-        password = bot.token,
+        authType = BitbucketCloudAuthType.API_TOKEN,
+        email = bot.email,
+        token = bot.token,
+        autoMergeEmail = approver.email,
+        autoMergeToken = approver.token,
     )
 }
 
+/**
+ * Creates a real configuration for Bitbucket Cloud, suitable for system tests, using the repository access token.
+ */
+fun bitbucketCloudTestConfigRealAccessToken(name: String = uid("C")) = bitbucketCloudTestEnv.run {
+    BitbucketCloudConfiguration(
+        name = name,
+        authType = BitbucketCloudAuthType.ACCESS_TOKEN,
+        token = accessToken,
+    )
+}
 
 fun bitbucketCloudTestConfigMock(
     name: String = uid("C"),
-    workspace: String = "my-workspace",
+    authType: BitbucketCloudAuthType = BitbucketCloudAuthType.API_TOKEN,
 ) =
     BitbucketCloudConfiguration(
         name = name,
-        workspace = workspace,
-        user = "user",
-        password = "token",
+        authType = authType,
+        email = if (authType == BitbucketCloudAuthType.API_TOKEN) "user@example.com" else null,
+        token = "token",
     )
 
 /**

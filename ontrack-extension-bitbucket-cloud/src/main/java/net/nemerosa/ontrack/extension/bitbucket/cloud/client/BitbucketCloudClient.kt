@@ -1,6 +1,5 @@
 package net.nemerosa.ontrack.extension.bitbucket.cloud.client
 
-import net.nemerosa.ontrack.extension.bitbucket.cloud.model.BitbucketCloudProject
 import net.nemerosa.ontrack.extension.bitbucket.cloud.model.BitbucketCloudRepository
 import java.time.LocalDateTime
 
@@ -10,44 +9,35 @@ import java.time.LocalDateTime
 interface BitbucketCloudClient {
 
     /**
-     * Associated workspace slug
-     */
-    val workspace: String
-
-    /**
-     * Gets the list of projects for this client
+     * Checks that the credentials are accepted by Bitbucket Cloud. Throws an exception if not.
      *
-     * @return List of projects
+     * - API token: `GET /2.0/user`
+     * - access token: `GET /2.0/hook_events` - `/2.0/user` is refused to access tokens, which have no user,
+     *   while `/2.0/hook_events` needs no scope but rejects an invalid token with a 401.
      */
-    val projects: List<BitbucketCloudProject>
+    fun validate()
 
     /**
-     * Gets all repositories for this client
+     * Gets all repositories of a workspace.
      */
-    val repositories: List<BitbucketCloudRepository>
+    fun getRepositories(workspace: String): List<BitbucketCloudRepository>
 
     /**
      * Given a [repository], returns its last modification date (if any).
-     *
-     * @param repository Repository to get the date from
-     * @return The last update date or `null` if not available
      */
     fun getRepositoryLastModified(repository: BitbucketCloudRepository): LocalDateTime?
 
     /**
      * Given a [repository], returns its creation date (if any).
-     *
-     * @param repository Repository to get the date from
-     * @return The creation date or `null` if not available
      */
     fun getRepositoryCreationDate(repository: BitbucketCloudRepository): LocalDateTime?
 
     /**
      * Gets the repository information.
      *
+     * @param workspace Workspace slug
      * @param repository Repository slug
-     * @return Repository information
      */
-    fun getRepository(repository: String): BitbucketCloudRepository
+    fun getRepository(workspace: String, repository: String): BitbucketCloudRepository
 
 }

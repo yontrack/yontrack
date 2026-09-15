@@ -51,6 +51,7 @@ class BitbucketCloudProjectConfigurationPropertyType(
         // OK
         return BitbucketCloudProjectConfigurationProperty(
             configuration = configuration,
+            workspace = node.path("workspace").asText(),
             repository = node.path("repository").asText(),
             indexationInterval = node.path("indexationInterval").asInt(),
             issueServiceConfigurationIdentifier = node.getTextField("issueServiceConfigurationIdentifier"),
@@ -60,6 +61,7 @@ class BitbucketCloudProjectConfigurationPropertyType(
     override fun forStorage(value: BitbucketCloudProjectConfigurationProperty): JsonNode {
         return mapOf(
             "configuration" to value.configuration.name,
+            "workspace" to value.workspace,
             "repository" to value.repository,
             "indexationInterval" to value.indexationInterval,
             "issueServiceConfigurationIdentifier" to value.issueServiceConfigurationIdentifier,
@@ -71,6 +73,7 @@ class BitbucketCloudProjectConfigurationPropertyType(
         replacementFunction: (String) -> String
     ): BitbucketCloudProjectConfigurationProperty = BitbucketCloudProjectConfigurationProperty(
         value.configuration,
+        value.workspace,
         replacementFunction(value.repository),
         value.indexationInterval,
         value.issueServiceConfigurationIdentifier
@@ -86,10 +89,10 @@ class BitbucketCloudProjectConfigurationPropertyType(
     private fun getBitbucketCloudProject(property: BitbucketCloudProjectConfigurationProperty): BitbucketCloudProjectProperty? {
         return try {
             val client = bitbucketCloudClientFactory.getBitbucketCloudClient(property.configuration)
-            val repository = client.getRepository(property.repository)
+            val repository = client.getRepository(property.workspace, property.repository)
             BitbucketCloudProjectProperty(
                 project = repository.project,
-                url = "https://bitbucket.org/${property.configuration.workspace}/workspace/projects/${repository.project.key}"
+                url = "https://bitbucket.org/${property.workspace}/workspace/projects/${repository.project.key}"
             )
         } catch (_: Exception) {
             null

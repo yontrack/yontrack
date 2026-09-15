@@ -34,14 +34,18 @@ class DefaultBitbucketCloudConfigurationService(
 
     override val type: String = "bitbucket-cloud"
 
-    override fun validate(configuration: BitbucketCloudConfiguration): ConnectionResult {
-        val client = bitbucketCloudClientFactory.getBitbucketCloudClient(configuration)
-        return try {
-            client.projects
-            ConnectionResult.ok()
-        } catch (_: Exception) {
-            ConnectionResult.error("Cannot connect to Bitbucket Cloud to get the list of project in the ${client.workspace} workspace.")
-        }
+    override fun checkConfigurationFields(configuration: BitbucketCloudConfiguration) {
+        configuration.checkFields()
     }
+
+    public override fun validate(configuration: BitbucketCloudConfiguration): ConnectionResult =
+        try {
+            bitbucketCloudClientFactory.getBitbucketCloudClient(configuration).validate()
+            ConnectionResult.ok()
+        } catch (any: Exception) {
+            ConnectionResult.error(
+                "Cannot connect to Bitbucket Cloud using the ${configuration.authType} of the ${configuration.name} configuration: ${any.message}"
+            )
+        }
 
 }
