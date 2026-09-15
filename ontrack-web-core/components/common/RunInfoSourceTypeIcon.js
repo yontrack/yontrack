@@ -1,4 +1,4 @@
-import {FaGithub, FaJenkins} from "react-icons/fa";
+import {FaBitbucket, FaGithub, FaJenkins} from "react-icons/fa";
 
 /**
  * The icons name themselves with `aria-label` rather than react-icons' `title`: an SVG <title>
@@ -15,6 +15,10 @@ export default function RunInfoSourceTypeIcon({type}) {
                 // `github-workflow` is what the GitHub ingestion records, and what the CI
                 // workflows send through the CLI, so the two land on the same icon.
                 type === 'github-workflow' && <FaGithub role="img" aria-label="GitHub"/>
+            }
+            {
+                // `bitbucket-pipeline` is what the CLI sends from Bitbucket Pipelines.
+                type === 'bitbucket-pipeline' && <FaBitbucket role="img" aria-label="Bitbucket Pipelines"/>
             }
         </>
     )

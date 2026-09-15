@@ -18,6 +18,11 @@ describe('RunInfoSourceTypeIcon', () => {
         expect(screen.getByRole('img', {name: 'GitHub'})).toBeInTheDocument()
     })
 
+    it('renders the Bitbucket icon for the bitbucket-pipeline source type', () => {
+        render(<RunInfoSourceTypeIcon type="bitbucket-pipeline"/>)
+        expect(screen.getByRole('img', {name: 'Bitbucket Pipelines'})).toBeInTheDocument()
+    })
+
     it('renders nothing for an unknown source type', () => {
         const {container} = render(<RunInfoSourceTypeIcon type="something-else"/>)
         expect(container).toBeEmptyDOMElement()
