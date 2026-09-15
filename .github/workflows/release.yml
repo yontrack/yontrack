@@ -485,6 +485,7 @@ jobs:
         run: |
           ./gradlew :ontrack-extension-bitbucket-cloud:integrationTest \
             --tests '*BitbucketPipelinesNotificationChannelRealIT' \
+            --tests '*BitbucketCloudPostProcessingRealIT' \
             --stacktrace \
             --console plain
 
