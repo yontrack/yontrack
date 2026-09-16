@@ -1,0 +1,393 @@
+# Nightly security rescan of the released builds (#1751).
+#
+# CI measures a commit once, when it is pushed. A release stays in use for months afterwards and
+# nobody pushes to it again, so nothing ever re-runs its pipeline - which means a CVE published
+# the day after a release never reaches Yontrack, and neither does a secret found in the history.
+# This workflow is what goes looking, every night.
+#
+# It reports on *existing* builds. Nothing here registers a build, and nothing here is built:
+# the images are pulled from Docker Hub by the version tag they were published under, which is
+# also the tag users are running.
+#
+# Which builds: the latest RELEASE-promoted build of the current minor and of the previous one,
+# resolved by promotion and by version rather than by branch name - per
+# doc/dev-guide/patch-release.md a release branch is cut on demand and usually none exists, so a
+# released build lives on `main` just as often as on a `release/X.Y`. See
+# scripts/security-rescan.sh, which holds the logic so that scripts/security-rescan-test.sh can
+# exercise it against stubs.
+#
+# The image scan is the composite action of #1749, not a copy of it: ci.yml and this workflow
+# must never disagree about what "the count" is. What differs is only which build the counts are
+# reported on, which is why that action returns counts and leaves the reporting to its caller.
+#
+# Every action below is pinned by commit SHA, not by tag, like the other security workflows.
+# .github/dependabot.yml keeps the pins up to date.
+name: Security rescan
+
+on:
+  schedule:
+    # Nightly, well after the European working day, and off the hour so as not to pile onto
+    # GitHub's busiest scheduling minute.
+    - cron: "41 2 * * *"
+  # For a rescan on demand - after publishing a release, or to check this workflow itself.
+  workflow_dispatch:
+
+# One rescan at a time. Queue rather than cancel: a cancelled run has reported some of its
+# stamps and not others, and the next night's run would silently paper over that.
+concurrency:
+  group: security-rescan
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  # Pinned, like ci.yml's: an unpinned CLI lets a Yontrack release turn a green pipeline red in
+  # a repository nobody touched. Only `validate` is used here, and always with `--project`,
+  # `--branch` and `--build` spelled out - in 5.1.1 the typed subcommands read the build from
+  # their flag only (yontrack/yontrack-cli#73), and nothing in this workflow exports one anyway.
+  YONTRACK_CLI_VERSION: "5.1.1"
+  # The Yontrack project ci.yml registers its builds in.
+  YONTRACK_PROJECT: yontrack
+  # The published images, by the version tag the release pushed. Deliberately Docker Hub and not
+  # the durable `:<rc version>` GHCR tag: these are the bytes users actually pull. The legacy
+  # `nemerosa/ontrack*` tags are re-tags of these same digests, so scanning one organisation
+  # scans both.
+  DOCKERHUB_ONTRACK: yontrack/yontrack
+  DOCKERHUB_ONTRACK_UI: yontrack/yontrack-ui
+
+jobs:
+
+  # ---------------------------------------------------------------------------------------------
+  # Which builds to rescan, resolved once for the whole run.
+  # ---------------------------------------------------------------------------------------------
+
+  targets:
+    name: Released builds to rescan
+    # A fork that enabled Actions would otherwise rescan this repository's releases against its
+    # own Yontrack credentials, which it does not have.
+    if: github.repository == 'yontrack/yontrack'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      count: ${{ steps.targets.outputs.count }}
+      targets: ${{ steps.targets.outputs.targets }}
+      newest_project: ${{ steps.targets.outputs.newest_project }}
+      newest_branch: ${{ steps.targets.outputs.newest_branch }}
+      newest_build: ${{ steps.targets.outputs.newest_build }}
+      newest_version: ${{ steps.targets.outputs.newest_version }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      # Straight GraphQL rather than the CLI: `build search` refuses `--output json` for more
+      # than one build, and picking the two minors needs every RELEASE-promoted build at once.
+      - name: Resolve the released builds
+        id: targets
+        env:
+          YONTRACK_URL: ${{ vars.YONTRACK_URL }}
+          YONTRACK_TOKEN: ${{ secrets.YONTRACK_TOKEN }}
+        run: scripts/security-rescan.sh targets "$YONTRACK_PROJECT"
+
+      - name: Summarise the targets
+        env:
+          COUNT: ${{ steps.targets.outputs.count }}
+          TARGETS: ${{ steps.targets.outputs.targets }}
+        run: |
+          set -euo pipefail
+          {
+            echo "### Released builds rescanned"
+            echo
+            if [ "$COUNT" = "0" ]; then
+              echo "No build promoted to RELEASE under a version: nothing to rescan."
+            else
+              echo "| Version | Build | Branch |"
+              echo "|---|---|---|"
+              printf '%s' "$TARGETS" | jq -r '.[] | "| \(.version) | \(.build) | \(.branch) |"'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # ---------------------------------------------------------------------------------------------
+  # SECURITY.IMAGE.*, on each target build.
+  # ---------------------------------------------------------------------------------------------
+
+  images:
+    name: Rescan ${{ matrix.target.version }}
+    needs: targets
+    if: ${{ needs.targets.outputs.count != '0' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    strategy:
+      # One target failing must not stop the other from being rescanned: they are independent
+      # releases and each has its own stamps to report.
+      fail-fast: false
+      matrix:
+        target: ${{ fromJson(needs.targets.outputs.targets) }}
+    env:
+      TARGET_PROJECT: ${{ matrix.target.project }}
+      TARGET_BRANCH: ${{ matrix.target.branch }}
+      TARGET_BUILD: ${{ matrix.target.build }}
+      TARGET_VERSION: ${{ matrix.target.version }}
+      # Same four flags as ci.yml, so a validation reported here and one reported there read the
+      # same way in the UI. The trigger data is the version being rescanned rather than a commit:
+      # this run has no commit of its own to point at, and the version is what identifies the
+      # thing measured.
+      YONTRACK_RUN_INFO: >-
+        --source-type github-workflow
+        --source-uri ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        --trigger-type ${{ github.event_name }}
+        --trigger-data ${{ matrix.target.version }}
+    steps:
+      # The run time reported for this job's validations is measured from here. A `run:` step is
+      # the earliest point a workflow can observe.
+      - name: Record the job start
+        id: job_start
+        run: echo "started=$(date +%s)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      # Installed directly rather than through ontrack-github-actions-cli-config, which registers
+      # a build as a side effect. This workflow reports on builds that already exist; it must not
+      # create one.
+      - name: Install the Yontrack CLI
+        env:
+          YONTRACK_URL: ${{ vars.YONTRACK_URL }}
+          YONTRACK_TOKEN: ${{ secrets.YONTRACK_TOKEN }}
+        run: |
+          set -euo pipefail
+          curl -sSfL -o /usr/local/bin/yontrack \
+            "https://github.com/nemerosa/ontrack-cli/releases/download/${YONTRACK_CLI_VERSION}/yontrack-linux-amd64"
+          chmod +x /usr/local/bin/yontrack
+          yontrack version --cli
+          yontrack config create prod "$YONTRACK_URL" --token "$YONTRACK_TOKEN" --override
+
+      # The point of this step is the release branch. A `release/5.3` cut before these stamps
+      # existed carries a `.yontrack/ci.yaml` that does not declare them, so its branch has no
+      # such stamp - and validating anyway would not fail cleanly but wrongly: the project's
+      # auto-validation-stamp property creates one on demand *without a data type*, and a run
+      # carrying data and no explicit status is then rejected. Declaring the stamps here, from
+      # the CI configuration of the default branch, makes the rescan independent of what the
+      # rescanned branch's configuration happened to say. On `main` it is a no-op.
+      - name: Declare the image stamps on the target branch
+        env:
+          YONTRACK_URL: ${{ vars.YONTRACK_URL }}
+          YONTRACK_TOKEN: ${{ secrets.YONTRACK_TOKEN }}
+        run: |
+          set -euo pipefail
+          scripts/security-rescan.sh setup-stamp "$TARGET_PROJECT" "$TARGET_BRANCH" SECURITY.IMAGE.BACKEND
+          scripts/security-rescan.sh setup-stamp "$TARGET_PROJECT" "$TARGET_BRANCH" SECURITY.IMAGE.UI
+
+      # Trivy pulls the images straight from the registry with the Docker credentials. Logged in
+      # rather than anonymous: the anonymous pull limit is shared by every job on the runner's
+      # egress address, and a rate-limited pull would read as a scanner error.
+      - name: Log in to Docker Hub
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
+        with:
+          username: ${{ secrets.DOCKER_HUB_USR }}
+          password: ${{ secrets.DOCKER_HUB_PSW }}
+
+      # `upload-sarif: false`, and this is not an oversight. GitHub replaces the previous
+      # analysis of a SARIF category, and ci.yml already owns `trivy-image-backend` and
+      # `trivy-image-ui` for the head of the default branch. Uploading an old release's findings
+      # under those categories would overwrite the alerts of the code people are working on with
+      # the alerts of a version they released months ago. The counts are what this workflow is
+      # for; the Security tab stays CI's.
+      - name: Scan the backend image
+        id: backend
+        uses: ./.github/actions/security-image-scan
+        with:
+          image: ${{ env.DOCKERHUB_ONTRACK }}:${{ matrix.target.version }}
+          category: trivy-image-backend-${{ matrix.target.version }}
+          upload-sarif: "false"
+
+      # !cancelled(), not the implicit success(): an error on the backend image must not leave
+      # the UI image unscanned.
+      - name: Scan the UI image
+        id: ui
+        if: ${{ !cancelled() }}
+        uses: ./.github/actions/security-image-scan
+        with:
+          image: ${{ env.DOCKERHUB_ONTRACK_UI }}:${{ matrix.target.version }}
+          category: trivy-image-ui-${{ matrix.target.version }}
+          upload-sarif: "false"
+
+      # `outcome` is empty only when the step was skipped. Anything but success means the scan
+      # itself went wrong, and the counts are then absent rather than zero - a scan that did not
+      # happen must never read as a clean image.
+      - name: Validate SECURITY.IMAGE.BACKEND
+        if: ${{ !cancelled() && steps.backend.outcome != '' }}
+        env:
+          OUTCOME: ${{ steps.backend.outcome }}
+          CRITICAL: ${{ steps.backend.outputs.critical }}
+          HIGH: ${{ steps.backend.outputs.high }}
+          MEDIUM: ${{ steps.backend.outputs.medium }}
+          LOW: ${{ steps.backend.outputs.low }}
+          STARTED: ${{ steps.job_start.outputs.started }}
+        run: |
+          set -uo pipefail
+          run_time_flag=""
+          if [ -n "${STARTED:-}" ]; then
+            run_time_flag="--run-time $(( $(date +%s) - STARTED ))"
+          fi
+          if [ "$OUTCOME" = "success" ]; then
+            # shellcheck disable=SC2086  # deliberate: run info is a set of flags, not one word
+            yontrack validate --project "$TARGET_PROJECT" --branch "$TARGET_BRANCH" --build "$TARGET_BUILD" \
+              --validation SECURITY.IMAGE.BACKEND \
+              chml --critical "$CRITICAL" --high "$HIGH" --medium "$MEDIUM" --low "$LOW" \
+              $run_time_flag $YONTRACK_RUN_INFO
+          else
+            # shellcheck disable=SC2086  # deliberate: run info is a set of flags, not one word
+            yontrack validate --project "$TARGET_PROJECT" --branch "$TARGET_BRANCH" --build "$TARGET_BUILD" \
+              --validation SECURITY.IMAGE.BACKEND --status FAILED \
+              $run_time_flag $YONTRACK_RUN_INFO
+          fi
+
+      - name: Validate SECURITY.IMAGE.UI
+        if: ${{ !cancelled() && steps.ui.outcome != '' }}
+        env:
+          OUTCOME: ${{ steps.ui.outcome }}
+          CRITICAL: ${{ steps.ui.outputs.critical }}
+          HIGH: ${{ steps.ui.outputs.high }}
+          MEDIUM: ${{ steps.ui.outputs.medium }}
+          LOW: ${{ steps.ui.outputs.low }}
+          STARTED: ${{ steps.job_start.outputs.started }}
+        run: |
+          set -uo pipefail
+          run_time_flag=""
+          if [ -n "${STARTED:-}" ]; then
+            run_time_flag="--run-time $(( $(date +%s) - STARTED ))"
+          fi
+          if [ "$OUTCOME" = "success" ]; then
+            # shellcheck disable=SC2086  # deliberate: run info is a set of flags, not one word
+            yontrack validate --project "$TARGET_PROJECT" --branch "$TARGET_BRANCH" --build "$TARGET_BUILD" \
+              --validation SECURITY.IMAGE.UI \
+              chml --critical "$CRITICAL" --high "$HIGH" --medium "$MEDIUM" --low "$LOW" \
+              $run_time_flag $YONTRACK_RUN_INFO
+          else
+            # shellcheck disable=SC2086  # deliberate: run info is a set of flags, not one word
+            yontrack validate --project "$TARGET_PROJECT" --branch "$TARGET_BRANCH" --build "$TARGET_BUILD" \
+              --validation SECURITY.IMAGE.UI --status FAILED \
+              $run_time_flag $YONTRACK_RUN_INFO
+          fi
+
+      - name: Summarise the counts
+        if: ${{ !cancelled() }}
+        env:
+          BACKEND: ${{ steps.backend.outputs.critical }}/${{ steps.backend.outputs.high }}/${{ steps.backend.outputs.medium }}/${{ steps.backend.outputs.low }}
+          UI: ${{ steps.ui.outputs.critical }}/${{ steps.ui.outputs.high }}/${{ steps.ui.outputs.medium }}/${{ steps.ui.outputs.low }}
+        run: |
+          {
+            echo "### Fixable vulnerabilities in $TARGET_VERSION (critical/high/medium/low)"
+            echo
+            echo "| Image | Counts |"
+            echo "|---|---|"
+            echo "| \`$DOCKERHUB_ONTRACK:$TARGET_VERSION\` | \`$BACKEND\` |"
+            echo "| \`$DOCKERHUB_ONTRACK_UI:$TARGET_VERSION\` | \`$UI\` |"
+            echo
+            echo "Reported on build \`$TARGET_PROJECT/$TARGET_BRANCH/$TARGET_BUILD\`."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # ---------------------------------------------------------------------------------------------
+  # SECURITY.SECRETS, on the newest target build only.
+  # ---------------------------------------------------------------------------------------------
+
+  # A job of its own, rather than a step of the matrix above, for two reasons: the count is a
+  # number about the repository as it is today, not about a release, so reporting it on both
+  # targets would say the same thing twice; and `SECRET_SCANNING_TOKEN` then reaches exactly one
+  # job, which is the whole point of a token scoped to secret scanning alone (#1747). It is used
+  # here and nowhere else - never in ci.yml.
+  secrets:
+    name: Rescan the secret-scanning alerts
+    needs: targets
+    if: ${{ needs.targets.outputs.count != '0' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    env:
+      TARGET_PROJECT: ${{ needs.targets.outputs.newest_project }}
+      TARGET_BRANCH: ${{ needs.targets.outputs.newest_branch }}
+      TARGET_BUILD: ${{ needs.targets.outputs.newest_build }}
+      TARGET_VERSION: ${{ needs.targets.outputs.newest_version }}
+      YONTRACK_RUN_INFO: >-
+        --source-type github-workflow
+        --source-uri ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        --trigger-type ${{ github.event_name }}
+        --trigger-data ${{ needs.targets.outputs.newest_version }}
+    steps:
+      - name: Record the job start
+        id: job_start
+        run: echo "started=$(date +%s)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Install the Yontrack CLI
+        env:
+          YONTRACK_URL: ${{ vars.YONTRACK_URL }}
+          YONTRACK_TOKEN: ${{ secrets.YONTRACK_TOKEN }}
+        run: |
+          set -euo pipefail
+          curl -sSfL -o /usr/local/bin/yontrack \
+            "https://github.com/nemerosa/ontrack-cli/releases/download/${YONTRACK_CLI_VERSION}/yontrack-linux-amd64"
+          chmod +x /usr/local/bin/yontrack
+          yontrack version --cli
+          yontrack config create prod "$YONTRACK_URL" --token "$YONTRACK_TOKEN" --override
+
+      - name: Declare the secrets stamp on the target branch
+        env:
+          YONTRACK_URL: ${{ vars.YONTRACK_URL }}
+          YONTRACK_TOKEN: ${{ secrets.YONTRACK_TOKEN }}
+        run: scripts/security-rescan.sh setup-stamp "$TARGET_PROJECT" "$TARGET_BRANCH" SECURITY.SECRETS
+
+      # Only the count leaves this step. The alert bodies carry the secrets themselves, and a
+      # workflow log is a far easier thing to read than the Security tab they belong in.
+      - name: Count the open secret-scanning alerts
+        id: alerts
+        env:
+          GH_TOKEN: ${{ secrets.SECRET_SCANNING_TOKEN }}
+        run: scripts/security-rescan.sh secrets "$GITHUB_REPOSITORY"
+
+      # A count that could not be fetched is FAILED, never zero: a token that lost its access
+      # must not read as a repository with no leaked secret.
+      #
+      # The data goes as `{"value": N}` and not as a bare `N`. The CLI sends either faithfully,
+      # but `ThresholdNumberValidationDataType.fromForm` reads the number out of a `value` field
+      # and returns null for anything else - a bare number would arrive as no data at all and the
+      # call would fail asking for a status. See yontrack/yontrack-cli#69.
+      - name: Validate SECURITY.SECRETS
+        if: ${{ !cancelled() }}
+        env:
+          OUTCOME: ${{ steps.alerts.outcome }}
+          SECRETS: ${{ steps.alerts.outputs.secrets }}
+          STARTED: ${{ steps.job_start.outputs.started }}
+        run: |
+          set -uo pipefail
+          run_time_flag=""
+          if [ -n "${STARTED:-}" ]; then
+            run_time_flag="--run-time $(( $(date +%s) - STARTED ))"
+          fi
+          if [ "$OUTCOME" = "success" ]; then
+            # shellcheck disable=SC2086  # deliberate: run info is a set of flags, not one word
+            yontrack validate --project "$TARGET_PROJECT" --branch "$TARGET_BRANCH" --build "$TARGET_BUILD" \
+              --validation SECURITY.SECRETS \
+              --data-type net.nemerosa.ontrack.extension.general.validation.ThresholdNumberValidationDataType \
+              --data "{\"value\": $SECRETS}" \
+              $run_time_flag $YONTRACK_RUN_INFO
+          else
+            # shellcheck disable=SC2086  # deliberate: run info is a set of flags, not one word
+            yontrack validate --project "$TARGET_PROJECT" --branch "$TARGET_BRANCH" --build "$TARGET_BUILD" \
+              --validation SECURITY.SECRETS --status FAILED \
+              $run_time_flag $YONTRACK_RUN_INFO
+          fi
+
+      - name: Summarise the count
+        if: ${{ !cancelled() }}
+        env:
+          SECRETS: ${{ steps.alerts.outputs.secrets }}
+        run: |
+          {
+            echo "### Open secret-scanning alerts"
+            echo
+            echo "Count: \`${SECRETS:-?}\`, reported on build \`$TARGET_PROJECT/$TARGET_BRANCH/$TARGET_BUILD\` ($TARGET_VERSION)."
+          } >> "$GITHUB_STEP_SUMMARY"

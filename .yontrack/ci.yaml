@@ -45,6 +45,26 @@ configuration:
             warningValue: 1
             failedLevel: CRITICAL
             failedValue: 1
+        # Open secret-scanning alerts of the repository, counted by the nightly
+        # .github/workflows/security-rescan.yml and reported on the newest released build only
+        # (#1751). Repository-wide and not a property of a release, which is why it is reported
+        # once rather than on every build the rescan touches.
+        #
+        # One open alert fails: a leaked credential has no acceptable count. `okIfGreater: false`
+        # is what says that more is worse - the threshold type reads high as good by default.
+        #
+        # Spelled as the data type's class name rather than as the `number` alias #1748 added:
+        # the alias reaches an instance only with the release that carries it, and
+        # `CIConfigurationParserImpl` rejects a name it does not know outright, which would fail
+        # the CI configuration on every push. The class name is what the alias resolves to and
+        # every version understands it. Switch to `number` once the instance runs a release with
+        # #1748 in it.
+        #
+        # Not in any promotion, like the other SECURITY stamps.
+        SECURITY.SECRETS:
+          net.nemerosa.ontrack.extension.general.validation.ThresholdNumberValidationDataType:
+            failureThreshold: 0
+            okIfGreater: false
         # Reported by the `docs` job in ci.yml, which now runs on every full run: the site
         # built and was archived as a run artefact for the release to carry forward (#1668).
         # Distinct from DOCUMENTATION below, which records the S3 publication at release time
