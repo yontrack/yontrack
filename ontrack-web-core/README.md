@@ -10,6 +10,7 @@ Ontrack Web Core (Next UI)
 | ONTRACK_URL                    | `http://localhost:8080`                            | URL of the backend                                                                |
 | YONTRACK_UI_MANAGE_ACCOUNT_URL | _None_                                             | URL used to redirect the user to the management of their profile in the IdP       |
 | YONTRACK_UI_AUTH_SIGNIN_CUSTOM | `false`                                            | If set, activates a custom signin page                                            |
+| YONTRACK_UI_FRAME_ANCESTORS    | `'self'`                                           | CSP `frame-ancestors` source list of the sites allowed to frame the UI's pages, e.g. `'self' https://portal.example.com`. Read at run time by `middleware.js`; see `components/security/securityHeaders.js` |
 | NEXTAUTH_PROVIDER              | _None_                                             | If `oidc`, activates direct OIDC authentication. Otherwise, uses the Keycloak IdP |
 | NEXTAUTH_PROVIDER_NAME         | `OIDC` if using OIDC, `Yontrack` if using Keycloak | Display name of the IdP to show on the signin page                                |
 | NEXTAUTH_ISSUER                | _Required_                                         | OIDC issuer URL (public-facing, used for browser redirects and id_token validation) |

@@ -35,6 +35,13 @@ While you may keep using this local Keycloak as an identity provider, in most ca
 
 Once authentication has been setup, you can start configuring [groups](../security/groups.md) and map them to the [groups of your identity provider](../security/group-mappings.md).
 
+## TLS and HSTS
+
+Terminate TLS in front of Yontrack — at your ingress controller, load balancer or reverse proxy —
+and set `Strict-Transport-Security` there. Yontrack deliberately does not send HSTS itself: see
+[HTTP security headers](../security/http-headers.md), which also lists the headers Yontrack does
+send and how to allow other sites to embed its pages.
+
 ## Security updates
 
 Security fixes ship in the next Yontrack release and are not backported to older ones: keep your

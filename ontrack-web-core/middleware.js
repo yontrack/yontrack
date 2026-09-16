@@ -14,6 +14,25 @@
 import {NextResponse} from "next/server"
 import {decideMobileRedirect} from "@components/mobile/mobileRedirect"
 import {DESKTOP_UI_COOKIE_NAME, DESKTOP_UI_COOKIE_VALUE} from "@components/mobile/desktopUiCookie"
+import {frameAncestorsOverride} from "@components/security/securityHeaders"
+
+/**
+ * Who may frame this page, when the instance says so.
+ *
+ * The default framing header comes from `headers()` in `next.config.js`, which
+ * is fixed when the image is built. `YONTRACK_UI_FRAME_ANCESTORS` is read here
+ * instead because the middleware runs with the environment of the running
+ * container, and a header it sets replaces the config's one of the same name.
+ * Pages only, like everything else in this file: framing a JSON answer or a
+ * script means nothing (#1770).
+ */
+const withFraming = (response) => {
+    const framing = frameAncestorsOverride(process.env.YONTRACK_UI_FRAME_ANCESTORS)
+    if (framing) {
+        response.headers.set(framing.key, framing.value)
+    }
+    return response
+}
 
 export function middleware(request) {
 
@@ -24,7 +43,7 @@ export function middleware(request) {
         desktopOptOut: request.cookies.get(DESKTOP_UI_COOKIE_NAME)?.value === DESKTOP_UI_COOKIE_VALUE,
     })
 
-    if (!decision) return NextResponse.next()
+    if (!decision) return withFraming(NextResponse.next())
 
     const url = request.nextUrl.clone()
     url.pathname = decision.pathname
@@ -38,7 +57,7 @@ export function middleware(request) {
     // path legitimately answers differently per device and per cookie.
     response.headers.set('Cache-Control', 'no-store')
     response.headers.set('Vary', 'User-Agent, Cookie')
-    return response
+    return withFraming(response)
 }
 
 export const config = {

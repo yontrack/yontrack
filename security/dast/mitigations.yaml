@@ -28,13 +28,16 @@ mitigations:
     title: "Security response headers missing on the UI"
     issue: "https://github.com/yontrack/yontrack/issues/1770"
     change: >-
-      Add a `headers()` section to `ontrack-web-core/next.config.js` covering every route,
-      `/mobile` included: X-Content-Type-Options, X-Frame-Options (or frame-ancestors),
-      Referrer-Policy, Permissions-Policy and a Content-Security-Policy — report-only first, so
-      that a policy that breaks Ant Design or the Next runtime is found from the reports rather
-      than from a blank page. HSTS (rule 10035) is deliberately NOT set by the application: it is
-      the ingress's to set, since it is the component that terminates TLS and knows whether every
-      hostname under the domain is HTTPS-only.
+      Done by #1770: `headers()` in `ontrack-web-core/next.config.js`, built by
+      `components/security/securityHeaders.js`, sends X-Content-Type-Options, Referrer-Policy,
+      Permissions-Policy, `Content-Security-Policy: frame-ancestors 'self'` with
+      X-Frame-Options, and a report-only Content-Security-Policy on every route, `/mobile` and
+      `/api/*` included. If this fires again, check that the deployed image carries that build,
+      then which header the finding names. Enforcing the full CSP, which ZAP may keep reporting while
+      it is report-only, is a later decision taken from the browsers' report-only messages. HSTS
+      (rule 10035) is deliberately NOT set by the application: it is the ingress's to set, since
+      it is the component that terminates TLS and knows whether every hostname under the domain
+      is HTTPS-only.
 
   # -----------------------------------------------------------------------------------------
   # Permissive CORS — expected on the first run, fixed by #1771.

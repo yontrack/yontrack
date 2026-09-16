@@ -72,6 +72,7 @@ nav:
       - Groups: content/security/groups.md
       - Group mappings: content/security/group-mappings.md
       - Tokens: content/security/tokens.md
+      - HTTP headers: content/security/http-headers.md
   - Concepts:
       - Model: content/concepts/model/index.md
       - Build links: content/concepts/model/build-links.md
