@@ -18,7 +18,7 @@ buildscript {
 plugins {
     kotlin("jvm") version "2.2.20"
     kotlin("plugin.spring") version "2.2.20"
-    id("org.springframework.boot") version "3.5.9" apply false
+    id("org.springframework.boot") version "4.1.1" apply false
     id("com.avast.gradle.docker-compose") version "0.17.12"
     id("com.google.cloud.tools.jib") version "3.5.1" apply false
     id("com.github.node-gradle.node") version "7.1.0" apply false
