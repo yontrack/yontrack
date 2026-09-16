@@ -62,10 +62,13 @@ permissions:
 
 env:
   # Pinned: an unpinned CLI lets a Yontrack release turn a green pipeline red in a repository
-  # nobody touched. Only `validate` is used, and always with --project/--branch/--build spelled
-  # out - in 5.1.1 the typed subcommands read the build from their flag only
-  # (yontrack/yontrack-cli#73).
-  YONTRACK_CLI_VERSION: "5.1.1"
+  # nobody touched. 5.2.0 and not the 5.1.1 the other security workflows pin, because the build
+  # lookup this shares with demo-smoke.yml needs `build search --with-display-name`, which 5.1.1
+  # does not have - see scripts/yontrack-build.sh.
+  #
+  # `validate` is always called with --project/--branch/--build spelled out: the typed subcommands
+  # read the build from their flag only and ignore YONTRACK_BUILD_NAME (yontrack/yontrack-cli#73).
+  YONTRACK_CLI_VERSION: "5.2.0"
   # Pinned by digest, not by the `stable` tag. A scanner whose version moves under you turns
   # "three new findings" into "or maybe three new rules", which is the one question a report must
   # never leave open.
