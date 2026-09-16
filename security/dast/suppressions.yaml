@@ -11,8 +11,9 @@
 # Matching. An entry matches a finding when *every field it declares* matches; a field it does not
 # declare matches anything. All of them are regular expressions, anchored on the whole value:
 #
-#   scanner     the tool that reported it (`zap`, later `graphql-cop`, `nuclei`)
-#   rule        the tool's own rule id (for ZAP, the plugin id — e.g. `10098`)
+#   scanner     the tool that reported it (`zap`, `graphql-cop`, `nuclei`)
+#   rule        the tool's own rule id: for ZAP the plugin id (`10098`), for graphql-cop the test
+#               name (`alias_overloading`), for Nuclei the template id (`git-config`)
 #   name        the rule's title, for a tool whose ids are unstable or undocumented
 #   url         matched against each affected URL: an entry with a `url` suppresses the instances
 #               on matching URLs only, and the finding still counts if any instance is left
@@ -32,9 +33,15 @@ suppressions:
   # development time; disabling introspection would hide nothing and break the tooling.
   #
   # Keyed on the rule *name* rather than an id: introspection is reported by several tools under
-  # several ids (ZAP's GraphQL add-on, graphql-cop in #1766), and they agree on the word.
+  # several ids (ZAP's GraphQL add-on, graphql-cop's `introspection` test), and they agree on the
+  # word.
+  #
+  # The name ends there on purpose (#1766). graphql-cop also reports "Introspection-based Circular
+  # Query", which is a denial-of-service finding - no depth limit on a query that recurses through
+  # the introspection types - and not the disclosure accepted here. A `.*[Ii]ntrospection.*` would
+  # have suppressed it along with the finding it is named after.
   - id: graphql-introspection
-    name: ".*[Ii]ntrospection.*"
+    name: ".*[Ii]ntrospection( [Qq]uery)?( [Ee]nabled)?"
     url: ".*/graphql.*"
     statement: >-
       Accepted. The GraphQL schema is public: it is committed as ontrack-web-core/ontrack.graphql,

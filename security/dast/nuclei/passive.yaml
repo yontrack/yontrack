@@ -1,0 +1,75 @@
+# Nuclei configuration - PASSIVE scan of the Yontrack demo instance (#1766).
+#
+# Read by the pinned Nuclei in .github/workflows/dast-passive.yml, as `nuclei -config` with the
+# pinned nuclei-templates release as `-t`. The keys are Nuclei's own long flag names.
+#
+# What Nuclei is for here: deployment-shaped problems ZAP does not look for - exposed Spring Boot
+# actuators, default credentials, known Spring / Keycloak / Next.js CVEs, a `.git` or an env file
+# served by mistake. The demo runs on the yontrack-chart defaults, so this is also how the chart
+# defaults get checked.
+#
+# NOTHING IS FILTERED BY SEVERITY HERE, as in the ZAP plan: every selected template reports what it
+# finds, informational included, and scripts/security-dast.sh decides what it counts for. What is
+# decided here is which templates are allowed to send anything to the demo at all.
+
+# ---------------------------------------------------------------------------------------------
+# Which templates. Nuclei ORs the tags: a template carrying any of them is selected.
+#
+# `cve` is deliberately NOT a tag of its own - that would be every CVE template for every product
+# ever written. The CVEs of the three technologies the demo runs are selected through the
+# technology tags instead, which the CVE templates of those products carry.
+# ---------------------------------------------------------------------------------------------
+tags:
+  # Files and endpoints that should not be served: .git, env files, backups, debug endpoints.
+  - exposure
+  # Deployment misconfigurations, the chart defaults among them.
+  - misconfig
+  # Spring Boot and Spring - actuators and their CVEs.
+  - springboot
+  - spring
+  # The identity provider the demo signs in with, and the UI.
+  - keycloak
+  - nextjs
+  # Default credentials. A login attempt with a known default, one per product the template knows;
+  # the templates that try lists of passwords carry `bruteforce` and are excluded below.
+  - default-login
+
+# ---------------------------------------------------------------------------------------------
+# Which templates never run, whatever tag selected them. The demo is public and shared: it gates
+# SILVER and carries the dataset the smoke test asserts.
+#
+# `scripts/security-dast.sh nuclei-preflight` refuses to scan if any of these four is missing
+# from this list, and reads the tags of every template Nuclei actually selected (`nuclei -tl`)
+# to check that none of them carries one - the exclusion is observed, not assumed.
+# ---------------------------------------------------------------------------------------------
+exclude-tags:
+  # Sends payloads that can change state or crash a service.
+  - intrusive
+  # Denial of service.
+  - dos
+  # Fuzzing: many requests of invented input.
+  - fuzz
+  # Password lists.
+  - bruteforce
+
+# HTTP templates only. The tags above also select network, DNS, SSL and JavaScript templates -
+# SSH default logins, raw TCP probes of other ports - and the demo's ingress serves HTTPS and
+# nothing else, which is all this scan is about.
+type:
+  - http
+
+# ---------------------------------------------------------------------------------------------
+# How hard. About 2,200 templates and 5,500 requests with the selection above: at ten requests a
+# second, nine minutes or so, and never a burst the demo would notice next to its own users.
+# `nuclei-summary` prints the rate the run actually achieved.
+# ---------------------------------------------------------------------------------------------
+rate-limit: 10
+concurrency: 10
+bulk-size: 10
+timeout: 10
+retries: 1
+
+# No out-of-band interactions: an interactsh template makes the target call a public server
+# (oast.*) to prove a blind vulnerability. That is a request the demo would send to a third party
+# on this scan's behalf, and it tells that third party the demo's address.
+no-interactsh: true

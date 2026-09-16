@@ -1,7 +1,8 @@
 # DAST — dynamic application security testing
 
-Everything the automated DAST scans read: the ZAP plans, the per-rule levels, the accepted
-findings, the rule-to-mitigation map and the scanner role declaration. Nothing here is a report:
+Everything the automated DAST scans read: the ZAP plans, the graphql-cop configuration, the Nuclei
+template selection, the per-rule levels, the accepted findings, the rule-to-mitigation map and the
+scanner role declaration. Nothing here is a report:
 reports go to the **private** repository [`yontrack/security-reports`](https://github.com/yontrack/security-reports),
 because `yontrack/yontrack` is public and a finding's URL, parameter and evidence are an
 attacker's checklist against every deployment that has not upgraded yet.
@@ -16,9 +17,15 @@ security/dast/
   suppressions.yaml   accepted findings, subtracted from the counts, with a statement and an expiry
   mitigations.yaml    rule -> what to change in Yontrack and where
   graphql/            how the GraphQL endpoint is scanned, and why no mutation is ever sent
+  graphql-cop/
+    config.py         graphql-cop's configuration, reading the API token from a run-time file
+    requirements.txt  its Python dependencies, pinned by hash
+  nuclei/
+    passive.yaml      Nuclei configuration: selected and excluded tags, HTTP only, rate limit
   zap/
     passive.yaml      ZAP Automation Framework plan for the passive scan of the demo
-    rules.tsv         per-rule level overrides, in the zap-baseline IGNORE/WARN/FAIL vocabulary
+    rules.tsv         per-rule level overrides, in the zap-baseline IGNORE/WARN/FAIL vocabulary -
+                      for the findings of every scanner, despite the directory
 ```
 
 ## Who reads what
@@ -26,6 +33,8 @@ security/dast/
 | File | Read by |
 |---|---|
 | `zap/passive.yaml` | the ZAP container, in `.github/workflows/dast-passive.yml` |
+| `graphql-cop/*` | the graphql-cop container, in the same workflow |
+| `nuclei/passive.yaml` | Nuclei, in the same workflow, and `scripts/security-dast.sh nuclei-preflight` |
 | `zap/rules.tsv`, `suppressions.yaml`, `mitigations.yaml` | `scripts/security-dast.sh report` |
 | `casc.yaml` | a human, and its copy in the gitops repository; re-applied by `scripts/demo-smoke.sh casc` |
 
@@ -33,15 +42,19 @@ security/dast/
 
 A deliberate split, and the reason a second scanner costs so little to add:
 
-**The scanner reports everything it finds.** No rule is disabled in `zap/passive.yaml`, and no
-finding is filtered out of the ZAP report. The private report therefore keeps full fidelity —
+**The scanner reports everything it finds.** No rule is disabled in `zap/passive.yaml`, no finding
+is filtered out of the ZAP report, and Nuclei is not filtered by severity. What *is* restricted is
+what may be sent to the demo at all: graphql-cop's one mutation-sending test, and Nuclei's
+`intrusive`, `dos`, `fuzz` and `bruteforce` templates. The private report therefore keeps full fidelity —
 what the scanner saw is what the report shows.
 
 **`scripts/security-dast.sh` decides what it means.** It normalises a scanner's own report into
 one shape, then applies `zap/rules.tsv` and `suppressions.yaml` to it, counts what is left and
-writes the markdown report. A new scanner (#1766 adds graphql-cop and Nuclei) needs only a
-`normalize-<tool>` subcommand emitting that shape; the levels, the suppressions, the mitigations,
-the counting, the report and the disclosure rules are then already done for it. A second workflow
+writes the markdown report. A new scanner needs only a `normalize-<tool>` subcommand emitting that
+shape - which is all graphql-cop and Nuclei took (#1766); the levels, the suppressions, the
+mitigations, the counting, the report and the disclosure rules are then already done for it. All
+three scanners' counts add up into the one `SECURITY.DAST` validation run, and the report groups
+the findings by tool, with each tool's own counts. A second workflow
 (#1767 adds the active scan) needs only its own plan and `DAST_KIND=active`.
 
 The normalised shape is documented in the header of `scripts/security-dast.sh`.
@@ -54,13 +67,13 @@ pages the spider happened to reach.
 
 | Scanner risk | Counted as |
 |---|---|
-| Critical | CRITICAL |
+| Critical (Nuclei only) | CRITICAL |
 | High | HIGH |
 | Medium | MEDIUM |
 | Low | LOW |
-| Informational | dropped |
+| Informational, and Nuclei's `unknown` | dropped |
 
-ZAP has no Critical, so a passive ZAP-only run never produces one. The counts go to the
+ZAP and graphql-cop have no Critical; a Nuclei critical fails the stamp like a HIGH. The counts go to the
 `SECURITY.DAST` CHML stamp declared in `.yontrack/ci.yaml` — WARNING from one MEDIUM, FAILED from
 one HIGH — which is in no promotion: this is reporting, not gating.
 

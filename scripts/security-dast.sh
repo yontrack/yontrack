@@ -28,6 +28,31 @@
 #                             findings document (below) to stdout.
 #   assert-no-mutations HAR   Reads the HAR of every request ZAP sent and fails if any of them was
 #                             a GraphQL mutation or subscription. Prints counts only.
+#   fetch URL SHA256 OUT      Downloads URL to OUT and refuses it unless its SHA-256 is SHA256.
+#                             How every scanner that is not an image is pinned (#1766).
+#   graphql-cop-preflight SRC EXCLUDED
+#                             Before graphql-cop sends anything: fails unless every test registered
+#                             in SRC that mentions a mutation is in EXCLUDED (comma-separated), and
+#                             every name in EXCLUDED is a registered test.
+#   render-graphql-cop-headers OUT
+#                             Writes the API token header as JSON to OUT, for the run-time
+#                             graphql-cop configuration to read. Never on a command line.
+#   assert-graphql-cop-no-mutations OUT
+#                             Reads graphql-cop's own record of the request each test sent and fails
+#                             if any was a mutation or subscription. Prints counts only.
+#   normalize-graphql-cop OUT VERSION
+#                             Reads graphql-cop's `-o json` stdout and writes the normalised
+#                             findings document to stdout.
+#   nuclei-preflight LIST CONFIG
+#                             Reads Nuclei's `-tl` template list and fails if any selected template
+#                             carries a tag CONFIG excludes, or if CONFIG does not exclude
+#                             intrusive/dos/fuzz/bruteforce or set a rate limit. Prints counts.
+#   nuclei-summary LOG JSONL TARGET
+#                             Fails unless Nuclei finished, kept scanning TARGET and wrote every
+#                             match it counted to JSONL. Prints counts only.
+#   normalize-nuclei JSONL VERSION
+#                             Reads Nuclei's JSONL output and writes the normalised findings
+#                             document to stdout.
 #   report OUT_MD FILE...     Applies the rule levels and the suppressions to one or more
 #                             normalised findings documents, writes the markdown report to OUT_MD,
 #                             and prints the counts. With $GITHUB_OUTPUT set, writes `critical`,
@@ -59,17 +84,19 @@
 # ---------------------------------------------------------------------------------------------
 #
 # The one shape every scanner is turned into, and the reason a second scanner costs a converter
-# rather than a rewrite. `normalize-zap` produces it; #1766 adds `normalize-graphql-cop` and
-# `normalize-nuclei` beside it, and everything downstream - levels, suppressions, counting, the
-# report, the disclosure rules - is already written.
+# rather than a rewrite. `normalize-zap`, `normalize-graphql-cop` and `normalize-nuclei` produce it,
+# and everything downstream - levels, suppressions, counting, the report, the disclosure rules - is
+# the same code for all three.
 #
 #     {
 #       "scanner": "zap",
 #       "version": "2.16.1",
 #       "findings": [
 #         {
-#           "scanner":     "zap",
-#           "rule":        "10038",        // the tool's own rule id, matched by rules.tsv
+#           "scanner":     "zap",          // zap | graphql-cop | nuclei
+#           "rule":        "10038",        // the tool's own rule id, matched by rules.tsv:
+#                                          // ZAP's plugin id, graphql-cop's test name,
+#                                          // Nuclei's template id
 #           "ref":         "10038-1",      // the tool's finer id, when it has one
 #           "name":        "Content Security Policy (CSP) Header Not Set",
 #           "risk":        "MEDIUM",       // CRITICAL | HIGH | MEDIUM | LOW | INFO
@@ -91,7 +118,7 @@
 # ---------------------------------------------------------------------------------------------
 #
 # Requires jq and yq (mikefarah's, v4) on the PATH; ubuntu-latest carries both. `publish` also
-# needs `gh` authenticated as the private reports token, and `actuator` needs curl.
+# needs `gh` authenticated as the private reports token, and `actuator` and `fetch` need curl.
 
 set -uo pipefail
 
@@ -424,6 +451,428 @@ sd_assert_no_mutations() {
 }
 
 # ---------------------------------------------------------------------------------------------
+# fetch - pinning what is not an image
+# ---------------------------------------------------------------------------------------------
+
+# ZAP is an image and is pinned by digest. graphql-cop and Nuclei are not - graphql-cop publishes no
+# image of its current release, and Nuclei's image downloads whatever templates are newest when it
+# starts - so each is downloaded at a fixed version and checked against a SHA-256 committed in the
+# workflow. A mismatch is a failed run: a scanner that is not the one reviewed does not scan.
+sd_sha256() {
+    if command -v sha256sum > /dev/null 2>&1; then
+        sha256sum "$1" | cut -d' ' -f1
+    else
+        shasum -a 256 "$1" | cut -d' ' -f1
+    fi
+}
+
+sd_fetch() {
+    local url="${1:-}" expected="${2:-}" out="${3:-}" actual
+    [ -n "$url" ] && [ -n "$expected" ] && [ -n "$out" ] \
+        || { sd_fail "Usage: $0 fetch URL SHA256 OUT"; return 1; }
+    mkdir -p "$(dirname "$out")" || return 1
+
+    curl -sSfL --retry 3 -o "$out.part" "$url" \
+        || { rm -f "$out.part"; sd_fail "Could not download $(basename "$out")."; return 1; }
+    actual="$(sd_sha256 "$out.part")" || { rm -f "$out.part"; return 1; }
+    if [ "$actual" != "$expected" ]; then
+        rm -f "$out.part"
+        sd_fail "$(basename "$out") does not match its pinned checksum (expected $expected, got $actual): refusing to run it."
+        return 1
+    fi
+    mv "$out.part" "$out" || return 1
+    sd_log "$(basename "$out") downloaded and matches its pinned checksum."
+    return 0
+}
+
+# ---------------------------------------------------------------------------------------------
+# graphql-cop
+# ---------------------------------------------------------------------------------------------
+
+# graphql-cop runs a fixed list of tests, one or a few requests each, and ships one that sends
+# `mutation cop {__typename}` over GET to see whether mutations are accepted that way. It selects
+# nothing and writes nothing, but it is a mutation, sent to a shared instance with an admin token -
+# so it is excluded, and three things make sure of it, the same arrangement as ZAP's:
+#
+#   1. `graphql-cop-preflight` reads the pinned source before anything is sent, and fails unless
+#      every registered test that mentions a mutation is excluded - and unless every exclusion
+#      names a registered test, because graphql-cop answers an unknown `-e` name by printing a line
+#      and running everything;
+#   2. the exclusion itself, `-e`, on the command line;
+#   3. `assert-graphql-cop-no-mutations` reads back, after the run, the request graphql-cop reports
+#      for every test it ran (its `curl_verify`), and fails on any mutation or subscription.
+#
+# See security/dast/graphql/README.md.
+
+# The registered tests of a graphql-cop source tree, one `name<TAB>module` per line. Registrations
+# are the `"name":function` lines of the `tests = { }` dictionary in lib/tests/__init__.py; a
+# commented one is not registered. The module is found through the `from lib.tests.<module> import
+# <function>` line that brings the function in.
+sd_graphql_cop_tests() {
+    awk '
+        /^from lib\.tests\.[A-Za-z0-9_]+ import [A-Za-z0-9_]+/ {
+            module = $2; sub(/^lib\.tests\./, "", module); modules[$4] = module; next
+        }
+        /^tests[ \t]*=[ \t]*\{/ { intests = 1; next }
+        intests == 1 && /^[ \t]*\}/ { intests = 0; next }
+        intests == 1 {
+            line = $0
+            sub(/^[ \t]+/, "", line)
+            if (line ~ /^#/) { next }
+            if (match(line, /^"[A-Za-z0-9_]+"[ \t]*:[ \t]*[A-Za-z0-9_]+/)) {
+                entry = substr(line, RSTART, RLENGTH)
+                name = entry; sub(/^"/, "", name); sub(/".*$/, "", name)
+                fn = entry; sub(/^.*:[ \t]*/, "", fn)
+                registered[++n] = name; functions[n] = fn
+            }
+        }
+        END { for (i = 1; i <= n; i++) printf "%s\t%s\n", registered[i], modules[functions[i]] }
+    ' "$1"
+}
+
+sd_graphql_cop_preflight() {
+    local src="${1:-}" excluded="${2:-}" init tests name module running=0 bad="" item
+    [ -n "$src" ] || { sd_fail "Usage: $0 graphql-cop-preflight SRC EXCLUDED"; return 1; }
+    init="$src/lib/tests/__init__.py"
+    [ -f "$init" ] || { sd_fail "No graphql-cop source at $src"; return 1; }
+
+    tests="$(sd_graphql_cop_tests "$init")" || { sd_fail "Could not read the graphql-cop test list"; return 1; }
+    [ -n "$tests" ] || { sd_fail "No test registered in the graphql-cop source: not the shape this was written for."; return 1; }
+
+    # Every exclusion must name a registered test: graphql-cop would print one line and run it.
+    for item in $(printf '%s' "$excluded" | tr ',' ' '); do
+        if ! printf '%s\n' "$tests" | cut -f1 | grep -qxF "$item"; then
+            sd_fail "The graphql-cop exclusion \"$item\" names no registered test: graphql-cop would ignore it and run everything."
+            return 1
+        fi
+    done
+
+    while IFS=$'\t' read -r name module; do
+        [ -n "$name" ] || continue
+        if printf ',%s,' "$excluded" | grep -qF ",$name,"; then
+            continue
+        fi
+        running=$((running + 1))
+        # Conservative on purpose: any mention of a mutation, in a query or in a docstring, and the
+        # test does not run until someone has read it and excluded it or changed this.
+        if [ -z "$module" ] || [ ! -f "$src/lib/tests/$module.py" ]; then
+            bad="$bad $name(unreadable)"
+        elif grep -qi 'mutation' "$src/lib/tests/$module.py"; then
+            bad="$bad $name"
+        fi
+    done <<< "$tests"
+
+    if [ -n "$bad" ]; then
+        sd_fail "graphql-cop test(s) that may send a mutation are not excluded:$bad. Add them to the exclusions in .github/workflows/dast-passive.yml."
+        return 1
+    fi
+    sd_log "graphql-cop: $running test(s) will run, none of which mentions a mutation. Excluded: ${excluded:-none}."
+    return 0
+}
+
+# The token, as the JSON the run-time graphql-cop configuration reads (security/dast/graphql-cop/
+# config.py). graphql-cop's own way in is `-H '{"X-Ontrack-Token": "..."}'` on its command line, and
+# a command line is readable from /proc by anything else on the runner - the reason ZAP's plan is
+# rendered with the token rather than handed it as an argument.
+sd_render_graphql_cop_headers() {
+    local output="${1:-}"
+    [ -n "$output" ] || { sd_fail "Usage: $0 render-graphql-cop-headers OUT"; return 1; }
+    [ -n "${DEMO_TOKEN:-}" ] || { sd_fail "DEMO_TOKEN is not set: the API cannot be scanned."; return 1; }
+    mkdir -p "$(dirname "$output")" || return 1
+    # From the environment rather than interpolated or passed with --arg: jq writes the token as a
+    # JSON string whatever it contains, and it appears in no process's arguments on the way.
+    export DEMO_TOKEN
+    ( umask 077 && jq -n '{"X-Ontrack-Token": env.DEMO_TOKEN}' > "$output" ) \
+        || { rm -f "$output"; sd_fail "Could not write the graphql-cop headers"; return 1; }
+    sd_log "graphql-cop headers rendered: the API token is in place."
+    return 0
+}
+
+# The JSON array graphql-cop prints last. `-o json` still lets it print a line first - for an
+# exclusion it does not know, for an endpoint it does not recognise - so the array is the last line
+# that starts one. jq's own error is dropped: a parse error quotes the input.
+sd_graphql_cop_json() {
+    local file="$1" line
+    [ -f "$file" ] || { sd_fail "No graphql-cop output at $file"; return 1; }
+    line="$(grep -E '^\[' "$file" | tail -n 1)"
+    [ -n "$line" ] || { sd_fail "graphql-cop printed no result: it did not complete."; return 1; }
+    printf '%s\n' "$line" | jq -e -c 'if type == "array" then . else error("not an array") end' 2> /dev/null \
+        || { sd_fail "graphql-cop's result is not the JSON array it prints."; return 1; }
+}
+
+sd_assert_graphql_cop_no_mutations() {
+    local file="${1:-}" json summary total mutations unverifiable
+    [ -n "$file" ] || { sd_fail "Usage: $0 assert-graphql-cop-no-mutations OUT"; return 1; }
+    [ -f "$file" ] || { sd_fail "No graphql-cop output at $file: cannot prove what was sent."; return 1; }
+
+    if grep -q 'cannot be excluded' "$file"; then
+        sd_fail "graphql-cop did not recognise one of its exclusions, and ran every test instead."
+        return 1
+    fi
+    json="$(sd_graphql_cop_json "$file")" || return 1
+
+    summary="$(printf '%s\n' "$json" | jq -r '
+        # The operation keyword right after the query is introduced: as a JSON property, as a
+        # url-encoded parameter in a GET query string or a form body. A field whose name starts
+        # with `mutation` does not match, and neither does a batch of queries.
+        def request: (.curl_verify // "");
+        def sends($kw): request | test("(\"query\"\\s*:\\s*\"|query=)(\\s|\\+|%20|%0A)*" + $kw + "\\b"; "i");
+        length as $total
+        | "total=\($total)",
+          "mutations=\([.[] | select(sends("mutation") or sends("subscription"))] | length)",
+          "unverifiable=\([.[] | select(request == "")] | length)"
+    ')" || { sd_fail "Could not read graphql-cop's requests"; return 1; }
+
+    total="$(printf '%s\n' "$summary" | sed -n 's/^total=//p')"
+    mutations="$(printf '%s\n' "$summary" | sed -n 's/^mutations=//p')"
+    unverifiable="$(printf '%s\n' "$summary" | sed -n 's/^unverifiable=//p')"
+
+    if [ "${total:-0}" = "0" ]; then
+        sd_fail "graphql-cop ran no test: nothing to prove, and nothing scanned."
+        return 1
+    fi
+    if [ "${mutations:-1}" != "0" ]; then
+        sd_fail "$mutations of the $total graphql-cop tests sent a GraphQL mutation or subscription. The scan wrote to the target; fix the exclusions in .github/workflows/dast-passive.yml before running it again."
+        return 1
+    fi
+    if [ "${unverifiable:-1}" != "0" ]; then
+        sd_fail "$unverifiable of the $total graphql-cop tests report no request: cannot prove what they sent."
+        return 1
+    fi
+    sd_log "graphql-cop: Tests run: $total, each read back from the request it reports. Mutations: 0. Subscriptions: 0."
+    return 0
+}
+
+# graphql-cop's result, into the normalised document.
+#
+# One entry per test, `result: true` when the weakness is there; a test that passed is not a
+# finding. Its severity is already HIGH, MEDIUM, LOW or INFO. It has no rule id in its output, so the
+# rule is the test's registered name - the one `-e` takes - through its title, which is what the
+# output does carry; a title this does not know falls back to itself, lower-cased.
+#
+# The instance is the endpoint and the method, read from `curl_verify` - and `curl_verify` itself is
+# dropped: it is the whole request, the API token header included.
+sd_normalize_graphql_cop() {
+    local file="${1:-}" version="${2:-unknown}" json
+    [ -n "$file" ] || { sd_fail "Usage: $0 normalize-graphql-cop OUT VERSION"; return 1; }
+    json="$(sd_graphql_cop_json "$file")" || return 1
+    if [ "$(printf '%s\n' "$json" | jq 'length')" = "0" ]; then
+        sd_fail "graphql-cop ran no test - it did not recognise the endpoint as GraphQL. A scan that did not happen is not a clean result."
+        return 1
+    fi
+
+    printf '%s\n' "$json" | jq -e --arg version "$version" '
+        def rule_id:
+            {
+              "Field Suggestions": "field_suggestions",
+              "Introspection": "introspection",
+              "GraphQL IDE": "detect_graphiql",
+              "GET Method Query Support": "get_method_support",
+              "Alias Overloading": "alias_overloading",
+              "Array-based Query Batching": "batch_query",
+              "Trace Mode": "trace_mode",
+              "Directive Overloading": "directive_overloading",
+              "Introspection-based Circular Query": "circular_query_introspection",
+              "Mutation is allowed over GET (possible CSRF)": "get_based_mutation",
+              "POST based url-encoded query (possible CSRF)": "post_based_csrf",
+              "Unhandled Errors Detection": "unhandled_error_detection",
+              "Field Duplication": "field_duplication"
+            }[.title // ""]
+            // ((.title // "unnamed") | ascii_downcase | gsub("[^a-z0-9]+"; "_") | ltrimstr("_") | rtrimstr("_"));
+        def risk: ((.severity // "") | ascii_upcase) as $s
+            | if ["CRITICAL", "HIGH", "MEDIUM", "LOW"] | index($s) then $s else "INFO" end;
+        def endpoint: [ (.curl_verify // "") | capture("\u0027(?<u>https?://[^\u0027?]*)[^\u0027]*\u0027\\s*$") ] | (.[0].u // "");
+        def method: [ (.curl_verify // "") | capture("^curl -X (?<m>[A-Z]+)") ] | (.[0].m // "");
+        {
+          scanner: "graphql-cop",
+          version: $version,
+          findings: [
+            .[] | select(.result == true)
+            | {
+                scanner: "graphql-cop",
+                rule: rule_id,
+                ref: rule_id,
+                name: ((.title // "Unnamed") | tostring),
+                risk: risk,
+                confidence: "Unknown",
+                cwe: "",
+                description: ((.description // "") | tostring),
+                solution: "",
+                reference: "https://github.com/dolevf/graphql-cop",
+                instances: [
+                  { uri: endpoint, method: method, param: "", evidence: ((.impact // "") | tostring), attack: "", info: "" }
+                ]
+              }
+          ]
+        }
+    ' || { sd_fail "Could not convert graphql-cop's result"; return 1; }
+}
+
+# ---------------------------------------------------------------------------------------------
+# Nuclei
+# ---------------------------------------------------------------------------------------------
+
+# The exclusions and the rate limit, observed rather than assumed: security/dast/nuclei/passive.yaml
+# says which tags are excluded, and this reads the tags of every template Nuclei actually selected
+# with that configuration (`nuclei -tl`) and fails if one of them carries an excluded tag anyway.
+# It also refuses a configuration that has stopped excluding one of the four tags the demo must
+# never see, or that has lost its rate limit - the demo is public and shared.
+sd_nuclei_preflight() {
+    local list="${1:-}" config="${2:-}" excluded rate required count bad
+    [ -n "$list" ] && [ -n "$config" ] || { sd_fail "Usage: $0 nuclei-preflight LIST CONFIG"; return 1; }
+    [ -f "$list" ] || { sd_fail "No Nuclei template list at $list"; return 1; }
+    [ -f "$config" ] || { sd_fail "No Nuclei configuration at $config"; return 1; }
+
+    excluded="$(yq -r '(.["exclude-tags"] // []) | join(",")' "$config")" \
+        || { sd_fail "Could not read the excluded tags from $config"; return 1; }
+    for required in intrusive dos fuzz bruteforce; do
+        if ! printf ',%s,' "$excluded" | grep -qF ",$required,"; then
+            sd_fail "$config does not exclude the \`$required\` tag. The demo is public and shared: it must."
+            return 1
+        fi
+    done
+    rate="$(yq -r '.["rate-limit"] // ""' "$config")" || return 1
+    case "$rate" in
+        ''|*[!0-9]*|0) sd_fail "$config sets no rate limit. The demo is public and shared: it must."; return 1 ;;
+        *) ;;
+    esac
+
+    # One awk over every selected template: the first `tags:` line of each, split on commas.
+    local result
+    # shellcheck disable=SC2016  # deliberate: an awk program, expanded by awk
+    result="$(grep -E '\.ya?ml$' "$list" | while IFS= read -r path; do
+                  [ -f "$path" ] && printf '%s\0' "$path"
+              done | xargs -0 awk -v excluded="$excluded" '
+        BEGIN { n = split(excluded, ex, ","); for (i = 1; i <= n; i++) if (ex[i] != "") bad_tag[ex[i]] = 1 }
+        FNR == 1 { files++ }
+        /^[ \t]*tags:/ && !(FILENAME in seen) {
+            seen[FILENAME] = 1
+            value = $0
+            sub(/^[ \t]*tags:[ \t]*/, "", value)
+            gsub(/["\047\[\]]/, "", value)
+            m = split(value, tags, ",")
+            for (j = 1; j <= m; j++) {
+                t = tags[j]; gsub(/^[ \t]+|[ \t]+$/, "", t)
+                if (t in bad_tag) { bad++; break }
+            }
+        }
+        END { printf "%d %d\n", files, bad }
+    ')" || true
+    count="${result%% *}"
+    bad="${result##* }"
+    count="${count:-0}"
+    bad="${bad:-0}"
+
+    if [ "$count" = "0" ]; then
+        sd_fail "Nuclei selected no template: the selection is broken, and a scan of nothing is not a clean scan."
+        return 1
+    fi
+    if [ "$bad" != "0" ]; then
+        sd_fail "$bad of the $count templates Nuclei selected carry an excluded tag. Refusing to scan the demo with them."
+        return 1
+    fi
+    sd_log "Nuclei: $count template(s) selected, none tagged $(printf '%s' "$excluded" | sed 's/,/, /g'). Rate limit: $rate request(s) per second."
+    return 0
+}
+
+# Whether the Nuclei run is a scan at all, from its log and its output. Nuclei exits 0 in three
+# cases that are not a clean result: when it did not finish, when it gave up on the target as
+# unresponsive - it then skips every remaining template silently - and when the output file holds
+# fewer matches than it counted. Each of them fails here, so that it reports no stamp.
+#
+# The log itself is never printed: it carries every match, URL included. This prints the final
+# statistics, which are counts.
+sd_nuclei_summary() {
+    local log="${1:-}" jsonl="${2:-}" target="${3:-${DAST_TARGET:-}}" stats host port lines
+    [ -n "$log" ] && [ -n "$jsonl" ] && [ -n "$target" ] \
+        || { sd_fail "Usage: $0 nuclei-summary LOG JSONL TARGET"; return 1; }
+    [ -f "$log" ] || { sd_fail "No Nuclei log at $log"; return 1; }
+    [ -f "$jsonl" ] || { sd_fail "No Nuclei output at $jsonl"; return 1; }
+
+    stats="$(grep -E '^\{"duration"' "$log" | tail -n 1)"
+    if [ -z "$stats" ] || ! printf '%s\n' "$stats" | jq -e 'type == "object"' > /dev/null 2>&1; then
+        sd_fail "Nuclei printed no final statistics: the scan did not finish."
+        return 1
+    fi
+
+    host="${target#*://}"
+    host="${host%%/*}"
+    case "$host" in
+        *:*) port="${host##*:}"; host="${host%%:*}" ;;
+        *) case "$target" in https://*) port=443 ;; *) port=80 ;; esac ;;
+    esac
+    if grep -qF "Skipped $host:$port from target list" "$log"; then
+        sd_fail "Nuclei gave up on the target as unresponsive and skipped the rest of its templates: not a completed scan."
+        return 1
+    fi
+
+    lines="$(grep -c . "$jsonl" || true)"
+    if [ "${lines:-0}" -lt "$(printf '%s\n' "$stats" | jq -r '.matched // 0 | tonumber')" ]; then
+        sd_fail "Nuclei counted more matches than its output file holds: the output is incomplete."
+        return 1
+    fi
+
+    printf '%s\n' "$stats" | jq -r '
+        "Nuclei: \(.templates // "?") template(s), \(.requests // "?") request(s) in \(.duration // "?"), \(.rps // "?") request(s) per second, \(.errors // "?") error(s)."
+    ' || return 1
+    return 0
+}
+
+# Nuclei's JSONL, into the normalised document.
+#
+# One line per match; grouped by template, so that one template matching on several paths is one
+# finding with several instances. Its severities map one to one, `critical` included - the only
+# scanner of the three that has one. `unknown` is INFO: a template that does not say how bad it is
+# does not get to count.
+#
+# An empty file is zero findings: Nuclei writes nothing when nothing matched, and whether it ran at
+# all is `nuclei-summary`'s question. `curl-command`, `request` and `response` are dropped.
+sd_normalize_nuclei() {
+    local file="${1:-}" version="${2:-unknown}"
+    [ -n "$file" ] || { sd_fail "Usage: $0 normalize-nuclei JSONL VERSION"; return 1; }
+    [ -f "$file" ] || { sd_fail "No Nuclei output at $file"; return 1; }
+
+    jq -e -s --arg version "$version" '
+        def risk: ((.info.severity // "") | ascii_upcase) as $s
+            | if ["CRITICAL", "HIGH", "MEDIUM", "LOW"] | index($s) then $s else "INFO" end;
+        def text: if . == null then "" elif type == "array" then map(tostring) | join("\n") else tostring end
+            | sub("\\s+$"; "");
+        {
+          scanner: "nuclei",
+          version: $version,
+          findings: (
+            group_by(.["template-id"] // "unknown")
+            | map(
+                (.[0]) as $a
+                | {
+                    scanner: "nuclei",
+                    rule: (($a["template-id"] // "unknown") | tostring),
+                    ref: (($a["template-id"] // "unknown") | tostring),
+                    name: (($a.info.name // $a["template-id"] // "Unnamed") | tostring),
+                    risk: ($a | risk),
+                    confidence: "Unknown",
+                    cwe: ((($a.info.classification["cwe-id"] // []) | .[0] // "") | tostring | ascii_downcase | ltrimstr("cwe-")),
+                    description: ($a.info.description | text),
+                    solution: ($a.info.remediation | text),
+                    reference: ($a.info.reference | text),
+                    instances: [
+                      .[] | {
+                        uri: ((.["matched-at"] // .url // .host // "") | tostring),
+                        method: "",
+                        param: ((.["matcher-name"] // "") | tostring),
+                        evidence: (.["extracted-results"] | text | gsub("\n"; ", ")),
+                        attack: "",
+                        info: ""
+                      }
+                    ]
+                  }
+              )
+          )
+        }
+    ' "$file" 2> /dev/null || { sd_fail "Could not read the Nuclei output at $file"; return 1; }
+}
+
+# ---------------------------------------------------------------------------------------------
 # report
 # ---------------------------------------------------------------------------------------------
 
@@ -548,7 +997,23 @@ sd_verdict() {
             suppressions_expired: [
               $expired_sup[] | {id: (.id // .rule // .name // "suppression"), statement: .statement, expired_at: .expired_at}
             ],
-            overrides: [ $scored[] | select(.override != null) | {rule: .rule, name: .name, level: .override, risk: .risk} ]
+            overrides: [ $scored[] | select(.override != null) | {rule: .rule, name: .name, level: .override, risk: .risk} ],
+            # The per-tool split. For the private report only: the stamp and the public log carry the
+            # totals, and which tool found what is detail.
+            by_scanner: [ ($meta.tools // [])[] | . as $t
+              | ($counted | map(select(.scanner == $t.scanner))) as $c
+              | {
+                  scanner: $t.scanner,
+                  version: $t.version,
+                  reported: ($scored | map(select(.scanner == $t.scanner)) | length),
+                  counts: {
+                    CRITICAL: ($c | map(select(.risk == "CRITICAL")) | length),
+                    HIGH: ($c | map(select(.risk == "HIGH")) | length),
+                    MEDIUM: ($c | map(select(.risk == "MEDIUM")) | length),
+                    LOW: ($c | map(select(.risk == "LOW")) | length)
+                  }
+                }
+            ]
           }
     ' || { sd_fail "Could not apply the rule levels and suppressions"; return 1; }
 }
@@ -590,15 +1055,27 @@ sd_render() {
           "",
           "Counted **per rule**, not per affected URL: \(.totals.findings) rule(s) reported, \(.totals.counted) counted, \(.totals.informational) informational (dropped), \(.totals.instances) instance(s) in total.",
           "",
-          "## Findings",
-          ""
+          "## Counts by scanner",
+          "",
+          "| Scanner | Version | CRITICAL | HIGH | MEDIUM | LOW |",
+          "|---|---|---|---|---|---|"
         ]
-        + (if (.findings | length) == 0 then ["Nothing reported. That is unusual rather than reassuring — check that the scan actually reached the target."] else
-            [ .findings[] |
+        + [ .by_scanner[] | "| `\(.scanner)` | \(.version | md) | \(.counts.CRITICAL) | \(.counts.HIGH) | \(.counts.MEDIUM) | \(.counts.LOW) |" ]
+        + [""]
+        + (if (.findings | length) == 0 then ["Nothing reported by any scanner. That is unusual rather than reassuring — check that the scan actually reached the target.", ""] else [] end)
+        # Grouped by tool, then by risk and rule within a tool: three tools reporting the same
+        # weakness under three names read as three findings otherwise, and a reader comparing two
+        # reports compares one tool at a time.
+        + ( .findings as $all | [ .by_scanner[] | .scanner as $sc
+            | ($all | map(select(.scanner == $sc))) as $mine
+            | "## Findings — `\($sc)`",
+              "",
+              (if ($mine | length) == 0 then "Nothing reported by this scanner.\n" else empty end),
+            ( $mine[] |
               (
                 "### \(.risk) — \(.name)",
                 "",
-                "`\(.scanner)` rule `\(.rule)`\(if .ref != .rule then " (`\(.ref)`)" else "" end), confidence \(.confidence)\(if .cwe != "" then ", CWE-\(.cwe)" else "" end)\(if .counted then "" else " — **not counted**\(if (.kept | length) == 0 then " (every instance suppressed)" else " (informational)" end)" end)\(if .override != null then " — level forced to `\(.override)` by `rules.tsv`" else "" end)",
+                "`\(.scanner)` rule `\(.rule)`\(if .ref != .rule then " (`\(.ref)`)" else "" end)\(if .confidence == "Unknown" then "" else ", confidence \(.confidence)" end)\(if .cwe != "" then ", CWE-\(.cwe)" else "" end)\(if .counted then "" else " — **not counted**\(if (.kept | length) == 0 then " (every instance suppressed)" else " (informational)" end)" end)\(if .override != null then " — level forced to `\(.override)` by `rules.tsv`" else "" end)",
                 "",
                 (.description | blockquote),
                 "",
@@ -621,7 +1098,8 @@ sd_render() {
                 "---",
                 ""
               )
-            ] end)
+            )
+          ] )
         + ["## Suppressions", ""]
         + (if (.suppressions_applied | length) == 0 then ["No suppression applied to this run."] else
             [ "| Suppression | Instances subtracted | Expires | Statement |", "|---|---|---|---|" ]
@@ -654,7 +1132,7 @@ sd_render() {
 }
 
 sd_report() {
-    local out="${1:-}" findings rules suppressions mitigations meta verdict duration=0
+    local out="${1:-}" findings tools rules suppressions mitigations meta verdict duration=0
     [ -n "$out" ] || { sd_fail "Usage: $0 report OUT_MD FILE..."; return 1; }
     shift
     [ $# -gt 0 ] || { sd_fail "No normalised findings document given."; return 1; }
@@ -665,6 +1143,14 @@ sd_report() {
     done
 
     findings="$(jq -e -s -c '[.[] | .findings[]?]' "$@")" \
+        || { sd_fail "Could not read the findings documents"; return 1; }
+    # Which tools ran, at which version, in the order they were given: one line each in the report,
+    # a tool with nothing to report included. The report is grouped by these, so a finding whose
+    # scanner no document declares still gets a line - it must never fall out of the report.
+    tools="$(jq -e -s -c '
+        map({scanner: (.scanner // "unknown"), version: ((.version // "unknown") | tostring)})
+        + [ .[] | .findings[]? | {scanner: (.scanner // "unknown"), version: "unknown"} ]
+        | reduce .[] as $t ([]; if any(.[]; .scanner == $t.scanner) then . else . + [$t] end)' "$@")" \
         || { sd_fail "Could not read the findings documents"; return 1; }
     rules="$(sd_rules_json "$SD_RULES")" || return 1
     suppressions="$(sd_yaml_list "$SD_SUPPRESSIONS" suppressions)" || return 1
@@ -683,6 +1169,7 @@ sd_report() {
         --arg run_url "${DAST_RUN_URL:-unknown}" \
         --arg scanners "${DAST_SCANNERS:-unknown}" \
         --argjson duration "$duration" \
+        --argjson tools "$tools" \
         '$ARGS.named')" || return 1
 
     verdict="$(sd_verdict "$findings" "$rules" "$suppressions" "$mitigations" "$meta")" || return 1
@@ -754,12 +1241,20 @@ sd_main() {
         actuator) sd_actuator "$@" ;;
         normalize-zap) sd_normalize_zap "$@" ;;
         assert-no-mutations) sd_assert_no_mutations "$@" ;;
+        fetch) sd_fetch "$@" ;;
+        graphql-cop-preflight) sd_graphql_cop_preflight "$@" ;;
+        render-graphql-cop-headers) sd_render_graphql_cop_headers "$@" ;;
+        assert-graphql-cop-no-mutations) sd_assert_graphql_cop_no_mutations "$@" ;;
+        normalize-graphql-cop) sd_normalize_graphql_cop "$@" ;;
+        nuclei-preflight) sd_nuclei_preflight "$@" ;;
+        nuclei-summary) sd_nuclei_summary "$@" ;;
+        normalize-nuclei) sd_normalize_nuclei "$@" ;;
         report) sd_report "$@" ;;
         report-path) sd_report_path ;;
         publish) sd_publish "$@" ;;
         scrub) sd_scrub ;;
         *)
-            echo "Usage: $0 query-schema|render-plan|actuator|normalize-zap|assert-no-mutations|report|report-path|publish|scrub ..." >&2
+            echo "Usage: $0 query-schema|render-plan|actuator|normalize-zap|assert-no-mutations|fetch|graphql-cop-preflight|render-graphql-cop-headers|assert-graphql-cop-no-mutations|normalize-graphql-cop|nuclei-preflight|nuclei-summary|normalize-nuclei|report|report-path|publish|scrub ..." >&2
             return 1
             ;;
     esac

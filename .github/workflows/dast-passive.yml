@@ -3,14 +3,25 @@
 # Part of `initiative: security-scans`, DAST track. The design is docs/grilling/2026-09-dast.md;
 # what the scanners read is security/dast/, and what every later DAST issue builds on is the
 # split described there: the scanner reports everything, and scripts/security-dast.sh decides what
-# it counts for. #1766 adds graphql-cop and Nuclei as two more `normalize-*` converters feeding
-# the same `report` step; #1767 runs the same script with DAST_KIND=active.
+# it counts for. Three scanners run, one after the other, and each has its `normalize-*` converter
+# feeding the same `report` step and the same SECURITY.DAST validation run:
 #
-# Passive means no request that changes state ever leaves the scanner. There is no active scan,
-# no fuzzing, no attack payload and - the one that matters on a shared instance - no GraphQL
-# mutation: ZAP is fed a schema with no mutation root, so a mutation is not filtered out, it is
-# not expressible. security/dast/graphql/README.md explains it, and the run proves it afterwards
-# from ZAP's own record of what it sent.
+#   * OWASP ZAP (#1765) - passive rules over a crawl of the UI and every root query of the API;
+#   * graphql-cop (#1766) - GraphQL-specific weaknesses: introspection, alias, batch and depth abuse,
+#     GET-based queries, field suggestions;
+#   * Nuclei (#1766) - deployment-shaped problems: exposed actuators and files, default credentials,
+#     known Spring / Keycloak / Next.js CVEs, and so the yontrack-chart defaults the demo runs on.
+#
+# #1767 runs the same script with DAST_KIND=active.
+#
+# Passive means no request that changes state ever leaves a scanner. There is no active scan, no
+# fuzzing, no attack payload and - the one that matters on a shared instance - no GraphQL mutation.
+# ZAP is fed a schema with no mutation root, so a mutation is not filtered out, it is not
+# expressible; graphql-cop's one test that sends a mutation is excluded, and the exclusion is
+# checked against its source before it runs; Nuclei runs no template tagged intrusive, dos, fuzz or
+# bruteforce, and that is checked against the templates it selected. Both GraphQL scanners are
+# proved afterwards, from their own record of what they sent, to have sent no mutation.
+# security/dast/graphql/README.md explains it.
 #
 # ---------------------------------------------------------------------------------------------
 # DISCLOSURE. This repository is public: its workflow logs are readable by any signed-in GitHub
@@ -39,8 +50,17 @@
 # truth, which is what docs/grilling/2026-09-dast.md provided for. Do not re-add it without
 # re-measuring: this is a statement about what GitHub did, not about what it might do.
 #
+# `dast-graphql` and `dast-nuclei` were not tried, and that is a decision rather than an omission
+# (#1766). Their findings are located the same way - graphql-cop's by the endpoint, Nuclei's by the
+# matched URL - so GitHub has the same nothing to place them on; and the request detail that would
+# make either useful carries the token (graphql-cop's `curl_verify`) or the exact path of an exposure
+# (Nuclei's `matched-at`) into a repository whose Security tab is not where those belong.
+#
 # Every action is pinned by commit SHA and the ZAP image by digest, like the other security
-# workflows. .github/dependabot.yml keeps the action pins up to date.
+# workflows; .github/dependabot.yml keeps the action pins up to date. graphql-cop and Nuclei are not
+# images: each is downloaded at a fixed version and refused unless it matches the SHA-256 below,
+# and graphql-cop's Python dependencies are installed with --require-hashes. Dependabot does not see
+# those pins - moving one is a reviewed change to this file.
 name: DAST passive
 
 on:
@@ -84,6 +104,29 @@ env:
   # The `stable` tag this digest was taken from carried ZAP 2.16.1, which is what DAST_SCANNERS
   # below records in every report. Move the two together.
   ZAP_IMAGE: ghcr.io/zaproxy/zaproxy@sha256:781a2bdaea47324e7bab583e2263f21d257b0aee61ed51521a5be45f5f5081ef
+  # graphql-cop 1.16, as the commit its tag points at and the SHA-256 of GitHub's archive of it.
+  # It publishes no image of this release (the Docker Hub `latest` is older), so it runs from source
+  # in a digest-pinned Python, with the dependencies of security/dast/graphql-cop/requirements.txt.
+  # 3.10 because graphql-cop pins simplejson 3.17.6, which has wheels up to 3.10 and would otherwise
+  # be compiled on the runner. Move the four together.
+  GRAPHQL_COP_VERSION: "1.16"
+  GRAPHQL_COP_REF: 2b7e086efae672f28b419c7fcdfe6b48d846c9dc
+  GRAPHQL_COP_SHA256: 4168ee12735fcc8a40bf7184b73a4c25277434c68431bfbc3231a425d0c66aed
+  GRAPHQL_COP_PYTHON_IMAGE: python:3.10-slim@sha256:fd76ade0c607f27677bc04be3c60749f400eedc941d9e72967e19a4cedff80c2
+  # The graphql-cop tests that never run against the demo, comma-separated, by the names graphql-cop
+  # registers them under. `get_based_mutation` sends `mutation cop {__typename}` over GET: it writes
+  # nothing, but it is a mutation on a shared instance with an admin token, which this scan does not
+  # send. `graphql-cop-preflight` fails the run if any other registered test mentions a mutation.
+  GRAPHQL_COP_EXCLUDED: get_based_mutation
+  # Nuclei 3.11.1, with the SHA-256 its release publishes in nuclei_3.11.1_checksums.txt, and the
+  # nuclei-templates release v10.4.8 as the commit its tag points at and the SHA-256 of GitHub's
+  # archive of it. The templates are pinned separately because the engine's default is to download
+  # the newest ones when it starts - which would turn "a new finding" into "or maybe a new template".
+  NUCLEI_VERSION: "3.11.1"
+  NUCLEI_SHA256: ea63d4ae232808cd7c6bc00d0142428e231fab59dae01042246097d195835ab6
+  NUCLEI_TEMPLATES_VERSION: "v10.4.8"
+  NUCLEI_TEMPLATES_REF: e5f19e6144135e107962bb943231413796fd7fe7
+  NUCLEI_TEMPLATES_SHA256: 0dc334333848bd189a589247d6f4eed0d0f9cb9956c00cc45c569630817aaf43
   # The demo, not the Yontrack instance the validation is reported to.
   DEMO_URL: ${{ vars.DEMO_URL || 'https://demo.dev.yontrack.com' }}
   # Where the reports go. Private, and the only place any detail is allowed to exist.
@@ -98,7 +141,8 @@ jobs:
       github.repository == 'yontrack/yontrack'
       && (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success')
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    # ZAP takes about fifteen minutes, Nuclei about ten at its rate limit, graphql-cop seconds.
+    timeout-minutes: 90
     permissions:
       # Read only. No `security-events: write` - nothing is uploaded to code scanning, see the
       # "No SARIF" note in the header.
@@ -108,7 +152,11 @@ jobs:
       DAST_TARGET: ${{ vars.DEMO_URL || 'https://demo.dev.yontrack.com' }}
       DAST_RUN_ID: ${{ github.run_id }}
       DAST_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-      DAST_SCANNERS: OWASP ZAP 2.16.1 (passive rules, GraphQL add-on, query-only schema)
+      DAST_SCANNERS: >-
+        OWASP ZAP 2.16.1 (passive rules, GraphQL add-on, query-only schema);
+        graphql-cop 1.16 (every test but get_based_mutation);
+        Nuclei 3.11.1 with nuclei-templates v10.4.8 (HTTP templates, no intrusive, dos, fuzz or
+        bruteforce tag, 10 requests per second)
       YONTRACK_PROJECT: yontrack
       YONTRACK_BRANCH: main
     steps:
@@ -254,7 +302,132 @@ jobs:
         run: scripts/security-dast.sh assert-no-mutations "$WORK/out/messages.har"
 
       # ------------------------------------------------------------------------------------
-      # 5. Count, report, publish.
+      # 5. graphql-cop.
+      #
+      # What a spider cannot see on /graphql: introspection, field suggestions, alias, batch and
+      # directive overloading, queries recursing without a depth limit, queries accepted over GET
+      # or as a form. About a dozen requests in all, each one query of `__typename` or of the
+      # introspection types.
+      # ------------------------------------------------------------------------------------
+
+      # The pinned source, checked for a test that could send a mutation before a single request
+      # goes out, with the run-time configuration that reads the token from a file.
+      - name: Prepare graphql-cop
+        env:
+          DEMO_TOKEN: ${{ secrets.DEMO_TOKEN }}
+          WORK: ${{ steps.prepare.outputs.work }}
+        run: |
+          set -euo pipefail
+          cop="$WORK/graphql-cop"
+          scripts/security-dast.sh fetch \
+            "https://github.com/dolevf/graphql-cop/archive/${GRAPHQL_COP_REF}.tar.gz" \
+            "$GRAPHQL_COP_SHA256" "$cop/graphql-cop.tar.gz"
+          mkdir -p "$cop/src"
+          tar -xzf "$cop/graphql-cop.tar.gz" -C "$cop/src" --strip-components=1
+          # The upstream config.py plus the token header, read from headers.json - see the file.
+          cp security/dast/graphql-cop/config.py "$cop/src/config.py"
+          cp security/dast/graphql-cop/requirements.txt "$cop/requirements.txt"
+          scripts/security-dast.sh graphql-cop-preflight "$cop/src" "$GRAPHQL_COP_EXCLUDED"
+          scripts/security-dast.sh render-graphql-cop-headers "$cop/headers.json"
+          echo "graphql-cop $GRAPHQL_COP_VERSION (commit $GRAPHQL_COP_REF), in $GRAPHQL_COP_PYTHON_IMAGE."
+
+      # Its stdout is the JSON result, and each entry of it carries the request the test sent,
+      # token included - so it goes to a file and is never printed. stderr (pip, a traceback) is
+      # printed only on a failure, and only scrubbed.
+      #
+      # The endpoint and the exclusions are arguments of the container's `sh -c`, not interpolated
+      # into it. The token is in neither: it is in /cop/headers.json, mounted read-only.
+      - name: Run graphql-cop
+        env:
+          DEMO_TOKEN: ${{ secrets.DEMO_TOKEN }}
+          WORK: ${{ steps.prepare.outputs.work }}
+        run: |
+          set -uo pipefail
+          rc=0
+          # shellcheck disable=SC2016  # deliberate: expanded by the container's shell, from its arguments
+          docker run --rm \
+            -v "$WORK/graphql-cop:/cop:ro" \
+            -e GRAPHQL_COP_HEADERS=/cop/headers.json \
+            -e PYTHONDONTWRITEBYTECODE=1 \
+            "$GRAPHQL_COP_PYTHON_IMAGE" \
+            sh -c 'pip install --quiet --no-cache-dir --disable-pip-version-check --root-user-action=ignore \
+                     --require-hashes --only-binary :all: --target /tmp/deps -r /cop/requirements.txt 1>&2 \
+                   && PYTHONPATH=/tmp/deps exec python /cop/src/graphql-cop.py -t "$0" -o json -e "$1"' \
+            "$DAST_TARGET/graphql" "$GRAPHQL_COP_EXCLUDED" \
+            > "$WORK/out/graphql-cop.out" 2> "$WORK/graphql-cop.log" || rc=$?
+          echo "graphql-cop finished with exit code $rc."
+          if [ "$rc" -ne 0 ]; then
+            echo "--- last lines of the graphql-cop log, URLs and credentials removed ---"
+            tail -n 30 "$WORK/graphql-cop.log" | scripts/security-dast.sh scrub
+            exit "$rc"
+          fi
+          exit 0
+
+      # The graphql-cop counterpart of the ZAP check above: every test reports the request it sent,
+      # and none of them may be a mutation or a subscription. Counts only.
+      - name: Prove that graphql-cop sent no mutation
+        env:
+          WORK: ${{ steps.prepare.outputs.work }}
+        run: scripts/security-dast.sh assert-graphql-cop-no-mutations "$WORK/out/graphql-cop.out"
+
+      # ------------------------------------------------------------------------------------
+      # 6. Nuclei.
+      #
+      # The template selection, the excluded tags and the rate limit are
+      # security/dast/nuclei/passive.yaml. Unauthenticated, deliberately: what Nuclei looks for -
+      # an exposed actuator, a served .git, a default password - is what an attacker without a
+      # token reaches, and an admin token on a login template is not something to find out about.
+      # ------------------------------------------------------------------------------------
+
+      # The engine and the templates, each checked against its pin, then the selection checked
+      # against the excluded tags before anything is sent.
+      - name: Prepare Nuclei
+        env:
+          WORK: ${{ steps.prepare.outputs.work }}
+        run: |
+          set -euo pipefail
+          nuclei="$WORK/nuclei"
+          scripts/security-dast.sh fetch \
+            "https://github.com/projectdiscovery/nuclei/releases/download/v${NUCLEI_VERSION}/nuclei_${NUCLEI_VERSION}_linux_amd64.zip" \
+            "$NUCLEI_SHA256" "$nuclei/nuclei.zip"
+          unzip -q -o "$nuclei/nuclei.zip" nuclei -d "$nuclei/bin"
+          scripts/security-dast.sh fetch \
+            "https://github.com/projectdiscovery/nuclei-templates/archive/${NUCLEI_TEMPLATES_REF}.tar.gz" \
+            "$NUCLEI_TEMPLATES_SHA256" "$nuclei/templates.tar.gz"
+          mkdir -p "$nuclei/templates"
+          tar -xzf "$nuclei/templates.tar.gz" -C "$nuclei/templates" --strip-components=1
+          echo "Nuclei $NUCLEI_VERSION with nuclei-templates $NUCLEI_TEMPLATES_VERSION (commit $NUCLEI_TEMPLATES_REF)."
+          # -tl lists what this configuration selects, and sends nothing.
+          "$nuclei/bin/nuclei" -config security/dast/nuclei/passive.yaml -t "$nuclei/templates" \
+            -tl -duc -nc > "$nuclei/templates.list" 2>&1
+          scripts/security-dast.sh nuclei-preflight "$nuclei/templates.list" security/dast/nuclei/passive.yaml
+
+      # Nuclei prints every match to stdout as it finds it, URL and template included, so both of
+      # its streams go to a file that is never printed. On a failure, only its fatal lines are, and
+      # scrubbed. `nuclei-summary` then prints the final statistics - counts - and fails a run that
+      # did not finish, gave up on the target, or lost matches, because Nuclei exits 0 on all three.
+      - name: Run Nuclei
+        env:
+          WORK: ${{ steps.prepare.outputs.work }}
+        run: |
+          set -uo pipefail
+          nuclei="$WORK/nuclei"
+          # Nuclei writes no file when nothing matched, and no match is a result.
+          : > "$WORK/out/nuclei.jsonl"
+          rc=0
+          "$nuclei/bin/nuclei" -config security/dast/nuclei/passive.yaml -t "$nuclei/templates" \
+            -u "$DAST_TARGET" -duc -nc -omit-raw -jsonl -o "$WORK/out/nuclei.jsonl" \
+            -stats -si 60 -sj > "$WORK/nuclei.log" 2>&1 || rc=$?
+          echo "Nuclei finished with exit code $rc."
+          if [ "$rc" -ne 0 ]; then
+            echo "--- fatal lines of the Nuclei log, URLs removed ---"
+            grep -E '^\[FTL\]' "$WORK/nuclei.log" | tail -n 20 | scripts/security-dast.sh scrub
+            exit "$rc"
+          fi
+          scripts/security-dast.sh nuclei-summary "$WORK/nuclei.log" "$WORK/out/nuclei.jsonl" "$DAST_TARGET"
+
+      # ------------------------------------------------------------------------------------
+      # 7. Count, report, publish.
       # ------------------------------------------------------------------------------------
 
       - name: Count the findings and write the report
@@ -269,7 +442,13 @@ jobs:
         run: |
           set -euo pipefail
           scripts/security-dast.sh normalize-zap "$WORK/out/zap.json" > "$WORK/out/findings-zap.json"
-          scripts/security-dast.sh report "$WORK/out/report.md" "$WORK/out/findings-zap.json"
+          scripts/security-dast.sh normalize-graphql-cop "$WORK/out/graphql-cop.out" \
+            "$GRAPHQL_COP_VERSION" > "$WORK/out/findings-graphql-cop.json"
+          scripts/security-dast.sh normalize-nuclei "$WORK/out/nuclei.jsonl" \
+            "$NUCLEI_VERSION (templates $NUCLEI_TEMPLATES_VERSION)" > "$WORK/out/findings-nuclei.json"
+          # One report, one set of counts, one validation run: the per-tool split is in the report.
+          scripts/security-dast.sh report "$WORK/out/report.md" \
+            "$WORK/out/findings-zap.json" "$WORK/out/findings-graphql-cop.json" "$WORK/out/findings-nuclei.json"
           echo "path=$(scripts/security-dast.sh report-path)" >> "$GITHUB_OUTPUT"
 
       # The private repository, and the only place the detail exists. The token is fine-grained
@@ -284,7 +463,7 @@ jobs:
         run: scripts/security-dast.sh publish "$REPORTS_REPOSITORY" "$REPORT_PATH" "$WORK/out/report.md"
 
       # ------------------------------------------------------------------------------------
-      # 6. Report to Yontrack.
+      # 8. Report to Yontrack.
       #
       # No `if:` at all, which is the deliberate opposite of what demo-smoke.yml does with
       # DEMO.SMOKE, and the issue's "Failure semantics" is why: a scanner error fails the run and
@@ -323,7 +502,7 @@ jobs:
             $run_time_flag $run_info
 
       # ------------------------------------------------------------------------------------
-      # 7. The summary. Counts only - check what you add here.
+      # 9. The summary. Counts only - check what you add here.
       # ------------------------------------------------------------------------------------
 
       - name: Summarise the counts
@@ -346,13 +525,14 @@ jobs:
             echo "|---|---|---|---|"
             echo "| ${CRITICAL:-?} | ${HIGH:-?} | ${MEDIUM:-?} | ${LOW:-?} |"
             echo
-            echo "Counted per rule, after suppressions; informational findings dropped."
+            echo "ZAP, graphql-cop and Nuclei together, counted per rule, after suppressions;"
+            echo "informational findings dropped."
             echo "${FINDINGS:-?} rule(s) counted, ${SUPPRESSED:-?} instance(s) suppressed."
             echo
             echo "Reported as \`SECURITY.DAST\` on build \`${BUILD:-unknown}\` of"
             echo "\`$YONTRACK_PROJECT/$YONTRACK_BRANCH\`."
             echo
             echo "The findings themselves are in \`$REPORTS_REPOSITORY\` at"
-            echo "\`${REPORT_PATH:-not published}\` — never here, never as an artifact,"
+            echo "\`${REPORT_PATH:-not published}\`, split by scanner — never here, never as an artifact,"
             echo "and not in the Security tab: see the \"No SARIF\" note in this workflow."
           } >> "$GITHUB_STEP_SUMMARY"

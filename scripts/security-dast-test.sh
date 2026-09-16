@@ -32,24 +32,34 @@ WORK="$(mktemp -d "${TMPDIR:-/tmp}/security-dast-test.XXXXXX")" || {
     echo "FATAL: could not create a temporary directory" >&2
     exit 1
 }
-trap 'rm -rf "$WORK"' EXIT
+trap '[ -n "${KEEP_WORK:-}" ] || rm -rf "$WORK"' EXIT
 mkdir -p "$WORK/bin"
 
 # ===========================================================================
 # Stubs
 # ===========================================================================
 
-# curl, for the management port probe. Prints the status code of the first line of
+# curl, for the management port probe and for `fetch`. Prints the status code of the first line of
 # $SD_STUB_DIR/answers whose pattern the URL contains, and 000 - a connection failure - otherwise,
 # which is what a port nothing listens on looks like.
 cat > "$WORK/bin/curl" <<'STUB'
 #!/usr/bin/env bash
 set -uo pipefail
 url=""
+out=""
+previous=""
 for arg in "$@"; do
     case "$arg" in http*) url="$arg" ;; esac
+    [ "$previous" = "-o" ] && out="$arg"
+    previous="$arg"
 done
 echo "$url" >> "$SD_STUB_DIR/curl.log"
+# A download: the bytes of $SD_STUB_DIR/download, or a failure when there is none.
+if [ -n "$out" ] && [ "$out" != "/dev/null" ]; then
+    [ -f "$SD_STUB_DIR/download" ] || { echo "curl: (22) The requested URL returned error: 404" >&2; exit 22; }
+    cp "$SD_STUB_DIR/download" "$out"
+    exit 0
+fi
 if [ -f "$SD_STUB_DIR/answers" ]; then
     while IFS=' ' read -r pattern code; do
         [ -n "$pattern" ] || continue
@@ -336,7 +346,7 @@ cat > "$WORK/suppressions.yaml" <<'YAML'
 version: 1
 suppressions:
   - id: graphql-introspection
-    name: ".*[Ii]ntrospection.*"
+    name: ".*[Ii]ntrospection( [Qq]uery)?( [Ee]nabled)?"
     url: ".*/graphql.*"
     statement: "The schema is public."
     expired_at: "2099-01-01"
@@ -419,6 +429,371 @@ SD_RULES="$WORK/rules.tsv"
 
 out="$(sd_report "$WORK/report4.md" "$WORK/absent.json" 2>&1)"; rc=$?
 assert_eq "1" "$rc" "report: fails when a findings document is missing"
+
+# ===========================================================================
+# graphql-cop (#1766) - its raw stdout, as the workflow captures it
+# ===========================================================================
+
+# What `graphql-cop.py -o json` prints: anything the tool says before the JSON (here, nothing), then
+# one line holding every test that ran, passed or not. `curl_verify` is the request it sent, headers
+# included - the API token with them, which is why it must never reach a report or a log.
+cat > "$WORK/cop.out" <<'JSON'
+[{"result": true, "title": "Alias Overloading", "description": "Alias Overloading with 100+ aliases is allowed", "impact": "Denial of Service - /graphql", "severity": "HIGH", "color": "red", "curl_verify": "curl -X POST -H \"User-Agent: graphql-cop/1.15\" -H \"X-Ontrack-Token: SECRET-COP\" -d '{\"query\": \"query cop { alias0:__typename \\n }\", \"operationName\": \"cop\"}' 'https://demo.example.com/graphql'"}, {"result": false, "title": "Array-based Query Batching", "description": "Batch queries allowed with 10+ simultaneous queries", "impact": "Denial of Service - /graphql", "severity": "HIGH", "color": "red", "curl_verify": "curl -X POST -H \"X-Ontrack-Token: SECRET-COP\" -d '[{\"query\": \"query cop { __typename }\"}, {\"query\": \"query cop { __typename }\"}]' 'https://demo.example.com/graphql'"}, {"result": true, "title": "Field Suggestions", "description": "Field Suggestions are Enabled", "impact": "Information Leakage - /graphql", "severity": "LOW", "color": "blue", "curl_verify": "curl -X POST -H \"X-Ontrack-Token: SECRET-COP\" -d '{\"query\": \"query cop { __schema { directive } }\", \"operationName\": \"cop\"}' 'https://demo.example.com/graphql'"}, {"result": true, "title": "GET Method Query Support", "description": "GraphQL queries allowed using the GET method", "impact": "Possible Cross Site Request Forgery (CSRF) - /graphql", "severity": "MEDIUM", "color": "yellow", "curl_verify": "curl -X GET -H \"X-Ontrack-Token: SECRET-COP\" -d '' 'https://demo.example.com/graphql?query=query+cop+%7B__typename%7D'"}, {"result": true, "title": "Introspection", "description": "Introspection Query Enabled", "impact": "Information Leakage - /graphql", "severity": "HIGH", "color": "red", "curl_verify": "curl -X POST -H \"X-Ontrack-Token: SECRET-COP\" -d '{\"query\": \"query cop { __schema { types { name fields { name } } } }\", \"operationName\": \"cop\"}' 'https://demo.example.com/graphql'"}, {"result": true, "title": "Introspection-based Circular Query", "description": "Circular-query using Introspection", "impact": "Denial of Service - /graphql", "severity": "HIGH", "color": "red", "curl_verify": "curl -X POST -H \"X-Ontrack-Token: SECRET-COP\" -d '{\"query\": \"query cop { __schema { types { fields { type { name } } } } }\", \"operationName\": \"cop\"}' 'https://demo.example.com/graphql'"}, {"result": true, "title": "POST based url-encoded query (possible CSRF)", "description": "GraphQL accepts non-JSON queries over POST", "impact": "Possible Cross Site Request Forgery - /graphql", "severity": "MEDIUM", "color": "yellow", "curl_verify": "curl -X POST -H \"X-Ontrack-Token: SECRET-COP\" -d 'query=query+cop+%7B+__typename+%7D' 'https://demo.example.com/graphql'"}, {"result": true, "title": "Trace Mode", "description": "Tracing is Enabled", "impact": "Information Leakage - /graphql", "severity": "INFO", "color": "green", "curl_verify": "curl -X POST -H \"X-Ontrack-Token: SECRET-COP\" -d '{\"query\": \"query cop { __typename }\", \"operationName\": \"cop\"}' 'https://demo.example.com/graphql'"}]
+JSON
+
+# ---------------------------------------------------------------------------
+# normalize-graphql-cop
+# ---------------------------------------------------------------------------
+
+normalized="$(sd_normalize_graphql_cop "$WORK/cop.out" "1.16" 2>&1)"; rc=$?
+assert_eq "0" "$rc" "normalize-graphql-cop: reads graphql-cop's JSON output"
+assert_eq "graphql-cop" "$(printf '%s' "$normalized" | jq -r '.scanner')" \
+    "normalize-graphql-cop: names the scanner"
+assert_eq "1.16" "$(printf '%s' "$normalized" | jq -r '.version')" \
+    "normalize-graphql-cop: carries the pinned version it was given - the tool's own version.py lags its tag"
+assert_eq "7" "$(printf '%s' "$normalized" | jq -r '.findings | length')" \
+    "normalize-graphql-cop: a test that passed is not a finding"
+assert_eq "alias_overloading" "$(printf '%s' "$normalized" | jq -r '.findings[] | select(.name == "Alias Overloading") | .rule')" \
+    "normalize-graphql-cop: the rule id is graphql-cop's own test name, the one -e takes"
+assert_eq "circular_query_introspection" "$(printf '%s' "$normalized" | jq -r '.findings[] | select(.name == "Introspection-based Circular Query") | .rule')" \
+    "normalize-graphql-cop: the circular query is its own rule, not introspection"
+assert_eq "HIGH" "$(printf '%s' "$normalized" | jq -r '.findings[] | select(.rule == "introspection") | .risk')" \
+    "normalize-graphql-cop: HIGH is HIGH"
+assert_eq "MEDIUM" "$(printf '%s' "$normalized" | jq -r '.findings[] | select(.rule == "get_method_support") | .risk')" \
+    "normalize-graphql-cop: MEDIUM is MEDIUM"
+assert_eq "LOW" "$(printf '%s' "$normalized" | jq -r '.findings[] | select(.rule == "field_suggestions") | .risk')" \
+    "normalize-graphql-cop: LOW is LOW"
+assert_eq "INFO" "$(printf '%s' "$normalized" | jq -r '.findings[] | select(.rule == "trace_mode") | .risk')" \
+    "normalize-graphql-cop: INFO stays INFO, for the counting layer to drop"
+assert_eq "https://demo.example.com/graphql" "$(printf '%s' "$normalized" | jq -r '.findings[] | select(.rule == "get_method_support") | .instances[0].uri')" \
+    "normalize-graphql-cop: the instance is the endpoint, without the query string the test sent"
+assert_eq "GET" "$(printf '%s' "$normalized" | jq -r '.findings[] | select(.rule == "get_method_support") | .instances[0].method')" \
+    "normalize-graphql-cop: keeps the method the test used"
+assert_not_contains "$normalized" "SECRET-COP" \
+    "normalize-graphql-cop: drops curl_verify, and the API token with it"
+assert_not_contains "$normalized" "curl -X" \
+    "normalize-graphql-cop: no request detail survives into the findings"
+
+# A run that tested nothing is the tool failing to recognise the endpoint - it says so on stdout and
+# prints `[]`. That is a scanner error, never a clean result.
+printf '%s\n' "https://demo.example.com/graphql does not seem to be running GraphQL." "[]" > "$WORK/cop-empty.out"
+out="$(sd_normalize_graphql_cop "$WORK/cop-empty.out" "1.16" 2>&1)"; rc=$?
+assert_eq "1" "$rc" "normalize-graphql-cop: an empty result is a scanner error, not zero findings"
+assert_not_contains "$out" "demo.example.com" "normalize-graphql-cop: its error carries no URL"
+: > "$WORK/cop-nothing.out"
+out="$(sd_normalize_graphql_cop "$WORK/cop-nothing.out" "1.16" 2>&1)"; rc=$?
+assert_eq "1" "$rc" "normalize-graphql-cop: empty output is a scanner error"
+out="$(sd_normalize_graphql_cop "$WORK/absent.out" "1.16" 2>&1)"; rc=$?
+assert_eq "1" "$rc" "normalize-graphql-cop: fails when there is no output"
+printf 'Traceback (most recent call last):\n  AttributeError\n' > "$WORK/cop-crash.out"
+out="$(sd_normalize_graphql_cop "$WORK/cop-crash.out" "1.16" 2>&1)"; rc=$?
+assert_eq "1" "$rc" "normalize-graphql-cop: a crash with no JSON fails"
+
+# ---------------------------------------------------------------------------
+# assert-graphql-cop-no-mutations - what graphql-cop says it sent
+# ---------------------------------------------------------------------------
+
+out="$(DEMO_TOKEN=SECRET-COP sd_assert_graphql_cop_no_mutations "$WORK/cop.out" 2>&1)"; rc=$?
+assert_eq "0" "$rc" "assert-graphql-cop-no-mutations: passes on a query-only run"
+assert_contains "$out" "Tests run: 8" "assert-graphql-cop-no-mutations: counts the tests it read requests from"
+assert_contains "$out" "Mutations: 0" "assert-graphql-cop-no-mutations: prints the counts"
+assert_not_contains "$out" "demo.example.com" "assert-graphql-cop-no-mutations: prints no URL"
+assert_not_contains "$out" "SECRET-COP" "assert-graphql-cop-no-mutations: prints no token"
+assert_not_contains "$out" "Alias" "assert-graphql-cop-no-mutations: prints no test name"
+
+# The test graphql-cop ships that sends `mutation cop {__typename}` over GET, had it not been excluded.
+cat > "$WORK/cop-get-mutation.out" <<'JSON'
+[{"result": false, "title": "Mutation is allowed over GET (possible CSRF)", "description": "GraphQL mutations allowed using the GET method", "impact": "Possible Cross Site Request Forgery - /graphql", "severity": "MEDIUM", "color": "yellow", "curl_verify": "curl -X GET -H \"X-Ontrack-Token: SECRET-COP\" -d '' 'https://demo.example.com/graphql?query=mutation+cop+%7B__typename%7D'"}]
+JSON
+out="$(sd_assert_graphql_cop_no_mutations "$WORK/cop-get-mutation.out" 2>&1)"; rc=$?
+assert_eq "1" "$rc" "assert-graphql-cop-no-mutations: fails on a mutation sent in a GET query string"
+assert_contains "$out" "wrote to the target" "assert-graphql-cop-no-mutations: says what went wrong"
+assert_not_contains "$out" "SECRET-COP" "assert-graphql-cop-no-mutations: even its failure prints no token"
+
+cat > "$WORK/cop-post-mutation.out" <<'JSON'
+[{"result": false, "title": "Something new", "description": "", "impact": "", "severity": "LOW", "color": "blue", "curl_verify": "curl -X POST -H \"X-Ontrack-Token: SECRET-COP\" -d '{\"query\": \"mutation cop { deleteProject(input: {id: 1}) { errors { message } } }\", \"operationName\": \"cop\"}' 'https://demo.example.com/graphql'"}]
+JSON
+out="$(sd_assert_graphql_cop_no_mutations "$WORK/cop-post-mutation.out" 2>&1)"; rc=$?
+assert_eq "1" "$rc" "assert-graphql-cop-no-mutations: fails on a mutation in a JSON body"
+
+cat > "$WORK/cop-form-mutation.out" <<'JSON'
+[{"result": false, "title": "Something else", "description": "", "impact": "", "severity": "LOW", "color": "blue", "curl_verify": "curl -X POST -H \"X-Ontrack-Token: SECRET-COP\" -d 'query=mutation+cop+%7B+__typename+%7D' 'https://demo.example.com/graphql'"}]
+JSON
+out="$(sd_assert_graphql_cop_no_mutations "$WORK/cop-form-mutation.out" 2>&1)"; rc=$?
+assert_eq "1" "$rc" "assert-graphql-cop-no-mutations: fails on a mutation in a url-encoded body"
+
+# graphql-cop does not fail on an exclusion it does not recognise: it says so and runs the test.
+{ echo "get_based_mutaton cannot be excluded, skipping"; cat "$WORK/cop.out"; } > "$WORK/cop-typo.out"
+out="$(sd_assert_graphql_cop_no_mutations "$WORK/cop-typo.out" 2>&1)"; rc=$?
+assert_eq "1" "$rc" "assert-graphql-cop-no-mutations: an exclusion graphql-cop ignored is a failure"
+
+out="$(sd_assert_graphql_cop_no_mutations "$WORK/cop-empty.out" 2>&1)"; rc=$?
+assert_eq "1" "$rc" "assert-graphql-cop-no-mutations: no test run proves nothing and fails"
+out="$(sd_assert_graphql_cop_no_mutations "$WORK/absent.out" 2>&1)"; rc=$?
+assert_eq "1" "$rc" "assert-graphql-cop-no-mutations: no output proves nothing and fails"
+
+# ---------------------------------------------------------------------------
+# graphql-cop-preflight - before a request is sent
+# ---------------------------------------------------------------------------
+
+mkdir -p "$WORK/cop-src/lib/tests"
+cat > "$WORK/cop-src/lib/tests/__init__.py" <<'PY'
+from lib.tests.info_introspect import introspection
+from lib.tests.info_get_based_mutation import get_based_mutation
+from lib.tests.dos_field_duplication import field_duplication
+
+tests = {
+    "introspection":introspection,
+    "get_based_mutation":get_based_mutation,
+    # "field_duplication":field_duplication,
+}
+PY
+printf '%s\n' '"""Perform introspection tests."""' "q = 'query cop { __schema { types { name } } }'" \
+    > "$WORK/cop-src/lib/tests/info_introspect.py"
+printf '%s\n' '"""Checks mutation support over on GET."""' "q = 'mutation cop {__typename}'" \
+    > "$WORK/cop-src/lib/tests/info_get_based_mutation.py"
+printf '%s\n' "q = 'mutation cop { x }'" > "$WORK/cop-src/lib/tests/dos_field_duplication.py"
+
+out="$(sd_graphql_cop_preflight "$WORK/cop-src" "get_based_mutation" 2>&1)"; rc=$?
+assert_eq "0" "$rc" "graphql-cop-preflight: passes when every test that mentions a mutation is excluded"
+assert_contains "$out" "1 test(s) will run" "graphql-cop-preflight: says how many tests will run"
+assert_contains "$out" "get_based_mutation" \
+    "graphql-cop-preflight: names what it excluded - test names, not findings"
+
+out="$(sd_graphql_cop_preflight "$WORK/cop-src" "" 2>&1)"; rc=$?
+assert_eq "1" "$rc" "graphql-cop-preflight: refuses to run a registered test that mentions a mutation"
+assert_contains "$out" "get_based_mutation" "graphql-cop-preflight: names the test"
+
+out="$(sd_graphql_cop_preflight "$WORK/cop-src" "get_based_mutaton" 2>&1)"; rc=$?
+assert_eq "1" "$rc" "graphql-cop-preflight: refuses an exclusion that names no registered test - graphql-cop would skip it silently"
+
+out="$(sd_graphql_cop_preflight "$WORK/absent-src" "get_based_mutation" 2>&1)"; rc=$?
+assert_eq "1" "$rc" "graphql-cop-preflight: fails without the source"
+
+# ---------------------------------------------------------------------------
+# render-graphql-cop-headers - the token in a run-time file, never on a command line
+# ---------------------------------------------------------------------------
+
+out="$(DEMO_TOKEN='to"ken\with' sd_render_graphql_cop_headers "$WORK/cop-run/headers.json" 2>&1)"; rc=$?
+assert_eq "0" "$rc" "render-graphql-cop-headers: succeeds"
+assert_eq 'to"ken\with' "$(jq -r '."X-Ontrack-Token"' "$WORK/cop-run/headers.json")" \
+    "render-graphql-cop-headers: writes the token as JSON, quotes and backslashes intact"
+assert_not_contains "$out" 'to"ken' "render-graphql-cop-headers: does not print the token"
+out="$(DEMO_TOKEN='' sd_render_graphql_cop_headers "$WORK/cop-run/headers2.json" 2>&1)"; rc=$?
+assert_eq "1" "$rc" "render-graphql-cop-headers: refuses to scan unauthenticated"
+
+# ---------------------------------------------------------------------------
+# The introspection suppression, as committed, against graphql-cop
+# ---------------------------------------------------------------------------
+
+printf '%s' "$normalized" > "$WORK/findings-cop.json"
+SD_SUPPRESSIONS="$SCRIPT_DIR/../security/dast/suppressions.yaml"
+: > "$WORK/empty-rules.tsv"
+SD_RULES="$WORK/empty-rules.tsv"
+counts="$(sd_report "$WORK/report-cop.md" "$WORK/findings-cop.json")"; rc=$?
+assert_eq "0" "$rc" "report: counts graphql-cop findings"
+# alias_overloading and the circular query HIGH; introspection HIGH but suppressed.
+assert_contains "$counts" "high=2" "report: the introspection suppression takes graphql-cop's Introspection out"
+assert_contains "$counts" "medium=2" "report: graphql-cop's MEDIUMs count"
+assert_contains "$counts" "low=1" "report: graphql-cop's LOW counts, its INFO does not"
+assert_contains "$counts" "suppressed=1" "report: exactly one graphql-cop instance suppressed"
+assert_contains "$(cat "$WORK/report-cop.md")" "| \`graphql-introspection\` | 1 |" \
+    "report: the committed suppression is the one that applied"
+assert_not_contains "$(cat "$WORK/report-cop.md")" "Declared and matched nothing this run: \`graphql-introspection\`" \
+    "report: the introspection suppression no longer matches nothing"
+SD_SUPPRESSIONS="$WORK/suppressions.yaml"
+SD_RULES="$WORK/rules.tsv"
+
+# ===========================================================================
+# Nuclei (#1766) - its JSONL output
+# ===========================================================================
+
+# One line per match. `curl-command` is the request; nothing of it may reach the findings.
+cat > "$WORK/nuclei.jsonl" <<'JSONL'
+{"template-id":"CVE-2099-0001","info":{"name":"Critical Thing","tags":["cve","springboot"],"description":"Bad.","reference":["https://example.org/cve"],"severity":"critical","classification":{"cve-id":["cve-2099-0001"],"cwe-id":["cwe-94"]},"remediation":"Upgrade."},"type":"http","host":"demo.example.com","matched-at":"https://demo.example.com/x","curl-command":"curl -X 'GET' 'https://demo.example.com/x'","matcher-status":true}
+{"template-id":"git-config","info":{"name":"Git Configuration - Detect","tags":["config","git","exposure"],"description":"Git config.","severity":"high","classification":{"cve-id":null,"cwe-id":["cwe-200"]}},"type":"http","host":"demo.example.com","matched-at":"https://demo.example.com/.git/config","extracted-results":["core"],"curl-command":"curl -X 'GET' 'https://demo.example.com/.git/config'","matcher-status":true}
+{"template-id":"git-config","info":{"name":"Git Configuration - Detect","tags":["config","git","exposure"],"description":"Git config.","severity":"high","classification":{"cve-id":null,"cwe-id":["cwe-200"]}},"type":"http","host":"demo.example.com","matched-at":"https://demo.example.com/mobile/.git/config","curl-command":"curl -X 'GET' 'https://demo.example.com/mobile/.git/config'","matcher-status":true}
+{"template-id":"medium-thing","info":{"name":"Medium Thing","tags":["misconfig"],"severity":"medium"},"type":"http","host":"demo.example.com","matched-at":"https://demo.example.com/m","matcher-status":true}
+{"template-id":"low-thing","info":{"name":"Low Thing","tags":["misconfig"],"severity":"low"},"type":"http","host":"demo.example.com","matched-at":"https://demo.example.com/l","matcher-status":true}
+{"template-id":"http-missing-security-headers","info":{"name":"HTTP Missing Security Headers","tags":["misconfig","headers"],"severity":"info"},"matcher-name":"strict-transport-security","type":"http","host":"demo.example.com","matched-at":"https://demo.example.com","matcher-status":true}
+{"template-id":"http-missing-security-headers","info":{"name":"HTTP Missing Security Headers","tags":["misconfig","headers"],"severity":"info"},"matcher-name":"permissions-policy","type":"http","host":"demo.example.com","matched-at":"https://demo.example.com","matcher-status":true}
+{"template-id":"odd-thing","info":{"name":"Odd Thing","tags":["exposure"],"severity":"unknown"},"type":"http","host":"demo.example.com","matched-at":"https://demo.example.com/o","matcher-status":true}
+JSONL
+
+normalized="$(sd_normalize_nuclei "$WORK/nuclei.jsonl" "3.11.1 (templates v10.4.8)" 2>&1)"; rc=$?
+assert_eq "0" "$rc" "normalize-nuclei: reads Nuclei's JSONL"
+assert_eq "nuclei" "$(printf '%s' "$normalized" | jq -r '.scanner')" "normalize-nuclei: names the scanner"
+assert_eq "3.11.1 (templates v10.4.8)" "$(printf '%s' "$normalized" | jq -r '.version')" \
+    "normalize-nuclei: carries the engine and the template versions"
+assert_eq "6" "$(printf '%s' "$normalized" | jq -r '.findings | length')" \
+    "normalize-nuclei: one finding per template, not per match"
+assert_eq "2" "$(printf '%s' "$normalized" | jq -r '.findings[] | select(.rule == "git-config") | .instances | length')" \
+    "normalize-nuclei: merges the matches of one template into its instances"
+assert_eq "CRITICAL" "$(printf '%s' "$normalized" | jq -r '.findings[] | select(.rule == "CVE-2099-0001") | .risk')" \
+    "normalize-nuclei: critical is CRITICAL"
+assert_eq "HIGH" "$(printf '%s' "$normalized" | jq -r '.findings[] | select(.rule == "git-config") | .risk')" \
+    "normalize-nuclei: high is HIGH"
+assert_eq "MEDIUM" "$(printf '%s' "$normalized" | jq -r '.findings[] | select(.rule == "medium-thing") | .risk')" \
+    "normalize-nuclei: medium is MEDIUM"
+assert_eq "LOW" "$(printf '%s' "$normalized" | jq -r '.findings[] | select(.rule == "low-thing") | .risk')" \
+    "normalize-nuclei: low is LOW"
+assert_eq "INFO" "$(printf '%s' "$normalized" | jq -r '.findings[] | select(.rule == "http-missing-security-headers") | .risk')" \
+    "normalize-nuclei: info is INFO"
+assert_eq "INFO" "$(printf '%s' "$normalized" | jq -r '.findings[] | select(.rule == "odd-thing") | .risk')" \
+    "normalize-nuclei: an unknown severity is not promoted to a count"
+assert_eq "94" "$(printf '%s' "$normalized" | jq -r '.findings[] | select(.rule == "CVE-2099-0001") | .cwe')" \
+    "normalize-nuclei: the CWE, as a bare number like ZAP's"
+assert_eq "strict-transport-security" "$(printf '%s' "$normalized" | jq -r '[.findings[] | select(.rule == "http-missing-security-headers") | .instances[].param] | sort | .[1]')" \
+    "normalize-nuclei: a matcher name is kept as the instance's parameter"
+assert_not_contains "$normalized" "curl -X" "normalize-nuclei: drops the request"
+
+: > "$WORK/nuclei-empty.jsonl"
+out="$(sd_normalize_nuclei "$WORK/nuclei-empty.jsonl" "3.11.1" 2>&1)"; rc=$?
+assert_eq "0" "$rc" "normalize-nuclei: no match is a result - Nuclei writes nothing when nothing matched"
+assert_eq "0" "$(printf '%s' "$out" | jq -r '.findings | length')" "normalize-nuclei: no match is zero findings"
+out="$(sd_normalize_nuclei "$WORK/absent.jsonl" "3.11.1" 2>&1)"; rc=$?
+assert_eq "1" "$rc" "normalize-nuclei: no output file at all is a scanner error"
+printf '{"template-id":"x"\n' > "$WORK/nuclei-broken.jsonl"
+out="$(sd_normalize_nuclei "$WORK/nuclei-broken.jsonl" "3.11.1" 2>&1)"; rc=$?
+assert_eq "1" "$rc" "normalize-nuclei: a truncated line fails rather than dropping a finding"
+
+printf '%s' "$normalized" > "$WORK/findings-nuclei.json"
+
+# ---------------------------------------------------------------------------
+# nuclei-preflight - the tag exclusions, observed on the templates that will actually run
+# ---------------------------------------------------------------------------
+
+cat > "$WORK/nuclei.yaml" <<'YAML'
+tags:
+  - exposure
+exclude-tags:
+  - intrusive
+  - dos
+  - fuzz
+  - bruteforce
+rate-limit: 10
+YAML
+mkdir -p "$WORK/templates"
+printf 'id: a\ninfo:\n  name: A\n  tags: config,git,exposure\n' > "$WORK/templates/a.yaml"
+printf 'id: b\ninfo:\n  name: B\n  tags: exposure,ddos-protection\n' > "$WORK/templates/b.yaml"
+printf 'id: c\ninfo:\n  name: C\n  tags: "exposure, intrusive"\n' > "$WORK/templates/c.yaml"
+printf 'noise before the list\n%s\n%s\n' "$WORK/templates/a.yaml" "$WORK/templates/b.yaml" > "$WORK/tl-clean.txt"
+out="$(sd_nuclei_preflight "$WORK/tl-clean.txt" "$WORK/nuclei.yaml" 2>&1)"; rc=$?
+assert_eq "0" "$rc" "nuclei-preflight: passes when no selected template carries an excluded tag"
+assert_contains "$out" "2 template(s)" "nuclei-preflight: counts the selected templates"
+assert_contains "$out" "intrusive, dos, fuzz, bruteforce" "nuclei-preflight: says which tags are excluded"
+assert_contains "$out" "10 request(s) per second" "nuclei-preflight: says what the rate limit is"
+assert_not_contains "$out" "templates/a.yaml" "nuclei-preflight: prints no template"
+
+printf '%s\n%s\n' "$WORK/templates/a.yaml" "$WORK/templates/c.yaml" > "$WORK/tl-dirty.txt"
+out="$(sd_nuclei_preflight "$WORK/tl-dirty.txt" "$WORK/nuclei.yaml" 2>&1)"; rc=$?
+assert_eq "1" "$rc" "nuclei-preflight: fails when a selected template carries an excluded tag"
+
+printf 'nothing\n' > "$WORK/tl-none.txt"
+out="$(sd_nuclei_preflight "$WORK/tl-none.txt" "$WORK/nuclei.yaml" 2>&1)"; rc=$?
+assert_eq "1" "$rc" "nuclei-preflight: no template selected is a broken selection, not a quiet scan"
+
+printf 'tags: [exposure]\nrate-limit: 10\n' > "$WORK/nuclei-noexclude.yaml"
+out="$(sd_nuclei_preflight "$WORK/tl-clean.txt" "$WORK/nuclei-noexclude.yaml" 2>&1)"; rc=$?
+assert_eq "1" "$rc" "nuclei-preflight: refuses a configuration that does not exclude the four tags"
+printf 'tags: [exposure]\nexclude-tags: [intrusive, dos, fuzz, bruteforce]\n' > "$WORK/nuclei-norate.yaml"
+out="$(sd_nuclei_preflight "$WORK/tl-clean.txt" "$WORK/nuclei-norate.yaml" 2>&1)"; rc=$?
+assert_eq "1" "$rc" "nuclei-preflight: refuses a configuration with no rate limit"
+
+# ---------------------------------------------------------------------------
+# nuclei-summary - did the scan happen, and at what rate
+# ---------------------------------------------------------------------------
+
+cat > "$WORK/nuclei.log" <<'LOG'
+[INF] Templates loaded for current scan: 2244
+{"template-id":"git-config","matched-at":"https://demo.example.com/.git/config"}
+[INF] Skipped demo.example.com:5814 from target list as found unresponsive permanently: Get "https://demo.example.com:5814/autopass"
+{"duration":"0:09:05","errors":"159","hosts":"1","matched":"8","percent":"100","requests":"5458","rps":"10","startedAt":"2026-09-16T13:11:34Z","templates":"2244","total":"5451"}
+[INF] Scan completed in 9m5s. 8 matches found.
+LOG
+out="$(sd_nuclei_summary "$WORK/nuclei.log" "$WORK/nuclei.jsonl" "https://demo.example.com" 2>&1)"; rc=$?
+assert_eq "0" "$rc" "nuclei-summary: passes on a completed scan"
+assert_contains "$out" "2244 template(s)" "nuclei-summary: prints the template count"
+assert_contains "$out" "5458 request(s)" "nuclei-summary: prints the request count"
+assert_contains "$out" "10 request(s) per second" "nuclei-summary: prints the effective rate"
+assert_not_contains "$out" "demo.example.com" "nuclei-summary: prints no URL"
+assert_not_contains "$out" "git-config" "nuclei-summary: prints no template match"
+assert_not_contains "$out" "8 match" "nuclei-summary: prints no match count - the counts are the report's"
+
+grep -v '"duration"' "$WORK/nuclei.log" > "$WORK/nuclei-unfinished.log"
+out="$(sd_nuclei_summary "$WORK/nuclei-unfinished.log" "$WORK/nuclei.jsonl" "https://demo.example.com" 2>&1)"; rc=$?
+assert_eq "1" "$rc" "nuclei-summary: a scan with no final statistics did not finish"
+
+{ echo '[INF] Skipped demo.example.com:443 from target list as found unresponsive permanently: x'; cat "$WORK/nuclei.log"; } > "$WORK/nuclei-skipped.log"
+out="$(sd_nuclei_summary "$WORK/nuclei-skipped.log" "$WORK/nuclei.jsonl" "https://demo.example.com" 2>&1)"; rc=$?
+assert_eq "1" "$rc" "nuclei-summary: the target given up on as unresponsive is a scanner error, not a clean scan"
+assert_not_contains "$out" "demo.example.com" "nuclei-summary: its failure prints no URL either"
+
+sed 's/"matched":"8"/"matched":"9"/' "$WORK/nuclei.log" > "$WORK/nuclei-mismatch.log"
+out="$(sd_nuclei_summary "$WORK/nuclei-mismatch.log" "$WORK/nuclei.jsonl" "https://demo.example.com" 2>&1)"; rc=$?
+assert_eq "1" "$rc" "nuclei-summary: fails when the output file lost matches the scan reported"
+
+# ---------------------------------------------------------------------------
+# All three scanners in one report
+# ---------------------------------------------------------------------------
+
+counts="$(sd_report "$WORK/report-all.md" "$WORK/findings.json" "$WORK/findings-cop.json" "$WORK/findings-nuclei.json")"; rc=$?
+assert_eq "0" "$rc" "report: takes the three scanners' documents together"
+assert_contains "$counts" "critical=1" "report: a Nuclei critical is a CRITICAL"
+# ZAP: no HIGH. graphql-cop: alias overloading and the circular query - its Introspection is taken out
+# by the fixture's suppression, which is written like the committed one. Nuclei: git-config.
+assert_contains "$counts" "high=3" "report: HIGHs add up across scanners"
+assert_contains "$counts" "medium=5" "report: MEDIUMs add up across scanners"
+assert_contains "$counts" "low=2" "report: LOWs add up across scanners"
+report="$(cat "$WORK/report-all.md")"
+assert_contains "$report" "## Findings — \`zap\`" "report: groups findings by tool - ZAP"
+assert_contains "$report" "## Findings — \`graphql-cop\`" "report: groups findings by tool - graphql-cop"
+assert_contains "$report" "## Findings — \`nuclei\`" "report: groups findings by tool - Nuclei"
+assert_contains "$report" "| \`nuclei\` | 3.11.1 (templates v10.4.8) | 1 | 1 | 1 | 1 |" \
+    "report: the per-tool split, with each tool's version"
+assert_contains "$report" "| \`graphql-cop\` | 1.16 | 0 | 2 | 2 | 1 |" \
+    "report: graphql-cop's own line in the split"
+assert_not_contains "$report" "SECRET-COP" "report: the graphql-cop token never reaches the report"
+assert_not_contains "$counts" "nuclei" "report: the printed counts carry no per-tool split"
+
+# The report is grouped by tool: a finding must not fall out of it because its document names
+# another scanner.
+jq '.findings[0].scanner = "somebody-else"' "$WORK/findings-nuclei.json" > "$WORK/findings-stray.json"
+counts="$(sd_report "$WORK/report-stray.md" "$WORK/findings-stray.json")"; rc=$?
+assert_contains "$(cat "$WORK/report-stray.md")" "## Findings — \`somebody-else\`" \
+    "report: a finding of a scanner no document declares still has its section"
+assert_contains "$counts" "critical=1" "report: and still counts"
+
+# A suppression scoped to one scanner leaves the others alone.
+cat > "$WORK/suppressions-scoped.yaml" <<'YAML'
+version: 1
+suppressions:
+  - id: nuclei-low
+    scanner: "nuclei"
+    rule: "low-thing"
+    statement: "Scoped."
+    expired_at: "2099-01-01"
+YAML
+SD_SUPPRESSIONS="$WORK/suppressions-scoped.yaml"
+counts="$(sd_report "$WORK/report-scoped.md" "$WORK/findings-cop.json" "$WORK/findings-nuclei.json")"; rc=$?
+assert_contains "$counts" "low=1" "report: a scanner-scoped suppression applies to Nuclei's findings"
+SD_SUPPRESSIONS="$WORK/suppressions.yaml"
+
+# ===========================================================================
+# fetch - every downloaded tool is checked against a committed checksum
+# ===========================================================================
+
+printf 'scanner bytes\n' > "$WORK/download"
+good="$(shasum -a 256 "$WORK/download" 2>/dev/null | cut -d' ' -f1 || sha256sum "$WORK/download" | cut -d' ' -f1)"
+out="$(sd_fetch "https://example.org/tool.zip" "$good" "$WORK/fetched/tool.zip" 2>&1)"; rc=$?
+assert_eq "0" "$rc" "fetch: accepts a download matching its checksum"
+assert_eq "scanner bytes" "$(cat "$WORK/fetched/tool.zip")" "fetch: leaves the file where it was asked"
+out="$(sd_fetch "https://example.org/tool.zip" "0000000000000000000000000000000000000000000000000000000000000000" "$WORK/fetched/bad.zip" 2>&1)"; rc=$?
+assert_eq "1" "$rc" "fetch: refuses a download whose checksum does not match"
+assert_eq "no" "$([ -e "$WORK/fetched/bad.zip" ] && echo yes || echo no)" "fetch: and does not leave it behind"
+rm -f "$WORK/download"
+out="$(sd_fetch "https://example.org/tool.zip" "$good" "$WORK/fetched/missing.zip" 2>&1)"; rc=$?
+assert_eq "1" "$rc" "fetch: fails when the download fails"
 
 # ===========================================================================
 # report-path

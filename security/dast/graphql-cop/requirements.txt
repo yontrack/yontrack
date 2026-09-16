@@ -1,0 +1,26 @@
+# graphql-cop's dependencies, pinned by hash (#1766).
+#
+# The versions are graphql-cop's own requirements.txt at the pinned commit; the hashes are PyPI's,
+# for the wheels of the Python in GRAPHQL_COP_PYTHON_IMAGE (3.10, linux x86_64). pip installs them
+# with --require-hashes --only-binary :all:, so a file that is not exactly this one is refused, and
+# nothing is built from source on the runner.
+#
+# The transitive dependencies are listed too - --require-hashes insists - at the newest version
+# requests 2.25.1 accepts (urllib3 < 1.27, chardet < 5, idna < 3). PySocks is left out: graphql-cop
+# imports it only for --tor.
+#
+# Move this file and GRAPHQL_COP_REF in .github/workflows/dast-passive.yml together.
+requests==2.25.1 \
+    --hash=sha256:c210084e36a42ae6b9219e00e48287def368a26d03a048ddad7bfee44f75871e
+simplejson==3.17.6 \
+    --hash=sha256:f63600ec06982cdf480899026f4fda622776f5fabed9a869fdb32d72bc17e99a
+termcolor==2.2.0 \
+    --hash=sha256:91ddd848e7251200eac969846cbae2dacd7d71c2871e92733289e7e3666f48e7
+urllib3==1.26.20 \
+    --hash=sha256:0ed14ccfbf1c30a9072c7ca157e4319b70d65f623e91e7b32fadb2853431016e
+chardet==4.0.0 \
+    --hash=sha256:f864054d66fd9118f2e67044ac8981a54775ec5b67aed0441892edb553d21da5
+idna==2.10 \
+    --hash=sha256:b97d804b1e9b523befed77c48dacec60e6dcb0b5391d57af6a65a312a90648c0
+certifi==2026.7.22 \
+    --hash=sha256:62f22742b58a1a33014a2b6b706588a8d7e2a88ae7bd1a6ebe8c992928483775

@@ -59,6 +59,98 @@ mitigations:
       Covered by `CorsDefaultIT` and `CorsAllowlistIT` in `ontrack-ui`.
 
   # -----------------------------------------------------------------------------------------
+  # graphql-cop (#1766). Rule ids are graphql-cop's test names. Listed before the introspection
+  # entry below, whose name pattern would otherwise also claim the circular query: the first
+  # entry that matches is the one a report prints.
+  # -----------------------------------------------------------------------------------------
+  - id: graphql-query-cost
+    scanner: "graphql-cop"
+    rule: "alias_overloading|batch_query|directive_overloading|field_duplication|circular_query_introspection"
+    title: "No limit on the cost of a GraphQL query"
+    issue: "https://github.com/yontrack/yontrack/issues/1766"
+    change: >-
+      Denial of service, not disclosure: one request can make the server do an unbounded amount of
+      work - a hundred aliases, repeated directives, a batch, or a selection recursing through the
+      introspection types. Yontrack's schema is deeply nested (project, branch, build, links …), so
+      the same applies to ordinary queries. The GraphQL engine is set up in
+      `ontrack-ui-graphql/src/main/java/net/nemerosa/ontrack/graphql/GraphQLConfiguration.kt`, which
+      configures no limit today. graphql-java provides `MaxQueryDepthInstrumentation` and
+      `MaxQueryComplexityInstrumentation`, and Spring for GraphQL applies an `Instrumentation` bean;
+      any limit must be measured against the deepest queries the UI and the CLI send first, or it
+      breaks them. `batch_query` firing would be a surprise - Spring for GraphQL does not accept an
+      array of operations - so check first what in front of the backend answered.
+  - id: graphql-csrf
+    scanner: "graphql-cop"
+    rule: "get_method_support|post_based_csrf|get_based_mutation"
+    title: "GraphQL accepted outside a JSON POST (CSRF shape)"
+    issue: "https://github.com/yontrack/yontrack/issues/1766"
+    change: >-
+      Only exploitable as cross-site request forgery if a browser attaches the credentials by
+      itself, and the API takes none it would: `WebSecurityConfig` makes it stateless, with CSRF
+      protection disabled because authentication is an `X-Ontrack-Token` or `Authorization` header,
+      which a cross-site form or link cannot set. If a cookie-based session on `/graphql` is ever
+      introduced, this becomes real and the fix is to refuse anything but `POST` with
+      `Content-Type: application/json` on `/graphql`.
+  - id: graphql-field-suggestions
+    scanner: "graphql-cop"
+    rule: "field_suggestions"
+    title: "GraphQL error messages suggest field names"
+    issue: "https://github.com/yontrack/yontrack/issues/1766"
+    change: >-
+      Discloses what introspection already does, and introspection is accepted (see
+      suppressions.yaml): the schema is public. Worth a suppression with that statement rather than
+      a change, unless introspection is ever turned off - in which case graphql-java's validation
+      messages have to lose their "Did you mean" suggestions at the same time, or they rebuild the
+      schema field by field.
+  - id: graphql-ide
+    scanner: "graphql-cop"
+    rule: "detect_graphiql"
+    title: "A GraphQL IDE is served"
+    issue: "https://github.com/yontrack/yontrack/issues/1766"
+    change: >-
+      `spring.graphql.graphiql.enabled` in `ontrack-ui/src/main/resources/config/application.yml`
+      (off by default in Spring for GraphQL). If it fires, find which page answered: the Next.js UI
+      also matches on the word "GraphiQL".
+
+  # -----------------------------------------------------------------------------------------
+  # Nuclei (#1766). Rule ids are template ids. Exposed files and default credentials are
+  # incidents on the demo, not counts to live with. The actuator entry comes first: `springboot-env`
+  # is an actuator endpoint, not an env file.
+  # -----------------------------------------------------------------------------------------
+  - id: springboot-actuator-nuclei
+    scanner: "nuclei"
+    rule: "springboot-.*|jolokia-.*|spring-.*"
+    title: "Spring Boot actuator endpoint reachable"
+    issue: "https://github.com/yontrack/yontrack/issues/1772"
+    change: >-
+      See the `actuator-exposure` entry: the management port 8800 is unauthenticated by design and
+      must never be routed from outside the cluster (yontrack/yontrack-chart#110). The workflow
+      stops before any scanner runs if the management port answers, so a Nuclei finding here means
+      an actuator path answered on the public port instead - check the ingress rules, and whether
+      the instance moved `management.server.port` back onto the application port.
+  - id: exposed-files
+    scanner: "nuclei"
+    rule: "git-.*|.*-env|.*dotenv.*|.*-config-file|.*backup.*"
+    title: "A file that should never be served is served"
+    issue: "https://github.com/yontrack/yontrack/issues/1766"
+    change: >-
+      Neither the image nor the chart serves a repository or an environment file: the backend
+      serves the API and the Next.js server serves its build output. Check first what answered -
+      the finding's instance in this report says which path - and whether it is a real file or a
+      page the UI returns for every path; then the ingress rules of the deployment in
+      yontrack/yontrack-chart. A real one is an incident: rotate whatever the file contains.
+  - id: default-credentials
+    scanner: "nuclei"
+    rule: ".*default-login.*"
+    title: "Default credentials accepted"
+    issue: "https://github.com/yontrack/yontrack/issues/1766"
+    change: >-
+      An incident, whichever component it is. On the demo the likeliest is Keycloak's admin
+      account: its credentials come from the chart values (`auth.keycloak.*` in
+      yontrack/yontrack-chart) and the deployment's secrets in yontrack/yontrack-infra-gitops, and
+      must never be a default. Change them, then check the chart does not ship a usable default.
+
+  # -----------------------------------------------------------------------------------------
   # GraphQL introspection — accepted, see suppressions.yaml. Kept here so that a report still
   # explains it if the suppression ever expires.
   # -----------------------------------------------------------------------------------------

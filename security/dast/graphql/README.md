@@ -53,6 +53,32 @@ Three independent things would each have to fail for a mutation to reach the dem
    or `subscription` operation. It is the only one of the three that observes what actually went
    over the wire, which is why it exists even though the first two should make it unreachable.
 
+## graphql-cop (#1766)
+
+graphql-cop is not generated from a schema: it runs a fixed list of tests, each one or a few
+requests - `__typename` a hundred times under aliases, ten `__typename` queries in a batch, one
+query recursing through the introspection types, and so on. Every one of them is a query, except
+`get_based_mutation`, which sends `mutation cop {__typename}` over GET to see whether mutations are
+accepted that way. It selects nothing and would write nothing, but it is a mutation, sent with an
+admin token to a shared instance, and this scan does not send one. It is excluded, and the same
+three layers hold it out:
+
+1. **before anything is sent**, `scripts/security-dast.sh graphql-cop-preflight` reads the pinned
+   source and fails unless every registered test that mentions a mutation is excluded - and unless
+   every exclusion names a registered test, because graphql-cop answers an exclusion it does not
+   know by printing one line and running every test;
+2. the exclusion itself, `-e get_based_mutation`, from `GRAPHQL_COP_EXCLUDED` in the workflow;
+3. **after the run**, `assert-graphql-cop-no-mutations` reads the request every test reports having
+   sent - graphql-cop's JSON carries it, as `curl_verify` - and fails the workflow if any carried a
+   mutation or subscription, in a JSON body, a form body or a GET query string. It also fails if the
+   output shows an ignored exclusion or a test that reports no request.
+
+The one request graphql-cop sends that is not a test - `query cop { __typename }`, checking that the
+endpoint is GraphQL at all - is not in its output, and is a query.
+
+The same `curl_verify` carries the token, which is why graphql-cop's output never leaves the runner:
+the converter drops it, and only counts are printed.
+
 ## Nothing is committed here
 
 The query-only schema is derived at scan time and lives in the runner's temporary directory. It is
