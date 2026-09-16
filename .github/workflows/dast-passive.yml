@@ -219,16 +219,19 @@ jobs:
           WORK: ${{ steps.prepare.outputs.work }}
         run: |
           set -uo pipefail
+          # `|| rc=$?` rather than reading $? on the next line: GitHub runs a `run:` block under
+          # `bash -e`, which `set -uo pipefail` does not undo, so a bare failing command would
+          # abort the step before anything could be said about why.
+          rc=0
           docker run --rm \
             -v "$WORK:/zap/wrk:rw" \
             -e DAST_TARGET="$DAST_TARGET" \
             "$ZAP_IMAGE" \
-            zap.sh -cmd -autorun /zap/wrk/passive.yaml > "$WORK/zap.log" 2>&1
-          rc=$?
+            zap.sh -cmd -autorun /zap/wrk/passive.yaml > "$WORK/zap.log" 2>&1 || rc=$?
           echo "ZAP finished with exit code $rc."
           if [ "$rc" -ne 0 ]; then
             echo "--- last lines of the ZAP log, URLs and credentials removed ---"
-            tail -n 60 "$WORK/zap.log" | scripts/security-dast.sh scrub
+            tail -n 100 "$WORK/zap.log" | scripts/security-dast.sh scrub
             exit "$rc"
           fi
           exit 0
