@@ -17,15 +17,23 @@
 #                             `schema { }` block. Refuses to write a file that still declares one.
 #                             This is what keeps mutations out of the scan - see
 #                             security/dast/graphql/README.md.
-#   render-plan IN OUT        Copies the ZAP plan, substituting `${DEMO_TOKEN}` with the token.
-#                             The Automation Framework expands `${...}` in job parameters but not
-#                             inside a replacer rule, so the one place the token is needed is the
-#                             one place ZAP will not fill in.
+#   login ROLE DIR [BUDGET]   Logs scanner ROLE (scan-admin, scan-readonly, scan-project) in by a
+#                             Keycloak password grant and writes its access token to DIR/ROLE.token.
+#                             Fails - naming the account and Keycloak's error class - when it
+#                             cannot, or when the token would expire within BUDGET seconds (#1769).
+#   whoami ROLE DIR           Fails unless the API accepts ROLE's token and maps it to the group
+#                             security/dast/casc.yaml gives it. Prints counts; writes `version`.
+#   render-plan IN OUT ROLE   Copies the ZAP plan, substituting `${DAST_BEARER_TOKEN}` with ROLE's
+#                             token. The Automation Framework expands `${...}` in job parameters but
+#                             not inside a replacer rule, so the one place the token is needed is
+#                             the one place ZAP will not fill in.
+#   assert-authenticated HAR  Fails if any request of an API pass to /graphql was answered 401: the
+#                             pass outlived its token. Prints counts only.
 #   actuator BASE_URL         Probes for a reachable Spring Boot management port. Exit 0 when it
 #                             is not reachable, 1 when it is - which is an incident, not a
 #                             finding.
-#   normalize-zap FILE        Reads a ZAP `traditional-json` report and writes the normalised
-#                             findings document (below) to stdout.
+#   normalize-zap FILE [ROLE] Reads a ZAP `traditional-json` report and writes the normalised
+#                             findings document (below) to stdout, naming the role of the pass.
 #   assert-no-mutations HAR   Reads the HAR of every request ZAP sent and fails if any of them was
 #                             a GraphQL mutation or subscription. Prints counts only.
 #   fetch URL SHA256 OUT      Downloads URL to OUT and refuses it unless its SHA-256 is SHA256.
@@ -34,15 +42,15 @@
 #                             Before graphql-cop sends anything: fails unless every test registered
 #                             in SRC that mentions a mutation is in EXCLUDED (comma-separated), and
 #                             every name in EXCLUDED is a registered test.
-#   render-graphql-cop-headers OUT
-#                             Writes the API token header as JSON to OUT, for the run-time
+#   render-graphql-cop-headers OUT ROLE
+#                             Writes ROLE's bearer token header as JSON to OUT, for the run-time
 #                             graphql-cop configuration to read. Never on a command line.
 #   assert-graphql-cop-no-mutations OUT
 #                             Reads graphql-cop's own record of the request each test sent and fails
 #                             if any was a mutation or subscription. Prints counts only.
-#   normalize-graphql-cop OUT VERSION
+#   normalize-graphql-cop OUT VERSION [ROLE]
 #                             Reads graphql-cop's `-o json` stdout and writes the normalised
-#                             findings document to stdout.
+#                             findings document to stdout, naming the role of the pass.
 #   nuclei-preflight LIST CONFIG
 #                             Reads Nuclei's `-tl` template list and fails if any selected template
 #                             carries a tag CONFIG excludes, or if CONFIG does not exclude
@@ -53,14 +61,15 @@
 #   normalize-nuclei JSONL VERSION
 #                             Reads Nuclei's JSONL output and writes the normalised findings
 #                             document to stdout.
-#   report OUT_MD FILE...     Applies the rule levels and the suppressions to one or more
-#                             normalised findings documents, writes the markdown report to OUT_MD,
+#   report OUT_MD FILE...     De-duplicates one or more normalised findings documents by rule and
+#                             URL, attributing each finding to the roles that saw it, applies the
+#                             rule levels and the suppressions, writes the markdown report to OUT_MD,
 #                             and prints the counts. With $GITHUB_OUTPUT set, writes `critical`,
 #                             `high`, `medium`, `low`, `findings` and `suppressed` to it.
 #   report-path               Prints the path the report takes in yontrack/security-reports.
 #   publish REPO PATH FILE    Creates PATH in REPO with the contents of FILE. Never updates: one
 #                             file per run, never rewritten.
-#   scrub                     Copies stdin to stdout with URLs and the API token redacted. Every
+#   scrub                     Copies stdin to stdout with URLs and every token redacted. Every
 #                             byte a scanner writes goes through this before it can reach a log.
 #
 # Environment (report, report-path):
@@ -77,7 +86,13 @@
 #   DAST_RULES         rule levels (default: security/dast/zap/rules.tsv)
 #   DAST_SUPPRESSIONS  accepted findings (default: security/dast/suppressions.yaml)
 #   DAST_MITIGATIONS   rule mitigations (default: security/dast/mitigations.yaml)
-#   DEMO_TOKEN         redacted wherever it appears, in the report and in scrubbed output
+#   DAST_TOKEN_DIR     where `login` wrote the scanner roles' tokens; every one of them is redacted
+#                      wherever it appears, in the report and in scrubbed output - and so is
+#                      DEMO_TOKEN, should anything still set it
+#   DAST_CASC          the scanner roles' CasC (default: security/dast/casc.yaml) (whoami)
+#   DAST_KEYCLOAK_REALM_URL, DAST_KEYCLOAK_CLIENT_ID, DEMO_KEYCLOAK_CLIENT_SECRET,
+#   DAST_SCAN_{ADMIN,READONLY,PROJECT}_PASSWORD
+#                      the demo realm, its client, and each role's password (login)
 #
 # ---------------------------------------------------------------------------------------------
 # The normalised findings document
@@ -91,6 +106,7 @@
 #     {
 #       "scanner": "zap",
 #       "version": "2.16.1",
+#       "role": "scan-readonly",           // the scanner role of the pass; absent when unauthenticated
 #       "findings": [
 #         {
 #           "scanner":     "zap",          // zap | graphql-cop | nuclei
@@ -111,6 +127,8 @@
 #         }
 #       ]
 #     }
+#
+# `report` adds a `roles` list to every finding and every instance when it merges the documents.
 #
 # Counting is **per finding**, not per instance: one misconfiguration shows up on dozens of URLs,
 # and counting URLs would make "how bad is it" a function of how far the spider got.
@@ -144,17 +162,66 @@ sd_fail() { echo "ERROR: $*" >&2; return 1; }
 # reaches the log raw. What is left is enough to tell a crashed container from a refused
 # connection, which is all a log is for here.
 #
-# The token first, and unconditionally: a redaction that only runs when something looks like a URL
+# The tokens first, and unconditionally: a redaction that only runs when something looks like a URL
 # is a redaction that misses the one line that mattered.
+#
+# Every token this run holds, not one (#1769): each scanner role's bearer token, read from the
+# `<role>.token` files `login` wrote into $DAST_TOKEN_DIR, and $DEMO_TOKEN when something still sets
+# it. Literally, with awk's index/substr: a token is data, and a regex or a sed replacement built
+# from it would mangle a `&`, a `/` or a backslash - and then quietly not match.
+sd_redact_tokens() {
+    local dir="${DAST_TOKEN_DIR:-}" file
+    local files=()
+    if [ -n "$dir" ] && [ -d "$dir" ]; then
+        for file in "$dir"/*.token; do
+            [ -f "$file" ] && files+=("$file")
+        done
+    fi
+    # The file names are awk's arguments, emptied once read, so that awk then reads stdin.
+    awk '
+        BEGIN {
+            n = 0
+            if (ENVIRON["DEMO_TOKEN"] != "") { tok[++n] = ENVIRON["DEMO_TOKEN"] }
+            for (a = 1; a < ARGC; a++) {
+                while ((getline line < ARGV[a]) > 0) { if (line != "") { tok[++n] = line } }
+                close(ARGV[a])
+                ARGV[a] = ""
+            }
+        }
+        {
+            for (k = 1; k <= n; k++) {
+                rest = $0; done = ""; len = length(tok[k])
+                while ((i = index(rest, tok[k])) > 0) {
+                    done = done substr(rest, 1, i - 1) "<redacted>"
+                    rest = substr(rest, i + len)
+                }
+                $0 = done rest
+            }
+            print
+        }
+    ' ${files[@]+"${files[@]}"}
+}
+
 sd_scrub() {
-    local token="${DEMO_TOKEN:-}"
-    if [ -n "$token" ]; then
-        sed -e "s#$(printf '%s' "$token" | sed 's/[&/\]/\\&/g')#<redacted>#g"
-    else
-        cat
-    fi | sed -E \
+    # Then the shapes, for a token no file knows about: anything that looks like a JWT, and whatever
+    # follows a token header's name - `Authorization: Bearer x` included.
+    sd_redact_tokens | sed -E \
+        -e 's#eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]*#<redacted>#g' \
         -e 's#https?://[^[:space:]"'"'"'<>]+#<url>#g' \
-        -e 's#(X-Ontrack-Token|Authorization)[: =][^[:space:]"]+#\1: <redacted>#gI'
+        -e 's#(X-Ontrack-Token|Authorization)"?[:= ]+(Bearer[[:space:]]+)?[^[:space:]"'"'"',}]+#\1: <redacted>#gI'
+}
+
+# The file holding a scanner role's bearer token, as `login` wrote it. Fails, naming the role, when
+# there is none: a pass for a role that did not log in must not run.
+sd_token_file() {
+    local role="${1:-}" file
+    [ -n "$role" ] || { sd_fail "No scanner role given."; return 1; }
+    file="${DAST_TOKEN_DIR:-}/$role.token"
+    if [ -z "${DAST_TOKEN_DIR:-}" ] || [ ! -s "$file" ]; then
+        sd_fail "No token for $role: it has not logged in. Refusing to scan unauthenticated."
+        return 1
+    fi
+    printf '%s\n' "$file"
 }
 
 # ---------------------------------------------------------------------------------------------
@@ -245,28 +312,29 @@ sd_query_schema() {
 # The Automation Framework expands `${VAR}` from the environment in a job's parameters - the
 # requestor URLs, the spider's start URL, the GraphQL endpoint all arrive substituted - but NOT
 # inside a `replacer` job's rules, which the replacer add-on parses for itself. Verified against
-# the pinned image: the header went out with the literal `${DEMO_TOKEN}` as its value.
+# the pinned image: the header went out with the literal placeholder as its value.
 #
 # So the one value ZAP will not fill in is the one that is a secret, and it is written into a copy
-# of the plan instead. That copy lives in $RUNNER_TEMP, is never uploaded - this workflow uploads
-# nothing - and dies with the runner. It is left world-readable because the ZAP container runs as
-# its own uid and has to read it; on an ephemeral runner that is a narrower exposure than the
-# alternatives (the token on the `docker run` command line, where any process could read it off
-# /proc, or in a plan committed to a public repository, which is not an alternative at all).
+# of the plan instead: `${DAST_BEARER_TOKEN}` becomes the bearer token of ROLE, read from the file
+# `login` wrote (#1769) - never from an argument, never from the environment. That copy lives in
+# $RUNNER_TEMP, is never uploaded - this workflow uploads nothing - and dies with the runner. It is
+# left world-readable because the ZAP container runs as its own uid and has to read it; on an
+# ephemeral runner that is a narrower exposure than the alternatives (the token on the `docker run`
+# command line, where any process could read it off /proc, or in a plan committed to a public
+# repository, which is not an alternative at all).
 sd_render_plan() {
-    local input="${1:-}" output="${2:-}"
-    [ -n "$input" ] && [ -n "$output" ] || { sd_fail "Usage: $0 render-plan IN OUT"; return 1; }
+    local input="${1:-}" output="${2:-}" role="${3:-}" token_file
+    [ -n "$input" ] && [ -n "$output" ] && [ -n "$role" ] \
+        || { sd_fail "Usage: $0 render-plan IN OUT ROLE"; return 1; }
     [ -f "$input" ] || { sd_fail "No ZAP plan at $input"; return 1; }
-    [ -n "${DEMO_TOKEN:-}" ] || { sd_fail "DEMO_TOKEN is not set: the API cannot be scanned."; return 1; }
-    # awk reads it out of ENVIRON below, which only sees exported variables.
-    export DEMO_TOKEN
+    token_file="$(sd_token_file "$role")" || return 1
 
-    # Literal index/substr rather than gsub, and the token read from the environment rather than
-    # passed with -v: a regex replacement would mangle a `&` or a backslash, and awk expands
-    # escape sequences in a -v assignment - both turn a good token into a wrong one, which reads
-    # as an expired one.
-    awk '
-        BEGIN { tok = ENVIRON["DEMO_TOKEN"]; needle = "${DEMO_TOKEN}"; n = length(needle) }
+    # Literal index/substr rather than gsub, and the token read from its file rather than passed
+    # with -v: a regex replacement would mangle a `&` or a backslash, and awk expands escape
+    # sequences in a -v assignment - both turn a good token into a wrong one, which reads as an
+    # expired one.
+    awk -v token_file="$token_file" '
+        BEGIN { getline tok < token_file; close(token_file); needle = "${DAST_BEARER_TOKEN}"; n = length(needle) }
         {
             while ((i = index($0, needle)) > 0) {
                 $0 = substr($0, 1, i - 1) tok substr($0, i + n)
@@ -278,12 +346,198 @@ sd_render_plan() {
     ' "$input" > "$output"
     case $? in
         0) ;;
-        3) rm -f "$output"; sd_fail "No \${DEMO_TOKEN} placeholder in $input: the API would be scanned unauthenticated."; return 1 ;;
+        3) rm -f "$output"; sd_fail "No \${DAST_BEARER_TOKEN} placeholder in $input: the API would be scanned unauthenticated."; return 1 ;;
         *) rm -f "$output"; sd_fail "Could not render $input"; return 1 ;;
     esac
 
     chmod 644 "$output" || return 1
-    sd_log "ZAP plan rendered: the API token is in place."
+    sd_log "ZAP plan rendered for $role: its bearer token is in place."
+    return 0
+}
+
+# ---------------------------------------------------------------------------------------------
+# The scanner roles (#1769) - login, whoami, assert-authenticated
+# ---------------------------------------------------------------------------------------------
+
+# The three accounts of security/dast/casc.yaml, and nothing else: a typo in the workflow must not
+# turn into a login attempt as some other user of the demo.
+SD_ROLES="scan-admin scan-readonly scan-project"
+SD_CASC="${DAST_CASC:-$SD_ROOT/security/dast/casc.yaml}"
+
+sd_known_role() {
+    case " $SD_ROLES " in
+        *" ${1:-} "*) return 0 ;;
+        *) sd_fail "\"${1:-}\" is not one of the scanner roles ($SD_ROLES)."; return 1 ;;
+    esac
+}
+
+# A Keycloak password grant on the demo realm, as ROLE: `scan-readonly` logs in with
+# $DAST_SCAN_READONLY_PASSWORD - the name of the Actions secret it comes from - through the client
+# $DAST_KEYCLOAK_CLIENT_ID and its secret $DEMO_KEYCLOAK_CLIENT_SECRET.
+#
+# The access token goes to DIR/ROLE.token, readable by the runner's user only, and nowhere else;
+# every later step reads it from there, and `scrub` and `report` redact whatever is in it. In Actions
+# it is also registered as a mask, so the runner blanks it from the log should anything print it.
+#
+# The password and the client secret travel on curl's stdin, form-encoded: never on its command line.
+#
+# A pass must not outlive its token. The workflow logs in again right before every pass, and gives
+# the pass's time budget as BUDGET: a token that expires sooner is refused here rather than
+# discovered half-way through as a run of 401s - which `assert-authenticated` would catch anyway.
+#
+# Any failure stops the run. A scanner account that cannot log in is a credential or demo
+# configuration problem, and a scan that went on unauthenticated would report a clean API.
+sd_login() {
+    local role="${1:-}" dir="${2:-}" budget="${3:-0}" secret realm tmp status token expires error
+    [ -n "$role" ] && [ -n "$dir" ] || { sd_fail "Usage: $0 login ROLE DIR [BUDGET_SECONDS]"; return 1; }
+    sd_known_role "$role" || return 1
+    secret="DAST_$(printf '%s' "$role" | tr 'a-z-' 'A-Z_')_PASSWORD"
+    [ -n "${!secret:-}" ] || { sd_fail "$secret is not set: $role cannot log in, and the scan does not go on unauthenticated."; return 1; }
+    [ -n "${DEMO_KEYCLOAK_CLIENT_SECRET:-}" ] || { sd_fail "DEMO_KEYCLOAK_CLIENT_SECRET is not set: no scanner account can log in."; return 1; }
+    [ -n "${DAST_KEYCLOAK_CLIENT_ID:-}" ] || { sd_fail "DAST_KEYCLOAK_CLIENT_ID is not set."; return 1; }
+    realm="${DAST_KEYCLOAK_REALM_URL:-${DAST_TARGET:-}/keycloak/realms/ontrack}"
+    realm="${realm%/}"
+
+    mkdir -p "$dir" || return 1
+    rm -f "$dir/$role.token" "$dir/$role.expires"
+    tmp="$(mktemp -d "${TMPDIR:-/tmp}/dast-login.XXXXXX")" || return 1
+    chmod 700 "$tmp"
+
+    # jq reads the secrets out of its environment by name and form-encodes them; the pipe hands the
+    # result to curl without it ever being an argument.
+    status="$(jq -r -n --arg secret "$secret" --arg user "$role" '
+            "grant_type=password&scope=openid"
+            + "&client_id=" + (env.DAST_KEYCLOAK_CLIENT_ID | @uri)
+            + "&client_secret=" + (env.DEMO_KEYCLOAK_CLIENT_SECRET | @uri)
+            + "&username=" + ($user | @uri)
+            + "&password=" + (env[$secret] | @uri)' \
+        | tr -d '\n' \
+        | curl -sS --max-time 30 -o "$tmp/body" -w '%{http_code}' -X POST \
+            -H 'Content-Type: application/x-www-form-urlencoded' \
+            --data-binary @- "$realm/protocol/openid-connect/token" 2> "$tmp/err")" || status="000"
+
+    if [ "$status" != "200" ]; then
+        # Keycloak's error class and its one-line description - "invalid_grant (Invalid user
+        # credentials)", "unauthorized_client (Invalid client credentials)" - which name the problem
+        # and carry nothing secret. Scrubbed all the same.
+        error="$(jq -r '[.error // empty, (.error_description // empty | "(\(.))")] | join(" ")' "$tmp/body" 2> /dev/null)"
+        [ -n "$error" ] || error="$(head -c 200 "$tmp/err" 2> /dev/null)"
+        rm -rf "$tmp"
+        sd_fail "$role could not log in: Keycloak answered $status $(printf '%s' "${error:-with no error}" | sd_scrub). Check the account and its password secret; the scan does not go on unauthenticated."
+        return 1
+    fi
+
+    token="$(jq -r '.access_token // empty' "$tmp/body" 2> /dev/null)"
+    expires="$(jq -r '.expires_in // 0 | floor' "$tmp/body" 2> /dev/null)"
+    rm -rf "$tmp"
+    if [ -z "$token" ]; then
+        sd_fail "$role could not log in: Keycloak answered 200 with no access token."
+        return 1
+    fi
+    case "$expires" in ''|*[!0-9]*) expires=0 ;; esac
+    if [ "$expires" -lt "$budget" ]; then
+        sd_fail "$role's token is valid for ${expires}s, less than the ${budget}s its pass may take: it would expire mid-pass and the rest of the pass would run unauthenticated. Raise the realm's access token lifespan."
+        return 1
+    fi
+
+    if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
+        echo "::add-mask::$token"
+    fi
+    ( umask 077 && printf '%s' "$token" > "$dir/$role.token" && echo $(( $(date +%s) + expires )) > "$dir/$role.expires" ) \
+        || { rm -f "$dir/$role.token"; sd_fail "Could not store $role's token"; return 1; }
+    sd_log "$role logged in: token valid for ${expires}s."
+    return 0
+}
+
+# One authenticated call to the API as ROLE, proving three things before anything is scanned: the
+# API accepts the bearer token (an OIDC token is resolved by Spring's resource server from the
+# `Authorization: Bearer` header - WebSecurityConfig), the account arrives in the Yontrack group
+# security/dast/casc.yaml maps its Keycloak group to, and - for a role granted on projects rather
+# than globally - that it has a project to scan at all.
+#
+# A project-scoped role seeing more projects than casc.yaml grants it is printed as a WARNING rather
+# than failing: an instance may grant project view to every user, which this cannot read. Counts
+# only: the group name is the one the public casc.yaml declares.
+#
+# With $GITHUB_OUTPUT set, writes `version` - the version the demo runs - to it.
+sd_whoami() {
+    local role="${1:-}" dir="${2:-}" token_file url tmp status body groups expected visible granted global version
+    [ -n "$role" ] && [ -n "$dir" ] || { sd_fail "Usage: $0 whoami ROLE DIR"; return 1; }
+    sd_known_role "$role" || return 1
+    token_file="$(DAST_TOKEN_DIR="$dir" sd_token_file "$role")" || return 1
+    url="${DAST_TARGET:-}"
+    url="${url%/}/graphql"
+
+    tmp="$(mktemp -d "${TMPDIR:-/tmp}/dast-whoami.XXXXXX")" || return 1
+    chmod 700 "$tmp"
+    ( umask 077 && printf 'Authorization: Bearer %s\n' "$(cat "$token_file")" > "$tmp/headers" ) || { rm -rf "$tmp"; return 1; }
+    status="$(printf '%s' '{"query":"{ user { mappedGroups { name } } projects { id } info { version { full } } }"}' \
+        | curl -sS --max-time 30 -o "$tmp/body" -w '%{http_code}' -X POST \
+            -H 'Content-Type: application/json' -H "@$tmp/headers" \
+            --data-binary @- "$url" 2> /dev/null)" || status="000"
+    body="$(cat "$tmp/body" 2> /dev/null)"
+    rm -rf "$tmp"
+
+    if [ "$status" != "200" ]; then
+        sd_fail "The API answered $status to $role's token: it does not accept it, and the scan does not go on unauthenticated."
+        return 1
+    fi
+    if ! printf '%s' "$body" | jq -e '(.errors // [] | length) == 0 and .data.user != null' > /dev/null 2>&1; then
+        sd_fail "The API did not answer $role's query without errors: cannot tell which user it scans as."
+        return 1
+    fi
+
+    expected="$(yq -r '.casc.ontrack.admin["group-mappings"][] | select(.idp == "/dast-'"${role#scan-}"'") | .group' "$SD_CASC")" \
+        || { sd_fail "Could not read the group mappings from $SD_CASC"; return 1; }
+    [ -n "$expected" ] || { sd_fail "$SD_CASC maps no group for $role."; return 1; }
+    groups="$(printf '%s' "$body" | jq -r '.data.user.mappedGroups[]?.name')"
+    if ! printf '%s\n' "$groups" | grep -qxF "$expected"; then
+        sd_fail "$role is authenticated but not mapped to the group \`$expected\`: its scan would not test that role. Check the group mappings of $SD_CASC on the instance."
+        return 1
+    fi
+
+    visible="$(printf '%s' "$body" | jq -r '.data.projects // [] | length')"
+    global="$(yq -r '[.casc.ontrack.admin["group-permissions"][] | select(.group == "'"$expected"'")] | length' "$SD_CASC")" || return 1
+    granted="$(yq -r '[.casc.ontrack.admin["project-permissions"][] | select(.group == "'"$expected"'") | .projects[]] | length' "$SD_CASC")" || return 1
+    if [ "$global" = "0" ] && [ "${granted:-0}" != "0" ]; then
+        if [ "$visible" = "0" ]; then
+            sd_fail "$role sees no project, where $SD_CASC grants it $granted: the project permissions were not re-applied after the demo seed, and its scan would test nothing."
+            return 1
+        fi
+        if [ "$visible" -gt "$granted" ]; then
+            sd_log "WARNING: $role sees $visible project(s), where $SD_CASC grants it $granted. Either the instance grants project view to all, or the role reaches projects it should not."
+        fi
+    fi
+
+    sd_log "$role: authenticated by the API as a member of \`$expected\`, $visible project(s) visible."
+    version="$(printf '%s' "$body" | jq -r '.data.info.version.full // empty')"
+    if [ -n "$version" ] && [ -n "${GITHUB_OUTPUT:-}" ]; then
+        echo "version=$version" >> "$GITHUB_OUTPUT"
+    fi
+    return 0
+}
+
+# After an authenticated ZAP pass, from its HAR: every request to /graphql was answered as an
+# authenticated one. A 401 means the token was refused or expired part-way, and the rest of the pass
+# scanned the API as nobody - which would read as a cleaner API than there is. Counts only.
+sd_assert_authenticated() {
+    local har="${1:-}" summary total refused ok
+    [ -n "$har" ] || { sd_fail "Usage: $0 assert-authenticated HAR"; return 1; }
+    [ -f "$har" ] || { sd_fail "No HAR at $har: cannot prove the pass was authenticated."; return 1; }
+    summary="$(jq -e -r '
+        [(.log.entries // [])[] | select((.request.url // "") | test("/graphql"))] as $g
+        | "\($g | length) \([$g[] | select((.response.status // 0) == 401)] | length) \([$g[] | select((.response.status // 0) >= 200 and (.response.status // 0) < 300)] | length)"
+    ' "$har")" || { sd_fail "Could not read the request HAR at $har"; return 1; }
+    read -r total refused ok <<< "$summary"
+    if [ "${refused:-1}" != "0" ]; then
+        sd_fail "$refused of the $total requests to /graphql answered 401: the token was refused or expired mid-pass, and part of the pass ran unauthenticated."
+        return 1
+    fi
+    if [ "${ok:-0}" = "0" ]; then
+        sd_fail "None of the $total requests to /graphql succeeded: the pass did not scan the API."
+        return 1
+    fi
+    sd_log "Authenticated: $ok of the $total requests to /graphql succeeded, none answered 401."
     return 0
 }
 
@@ -344,17 +598,17 @@ sd_actuator() {
 # `riskcode` is ZAP's 0..3; ZAP has no Critical, which is why a passive ZAP-only run never
 # produces one. The prose fields are HTML in the report and are stripped: they end up in markdown.
 sd_normalize_zap() {
-    local file="${1:-}"
-    [ -n "$file" ] || { sd_fail "Usage: $0 normalize-zap FILE"; return 1; }
+    local file="${1:-}" role="${2:-}"
+    [ -n "$file" ] || { sd_fail "Usage: $0 normalize-zap FILE [ROLE]"; return 1; }
     [ -f "$file" ] || { sd_fail "No ZAP report at $file"; return 1; }
 
-    jq -e '
+    jq -e --arg role "$role" '
         def text: (. // "") | tostring
             | gsub("<(br|BR)[^>]*>"; "\n") | gsub("</p>"; "\n") | gsub("<[^>]*>"; "")
             | gsub("&lt;"; "<") | gsub("&gt;"; ">") | gsub("&amp;"; "&") | gsub("&quot;"; "\"")
             | gsub("[ \t]+"; " ") | gsub("\n[ \n]*"; "\n") | sub("^\\s+"; "") | sub("\\s+$"; "");
         def risk: ({"0": "INFO", "1": "LOW", "2": "MEDIUM", "3": "HIGH"}[(. // 0) | tostring] // "INFO");
-        {
+        (if $role == "" then {} else {role: $role} end) + {
           scanner: "zap",
           version: ((.["@version"] // "unknown") | tostring),
           findings: (
@@ -570,21 +824,20 @@ sd_graphql_cop_preflight() {
     return 0
 }
 
-# The token, as the JSON the run-time graphql-cop configuration reads (security/dast/graphql-cop/
-# config.py). graphql-cop's own way in is `-H '{"X-Ontrack-Token": "..."}'` on its command line, and
-# a command line is readable from /proc by anything else on the runner - the reason ZAP's plan is
-# rendered with the token rather than handed it as an argument.
+# ROLE's bearer token, as the JSON the run-time graphql-cop configuration reads (security/dast/
+# graphql-cop/config.py). graphql-cop's own way in is `-H '{"Authorization": "..."}'` on its command
+# line, and a command line is readable from /proc by anything else on the runner - the reason ZAP's
+# plan is rendered with the token rather than handed it as an argument.
 sd_render_graphql_cop_headers() {
-    local output="${1:-}"
-    [ -n "$output" ] || { sd_fail "Usage: $0 render-graphql-cop-headers OUT"; return 1; }
-    [ -n "${DEMO_TOKEN:-}" ] || { sd_fail "DEMO_TOKEN is not set: the API cannot be scanned."; return 1; }
+    local output="${1:-}" role="${2:-}" token_file
+    [ -n "$output" ] && [ -n "$role" ] || { sd_fail "Usage: $0 render-graphql-cop-headers OUT ROLE"; return 1; }
+    token_file="$(sd_token_file "$role")" || return 1
     mkdir -p "$(dirname "$output")" || return 1
-    # From the environment rather than interpolated or passed with --arg: jq writes the token as a
-    # JSON string whatever it contains, and it appears in no process's arguments on the way.
-    export DEMO_TOKEN
-    ( umask 077 && jq -n '{"X-Ontrack-Token": env.DEMO_TOKEN}' > "$output" ) \
-        || { rm -f "$output"; sd_fail "Could not write the graphql-cop headers"; return 1; }
-    sd_log "graphql-cop headers rendered: the API token is in place."
+    # --rawfile rather than --arg: jq writes the token as a JSON string whatever it contains, and it
+    # appears in no process's arguments on the way - only the name of its file does.
+    ( umask 077 && jq -n --rawfile token "$token_file" '{"Authorization": ("Bearer " + ($token | rtrimstr("\n")))}' > "$output" ) \
+        || { rm -f "$output"; sd_fail "Could not write the graphql-cop headers for $role"; return 1; }
+    sd_log "graphql-cop headers rendered for $role: its bearer token is in place."
     return 0
 }
 
@@ -651,17 +904,17 @@ sd_assert_graphql_cop_no_mutations() {
 # output does carry; a title this does not know falls back to itself, lower-cased.
 #
 # The instance is the endpoint and the method, read from `curl_verify` - and `curl_verify` itself is
-# dropped: it is the whole request, the API token header included.
+# dropped: it is the whole request, the bearer token header included.
 sd_normalize_graphql_cop() {
-    local file="${1:-}" version="${2:-unknown}" json
-    [ -n "$file" ] || { sd_fail "Usage: $0 normalize-graphql-cop OUT VERSION"; return 1; }
+    local file="${1:-}" version="${2:-unknown}" role="${3:-}" json
+    [ -n "$file" ] || { sd_fail "Usage: $0 normalize-graphql-cop OUT VERSION [ROLE]"; return 1; }
     json="$(sd_graphql_cop_json "$file")" || return 1
     if [ "$(printf '%s\n' "$json" | jq 'length')" = "0" ]; then
         sd_fail "graphql-cop ran no test - it did not recognise the endpoint as GraphQL. A scan that did not happen is not a clean result."
         return 1
     fi
 
-    printf '%s\n' "$json" | jq -e --arg version "$version" '
+    printf '%s\n' "$json" | jq -e --arg version "$version" --arg role "$role" '
         def rule_id:
             {
               "Field Suggestions": "field_suggestions",
@@ -683,7 +936,7 @@ sd_normalize_graphql_cop() {
             | if ["CRITICAL", "HIGH", "MEDIUM", "LOW"] | index($s) then $s else "INFO" end;
         def endpoint: [ (.curl_verify // "") | capture("\u0027(?<u>https?://[^\u0027?]*)[^\u0027]*\u0027\\s*$") ] | (.[0].u // "");
         def method: [ (.curl_verify // "") | capture("^curl -X (?<m>[A-Z]+)") ] | (.[0].m // "");
-        {
+        (if $role == "" then {} else {role: $role} end) + {
           scanner: "graphql-cop",
           version: $version,
           findings: [
@@ -944,7 +1197,7 @@ sd_verdict() {
             | .override = (if $lv == "" then null else $lv end)
             | .risk = (if $lv == "FAIL" then "HIGH" elif $lv == "WARN" then "LOW" else .risk end)
             # An instance-less finding still has to be countable.
-            | .instances = (if (.instances | length) == 0 then [{uri: "", method: "", param: "", evidence: "", attack: "", info: ""}] else .instances end)
+            | .instances = (if (.instances | length) == 0 then [{uri: "", method: "", param: "", evidence: "", attack: "", info: "", roles: (.roles // [])}] else .instances end)
           ] as $levelled
 
         | [ $suppressions[] | select(.expired_at >= $meta.date) ] as $active_sup
@@ -1001,6 +1254,20 @@ sd_verdict() {
               $expired_sup[] | {id: (.id // .rule // .name // "suppression"), statement: .statement, expired_at: .expired_at}
             ],
             overrides: [ $scored[] | select(.override != null) | {rule: .rule, name: .name, level: .override, risk: .risk} ],
+            # The per-role split (#1769): a counted finding counts for every role that saw one of its
+            # counted instances. For the private report only, like the per-tool split.
+            by_role: [ ($meta.roles // [])[] | . as $r
+              | ($counted | map(select([.kept[] | (.roles // [])[]] | index($r)))) as $c
+              | {
+                  role: $r,
+                  counts: {
+                    CRITICAL: ($c | map(select(.risk == "CRITICAL")) | length),
+                    HIGH: ($c | map(select(.risk == "HIGH")) | length),
+                    MEDIUM: ($c | map(select(.risk == "MEDIUM")) | length),
+                    LOW: ($c | map(select(.risk == "LOW")) | length)
+                  }
+                }
+            ],
             # The per-tool split. For the private report only: the stamp and the public log carry the
             # totals, and which tool found what is detail.
             by_scanner: [ ($meta.tools // [])[] | . as $t
@@ -1065,6 +1332,16 @@ sd_render() {
         ]
         + [ .by_scanner[] | "| `\(.scanner)` | \(.version | md) | \(.counts.CRITICAL) | \(.counts.HIGH) | \(.counts.MEDIUM) | \(.counts.LOW) |" ]
         + [""]
+        + [
+          "## Counts by role",
+          "",
+          "What each role saw. The API passes ran once per scanner account; `unauthenticated` is the UI part of the ZAP scan and Nuclei. A rule several roles saw is counted once above, and once in each of their lines here.",
+          "",
+          "| Role | CRITICAL | HIGH | MEDIUM | LOW |",
+          "|---|---|---|---|---|"
+        ]
+        + [ .by_role[] | "| `\(.role)` | \(.counts.CRITICAL) | \(.counts.HIGH) | \(.counts.MEDIUM) | \(.counts.LOW) |" ]
+        + [""]
         + (if (.findings | length) == 0 then ["Nothing reported by any scanner. That is unusual rather than reassuring — check that the scan actually reached the target.", ""] else [] end)
         # Grouped by tool, then by risk and rule within a tool: three tools reporting the same
         # weakness under three names read as three findings otherwise, and a reader comparing two
@@ -1080,14 +1357,16 @@ sd_render() {
                 "",
                 "`\(.scanner)` rule `\(.rule)`\(if .ref != .rule then " (`\(.ref)`)" else "" end)\(if .confidence == "Unknown" then "" else ", confidence \(.confidence)" end)\(if .cwe != "" then ", CWE-\(.cwe)" else "" end)\(if .counted then "" else " — **not counted**\(if (.kept | length) == 0 then " (every instance suppressed)" else " (informational)" end)" end)\(if .override != null then " — level forced to `\(.override)` by `rules.tsv`" else "" end)",
                 "",
+                "Seen by \([(.roles // [])[] | "`\(.)`"] | join(", "))\(if (.roles // []) == [] then "no role recorded" else "" end).",
+                "",
                 (.description | blockquote),
                 "",
                 "**Affected** — \(.kept | length) instance(s) counted, \(.suppressed | length) suppressed:",
                 "",
-                "| URL | Method | Parameter | Evidence |",
-                "|---|---|---|---|",
+                "| URL | Method | Parameter | Evidence | Roles |",
+                "|---|---|---|---|---|",
                 ( [ (.kept + .suppressed)[:20][] |
-                    "| `\(.uri | md)` | \(.method | md) | \(if .param == "" then "—" else "`\(.param | md)`" end) | \(if .evidence == "" then "—" else "`\(.evidence | md)`" end) |" ] | join("\n") ),
+                    "| `\(.uri | md)` | \(.method | md) | \(if .param == "" then "—" else "`\(.param | md)`" end) | \(if .evidence == "" then "—" else "`\(.evidence | md)`" end) | \([(.roles // [])[] | "`\(.)`"] | join(", ")) |" ] | join("\n") ),
                 (if ((.kept | length) + (.suppressed | length)) > 20 then "\n… and \(((.kept | length) + (.suppressed | length)) - 20) more instance(s)." else "" end),
                 "",
                 (if .mitigation == null then
@@ -1135,7 +1414,7 @@ sd_render() {
 }
 
 sd_report() {
-    local out="${1:-}" findings tools rules suppressions mitigations meta verdict duration=0
+    local out="${1:-}" findings roles tools rules suppressions mitigations meta verdict duration=0
     [ -n "$out" ] || { sd_fail "Usage: $0 report OUT_MD FILE..."; return 1; }
     shift
     [ $# -gt 0 ] || { sd_fail "No normalised findings document given."; return 1; }
@@ -1145,7 +1424,38 @@ sd_report() {
         [ -f "$file" ] || { sd_fail "No findings document at $file"; return 1; }
     done
 
-    findings="$(jq -e -s -c '[.[] | .findings[]?]' "$@")" \
+    # One document per scanner pass, and since #1769 one pass per scanner role: the documents are
+    # merged here, before anything is counted.
+    #
+    #   * every finding and instance is attributed to the role of its document - `unauthenticated`
+    #     when the document names none (Nuclei, the UI part of the ZAP scan);
+    #   * findings are de-duplicated by scanner and rule - `ref`, the finer id, which is what one
+    #     finding already was: three roles tripping the same rule are one finding, not three;
+    #   * their instances are de-duplicated by URL, the roles that saw each one merged.
+    #
+    # So the counts of three passes are the counts of one pass that saw everything any of them saw,
+    # and the report says which role saw what.
+    findings="$(jq -e -s -c '
+        [ .[] | (.role // "unauthenticated") as $r | .findings[]?
+          | .roles = ((.roles // []) + [$r] | unique)
+          | .instances = ((.instances // []) | map(.roles = ((.roles // []) + [$r] | unique)))
+        ]
+        | group_by([(.scanner // "unknown"), ((.ref // .rule) | tostring)])
+        | map(
+            .[0] + {
+              roles: ([.[].roles[]] | unique),
+              instances: (
+                [.[].instances[]]
+                | group_by(.uri // "")
+                | map(.[0] + {
+                    method: ([.[].method // "" | select(. != "")] | unique | join(", ")),
+                    roles: ([.[].roles[]] | unique)
+                  })
+              )
+            }
+          )' "$@")" \
+        || { sd_fail "Could not read the findings documents"; return 1; }
+    roles="$(jq -e -s -c '[.[] | .role // "unauthenticated"] | unique' "$@")" \
         || { sd_fail "Could not read the findings documents"; return 1; }
     # Which tools ran, at which version, in the order they were given: one line each in the report,
     # a tool with nothing to report included. The report is grouped by these, so a finding whose
@@ -1173,15 +1483,15 @@ sd_report() {
         --arg scanners "${DAST_SCANNERS:-unknown}" \
         --argjson duration "$duration" \
         --argjson tools "$tools" \
+        --argjson roles "$roles" \
         '$ARGS.named')" || return 1
 
     verdict="$(sd_verdict "$findings" "$rules" "$suppressions" "$mitigations" "$meta")" || return 1
 
     mkdir -p "$(dirname "$out")" || return 1
-    # The token is redacted from the report too, not only from the logs. It is never put into one
-    # - but the report is the file that leaves this runner, and a belt is cheap.
-    printf '%s\n' "$verdict" | sd_render \
-        | { if [ -n "${DEMO_TOKEN:-}" ]; then sed "s#$(printf '%s' "$DEMO_TOKEN" | sed 's/[&/\]/\\&/g')#<redacted>#g"; else cat; fi; } > "$out" \
+    # Every token is redacted from the report too, not only from the logs. None is ever put into
+    # one - but the report is the file that leaves this runner, and a belt is cheap.
+    printf '%s\n' "$verdict" | sd_render | sd_redact_tokens > "$out" \
         || { sd_fail "Could not write the report to $out"; return 1; }
 
     local counts
@@ -1241,6 +1551,9 @@ sd_main() {
     case "$command" in
         query-schema) sd_query_schema "$@" ;;
         render-plan) sd_render_plan "$@" ;;
+        login) sd_login "$@" ;;
+        whoami) sd_whoami "$@" ;;
+        assert-authenticated) sd_assert_authenticated "$@" ;;
         actuator) sd_actuator "$@" ;;
         normalize-zap) sd_normalize_zap "$@" ;;
         assert-no-mutations) sd_assert_no_mutations "$@" ;;
@@ -1257,7 +1570,7 @@ sd_main() {
         publish) sd_publish "$@" ;;
         scrub) sd_scrub ;;
         *)
-            echo "Usage: $0 query-schema|render-plan|actuator|normalize-zap|assert-no-mutations|fetch|graphql-cop-preflight|render-graphql-cop-headers|assert-graphql-cop-no-mutations|normalize-graphql-cop|nuclei-preflight|nuclei-summary|normalize-nuclei|report|report-path|publish|scrub ..." >&2
+            echo "Usage: $0 query-schema|login|whoami|render-plan|assert-authenticated|actuator|normalize-zap|assert-no-mutations|fetch|graphql-cop-preflight|render-graphql-cop-headers|assert-graphql-cop-no-mutations|normalize-graphql-cop|nuclei-preflight|nuclei-summary|normalize-nuclei|report|report-path|publish|scrub ..." >&2
             return 1
             ;;
     esac

@@ -28,24 +28,30 @@ touches the demo joins that group.
 
 ## What it does
 
-1. **Asks the demo which version it is running**, and resolves that version back to a Yontrack
-   build — `scripts/demo-smoke.sh version` then `resolve`, the same two functions `demo-smoke.yml`
-   uses, so `SECURITY.DAST` and `DEMO.SMOKE` land on the same build by construction. The CLI is
-   installed directly rather than through `ontrack-github-actions-cli-config`, which would
-   register a build as a side effect.
-2. **Checks that the management port is not reachable.** If it answers, the run stops: an exposed
+1. **Derives a query-only GraphQL schema**, the one ZAP is fed.
+2. **Logs in as the three scanner roles** (#1769) — see below — and, with the same authenticated
+   query, asks the demo which version it is running.
+3. **Resolves that version back to a Yontrack build** — `scripts/demo-smoke.sh resolve`, the
+   function `demo-smoke.yml` uses, so `SECURITY.DAST` and `DEMO.SMOKE` land on the same build by
+   construction. The CLI is installed directly rather than through
+   `ontrack-github-actions-cli-config`, which would register a build as a side effect.
+4. **Checks that the management port is not reachable.** If it answers, the run stops: an exposed
    actuator is an incident, not a MEDIUM to add to a tally.
-3. **Derives a query-only GraphQL schema** and renders the ZAP plan with the API token.
-4. **Runs ZAP** from a digest-pinned container against `security/dast/zap/passive.yaml`.
-5. **Proves no mutation was sent**, from ZAP's own record of every request.
-6. **Runs graphql-cop** (#1766) against `/graphql`, authenticated, every test but the one that
-   sends a mutation — checked in its source first, and proved from its output afterwards.
+5. **Runs ZAP** from a digest-pinned container: once over the UI, unauthenticated
+   (`security/dast/zap/passive.yaml`), then once over `/graphql` per scanner role
+   (`security/dast/zap/passive-api.yaml`, rendered with that role's token). After every pass it
+   **proves no mutation was sent**, from ZAP's own record of every request, and after every API
+   pass that **no request was answered 401**.
+6. **Runs graphql-cop** (#1766) against `/graphql`, once per scanner role, every test but the one
+   that sends a mutation — checked in its source first, and proved from each pass's output
+   afterwards.
 7. **Runs Nuclei** (#1766) against the demo, unauthenticated, with the templates tagged `exposure`,
    `misconfig`, `springboot`, `spring`, `keycloak`, `nextjs` and `default-login`, none tagged
    `intrusive`, `dos`, `fuzz` or `bruteforce`, HTTP only, ten requests a second —
    `security/dast/nuclei/passive.yaml`, checked against the templates actually selected.
 8. **Counts and reports** — `scripts/security-dast.sh`, one converter per scanner into one report
-   grouped by tool.
+   grouped by tool. The passes are de-duplicated by rule and URL first, and the report says which
+   role saw each finding.
 9. **Publishes the markdown report** to the private `yontrack/security-reports`.
 10. **Validates `SECURITY.DAST`** on the build, with the counts of all three. A scanner error reports no stamp
    at all: nothing depends on this one, so an absent stamp stalls nothing and says the true
@@ -81,13 +87,61 @@ and the exact path of an exposure.
 `scripts/security-dast.sh fetch` refuses a download that does not match. All the pins are `env` in
 `.github/workflows/dast-passive.yml`; Dependabot does not move them.
 
-## Why graphql-cop is authenticated and Nuclei is not
+## The scanner roles
 
-graphql-cop tests what the GraphQL endpoint accepts, and an unauthenticated request stops at the
-authentication. Nuclei looks for what an attacker **without** a token reaches — an exposed actuator,
-a served `.git`, a default password — and an admin token on a login template is not something to
-find out about. The token reaches graphql-cop through a file mounted read-only and read by
-`security/dast/graphql-cop/config.py`, never through its `-H` option on a command line.
+The API is scanned as the three accounts of [`security/dast/casc.yaml`](../../security/dast/casc.yaml)
+(#1769), not as the demo admin, so that what a read-only or a project-scoped user reaches is scanned
+too:
+
+| Account | Yontrack group | Role |
+|---|---|---|
+| `scan-admin` | `DAST Admin` | global `ADMINISTRATOR` |
+| `scan-readonly` | `DAST Read-only` | global `READ_ONLY` |
+| `scan-project` | `DAST Project` | `PARTICIPANT` on `petclinic` |
+
+They are Keycloak users of the demo realm (yontrack/yontrack-infra-gitops#72), and the workflow does
+not use `DEMO_TOKEN` any more. Their passwords are the Actions secrets `DAST_SCAN_ADMIN_PASSWORD`,
+`DAST_SCAN_READONLY_PASSWORD` and `DAST_SCAN_PROJECT_PASSWORD`, and the realm's client secret is
+`DEMO_KEYCLOAK_CLIENT_SECRET`.
+
+**Tokens.** `scripts/security-dast.sh login` gets each role an access token by a Keycloak password
+grant on the demo realm, client `yontrack-client`; the password and the client secret go to curl on
+its stdin, never on a command line. The token goes to a file in `$RUNNER_TEMP/dast/tokens`, readable
+by the runner's user only, and is registered as a log mask. It is sent as `Authorization: Bearer`:
+the API is a Spring OAuth2 resource server (`WebSecurityConfig`), and `X-Ontrack-Token` is for
+Yontrack's own API tokens, which these accounts do not hold. ZAP gets it through a run-time rendered
+copy of its plan, graphql-cop through a headers file mounted read-only; both are deleted after their
+pass.
+
+**Before scanning**, `whoami` makes one authenticated query as each role and stops the run unless the
+API accepts the token and maps the account to the group `casc.yaml` gives it — and, for
+`scan-project`, unless it sees at least one project, which it would not if the CasC had not been
+re-applied after the seed. A project-scoped role seeing more projects than `casc.yaml` grants it is
+printed as a WARNING, with the counts: the instance may grant project view to every user.
+
+**Failure.** An account that cannot log in stops the run with the account, the status and Keycloak's
+error class - `invalid_grant`, `unauthorized_client` - and reports no stamp. A scan that went on
+unauthenticated would report a cleaner API than there is.
+
+**Expiry.** A pass must not outlive its token. Every pass logs in again right before it runs, and
+`login` refuses a token valid for less than the pass's budget (`DAST_ZAP_PASS_BUDGET`,
+`DAST_GRAPHQL_COP_PASS_BUDGET`); the demo's realm issues tokens for an hour. After each ZAP API pass,
+`assert-authenticated` proves from its HAR that no request to `/graphql` was answered 401.
+
+**Redaction.** `scrub` and `report` redact every file in the token directory, wherever its contents
+appear, and anything shaped like a JWT or following an `Authorization` or `X-Ontrack-Token` header
+name.
+
+Passive only: no role attempts a write, least of all a cross-project one. That is #1767's job, on a
+throwaway stack.
+
+## Why the API is authenticated and Nuclei and the UI are not
+
+graphql-cop and ZAP's API pass test what the GraphQL endpoint accepts, and an unauthenticated request
+stops at the authentication. The UI goes through that same API, so an authenticated crawl of it would
+re-test the API through a browser. Nuclei looks for what an attacker **without** a token reaches — an
+exposed actuator, a served `.git`, a default password — and an administrator's token on a login
+template is not something to find out about.
 
 ## Why the scan sends an `Origin`
 
@@ -128,11 +182,14 @@ upgraded yet.
 - The validation run points at the workflow run, never at the report.
 - Anything a scanner writes to its own stdout goes through `scripts/security-dast.sh scrub` first.
   The ZAP log carries both crawled URLs and, when it echoes the plan back, the API token.
+- The scanner roles' tokens are registered as masks, and `scrub` and `report` redact every one of
+  them. The login and `whoami` steps print the account, its group and counts.
 - graphql-cop's output carries every request it sent, token included, and Nuclei's log carries
   every match as it is found: neither is printed. On a failure, graphql-cop's stderr is printed
   scrubbed, and of Nuclei's log only its fatal lines. On success, Nuclei's final statistics — counts
   of templates, requests and errors — are all that is printed.
-- The per-tool split of the counts is in the report only; the log and the summary carry totals.
+- The per-tool and per-role splits of the counts are in the report only; the log and the summary
+  carry totals.
 
 A step you add either prints a number or prints nothing.
 
@@ -152,8 +209,8 @@ All three are reviewed in git, in the public repository, and none of them carrie
 
 ## Running the pieces locally
 
-The scan itself needs the demo and its token, so it is not reproducible on a laptop; everything
-around it is.
+The scan itself needs the demo and the scanner accounts' passwords, so it is not reproducible on a
+laptop; everything around it is.
 
 ```bash
 # The whole counting and reporting layer, against stubs and fixtures
@@ -163,8 +220,9 @@ scripts/security-dast-test.sh
 scripts/security-dast.sh query-schema ontrack-web-core/ontrack.graphql /tmp/query-only.graphql
 
 # A report out of scanner outputs you already have
-scripts/security-dast.sh normalize-zap zap.json > findings-zap.json
-scripts/security-dast.sh normalize-graphql-cop graphql-cop.out 1.16 > findings-graphql-cop.json
+scripts/security-dast.sh normalize-zap zap-ui.json > findings-zap-ui.json
+scripts/security-dast.sh normalize-zap zap-readonly.json scan-readonly > findings-zap-readonly.json
+scripts/security-dast.sh normalize-graphql-cop graphql-cop.out 1.16 scan-readonly > findings-graphql-cop.json
 scripts/security-dast.sh normalize-nuclei nuclei.jsonl 3.11.1 > findings-nuclei.json
 DAST_VERSION=x DAST_BUILD=y DAST_RUN_URL=z scripts/security-dast.sh report report.md findings-*.json
 ```
@@ -176,5 +234,4 @@ carries.
 
 - [#1767](https://github.com/yontrack/yontrack/issues/1767) — the weekly **active** scan on a
   throwaway stack, reporting `SECURITY.DAST.ACTIVE`, reusing this script with `DAST_KIND=active`.
-- [#1769](https://github.com/yontrack/yontrack/issues/1769) — the three scanner roles of
-  `security/dast/casc.yaml`, replacing the single admin token used here.
+- [#1769](https://github.com/yontrack/yontrack/issues/1769) — done: the three scanner roles, above.

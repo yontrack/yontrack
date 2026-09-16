@@ -1,8 +1,15 @@
-# ZAP Automation Framework plan — PASSIVE scan of the Yontrack demo instance (#1765).
+# ZAP Automation Framework plan — PASSIVE scan of the Yontrack demo instance (#1765): the UI part,
+# UNAUTHENTICATED.
 #
-# Run by .github/workflows/dast-passive.yml, in the pinned ZAP container:
+# Run by .github/workflows/dast-passive.yml, once, in the pinned ZAP container:
 #
 #     zap.sh -cmd -autorun /zap/wrk/passive.yaml
+#
+# The API is the other plan, security/dast/zap/passive-api.yaml, run once per scanner role (#1769).
+# They were one plan until the roles came: the UI is scanned unauthenticated by design (grilling
+# outcome, "Two scans, two targets" - it goes through the same API, which is scanned authenticated),
+# so running it three times would scan the same pages three times and attribute what it found there
+# to accounts that never sent a token to it.
 #
 # Passive means exactly one thing here: **no request that changes state ever leaves ZAP**. There
 # is no activeScan job, no fuzzing, no attack payload, and no GraphQL mutation — see the
@@ -12,7 +19,8 @@
 # `${...}` are environment variables, substituted by the Automation Framework:
 #
 #   DAST_TARGET   the demo, no trailing slash (vars.DEMO_URL)
-#   DEMO_TOKEN    Yontrack API token, sent to /graphql only — never logged, never reported
+#
+# No token of any kind: nothing in this plan authenticates.
 #
 # NOTHING IS DISABLED HERE, on purpose. Every rule stays on and the report keeps every finding:
 # what a rule *counts for* is decided afterwards by scripts/security-dast.sh from
@@ -29,8 +37,8 @@ env:
       includePaths:
         - "\\Q${DAST_TARGET}\\E.*"
       excludePaths:
-        # Signing out of the demo admin session mid-scan, and the fingerprinted Next bundles,
-        # which are megabytes of the same two findings.
+        # Signing out, and the fingerprinted Next bundles, which are megabytes of the same two
+        # findings.
         - ".*/logout.*"
         - ".*/signout.*"
         - ".*/_next/static/.*"
@@ -68,29 +76,10 @@ jobs:
       enableTags: false
 
   # -------------------------------------------------------------------------------------------
-  # Authentication for the API only.
-  #
-  # The UI is scanned **unauthenticated** by design (grilling outcome, "Two scans, two targets"):
-  # it goes through the same API, which is scanned authenticated, so an authenticated crawl would
-  # re-test the API through a browser. The `url` regex is what keeps the token off every UI
-  # request — it is sent to /graphql and to nothing else.
-  #
-  # The token reaches ZAP as an environment variable and appears in no file, no log and no report;
-  # scripts/security-dast.sh redacts it from the report before it is published, as a second line
-  # of defence.
+  # No authentication: see the header. The one header this plan adds is below.
   # -------------------------------------------------------------------------------------------
   - type: replacer
     rules:
-      - description: "Yontrack API token, on /graphql only"
-        url: ".*/graphql.*"
-        # `req_header`, not `request_header`: the Automation Framework rejects the plan outright
-        # for anything outside [req_header, req_header_str, req_body_str, resp_header,
-        # resp_header_str, resp_body_str].
-        matchType: req_header
-        matchString: "X-Ontrack-Token"
-        replacementString: "${DEMO_TOKEN}"
-        tokenProcessing: false
-
       # An Origin, on the two endpoints that have a CORS configuration at all.
       #
       # Without it the CORS misconfiguration is invisible: Spring only emits
@@ -170,34 +159,6 @@ jobs:
         onFail: INFO
 
   # -------------------------------------------------------------------------------------------
-  # The API.
-  #
-  # `schemaFile` is NOT ontrack-web-core/ontrack.graphql: the workflow derives a **query-only**
-  # SDL from it first (scripts/security-dast.sh query-schema) and hands that over. The GraphQL
-  # add-on generates one request per root field of every root type it is given, mutations
-  # included, and has no switch to leave them out — so the switch is the schema. A Mutation type
-  # that is not in the schema cannot be generated from it.
-  #
-  # security/dast/graphql/README.md explains it, and `query-schema` refuses to write a file that
-  # still declares a mutation or subscription root.
-  # -------------------------------------------------------------------------------------------
-  - type: graphql
-    parameters:
-      endpoint: "${DAST_TARGET}/graphql"
-      schemaFile: "/zap/wrk/graphql/query-only.graphql"
-      # One request per root query field. `leaf` would generate one per leaf field of a 12,000
-      # line schema, and `operation` a single query so deep the server would reject it outright.
-      querySplitType: root_field
-      # Two levels of selection is enough for a passive scan: what is being read is the response
-      # headers and the error shape, not the data.
-      maxQueryDepth: 2
-      maxArgsDepth: 1
-      optionalArgsEnabled: false
-      argsType: inline
-      lenientMaxQueryDepthEnabled: true
-      requestMethod: post_json
-
-  # -------------------------------------------------------------------------------------------
   # Let the passive rules finish on everything the jobs above put through the proxy.
   # -------------------------------------------------------------------------------------------
   - type: passiveScan-wait
@@ -209,10 +170,8 @@ jobs:
   #
   # Not a report and never published: it is read once, on the runner, by
   # `scripts/security-dast.sh assert-no-mutations`, which fails the workflow if any request body
-  # carried a GraphQL mutation or subscription. The query-only schema should make that
-  # impossible - this is the check that looks at what actually went over the wire rather than at
-  # what was meant to. It also carries the API token in its request headers, which is the other
-  # reason it never leaves the runner.
+  # carried a GraphQL mutation or subscription. This plan sends nothing to /graphql but one GET
+  # with no query - the check holds it to that all the same.
   # -------------------------------------------------------------------------------------------
   - type: export
     parameters:
@@ -243,7 +202,7 @@ jobs:
       reportDir: /zap/wrk/out
       reportFile: zap
       reportTitle: "Yontrack passive DAST"
-      reportDescription: "Passive ZAP scan of the Yontrack demo instance"
+      reportDescription: "Passive ZAP scan of the Yontrack demo instance, UI, unauthenticated"
       displayReport: false
     risks: [info, low, medium, high]
     confidences: [falsepositive, low, medium, high, confirmed]

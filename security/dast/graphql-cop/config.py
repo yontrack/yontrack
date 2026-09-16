@@ -2,13 +2,14 @@
 
 .github/workflows/dast-passive.yml copies this file over the `config.py` of the pinned graphql-cop
 source before running it. It is the upstream file - the same `HEADERS` with the same User-Agent -
-plus one thing: the API token header, read from a JSON file rendered at run time by
+plus one thing: the `Authorization: Bearer` header of the scanner role the pass runs as (#1769),
+read from the JSON file named by $GRAPHQL_COP_HEADERS and rendered at run time by
 `scripts/security-dast.sh render-graphql-cop-headers`.
 
-graphql-cop's own way to send a header is `-H '{"X-Ontrack-Token": "..."}'` on its command line,
+graphql-cop's own way to send a header is `-H '{"Authorization": "..."}'` on its command line,
 and a command line is readable from /proc by anything else on the runner - on the host, too, for a
-process in a container. The rendered file lives in $RUNNER_TEMP, is mounted read-only, and is never
-uploaded.
+process in a container. The rendered file lives in $RUNNER_TEMP, is mounted read-only, is deleted after
+its pass, and is never uploaded.
 """
 import json
 import os

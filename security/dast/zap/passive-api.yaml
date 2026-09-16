@@ -1,0 +1,141 @@
+# ZAP Automation Framework plan — PASSIVE scan of the Yontrack demo instance (#1765): the API part,
+# AUTHENTICATED, run once per scanner role (#1769).
+#
+# Run by .github/workflows/dast-passive.yml, in the pinned ZAP container, once as each of
+# `scan-admin`, `scan-readonly` and `scan-project` - the accounts of security/dast/casc.yaml:
+#
+#     zap.sh -cmd -autorun /zap/wrk/passive-api.yaml
+#
+# The UI part is security/dast/zap/passive.yaml, run once and unauthenticated. What one role reaches
+# and another does not is what running this plan three times is for; the findings of the three
+# passes are de-duplicated by rule and URL before anything is counted, and the private report says
+# which role saw each one (scripts/security-dast.sh report).
+#
+# Passive means exactly one thing here: **no request that changes state ever leaves ZAP**, as any
+# of the three. There is no activeScan job, no fuzzing, no attack payload, and no GraphQL mutation —
+# see the `graphql` job below and security/dast/graphql/README.md.
+#
+# `${...}` are environment variables, substituted by the Automation Framework - except one:
+#
+#   DAST_TARGET         the demo, no trailing slash (vars.DEMO_URL)
+#   DAST_BEARER_TOKEN   the role's Keycloak access token, sent to /graphql only. NOT an environment
+#                       variable: the Automation Framework does not expand one inside a replacer
+#                       rule, so `scripts/security-dast.sh render-plan` writes it into a run-time copy
+#                       of this plan. Never logged, never reported.
+#
+# NOTHING IS DISABLED HERE, on purpose - see security/dast/README.md.
+
+env:
+  contexts:
+    - name: yontrack-demo-api
+      urls:
+        - "${DAST_TARGET}/graphql"
+      # \Q…\E quotes the target literally: a bare interpolation would leave the dots of the host
+      # name as regex wildcards, and `demo.dev.yontrack.com.*` also matches `demoXdev…evil.com`.
+      includePaths:
+        - "\\Q${DAST_TARGET}\\E.*"
+  parameters:
+    # A scanner error is a failed run reporting no stamp, not a clean scan.
+    failOnError: true
+    failOnWarning: false
+    # To ZAP's own stdout, which the workflow captures to a file and never prints raw: it echoes the
+    # replacer's rules back, token included. scripts/security-dast.sh scrubs anything that reaches
+    # the log.
+    progressToStdout: true
+
+jobs:
+
+  # There is deliberately no `addOns` job: see security/dast/zap/passive.yaml.
+
+  - type: passiveScan-config
+    parameters:
+      maxAlertsPerRule: 10
+      scanOnlyInScope: true
+      enableTags: false
+
+  # -------------------------------------------------------------------------------------------
+  # Authentication, on /graphql only.
+  #
+  # `Authorization: Bearer`, the header an OIDC access token is read from: the API is a Spring
+  # resource server (WebSecurityConfig, `oauth2ResourceServer { jwt }`), and the `X-Ontrack-Token`
+  # the scan sent before #1769 is for Yontrack's own API tokens, which the scanner accounts do not
+  # hold. The `url` regex keeps the token off every other request.
+  # -------------------------------------------------------------------------------------------
+  - type: replacer
+    rules:
+      - description: "Scanner role's bearer token, on /graphql only"
+        url: ".*/graphql.*"
+        # `req_header`, not `request_header`: the Automation Framework rejects the plan outright
+        # for anything outside [req_header, req_header_str, req_body_str, resp_header,
+        # resp_header_str, resp_body_str].
+        matchType: req_header
+        matchString: "Authorization"
+        replacementString: "Bearer ${DAST_BEARER_TOKEN}"
+        tokenProcessing: false
+
+      # An Origin, so that the CORS response headers are emitted at all - the reason is in
+      # security/dast/zap/passive.yaml, which sends it on the unauthenticated requests too.
+      - description: "Origin, so that the CORS response headers are emitted at all"
+        url: ".*/graphql.*"
+        matchType: req_header
+        matchString: "Origin"
+        replacementString: "https://dast.invalid"
+        tokenProcessing: false
+
+  # -------------------------------------------------------------------------------------------
+  # The API.
+  #
+  # `schemaFile` is NOT ontrack-web-core/ontrack.graphql: the workflow derives a **query-only**
+  # SDL from it first (scripts/security-dast.sh query-schema) and hands that over. The GraphQL
+  # add-on generates one request per root field of every root type it is given, mutations
+  # included, and has no switch to leave them out — so the switch is the schema. A Mutation type
+  # that is not in the schema cannot be generated from it.
+  #
+  # security/dast/graphql/README.md explains it, and `query-schema` refuses to write a file that
+  # still declares a mutation or subscription root.
+  # -------------------------------------------------------------------------------------------
+  - type: graphql
+    parameters:
+      endpoint: "${DAST_TARGET}/graphql"
+      schemaFile: "/zap/wrk/graphql/query-only.graphql"
+      # One request per root query field. `leaf` would generate one per leaf field of a 12,000
+      # line schema, and `operation` a single query so deep the server would reject it outright.
+      querySplitType: root_field
+      # Two levels of selection is enough for a passive scan: what is being read is the response
+      # headers and the error shape, not the data.
+      maxQueryDepth: 2
+      maxArgsDepth: 1
+      optionalArgsEnabled: false
+      argsType: inline
+      lenientMaxQueryDepthEnabled: true
+      requestMethod: post_json
+
+  - type: passiveScan-wait
+    parameters:
+      maxDuration: 10
+
+  # -------------------------------------------------------------------------------------------
+  # Every request ZAP sent, as a HAR. Never published: read on the runner by
+  # `scripts/security-dast.sh assert-no-mutations` - no request carried a mutation - and
+  # `assert-authenticated` - no request to /graphql was answered 401, so the pass did not outlive
+  # its token. It carries the token in its request headers, the other reason it never leaves the
+  # runner.
+  # -------------------------------------------------------------------------------------------
+  - type: export
+    parameters:
+      fileName: /zap/wrk/out/messages.har
+      type: har
+      source: history
+
+  # The report, read by scripts/security-dast.sh with the role of this pass. Never an artifact, no
+  # SARIF - see security/dast/zap/passive.yaml.
+  - type: report
+    parameters:
+      template: traditional-json
+      reportDir: /zap/wrk/out
+      reportFile: zap
+      reportTitle: "Yontrack passive DAST"
+      reportDescription: "Passive ZAP scan of the Yontrack demo instance, API, one scanner role"
+      displayReport: false
+    risks: [info, low, medium, high]
+    confidences: [falsepositive, low, medium, high, confirmed]

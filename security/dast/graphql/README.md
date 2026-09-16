@@ -45,13 +45,19 @@ Three independent things would each have to fail for a mutation to reach the dem
 
 1. the derived schema would have to contain a mutation root — `query-schema` fails the run if it
    does, before ZAP starts;
-2. the ZAP plan would have to run something that sends requests of its own devising — it does not:
-   `security/dast/zap/passive.yaml` has no `activeScan` job, its `spider` has `postForm: false`
-   and `processForm: false`, and its `requestor` job lists nine URLs, all `GET`;
+2. a ZAP plan would have to run something that sends requests of its own devising — neither does:
+   `security/dast/zap/passive.yaml`, the unauthenticated UI crawl, has no `activeScan` job, its
+   `spider` has `postForm: false` and `processForm: false`, and its `requestor` job lists nine URLs,
+   all `GET`; `security/dast/zap/passive-api.yaml` has no job but the `graphql` one fed the schema
+   above;
 3. `scripts/security-dast.sh assert-no-mutations` re-reads ZAP's own record of every request it
    sent, after the scan, and fails the workflow if any `POST /graphql` body carries a `mutation`
    or `subscription` operation. It is the only one of the three that observes what actually went
    over the wire, which is why it exists even though the first two should make it unreachable.
+
+The API plan runs once per scanner role (#1769) - `scan-admin`, `scan-readonly`, `scan-project` - and
+the three hold for every one of those passes: the same derived schema, and `assert-no-mutations` on
+each pass's own record.
 
 ## graphql-cop (#1766)
 
@@ -59,9 +65,9 @@ graphql-cop is not generated from a schema: it runs a fixed list of tests, each 
 requests - `__typename` a hundred times under aliases, ten `__typename` queries in a batch, one
 query recursing through the introspection types, and so on. Every one of them is a query, except
 `get_based_mutation`, which sends `mutation cop {__typename}` over GET to see whether mutations are
-accepted that way. It selects nothing and would write nothing, but it is a mutation, sent with an
-admin token to a shared instance, and this scan does not send one. It is excluded, and the same
-three layers hold it out:
+accepted that way. It selects nothing and would write nothing, but it is a mutation, sent with a
+scanner account's token - one of them an administrator's - to a shared instance, and this scan does
+not send one. It is excluded, and the same three layers hold it out:
 
 1. **before anything is sent**, `scripts/security-dast.sh graphql-cop-preflight` reads the pinned
    source and fails unless every registered test that mentions a mutation is excluded - and unless
@@ -72,6 +78,9 @@ three layers hold it out:
    sent - graphql-cop's JSON carries it, as `curl_verify` - and fails the workflow if any carried a
    mutation or subscription, in a JSON body, a form body or a GET query string. It also fails if the
    output shows an ignored exclusion or a test that reports no request.
+
+graphql-cop runs once per scanner role (#1769). The source is the same for every pass, so the
+preflight runs once; the exclusion and the check afterwards run for every pass.
 
 The one request graphql-cop sends that is not a test - `query cop { __typename }`, checking that the
 endpoint is GraphQL at all - is not in its output, and is a query.

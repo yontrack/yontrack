@@ -12,6 +12,11 @@
 #   * Nuclei (#1766) - deployment-shaped problems: exposed actuators and files, default credentials,
 #     known Spring / Keycloak / Next.js CVEs, and so the yontrack-chart defaults the demo runs on.
 #
+# The API - ZAP's API pass and graphql-cop - is scanned once as each of the three scanner roles of
+# security/dast/casc.yaml (#1769): scan-admin, scan-readonly and scan-project. The UI and Nuclei are
+# scanned unauthenticated, once. Findings are de-duplicated by rule and URL across the passes before
+# they are counted, and the private report says which role saw each one.
+#
 # #1767 runs the same script with DAST_KIND=active.
 #
 # Passive means no request that changes state ever leaves a scanner. There is no active scan, no
@@ -154,12 +159,25 @@ jobs:
       DAST_RUN_ID: ${{ github.run_id }}
       DAST_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
       DAST_SCANNERS: >-
-        OWASP ZAP 2.17.0 (passive rules, GraphQL add-on, query-only schema);
-        graphql-cop 1.16 (every test but get_based_mutation);
+        OWASP ZAP 2.17.0 (passive rules, GraphQL add-on, query-only schema; UI unauthenticated,
+        API once per scanner role);
+        graphql-cop 1.16 (every test but get_based_mutation, once per scanner role);
         Nuclei 3.11.1 with nuclei-templates v10.4.8 (HTTP templates, no intrusive, dos, fuzz or
         bruteforce tag, 10 requests per second)
       YONTRACK_PROJECT: yontrack
       YONTRACK_BRANCH: main
+      # The scanner accounts of security/dast/casc.yaml (#1769), in the order their passes run.
+      # Each logs in with the Actions secret named after it - DAST_SCAN_ADMIN_PASSWORD for
+      # scan-admin - through the demo realm's client. `scripts/security-dast.sh login` accepts
+      # these three and no other.
+      DAST_ROLES: scan-admin scan-readonly scan-project
+      DAST_KEYCLOAK_REALM_URL: ${{ vars.DEMO_URL || 'https://demo.dev.yontrack.com' }}/keycloak/realms/ontrack
+      DAST_KEYCLOAK_CLIENT_ID: yontrack-client
+      # The longest a pass may take, in seconds: a token valid for less is refused before the pass
+      # rather than expiring during it. ZAP's API pass waits up to ten minutes for the passive rules
+      # and took about a minute on the demo; graphql-cop takes seconds.
+      DAST_ZAP_PASS_BUDGET: "1800"
+      DAST_GRAPHQL_COP_PASS_BUDGET: "600"
     steps:
       # The run time reported for the validation is measured from here, and so is the duration in
       # the report. A `run:` step is the earliest point a workflow can observe.
@@ -191,131 +209,190 @@ jobs:
           yontrack config create prod "$YONTRACK_URL" --token "$YONTRACK_TOKEN" --override
 
       # ------------------------------------------------------------------------------------
-      # 1. What is deployed, and which build that is.
+      # 1. Prepare, and log in as the three scanner roles.
       #
-      # Nothing tells this workflow which version to scan - a schedule and a workflow_run carry
-      # no inputs - so it asks the demo, then resolves that version back to a build exactly as
-      # demo-smoke.yml does, through the same two functions. The stamp therefore lands on the
-      # same build DEMO.SMOKE landed on, by construction rather than by coincidence.
+      # The scan runs as the accounts of security/dast/casc.yaml (#1769), not as the demo
+      # admin: `scan-admin` (global ADMINISTRATOR), `scan-readonly` (global READ_ONLY) and
+      # `scan-project` (PARTICIPANT on one seeded project), so that what a read-only or a
+      # project-scoped user reaches is scanned too. DEMO_TOKEN is not used by this workflow.
+      #
+      # Each logs in by a Keycloak password grant on the demo realm. Its access token goes to a
+      # file in $RUNNER_TEMP/dast/tokens, readable by the runner's user only, is registered as a
+      # mask, and is redacted by `scrub` and `report` wherever it appears. An account that cannot
+      # log in, or that the API does not map to its CasC group, stops the run: a scan that went
+      # on unauthenticated would report a cleaner API than there is.
       # ------------------------------------------------------------------------------------
 
-      - name: Ask the demo which version it is running
-        id: version
+      # The query-only schema, and the reason a mutation cannot be generated. `query-schema` fails
+      # the run if the derived schema still declares a mutation or subscription root.
+      - name: Prepare the scan
+        id: prepare
+        run: |
+          set -euo pipefail
+          work="$RUNNER_TEMP/dast"
+          mkdir -p "$work/out" "$work/graphql" "$work/zap"
+          ( umask 077 && mkdir -p "$work/tokens" )
+          scripts/security-dast.sh query-schema \
+            ontrack-web-core/ontrack.graphql "$work/graphql/query-only.graphql"
+          echo "work=$work" >> "$GITHUB_OUTPUT"
+          # Where every later step's `scrub` and `report` find the tokens to redact.
+          echo "DAST_TOKEN_DIR=$work/tokens" >> "$GITHUB_ENV"
+
+      # Also asks the demo which version it is running: `whoami` is one authenticated query, and
+      # the version rides along with it.
+      - name: Log in as the scanner roles
+        id: login
         env:
-          DEMO_TOKEN: ${{ secrets.DEMO_TOKEN }}
-        run: scripts/demo-smoke.sh version
+          DAST_SCAN_ADMIN_PASSWORD: ${{ secrets.DAST_SCAN_ADMIN_PASSWORD }}
+          DAST_SCAN_READONLY_PASSWORD: ${{ secrets.DAST_SCAN_READONLY_PASSWORD }}
+          DAST_SCAN_PROJECT_PASSWORD: ${{ secrets.DAST_SCAN_PROJECT_PASSWORD }}
+          DEMO_KEYCLOAK_CLIENT_SECRET: ${{ secrets.DEMO_KEYCLOAK_CLIENT_SECRET }}
+        run: |
+          set -euo pipefail
+          for role in $DAST_ROLES; do
+            scripts/security-dast.sh login "$role" "$DAST_TOKEN_DIR"
+            scripts/security-dast.sh whoami "$role" "$DAST_TOKEN_DIR"
+          done
+
+      # ------------------------------------------------------------------------------------
+      # 2. Which build that is.
+      #
+      # Nothing tells this workflow which version to scan - a schedule and a workflow_run carry
+      # no inputs - so it asked the demo, and now resolves that version back to a build exactly
+      # as demo-smoke.yml does, through the same function. The stamp therefore lands on the same
+      # build DEMO.SMOKE landed on, by construction rather than by coincidence.
+      # ------------------------------------------------------------------------------------
 
       - name: Resolve the build
         id: resolve
         env:
-          DEMO_VERSION: ${{ steps.version.outputs.version }}
+          DEMO_VERSION: ${{ steps.login.outputs.version }}
           DEMO_PROJECT: ${{ env.YONTRACK_PROJECT }}
           DEMO_BRANCH: ${{ env.YONTRACK_BRANCH }}
         run: scripts/demo-smoke.sh resolve
 
       # ------------------------------------------------------------------------------------
-      # 2. The one thing that stops the run rather than counting.
+      # 3. The one thing that stops the run rather than counting.
       #
       # The Spring Boot management port is unauthenticated by design and must never be routed
       # from outside the cluster. If it answers, that is an incident - not a MEDIUM to add to a
-      # tally - and the scan does not proceed to dress it up as one. See the issue's "Expected
-      # first result".
+      # tally - and the scan does not proceed to dress it up as one.
       # ------------------------------------------------------------------------------------
 
       - name: Check that the management port is not exposed
         run: scripts/security-dast.sh actuator "$DAST_TARGET"
 
       # ------------------------------------------------------------------------------------
-      # 3. Prepare the scan.
-      # ------------------------------------------------------------------------------------
-
-      # The query-only schema, and the reason a mutation cannot be generated. `query-schema` fails
-      # the run if the derived schema still declares a mutation or subscription root.
+      # 4. ZAP.
       #
-      # `render-plan` fills in the one value ZAP will not: the Automation Framework expands
-      # `${...}` in job parameters but not inside a replacer rule, so a plan left as committed
-      # would send the literal `${DEMO_TOKEN}` as the API token and scan the API unauthenticated.
-      # The rendered copy stays in $RUNNER_TEMP, which this workflow never uploads.
-      - name: Prepare the scan
-        id: prepare
-        env:
-          DEMO_TOKEN: ${{ secrets.DEMO_TOKEN }}
-        run: |
-          set -euo pipefail
-          work="$RUNNER_TEMP/dast"
-          mkdir -p "$work/out" "$work/graphql"
-          scripts/security-dast.sh query-schema \
-            ontrack-web-core/ontrack.graphql "$work/graphql/query-only.graphql"
-          scripts/security-dast.sh render-plan \
-            security/dast/zap/passive.yaml "$work/passive.yaml"
-          # The ZAP image runs as its own uid, so everything it reads has to be readable by
-          # another user and the directories traversable - `a+rX` - and out/, which it writes its
-          # reports into, writable by it. Both scripts already set 644 on the file they wrote;
-          # this is the belt to that pair of braces, and it is what makes the mode of anything
-          # added to the plan later somebody else's problem rather than a failed scan.
-          chmod -R a+rX "$work"
-          chmod 777 "$work/out"
-          echo "work=$work" >> "$GITHUB_OUTPUT"
-
-      # ------------------------------------------------------------------------------------
-      # 4. Scan.
+      # Two plans. security/dast/zap/passive.yaml crawls the UI once, unauthenticated;
+      # security/dast/zap/passive-api.yaml scans /graphql once per scanner role.
       #
       # ZAP's stdout goes to a file and is never printed raw. Two reasons, both verified against
       # the pinned image rather than assumed: its progress lines carry every URL it crawls, and
       # when it loads the plan it echoes each job's parameters back - including the replacer's
-      # replacement string, which is the API token. On a failure the tail of it is printed
+      # replacement string, which is the bearer token. On a failure the tail of it is printed
       # through `scripts/security-dast.sh scrub`, which redacts both and leaves enough to tell a
       # crashed container from a refused connection.
+      #
+      # The ZAP image runs as its own uid, so everything it reads has to be readable by another
+      # user and the directories traversable - `a+rX` - and out/, which it writes its reports
+      # into, writable by it.
       # ------------------------------------------------------------------------------------
 
-      # No `-e DEMO_TOKEN`: the plan was rendered with it already, and an environment variable on
-      # a `docker run` command line is readable from /proc by anything else on the runner.
-      - name: Run the ZAP passive scan
-        id: zap
+      - name: Run the ZAP passive scan of the UI, unauthenticated
         env:
-          DEMO_TOKEN: ${{ secrets.DEMO_TOKEN }}
           WORK: ${{ steps.prepare.outputs.work }}
         run: |
           set -uo pipefail
+          pass="$WORK/zap/ui"
+          mkdir -p "$pass/out"
+          cp security/dast/zap/passive.yaml "$pass/passive.yaml"
+          chmod -R a+rX "$pass"
+          chmod 777 "$pass/out"
           # `|| rc=$?` rather than reading $? on the next line: GitHub runs a `run:` block under
           # `bash -e`, which `set -uo pipefail` does not undo, so a bare failing command would
           # abort the step before anything could be said about why.
           rc=0
           docker run --rm \
-            -v "$WORK:/zap/wrk:rw" \
+            -v "$pass:/zap/wrk:rw" \
             -e DAST_TARGET="$DAST_TARGET" \
             "$ZAP_IMAGE" \
-            zap.sh -cmd -autorun /zap/wrk/passive.yaml > "$WORK/zap.log" 2>&1 || rc=$?
-          echo "ZAP finished with exit code $rc."
+            zap.sh -cmd -autorun /zap/wrk/passive.yaml > "$pass/zap.log" 2>&1 || rc=$?
+          echo "ZAP (UI, unauthenticated) finished with exit code $rc."
           if [ "$rc" -ne 0 ]; then
             echo "--- last lines of the ZAP log, URLs and credentials removed ---"
-            tail -n 100 "$WORK/zap.log" | scripts/security-dast.sh scrub
+            tail -n 100 "$pass/zap.log" | scripts/security-dast.sh scrub
             exit "$rc"
           fi
-          exit 0
+          # The plan sends nothing to /graphql but a GET with no query; held to it all the same.
+          scripts/security-dast.sh assert-no-mutations "$pass/out/messages.har"
 
-      # The third of the three independent things that would each have to fail for a mutation to
-      # reach the demo, and the only one that observes what actually went over the wire. Counts
-      # only: how many requests, how many of them to /graphql.
-      - name: Prove that no mutation was sent
+      # One pass per role, one after the other, each with a token obtained right before it: a
+      # pass must not outlive its token. `login` refuses a token valid for less than the pass's
+      # budget, and `assert-authenticated` then proves from the HAR that no request to /graphql
+      # was answered 401 - so an expiry mid-pass fails the run instead of scanning the rest of the
+      # API as nobody. The demo's realm issues tokens for an hour; a pass takes a couple of minutes.
+      #
+      # `render-plan` fills in the one value ZAP will not: the Automation Framework expands
+      # `${...}` in job parameters but not inside a replacer rule, so a plan left as committed
+      # would send the literal placeholder and scan the API unauthenticated. No token on the
+      # `docker run` command line or in its environment, where /proc would show it.
+      #
+      # After each pass, the two checks that observe what went over the wire: no mutation, and
+      # authenticated throughout. Counts only.
+      - name: Run the ZAP passive scan of the API, once per scanner role
         env:
+          DAST_SCAN_ADMIN_PASSWORD: ${{ secrets.DAST_SCAN_ADMIN_PASSWORD }}
+          DAST_SCAN_READONLY_PASSWORD: ${{ secrets.DAST_SCAN_READONLY_PASSWORD }}
+          DAST_SCAN_PROJECT_PASSWORD: ${{ secrets.DAST_SCAN_PROJECT_PASSWORD }}
+          DEMO_KEYCLOAK_CLIENT_SECRET: ${{ secrets.DEMO_KEYCLOAK_CLIENT_SECRET }}
           WORK: ${{ steps.prepare.outputs.work }}
-        run: scripts/security-dast.sh assert-no-mutations "$WORK/out/messages.har"
+        run: |
+          set -uo pipefail
+          for role in $DAST_ROLES; do
+            echo "--- ZAP, API, as $role ---"
+            pass="$WORK/zap/api-$role"
+            mkdir -p "$pass/out" "$pass/graphql"
+            cp "$WORK/graphql/query-only.graphql" "$pass/graphql/query-only.graphql"
+            scripts/security-dast.sh login "$role" "$DAST_TOKEN_DIR" "$DAST_ZAP_PASS_BUDGET" || exit 1
+            scripts/security-dast.sh render-plan \
+              security/dast/zap/passive-api.yaml "$pass/passive-api.yaml" "$role" || exit 1
+            chmod -R a+rX "$pass"
+            chmod 777 "$pass/out"
+            rc=0
+            docker run --rm \
+              -v "$pass:/zap/wrk:rw" \
+              -e DAST_TARGET="$DAST_TARGET" \
+              "$ZAP_IMAGE" \
+              zap.sh -cmd -autorun /zap/wrk/passive-api.yaml > "$pass/zap.log" 2>&1 || rc=$?
+            # The rendered copy holds the token; the pass is over, and so is its need for it.
+            rm -f "$pass/passive-api.yaml"
+            echo "ZAP (API, $role) finished with exit code $rc."
+            if [ "$rc" -ne 0 ]; then
+              echo "--- last lines of the ZAP log, URLs and credentials removed ---"
+              tail -n 100 "$pass/zap.log" | scripts/security-dast.sh scrub
+              exit "$rc"
+            fi
+            scripts/security-dast.sh assert-no-mutations "$pass/out/messages.har" || exit 1
+            scripts/security-dast.sh assert-authenticated "$pass/out/messages.har" || exit 1
+          done
 
       # ------------------------------------------------------------------------------------
       # 5. graphql-cop.
       #
       # What a spider cannot see on /graphql: introspection, field suggestions, alias, batch and
       # directive overloading, queries recursing without a depth limit, queries accepted over GET
-      # or as a form. About a dozen requests in all, each one query of `__typename` or of the
+      # or as a form. About a dozen requests per role, each one query of `__typename` or of the
       # introspection types.
       # ------------------------------------------------------------------------------------
 
       # The pinned source, checked for a test that could send a mutation before a single request
-      # goes out, with the run-time configuration that reads the token from a file.
+      # goes out, with the run-time configuration that reads the token from a file. The source
+      # is the same for every role, so it is checked once; what each role's pass sent is checked
+      # after it.
       - name: Prepare graphql-cop
         env:
-          DEMO_TOKEN: ${{ secrets.DEMO_TOKEN }}
           WORK: ${{ steps.prepare.outputs.work }}
         run: |
           set -euo pipefail
@@ -325,51 +402,56 @@ jobs:
             "$GRAPHQL_COP_SHA256" "$cop/graphql-cop.tar.gz"
           mkdir -p "$cop/src"
           tar -xzf "$cop/graphql-cop.tar.gz" -C "$cop/src" --strip-components=1
-          # The upstream config.py plus the token header, read from headers.json - see the file.
+          # The upstream config.py plus the token header, read from a headers file - see the file.
           cp security/dast/graphql-cop/config.py "$cop/src/config.py"
           cp security/dast/graphql-cop/requirements.txt "$cop/requirements.txt"
           scripts/security-dast.sh graphql-cop-preflight "$cop/src" "$GRAPHQL_COP_EXCLUDED"
-          scripts/security-dast.sh render-graphql-cop-headers "$cop/headers.json"
           echo "graphql-cop $GRAPHQL_COP_VERSION (commit $GRAPHQL_COP_REF), in $GRAPHQL_COP_PYTHON_IMAGE."
 
       # Its stdout is the JSON result, and each entry of it carries the request the test sent,
       # token included - so it goes to a file and is never printed. stderr (pip, a traceback) is
       # printed only on a failure, and only scrubbed.
       #
-      # The endpoint and the exclusions are arguments of the container's `sh -c`, not interpolated
-      # into it. The token is in neither: it is in /cop/headers.json, mounted read-only.
-      - name: Run graphql-cop
+      # Once per role, each right after a fresh login, like ZAP's API passes. The endpoint and the
+      # exclusions are arguments of the container's `sh -c`, not interpolated into it. The token is
+      # in neither: it is in the role's headers file, mounted read-only and removed after its pass.
+      - name: Run graphql-cop, once per scanner role
         env:
-          DEMO_TOKEN: ${{ secrets.DEMO_TOKEN }}
+          DAST_SCAN_ADMIN_PASSWORD: ${{ secrets.DAST_SCAN_ADMIN_PASSWORD }}
+          DAST_SCAN_READONLY_PASSWORD: ${{ secrets.DAST_SCAN_READONLY_PASSWORD }}
+          DAST_SCAN_PROJECT_PASSWORD: ${{ secrets.DAST_SCAN_PROJECT_PASSWORD }}
+          DEMO_KEYCLOAK_CLIENT_SECRET: ${{ secrets.DEMO_KEYCLOAK_CLIENT_SECRET }}
           WORK: ${{ steps.prepare.outputs.work }}
         run: |
           set -uo pipefail
-          rc=0
-          # shellcheck disable=SC2016  # deliberate: expanded by the container's shell, from its arguments
-          docker run --rm \
-            -v "$WORK/graphql-cop:/cop:ro" \
-            -e GRAPHQL_COP_HEADERS=/cop/headers.json \
-            -e PYTHONDONTWRITEBYTECODE=1 \
-            "$GRAPHQL_COP_PYTHON_IMAGE" \
-            sh -c 'pip install --quiet --no-cache-dir --disable-pip-version-check --root-user-action=ignore \
-                     --require-hashes --only-binary :all: --target /tmp/deps -r /cop/requirements.txt 1>&2 \
-                   && PYTHONPATH=/tmp/deps exec python /cop/src/graphql-cop.py -t "$0" -o json -e "$1"' \
-            "$DAST_TARGET/graphql" "$GRAPHQL_COP_EXCLUDED" \
-            > "$WORK/out/graphql-cop.out" 2> "$WORK/graphql-cop.log" || rc=$?
-          echo "graphql-cop finished with exit code $rc."
-          if [ "$rc" -ne 0 ]; then
-            echo "--- last lines of the graphql-cop log, URLs and credentials removed ---"
-            tail -n 30 "$WORK/graphql-cop.log" | scripts/security-dast.sh scrub
-            exit "$rc"
-          fi
-          exit 0
-
-      # The graphql-cop counterpart of the ZAP check above: every test reports the request it sent,
-      # and none of them may be a mutation or a subscription. Counts only.
-      - name: Prove that graphql-cop sent no mutation
-        env:
-          WORK: ${{ steps.prepare.outputs.work }}
-        run: scripts/security-dast.sh assert-graphql-cop-no-mutations "$WORK/out/graphql-cop.out"
+          cop="$WORK/graphql-cop"
+          for role in $DAST_ROLES; do
+            echo "--- graphql-cop, as $role ---"
+            scripts/security-dast.sh login "$role" "$DAST_TOKEN_DIR" "$DAST_GRAPHQL_COP_PASS_BUDGET" || exit 1
+            scripts/security-dast.sh render-graphql-cop-headers "$cop/headers-$role.json" "$role" || exit 1
+            rc=0
+            # shellcheck disable=SC2016  # deliberate: expanded by the container's shell, from its arguments
+            docker run --rm \
+              -v "$cop:/cop:ro" \
+              -e GRAPHQL_COP_HEADERS="/cop/headers-$role.json" \
+              -e PYTHONDONTWRITEBYTECODE=1 \
+              "$GRAPHQL_COP_PYTHON_IMAGE" \
+              sh -c 'pip install --quiet --no-cache-dir --disable-pip-version-check --root-user-action=ignore \
+                       --require-hashes --only-binary :all: --target /tmp/deps -r /cop/requirements.txt 1>&2 \
+                     && PYTHONPATH=/tmp/deps exec python /cop/src/graphql-cop.py -t "$0" -o json -e "$1"' \
+              "$DAST_TARGET/graphql" "$GRAPHQL_COP_EXCLUDED" \
+              > "$WORK/out/graphql-cop-$role.out" 2> "$WORK/graphql-cop-$role.log" || rc=$?
+            rm -f "$cop/headers-$role.json"
+            echo "graphql-cop ($role) finished with exit code $rc."
+            if [ "$rc" -ne 0 ]; then
+              echo "--- last lines of the graphql-cop log, URLs and credentials removed ---"
+              tail -n 30 "$WORK/graphql-cop-$role.log" | scripts/security-dast.sh scrub
+              exit "$rc"
+            fi
+            # The graphql-cop counterpart of the ZAP check: every test reports the request it sent,
+            # and none of them may be a mutation or a subscription. Counts only.
+            scripts/security-dast.sh assert-graphql-cop-no-mutations "$WORK/out/graphql-cop-$role.out" || exit 1
+          done
 
       # ------------------------------------------------------------------------------------
       # 6. Nuclei.
@@ -434,22 +516,35 @@ jobs:
       - name: Count the findings and write the report
         id: report
         env:
-          DEMO_TOKEN: ${{ secrets.DEMO_TOKEN }}
           WORK: ${{ steps.prepare.outputs.work }}
-          DAST_VERSION: ${{ steps.version.outputs.version }}
+          DAST_VERSION: ${{ steps.login.outputs.version }}
           DAST_BUILD: ${{ steps.resolve.outputs.build }}
           DAST_DATE: ${{ steps.job_start.outputs.date }}
           DAST_STARTED: ${{ steps.job_start.outputs.started }}
         run: |
           set -euo pipefail
-          scripts/security-dast.sh normalize-zap "$WORK/out/zap.json" > "$WORK/out/findings-zap.json"
-          scripts/security-dast.sh normalize-graphql-cop "$WORK/out/graphql-cop.out" \
-            "$GRAPHQL_COP_VERSION" > "$WORK/out/findings-graphql-cop.json"
+          # One findings document per pass, each naming the role it ran as - none for the
+          # unauthenticated ones, which the report attributes to `unauthenticated`.
+          documents=()
+          scripts/security-dast.sh normalize-zap "$WORK/zap/ui/out/zap.json" > "$WORK/out/findings-zap-ui.json"
+          documents+=("$WORK/out/findings-zap-ui.json")
+          for role in $DAST_ROLES; do
+            scripts/security-dast.sh normalize-zap "$WORK/zap/api-$role/out/zap.json" "$role" \
+              > "$WORK/out/findings-zap-$role.json"
+            documents+=("$WORK/out/findings-zap-$role.json")
+          done
+          for role in $DAST_ROLES; do
+            scripts/security-dast.sh normalize-graphql-cop "$WORK/out/graphql-cop-$role.out" \
+              "$GRAPHQL_COP_VERSION" "$role" > "$WORK/out/findings-graphql-cop-$role.json"
+            documents+=("$WORK/out/findings-graphql-cop-$role.json")
+          done
           scripts/security-dast.sh normalize-nuclei "$WORK/out/nuclei.jsonl" \
             "$NUCLEI_VERSION (templates $NUCLEI_TEMPLATES_VERSION)" > "$WORK/out/findings-nuclei.json"
-          # One report, one set of counts, one validation run: the per-tool split is in the report.
-          scripts/security-dast.sh report "$WORK/out/report.md" \
-            "$WORK/out/findings-zap.json" "$WORK/out/findings-graphql-cop.json" "$WORK/out/findings-nuclei.json"
+          documents+=("$WORK/out/findings-nuclei.json")
+          # One report, one set of counts, one validation run. The documents are de-duplicated by
+          # rule and URL across roles before counting; the per-tool and per-role splits are in the
+          # report only.
+          scripts/security-dast.sh report "$WORK/out/report.md" "${documents[@]}"
           echo "path=$(scripts/security-dast.sh report-path)" >> "$GITHUB_OUTPUT"
 
       # The private repository, and the only place the detail exists. The token is fine-grained
@@ -458,7 +553,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.SECURITY_REPORTS_TOKEN }}
           WORK: ${{ steps.prepare.outputs.work }}
-          DAST_VERSION: ${{ steps.version.outputs.version }}
+          DAST_VERSION: ${{ steps.login.outputs.version }}
           DAST_DATE: ${{ steps.job_start.outputs.date }}
           REPORT_PATH: ${{ steps.report.outputs.path }}
         run: scripts/security-dast.sh publish "$REPORTS_REPOSITORY" "$REPORT_PATH" "$WORK/out/report.md"
@@ -486,7 +581,7 @@ jobs:
           LOW: ${{ steps.report.outputs.low }}
           STARTED: ${{ steps.job_start.outputs.started }}
           BUILD: ${{ steps.resolve.outputs.build }}
-          VERSION: ${{ steps.version.outputs.version }}
+          VERSION: ${{ steps.login.outputs.version }}
         run: |
           set -euo pipefail
           run_time_flag=""
@@ -509,7 +604,7 @@ jobs:
       - name: Summarise the counts
         if: ${{ !cancelled() }}
         env:
-          VERSION: ${{ steps.version.outputs.version }}
+          VERSION: ${{ steps.login.outputs.version }}
           BUILD: ${{ steps.resolve.outputs.build }}
           CRITICAL: ${{ steps.report.outputs.critical }}
           HIGH: ${{ steps.report.outputs.high }}
@@ -526,14 +621,14 @@ jobs:
             echo "|---|---|---|---|"
             echo "| ${CRITICAL:-?} | ${HIGH:-?} | ${MEDIUM:-?} | ${LOW:-?} |"
             echo
-            echo "ZAP, graphql-cop and Nuclei together, counted per rule, after suppressions;"
-            echo "informational findings dropped."
+            echo "ZAP, graphql-cop and Nuclei together, the API passes run as each of the three scanner"
+            echo "roles, de-duplicated and counted per rule, after suppressions; informational findings dropped."
             echo "${FINDINGS:-?} rule(s) counted, ${SUPPRESSED:-?} instance(s) suppressed."
             echo
             echo "Reported as \`SECURITY.DAST\` on build \`${BUILD:-unknown}\` of"
             echo "\`$YONTRACK_PROJECT/$YONTRACK_BRANCH\`."
             echo
             echo "The findings themselves are in \`$REPORTS_REPOSITORY\` at"
-            echo "\`${REPORT_PATH:-not published}\`, split by scanner — never here, never as an artifact,"
+            echo "\`${REPORT_PATH:-not published}\`, split by scanner and by role — never here, never as an artifact,"
             echo "and not in the Security tab: see the \"No SARIF\" note in this workflow."
           } >> "$GITHUB_STEP_SUMMARY"

@@ -48,12 +48,32 @@ set -uo pipefail
 url=""
 out=""
 previous=""
+stdin_data=0
 for arg in "$@"; do
     case "$arg" in http*) url="$arg" ;; esac
     [ "$previous" = "-o" ] && out="$arg"
+    # A header read from a file: what was in the file, which is where a token is meant to be.
+    if [ "$previous" = "-H" ]; then
+        case "$arg" in @*) cat "${arg#@}" >> "$SD_STUB_DIR/curl.headers"; echo >> "$SD_STUB_DIR/curl.headers" ;; esac
+    fi
+    [ "$previous" = "--data-binary" ] && [ "$arg" = "@-" ] && stdin_data=1
     previous="$arg"
 done
+# Every argument, as another process on the runner could read them off /proc.
+printf '%s\n' "$*" >> "$SD_STUB_DIR/curl.argv"
 echo "$url" >> "$SD_STUB_DIR/curl.log"
+[ "$stdin_data" -eq 1 ] && { cat >> "$SD_STUB_DIR/curl.stdin"; echo >> "$SD_STUB_DIR/curl.stdin"; }
+# Keycloak's token endpoint and the API: a canned body into -o, and a canned status on stdout.
+for endpoint in token graphql; do
+    case "$endpoint:$url" in
+        token:*/protocol/openid-connect/token|graphql:*/graphql)
+            [ -f "$SD_STUB_DIR/$endpoint.fails" ] && { echo "curl: (7) Failed to connect" >&2; exit 7; }
+            cp "$SD_STUB_DIR/$endpoint.body" "$out"
+            cat "$SD_STUB_DIR/$endpoint.status"
+            exit 0
+            ;;
+    esac
+done
 # A download: the bytes of $SD_STUB_DIR/download, or a failure when there is none.
 if [ -n "$out" ] && [ "$out" != "/dev/null" ]; then
     [ -f "$SD_STUB_DIR/download" ] || { echo "curl: (22) The requested URL returned error: 404" >&2; exit 22; }
@@ -173,32 +193,47 @@ assert_eq "1" "$rc" "query-schema: fails when the input does not exist"
 # render-plan
 # ===========================================================================
 
+# The tokens of the scanner roles (#1769), as `login` leaves them: one file per role.
+mkdir -p "$WORK/tokens"
+printf '%s' 'tok&en\with/specials' > "$WORK/tokens/scan-readonly.token"
+export DAST_TOKEN_DIR="$WORK/tokens"
+
 cat > "$WORK/plan.yaml" <<'PLAN'
 jobs:
   - type: replacer
     rules:
-      - matchString: "X-Ontrack-Token"
-        replacementString: "${DEMO_TOKEN}"
+      - matchString: "Authorization"
+        replacementString: "Bearer ${DAST_BEARER_TOKEN}"
   - type: spider
     parameters:
       url: "${DAST_TARGET}/"
 PLAN
 
-out="$(DEMO_TOKEN='tok&en\with/specials' sd_render_plan "$WORK/plan.yaml" "$WORK/plan-rendered.yaml" 2>&1)"; rc=$?
+out="$(sd_render_plan "$WORK/plan.yaml" "$WORK/plan-rendered.yaml" scan-readonly 2>&1)"; rc=$?
 assert_eq "0" "$rc" "render-plan: succeeds"
-assert_contains "$(cat "$WORK/plan-rendered.yaml")" 'replacementString: "tok&en\with/specials"' \
-    "render-plan: substitutes a token containing regex and sed metacharacters literally"
+assert_contains "$(cat "$WORK/plan-rendered.yaml")" 'replacementString: "Bearer tok&en\with/specials"' \
+    "render-plan: substitutes the role's token, containing regex and sed metacharacters, literally"
 # shellcheck disable=SC2016  # deliberate: the literal ZAP expands is what is being asserted
 assert_contains "$(cat "$WORK/plan-rendered.yaml")" '${DAST_TARGET}/' \
     "render-plan: leaves the variables ZAP itself expands alone"
 assert_not_contains "$out" "tok&en" "render-plan: does not print the token"
 
-out="$(DEMO_TOKEN='' sd_render_plan "$WORK/plan.yaml" "$WORK/plan-rendered.yaml" 2>&1)"; rc=$?
-assert_eq "1" "$rc" "render-plan: refuses to render without a token"
+out="$(sd_render_plan "$WORK/plan.yaml" "$WORK/plan-rendered.yaml" scan-nobody 2>&1)"; rc=$?
+assert_eq "1" "$rc" "render-plan: refuses to render for a role that did not log in"
+assert_contains "$out" "scan-nobody" "render-plan: names the role with no token"
+
+out="$(sd_render_plan "$WORK/plan.yaml" "$WORK/plan-rendered.yaml" 2>&1)"; rc=$?
+assert_eq "1" "$rc" "render-plan: refuses to render without a role"
 
 printf 'jobs: []\n' > "$WORK/plan-notoken.yaml"
-out="$(DEMO_TOKEN=abc sd_render_plan "$WORK/plan-notoken.yaml" "$WORK/plan-rendered.yaml" 2>&1)"; rc=$?
+out="$(sd_render_plan "$WORK/plan-notoken.yaml" "$WORK/plan-rendered.yaml" scan-readonly 2>&1)"; rc=$?
 assert_eq "1" "$rc" "render-plan: refuses a plan with no placeholder rather than scanning unauthenticated"
+
+# The old placeholder is gone with DEMO_TOKEN: a plan still carrying it would send it literally.
+# shellcheck disable=SC2016  # deliberate: the literal placeholder is what is being written
+printf 'x: "${DEMO_TOKEN}"\n' > "$WORK/plan-old.yaml"
+out="$(sd_render_plan "$WORK/plan-old.yaml" "$WORK/plan-rendered.yaml" scan-readonly 2>&1)"; rc=$?
+assert_eq "1" "$rc" "render-plan: a plan still written for DEMO_TOKEN is refused"
 
 # ===========================================================================
 # actuator - the one check that stops the run
@@ -228,6 +263,201 @@ echo "/manage/health 404" > "$WORK/answers"
 out="$(sd_actuator "https://demo.example.com" 2>&1)"; rc=$?
 rm -f "$WORK/answers"
 assert_eq "0" "$rc" "actuator: a 404 is not an exposure"
+
+# ===========================================================================
+# login - a Keycloak password grant per scanner role (#1769)
+# ===========================================================================
+
+export DAST_KEYCLOAK_REALM_URL="https://demo.example.com/keycloak/realms/ontrack"
+export DAST_KEYCLOAK_CLIENT_ID="yontrack-client"
+export DEMO_KEYCLOAK_CLIENT_SECRET='client&secret'
+export DAST_SCAN_READONLY_PASSWORD='pa ss&wo=rd%'
+unset GITHUB_ACTIONS
+
+login_reset() {
+    rm -f "$WORK/curl.argv" "$WORK/curl.stdin" "$WORK/curl.headers" "$WORK/token.fails"
+    : > "$WORK/curl.log"
+    rm -rf "$WORK/login"
+}
+
+JWT_RO='eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJzY2FuLXJlYWRvbmx5In0.c2lnLXJlYWRvbmx5'
+login_reset
+printf '{"access_token":"%s","expires_in":3600,"token_type":"Bearer","refresh_token":"r"}' "$JWT_RO" > "$WORK/token.body"
+printf '200' > "$WORK/token.status"
+out="$(sd_login scan-readonly "$WORK/login" 2>&1)"; rc=$?
+assert_eq "0" "$rc" "login: a good password gets a token"
+assert_eq "$JWT_RO" "$(cat "$WORK/login/scan-readonly.token")" "login: writes the access token to the role's token file"
+assert_contains "$(ls -l "$WORK/login/scan-readonly.token")" "-rw-------" "login: the token file is readable by the runner's user only"
+assert_contains "$(cat "$WORK/curl.log")" "https://demo.example.com/keycloak/realms/ontrack/protocol/openid-connect/token" \
+    "login: asks the demo realm's token endpoint"
+assert_contains "$out" "scan-readonly" "login: names the account that logged in"
+assert_contains "$out" "3600" "login: says how long the token is valid for"
+assert_not_contains "$out" "$JWT_RO" "login: does not print the token"
+assert_not_contains "$(cat "$WORK/curl.argv")" "pa ss" "login: the password is on no command line"
+assert_not_contains "$(cat "$WORK/curl.argv")" "client&secret" "login: the client secret is on no command line"
+assert_contains "$(cat "$WORK/curl.stdin")" "grant_type=password" "login: a password grant"
+assert_contains "$(cat "$WORK/curl.stdin")" "username=scan-readonly" "login: as the role's own account"
+assert_contains "$(cat "$WORK/curl.stdin")" "client_id=yontrack-client" "login: with the demo's client"
+assert_contains "$(cat "$WORK/curl.stdin")" "password=pa%20ss%26wo%3Drd%25" \
+    "login: the password is form-encoded, so a & or = in it does not break the request"
+assert_contains "$(cat "$WORK/curl.stdin")" "client_secret=client%26secret" "login: so is the client secret"
+
+# In Actions, the token is also registered as a mask, so that the runner blanks it from the log too.
+login_reset
+out="$(GITHUB_ACTIONS=true sd_login scan-readonly "$WORK/login" 2>&1)"; rc=$?
+assert_contains "$out" "::add-mask::$JWT_RO" "login: masks the token in Actions"
+
+# A pass must not outlive its token.
+login_reset
+printf '{"access_token":"%s","expires_in":300}' "$JWT_RO" > "$WORK/token.body"
+out="$(sd_login scan-readonly "$WORK/login" 900 2>&1)"; rc=$?
+assert_eq "1" "$rc" "login: refuses a token that would expire before the pass it is for ends"
+assert_contains "$out" "300" "login: says how long the token lives"
+assert_contains "$out" "900" "login: and how long the pass may take"
+assert_eq "no" "$([ -e "$WORK/login/scan-readonly.token" ] && echo yes || echo no)" "login: and leaves no token behind"
+printf '{"access_token":"%s","expires_in":3600}' "$JWT_RO" > "$WORK/token.body"
+
+# A bad password is an error that stops the run - never a scan that quietly goes on unauthenticated.
+login_reset
+printf '{"error":"invalid_grant","error_description":"Invalid user credentials"}' > "$WORK/token.body"
+printf '401' > "$WORK/token.status"
+out="$(sd_login scan-readonly "$WORK/login" 2>&1)"; rc=$?
+assert_eq "1" "$rc" "login: a bad password fails"
+assert_contains "$out" "scan-readonly" "login: names the account that could not log in"
+assert_contains "$out" "invalid_grant" "login: gives the error class"
+assert_contains "$out" "401" "login: and the status"
+assert_not_contains "$out" "pa ss" "login: never prints the password"
+assert_eq "no" "$([ -e "$WORK/login/scan-readonly.token" ] && echo yes || echo no)" "login: writes no token file on a failure"
+
+# A 200 without a token is not a login either.
+login_reset
+printf '{"token_type":"Bearer"}' > "$WORK/token.body"
+printf '200' > "$WORK/token.status"
+out="$(sd_login scan-readonly "$WORK/login" 2>&1)"; rc=$?
+assert_eq "1" "$rc" "login: an answer with no access token fails"
+
+login_reset
+touch "$WORK/token.fails"
+out="$(sd_login scan-readonly "$WORK/login" 2>&1)"; rc=$?
+assert_eq "1" "$rc" "login: Keycloak not answering fails"
+rm -f "$WORK/token.fails"
+printf '{"access_token":"%s","expires_in":3600}' "$JWT_RO" > "$WORK/token.body"
+
+# A missing secret fails before anything is sent.
+login_reset
+out="$(sd_login scan-admin "$WORK/login" 2>&1)"; rc=$?
+assert_eq "1" "$rc" "login: a role whose password secret is not set fails"
+assert_contains "$out" "DAST_SCAN_ADMIN_PASSWORD" "login: names the missing secret"
+assert_eq "" "$(cat "$WORK/curl.log")" "login: and sends nothing"
+login_reset
+out="$(DEMO_KEYCLOAK_CLIENT_SECRET='' sd_login scan-readonly "$WORK/login" 2>&1)"; rc=$?
+assert_eq "1" "$rc" "login: a missing client secret fails"
+assert_contains "$out" "DEMO_KEYCLOAK_CLIENT_SECRET" "login: names the missing client secret"
+assert_eq "" "$(cat "$WORK/curl.log")" "login: and sends nothing either"
+login_reset
+out="$(sd_login scan-root "$WORK/login" 2>&1)"; rc=$?
+assert_eq "1" "$rc" "login: an account that is not one of the three scanner roles is refused"
+
+# ===========================================================================
+# whoami - the API accepts the token, as the group the CasC gives the role
+# ===========================================================================
+
+login_reset
+mkdir -p "$WORK/login"
+printf '%s' "$JWT_RO" > "$WORK/login/scan-readonly.token"
+printf '%s' 'eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJzY2FuLXByb2plY3QifQ.c2lnLXByb2plY3Q' > "$WORK/login/scan-project.token"
+export DAST_CASC="$SCRIPT_DIR/../security/dast/casc.yaml"
+export DAST_TARGET="https://demo.example.com"
+
+whoami_body() { # groups-json project-count
+    jq -n -c --argjson groups "$1" --argjson n "$2" \
+        '{data: {user: {mappedGroups: ($groups | map({name: .}))}, projects: [range($n) | {id: .}], info: {version: {full: "5.5.0-abc1234"}}}}' \
+        > "$WORK/graphql.body"
+}
+
+whoami_body '["DAST Read-only"]' 12
+printf '200' > "$WORK/graphql.status"
+: > "$WORK/github-output"
+out="$(GITHUB_OUTPUT="$WORK/github-output" sd_whoami scan-readonly "$WORK/login" 2>&1)"; rc=$?
+assert_eq "0" "$rc" "whoami: passes when the API maps the role to its CasC group"
+assert_contains "$out" "DAST Read-only" "whoami: names the group - declared in the public casc.yaml"
+assert_contains "$out" "12 project(s)" "whoami: counts the projects the role can see"
+assert_contains "$(cat "$WORK/github-output")" "version=5.5.0-abc1234" "whoami: reports the version the demo runs"
+assert_contains "$(cat "$WORK/curl.headers")" "Authorization: Bearer $JWT_RO" "whoami: sends the token as a bearer token"
+assert_not_contains "$(cat "$WORK/curl.argv")" "$JWT_RO" "whoami: the token is on no command line"
+assert_not_contains "$out" "$JWT_RO" "whoami: does not print the token"
+assert_not_contains "$out" "demo.example.com" "whoami: prints no URL"
+
+whoami_body '[]' 12
+out="$(sd_whoami scan-readonly "$WORK/login" 2>&1)"; rc=$?
+assert_eq "1" "$rc" "whoami: a token the API accepts without the role's group is not the role being scanned"
+assert_contains "$out" "DAST Read-only" "whoami: says which group was expected"
+
+printf '401' > "$WORK/graphql.status"
+printf '' > "$WORK/graphql.body"
+out="$(sd_whoami scan-readonly "$WORK/login" 2>&1)"; rc=$?
+assert_eq "1" "$rc" "whoami: the API refusing the token fails"
+assert_contains "$out" "401" "whoami: with the status"
+printf '200' > "$WORK/graphql.status"
+
+printf '{"errors":[{"message":"boom"}]}' > "$WORK/graphql.body"
+out="$(sd_whoami scan-readonly "$WORK/login" 2>&1)"; rc=$?
+assert_eq "1" "$rc" "whoami: GraphQL errors fail"
+
+whoami_body '["DAST Project"]' 0
+out="$(sd_whoami scan-project "$WORK/login" 2>&1)"; rc=$?
+assert_eq "1" "$rc" "whoami: scan-project with no project means the CasC was not re-applied - its scan would test nothing"
+
+whoami_body '["DAST Project"]' 1
+out="$(sd_whoami scan-project "$WORK/login" 2>&1)"; rc=$?
+assert_eq "0" "$rc" "whoami: scan-project with its one project passes"
+assert_contains "$out" "1 project(s)" "whoami: counts it"
+assert_not_contains "$out" "WARNING" "whoami: no warning when it sees what the CasC grants"
+
+whoami_body '["DAST Project"]' 4
+out="$(sd_whoami scan-project "$WORK/login" 2>&1)"; rc=$?
+assert_eq "0" "$rc" "whoami: scan-project seeing more is reported, not a failure - the instance may grant view to all"
+assert_contains "$out" "WARNING" "whoami: but it is flagged"
+assert_contains "$out" "4 project(s)" "whoami: with the counts"
+assert_contains "$out" "grants it 1" "whoami: against what casc.yaml grants"
+
+out="$(sd_whoami scan-admin "$WORK/login" 2>&1)"; rc=$?
+assert_eq "1" "$rc" "whoami: a role that did not log in fails"
+
+# ===========================================================================
+# assert-authenticated - no API pass outlived its token
+# ===========================================================================
+
+cat > "$WORK/auth.har" <<'JSON'
+{"log": {"entries": [
+  {"request": {"url": "https://demo.example.com/graphql", "method": "POST"}, "response": {"status": 200}},
+  {"request": {"url": "https://demo.example.com/graphql", "method": "POST"}, "response": {"status": 200}},
+  {"request": {"url": "https://demo.example.com/", "method": "GET"}, "response": {"status": 401}}
+]}}
+JSON
+out="$(sd_assert_authenticated "$WORK/auth.har" 2>&1)"; rc=$?
+assert_eq "0" "$rc" "assert-authenticated: passes when every /graphql request was authenticated"
+assert_contains "$out" "2" "assert-authenticated: prints the counts"
+assert_not_contains "$out" "demo.example.com" "assert-authenticated: prints no URL"
+
+cat > "$WORK/unauth.har" <<'JSON'
+{"log": {"entries": [
+  {"request": {"url": "https://demo.example.com/graphql", "method": "POST"}, "response": {"status": 200}},
+  {"request": {"url": "https://demo.example.com/graphql", "method": "POST"}, "response": {"status": 401}}
+]}}
+JSON
+out="$(sd_assert_authenticated "$WORK/unauth.har" 2>&1)"; rc=$?
+assert_eq "1" "$rc" "assert-authenticated: a 401 on /graphql means part of the pass ran unauthenticated"
+
+cat > "$WORK/nographql.har" <<'JSON'
+{"log": {"entries": [
+  {"request": {"url": "https://demo.example.com/", "method": "GET"}, "response": {"status": 200}}
+]}}
+JSON
+out="$(sd_assert_authenticated "$WORK/nographql.har" 2>&1)"; rc=$?
+assert_eq "1" "$rc" "assert-authenticated: an API pass that sent nothing to /graphql proves nothing"
+out="$(sd_assert_authenticated "$WORK/absent.har" 2>&1)"; rc=$?
+assert_eq "1" "$rc" "assert-authenticated: a missing HAR fails"
 
 # ===========================================================================
 # normalize-zap
@@ -493,7 +723,7 @@ assert_eq "1" "$rc" "normalize-graphql-cop: a crash with no JSON fails"
 # assert-graphql-cop-no-mutations - what graphql-cop says it sent
 # ---------------------------------------------------------------------------
 
-out="$(DEMO_TOKEN=SECRET-COP sd_assert_graphql_cop_no_mutations "$WORK/cop.out" 2>&1)"; rc=$?
+out="$(sd_assert_graphql_cop_no_mutations "$WORK/cop.out" 2>&1)"; rc=$?
 assert_eq "0" "$rc" "assert-graphql-cop-no-mutations: passes on a query-only run"
 assert_contains "$out" "Tests run: 8" "assert-graphql-cop-no-mutations: counts the tests it read requests from"
 assert_contains "$out" "Mutations: 0" "assert-graphql-cop-no-mutations: prints the counts"
@@ -574,13 +804,19 @@ assert_eq "1" "$rc" "graphql-cop-preflight: fails without the source"
 # render-graphql-cop-headers - the token in a run-time file, never on a command line
 # ---------------------------------------------------------------------------
 
-out="$(DEMO_TOKEN='to"ken\with' sd_render_graphql_cop_headers "$WORK/cop-run/headers.json" 2>&1)"; rc=$?
+printf '%s' 'to"ken\with' > "$WORK/tokens/scan-project.token"
+out="$(sd_render_graphql_cop_headers "$WORK/cop-run/headers.json" scan-project 2>&1)"; rc=$?
 assert_eq "0" "$rc" "render-graphql-cop-headers: succeeds"
-assert_eq 'to"ken\with' "$(jq -r '."X-Ontrack-Token"' "$WORK/cop-run/headers.json")" \
-    "render-graphql-cop-headers: writes the token as JSON, quotes and backslashes intact"
+assert_eq 'Bearer to"ken\with' "$(jq -r '.Authorization' "$WORK/cop-run/headers.json")" \
+    "render-graphql-cop-headers: writes the role's bearer token as JSON, quotes and backslashes intact"
+assert_eq "null" "$(jq -r '."X-Ontrack-Token"' "$WORK/cop-run/headers.json")" \
+    "render-graphql-cop-headers: sends no X-Ontrack-Token any more"
 assert_not_contains "$out" 'to"ken' "render-graphql-cop-headers: does not print the token"
-out="$(DEMO_TOKEN='' sd_render_graphql_cop_headers "$WORK/cop-run/headers2.json" 2>&1)"; rc=$?
+out="$(sd_render_graphql_cop_headers "$WORK/cop-run/headers2.json" scan-nobody 2>&1)"; rc=$?
 assert_eq "1" "$rc" "render-graphql-cop-headers: refuses to scan unauthenticated"
+assert_eq "no" "$([ -e "$WORK/cop-run/headers2.json" ] && echo yes || echo no)" \
+    "render-graphql-cop-headers: leaves no headers file behind for a role with no token"
+rm -f "$WORK/tokens/scan-project.token"
 
 # ---------------------------------------------------------------------------
 # The introspection suppression, as committed, against graphql-cop
@@ -789,6 +1025,79 @@ counts="$(sd_report "$WORK/report-scoped.md" "$WORK/findings-cop.json" "$WORK/fi
 assert_contains "$counts" "low=1" "report: a scanner-scoped suppression applies to Nuclei's findings"
 SD_SUPPRESSIONS="$WORK/suppressions.yaml"
 
+# ---------------------------------------------------------------------------
+# One pass per scanner role (#1769): de-duplicated by rule + URL, attributed to roles
+# ---------------------------------------------------------------------------
+
+sd_normalize_zap "$WORK/zap.json" scan-admin > "$WORK/findings-zap-admin.json"
+assert_eq "scan-admin" "$(jq -r '.role' "$WORK/findings-zap-admin.json")" \
+    "normalize-zap: records the role of the pass it was given"
+assert_eq "null" "$(sd_normalize_zap "$WORK/zap.json" | jq -r '.role')" \
+    "normalize-zap: no role for an unauthenticated pass"
+# scan-readonly sees the CSP finding on one more URL and not the CORS one.
+sd_normalize_zap "$WORK/zap.json" scan-readonly \
+    | jq '.findings |= (map(select(.rule != "10098"))
+          | map(if .rule == "10038" then .instances += [{uri: "https://demo.example.com/extra", method: "GET", param: "", evidence: "", attack: "", info: ""}] else . end))' \
+    > "$WORK/findings-zap-readonly.json"
+# The unauthenticated UI pass sees the CSP finding on the root page only.
+sd_normalize_zap "$WORK/zap.json" \
+    | jq '.findings |= (map(select(.rule == "10038")) | map(.instances |= .[:1]))' \
+    > "$WORK/findings-zap-ui.json"
+
+SD_RULES="$WORK/rules.tsv"
+SD_SUPPRESSIONS="$WORK/suppressions.yaml"
+single="$(sd_report "$WORK/report-single.md" "$WORK/findings.json")"
+counts="$(sd_report "$WORK/report-roles.md" "$WORK/findings-zap-ui.json" "$WORK/findings-zap-admin.json" "$WORK/findings-zap-readonly.json")"; rc=$?
+assert_eq "0" "$rc" "report: takes one document per role"
+assert_eq "$single" "$counts" \
+    "report: the same rule seen by several roles is counted once - the counts of three passes are the counts of one"
+report="$(cat "$WORK/report-roles.md")"
+assert_eq "1" "$(grep -c '^### MEDIUM — CSP Header Not Set$' "$WORK/report-roles.md")" \
+    "report: one section per rule, not one per role"
+assert_contains "$report" "3 instance(s) counted" \
+    "report: instances are de-duplicated by URL across roles - /, /mobile and the one only scan-readonly saw"
+assert_contains "$report" "Seen by \`scan-admin\`, \`scan-readonly\`, \`unauthenticated\`." \
+    "report: says which roles saw a finding"
+assert_contains "$report" "Seen by \`scan-admin\`." \
+    "report: a finding only one role saw says so"
+assert_contains "$report" "| \`https://demo.example.com/extra\` | GET | — | — | \`scan-readonly\` |" \
+    "report: each instance names the roles that saw it"
+assert_contains "$report" "| \`https://demo.example.com/\` | GET | — | — | \`scan-admin\`, \`scan-readonly\`, \`unauthenticated\` |" \
+    "report: an instance several roles saw names all of them, once"
+assert_contains "$report" "## Counts by role" "report: splits the counts by role"
+assert_contains "$report" "| \`scan-admin\` | 0 | 0 | 2 | 0 |" "report: what scan-admin saw"
+assert_contains "$report" "| \`scan-readonly\` | 0 | 0 | 1 | 0 |" "report: what scan-readonly saw"
+assert_contains "$report" "| \`unauthenticated\` | 0 | 0 | 1 | 0 |" "report: what the unauthenticated passes saw"
+assert_not_contains "$counts" "scan-" "report: the printed counts carry no per-role split"
+
+# graphql-cop, once per role: the same tests failing for three roles are the same findings.
+SD_SUPPRESSIONS="$SCRIPT_DIR/../security/dast/suppressions.yaml"
+SD_RULES="$WORK/empty-rules.tsv"
+for role in scan-admin scan-readonly scan-project; do
+    sd_normalize_graphql_cop "$WORK/cop.out" "1.16" "$role" > "$WORK/findings-cop-$role.json"
+done
+assert_eq "scan-project" "$(jq -r '.role' "$WORK/findings-cop-scan-project.json")" \
+    "normalize-graphql-cop: records the role of the pass"
+single="$(sd_report "$WORK/report-cop-single.md" "$WORK/findings-cop.json")"
+counts="$(sd_report "$WORK/report-cop-roles.md" "$WORK/findings-cop-scan-admin.json" "$WORK/findings-cop-scan-readonly.json" "$WORK/findings-cop-scan-project.json")"
+assert_eq "$single" "$counts" "report: graphql-cop's three passes count like one"
+assert_contains "$(cat "$WORK/report-cop-roles.md")" "| \`graphql-introspection\` | 1 |" \
+    "report: a suppression subtracts a de-duplicated instance once, not once per role"
+SD_SUPPRESSIONS="$WORK/suppressions.yaml"
+SD_RULES="$WORK/rules.tsv"
+
+# Every role's token is redacted from the report, not only one.
+printf '%s' 'TOKEN-OF-ADMIN' > "$WORK/tokens/scan-admin.token"
+printf '%s' 'TOKEN-OF-PROJECT' > "$WORK/tokens/scan-project.token"
+jq '(.findings[] | select(.rule == "10038") | .description) = "leaked TOKEN-OF-ADMIN and TOKEN-OF-PROJECT and tok&en\\with/specials"' \
+    "$WORK/findings-zap-admin.json" > "$WORK/findings-leaky.json"
+sd_report "$WORK/report-leaky.md" "$WORK/findings-leaky.json" > /dev/null
+report="$(cat "$WORK/report-leaky.md")"
+assert_not_contains "$report" "TOKEN-OF-ADMIN" "report: redacts scan-admin's token"
+assert_not_contains "$report" "TOKEN-OF-PROJECT" "report: redacts scan-project's token"
+assert_not_contains "$report" "tok&en" "report: redacts scan-readonly's token"
+assert_contains "$report" "leaked <redacted> and <redacted> and <redacted>" "report: in place, leaving the rest"
+
 # ===========================================================================
 # fetch - every downloaded tool is checked against a committed checksum
 # ===========================================================================
@@ -846,6 +1155,22 @@ scrubbed="$(printf '%s\n' "$noisy" | DEMO_TOKEN=SECRET1 sd_scrub)"
 assert_not_contains "$scrubbed" "demo.example.com" "scrub: removes URLs"
 assert_not_contains "$scrubbed" "SECRET1" "scrub: removes the token"
 assert_contains "$scrubbed" "Spider found" "scrub: keeps enough to diagnose a failure"
+
+# Every role's token, wherever it appears - not only after a header name or inside a URL.
+printf '%s' 'SECRET-ADMIN' > "$WORK/tokens/scan-admin.token"
+printf '%s' 'SECRET-PROJECT' > "$WORK/tokens/scan-project.token"
+noisy='replacer: SECRET-ADMIN / tok&en\with/specials / SECRET-PROJECT'
+scrubbed="$(printf '%s\n' "$noisy" | sd_scrub)"
+assert_not_contains "$scrubbed" "SECRET-ADMIN" "scrub: removes scan-admin's token"
+assert_not_contains "$scrubbed" "tok&en" "scrub: removes scan-readonly's token"
+assert_not_contains "$scrubbed" "SECRET-PROJECT" "scrub: removes scan-project's token"
+assert_contains "$scrubbed" "replacer: <redacted>" "scrub: in place"
+
+scrubbed="$(printf '%s\n' 'H: Authorization: Bearer abc.def-ghi' | DAST_TOKEN_DIR="" sd_scrub)"
+assert_not_contains "$scrubbed" "abc.def-ghi" "scrub: a bearer header is redacted even with no token file to go on"
+scrubbed="$(printf '%s\n' 'value eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJ4In0.c2ln end' | DAST_TOKEN_DIR="" sd_scrub)"
+assert_not_contains "$scrubbed" "eyJzdWIiOiJ4In0" "scrub: so is anything shaped like a JWT"
+assert_contains "$scrubbed" "value <redacted> end" "scrub: in place"
 
 scrubbed="$(printf 'java.lang.OutOfMemoryError\n' | sd_scrub)"
 assert_eq "java.lang.OutOfMemoryError" "$scrubbed" "scrub: leaves a plain diagnostic alone"
