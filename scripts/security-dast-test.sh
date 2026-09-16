@@ -324,29 +324,6 @@ out="$(sd_assert_no_mutations "$WORK/absent.har" 2>&1)"; rc=$?
 assert_eq "1" "$rc" "assert-no-mutations: a missing HAR proves nothing and fails"
 
 # ===========================================================================
-# sanitize-sarif
-# ===========================================================================
-
-cat > "$WORK/zap-sarif.json" <<'JSON'
-{"version": "2.1.0", "runs": [{"tool": {"driver": {"name": "ZAP", "rules": [{"id": "10038"}]}},
- "results": [
-   {"ruleId": "10038", "level": "warning", "message": {"text": "No CSP"},
-    "locations": [{"physicalLocation": {"artifactLocation": {"uri": "https://demo.example.com/"}}}],
-    "webRequest": {"headers": {"X-Ontrack-Token": "SECRET-TOKEN-VALUE"}},
-    "webResponse": {"statusCode": 200}}
- ]}]}
-JSON
-out="$(DEMO_TOKEN=SECRET-TOKEN-VALUE sd_sanitize_sarif "$WORK/zap-sarif.json" "$WORK/clean.sarif" 2>&1)"; rc=$?
-assert_eq "0" "$rc" "sanitize-sarif: succeeds"
-assert_not_contains "$(cat "$WORK/clean.sarif")" "SECRET-TOKEN-VALUE" \
-    "sanitize-sarif: the API token does not reach GitHub's alert store"
-assert_not_contains "$(cat "$WORK/clean.sarif")" "webRequest" \
-    "sanitize-sarif: the whole request goes, not only the token"
-assert_contains "$(cat "$WORK/clean.sarif")" "10038" "sanitize-sarif: the finding stays"
-assert_contains "$(cat "$WORK/clean.sarif")" "demo.example.com" \
-    "sanitize-sarif: the URL stays - a DAST finding with no URL is not usable"
-
-# ===========================================================================
 # report - levels, suppressions and counting
 # ===========================================================================
 

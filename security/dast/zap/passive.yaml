@@ -91,6 +91,24 @@ jobs:
         replacementString: "${DEMO_TOKEN}"
         tokenProcessing: false
 
+      # An Origin, on the two endpoints that have a CORS configuration at all.
+      #
+      # Without it the CORS misconfiguration is invisible: Spring only emits
+      # `Access-Control-Allow-Origin` in answer to a request that carries an `Origin`, a scanner
+      # does not send one by default, and the rule that reports a permissive policy (10098) has
+      # nothing to look at. The first real run proved the point - it reported the missing headers
+      # and not the `allowed-origins: "*"` sitting in application.yml (#1771).
+      #
+      # A header on a read request. It changes nothing on the instance, which is what keeps this
+      # a passive scan; the value is a domain that cannot exist, so a server that echoes it back
+      # is saying something about its policy rather than about that name.
+      - description: "Origin, so that the CORS response headers are emitted at all"
+        url: ".*/(graphql|hook).*"
+        matchType: req_header
+        matchString: "Origin"
+        replacementString: "https://dast.invalid"
+        tokenProcessing: false
+
   # -------------------------------------------------------------------------------------------
   # The targets that are named rather than discovered.
   #
@@ -202,12 +220,18 @@ jobs:
       source: history
 
   # -------------------------------------------------------------------------------------------
-  # Reports. Two files, neither of which ever becomes a workflow artifact:
+  # The report. One file, read by scripts/security-dast.sh, which counts it and writes the
+  # markdown report pushed to the private yontrack/security-reports. It never becomes a workflow
+  # artifact.
   #
-  #   zap.json   read by scripts/security-dast.sh, which counts it and writes the markdown report
-  #              pushed to the private yontrack/security-reports;
-  #   zap.sarif  uploaded to GitHub code scanning under the `dast-zap` category, if and only if
-  #              GitHub accepts and usefully renders findings located by URL rather than by file.
+  # There is no SARIF report here any more, and that was measured rather than assumed. Run
+  # 35087242240 uploaded one under the `dast-zap` category: GitHub accepted it without a warning
+  # and turned 40 results into **zero alerts**. A DAST finding is located by URL, and code
+  # scanning maps a result to a line of a file in the repository - there is nothing for it to
+  # point at. The alternative would be to invent a file location per rule, which is worse than no
+  # alert: an alert on a line that has nothing to do with the finding. So the upload is dropped
+  # and the private report is the source of truth, exactly as docs/grilling/2026-09-dast.md
+  # provided for.
   #
   # Every risk and every confidence, including informational and false-positive: the filtering is
   # the counting layer's job, and a report that filters first cannot be reviewed.
@@ -217,19 +241,6 @@ jobs:
       template: traditional-json
       reportDir: /zap/wrk/out
       reportFile: zap
-      reportTitle: "Yontrack passive DAST"
-      reportDescription: "Passive ZAP scan of the Yontrack demo instance"
-      displayReport: false
-    risks: [info, low, medium, high]
-    confidences: [falsepositive, low, medium, high, confirmed]
-
-  - type: report
-    parameters:
-      template: sarif-json
-      # A different base name from the one above: both templates write `<reportFile>.json`, and
-      # sharing it would silently leave one report overwriting the other.
-      reportDir: /zap/wrk/out
-      reportFile: zap-sarif
       reportTitle: "Yontrack passive DAST"
       reportDescription: "Passive ZAP scan of the Yontrack demo instance"
       displayReport: false

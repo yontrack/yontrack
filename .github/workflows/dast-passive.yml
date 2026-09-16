@@ -20,7 +20,8 @@
 #   * this workflow prints COUNTS ONLY - never a URL, a parameter or a piece of evidence;
 #   * it uploads NO ARTIFACT, deliberately. Do not add one;
 #   * the full detail goes to the private yontrack/security-reports, one file per run;
-#   * the validation run points at this workflow run, never at the report.
+#   * the validation run points at this workflow run, never at the report;
+#   * nothing goes to code scanning - see "No SARIF" below.
 #
 # Anything a scanner writes to its own stdout goes through `scripts/security-dast.sh scrub`
 # before it can reach the log. If you add a step here, it prints a number or it prints nothing.
@@ -29,6 +30,14 @@
 # Nothing in ci.yml or in any promotion depends on this workflow: SECURITY.DAST is reporting only.
 # A scanner error fails the run and reports no stamp - a scan that did not happen must never read
 # as a clean instance.
+#
+# No SARIF. The first real run (35087242240) uploaded one under the `dast-zap` category and
+# GitHub accepted it without a warning - then rendered **zero alerts** out of 40 results. A DAST
+# finding is located by a URL, and code scanning maps a result to a line of a file in the
+# repository; there is nothing for it to point at. Inventing a plausible file per rule would be
+# worse than no alert at all, so the upload is dropped and the private report is the source of
+# truth, which is what docs/grilling/2026-09-dast.md provided for. Do not re-add it without
+# re-measuring: this is a statement about what GitHub did, not about what it might do.
 #
 # Every action is pinned by commit SHA and the ZAP image by digest, like the other security
 # workflows. .github/dependabot.yml keeps the action pins up to date.
@@ -91,11 +100,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     permissions:
+      # Read only. No `security-events: write` - nothing is uploaded to code scanning, see the
+      # "No SARIF" note in the header.
       contents: read
-      # For the SARIF upload only. Verify-or-drop: DAST findings are located by URL, not by file,
-      # and if GitHub cannot render them usefully the upload goes and the private report is the
-      # only source of truth.
-      security-events: write
     env:
       DAST_KIND: passive
       DAST_TARGET: ${{ vars.DEMO_URL || 'https://demo.dev.yontrack.com' }}
@@ -316,48 +323,7 @@ jobs:
             $run_time_flag $run_info
 
       # ------------------------------------------------------------------------------------
-      # 7. SARIF, on probation.
-      #
-      # `continue-on-error`, and that is the decision rather than a hedge: the counts and the
-      # private report are what this workflow is for, and a code-scanning upload that GitHub
-      # rejects must not turn a successful scan into a failed one. The step's outcome goes into
-      # the summary, which is how the verify-or-drop call gets made.
-      # ------------------------------------------------------------------------------------
-
-      # Sanitised before it is uploaded, and not as a precaution: ZAP's SARIF embeds the whole
-      # exchange of every result under `webRequest`, request headers included - so a result on
-      # /graphql carries a live admin token for the demo. That must not reach GitHub's alert
-      # store. What is uploaded is the rule, the level, the message and the URL, which is the
-      # whole point of a DAST SARIF.
-      - name: Sanitize the SARIF report
-        id: sarif
-        if: ${{ !cancelled() && steps.zap.outcome == 'success' }}
-        env:
-          DEMO_TOKEN: ${{ secrets.DEMO_TOKEN }}
-          WORK: ${{ steps.prepare.outputs.work }}
-        run: |
-          set -euo pipefail
-          raw="$(find "$WORK/out" -maxdepth 1 -name 'zap-sarif*' -type f | head -n 1)"
-          if [ -z "$raw" ]; then
-            echo "No SARIF report was produced."
-            echo "found=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          scripts/security-dast.sh sanitize-sarif "$raw" "$WORK/out/dast-zap.sarif"
-          echo "found=true" >> "$GITHUB_OUTPUT"
-          echo "file=$WORK/out/dast-zap.sarif" >> "$GITHUB_OUTPUT"
-
-      - name: Upload the SARIF report
-        id: upload
-        if: ${{ !cancelled() && steps.sarif.outputs.found == 'true' }}
-        continue-on-error: true
-        uses: github/codeql-action/upload-sarif@b96794f015dfd88f77b49b1c93e0fa7110f94c63 # v4.38.0
-        with:
-          sarif_file: ${{ steps.sarif.outputs.file }}
-          category: dast-zap
-
-      # ------------------------------------------------------------------------------------
-      # 8. The summary. Counts only - check what you add here.
+      # 7. The summary. Counts only - check what you add here.
       # ------------------------------------------------------------------------------------
 
       - name: Summarise the counts
@@ -372,7 +338,6 @@ jobs:
           FINDINGS: ${{ steps.report.outputs.findings }}
           SUPPRESSED: ${{ steps.report.outputs.suppressed }}
           REPORT_PATH: ${{ steps.report.outputs.path }}
-          SARIF: ${{ steps.upload.outcome }}
         run: |
           {
             echo "### Passive DAST scan of the demo — \`${VERSION:-unknown}\`"
@@ -388,7 +353,6 @@ jobs:
             echo "\`$YONTRACK_PROJECT/$YONTRACK_BRANCH\`."
             echo
             echo "The findings themselves are in \`$REPORTS_REPOSITORY\` at"
-            echo "\`${REPORT_PATH:-not published}\` — never here, never as an artifact."
-            echo
-            echo "SARIF upload to code scanning (\`dast-zap\`): \`${SARIF:-skipped}\`."
+            echo "\`${REPORT_PATH:-not published}\` — never here, never as an artifact,"
+            echo "and not in the Security tab: see the \"No SARIF\" note in this workflow."
           } >> "$GITHUB_STEP_SUMMARY"

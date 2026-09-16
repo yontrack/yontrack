@@ -28,9 +28,6 @@
 #                             findings document (below) to stdout.
 #   assert-no-mutations HAR   Reads the HAR of every request ZAP sent and fails if any of them was
 #                             a GraphQL mutation or subscription. Prints counts only.
-#   sanitize-sarif IN OUT     Strips the full request and response of every result out of a ZAP
-#                             SARIF report - they carry the API token - before it is uploaded to
-#                             code scanning.
 #   report OUT_MD FILE...     Applies the rule levels and the suppressions to one or more
 #                             normalised findings documents, writes the markdown report to OUT_MD,
 #                             and prints the counts. With $GITHUB_OUTPUT set, writes `critical`,
@@ -427,40 +424,6 @@ sd_assert_no_mutations() {
 }
 
 # ---------------------------------------------------------------------------------------------
-# sanitize-sarif
-# ---------------------------------------------------------------------------------------------
-
-# ZAP's `sarif-json` template embeds the whole exchange under `webRequest` and `webResponse`:
-# every request header of every result, and for a result on /graphql that includes
-# `X-Ontrack-Token` with the live API token in it. Uploading that to code scanning would put a
-# working admin credential for the demo into GitHub's alert store - where it would sit until
-# somebody noticed, and where the report's own disclosure rules have no say.
-#
-# So the exchange goes and the finding stays: rule, level, message, and the URL it was found on,
-# which is the whole point of uploading a DAST SARIF at all. The token is redacted from what is
-# left as well, in case a future ZAP version puts it somewhere else.
-sd_sanitize_sarif() {
-    local input="${1:-}" output="${2:-}"
-    [ -n "$input" ] && [ -n "$output" ] || { sd_fail "Usage: $0 sanitize-sarif IN OUT"; return 1; }
-    [ -f "$input" ] || { sd_fail "No SARIF report at $input"; return 1; }
-
-    jq -e '
-        .runs = [ (.runs // [])[] | .results = [ (.results // [])[] | del(.webRequest, .webResponse) ] ]
-    ' "$input" \
-        | { if [ -n "${DEMO_TOKEN:-}" ]; then sed "s#$(printf '%s' "$DEMO_TOKEN" | sed 's/[&/\]/\\&/g')#<redacted>#g"; else cat; fi; } \
-        > "$output" \
-        || { sd_fail "Could not sanitize $input"; return 1; }
-
-    if [ -n "${DEMO_TOKEN:-}" ] && grep -qF "$DEMO_TOKEN" "$output"; then
-        rm -f "$output"
-        sd_fail "The sanitized SARIF still carries the API token: refusing to upload it."
-        return 1
-    fi
-    sd_log "SARIF sanitized: $(jq -r '[.runs[].results[]] | length' "$output") result(s), no request or response bodies."
-    return 0
-}
-
-# ---------------------------------------------------------------------------------------------
 # report
 # ---------------------------------------------------------------------------------------------
 
@@ -791,13 +754,12 @@ sd_main() {
         actuator) sd_actuator "$@" ;;
         normalize-zap) sd_normalize_zap "$@" ;;
         assert-no-mutations) sd_assert_no_mutations "$@" ;;
-        sanitize-sarif) sd_sanitize_sarif "$@" ;;
         report) sd_report "$@" ;;
         report-path) sd_report_path ;;
         publish) sd_publish "$@" ;;
         scrub) sd_scrub ;;
         *)
-            echo "Usage: $0 query-schema|render-plan|actuator|normalize-zap|assert-no-mutations|sanitize-sarif|report|report-path|publish|scrub ..." >&2
+            echo "Usage: $0 query-schema|render-plan|actuator|normalize-zap|assert-no-mutations|report|report-path|publish|scrub ..." >&2
             return 1
             ;;
     esac

@@ -40,8 +40,30 @@ touches the demo joins that group.
 5. **Proves no mutation was sent**, from ZAP's own record of every request.
 6. **Counts and reports** — `scripts/security-dast.sh`.
 7. **Publishes the markdown report** to the private `yontrack/security-reports`.
-8. **Validates `SECURITY.DAST`** on the build, with the counts.
-9. **Uploads a sanitised SARIF** to code scanning under `dast-zap`, on probation.
+8. **Validates `SECURITY.DAST`** on the build, with the counts. A scanner error reports no stamp
+   at all: nothing depends on this one, so an absent stamp stalls nothing and says the true
+   thing - not scanned.
+
+## Why there is no SARIF upload
+
+The design allowed one, "only if GitHub accepts and usefully renders URL-located findings". It was
+tried on the first real run: GitHub accepted the `dast-zap` upload without a warning and rendered
+**zero alerts** out of 40 results. Code scanning places a result on a line of a file in the
+repository, and a DAST finding is located by a URL, so there is nothing to place it on. Inventing a
+file per rule would be worse than no alert. The upload was dropped, and the private report is the
+only source of truth.
+
+It had a second problem worth knowing before anyone tries again: ZAP's `sarif-json` template
+embeds the whole exchange of every result, request headers included, so a result on `/graphql`
+carries the live API token. Any future upload has to strip `webRequest` and `webResponse` first.
+
+## Why the scan sends an `Origin`
+
+Spring only emits `Access-Control-Allow-Origin` in answer to a request that carries an `Origin`,
+and a scanner sends none by default - so the first run reported every missing header on the UI and
+not the `allowed-origins: "*"` in `application.yml`. The plan now adds `Origin:
+https://dast.invalid` to requests on `/graphql` and `/hook`: a header on a read, which changes
+nothing on the instance and makes the CORS policy observable.
 
 ## How mutations are kept out
 
