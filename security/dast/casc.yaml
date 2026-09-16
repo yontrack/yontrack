@@ -1,0 +1,56 @@
+# Yontrack roles of the DAST scanner accounts — CANONICAL DECLARATION.
+#
+# Part of `initiative: security-scans`, DAST track (docs/grilling/2026-09-dast.md, "Scanner roles").
+#
+# The demo instance carries a copy of this file, as the CasC config map of the deployment:
+# `yontrack-helmfile.d/values/yontrack-demo/casc/casc.yaml` in yontrack/yontrack-infra-gitops
+# (yontrack/yontrack-infra-gitops#72). Keep the two in sync — this one is the reference, the
+# gitops one is what actually runs.
+#
+# The accounts themselves (`scan-admin`, `scan-readonly`, `scan-project`) are Keycloak users,
+# provisioned by the chart's `auth.keycloak.settings.users[]` / `groups[]` (yontrack/yontrack-chart#110),
+# with their passwords in Actions secrets. Roles reach an OIDC user only through groups:
+# IdP group -> group mapping -> Yontrack group -> role, which is what this file declares.
+#
+# | Keycloak user   | Keycloak group  | Yontrack group  | Role                              |
+# |-----------------|-----------------|-----------------|-----------------------------------|
+# | `scan-admin`    | `dast-admin`    | `DAST Admin`    | global `ADMINISTRATOR`            |
+# | `scan-readonly` | `dast-readonly` | `DAST Read-only`| global `READ_ONLY`                |
+# | `scan-project`  | `dast-project`  | `DAST Project`  | `PARTICIPANT` on one seeded project |
+#
+# This file is re-applied to the demo after every seed by `scripts/demo-smoke.sh casc`
+# (`mutation { reloadCasc }`), because the seed deletes and recreates every project and a
+# project's permissions go with it — see doc/dev-guide/demo-smoke.md.
+casc:
+  ontrack:
+    admin:
+      # Additive: existing groups are preserved.
+      groups:
+        - name: "DAST Admin"
+          description: "DAST scanner account with the global ADMINISTRATOR role"
+        - name: "DAST Read-only"
+          description: "DAST scanner account with the global READ_ONLY role"
+        - name: "DAST Project"
+          description: "DAST scanner account with the PARTICIPANT role on one seeded project"
+      # FULL SYNC: any group mapping not declared here is deleted from the instance.
+      # Keycloak sends full group paths in the `groups` claim (the chart's mapper uses full.path),
+      # hence the leading slash.
+      group-mappings:
+        - idp: "/dast-admin"
+          group: "DAST Admin"
+        - idp: "/dast-readonly"
+          group: "DAST Read-only"
+        - idp: "/dast-project"
+          group: "DAST Project"
+      group-permissions:
+        - group: "DAST Admin"
+          role: "ADMINISTRATOR"
+        - group: "DAST Read-only"
+          role: "READ_ONLY"
+      # Lost when the demo seed recreates petclinic, and restored by the reload that
+      # demo-smoke.yml runs right after the seed. A missing project is skipped, not an error.
+      project-permissions:
+        - group: "DAST Project"
+          role: "PARTICIPANT"
+          projects:
+            - "petclinic"

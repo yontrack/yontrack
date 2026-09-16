@@ -15,14 +15,51 @@ promotes the build to `SILVER` - see [`SILVER`](#silver) below.
 | 1 | Resolve the build the version names | `yontrack validate --build` takes the build *name*, and the slot can only pass the version |
 | 2 | Poll until the demo reports that version | The whole deployment contract: the version asked for is the version answering |
 | 3 | Reset and seed | The demo's state is a function of the build - see [Demo seed and reset](demo-seed.md) |
-| 4 | Check the seeded dataset over GraphQL | The seed ran and left something behind |
-| 5 | Check the UI signs in and renders | Keycloak's realm, and the UI pod reaching the backend pod |
-| 6 | Report `DEMO.SMOKE` | Whatever happened, including "the demo never came up" |
+| 4 | Re-apply the CasC | The seed deleted the projects, and their permissions with them - see [Re-applying the CasC](#re-applying-the-casc) below |
+| 5 | Check the seeded dataset over GraphQL | The seed ran and left something behind |
+| 6 | Check the UI signs in and renders | Keycloak's realm, and the UI pod reaching the backend pod |
+| 7 | Report `DEMO.SMOKE` | Whatever happened, including "the demo never came up" |
 
 Step 2 is the valuable one. Everything that can go wrong between the merged PR and a serving
 pod - ArgoCD not synced, image not pullable, old pod still up, new pod crash-looping - looks
 the same from outside: the demo answers with the previous version, or with nothing. One poll
 with one deadline covers them all.
+
+## Re-applying the CasC
+
+The demo's configuration as code gives the DAST scanner group `DAST Project` the `PARTICIPANT`
+role on the seeded project, through CasC `project-permissions`. The seed deletes and recreates
+every project, and a project's permissions go with the project - so from the first reset onwards
+`scan-project` would hold no project at all and the cross-project authorization scan of the DAST
+track would test nothing (issue #1768).
+
+`scripts/demo-smoke.sh casc` runs right after the seed, and does two things:
+
+1. `mutation { reloadCasc { errors { message } } }`, which re-applies the demo's CasC config map;
+2. reads `accountGroups(name: "DAST Project") { authorizedProjects { project { name } role { id } } }`
+   back, and fails unless the group holds `PARTICIPANT` on the seeded project.
+
+The second half is not ceremony: a reload that ran but left `project-permissions` unapplied is
+indistinguishable from a good one on the mutation's side, and the permission is the thing this
+step exists for.
+
+Why `reloadCasc` and not the REST endpoints: `PUT /extension/casc/reload` and
+`POST /extension/casc/upload` exist, but the chart's ingress routes only `/graphql` and `/hook`
+to the backend, so neither is reachable from outside the cluster. `reloadCasc` needs no enabling
+flag - `ontrack.casc.reloading` only creates a *scheduled* job and `ontrack.casc.upload` only
+opens the upload endpoint - and is gated on the global `GlobalSettings` function, which
+`DEMO_TOKEN` already carries.
+
+CasC is declarative, so the reload is idempotent by construction. It has to be: this workflow
+runs on every `main` `BRONZE` deployment.
+
+The canonical declaration of the scanner roles is
+[`security/dast/casc.yaml`](../../security/dast/casc.yaml); the demo runs a copy of it, in
+`yontrack-helmfile.d/values/yontrack-demo/casc/casc.yaml` in `yontrack/yontrack-infra-gitops`.
+An instance that declares no such group - anything but the demo - is not a failure: there is no
+DAST CasC there and nothing to restore, and the step says so and passes.
+
+`DEMO_CASC_GROUP` and `DEMO_CASC_ROLE` override the group and role that are checked.
 
 ## `SILVER`
 
@@ -116,7 +153,7 @@ See [the channel's documentation](../../ontrack-docs/docs/content/integrations/n
 | Piece | Role |
 |---|---|
 | `.github/workflows/demo-smoke.yml` | The steps, and the `DEMO.SMOKE` report |
-| `scripts/demo-smoke.sh` | Build resolution, the poll, the GraphQL assertion |
+| `scripts/demo-smoke.sh` | Build resolution, the poll, the CasC reload, the GraphQL assertion |
 | `scripts/demo-smoke-test.sh` | Its tests, against a stubbed `curl` and a stubbed CLI |
 | `scripts/yontrack-build.sh` | Build lookup by version, shared with `scripts/demo-deploy.sh` |
 | `ontrack-web-tests/demo/demo.spec.js` | The browser leg |

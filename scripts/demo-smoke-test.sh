@@ -62,6 +62,8 @@ fi
 status="$(cat "$DSM_STUB_DIR/status" 2>/dev/null || echo 200)"
 
 case "$body" in
+    *reloadCasc*) file=reload-casc.json ;;
+    *accountGroups*) file=account-groups.json ;;
     *info*) file=info.json ;;
     *projects*) file=projects.json ;;
     *) file=unexpected.json ;;
@@ -123,6 +125,14 @@ JSON
 
     cat > "$DSM_STUB_DIR/build.json" <<'JSON'
 {"Id":"100","Name":"20260901055547-100","DisplayName":"5.3.0-rc-100"}
+JSON
+
+    cat > "$DSM_STUB_DIR/reload-casc.json" <<'JSON'
+{"data":{"reloadCasc":{"errors":null}}}
+JSON
+
+    cat > "$DSM_STUB_DIR/account-groups.json" <<'JSON'
+{"data":{"accountGroups":[{"name":"DAST Project","authorizedProjects":[{"project":{"name":"petclinic"},"role":{"id":"PARTICIPANT"}}]}]}}
 JSON
 }
 
@@ -242,6 +252,85 @@ assert_contains "$(calls)" "another-project" "dsm_assert_seeded_project asks for
 # shellcheck disable=SC2034
 DSM_SEEDED_PROJECT="petclinic"
 
+# --- dsm_casc_reload ---------------------------------------------------------
+
+# The seed deletes and recreates every project, and a project's permissions go with it, so the
+# DAST scanner's project role only exists again once the CasC has been re-applied.
+
+setup_stub
+out="$(dsm_casc_reload 2>&1)"; rc=$?
+assert_eq "0" "$rc" "dsm_casc_reload passes when the reload reports no error"
+assert_contains "$(calls)" "reloadCasc" "dsm_casc_reload runs the reloadCasc mutation"
+
+# The REST reload and upload endpoints are not routed to the backend by the chart's ingress -
+# only /graphql and /hook are - so the reload must go through GraphQL.
+assert_not_contains "$(calls)" "/extension/casc" "dsm_casc_reload does not use the REST endpoints"
+
+setup_stub
+echo '{"data":{"reloadCasc":{"errors":[{"message":"Unknown project"}]}}}' \
+    > "$DSM_STUB_DIR/reload-casc.json"
+out="$(dsm_casc_reload 2>&1)"; rc=$?
+assert_eq "1" "$rc" "dsm_casc_reload fails when the mutation returns user errors"
+assert_contains "$out" "Unknown project" "dsm_casc_reload surfaces the mutation's error"
+
+setup_stub
+echo '{"errors":[{"message":"Access denied"}]}' > "$DSM_STUB_DIR/reload-casc.json"
+out="$(dsm_casc_reload 2>&1)"; rc=$?
+assert_eq "1" "$rc" "dsm_casc_reload fails when the token may not reload the CasC"
+
+# --- dsm_casc_project_role ---------------------------------------------------
+
+setup_stub
+out="$(dsm_casc_project_role 2>&1)"; rc=$?
+assert_eq "0" "$rc" "dsm_casc_project_role passes when the group holds the role"
+assert_contains "$out" "PARTICIPANT on petclinic" \
+    "dsm_casc_project_role names the role and the project it found"
+
+# The regression this whole issue is about: the project came back, the permission did not.
+setup_stub
+echo '{"data":{"accountGroups":[{"name":"DAST Project","authorizedProjects":[]}]}}' \
+    > "$DSM_STUB_DIR/account-groups.json"
+out="$(dsm_casc_project_role 2>&1)"; rc=$?
+assert_eq "1" "$rc" "dsm_casc_project_role fails when the group lost its project role"
+assert_contains "$out" "petclinic" "dsm_casc_project_role names the project it looked at"
+
+setup_stub
+echo '{"data":{"accountGroups":[{"name":"DAST Project","authorizedProjects":[{"project":{"name":"petclinic"},"role":{"id":"READ_ONLY"}}]}]}}' \
+    > "$DSM_STUB_DIR/account-groups.json"
+out="$(dsm_casc_project_role 2>&1)"; rc=$?
+assert_eq "1" "$rc" "dsm_casc_project_role fails when the group holds the wrong role"
+assert_contains "$out" "expected PARTICIPANT" "dsm_casc_project_role says which role it wanted"
+
+# A role on some other project is not the one that was asked for.
+setup_stub
+echo '{"data":{"accountGroups":[{"name":"DAST Project","authorizedProjects":[{"project":{"name":"elsewhere"},"role":{"id":"PARTICIPANT"}}]}]}}' \
+    > "$DSM_STUB_DIR/account-groups.json"
+out="$(dsm_casc_project_role 2>&1)"; rc=$?
+assert_eq "1" "$rc" "dsm_casc_project_role fails when the role is on another project"
+
+# An instance with no DAST CasC at all - anything but the demo - has nothing to restore, and
+# must not fail the smoke test for it.
+setup_stub
+echo '{"data":{"accountGroups":[]}}' > "$DSM_STUB_DIR/account-groups.json"
+out="$(dsm_casc_project_role 2>&1)"; rc=$?
+assert_eq "0" "$rc" "dsm_casc_project_role passes when no DAST group is declared"
+assert_contains "$out" "nothing to check" "dsm_casc_project_role says why it checked nothing"
+
+# `accountGroups(name:)` matches a substring of the name or the description, so a near-miss
+# must not be taken for the group that was asked for.
+setup_stub
+echo '{"data":{"accountGroups":[{"name":"DAST Project Readers","authorizedProjects":[]}]}}' \
+    > "$DSM_STUB_DIR/account-groups.json"
+out="$(dsm_casc_project_role 2>&1)"; rc=$?
+assert_eq "0" "$rc" "dsm_casc_project_role ignores a group whose name only contains the one asked for"
+
+setup_stub
+DSM_CASC_GROUP="Another Group"
+out="$(dsm_casc_project_role 2>&1)"
+assert_contains "$(calls)" "Another Group" "dsm_casc_project_role asks for the configured group"
+# shellcheck disable=SC2034
+DSM_CASC_GROUP="DAST Project"
+
 # --- dsm_resolve_build -------------------------------------------------------
 
 # `yontrack validate --build` takes the build *name*, and the slot workflow can only pass the
@@ -306,13 +395,39 @@ assert_eq "1" "$rc" "poll: refuses to run without a token"
 assert_contains "$out" "DEMO_TOKEN" "poll: says which variable is missing"
 
 setup_stub
+out="$(dsm_casc 2>&1)"; rc=$?
+assert_eq "0" "$rc" "casc: passes when the reload restores the project role"
+
+# Idempotent by construction - CasC is declarative - and demo-smoke runs on every main BRONZE
+# deployment, so running it twice has to be as good as running it once.
+setup_stub
+out="$(dsm_casc 2>&1 && dsm_casc 2>&1)"; rc=$?
+assert_eq "0" "$rc" "casc: is idempotent across two consecutive runs"
+
+setup_stub
+out="$(DEMO_TOKEN='' dsm_casc 2>&1)"; rc=$?
+assert_eq "1" "$rc" "casc: refuses to run without a token"
+assert_not_contains "$(calls)" "graphql" "casc: asks nothing when it has no token"
+
+# A failed reload must not be followed by an assertion on a stale state.
+setup_stub
+echo '{"data":{"reloadCasc":{"errors":[{"message":"boom"}]}}}' > "$DSM_STUB_DIR/reload-casc.json"
+out="$(dsm_casc 2>&1)"; rc=$?
+assert_eq "1" "$rc" "casc: fails when the reload fails"
+assert_not_contains "$(calls)" "accountGroups" "casc: does not check the role when the reload failed"
+
+setup_stub
 out="$(dsm_assert 2>&1)"; rc=$?
 assert_eq "0" "$rc" "assert: passes on a seeded demo"
 
 setup_stub
 out="$(dsm_main 2>&1)"; rc=$?
 assert_eq "1" "$rc" "no command: fails with the usage"
-assert_contains "$out" "resolve|poll|assert" "no command: prints the usage"
+assert_contains "$out" "resolve|poll|casc|assert" "no command: prints the usage"
+
+setup_stub
+out="$(dsm_main casc 2>&1)"; rc=$?
+assert_eq "0" "$rc" "casc: is reachable as a command"
 
 # --- report ----------------------------------------------------------------
 

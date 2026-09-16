@@ -7,7 +7,7 @@
 # inline in the workflow so that scripts/demo-smoke-test.sh can exercise it against a
 # stubbed HTTP client.
 #
-# Usage: scripts/demo-smoke.sh resolve|poll|assert
+# Usage: scripts/demo-smoke.sh resolve|poll|casc|assert
 #
 #   resolve  Finds the Yontrack build the deployed version names, and writes its name to
 #            $GITHUB_OUTPUT as `build`. DEMO.SMOKE is reported against that name.
@@ -15,6 +15,11 @@
 #            marks itself deployed when the gitops PR merges, which is well before ArgoCD
 #            has synced and the pods are serving, so this is the first and most valuable
 #            check of the lot: "the version I asked for is the version answering".
+#   casc     Re-applies the demo's configuration as code, and checks that the DAST scanner
+#            group got its project role back. Runs right after the seed: the seed deletes
+#            and recreates every project, and a project's permissions go with the project,
+#            so `scan-project` would otherwise have no project at all from the first reset
+#            onwards and the cross-project authorization scan would test nothing.
 #   assert   Checks that the seeded demo dataset is there. Deliberately thin - the heavy
 #            suites already ran for BRONZE, and a fat smoke suite becomes the flaky thing
 #            that blocks releases.
@@ -26,6 +31,9 @@
 #   DEMO_PROJECT         Yontrack project holding the build (default: yontrack)
 #   DEMO_BRANCH          Yontrack branch holding the build (default: main)
 #   DEMO_SEEDED_PROJECT  seeded project to assert (default: petclinic)
+#   DEMO_CASC_GROUP      Yontrack group the CasC gives a project role to
+#                        (default: DAST Project)
+#   DEMO_CASC_ROLE       project role that group must hold (default: PARTICIPANT)
 #   DEMO_POLL_TIMEOUT    how long to wait for the version, in seconds (default: 600).
 #                        0 makes `poll` a single check rather than a wait - the loop
 #                        always attempts once before testing the deadline, which is
@@ -50,6 +58,8 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/yontrack-build.sh"
 DSM_URL="${DEMO_URL:-https://demo.dev.yontrack.com}"
 DSM_URL="${DSM_URL%/}"
 DSM_SEEDED_PROJECT="${DEMO_SEEDED_PROJECT:-petclinic}"
+DSM_CASC_GROUP="${DEMO_CASC_GROUP:-DAST Project}"
+DSM_CASC_ROLE="${DEMO_CASC_ROLE:-PARTICIPANT}"
 DSM_YONTRACK_PROJECT="${DEMO_PROJECT:-yontrack}"
 DSM_YONTRACK_BRANCH="${DEMO_BRANCH:-main}"
 DSM_TIMEOUT="${DEMO_POLL_TIMEOUT:-600}"
@@ -163,6 +173,74 @@ dsm_assert_seeded_project() {
     return 0
 }
 
+# Re-applies the demo's configuration as code.
+#
+# `reloadCasc` is the only remote reload that reaches the demo: the REST endpoints
+# (`PUT /extension/casc/reload`, `POST /extension/casc/upload`) are not routed by the chart's
+# ingress, which sends everything but /graphql and /hook to the Next UI. It needs no enabling
+# flag - `ontrack.casc.reloading` only creates a scheduled job and `ontrack.casc.upload` only
+# opens the upload endpoint - and it is gated on the global GlobalSettings function, which
+# DEMO_TOKEN already carries since the seed deletes every project with it.
+#
+# Idempotent by construction: CasC is declarative, so a reload on an instance whose CasC
+# already applies is a no-op. This runs on every main BRONZE deployment.
+dsm_casc_reload() {
+    local body errors
+    body="$(dsm_graphql 'mutation { reloadCasc { errors { message } } }')" || return 1
+    errors="$(echo "$body" | jq -r '.data.reloadCasc.errors // [] | map(.message) | join("; ")')"
+    if [ -n "$errors" ]; then
+        dsm_fail "reloadCasc reported errors: $errors"
+        return 1
+    fi
+    dsm_log "The CasC of $DSM_URL has been re-applied."
+    return 0
+}
+
+# Checks that the DAST scanner group holds its project role on the seeded project.
+#
+# This is the point of the reload, so it is asserted rather than assumed: a reload that ran
+# but left `project-permissions` unapplied looks exactly like a successful one from the
+# mutation's side.
+#
+# An instance that declares no such group at all - any instance but the demo - is not a
+# failure: there is simply no DAST CasC there, and nothing to restore. A group that exists
+# but lost its role is a failure, because that is precisely the regression this guards.
+dsm_casc_project_role() {
+    local body group role
+    body="$(dsm_graphql "query {
+        accountGroups(name: \"$DSM_CASC_GROUP\") {
+            name
+            authorizedProjects {
+                project { name }
+                role { id }
+            }
+        }
+    }")" || return 1
+
+    # `accountGroups(name:)` searches for a substring in the name or the description, so the
+    # exact group is picked out here rather than taken as the first result.
+    group="$(echo "$body" | jq -c --arg g "$DSM_CASC_GROUP" \
+        '.data.accountGroups // [] | map(select(.name == $g)) | .[0] // empty')"
+    if [ -z "$group" ]; then
+        dsm_log "No group \"$DSM_CASC_GROUP\" on $DSM_URL: no DAST CasC on this instance, nothing to check."
+        return 0
+    fi
+
+    role="$(echo "$group" | jq -r --arg p "$DSM_SEEDED_PROJECT" \
+        '.authorizedProjects // [] | map(select(.project.name == $p)) | .[0].role.id // empty')"
+    if [ -z "$role" ]; then
+        dsm_fail "Group \"$DSM_CASC_GROUP\" holds no role on $DSM_SEEDED_PROJECT after the seed."
+        return 1
+    fi
+    if [ "$role" != "$DSM_CASC_ROLE" ]; then
+        dsm_fail "Group \"$DSM_CASC_GROUP\" holds $role on $DSM_SEEDED_PROJECT, expected $DSM_CASC_ROLE."
+        return 1
+    fi
+
+    dsm_log "Group \"$DSM_CASC_GROUP\" holds $role on $DSM_SEEDED_PROJECT."
+    return 0
+}
+
 # The Yontrack build name the deployed version stands for.
 #
 # DEMO.SMOKE is reported with `yontrack validate --build`, which takes the build *name* - the
@@ -205,6 +283,13 @@ dsm_poll() {
     dsm_wait_for_version "$expected"
 }
 
+dsm_casc() {
+    dsm_require_token || return 1
+    dsm_log "Re-applying the CasC of $DSM_URL after the seed"
+    dsm_casc_reload || return 1
+    dsm_casc_project_role
+}
+
 dsm_assert() {
     dsm_require_token || return 1
     dsm_log "Asserting the seeded demo at $DSM_URL"
@@ -215,9 +300,10 @@ dsm_main() {
     case "${1:-}" in
         resolve) dsm_resolve ;;
         poll) dsm_poll ;;
+        casc) dsm_casc ;;
         assert) dsm_assert ;;
         *)
-            dsm_fail "Usage: $0 resolve|poll|assert"
+            dsm_fail "Usage: $0 resolve|poll|casc|assert"
             return 1
             ;;
     esac

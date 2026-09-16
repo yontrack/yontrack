@@ -160,7 +160,28 @@ jobs:
         run: ontrack-demo-seed/build/install/ontrack-demo-seed/bin/ontrack-demo-seed
 
       # ------------------------------------------------------------------------------------
-      # 3. Assert, thinly.
+      # 3. Re-apply the configuration as code.
+      #
+      # The seed deleted and recreated every project, and a project's permissions went with
+      # the project. The demo's CasC declares `project-permissions` giving the DAST scanner
+      # group `DAST Project` the PARTICIPANT role on the seeded project, so from the first
+      # reset onwards `scan-project` would have no project at all and the cross-project
+      # authorization scan would test nothing (issue #1768).
+      #
+      # `reloadCasc` over /graphql is the only remote reload that reaches the demo: the REST
+      # reload and upload endpoints are not routed by the chart's ingress. It is declarative
+      # and therefore idempotent, which it has to be - this runs on every main BRONZE
+      # deployment. The canonical declaration is security/dast/casc.yaml.
+      # ------------------------------------------------------------------------------------
+
+      - name: Re-apply the CasC and check the scanner's project role
+        id: casc
+        env:
+          DEMO_TOKEN: ${{ secrets.DEMO_TOKEN }}
+        run: scripts/demo-smoke.sh casc
+
+      # ------------------------------------------------------------------------------------
+      # 4. Assert, thinly.
       # ------------------------------------------------------------------------------------
 
       - name: Check the seeded dataset over GraphQL
@@ -204,7 +225,7 @@ jobs:
           if-no-files-found: ignore
 
       # ------------------------------------------------------------------------------------
-      # 4. Report, whatever happened.
+      # 5. Report, whatever happened.
       # ------------------------------------------------------------------------------------
 
       # `!cancelled()` and not `success()`: a demo that never came up must land a FAILED
@@ -216,6 +237,7 @@ jobs:
           STARTED: ${{ steps.job_start.outputs.started }}
           POLL: ${{ steps.poll.outcome }}
           SEED: ${{ steps.seed.outcome }}
+          CASC: ${{ steps.casc.outcome }}
           ASSERT: ${{ steps.assert.outcome }}
           PLAYWRIGHT: ${{ steps.playwright.outcome }}
           BUILD: ${{ steps.resolve.outputs.build }}
@@ -226,7 +248,7 @@ jobs:
             run_time_flag="--run-time $(( $(date +%s) - STARTED ))"
           fi
           # A skipped step is a failure here: it means an earlier one stopped the run.
-          if [ "$POLL" = "success" ] && [ "$SEED" = "success" ] \
+          if [ "$POLL" = "success" ] && [ "$SEED" = "success" ] && [ "$CASC" = "success" ] \
             && [ "$ASSERT" = "success" ] && [ "$PLAYWRIGHT" = "success" ]; then
             status=PASSED
           else
@@ -239,6 +261,7 @@ jobs:
             echo "|---|---|"
             echo "| Version \`$DEMO_VERSION\` answering | ${POLL:-skipped} |"
             echo "| Reset and seed | ${SEED:-skipped} |"
+            echo "| CasC re-applied, scanner project role back | ${CASC:-skipped} |"
             echo "| Seeded dataset over GraphQL | ${ASSERT:-skipped} |"
             echo "| UI signs in and renders | ${PLAYWRIGHT:-skipped} |"
           } >> "$GITHUB_STEP_SUMMARY"
