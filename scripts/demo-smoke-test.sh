@@ -365,6 +365,27 @@ assert_eq "1" "$rc" "dsm_resolve_build fails rather than validating something un
 
 # --- the entry points -------------------------------------------------------
 
+# `version` feeds `resolve`: dast-passive.yml is told nothing about what is deployed, so it asks
+# the demo and hands the answer straight over. The two have to agree on the shape of that value.
+setup_stub
+GITHUB_OUTPUT="$DSM_STUB_DIR/github_output"
+export GITHUB_OUTPUT
+out="$(dsm_version_command 2>&1)"; rc=$?
+assert_eq "0" "$rc" "version: passes when the demo answers"
+assert_contains "$(cat "$GITHUB_OUTPUT")" "version=5.3.0-rc-100" \
+    "version: hands the deployed version to the next step"
+unset GITHUB_OUTPUT
+
+setup_stub
+out="$(DEMO_TOKEN='' dsm_version_command 2>&1)"; rc=$?
+assert_eq "1" "$rc" "version: refuses to run without a token"
+assert_not_contains "$(calls)" "graphql" "version: asks nothing when it has no token"
+
+setup_stub
+echo '{"data":{"info":{"version":{"full":null}}}}' > "$DSM_STUB_DIR/info.json"
+out="$(dsm_version_command 2>&1)"; rc=$?
+assert_eq "1" "$rc" "version: fails rather than handing on an empty version"
+
 setup_stub
 GITHUB_OUTPUT="$DSM_STUB_DIR/github_output"
 export GITHUB_OUTPUT

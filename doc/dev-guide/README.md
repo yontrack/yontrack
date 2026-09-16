@@ -16,5 +16,7 @@
   * [Releasing](release.md) - GOLD publishes, RELEASE records that it did
   * [Patch releases](patch-release.md) - fixing the previous minor from a release/X.Y branch
   * [Minor cutover](minor-cutover.md) - moving main to the next minor and retiring the old release branch
+* Security
+  * [Passive DAST scan](dast.md) - scanning the running demo with OWASP ZAP, reporting SECURITY.DAST
 * Workflows
   * [Claude Pick Workflow](claude-pick-workflow.md) - Let Claude autonomously pick and implement issues

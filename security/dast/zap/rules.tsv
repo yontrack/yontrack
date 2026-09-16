@@ -1,0 +1,23 @@
+# Per-rule level overrides for the DAST counting layer.
+#
+# Tab-separated, in the vocabulary of the zap-baseline rule file so that anyone who has used ZAP
+# before can read it, but applied by `scripts/security-dast.sh report` rather than by ZAP itself:
+# no rule is disabled in the scan, so the private report always keeps what the scanner actually
+# saw, and only what it *counts for* is decided here. See security/dast/README.md.
+#
+#     <rule id><TAB><IGNORE|WARN|FAIL><TAB><why>
+#
+#   IGNORE  the rule is dropped entirely — not counted, not reported. For scanner noise that is
+#           never actionable anywhere in Yontrack. A finding that is real but accepted belongs in
+#           suppressions.yaml instead, with a statement and an expiry; this file has neither.
+#   WARN    the rule is counted as LOW, whatever risk the scanner gave it. For a rule Yontrack
+#           takes less seriously than the scanner does, everywhere and for good.
+#   FAIL    the rule is counted as HIGH, whatever risk the scanner gave it. For a rule Yontrack
+#           takes more seriously than the scanner does.
+#
+# A rule that is not listed keeps the risk its scanner gave it, which is the normal case. Blank
+# lines and `#` comments are ignored.
+#
+# Deliberately empty of entries for the first run. An override is a judgement about a rule, and
+# the honest moment to make it is after seeing the rule fire on Yontrack — not before, from a list
+# of rule ids. The first reports are the input to this file.

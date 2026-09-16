@@ -45,10 +45,16 @@ on:
         default: main
         type: string
 
-# One smoke run at a time, and queue rather than cancel: the seed wipes the demo, so two
-# overlapping runs would reset the instance under each other's feet.
+# One thing at a time on the demo, and queue rather than cancel: the seed wipes the instance, so
+# two overlapping runs would reset it under each other's feet.
+#
+# The group is `demo-instance` rather than `demo-smoke` because it is shared with
+# .github/workflows/dast-passive.yml (#1765): the passive DAST scan crawls the demo for minutes,
+# and a reset starting underneath it would have the scanner walking an instance that is being
+# deleted around it - which reads as a broken scan, or worse as a clean one. Anything else that
+# touches the demo joins this group too.
 concurrency:
-  group: demo-smoke
+  group: demo-instance
   cancel-in-progress: false
 
 permissions:

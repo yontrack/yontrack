@@ -1,0 +1,99 @@
+# Scanner rule → what to change in Yontrack, and where.
+#
+# Read by `scripts/security-dast.sh report`, which prints the mitigation under each rule of the
+# markdown report pushed to yontrack/security-reports. A rule with no entry here is reported as
+# "no mitigation recorded", which is the signal to add one — see security/dast/README.md.
+#
+# The point of the file is that a report is readable months later by someone who did not run the
+# scan: a rule title says what is wrong, this says what to do about it in *this* codebase — the
+# class, the configuration key, the chart value, the issue where it is being fixed.
+#
+# Matching follows the same rule as suppressions.yaml: an entry matches a finding when every field
+# it declares matches, as an anchored regular expression, and a field it does not declare matches
+# anything. `scanner`, `rule` (the tool's own rule id) and `name` (the rule title) can be declared;
+# there is no `url` — a mitigation is about the rule, not about where it was seen.
+#
+# Seeded with the four findings decided up front in docs/grilling/2026-09-dast.md, "Known
+# findings", so that the very first report explains itself rather than listing expected noise.
+version: 1
+
+mitigations:
+
+  # -----------------------------------------------------------------------------------------
+  # Missing security headers on the Next.js UI — expected on the first run, fixed by #1770.
+  # -----------------------------------------------------------------------------------------
+  - id: ui-security-headers
+    scanner: "zap"
+    rule: "10020|10021|10035|10038|10063|90004"
+    title: "Security response headers missing on the UI"
+    issue: "https://github.com/yontrack/yontrack/issues/1770"
+    change: >-
+      Add a `headers()` section to `ontrack-web-core/next.config.js` covering every route,
+      `/mobile` included: X-Content-Type-Options, X-Frame-Options (or frame-ancestors),
+      Referrer-Policy, Permissions-Policy and a Content-Security-Policy — report-only first, so
+      that a policy that breaks Ant Design or the Next runtime is found from the reports rather
+      than from a blank page. HSTS (rule 10035) is deliberately NOT set by the application: it is
+      the ingress's to set, since it is the component that terminates TLS and knows whether every
+      hostname under the domain is HTTPS-only.
+
+  # -----------------------------------------------------------------------------------------
+  # Permissive CORS — expected on the first run, fixed by #1771.
+  # -----------------------------------------------------------------------------------------
+  - id: permissive-cors
+    scanner: "zap"
+    rule: "10098"
+    title: "Cross-domain misconfiguration: any origin is allowed"
+    issue: "https://github.com/yontrack/yontrack/issues/1771"
+    change: >-
+      `spring.graphql.cors.allowed-origins` is `"*"` in
+      `ontrack-ui/src/main/resources/config/application.yml`, and so are the CORS settings of the
+      REST and hook endpoints. Default to same-origin and make the allowlist a configuration
+      property, so that a deployment whose UI is served from another host opts in explicitly
+      instead of every deployment opting out by default. A minor release: it changes a shipped
+      default.
+
+  # -----------------------------------------------------------------------------------------
+  # GraphQL introspection — accepted, see suppressions.yaml. Kept here so that a report still
+  # explains it if the suppression ever expires.
+  # -----------------------------------------------------------------------------------------
+  - id: graphql-introspection
+    name: ".*[Ii]ntrospection.*"
+    title: "GraphQL introspection is enabled"
+    issue: "https://github.com/yontrack/yontrack/issues/1765"
+    change: >-
+      Accepted, not fixed: `spring.graphql.schema.introspection.enabled` stays `true`. The schema
+      is public — committed as `ontrack-web-core/ontrack.graphql` and published with the
+      documentation — and the UI needs it. Suppressed in security/dast/suppressions.yaml with that
+      statement.
+
+  # -----------------------------------------------------------------------------------------
+  # The management port. Not expected from the demo — the chart must not route 8800 at all — and
+  # `.github/workflows/dast-passive.yml` stops the run outright if it answers. Here so that a
+  # report of any other instance says what to do.
+  # -----------------------------------------------------------------------------------------
+  - id: actuator-exposure
+    name: ".*([Aa]ctuator|[Ss]pring [Bb]oot|/manage).*"
+    title: "Spring Boot management endpoints are reachable"
+    issue: "https://github.com/yontrack/yontrack/issues/1772"
+    change: >-
+      The management port 8800 (`/manage`) is unauthenticated by design — see `WebSecurityConfig`
+      — so reaching it from outside the cluster is a deployment fault, not an application one. The
+      shipped defaults were narrowed by #1772 (`management.endpoints.web.exposure.include` is
+      `health,info,prometheus`, `show-details: when-authorized`, the account endpoint disabled),
+      and the chart must never route the management port to an ingress
+      (yontrack/yontrack-chart#110). If this fires on the demo, treat it as an incident: the port
+      is exposed, whatever the endpoints on it happen to be.
+
+  # -----------------------------------------------------------------------------------------
+  # Version and technology disclosure. Low, and worth a line rather than an issue.
+  # -----------------------------------------------------------------------------------------
+  - id: version-disclosure
+    scanner: "zap"
+    rule: "10036|10037"
+    title: "Server and framework versions in the response headers"
+    change: >-
+      The demo answers with the `Server` and `X-Powered-By` headers of Next.js and of the ingress.
+      Yontrack publishes its own version over `/graphql` (`info { version { full } }`) to any
+      authenticated caller and the demo runs the newest build by construction, so this discloses
+      nothing an attacker could not ask for; `poweredByHeader: false` in
+      `ontrack-web-core/next.config.js` removes half of it for free if it is ever worth doing.

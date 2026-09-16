@@ -7,8 +7,14 @@
 # inline in the workflow so that scripts/demo-smoke-test.sh can exercise it against a
 # stubbed HTTP client.
 #
-# Usage: scripts/demo-smoke.sh resolve|poll|casc|assert
+# Usage: scripts/demo-smoke.sh version|resolve|poll|casc|assert
 #
+#   version  Asks the demo which version it is running and writes it to $GITHUB_OUTPUT as
+#            `version`. The mirror image of `poll`, for a workflow that is told nothing and has
+#            to find out: .github/workflows/dast-passive.yml scans whatever is deployed, so it
+#            reads the version here and feeds it straight back into `resolve` below. That is
+#            what makes the DAST scan stamp the same build the smoke test stamped, by the same
+#            code, rather than by a second lookup that could drift onto another one.
 #   resolve  Finds the Yontrack build the deployed version names, and writes its name to
 #            $GITHUB_OUTPUT as `build`. DEMO.SMOKE is reported against that name.
 #   poll     Waits until the demo answers with the version that was deployed. The slot
@@ -267,6 +273,15 @@ dsm_require_token() {
     [ -n "${DEMO_TOKEN:-}" ] || { dsm_fail "DEMO_TOKEN is not set: the demo cannot be queried."; return 1; }
 }
 
+dsm_version_command() {
+    local version
+    dsm_require_token || return 1
+    version="$(dsm_version)" || return 1
+    [ -n "$version" ] || { dsm_fail "$DSM_URL does not report a version."; return 1; }
+    dsm_log "$DSM_URL is running $version."
+    dsm_output version "$version"
+}
+
 dsm_resolve() {
     local version="${DEMO_VERSION:-}" name
     [ -n "$version" ] || { dsm_fail "DEMO_VERSION is not set: nothing to resolve."; return 1; }
@@ -298,12 +313,13 @@ dsm_assert() {
 
 dsm_main() {
     case "${1:-}" in
+        version) dsm_version_command ;;
         resolve) dsm_resolve ;;
         poll) dsm_poll ;;
         casc) dsm_casc ;;
         assert) dsm_assert ;;
         *)
-            dsm_fail "Usage: $0 resolve|poll|casc|assert"
+            dsm_fail "Usage: $0 version|resolve|poll|casc|assert"
             return 1
             ;;
     esac

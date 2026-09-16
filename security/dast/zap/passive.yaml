@@ -1,0 +1,237 @@
+# ZAP Automation Framework plan — PASSIVE scan of the Yontrack demo instance (#1765).
+#
+# Run by .github/workflows/dast-passive.yml, in the pinned ZAP container:
+#
+#     zap.sh -cmd -autorun /zap/wrk/passive.yaml
+#
+# Passive means exactly one thing here: **no request that changes state ever leaves ZAP**. There
+# is no activeScan job, no fuzzing, no attack payload, and no GraphQL mutation — see the
+# `graphql` job below and security/dast/graphql/README.md. The demo is a shared, seeded instance
+# that gates SILVER; a scan that wrote to it would break the very pipeline it is watching.
+#
+# `${...}` are environment variables, substituted by the Automation Framework:
+#
+#   DAST_TARGET   the demo, no trailing slash (vars.DEMO_URL)
+#   DEMO_TOKEN    Yontrack API token, sent to /graphql only — never logged, never reported
+#
+# NOTHING IS DISABLED HERE, on purpose. Every rule stays on and the report keeps every finding:
+# what a rule *counts for* is decided afterwards by scripts/security-dast.sh from
+# security/dast/zap/rules.tsv and security/dast/suppressions.yaml, so that the private report
+# always shows what the scanner actually saw. See security/dast/README.md.
+
+env:
+  contexts:
+    - name: yontrack-demo
+      urls:
+        - "${DAST_TARGET}/"
+      # \Q…\E quotes the target literally: a bare interpolation would leave the dots of the host
+      # name as regex wildcards, and `demo.dev.yontrack.com.*` also matches `demoXdev…evil.com`.
+      includePaths:
+        - "\\Q${DAST_TARGET}\\E.*"
+      excludePaths:
+        # Signing out of the demo admin session mid-scan, and the fingerprinted Next bundles,
+        # which are megabytes of the same two findings.
+        - ".*/logout.*"
+        - ".*/signout.*"
+        - ".*/_next/static/.*"
+  parameters:
+    # A scanner error is a failed run reporting no stamp, not a clean scan — see the issue's
+    # "Failure semantics". Warnings are not: a spider that found fewer URLs than a default test
+    # expects is a small demo, not a broken scan.
+    failOnError: true
+    failOnWarning: false
+    # To ZAP's own stdout, which the workflow captures to a file and never prints raw: progress
+    # lines carry the URLs being crawled. Kept on because it is the only diagnostic a failed run
+    # has, and scripts/security-dast.sh scrubs URLs out of anything that reaches the log.
+    progressToStdout: true
+
+jobs:
+
+  # -------------------------------------------------------------------------------------------
+  # There is deliberately no `addOns` job.
+  #
+  # The `graphql` and `replacer` add-ons this plan needs both ship in the pinned image, and the
+  # Automation Framework's addOns job "no longer does anything" - it warns and is ignored. Pinning
+  # the image by digest is what makes the add-on set reproducible; an `install` list would only
+  # look like it was doing that.
+  # -------------------------------------------------------------------------------------------
+
+  # -------------------------------------------------------------------------------------------
+  # Passive scanning configuration. Every rule on, in-scope only.
+  # -------------------------------------------------------------------------------------------
+  - type: passiveScan-config
+    parameters:
+      # Per rule, not overall: a header missing on every page of the UI is one finding with ten
+      # example URLs, which is what the report wants, rather than several hundred instances of it.
+      maxAlertsPerRule: 10
+      scanOnlyInScope: true
+      enableTags: false
+
+  # -------------------------------------------------------------------------------------------
+  # Authentication for the API only.
+  #
+  # The UI is scanned **unauthenticated** by design (grilling outcome, "Two scans, two targets"):
+  # it goes through the same API, which is scanned authenticated, so an authenticated crawl would
+  # re-test the API through a browser. The `url` regex is what keeps the token off every UI
+  # request — it is sent to /graphql and to nothing else.
+  #
+  # The token reaches ZAP as an environment variable and appears in no file, no log and no report;
+  # scripts/security-dast.sh redacts it from the report before it is published, as a second line
+  # of defence.
+  # -------------------------------------------------------------------------------------------
+  - type: replacer
+    rules:
+      - description: "Yontrack API token, on /graphql only"
+        url: ".*/graphql.*"
+        # `req_header`, not `request_header`: the Automation Framework rejects the plan outright
+        # for anything outside [req_header, req_header_str, req_body_str, resp_header,
+        # resp_header_str, resp_body_str].
+        matchType: req_header
+        matchString: "X-Ontrack-Token"
+        replacementString: "${DEMO_TOKEN}"
+        tokenProcessing: false
+
+  # -------------------------------------------------------------------------------------------
+  # The targets that are named rather than discovered.
+  #
+  # The spider below finds what is linked; these are the ones that matter and are not: /mobile is
+  # a separate app shell with no link from the desktop root, the /api/auth/* endpoints are called
+  # by NextAuth from JavaScript, and /hook/secured/** is POST-only so nothing ever links to it.
+  #
+  # All GET. The hook endpoint answers 405 to a GET, which is the point: the response headers are
+  # what is being scanned, and a GET cannot ingest anything.
+  # -------------------------------------------------------------------------------------------
+  - type: requestor
+    requests:
+      - url: "${DAST_TARGET}/"
+        method: GET
+      - url: "${DAST_TARGET}/mobile"
+        method: GET
+      - url: "${DAST_TARGET}/api/health"
+        method: GET
+      - url: "${DAST_TARGET}/api/auth/session"
+        method: GET
+      - url: "${DAST_TARGET}/api/auth/providers"
+        method: GET
+      - url: "${DAST_TARGET}/api/auth/csrf"
+        method: GET
+      - url: "${DAST_TARGET}/api/auth/signin"
+        method: GET
+      - url: "${DAST_TARGET}/graphql"
+        method: GET
+      - url: "${DAST_TARGET}/hook/secured/github/ingestion"
+        method: GET
+
+  # -------------------------------------------------------------------------------------------
+  # The crawl. The traditional spider, not the AJAX one: it costs minutes rather than tens of
+  # them, and the UI's client-rendered pages all go through /graphql, which is scanned directly.
+  #
+  # `postForm: false` is load-bearing: it is what stops the spider from submitting the forms it
+  # finds on a live, shared instance.
+  # -------------------------------------------------------------------------------------------
+  - type: spider
+    parameters:
+      context: yontrack-demo
+      url: "${DAST_TARGET}/"
+      maxDuration: 5
+      maxDepth: 5
+      maxChildren: 20
+      postForm: false
+      processForm: false
+      handleODataParametersVisited: false
+      acceptCookies: true
+    tests:
+      # The default test expects 100 URLs and warns below that. The demo signs users in through
+      # Keycloak, so an unauthenticated crawl legitimately reaches a handful of pages; INFO says
+      # so in the ZAP log without colouring the run.
+      - type: stats
+        statistic: automation.spider.urls.added
+        operator: ">="
+        value: 1
+        onFail: INFO
+
+  # -------------------------------------------------------------------------------------------
+  # The API.
+  #
+  # `schemaFile` is NOT ontrack-web-core/ontrack.graphql: the workflow derives a **query-only**
+  # SDL from it first (scripts/security-dast.sh query-schema) and hands that over. The GraphQL
+  # add-on generates one request per root field of every root type it is given, mutations
+  # included, and has no switch to leave them out — so the switch is the schema. A Mutation type
+  # that is not in the schema cannot be generated from it.
+  #
+  # security/dast/graphql/README.md explains it, and `query-schema` refuses to write a file that
+  # still declares a mutation or subscription root.
+  # -------------------------------------------------------------------------------------------
+  - type: graphql
+    parameters:
+      endpoint: "${DAST_TARGET}/graphql"
+      schemaFile: "/zap/wrk/graphql/query-only.graphql"
+      # One request per root query field. `leaf` would generate one per leaf field of a 12,000
+      # line schema, and `operation` a single query so deep the server would reject it outright.
+      querySplitType: root_field
+      # Two levels of selection is enough for a passive scan: what is being read is the response
+      # headers and the error shape, not the data.
+      maxQueryDepth: 2
+      maxArgsDepth: 1
+      optionalArgsEnabled: false
+      argsType: inline
+      lenientMaxQueryDepthEnabled: true
+      requestMethod: post_json
+
+  # -------------------------------------------------------------------------------------------
+  # Let the passive rules finish on everything the jobs above put through the proxy.
+  # -------------------------------------------------------------------------------------------
+  - type: passiveScan-wait
+    parameters:
+      maxDuration: 10
+
+  # -------------------------------------------------------------------------------------------
+  # Every request ZAP sent, as a HAR.
+  #
+  # Not a report and never published: it is read once, on the runner, by
+  # `scripts/security-dast.sh assert-no-mutations`, which fails the workflow if any request body
+  # carried a GraphQL mutation or subscription. The query-only schema should make that
+  # impossible - this is the check that looks at what actually went over the wire rather than at
+  # what was meant to. It also carries the API token in its request headers, which is the other
+  # reason it never leaves the runner.
+  # -------------------------------------------------------------------------------------------
+  - type: export
+    parameters:
+      fileName: /zap/wrk/out/messages.har
+      type: har
+      source: history
+
+  # -------------------------------------------------------------------------------------------
+  # Reports. Two files, neither of which ever becomes a workflow artifact:
+  #
+  #   zap.json   read by scripts/security-dast.sh, which counts it and writes the markdown report
+  #              pushed to the private yontrack/security-reports;
+  #   zap.sarif  uploaded to GitHub code scanning under the `dast-zap` category, if and only if
+  #              GitHub accepts and usefully renders findings located by URL rather than by file.
+  #
+  # Every risk and every confidence, including informational and false-positive: the filtering is
+  # the counting layer's job, and a report that filters first cannot be reviewed.
+  # -------------------------------------------------------------------------------------------
+  - type: report
+    parameters:
+      template: traditional-json
+      reportDir: /zap/wrk/out
+      reportFile: zap
+      reportTitle: "Yontrack passive DAST"
+      reportDescription: "Passive ZAP scan of the Yontrack demo instance"
+      displayReport: false
+    risks: [info, low, medium, high]
+    confidences: [falsepositive, low, medium, high, confirmed]
+
+  - type: report
+    parameters:
+      template: sarif-json
+      # A different base name from the one above: both templates write `<reportFile>.json`, and
+      # sharing it would silently leave one report overwriting the other.
+      reportDir: /zap/wrk/out
+      reportFile: zap-sarif
+      reportTitle: "Yontrack passive DAST"
+      reportDescription: "Passive ZAP scan of the Yontrack demo instance"
+      displayReport: false
+    risks: [info, low, medium, high]
+    confidences: [falsepositive, low, medium, high, confirmed]

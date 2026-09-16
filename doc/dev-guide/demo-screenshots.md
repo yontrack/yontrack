@@ -23,8 +23,9 @@ deterministically on the way to `SILVER`, and one system owning the demo's state
 than a guarantee here. If the demo has drifted since - someone was demonstrating against it -
 dispatch `demo-smoke.yml` first, then this.
 
-And it keeps its own concurrency group rather than joining `demo-smoke`'s. Sharing that group
-would serialise the two, which reads like the safer choice until you notice which way the queue
+And it keeps its own concurrency group rather than joining `demo-instance`, the group
+[`demo-smoke.yml`](demo-smoke.md) and the [passive DAST scan](dast.md) share. Sharing it
+would serialise the three, which reads like the safer choice until you notice which way the queue
 runs: a 20-minute capture would hold up a `SILVER` smoke run, and this is precisely the system
 that must never do that. The cost lands the other way instead - a seed starting mid-capture
 leaves some images showing the old dataset. That is visible and recoverable on a workflow

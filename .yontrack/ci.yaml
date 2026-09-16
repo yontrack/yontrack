@@ -65,6 +65,22 @@ configuration:
           net.nemerosa.ontrack.extension.general.validation.ThresholdNumberValidationDataType:
             failureThreshold: 0
             okIfGreater: false
+        # Findings of the passive DAST scan of the demo instance, counted after suppressions by
+        # .github/workflows/dast-passive.yml and reported on the build the demo is running
+        # (#1765). One count per scanner rule, not per affected URL; informational findings are
+        # dropped, and ZAP has no Critical, so a passive ZAP-only run never produces one.
+        #
+        # Lower thresholds than the other SECURITY stamps on purpose: these are findings against a
+        # deployment that is actually reachable, so one MEDIUM is worth a look and one HIGH is
+        # worth stopping for. The scan is still reporting only - the stamp is in no promotion, and
+        # nothing in ci.yml depends on the workflow. What the numbers mean and where the detail
+        # lives: security/dast/README.md.
+        SECURITY.DAST:
+          chml:
+            warningLevel: MEDIUM
+            warningValue: 1
+            failedLevel: HIGH
+            failedValue: 1
         # Reported by the `docs` job in ci.yml, which now runs on every full run: the site
         # built and was archived as a run artefact for the release to carry forward (#1668).
         # Distinct from DOCUMENTATION below, which records the S3 publication at release time

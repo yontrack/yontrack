@@ -1,0 +1,386 @@
+# Passive DAST scan of the demo instance, reporting SECURITY.DAST (#1765).
+#
+# Part of `initiative: security-scans`, DAST track. The design is docs/grilling/2026-09-dast.md;
+# what the scanners read is security/dast/, and what every later DAST issue builds on is the
+# split described there: the scanner reports everything, and scripts/security-dast.sh decides what
+# it counts for. #1766 adds graphql-cop and Nuclei as two more `normalize-*` converters feeding
+# the same `report` step; #1767 runs the same script with DAST_KIND=active.
+#
+# Passive means no request that changes state ever leaves the scanner. There is no active scan,
+# no fuzzing, no attack payload and - the one that matters on a shared instance - no GraphQL
+# mutation: ZAP is fed a schema with no mutation root, so a mutation is not filtered out, it is
+# not expressible. security/dast/graphql/README.md explains it, and the run proves it afterwards
+# from ZAP's own record of what it sent.
+#
+# ---------------------------------------------------------------------------------------------
+# DISCLOSURE. This repository is public: its workflow logs are readable by any signed-in GitHub
+# user. A DAST report is a working checklist against every deployment that has not upgraded yet,
+# so:
+#
+#   * this workflow prints COUNTS ONLY - never a URL, a parameter or a piece of evidence;
+#   * it uploads NO ARTIFACT, deliberately. Do not add one;
+#   * the full detail goes to the private yontrack/security-reports, one file per run;
+#   * the validation run points at this workflow run, never at the report.
+#
+# Anything a scanner writes to its own stdout goes through `scripts/security-dast.sh scrub`
+# before it can reach the log. If you add a step here, it prints a number or it prints nothing.
+# ---------------------------------------------------------------------------------------------
+#
+# Nothing in ci.yml or in any promotion depends on this workflow: SECURITY.DAST is reporting only.
+# A scanner error fails the run and reports no stamp - a scan that did not happen must never read
+# as a clean instance.
+#
+# Every action is pinned by commit SHA and the ZAP image by digest, like the other security
+# workflows. .github/dependabot.yml keeps the action pins up to date.
+name: DAST passive
+
+on:
+  # The moment a new BRONZE build is live and freshly seeded. demo-smoke.yml is what deploys the
+  # demo's dataset and re-applies its CasC, so this is also the only moment the instance is in a
+  # known state.
+  workflow_run:
+    workflows: ["Demo smoke"]
+    types:
+      - completed
+
+  # New ZAP rules appear even in weeks when Yontrack does not change, and a demo that has not been
+  # redeployed still deserves a current verdict. Monday morning, off the hour.
+  schedule:
+    - cron: "17 3 * * 1"
+
+  workflow_dispatch:
+
+# Shared with demo-smoke.yml, and that is the whole point: the seed wipes and rebuilds the demo,
+# so a reset running under a scan would have the scanner crawling an instance that is being
+# deleted around it. Queue rather than cancel - a cancelled scan reports no stamp at all.
+concurrency:
+  group: demo-instance
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  # Pinned: an unpinned CLI lets a Yontrack release turn a green pipeline red in a repository
+  # nobody touched. Only `validate` is used, and always with --project/--branch/--build spelled
+  # out - in 5.1.1 the typed subcommands read the build from their flag only
+  # (yontrack/yontrack-cli#73).
+  YONTRACK_CLI_VERSION: "5.1.1"
+  # Pinned by digest, not by the `stable` tag. A scanner whose version moves under you turns
+  # "three new findings" into "or maybe three new rules", which is the one question a report must
+  # never leave open.
+  # The `stable` tag this digest was taken from carried ZAP 2.16.1, which is what DAST_SCANNERS
+  # below records in every report. Move the two together.
+  ZAP_IMAGE: ghcr.io/zaproxy/zaproxy@sha256:781a2bdaea47324e7bab583e2263f21d257b0aee61ed51521a5be45f5f5081ef
+  # The demo, not the Yontrack instance the validation is reported to.
+  DEMO_URL: ${{ vars.DEMO_URL || 'https://demo.dev.yontrack.com' }}
+  # Where the reports go. Private, and the only place any detail is allowed to exist.
+  REPORTS_REPOSITORY: yontrack/security-reports
+
+jobs:
+  passive:
+    name: Passive scan of the demo
+    # A fork that enabled Actions would otherwise scan this organisation's demo with credentials
+    # it does not have, and file reports it cannot write.
+    if: >-
+      github.repository == 'yontrack/yontrack'
+      && (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success')
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      # For the SARIF upload only. Verify-or-drop: DAST findings are located by URL, not by file,
+      # and if GitHub cannot render them usefully the upload goes and the private report is the
+      # only source of truth.
+      security-events: write
+    env:
+      DAST_KIND: passive
+      DAST_TARGET: ${{ vars.DEMO_URL || 'https://demo.dev.yontrack.com' }}
+      DAST_RUN_ID: ${{ github.run_id }}
+      DAST_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      DAST_SCANNERS: OWASP ZAP 2.16.1 (passive rules, GraphQL add-on, query-only schema)
+      YONTRACK_PROJECT: yontrack
+      YONTRACK_BRANCH: main
+    steps:
+      # The run time reported for the validation is measured from here, and so is the duration in
+      # the report. A `run:` step is the earliest point a workflow can observe.
+      - name: Record the job start
+        id: job_start
+        run: |
+          set -euo pipefail
+          {
+            echo "started=$(date +%s)"
+            echo "date=$(date -u +%Y-%m-%d)"
+          } >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      # Installed directly rather than through ontrack-github-actions-cli-config, which registers
+      # a build as a side effect. This workflow reports on a build that already exists - the one
+      # running on the demo - and must not create one.
+      - name: Install the Yontrack CLI
+        env:
+          YONTRACK_URL: ${{ vars.YONTRACK_URL }}
+          YONTRACK_TOKEN: ${{ secrets.YONTRACK_TOKEN }}
+        run: |
+          set -euo pipefail
+          curl -sSfL -o /usr/local/bin/yontrack \
+            "https://github.com/nemerosa/ontrack-cli/releases/download/${YONTRACK_CLI_VERSION}/yontrack-linux-amd64"
+          chmod +x /usr/local/bin/yontrack
+          # --cli only: the bare `version` also asks the server, which is not configured yet.
+          yontrack version --cli
+          yontrack config create prod "$YONTRACK_URL" --token "$YONTRACK_TOKEN" --override
+
+      # ------------------------------------------------------------------------------------
+      # 1. What is deployed, and which build that is.
+      #
+      # Nothing tells this workflow which version to scan - a schedule and a workflow_run carry
+      # no inputs - so it asks the demo, then resolves that version back to a build exactly as
+      # demo-smoke.yml does, through the same two functions. The stamp therefore lands on the
+      # same build DEMO.SMOKE landed on, by construction rather than by coincidence.
+      # ------------------------------------------------------------------------------------
+
+      - name: Ask the demo which version it is running
+        id: version
+        env:
+          DEMO_TOKEN: ${{ secrets.DEMO_TOKEN }}
+        run: scripts/demo-smoke.sh version
+
+      - name: Resolve the build
+        id: resolve
+        env:
+          DEMO_VERSION: ${{ steps.version.outputs.version }}
+          DEMO_PROJECT: ${{ env.YONTRACK_PROJECT }}
+          DEMO_BRANCH: ${{ env.YONTRACK_BRANCH }}
+        run: scripts/demo-smoke.sh resolve
+
+      # ------------------------------------------------------------------------------------
+      # 2. The one thing that stops the run rather than counting.
+      #
+      # The Spring Boot management port is unauthenticated by design and must never be routed
+      # from outside the cluster. If it answers, that is an incident - not a MEDIUM to add to a
+      # tally - and the scan does not proceed to dress it up as one. See the issue's "Expected
+      # first result".
+      # ------------------------------------------------------------------------------------
+
+      - name: Check that the management port is not exposed
+        run: scripts/security-dast.sh actuator "$DAST_TARGET"
+
+      # ------------------------------------------------------------------------------------
+      # 3. Prepare the scan.
+      # ------------------------------------------------------------------------------------
+
+      # The query-only schema, and the reason a mutation cannot be generated. `query-schema` fails
+      # the run if the derived schema still declares a mutation or subscription root.
+      #
+      # `render-plan` fills in the one value ZAP will not: the Automation Framework expands
+      # `${...}` in job parameters but not inside a replacer rule, so a plan left as committed
+      # would send the literal `${DEMO_TOKEN}` as the API token and scan the API unauthenticated.
+      # The rendered copy stays in $RUNNER_TEMP, which this workflow never uploads.
+      - name: Prepare the scan
+        id: prepare
+        env:
+          DEMO_TOKEN: ${{ secrets.DEMO_TOKEN }}
+        run: |
+          set -euo pipefail
+          work="$RUNNER_TEMP/dast"
+          mkdir -p "$work/out" "$work/graphql"
+          scripts/security-dast.sh query-schema \
+            ontrack-web-core/ontrack.graphql "$work/graphql/query-only.graphql"
+          scripts/security-dast.sh render-plan \
+            security/dast/zap/passive.yaml "$work/passive.yaml"
+          # The ZAP image runs as its own uid: it has to be able to traverse the directories and
+          # to write its reports into out/. The files themselves stay 644 - `render-plan` sets
+          # that on the one it wrote.
+          chmod 755 "$work" "$work/graphql"
+          chmod 777 "$work/out"
+          echo "work=$work" >> "$GITHUB_OUTPUT"
+
+      # ------------------------------------------------------------------------------------
+      # 4. Scan.
+      #
+      # ZAP's stdout goes to a file and is never printed raw. Two reasons, both verified against
+      # the pinned image rather than assumed: its progress lines carry every URL it crawls, and
+      # when it loads the plan it echoes each job's parameters back - including the replacer's
+      # replacement string, which is the API token. On a failure the tail of it is printed
+      # through `scripts/security-dast.sh scrub`, which redacts both and leaves enough to tell a
+      # crashed container from a refused connection.
+      # ------------------------------------------------------------------------------------
+
+      # No `-e DEMO_TOKEN`: the plan was rendered with it already, and an environment variable on
+      # a `docker run` command line is readable from /proc by anything else on the runner.
+      - name: Run the ZAP passive scan
+        id: zap
+        env:
+          DEMO_TOKEN: ${{ secrets.DEMO_TOKEN }}
+          WORK: ${{ steps.prepare.outputs.work }}
+        run: |
+          set -uo pipefail
+          docker run --rm \
+            -v "$WORK:/zap/wrk:rw" \
+            -e DAST_TARGET="$DAST_TARGET" \
+            "$ZAP_IMAGE" \
+            zap.sh -cmd -autorun /zap/wrk/passive.yaml > "$WORK/zap.log" 2>&1
+          rc=$?
+          echo "ZAP finished with exit code $rc."
+          if [ "$rc" -ne 0 ]; then
+            echo "--- last lines of the ZAP log, URLs and credentials removed ---"
+            tail -n 60 "$WORK/zap.log" | scripts/security-dast.sh scrub
+            exit "$rc"
+          fi
+          exit 0
+
+      # The third of the three independent things that would each have to fail for a mutation to
+      # reach the demo, and the only one that observes what actually went over the wire. Counts
+      # only: how many requests, how many of them to /graphql.
+      - name: Prove that no mutation was sent
+        env:
+          WORK: ${{ steps.prepare.outputs.work }}
+        run: scripts/security-dast.sh assert-no-mutations "$WORK/out/messages.har"
+
+      # ------------------------------------------------------------------------------------
+      # 5. Count, report, publish.
+      # ------------------------------------------------------------------------------------
+
+      - name: Count the findings and write the report
+        id: report
+        env:
+          DEMO_TOKEN: ${{ secrets.DEMO_TOKEN }}
+          WORK: ${{ steps.prepare.outputs.work }}
+          DAST_VERSION: ${{ steps.version.outputs.version }}
+          DAST_BUILD: ${{ steps.resolve.outputs.build }}
+          DAST_DATE: ${{ steps.job_start.outputs.date }}
+          DAST_STARTED: ${{ steps.job_start.outputs.started }}
+        run: |
+          set -euo pipefail
+          scripts/security-dast.sh normalize-zap "$WORK/out/zap.json" > "$WORK/out/findings-zap.json"
+          scripts/security-dast.sh report "$WORK/out/report.md" "$WORK/out/findings-zap.json"
+          echo "path=$(scripts/security-dast.sh report-path)" >> "$GITHUB_OUTPUT"
+
+      # The private repository, and the only place the detail exists. The token is fine-grained
+      # to Contents on that repository alone: it cannot reach this one.
+      - name: Publish the report
+        env:
+          GH_TOKEN: ${{ secrets.SECURITY_REPORTS_TOKEN }}
+          WORK: ${{ steps.prepare.outputs.work }}
+          DAST_VERSION: ${{ steps.version.outputs.version }}
+          DAST_DATE: ${{ steps.job_start.outputs.date }}
+          REPORT_PATH: ${{ steps.report.outputs.path }}
+        run: scripts/security-dast.sh publish "$REPORTS_REPOSITORY" "$REPORT_PATH" "$WORK/out/report.md"
+
+      # ------------------------------------------------------------------------------------
+      # 6. Report to Yontrack.
+      #
+      # No `if:` at all, which is the deliberate opposite of what demo-smoke.yml does with
+      # DEMO.SMOKE, and the issue's "Failure semantics" is why: a scanner error fails the run and
+      # reports NO stamp. The two stamps carry different meanings. DEMO.SMOKE gates SILVER, so an
+      # absent one silently stalls a promotion and a FAILED one is the honest signal; nothing at
+      # all depends on SECURITY.DAST, so an absent one stalls nothing and says the true thing -
+      # this build has not been scanned. A FAILED stamp would say the opposite: that it was
+      # scanned and came back bad.
+      #
+      # Counts that could not be produced are never reported as zero either way. A scan that did
+      # not happen must not read as a clean instance.
+      # ------------------------------------------------------------------------------------
+
+      - name: Validate SECURITY.DAST
+        env:
+          CRITICAL: ${{ steps.report.outputs.critical }}
+          HIGH: ${{ steps.report.outputs.high }}
+          MEDIUM: ${{ steps.report.outputs.medium }}
+          LOW: ${{ steps.report.outputs.low }}
+          STARTED: ${{ steps.job_start.outputs.started }}
+          BUILD: ${{ steps.resolve.outputs.build }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          run_time_flag=""
+          if [ -n "${STARTED:-}" ]; then
+            run_time_flag="--run-time $(( $(date +%s) - STARTED ))"
+          fi
+          run_info="--source-type github-workflow --source-uri $DAST_RUN_URL"
+          run_info="$run_info --trigger-type ${GITHUB_EVENT_NAME} --trigger-data $VERSION"
+          # shellcheck disable=SC2086  # deliberate: run info is a set of flags, not one word
+          yontrack validate \
+            --project "$YONTRACK_PROJECT" --branch "$YONTRACK_BRANCH" --build "$BUILD" \
+            --validation SECURITY.DAST \
+            chml --critical "$CRITICAL" --high "$HIGH" --medium "$MEDIUM" --low "$LOW" \
+            $run_time_flag $run_info
+
+      # ------------------------------------------------------------------------------------
+      # 7. SARIF, on probation.
+      #
+      # `continue-on-error`, and that is the decision rather than a hedge: the counts and the
+      # private report are what this workflow is for, and a code-scanning upload that GitHub
+      # rejects must not turn a successful scan into a failed one. The step's outcome goes into
+      # the summary, which is how the verify-or-drop call gets made.
+      # ------------------------------------------------------------------------------------
+
+      # Sanitised before it is uploaded, and not as a precaution: ZAP's SARIF embeds the whole
+      # exchange of every result under `webRequest`, request headers included - so a result on
+      # /graphql carries a live admin token for the demo. That must not reach GitHub's alert
+      # store. What is uploaded is the rule, the level, the message and the URL, which is the
+      # whole point of a DAST SARIF.
+      - name: Sanitize the SARIF report
+        id: sarif
+        if: ${{ !cancelled() && steps.zap.outcome == 'success' }}
+        env:
+          DEMO_TOKEN: ${{ secrets.DEMO_TOKEN }}
+          WORK: ${{ steps.prepare.outputs.work }}
+        run: |
+          set -euo pipefail
+          raw="$(find "$WORK/out" -maxdepth 1 -name 'zap-sarif*' -type f | head -n 1)"
+          if [ -z "$raw" ]; then
+            echo "No SARIF report was produced."
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          scripts/security-dast.sh sanitize-sarif "$raw" "$WORK/out/dast-zap.sarif"
+          echo "found=true" >> "$GITHUB_OUTPUT"
+          echo "file=$WORK/out/dast-zap.sarif" >> "$GITHUB_OUTPUT"
+
+      - name: Upload the SARIF report
+        id: upload
+        if: ${{ !cancelled() && steps.sarif.outputs.found == 'true' }}
+        continue-on-error: true
+        uses: github/codeql-action/upload-sarif@b96794f015dfd88f77b49b1c93e0fa7110f94c63 # v4.38.0
+        with:
+          sarif_file: ${{ steps.sarif.outputs.file }}
+          category: dast-zap
+
+      # ------------------------------------------------------------------------------------
+      # 8. The summary. Counts only - check what you add here.
+      # ------------------------------------------------------------------------------------
+
+      - name: Summarise the counts
+        if: ${{ !cancelled() }}
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          BUILD: ${{ steps.resolve.outputs.build }}
+          CRITICAL: ${{ steps.report.outputs.critical }}
+          HIGH: ${{ steps.report.outputs.high }}
+          MEDIUM: ${{ steps.report.outputs.medium }}
+          LOW: ${{ steps.report.outputs.low }}
+          FINDINGS: ${{ steps.report.outputs.findings }}
+          SUPPRESSED: ${{ steps.report.outputs.suppressed }}
+          REPORT_PATH: ${{ steps.report.outputs.path }}
+          SARIF: ${{ steps.upload.outcome }}
+        run: |
+          {
+            echo "### Passive DAST scan of the demo — \`${VERSION:-unknown}\`"
+            echo
+            echo "| CRITICAL | HIGH | MEDIUM | LOW |"
+            echo "|---|---|---|---|"
+            echo "| ${CRITICAL:-?} | ${HIGH:-?} | ${MEDIUM:-?} | ${LOW:-?} |"
+            echo
+            echo "Counted per rule, after suppressions; informational findings dropped."
+            echo "${FINDINGS:-?} rule(s) counted, ${SUPPRESSED:-?} instance(s) suppressed."
+            echo
+            echo "Reported as \`SECURITY.DAST\` on build \`${BUILD:-unknown}\` of"
+            echo "\`$YONTRACK_PROJECT/$YONTRACK_BRANCH\`."
+            echo
+            echo "The findings themselves are in \`$REPORTS_REPOSITORY\` at"
+            echo "\`${REPORT_PATH:-not published}\` — never here, never as an artifact."
+            echo
+            echo "SARIF upload to code scanning (\`dast-zap\`): \`${SARIF:-skipped}\`."
+          } >> "$GITHUB_STEP_SUMMARY"

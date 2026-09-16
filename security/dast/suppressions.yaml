@@ -1,0 +1,43 @@
+# Accepted DAST findings — subtracted from the counts, listed in every report.
+#
+# Read by `scripts/security-dast.sh report`, which applies them after `zap/rules.tsv` and before
+# counting. See security/dast/README.md and docs/grilling/2026-09-dast.md.
+#
+# A suppression is a decision, not a filter: it carries the statement explaining why the finding
+# is accepted, and a date on which the acceptance lapses. An **expired** entry stops applying and
+# the finding comes back into the counts — that is the point of the date. The report says which
+# suppressions applied and which had expired, so neither is silent.
+#
+# Matching. An entry matches a finding when *every field it declares* matches; a field it does not
+# declare matches anything. All of them are regular expressions, anchored on the whole value:
+#
+#   scanner     the tool that reported it (`zap`, later `graphql-cop`, `nuclei`)
+#   rule        the tool's own rule id (for ZAP, the plugin id — e.g. `10098`)
+#   name        the rule's title, for a tool whose ids are unstable or undocumented
+#   url         matched against each affected URL: an entry with a `url` suppresses the instances
+#               on matching URLs only, and the finding still counts if any instance is left
+#
+# `statement` and `expired_at` (YYYY-MM-DD) are required — an acceptance with neither a reason nor
+# an end is how a finding disappears for good by accident.
+#
+# Nothing here carries exploit detail: these files are public, and a suppression says what was
+# decided, not how to exploit what was accepted.
+version: 1
+
+suppressions:
+
+  # The one accepted finding decided before the first scan ever ran — see the grilling outcome,
+  # "Known findings". The schema this exposes is committed in this repository as
+  # `ontrack-web-core/ontrack.graphql`, published with the documentation, and read by the UI at
+  # development time; disabling introspection would hide nothing and break the tooling.
+  #
+  # Keyed on the rule *name* rather than an id: introspection is reported by several tools under
+  # several ids (ZAP's GraphQL add-on, graphql-cop in #1766), and they agree on the word.
+  - id: graphql-introspection
+    name: ".*[Ii]ntrospection.*"
+    url: ".*/graphql.*"
+    statement: >-
+      Accepted. The GraphQL schema is public: it is committed as ontrack-web-core/ontrack.graphql,
+      published with the documentation, and needed by the UI and by every client generator.
+      Introspection discloses nothing that is not already on GitHub.
+    expired_at: "2027-09-30"
