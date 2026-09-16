@@ -90,7 +90,8 @@
 #                      wherever it appears, in the report and in scrubbed output - and so is
 #                      DEMO_TOKEN, should anything still set it
 #   DAST_CASC          the scanner roles' CasC (default: security/dast/casc.yaml) (whoami)
-#   DAST_KEYCLOAK_REALM_URL, DAST_KEYCLOAK_CLIENT_ID, DEMO_KEYCLOAK_CLIENT_SECRET,
+#   DAST_KEYCLOAK_REALM_URL (default: $DAST_TARGET/keycloak/realms/ontrack), DAST_KEYCLOAK_CLIENT_ID,
+#   DEMO_KEYCLOAK_CLIENT_SECRET,
 #   DAST_SCAN_{ADMIN,READONLY,PROJECT}_PASSWORD
 #                      the demo realm, its client, and each role's password (login)
 #
@@ -395,6 +396,8 @@ sd_login() {
     [ -n "${!secret:-}" ] || { sd_fail "$secret is not set: $role cannot log in, and the scan does not go on unauthenticated."; return 1; }
     [ -n "${DEMO_KEYCLOAK_CLIENT_SECRET:-}" ] || { sd_fail "DEMO_KEYCLOAK_CLIENT_SECRET is not set: no scanner account can log in."; return 1; }
     [ -n "${DAST_KEYCLOAK_CLIENT_ID:-}" ] || { sd_fail "DAST_KEYCLOAK_CLIENT_ID is not set."; return 1; }
+    # Derived from the target unless given: the chart serves Keycloak under /keycloak and names the
+    # realm `ontrack`. Not a workflow variable, which every step would print in its environment.
     realm="${DAST_KEYCLOAK_REALM_URL:-${DAST_TARGET:-}/keycloak/realms/ontrack}"
     realm="${realm%/}"
 
@@ -461,8 +464,10 @@ sd_login() {
 #
 # With $GITHUB_OUTPUT set, writes `version` - the version the demo runs - to it.
 sd_whoami() {
-    local role="${1:-}" dir="${2:-}" token_file url tmp status body groups expected visible granted global version
+    local role="${1:-}" dir="${2:-}" token_file url tmp status body groups expected visible granted global version casc
     [ -n "$role" ] && [ -n "$dir" ] || { sd_fail "Usage: $0 whoami ROLE DIR"; return 1; }
+    # By its path in the repository: the runner's checkout directory is nothing a log needs.
+    casc="${SD_CASC#"$SD_ROOT"/}"
     sd_known_role "$role" || return 1
     token_file="$(DAST_TOKEN_DIR="$dir" sd_token_file "$role")" || return 1
     url="${DAST_TARGET:-}"
@@ -488,11 +493,11 @@ sd_whoami() {
     fi
 
     expected="$(yq -r '.casc.ontrack.admin["group-mappings"][] | select(.idp == "/dast-'"${role#scan-}"'") | .group' "$SD_CASC")" \
-        || { sd_fail "Could not read the group mappings from $SD_CASC"; return 1; }
-    [ -n "$expected" ] || { sd_fail "$SD_CASC maps no group for $role."; return 1; }
+        || { sd_fail "Could not read the group mappings from $casc"; return 1; }
+    [ -n "$expected" ] || { sd_fail "$casc maps no group for $role."; return 1; }
     groups="$(printf '%s' "$body" | jq -r '.data.user.mappedGroups[]?.name')"
     if ! printf '%s\n' "$groups" | grep -qxF "$expected"; then
-        sd_fail "$role is authenticated but not mapped to the group \`$expected\`: its scan would not test that role. Check the group mappings of $SD_CASC on the instance."
+        sd_fail "$role is authenticated but not mapped to the group \`$expected\`: its scan would not test that role. Check the group mappings of $casc on the instance."
         return 1
     fi
 
@@ -501,11 +506,11 @@ sd_whoami() {
     granted="$(yq -r '[.casc.ontrack.admin["project-permissions"][] | select(.group == "'"$expected"'") | .projects[]] | length' "$SD_CASC")" || return 1
     if [ "$global" = "0" ] && [ "${granted:-0}" != "0" ]; then
         if [ "$visible" = "0" ]; then
-            sd_fail "$role sees no project, where $SD_CASC grants it $granted: the project permissions were not re-applied after the demo seed, and its scan would test nothing."
+            sd_fail "$role sees no project, where $casc grants it $granted: the project permissions were not re-applied after the demo seed, and its scan would test nothing."
             return 1
         fi
         if [ "$visible" -gt "$granted" ]; then
-            sd_log "WARNING: $role sees $visible project(s), where $SD_CASC grants it $granted. Either the instance grants project view to all, or the role reaches projects it should not."
+            sd_log "WARNING: $role sees $visible project(s), where $casc grants it $granted. Either the instance grants project view to all users - Yontrack's default, unless its security settings say otherwise - or the role reaches projects it should not."
         fi
     fi
 

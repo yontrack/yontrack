@@ -169,9 +169,9 @@ jobs:
       # The scanner accounts of security/dast/casc.yaml (#1769), in the order their passes run.
       # Each logs in with the Actions secret named after it - DAST_SCAN_ADMIN_PASSWORD for
       # scan-admin - through the demo realm's client. `scripts/security-dast.sh login` accepts
-      # these three and no other.
+      # these three and no other. The realm is DAST_TARGET/keycloak/realms/ontrack, derived by the
+      # script: as a variable here, its URL would be printed in every step's environment.
       DAST_ROLES: scan-admin scan-readonly scan-project
-      DAST_KEYCLOAK_REALM_URL: ${{ vars.DEMO_URL || 'https://demo.dev.yontrack.com' }}/keycloak/realms/ontrack
       DAST_KEYCLOAK_CLIENT_ID: yontrack-client
       # The longest a pass may take, in seconds: a token valid for less is refused before the pass
       # rather than expiring during it. ZAP's API pass waits up to ten minutes for the passive rules

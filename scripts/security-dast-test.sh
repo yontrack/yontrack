@@ -268,7 +268,9 @@ assert_eq "0" "$rc" "actuator: a 404 is not an exposure"
 # login - a Keycloak password grant per scanner role (#1769)
 # ===========================================================================
 
-export DAST_KEYCLOAK_REALM_URL="https://demo.example.com/keycloak/realms/ontrack"
+# No DAST_KEYCLOAK_REALM_URL: the realm is derived from the target, so that the workflow does not
+# print a URL beyond the demo's base in every step's environment.
+export DAST_TARGET="https://demo.example.com"
 export DAST_KEYCLOAK_CLIENT_ID="yontrack-client"
 export DEMO_KEYCLOAK_CLIENT_SECRET='client&secret'
 export DAST_SCAN_READONLY_PASSWORD='pa ss&wo=rd%'
@@ -420,6 +422,8 @@ assert_eq "0" "$rc" "whoami: scan-project seeing more is reported, not a failure
 assert_contains "$out" "WARNING" "whoami: but it is flagged"
 assert_contains "$out" "4 project(s)" "whoami: with the counts"
 assert_contains "$out" "grants it 1" "whoami: against what casc.yaml grants"
+assert_contains "$out" "security/dast/casc.yaml grants it 1" "whoami: naming casc.yaml by its path in the repository"
+assert_not_contains "$out" "$SD_ROOT" "whoami: and not by the runner's checkout directory"
 
 out="$(sd_whoami scan-admin "$WORK/login" 2>&1)"; rc=$?
 assert_eq "1" "$rc" "whoami: a role that did not log in fails"
