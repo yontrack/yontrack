@@ -97,7 +97,8 @@ jobs:
       # `Access-Control-Allow-Origin` in answer to a request that carries an `Origin`, a scanner
       # does not send one by default, and the rule that reports a permissive policy (10098) has
       # nothing to look at. The first real run proved the point - it reported the missing headers
-      # and not the `allowed-origins: "*"` sitting in application.yml (#1771).
+      # and not the `allowed-origins: "*"` sitting in application.yml (#1771). Kept after that fix: it
+      # is what shows the permissive policy gone, and what would show it back.
       #
       # A header on a read request. It changes nothing on the instance, which is what keeps this
       # a passive scan; the value is a domain that cannot exist, so a server that echoes it back

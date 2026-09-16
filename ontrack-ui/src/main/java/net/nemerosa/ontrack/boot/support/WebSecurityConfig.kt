@@ -76,6 +76,8 @@ class WebSecurityConfig(
                 authorize(anyRequest, authenticated)
             }
             csrf { disable() }
+            // Answers the CORS preflights before authentication, using the mappings of WebConfig (#1771)
+            cors { }
             sessionManagement { sessionCreationPolicy = SessionCreationPolicy.STATELESS }
             oauth2ResourceServer {
                 jwt {

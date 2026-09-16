@@ -73,6 +73,7 @@ nav:
       - Group mappings: content/security/group-mappings.md
       - Tokens: content/security/tokens.md
       - HTTP headers: content/security/http-headers.md
+      - Cross-origin requests: content/security/cors.md
   - Concepts:
       - Model: content/concepts/model/index.md
       - Build links: content/concepts/model/build-links.md

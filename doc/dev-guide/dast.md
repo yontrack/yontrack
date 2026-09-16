@@ -65,6 +65,12 @@ not the `allowed-origins: "*"` in `application.yml`. The plan now adds `Origin:
 https://dast.invalid` to requests on `/graphql` and `/hook`: a header on a read, which changes
 nothing on the instance and makes the CORS policy observable.
 
+The header stays now that #1771 has fixed the policy. The API is same-origin by default, so the
+scan's responses carry no `Access-Control-Allow-Origin`, and it is the header that would show a
+regression. It costs the scan nothing: with no origin configured the API serves a request carrying
+an `Origin` like any other and leaves the refusal to the browser, so the GraphQL requests still
+answer `200`. `CorsDefaultIT` holds that.
+
 ## How mutations are kept out
 
 The demo gates SILVER and carries the dataset the smoke test asserts. The scan's hardest

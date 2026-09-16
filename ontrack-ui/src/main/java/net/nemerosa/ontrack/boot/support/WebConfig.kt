@@ -1,6 +1,7 @@
 package net.nemerosa.ontrack.boot.support
 
 import jakarta.servlet.DispatcherType
+import net.nemerosa.ontrack.model.support.OntrackConfigProperties
 import org.springframework.boot.web.servlet.FilterRegistrationBean
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -15,7 +16,9 @@ import org.springframework.web.servlet.config.annotation.ViewControllerRegistry
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer
 
 @Configuration
-class WebConfig : WebMvcConfigurer {
+class WebConfig(
+    private val ontrackConfigProperties: OntrackConfigProperties,
+) : WebMvcConfigurer {
 
     /**
      * Uses the HTTP header for content negociation.
@@ -48,14 +51,30 @@ class WebConfig : WebMvcConfigurer {
         converters.add(MappingJackson2HttpMessageConverter())
     }
 
+    /**
+     * CORS on the API, same-origin only unless origins are listed in
+     * `ontrack.config.security.cors.allowed-origins` (#1771).
+     *
+     * With no origin listed, no mapping is registered at all rather than a mapping allowing no
+     * origin: the browser then refuses any cross-origin call by itself, since no answer carries an
+     * `Access-Control-Allow-Origin`, while a non-browser client which happens to send an `Origin`
+     * (a scanner, a proxy) is still served instead of getting a `403 Invalid CORS request`.
+     *
+     * The hooks (`/hook/secured/...`) are never mapped: they are called server-to-server.
+     *
+     * The same settings apply to the preflights, which Spring Security answers before
+     * authentication - see `WebSecurityConfig`.
+     */
     override fun addCorsMappings(registry: CorsRegistry) {
-        listOf(
-            "/graphql/**",
-            "/rest/**",
-            "/extension/**",
-            "/hook/secured/**",
-        ).forEach {
-            registry.addMapping(it).allowedMethods(*ALLOWED_API_METHODS.toTypedArray())
+        val allowedOrigins = ontrackConfigProperties.security.cors.allowedOrigins
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+        if (allowedOrigins.isNotEmpty()) {
+            CORS_API_PATHS.forEach {
+                registry.addMapping(it)
+                    .allowedOrigins(*allowedOrigins.toTypedArray())
+                    .allowedMethods(*ALLOWED_API_METHODS.toTypedArray())
+            }
         }
     }
 
@@ -65,6 +84,12 @@ class WebConfig : WebMvcConfigurer {
 
     companion object {
         private val ALLOWED_API_METHODS = setOf("GET", "POST", "PUT", "DELETE", "HEAD")
+
+        private val CORS_API_PATHS = listOf(
+            "/graphql/**",
+            "/rest/**",
+            "/extension/**",
+        )
     }
 
 }

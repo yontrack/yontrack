@@ -40,7 +40,7 @@ mitigations:
       is HTTPS-only.
 
   # -----------------------------------------------------------------------------------------
-  # Permissive CORS — expected on the first run, fixed by #1771.
+  # Permissive CORS — reported by the first run, fixed by #1771.
   # -----------------------------------------------------------------------------------------
   - id: permissive-cors
     scanner: "zap"
@@ -48,12 +48,15 @@ mitigations:
     title: "Cross-domain misconfiguration: any origin is allowed"
     issue: "https://github.com/yontrack/yontrack/issues/1771"
     change: >-
-      `spring.graphql.cors.allowed-origins` is `"*"` in
-      `ontrack-ui/src/main/resources/config/application.yml`, and so are the CORS settings of the
-      REST and hook endpoints. Default to same-origin and make the allowlist a configuration
-      property, so that a deployment whose UI is served from another host opts in explicitly
-      instead of every deployment opting out by default. A minor release: it changes a shipped
-      default.
+      Done by #1771: `spring.graphql.cors` is gone from
+      `ontrack-ui/src/main/resources/config/application.yml`, and `WebConfig.addCorsMappings` maps
+      `/graphql/**`, `/rest/**` and `/extension/**` only when
+      `ontrack.config.security.cors.allowed-origins` lists origins, allowing those and no others;
+      `/hook/secured/**` is never mapped. `WebSecurityConfig` answers the preflights from the same
+      mappings. The default is empty, so no response carries `Access-Control-Allow-Origin`. If this
+      fires again, check first that the deployed image carries that build, then whether the
+      instance sets the property, and to what: a `*` in the list reopens exactly this finding.
+      Covered by `CorsDefaultIT` and `CorsAllowlistIT` in `ontrack-ui`.
 
   # -----------------------------------------------------------------------------------------
   # GraphQL introspection — accepted, see suppressions.yaml. Kept here so that a report still

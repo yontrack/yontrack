@@ -283,6 +283,18 @@ class OntrackConfigProperties {
          * Security token settings
          */
         var tokens = TokensProperties()
+        /**
+         * Cross-origin (CORS) settings
+         */
+        var cors = CorsProperties()
+    }
+
+    /**
+     * Cross-origin (CORS) settings of the API
+     */
+    class CorsProperties {
+        @APIDescription("Origins (scheme, host and port, like `https://portal.example.com`) allowed to call the API - `/graphql`, `/rest/**` and `/extension/**` - from a browser. Empty by default: the API answers no cross-origin browser call at all, which is all the Yontrack UI needs since it calls the API from its own server. `/hook/**` never accepts cross-origin calls.")
+        var allowedOrigins: List<String> = emptyList()
     }
 
     /**

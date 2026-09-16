@@ -36,14 +36,8 @@ spring:
       printer:
         enabled: true
       locations: "classpath*:graphql/**"
-    cors:
-      allowed-origins: "*"
-      allowed-methods:
-        - GET
-        - POST
-        - OPTIONS
-      max-age: 1800s
-      allowed-headers: "*"
+    # No `cors` section: CORS on /graphql is set by `ontrack.config.security.cors.allowed-origins`,
+    # like on the rest of the API - see WebConfig (#1771).
 
 # Compression of web resources
 server:
