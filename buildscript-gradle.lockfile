@@ -36,7 +36,6 @@ commons-logging:commons-logging:1.2=classpath
 io.grpc:grpc-context:1.27.2=classpath
 io.opencensus:opencensus-api:0.31.1=classpath
 io.opencensus:opencensus-contrib-http-util:0.31.1=classpath
-io.spring.dependency-management:io.spring.dependency-management.gradle.plugin:1.1.7=classpath
 io.spring.gradle:dependency-management-plugin:1.1.7=classpath
 net.java.dev.jna:jna-platform:5.17.0=classpath
 net.java.dev.jna:jna:5.17.0=classpath
