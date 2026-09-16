@@ -6,16 +6,23 @@
 # comment beside it together.
 #
 # gradle keeps the backend's dependencies and plugins up to date, lockfiles included (#1752).
-# Dependabot rewrites the per-module gradle.lockfile files from the root. Whether it also rewrites
-# the buildscript-gradle.lockfile files and the buildSrc lockfiles is not verified yet; when it does
-# not, the pull request fails the STRICT locking and needs a manual
-# `./gradlew resolveAndLockAll --write-locks` on its branch - see DEVELOPMENT.md.
+# Verified on the first Dependabot gradle pull request (#1776): it rewrites the per-module
+# gradle.lockfile files from the root, buildSrc/gradle.lockfile included, but never a
+# buildscript-gradle.lockfile. A pull request that bumps a *plugin* version therefore fails the
+# STRICT locking until `./gradlew resolveAndLockAll --write-locks` and
+# `./gradlew -p buildSrc resolveAndLockAll --write-locks` are run on its branch - see DEVELOPMENT.md.
 version: 2
 updates:
   - package-ecosystem: gradle
     directory: "/"
     schedule:
       interval: weekly
+    # A Spring Boot major is a migration to plan, not routine maintenance: the BOM it carries moves
+    # every Spring version under it at once. Minor and patch updates stay welcome.
+    ignore:
+      - dependency-name: "org.springframework.boot*"
+        update-types:
+          - "version-update:semver-major"
     # A dependency joins the first group it matches, so "everything else" comes last.
     groups:
       # The Spring Boot plugin, which also sets the version of the BOM every project imports.
