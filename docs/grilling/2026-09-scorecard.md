@@ -1,7 +1,8 @@
 # Delivery scorecard and security findings — Yontrack 6.x
 
-Outcome of the grilling session of 2026-09-16 on blocks 3 and 4 of the delivery-harvesting brief:
-a model for vulnerability findings, and a reading surface across projects. Both ship in **6.x**.
+Outcome of the grilling session of 2026-09-16 on blocks 3 and 4 of the delivery-harvesting brief
+([2026-09-harvesting-brief.md](2026-09-harvesting-brief.md)): a model for vulnerability findings,
+and a reading surface across projects. Both ship in **6.x**.
 Blocks 1 and 2 (the portable ledger and its import) are not decided here; where a decision below
 touches them, it says so.
 
@@ -232,7 +233,7 @@ data.
 
 ## Sources
 
-- The harvesting brief of 2026-09-16 (session handover; not in the repo).
+- [2026-09-harvesting-brief.md](2026-09-harvesting-brief.md), the session handover this session started from.
 - `docs/grilling/2026-09-dast.md` for the DAST severities, suppressions and per-rule counting.
 - `scripts/security-image-scan.sh`, `.github/workflows/ci.yml` (`security-images` job) and
   `.yontrack/ci.yaml` for how counts reach Yontrack today.
