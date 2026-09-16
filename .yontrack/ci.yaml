@@ -209,12 +209,11 @@ configuration:
                       # input defaults to `main` - so without this a patch would be looked up on
                       # main and fail with "No build named 5.3.2-rc-N in yontrack/main" (#1702).
                       #
-                      # This is the YONTRACK branch name, not the SCM one, which is exactly what
-                      # release.yml wants: workflow inputs render with `PlainEventRenderer`
-                      # (`render(entity, name) = name`) and NEW_PROMOTION_RUN's context carries
-                      # `eventBranch`, so it yields `main` on main and `release-5.3` - the escaped
-                      # form - on `release/5.3`. Safe on main: it renders what was already the
-                      # default.
+                      # It yields `main` on main. On a release branch it was expected to yield the
+                      # escaped Yontrack name, `release-5.3`, but the first patch release (5.4.2)
+                      # received the SCM name, `release/5.4`, and the build lookup still found the
+                      # build. Why is not established - see "Two names for one branch" in
+                      # doc/dev-guide/patch-release.md before relying on either spelling.
                       - name: branch
                         value: "${branch}"
         RELEASE:
