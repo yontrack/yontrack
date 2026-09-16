@@ -689,6 +689,16 @@ printf '%s\n%s\n' "$WORK/templates/a.yaml" "$WORK/templates/c.yaml" > "$WORK/tl-
 out="$(sd_nuclei_preflight "$WORK/tl-dirty.txt" "$WORK/nuclei.yaml" 2>&1)"; rc=$?
 assert_eq "1" "$rc" "nuclei-preflight: fails when a selected template carries an excluded tag"
 
+# Nuclei selects some two thousand templates, more paths than one command line holds on Linux, so
+# they are read in several batches - and every batch counts. The first run of #1766 counted the
+# first batch only, and would have missed an excluded tag in any other.
+printf '%s\n%s\n%s\n' "$WORK/templates/a.yaml" "$WORK/templates/c.yaml" "$WORK/templates/b.yaml" > "$WORK/tl-batched.txt"
+out="$(SD_XARGS_BATCH=1 sd_nuclei_preflight "$WORK/tl-batched.txt" "$WORK/nuclei.yaml" 2>&1)"; rc=$?
+assert_eq "1" "$rc" "nuclei-preflight: an excluded tag in any batch of templates fails, not only in the last"
+out="$(SD_XARGS_BATCH=1 sd_nuclei_preflight "$WORK/tl-clean.txt" "$WORK/nuclei.yaml" 2>&1)"; rc=$?
+assert_eq "0" "$rc" "nuclei-preflight: passes in batches"
+assert_contains "$out" "2 template(s)" "nuclei-preflight: counts the templates of every batch, not only the first"
+
 printf 'nothing\n' > "$WORK/tl-none.txt"
 out="$(sd_nuclei_preflight "$WORK/tl-none.txt" "$WORK/nuclei.yaml" 2>&1)"; rc=$?
 assert_eq "1" "$rc" "nuclei-preflight: no template selected is a broken selection, not a quiet scan"

@@ -737,12 +737,15 @@ sd_nuclei_preflight() {
         *) ;;
     esac
 
-    # One awk over every selected template: the first `tags:` line of each, split on commas.
+    # awk over every selected template: the first `tags:` line of each, split on commas. Two
+    # thousand paths do not fit one command line, so xargs runs awk in batches - each prints its own
+    # `files bad` line, and they are added up. Reading only the first line is how the first run of
+    # #1766 checked 1,393 of 2,244 templates.
     local result
     # shellcheck disable=SC2016  # deliberate: an awk program, expanded by awk
     result="$(grep -E '\.ya?ml$' "$list" | while IFS= read -r path; do
                   [ -f "$path" ] && printf '%s\0' "$path"
-              done | xargs -0 awk -v excluded="$excluded" '
+              done | xargs -0 -n "${SD_XARGS_BATCH:-500}" awk -v excluded="$excluded" '
         BEGIN { n = split(excluded, ex, ","); for (i = 1; i <= n; i++) if (ex[i] != "") bad_tag[ex[i]] = 1 }
         FNR == 1 { files++ }
         /^[ \t]*tags:/ && !(FILENAME in seen) {
@@ -757,7 +760,7 @@ sd_nuclei_preflight() {
             }
         }
         END { printf "%d %d\n", files, bad }
-    ')" || true
+    ' | awk '{ files += $1; bad += $2 } END { printf "%d %d\n", files, bad }')" || true
     count="${result%% *}"
     bad="${result##* }"
     count="${count:-0}"

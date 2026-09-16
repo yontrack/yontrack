@@ -101,8 +101,9 @@ env:
   # Pinned by digest, not by the `stable` tag. A scanner whose version moves under you turns
   # "three new findings" into "or maybe three new rules", which is the one question a report must
   # never leave open.
-  # The `stable` tag this digest was taken from carried ZAP 2.16.1, which is what DAST_SCANNERS
-  # below records in every report. Move the two together.
+  # DAST_SCANNERS below records the ZAP version this digest carries in every report: 2.17.0, as ZAP
+  # itself reports it in its JSON report (run 35102207018). The 2.16.1 first written here did not
+  # match the image. Move the two together.
   ZAP_IMAGE: ghcr.io/zaproxy/zaproxy@sha256:781a2bdaea47324e7bab583e2263f21d257b0aee61ed51521a5be45f5f5081ef
   # graphql-cop 1.16, as the commit its tag points at and the SHA-256 of GitHub's archive of it.
   # It publishes no image of this release (the Docker Hub `latest` is older), so it runs from source
@@ -153,7 +154,7 @@ jobs:
       DAST_RUN_ID: ${{ github.run_id }}
       DAST_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
       DAST_SCANNERS: >-
-        OWASP ZAP 2.16.1 (passive rules, GraphQL add-on, query-only schema);
+        OWASP ZAP 2.17.0 (passive rules, GraphQL add-on, query-only schema);
         graphql-cop 1.16 (every test but get_based_mutation);
         Nuclei 3.11.1 with nuclei-templates v10.4.8 (HTTP templates, no intrusive, dos, fuzz or
         bruteforce tag, 10 requests per second)
