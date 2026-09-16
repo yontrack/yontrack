@@ -5,7 +5,8 @@ no files added to the repo, no GitHub issues created or labelled. Grounded in a 
 `yontrack/yontrack` at `main` = `5.4.1-54-g5818176e96`.
 
 Blocks 3 and 4 below were grilled the same day; the outcome is
-[2026-09-scorecard.md](2026-09-scorecard.md). Blocks 1 and 2 are not decided yet.
+[2026-09-scorecard.md](2026-09-scorecard.md). Block 2 was grilled the same day too; the outcome
+is [2026-09-ledger.md](2026-09-ledger.md), which also records where block 1 was left.
 
 ## The problem
 
@@ -245,21 +246,21 @@ exporter survives only as an output, not as the place the data lives.
 
 ## Open questions, in the order to grill them
 
-Those marked ✔ were settled in [2026-09-scorecard.md](2026-09-scorecard.md); the rest belong to
-the ledger sessions.
+Those marked ✔ were settled in [2026-09-scorecard.md](2026-09-scorecard.md); those marked ✔✔
+in [2026-09-ledger.md](2026-09-ledger.md).
 
-1. **Import mode.** Does a ledger import suppress events entirely, post them with a flag
+1. ✔✔ **Import mode.** Does a ledger import suppress events entirely, post them with a flag
    subscriptions can filter, or is import restricted to instances where the noise is accepted?
-2. **Ledger semantics.** Does the ledger assert a build's full state at a point in time, or a
+2. ✔✔ **Ledger semantics.** Does the ledger assert a build's full state at a point in time, or a
    stream of individual facts? Decides idempotency, ordering and whether corrections are
    expressible.
-3. **Ordering contract.** Chronological order guaranteed per project and per slot, or must the
+3. ✔✔ **Ordering contract.** Chronological order guaranteed per project and per slot, or must the
    importer tolerate arbitrary order? Promotion checks and slot cancel-actives both push toward
    guaranteeing it.
-4. **Dedupe.** Promotion and validation runs by new unique constraints, by an external fact id, or
+4. ✔✔ **Dedupe.** Promotion and validation runs by new unique constraints, by an external fact id, or
    not at all?
-5. **Promotion checks on import** — do they apply, or does the ledger write below them?
-6. **Deployments** — new backdatable recording path on `SlotService`, or model historical
+5. ✔✔ **Promotion checks on import** — do they apply, or does the ledger write below them?
+6. ✔✔ **Deployments** — new backdatable recording path on `SlotService`, or model historical
    deployments as something other than slot pipelines?
 7. ✔ **Severity vocabulary.** Adopt CHML, or a scanner-neutral scale with a mapping, and where
    does UNKNOWN go?
