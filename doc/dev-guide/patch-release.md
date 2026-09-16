@@ -27,12 +27,18 @@ Both appear below, and using the wrong one is the likeliest way to get this subt
 
 | | Name | Where it is used |
 |---|------|------------------|
-| **SCM branch** | `release/5.3` | `git`, the `branch` condition in `.yontrack/ci.yaml` (which matches `GITHUB_REF_NAME`), `ci.yml` |
-| **Yontrack branch** | `release-5.3` | The Yontrack UI, `release.yml`'s `branch` input, `yontrack build search --branch` |
+| **SCM branch** | `release/5.3` | `git`, the `branch` condition in `.yontrack/ci.yaml` (which matches `GITHUB_REF_NAME`), `ci.yml`, and — as observed — `release.yml`'s `branch` input |
+| **Yontrack branch** | `release-5.3` | The Yontrack UI, the `branchPattern` admission rule of a slot |
 
 Yontrack escapes the name: `NameDescription` allows only `A-Za-z0-9._-`, so the slash becomes a dash.
-The `GOLD` workflow passes `${branch}`, which renders the **Yontrack** name — which is exactly what
-`release.yml` needs.
+
+The `GOLD` workflow passes `${branch}`, and the comment beside it in `.yontrack/ci.yaml` says that
+renders the **Yontrack** name. The first patch release did not bear that out: 5.4.2
+([run 35091659678](https://github.com/yontrack/yontrack/actions/runs/35091659678)) received
+`RELEASE_BRANCH: release/5.4`, the **SCM** name, and `resolve` still found `5.4.2-rc-196`. So in
+practice `yontrack build search --branch` accepted the SCM name. Why has not been established, and
+nothing tests it: do not rely on either spelling being the only one that works, and check the
+`RELEASE_BRANCH` line of the release run when a lookup fails.
 
 ## The procedure
 
@@ -90,15 +96,19 @@ a missing `](Release-5.3.2)` link in `Home.md`, before anything is published.
 
 ### 6. Grant `GOLD`
 
-The `GOLD` workflow dispatches `release.yml` with `version: 5.3.2-rc-<run>` **and
-`branch: release-5.3`**. Without that second input the build would be looked up on `main` and the
-release would fail with `No build named 5.3.2-rc-<run> in yontrack/main`.
+The `GOLD` workflow dispatches `release.yml` with `version: 5.3.2-rc-<run>` **and a `branch`**
+naming the release branch — `release/5.3` as observed on 5.4.2, see
+[Two names for one branch](#two-names-for-one-branch). Without that second input the build would be
+looked up on `main` and the release would fail with `No build named 5.3.2-rc-<run> in yontrack/main`.
 
 Two things then differ from a release off `main`:
 
-* **The GitHub release is not marked Latest.** `resolve` compares 5.3.2 against every released tag
-  and passes `--latest=false`, so 5.4.0 keeps the badge and the README's shields.io version does not
-  flip back to the previous minor.
+* **The GitHub release may not be marked Latest.** `resolve` compares the patch against every
+  released tag and passes `--latest=true` only when it is the highest. A 5.3.2 published after
+  5.4.0 gets `--latest=false`, so 5.4.0 keeps the badge and the README's shields.io version does not
+  flip back to the previous minor. A patch of the **newest** released minor is the highest version,
+  and does take the badge: 5.4.2, released while `main` was on an unreleased 5.5, logged
+  `Latest release: true.` That is correct, not a regression of the rule.
 * **The changelog comes from git.** There is no previously `RELEASE`-promoted build on the branch —
   5.3.1 was released from a build on `main` — so `--from-promotion RELEASE` returns nothing and the
   body falls back to `git log 5.3.1..<sha>`. For a patch that range *is* the changelog: it is the
