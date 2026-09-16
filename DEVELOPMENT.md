@@ -96,6 +96,35 @@ kill $(cat .yontrack-dev/backend.pid)
 > directly. The Spring Boot actuator runs at http://localhost:8800/manage, and
 > the application itself on http://localhost:3000.
 
+## Dependency management
+
+Versions come from BOMs declared as Gradle platforms, not from the
+`io.spring.dependency-management` plugin, which was dropped in #1753. The root
+build script declares, on every dependency bucket of every source set of every
+Java project:
+
+* `org.springframework.boot:spring-boot-dependencies`, the Spring Boot BOM, at
+  the version of the `org.springframework.boot` plugin;
+* `org.jetbrains.kotlin:kotlin-bom` and
+  `org.jetbrains.kotlinx:kotlinx-coroutines-bom`, at the versions this build
+  wants. The Spring Boot BOM imports both at older versions; conflict
+  resolution keeps the higher ones. They stand in for the
+  `extra["kotlin.version"]` and `extra["kotlin-coroutines.version"]` BOM
+  property overrides the plugin used to honour -- a Gradle platform reads a
+  published POM, whose properties are already substituted, so there is nothing
+  to override.
+
+Modules no BOM covers get a plain constraint in the same place, in the
+`versionConstraints` list.
+
+The two mechanisms are not equivalent, and the difference matters when reading
+a lockfile diff: the plugin *overrode* the version of every module it managed,
+wherever it sat in the graph, while a platform only takes part in conflict
+resolution -- and, unlike the plugin, it honours the `<exclusions>` a BOM
+declares. `platform`, not `enforcedPlatform`: an enforced one would force
+`org.jetbrains.kotlin:*` down to the Spring Boot BOM's Kotlin, with no
+constraint able to lift it again.
+
 ## Dependency locking
 
 Every Gradle configuration of every project is locked, in `STRICT` mode. The
