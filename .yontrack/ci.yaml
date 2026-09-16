@@ -402,12 +402,21 @@ configuration:
                                 value: "${build.release}"
               - name: self.dev.yontrack.com
                 admissionRules:
+                  # A RELEASE build is deployable from `main` and from a patch branch alike. The
+                  # pattern reads the Yontrack branch name, so `release-5.4`, not `release/5.4`.
+                  #
+                  # One regex rather than two `includes` entries: the eligible-builds query ANDs
+                  # its entries, so `main` and `release-.*` listed separately match no branch.
+                  # Anchored because that query uses PostgreSQL's unanchored `~`.
+                  #
+                  # No `lastBranchOnly`: it orders branches by the version in their name, so any
+                  # `release-*` branch would win over `main`, and no build of `main` could be
+                  # deployed again while one exists.
                   - name: "branchPattern"
                     ruleId: "branchPattern"
                     ruleConfig:
                       includes:
-                        - "main"
-                      lastBranchOnly: true
+                        - "^(main|release-.*)$"
                   - name: "promotion"
                     ruleId: "promotion"
                     ruleConfig:
