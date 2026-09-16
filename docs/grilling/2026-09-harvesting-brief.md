@@ -6,7 +6,8 @@ no files added to the repo, no GitHub issues created or labelled. Grounded in a 
 
 Blocks 3 and 4 below were grilled the same day; the outcome is
 [2026-09-scorecard.md](2026-09-scorecard.md). Block 2 was grilled the same day too; the outcome
-is [2026-09-ledger.md](2026-09-ledger.md), which also records where block 1 was left.
+is [2026-09-ledger.md](2026-09-ledger.md), which also records where block 1 was left. Block 1
+was then grilled from there; the outcome is [2026-09-harvester.md](2026-09-harvester.md).
 
 ## The problem
 
@@ -56,7 +57,7 @@ snapshot the perishable sources early and coarsely, and reconstruct from durable
 
 | # | Block | Depends on | Release home |
 |---|---|---|---|
-| 1 | Ledger creation at the organization | the published format only | own repo, own cadence |
+| 1 | Ledger creation at the organization | the published format only | own repo (`yontrack-harvester`), own cadence |
 | 2 | Ledger import into Yontrack (+ API changes) | nothing | 5.x minors, additive |
 | 3 | CVE / vulnerability modelling | nothing | 5.x, must ship with its own reader (*) |
 | 4 | Reading across the estate (indicators rewrite) | 3 for its first real data | 6.x |
