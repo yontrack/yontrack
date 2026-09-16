@@ -129,6 +129,10 @@ assert_not_contains "$(cat "$WORK/query-only.graphql")" "subscription: Subscript
     "query-schema: removes the subscription root from the schema block"
 assert_contains "$(cat "$WORK/query-only.graphql")" "query: Query" \
     "query-schema: keeps the query root"
+# mktemp makes 600, and the scanner reads this from a container running as another uid. A schema
+# it cannot open looks exactly like a schema it cannot parse.
+assert_contains "$(ls -l "$WORK/query-only.graphql")" "-rw-r--r--" \
+    "query-schema: leaves the schema readable by the scanner's uid"
 assert_not_contains "$(cat "$WORK/query-only.graphql")" "deleteProject" \
     "query-schema: the mutation's fields go with it"
 assert_contains "$(cat "$WORK/query-only.graphql")" "input DeleteProjectInput" \

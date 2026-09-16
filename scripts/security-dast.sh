@@ -205,6 +205,11 @@ sd_query_schema() {
 
     mkdir -p "$(dirname "$output")" || { rm -f "$tmp"; return 1; }
     mv "$tmp" "$output" || return 1
+    # `mktemp` creates 600, and the scanner reads this from a container running as its own uid: a
+    # file it cannot open is reported by the GraphQL add-on as the same "An error occurred while
+    # importing from file" it reports for a schema it cannot parse. A bind mount on macOS hides
+    # the difference, which is how this survived a local run and failed on the first real one.
+    chmod 644 "$output" || return 1
     sd_log "Query-only schema written: $(wc -l < "$output" | tr -d ' ') lines, no mutation or subscription root."
     return 0
 }

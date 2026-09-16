@@ -192,10 +192,12 @@ jobs:
             ontrack-web-core/ontrack.graphql "$work/graphql/query-only.graphql"
           scripts/security-dast.sh render-plan \
             security/dast/zap/passive.yaml "$work/passive.yaml"
-          # The ZAP image runs as its own uid: it has to be able to traverse the directories and
-          # to write its reports into out/. The files themselves stay 644 - `render-plan` sets
-          # that on the one it wrote.
-          chmod 755 "$work" "$work/graphql"
+          # The ZAP image runs as its own uid, so everything it reads has to be readable by
+          # another user and the directories traversable - `a+rX` - and out/, which it writes its
+          # reports into, writable by it. Both scripts already set 644 on the file they wrote;
+          # this is the belt to that pair of braces, and it is what makes the mode of anything
+          # added to the plan later somebody else's problem rather than a failed scan.
+          chmod -R a+rX "$work"
           chmod 777 "$work/out"
           echo "work=$work" >> "$GITHUB_OUTPUT"
 
