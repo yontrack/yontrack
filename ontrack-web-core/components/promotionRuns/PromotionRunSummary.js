@@ -1,5 +1,4 @@
 import {Card, Descriptions, Space, Typography} from "antd";
-import {PromotionLevelImage} from "@components/promotionLevels/PromotionLevelImage";
 import PromotionLevelLink from "@components/promotionLevels/PromotionLevelLink";
 import BuildLink from "@components/builds/BuildLink";
 import BranchLink from "@components/branches/BranchLink";
@@ -20,10 +19,10 @@ export default function PromotionRunSummary({run}) {
         {
             key: 'promotion',
             label: "Promotion",
-            children: <Space size="small">
-                <PromotionLevelImage promotionLevel={run.promotionLevel}/>
-                <PromotionLevelLink promotionLevel={run.promotionLevel}/>
-            </Space>,
+            // No `PromotionLevelImage` beside the link: `PromotionLevelLink` already renders the
+            // medal inside its `<Link>`. Adding one here drew the medal twice (#1777), and the
+            // extra one sat outside the link, so only the name was clickable.
+            children: <PromotionLevelLink promotionLevel={run.promotionLevel}/>,
         },
         {
             key: 'build',
