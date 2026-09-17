@@ -18,7 +18,7 @@ buildscript {
 plugins {
     kotlin("jvm") version "2.2.20"
     kotlin("plugin.spring") version "2.2.20"
-    id("org.springframework.boot") version "3.5.9" apply false
+    id("org.springframework.boot") version "3.5.16" apply false
     id("com.avast.gradle.docker-compose") version "0.17.12"
     id("com.google.cloud.tools.jib") version "3.5.1" apply false
     id("com.github.node-gradle.node") version "7.1.0" apply false
@@ -231,6 +231,7 @@ configure(javaProjects) {
     val greenMailVersion = "1.6.15"
     val mockkVersion = "1.13.17"
     val jgitVersion = "6.6.1.202309021850-r"
+    val tomcatVersion = "10.1.59"
 
     // The BOMs. The Spring Boot one is what io.spring.dependency-management imported; the other two
     // are the BOMs it imports itself, restated at the versions this build wants, in place of the
@@ -268,6 +269,13 @@ configure(javaProjects) {
 
         // Git repository support TODO Will be removed in V6
         "org.eclipse.jgit:org.eclipse.jgit:$jgitVersion",
+
+        // Tomcat pinned past the Boot BOM (3.5.16 manages 10.1.55) to fix CVE-2026-65182,
+        // CVE-2026-65905 and CVE-2026-68525 (fixed in 10.1.58). Remove this pin once the
+        // Spring Boot BOM manages Tomcat >= 10.1.58.
+        "org.apache.tomcat.embed:tomcat-embed-core:$tomcatVersion",
+        "org.apache.tomcat.embed:tomcat-embed-el:$tomcatVersion",
+        "org.apache.tomcat.embed:tomcat-embed-websocket:$tomcatVersion",
     )
 
     // Declared on every dependency bucket of every source set -- main, test, and the testFixtures
