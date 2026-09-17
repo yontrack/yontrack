@@ -35,6 +35,9 @@ import AnnotatedDescription from "@components/common/AnnotatedDescription";
 import {useQuery} from "@components/services/GraphQL";
 import {useRefresh} from "@components/common/RefreshUtils";
 import ProjectEditCommand from "@components/projects/ProjectEditCommand";
+import ProjectLabelsCommand from "@components/projects/ProjectLabelsCommand";
+import LabelChip from "@components/labels/LabelChip";
+import {gqlLabelFragment} from "@components/labels/LabelGraphQLFragments";
 
 export default function ProjectView({id}) {
 
@@ -49,6 +52,9 @@ export default function ProjectView({id}) {
             query GetProject($id: Int!) {
                 project(id: $id) {
                     ...ProjectContent
+                    labels {
+                        ...labelFragment
+                    }
                     properties {
                         ...propertiesFragment
                     }
@@ -103,6 +109,7 @@ export default function ProjectView({id}) {
             ${gqlUserMenuActionFragment}
             ${gqlProjectContentFragment}
             ${gqlBranchContentFragment}
+            ${gqlLabelFragment}
         `,
         {
             initialData: {},
@@ -153,6 +160,12 @@ export default function ProjectView({id}) {
                 <UserMenuActions key="userMenuActions" actions={project.userMenuActions}/>,
                 <JumpToBranch key="branch" projectName={project.name}/>,
             )
+            // Assigning labels to the project
+            if (isAuthorized(project, 'project', 'labels')) {
+                commands.push(
+                    <ProjectLabelsCommand key="labels" project={project}/>
+                )
+            }
             // Editing the project
             if (isAuthorized(project, 'project', 'edit')) {
                 commands.push(
@@ -186,6 +199,16 @@ export default function ProjectView({id}) {
                     <Space>
                         {project.name}
                         <ProjectFavourite project={project}/>
+                        {
+                            project.labels && project.labels.length > 0 &&
+                            <Space size={4} data-testid="project-labels">
+                                {
+                                    project.labels.map(label =>
+                                        <LabelChip key={label.id} label={label}/>
+                                    )
+                                }
+                            </Space>
+                        }
                         <AnnotatedDescription entity={project} type="secondary" disabled={false}/>
                     </Space>
                 }

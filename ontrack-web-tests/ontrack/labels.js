@@ -103,6 +103,27 @@ export class LabelsMgt {
     }
 
     /**
+     * The labels carried by a project, used to check what the UI has actually saved.
+     */
+    async getProjectLabels(projectId) {
+        const data = await graphQLCall(
+            this.ontrack.connection,
+            gql`
+                query ProjectLabels($id: Int!) {
+                    project(id: $id) {
+                        labels {
+                            ...LabelData
+                        }
+                    }
+                }
+                ${gqlLabelData}
+            `,
+            {id: Number(projectId)}
+        )
+        return data.project.labels
+    }
+
+    /**
      * Labels matching a category and a name, used to check what the UI has
      * actually saved.
      */

@@ -1,6 +1,7 @@
 import {expect} from "@playwright/test";
 import {confirmBox} from "../../support/confirm";
 import {expectOnPage} from "../../support/page-utils";
+import {labelDisplay} from "../../support/labels";
 
 export class ProjectPage {
 
@@ -86,5 +87,64 @@ export class ProjectPage {
 
     async checkProjectDescription(description) {
         await expect(this.page.getByText(description ?? this.project.description)).toBeVisible()
+    }
+
+    // Labels
+
+    /**
+     * The chip of a label in the title row. Scoped to the title, because the assignment
+     * dialog renders the very same chips.
+     */
+    labelChip(label) {
+        return this.page.getByTestId("project-labels").getByTestId(`label-${labelDisplay(label)}`)
+    }
+
+    async expectLabelChip(label) {
+        await expect(this.labelChip(label)).toBeVisible()
+    }
+
+    async expectNoLabelChip(label) {
+        await expect(this.labelChip(label)).not.toBeVisible()
+    }
+
+    labelsCommand() {
+        return this.page.getByRole('button', {name: 'Labels', exact: true})
+    }
+
+    labelsDialog() {
+        return this.page.getByTestId("project-labels-dialog")
+    }
+
+    async openLabelsDialog() {
+        const button = this.labelsCommand()
+        await expect(button).toBeVisible()
+        await button.click()
+        await expect(this.labelsDialog()).toBeVisible()
+    }
+
+    labelCheckbox(label) {
+        return this.labelsDialog().getByTestId(`label-check-${labelDisplay(label)}`)
+    }
+
+    /**
+     * Filters the list of labels inside the assignment dialog.
+     */
+    async filterLabels(text) {
+        await this.labelsDialog().getByPlaceholder('Filter the labels').fill(text)
+    }
+
+    /**
+     * Opens the assignment dialog, checks and unchecks labels, and saves.
+     */
+    async setLabels({check = [], uncheck = []} = {}) {
+        await this.openLabelsDialog()
+        for (const label of check) {
+            await this.labelCheckbox(label).check()
+        }
+        for (const label of uncheck) {
+            await this.labelCheckbox(label).uncheck()
+        }
+        await this.page.getByRole('button', {name: 'OK', exact: true}).click()
+        await expect(this.labelsDialog()).not.toBeVisible()
     }
 }

@@ -1,11 +1,9 @@
 import {expect} from "@playwright/test";
 import {confirmBox} from "../../support/confirm";
 import {getTable} from "../../support/antd-table-support";
+import {labelDisplay} from "../../support/labels";
 
-/**
- * Display string of a label, the way the UI renders it in a chip.
- */
-export const labelDisplay = ({category, name}) => category ? `${category}:${name}` : name
+export {labelDisplay}
 
 /**
  * The labels admin page, at `core/config/labels`.

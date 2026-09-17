@@ -1,5 +1,6 @@
 import {graphQLCall, graphQLCallMutation} from "@ontrack/graphql";
 import {gql} from "graphql-request";
+import {restCallPut} from "@ontrack/rest";
 
 class AdminMgt {
 
@@ -53,6 +54,23 @@ class AdminMgt {
         } else {
             throw new Error(`Cannot find group with name ${groupName}`)
         }
+    }
+
+    /**
+     * Gives a group a role on one project. There is no mutation for the permissions, only
+     * the REST API the legacy UI used.
+     *
+     * Scoping the permission to one project rather than granting a global role keeps the
+     * change to the shared instance out of the way of the other tests signing in with the
+     * same user.
+     */
+    async setGroupProjectRole(groupName, projectId, role) {
+        const group = await this.getGroupByName(groupName)
+        await restCallPut(
+            this.ontrack.connection,
+            `/rest/accounts/permissions/projects/${projectId}/GROUP/${group.id}`,
+            {role}
+        )
     }
 
     async mapGroup(idpGroup, groupName) {
