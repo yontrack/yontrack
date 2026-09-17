@@ -227,6 +227,20 @@ td.rel{font-family:"IBM Plex Mono", monospace; color:var(--accent-ink); white-sp
 .chain .card p{font-size:.85em; color:var(--ink-2)}
 .chain .arrow{align-self:center; padding:0}
 
+/* architecture diagram */
+.arch-body{display:grid; grid-template-rows:auto minmax(0,1fr); gap:1cqi; min-height:0; overflow:hidden}
+.arch{width:100%; height:100%; display:block; font-family:"Hanken Grotesk",sans-serif}
+.arch .zone{fill:none; stroke:var(--line); stroke-dasharray:6 6}
+.arch .zt{font-family:"IBM Plex Mono",monospace; font-size:13px; letter-spacing:.12em; text-transform:uppercase; fill:var(--ink-2)}
+.arch .box{fill:var(--paper-2); stroke:var(--line)}
+.arch .icon{color:var(--accent-ink); overflow:visible}
+.arch .icon use{fill:none; stroke:currentColor; stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round}
+.arch .name{font-size:19px; font-weight:600; fill:var(--ink)}
+.arch .sub{font-size:14px; fill:var(--ink-2)}
+.arch .lbl{font-family:"IBM Plex Mono",monospace; font-size:12px; fill:var(--ink-2)}
+.arch .flow{fill:none; stroke:var(--ink-2); stroke-width:2; stroke-linecap:round}
+.arch .prop{fill:none; stroke:var(--amber); stroke-width:2; stroke-dasharray:7 6; stroke-linecap:round}
+.arch .mk-flow{fill:var(--ink-2)} .arch .mk-prop{fill:var(--amber)}
 /* UI mock-up: always the light Yontrack UI, like a screenshot */
 .mock{border:1px solid var(--line); border-radius:.6cqi; overflow:hidden; background:#F6F2F9; color:#1F1830; font-size:.75em; box-shadow:var(--shadow)}
 .mock code{background:#E6E1E9; color:#3F3053}
@@ -352,7 +366,7 @@ body.scroll .in > .body{overflow:visible}
   <div class="brand"><svg class="logo" aria-hidden="true"><use href="#i-logo"/></svg><b>Scout</b><span>· reading delivery history</span></div>
   <nav aria-label="Deck navigation">
     <button type="button" id="prev" aria-label="Previous slide">←</button>
-    <span class="count" id="count">1 / 24</span>
+    <span class="count" id="count">1 / 25</span>
     <button type="button" id="next" aria-label="Next slide">→</button>
     <button type="button" id="mode" aria-pressed="false" title="Show every slide on one scrolling page (key: o)">All slides</button>
   </nav>
@@ -383,7 +397,7 @@ body.scroll .in > .body{overflow:visible}
         <div class="node"><span class="ic"><svg><use href="#i-estate"/></svg></span><span class="lbl">Estate</span></div>
       </div>
     </div>
-    <div class="foot"><span>Use ← → to navigate · O for all slides</span><span>1 / 24</span></div>
+    <div class="foot"><span>Use ← → to navigate · O for all slides</span><span>1 / 25</span></div>
   </div>
 </section>
 
@@ -401,7 +415,7 @@ body.scroll .in > .body{overflow:visible}
       </div>
       <p style="margin-top:2cqi" class="muted">None of these questions can be answered without data. Yet in most organizations the maturity of software delivery is assessed from interviews and impressions: the numbers that would settle it are scattered across CI servers, scanners, spreadsheets and release emails, and nobody has ever put them side by side.</p>
     </div>
-    <div class="foot"><span>The questions</span><span>2 / 24</span></div>
+    <div class="foot"><span>The questions</span><span>2 / 25</span></div>
   </div>
 </section>
 
@@ -429,7 +443,7 @@ body.scroll .in > .body{overflow:visible}
         </ul>
       </div>
     </div>
-    <div class="foot"><span>Problems</span><span>3 / 24</span></div>
+    <div class="foot"><span>Problems</span><span>3 / 25</span></div>
   </div>
 </section>
 
@@ -460,7 +474,7 @@ body.scroll .in > .body{overflow:visible}
         </div>
       </div>
     </div>
-    <div class="foot"><span>Problems</span><span>4 / 24</span></div>
+    <div class="foot"><span>Problems</span><span>4 / 25</span></div>
   </div>
 </section>
 
@@ -487,7 +501,7 @@ body.scroll .in > .body{overflow:visible}
         <p class="muted">A git-only estate, with no CI history left, is the common case this predicts. The design below treats it as normal, not as a failure.</p>
       </div>
     </div>
-    <div class="foot"><span>Problems</span><span>5 / 24</span></div>
+    <div class="foot"><span>Problems</span><span>5 / 25</span></div>
   </div>
 </section>
 
@@ -516,7 +530,7 @@ body.scroll .in > .body{overflow:visible}
         <p class="muted" style="margin-top:1cqi; font-size:.9em">Every new scanner repeats it. Worth fixing even if no organization is ever harvested: any CI pipeline already produces exactly this data, and throws all but four integers away.</p>
       </div>
     </div>
-    <div class="foot"><span>Problems</span><span>6 / 24</span></div>
+    <div class="foot"><span>Problems</span><span>6 / 25</span></div>
   </div>
 </section>
 
@@ -545,7 +559,7 @@ body.scroll .in > .body{overflow:visible}
         </div>
       </div>
     </div>
-    <div class="foot"><span>Problems</span><span>7 / 24</span></div>
+    <div class="foot"><span>Problems</span><span>7 / 25</span></div>
   </div>
 </section>
 
@@ -585,7 +599,7 @@ body.scroll .in > .body{overflow:visible}
         </div>
       </div>
     </div>
-    <div class="foot"><span>Yontrack</span><span>8 / 24</span></div>
+    <div class="foot"><span>Yontrack</span><span>8 / 25</span></div>
   </div>
 </section>
 
@@ -616,7 +630,7 @@ body.scroll .in > .body{overflow:visible}
         </div>
       </div>
     </div>
-    <div class="foot"><span>Yontrack</span><span>9 / 24</span></div>
+    <div class="foot"><span>Yontrack</span><span>9 / 25</span></div>
   </div>
 </section>
 
@@ -660,7 +674,7 @@ body.scroll .in > .body{overflow:visible}
         <p><b>Two alternatives were rejected</b> as primary: an in-org push gateway (presumes egress, nothing to inspect when numbers look wrong) and an edge Yontrack that federates (real product work, kept as the strategic direction if the pattern recurs).</p>
       </div>
     </div>
-    <div class="foot"><span>Approach</span><span>10 / 24</span></div>
+    <div class="foot"><span>Approach</span><span>10 / 25</span></div>
   </div>
 </section>
 
@@ -679,7 +693,7 @@ body.scroll .in > .body{overflow:visible}
         <div class="step"><h3>Unknown is a value, not a zero</h3><p>Every reading carries its basis, <span class="tag m">measured</span>, <span class="tag e">estimated</span> or <span class="tag u">unknown</span>, the window it covers and the branches that fed it. The estate view can be read measured-only.</p></div>
       </div>
     </div>
-    <div class="foot"><span>Approach</span><span>11 / 24</span></div>
+    <div class="foot"><span>Approach</span><span>11 / 25</span></div>
   </div>
 </section>
 
@@ -719,7 +733,74 @@ body.scroll .in > .body{overflow:visible}
       </div>
       <p class="muted" style="margin-top:1.6cqi; font-size:.9em">Own repository, one static binary, one-shot commands run by the organization's own cron. Never a daemon.</p>
     </div>
-    <div class="foot"><span>Harvester</span><span>12 / 24</span></div>
+    <div class="foot"><span>Harvester</span><span>12 / 25</span></div>
+  </div>
+</section>
+
+<!-- Harvester architecture -->
+<!-- Harvester architecture -->
+<section class="slide" aria-label="Harvester architecture">
+  <div class="in">
+    <div class="eyebrow"><span class="ic"><svg><use href="#i-harvester"/></svg></span> Inside the organization · how the harvester is put together</div>
+    <div class="body arch-body">
+      <h2 style="margin-bottom:0; font-size:2.6cqi">Three kinds of sources, one deterministic tool, an agent on the side</h2>
+      <svg class="arch" viewBox="0 0 1200 520" role="img" aria-label="Architecture of the harvester">
+<defs><marker id="m-flow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="mk-flow"/></marker><marker id="m-prop" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="mk-prop"/></marker></defs>
+<text class="zt" x="30" y="40">Organization sources</text>
+<text class="zt" x="430" y="40">Harvest repository (git)</text>
+<text class="zt" x="910" y="40">Output</text>
+<path class="flow" d="M290 95 C360 95 350 180 420 180" marker-end="url(#m-flow)"/>
+<path class="flow" d="M290 205 C360 205 350 180 420 180" marker-end="url(#m-flow)"/>
+<path class="flow" d="M780 180 C850 180 840 125 910 125" marker-end="url(#m-flow)"/>
+<path class="flow" d="M780 180 C850 180 840 245 910 245" marker-end="url(#m-flow)"/>
+<path class="prop" d="M290 315 C365 315 355 410 430 410" marker-end="url(#m-prop)"/>
+<path class="prop" d="M598 360 L598 230" marker-end="url(#m-prop)"/>
+<path class="prop" d="M1040 280 C1040 390 990 410 760 410" marker-end="url(#m-prop)"/>
+<text class="lbl" x="298" y="238">fetch, by a human or cron</text>
+<text class="lbl" x="60" y="376">mined, with the source as evidence</text>
+<text class="lbl" x="602" y="308">mapping and facts file</text>
+<text class="lbl" x="860" y="398">reviewed</text>
+<g class="node"><rect class="box" x="30" y="60" width="260" height="70" rx="8"/>
+<svg class="icon" x="46" y="79" width="32" height="32"><use href="#i-source"/></svg>
+<text class="name" x="92" y="91">Structured, live</text>
+<text class="sub" x="92" y="114">CI, SCM, scanners</text>
+</g>
+<g class="node"><rect class="box" x="30" y="170" width="260" height="70" rx="8"/>
+<svg class="icon" x="46" y="189" width="32" height="32"><use href="#i-export"/></svg>
+<text class="name" x="92" y="201">Structured, handed over</text>
+<text class="sub" x="92" y="224">exports run by someone else</text>
+</g>
+<g class="node"><rect class="box" x="30" y="280" width="260" height="70" rx="8"/>
+<svg class="icon" x="46" y="299" width="32" height="32"><use href="#i-facts"/></svg>
+<text class="name" x="92" y="311">Unstructured</text>
+<text class="sub" x="92" y="334">spreadsheets, wikis, emails</text>
+</g>
+<g class="node"><rect class="box" x="420" y="130" width="360" height="100" rx="8"/>
+<svg class="icon" x="436" y="149" width="32" height="32"><use href="#i-harvester"/></svg>
+<text class="name" x="482" y="161">Harvester · collect</text>
+<text class="sub" x="482" y="184">reads the mapping, the exports, the facts file</text>
+<text class="sub" x="482" y="205">deterministic · no credentials · no model</text>
+</g>
+<g class="node"><rect class="box" x="910" y="90" width="260" height="70" rx="8"/>
+<svg class="icon" x="926" y="109" width="32" height="32"><use href="#i-ledger"/></svg>
+<text class="name" x="972" y="121">Ledger</text>
+<text class="sub" x="972" y="144">one file per run, shipped to Yontrack</text>
+</g>
+<g class="node"><rect class="box" x="910" y="210" width="260" height="70" rx="8"/>
+<svg class="icon" x="926" y="229" width="32" height="32"><use href="#i-reconcile"/></svg>
+<text class="name" x="972" y="241">Reconciliation report</text>
+<text class="sub" x="972" y="264">gaps, disagreements, staleness</text>
+</g>
+<g class="node"><rect class="box" x="430" y="360" width="330" height="100" rx="8"/>
+<svg class="icon" x="446" y="379" width="32" height="32"><use href="#i-agent"/></svg>
+<text class="name" x="492" y="391">Agent</text>
+<text class="sub" x="492" y="414">drafts the mapping, mines the facts file</text>
+<text class="sub" x="492" y="435">every proposal is a branch a human merges</text>
+</g>
+<g class="legend"><path class="flow" d="M30 500 L90 500"/><text class="sub" x="100" y="505">deterministic data flow</text><path class="prop" d="M330 500 L390 500"/><text class="sub" x="400" y="505">agent proposal, reviewed and merged by a human</text></g>
+</svg>
+    </div>
+    <div class="foot"><span>Harvester</span><span>13 / 25</span></div>
   </div>
 </section>
 
@@ -754,7 +835,7 @@ body.scroll .in > .body{overflow:visible}
         </ul>
       </div>
     </div>
-    <div class="foot"><span>Ledger</span><span>13 / 24</span></div>
+    <div class="foot"><span>Ledger</span><span>14 / 25</span></div>
   </div>
 </section>
 
@@ -786,7 +867,7 @@ body.scroll .in > .body{overflow:visible}
         </div>
       </div>
     </div>
-    <div class="foot"><span>Harvester</span><span>14 / 24</span></div>
+    <div class="foot"><span>Harvester</span><span>15 / 25</span></div>
   </div>
 </section>
 
@@ -806,7 +887,7 @@ body.scroll .in > .body{overflow:visible}
       </div>
       <p class="muted" style="margin-top:1.6cqi; font-size:.9em">Behind a dedicated permission, and executed as the uploader so per-project rights hold. Import is a privilege because it can write dates.</p>
     </div>
-    <div class="foot"><span>Import</span><span>15 / 24</span></div>
+    <div class="foot"><span>Import</span><span>16 / 25</span></div>
   </div>
 </section>
 
@@ -852,7 +933,7 @@ body.scroll .in > .body{overflow:visible}
         </ul>
       </div>
     </div>
-    <div class="foot"><span>Findings</span><span>16 / 24</span></div>
+    <div class="foot"><span>Findings</span><span>17 / 25</span></div>
   </div>
 </section>
 
@@ -887,7 +968,7 @@ body.scroll .in > .body{overflow:visible}
         </ul>
       </div>
     </div>
-    <div class="foot"><span>Readings</span><span>17 / 24</span></div>
+    <div class="foot"><span>Readings</span><span>18 / 25</span></div>
   </div>
 </section>
 
@@ -919,7 +1000,7 @@ body.scroll .in > .body{overflow:visible}
         </ul>
       </div>
     </div>
-    <div class="foot"><span>Estates</span><span>18 / 24</span></div>
+    <div class="foot"><span>Estates</span><span>19 / 25</span></div>
   </div>
 </section>
 
@@ -960,7 +1041,7 @@ body.scroll .in > .body{overflow:visible}
         </div>
       </div>
     </div>
-    <div class="foot"><span>Due diligence</span><span>19 / 24</span></div>
+    <div class="foot"><span>Due diligence</span><span>20 / 25</span></div>
   </div>
 </section>
 
@@ -1000,7 +1081,7 @@ body.scroll .in > .body{overflow:visible}
       </div>
       <p class="muted" style="margin-top:1.6cqi; font-size:.9em">The findings model pays off even if no organization is ever harvested. The estate view is the block that decides whether the other three were worth doing.</p>
     </div>
-    <div class="foot"><span>Roadmap</span><span>20 / 24</span></div>
+    <div class="foot"><span>Roadmap</span><span>21 / 25</span></div>
   </div>
 </section>
 
@@ -1036,7 +1117,7 @@ body.scroll .in > .body{overflow:visible}
         </div>
       </div>
     </div>
-    <div class="foot"><span>On the radar</span><span>21 / 24</span></div>
+    <div class="foot"><span>On the radar</span><span>22 / 25</span></div>
   </div>
 </section>
 
@@ -1059,7 +1140,7 @@ body.scroll .in > .body{overflow:visible}
         </ul>
       </div>
     </div>
-    <div class="foot"><span>Scout · by Yontrack</span><span>22 / 24</span></div>
+    <div class="foot"><span>Scout · by Yontrack</span><span>23 / 25</span></div>
   </div>
 </section>
 
@@ -1106,7 +1187,7 @@ body.scroll .in > .body{overflow:visible}
       </div>
       <p class="muted" style="font-size:.8em; margin-top:.8cqi">Illustrative mock-up with example figures, not a screenshot.</p>
     </div>
-    <div class="foot"><span>Mock-up</span><span>23 / 24</span></div>
+    <div class="foot"><span>Mock-up</span><span>24 / 25</span></div>
   </div>
 </section>
 
@@ -1141,7 +1222,7 @@ body.scroll .in > .body{overflow:visible}
         <div class="b"><span class="ic" style="color:var(--accent-ink)"><svg><use href="#i-marker"/></svg></span><b>Deployment marker</b><span class="muted">what "reached production" means in this estate</span></div>
       </div>
     </div>
-    <div class="foot"><span>Appendix</span><span>24 / 24</span></div>
+    <div class="foot"><span>Appendix</span><span>25 / 25</span></div>
   </div>
 </section>
 
