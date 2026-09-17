@@ -56,7 +56,7 @@ val uiTest by tasks.registering(NpmTask::class) {
             listOf("run", "test")
         }
     )
-    // Both shards write into reports/main/junit, so the report carries the shard in its name. The
+    // All the shards write into reports/main/junit, so the report carries the shard in its name. The
     // stamp's glob is reports/*/junit/*.xml and is unaffected.
     environment.put("JUNIT_REPORT_PATH", "reports/main/junit/report$shardSuffix.xml")
     environment.put("HTML_REPORT_PATH", "reports/main/html")

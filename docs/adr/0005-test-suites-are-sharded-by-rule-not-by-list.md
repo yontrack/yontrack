@@ -1,7 +1,7 @@
 # Test suites are sharded by a rule over the discovered set, never by a list
 
-`UI tests (main)` and `KDSL acceptance tests` each run in two shards, on separate
-runners. Which test goes to which shard is decided by a rule applied to the set
+`UI tests (main)` runs in three shards and `KDSL acceptance tests` in two, on
+separate runners. Which test goes to which shard is decided by a rule applied to the set
 of tests that were actually discovered — never by an enumeration of test names
 held in the workflow or the build.
 
@@ -101,3 +101,14 @@ against a best-possible 183 and 183: a 7% imbalance, and within 12 seconds of
 optimal on the slow side. Dealing sorted names out round-robin did what it was
 chosen to do, visibly so on the three ~60 second GitHub ingestion classes, which
 are adjacent once sorted and alternated rather than clumping.
+
+### Update: a third UI shard
+
+The shard count is a response to measured durations, not a fixed number. As the
+Playwright suite grew, the two `main` shards went from 6.1 and 6.6 minutes to 8.7
+and 9.4, making them the slowest legs of the parallel band — above both KDSL
+shards (6.0 and 8.4) and every `integration` leg (7.0 at most). Unlike the KDSL
+case above, a third UI shard therefore shortens the critical path directly, and
+the UI legs have little to compile, so most of each shard's time is the suite
+itself. `main` now runs in three shards; nothing else changed, since
+`--shard=i/n` and the report naming already took any count.

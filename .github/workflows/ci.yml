@@ -1006,21 +1006,27 @@ jobs:
       # stack runs in; `shard` is a partition of one suite across runners, as in `integration`.
       # Only `main` is sharded: ldap and oidc run `--grep '@auth'` and take three minutes.
       #
-      # Two shards takes `main` from ~10 minutes to 6.1 and 6.6, measured, which is about where the
-      # parallel band's own floor is - the slowest `integration` leg was 6.7 in the same run. See
-      # #1679 and docs/adr/0005-test-suites-are-sharded-by-rule-not-by-list.md.
+      # Two shards took `main` from ~10 minutes to 6.1 and 6.6 (#1679), but the suite kept growing
+      # and they reached 8.7 and 9.4 - the slowest legs of the parallel band, above KDSL at 8.4 and
+      # the slowest `integration` leg at 7.0. Hence three. See
+      # docs/adr/0005-test-suites-are-sharded-by-rule-not-by-list.md.
       matrix:
         include:
           - variant: main
-            label: main 1/2
+            label: main 1/3
             task: uiTest
             shard: 1
-            shards: 2
+            shards: 3
           - variant: main
-            label: main 2/2
+            label: main 2/3
             task: uiTest
             shard: 2
-            shards: 2
+            shards: 3
+          - variant: main
+            label: main 3/3
+            task: uiTest
+            shard: 3
+            shards: 3
           - variant: ldap
             label: ldap
             task: uiLdapTest
@@ -1204,9 +1210,9 @@ jobs:
       # Rebuild the layout the stamp's glob expects: reports/<variant>/junit/*.xml
       #
       # The artefacts are named `<variant>-<shard>`, and the shard is dropped here so the reports
-      # land under the variant they belong to rather than inventing a `main-1` variant. The two
-      # shards of `main` do not collide: the Gradle build names their reports report-1.xml and
-      # report-2.xml.
+      # land under the variant they belong to rather than inventing a `main-1` variant. The
+      # shards of `main` do not collide: the Gradle build names their reports report-1.xml,
+      # report-2.xml and so on.
       - name: Lay the reports out
         id: layout
         if: ${{ !cancelled() && steps.collect.outcome != '' }}
