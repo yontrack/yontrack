@@ -1,0 +1,9 @@
+mutation DeleteLabel(
+    $id: Int!,
+) {
+    deleteLabel(input: {
+        id: $id,
+    }) {
+        ...PayloadUserErrors
+    }
+}

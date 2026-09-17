@@ -1,0 +1,11 @@
+mutation SetProjectLabels(
+    $projectId: Int!,
+    $labelIds: [Int!]!,
+) {
+    setProjectLabels(input: {
+        projectId: $projectId,
+        labelIds: $labelIds,
+    }) {
+        ...PayloadUserErrors
+    }
+}

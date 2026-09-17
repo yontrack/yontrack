@@ -25,6 +25,30 @@ fun DemoDataset.validate() {
 
     val buildRefs = mutableSetOf<BuildRef>()
 
+    // Labels first: a project names them, so what is declared here has to be known before the
+    // projects are walked.
+    val labelDisplays = mutableSetOf<String>()
+    labels.forEach { label ->
+        label.category?.let { category ->
+            if (!LABEL_NAME.matches(category)) {
+                problems += "Label category \"$category\" can only have letters, digits, dots, " +
+                        "dashes or underscores."
+            }
+        }
+        if (!LABEL_NAME.matches(label.name)) {
+            problems += "Label name \"${label.name}\" can only have letters, digits, dots, " +
+                    "dashes or underscores."
+        }
+        if (!LABEL_COLOR.matches(label.color)) {
+            problems += "The ${label.display} label is coloured \"${label.color}\"; " +
+                    "a label colour is a #RRGGBB string."
+        }
+        if (!labelDisplays.add(label.display)) {
+            problems += "The dataset declares the ${label.display} label twice, and Yontrack " +
+                    "refuses a second label of the same category and name."
+        }
+    }
+
     // Creation times are resolved against one arbitrary but fixed instant: `DaysAgo` is
     // monotonic in it, so which instant it is does not change the order it yields. Only a
     // branch mixing `DaysAgo` and `At` builds could read differently under another one, and
@@ -33,6 +57,20 @@ fun DemoDataset.validate() {
 
     projects.forEach { project ->
         checkName(project.name, "Project")
+        // A label naming nothing is a typo here for the same reason a promotion dependency is:
+        // the seed would fail half-way through the reset, with the demo already deleted.
+        project.labels.forEach { label ->
+            if (label !in labelDisplays) {
+                problems += "Project ${project.name} carries the $label label, " +
+                        "which the dataset never creates."
+            }
+        }
+        project.labels.groupingBy { it }.eachCount()
+            .filterValues { it > 1 }
+            .keys
+            .forEach { label ->
+                problems += "Project ${project.name} carries the $label label twice."
+            }
         project.scm?.issues?.forEach { issue ->
             if (!ISSUE_KEY.matches(issue.key)) {
                 problems += "The ${project.name} project declares the issue \"${issue.key}\", " +

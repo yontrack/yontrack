@@ -3,10 +3,15 @@ package net.nemerosa.ontrack.demo.seed
 import net.nemerosa.ontrack.json.asJson
 import net.nemerosa.ontrack.kdsl.spec.Branch
 import net.nemerosa.ontrack.kdsl.spec.Build
+import net.nemerosa.ontrack.kdsl.spec.Label
 import net.nemerosa.ontrack.kdsl.spec.Ontrack
 import net.nemerosa.ontrack.kdsl.spec.Project
 import net.nemerosa.ontrack.kdsl.spec.PromotionLevel
 import net.nemerosa.ontrack.kdsl.spec.ValidationStamp
+import net.nemerosa.ontrack.kdsl.spec.createLabel
+import net.nemerosa.ontrack.kdsl.spec.deleteLabel
+import net.nemerosa.ontrack.kdsl.spec.labels
+import net.nemerosa.ontrack.kdsl.spec.setLabels
 import net.nemerosa.ontrack.kdsl.spec.dashboards.DashboardWidget
 import net.nemerosa.ontrack.kdsl.spec.dashboards.DashboardWidgetLayout
 import net.nemerosa.ontrack.kdsl.spec.dashboards.dashboards
@@ -43,6 +48,20 @@ class KdslDemoTarget(private val ontrack: Ontrack) : DemoTarget {
 
     override fun createProject(name: String, description: String): DemoProject =
         KdslDemoProject(ontrack, ontrack.createProject(name, description))
+
+    override fun labels(): List<DemoLabel> =
+        ontrack.labels().map { KdslDemoLabel(ontrack, it) }
+
+    override fun createLabel(spec: LabelSpec): DemoLabel =
+        KdslDemoLabel(
+            ontrack,
+            ontrack.createLabel(
+                name = spec.name,
+                category = spec.category,
+                description = spec.description,
+                color = spec.color,
+            )
+        )
 
     override fun environments(): List<DemoEnvironment> =
         ontrack.environments.list().map(::KdslDemoEnvironment)
@@ -182,6 +201,20 @@ private class KdslDemoProject(
     }
 
     override fun markAsFavourite() = project.favourite()
+
+    override fun setLabels(labels: List<DemoLabel>) {
+        project.setLabels(labels.map { (it as KdslDemoLabel).label.id })
+    }
+}
+
+private class KdslDemoLabel(
+    private val ontrack: Ontrack,
+    val label: Label,
+) : DemoLabel {
+
+    override val display: String get() = label.display
+
+    override fun delete() = ontrack.deleteLabel(label.id)
 }
 
 private class KdslDemoBranch(

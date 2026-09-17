@@ -8,11 +8,13 @@ The reset goes **through the Yontrack API**, not the database. No Postgres hooks
 churn, and no dependency on ArgoCD sync timing — a Helm pre-upgrade hook would fire on
 *every* sync, so an unrelated values tweak would silently destroy the demo.
 
-Settings stay covered by CasC and users live in Keycloak, so projects, environments and
-dashboards are the only things the seed has to reset.
+Settings stay covered by CasC and users live in Keycloak, so projects, environments, labels
+and dashboards are the only things the seed has to reset. What they have in common is that
+they outlive a project deletion: a label is global and carried by several projects, so
+deleting every project leaves every label behind.
 
 The token it runs with needs admin-level rights: it deletes projects, manages environments
-and shares a dashboard (`DashboardSharing`).
+and labels (`LabelManagement`) and shares a dashboard (`DashboardSharing`).
 
 ## Running it
 

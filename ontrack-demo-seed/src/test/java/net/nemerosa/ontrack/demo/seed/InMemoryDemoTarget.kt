@@ -31,12 +31,38 @@ class InMemoryDemoTarget(
     private val environments = mutableListOf<InMemoryEnvironment>()
     private val dashboards = mutableListOf<InMemoryDashboard>()
 
+    /**
+     * Labels, held by the instance rather than by the projects — as they are on a real
+     * server, where they outlive the projects the reset deletes.
+     */
+    private val labels = mutableListOf<InMemoryLabel>()
+
     override fun projects(): List<DemoProject> = projects.toList()
 
     override fun createProject(name: String, description: String): DemoProject {
         checkName(name, "Project")
         require(projects.none { it.name == name }) { "Project $name already exists" }
         return InMemoryProject(name, description).also { projects += it }
+    }
+
+    override fun labels(): List<DemoLabel> = labels.toList()
+
+    override fun createLabel(spec: LabelSpec): DemoLabel {
+        spec.category?.let {
+            require(LABEL_NAME.matches(it)) {
+                "Label category \"$it\" can only have letters, digits, dots, dashes or underscores."
+            }
+        }
+        require(LABEL_NAME.matches(spec.name)) {
+            "Label name \"${spec.name}\" can only have letters, digits, dots, dashes or underscores."
+        }
+        require(LABEL_COLOR.matches(spec.color)) {
+            "Label colour \"${spec.color}\" is not a #RRGGBB string."
+        }
+        require(labels.none { it.display == spec.display }) {
+            "Label ${spec.display} already exists"
+        }
+        return InMemoryLabel(spec).also { labels += it }
     }
 
     override fun environments(): List<DemoEnvironment> = environments.toList()
@@ -72,9 +98,14 @@ class InMemoryDemoTarget(
      * soon as one line does.
      */
     fun snapshot(): String = buildList {
+        // First, as the seed creates them: a project below names them.
+        labels.forEach { label ->
+            add("label ${label.display} ${label.spec.color} \"${label.spec.description}\"")
+        }
         projects.forEach { project ->
             add("project ${project.name} \"${project.description}\"")
             if (project.favourite) add("  favourite")
+            if (project.labels.isNotEmpty()) add("  labels ${project.labels.joinToString(", ")}")
             project.scmRepositoryName?.let { repositoryName ->
                 val repository = scmRepositories.getValue(repositoryName)
                 add("  scm ${repository.name}")
@@ -125,6 +156,18 @@ class InMemoryDemoTarget(
         }
     }.joinToString("\n")
 
+    inner class InMemoryLabel(val spec: LabelSpec) : DemoLabel {
+
+        override val display: String get() = spec.display
+
+        override fun delete() {
+            labels -= this
+            // As the server does, by cascade on PROJECT_LABEL: a deleted label is gone from
+            // every project that carried it.
+            projects.forEach { it.removeLabel(display) }
+        }
+    }
+
     inner class InMemoryDashboard(val dashboard: DemoDashboard) : DemoDashboardHandle {
 
         override val name: String get() = dashboard.name
@@ -151,8 +194,28 @@ class InMemoryDemoTarget(
         var favourite: Boolean = false
             private set
 
+        /** The labels this project carries, by their display form, in assignment order. */
+        var labels: List<String> = emptyList()
+            private set
+
         override fun markAsFavourite() {
             favourite = true
+        }
+
+        /**
+         * Replaces the whole set, as `setProjectLabels` does on the server.
+         */
+        override fun setLabels(labels: List<DemoLabel>) {
+            labels.forEach { label ->
+                require(this@InMemoryDemoTarget.labels.any { it.display == label.display }) {
+                    "Label ${label.display} does not exist"
+                }
+            }
+            this.labels = labels.map { it.display }
+        }
+
+        fun removeLabel(display: String) {
+            labels = labels - display
         }
 
         override fun delete() {

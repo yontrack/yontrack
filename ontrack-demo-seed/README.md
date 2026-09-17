@@ -23,15 +23,27 @@ the seed — keep it in sync by hand whenever that file changes.
 | Shared dashboard                            | Dashboard picker → "Yontrack demo"                                    | `BranchStatuses`, `EnvironmentList`, `LastActiveProjects` and `PromotionFrequencyChart` widgets |
 | Self-hosted changelog                       | `yontrack` / `main`                                                   | One build per commit since the last release, always current, `BRONZE` only                 |
 | Change log between two builds               | `petclinic` / `main`, change log from build `104` to `107`            | Conventional-commit subjects, grouped issues, and the semantic view of the same change log |
+| Project labels                              | Any project page, the project lists, and _Configuration_ → _Labels_   | `team:` and `language:` chips on every project; filtering the project list on one or two of them |
 
 ## Projects
 
-| Project           | Branches                    | Role                                                                |
-|--------------------|------------------------------|----------------------------------------------------------------------|
-| `common-library`   | `main`                       | Bottom of the dependency graph; `petclinic` links to its builds       |
-| `petclinic`        | `main`, `release-1.3`        | The main demo project — full pipeline, both promotion ladders, the only one with an SCM |
-| `petclinic-ui`     | `main`                       | Consumes `petclinic`, so the demo has a dependency graph to walk       |
-| `yontrack`         | `main`                       | Yontrack's own changelog, reseeded from git on every run              |
+| Project           | Branches                    | Labels                                  | Role                                                                |
+|--------------------|------------------------------|------------------------------------------|----------------------------------------------------------------------|
+| `common-library`   | `main`                       | `team:platform`, `language:java`         | Bottom of the dependency graph; `petclinic` links to its builds       |
+| `petclinic`        | `main`, `release-1.3`        | `team:apps`, `language:java`             | The main demo project — full pipeline, both promotion ladders, the only one with an SCM |
+| `petclinic-ui`     | `main`                       | `team:apps`, `language:javascript`       | Consumes `petclinic`, so the demo has a dependency graph to walk       |
+| `yontrack`         | `main`                       | `team:platform`, `language:kotlin`       | Yontrack's own changelog, reseeded from git on every run              |
+
+## Labels
+
+Two categories, `team` and `language`, and every project carries one of each. The two cut the
+demo's four projects in two different ways on purpose: `team:apps` and `language:java` overlap
+on `petclinic` alone, so filtering the project list on both is worth trying and returns
+something other than what either returns by itself.
+
+Labels are global rather than owned by a project, so the reset deletes them all before
+recreating them — the same treatment as environments and dashboards, and for the same reason:
+they outlive the projects it deletes.
 
 ## The change log
 

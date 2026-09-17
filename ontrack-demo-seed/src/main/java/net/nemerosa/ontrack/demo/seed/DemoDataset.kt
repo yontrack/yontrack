@@ -10,6 +10,12 @@ import java.time.LocalDateTime
  */
 data class DemoDataset(
     val projects: List<ProjectSpec>,
+    /**
+     * Labels, which are instance-level and not owned by any project: several projects carry
+     * the same label, which is the whole point of one. They are declared here and named by
+     * [ProjectSpec.labels], the way a slot names its project.
+     */
+    val labels: List<LabelSpec> = emptyList(),
     val environments: List<EnvironmentSpec> = emptyList(),
     /**
      * Deployments, run in the order they are declared, after every slot exists.
@@ -34,13 +40,43 @@ data class DemoDataset(
  * user sees on the mobile home screen - which is their favourites and nothing else, and so
  * would be blank on a demo that curated none (#1720).
  */
+/**
+ * @property labels The labels this project carries, named by their [LabelSpec.display] the way
+ * an auto promotion names a validation stamp. A label is instance-level, so it is declared once
+ * in [DemoDataset.labels] and named here as many times as projects carry it.
+ */
 data class ProjectSpec(
     val name: String,
     val description: String,
     val branches: List<BranchSpec>,
     val scm: ScmSpec? = null,
     val favourite: Boolean = false,
+    val labels: List<String> = emptyList(),
 )
+
+/**
+ * A project label: a coloured tag put on any number of projects.
+ *
+ * @property category Category of the label, optional. Two categories read better than one on the
+ * demo: a chip shows `category:name` and the reader can see what a category is for.
+ * @property name Name of the label, unique within its category.
+ * @property description Shown as the chip's tooltip and on the label page.
+ * @property color Background colour of the chip, in the `#RRGGBB` format. Yontrack computes the
+ * foreground colour from it.
+ */
+data class LabelSpec(
+    val category: String?,
+    val name: String,
+    val description: String,
+    val color: String,
+) {
+    /**
+     * How Yontrack displays the label, and how the dataset names it: `category:name`, or just
+     * `name` for a label with no category.
+     */
+    val display: String
+        get() = category?.let { "$it:$name" } ?: name
+}
 
 /**
  * A mock SCM repository behind a project.

@@ -1,0 +1,20 @@
+mutation UpdateLabel(
+    $id: Int!,
+    $category: String,
+    $name: String!,
+    $description: String,
+    $color: String!,
+) {
+    updateLabel(input: {
+        id: $id,
+        category: $category,
+        name: $name,
+        description: $description,
+        color: $color,
+    }) {
+        label {
+            ...LabelFragment
+        }
+        ...PayloadUserErrors
+    }
+}

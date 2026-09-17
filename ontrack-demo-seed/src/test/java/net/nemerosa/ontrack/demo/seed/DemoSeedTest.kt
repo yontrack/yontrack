@@ -940,6 +940,160 @@ class DemoSeedTest {
     }
 
     @Test
+    fun `the demo projects carry labels`() {
+        // Labels are the demo of the whole labels UI initiative: the admin page, the chips
+        // on a project and in the project lists, and the label filter all read what the
+        // seed puts here, so a demo with no label shows none of them.
+        val target = InMemoryDemoTarget()
+
+        seed(target).run(DemoContent.dataset(changelog))
+
+        val projects = target.projects().filterIsInstance<InMemoryDemoTarget.InMemoryProject>()
+        assertTrue(
+            projects.all { it.labels.isNotEmpty() },
+            "Every demo project carries at least one label",
+        )
+        // Two categories rather than one: the chips only read as `category:name` where more
+        // than one category is on screen, and filtering on two labels at once is an AND.
+        val categories = target.labels()
+            .filterIsInstance<InMemoryDemoTarget.InMemoryLabel>()
+            .mapNotNull { it.spec.category }
+            .distinct()
+        assertTrue(categories.size >= 2, "The demo shows labels of more than one category")
+    }
+
+    @Test
+    fun `labels are attached to the projects the dataset names`() {
+        val target = InMemoryDemoTarget()
+
+        seed(target).run(
+            DemoDataset(
+                labels = listOf(
+                    LabelSpec(category = "team", name = "platform", description = "", color = "#FF0000"),
+                    LabelSpec(category = null, name = "legacy", description = "", color = "#00FF00"),
+                ),
+                projects = listOf(
+                    ProjectSpec(
+                        name = "labelled",
+                        description = "",
+                        labels = listOf("team:platform", "legacy"),
+                        branches = listOf(BranchSpec(name = "main", description = "")),
+                    ),
+                    ProjectSpec(
+                        name = "plain",
+                        description = "",
+                        branches = listOf(BranchSpec(name = "main", description = "")),
+                    ),
+                ),
+            )
+        )
+
+        val projects = target.projects().filterIsInstance<InMemoryDemoTarget.InMemoryProject>()
+        assertEquals(
+            listOf(
+                "labelled" to listOf("team:platform", "legacy"),
+                "plain" to emptyList(),
+            ),
+            projects.map { it.name to it.labels },
+        )
+    }
+
+    @Test
+    fun `the reset deletes the labels that were there before`() {
+        // Labels are global: they outlive the projects the reset deletes, the way
+        // dashboards and mock SCM repositories do, so the reset has to delete them itself.
+        val target = InMemoryDemoTarget()
+        target.createLabel(
+            LabelSpec(category = "left-over", name = "label", description = "", color = "#123456")
+        )
+
+        seed(target).run(DemoContent.dataset(changelog))
+
+        assertTrue(
+            target.labels().none { it.display == "left-over:label" },
+            "The left-over label is gone",
+        )
+    }
+
+    @Test
+    fun `a project cannot carry a label the dataset never declares`() {
+        val error = assertFailsWith<IllegalArgumentException> {
+            seed(InMemoryDemoTarget()).run(
+                DemoDataset(
+                    projects = listOf(
+                        ProjectSpec(
+                            name = "p",
+                            description = "",
+                            labels = listOf("team:ghost"),
+                            branches = listOf(BranchSpec(name = "main", description = "")),
+                        ),
+                    ),
+                )
+            )
+        }
+        assertTrue("team:ghost" in error.message.orEmpty(), error.message.orEmpty())
+        assertTrue("never creates" in error.message.orEmpty(), error.message.orEmpty())
+    }
+
+    @Test
+    fun `a label Yontrack would refuse is a problem before anything is deleted`() {
+        val error = assertFailsWith<IllegalArgumentException> {
+            seed(InMemoryDemoTarget()).run(
+                DemoDataset(
+                    labels = listOf(
+                        LabelSpec(category = "not a category", name = "ok", description = "", color = "#FF0000"),
+                        LabelSpec(category = "team", name = "not a name", description = "", color = "#FF0000"),
+                        LabelSpec(category = "team", name = "colourless", description = "", color = "red"),
+                    ),
+                    projects = emptyList(),
+                )
+            )
+        }
+        val message = error.message.orEmpty()
+        assertTrue("not a category" in message, message)
+        assertTrue("not a name" in message, message)
+        assertTrue("red" in message, message)
+    }
+
+    @Test
+    fun `two labels cannot share the same display`() {
+        val error = assertFailsWith<IllegalArgumentException> {
+            seed(InMemoryDemoTarget()).run(
+                DemoDataset(
+                    labels = listOf(
+                        LabelSpec(category = "team", name = "platform", description = "", color = "#FF0000"),
+                        LabelSpec(category = "team", name = "platform", description = "Again", color = "#00FF00"),
+                    ),
+                    projects = emptyList(),
+                )
+            )
+        }
+        assertTrue("team:platform" in error.message.orEmpty(), error.message.orEmpty())
+    }
+
+    @Test
+    fun `a project cannot carry the same label twice`() {
+        val error = assertFailsWith<IllegalArgumentException> {
+            seed(InMemoryDemoTarget()).run(
+                DemoDataset(
+                    labels = listOf(
+                        LabelSpec(category = "team", name = "platform", description = "", color = "#FF0000"),
+                    ),
+                    projects = listOf(
+                        ProjectSpec(
+                            name = "p",
+                            description = "",
+                            labels = listOf("team:platform", "team:platform"),
+                            branches = listOf(BranchSpec(name = "main", description = "")),
+                        ),
+                    ),
+                )
+            )
+        }
+        assertTrue("twice" in error.message.orEmpty(), error.message.orEmpty())
+    }
+
+    @Test
     fun `every problem is reported at once, not one reset at a time`() {
         val error = assertFailsWith<IllegalArgumentException> {
             seed(InMemoryDemoTarget()).run(

@@ -1,0 +1,9 @@
+query ProjectLabels(
+    $id: Int!,
+) {
+    projects(id: $id) {
+        labels {
+            ...LabelFragment
+        }
+    }
+}

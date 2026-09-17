@@ -26,6 +26,15 @@ interface DemoTarget {
     fun createProject(name: String, description: String): DemoProject
 
     /**
+     * Every label on the instance. Labels belong to the instance rather than to a project —
+     * several projects carry the same one — so they outlive the projects the reset deletes
+     * and the reset has to delete them explicitly, as it does environments and dashboards.
+     */
+    fun labels(): List<DemoLabel>
+
+    fun createLabel(spec: LabelSpec): DemoLabel
+
+    /**
      * Every environment on the instance. Environments are not projects and are not
      * covered by CasC, so the reset has to delete them explicitly.
      */
@@ -69,6 +78,17 @@ interface DemoDashboardHandle {
     fun delete()
 }
 
+/**
+ * A label held by the instance, as [DemoDashboardHandle] is a dashboard held by it.
+ *
+ * @property display `category:name`, or `name` alone for a label with no category — what the
+ * dataset names a label by.
+ */
+interface DemoLabel {
+    val display: String
+    fun delete()
+}
+
 interface DemoProject {
     val name: String
     fun delete()
@@ -89,6 +109,14 @@ interface DemoProject {
      * blank on a phone.
      */
     fun markAsFavourite()
+
+    /**
+     * Puts [labels] on this project, replacing whatever it carried.
+     *
+     * Replace-all rather than add-one-at-a-time because that is what the server offers:
+     * `setProjectLabels` removes from the project every label the call does not name.
+     */
+    fun setLabels(labels: List<DemoLabel>)
 }
 
 interface DemoBranch {

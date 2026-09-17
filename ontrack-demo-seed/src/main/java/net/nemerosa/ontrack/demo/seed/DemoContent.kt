@@ -65,11 +65,24 @@ object DemoContent {
     const val DASHBOARD_UUID = "1c1f9c3e-8bfa-4a1f-8a0b-4e2f0b0d1a01"
 
     /**
+     * Two label categories, not one. A single category would put the same word on every chip
+     * and make the `category:name` form look like noise; two of them show what a category is
+     * for — who owns a project, and what it is written in — and make the label filter's AND
+     * worth trying, since "the platform team's Java projects" selects a subset of each.
+     */
+    const val LABEL_TEAM_PLATFORM = "team:platform"
+    const val LABEL_TEAM_APPS = "team:apps"
+    const val LABEL_LANGUAGE_JAVA = "language:java"
+    const val LABEL_LANGUAGE_JAVASCRIPT = "language:javascript"
+    const val LABEL_LANGUAGE_KOTLIN = "language:kotlin"
+
+    /**
      * The whole dataset, curated part and changelog project together.
      *
      * @param changelog Commits since the last release, one build each.
      */
     fun dataset(changelog: List<ChangelogEntry>) = DemoDataset(
+        labels = labels(),
         projects = listOf(
             library(),
             service(),
@@ -79,6 +92,47 @@ object DemoContent {
         environments = environments(),
         deployments = deployments(),
         dashboard = dashboard(),
+    )
+
+    /**
+     * The labels every project of the demo carries. Every one of them is on at least one
+     * project: a label nobody carries shows an empty label page and is the one thing a
+     * reader would take for a bug rather than for a demonstration.
+     *
+     * The colours are the chips' background; Yontrack computes a readable foreground from
+     * each, which is why a dark and a light one both appear here.
+     */
+    private fun labels() = listOf(
+        LabelSpec(
+            category = "team",
+            name = "platform",
+            description = "Owned by the platform team.",
+            color = "#2F54EB",
+        ),
+        LabelSpec(
+            category = "team",
+            name = "apps",
+            description = "Owned by the application team.",
+            color = "#FA8C16",
+        ),
+        LabelSpec(
+            category = "language",
+            name = "java",
+            description = "Written in Java.",
+            color = "#B7292E",
+        ),
+        LabelSpec(
+            category = "language",
+            name = "javascript",
+            description = "Written in JavaScript.",
+            color = "#F7DF1E",
+        ),
+        LabelSpec(
+            category = "language",
+            name = "kotlin",
+            description = "Written in Kotlin.",
+            color = "#7F52FF",
+        ),
     )
 
     private val bronze = PromotionLevelSpec(BRONZE, "The build is green and can be looked at.")
@@ -252,6 +306,7 @@ object DemoContent {
     private fun library() = ProjectSpec(
         name = LIBRARY,
         description = "Shared library, used by the other demo projects.",
+        labels = listOf(LABEL_TEAM_PLATFORM, LABEL_LANGUAGE_JAVA),
         branches = listOf(
             BranchSpec(
                 name = MAIN,
@@ -330,6 +385,7 @@ object DemoContent {
         // main project, so the home screen shows the project each branch belongs to doing
         // real work - two branches called differently under one project name.
         favourite = true,
+        labels = listOf(LABEL_TEAM_APPS, LABEL_LANGUAGE_JAVA),
         branches = listOf(
             BranchSpec(
                 name = MAIN,
@@ -566,6 +622,9 @@ object DemoContent {
         description = "Front-end for the sample application.",
         // A second favourite project, so the home screen is a list rather than one row.
         favourite = true,
+        // Same team as the service, another language: the two categories cut the demo's
+        // projects in two different ways, which is what makes filtering on both interesting.
+        labels = listOf(LABEL_TEAM_APPS, LABEL_LANGUAGE_JAVASCRIPT),
         branches = listOf(
             BranchSpec(
                 name = MAIN,
@@ -611,6 +670,7 @@ object DemoContent {
     private fun changelogProject(changelog: List<ChangelogEntry>) = ProjectSpec(
         name = CHANGELOG,
         description = "Yontrack itself, seeded from the changelog since the last release.",
+        labels = listOf(LABEL_TEAM_PLATFORM, LABEL_LANGUAGE_KOTLIN),
         branches = listOf(
             BranchSpec(
                 name = MAIN,

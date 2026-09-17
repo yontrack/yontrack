@@ -6,7 +6,9 @@ import net.nemerosa.ontrack.kdsl.connector.Connected
 import net.nemerosa.ontrack.kdsl.connector.graphql.convert
 import net.nemerosa.ontrack.kdsl.connector.graphql.schema.ProjectDeletePropertyMutation
 import net.nemerosa.ontrack.kdsl.connector.graphql.schema.ProjectGetPropertyQuery
+import net.nemerosa.ontrack.kdsl.connector.graphql.schema.ProjectLabelsQuery
 import net.nemerosa.ontrack.kdsl.connector.graphql.schema.ProjectSetPropertyMutation
+import net.nemerosa.ontrack.kdsl.connector.graphql.schema.SetProjectLabelsMutation
 import net.nemerosa.ontrack.kdsl.connector.graphql.schema.fragment.ProjectFragment
 import net.nemerosa.ontrack.kdsl.connector.graphqlConnector
 
@@ -73,3 +75,43 @@ fun Project.deleteProperty(
     }
     return this
 }
+
+/**
+ * Gets the labels of a [Project].
+ */
+fun Project.labels(): List<Label> =
+    graphqlConnector.query(
+        ProjectLabelsQuery(id.toInt())
+    )?.projects?.firstOrNull()?.labels?.map {
+        it.labelFragment.toLabel()
+    } ?: emptyList()
+
+/**
+ * Sets the labels of a [Project], replacing all the existing ones.
+ *
+ * Passing an empty list removes every label from the project.
+ *
+ * Needs the `ProjectLabelManagement` project function.
+ *
+ * @param labelIds IDs of the labels to set on the project
+ */
+fun Project.setLabels(
+    labelIds: List<Int>,
+): Project {
+    graphqlConnector.mutate(
+        SetProjectLabelsMutation(
+            id.toInt(),
+            labelIds,
+        )
+    ) {
+        it?.setProjectLabels?.payloadUserErrors?.convert()
+    }
+    return this
+}
+
+/**
+ * Sets the labels of a [Project] from [Label] objects, replacing all the existing ones.
+ */
+fun Project.setLabels(
+    vararg labels: Label,
+): Project = setLabels(labels.map { it.id })

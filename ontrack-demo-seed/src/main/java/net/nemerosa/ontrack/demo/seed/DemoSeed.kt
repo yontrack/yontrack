@@ -58,11 +58,27 @@ class DemoSeed(
             log("Deleting dashboard ${dashboard.name}")
             dashboard.delete()
         }
+        // After the projects, and for the same reason as the dashboards: a label belongs to
+        // the instance rather than to a project, so deleting every project leaves every label
+        // behind. Deleting them here is also what makes a second run reproduce the first
+        // rather than add to it - Yontrack refuses a second label of the same category and
+        // name.
+        target.labels().forEach { label ->
+            log("Deleting label ${label.display}")
+            label.delete()
+        }
     }
 
     private fun create(dataset: DemoDataset, now: LocalDateTime) {
         val projects = mutableMapOf<String, DemoProject>()
         val builds = mutableMapOf<BuildRef, DemoBuild>()
+
+        // Before the projects: a project is given its labels as it is created, and the
+        // assignment is written with label *ids*, so every label has to exist first.
+        val labels = dataset.labels.associate { spec ->
+            log("Creating label ${spec.display}")
+            spec.display to target.createLabel(spec)
+        }
 
         dataset.projects.forEach { spec ->
             log("Creating project ${spec.name}")
@@ -73,6 +89,10 @@ class DemoSeed(
             // registered, so the issues have to be in place first.
             spec.scm?.let { project.configureScm(it) }
             if (spec.favourite) project.markAsFavourite()
+            // One call, whatever the project carries: the server replaces the whole set.
+            if (spec.labels.isNotEmpty()) {
+                project.setLabels(spec.labels.map { labels.getValue(it) })
+            }
             spec.branches.forEach { branchSpec ->
                 createBranch(spec, branchSpec, project, now, builds)
             }

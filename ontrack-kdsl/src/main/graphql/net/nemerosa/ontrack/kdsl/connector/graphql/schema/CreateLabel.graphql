@@ -1,0 +1,18 @@
+mutation CreateLabel(
+    $category: String,
+    $name: String!,
+    $description: String,
+    $color: String!,
+) {
+    createLabel(input: {
+        category: $category,
+        name: $name,
+        description: $description,
+        color: $color,
+    }) {
+        label {
+            ...LabelFragment
+        }
+        ...PayloadUserErrors
+    }
+}
