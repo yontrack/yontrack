@@ -590,8 +590,18 @@ sd_assert_authenticated() {
 # recording a number: an exposed management port is not a finding to count alongside a missing
 # header.
 #
-# Both shapes are probed: the port on the public host, and `/manage` on the normal one, in case an
-# ingress rule ever routes the management base path to the backend.
+# Two shapes are probed, and they mean different things:
+#
+#   * the management PORT itself (8800): any answer at all - 200, or even 401/403 - means the port
+#     is listening where it must not be, so all three count. This is the demo/chart concern.
+#   * the management BASE PATH on the NORMAL port (`/manage`, `/actuator`): only an *unauthenticated*
+#     response (200) is an exposure - an ingress routing the management path to the backend's
+#     management port, which answers actuator health with no auth. A 401/403 there is NOT an
+#     exposure: on a bare backend (the throwaway active-scan stack, reached directly rather than
+#     through the demo's ingress) every unknown path answers 401, because the actuator endpoints
+#     live on the separate management port and the API chain's catch-all is `authenticated`
+#     (WebSecurityConfig). Counting that 401 would fail the active scan on a stack that publishes
+#     no management port at all. On the demo these paths land on the Next UI and answer 404.
 sd_actuator() {
     local base="${1:-${DAST_TARGET:-}}" host scheme found=0 url code
     [ -n "$base" ] || { sd_fail "Usage: $0 actuator BASE_URL"; return 1; }
@@ -601,15 +611,24 @@ sd_actuator() {
     host="${host%%/*}"
     host="${host%%:*}"
 
-    for url in "$scheme://$host:8800/manage/health" "$scheme://$host:8800/actuator/health" \
-               "$base/manage/health" "$base/actuator/health"; do
+    # The management port: listening at all is the exposure.
+    for url in "$scheme://$host:8800/manage/health" "$scheme://$host:8800/actuator/health"; do
         code="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 20 "$url" 2>/dev/null)" || code="000"
         case "$code" in
             200|401|403)
-                # Anything that is not a connection failure, a 404 or a redirect to the UI means
-                # something is listening on a management path. 401/403 counts: the port answering
-                # at all is the exposure.
-                sd_log "A management endpoint answered $code on $(printf '%s' "$url" | sed -E 's#^(https?://[^/]+).*#\1#')/<manage>."
+                sd_log "The management port answered $code on $(printf '%s' "$url" | sed -E 's#^(https?://[^/]+).*#\1#')/<manage>."
+                found=1
+                ;;
+            *) ;;
+        esac
+    done
+
+    # The management base path on the normal port: only an unauthenticated actuator response counts.
+    for url in "$base/manage/health" "$base/actuator/health"; do
+        code="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 20 "$url" 2>/dev/null)" || code="000"
+        case "$code" in
+            200)
+                sd_log "An unauthenticated management endpoint answered 200 on the normal port at $(printf '%s' "$url" | sed -E 's#^(https?://[^/]+).*#\1#')/<manage>."
                 found=1
                 ;;
             *) ;;

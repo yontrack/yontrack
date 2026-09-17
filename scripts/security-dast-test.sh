@@ -264,6 +264,24 @@ out="$(sd_actuator "https://demo.example.com" 2>&1)"; rc=$?
 rm -f "$WORK/answers"
 assert_eq "0" "$rc" "actuator: a 404 is not an exposure"
 
+# On a bare backend (the throwaway active-scan stack) every unknown path on the normal port answers
+# 401 - the actuator lives on the separate, unpublished management port. That 401 on the normal port
+# is NOT an exposure, or the active scan would fail on a stack that publishes no management port.
+: > "$WORK/curl.log"
+printf '%s\n' "8800/manage/health 000" "8800/actuator/health 000" "/manage/health 401" "/actuator/health 401" > "$WORK/answers"
+out="$(sd_actuator "http://localhost:8080" 2>&1)"; rc=$?
+rm -f "$WORK/answers"
+assert_eq "0" "$rc" "actuator: a 401 on the normal port (API auth catch-all) is not a management exposure"
+assert_contains "$(cat "$WORK/curl.log")" ":8800/manage/health" "actuator: still probes the management port"
+
+# But an UNAUTHENTICATED actuator on the normal port (an ingress routing /manage to the backend
+# management port) is an exposure.
+: > "$WORK/curl.log"
+printf '%s\n' "8800/manage/health 000" "8800/actuator/health 000" "/actuator/health 200" > "$WORK/answers"
+out="$(sd_actuator "http://localhost:8080" 2>&1)"; rc=$?
+rm -f "$WORK/answers"
+assert_eq "1" "$rc" "actuator: an unauthenticated 200 on the normal port's management path is an exposure"
+
 # ===========================================================================
 # login - a Keycloak password grant per scanner role (#1769)
 # ===========================================================================
