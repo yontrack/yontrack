@@ -1044,6 +1044,14 @@ type CreateJenkinsConfigurationPayload implements Payload {
   errors: [UserError]
 }
 
+"Output type for the createLabel mutation."
+type CreateLabelPayload implements Payload {
+  "List of errors"
+  errors: [UserError]
+  "Created label"
+  label: Label
+}
+
 "Output type for the createPredefinedPromotionLevel mutation."
 type CreatePredefinedPromotionLevelPayload implements Payload {
   "List of errors"
@@ -1415,6 +1423,12 @@ type DeleteGlobalRoleFromAccountPayload implements Payload {
 
 "Output type for the deleteJenkinsConfiguration mutation."
 type DeleteJenkinsConfigurationPayload implements Payload {
+  "List of errors"
+  errors: [UserError]
+}
+
+"Output type for the deleteLabel mutation."
+type DeleteLabelPayload implements Payload {
   "List of errors"
   errors: [UserError]
 }
@@ -3358,6 +3372,11 @@ type Mutation {
     "Input for the mutation"
     input: CreateJenkinsConfigurationInput
   ): CreateJenkinsConfigurationPayload
+  "Creates a new label"
+  createLabel(
+    "Input for the mutation"
+    input: CreateLabelInput
+  ): CreateLabelPayload
   "Creates a new predefined promotion level"
   createPredefinedPromotionLevel(
     "Input for the mutation"
@@ -3597,6 +3616,11 @@ type Mutation {
   ): DeleteJenkinsConfigurationPayload
   "Deletes a job"
   deleteJob(id: Int!): JobActionResult!
+  "Deletes an existing label"
+  deleteLabel(
+    "Input for the mutation"
+    input: DeleteLabelInput
+  ): DeleteLabelPayload
   "Deleting notification records"
   deleteNotificationRecords(
     "Input for the mutation"
@@ -4350,6 +4374,11 @@ type Mutation {
     "Input for the mutation"
     input: SetProjectGitLabConfigurationPropertyByIdInput
   ): SetProjectGitLabConfigurationPropertyByIdPayload
+  "Sets the labels of a project, replacing all the existing ones"
+  setProjectLabels(
+    "Input for the mutation"
+    input: SetProjectLabelsInput
+  ): SetProjectLabelsPayload
   "Set the message property on a project identified by name."
   setProjectMessageProperty(
     "Input for the mutation"
@@ -4684,6 +4713,11 @@ type Mutation {
     "Input for the mutation"
     input: UpdateJenkinsConfigurationInput
   ): UpdateJenkinsConfigurationPayload
+  "Updates an existing label"
+  updateLabel(
+    "Input for the mutation"
+    input: UpdateLabelInput
+  ): UpdateLabelPayload
   "Updating the pipeline admission data"
   updatePipelineData(
     "Input for the mutation"
@@ -6958,6 +6992,14 @@ type SetProjectGitLabConfigurationPropertyPayload implements Payload {
   project: Project
 }
 
+"Output type for the setProjectLabels mutation."
+type SetProjectLabelsPayload implements Payload {
+  "List of errors"
+  errors: [UserError]
+  "Updated project"
+  project: Project
+}
+
 "Output type for the setProjectMessagePropertyById mutation."
 type SetProjectMessagePropertyByIdPayload implements Payload {
   "List of errors"
@@ -7836,6 +7878,14 @@ type UpdateConfigurationPayload implements Payload {
 type UpdateJenkinsConfigurationPayload implements Payload {
   "List of errors"
   errors: [UserError]
+}
+
+"Output type for the updateLabel mutation."
+type UpdateLabelPayload implements Payload {
+  "List of errors"
+  errors: [UserError]
+  "Updated label"
+  label: Label
 }
 
 "Output type for the updatePipelineData mutation."
@@ -9169,6 +9219,18 @@ input CreateJenkinsConfigurationInput {
   user: String
 }
 
+"Input type for the createLabel mutation."
+input CreateLabelInput {
+  "Category of the label, optional"
+  category: String
+  "Color of the label, in the #RRGGBB format"
+  color: String!
+  "Description of the label"
+  description: String
+  "Name of the label"
+  name: String!
+}
+
 "Input type for the createPredefinedPromotionLevel mutation."
 input CreatePredefinedPromotionLevelInput {
   "Description for the predefined promotion level"
@@ -9612,6 +9674,12 @@ input DeleteGlobalRoleFromAccountInput {
 input DeleteJenkinsConfigurationInput {
   "name field"
   name: String!
+}
+
+"Input type for the deleteLabel mutation."
+input DeleteLabelInput {
+  "ID of the label to delete"
+  id: Int!
 }
 
 "Input type for the deleteNotificationRecords mutation."
@@ -11265,6 +11333,14 @@ input SetProjectGitLabConfigurationPropertyInput {
   repository: String!
 }
 
+"Input type for the setProjectLabels mutation."
+input SetProjectLabelsInput {
+  "IDs of the labels to set on the project. Any other label is removed from the project."
+  labelIds: [Int!]!
+  "ID of the project"
+  projectId: Int!
+}
+
 "Input type for the setProjectMessagePropertyById mutation."
 input SetProjectMessagePropertyByIdInput {
   "ID of the project"
@@ -12219,6 +12295,20 @@ input UpdateJenkinsConfigurationInput {
   url: String!
   "user field"
   user: String
+}
+
+"Input type for the updateLabel mutation."
+input UpdateLabelInput {
+  "Category of the label, optional"
+  category: String
+  "Color of the label, in the #RRGGBB format"
+  color: String!
+  "Description of the label"
+  description: String
+  "ID of the label to update"
+  id: Int!
+  "Name of the label"
+  name: String!
 }
 
 "Input type for the updatePipelineData mutation."
