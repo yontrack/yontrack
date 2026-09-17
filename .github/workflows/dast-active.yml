@@ -264,6 +264,7 @@ jobs:
                 "grant_type=password&client_id=" + ("ontrack-client" | @uri)
                 + "&client_secret=" + ("ontrack-client-secret" | @uri)
                 + "&username=admin&password=admin"' \
+              | tr -d '\n' \
               | curl -sS --max-time 10 -X POST \
                   -H 'Content-Type: application/x-www-form-urlencoded' \
                   --data-binary @- "$DAST_KEYCLOAK_REALM_URL/protocol/openid-connect/token" 2>/dev/null || true)"
@@ -320,6 +321,7 @@ jobs:
                 + "&client_id=" + ("ontrack-client" | @uri)
                 + "&client_secret=" + ("ontrack-client-secret" | @uri)
                 + "&username=admin&password=admin"' \
+              | tr -d '\n' \
               | curl -sS --max-time 30 -X POST \
                   -H 'Content-Type: application/x-www-form-urlencoded' \
                   --data-binary @- "$DAST_KEYCLOAK_REALM_URL/protocol/openid-connect/token" 2>/dev/null || true)"
