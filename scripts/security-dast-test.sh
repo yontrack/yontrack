@@ -1180,12 +1180,200 @@ scrubbed="$(printf 'java.lang.OutOfMemoryError\n' | sd_scrub)"
 assert_eq "java.lang.OutOfMemoryError" "$scrubbed" "scrub: leaves a plain diagnostic alone"
 
 # ===========================================================================
+# active-schema (#1767) - the ACTIVE scan sends mutations, but never the dangerous ones
+# ===========================================================================
+
+cat > "$WORK/active-in.graphql" <<'SDL'
+schema {
+  query: Query
+  mutation: Mutation
+}
+
+type Query {
+  projects: [Project]
+}
+
+type Mutation {
+  "Creates a project - kept, the active scan sends it."
+  createProject(
+    "Input for the mutation"
+    input: CreateProjectInput
+  ): CreateProjectPayload
+  "Revokes every token - denied, it would revoke the scanner's own."
+  revokeAllTokens: RevokeAllTokensPayload
+  "Revokes a token - denied."
+  revokeToken(
+    "Input for the mutation"
+    input: RevokeTokenInput
+  ): RevokeTokenPayload
+  "Deletes an account - denied, it could delete a scan-* account."
+  deleteAccount(
+    "Input for the mutation"
+    input: DeleteAccountInput
+  ): DeleteAccountPayload
+  "Deletes an account group - denied, and must not take deleteAccount with it."
+  deleteAccountGroup(input: DeleteAccountGroupInput): DeleteAccountGroupPayload
+  "Re-applies the CasC - denied, it could undo grantProjectViewToAll."
+  reloadCasc: ReloadCascPayload
+  "Creates a build - kept."
+  createBuild(input: CreateBuildInput): CreateBuildPayload
+}
+
+type Project {
+  name: String!
+}
+SDL
+
+out="$(sd_active_schema "$WORK/active-in.graphql" "$WORK/active-out.graphql" 2>&1)"; rc=$?
+assert_eq "0" "$rc" "active-schema: succeeds on the generated shape"
+assert_contains "$(cat "$WORK/active-out.graphql")" "type Mutation {" \
+    "active-schema: keeps the Mutation root - the active scan sends mutations on purpose"
+assert_contains "$(cat "$WORK/active-out.graphql")" "createProject(" \
+    "active-schema: keeps a benign multiline mutation"
+assert_contains "$(cat "$WORK/active-out.graphql")" "createBuild(input:" \
+    "active-schema: keeps a benign single-line mutation"
+assert_not_contains "$(cat "$WORK/active-out.graphql")" "revokeAllTokens" \
+    "active-schema: strips token revocation (single-line)"
+assert_not_contains "$(cat "$WORK/active-out.graphql")" "revokeToken(" \
+    "active-schema: strips token revocation (multiline)"
+assert_not_contains "$(cat "$WORK/active-out.graphql")" "deleteAccount(" \
+    "active-schema: strips scan-account deletion"
+assert_not_contains "$(cat "$WORK/active-out.graphql")" "deleteAccountGroup" \
+    "active-schema: strips scan-group deletion"
+assert_not_contains "$(cat "$WORK/active-out.graphql")" "reloadCasc" \
+    "active-schema: strips reloadCasc, which could undo the throwaway stack's settings mid-run"
+# The description line of a denied field goes with it - a floating description would attach to the
+# wrong field or not parse.
+assert_not_contains "$(cat "$WORK/active-out.graphql")" "would revoke the scanner" \
+    "active-schema: removes the denied field's description line too"
+assert_contains "$(cat "$WORK/active-out.graphql")" "the active scan sends it" \
+    "active-schema: keeps a kept field's description line"
+# mktemp makes 600; the ZAP container reads this as another uid.
+assert_contains "$(ls -l "$WORK/active-out.graphql")" "-rw-r--r--" \
+    "active-schema: leaves the schema readable by the scanner's uid"
+
+# A schema with no Mutation root would scan no mutation at all - refused rather than written.
+cat > "$WORK/active-noroot.graphql" <<'SDL'
+schema {
+  query: Query
+}
+type Query { projects: [Project] }
+SDL
+out="$(sd_active_schema "$WORK/active-noroot.graphql" "$WORK/active-nope.graphql" 2>&1)"; rc=$?
+assert_eq "1" "$rc" "active-schema: refuses a schema with no Mutation root"
+assert_contains "$out" "no Mutation root" "active-schema: says why"
+assert_eq "no" "$([ -e "$WORK/active-nope.graphql" ] && echo yes || echo no)" "active-schema: writes nothing on refusal"
+
+out="$(sd_active_schema "$WORK/absent.graphql" "$WORK/active-nope.graphql" 2>&1)"; rc=$?
+assert_eq "1" "$rc" "active-schema: fails when the input does not exist"
+
+# ===========================================================================
+# whoami active-strict - more than the granted project count stops the run (#1767)
+# ===========================================================================
+
+# The passive scan warns; the active scan fails, because on the throwaway stack we own the setting.
+whoami_body '["DAST Project"]' 4
+printf '200' > "$WORK/graphql.status"
+SD_KIND=active
+out="$(sd_whoami scan-project "$WORK/login" 2>&1)"; rc=$?
+SD_KIND=passive
+assert_eq "1" "$rc" "whoami (active): scan-project seeing more than its grant fails before scanning"
+assert_contains "$out" "grantProjectViewToAll" "whoami (active): names the setting to turn off on the throwaway stack"
+
+whoami_body '["DAST Project"]' 1
+SD_KIND=active
+out="$(sd_whoami scan-project "$WORK/login" 2>&1)"; rc=$?
+SD_KIND=passive
+assert_eq "0" "$rc" "whoami (active): scan-project seeing exactly its one project passes"
+
+# ===========================================================================
+# access-control (#1767) - the authorization checks, and their normalisation
+# ===========================================================================
+
+mkdir -p "$WORK/ac-tokens" "$WORK/ac-out"
+printf '%s' 'tok-readonly' > "$WORK/ac-tokens/scan-readonly.token"
+printf '%s' 'tok-project' > "$WORK/ac-tokens/scan-project.token"
+export DAST_TARGET="https://demo.example.com"
+printf '200' > "$WORK/graphql.status"
+
+# Every probe correctly refused: the response shows the write did not happen and the read is empty.
+cat > "$WORK/graphql.body" <<'JSON'
+{"data":{"createProject":{"project":null,"errors":[{"message":"Access denied"}]},"projects":[],"createBranchOrGet":{"branch":null,"errors":[{"message":"Access denied"}]}}}
+JSON
+: > "$WORK/ac-github-output"
+out="$(DAST_RUN_ID=99 GITHUB_OUTPUT="$WORK/ac-github-output" sd_access_control "$WORK/ac-tokens" "$WORK/ac-out" 2>&1)"; rc=$?
+assert_eq "0" "$rc" "access-control: succeeds when every probe is refused"
+assert_contains "$out" "0 escalation(s)" "access-control: reports no escalation"
+assert_contains "$(cat "$WORK/ac-github-output")" "access_control_escalations=0" "access-control: writes the escalation count"
+assert_not_contains "$out" "demo.example.com" "access-control: prints no URL"
+assert_not_contains "$out" "tok-readonly" "access-control: prints no token"
+# Normalisation of a clean run: no finding.
+norm="$(sd_normalize_access_control "$WORK/ac-out/access-control-scan-readonly.raw.json" scan-readonly)"; rc=$?
+assert_eq "0" "$rc" "normalize-access-control: reads a clean raw document"
+assert_eq "0" "$(printf '%s' "$norm" | jq '.findings | length')" "normalize-access-control: a refused check is not a finding"
+
+# Every probe escalates: the write's payload shows it happened, the cross-project read returns data.
+cat > "$WORK/graphql.body" <<'JSON'
+{"data":{"createProject":{"project":{"id":"1"},"errors":[]},"projects":[{"id":"2","name":"common-library"}],"createBranchOrGet":{"branch":{"id":"3"},"errors":[]}}}
+JSON
+out="$(DAST_RUN_ID=99 sd_access_control "$WORK/ac-tokens" "$WORK/ac-out" 2>&1)"; rc=$?
+assert_eq "0" "$rc" "access-control: an escalation is a finding, not a run error - still returns 0"
+assert_contains "$out" "3 escalation(s)" "access-control: counts the escalations"
+# Counts only: no request, payload or evidence in what it prints.
+assert_not_contains "$out" "common-library" "access-control: prints no project name it reached"
+
+norm_ro="$(sd_normalize_access_control "$WORK/ac-out/access-control-scan-readonly.raw.json" scan-readonly)"
+assert_eq "1" "$(printf '%s' "$norm_ro" | jq '.findings | length')" "normalize-access-control: an escalation is one HIGH finding"
+assert_eq "HIGH" "$(printf '%s' "$norm_ro" | jq -r '.findings[0].risk')" "normalize-access-control: at HIGH"
+assert_eq "scan-readonly" "$(printf '%s' "$norm_ro" | jq -r '.role')" "normalize-access-control: attributed to the role"
+norm_pr="$(sd_normalize_access_control "$WORK/ac-out/access-control-scan-project.raw.json" scan-project)"
+assert_eq "2" "$(printf '%s' "$norm_pr" | jq '.findings | length')" "normalize-access-control: scan-project's read and write escalations"
+# The finding carries no exploit detail - a kind, not a payload.
+assert_not_contains "$norm_pr" "common-library" "normalize-access-control: the finding names no project it reached"
+
+# A probe the API refuses to answer at all is a broken scan, not a clean one.
+printf '500' > "$WORK/graphql.status"
+out="$(DAST_RUN_ID=99 sd_access_control "$WORK/ac-tokens" "$WORK/ac-out" 2>&1)"; rc=$?
+assert_eq "1" "$rc" "access-control: a probe the API will not answer fails the run"
+printf '200' > "$WORK/graphql.status"
+
+out="$(sd_normalize_access_control "$WORK/absent.json" 2>&1)"; rc=$?
+assert_eq "1" "$rc" "normalize-access-control: a missing raw document fails"
+
+# ===========================================================================
+# The active ZAP plan carries the exclusions and the active schema
+# ===========================================================================
+
+ACTIVE_PLAN="$SCRIPT_DIR/../security/dast/zap/active.yaml"
+assert_contains "$(cat "$ACTIVE_PLAN")" 'active-only.graphql' \
+    "active plan: feeds ZAP the active schema, not the query-only one"
+# shellcheck disable=SC2016  # deliberate: the literal placeholder is what is being asserted
+assert_contains "$(cat "$ACTIVE_PLAN")" '${DAST_BEARER_TOKEN}' \
+    "active plan: carries the bearer-token placeholder, rendered per role like the passive one"
+assert_contains "$(cat "$ACTIVE_PLAN")" 'type: activeScan' \
+    "active plan: actually runs the active scanner"
+assert_contains "$(cat "$ACTIVE_PLAN")" 'logout' \
+    "active plan: excludes the logout endpoint from attack"
+assert_contains "$(cat "$ACTIVE_PLAN")" '8800' \
+    "active plan: excludes the management path from attack"
+# render-plan works on the active plan exactly as on the passive one.
+printf '%s' 'active-tok' > "$WORK/tokens/scan-admin.token"
+out="$(sd_render_plan "$ACTIVE_PLAN" "$WORK/active-plan-rendered.yaml" scan-admin 2>&1)"; rc=$?
+assert_eq "0" "$rc" "active plan: renders with the role's bearer token"
+assert_contains "$(cat "$WORK/active-plan-rendered.yaml")" "Bearer active-tok" \
+    "active plan: the token is in place after rendering"
+# shellcheck disable=SC2016  # deliberate: the literal placeholder is what must be gone
+assert_not_contains "$(cat "$WORK/active-plan-rendered.yaml")" '${DAST_BEARER_TOKEN}' \
+    "active plan: no placeholder is left unrendered"
+
+# ===========================================================================
 # The command surface
 # ===========================================================================
 
 out="$(sd_main 2>&1)"; rc=$?
 assert_eq "1" "$rc" "no command: fails with the usage"
 assert_contains "$out" "query-schema" "no command: prints the usage"
+assert_contains "$out" "active-schema" "no command: lists the active-scan commands"
 
 out="$(sd_main report-path 2>&1)"; rc=$?
 assert_eq "0" "$rc" "report-path: is reachable as a command"

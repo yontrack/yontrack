@@ -15,8 +15,31 @@
 #   query-schema IN OUT       Derives a query-only GraphQL SDL from IN into OUT: no `type
 #                             Mutation`, no `type Subscription`, and neither of them left in the
 #                             `schema { }` block. Refuses to write a file that still declares one.
-#                             This is what keeps mutations out of the scan - see
+#                             This is what keeps mutations out of the passive scan - see
 #                             security/dast/graphql/README.md.
+#   active-schema IN OUT      The ACTIVE scan's counterpart (#1767): keeps the `Mutation` root -
+#                             the active scan sends mutations on purpose - but strips the fields a
+#                             scanner must never fire, whatever role it runs as: token revocation
+#                             (`revokeToken`, `revokeAllTokens`, `revokeAccountTokens`) and every
+#                             account/group/role/CasC/settings mutation, so ZAP cannot delete the
+#                             `scan-*` accounts, revoke its own token, or turn `grantProjectViewToAll`
+#                             back on mid-run. Refuses to write a file that lost its Mutation root or
+#                             that still declares a denied field. Denylist: $DAST_ACTIVE_MUTATION_DENYLIST.
+#   access-control DIR OUT_DIR
+#                             The authorization checks of the active scan (#1767) - the ones that
+#                             would have caught #1739/#1741/#1742. Sends a small, curated set of
+#                             privileged requests as `scan-readonly` and `scan-project`, each of
+#                             which the role MUST be refused, and records an escalation when one
+#                             succeeds: `scan-readonly` creating a project, `scan-project` reading or
+#                             writing a project it does not hold. Writes one raw result document per
+#                             role to OUT_DIR (never printed - a success would carry data), and prints
+#                             the escalation counts per role and kind. Returns non-zero only when a
+#                             probe could not be sent at all; an escalation is a finding, reported by
+#                             the stamp, not a run error.
+#   normalize-access-control RAW [ROLE]
+#                             Reads an `access-control` raw result document and writes the normalised
+#                             findings document to stdout: one HIGH finding per escalation, none for a
+#                             check that passed. A passing authorization check is not a finding.
 #   login ROLE DIR [BUDGET]   Logs scanner ROLE (scan-admin, scan-readonly, scan-project) in by a
 #                             Keycloak password grant and writes its access token to DIR/ROLE.token.
 #                             Fails - naming the account and Keycloak's error class - when it
@@ -510,6 +533,17 @@ sd_whoami() {
             return 1
         fi
         if [ "$visible" -gt "$granted" ]; then
+            # On the passive scan of the shared demo this is a WARNING: the instance is not ours to
+            # reconfigure, and Yontrack's default grants project view to every authenticated user, so
+            # seeing more than the CasC grants is expected there and cannot be read as an escalation.
+            # On the ACTIVE scan (#1767) the stack is a throwaway we own and have turned
+            # `grantProjectViewToAll` off on, so a project-scoped role seeing more than its one
+            # project means the cross-project authorization checks would test nothing - and the run
+            # stops here, before ZAP, rather than reporting a scan that proved nothing.
+            if [ "$SD_KIND" = "active" ]; then
+                sd_fail "$role sees $visible project(s), where $casc grants it $granted. On the active scan the throwaway stack must have grantProjectViewToAll off so the cross-project checks mean something. Refusing to scan."
+                return 1
+            fi
             sd_log "WARNING: $role sees $visible project(s), where $casc grants it $granted. Either the instance grants project view to all users - Yontrack's default, unless its security settings say otherwise - or the role reaches projects it should not."
         fi
     fi
@@ -1515,6 +1549,245 @@ sd_report() {
 }
 
 # ---------------------------------------------------------------------------------------------
+# active-schema - the ACTIVE scan sends mutations, but never the dangerous ones (#1767)
+# ---------------------------------------------------------------------------------------------
+
+# The active scan's whole point is to send mutations, so - unlike the passive scan's query-only
+# schema - this keeps the `Mutation` root. What it strips is the handful of mutation fields no
+# scanner may ever fire, whatever role it runs as:
+#
+#   * token revocation - `revokeToken`, `revokeAllTokens`, `revokeAccountTokens` - which would
+#     revoke the scanner's own bearer token and leave the rest of the pass running as nobody;
+#   * every account, group and role mutation - so ZAP cannot delete, edit or re-map the `scan-*`
+#     accounts and their groups (the issue's "deletion or change of the scan-* accounts and
+#     groups"), nor grant itself a role it should not have;
+#   * `reloadCasc` and `saveSettings`, which could re-apply CasC or turn `grantProjectViewToAll`
+#     back on halfway through and quietly invalidate the cross-project authorization checks.
+#
+# The lever is the schema, exactly as for the passive scan: ZAP's GraphQL add-on generates one
+# request per mutation field of the schema it is given and has no per-field switch, so a field
+# that is not in the schema cannot be generated. The denylist is by exact field name, so
+# `deleteAccount` never takes `deleteAccountGroup` with it.
+#
+# The post-condition is checked, not assumed: this refuses to write a schema that lost its
+# Mutation root (a bad edit would then scan no mutation at all and read as a clean pass) or that
+# still declares a denied field.
+SD_ACTIVE_MUTATION_DENYLIST="${DAST_ACTIVE_MUTATION_DENYLIST:-revokeToken,revokeAllTokens,revokeAccountTokens,deleteAccount,deleteAccountGroup,editAccount,editAccountGroup,createAccountGroup,createTestAccount,grantGlobalRoleToAccount,grantGlobalRoleToAccountGroup,deleteGlobalRoleFromAccount,deleteGlobalRoleFromAccountGroup,mapGroup,reloadCasc,saveSettings}"
+
+sd_active_schema() {
+    local input="${1:-}" output="${2:-}" denylist="${3:-$SD_ACTIVE_MUTATION_DENYLIST}" tmp
+    [ -n "$input" ] && [ -n "$output" ] || { sd_fail "Usage: $0 active-schema IN OUT"; return 1; }
+    [ -f "$input" ] || { sd_fail "No GraphQL schema at $input"; return 1; }
+
+    tmp="$(mktemp "${TMPDIR:-/tmp}/active-schema.XXXXXX")" || return 1
+
+    # The generated SDL has a predictable shape: a top-level `type Mutation {` opening at column 0
+    # and its closing `}` at column 0; each field at two-space indent, optionally preceded by a
+    # `"..."` description line; a field with arguments opens with a trailing `(` and closes on a
+    # `  ): ReturnType` line. A denied field is dropped together with its description line.
+    awk -v denylist="$denylist" '
+        function flush() { if (pending != "") { print pending; pending = "" } }
+        BEGIN { n = split(denylist, a, ","); for (i = 1; i <= n; i++) if (a[i] != "") deny[a[i]] = 1 }
+        !inmut {
+            if ($0 ~ /^type Mutation[ \t]*\{/) { inmut = 1 }
+            print; next
+        }
+        # Inside `type Mutation { ... }`.
+        infield == 1 {
+            # A multiline field: keep or drop every line up to its `  )` close.
+            if ($0 ~ /^  \)/) { infield = 0; if (!fielddrop) print; fielddrop = 0; next }
+            if (!fielddrop) print
+            next
+        }
+        $0 == "}" { inmut = 0; flush(); print; next }
+        # A description line is held until we know whether the field it describes is kept.
+        $0 ~ /^  "/ { flush(); pending = $0; next }
+        # A field declaration: `  name:` or `  name(`.
+        $0 ~ /^  [A-Za-z_][A-Za-z0-9_]*[ \t]*[:(]/ {
+            line = $0; sub(/^  /, "", line); name = line; sub(/[ \t]*[:(].*/, "", name)
+            dropping = (name in deny)
+            trimmed = $0; sub(/[ \t]*$/, "", trimmed)
+            if (trimmed ~ /\($/) {
+                # Multiline field: consume until its close.
+                infield = 1; fielddrop = dropping
+                if (dropping) { pending = "" } else { flush(); print }
+                next
+            }
+            # Single-line field.
+            if (dropping) { pending = "" } else { flush(); print }
+            next
+        }
+        { flush(); print }
+        END { if (inmut == 1 || infield == 1) exit 3 }
+    ' "$input" > "$tmp"
+    case $? in
+        0) ;;
+        3) rm -f "$tmp"; sd_fail "Unterminated Mutation block in $input: the schema is not the generated shape."; return 1 ;;
+        *) rm -f "$tmp"; sd_fail "Could not read $input"; return 1 ;;
+    esac
+
+    # Post-condition: the Mutation root survived and no denied field is left.
+    if ! grep -q '^type Mutation[ \t]*{' "$tmp"; then
+        rm -f "$tmp"; sd_fail "The derived active schema has no Mutation root: the active scan would send no mutation at all."; return 1
+    fi
+    local item
+    for item in $(printf '%s' "$denylist" | tr ',' ' '); do
+        [ -n "$item" ] || continue
+        if grep -qE "^  ${item}[ \t]*[:(]" "$tmp"; then
+            rm -f "$tmp"; sd_fail "The derived active schema still declares the denied mutation \`$item\`: refusing to hand it to the scanner."; return 1
+        fi
+    done
+
+    mkdir -p "$(dirname "$output")" || { rm -f "$tmp"; return 1; }
+    mv "$tmp" "$output" || return 1
+    # World-readable: the ZAP container reads it as its own uid (see query-schema).
+    chmod 644 "$output" || return 1
+    sd_log "Active schema written: Mutation root kept, $(printf '%s' "$denylist" | tr ',' ' ' | wc -w | tr -d ' ') field(s) denied and removed."
+    return 0
+}
+
+# ---------------------------------------------------------------------------------------------
+# access-control - the authorization checks (#1767)
+# ---------------------------------------------------------------------------------------------
+
+# The checks the active scan exists for. #1739, #1741 and #1742 were authorization bugs found by
+# hand; this is what would have caught them. Each probe sends one request a role MUST be refused
+# and records an *escalation* when the request instead succeeded:
+#
+#   * scan-readonly (global READ_ONLY) creating a project - a global write it must not have;
+#   * scan-project (PARTICIPANT on one project only) reading another project;
+#   * scan-project changing another project (creating a branch on it).
+#
+# Success is read from the response, not from a status code: a denied mutation comes back with a
+# GraphQL error and no payload, so "the write happened" means the payload shows it - a created
+# entity, an empty `errors`. A refused read of another project returns an empty list.
+#
+# Nothing here is an attack payload: a probe is a legitimate request that authorization must stop.
+# The probes run on the throwaway stack, so a genuine escalation does create data - which is the
+# proof, and the stack is torn down after.
+#
+# The raw result of each role goes to a file OUT_DIR/access-control-<role>.raw.json and is never
+# printed: a success carries the data it should not have been allowed to reach. Only counts are
+# printed. An escalation is a finding for the report and the stamp, not a run error, so this
+# returns 0 even when it finds one; it returns non-zero only when a probe could not be sent, which
+# is a broken scan.
+# The project scan-project reaching another one is tested against: a seeded project it does NOT
+# hold (petclinic is the one it does). Overridable so the probe survives a rename of the seed data.
+SD_AC_OTHER_PROJECT="${DAST_AC_OTHER_PROJECT:-common-library}"
+
+# One authenticated GraphQL request as ROLE. Echoes the response body; fails on a transport or
+# non-2xx error - never on a GraphQL error, which is a legitimate "denied" answer.
+sd_ac_request() {
+    local role="$1" query="$2" token_file url tmp status body
+    token_file="$(sd_token_file "$role")" || return 1
+    url="${DAST_TARGET:-}"; url="${url%/}/graphql"
+    tmp="$(mktemp -d "${TMPDIR:-/tmp}/dast-ac.XXXXXX")" || return 1
+    chmod 700 "$tmp"
+    ( umask 077 && printf 'Authorization: Bearer %s\n' "$(cat "$token_file")" > "$tmp/headers" ) || { rm -rf "$tmp"; return 1; }
+    status="$(jq -nc --arg q "$query" '{query: $q}' \
+        | curl -sS --max-time 30 -o "$tmp/body" -w '%{http_code}' -X POST \
+            -H 'Content-Type: application/json' -H "@$tmp/headers" \
+            --data-binary @- "$url" 2> /dev/null)" || status="000"
+    body="$(cat "$tmp/body" 2> /dev/null)"
+    rm -rf "$tmp"
+    case "$status" in
+        2??) printf '%s' "$body"; return 0 ;;
+        *) sd_fail "The API answered $status to $role's access-control probe: cannot tell what it allowed."; return 1 ;;
+    esac
+}
+
+sd_access_control() {
+    local dir="${1:-}" out_dir="${2:-}"
+    [ -n "$dir" ] && [ -n "$out_dir" ] || { sd_fail "Usage: $0 access-control DIR OUT_DIR"; return 1; }
+    DAST_TOKEN_DIR="$dir"
+    mkdir -p "$out_dir" || return 1
+
+    local other="$SD_AC_OTHER_PROJECT" total=0 escalations=0
+
+    # The probe table, one line per probe: role, area, kind, id, query, and the jq that reads
+    # "the request succeeded" (an escalation) from the response. `\(other)` is interpolated below.
+    _ac_probe() {
+        local role="$1" area="$2" kind="$3" id="$4" query="$5" success_jq="$6"
+        local raw="$out_dir/access-control-$role.raw.json"
+        local body succeeded
+        body="$(sd_ac_request "$role" "$query")" || return 1
+        succeeded="$(printf '%s' "$body" | jq -r "$success_jq" 2>/dev/null)" || succeeded="false"
+        [ "$succeeded" = "true" ] || succeeded="false"
+        total=$((total + 1))
+        [ "$succeeded" = "true" ] && escalations=$((escalations + 1))
+        # Append to the role's raw array (never printed).
+        local prev='[]'
+        [ -f "$raw" ] && prev="$(cat "$raw")"
+        printf '%s' "$prev" | jq -c \
+            --arg role "$role" --arg area "$area" --arg kind "$kind" --arg id "$id" \
+            --argjson escalation "$([ "$succeeded" = "true" ] && echo true || echo false)" \
+            '. + [{role: $role, area: $area, kind: $kind, id: $id, escalation: $escalation}]' \
+            > "$raw.tmp" && mv "$raw.tmp" "$raw"
+        sd_log "access-control: $role / $kind / $area -> $([ "$succeeded" = "true" ] && echo "ESCALATION" || echo "refused")."
+        return 0
+    }
+
+    # Fresh raw files, so a re-run does not accumulate.
+    rm -f "$out_dir/access-control-scan-readonly.raw.json" "$out_dir/access-control-scan-project.raw.json"
+
+    _ac_probe scan-readonly global write "readonly-create-project" \
+        "mutation { createProject(input: {name: \"dast-ac-probe-${DAST_RUN_ID:-0}-r\"}) { project { id } errors { message } } }" \
+        '(.data.createProject.project // null) != null and ((.data.createProject.errors // []) | length) == 0' || return 1
+
+    _ac_probe scan-project cross-project read "project-read-other" \
+        "query { projects(name: \"$other\") { id name } }" \
+        '((.data.projects // []) | length) > 0' || return 1
+
+    _ac_probe scan-project cross-project write "project-write-other" \
+        "mutation { createBranchOrGet(input: {projectName: \"$other\", name: \"dast-ac-probe-${DAST_RUN_ID:-0}-p\"}) { branch { id } errors { message } } }" \
+        '(.data.createBranchOrGet.branch // null) != null and ((.data.createBranchOrGet.errors // []) | length) == 0' || return 1
+
+    unset -f _ac_probe
+    sd_log "Access control: $total probe(s) sent, $escalations escalation(s) (scan-readonly write, scan-project read, scan-project write)."
+    if [ -n "${GITHUB_OUTPUT:-}" ]; then
+        echo "access_control_escalations=$escalations" >> "$GITHUB_OUTPUT"
+    fi
+    return 0
+}
+
+# An access-control raw document, into the normalised findings document. One HIGH finding per
+# escalation; a check that was correctly refused is not a finding.
+sd_normalize_access_control() {
+    local file="${1:-}" role="${2:-}"
+    [ -n "$file" ] || { sd_fail "Usage: $0 normalize-access-control RAW [ROLE]"; return 1; }
+    [ -f "$file" ] || { sd_fail "No access-control raw document at $file"; return 1; }
+
+    jq -e --arg role "$role" '
+        def describe:
+            "Access control: \(.role) can " +
+            (if .kind == "read" then "read" else "change" end) +
+            (if .area == "cross-project" then " a project it does not hold" else " beyond its role" end);
+        (if $role == "" then {} else {role: $role} end) + {
+          scanner: "access-control",
+          version: "1",
+          findings: [
+            .[] | select(.escalation == true)
+            | {
+                scanner: "access-control",
+                rule: ("access-control-\(.role)-\(.kind)-\(.area)" | gsub("scan-"; "")),
+                ref: ("access-control-\(.role)-\(.kind)-\(.area)" | gsub("scan-"; "")),
+                name: describe,
+                risk: "HIGH",
+                confidence: "Confirmed",
+                cwe: "285",
+                description: (describe + " — a request that authorization must refuse succeeded. This is the kind of finding the active scan exists to catch (see #1739, #1741, #1742). The detail is deliberately not here: the report says the kind of access, never how to reach it."),
+                solution: "",
+                reference: "",
+                instances: [
+                  { uri: "/graphql", method: "POST", param: (.id // ""), evidence: "", attack: "", info: "" }
+                ]
+              }
+          ]
+        }
+    ' "$file" || { sd_fail "Could not read the access-control raw document at $file"; return 1; }
+}
+
+# ---------------------------------------------------------------------------------------------
 # Publication to the private repository
 # ---------------------------------------------------------------------------------------------
 
@@ -1555,6 +1828,9 @@ sd_main() {
     [ $# -gt 0 ] && shift
     case "$command" in
         query-schema) sd_query_schema "$@" ;;
+        active-schema) sd_active_schema "$@" ;;
+        access-control) sd_access_control "$@" ;;
+        normalize-access-control) sd_normalize_access_control "$@" ;;
         render-plan) sd_render_plan "$@" ;;
         login) sd_login "$@" ;;
         whoami) sd_whoami "$@" ;;
@@ -1575,7 +1851,7 @@ sd_main() {
         publish) sd_publish "$@" ;;
         scrub) sd_scrub ;;
         *)
-            echo "Usage: $0 query-schema|login|whoami|render-plan|assert-authenticated|actuator|normalize-zap|assert-no-mutations|fetch|graphql-cop-preflight|render-graphql-cop-headers|assert-graphql-cop-no-mutations|normalize-graphql-cop|nuclei-preflight|nuclei-summary|normalize-nuclei|report|report-path|publish|scrub ..." >&2
+            echo "Usage: $0 query-schema|active-schema|access-control|normalize-access-control|login|whoami|render-plan|assert-authenticated|actuator|normalize-zap|assert-no-mutations|fetch|graphql-cop-preflight|render-graphql-cop-headers|assert-graphql-cop-no-mutations|normalize-graphql-cop|nuclei-preflight|nuclei-summary|normalize-nuclei|report|report-path|publish|scrub ..." >&2
             return 1
             ;;
     esac
