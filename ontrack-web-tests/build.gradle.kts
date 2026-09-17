@@ -8,8 +8,8 @@ plugins {
 // Node environment
 
 configure<NodeExtension> {
-    version.set("20.2.0")
-    npmVersion.set("9.6.6")
+    version.set("24.21.0")
+    npmVersion.set("11.19.0")
     download.set(true)
 }
 

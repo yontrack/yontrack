@@ -309,7 +309,7 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
-      # No actions/setup-node: the Gradle node plugin downloads its own Node (23.7.0 for
+      # No actions/setup-node: the Gradle node plugin downloads its own Node (24.21.0 for
       # ontrack-web-core), and a runner-level Node would fight it.
       - name: Cache the npm downloads
         uses: actions/cache@v4
@@ -1085,7 +1085,7 @@ jobs:
           restore-keys: playwright-${{ runner.os }}-
 
       # Only Playwright's *system* dependencies are installed here. The browsers themselves and
-      # Node come from the Gradle node plugin (20.2.0 for ontrack-web-tests).
+      # Node come from the Gradle node plugin (24.21.0 for ontrack-web-tests).
       - name: Install the Playwright system dependencies
         working-directory: ontrack-web-tests
         run: npx --yes playwright install-deps chromium
