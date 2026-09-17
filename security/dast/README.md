@@ -16,7 +16,14 @@ security/dast/
   casc.yaml           Yontrack roles of the scanner accounts - canonical declaration (#1768)
   suppressions.yaml   accepted findings, subtracted from the counts, with a statement and an expiry
   mitigations.yaml    rule -> what to change in Yontrack and where
-  graphql/            how the GraphQL endpoint is scanned, and why no mutation is ever sent
+  compose/
+    docker-compose-dast.yml  the throwaway stack the ACTIVE scan attacks (#1767): the OIDC KDSL
+                             stack with the hook signature check ON, the management port NOT
+                             published, and the CasC mounted
+    casc/
+      security-settings.yaml throwaway-only CasC turning grantProjectViewToAll OFF, so the active
+                             scan's cross-project checks mean something (never in casc.yaml itself)
+  graphql/            how the GraphQL endpoint is scanned, and why no mutation is ever sent (passive)
   graphql-cop/
     config.py         graphql-cop's configuration, reading the role's bearer token from a run-time file
     requirements.txt  its Python dependencies, pinned by hash
@@ -26,19 +33,59 @@ security/dast/
     passive.yaml      ZAP Automation Framework plan for the passive scan of the demo: the UI,
                       unauthenticated
     passive-api.yaml  the same for the API, run once per scanner role of casc.yaml (#1769)
+    active.yaml       ZAP plan for the ACTIVE scan of the throwaway stack (#1767): attacks, and
+                      exercises mutations, once per scanner role
     rules.tsv         per-rule level overrides, in the zap-baseline IGNORE/WARN/FAIL vocabulary -
                       for the findings of every scanner, despite the directory
 ```
+
+## Two scans
+
+| | Passive (#1765/#1766/#1769) | Active (#1767) |
+|---|---|---|
+| Workflow | `.github/workflows/dast-passive.yml` | `.github/workflows/dast-active.yml` |
+| Target | the demo — real ingress, TLS, Keycloak | a throwaway stack on the runner, torn down after |
+| Writes? | never — mutations are not even expressible | yes — it creates, changes and deletes data |
+| Scanners | ZAP baseline, graphql-cop, Nuclei | ZAP active scan, plus the authorization probes |
+| Mutations | stripped from the schema (`query-schema`) | KEPT, minus the dangerous ones (`active-schema`) |
+| Stamp | `SECURITY.DAST` on the deployed build | `SECURITY.DAST.ACTIVE` on the scanned BRONZE build |
+
+Both run the same counting/reporting/disclosure layer — `scripts/security-dast.sh` — the active
+scan only setting `DAST_KIND=active`. What differs is what may be sent: the passive scan is fed a
+query-only schema so a mutation cannot be generated at all; the active scan is fed a schema that
+keeps the `Mutation` root but strips token revocation and every account/group/role/CasC/settings
+mutation (`active-schema`), so ZAP sends mutations on purpose but never one that could revoke its
+own token, delete a `scan-*` account, or turn `grantProjectViewToAll` back on mid-run. Logout and
+the management port are excluded from attack in the plan.
+
+### The active scan's authorization checks
+
+The active scan adds the checks the passive one cannot make, because they require *writing*: a role
+attempting what its authorization must refuse. `scripts/security-dast.sh access-control` sends a
+curated, deterministic set of probes — `scan-readonly` creating a project, `scan-project` reading
+and changing a project it does not hold — and records an *escalation* when one succeeds. These are
+the checks that would have caught #1739, #1741 and #1742. They run before ZAP, while the seeded data
+is intact, and are a scanner in their own right in the report (`access-control`), counted as HIGH.
+ZAP has no Access Control Testing job in the Automation Framework, which is why the checks live in
+the script rather than the plan.
+
+They only mean something with `grantProjectViewToAll` off — Yontrack grants project view to every
+authenticated user by default, which is why `scan-project` sees four projects on the demo though its
+CasC grants it one (#1769). The throwaway stack turns that default off through
+`compose/casc/security-settings.yaml`, and the workflow proves with `whoami` that `scan-project`
+sees exactly one project before ZAP starts, failing before scanning if it sees more.
 
 ## Who reads what
 
 | File | Read by |
 |---|---|
 | `zap/passive.yaml`, `zap/passive-api.yaml` | the ZAP container, in `.github/workflows/dast-passive.yml` |
-| `graphql-cop/*` | the graphql-cop container, in the same workflow |
-| `nuclei/passive.yaml` | Nuclei, in the same workflow, and `scripts/security-dast.sh nuclei-preflight` |
-| `zap/rules.tsv`, `suppressions.yaml`, `mitigations.yaml` | `scripts/security-dast.sh report` |
-| `casc.yaml` | a human, and its copy in the gitops repository; re-applied by `scripts/demo-smoke.sh casc`; read by `scripts/security-dast.sh whoami`, which checks each scanner account arrives in its group |
+| `zap/active.yaml` | the ZAP container, in `.github/workflows/dast-active.yml`, rendered per role by `render-plan` |
+| `compose/docker-compose-dast.yml`, `compose/casc/*` | Docker Compose, in `.github/workflows/dast-active.yml` |
+| `graphql-cop/*` | the graphql-cop container, in the passive workflow |
+| `nuclei/passive.yaml` | Nuclei, in the passive workflow, and `scripts/security-dast.sh nuclei-preflight` |
+| `zap/rules.tsv`, `suppressions.yaml`, `mitigations.yaml` | `scripts/security-dast.sh report` (both scans) |
+| `casc.yaml` | a human, and its copy in the gitops repository; re-applied by `scripts/demo-smoke.sh casc`; read by `scripts/security-dast.sh whoami`, which checks each scanner account arrives in its group; on the active stack its `casc:` wrapper is stripped and it is mounted as CasC |
 
 ## The counting layer is not the scanner
 

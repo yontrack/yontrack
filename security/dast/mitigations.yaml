@@ -183,6 +183,26 @@ mitigations:
       is exposed, whatever the endpoints on it happen to be.
 
   # -----------------------------------------------------------------------------------------
+  # Access-control escalations from the active scan (#1767). A genuine authorization
+  # vulnerability, the kind #1739/#1741/#1742 were — the report says the KIND of access, never how
+  # to reach it, and the workflow leaves the issue at status:wip for the operator to decide on
+  # disclosure. So this points at where authorization is decided, not at a payload.
+  # -----------------------------------------------------------------------------------------
+  - id: access-control-escalation
+    scanner: "access-control"
+    title: "A role reached something its authorization must refuse"
+    change: >-
+      A scanner account succeeded on a request its role must be refused: `scan-readonly` (global
+      READ_ONLY) writing, or `scan-project` (PARTICIPANT on one project) reading or changing
+      another. Authorization is enforced by `SecurityService` checks in the service layer and by
+      the `canEdit`/`canView` of each property and mutation; a missing or wrong check is the bug,
+      not the scan. Find the resolver or service behind the affected area (the finding names the
+      kind — global write, cross-project read, cross-project write — not the endpoint) and add the
+      `checkProjectFunction` / `checkGlobalFunction` it lacks, then cover it with a `*IT` that runs
+      under the low-privileged role via `asAccountWithGlobalRole` / a project role. This is exactly
+      the class of bug the active scan exists to catch.
+
+  # -----------------------------------------------------------------------------------------
   # Version and technology disclosure. Low, and worth a line rather than an issue.
   # -----------------------------------------------------------------------------------------
   - id: version-disclosure

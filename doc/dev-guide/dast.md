@@ -230,8 +230,60 @@ DAST_VERSION=x DAST_BUILD=y DAST_RUN_URL=z scripts/security-dast.sh report repor
 `scripts/security-dast.sh` needs `jq` and `yq` (mikefarah's v4), both of which `ubuntu-latest`
 carries.
 
-## What comes next
+## The active scan
 
-- [#1767](https://github.com/yontrack/yontrack/issues/1767) — the weekly **active** scan on a
-  throwaway stack, reporting `SECURITY.DAST.ACTIVE`, reusing this script with `DAST_KIND=active`.
-- [#1769](https://github.com/yontrack/yontrack/issues/1769) — done: the three scanner roles, above.
+*Introduced by [#1767](https://github.com/yontrack/yontrack/issues/1767).*
+[`.github/workflows/dast-active.yml`](../../.github/workflows/dast-active.yml) runs a second scan
+that **attacks**: ZAP sends injection, XSS, SSRF and traversal payloads and exercises GraphQL
+**mutations**, so it never touches the demo — only a **throwaway stack** brought up on the runner
+from the latest BRONZE image, seeded with `ontrack-demo-seed`, and torn down after. Its counts land
+on that BRONZE build as `SECURITY.DAST.ACTIVE`. Weekly (Sunday 01:00 UTC) and on demand; report
+only, like the passive scan.
+
+It reuses `scripts/security-dast.sh` unchanged, with `DAST_KIND=active`. What differs:
+
+| | Passive | Active |
+|---|---|---|
+| Target | the demo | a throwaway stack ([`security/dast/compose/docker-compose-dast.yml`](../../security/dast/compose/docker-compose-dast.yml)) |
+| Schema fed to ZAP | query-only (`query-schema`) — no mutation is expressible | mutations kept, the dangerous ones stripped (`active-schema`) |
+| Plan | `zap/passive*.yaml` | [`zap/active.yaml`](../../security/dast/zap/active.yaml) — spider + `activeScan`, per role |
+| Extra checks | — | authorization probes (`access-control`) |
+
+**The throwaway stack** is the OIDC KDSL compose with three deliberate differences, each a
+requirement of the issue: the GitHub ingestion hook **signature check is on** (so `/hook/secured/**`
+is scanned as customers run it), the **management port 8800 is not published** (and
+`MANAGEMENT_ENDPOINT_ACCOUNT_ACCESS` is left at its default), and the scanner-role CasC plus a
+throwaway-only fragment turning `grantProjectViewToAll` **off** are mounted. It is a self-contained
+compose file rather than an overlay because Docker Compose concatenates `ports`, so an override
+cannot un-publish 8800. The scanner accounts (`scan-admin`, `scan-readonly`, `scan-project`) and
+their `/dast-*` groups live in `compose/keycloak/import/oidc/ontrack.json`, shared with the OIDC
+KDSL and Playwright shards; their passwords on this stack are fixed, clearly non-secret test values,
+never the demo's `DAST_SCAN_*_PASSWORD` secrets.
+
+**Mutations are kept, but not the dangerous ones.** `active-schema` keeps the `Mutation` root — the
+whole point of an active scan — but strips token revocation and every account/group/role/CasC/
+settings mutation, so ZAP cannot revoke its own token, delete a `scan-*` account, or turn
+`grantProjectViewToAll` back on mid-run. Logout and the management port are excluded from attack in
+the plan.
+
+**The authorization checks** (`access-control`) are what the active scan exists for — the class of
+bug [#1739], [#1741] and [#1742] were. `scan-readonly` must not create a project; `scan-project`
+must not read or change a project it does not hold. They run before ZAP, while the seeded data is
+intact, and count as HIGH. They only mean something with `grantProjectViewToAll` off, so the
+workflow **fails before scanning** unless `whoami` shows `scan-project` seeing exactly its one
+project. ZAP's own Access Control Testing has no Automation Framework job, which is why these live in
+the script.
+
+**Tokens over a multi-hour run** are refreshed the same way as the passive scan: a fresh Keycloak
+password grant right before each role's pass, and each pass (spider + `activeScan` ≈ 45 min) is
+bounded well under the realm's one-hour token, so no pass outlives its token — `assert-authenticated`
+proves it afterwards.
+
+[#1739]: https://github.com/yontrack/yontrack/issues/1739
+[#1741]: https://github.com/yontrack/yontrack/issues/1741
+[#1742]: https://github.com/yontrack/yontrack/issues/1742
+
+## What came next
+
+- [#1767](https://github.com/yontrack/yontrack/issues/1767) — done: the active scan, above.
+- [#1769](https://github.com/yontrack/yontrack/issues/1769) — done: the three scanner roles.
