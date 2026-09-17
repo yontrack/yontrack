@@ -423,11 +423,15 @@ jobs:
             chmod -R a+rX "$pass"
             chmod 777 "$pass/out"
             rc=0
+            # --network host so ZAP reaches the backend on localhost:8080. ZAP's own proxy would
+            # default to 8080 and collide with the published backend port ("Address already in
+            # use"), so it is moved to a free port with -port; the scan targets DAST_TARGET directly
+            # and does not go through that proxy.
             docker run --rm --network host \
               -v "$pass:/zap/wrk:rw" \
               -e DAST_TARGET="$DAST_TARGET" \
               "$ZAP_IMAGE" \
-              zap.sh -cmd -autorun /zap/wrk/active.yaml > "$pass/zap.log" 2>&1 || rc=$?
+              zap.sh -cmd -port 8090 -host 127.0.0.1 -autorun /zap/wrk/active.yaml > "$pass/zap.log" 2>&1 || rc=$?
             rm -f "$pass/active.yaml"
             echo "ZAP (active, $role) finished with exit code $rc."
             if [ "$rc" -ne 0 ]; then
