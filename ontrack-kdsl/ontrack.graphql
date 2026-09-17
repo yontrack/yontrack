@@ -3151,6 +3151,8 @@ type Label {
   id: Int!
   "name field"
   name: String!
+  "Number of projects carrying this label, among the ones which are visible to the current user"
+  projectCount: Int!
   "List of associated projects"
   projects: [Project!]!
 }

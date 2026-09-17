@@ -1,5 +1,7 @@
 package net.nemerosa.ontrack.graphql.schema
 
+import graphql.Scalars.GraphQLInt
+import graphql.schema.GraphQLNonNull
 import graphql.schema.GraphQLObjectType
 import graphql.schema.GraphQLTypeReference
 import net.nemerosa.ontrack.graphql.support.GraphQLBeanConverter
@@ -30,6 +32,16 @@ class GQLTypeLabel(
                         projectIds.map { id ->
                             structureService.getProject(id)
                         }
+                    }
+            }
+            // Number of associated projects
+            .field {
+                it.name("projectCount")
+                    .description("Number of projects carrying this label, among the ones which are visible to the current user")
+                    .type(GraphQLNonNull(GraphQLInt))
+                    .dataFetcher { environment ->
+                        val label: Label = environment.getSource()!!
+                        projectLabelManagementService.getProjectsForLabel(label).size
                     }
             }
             // Links

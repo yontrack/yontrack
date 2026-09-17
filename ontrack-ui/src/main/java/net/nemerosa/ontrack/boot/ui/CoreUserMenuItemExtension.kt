@@ -3,6 +3,7 @@ package net.nemerosa.ontrack.boot.ui
 import net.nemerosa.ontrack.extension.api.UserMenuItemExtension
 import net.nemerosa.ontrack.extension.support.AbstractExtension
 import net.nemerosa.ontrack.extension.support.CoreExtensionFeature
+import net.nemerosa.ontrack.model.labels.LabelManagement
 import net.nemerosa.ontrack.model.security.AccountManagement
 import net.nemerosa.ontrack.model.security.GlobalSettings
 import net.nemerosa.ontrack.model.security.SecurityService
@@ -20,6 +21,7 @@ class CoreUserMenuItemExtension(
         get() {
             val globalSettings = securityService.isGlobalFunctionGranted<GlobalSettings>()
             val accountManagement = securityService.isGlobalFunctionGranted<AccountManagement>()
+            val labelManagement = securityService.isGlobalFunctionGranted<LabelManagement>()
 
             val items = mutableListOf<UserMenuItem>()
 
@@ -67,6 +69,17 @@ class CoreUserMenuItemExtension(
                     extension = "core/admin",
                     id = "health",
                     name = "System health",
+                )
+            }
+
+            // Labels are managed by the holders of the LabelManagement function (administrators
+            // and creators), which is a different population from the one holding GlobalSettings.
+            if (labelManagement) {
+                items += UserMenuItem(
+                    groupId = CoreUserMenuGroups.CONFIGURATIONS,
+                    extension = "core/config",
+                    id = "labels",
+                    name = "Labels",
                 )
             }
 

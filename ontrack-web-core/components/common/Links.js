@@ -61,6 +61,14 @@ export function validationRunUri(validationRun) {
     return `/validationRun/${validationRun.id}`
 }
 
+/**
+ * Page listing the projects carrying a label. The page itself is added by #1805;
+ * the label chips and the admin page's project count already point at it.
+ */
+export function projectLabelUri(label) {
+    return `/project-labels/${label.id}`
+}
+
 export function restPromotionLevelImageUri(promotionLevel) {
     return `/api/protected/images/promotionLevels/${promotionLevel.id}`
 }

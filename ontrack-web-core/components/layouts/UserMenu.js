@@ -29,6 +29,7 @@ import {
     FaSignOutAlt,
     FaStamp,
     FaTag,
+    FaTags,
     FaUser,
     FaUserCog,
     FaUsers,
@@ -76,6 +77,7 @@ export default function UserMenu({userMenu}) {
     }
 
     const itemIcons = {
+        'core/config/labels': <FaTags/>,
         'core/config/predefined-promotion-levels': <FaMedal/>,
         'core/config/predefined-validation-stamps': <FaStamp/>,
         'core/admin/account-management': <FaUsers/>,

@@ -1,55 +1,43 @@
-import {useEffect, useState} from "react";
 import {gql} from "graphql-request";
-import {Select, Space, Typography} from "antd";
-import ColorBox from "@components/common/ColorBox";
-import {useGraphQLClient} from "@components/providers/ConnectionContextProvider";
+import {Select} from "antd";
+import {useQuery} from "@components/services/GraphQL";
+import LabelChip, {labelDisplay} from "@components/labels/LabelChip";
+import {gqlLabelFragment} from "@components/labels/LabelGraphQLFragments";
 
+/**
+ * Selection of one label, identified by its display string (`category:name`, or
+ * `name` alone when it has no category) - the same string the label filters of
+ * the API take.
+ */
 export default function SelectLabel({value, onChange}) {
 
-    const client = useGraphQLClient()
+    const {data, loading} = useQuery(
+        gql`
+            query GetLabels {
+                labels {
+                    ...labelFragment
+                }
+            }
 
-    const [labels, setLabels] = useState([])
-
-    useEffect(() => {
-        if (client) {
-            client.request(
-                gql`
-                    query GetLabels {
-                        labels {
-                            id
-                            category
-                            name
-                            title: description
-                            color
-                        }
-                    }
-                `
-            ).then(data => {
-                setLabels(data.labels.map(label => (
-                    {
-                        value: `${label.category}:${label.name}`,
-                        label: <Space>
-                            {
-                                label.color && <ColorBox color={label.color}/>
-                            }
-                            <Typography.Text>
-                                {label.category && `${label.category} / `}
-                                {label.name}
-                            </Typography.Text>
-                        </Space>,
-                        ...label,
-                    }
-                )))
-            })
+            ${gqlLabelFragment}
+        `,
+        {
+            dataFn: data => data.labels,
         }
-    }, [client]);
+    )
+
+    const options = (data ?? []).map(label => ({
+        value: labelDisplay(label),
+        label: <LabelChip label={label} link={false}/>,
+    }))
 
     return (
         <>
             <Select
                 value={value}
                 onChange={onChange}
-                options={labels}
+                options={options}
+                loading={loading}
                 allowClear={true}
             />
         </>

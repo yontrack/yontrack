@@ -7,6 +7,7 @@ import {EnvironmentsExtension} from "@ontrack/extensions/environments/environmen
 import {OntrackSettings} from "@ontrack/settings";
 import {AutoVersioningExtension} from "@ontrack/extensions/auto-versioning/AutoVersioningExtension";
 import {SearchMgt} from "@ontrack/search";
+import {labels} from "@ontrack/labels";
 
 /**
  * Ontrack service
@@ -20,6 +21,8 @@ export class Ontrack {
     configurations = new OntrackConfigurations(this)
     settings = new OntrackSettings(this)
     search = new SearchMgt(this)
+
+    labels = () => labels(this)
 
     createProject = async (name) => createProject(this, name)
     getProjectById = async (id) => getProjectById(this, id)

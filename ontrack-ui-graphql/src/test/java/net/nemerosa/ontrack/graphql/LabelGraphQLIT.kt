@@ -2,6 +2,7 @@ package net.nemerosa.ontrack.graphql
 
 import net.nemerosa.ontrack.it.AsAdminTest
 import org.junit.jupiter.api.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
@@ -21,6 +22,61 @@ class LabelGraphQLIT : AbstractQLKTITSupport() {
         """)
         val labels = data["labels"]
         assertNotNull(labels)
+    }
+
+    @Test
+    fun `Number of projects for a label`() {
+        val used = label()
+        val unused = label()
+        project { labels = listOf(used) }
+        project { labels = listOf(used) }
+        run(
+            """
+                query Labels(${'$'}category: String!, ${'$'}name: String!) {
+                    labels(category: ${'$'}category, name: ${'$'}name) {
+                        projectCount
+                    }
+                }
+            """,
+            mapOf("category" to used.category, "name" to used.name)
+        ).apply {
+            assertEquals(2, path("labels").first()["projectCount"].asInt())
+        }
+        run(
+            """
+                query Labels(${'$'}category: String!, ${'$'}name: String!) {
+                    labels(category: ${'$'}category, name: ${'$'}name) {
+                        projectCount
+                    }
+                }
+            """,
+            mapOf("category" to unused.category, "name" to unused.name)
+        ).apply {
+            assertEquals(0, path("labels").first()["projectCount"].asInt())
+        }
+    }
+
+    @Test
+    fun `Number of projects for a label counts only the projects visible to the user`() {
+        val label = label()
+        val visible = project { labels = listOf(label) }
+        project { labels = listOf(label) }
+        withNoGrantViewToAll {
+            asUserWithView(visible) {
+                run(
+                    """
+                        query Labels(${'$'}category: String!, ${'$'}name: String!) {
+                            labels(category: ${'$'}category, name: ${'$'}name) {
+                                projectCount
+                            }
+                        }
+                    """,
+                    mapOf("category" to label.category, "name" to label.name)
+                ).apply {
+                    assertEquals(1, path("labels").first()["projectCount"].asInt())
+                }
+            }
+        }
     }
 
     @Test
