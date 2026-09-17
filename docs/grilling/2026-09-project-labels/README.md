@@ -2,7 +2,7 @@
 
 Outcome of the grilling session of 2026-09-17 on bringing project labels back into the web UI.
 The session settled 26 questions. This document records the decisions and their reasons, not the
-questions. The work is tracked as the initiative `initiative: labels-ui`, milestone 5.5 — see
+questions. The work is tracked as the initiative `initiative: labels-ui` (#1800–#1808), milestone 5.5 — see
 [Breakdown](#breakdown).
 
 ## Where we start from
@@ -172,16 +172,16 @@ tests (`ontrack-web-tests/`) for each UI issue.
 Initiative label `initiative: labels-ui`, milestone 5.5. Each issue starts at `status:todo` with
 `ready-for-agent`; dependencies are recorded as native GitHub issue dependencies.
 
-| # | Issue | Depends on |
+| Issue | Scope | Depends on |
 |---|---|---|
-| 1 | Remove automatic labels — migration, providers, job, settings, casc key, SCM provider, config property, settings form, tests, schema snapshots | — |
-| 2 | GraphQL label mutations and `labels` project authorization; delete the REST controllers | 1 |
-| 3 | KDSL label support, demo seed labels, KDSL acceptance test | 2 |
-| 4 | Labels admin page, including the `SelectLabel` fix | 2 |
-| 5 | Label chips on the project page and assignment dialog | 2 |
-| 6 | Label chips in project lists, label page, label filter in the All projects widget (`paginatedProjects(labels:)`) | 5 |
-| 7 | Label search in the mobile project list | 6 |
-| 8 | mkdocs "Project labels" page | 4, 5, 6 |
-| 9 | Cleanup: `MainBuildLinksFilterService`, `LabelTokenForm`, N+1 in `getLabelsForProject` | 1 |
+| #1800 | Remove automatic labels — migration, providers, job, settings, casc key, SCM provider, config property, settings form, tests, schema snapshots | — |
+| #1801 | GraphQL label mutations and `labels` project authorization; delete the REST controllers | #1800 |
+| #1802 | KDSL label support, demo seed labels, KDSL acceptance test | #1801 |
+| #1803 | Labels admin page, including the `SelectLabel` fix | #1801 |
+| #1804 | Label chips on the project page and assignment dialog | #1801 |
+| #1805 | Label chips in project lists, label page, label filter in the All projects widget (`paginatedProjects(labels:)`) | #1804 |
+| #1806 | Label search in the mobile project list | #1805 |
+| #1807 | mkdocs "Project labels" page | #1803, #1804, #1805 |
+| #1808 | Cleanup: `MainBuildLinksFilterService`, `LabelTokenForm`, N+1 in `getLabelsForProject` | #1800 |
 
-Issue 6 depends on 5 because both need the shared chip component, which 5 introduces.
+#1805 depends on #1804 because both need the shared chip component.
