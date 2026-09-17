@@ -81,6 +81,21 @@ configuration:
             warningValue: 1
             failedLevel: HIGH
             failedValue: 1
+        # Findings of the weekly ACTIVE DAST scan, counted after suppressions by
+        # .github/workflows/dast-active.yml and reported on the latest BRONZE build it scanned
+        # (#1767). The active scan attacks a throwaway stack - injection, XSS, SSRF, traversal, and
+        # GraphQL mutations - and adds the cross-role authorization checks (scan-readonly must not
+        # write, scan-project must not reach another project), whose escalations count as HIGH.
+        #
+        # Same thresholds as the passive scan, and for the same reason: a finding here is against a
+        # running Yontrack. Reporting only - in no promotion, and nothing in ci.yml depends on the
+        # workflow. Where the detail lives: security/dast/README.md.
+        SECURITY.DAST.ACTIVE:
+          chml:
+            warningLevel: MEDIUM
+            warningValue: 1
+            failedLevel: HIGH
+            failedValue: 1
         # Reported by the `docs` job in ci.yml, which now runs on every full run: the site
         # built and was archived as a run artefact for the release to carry forward (#1668).
         # Distinct from DOCUMENTATION below, which records the S3 publication at release time

@@ -1,0 +1,509 @@
+# Weekly ACTIVE DAST scan on a throwaway stack, reporting SECURITY.DAST.ACTIVE (#1767).
+#
+# Part of `initiative: security-scans`, DAST track. The design is docs/grilling/2026-09-dast.md; the
+# passive scan it builds on is .github/workflows/dast-passive.yml, and the counting/reporting layer it
+# reuses unchanged - with DAST_KIND=active - is scripts/security-dast.sh. What the scanners read is
+# security/dast/; what runs the stack is security/dast/compose/docker-compose-dast.yml.
+#
+# ACTIVE means it attacks: ZAP sends injection, XSS, SSRF and traversal payloads, and it exercises
+# GraphQL MUTATIONS as well as queries. So it never touches the demo - it creates, changes and deletes
+# data - only a THROWAWAY stack brought up on the runner from the latest BRONZE image, seeded with
+# ontrack-demo-seed, and torn down after. The counts land on that BRONZE build as SECURITY.DAST.ACTIVE.
+#
+# What it does, in order:
+#   1. resolves the build to scan (the latest BRONZE on main, or the dispatched version) and pulls its
+#      GHCR image, re-tagged as the compose file expects;
+#   2. brings up the throwaway stack with the GitHub ingestion hook signature check ENABLED and the
+#      management port 8800 NOT published (security/dast/compose/docker-compose-dast.yml), mounting the
+#      scanner-role CasC and a throwaway-only fragment that turns grantProjectViewToAll OFF;
+#   3. seeds it with ontrack-demo-seed and re-applies the CasC (the seed recreates projects, dropping
+#      their permissions), exactly as demo-smoke.yml does for the demo;
+#   4. logs in as scan-admin / scan-readonly / scan-project and, before scanning, FAILS unless
+#      scan-project sees exactly its one project - the cross-project checks would otherwise test
+#      nothing (the setting is Yontrack's default-on, see #1769);
+#   5. checks the management port is unreachable;
+#   6. runs the authorization probes (scripts/security-dast.sh access-control) while the seeded data is
+#      intact - scan-readonly must not write, scan-project must not read or change another project;
+#   7. runs ZAP's active scan once per role, mutations included, the dangerous mutations stripped from
+#      the schema and logout / the management port excluded from attack;
+#   8. counts, reports to the private yontrack/security-reports under dast/active/, and reports
+#      SECURITY.DAST.ACTIVE on the build.
+#
+# ---------------------------------------------------------------------------------------------
+# DISCLOSURE - identical to the passive scan, read it there. This repository is public: this workflow
+# prints COUNTS ONLY, uploads NO ARTIFACT, and the full detail (including which authorization check
+# escalated, never how) goes to the private yontrack/security-reports. Everything a scanner writes goes
+# through `scripts/security-dast.sh scrub` first. A step you add prints a number or prints nothing.
+#
+# No SARIF, for the reasons in dast-passive.yml: every DAST SARIF upload rendered zero alerts and
+# ZAP's carried the token. `dast-zap-active` is dropped on that evidence rather than after a fresh
+# trial - a DAST finding is URL-located and code scanning has nothing to place it on, and an escalation
+# is exactly the detail that must not enter a public Security tab.
+#
+# Pinning: the images by digest via the CLI/GHCR, the CLI by version, the actions by SHA - as the
+# other security workflows. The ZAP image is pinned by digest in ZAP_IMAGE, shared with the passive
+# scan and moved by the same Dependabot pin.
+# ---------------------------------------------------------------------------------------------
+name: DAST active
+
+on:
+  # Weekly, Sunday 01:00 UTC. A regression lives at most seven days on main.
+  schedule:
+    - cron: "0 1 * * 0"
+
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to scan (e.g. 5.5.0-rc-212). Blank scans the latest BRONZE build of main.'
+        required: false
+        type: string
+
+# One active scan at a time. Unlike the passive scan this shares nothing with the demo - its stack is
+# private to the runner - but two active runs would each build a stack and race on the fixed host ports.
+concurrency:
+  group: dast-active
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  # See dast-passive.yml: 5.2.0 for `build search --with-display-name`, and validate is always called
+  # with --project/--branch/--build spelled out.
+  YONTRACK_CLI_VERSION: "5.2.0"
+  # The same digest-pinned ZAP image the passive scan uses (2.17.0). Moved together with the passive
+  # pin by Dependabot.
+  ZAP_IMAGE: ghcr.io/zaproxy/zaproxy@sha256:781a2bdaea47324e7bab583e2263f21d257b0aee61ed51521a5be45f5f5081ef
+  # GHCR images of the build being scanned, tagged with the durable version (the build's display name).
+  GHCR_ONTRACK: ghcr.io/${{ github.repository }}/ontrack
+  # Where the reports go. Private, and the only place any detail is allowed to exist.
+  REPORTS_REPOSITORY: yontrack/security-reports
+  # The throwaway stack, on the runner. Fixed ports: this job is alone on its runner (see the compose
+  # file). The API base is what ZAP and the script scan; Keycloak is where the roles log in.
+  DAST_TARGET: http://localhost:8080
+  DAST_KEYCLOAK_REALM_URL: http://localhost:8008/realms/ontrack
+  DAST_KEYCLOAK_CLIENT_ID: ontrack-client
+  # The scanner roles, in the order their passes run.
+  DAST_ROLES: scan-admin scan-readonly scan-project
+  YONTRACK_PROJECT: yontrack
+  YONTRACK_BRANCH: main
+
+jobs:
+  active:
+    name: Active scan of a throwaway stack
+    # A fork with Actions enabled would otherwise pull this org's images and file reports it cannot write.
+    if: github.repository == 'yontrack/yontrack'
+    runs-on: ubuntu-latest
+    # ZAP is bounded to 180 minutes of scanning across the three passes; the job caps at 240.
+    timeout-minutes: 240
+    permissions:
+      contents: read
+      # To pull the BRONZE image from GHCR.
+      packages: read
+    env:
+      DAST_KIND: active
+      DAST_RUN_ID: ${{ github.run_id }}
+      DAST_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      DAST_SCANNERS: >-
+        OWASP ZAP 2.17.0 (active scan: injection, XSS, SSRF, traversal; GraphQL add-on, mutations
+        included, dangerous mutations stripped; run once per scanner role);
+        access-control probes (scan-readonly must not write, scan-project must not read or change
+        another project)
+      # The scanner accounts' passwords on the THROWAWAY stack: fixed, clearly non-secret test values,
+      # matching compose/keycloak/import/oidc/ontrack.json. NEVER the demo's DAST_SCAN_*_PASSWORD
+      # secrets - those are the demo's, and this stack is not the demo. The client secret is likewise
+      # the committed fixture, not a secret.
+      DAST_SCAN_ADMIN_PASSWORD: dast-scan-admin-not-a-secret
+      DAST_SCAN_READONLY_PASSWORD: dast-scan-readonly-not-a-secret
+      DAST_SCAN_PROJECT_PASSWORD: dast-scan-project-not-a-secret
+      DEMO_KEYCLOAK_CLIENT_SECRET: ontrack-client-secret
+      # A pass may take this long, in seconds: `login` refuses a token valid for less, so a token
+      # cannot expire mid-pass. A pass is spider (3m) + activeScan (40m) + passive waits (10m) ~= 53m;
+      # the realm issues tokens for an hour, and a fresh one is minted right before each pass - which is
+      # how the token is "refreshed" over the multi-hour job.
+      DAST_ZAP_ACTIVE_PASS_BUDGET: "3000"
+    steps:
+      - name: Record the job start
+        id: job_start
+        run: |
+          set -euo pipefail
+          {
+            echo "started=$(date +%s)"
+            echo "date=$(date -u +%Y-%m-%d)"
+          } >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        # The seed's changelog project is built from the commits since the last release tag, so it
+        # needs tags and history.
+        with:
+          fetch-depth: 0
+
+      - name: Configure git
+        run: |
+          git config --global user.email "yontrack@nemerosa.net"
+          git config --global user.name "Yontrack"
+          git config --global init.defaultBranch main
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: zulu
+          java-version: "21"
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      # Installed directly rather than through ontrack-github-actions-cli-config, which registers a
+      # build as a side effect. This workflow reports on a build that already exists.
+      - name: Install the Yontrack CLI
+        env:
+          YONTRACK_URL: ${{ vars.YONTRACK_URL }}
+          YONTRACK_TOKEN: ${{ secrets.YONTRACK_TOKEN }}
+        run: |
+          set -euo pipefail
+          curl -sSfL -o /usr/local/bin/yontrack \
+            "https://github.com/nemerosa/ontrack-cli/releases/download/${YONTRACK_CLI_VERSION}/yontrack-linux-amd64"
+          chmod +x /usr/local/bin/yontrack
+          yontrack version --cli
+          yontrack config create prod "$YONTRACK_URL" --token "$YONTRACK_TOKEN" --override
+
+      # ------------------------------------------------------------------------------------
+      # 1. Which build to scan, and its image.
+      #
+      # The dispatched version if one was given, else the latest BRONZE build of main. The version is
+      # the build's display name, which is also its GHCR image tag; the build NAME is what the stamp is
+      # reported on.
+      # ------------------------------------------------------------------------------------
+      - name: Resolve the build to scan
+        id: resolve
+        env:
+          INPUT_VERSION: ${{ github.event.inputs.version }}
+        run: |
+          set -euo pipefail
+          if [ -n "${INPUT_VERSION:-}" ]; then
+            version="$INPUT_VERSION"
+            json="$(yontrack build search --project "$YONTRACK_PROJECT" --branch "$YONTRACK_BRANCH" \
+              --with-display-name "^$(printf '%s' "$version" | sed 's/[][^$.*+?(){}|\\]/\\&/g')$" \
+              --count 1 --output json)"
+          else
+            json="$(yontrack build search --project "$YONTRACK_PROJECT" --branch "$YONTRACK_BRANCH" \
+              --with-promotion BRONZE --count 1 --output json)"
+            version="$(printf '%s' "$json" | jq -r '.DisplayName // .Name // empty')"
+          fi
+          build="$(printf '%s' "$json" | jq -r '.Name // empty')"
+          [ -n "$version" ] && [ -n "$build" ] || { echo "Could not resolve a BRONZE build to scan." >&2; exit 1; }
+          echo "Scanning version $version (build $build)."
+          {
+            echo "version=$version"
+            echo "build=$build"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Log in to GHCR
+        uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3.4.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # The compose file resolves the backend as nemerosa/ontrack:${ONTRACK_VERSION}. Pull the BRONZE
+      # image by its durable version tag and re-tag it, exactly as the kdsl job of ci.yml does.
+      - name: Pull the build's image
+        id: image
+        env:
+          VERSION: ${{ steps.resolve.outputs.version }}
+        run: |
+          set -euo pipefail
+          docker pull "$GHCR_ONTRACK:$VERSION"
+          docker tag "$GHCR_ONTRACK:$VERSION" "nemerosa/ontrack:$VERSION"
+          echo "ontrack_version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      # ------------------------------------------------------------------------------------
+      # 2. Bring up the throwaway stack.
+      #
+      # security/dast/compose/docker-compose-dast.yml: the OIDC KDSL stack with the hook signature
+      # check ENABLED, the management port NOT published, and the CasC mounted. The CasC directory is
+      # prepared here: casc.yaml with its `casc:` Helm-values wrapper stripped so the root is `ontrack`
+      # (the engine requires it), plus the throwaway-only settings fragment that turns
+      # grantProjectViewToAll off.
+      # ------------------------------------------------------------------------------------
+      - name: Prepare the CasC
+        id: prepare
+        run: |
+          set -euo pipefail
+          work="$RUNNER_TEMP/dast"
+          mkdir -p "$work/out"
+          ( umask 077 && mkdir -p "$work/tokens" )
+          cascdir="$work/casc"
+          mkdir -p "$cascdir"
+          # `.casc` is the value under the Helm-values wrapper: its root is `ontrack`, which the CasC
+          # engine requires. A directory of .yaml files is loaded and merged.
+          yq '.casc' security/dast/casc.yaml > "$cascdir/scanner-roles.yaml"
+          cp security/dast/compose/casc/security-settings.yaml "$cascdir/security-settings.yaml"
+          chmod -R a+rX "$cascdir"
+          {
+            echo "work=$work"
+            echo "cascdir=$cascdir"
+          } >> "$GITHUB_OUTPUT"
+          echo "DAST_TOKEN_DIR=$work/tokens" >> "$GITHUB_ENV"
+
+      - name: Start the throwaway stack
+        env:
+          ONTRACK_VERSION: ${{ steps.image.outputs.ontrack_version }}
+          DAST_CASC_DIR: ${{ steps.prepare.outputs.cascdir }}
+        run: |
+          set -euo pipefail
+          docker compose -f security/dast/compose/docker-compose-dast.yml up -d
+          # Wait for the backend to answer its health probe (the management port is internal to the
+          # container; the health endpoint on the API port is enough to know it is up).
+          echo "Waiting for the backend to become healthy..."
+          for i in $(seq 1 60); do
+            code="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 10 "$DAST_TARGET/rest/info" 2>/dev/null || echo 000)"
+            # /rest/info answers 200 unauthenticated on the API port once the app is up.
+            if [ "$code" = "200" ] || [ "$code" = "401" ] || [ "$code" = "403" ]; then
+              echo "Backend answering ($code) after $((i*10))s."
+              break
+            fi
+            if [ "$i" = "60" ]; then
+              echo "Backend did not come up in 600s." >&2
+              docker compose -f security/dast/compose/docker-compose-dast.yml logs --tail 100 ontrack \
+                | scripts/security-dast.sh scrub || true
+              exit 1
+            fi
+            sleep 10
+          done
+
+      # ------------------------------------------------------------------------------------
+      # 3. Seed the throwaway stack, then re-apply the CasC.
+      #
+      # The seed runs with an admin API token minted through Keycloak (docs/agents/local-api-access.md):
+      # a password grant as the realm's admin user, then generateToken. The stack is localhost and
+      # ephemeral - the seed's URL guard allows a local instance. The seed deletes and recreates every
+      # project, so the CasC is re-applied afterwards, exactly as demo-smoke.yml does for the demo.
+      # ------------------------------------------------------------------------------------
+      - name: Mint an admin token and seed the stack
+        id: seed
+        run: |
+          set -euo pipefail
+          # A bearer token for the admin Keycloak user (admin/admin), on the local realm.
+          bearer="$(jq -rn '
+              "grant_type=password&scope=openid"
+              + "&client_id=" + ("ontrack-client" | @uri)
+              + "&client_secret=" + ("ontrack-client-secret" | @uri)
+              + "&username=admin&password=admin"' \
+            | curl -sS --max-time 30 -X POST \
+                -H 'Content-Type: application/x-www-form-urlencoded' \
+                --data-binary @- "$DAST_KEYCLOAK_REALM_URL/protocol/openid-connect/token" \
+            | jq -r '.access_token // empty')"
+          [ -n "$bearer" ] || { echo "Could not obtain an admin bearer token from Keycloak." >&2; exit 1; }
+          # A Yontrack API token for the seed.
+          token="$(printf '%s' '{"query":"mutation { generateToken(input: {name: \"dast-seed\"}) { token { value } errors { message } } }"}' \
+            | curl -sS --max-time 30 -X POST -H 'Content-Type: application/json' \
+                -H "Authorization: Bearer $bearer" --data-binary @- "$DAST_TARGET/graphql" \
+            | jq -r '.data.generateToken.token.value // empty')"
+          [ -n "$token" ] || { echo "Could not generate a Yontrack API token." >&2; exit 1; }
+          echo "::add-mask::$token"
+          echo "::add-mask::$bearer"
+          # Build and run the seed against the throwaway stack.
+          ./gradlew :ontrack-demo-seed:installDist --console plain
+          YONTRACK_URL="$DAST_TARGET" YONTRACK_TOKEN="$token" \
+            ontrack-demo-seed/build/install/ontrack-demo-seed/bin/ontrack-demo-seed
+          # Hand the admin token to the CasC reload step, masked.
+          echo "token=$token" >> "$GITHUB_OUTPUT"
+
+      - name: Re-apply the CasC and check the scanner's project role
+        env:
+          DEMO_URL: ${{ env.DAST_TARGET }}
+          DEMO_TOKEN: ${{ steps.seed.outputs.token }}
+        run: scripts/demo-smoke.sh casc
+
+      # ------------------------------------------------------------------------------------
+      # 4. Log in as the scanner roles, and prove scan-project is scoped to its one project.
+      #
+      # On the active scan `whoami` FAILS (not warns) if a project-scoped role sees more than the CasC
+      # grants it: the throwaway stack has grantProjectViewToAll off, so more than one project would
+      # mean the cross-project checks test nothing. DAST_KIND=active is what makes it strict.
+      # ------------------------------------------------------------------------------------
+      - name: Log in as the scanner roles
+        run: |
+          set -uo pipefail
+          for role in $DAST_ROLES; do
+            scripts/security-dast.sh login "$role" "$DAST_TOKEN_DIR" || exit 1
+            scripts/security-dast.sh whoami "$role" "$DAST_TOKEN_DIR" || exit 1
+          done
+
+      - name: Check that the management port is not exposed
+        run: scripts/security-dast.sh actuator "$DAST_TARGET"
+
+      # ------------------------------------------------------------------------------------
+      # 5. The authorization checks - BEFORE ZAP, while the seeded data is intact.
+      #
+      # scan-readonly must not create a project; scan-project must not read or change a project it does
+      # not hold. An escalation is a finding for the report and the stamp (counts only in the log), not
+      # a run failure - the operator decides on disclosure. The raw results feed normalize-access-control.
+      # ------------------------------------------------------------------------------------
+      - name: Run the authorization checks
+        id: ac
+        env:
+          WORK: ${{ steps.prepare.outputs.work }}
+        run: |
+          set -uo pipefail
+          scripts/security-dast.sh access-control "$DAST_TOKEN_DIR" "$WORK/out" || exit 1
+
+      # ------------------------------------------------------------------------------------
+      # 6. The active schema and ZAP, once per role.
+      #
+      # The schema keeps the Mutation root but strips token revocation and every account/group/role/
+      # CasC/settings mutation, so ZAP cannot revoke its own token or touch the scan-* accounts. Each
+      # pass logs in again first (the token refresh) and is asserted authenticated throughout afterwards.
+      # ------------------------------------------------------------------------------------
+      - name: Derive the active schema
+        env:
+          WORK: ${{ steps.prepare.outputs.work }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$WORK/graphql"
+          scripts/security-dast.sh active-schema \
+            ontrack-web-core/ontrack.graphql "$WORK/graphql/active-only.graphql"
+
+      - name: Run the ZAP active scan, once per scanner role
+        env:
+          WORK: ${{ steps.prepare.outputs.work }}
+        run: |
+          set -uo pipefail
+          for role in $DAST_ROLES; do
+            echo "--- ZAP active scan, as $role ---"
+            pass="$WORK/zap/$role"
+            mkdir -p "$pass/out" "$pass/graphql"
+            cp "$WORK/graphql/active-only.graphql" "$pass/graphql/active-only.graphql"
+            scripts/security-dast.sh login "$role" "$DAST_TOKEN_DIR" "$DAST_ZAP_ACTIVE_PASS_BUDGET" || exit 1
+            scripts/security-dast.sh render-plan \
+              security/dast/zap/active.yaml "$pass/active.yaml" "$role" || exit 1
+            chmod -R a+rX "$pass"
+            chmod 777 "$pass/out"
+            rc=0
+            docker run --rm --network host \
+              -v "$pass:/zap/wrk:rw" \
+              -e DAST_TARGET="$DAST_TARGET" \
+              "$ZAP_IMAGE" \
+              zap.sh -cmd -autorun /zap/wrk/active.yaml > "$pass/zap.log" 2>&1 || rc=$?
+            rm -f "$pass/active.yaml"
+            echo "ZAP (active, $role) finished with exit code $rc."
+            if [ "$rc" -ne 0 ]; then
+              echo "--- last lines of the ZAP log, URLs and credentials removed ---"
+              tail -n 100 "$pass/zap.log" | scripts/security-dast.sh scrub
+              exit "$rc"
+            fi
+            scripts/security-dast.sh assert-authenticated "$pass/out/messages.har" || exit 1
+          done
+
+      # ------------------------------------------------------------------------------------
+      # 7. Count, report, publish.
+      # ------------------------------------------------------------------------------------
+      - name: Count the findings and write the report
+        id: report
+        env:
+          WORK: ${{ steps.prepare.outputs.work }}
+          DAST_VERSION: ${{ steps.resolve.outputs.version }}
+          DAST_BUILD: ${{ steps.resolve.outputs.build }}
+          DAST_DATE: ${{ steps.job_start.outputs.date }}
+          DAST_STARTED: ${{ steps.job_start.outputs.started }}
+        run: |
+          set -euo pipefail
+          documents=()
+          for role in $DAST_ROLES; do
+            scripts/security-dast.sh normalize-zap "$WORK/zap/$role/out/zap.json" "$role" \
+              > "$WORK/out/findings-zap-$role.json"
+            documents+=("$WORK/out/findings-zap-$role.json")
+          done
+          # The authorization escalations, per role that has probes.
+          for role in scan-readonly scan-project; do
+            scripts/security-dast.sh normalize-access-control \
+              "$WORK/out/access-control-$role.raw.json" "$role" \
+              > "$WORK/out/findings-access-control-$role.json"
+            documents+=("$WORK/out/findings-access-control-$role.json")
+          done
+          scripts/security-dast.sh report "$WORK/out/report.md" "${documents[@]}"
+          echo "path=$(scripts/security-dast.sh report-path)" >> "$GITHUB_OUTPUT"
+
+      - name: Publish the report
+        env:
+          GH_TOKEN: ${{ secrets.SECURITY_REPORTS_TOKEN }}
+          WORK: ${{ steps.prepare.outputs.work }}
+          DAST_VERSION: ${{ steps.resolve.outputs.version }}
+          DAST_DATE: ${{ steps.job_start.outputs.date }}
+          REPORT_PATH: ${{ steps.report.outputs.path }}
+        run: scripts/security-dast.sh publish "$REPORTS_REPOSITORY" "$REPORT_PATH" "$WORK/out/report.md"
+
+      # ------------------------------------------------------------------------------------
+      # 8. Report to Yontrack.
+      #
+      # No `if:`, like the passive scan: a scanner error fails the run and reports NO stamp - a scan
+      # that did not happen must never read as a clean build. SECURITY.DAST.ACTIVE is in no promotion.
+      # ------------------------------------------------------------------------------------
+      - name: Validate SECURITY.DAST.ACTIVE
+        env:
+          CRITICAL: ${{ steps.report.outputs.critical }}
+          HIGH: ${{ steps.report.outputs.high }}
+          MEDIUM: ${{ steps.report.outputs.medium }}
+          LOW: ${{ steps.report.outputs.low }}
+          STARTED: ${{ steps.job_start.outputs.started }}
+          BUILD: ${{ steps.resolve.outputs.build }}
+          VERSION: ${{ steps.resolve.outputs.version }}
+        run: |
+          set -euo pipefail
+          run_time_flag=""
+          if [ -n "${STARTED:-}" ]; then
+            run_time_flag="--run-time $(( $(date +%s) - STARTED ))"
+          fi
+          run_info="--source-type github-workflow --source-uri $DAST_RUN_URL"
+          run_info="$run_info --trigger-type ${GITHUB_EVENT_NAME} --trigger-data $VERSION"
+          # shellcheck disable=SC2086  # deliberate: run info is a set of flags, not one word
+          yontrack validate \
+            --project "$YONTRACK_PROJECT" --branch "$YONTRACK_BRANCH" --build "$BUILD" \
+            --validation SECURITY.DAST.ACTIVE \
+            chml --critical "$CRITICAL" --high "$HIGH" --medium "$MEDIUM" --low "$LOW" \
+            $run_time_flag $run_info
+
+      # ------------------------------------------------------------------------------------
+      # 9. Tear the stack down and summarise. Counts only.
+      # ------------------------------------------------------------------------------------
+      - name: Tear down the throwaway stack
+        if: ${{ always() }}
+        env:
+          ONTRACK_VERSION: ${{ steps.image.outputs.ontrack_version }}
+          DAST_CASC_DIR: ${{ steps.prepare.outputs.cascdir }}
+        run: |
+          docker compose -f security/dast/compose/docker-compose-dast.yml down -v || true
+
+      - name: Summarise the counts
+        if: ${{ !cancelled() }}
+        env:
+          VERSION: ${{ steps.resolve.outputs.version }}
+          BUILD: ${{ steps.resolve.outputs.build }}
+          CRITICAL: ${{ steps.report.outputs.critical }}
+          HIGH: ${{ steps.report.outputs.high }}
+          MEDIUM: ${{ steps.report.outputs.medium }}
+          LOW: ${{ steps.report.outputs.low }}
+          FINDINGS: ${{ steps.report.outputs.findings }}
+          SUPPRESSED: ${{ steps.report.outputs.suppressed }}
+          ESCALATIONS: ${{ steps.ac.outputs.access_control_escalations }}
+          REPORT_PATH: ${{ steps.report.outputs.path }}
+        run: |
+          {
+            echo "### Active DAST scan of a throwaway stack — \`${VERSION:-unknown}\`"
+            echo
+            echo "| CRITICAL | HIGH | MEDIUM | LOW |"
+            echo "|---|---|---|---|"
+            echo "| ${CRITICAL:-?} | ${HIGH:-?} | ${MEDIUM:-?} | ${LOW:-?} |"
+            echo
+            echo "ZAP active rules run as each of the three scanner roles, mutations included, plus the"
+            echo "cross-role authorization checks. Counted per rule, after suppressions; informational dropped."
+            echo "${FINDINGS:-?} rule(s) counted, ${SUPPRESSED:-?} instance(s) suppressed."
+            echo
+            echo "Authorization escalations (scan-readonly writing, scan-project reaching another project): ${ESCALATIONS:-?}."
+            echo
+            echo "Reported as \`SECURITY.DAST.ACTIVE\` on build \`${BUILD:-unknown}\` of"
+            echo "\`$YONTRACK_PROJECT/$YONTRACK_BRANCH\`."
+            echo
+            echo "The findings themselves are in \`$REPORTS_REPOSITORY\` at"
+            echo "\`${REPORT_PATH:-not published}\`, split by scanner and by role — never here, never as an artifact,"
+            echo "and not in the Security tab: see the \"No SARIF\" note in this workflow."
+          } >> "$GITHUB_STEP_SUMMARY"
