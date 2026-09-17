@@ -1,0 +1,138 @@
+# Throwaway Yontrack stack for the ACTIVE DAST scan (#1767).
+#
+# Brought up and torn down by .github/workflows/dast-active.yml on a GitHub runner, never by hand and
+# never against the demo: the active scan creates, changes and deletes data. It is a SELF-CONTAINED
+# compose file rather than an overlay on compose/docker-compose-kdsl-oidc.yml on purpose — Docker
+# Compose merges `ports` by concatenation, so an override cannot UN-publish the management port 8800
+# the KDSL file publishes, and this scan must not expose it. It is the OIDC KDSL stack with three
+# deliberate differences, each one a requirement of the issue:
+#
+#   1. the GitHub ingestion hook signature check is ENABLED (the KDSL stack disables it), so
+#      /hook/secured/** is scanned as a customer runs it;
+#   2. the Spring Boot management port 8800 is NOT published, and MANAGEMENT_ENDPOINT_ACCOUNT_ACCESS
+#      and the actuator exposure are left at their shipped defaults — the customer-facing posture,
+#      which the workflow's `actuator` check then confirms is unreachable;
+#   3. the scanner-role CasC (security/dast/casc.yaml) and a throwaway-only settings fragment that
+#      turns `grantProjectViewToAll` OFF are mounted, so the cross-project authorization checks test
+#      something. The settings fragment lives only on this stack, never in casc.yaml itself, whose
+#      gitops copy runs the demo.
+#
+# It mounts the SAME Keycloak realm import as the OIDC KDSL and Playwright shards
+# (compose/keycloak/import/oidc), so the `scan-admin` / `scan-readonly` / `scan-project` accounts and
+# their `/dast-*` groups are declared in one place. The dev profile is kept (its mock SCM and mock
+# workflow executor are what ontrack-demo-seed needs, and its license is the dev one) — the two
+# hardenings above are the customer-facing bits the active scan cares about.
+#
+# The UI is deliberately absent: the active scan targets the API (GraphQL and REST), the scanner
+# accounts authenticate by Keycloak password grant rather than through the browser, and the fewer
+# services a multi-hour job depends on the fewer ways it flakes.
+#
+# Ports are fixed: this stack is alone on its runner, so it needs no worktree offset. Only the
+# backend API (8080) and Keycloak (8008) are published; nothing else, and above all not 8800.
+
+services:
+
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: ontrack
+      POSTGRES_USER: ontrack
+      POSTGRES_PASSWORD: ontrack
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ontrack -d ontrack"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:9.2.0
+    environment:
+      - "discovery.type=single-node"
+      - bootstrap.memory_lock=true
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      - "xpack.security.enabled=false"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -f http://localhost:9200/_cluster/health?wait_for_status=yellow&timeout=1s || exit 1" ]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 40s
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.2.5
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      KC_HOSTNAME: "http://localhost:8008"
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: true
+      KC_HOSTNAME_STRICT: false
+      KC_HTTP_ENABLED: true
+    ports:
+      - "8008:8080"
+    command:
+      - start
+      - --import-realm
+    volumes:
+      # The one shared with the OIDC KDSL and Playwright shards: one place for the scanner accounts.
+      - ../../../compose/keycloak/import/oidc:/opt/keycloak/data/import
+      - ../../../compose/keycloak/themes/yontrack:/opt/keycloak/themes/yontrack
+
+  rabbitmq:
+    image: rabbitmq:4.1.3-management
+    hostname: rabbit
+    environment:
+      RABBITMQ_DEFAULT_USER: ontrack
+      RABBITMQ_DEFAULT_PASS: ontrack
+
+  ontrack:
+    image: "nemerosa/ontrack:${ONTRACK_VERSION:-latest}"
+    ports:
+      # The API only. NOT 8800 — the management port must not be reachable from outside the
+      # container, which the workflow's `actuator` check verifies before scanning.
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_started
+      keycloak:
+        condition: service_started
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+
+      JAVA_OPTIONS: "-Xmx2048m -Xms2048m"
+
+      SPRING_DATASOURCE_URL: "jdbc:postgresql://postgres/ontrack"
+
+      ONTRACK_CONFIG_SEARCH_INDEX_IMMEDIATE: "true"
+      SPRING_ELASTICSEARCH_URIS: "http://elasticsearch:9200"
+
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_USERNAME: ontrack
+      SPRING_RABBITMQ_PASSWORD: ontrack
+
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI: "http://localhost:8008/realms/ontrack"
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: http://keycloak:8080/realms/ontrack/protocol/openid-connect/certs
+
+      # Configuration as code: the scanner roles (security/dast/casc.yaml, wrapper stripped) and the
+      # throwaway-only security-settings fragment, both prepared into $DAST_CASC_DIR by the workflow.
+      ONTRACK_CONFIG_CASC_LOCATIONS: "file:/casc/"
+
+      # The hardening the passive/KDSL stacks do not do. The signature check is ON, so /hook/secured/**
+      # behaves as a customer runs it. MANAGEMENT_ENDPOINT_ACCOUNT_ACCESS and the actuator exposure are
+      # NOT set here — left at their shipped defaults on purpose.
+      ONTRACK_EXTENSION_GITHUB_INGESTION_HOOK_SIGNATURE_DISABLED: "false"
+
+      # Configurations are not tested, and Jira runs in mock mode, as on the KDSL stack.
+      ONTRACK_CONFIG_CONFIGURATION_TEST: "false"
+      ONTRACK_EXTENSION_JIRA_CLIENT_TYPE: mock
+    volumes:
+      # Prepared by the workflow: scanner-roles.yaml (casc.yaml with its `casc:` wrapper stripped) and
+      # security-settings.yaml (grantProjectViewToAll off). Read-only.
+      - "${DAST_CASC_DIR:-./casc}:/casc:ro"

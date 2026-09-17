@@ -1,0 +1,19 @@
+# Throwaway-stack-only CasC for the ACTIVE DAST scan (#1767).
+#
+# Mounted into the active-scan stack alongside the scanner roles (security/dast/casc.yaml), and NOT
+# part of casc.yaml itself — whose gitops copy runs the demo, where this setting is the deployment's
+# own decision.
+#
+# Yontrack grants every authenticated user read (and participate) access to every project by default
+# (SecuritySettings.grantProjectViewToAll / grantProjectParticipationToAll). On the demo that is why
+# `scan-project` sees four projects although its CasC grants it one (#1769). The active scan's
+# cross-project authorization checks — "scan-project must not read or change a project it does not
+# hold" — only mean something when that default is off, so the throwaway stack turns it off here.
+# The workflow then proves with `whoami` that `scan-project` sees exactly one project before ZAP
+# starts, and fails before scanning if it sees more.
+ontrack:
+  config:
+    settings:
+      security:
+        grantProjectViewToAll: false
+        grantProjectParticipationToAll: false

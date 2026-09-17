@@ -1,0 +1,176 @@
+# ZAP Automation Framework plan — ACTIVE scan of a throwaway Yontrack stack (#1767), AUTHENTICATED,
+# run once per scanner role.
+#
+# Run by .github/workflows/dast-active.yml, in the pinned ZAP container, once as each of
+# `scan-admin`, `scan-readonly` and `scan-project` — the accounts of security/dast/casc.yaml:
+#
+#     zap.sh -cmd -autorun /zap/wrk/active.yaml
+#
+# UNLIKE the passive plans (security/dast/zap/passive.yaml, passive-api.yaml), this one attacks:
+# it sends injection, XSS, SSRF and traversal payloads (the activeScan job) and it exercises
+# GraphQL MUTATIONS as well as queries. That is why it never runs against the demo — it creates,
+# changes and deletes data — only against a throwaway stack on the runner, seeded from
+# ontrack-demo-seed and torn down after. security/dast/README.md and doc/dev-guide/dast.md.
+#
+# `${...}` are environment variables the Automation Framework substitutes — except one:
+#
+#   DAST_TARGET         the throwaway backend, no trailing slash (http://localhost:<port>)
+#   DAST_BEARER_TOKEN   the role's Keycloak access token, sent to the API only. NOT an environment
+#                       variable — the AF does not expand one inside a replacer rule, so
+#                       `scripts/security-dast.sh render-plan` writes it into a run-time copy of
+#                       this plan, exactly as for the passive API plan. Never logged, never reported.
+#
+# What the scanner may NOT touch, however privileged the role (the issue's exclusions):
+#
+#   * token revocation and every account / group / role / CasC / settings mutation — removed from
+#     the schema this is fed, so the GraphQL add-on cannot generate them. That schema is derived by
+#     `scripts/security-dast.sh active-schema`, which keeps the Mutation root but strips those
+#     fields, so ZAP cannot revoke its own token, delete a `scan-*` account, or turn
+#     `grantProjectViewToAll` back on mid-run;
+#   * logout and the management port — excluded by path below, so neither the spider nor the active
+#     scanner attacks them.
+#
+# The cross-role authorization checks — scan-readonly must not write, scan-project must not reach
+# another project — are NOT done here: ZAP has no Access Control Testing job in the Automation
+# Framework, so `scripts/security-dast.sh access-control` runs a curated, deterministic set of
+# authorization probes instead, before this plan, while the seeded data is still intact.
+#
+# Bounded: each pass is spider (3 min) + activeScan (40 min) + passive wait (5 min) ≈ 45 min, well
+# under the realm's one-hour access token, so a pass never outlives its token; three passes ≈ 135
+# min, under the job's 240-minute cap. A fresh token is minted right before each pass.
+
+env:
+  contexts:
+    - name: yontrack-active
+      urls:
+        - "${DAST_TARGET}/graphql"
+        - "${DAST_TARGET}/rest"
+      # \Q…\E quotes the target literally: a bare interpolation would leave the dots of the host as
+      # regex wildcards.
+      includePaths:
+        - "\\Q${DAST_TARGET}\\E/graphql.*"
+        - "\\Q${DAST_TARGET}\\E/rest.*"
+      # Never attacked, whatever role runs: logout, the OIDC/auth callbacks, and the Spring Boot
+      # management port and paths (an actuator is an incident the workflow already checks for, not a
+      # surface to fuzz). Token-revocation and scan-account mutations are excluded a different way —
+      # they are not in the schema this plan is given (active-schema).
+      excludePaths:
+        - ".*/logout.*"
+        - ".*/api/auth/.*"
+        - ".*/oauth2/.*"
+        - ".*:8800/.*"
+        - ".*/manage/.*"
+        - ".*/actuator/.*"
+  parameters:
+    # A scanner error is a failed run reporting no stamp, not a clean scan.
+    failOnError: true
+    failOnWarning: false
+    progressToStdout: true
+
+jobs:
+
+  # There is deliberately no `addOns` job: the pinned image carries the add-ons the plan uses, and
+  # a run-time install would not be pinned — see security/dast/zap/passive.yaml.
+
+  - type: passiveScan-config
+    parameters:
+      maxAlertsPerRule: 10
+      scanOnlyInScope: true
+      enableTags: false
+
+  # -------------------------------------------------------------------------------------------
+  # Authentication, on the API only.
+  #
+  # `Authorization: Bearer`, the header an OIDC access token is read from. The `url` regex keeps the
+  # token off every request that is not the API. Rendered per role by `render-plan`.
+  # -------------------------------------------------------------------------------------------
+  - type: replacer
+    rules:
+      - description: "Scanner role's bearer token, on the API only"
+        url: ".*/(graphql|rest).*"
+        matchType: req_header
+        matchString: "Authorization"
+        replacementString: "Bearer ${DAST_BEARER_TOKEN}"
+        tokenProcessing: false
+
+      - description: "Origin, so that the CORS response headers are emitted at all"
+        url: ".*/(graphql|rest).*"
+        matchType: req_header
+        matchString: "Origin"
+        replacementString: "https://dast.invalid"
+        tokenProcessing: false
+
+  # -------------------------------------------------------------------------------------------
+  # The GraphQL surface, MUTATIONS INCLUDED.
+  #
+  # `schemaFile` is the ACTIVE schema — derived by `scripts/security-dast.sh active-schema` from
+  # ontrack-web-core/ontrack.graphql. It keeps the Mutation root, so the add-on generates one
+  # request per mutation field and the active scanner then attacks each — but the dangerous fields
+  # (token revocation, account/group/role/CasC/settings) are not in it, so they cannot be generated.
+  # -------------------------------------------------------------------------------------------
+  - type: graphql
+    parameters:
+      endpoint: "${DAST_TARGET}/graphql"
+      schemaFile: "/zap/wrk/graphql/active-only.graphql"
+      querySplitType: root_field
+      maxQueryDepth: 3
+      maxArgsDepth: 2
+      optionalArgsEnabled: true
+      argsType: both
+      lenientMaxQueryDepthEnabled: true
+      requestMethod: post_json
+
+  # The REST surface, crawled authenticated so that the active scanner has parameters to attack.
+  - type: spider
+    parameters:
+      context: yontrack-active
+      url: "${DAST_TARGET}/rest"
+      maxDuration: 3
+      maxChildren: 0
+      maxParseSizeBytes: 2621440
+
+  - type: passiveScan-wait
+    parameters:
+      maxDuration: 5
+
+  # -------------------------------------------------------------------------------------------
+  # The active scan: the attack payloads. Bounded so a pass never outlives its token.
+  # -------------------------------------------------------------------------------------------
+  - type: activeScan
+    parameters:
+      context: yontrack-active
+      maxRuleDurationInMins: 5
+      maxScanDurationInMins: 40
+      threadPerHost: 2
+    policyDefinition:
+      defaultStrength: medium
+      defaultThreshold: medium
+
+  - type: passiveScan-wait
+    parameters:
+      maxDuration: 5
+
+  # -------------------------------------------------------------------------------------------
+  # Every request ZAP sent, as a HAR. Never published: read on the runner by
+  # `scripts/security-dast.sh assert-authenticated` — no request to /graphql was answered 401, so
+  # the pass did not outlive its token. It carries the token in its request headers, the reason it
+  # never leaves the runner.
+  # -------------------------------------------------------------------------------------------
+  - type: export
+    parameters:
+      fileName: /zap/wrk/out/messages.har
+      type: har
+      source: history
+
+  # The report, read by scripts/security-dast.sh with the role of this pass. Never an artifact, no
+  # SARIF — see security/dast/zap/passive.yaml and the workflow header.
+  - type: report
+    parameters:
+      template: traditional-json
+      reportDir: /zap/wrk/out
+      reportFile: zap
+      reportTitle: "Yontrack active DAST"
+      reportDescription: "Active ZAP scan of a throwaway Yontrack stack, one scanner role"
+      displayReport: false
+    risks: [info, low, medium, high]
+    confidences: [falsepositive, low, medium, high, confirmed]
