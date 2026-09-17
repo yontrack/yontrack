@@ -12,6 +12,18 @@
     {
       "name": "ReadOnly",
       "path": "/ReadOnly"
+    },
+    {
+      "name": "dast-admin",
+      "path": "/dast-admin"
+    },
+    {
+      "name": "dast-readonly",
+      "path": "/dast-readonly"
+    },
+    {
+      "name": "dast-project",
+      "path": "/dast-project"
     }
   ],
   "users": [
@@ -50,6 +62,66 @@
       ],
       "groups": [
         "ReadOnly"
+      ]
+    },
+    {
+      "username": "scan-admin",
+      "enabled": true,
+      "email": "scan-admin@ontrack.local",
+      "firstName": "DAST",
+      "lastName": "Admin",
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "dast-scan-admin-not-a-secret"
+        }
+      ],
+      "realmRoles": [
+        "default-roles-ontrack"
+      ],
+      "groups": [
+        "dast-admin"
+      ]
+    },
+    {
+      "username": "scan-readonly",
+      "enabled": true,
+      "email": "scan-readonly@ontrack.local",
+      "firstName": "DAST",
+      "lastName": "ReadOnly",
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "dast-scan-readonly-not-a-secret"
+        }
+      ],
+      "realmRoles": [
+        "default-roles-ontrack"
+      ],
+      "groups": [
+        "dast-readonly"
+      ]
+    },
+    {
+      "username": "scan-project",
+      "enabled": true,
+      "email": "scan-project@ontrack.local",
+      "firstName": "DAST",
+      "lastName": "Project",
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "dast-scan-project-not-a-secret"
+        }
+      ],
+      "realmRoles": [
+        "default-roles-ontrack"
+      ],
+      "groups": [
+        "dast-project"
       ]
     }
   ],
