@@ -43,6 +43,21 @@ public interface StructureRepository {
     @NotNull
     List<Project> findProjectsByNamePattern(@NotNull String pattern);
 
+    /**
+     * Finds the projects matching a name pattern and carrying all the given labels, in one query.
+     *
+     * <p>Both criteria are combined with AND, and so are the labels between themselves: a project
+     * is returned only when it carries every one of them. Omitting a criterion (a blank pattern, an
+     * empty list of labels) drops it, so that no criterion at all returns the whole list.
+     *
+     * @param namePattern Part of the name to look for, case-insensitive, or <code>null</code>
+     * @param labels      Labels the project must all carry, as <code>category:name</code> display
+     *                    strings (just <code>name</code> for a label without a category)
+     * @return List of projects, ordered by name
+     */
+    @NotNull
+    List<Project> findProjects(@Nullable String namePattern, @NotNull List<String> labels);
+
     @NotNull
     Project getProject(ID projectId);
 

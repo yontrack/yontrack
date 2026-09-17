@@ -65,20 +65,23 @@ class StructureServiceImpl(
     }
 
     override val projectList: List<Project>
-        get() {
-            val list = structureRepository.projectList
-            return when {
-                securityService.isGlobalFunctionGranted(ProjectList::class.java) -> list
-                securityService.isLogged -> list.filter { p ->
-                    securityService.isProjectFunctionGranted(
-                        p.id(),
-                        ProjectView::class.java
-                    )
-                }
+        get() = visibleProjects(structureRepository.projectList)
 
-                else -> throw AccessDeniedException("Authentication is required.")
-            }
+    /**
+     * The projects of [list] the current user is allowed to see. Every listing of projects goes
+     * through it, filtered or not, so that a filter never changes what a user may see.
+     */
+    private fun visibleProjects(list: List<Project>): List<Project> = when {
+        securityService.isGlobalFunctionGranted(ProjectList::class.java) -> list
+        securityService.isLogged -> list.filter { p ->
+            securityService.isProjectFunctionGranted(
+                p.id(),
+                ProjectView::class.java
+            )
         }
+
+        else -> throw AccessDeniedException("Authentication is required.")
+    }
 
     override fun newProject(project: Project): Project {
         isEntityNew(project, "Project must be defined")
@@ -99,6 +102,9 @@ class StructureServiceImpl(
             securityService.isProjectFunctionGranted(it.id(), ProjectView::class.java)
         }
     }
+
+    override fun findProjects(namePattern: String?, labels: List<String>): List<Project> =
+        visibleProjects(structureRepository.findProjects(namePattern, labels))
 
     override fun getProject(projectId: ID): Project {
         securityService.checkProjectFunction(projectId.value, ProjectView::class.java)

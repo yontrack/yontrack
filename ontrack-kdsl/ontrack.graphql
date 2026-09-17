@@ -5815,6 +5815,11 @@ type Query {
   ): JobStatusPaginated
   "Gets the JSON schema definitions"
   jsonSchemaDefinitions: [JsonSchemaDefinition!]!
+  "Label using its ID, null when there is no such label"
+  label(
+    "ID of the label to look for"
+    id: Int!
+  ): Label
   "List of all labels"
   labels(
     "Category to look for"
@@ -5864,6 +5869,8 @@ type Query {
   notificationSettings: NotificationSettings
   "Paginated list of projects"
   paginatedProjects(
+    "Labels the projects must all carry, as `category:name` display strings (just `name` for a label without a category), like the `labels` argument of `projects`. Combined with `name` by AND, and so are the labels between themselves."
+    labels: [String!],
     "Fragment of the project name to filter on"
     name: String,
     "Offset for the page"

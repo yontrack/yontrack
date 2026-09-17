@@ -6,6 +6,7 @@ import PaddedContent from "@components/common/PaddedContent";
 import SimpleProjectList from "@components/projects/SimpleProjectList";
 import {Skeleton} from "antd";
 import {gqlDecorationFragment} from "@components/services/fragments";
+import {gqlLabelFragment} from "@components/labels/LabelGraphQLFragments";
 
 export default function ProjectListWidget({projectNames}) {
 
@@ -24,6 +25,9 @@ export default function ProjectListWidget({projectNames}) {
                         id
                         name
                         favourite
+                        labels {
+                            ...labelFragment
+                        }
                         decorations {
                             ...decorationContent
                         }
@@ -31,6 +35,7 @@ export default function ProjectListWidget({projectNames}) {
                 }
 
                 ${gqlDecorationFragment}
+                ${gqlLabelFragment}
             `,
             {name}
         )

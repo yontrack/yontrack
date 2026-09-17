@@ -14,6 +14,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.stereotype.Repository;
 
 import javax.sql.DataSource;
@@ -21,9 +22,11 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.LocalDateTime;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -91,6 +94,37 @@ public class StructureJdbcRepository extends AbstractJdbcRepository implements S
         return getNamedParameterJdbcTemplate().query(
                 "SELECT * FROM PROJECTS WHERE NAME ILIKE :pattern ORDER BY NAME",
                 params("pattern", "%" + pattern + "%"),
+                (rs, rowNum) -> toProject(rs)
+        );
+    }
+
+    @NotNull
+    @Override
+    public List<Project> findProjects(@Nullable String namePattern, @NotNull List<String> labels) {
+        StringBuilder sql = new StringBuilder("SELECT * FROM PROJECTS P WHERE 1 = 1");
+        MapSqlParameterSource params = noParams();
+        if (StringUtils.isNotBlank(namePattern)) {
+            sql.append(" AND P.NAME ILIKE :namePattern");
+            params.addValue("namePattern", "%" + namePattern + "%");
+        }
+        if (!labels.isEmpty()) {
+            // Counting the filtered labels the project carries and requiring them all is what
+            // combines the labels with AND, in the same query as the name filter.
+            sql.append(" AND (").append("""
+                    SELECT COUNT(DISTINCT COALESCE(L.CATEGORY || ':' || L.NAME, L.NAME))
+                    FROM PROJECT_LABEL PL
+                    INNER JOIN LABEL L ON L.ID = PL.LABEL_ID
+                    WHERE PL.PROJECT_ID = P.ID
+                    AND COALESCE(L.CATEGORY || ':' || L.NAME, L.NAME) IN (:labels)
+                    """).append(") = :labelCount");
+            Set<String> distinctLabels = new LinkedHashSet<>(labels);
+            params.addValue("labels", distinctLabels);
+            params.addValue("labelCount", distinctLabels.size());
+        }
+        sql.append(" ORDER BY P.NAME");
+        return getNamedParameterJdbcTemplate().query(
+                sql.toString(),
+                params,
                 (rs, rowNum) -> toProject(rs)
         );
     }

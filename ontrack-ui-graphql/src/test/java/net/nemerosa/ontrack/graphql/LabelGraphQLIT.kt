@@ -135,4 +135,45 @@ class LabelGraphQLIT : AbstractQLKTITSupport() {
         }
     }
 
+    @Test
+    fun `Getting a label using its ID`() {
+        val label = label()
+        val project = project { labels = listOf(label) }
+        run(
+            """
+                query Label(${'$'}id: Int!) {
+                    label(id: ${'$'}id) {
+                        category
+                        name
+                        projects {
+                            name
+                        }
+                    }
+                }
+            """,
+            mapOf("id" to label.id)
+        ).apply {
+            val node = path("label")
+            assertEquals(label.category, node["category"].asText())
+            assertEquals(label.name, node["name"].asText())
+            assertEquals(listOf(project.name), node["projects"].map { it["name"].asText() })
+        }
+    }
+
+    @Test
+    fun `Getting a label using an unknown ID returns null`() {
+        run(
+            """
+                query Label(${'$'}id: Int!) {
+                    label(id: ${'$'}id) {
+                        name
+                    }
+                }
+            """,
+            mapOf("id" to -1)
+        ).apply {
+            assertTrue(path("label").isNull)
+        }
+    }
+
 }

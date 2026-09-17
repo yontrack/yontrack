@@ -37,7 +37,6 @@ import {useRefresh} from "@components/common/RefreshUtils";
 import ProjectEditCommand from "@components/projects/ProjectEditCommand";
 import ProjectLabelsCommand from "@components/projects/ProjectLabelsCommand";
 import LabelChip from "@components/labels/LabelChip";
-import {gqlLabelFragment} from "@components/labels/LabelGraphQLFragments";
 
 export default function ProjectView({id}) {
 
@@ -52,9 +51,6 @@ export default function ProjectView({id}) {
             query GetProject($id: Int!) {
                 project(id: $id) {
                     ...ProjectContent
-                    labels {
-                        ...labelFragment
-                    }
                     properties {
                         ...propertiesFragment
                     }
@@ -109,7 +105,6 @@ export default function ProjectView({id}) {
             ${gqlUserMenuActionFragment}
             ${gqlProjectContentFragment}
             ${gqlBranchContentFragment}
-            ${gqlLabelFragment}
         `,
         {
             initialData: {},

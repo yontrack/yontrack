@@ -35,6 +35,22 @@ interface StructureService {
      */
     fun findProjectsByNamePattern(pattern: String): List<Project>
 
+    /**
+     * Finds the projects matching a name pattern and carrying all the given labels.
+     *
+     * Both criteria are combined with AND, and so are the labels between themselves. Omitting a
+     * criterion (a `null` or blank pattern, an empty list of labels) drops it, so that no criterion
+     * at all returns every project.
+     *
+     * Only the projects the current user is allowed to see are returned.
+     *
+     * @param namePattern Part of the name to look for, case-insensitive, or `null` for no filter
+     * @param labels Labels the project must all carry, as `category:name` display strings
+     *               (just `name` for a label without a category)
+     * @return List of projects, ordered by name
+     */
+    fun findProjects(namePattern: String?, labels: List<String>): List<Project>
+
     fun getProject(projectId: ID): Project
 
     fun saveProject(project: Project)
