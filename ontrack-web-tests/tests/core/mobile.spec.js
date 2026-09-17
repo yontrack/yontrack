@@ -13,6 +13,7 @@ const {
 } = require("../extensions/environments/workflows/slotWorkflowsFixtures");
 const {addSlotWorkflow} = require("@ontrack/extensions/environments/workflows");
 const {createPipeline} = require("../extensions/environments/pipelineFixtures");
+const {labelDisplay} = require("../support/labels");
 
 /**
  * The mobile UI.
@@ -24,6 +25,7 @@ const {createPipeline} = require("../extensions/environments/pipelineFixtures");
  * | Journey | Tests |
  * |---|---|
  * | Locate a project and a branch | "the home screen is the favourites…", "a user gets from the home screen to a build…" |
+ * | Narrow the project list to the projects of a team, a language, both | "the project list is filtered by label, and by label and name together" |
  * | See the latest builds, with their promotions and deployments | "a user gets from the home screen to a build…" (promotions), "a deployed build says where it is…" (deployments), "the build screen carries the promotions, deployments and validations" |
  * | Search for a build | "a build is found on a branch by name, by promotion, and by both" |
  * | Promote a build | "a build is promoted from a phone, required fields and all" |
@@ -131,6 +133,24 @@ const selectMobileTheme = async (page, label) => {
 }
 
 /**
+ * Adds one label to the project list's label filter, the way a thumb does it.
+ *
+ * The labels add up - a project has to carry all of them to be listed - so this
+ * is called once per label rather than given the whole selection.
+ */
+const filterByMobileLabel = async (page, label) => {
+    const filter = page.getByTestId('mobile-projects-labels-filter')
+    // The select's search box is read-only until the select has the focus
+    await filter.click()
+    const input = filter.locator('input')
+    await input.fill(labelDisplay(label))
+    // The first - and, the display string being unique, the only - matching option
+    await input.press('Enter')
+    // The dropdown stays open and would cover the list underneath it
+    await page.keyboard.press('Escape')
+}
+
+/**
  * Asserts this browser now carries the desktop opt-out, and that it dies with
  * the browser session.
  *
@@ -229,6 +249,48 @@ test.describe('the mobile UI on a phone', () => {
         // And unstarring from the home screen itself takes it away again.
         await page.getByTestId(`mobile-favourite-project-${project.id}`).click()
         await expect(page.getByTestId(`mobile-project-${project.id}`)).toHaveCount(0)
+    })
+
+    test('the project list is filtered by label, and by label and name together', async ({page, ontrack}) => {
+        // Two labels of two categories, which is what a phone user actually has:
+        // "the apps team's Kotlin projects" is two criteria, not one.
+        const team = await ontrack.labels().createLabel({category: generate("team-"), name: generate("lbl-")})
+        const language = await ontrack.labels().createLabel({category: generate("lang-"), name: generate("lbl-")})
+
+        const teamOnly = await ontrack.createProject()
+        await ontrack.labels().setProjectLabels(teamOnly.id, [team.id])
+        const both = await ontrack.createProject()
+        await ontrack.labels().setProjectLabels(both.id, [team.id, language.id])
+        const noLabel = await ontrack.createProject()
+
+        await signInOnPhone(page, ontrack)
+        await page.goto(`${ontrack.connection.ui}/mobile/projects`)
+
+        // One label: the projects carrying it, and no other.
+        await filterByMobileLabel(page, team)
+        await expect(page.getByTestId(`mobile-project-${teamOnly.id}`)).toBeVisible()
+        await expect(page.getByTestId(`mobile-project-${both.id}`)).toBeVisible()
+        await expect(page.getByTestId(`mobile-project-${noLabel.id}`)).toHaveCount(0)
+
+        // Two labels combine by AND, as everywhere else labels are filtered on.
+        await filterByMobileLabel(page, language)
+        await expect(page.getByTestId(`mobile-project-${both.id}`)).toBeVisible()
+        await expect(page.getByTestId(`mobile-project-${teamOnly.id}`)).toHaveCount(0)
+
+        // The list itself stays label-free: the filter is what labels are for on
+        // a phone, and a chip per row would cost the name the width it needs.
+        // Scoped to the list, because the filter itself draws the chips it picked.
+        await expect(
+            page.getByTestId('mobile-projects').getByTestId(`label-${labelDisplay(language)}`)
+        ).toHaveCount(0)
+
+        // And the name filter narrows the labelled list further rather than
+        // replacing it - `paginatedProjects` ANDs the two, which the empty state
+        // is the visible proof of.
+        await page.getByTestId('mobile-projects-filter').fill(teamOnly.name)
+        await expect(page.getByTestId('mobile-projects-empty')).toBeVisible()
+
+        await expectNoSidewaysScroll(page)
     })
 
     test('a favourite branch is on the home screen, under the project it belongs to', async ({page, ontrack}) => {

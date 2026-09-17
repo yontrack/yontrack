@@ -35,6 +35,7 @@ the second one is not the one you are looking at.
 |---|---|
 | Services, GraphQL fragments and mutations | **Every layout component** |
 | The promotion level field mapping (`promotionLevelFields`) | The promote dialog and the promote sheet around it |
+| `SelectLabel`, and the `LabelChip` it draws its options with — the project list's label filter is the same control on both UIs (#1806) | Every other label affordance: no chip on a mobile row, no assignment dialog, no label page |
 | Authorization helpers (`isAuthorized`, the `authorizations` field) | `MainLayout`, `MainPage`, `MainPageBar`, `NavBar`, `UserMenu` |
 | Theme tokens (`styles/globals.css`) and the pre-paint theme script | The mobile shell: `MobileLayout`, `MobileHeader`, `MobileBottomNav` |
 | A handful of display primitives — `ValidationChip`, `PromotionLevelImage`, `TimestampText`, `DurationMs`, `EntityIcon`, `CheckIcon`, `SlotPipelineStatusLabel`, `SlotWorkflowTrigger`, `WorkflowInstanceStatus`, `WorkflowInstanceNodeStatus`, and the `workflowNodeDepths` ordering function | The provider stack: `/mobile` is its own App Router root and assembles its own |
@@ -84,8 +85,14 @@ change reaches the mobile UI; the right column is where it cannot.
 - **A change to a shared display primitive.** `ValidationChip`, `PromotionLevelImage`,
   `TimestampText`, `EntityIcon` and — since #1737 — `WorkflowInstanceStatus`,
   `WorkflowInstanceNodeStatus` and `SlotWorkflowTrigger` all render inside `/mobile` at phone
-  width. A primitive that grew a desktop-sized affordance, or that started reaching for a
+  width — and, since #1806, `LabelChip`, as the options of the project list's label filter.
+  A primitive that grew a desktop-sized affordance, or that started reaching for a
   provider the mobile stack does not have, breaks a mobile screen and not a desktop one.
+
+  `LabelChip` is also the one of them that carries a **desktop link**: it wraps itself in a
+  link to `/project-labels/[id]` unless given `link={false}`, which `SelectLabel` does. A chip
+  shown on a mobile screen with the link left on would take a phone out of `/mobile` — and,
+  once the app is installed as a PWA scoped to that prefix, out of the app.
 
   That last one has already happened once: `useEventForRefresh` read a context with an empty
   default, and the mobile provider stack has no `EventsContextProvider` — so every promotion
@@ -118,7 +125,7 @@ and it is also what makes the check cheap — this is the whole list.
 | Screen | Reads |
 |---|---|
 | Home | `projects(favourites: true)`, `branches(favourite: true)` |
-| Projects | `projects(pattern:)` |
+| Projects | `paginatedProjects(offset:, size:, name:, labels:)` — `pageItems` and `pageInfo.totalSize`, the latter being the *filtered* total |
 | Project | `project(id:)`, `Project.branches(name:, count:, order:)` |
 | Branch | `branch(id:)`, `Branch.builds(filter: StandardBuildFilter, size:)` with `withDisplayName` and `withPromotionLevel`, `Branch.promotionLevels` |
 | Build | `build(id:)` — `displayName`, `description`, `creation`, `branch`, `authorizations`, `promotionRuns(lastPerLevel: true)` with `workflowInstances`, `validations(size:)` with its runs' `lastStatus` |

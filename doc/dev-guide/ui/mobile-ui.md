@@ -31,6 +31,7 @@ rather than everything badly, and it says so when a user arrives somewhere it do
 |---|---|
 | Services, GraphQL fragments and mutations | Every layout component |
 | The promotion level field mapping (`promotionLevelFields`) | The promote dialog and the promote sheet around it |
+| `SelectLabel` and the `LabelChip` it draws its options with (#1806) — a control, not a layout, and the one place the `category:name` display strings are produced | Every other label affordance: no chip on a mobile row, no assignment, no label page |
 | The admission rule components themselves (`.../environments-slot-admission-rule/*`) | The rule-id lookup: `Dynamic` resolves into the wrong webpack layer under `/mobile` |
 | Authorization helpers | `MainLayout`, `MainPage`, `MainPageBar`, `NavBar`, `UserMenu` |
 | Theme tokens (`styles/globals.css`) and the pre-paint theme script | The mobile shell: `MobileLayout`, `MobileHeader`, `MobileBottomNav` |
@@ -1087,9 +1088,24 @@ lives once, in `useMobileFilter`.
 
 What each screen sends differs, and the difference matters:
 
-- `projects(pattern:)` is an `ILIKE '%…%'` ordered by name. The server refuses `pattern`
-  alongside any *other* argument, and it tells "no pattern" from "empty pattern" by whether
-  the argument was supplied at all — so the screen sends `null`, never `''`.
+- `paginatedProjects(name:)` is an `ILIKE '%…%'` ordered by name, and it tells "no name" from
+  "empty name" by whether the argument was supplied at all — so the screen sends `null`, never
+  `''`. It replaced `projects(pattern:)` in #1806: `pattern` is refused alongside any *other*
+  argument, which made a second criterion impossible.
+- The project list's **second** criterion is its labels, and it is picked rather than typed:
+  `SelectLabel` (shared with the desktop project list filter) hands
+  `paginatedProjects(labels:)` the exact `category:name` display strings it filters on. A
+  token typed into the name box would have been both undiscoverable — nobody remembers a
+  label's exact string, and a phone has no admin page to look it up on — and ambiguous, a
+  project name being allowed a colon. The server ANDs the name and the labels, and the labels
+  between themselves.
+
+  `paginatedProjects` is paginated where `projects` was not, and the screen deliberately does
+  not page: a phone list is scrolled, not paged, and a "next page" control on a list that two
+  filters already narrow would be a third way to move through it. So one page of
+  `MOBILE_PROJECT_PAGE_SIZE`, well past what any instance holds, and — when even that was not
+  enough — the same note the branch list shows, pointing at the same answer: filter. The
+  total it quotes is `pageInfo.totalSize`, which is the *filtered* total.
 - `Project.branches(name:)` is **a regular expression**, matched with Postgres' `~`. Handing
   it the typed text raw would be wrong twice over: `release/1.0` would match `release/1x0`,
   and a lone `(` would not narrow the list but fail the whole query with an

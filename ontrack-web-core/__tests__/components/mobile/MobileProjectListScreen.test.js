@@ -1,29 +1,57 @@
 import "@testing-library/jest-dom"
-import {act, fireEvent, render, screen} from "@testing-library/react"
+import {act, fireEvent, render, screen, waitFor} from "@testing-library/react"
 
 let queryResult = {data: null, loading: false, error: null, finished: true}
-/** The options the screen handed `useQuery` on its last render. */
+/** The options the screen handed `useQuery` for the *list* query on its last render. */
 let queryOptions
+/** What the label filter's own query answers with. */
+let labelsResult = []
 
 jest.mock("../../../components/services/GraphQL", () => ({
+    /*
+     * Two queries run on this screen: the list itself, and the labels the label
+     * filter offers to pick from. They are told apart by their text, so that the
+     * tests below drive the list without the filter's query standing in for it.
+     *
+     * `dataFn` is applied rather than bypassed: it is part of what the screen
+     * asks for, and a test feeding it the already-unwrapped answer would not
+     * notice the screen reading the wrong field of it.
+     */
     useQuery: (query, options) => {
-        queryOptions = options
-        return queryResult
+        if (query.includes('paginatedProjects')) {
+            queryOptions = options
+            const {data, ...rest} = queryResult
+            return {...rest, data: data ? options.dataFn(data) : data}
+        }
+        return {data: labelsResult, loading: false, error: null, finished: true}
     },
     callGraphQL: jest.fn(),
 }))
 
 import MobileProjectListScreen from "@/app/mobile/projects/ProjectListScreen"
+import {MOBILE_PROJECT_PAGE_SIZE} from "@/app/mobile/projects/ProjectListScreen"
 
 const setResult = (result) => {
     queryResult = {data: null, loading: false, error: null, finished: true, ...result}
 }
 
-const projects = (...list) => setResult({data: {projects: list}})
+/**
+ * The answer to the list query, in the shape the server sends it - the page and
+ * the *filtered* total beside it.
+ */
+const page = (list, totalSize = list.length) => setResult({
+    data: {paginatedProjects: {pageInfo: {totalSize}, pageItems: list}},
+})
+
+const projects = (...list) => page(list)
 
 const project = (id, name, favourite = false, disabled = false) => ({id, name, favourite, disabled})
 
-/** Types into the filter, then lets the debounce fire. */
+const label = (id, category, name) => ({
+    id, category, name, description: null, color: '#FF0000', foregroundColor: '#000000',
+})
+
+/** Types into the name filter, then lets the debounce fire. */
 const filterBy = async (text) => {
     fireEvent.change(screen.getByTestId('mobile-projects-filter'), {target: {value: text}})
     await act(async () => {
@@ -31,8 +59,27 @@ const filterBy = async (text) => {
     })
 }
 
+/**
+ * Picks a label in the label filter, the way a thumb does it.
+ *
+ * The options carry a chip rather than a string, so they are found by the chip's
+ * own test id rather than by title. Real timers: the dropdown's own animation
+ * would otherwise never run, and only the name filter needs the fake ones.
+ */
+const pickLabel = async (display) => {
+    jest.useRealTimers()
+    fireEvent.mouseDown(
+        screen.getByTestId('mobile-projects-labels-filter').querySelector('.ant-select-selector')
+    )
+    const options = await screen.findAllByTestId(`label-${display}`)
+    fireEvent.click(options[options.length - 1])
+    await waitFor(() => expect(queryOptions.variables.labels).toContain(display))
+    jest.useFakeTimers()
+}
+
 beforeEach(() => {
     queryOptions = undefined
+    labelsResult = []
     jest.useFakeTimers()
 })
 
@@ -74,6 +121,41 @@ describe('the mobile project list', () => {
         expect(screen.getByTestId('mobile-project-3')).toHaveTextContent('Disabled')
     })
 
+    it('shows no label on the rows themselves', () => {
+        // The filter is what labels are for on a phone: a chip per row would
+        // cost the project name the width it needs at 375px.
+        labelsResult = [label(10, 'team', 'platform')]
+        projects(project(1, 'petclinic'))
+        render(<MobileProjectListScreen/>)
+        expect(screen.getByTestId('mobile-projects').querySelector('[data-testid^="label-"]')).toBeNull()
+    })
+
+    describe('paging', () => {
+
+        it('asks for one page, large enough to hold what an instance holds', () => {
+            // `paginatedProjects` is paginated where `projects(pattern:)` was
+            // not, and a phone list is scrolled rather than paged - so the whole
+            // list comes in one answer.
+            projects(project(1, 'petclinic'))
+            render(<MobileProjectListScreen/>)
+            expect(queryOptions.variables.size).toEqual(MOBILE_PROJECT_PAGE_SIZE)
+        })
+
+        it('says so when the page did not hold everything', () => {
+            // Silently dropping projects off the end is the failure this guards:
+            // the total is the filtered one, so it says exactly what was missed.
+            page([project(1, 'petclinic')], 300)
+            render(<MobileProjectListScreen/>)
+            expect(screen.getByTestId('mobile-projects-truncated')).toHaveTextContent('1 of 300')
+        })
+
+        it('says nothing when the page held everything', () => {
+            projects(project(1, 'petclinic'))
+            render(<MobileProjectListScreen/>)
+            expect(screen.queryByTestId('mobile-projects-truncated')).not.toBeInTheDocument()
+        })
+    })
+
     describe('filtering by name', () => {
 
         it('asks the server for the whole list until something is typed', () => {
@@ -82,7 +164,7 @@ describe('the mobile project list', () => {
             // or the screen would open on nothing.
             projects(project(1, 'petclinic'))
             render(<MobileProjectListScreen/>)
-            expect(queryOptions.variables.pattern).toBeNull()
+            expect(queryOptions.variables.name).toBeNull()
         })
 
         it('filters on the server, not in the browser', () => {
@@ -92,7 +174,7 @@ describe('the mobile project list', () => {
             projects(project(1, 'petclinic'))
             render(<MobileProjectListScreen/>)
             return filterBy('pet').then(() => {
-                expect(queryOptions.variables.pattern).toEqual('pet')
+                expect(queryOptions.variables.name).toEqual('pet')
             })
         })
 
@@ -102,25 +184,25 @@ describe('the mobile project list', () => {
             fireEvent.change(screen.getByTestId('mobile-projects-filter'), {target: {value: 'p'}})
             // One request per keystroke on a list this size is what the debounce
             // is there to prevent.
-            expect(queryOptions.variables.pattern).toBeNull()
+            expect(queryOptions.variables.name).toBeNull()
         })
 
         it('treats a whitespace-only filter as no filter', async () => {
-            // The server tests the pattern with `isNullOrBlank` and answers a
-            // blank one with the whole list, so a screen calling itself filtered
-            // would head every project on the instance with "Matching projects".
+            // The server answers a blank name with the whole list, so a screen
+            // calling itself filtered would head every project on the instance
+            // with "Matching projects".
             projects(project(1, 'petclinic'))
             render(<MobileProjectListScreen/>)
             await filterBy('   ')
-            expect(queryOptions.variables.pattern).toBeNull()
+            expect(queryOptions.variables.name).toBeNull()
             expect(screen.getByTestId('mobile-projects')).toHaveTextContent('All projects')
         })
 
-        it('sends the pattern without the spaces around it', async () => {
+        it('sends the name without the spaces around it', async () => {
             projects(project(1, 'petclinic'))
             render(<MobileProjectListScreen/>)
             await filterBy('  pet  ')
-            expect(queryOptions.variables.pattern).toEqual('pet')
+            expect(queryOptions.variables.name).toEqual('pet')
         })
 
         it('goes back to the whole list when the filter is cleared', async () => {
@@ -128,7 +210,7 @@ describe('the mobile project list', () => {
             render(<MobileProjectListScreen/>)
             await filterBy('pet')
             await filterBy('')
-            expect(queryOptions.variables.pattern).toBeNull()
+            expect(queryOptions.variables.name).toBeNull()
         })
 
         it('says a filter matched nothing, rather than showing the empty instance message', async () => {
@@ -140,8 +222,50 @@ describe('the mobile project list', () => {
         })
     })
 
+    describe('filtering by label', () => {
+
+        it('asks for no label filter until one is picked', () => {
+            projects(project(1, 'petclinic'))
+            render(<MobileProjectListScreen/>)
+            expect(queryOptions.variables.labels).toEqual([])
+        })
+
+        it('sends the labels as the display strings the server filters on', async () => {
+            // `category:name`, the same strings `paginatedProjects(labels:)` and
+            // the desktop project list filter use.
+            labelsResult = [label(10, 'team', 'platform'), label(11, null, 'legacy')]
+            projects(project(1, 'petclinic'))
+            render(<MobileProjectListScreen/>)
+            await pickLabel('team:platform')
+            expect(queryOptions.variables.labels).toEqual(['team:platform'])
+        })
+
+        it('counts as filtering, so the list does not call itself the whole one', async () => {
+            labelsResult = [label(10, 'team', 'platform')]
+            projects(project(1, 'petclinic'))
+            render(<MobileProjectListScreen/>)
+            await pickLabel('team:platform')
+            expect(screen.getByTestId('mobile-projects')).toHaveTextContent('Matching projects')
+        })
+
+        it('says which labels matched nothing, rather than showing the empty instance message', async () => {
+            labelsResult = [label(10, 'team', 'platform')]
+            projects(project(1, 'petclinic'))
+            render(<MobileProjectListScreen/>)
+            projects()
+            await pickLabel('team:platform')
+            await waitFor(() =>
+                expect(screen.getByTestId('mobile-projects-empty')).toHaveTextContent('team:platform')
+            )
+        })
+    })
+
     it('keeps the list on screen while a filter or a toggle refetches it', () => {
-        setResult({data: {projects: [project(1, 'petclinic')]}, loading: true, finished: true})
+        setResult({
+            data: {paginatedProjects: {pageInfo: {totalSize: 1}, pageItems: [project(1, 'petclinic')]}},
+            loading: true,
+            finished: true,
+        })
         render(<MobileProjectListScreen/>)
         expect(screen.getByTestId('mobile-project-1')).toBeInTheDocument()
     })
