@@ -24,7 +24,7 @@ import PromotionLevelStabilityChart from "@components/promotionLevels/PromotionL
 import PromotionLevelHistory from "@components/promotionLevels/PromotionLevelHistory";
 import UserMenuActions from "@components/entities/UserMenuActions";
 import PromotionLevelViewTitle from "@components/promotionLevels/PromotionLevelViewTitle";
-import PromotionLevelViewDrawer from "@components/promotionLevels/PromotionLevelViewDrawer";
+import InfoViewDrawer from "@components/common/InfoViewDrawer";
 import {CloseCommand} from "@components/common/Commands";
 import {branchPromotionLevelsUri} from "@components/common/Links";
 import PromotionLevelAutoVersioningTargets from "@components/promotionLevels/PromotionLevelAutoVersioningTargets";
@@ -49,6 +49,13 @@ export default function PromotionLevelView({id}) {
     useEffect(() => {
         if (promotionLevel) {
             const commands = [
+                <InfoViewDrawer
+                    key="details"
+                    id="promotion-level-info"
+                    entityType="PROMOTION_LEVEL"
+                    entityName="promotion level"
+                    entity={promotionLevel}
+                />,
                 <UserMenuActions key="userMenuActions" actions={promotionLevel.userMenuActions}/>
             ]
             if (isAuthorized(promotionLevel, 'promotion_level', 'edit')) {
@@ -190,10 +197,6 @@ export default function PromotionLevelView({id}) {
                             rowHeight={30}
                             isDraggable={true}
                         />
-                        {
-                            promotionLevel &&
-                            <PromotionLevelViewDrawer promotionLevel={promotionLevel} loading={loadingPromotionLevel}/>
-                        }
                     </Skeleton>
                 </MainPage>
             </StoredGridLayoutContextProvider>

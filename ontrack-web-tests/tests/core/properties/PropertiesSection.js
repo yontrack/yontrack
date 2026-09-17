@@ -2,7 +2,7 @@ import {expect} from "@playwright/test";
 import {PropertyDialog} from "./PropertyDialog";
 
 /**
- * The "Properties" section displayed in the information drawer of an entity.
+ * The "Properties" section displayed in the details drawer of an entity.
  */
 export class PropertiesSection {
 
@@ -16,6 +16,17 @@ export class PropertiesSection {
      */
     property(shortTypeName) {
         return this.page.getByTestId(`property-${shortTypeName}`)
+    }
+
+    /**
+     * Deletes the given property, confirming the deletion.
+     */
+    async deleteProperty(shortTypeName) {
+        const property = this.property(shortTypeName)
+        await expect(property).toBeVisible()
+        await property.getByRole('button', {name: 'Deletes this property'}).click()
+        await this.page.getByRole('button', {name: 'OK'}).click()
+        await expect(property).toBeHidden()
     }
 
     /**

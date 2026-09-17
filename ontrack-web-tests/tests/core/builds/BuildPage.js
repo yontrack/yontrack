@@ -2,6 +2,7 @@ import {BuildLinksPage} from "./buildLinks";
 import {PromotionInfoSection} from "./PromotionInfoSection";
 import {confirmBox} from "../../support/confirm";
 import {BuildLinksSection} from "./BuildLinksSection";
+import {PropertiesSection} from "../properties/PropertiesSection";
 
 const {expect} = require("@playwright/test");
 
@@ -55,6 +56,31 @@ export class BuildPage {
     async goToLinks() {
         await this.page.getByRole("button", {name: "Links"}).click()
         return new BuildLinksPage(this.page)
+    }
+
+    /**
+     * The "Details" command of the header, opening the properties & information drawer.
+     */
+    detailsCommand() {
+        return this.page.getByTestId('build-info')
+    }
+
+    /**
+     * The dot on the "Details" command, telling that the build carries properties or information.
+     */
+    detailsDot() {
+        return this.page.getByTestId('build-info-dot')
+    }
+
+    /**
+     * Opens the details drawer and returns its properties section.
+     */
+    async openDetails() {
+        const button = this.detailsCommand()
+        await expect(button).toBeVisible()
+        await button.click()
+        await expect(this.page.getByText('Build details')).toBeVisible()
+        return new PropertiesSection(this.page)
     }
 
     async getPromotionInfoSection() {

@@ -25,7 +25,7 @@ import ValidationStampLeadTimeChart from "@components/validationStamps/Validatio
 import ValidationStampFrequencyChart from "@components/validationStamps/ValidationStampFrequencyChart";
 import ValidationStampStabilityChart from "@components/validationStamps/ValidationStampStabilityChart";
 import ValidationStampMetricsChart from "@components/validationStamps/ValidationStampMetricsChart";
-import ValidationStampViewDrawer from "@components/validationStamps/ValidationStampViewDrawer";
+import InfoViewDrawer from "@components/common/InfoViewDrawer";
 import UserMenuActions from "@components/entities/UserMenuActions";
 import ValidationStampViewTitle from "@components/validationStamps/ValidationStampViewTitle";
 import {useRefresh} from "@components/common/RefreshUtils";
@@ -57,6 +57,13 @@ export default function ValidationStampView({id}) {
     useEffect(() => {
         if (validationStamp) {
             const commands = [
+                <InfoViewDrawer
+                    key="details"
+                    id="validation-stamp-info"
+                    entityType="VALIDATION_STAMP"
+                    entityName="validation stamp"
+                    entity={validationStamp}
+                />,
                 <UserMenuActions key="userMenuActions" actions={validationStamp.userMenuActions}/>
             ]
             if (isAuthorized(validationStamp, 'validation_stamp', 'edit')) {
@@ -211,10 +218,6 @@ export default function ValidationStampView({id}) {
                             rowHeight={30}
                             isDraggable={true}
                         />
-                        {
-                            validationStamp &&
-                            <ValidationStampViewDrawer validationStamp={validationStamp} loading={loading}/>
-                        }
                     </Skeleton>
                 </MainPage>
             </StoredGridLayoutContextProvider>

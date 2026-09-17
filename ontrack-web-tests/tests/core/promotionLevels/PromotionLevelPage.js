@@ -20,11 +20,11 @@ export class PromotionLevelPage extends AbstractImagePage {
     }
 
     /**
-     * Opens the information drawer and returns its properties section.
+     * Opens the details drawer through the "Details" header command and returns its properties section.
      */
     async openProperties() {
         const button = this.page.getByTestId('promotion-level-info')
-        await expect(button).toBeVisible()
+        await expect(button).toHaveText('Details')
         await button.click()
         return new PropertiesSection(this.page)
     }

@@ -19,7 +19,7 @@ import {branchLinksUri, branchPromotionLevelsUri, branchValidationStampsUri, pro
 import UserMenuActions from "@components/entities/UserMenuActions";
 import JumpToBranch from "@components/branches/JumpToBranch";
 import LoadingContainer from "@components/common/LoadingContainer";
-import BranchInfoViewDrawer from "@components/branches/BranchInfoViewDrawer";
+import InfoViewDrawer from "@components/common/InfoViewDrawer";
 import BranchContent from "@components/branches/BranchContent";
 import {useEventForRefresh} from "@components/common/EventsContext";
 import BranchContentViewSelector from "@components/branches/BranchContentViewSelector";
@@ -74,6 +74,13 @@ export default function BranchView({id}) {
         if (branch && !loading) {
             const commands = []
             commands.push(
+                <InfoViewDrawer
+                    key="details"
+                    id="branch-info"
+                    entityType="BRANCH"
+                    entityName="branch"
+                    entity={branch}
+                />,
                 <NewBuildCommand
                     key="build-create"
                     branch={branch}
@@ -148,10 +155,7 @@ export default function BranchView({id}) {
             >
                 <LoadingContainer loading={loading} tip="Loading branch">
                     {
-                        branch && <>
-                            <BranchInfoViewDrawer branch={branch} loadingBranch={loading}/>
-                            <BranchContent branch={branch} viewKey={selectedViewKey}/>
-                        </>
+                        branch && <BranchContent branch={branch} viewKey={selectedViewKey}/>
                     }
                 </LoadingContainer>
             </MainPage>

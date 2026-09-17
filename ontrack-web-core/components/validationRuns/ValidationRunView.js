@@ -24,7 +24,8 @@ import ValidationDataType from "@components/framework/validation-data-type/Valid
 import {isAuthorized} from "@components/common/authorizations";
 import ValidationRunStatusChange from "@components/validationRuns/ValidationRunStatusChange";
 import {useRefresh} from "@components/common/RefreshUtils";
-import ValidationRunViewDrawer from "@components/validationRuns/ValidationRunViewDrawer";
+import InfoViewDrawer from "@components/common/InfoViewDrawer";
+import {gqlInformationFragment, gqlPropertiesFragment} from "@components/services/fragments";
 
 export default function ValidationRunView({id}) {
 
@@ -44,6 +45,12 @@ export default function ValidationRunView({id}) {
                     query GetValidationRun($id: Int!) {
                         validationRuns(id: $id) {
                             ...ValidationRunContent
+                            properties {
+                                ...propertiesFragment
+                            }
+                            information {
+                                ...informationFragment
+                            }
                             validationStamp {
                                 id
                                 name
@@ -81,12 +88,21 @@ export default function ValidationRunView({id}) {
                         }
                     }
                     ${gqlValidationRunContent}
+                    ${gqlPropertiesFragment}
+                    ${gqlInformationFragment}
                 `,
                 {id}
             ).then(data => {
                 const run = data.validationRuns[0]
                 setRun(run)
                 setCommands([
+                    <InfoViewDrawer
+                        key="details"
+                        id="validation-run-info"
+                        entityType="VALIDATION_RUN"
+                        entityName="validation run"
+                        entity={run}
+                    />,
                     <StoredGridLayoutResetCommand key="reset"/>,
                     <CloseCommand key="close" href={buildUri(run.build)}/>,
                 ])
@@ -202,7 +218,6 @@ export default function ValidationRunView({id}) {
                                 rowHeight={30}
                                 isDraggable={true}
                             />
-                            <ValidationRunViewDrawer run={run}/>
                         </Space>
                     </LoadingContainer>
                 </MainPage>

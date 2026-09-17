@@ -20,7 +20,7 @@ import BranchBox from "@components/branches/BranchBox";
 import JumpToBranch from "@components/branches/JumpToBranch";
 import ProjectFavourite from "@components/projects/ProjectFavourite";
 import {useEventForRefresh} from "@components/common/EventsContext";
-import ProjectInfoViewDrawer from "@components/projects/ProjectInfoViewDrawer";
+import InfoViewDrawer from "@components/common/InfoViewDrawer";
 import UserMenuActions from "@components/entities/UserMenuActions";
 import {gqlProjectContentFragment} from "@components/projects/ProjectGraphQLFragments";
 import {isAuthorized} from "@components/common/authorizations";
@@ -122,7 +122,15 @@ export default function ProjectView({id}) {
             setBranches(project.branches)
 
             // Commands
-            const commands = []
+            const commands = [
+                <InfoViewDrawer
+                    key="details"
+                    id="project-info"
+                    entityType="PROJECT"
+                    entityName="project"
+                    entity={project}
+                />
+            ]
             // Commands depending on the project authorizations & state
             commands.push(
                 <NewBranchCommand
@@ -225,7 +233,6 @@ export default function ProjectView({id}) {
                             </Space>
                         }
                     </PageSection>
-                    <ProjectInfoViewDrawer project={project} loadingProject={loading}/>
                 </Space>
             </MainPage>
         </>

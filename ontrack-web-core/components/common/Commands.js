@@ -3,9 +3,10 @@ import {Button, Space, Typography} from "antd";
 import Link from "next/link";
 import {homeUri} from "@components/common/Links";
 
-export function Command({icon, text, href, target, action, title, disabled = false}) {
+export function Command({icon, text, href, target, action, title, disabled = false, testId}) {
     return <Button
         type="text"
+        data-testid={testId}
         onClick={action}
         title={title}
         disabled={disabled}

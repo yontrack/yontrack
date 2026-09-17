@@ -11,7 +11,7 @@ import PropertyTitle from "@components/framework/properties/PropertyTitle";
 import {callDynamicFunction} from "@components/common/DynamicFunction";
 import {getExtensionShortName} from "@components/common/ExtensionUtils";
 
-export default function PropertiesSection({entityType, entityId}) {
+export default function PropertiesSection({entityType, entityId, onPropertiesLoaded}) {
 
     const client = useGraphQLClient()
     const [propertyList, setPropertyList] = useState([])
@@ -69,6 +69,9 @@ export default function PropertiesSection({entityType, entityId}) {
             )
 
             setPropertyList(transformedProperties)
+            if (onPropertiesLoaded) {
+                onPropertiesLoaded(transformedProperties)
+            }
         }
 
         if (client) {
@@ -76,6 +79,8 @@ export default function PropertiesSection({entityType, entityId}) {
             fetchPropertyList()
         }
     }, [client, entityType, entityId, refreshCount])
+
+    const canAdd = propertyList.some(it => it.editable)
 
     return (
         <ListSection
@@ -86,6 +91,7 @@ export default function PropertiesSection({entityType, entityId}) {
                     <PropertyAddButton entityType={entityType} entityId={entityId} propertyList={propertyList}/>
                 </>
             }
+            emptyText={canAdd ? "No properties set yet. Use + to add one." : undefined}
             items={
                 propertyList
                     .filter(it => it.value)

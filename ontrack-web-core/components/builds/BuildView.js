@@ -16,7 +16,7 @@ import {
 import BuildContent from "@components/builds/BuildContent";
 import {Space} from "antd";
 import Decorations from "@components/framework/decorations/Decorations";
-import BuildInfoViewDrawer from "@components/builds/BuildInfoViewDrawer";
+import InfoViewDrawer from "@components/common/InfoViewDrawer";
 import {useGraphQLClient} from "@components/providers/ConnectionContextProvider";
 import StoredGridLayoutResetCommand from "@components/grid/StoredGridLayoutResetCommand";
 import StoredGridLayoutContextProvider from "@components/grid/StoredGridLayoutContext";
@@ -106,6 +106,13 @@ export default function BuildView({id}) {
                 setBuild(data.build)
                 setLoadingBuild(false)
                 const commands = [
+                    <InfoViewDrawer
+                        key="details"
+                        id="build-info"
+                        entityType="BUILD"
+                        entityName="build"
+                        entity={data.build}
+                    />,
                     <PreviousBuildCommand
                         key={`previous-${data.build.id}`}
                         previousBuild={data.build.previousBuild}
@@ -166,7 +173,6 @@ export default function BuildView({id}) {
                 >
                     <LoadingContainer loading={loadingBuild} tip="Loading build">
                         <BuildContent build={build}/>
-                        <BuildInfoViewDrawer build={build} loading={loadingBuild}/>
                     </LoadingContainer>
                 </MainPage>
             </StoredGridLayoutContextProvider>
