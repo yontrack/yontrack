@@ -251,18 +251,37 @@ jobs:
         run: |
           set -euo pipefail
           docker compose -f security/dast/compose/docker-compose-dast.yml up -d
-          # Wait for the backend to answer its health probe (the management port is internal to the
-          # container; the health endpoint on the API port is enough to know it is up).
-          echo "Waiting for the backend to become healthy..."
+
+          # 1. Keycloak: the realm must be IMPORTED, not just the container started. The password
+          #    grant that mints the seed token fails until the realm's OpenID configuration answers.
+          echo "Waiting for the Keycloak realm to be imported..."
           for i in $(seq 1 60); do
+            code="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 10 \
+              "$DAST_KEYCLOAK_REALM_URL/.well-known/openid-configuration" 2>/dev/null || echo 000)"
+            if [ "$code" = "200" ]; then
+              echo "Keycloak realm ready after $((i*10))s."
+              break
+            fi
+            if [ "$i" = "60" ]; then
+              echo "Keycloak realm did not come up in 600s." >&2
+              docker compose -f security/dast/compose/docker-compose-dast.yml logs --tail 100 keycloak \
+                | scripts/security-dast.sh scrub || true
+              exit 1
+            fi
+            sleep 10
+          done
+
+          # 2. Backend: authenticated on the API port, so any path answers 401 once the app is up
+          #    (the management health endpoint is on the unpublished port). 401/403/200 all mean up.
+          echo "Waiting for the backend to become healthy..."
+          for i in $(seq 1 90); do
             code="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 10 "$DAST_TARGET/rest/info" 2>/dev/null || echo 000)"
-            # /rest/info answers 200 unauthenticated on the API port once the app is up.
             if [ "$code" = "200" ] || [ "$code" = "401" ] || [ "$code" = "403" ]; then
               echo "Backend answering ($code) after $((i*10))s."
               break
             fi
-            if [ "$i" = "60" ]; then
-              echo "Backend did not come up in 600s." >&2
+            if [ "$i" = "90" ]; then
+              echo "Backend did not come up in 900s." >&2
               docker compose -f security/dast/compose/docker-compose-dast.yml logs --tail 100 ontrack \
                 | scripts/security-dast.sh scrub || true
               exit 1
@@ -282,22 +301,35 @@ jobs:
         id: seed
         run: |
           set -euo pipefail
-          # A bearer token for the admin Keycloak user (admin/admin), on the local realm.
-          bearer="$(jq -rn '
-              "grant_type=password&scope=openid"
-              + "&client_id=" + ("ontrack-client" | @uri)
-              + "&client_secret=" + ("ontrack-client-secret" | @uri)
-              + "&username=admin&password=admin"' \
-            | curl -sS --max-time 30 -X POST \
-                -H 'Content-Type: application/x-www-form-urlencoded' \
-                --data-binary @- "$DAST_KEYCLOAK_REALM_URL/protocol/openid-connect/token" \
-            | jq -r '.access_token // empty')"
+          # A bearer token for the admin Keycloak user (admin/admin), on the local realm. Retried:
+          # the realm answers its OpenID configuration a moment before the token endpoint is ready.
+          bearer=""
+          for attempt in $(seq 1 10); do
+            body="$(jq -rn '
+                "grant_type=password&scope=openid"
+                + "&client_id=" + ("ontrack-client" | @uri)
+                + "&client_secret=" + ("ontrack-client-secret" | @uri)
+                + "&username=admin&password=admin"' \
+              | curl -sS --max-time 30 -X POST \
+                  -H 'Content-Type: application/x-www-form-urlencoded' \
+                  --data-binary @- "$DAST_KEYCLOAK_REALM_URL/protocol/openid-connect/token" 2>/dev/null || true)"
+            bearer="$(printf '%s' "$body" | jq -r '.access_token // empty' 2>/dev/null || true)"
+            [ -n "$bearer" ] && break
+            echo "Attempt $attempt: no token yet ($(printf '%s' "$body" | jq -r '.error // "no response"' 2>/dev/null))."
+            sleep 6
+          done
           [ -n "$bearer" ] || { echo "Could not obtain an admin bearer token from Keycloak." >&2; exit 1; }
-          # A Yontrack API token for the seed.
-          token="$(printf '%s' '{"query":"mutation { generateToken(input: {name: \"dast-seed\"}) { token { value } errors { message } } }"}' \
-            | curl -sS --max-time 30 -X POST -H 'Content-Type: application/json' \
-                -H "Authorization: Bearer $bearer" --data-binary @- "$DAST_TARGET/graphql" \
-            | jq -r '.data.generateToken.token.value // empty')"
+          # A Yontrack API token for the seed. Retried too: the backend may still be resolving the JWK.
+          token=""
+          for attempt in $(seq 1 10); do
+            body="$(printf '%s' '{"query":"mutation { generateToken(input: {name: \"dast-seed\"}) { token { value } errors { message } } }"}' \
+              | curl -sS --max-time 30 -X POST -H 'Content-Type: application/json' \
+                  -H "Authorization: Bearer $bearer" --data-binary @- "$DAST_TARGET/graphql" 2>/dev/null || true)"
+            token="$(printf '%s' "$body" | jq -r '.data.generateToken.token.value // empty' 2>/dev/null || true)"
+            [ -n "$token" ] && break
+            echo "Attempt $attempt: no API token yet ($(printf '%s' "$body" | jq -r '(.errors // .data.generateToken.errors // []) | map(.message) | join("; ") // "no response"' 2>/dev/null | scripts/security-dast.sh scrub))."
+            sleep 6
+          done
           [ -n "$token" ] || { echo "Could not generate a Yontrack API token." >&2; exit 1; }
           echo "::add-mask::$token"
           echo "::add-mask::$bearer"
