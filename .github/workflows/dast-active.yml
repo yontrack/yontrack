@@ -252,24 +252,34 @@ jobs:
           set -euo pipefail
           docker compose -f security/dast/compose/docker-compose-dast.yml up -d
 
-          # 1. Keycloak: the realm must be IMPORTED, not just the container started. The password
-          #    grant that mints the seed token fails until the realm's OpenID configuration answers.
-          echo "Waiting for the Keycloak realm to be imported..."
+          # 1. Keycloak: the realm and its USERS must be imported, not just the container started.
+          #    The realm's OpenID configuration answers a little before the imported users are usable
+          #    (a `password` grant then returns `invalid_grant` for a moment), so readiness is a real
+          #    admin grant succeeding, not just metadata being served. That is also exactly what the
+          #    seed needs next. The token itself is discarded here; the seed step mints its own.
+          echo "Waiting for the Keycloak realm and its users to be imported..."
+          ready=0
           for i in $(seq 1 60); do
-            code="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 10 \
-              "$DAST_KEYCLOAK_REALM_URL/.well-known/openid-configuration" 2>/dev/null || echo 000)"
-            if [ "$code" = "200" ]; then
-              echo "Keycloak realm ready after $((i*10))s."
+            body="$(jq -rn '
+                "grant_type=password&client_id=" + ("ontrack-client" | @uri)
+                + "&client_secret=" + ("ontrack-client-secret" | @uri)
+                + "&username=admin&password=admin"' \
+              | curl -sS --max-time 10 -X POST \
+                  -H 'Content-Type: application/x-www-form-urlencoded' \
+                  --data-binary @- "$DAST_KEYCLOAK_REALM_URL/protocol/openid-connect/token" 2>/dev/null || true)"
+            if printf '%s' "$body" | jq -e '.access_token' >/dev/null 2>&1; then
+              echo "Keycloak realm and admin user ready after $((i*10))s."
+              ready=1
               break
-            fi
-            if [ "$i" = "60" ]; then
-              echo "Keycloak realm did not come up in 600s." >&2
-              docker compose -f security/dast/compose/docker-compose-dast.yml logs --tail 100 keycloak \
-                | scripts/security-dast.sh scrub || true
-              exit 1
             fi
             sleep 10
           done
+          if [ "$ready" != "1" ]; then
+            echo "Keycloak did not accept the admin grant in 600s." >&2
+            docker compose -f security/dast/compose/docker-compose-dast.yml logs --tail 120 keycloak \
+              | scripts/security-dast.sh scrub || true
+            exit 1
+          fi
 
           # 2. Backend: authenticated on the API port, so any path answers 401 once the app is up
           #    (the management health endpoint is on the unpublished port). 401/403/200 all mean up.
