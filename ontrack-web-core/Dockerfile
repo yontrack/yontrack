@@ -40,6 +40,21 @@ ENV NODE_ENV production
 # Uncomment the following line in case you want to disable telemetry during runtime.
 # ENV NEXT_TELEMETRY_DISABLED 1
 
+# #1811 Take the Alpine security fixes published since the base image was built (libssl3 /
+# libcrypto3 in particular), and remove the package managers the runtime does not need: the
+# standalone Next.js server only runs `node server.js`, so npm, npx, corepack and yarn are dead
+# weight whose bundled dependencies (tar, ip-address, brace-expansion, ...) are reported by the
+# image vulnerability scan.
+RUN apk upgrade --no-cache \
+ && rm -rf /usr/local/lib/node_modules/npm \
+           /usr/local/lib/node_modules/corepack \
+           /usr/local/bin/npm \
+           /usr/local/bin/npx \
+           /usr/local/bin/corepack \
+           /usr/local/bin/yarn \
+           /usr/local/bin/yarnpkg \
+           /opt/yarn-*
+
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
