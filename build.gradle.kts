@@ -232,6 +232,10 @@ configure(javaProjects) {
     val mockkVersion = "1.13.17"
     val jgitVersion = "6.6.1.202309021850-r"
     val tomcatVersion = "10.1.59"
+    val amqpClientVersion = "5.36.0"
+    val postgresqlVersion = "42.7.13"
+    val msgpackCoreVersion = "0.9.12"
+    val commonsBeanutilsVersion = "1.11.0"
 
     // The BOMs. The Spring Boot one is what io.spring.dependency-management imported; the other two
     // are the BOMs it imports itself, restated at the versions this build wants, in place of the
@@ -276,6 +280,21 @@ configure(javaProjects) {
         "org.apache.tomcat.embed:tomcat-embed-core:$tomcatVersion",
         "org.apache.tomcat.embed:tomcat-embed-el:$tomcatVersion",
         "org.apache.tomcat.embed:tomcat-embed-websocket:$tomcatVersion",
+
+        // Transitive libraries pinned past their managed versions to clear the HIGHs of the backend
+        // image scan. Each pin goes once its source brings a fixed version by itself.
+        // - amqp-client (Boot BOM manages 5.25.0): CVE-2026-63337, CVE-2026-69219, CVE-2026-69220,
+        //   CVE-2026-75516 (fixed in 5.34.0). Remove once the Spring Boot BOM manages >= 5.34.0.
+        "com.rabbitmq:amqp-client:$amqpClientVersion",
+        // - PostgreSQL JDBC driver (Boot BOM manages 42.7.11): CVE-2026-54291 (fixed in 42.7.12).
+        //   Remove once the Spring Boot BOM manages >= 42.7.12.
+        "org.postgresql:postgresql:$postgresqlVersion",
+        // - msgpack-core (0.9.8 via influxdb-java 2.25): CVE-2026-21452 (fixed in 0.9.11).
+        //   Remove once influxdb-java brings msgpack-core >= 0.9.11.
+        "org.msgpack:msgpack-core:$msgpackCoreVersion",
+        // - commons-beanutils (1.10.0 via opencsv 5.10): CVE-2025-48734 (fixed in 1.11.0).
+        //   Remove once opencsv brings commons-beanutils >= 1.11.0.
+        "commons-beanutils:commons-beanutils:$commonsBeanutilsVersion",
     )
 
     // Declared on every dependency bucket of every source set -- main, test, and the testFixtures
