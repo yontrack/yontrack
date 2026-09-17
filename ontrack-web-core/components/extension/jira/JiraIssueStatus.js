@@ -1,5 +1,4 @@
 import {Space, Typography} from "antd";
-import Image from "next/image";
 
 export default function JiraIssueStatus({status}) {
     return (
