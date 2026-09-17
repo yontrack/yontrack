@@ -27,7 +27,7 @@
     "graphql": "16.10.0",
     "graphql-request": "^6.1.0",
     "graphql-ws": "^6.0.5",
-    "lodash": "^4.17.23",
+    "lodash": "^4.18.0",
     "lodash.debounce": "^4.0.8",
     "next": "^13.5.11",
     "next-auth": "^4.24.15",
