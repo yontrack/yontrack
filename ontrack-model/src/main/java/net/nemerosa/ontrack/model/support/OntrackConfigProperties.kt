@@ -49,9 +49,6 @@ class OntrackConfigProperties {
     @Valid
     var jobs: JobConfigProperties = JobConfigProperties()
 
-    @APIDescription("Activation of the provided labels collection job")
-    var jobLabelProviderEnabled = false
-
     /**
      * Search configuration
      */

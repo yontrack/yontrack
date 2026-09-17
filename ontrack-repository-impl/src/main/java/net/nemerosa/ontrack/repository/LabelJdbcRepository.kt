@@ -17,13 +17,6 @@ class LabelJdbcRepository(
         dataSource: DataSource
 ) : AbstractJdbcRepository(dataSource), LabelRepository {
 
-    override fun findLabelsByProvider(providerId: String): List<LabelRecord> {
-        return namedParameterJdbcTemplate!!.query(
-                "SELECT * FROM LABEL WHERE COMPUTED_BY = :computedBy",
-                params("computedBy", providerId)
-        ) { rs, _ -> rsConversion(rs) }
-    }
-
     override fun findLabels(category: String?, name: String?): List<LabelRecord> {
         val sql: String
         val params: MapSqlParameterSource
@@ -48,55 +41,13 @@ class LabelJdbcRepository(
         ) { rs, _ -> rsConversion(rs) }
     }
 
-    override fun findLabelByCategoryAndNameAndProvider(category: String?, name: String, providerId: String): LabelRecord? {
-        return getFirstItem(
-                """SELECT *
-                   FROM LABEL
-                   WHERE COMPUTED_BY = :computedBy
-                   AND CATEGORY = :category
-                   AND NAME = :name
-                   """,
-                params("computedBy", providerId)
-                        .addValue("category", category)
-                        .addValue("name", name)
-        ) { rs, _ -> rsConversion(rs) }
-    }
-
-    private fun findLabelByCategoryAndName(category: String?, name: String): LabelRecord? {
-        return getFirstItem(
-                """SELECT *
-                   FROM LABEL
-                   WHERE CATEGORY = :category
-                   AND NAME = :name
-                   """,
-                params("category", category)
-                        .addValue("name", name)
-        ) { rs, _ -> rsConversion(rs) }
-    }
-
-    override fun newLabel(form: LabelForm): LabelRecord =
-            newLabel(form, null)
-
-    override fun overrideLabel(form: LabelForm, providerId: String): LabelRecord {
-        val record = findLabelByCategoryAndName(
-                form.category,
-                form.name
-        )
-        return if (record != null) {
-            updateAndOverrideLabel(record.id, form, providerId)
-        } else {
-            newLabel(form, providerId)
-        }
-    }
-
-    private fun newLabel(form: LabelForm, computedBy: String?): LabelRecord {
+    override fun newLabel(form: LabelForm): LabelRecord {
         try {
             val id = dbCreate("""
-                        INSERT INTO LABEL(category, name, description, color, computed_by)
-                        VALUES (:category, :name, :description, :color, :computedBy)
+                        INSERT INTO LABEL(category, name, description, color)
+                        VALUES (:category, :name, :description, :color)
                     """,
-                    params("computedBy", computedBy)
-                            .addValue("category", form.category)
+                    params("category", form.category)
                             .addValue("name", form.name)
                             .addValue("description", form.description)
                             .addValue("color", form.color)
@@ -107,28 +58,20 @@ class LabelJdbcRepository(
                     name = form.name,
                     description = form.description,
                     color = form.color,
-                    computedBy = computedBy
             )
         } catch (_: DuplicateKeyException) {
             throw LabelCategoryNameAlreadyExistException(form.category, form.name)
         }
     }
 
-    override fun updateAndOverrideLabel(labelId: Int, form: LabelForm, providerId: String): LabelRecord =
-            updateLabel(labelId, form, providerId)
-
-    override fun updateLabel(labelId: Int, form: LabelForm): LabelRecord =
-            updateLabel(labelId, form, null)
-
-    private fun updateLabel(labelId: Int, form: LabelForm, providerId: String?): LabelRecord {
+    override fun updateLabel(labelId: Int, form: LabelForm): LabelRecord {
         try {
             namedParameterJdbcTemplate!!.update("""
                         UPDATE LABEL
                         SET category = :category,
                             name = :name,
                             description = :description,
-                            color = :color,
-                            computed_by = :providerId
+                            color = :color
                         WHERE id = :id
                     """,
                     params("category", form.category)
@@ -136,7 +79,6 @@ class LabelJdbcRepository(
                             .addValue("description", form.description)
                             .addValue("color", form.color)
                             .addValue("id", labelId)
-                            .addValue("providerId", providerId)
             )
             return getLabel(labelId)
         } catch (_: DuplicateKeyException) {
@@ -176,7 +118,6 @@ class LabelJdbcRepository(
                 name = rs.getString("NAME"),
                 description = rs.getString("DESCRIPTION"),
                 color = rs.getString("COLOR"),
-                computedBy = rs.getString("COMPUTED_BY")
         )
     }
 }

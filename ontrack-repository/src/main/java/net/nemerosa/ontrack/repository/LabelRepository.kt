@@ -1,7 +1,6 @@
 package net.nemerosa.ontrack.repository
 
 import net.nemerosa.ontrack.model.Ack
-import net.nemerosa.ontrack.model.labels.Label
 import net.nemerosa.ontrack.model.labels.LabelForm
 
 interface LabelRepository {
@@ -10,11 +9,6 @@ interface LabelRepository {
      * Creation of a new label
      */
     fun newLabel(form: LabelForm): LabelRecord
-
-    /**
-     * Creates an automated label, overriding any manual one
-     */
-    fun overrideLabel(form: LabelForm, providerId: String): LabelRecord
 
     /**
      * Gets a label using its ID, returning `null` if not found
@@ -32,24 +26,9 @@ interface LabelRepository {
     fun updateLabel(labelId: Int, form: LabelForm): LabelRecord
 
     /**
-     * Updates a automated label
-     */
-    fun updateAndOverrideLabel(labelId: Int, form: LabelForm, providerId: String): LabelRecord
-
-    /**
      * Deletes a label
      */
     fun deleteLabel(labelId: Int): Ack
-
-    /**
-     * Gets the list of existing label for the given provider id ("computed by")
-     */
-    fun findLabelsByProvider(providerId: String): List<LabelRecord>
-
-    /**
-     * Finds a single record for the given attributes.
-     */
-    fun findLabelByCategoryAndNameAndProvider(category: String?, name: String, providerId: String): LabelRecord?
 
     /**
      * Finds a list of labels using their category and/or name.

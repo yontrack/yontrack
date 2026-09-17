@@ -8,7 +8,6 @@ class LabelRecord(
         val name: String,
         val description: String?,
         val color: String,
-        val computedBy: String?
 ) {
     /**
      * Conversion to a form

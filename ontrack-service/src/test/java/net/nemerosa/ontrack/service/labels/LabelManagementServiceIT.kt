@@ -30,7 +30,6 @@ class LabelManagementServiceIT : AbstractDSLTestSupport() {
             assertEquals(name, label.name)
             assertNull(label.description)
             assertEquals("#FFFFFF", label.color)
-            assertNull(label.computedBy)
             // Updating the description
             val updatedLabel = labelManagementService.updateLabel(
                 label.id,
@@ -46,7 +45,6 @@ class LabelManagementServiceIT : AbstractDSLTestSupport() {
             assertEquals(name, updatedLabel.name)
             assertEquals("New description", updatedLabel.description)
             assertEquals("#FFFFFF", updatedLabel.color)
-            assertNull(updatedLabel.computedBy)
             // Deleting the label
             labelManagementService.deleteLabel(label.id)
             val deletedLabel = labelManagementService.labels.find { it.id == label.id }

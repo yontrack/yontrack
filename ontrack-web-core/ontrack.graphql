@@ -553,6 +553,8 @@ type Build implements Authorizable & ProjectEntity {
   ): BuildAutoVersioning
   "Reference to branch"
   branch: Branch
+  "Link to the Bitbucket Pipelines run which created this build."
+  buildBitbucketPipelineRunProperty: Property
   "Link to the GitHub Workflow Run which created this build."
   buildGitHubWorkflowRunProperty: Property
   creation: Signature
@@ -1189,58 +1191,6 @@ type Decoration {
   feature: ExtensionFeatureDescription
 }
 
-"What a build on a branch has to pass through on its way to an environment"
-type DeliveryMap {
-  "Nodes of the map"
-  checkpoints: [DeliveryMapCheckpoint!]!
-  "Dependencies between the checkpoints"
-  edges: [DeliveryMapEdge!]!
-  "The branch's latest build, which every checkpoint's lag is counted against"
-  head: Build
-}
-
-"Latest build to have arrived at a checkpoint, and what became of it there"
-type DeliveryMapArrival {
-  "Latest build to have arrived at this checkpoint"
-  build: Build!
-  "Builds of the branch more recent than this one, null when it cannot be counted"
-  lag: Int
-  "What became of the build here, null when arriving is the whole outcome"
-  status: ValidationRunStatusID
-  "When the build arrived"
-  time: LocalDateTime!
-}
-
-"One node of a delivery map"
-type DeliveryMapCheckpoint {
-  "Latest build to have arrived at this checkpoint, and what became of it there"
-  arrival: DeliveryMapArrival
-  "Kind-specific payload, read by the renderer selected by the type"
-  data: JSON!
-  "Description of the checkpoint"
-  description: String
-  "Identifier, stable across fetches and unique across kinds"
-  id: String!
-  "Checkpoints an aggregate checkpoint stands for, empty for every other kind"
-  members: [DeliveryMapCheckpoint!]!
-  "Label of the checkpoint"
-  name: String!
-  "Kind of checkpoint, selecting how it is rendered"
-  type: String!
-}
-
-"A dependency between two checkpoints of a delivery map"
-type DeliveryMapEdge {
-  "Identifier, stable across fetches"
-  id: String!
-  "What the dependency means"
-  kind: DeliveryMapEdgeKind!
-  "ID of the checkpoint the dependency runs from"
-  source: String!
-  "ID of the checkpoint the dependency runs to"
-  target: String!
-}
-
 "Output type for the deleteAccountGroup mutation."
 type DeleteAccountGroupPayload implements Payload {
   "List of errors"
@@ -1325,6 +1275,22 @@ type DeleteBranchReleaseValidationPropertyByIdPayload implements Payload {
 type DeleteBranchReleaseValidationPropertyPayload implements Payload {
   "Branch updated"
   branch: Branch
+  "List of errors"
+  errors: [UserError]
+}
+
+"Output type for the deleteBuildBitbucketPipelineRunPropertyById mutation."
+type DeleteBuildBitbucketPipelineRunPropertyByIdPayload implements Payload {
+  "Build updated"
+  build: Build
+  "List of errors"
+  errors: [UserError]
+}
+
+"Output type for the deleteBuildBitbucketPipelineRunProperty mutation."
+type DeleteBuildBitbucketPipelineRunPropertyPayload implements Payload {
+  "Build updated"
+  build: Build
   "List of errors"
   errors: [UserError]
 }
@@ -1870,6 +1836,58 @@ type DeleteWebhookPayload implements Payload {
 type DeletionPayload implements PayloadInterface {
   "List of errors"
   errors: [PayloadUserError]
+}
+
+"What a build on a branch has to pass through on its way to an environment"
+type DeliveryMap {
+  "Nodes of the map"
+  checkpoints: [DeliveryMapCheckpoint!]!
+  "Dependencies between the checkpoints"
+  edges: [DeliveryMapEdge!]!
+  "The branch's latest build, which every checkpoint's lag is counted against"
+  head: Build
+}
+
+"Latest build to have arrived at a checkpoint, and what became of it there"
+type DeliveryMapArrival {
+  "Latest build to have arrived at this checkpoint"
+  build: Build!
+  "Builds of the branch more recent than this one, null when it cannot be counted"
+  lag: Int
+  "What became of the build here, null when arriving is the whole outcome"
+  status: ValidationRunStatusID
+  "When the build arrived"
+  time: LocalDateTime!
+}
+
+"One node of a delivery map"
+type DeliveryMapCheckpoint {
+  "Latest build to have arrived at this checkpoint, and what became of it there"
+  arrival: DeliveryMapArrival
+  "Kind-specific payload, read by the renderer selected by the type"
+  data: JSON
+  "Description of the checkpoint"
+  description: String
+  "Identifier, stable across fetches and unique across kinds"
+  id: String!
+  "Checkpoints an aggregate checkpoint stands for, empty for every other kind"
+  members: [DeliveryMapCheckpoint!]!
+  "Label of the checkpoint"
+  name: String!
+  "Kind of checkpoint, selecting how it is rendered"
+  type: String!
+}
+
+"A dependency between two checkpoints of a delivery map"
+type DeliveryMapEdge {
+  "Identifier, stable across fetches"
+  id: String!
+  "What the dependency means"
+  kind: DeliveryMapEdgeKind!
+  "ID of the checkpoint the dependency runs from"
+  source: String!
+  "ID of the checkpoint the dependency runs to"
+  target: String!
 }
 
 "Output type for the disableBranch mutation."
@@ -3111,8 +3129,6 @@ type Label {
   category: String
   "color field"
   color: String!
-  "computedBy field"
-  computedBy: LabelProviderDescription
   "description field"
   description: String
   "foregroundColor field"
@@ -3123,14 +3139,6 @@ type Label {
   name: String!
   "List of associated projects"
   projects: [Project!]!
-}
-
-"LabelProviderDescription"
-type LabelProviderDescription {
-  "id field"
-  id: String!
-  "name field"
-  name: String!
 }
 
 "Output type for the launchWorkflow mutation."
@@ -3485,6 +3493,16 @@ type Mutation {
     "Input for the mutation"
     input: DeleteBranchReleaseValidationPropertyByIdInput
   ): DeleteBranchReleaseValidationPropertyByIdPayload
+  "Deletes the bitbucket Pipelines run property on a build identified by name."
+  deleteBuildBitbucketPipelineRunProperty(
+    "Input for the mutation"
+    input: DeleteBuildBitbucketPipelineRunPropertyInput
+  ): DeleteBuildBitbucketPipelineRunPropertyPayload
+  "Deletes the bitbucket Pipelines run property on a build."
+  deleteBuildBitbucketPipelineRunPropertyById(
+    "Input for the mutation"
+    input: DeleteBuildBitbucketPipelineRunPropertyByIdInput
+  ): DeleteBuildBitbucketPipelineRunPropertyByIdPayload
   "Deletes a build by ID"
   deleteBuildById(
     "Input for the mutation"
@@ -4182,6 +4200,16 @@ type Mutation {
     "Input for the mutation"
     input: SetBranchReleaseValidationPropertyByIdInput
   ): SetBranchReleaseValidationPropertyByIdPayload
+  "Set the bitbucket Pipelines run property on a build identified by name."
+  setBuildBitbucketPipelineRunProperty(
+    "Input for the mutation"
+    input: SetBuildBitbucketPipelineRunPropertyInput
+  ): SetBuildBitbucketPipelineRunPropertyPayload
+  "Set the bitbucket Pipelines run property on a build."
+  setBuildBitbucketPipelineRunPropertyById(
+    "Input for the mutation"
+    input: SetBuildBitbucketPipelineRunPropertyByIdInput
+  ): SetBuildBitbucketPipelineRunPropertyByIdPayload
   "Set the git commit property on a build identified by name."
   setBuildGitCommitProperty(
     "Input for the mutation"
@@ -4517,6 +4545,11 @@ type Mutation {
     "Input for the mutation"
     input: SetupMetricsValidationStampInput
   ): SetupMetricsValidationStampPayload
+  "Creates or updates a Number validation stamp"
+  setupNumberValidationStamp(
+    "Input for the mutation"
+    input: SetupNumberValidationStampInput
+  ): SetupNumberValidationStampPayload
   "Creates or updates a Percentage validation stamp"
   setupPercentageValidationStamp(
     "Input for the mutation"
@@ -4701,6 +4734,11 @@ type Mutation {
     "Input for the mutation"
     input: ValidateBuildByIdWithMetricsInput
   ): ValidateBuildByIdWithMetricsPayload
+  "Validates a build identified by id with Number data"
+  validateBuildByIdWithNumber(
+    "Input for the mutation"
+    input: ValidateBuildByIdWithNumberInput
+  ): ValidateBuildByIdWithNumberPayload
   "Validates a build identified by id with Percentage data"
   validateBuildByIdWithPercentage(
     "Input for the mutation"
@@ -4721,6 +4759,11 @@ type Mutation {
     "Input for the mutation"
     input: ValidateBuildWithMetricsInput
   ): ValidateBuildWithMetricsPayload
+  "Validates a build identified by name with Number data"
+  validateBuildWithNumber(
+    "Input for the mutation"
+    input: ValidateBuildWithNumberInput
+  ): ValidateBuildWithNumberPayload
   "Validates a build identified by name with Percentage data"
   validateBuildWithPercentage(
     "Input for the mutation"
@@ -6675,6 +6718,22 @@ type SetBranchReleaseValidationPropertyPayload implements Payload {
   errors: [UserError]
 }
 
+"Output type for the setBuildBitbucketPipelineRunPropertyById mutation."
+type SetBuildBitbucketPipelineRunPropertyByIdPayload implements Payload {
+  "Build updated"
+  build: Build
+  "List of errors"
+  errors: [UserError]
+}
+
+"Output type for the setBuildBitbucketPipelineRunProperty mutation."
+type SetBuildBitbucketPipelineRunPropertyPayload implements Payload {
+  "Build updated"
+  build: Build
+  "List of errors"
+  errors: [UserError]
+}
+
 "Output type for the setBuildGitCommitPropertyById mutation."
 type SetBuildGitCommitPropertyByIdPayload implements Payload {
   "Build updated"
@@ -7224,6 +7283,14 @@ type SetupCHMLValidationStampPayload implements Payload {
 
 "Output type for the setupMetricsValidationStamp mutation."
 type SetupMetricsValidationStampPayload implements Payload {
+  "List of errors"
+  errors: [UserError]
+  "Created or updated validation stamp"
+  validationStamp: ValidationStamp
+}
+
+"Output type for the setupNumberValidationStamp mutation."
+type SetupNumberValidationStampPayload implements Payload {
   "List of errors"
   errors: [UserError]
   "Created or updated validation stamp"
@@ -7895,6 +7962,14 @@ type ValidateBuildByIdWithMetricsPayload implements Payload {
   validationRun: ValidationRun
 }
 
+"Output type for the validateBuildByIdWithNumber mutation."
+type ValidateBuildByIdWithNumberPayload implements Payload {
+  "List of errors"
+  errors: [UserError]
+  "Created validation run"
+  validationRun: ValidationRun
+}
+
 "Output type for the validateBuildByIdWithPercentage mutation."
 type ValidateBuildByIdWithPercentagePayload implements Payload {
   "List of errors"
@@ -7921,6 +7996,14 @@ type ValidateBuildWithCHMLPayload implements Payload {
 
 "Output type for the validateBuildWithMetrics mutation."
 type ValidateBuildWithMetricsPayload implements Payload {
+  "List of errors"
+  errors: [UserError]
+  "Created validation run"
+  validationRun: ValidationRun
+}
+
+"Output type for the validateBuildWithNumber mutation."
+type ValidateBuildWithNumberPayload implements Payload {
   "List of errors"
   errors: [UserError]
   "Created validation run"
@@ -8482,12 +8565,9 @@ enum DashboardContextUserScope {
 
 "What an edge of a delivery map means"
 enum DeliveryMapEdgeKind {
-  "Reaching the source grants the target by itself, as auto promotion does"
-  UNLOCKS
-  "The target cannot be reached until the source has been. It constrains; it does not act"
-  REQUIRES
-  "Reaching the source sets the target off, and nothing waits for the result"
   EMITS
+  REQUIRES
+  UNLOCKS
 }
 
 "State a hook request can be in"
@@ -9373,6 +9453,22 @@ input DeleteBranchReleaseValidationPropertyByIdInput {
 input DeleteBranchReleaseValidationPropertyInput {
   "Branch name"
   branch: String!
+  "Project name"
+  project: String!
+}
+
+"Input type for the deleteBuildBitbucketPipelineRunPropertyById mutation."
+input DeleteBuildBitbucketPipelineRunPropertyByIdInput {
+  "ID of the build"
+  id: Int!
+}
+
+"Input type for the deleteBuildBitbucketPipelineRunProperty mutation."
+input DeleteBuildBitbucketPipelineRunPropertyInput {
+  "Branch name"
+  branch: String!
+  "Build name"
+  build: String!
   "Project name"
   project: String!
 }
@@ -10793,6 +10889,38 @@ input SetBranchReleaseValidationPropertyInput {
   validation: String!
 }
 
+"Input type for the setBuildBitbucketPipelineRunPropertyById mutation."
+input SetBuildBitbucketPipelineRunPropertyByIdInput {
+  "Number of the pipeline run"
+  buildNumber: Int!
+  "ID of the build"
+  id: Int!
+  "Slug of the repository in the workspace"
+  repository: String!
+  "UUID of the pipeline run"
+  uuid: String
+  "Slug of the Bitbucket Cloud workspace"
+  workspace: String!
+}
+
+"Input type for the setBuildBitbucketPipelineRunProperty mutation."
+input SetBuildBitbucketPipelineRunPropertyInput {
+  "Branch name"
+  branch: String!
+  "Build name"
+  build: String!
+  "Number of the pipeline run"
+  buildNumber: Int!
+  "Project name"
+  project: String!
+  "Slug of the repository in the workspace"
+  repository: String!
+  "UUID of the pipeline run"
+  uuid: String
+  "Slug of the Bitbucket Cloud workspace"
+  workspace: String!
+}
+
 "Input type for the setBuildGitCommitPropertyById mutation."
 input SetBuildGitCommitPropertyByIdInput {
   "Full commit hash"
@@ -11651,6 +11779,24 @@ input SetupMetricsValidationStampInput {
   validation: String!
 }
 
+"Input type for the setupNumberValidationStamp mutation."
+input SetupNumberValidationStampInput {
+  "Name of the branch"
+  branch: String!
+  "Description of the validation stamp"
+  description: String
+  "Threshold value for a failure"
+  failureThreshold: Int
+  "Direction of the value scale"
+  okIfGreater: Boolean
+  "Name of the project"
+  project: String!
+  "Name of the validation stamp"
+  validation: String!
+  "Threshold value for a warning"
+  warningThreshold: Int
+}
+
 "Input type for the setupPercentageValidationStamp mutation."
 input SetupPercentageValidationStampInput {
   "Name of the branch"
@@ -12205,6 +12351,22 @@ input ValidateBuildByIdWithMetricsInput {
   validation: String!
 }
 
+"Input type for the validateBuildByIdWithNumber mutation."
+input ValidateBuildByIdWithNumberInput {
+  "Description of the validation run"
+  description: String
+  "ID of the build"
+  id: Int!
+  "Optional run info to associated with this validation run"
+  runInfo: RunInfoInput
+  "Status of the validation run"
+  status: String
+  "Name of the validation stamp"
+  validation: String!
+  "Number"
+  value: Int!
+}
+
 "Input type for the validateBuildByIdWithPercentage mutation."
 input ValidateBuildByIdWithPercentageInput {
   "Description of the validation run"
@@ -12285,6 +12447,26 @@ input ValidateBuildWithMetricsInput {
   status: String
   "Name of the validation stamp"
   validation: String!
+}
+
+"Input type for the validateBuildWithNumber mutation."
+input ValidateBuildWithNumberInput {
+  "Name of the branch"
+  branch: String!
+  "Name of the build"
+  build: String!
+  "Description of the validation run"
+  description: String
+  "Name of the project"
+  project: String!
+  "Optional run info to associated with this validation run"
+  runInfo: RunInfoInput
+  "Status of the validation run"
+  status: String
+  "Name of the validation stamp"
+  validation: String!
+  "Number"
+  value: Int!
 }
 
 "Input type for the validateBuildWithPercentage mutation."

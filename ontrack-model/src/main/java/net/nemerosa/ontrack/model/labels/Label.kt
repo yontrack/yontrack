@@ -8,7 +8,6 @@ open class Label(
     val name: String,
     val description: String?,
     val color: String,
-    val computedBy: LabelProviderDescription?
 ) {
     /**
      * Foreground colour
