@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Deployment page mockup</title>
+<!--
+  Static mockup for docs/grilling/2026-09-environments-ui/README.md.
+  The redesigned deployment page, on a hypothetical candidate of petclinic 104 to the proposed
+  production [canary] slot, blocked on a manual approval with an overridden workflow,
+  to show "What's blocking" with a failing item. Imitates Ant Design v5 under the Yontrack header.
+-->
+<style>
+  :root {
+    --brand: #3F3053; --primary: #1677ff; --border: #f0f0f0; --border-strong: #d9d9d9;
+    --text: rgba(0,0,0,.88); --muted: rgba(0,0,0,.45); --bg: #f5f5f5; --card: #fff;
+    --green: #52c41a; --red: #ff4d4f; --orange: #fa8c16; --gold: #d4b106;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 14px/1.5715 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: var(--text); background: var(--bg); }
+  a { color: var(--primary); text-decoration: none; }
+  .header { background: var(--brand); color: #fff; height: 48px; display: flex; align-items: center; padding: 0 16px; gap: 16px; }
+  .header .logo { font-weight: 600; }
+  .header .spacer { flex: 1; }
+  .header .avatar { width: 28px; height: 28px; border-radius: 50%; background: #fff; color: #141414; display: grid; place-items: center; font-size: 12px; font-weight: 600; }
+  .pagebar { background: #fff; border-bottom: 1px solid var(--border); padding: 8px 16px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .crumbs { color: var(--muted); font-size: 13px; }
+  .pagebar h1 { font-size: 18px; margin: 0; font-weight: 600; }
+  .pagebar .spacer { flex: 1; }
+  .cmd { border: 1px solid var(--border-strong); background: #fff; border-radius: 6px; padding: 3px 12px; font-size: 14px; }
+  .cmd.danger { color: var(--red); border-color: #ffccc7; }
+  .btn-primary { background: var(--primary); color: #fff; border: 1px solid var(--primary); border-radius: 6px; padding: 4px 15px; font-size: 14px; }
+  .btn-primary[disabled] { background: #f5f5f5; color: rgba(0,0,0,.25); border-color: var(--border-strong); }
+  .btn { border: 1px solid var(--border-strong); background: #fff; border-radius: 6px; padding: 1px 8px; font-size: 13px; }
+  .btn-danger-link { background: none; border: none; color: var(--red); padding: 4px 8px; font-size: 14px; }
+  main { padding: 16px; display: grid; gap: 16px; }
+  .card { background: var(--card); border-radius: 8px; border: 1px solid var(--border); padding: 16px 20px; }
+  .card h2 { font-size: 16px; margin: 0 0 12px; font-weight: 600; }
+  .summary { display: flex; flex-wrap: wrap; gap: 8px 24px; align-items: baseline; }
+  .muted { color: var(--muted); }
+  .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+  .steps { display: flex; align-items: center; gap: 8px; margin-top: 16px; }
+  .steps .st { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+  .steps .bar { flex: 1; height: 1px; background: var(--border-strong); min-width: 24px; }
+  .ic { width: 24px; height: 24px; border-radius: 50%; display: inline-grid; place-items: center; font-size: 12px; }
+  .current .ic { background: var(--primary); color: #fff; }
+  .current { font-weight: 600; }
+  .todo { color: var(--muted); }
+  .todo .ic { border: 1px solid var(--border-strong); }
+  .steps .actions { margin-left: 16px; display: flex; gap: 4px; align-items: center; }
+  .grid { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 16px; }
+  @media (max-width: 800px) { .grid { grid-template-columns: 1fr; } }
+  .item { display: flex; gap: 10px; align-items: flex-start; padding: 10px 0; border-top: 1px solid var(--border); }
+  .item:first-of-type { border-top: none; }
+  .item .what { flex: 1; }
+  .item .fix { display: flex; gap: 6px; }
+  .fail { color: var(--red); }
+  .over { color: var(--orange); }
+  .ok { color: var(--green); }
+  .reason { font-size: 13px; color: var(--muted); }
+  .collapsed { margin-top: 8px; padding: 8px 0; border-top: 1px dashed var(--border-strong); color: var(--muted); }
+  .timeline { list-style: none; margin: 0; padding: 0; }
+  .timeline li { position: relative; padding: 0 0 14px 18px; border-left: 1px solid var(--border-strong); margin-left: 4px; }
+  .timeline li::before { content: ""; position: absolute; left: -5px; top: 5px; width: 9px; height: 9px; border-radius: 50%; background: #fff; border: 2px solid var(--primary); }
+  .timeline li.o::before { border-color: var(--orange); }
+  .timeline .when { font-size: 12px; color: var(--muted); }
+  .timeline .msg { font-size: 13px; background: #fff7e6; border-radius: 4px; padding: 2px 6px; margin-top: 2px; }
+  code { font-size: 12px; background: #fafafa; border: 1px solid var(--border); border-radius: 3px; padding: 0 4px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <span class="logo">Yontrack</span>
+  <span class="spacer"></span>
+  <span>admin</span>
+  <span class="avatar">AD</span>
+</div>
+
+<div class="pagebar">
+  <div>
+    <div class="crumbs">Home › Environments › production · petclinic [canary]</div>
+    <h1>Deployment #1 — production · petclinic [canary]</h1>
+  </div>
+  <span class="spacer"></span>
+  <button class="cmd">Force deployment</button>
+  <button class="cmd danger">Delete deployment</button>
+  <button class="cmd">✕ Close</button>
+</div>
+
+<main>
+  <section class="card">
+    <div class="summary">
+      <span><strong>104 · 1.4.3</strong> <span class="muted">(main)</span></span>
+      <span><span class="dot" style="background:var(--gold)"></span> GOLD</span>
+      <span class="muted">Started 25 min ago by admin</span>
+      <span class="muted">Updated 8 s ago ⟳</span>
+    </div>
+    <div class="steps">
+      <span class="st current"><span class="ic">●</span>Candidate</span><span class="bar"></span>
+      <span class="st todo"><span class="ic"></span>Running</span><span class="bar"></span>
+      <span class="st todo"><span class="ic"></span>Deployed</span>
+      <span class="actions">
+        <button class="btn-danger-link">Cancel</button>
+        <button class="btn-primary" disabled title="1 check is blocking">Start the deployment</button>
+      </span>
+    </div>
+  </section>
+
+  <div class="grid">
+    <section class="card">
+      <h2>What's blocking <span class="muted" style="font-weight:400">— 1 of 4 checks blocking</span></h2>
+
+      <div class="item">
+        <span class="fail">✕</span>
+        <div class="what">
+          <div><strong>approval</strong> · Manual approval</div>
+          <div class="reason">Waiting for an approval from the <code>release-managers</code> group.</div>
+        </div>
+        <div class="fix"><button class="btn">Answer</button><button class="btn">Override</button></div>
+      </div>
+
+      <div class="item">
+        <span class="over">⚑</span>
+        <div class="what">
+          <div><strong>canaryWindow</strong> · Workflow "Canary window open" <span class="over">overridden</span></div>
+          <div class="reason">By admin, 10 min ago: "Window checked by phone with the on-call."</div>
+        </div>
+        <div class="fix"><a href="#">Open workflow</a></div>
+      </div>
+
+      <div class="collapsed">▸ 2 checks passed — <strong>gold</strong> (Promotion GOLD), <strong>production</strong> (Deployed in production)</div>
+    </section>
+
+    <section class="card">
+      <h2>Timeline</h2>
+      <ul class="timeline">
+        <li class="o">
+          <div>Workflow <strong>canaryWindow</strong> overridden — admin</div>
+          <div class="msg">Window checked by phone with the on-call.</div>
+          <div class="when">10 min ago</div>
+        </li>
+        <li>
+          <div>Candidate — admin</div>
+          <div class="when">25 min ago</div>
+        </li>
+      </ul>
+    </section>
+  </div>
+</main>
+
+</body>
+</html>

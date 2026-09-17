@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Environments matrix mockup</title>
+<!--
+  Static mockup for docs/grilling/2026-09-environments-ui/README.md.
+  The new Environments home (project x environment matrix) with the slot drawer open on
+  staging · petclinic. Data: the demo seed, plus the proposed `canary` production slot.
+  Imitates Ant Design v5 under the Yontrack header; not production code.
+-->
+<style>
+  :root {
+    --brand: #3F3053; --primary: #1677ff; --border: #f0f0f0; --border-strong: #d9d9d9;
+    --text: rgba(0,0,0,.88); --muted: rgba(0,0,0,.45); --bg: #f5f5f5; --card: #fff;
+    --green: #52c41a; --red: #ff4d4f; --orange: #fa8c16; --gold: #d4b106; --silver: #8c8c8c;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 14px/1.5715 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: var(--text); background: var(--bg); }
+  a { color: var(--primary); text-decoration: none; }
+  .header { background: var(--brand); color: #fff; height: 48px; display: flex; align-items: center; padding: 0 16px; gap: 16px; }
+  .header .logo { font-weight: 600; letter-spacing: .5px; }
+  .header .spacer { flex: 1; }
+  .header .avatar { width: 28px; height: 28px; border-radius: 50%; background: #fff; color: #141414; display: grid; place-items: center; font-size: 12px; font-weight: 600; }
+  .pagebar { background: #fff; border-bottom: 1px solid var(--border); padding: 8px 16px; display: flex; align-items: center; gap: 12px; }
+  .crumbs { color: var(--muted); font-size: 13px; }
+  .pagebar h1 { font-size: 18px; margin: 0; font-weight: 600; }
+  .pagebar .spacer { flex: 1; }
+  .cmd { border: 1px solid var(--border-strong); background: #fff; border-radius: 6px; padding: 3px 12px; font-size: 14px; cursor: pointer; }
+  .btn-primary { background: var(--primary); color: #fff; border: 1px solid var(--primary); border-radius: 6px; padding: 4px 15px; font-size: 14px; }
+  .btn-link { background: none; border: none; color: var(--primary); padding: 4px 8px; font-size: 14px; }
+  .btn-danger-link { background: none; border: none; color: var(--red); padding: 4px 8px; font-size: 14px; }
+  main { padding: 16px; }
+  .card { background: var(--card); border-radius: 8px; border: 1px solid var(--border); }
+  .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--border); }
+  .input { border: 1px solid var(--border-strong); border-radius: 6px; padding: 4px 11px; min-width: 200px; color: var(--muted); }
+  .seg { display: inline-flex; background: var(--bg); border-radius: 6px; padding: 2px; }
+  .seg span { padding: 2px 10px; border-radius: 4px; color: var(--muted); }
+  .seg span.on { background: #fff; color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,.1); }
+  .select { border: 1px solid var(--border-strong); border-radius: 6px; padding: 4px 11px; color: var(--muted); }
+  .updated { margin-left: auto; color: var(--muted); font-size: 12px; }
+  table { border-collapse: collapse; width: 100%; }
+  th, td { border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; }
+  thead th { background: #fafafa; font-weight: 600; padding: 8px 12px; }
+  thead tr.group th { font-weight: 400; font-size: 12px; color: var(--muted); padding: 4px 12px; background: #fff; }
+  td.project { padding: 10px 12px; width: 220px; white-space: nowrap; }
+  td.project.sub { padding-left: 36px; color: var(--muted); }
+  td.cell { padding: 6px; width: 260px; }
+  .envicon { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 4px; color: #fff; font-size: 11px; font-weight: 700; vertical-align: middle; margin-right: 6px; }
+  .slot { border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; cursor: pointer; background: #fff; min-height: 52px; }
+  .slot:hover { border-color: var(--primary); }
+  .slot.selected { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(22,119,255,.2); }
+  .slot .line { display: flex; align-items: center; gap: 6px; }
+  .slot .build { font-weight: 600; }
+  .slot .age { margin-left: auto; color: var(--muted); font-size: 12px; }
+  .slot .flight { font-size: 12px; color: var(--primary); margin-top: 2px; }
+  .slot .never { color: var(--muted); font-style: italic; }
+  .promo { display: inline-flex; align-items: center; gap: 3px; font-size: 12px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+  .blocked { font-size: 12px; color: var(--red); margin-top: 2px; }
+  .tag { display: inline-block; border: 1px solid var(--border-strong); background: #fafafa; border-radius: 4px; padding: 0 6px; font-size: 12px; }
+  .note { color: var(--muted); font-size: 12px; margin: 12px 4px; }
+  /* Drawer */
+  .mask { position: fixed; inset: 0; background: rgba(0,0,0,.25); }
+  .drawer { position: fixed; top: 0; right: 0; bottom: 0; width: 460px; max-width: 100%; background: #fff; box-shadow: -6px 0 16px rgba(0,0,0,.08); display: flex; flex-direction: column; }
+  .drawer header { display: flex; align-items: center; gap: 8px; padding: 14px 20px; border-bottom: 1px solid var(--border); }
+  .drawer header .title { font-weight: 600; font-size: 16px; }
+  .drawer header .close { margin-left: auto; color: var(--muted); }
+  .drawer .body { padding: 8px 20px 20px; overflow: auto; }
+  .section { margin-top: 16px; }
+  .section h3 { font-size: 11px; letter-spacing: .08em; color: var(--muted); margin: 0 0 6px; font-weight: 600; }
+  .steps { display: flex; align-items: center; gap: 6px; font-size: 13px; margin: 8px 0; }
+  .steps .st { display: inline-flex; align-items: center; gap: 4px; }
+  .steps .bar { flex: 1; height: 1px; background: var(--border-strong); }
+  .steps .done .ic { background: #e6f4ff; color: var(--primary); }
+  .steps .current .ic { background: var(--primary); color: #fff; }
+  .steps .todo { color: var(--muted); }
+  .steps .todo .ic { border: 1px solid var(--border-strong); }
+  .ic { width: 20px; height: 20px; border-radius: 50%; display: inline-grid; place-items: center; font-size: 11px; }
+  .blocking { border: 1px solid var(--border); border-radius: 6px; margin: 8px 0; }
+  .blocking .row { display: flex; gap: 8px; align-items: center; padding: 6px 10px; border-top: 1px solid var(--border); font-size: 13px; }
+  .blocking .row:first-child { border-top: none; }
+  .ok { color: var(--green); }
+  .actions { display: flex; justify-content: flex-end; gap: 4px; margin-top: 8px; }
+  .muted { color: var(--muted); }
+  .recent div { display: flex; gap: 8px; font-size: 13px; padding: 3px 0; }
+  .status { font-size: 12px; }
+  .annot { position: fixed; left: 16px; bottom: 16px; max-width: 520px; background: #fffbe6; border: 1px solid #ffe58f; border-radius: 6px; padding: 8px 12px; font-size: 12px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <span class="logo">Yontrack</span>
+  <span class="spacer"></span>
+  <span>admin</span>
+  <span class="avatar">AD</span>
+</div>
+
+<div class="pagebar">
+  <div>
+    <div class="crumbs">Home</div>
+    <h1>Environments</h1>
+  </div>
+  <span class="spacer"></span>
+  <button class="cmd">⚙ Setup</button>
+  <button class="cmd">✕ Close</button>
+</div>
+
+<main>
+  <div class="card">
+    <div class="toolbar">
+      <span class="input">🔍 Project</span>
+      <span class="seg"><span class="on">Favourites</span><span>All</span></span>
+      <span class="select">Group by label ▾</span>
+      <span class="select">Tags ▾</span>
+      <label><input type="checkbox"> Only with activity</label>
+      <span class="updated">Updated 12 s ago ⟳</span>
+    </div>
+    <table>
+      <thead>
+        <tr class="group"><th></th><th>non-production</th><th>production</th></tr>
+        <tr>
+          <th>Project</th>
+          <th><span class="envicon" style="background:#13a8a8">S</span>staging</th>
+          <th><span class="envicon" style="background:#cf1322">P</span>production</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="project">▾ <a href="#">petclinic</a></td>
+          <td class="cell">
+            <div class="slot selected">
+              <div class="line"><span class="build">89 · 1.3.9</span><span class="promo"><span class="dot" style="background:var(--silver)"></span>SILVER</span><span class="age">3d</span></div>
+              <div class="flight">→ 107 · 1.4.6 running ▸</div>
+            </div>
+          </td>
+          <td class="cell">
+            <div class="slot">
+              <div class="line"><span class="build">104 · 1.4.3</span><span class="promo"><span class="dot" style="background:var(--gold)"></span>GOLD</span><span class="age">18d</span></div>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td class="project sub">[canary]</td>
+          <td class="cell"></td>
+          <td class="cell"><div class="slot"><span class="never">Never deployed</span></div></td>
+        </tr>
+        <tr>
+          <td class="project">&nbsp;&nbsp;&nbsp;<a href="#">petclinic-ui</a></td>
+          <td class="cell"></td>
+          <td class="cell">
+            <div class="slot">
+              <span class="never">Never deployed</span>
+              <div class="blocked">● No eligible build — 2 rules refer to nothing</div>
+            </div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="note">Rows: projects, qualifiers nested. Columns: environments by order, grouped by first tag. Empty cell: no slot there.</p>
+</main>
+
+<div class="mask"></div>
+<aside class="drawer">
+  <header>
+    <span class="envicon" style="background:#13a8a8">S</span>
+    <span class="title">staging · petclinic</span>
+    <a href="#" style="margin-left:12px">Open slot ▸</a>
+    <span class="close">✕</span>
+  </header>
+  <div class="body">
+    <div class="section">
+      <h3>NOW</h3>
+      <div><strong>89 · 1.3.9</strong> <span class="muted">(release-1.3)</span> <span class="promo"><span class="dot" style="background:var(--silver)"></span>SILVER</span></div>
+      <div class="muted">Deployed 3 days ago by admin</div>
+    </div>
+
+    <div class="section">
+      <h3>IN FLIGHT</h3>
+      <div><a href="#">#3</a> <strong>107 · 1.4.6</strong> <span class="muted">(main)</span> <span class="promo"><span class="dot" style="background:var(--silver)"></span>SILVER</span></div>
+      <div class="steps">
+        <span class="st done"><span class="ic">✓</span>Candidate</span><span class="bar"></span>
+        <span class="st current"><span class="ic">▶</span>Running</span><span class="bar"></span>
+        <span class="st todo"><span class="ic"></span>Deployed</span>
+      </div>
+      <div class="blocking">
+        <div class="row"><span class="ok">✓</span> Nothing is blocking the completion</div>
+        <div class="row muted">▸ Candidate phase — 2 checks passed</div>
+      </div>
+      <div class="actions">
+        <button class="btn-danger-link">Cancel</button>
+        <button class="btn-primary">Finish the deployment</button>
+      </div>
+    </div>
+
+    <div class="section">
+      <h3>NEXT</h3>
+      <div class="muted">No eligible build newer than 107.</div>
+    </div>
+
+    <div class="section recent">
+      <h3>RECENT</h3>
+      <div><a href="#">#3</a><span>107 · 1.4.6</span><span class="status" style="color:var(--primary)">▶ Running</span><span class="muted" style="margin-left:auto">2 h ago</span></div>
+      <div><a href="#">#2</a><span>89 · 1.3.9</span><span class="status ok">✓ Deployed</span><span class="muted" style="margin-left:auto">3 d ago</span></div>
+      <div><a href="#">#1</a><span>104 · 1.4.3</span><span class="status ok">✓ Deployed</span><span class="muted" style="margin-left:auto">18 d ago</span></div>
+    </div>
+  </div>
+</aside>
+
+<div class="annot">Mockup — drawer open on <code>?slot=…</code> for staging · petclinic. Actions are hidden for users without the right.</div>
+
+</body>
+</html>
