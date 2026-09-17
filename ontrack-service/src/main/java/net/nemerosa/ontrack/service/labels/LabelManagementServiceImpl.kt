@@ -51,13 +51,13 @@ class LabelManagementServiceImpl(
         return labelRepository.deleteLabel(labelId)
     }
 
-    private fun LabelRecord.toLabel() =
-            Label(
-                    id = id,
-                    category = category,
-                    name = name,
-                    description = description,
-                    color = color,
-            )
-
 }
+
+internal fun LabelRecord.toLabel() =
+        Label(
+                id = id,
+                category = category,
+                name = name,
+                description = description,
+                color = color,
+        )

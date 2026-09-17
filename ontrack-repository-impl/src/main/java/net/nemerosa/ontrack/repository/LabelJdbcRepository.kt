@@ -111,13 +111,16 @@ class LabelJdbcRepository(
                 "SELECT * FROM LABEL ORDER BY CATEGORY, NAME"
         ) { rs, _ -> rsConversion(rs) }
 
-    private val rsConversion: (ResultSet) -> LabelRecord = { rs: ResultSet ->
-        LabelRecord(
-                id = rs.getInt("ID"),
-                category = rs.getString("CATEGORY"),
-                name = rs.getString("NAME"),
-                description = rs.getString("DESCRIPTION"),
-                color = rs.getString("COLOR"),
-        )
-    }
+    private val rsConversion: (ResultSet) -> LabelRecord = { rs: ResultSet -> rs.toLabelRecord() }
 }
+
+/**
+ * Reads a [LabelRecord] from the current row of a result set over the `LABEL` table columns.
+ */
+internal fun ResultSet.toLabelRecord() = LabelRecord(
+        id = getInt("ID"),
+        category = getString("CATEGORY"),
+        name = getString("NAME"),
+        description = getString("DESCRIPTION"),
+        color = getString("COLOR"),
+)

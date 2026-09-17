@@ -19,7 +19,7 @@ class ProjectLabelManagementServiceImpl(
 
     override fun getLabelsForProject(project: Project): List<Label> =
             projectLabelRepository.getLabelsForProject(project.id())
-                    .map { labelManagementService.getLabel(it.id) }
+                    .map { it.toLabel() }
 
     override fun hasProjectLabel(project: Project, label: Label): Boolean =
         projectLabelRepository.hasProjectLabel(project.id(), label.id)
