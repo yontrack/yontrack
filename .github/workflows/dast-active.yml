@@ -434,10 +434,19 @@ jobs:
               zap.sh -cmd -port 8090 -host 127.0.0.1 -autorun /zap/wrk/active.yaml > "$pass/zap.log" 2>&1 || rc=$?
             rm -f "$pass/active.yaml"
             echo "ZAP (active, $role) finished with exit code $rc."
-            if [ "$rc" -ne 0 ]; then
+            # ZAP returns non-zero when the plan had WARNINGS too (exit 2), not only errors - a spider
+            # that could not reach a URL (a 404/405 on the auth-gated REST surface) is a warning, and
+            # `failOnWarning` is false in the plan. The real question is whether the scan produced its
+            # report and its HAR; if it did, the pass ran, whatever warnings it logged. Only a missing
+            # report (a crashed container, a refused connection, failOnError) is a failure.
+            if [ ! -s "$pass/out/zap.json" ] || [ ! -s "$pass/out/messages.har" ]; then
+              echo "ZAP produced no report for $role (exit $rc)."
               echo "--- last lines of the ZAP log, URLs and credentials removed ---"
               tail -n 100 "$pass/zap.log" | scripts/security-dast.sh scrub
-              exit "$rc"
+              exit 1
+            fi
+            if [ "$rc" -ne 0 ]; then
+              echo "ZAP ($role) exited $rc with plan warnings but produced its report; continuing."
             fi
             scripts/security-dast.sh assert-authenticated "$pass/out/messages.har" || exit 1
           done
