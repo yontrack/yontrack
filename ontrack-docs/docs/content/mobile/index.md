@@ -17,9 +17,10 @@ Six things — the ones people actually do from a phone:
 :   The home screen is your [favourite](#favourites) projects and branches. The full
     project list is one tap away in the bottom bar, and it — like the branch list on a
     project — is filterable by name: a phone shows a handful of rows and an instance holds
-    far more than that. The project list also filters by **label**: pick one or more from
-    the list under the name box and you get the projects carrying all of them. Labels are
-    managed and assigned from the desktop UI; the phone only searches on them.
+    far more than that. The project list also filters by
+    **[label](../concepts/model/project-labels.md)**: pick one or more from the list under
+    the name box and you get the projects carrying all of them. Labels are managed and
+    assigned from the desktop UI; the phone only searches on them.
 
 **See the latest builds, with their promotions and deployments.**
 :   A branch screen shows its latest builds as cards: what the build is called, when it

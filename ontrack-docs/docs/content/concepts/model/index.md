@@ -23,6 +23,9 @@ by [links between builds](build-links.md)).
 In most cases, a project is linked to a SCM repository. But there are situations where creating a project independently
 of a repository is useful.
 
+Projects can be tagged with [labels](project-labels.md), to organise them across the hierarchy and to filter the
+project lists.
+
 ## Branches
 
 One project can have several branches. They are usually linked to an actual SCM branch.
