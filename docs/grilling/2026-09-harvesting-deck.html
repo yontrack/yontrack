@@ -1,0 +1,1200 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Scout</title>
+<meta name="description" content="Yontrack Scout: the high-level approach to harvesting an organization's delivery history into Yontrack: harvester, portable ledger, import, security findings, readings and estates. For due diligence and audits.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  /* Yontrack brand: purple #3F3053, lilac #D1B0F5, green #9FF58B, greys #E6E1E9 / #F6F2F9 */
+  --ground:#F6F2F9; --paper:#FFFFFF; --paper-2:#F6F2F9; --paper-3:#E6E1E9;
+  --ink:#1F1830; --ink-2:#5E5570; --line:#D9D2E0;
+  --accent:#3F3053; --accent-ink:#3F3053; --accent-soft:#E6E1E9;
+  --brand-purple:#3F3053; --brand-lilac:#D1B0F5; --brand-green:#9FF58B;
+  --header-bg:#3F3053; --header-fg:#FFFFFF;
+  --amber:#A8691A; --amber-soft:#F2E3C8;
+  --bad:#A33B3B; --bad-soft:#F0D8D8;
+  --unknown:#7F8B92; --unknown-soft:#E9E4EE;
+  --shadow: 0 1px 2px rgba(63,48,83,.08), 0 12px 32px -16px rgba(63,48,83,.3);
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ground:#141414; --paper:#1B1720; --paper-2:#241E2C; --paper-3:#2F2838;
+    --ink:#F1ECF6; --ink-2:#B3A9C2; --line:#3A3345;
+    --accent:#D1B0F5; --accent-ink:#D1B0F5; --accent-soft:#2E2340;
+    --brand-purple:#3F3053; --brand-lilac:#D1B0F5; --brand-green:#9FF58B;
+    --header-bg:#3F3053; --header-fg:#FFFFFF;
+    --amber:#DBA652; --amber-soft:#3A2B12;
+    --bad:#DE7373; --bad-soft:#3D1F1F;
+    --unknown:#8A8399; --unknown-soft:#26202E;
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 12px 32px -16px rgba(0,0,0,.7);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#141414; --paper:#1B1720; --paper-2:#241E2C; --paper-3:#2F2838;
+  --ink:#F1ECF6; --ink-2:#B3A9C2; --line:#3A3345;
+  --accent:#D1B0F5; --accent-ink:#D1B0F5; --accent-soft:#2E2340;
+  --brand-purple:#3F3053; --brand-lilac:#D1B0F5; --brand-green:#9FF58B;
+  --header-bg:#3F3053; --header-fg:#FFFFFF;
+  --amber:#DBA652; --amber-soft:#3A2B12;
+  --bad:#DE7373; --bad-soft:#3D1F1F;
+  --unknown:#8A8399; --unknown-soft:#26202E;
+  --shadow: 0 1px 2px rgba(0,0,0,.4), 0 12px 32px -16px rgba(0,0,0,.7);
+  color-scheme: dark;
+}
+
+*{box-sizing:border-box}
+html,body{margin:0}
+body{
+  background:var(--ground); color:var(--ink);
+  font-family:"Hanken Grotesk", "Helvetica Neue", Arial, sans-serif;
+  font-size:15px; line-height:1.45;
+  min-height:100vh; display:flex; flex-direction:column;
+  padding-inline:16px; padding-block:0;
+}
+a{color:var(--accent-ink)}
+:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+
+/* ---------- chrome ---------- */
+.bar{
+  display:flex; align-items:center; justify-content:space-between; gap:12px;
+  margin-inline:-16px; padding:8px 16px;
+  background:var(--header-bg); color:var(--header-fg);
+  font-family:"IBM Plex Mono", ui-monospace, Menlo, monospace; font-size:12px; letter-spacing:.04em;
+}
+.bar .brand{display:flex; align-items:center; gap:10px; color:var(--header-fg)}
+.bar .brand .logo{width:22px; height:20px; display:block}
+.bar .brand b{font-family:"Hanken Grotesk", sans-serif; font-weight:700; font-size:14px; letter-spacing:0}
+.bar nav{display:flex; align-items:center; gap:6px}
+.bar button{
+  font:inherit; color:var(--header-fg); background:transparent; border:1px solid rgba(255,255,255,.35);
+  border-radius:4px; padding:4px 9px; cursor:pointer;
+}
+.bar button:hover{border-color:var(--brand-lilac); color:var(--brand-lilac)}
+.bar button[aria-pressed="true"]{background:var(--brand-lilac); border-color:var(--brand-lilac); color:var(--brand-purple)}
+.bar :focus-visible{outline-color:var(--brand-green)}
+.bar .count{min-width:5.5em; text-align:center; font-variant-numeric:tabular-nums}
+.progress{height:3px; background:var(--header-bg); position:relative; margin-inline:-16px}
+.progress i{position:absolute; inset:0 auto 0 0; background:var(--brand-green); width:0; transition:width .25s}
+@media (prefers-reduced-motion: reduce){ .progress i{transition:none} }
+
+/* ---------- deck ---------- */
+.deck{flex:1; display:grid; place-items:center; padding-block:12px}
+.slide{
+  display:none; container-type:inline-size;
+  width:min(100%, calc((100vh - 110px) * 16 / 9)); aspect-ratio:16/9;
+  background:var(--paper); border:1px solid var(--line); box-shadow:var(--shadow);
+  position:relative; overflow:hidden;
+}
+.slide.is-active{display:block}
+.in{
+  height:100%; padding:4cqi 5.2cqi 3cqi;
+  display:grid; grid-template-rows:auto 1fr auto; gap:1.8cqi;
+  font-size:max(1.38cqi, 12px); line-height:1.4;
+}
+.in > .body{min-height:0; overflow:auto}
+.eyebrow{
+  display:flex; align-items:center; gap:.8cqi;
+  font-family:"IBM Plex Mono", ui-monospace, monospace; font-weight:500; font-size:max(1.05cqi, 10px);
+  letter-spacing:.14em; text-transform:uppercase; color:var(--accent-ink);
+}
+.eyebrow .ic{width:2cqi; height:2cqi}
+.foot{
+  display:flex; justify-content:space-between; align-items:baseline;
+  font-family:"IBM Plex Mono", ui-monospace, monospace; font-size:max(1cqi, 10px); color:var(--ink-2);
+  border-top:1px solid var(--line); padding-top:1cqi; font-variant-numeric:tabular-nums;
+}
+h1,h2,h3{font-family:"Hanken Grotesk","Helvetica Neue",Arial,sans-serif; margin:0; text-wrap:balance; line-height:1.08}
+h1{font-size:5cqi; font-weight:700; letter-spacing:-.02em}
+h2{font-size:3.3cqi; font-weight:700; letter-spacing:-.015em; margin-bottom:1.6cqi}
+h3{font-size:1.7cqi; font-weight:600; margin-bottom:.8cqi}
+p{margin:0 0 .9em}
+p:last-child{margin-bottom:0}
+.lede{font-size:1.15em; color:var(--ink-2); max-width:36em}
+.muted{color:var(--ink-2)}
+b,strong{font-weight:600}
+code,.mono{font-family:"IBM Plex Mono", ui-monospace, Menlo, monospace; font-size:.92em}
+code{background:var(--paper-2); padding:.05em .35em; border-radius:3px}
+pre{
+  margin:0; font-family:"IBM Plex Mono", ui-monospace, monospace; font-size:max(1.02cqi, 9.5px); line-height:1.5;
+  background:var(--paper-2); border:1px solid var(--line); padding:1.2cqi 1.4cqi; overflow-x:auto; white-space:pre;
+}
+pre .k{color:var(--accent-ink)} pre .s{color:var(--ink-2)} pre .e{color:var(--amber)} pre .m{color:var(--accent)}
+
+.cols{display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:3cqi; align-items:start}
+.cols-3{display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:2.4cqi; align-items:start}
+.cols-21{display:grid; grid-template-columns:minmax(0,1.25fr) minmax(0,1fr); gap:3cqi; align-items:start}
+.pts{list-style:none; margin:0; padding:0; display:grid; gap:.9cqi}
+.pts li{position:relative; padding-left:1.8cqi}
+.pts li::before{content:""; position:absolute; left:0; top:.72em; width:1cqi; height:2px; background:var(--accent)}
+.pts.tight{gap:.55cqi}
+.pts li .ic{vertical-align:-.25em; margin-right:.3em; color:var(--accent)}
+
+/* icons */
+.ic{display:inline-grid; place-items:center; width:1.35em; height:1.35em; flex:none}
+.ic svg{width:100%; height:100%; fill:none; stroke:currentColor; stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round}
+.ic.fill svg{fill:currentColor; stroke:none}
+
+/* nodes and diagrams */
+.node{display:flex; flex-direction:column; align-items:center; gap:.6cqi; text-align:center; min-width:0}
+.node .ic{
+  width:5cqi; height:5cqi; padding:1.1cqi; border-radius:50%;
+  border:1px solid var(--line); background:var(--paper-3); color:var(--accent-ink);
+}
+.node .lbl{font-weight:600; font-size:.95em; line-height:1.15}
+.node .sub{font-size:.78em; color:var(--ink-2); line-height:1.2; max-width:11em}
+.arrow{display:grid; place-items:center; color:var(--ink-2); align-self:start; padding-top:1.6cqi}
+.arrow .ic{width:2.4cqi; height:2.4cqi}
+.zone{border:1px solid var(--line); background:var(--paper); padding:1.6cqi 1.6cqi 1.4cqi; position:relative}
+.zone > .zt{
+  position:absolute; top:-.75em; left:1.2cqi; padding:0 .5em; background:var(--paper);
+  font-family:"IBM Plex Mono", monospace; font-size:max(.95cqi, 9px); letter-spacing:.12em; text-transform:uppercase; color:var(--ink-2);
+}
+.zone.dashed{border-style:dashed}
+.flow{display:flex; align-items:flex-start; justify-content:space-between; gap:.6cqi}
+
+/* tiles */
+.tiles{display:grid; grid-template-columns:repeat(4,1fr); gap:1.6cqi}
+.tile{border:1px solid var(--line); padding:1.4cqi 1.5cqi; background:var(--paper); display:grid; gap:.7cqi; align-content:start}
+.tile .ic{width:2.8cqi; height:2.8cqi; color:var(--accent-ink)}
+.tile h3{margin:0}
+.tile p{font-size:.92em; color:var(--ink-2)}
+
+/* glossary */
+.gloss{display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:.9cqi 1.8cqi; font-size:.92em}
+.gloss .g{display:grid; grid-template-columns:auto 1fr; gap:.9cqi; align-items:start}
+.gloss .g .ic{width:2.6cqi; height:2.6cqi; color:var(--accent-ink); margin-top:.1cqi}
+.gloss .g b{display:block; font-size:.98em}
+.gloss .g span{font-size:.82em; color:var(--ink-2); line-height:1.3; display:block}
+.basis{display:flex; gap:2.4cqi; margin-top:1.6cqi; padding-top:1.4cqi; border-top:1px solid var(--line); flex-wrap:wrap}
+.basis .b{display:flex; align-items:center; gap:.8cqi; font-size:.92em}
+.basis .b .ic{width:2.2cqi; height:2.2cqi}
+.tag{display:inline-block; font-family:"IBM Plex Mono", monospace; font-size:.78em; letter-spacing:.08em; padding:.1em .5em; border-radius:3px; border:1px solid currentColor}
+.tag.m{color:var(--accent-ink)} .tag.e{color:var(--amber)} .tag.u{color:var(--unknown)}
+
+/* durability chart */
+.dur{display:grid; grid-template-columns:auto 1fr auto; gap:1cqi 1.8cqi; align-items:center; font-size:.95em}
+.dur .n{font-weight:500; white-space:nowrap}
+.dur .track{height:1.6cqi; background:var(--paper-2); border:1px solid var(--line); position:relative}
+.dur .track i{position:absolute; inset:0 auto 0 0; background:var(--accent)}
+.dur .track i.p{background:var(--amber)}
+.dur .track i.z{background:repeating-linear-gradient(45deg, var(--unknown) 0 3px, transparent 3px 8px); inset:0; opacity:.55}
+.dur .v{font-family:"IBM Plex Mono", monospace; font-size:.85em; color:var(--ink-2); white-space:nowrap; text-align:right}
+.dur .axis{grid-column:2; display:flex; justify-content:space-between; font-family:"IBM Plex Mono", monospace; font-size:.75em; color:var(--ink-2); letter-spacing:.06em}
+
+/* tables */
+table{border-collapse:collapse; width:100%; font-size:.9em}
+th,td{text-align:left; padding:.55cqi .9cqi; border-bottom:1px solid var(--line); vertical-align:top}
+th{font-family:"IBM Plex Mono", monospace; font-weight:500; font-size:.8em; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-2)}
+td.num{font-family:"IBM Plex Mono", monospace; font-variant-numeric:tabular-nums; white-space:nowrap}
+td.rel{font-family:"IBM Plex Mono", monospace; color:var(--accent-ink); white-space:nowrap}
+.cell-e{color:var(--amber); font-family:"IBM Plex Mono", monospace; white-space:nowrap}
+.cell-u{color:var(--unknown); font-family:"IBM Plex Mono", monospace; background:repeating-linear-gradient(45deg, var(--unknown-soft) 0 3px, transparent 3px 8px)}
+.cell-u small{display:block; font-size:.8em; opacity:.85}
+.cell-bad{color:var(--bad); font-family:"IBM Plex Mono", monospace; white-space:nowrap}
+
+/* steps */
+.steps{display:grid; grid-template-columns:repeat(3,1fr); gap:1.4cqi 2cqi; counter-reset:step}
+.step{border-top:2px solid var(--accent); padding-top:.9cqi; counter-increment:step}
+.step h3{display:flex; gap:.7cqi; align-items:baseline}
+.step h3::before{content:counter(step, decimal-leading-zero); font-family:"IBM Plex Mono", monospace; font-size:.75em; font-weight:500; color:var(--accent-ink); letter-spacing:.06em}
+.step p{font-size:.9em; color:var(--ink-2)}
+
+/* roadmap */
+.lanes{display:grid; grid-template-columns:repeat(3,1fr); gap:2cqi}
+.lane{border:1px solid var(--line); padding:1.4cqi 1.6cqi; background:var(--paper)}
+.lane h3{display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid var(--line); padding-bottom:.8cqi; margin-bottom:1cqi}
+.lane h3 .tag{font-weight:400}
+.lane .pts{font-size:.9em}
+
+/* model card */
+.model{display:grid; grid-template-columns:1fr auto 1fr; gap:1.2cqi; align-items:center}
+.card{border:1px solid var(--line); background:var(--paper-2); padding:1.2cqi 1.4cqi}
+.card h3{display:flex; align-items:center; gap:.7cqi; margin-bottom:.6cqi}
+.card h3 .ic{color:var(--accent-ink)}
+.card dl{margin:0; display:grid; grid-template-columns:auto 1fr; gap:.25cqi 1cqi; font-size:.85em}
+.card dt{font-family:"IBM Plex Mono", monospace; color:var(--accent-ink)} .card dd{margin:0; color:var(--ink-2)}
+.model .rel{display:grid; place-items:center; font-family:"IBM Plex Mono", monospace; font-size:.8em; color:var(--ink-2); text-align:center; gap:.4cqi}
+
+/* chain */
+.chain{display:grid; grid-template-columns:1fr auto 1fr auto 1fr auto 1fr; gap:1cqi; align-items:stretch; margin-bottom:2cqi}
+.chain .card{display:grid; align-content:start; gap:.5cqi}
+.chain .card p{font-size:.85em; color:var(--ink-2)}
+.chain .arrow{align-self:center; padding:0}
+
+/* UI mock-up: always the light Yontrack UI, like a screenshot */
+.mock{border:1px solid var(--line); border-radius:.6cqi; overflow:hidden; background:#F6F2F9; color:#1F1830; font-size:.75em; box-shadow:var(--shadow)}
+.mock code{background:#E6E1E9; color:#3F3053}
+.mock *{color:inherit}
+.mock-bar{display:flex; align-items:center; gap:1.4cqi; background:#3F3053; color:#fff; padding:.7cqi 1.4cqi}
+.mock-bar svg{width:1.9cqi; height:1.7cqi}
+.mock-bar b{font-weight:700}
+.mock-bar .nav{display:flex; gap:1.2cqi; margin-left:1cqi; opacity:.85}
+.mock-bar .nav span.on{opacity:1; border-bottom:2px solid #9FF58B; padding-bottom:.15cqi}
+.mock-bar .sp{flex:1}
+.mock-bar .search{background:rgba(255,255,255,.14); border-radius:.3cqi; padding:.25cqi 1cqi; min-width:12cqi; opacity:.8}
+.mock-bar .avatar{width:2cqi; height:2cqi; border-radius:50%; background:#fff; color:#3F3053; display:grid; place-items:center; font-weight:700; font-size:.8em}
+.mock-page{padding:1cqi 1.4cqi 1.2cqi; display:grid; gap:.9cqi}
+.mock-crumb{font-size:.85em; color:#5E5570}
+.mock-head{display:flex; align-items:center; gap:1cqi; flex-wrap:wrap}
+.mock-head h4{margin:0; font-family:"Hanken Grotesk",sans-serif; font-size:1.6em; font-weight:700}
+.mock-chip{border:1px solid #D9D2E0; background:#fff; border-radius:1cqi; padding:.15cqi .8cqi; font-size:.82em; color:#5E5570}
+.mock-head .sp{flex:1}
+.mock-toggle{display:inline-flex; align-items:center; gap:.5cqi; font-size:.85em; color:#5E5570}
+.mock-toggle i{width:2.2cqi; height:1.2cqi; border-radius:1cqi; background:#3F3053; position:relative; display:inline-block}
+.mock-toggle i::after{content:""; position:absolute; top:.15cqi; right:.15cqi; width:.9cqi; height:.9cqi; border-radius:50%; background:#fff}
+.mock-panel{background:#fff; border:1px solid #E6E1E9; border-radius:.4cqi; overflow:hidden}
+.mock-panel h5{margin:0; padding:.55cqi 1cqi; font-size:.9em; font-weight:600; border-bottom:1px solid #E6E1E9; display:flex; gap:.8cqi; align-items:center}
+.mock-panel h5 .ic{width:1.6cqi; height:1.6cqi; color:#3F3053}
+.mock table{font-size:.95em}
+.mock th{color:#5E5570; background:#FAF8FC; border-bottom:1px solid #E6E1E9; letter-spacing:.06em; font-size:.75em; padding:.4cqi .8cqi; white-space:nowrap}
+.mock td{border-bottom:1px solid #F0ECF3; padding:.4cqi .8cqi}
+.mock tr:last-child td{border-bottom:0}
+.mock .proj{font-weight:600}
+.mock .proj small{display:block; font-weight:400; color:#5E5570; font-size:.8em}
+.mock .ok{color:#1F1830; font-family:"IBM Plex Mono",monospace}
+.mock .ok::before{content:""; display:inline-block; width:.6cqi; height:.6cqi; border-radius:50%; background:#5AA85A; margin-right:.5cqi; vertical-align:middle}
+.mock .warn{color:#A33B3B; font-family:"IBM Plex Mono",monospace}
+.mock .warn::before{content:""; display:inline-block; width:.6cqi; height:.6cqi; border-radius:50%; background:#A33B3B; margin-right:.5cqi; vertical-align:middle}
+.mock .est{color:#A8691A; font-family:"IBM Plex Mono",monospace; white-space:nowrap}
+.mock .unk{color:#7F8B92; font-family:"IBM Plex Mono",monospace; background:repeating-linear-gradient(45deg,#ECE8F0 0 3px,transparent 3px 8px)}
+.mock .unk small{display:block; font-size:.78em}
+.mock-grid{display:grid; grid-template-columns:minmax(0,2.3fr) minmax(0,1fr); gap:.9cqi; align-items:start}
+.mock .sev{display:inline-block; font-family:"IBM Plex Mono",monospace; font-size:.75em; padding:.05em .5em; border-radius:.3cqi; background:#FBE3E3; color:#A33B3B; margin-left:.4cqi}
+.mock .br{font-family:"IBM Plex Mono",monospace; font-size:.85em; color:#5E5570}
+/* closing lockup */
+.lockup{display:flex; align-items:center; gap:2.4cqi}
+.lockup svg{width:11cqi; height:11cqi; flex:none}
+.lockup .name{font-family:"Hanken Grotesk",sans-serif; font-weight:700; font-size:6.4cqi; line-height:1; letter-spacing:-.02em; color:var(--accent-ink)}
+.lockup.small{gap:1.4cqi}
+.lockup.small svg{width:6.2cqi; height:6.2cqi}
+.lockup.small .name{font-size:3.6cqi}
+.lockup.small .by{margin-top:.5cqi}
+.intro-row{display:flex; align-items:center; gap:3cqi; flex-wrap:wrap; margin-bottom:1.2cqi; padding-bottom:1.2cqi; border-bottom:1px solid var(--line)}
+.intro-row h2{margin:0; font-size:2.6cqi; max-width:26em}
+.lockup .by{display:block; margin-top:.9cqi; font-family:"IBM Plex Mono", monospace; font-size:max(1.15cqi,10px); letter-spacing:.16em; text-transform:uppercase; color:var(--accent-ink)}
+/* title slide */
+.title .in{grid-template-rows:auto 1fr auto}
+.scout{display:inline-flex; align-items:center; gap:1.2cqi; font-family:"Hanken Grotesk",sans-serif; font-weight:700; font-size:2.4cqi; letter-spacing:.02em; color:var(--accent-ink)}
+.scout .mark{display:grid; place-items:center; width:5.2cqi; height:5.2cqi; border-radius:1cqi; background:var(--brand-purple)}
+.scout .mark svg{width:3.2cqi; height:2.9cqi}
+.strip{display:flex; align-items:center; gap:.8cqi; flex-wrap:wrap}
+.strip .node .ic{width:4.2cqi; height:4.2cqi; padding:.9cqi}
+.strip .node .lbl{font-size:.8em; font-weight:500; color:var(--ink-2)}
+.strip .arrow{padding-top:1.2cqi}
+
+/* scroll (all slides) mode */
+body.scroll .deck{display:block; max-width:1120px; margin:0 auto; width:100%}
+body.scroll .slide{display:block; width:100%; margin-block:20px}
+body.scroll .in > .body{overflow:visible}
+@media (max-width: 720px){
+  body .deck{display:block}
+  body .slide{display:block; width:100%; aspect-ratio:auto; margin-block:16px}
+  body .in > .body{overflow:visible}
+  .cols,.cols-3,.cols-21,.tiles,.gloss,.steps,.lanes,.model,.chain{grid-template-columns:1fr}
+  .flow{flex-direction:column; align-items:stretch}
+  .arrow{transform:rotate(90deg); padding:0}
+  .chain .arrow{transform:rotate(90deg)}
+  .bar .count{display:none}
+}
+@media print{
+  body{background:#fff; padding:0}
+  .bar,.progress{display:none}
+  .deck{display:block}
+  .slide{display:block; width:100%; break-after:page; box-shadow:none; margin:0}
+  .in > .body{overflow:visible}
+}
+</style>
+</head>
+<body>
+
+<svg hidden aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+  <symbol id="i-scout-logo" viewBox="0 0 160 160"><rect x="0" y="0" width="160" height="160" rx="34" fill="#3F3053" stroke="none"/><circle cx="80" cy="80" r="58" fill="none" stroke="#D1B0F5" stroke-width="7" stroke-linecap="round" stroke-dasharray="290 74" transform="rotate(-62 80 80)"/><circle cx="121" cy="39" r="7" fill="#9FF58B" stroke="none"/><g transform="translate(44 47.6) scale(0.57)" fill="#9FF58B" stroke="none"><path d="M39.64,51.63l-.1-.17c-1.61-2.79-4.59-4.52-7.82-4.52H9.03c-4.99,0-9.03,4.04-9.03,9.03v.17c0,4.99,4.04,9.03,9.03,9.03h22.79c3.23,0,6.21-1.72,7.82-4.52,1.61-2.79,1.61-6.23,0-9.03"/><path d="M117.49,46.94h-22.77c-3.22,0-6.21,1.72-7.82,4.51l-7.89,13.66-.03.05-7.88,13.66c-1.61,2.79-1.61,6.23,0,9.03l11.39,19.73c2.49,4.32,8.02,5.8,12.33,3.3l.15-.08c4.32-2.49,5.8-8.01,3.3-12.33l-15.14-26.23c-1.82-3.14.45-7.07,4.08-7.07h30.28c4.99,0,9.03-4.04,9.03-9.03v-.17c0-4.99-4.04-9.03-9.03-9.03"/><path d="M73.86,56.07c2.81-4.86,16.83-29.11,24.56-42.48,2.48-4.29,1-9.76-3.28-12.24l-.26-.15c-4.3-2.48-9.79-1.01-12.27,3.29l-16.76,28.99c-1.12,1.94-3.93,1.94-5.05,0L44.04,4.49c-2.48-4.29-7.97-5.76-12.27-3.29l-.28.16c-4.29,2.47-5.76,7.95-3.29,12.23,6.3,10.91,16.85,29.07,22,38,1.6,2.77,1.6,6.16,0,8.93-5.71,9.88-15.5,26.81-21.99,38.04-2.47,4.28-1,9.73,3.28,12.2l.31.18c4.28,2.47,9.75,1.01,12.22-3.27,9.03-15.62,23.8-41.16,29.84-51.6"/></g></symbol>
+  <symbol id="i-logo" viewBox="0 0 126.52 112.13"><g fill="#9FF58B" stroke="none"><path d="M39.64,51.63l-.1-.17c-1.61-2.79-4.59-4.52-7.82-4.52H9.03c-4.99,0-9.03,4.04-9.03,9.03v.17c0,4.99,4.04,9.03,9.03,9.03h22.79c3.23,0,6.21-1.72,7.82-4.52,1.61-2.79,1.61-6.23,0-9.03"/><path d="M117.49,46.94h-22.77c-3.22,0-6.21,1.72-7.82,4.51l-7.89,13.66-.03.05-7.88,13.66c-1.61,2.79-1.61,6.23,0,9.03l11.39,19.73c2.49,4.32,8.02,5.8,12.33,3.3l.15-.08c4.32-2.49,5.8-8.01,3.3-12.33l-15.14-26.23c-1.82-3.14.45-7.07,4.08-7.07h30.28c4.99,0,9.03-4.04,9.03-9.03v-.17c0-4.99-4.04-9.03-9.03-9.03"/><path d="M73.86,56.07c2.81-4.86,16.83-29.11,24.56-42.48,2.48-4.29,1-9.76-3.28-12.24l-.26-.15c-4.3-2.48-9.79-1.01-12.27,3.29l-16.76,28.99c-1.12,1.94-3.93,1.94-5.05,0L44.04,4.49c-2.48-4.29-7.97-5.76-12.27-3.29l-.28.16c-4.29,2.47-5.76,7.95-3.29,12.23,6.3,10.91,16.85,29.07,22,38,1.6,2.77,1.6,6.16,0,8.93-5.71,9.88-15.5,26.81-21.99,38.04-2.47,4.28-1,9.73,3.28,12.2l.31.18c4.28,2.47,9.75,1.01,12.22-3.27,9.03-15.62,23.8-41.16,29.84-51.6"/></g></symbol>
+  <symbol id="i-source" viewBox="0 0 24 24"><ellipse cx="12" cy="5.5" rx="7.5" ry="2.8"/><path d="M4.5 5.5v13c0 1.5 3.4 2.8 7.5 2.8s7.5-1.3 7.5-2.8v-13"/><path d="M4.5 12c0 1.5 3.4 2.8 7.5 2.8s7.5-1.3 7.5-2.8"/></symbol>
+  <symbol id="i-harvester" viewBox="0 0 24 24"><path d="M4 20.5l7.5-7.5"/><path d="M11.5 13c-1.8-3.6.4-7.6 4.2-8.5 2.8-.7 5 .6 6 2.6-3-1.1-6.3 0-7.5 2.9-.6 1.4-1.4 2.3-2.7 3z"/></symbol>
+  <symbol id="i-collector" viewBox="0 0 24 24"><path d="M3.5 4.5h17l-6.5 7.5v5.5l-4 2.5v-8z"/></symbol>
+  <symbol id="i-export" viewBox="0 0 24 24"><path d="M5.5 3.5h8l4.5 4.5v4"/><path d="M13.5 3.5V8H18"/><path d="M5.5 3.5v17h12.5v-3"/><path d="M11 15h9.5"/><path d="M17.5 12l3 3-3 3"/></symbol>
+  <symbol id="i-facts" viewBox="0 0 24 24"><path d="M5.5 3.5h9l4.5 4.5v12.5H5.5z"/><path d="M14.5 3.5V8H19"/><path d="M8.5 11.5h4"/><path d="M8.5 14.5h2.5"/><path d="M11 18.5l5.5-5.5 1.8 1.8-5.5 5.5H11z"/></symbol>
+  <symbol id="i-mapping" viewBox="0 0 24 24"><path d="M4 7.5h13"/><path d="M14 4.5l3 3-3 3"/><path d="M20 16.5H7"/><path d="M10 13.5l-3 3 3 3"/></symbol>
+  <symbol id="i-ledger" viewBox="0 0 24 24"><path d="M5 3.5h13.5a1 1 0 0 1 1 1v15a1 1 0 0 1-1 1H5z"/><path d="M5 3.5h3.5v17H5"/><path d="M11.5 8.5h4.5"/><path d="M11.5 12h4.5"/><path d="M11.5 15.5h4.5"/></symbol>
+  <symbol id="i-fact" viewBox="0 0 24 24"><circle cx="6" cy="12" r="2.2"/><path d="M11 12h9.5"/><path d="M11 8h5"/><path d="M11 16h7"/></symbol>
+  <symbol id="i-ship" viewBox="0 0 24 24"><path d="M3.5 8l8.5-4 8.5 4v8.5l-8.5 4-8.5-4z"/><path d="M3.5 8l8.5 4 8.5-4"/><path d="M12 12v8.5"/></symbol>
+  <symbol id="i-import" viewBox="0 0 24 24"><path d="M12 3.5v11"/><path d="M8 10.5l4 4 4-4"/><path d="M4 15.5v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4"/></symbol>
+  <symbol id="i-yontrack" viewBox="0 0 24 24"><path d="M12 2.5l8.5 4.9v9.2L12 21.5l-8.5-4.9V7.4z"/><path d="M8 12l3 3 5.5-6"/></symbol>
+  <symbol id="i-quiet" viewBox="0 0 24 24"><path d="M6.5 17V11a5.5 5.5 0 0 1 11 0v6l1.5 1.5H5z"/><path d="M10 21h4"/><path d="M4.5 4.5l15 15"/></symbol>
+  <symbol id="i-finding" viewBox="0 0 24 24"><path d="M12 2.5l8 3v6c0 5-3.5 8.8-8 10.5-4.5-1.7-8-5.5-8-10.5v-6z"/><path d="M12 8v5"/><path d="M12 16.2v.1"/></symbol>
+  <symbol id="i-observation" viewBox="0 0 24 24"><path d="M2.5 12s3.5-6.5 9.5-6.5 9.5 6.5 9.5 6.5-3.5 6.5-9.5 6.5S2.5 12 2.5 12z"/><circle cx="12" cy="12" r="2.8"/></symbol>
+  <symbol id="i-reading" viewBox="0 0 24 24"><path d="M4 16.5a8 8 0 0 1 16 0"/><path d="M12 16.5l4.2-5.5"/><circle cx="12" cy="16.5" r="1.4"/><path d="M4 20.5h16"/></symbol>
+  <symbol id="i-scorecard" viewBox="0 0 24 24"><path d="M9 3.5h6v3H9z"/><path d="M7.5 5.5H5.5v15h13v-15h-2"/><path d="M8.5 11l2 2 3.5-3.5"/><path d="M8.5 16l2 2 3.5-3.5"/></symbol>
+  <symbol id="i-estate" viewBox="0 0 24 24"><path d="M2.5 20.5h19"/><path d="M4.5 20.5V8.5h5.5v12"/><path d="M10 20.5V3.5h6v17"/><path d="M16 20.5V11h4v9.5"/><path d="M6.5 11.5h1.5"/><path d="M6.5 14.5h1.5"/><path d="M12.5 7h1.5"/><path d="M12.5 10h1.5"/><path d="M12.5 13h1.5"/></symbol>
+  <symbol id="i-agent" viewBox="0 0 24 24"><path d="M11 3.5l1.8 5.2 5.2 1.8-5.2 1.8-1.8 5.2-1.8-5.2-5.2-1.8 5.2-1.8z"/><path d="M18 15l.9 2.1 2.1.9-2.1.9-.9 2.1-.9-2.1-2.1-.9 2.1-.9z"/></symbol>
+  <symbol id="i-human" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4.5 20.5a7.5 7.5 0 0 1 15 0"/></symbol>
+  <symbol id="i-marker" viewBox="0 0 24 24"><path d="M5.5 20.5v-17"/><path d="M5.5 4h12.5l-2.5 4 2.5 4H5.5"/></symbol>
+  <symbol id="i-measured" viewBox="0 0 24 24"><path d="M3.5 16.5L16.5 3.5l4 4L7.5 20.5z"/><path d="M7.5 12.5l2 2"/><path d="M10.5 9.5l2 2"/><path d="M13.5 6.5l2 2"/></symbol>
+  <symbol id="i-estimated" viewBox="0 0 24 24"><path d="M4 9.5c2.5-2.8 5.5 2.8 8 0s5.5-2.8 8 0"/><path d="M4 15c2.5-2.8 5.5 2.8 8 0s5.5-2.8 8 0"/></symbol>
+  <symbol id="i-unknown" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.3 9.5a2.7 2.7 0 1 1 3.9 2.4c-.8.4-1.2 1-1.2 1.8"/><path d="M12 17v.1"/></symbol>
+  <symbol id="i-schema" viewBox="0 0 24 24"><path d="M9 3.5c-2 0-3 1-3 3v3c0 1.5-1 2.3-2.2 2.5C5 12.2 6 13 6 14.5v3c0 2 1 3 3 3"/><path d="M15 3.5c2 0 3 1 3 3v3c0 1.5 1 2.3 2.2 2.5C19 12.2 18 13 18 14.5v3c0 2-1 3-3 3"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></symbol>
+  <symbol id="i-reconcile" viewBox="0 0 24 24"><path d="M12 3.5v17"/><path d="M6 20.5h12"/><path d="M12 6H5"/><path d="M12 6h7"/><path d="M2.5 12.5L5 6l2.5 6.5a2.5 2.5 0 0 1-5 0z"/><path d="M16.5 12.5L19 6l2.5 6.5a2.5 2.5 0 0 1-5 0z"/></symbol>
+  <symbol id="i-fanout" viewBox="0 0 24 24"><circle cx="4.5" cy="12" r="2"/><path d="M6.5 12h4"/><path d="M10.5 12l5-6h5"/><path d="M10.5 12h10"/><path d="M10.5 12l5 6h5"/></symbol>
+  <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M3 12h17"/><path d="M14.5 6.5L20 12l-5.5 5.5"/></symbol>
+  <symbol id="i-cve" viewBox="0 0 24 24"><path d="M8 8.5a4 4 0 0 1 8 0v5a4 4 0 0 1-8 0z"/><path d="M12 13.5v7"/><path d="M4 11.5h4"/><path d="M16 11.5h4"/><path d="M5 17.5l3-1.5"/><path d="M19 17.5l-3-1.5"/><path d="M5.5 5.5l3 2"/><path d="M18.5 5.5l-3 2"/><path d="M10 4.5l.7-1.5"/><path d="M14 4.5l-.7-1.5"/></symbol>
+  <symbol id="i-deploy" viewBox="0 0 24 24"><path d="M4 6.5h16v4H4z"/><path d="M4 13.5h16v4H4z"/><path d="M7 8.5h.1"/><path d="M7 15.5h.1"/><path d="M12 10.5v3"/></symbol>
+</svg>
+
+<header class="bar">
+  <div class="brand"><svg class="logo" aria-hidden="true"><use href="#i-logo"/></svg><b>Scout</b><span>· reading delivery history</span></div>
+  <nav aria-label="Deck navigation">
+    <button type="button" id="prev" aria-label="Previous slide">←</button>
+    <span class="count" id="count">1 / 24</span>
+    <button type="button" id="next" aria-label="Next slide">→</button>
+    <button type="button" id="mode" aria-pressed="false" title="Show every slide on one scrolling page (key: o)">All slides</button>
+  </nav>
+</header>
+<div class="progress" aria-hidden="true"><i id="prog"></i></div>
+
+<main class="deck" id="deck">
+
+<!-- 1 · Title -->
+<section class="slide title" aria-label="Title">
+  <div class="in">
+    <div class="eyebrow"><span class="ic"><svg><use href="#i-scorecard"/></svg></span> September 2026</div>
+    <div class="body" style="display:grid; align-content:safe center; gap:2cqi">
+      <div class="scout"><span class="mark"><svg aria-hidden="true"><use href="#i-logo"/></svg></span><span>Scout</span></div>
+      <h1>Reading an organization's delivery history</h1>
+      <p class="lede">One chain of evidence, from a harvester running inside the organization to a scorecard across its estate: what was built, what was deployed, what was tested, which vulnerabilities are still open, and how sure we are of each number. Built for due diligence and audits.</p>
+      <div class="strip" aria-label="The chain">
+        <div class="node"><span class="ic"><svg><use href="#i-harvester"/></svg></span><span class="lbl">Harvester</span></div>
+        <div class="arrow"><span class="ic"><svg><use href="#i-arrow"/></svg></span></div>
+        <div class="node"><span class="ic"><svg><use href="#i-ledger"/></svg></span><span class="lbl">Ledger</span></div>
+        <div class="arrow"><span class="ic"><svg><use href="#i-arrow"/></svg></span></div>
+        <div class="node"><span class="ic"><svg><use href="#i-import"/></svg></span><span class="lbl">Import</span></div>
+        <div class="arrow"><span class="ic"><svg><use href="#i-arrow"/></svg></span></div>
+        <div class="node"><span class="ic"><svg><use href="#i-finding"/></svg></span><span class="lbl">Findings</span></div>
+        <div class="arrow"><span class="ic"><svg><use href="#i-arrow"/></svg></span></div>
+        <div class="node"><span class="ic"><svg><use href="#i-reading"/></svg></span><span class="lbl">Readings</span></div>
+        <div class="arrow"><span class="ic"><svg><use href="#i-arrow"/></svg></span></div>
+        <div class="node"><span class="ic"><svg><use href="#i-estate"/></svg></span><span class="lbl">Estate</span></div>
+      </div>
+    </div>
+    <div class="foot"><span>Use ← → to navigate · O for all slides</span><span>1 / 24</span></div>
+  </div>
+</section>
+
+<!-- 2 · The questions -->
+<section class="slide" aria-label="The questions an audit asks">
+  <div class="in">
+    <div class="eyebrow"><span class="ic"><svg><use href="#i-scorecard"/></svg></span> Why we are here</div>
+    <div class="body">
+      <h2>Four questions, asked about the present and the past</h2>
+      <div class="tiles">
+        <div class="tile"><span class="ic"><svg><use href="#i-marker"/></svg></span><h3>How fast does a change reach production?</h3><p>Lead time from build to deployment, deployment frequency, success rate, time to recover from a failed deployment.</p></div>
+        <div class="tile"><span class="ic"><svg><use href="#i-reading"/></svg></span><h3>Can the tests be trusted?</h3><p>Share of builds whose test stages all pass, and how often a build flips from fail to pass without a change.</p></div>
+        <div class="tile"><span class="ic"><svg><use href="#i-finding"/></svg></span><h3>Is security scanning real?</h3><p>Not "do we have a scanner" but: every expected kind of scan, fresh, and actually gating a release.</p></div>
+        <div class="tile"><span class="ic"><svg><use href="#i-cve"/></svg></span><h3>How long does a HIGH stay open?</h3><p>Time from first sighting of a critical or high vulnerability to its disappearance, against a target the organization declared.</p></div>
+      </div>
+      <p style="margin-top:2cqi" class="muted">None of these questions can be answered without data. Yet in most organizations the maturity of software delivery is assessed from interviews and impressions: the numbers that would settle it are scattered across CI servers, scanners, spreadsheets and release emails, and nobody has ever put them side by side.</p>
+    </div>
+    <div class="foot"><span>The questions</span><span>2 / 24</span></div>
+  </div>
+</section>
+
+<!-- 3 · Problem 1 -->
+<section class="slide" aria-label="Problem: maturity is a feeling">
+  <div class="in">
+    <div class="eyebrow"><span class="ic"><svg><use href="#i-unknown"/></svg></span> Problem 1 of 4 · maturity</div>
+    <div class="body cols-21">
+      <div>
+        <h2>Nobody can say how mature delivery is</h2>
+        <ul class="pts">
+          <li><b>Maturity is a feeling, not a reading.</b> There is no view across projects. The numbers that exist live in people's heads and in slide decks, and each team measures itself with its own yardstick.</li>
+          <li><b>The tools that exist measure the wrong thing, or export it somewhere nobody looks.</b> Delivery metrics computed over promotions rather than deployments, then pushed to a time-series database that is off by default: the right measures, invisible from where decisions are made.</li>
+          <li><b>Unmeasured looks the same as failing.</b> A maturity model that normalises everything to a 0–100 score and an A–F rating gives a blind spot the exact shape of a bad score. For an estate report built on patchy data, that is fatal: half the value is knowing where we cannot see.</li>
+        </ul>
+      </div>
+      <div class="card" style="align-self:center">
+        <h3><span class="ic"><svg><use href="#i-reading"/></svg></span> What "reading it" has to mean</h3>
+        <ul class="pts tight" style="font-size:.92em">
+          <li>Across projects, not one page at a time</li>
+          <li>Over time, with a stated window</li>
+          <li>Computed from delivery history, never typed in</li>
+          <li>Able to say <span class="tag u">unknown</span>, distinct from bad</li>
+          <li>Able to say <span class="tag e">estimated</span>, distinct from measured</li>
+        </ul>
+      </div>
+    </div>
+    <div class="foot"><span>Problems</span><span>3 / 24</span></div>
+  </div>
+</section>
+
+<!-- 4 · Problem 2 -->
+<section class="slide" aria-label="Problem: data hard to reach and to read">
+  <div class="in">
+    <div class="eyebrow"><span class="ic"><svg><use href="#i-source"/></svg></span> Problem 2 of 4 · access and sense</div>
+    <div class="body">
+      <h2>The data is hard to reach, and harder to make sense of</h2>
+      <div class="cols">
+        <div>
+          <h3>Reaching it</h3>
+          <ul class="pts">
+            <li>Sources are the usual four, <b>SCM, CI, trackers, scanners</b>, plus the messy human ones: <b>spreadsheets, wikis, release emails</b>.</li>
+            <li>Each lives behind its own access, in its own format, with its own retention.</li>
+            <li>Credentials are often not granted. What we get is an export somebody ran for us, handed over as a file.</li>
+            <li>Nothing outside the organization can reach in, and little inside can reach out.</li>
+          </ul>
+        </div>
+        <div>
+          <h3>Making sense of it</h3>
+          <ul class="pts">
+            <li>Every team has its own vocabulary for the same pipeline: job names, stage names, what "released" means.</li>
+            <li>One build is seen three ways: a git tag, a Jenkins run, a spreadsheet row saying "release 3.4 shipped Monday". Nothing joins them.</li>
+            <li>"Deployed" is frequently recorded nowhere. Lead time to production has no end point to measure to.</li>
+            <li>The history is decaying while we plan. CI keeps weeks; scanners keep less; git keeps years. Next slide.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="foot"><span>Problems</span><span>4 / 24</span></div>
+  </div>
+</section>
+
+<!-- 5 · Durability -->
+<section class="slide" aria-label="Source durability">
+  <div class="in">
+    <div class="eyebrow"><span class="ic"><svg><use href="#i-clock"/></svg></span> Problem 2, continued · durability</div>
+    <div class="body cols-21">
+      <div>
+        <h2>The history is decaying while we plan</h2>
+        <div class="dur" role="img" aria-label="How long each source keeps its history">
+          <span class="n">Git commits, tags, branches</span><div class="track"><i style="width:100%"></i></div><span class="v">years, near permanent</span>
+          <span class="n">Pull requests</span><div class="track"><i style="width:92%"></i></div><span class="v">years</span>
+          <span class="n">CI build history</span><div class="track"><i class="p" style="width:22%"></i></div><span class="v">weeks to months</span>
+          <span class="n">Test results</span><div class="track"><i class="p" style="width:14%"></i></div><span class="v">weeks</span>
+          <span class="n">Scanner reports</span><div class="track"><i class="p" style="width:12%"></i></div><span class="v">weeks</span>
+          <span class="n">Deployment records</span><div class="track"><i class="z"></i></div><span class="v">often never existed</span>
+          <span></span><div class="axis"><span>now</span><span>a year ago</span><span>years</span></div><span></span>
+        </div>
+      </div>
+      <div style="align-self:center">
+        <h3>The rule this sets</h3>
+        <p><b>Harvest by durability, not by ease of access.</b> Snapshot the perishable sources early and coarsely, before the mapping is even designed. Reconstruct the rest from the durable sources later, at leisure.</p>
+        <p class="muted">A git-only estate, with no CI history left, is the common case this predicts. The design below treats it as normal, not as a failure.</p>
+      </div>
+    </div>
+    <div class="foot"><span>Problems</span><span>5 / 24</span></div>
+  </div>
+</section>
+
+<!-- 6 · Problem 3 CVEs -->
+<section class="slide" aria-label="Problem: CVEs are counted then forgotten">
+  <div class="in">
+    <div class="eyebrow"><span class="ic"><svg><use href="#i-cve"/></svg></span> Problem 3 of 4 · vulnerabilities</div>
+    <div class="body cols-21">
+      <div>
+        <h2>CVEs are counted, then forgotten</h2>
+        <ul class="pts">
+          <li><b>A scan reaches the dashboard as four integers</b>: critical, high, medium, low. The scanner's UNKNOWN severity has no slot and is dropped. The same CVE in two packages counts twice.</li>
+          <li><b>A release report can say "5.3.1 had 3 HIGH" and "5.3.4 had 1 HIGH"</b>, and cannot say which two were fixed, or when. Remediation time is unmeasurable by construction.</li>
+          <li><b>Accepted risk lives in files read by bash.</b> An ignore file for the image scanner, a suppressions file for the DAST scan: each carries a statement and an expiry that nothing enforces, and that no report reflects.</li>
+          <li><b>One CVE across forty projects</b>: thirty fixed it, who is left and for how long? Unaskable today, because both the finding and the affected component dissolve into a count.</li>
+        </ul>
+      </div>
+      <div class="card" style="align-self:center">
+        <h3><span class="ic"><svg><use href="#i-finding"/></svg></span> Today's pattern</h3>
+        <div class="flow" style="justify-content:flex-start; gap:1cqi; font-family:'IBM Plex Mono',monospace; font-size:.9em; align-items:center">
+          <span>scan</span><span class="ic" style="color:var(--ink-2)"><svg><use href="#i-arrow"/></svg></span>
+          <span>count</span><span class="ic" style="color:var(--ink-2)"><svg><use href="#i-arrow"/></svg></span>
+          <span>C / H / M / L</span><span class="ic" style="color:var(--ink-2)"><svg><use href="#i-arrow"/></svg></span>
+          <span style="color:var(--bad)">forget</span>
+        </div>
+        <p class="muted" style="margin-top:1cqi; font-size:.9em">Every new scanner repeats it. Worth fixing even if no organization is ever harvested: any CI pipeline already produces exactly this data, and throws all but four integers away.</p>
+      </div>
+    </div>
+    <div class="foot"><span>Problems</span><span>6 / 24</span></div>
+  </div>
+</section>
+
+<!-- 7 · Problem 4 deployments -->
+<section class="slide" aria-label="Problem: deployments">
+  <div class="in">
+    <div class="eyebrow"><span class="ic"><svg><use href="#i-deploy"/></svg></span> Problem 4 of 4 · deployments</div>
+    <div class="body cols">
+      <div>
+        <h2>Deployments: the record that often does not exist</h2>
+        <ul class="pts">
+          <li><b>In most organizations there is no deployment record.</b> A promotion, a tag, or a spreadsheet row is the closest thing to "it went live".</li>
+          <li><b>"Deployed" means something different in every team.</b> A pipeline stage, a ticket closed, an email sent. Nothing agrees on the moment.</li>
+          <li><b>So the two measures that matter most have no end point.</b> Lead time to production and time to recover both need the moment a build reached an environment, and it is the moment least likely to be recorded.</li>
+          <li><b>What is recorded does not replay.</b> Deployment tools keep the current state, not the history; when a record exists it is a log line, gone in weeks. Lead time then gets measured to a promotion at best.</li>
+        </ul>
+      </div>
+      <div style="align-self:center">
+        <div class="card">
+          <h3><span class="ic"><svg><use href="#i-marker"/></svg></span> What the design has to provide</h3>
+          <ul class="pts tight" style="font-size:.92em">
+            <li>A <b>deployment marker</b> per estate: a real environment when one exists, otherwise a named promotion level</li>
+            <li>A way to record a deployment that happened in 2024, with its real start and end</li>
+            <li>Readings that compute from that marker, so the same definition of lead time holds for a harvested estate and a live one</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="foot"><span>Problems</span><span>7 / 24</span></div>
+  </div>
+</section>
+
+<!-- Yontrack: what it is -->
+<section class="slide" aria-label="Yontrack, the system of record">
+  <div class="in">
+    <div class="eyebrow"><span class="ic"><svg><use href="#i-yontrack"/></svg></span> Yontrack · what it is</div>
+    <div class="body">
+      <h2>Yontrack: what was built, how far it got, what was checked</h2>
+      <div class="flow" style="margin:.4cqi 0 1.4cqi; justify-content:flex-start; gap:1cqi">
+        <div class="node"><span class="ic"><svg><use href="#i-estate"/></svg></span><span class="lbl">Project, branch</span><span class="sub">ownership and lines of work</span></div>
+        <div class="arrow"><span class="ic"><svg><use href="#i-arrow"/></svg></span></div>
+        <div class="node"><span class="ic"><svg><use href="#i-yontrack"/></svg></span><span class="lbl">Build</span><span class="sub">one artifact, timestamped, linked to its dependencies</span></div>
+        <div class="arrow"><span class="ic"><svg><use href="#i-arrow"/></svg></span></div>
+        <div class="node"><span class="ic"><svg><use href="#i-scorecard"/></svg></span><span class="lbl">Validations</span><span class="sub">named checks with typed data</span></div>
+        <div class="arrow"><span class="ic"><svg><use href="#i-arrow"/></svg></span></div>
+        <div class="node"><span class="ic"><svg><use href="#i-marker"/></svg></span><span class="lbl">Promotions</span><span class="sub">ordered rungs of release readiness</span></div>
+        <div class="arrow"><span class="ic"><svg><use href="#i-arrow"/></svg></span></div>
+        <div class="node"><span class="ic"><svg><use href="#i-deploy"/></svg></span><span class="lbl">Deployments</span><span class="sub">a build's passage into an environment</span></div>
+      </div>
+      <div class="cols">
+        <div>
+          <h3>Why it is the right place to assess delivery</h3>
+          <ul class="pts tight" style="font-size:.9em">
+            <li>It already holds the facts behind the four questions: when a build appeared, when it was promoted, what its tests and scans said, when and where it was deployed.</li>
+            <li>Every fact is <b>timestamped and kept per build</b>, so the past is queryable, not only the present.</li>
+            <li>Validations carry <b>typed data</b>, a test summary or a scan report, not a pass/fail flag; builds are <b>linked across projects</b>.</li>
+          </ul>
+        </div>
+        <div>
+          <h3>What it offers today</h3>
+          <ul class="pts tight" style="font-size:.9em">
+            <li>Fed by CI pipelines, a command-line tool and an API.</li>
+            <li>Read through project and branch pages, dashboards, delivery charts and notifications.</li>
+            <li>Environments and deployment pipelines, with admission rules and workflows.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="foot"><span>Yontrack</span><span>8 / 24</span></div>
+  </div>
+</section>
+
+<!-- Yontrack: why not directly -->
+<section class="slide" aria-label="Why Yontrack cannot simply be plugged in">
+  <div class="in">
+    <div class="eyebrow"><span class="ic"><svg><use href="#i-quiet"/></svg></span> Yontrack · at the organization</div>
+    <div class="body cols">
+      <div>
+        <h2>Why it cannot simply be plugged in</h2>
+        <ul class="pts">
+          <li><b>The organization's CI/CD cannot push anywhere.</b> Outbound HTTPS may exist; fully disconnected must work too.</li>
+          <li><b>Yontrack may not be installable inside</b> the organization at all.</li>
+          <li><b>The history predates any integration.</b> Nobody was posting builds to anything in 2024, and the readings need 2024.</li>
+          <li><b>Much of the history is not in a system.</b> A spreadsheet row and a release email are facts too, with a lower confidence.</li>
+          <li><b>Yontrack itself expects the present.</b> A build is created "now", a deployment starts "now", and every new fact fires notifications.</li>
+        </ul>
+      </div>
+      <div style="align-self:center">
+        <div class="card">
+          <h3><span class="ic"><svg><use href="#i-yontrack"/></svg></span> What we need</h3>
+          <ul class="pts tight" style="font-size:.92em">
+            <li>A way to bring in <b>history Yontrack did not witness</b>, from wherever it survives, as a file.</li>
+            <li>A Yontrack that <b>accepts the past without disturbing the present</b>: real dates, no notifications, no today's rules applied to 2024.</li>
+            <li>Vulnerabilities as <b>things with a history</b>, not counts.</li>
+            <li>A reading <b>across an estate</b>, with every number saying how sure it is.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="foot"><span>Yontrack</span><span>9 / 24</span></div>
+  </div>
+</section>
+
+<!-- 8 · Big picture -->
+<section class="slide" aria-label="The approach in one picture">
+  <div class="in">
+    <div class="eyebrow"><span class="ic"><svg><use href="#i-ledger"/></svg></span> Approach · introducing Scout</div>
+    <div class="body">
+      <div class="intro-row"><div class="lockup small"><svg aria-hidden="true"><use href="#i-scout-logo"/></svg><div><span class="name">Scout</span><span class="by">by Yontrack</span></div></div><h2>The approach in one picture: a portable ledger, produced inside the organization and replayed into Yontrack.</h2></div>
+      <div style="display:grid; grid-template-columns:1.55fr auto 2fr; gap:1.4cqi; align-items:stretch; margin-top:1.6cqi">
+        <div class="zone">
+          <span class="zt">Inside the organization</span>
+          <div class="flow">
+            <div class="node"><span class="ic"><svg><use href="#i-source"/></svg></span><span class="lbl">Sources</span><span class="sub">git, Jenkins, Bitbucket, scanners, spreadsheets</span></div>
+            <div class="arrow"><span class="ic"><svg><use href="#i-arrow"/></svg></span></div>
+            <div class="node"><span class="ic"><svg><use href="#i-harvester"/></svg></span><span class="lbl">Harvester</span><span class="sub">collectors, mapping, facts file</span></div>
+            <div class="arrow"><span class="ic"><svg><use href="#i-arrow"/></svg></span></div>
+            <div class="node"><span class="ic"><svg><use href="#i-ledger"/></svg></span><span class="lbl">Ledger</span><span class="sub">+ reconciliation report</span></div>
+          </div>
+        </div>
+        <div class="zone dashed" style="display:grid; align-content:center">
+          <span class="zt">Transport</span>
+          <div class="node"><span class="ic"><svg><use href="#i-ship"/></svg></span><span class="lbl">Shipper</span><span class="sub">HTTPS upload, or a copied file</span></div>
+        </div>
+        <div class="zone">
+          <span class="zt">Yontrack instance</span>
+          <div class="flow">
+            <div class="node"><span class="ic"><svg><use href="#i-import"/></svg></span><span class="lbl">Import</span><span class="sub">validated, dry-runnable, quiet</span></div>
+            <div class="arrow"><span class="ic"><svg><use href="#i-arrow"/></svg></span></div>
+            <div class="node"><span class="ic"><svg><use href="#i-yontrack"/></svg></span><span class="lbl">Model</span><span class="sub">builds, promotions, validations, deployments, findings</span></div>
+            <div class="arrow"><span class="ic"><svg><use href="#i-arrow"/></svg></span></div>
+            <div class="node"><span class="ic"><svg><use href="#i-reading"/></svg></span><span class="lbl">Readings</span><span class="sub">derived daily, never pushed</span></div>
+            <div class="arrow"><span class="ic"><svg><use href="#i-arrow"/></svg></span></div>
+            <div class="node"><span class="ic"><svg><use href="#i-estate"/></svg></span><span class="lbl">Estate view</span><span class="sub">projects × readings, fan-out</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="cols-3" style="margin-top:2.4cqi; font-size:.92em">
+        <p><b>The ledger is the seam.</b> Collectors run inside the organization and write an append-only, versioned file of delivery facts with provenance. A separate importer replays it. Transport is deliberately dumb: HTTPS and a USB key are two shippers over one artifact.</p>
+        <p><b>Yontrack owns the contract.</b> It publishes the JSON schema and accepts the upload, as it already does for configuration-as-code. This is history-as-code. If the format drifted to the harvester side, Yontrack would accept whatever it is sent and lose its second producer.</p>
+        <p><b>Two alternatives were rejected</b> as primary: an in-org push gateway (presumes egress, nothing to inspect when numbers look wrong) and an edge Yontrack that federates (real product work, kept as the strategic direction if the pattern recurs).</p>
+      </div>
+    </div>
+    <div class="foot"><span>Approach</span><span>10 / 24</span></div>
+  </div>
+</section>
+
+<!-- 9 · Principles -->
+<section class="slide" aria-label="Six principles">
+  <div class="in">
+    <div class="eyebrow"><span class="ic"><svg><use href="#i-schema"/></svg></span> Approach · principles</div>
+    <div class="body">
+      <h2>Six principles the whole chain is held to</h2>
+      <div class="steps" style="grid-template-columns:repeat(3,1fr)">
+        <div class="step"><h3>Portable ledger, dumb transport</h3><p>Facts are collected where they are and moved as a file. No component assumes the network, and everything that can be inspected is a file on disk.</p></div>
+        <div class="step"><h3>Yontrack owns the contract</h3><p>The ledger schema is published by the instance, versioned by one integer, and validated at the door. Producers pin it as a fixture; a contract only one producer has written is a private format.</p></div>
+        <div class="step"><h3>Agents produce configuration and rules, never numbers</h3><p>They inventory the estate, draft the mapping, mine the human sources, review reconciliation. Their output is reviewable config in git, executed deterministically. Judgement enters as an <span class="tag e">estimated</span> fact with evidence.</p></div>
+        <div class="step"><h3>Harvest by durability</h3><p>Fetch the perishable exports now, map them whenever the mapping is ready. Reconstruct from git later. Over-collecting is harmless because the server dedupes.</p></div>
+        <div class="step"><h3>Readings are derived, never pushed</h3><p>No REST update of a score, no computer interrogating another system. Import an organization's history and its scorecard exists, with nobody feeding a second system.</p></div>
+        <div class="step"><h3>Unknown is a value, not a zero</h3><p>Every reading carries its basis, <span class="tag m">measured</span>, <span class="tag e">estimated</span> or <span class="tag u">unknown</span>, the window it covers and the branches that fed it. The estate view can be read measured-only.</p></div>
+      </div>
+    </div>
+    <div class="foot"><span>Approach</span><span>11 / 24</span></div>
+  </div>
+</section>
+
+<!-- 11 · Harvester -->
+<section class="slide" aria-label="The harvester">
+  <div class="in">
+    <div class="eyebrow"><span class="ic"><svg><use href="#i-harvester"/></svg></span> Inside the organization · harvester</div>
+    <div class="body">
+      <h2>The harvester: three inputs, two collectors, one file out</h2>
+      <div class="cols-3">
+        <div>
+          <h3><span class="ic" style="vertical-align:-.25em; color:var(--accent-ink)"><svg><use href="#i-collector"/></svg></span> Inputs</h3>
+          <ul class="pts tight">
+            <li><b>Live collectors</b> fetch a CI or an SCM into an <b>export</b> file, then read it.</li>
+            <li><b>Report collectors</b> read the same export when someone ran the command for us. No credential needed.</li>
+            <li><b>Unstructured sources</b> (spreadsheets, wikis, emails) are mined by the agent into the <b>facts file</b>, as <span class="tag e">estimated</span>.</li>
+          </ul>
+        </div>
+        <div>
+          <h3><span class="ic" style="vertical-align:-.25em; color:var(--accent-ink)"><svg><use href="#i-mapping"/></svg></span> The mapping</h3>
+          <ul class="pts tight">
+            <li>One YAML per organization, validated against a published schema.</li>
+            <li>An <b>explicit project list</b>, drafted by the agent, reviewed by a human.</li>
+            <li>Stamp and level mappings organization-wide, with per-project overrides.</li>
+            <li>A <b>deployment marker</b> and a durability hint per source. Credentials by reference only.</li>
+          </ul>
+        </div>
+        <div>
+          <h3><span class="ic" style="vertical-align:-.25em; color:var(--accent-ink)"><svg><use href="#i-reconcile"/></svg></span> Output</h3>
+          <ul class="pts tight">
+            <li>One <b>ledger</b> per run, all sources.</li>
+            <li>A <b>reconciliation report</b> beside it: builds seen by one source and not another, unmapped jobs, stale sources. Errors fail the run.</li>
+            <li>Builds joined across sources by commit; disagreements are listed, not smoothed over.</li>
+            <li>Incremental by watermark; the server deduplicates anyway.</li>
+          </ul>
+        </div>
+      </div>
+      <p class="muted" style="margin-top:1.6cqi; font-size:.9em">Own repository, one static binary, one-shot commands run by the organization's own cron. Never a daemon.</p>
+    </div>
+    <div class="foot"><span>Harvester</span><span>12 / 24</span></div>
+  </div>
+</section>
+
+<!-- 13 · Ledger -->
+<section class="slide" aria-label="The ledger contract">
+  <div class="in">
+    <div class="eyebrow"><span class="ic"><svg><use href="#i-ledger"/></svg></span> The contract · ledger</div>
+    <div class="body cols-21">
+      <div>
+        <h2>The ledger: history as code</h2>
+<pre aria-label="Illustrative ledger excerpt"><span class="s">// one header line, then one fact per line</span>
+{<span class="k">"schemaVersion"</span>:1, <span class="k">"source"</span>:"acme", <span class="k">"producer"</span>:{…}, <span class="k">"createdAt"</span>:"2026-09-16T06:00:00+02:00"}
+{<span class="k">"id"</span>:"jenkins:job/app-build/42", <span class="k">"kind"</span>:"build",
+ <span class="k">"time"</span>:"2024-03-15T10:12:00+01:00", <span class="k">"basis"</span>:<span class="m">"MEASURED"</span>,
+ <span class="k">"evidence"</span>:"https://ci.acme.example/job/app-build/42/",
+ <span class="k">"payload"</span>:{"project":"app","branch":"main","name":"42"}}
+{<span class="k">"id"</span>:"facts:release-3.4-shipped", <span class="k">"kind"</span>:"deployment",
+ <span class="k">"time"</span>:"2024-03-18T00:00:00+01:00", <span class="k">"basis"</span>:<span class="e">"ESTIMATED"</span>,
+ <span class="k">"evidence"</span>:"Release log spreadsheet, row 118 (day only)",
+ <span class="k">"payload"</span>:{"slot":"app/production","build":"app/main/42","status":"DONE"}}</pre>
+        <p class="muted" style="font-size:.85em; margin-top:.8cqi">Illustrative shape. The schema is published by the Yontrack instance.</p>
+      </div>
+      <div>
+        <h3>The rules</h3>
+        <ul class="pts tight" style="font-size:.95em">
+          <li><b>A stream of facts, not a snapshot.</b> One thing that happened, at one time, applied in order.</li>
+          <li><b>Every fact carries</b> an id, a kind, a time, a basis and its evidence.</li>
+          <li><b>Deduplicated by source and id.</b> Ids derive from the natural key, so re-collecting is harmless.</li>
+          <li><b>Thirteen kinds, closed</b>: from project and branch down to build, validation, promotion, deployment.</li>
+          <li><b>One integer version</b>; older ledgers are always accepted.</li>
+          <li><b>No corrections</b>: purge the source and re-import.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="foot"><span>Ledger</span><span>13 / 24</span></div>
+  </div>
+</section>
+
+<!-- 12 · Agent -->
+<section class="slide" aria-label="Where the agent sits">
+  <div class="in">
+    <div class="eyebrow"><span class="ic"><svg><use href="#i-agent"/></svg></span> Inside the organization · the agent</div>
+    <div class="body cols">
+      <div>
+        <h2>Where the agent sits, and where it does not</h2>
+        <div class="flow" style="margin:1.5cqi 0 2cqi; justify-content:flex-start; gap:1.2cqi">
+          <div class="node"><span class="ic"><svg><use href="#i-agent"/></svg></span><span class="lbl">Agent proposes</span><span class="sub">on a branch of the harvest repository</span></div>
+          <div class="arrow"><span class="ic"><svg><use href="#i-arrow"/></svg></span></div>
+          <div class="node"><span class="ic"><svg><use href="#i-human"/></svg></span><span class="lbl">Human reviews</span><span class="sub">the diff, then merges</span></div>
+          <div class="arrow"><span class="ic"><svg><use href="#i-arrow"/></svg></span></div>
+          <div class="node"><span class="ic"><svg><use href="#i-harvester"/></svg></span><span class="lbl">Harvester runs</span><span class="sub">deterministically, from files on disk</span></div>
+        </div>
+        <p>Four procedures, written for any agent runtime and runnable by a human with no agent at all: <b>inventory</b> the sources and propose the project list; <b>draft the mapping</b>; <b>mine facts</b> from a spreadsheet or wiki page into the facts file, with the document as evidence; <b>review the reconciliation report</b>.</p>
+      </div>
+      <div style="align-self:center">
+        <div class="card">
+          <h3><span class="ic"><svg><use href="#i-quiet"/></svg></span> Guardrails that make the principle mechanical</h3>
+          <ul class="pts tight" style="font-size:.92em">
+            <li>The agent runs <code>collect</code> freely and <b>never <code>fetch</code></b> against a live source. Credentials stay with a human or cron.</li>
+            <li><b>The harvester never holds a model key.</b> The model belongs to the organization's agent runtime; judgement never sits inside the pipeline that produces numbers.</li>
+            <li>Anything the agent writes that is not a rule enters as <span class="tag e">estimated</span>, with the source document as evidence. An imprecise date ("2024-03") is expanded, and the original precision kept in the evidence.</li>
+            <li>Ids are readable slugs (<code>facts:release-3.4-shipped</code>, <code>jenkins:job/app-build/42</code>), never UUIDs: a reconciliation report is debugged by a human reading ids.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="foot"><span>Harvester</span><span>14 / 24</span></div>
+  </div>
+</section>
+
+<!-- 14 · Import -->
+<section class="slide" aria-label="The import">
+  <div class="in">
+    <div class="eyebrow"><span class="ic"><svg><use href="#i-import"/></svg></span> Into Yontrack · import</div>
+    <div class="body">
+      <h2>The import: history arrives without waking anyone up</h2>
+      <div class="steps">
+        <div class="step"><h3>Validated at the door</h3><p>The whole file is schema-checked in the request. A malformed ledger is rejected where the producer is standing; slow application runs behind.</p></div>
+        <div class="step"><h3>Dry run, first-class</h3><p>What would be created, skipped or rejected, and nothing written. The inspection a push gateway could never offer.</p></div>
+        <div class="step"><h3>Applied in order</h3><p>Facts sorted by time per project. A later ledger may carry older facts, harmlessly.</p></div>
+        <div class="step"><h3><span class="ic" style="vertical-align:-.2em; color:var(--accent-ink)"><svg><use href="#i-quiet"/></svg></span> Quiet</h3><p>Years of history must not fire years of notifications. Events are suppressed, model side effects kept, one "history arrived" event per run.</p></div>
+        <div class="step"><h3>Below today's rules</h3><p>A promotion rule configured in 2026 has nothing to say about 2024. Backfilled promotions and deployments are recorded as they happened.</p></div>
+        <div class="step"><h3>Recorded, labelled, purgeable</h3><p>An import run with counts and errors; a failing fact does not fail the run. Touched projects carry the source's label, and a source can be purged whole.</p></div>
+      </div>
+      <p class="muted" style="margin-top:1.6cqi; font-size:.9em">Behind a dedicated permission, and executed as the uploader so per-project rights hold. Import is a privilege because it can write dates.</p>
+    </div>
+    <div class="foot"><span>Import</span><span>15 / 24</span></div>
+  </div>
+</section>
+
+<!-- 15 · Findings -->
+<section class="slide" aria-label="Findings model">
+  <div class="in">
+    <div class="eyebrow"><span class="ic"><svg><use href="#i-finding"/></svg></span> Into Yontrack · security findings</div>
+    <div class="body cols-21">
+      <div>
+        <h2>A CVE becomes a thing with a history</h2>
+        <div class="model" style="margin-bottom:1.4cqi">
+          <div class="card">
+            <h3><span class="ic"><svg><use href="#i-finding"/></svg></span> Finding</h3>
+            <dl>
+              <dt>key</dt><dd>scanner, external id, affected package</dd>
+              <dt>owner</dt><dd>the project: one finding across its branches</dd>
+              <dt>keeps</dt><dd>first seen, last seen, resolved at; survives build purge</dd>
+            </dl>
+          </div>
+          <div class="rel"><span class="ic" style="width:2.2cqi;height:2.2cqi"><svg><use href="#i-arrow"/></svg></span><span>1 : n</span></div>
+          <div class="card">
+            <h3><span class="ic"><svg><use href="#i-observation"/></svg></span> Observation</h3>
+            <dl>
+              <dt>from</dt><dd>one scan of one build</dd>
+              <dt>carries</dt><dd>time, severity as the scanner said it, acceptance if any</dd>
+              <dt>why</dt><dd>CVEs get re-scored; scanners disagree</dd>
+            </dl>
+          </div>
+        </div>
+        <ul class="pts tight" style="font-size:.95em">
+          <li><b>The door is a scan report on a validation run</b>: scanner, kind, list of findings. The ledger imports a scan through the same door.</li>
+          <li><b>Severity</b>: critical, high, medium, low or <b>unknown</b>, with the scanner's raw word kept.</li>
+        </ul>
+      </div>
+      <div>
+        <h3>What becomes answerable</h3>
+        <ul class="pts tight" style="font-size:.95em">
+          <li><b>Resolution per branch</b>, rolled up per project. "Fixed on <code>main</code>, still shipping on <code>release/5.3</code>" becomes askable.</li>
+          <li><b>Acceptance is in the model</b>, read from the scanner's ignore files with their statement and expiry. An expired acceptance reopens the finding. Accepted is a third count, never "closed".</li>
+          <li><b>Remediation time</b>: first seen to first absent, against the estate's target.</li>
+          <li><b><span class="ic" style="vertical-align:-.25em; color:var(--accent-ink)"><svg><use href="#i-fanout"/></svg></span> Fan-out.</b> One CVE, forty projects, thirty fixed: who is left, on which branches, since when.</li>
+          <li><b>Two events</b>: a new finding, a resolved one. "New HIGH on <code>main</code>" is the first notification anyone sets up.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="foot"><span>Findings</span><span>16 / 24</span></div>
+  </div>
+</section>
+
+<!-- 16 · Readings -->
+<section class="slide" aria-label="Readings">
+  <div class="in">
+    <div class="eyebrow"><span class="ic"><svg><use href="#i-reading"/></svg></span> Into Yontrack · readings</div>
+    <div class="body cols-21">
+      <div>
+        <h2>Readings: a fixed catalogue, derived from the model</h2>
+        <table>
+          <thead><tr><th>Reading</th><th>Ships</th><th>Definition</th></tr></thead>
+          <tbody>
+            <tr><td><b>Lead time</b></td><td class="rel">6.0</td><td>Build creation to the deployment marker.</td></tr>
+            <tr><td><b>Deployment frequency</b></td><td class="rel">6.0</td><td>Markers reached per window.</td></tr>
+            <tr><td><b>Success rate</b></td><td class="rel">6.0</td><td>Successful deployments over attempts.</td></tr>
+            <tr><td><b>Time to recover</b></td><td class="rel">6.0</td><td>Failed deployment to the next successful one.</td></tr>
+            <tr><td><b>Test stability</b></td><td class="rel">6.0</td><td>Share of builds with all tests passing, and fail-then-pass flips.</td></tr>
+            <tr><td><b>Security maturity</b></td><td class="rel">6.1</td><td>Ladder: none, reported, covered and fresh, gating a release.</td></tr>
+            <tr><td><b>Remediation</b></td><td class="rel">6.1</td><td>Median time to close critical and high findings; count open past target.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div>
+        <h3>How a reading is taken</h3>
+        <ul class="pts tight" style="font-size:.95em">
+          <li><b>Materialised daily</b> over a trailing window, 90 days by default. Retention purges the inputs, and forty projects must not mean forty live computations.</li>
+          <li><b>Keyed by estate.</b> The marker, expected scans and targets are estate configuration, so one project can read differently in two estates.</li>
+          <li><b>Each reading records</b> its window, its basis (<span class="tag m">measured</span> / <span class="tag e">estimated</span> / <span class="tag u">unknown</span>), the reason when unknown, and the branches it read.</li>
+          <li><b>Branch rule fixed per reading</b>, never a hardcoded name.</li>
+          <li><b>Fixed catalogue.</b> Any addition is an issue against a real use case.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="foot"><span>Readings</span><span>17 / 24</span></div>
+  </div>
+</section>
+
+<!-- 17 · Estates -->
+<section class="slide" aria-label="Estates and the scorecard">
+  <div class="in">
+    <div class="eyebrow"><span class="ic"><svg><use href="#i-estate"/></svg></span> Into Yontrack · estates</div>
+    <div class="body cols-21">
+      <div>
+        <h2>The estate view: projects × readings, honest cells</h2>
+        <table aria-label="Example estate view">
+          <thead><tr><th>Project</th><th>Lead time</th><th>Frequency</th><th>Tests</th><th>Security</th><th>Remediation</th></tr></thead>
+          <tbody>
+            <tr><td>app</td><td class="num">3.2 d</td><td class="num">14 / 90 d</td><td class="num">96 %</td><td class="num">gating</td><td class="num">11 d</td></tr>
+            <tr><td>billing</td><td class="num">6.8 d</td><td class="num">7 / 90 d</td><td class="num">88 %</td><td class="num">covered</td><td class="cell-bad">34 d · 3 overdue</td></tr>
+            <tr><td>legacy-erp</td><td class="cell-e">≈ 21 d</td><td class="cell-e">≈ 2 / 90 d</td><td class="cell-u">unknown<small>no test data</small></td><td class="num">reported</td><td class="cell-u">unknown<small>no scan</small></td></tr>
+            <tr><td>gateway</td><td class="num">1.1 d</td><td class="num">31 / 90 d</td><td class="num">99 %</td><td class="num">gating</td><td class="num">4 d</td></tr>
+          </tbody>
+        </table>
+        <p class="muted" style="font-size:.85em; margin-top:.9cqi">Example figures. <span class="cell-e">≈ amber</span> is estimated, <span class="cell-u">hatched</span> is unknown with its reason, red is past the estate's target. A toggle reads the estate measured-only; a fan-out table below lists one CVE against the projects still exposed.</p>
+      </div>
+      <div>
+        <h3>What an estate is</h3>
+        <ul class="pts tight" style="font-size:.95em">
+          <li>A named group of projects, selected by <b>labels</b>, with its <b>deployment marker</b>, the <b>scans it expects</b>, and its <b>targets</b>: days to close a critical, days to close a high.</li>
+          <li><b>Targets live on the estate.</b> A project in two estates may be green in one and red in the other. The expectation belongs to whoever is reading.</li>
+          <li><b>No "all projects" estate.</b> An estate must be declared to be read, which forces its targets to exist.</li>
+          <li>An imported organization is an estate the moment it lands.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="foot"><span>Estates</span><span>18 / 24</span></div>
+  </div>
+</section>
+
+<!-- 18 · Audit -->
+<section class="slide" aria-label="What an audit gets">
+  <div class="in">
+    <div class="eyebrow"><span class="ic"><svg><use href="#i-reconcile"/></svg></span> Due diligence · the evidence chain</div>
+    <div class="body">
+      <h2>Every number traces back, or says why it cannot</h2>
+      <div class="chain">
+        <div class="card"><h3><span class="ic"><svg><use href="#i-reading"/></svg></span> Reading</h3><p>Value, basis, window, branches read, and the reason when unknown.</p></div>
+        <div class="arrow"><span class="ic"><svg><use href="#i-arrow"/></svg></span></div>
+        <div class="card"><h3><span class="ic"><svg><use href="#i-yontrack"/></svg></span> Model</h3><p>The builds, promotions, validations, deployments and findings it was computed from.</p></div>
+        <div class="arrow"><span class="ic"><svg><use href="#i-arrow"/></svg></span></div>
+        <div class="card"><h3><span class="ic"><svg><use href="#i-fact"/></svg></span> Fact</h3><p>Which import, which source, measured or estimated, and the evidence.</p></div>
+        <div class="arrow"><span class="ic"><svg><use href="#i-arrow"/></svg></span></div>
+        <div class="card"><h3><span class="ic"><svg><use href="#i-source"/></svg></span> Source</h3><p>The CI record, the git tag, or the spreadsheet row, and the reviewed reconciliation report.</p></div>
+      </div>
+      <div class="cols">
+        <div>
+          <h3>Questions this answers</h3>
+          <ul class="pts tight" style="font-size:.92em">
+            <li>Was this lead time measured or estimated, over which window?</li>
+            <li>Where are we blind, and why?</li>
+            <li>Which projects still ship this CVE, on which branches, since when?</li>
+            <li>How long do highs stay open, against the target?</li>
+            <li>What was accepted rather than fixed, and until when?</li>
+          </ul>
+        </div>
+        <div>
+          <h3>What an auditor can re-run</h3>
+          <ul class="pts tight" style="font-size:.92em">
+            <li>A <b>dry run</b> of any ledger, without writing.</li>
+            <li>A <b>re-collect</b> from the same exports: same ids, same facts.</li>
+            <li>The <b>reconciliation report</b>: disagreements listed, not smoothed over.</li>
+            <li>The <b>estate view measured-only</b>: every estimate removed.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="foot"><span>Due diligence</span><span>19 / 24</span></div>
+  </div>
+</section>
+
+<!-- 19 · Roadmap -->
+<section class="slide" aria-label="Roadmap">
+  <div class="in">
+    <div class="eyebrow"><span class="ic"><svg><use href="#i-clock"/></svg></span> Delivery · what ships where</div>
+    <div class="body">
+      <h2>Four blocks, three release homes</h2>
+      <div class="lanes">
+        <div class="lane">
+          <h3>Yontrack 6.0 <span class="tag m">major</span></h3>
+          <ul class="pts tight">
+            <li>The <b>finding and observation model</b>, in 6.0 so history accumulates from the first install.</li>
+            <li>The <b>delivery readings</b> and <b>test stability</b>; the project scorecard and security sections.</li>
+          </ul>
+        </div>
+        <div class="lane">
+          <h3>Yontrack 6.1 <span class="tag m">minor</span></h3>
+          <ul class="pts tight">
+            <li><b>Security maturity</b> and <b>remediation</b>, once weeks of findings exist.</li>
+            <li><b>Estates</b> and the estate view with fan-out.</li>
+            <li>The <b>ledger contract</b>, schema first, then the <b>ledger import</b>.</li>
+            <li><b>Yontrack learns to accept the past</b>: quiet import, promotions below today's rules, deployments with a real start and end.</li>
+          </ul>
+        </div>
+        <div class="lane">
+          <h3>Harvester <span class="tag e">own cadence</span></h3>
+          <ul class="pts tight">
+            <li>Own repository, depending only on the published schema.</li>
+            <li>Tool, harvest-repository template, agent playbook.</li>
+            <li>Collectors for the organization's structured sources: SCM, CI, scanners.</li>
+            <li>Agents gather the rest: inventory, mapping, and the unstructured sources mined into reviewed, estimated facts.</li>
+            <li>Done when the target organization's ledger validates, then imports cleanly once 6.1 ships.</li>
+          </ul>
+        </div>
+      </div>
+      <p class="muted" style="margin-top:1.6cqi; font-size:.9em">The findings model pays off even if no organization is ever harvested. The estate view is the block that decides whether the other three were worth doing.</p>
+    </div>
+    <div class="foot"><span>Roadmap</span><span>20 / 24</span></div>
+  </div>
+</section>
+
+<!-- 20 · On the radar -->
+<section class="slide" aria-label="On the radar">
+  <div class="in">
+    <div class="eyebrow"><span class="ic"><svg><use href="#i-clock"/></svg></span> Delivery · on the radar</div>
+    <div class="body">
+      <h2>On the radar: what the first cycle makes room for</h2>
+      <div class="cols-3">
+        <div>
+          <h3>Model</h3>
+          <ul class="pts tight" style="font-size:.95em">
+            <li><b>SBOM support.</b> A build's component list enters through the same door as a scan; findings already carry the package coordinate that joins to it. Then "the component is gone" becomes distinguishable from "not scanned", and fan-out works by package as well as by CVE.</li>
+            <li><b>Acceptance stays read-only in Yontrack.</b> The scanner-side files remain the source of truth; Yontrack reflects them, with their statement and expiry.</li>
+          </ul>
+        </div>
+        <div>
+          <h3>Producer</h3>
+          <ul class="pts tight" style="font-size:.95em">
+            <li><b>More collectors</b>, added as organizations bring their tools.</li>
+            <li><b>A pull shipper</b>: Yontrack fetching ledgers from a bucket or URL, once the file-based shippers have proven the contract.</li>
+            <li><b>A redaction layer</b>, for the day a ledger crosses a trust boundary.</li>
+            <li><b>Packaging and distribution</b> of the harvester.</li>
+          </ul>
+        </div>
+        <div>
+          <h3>Product</h3>
+          <ul class="pts tight" style="font-size:.95em">
+            <li><b>New readings</b>, each added against a real use case rather than through a generic extension point.</li>
+            <li><b>Corrections in the ledger</b>: retracting a fact rather than purging a source.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="foot"><span>On the radar</span><span>21 / 24</span></div>
+  </div>
+</section>
+
+<!-- 21 · Close -->
+<section class="slide" aria-label="Summary">
+  <div class="in">
+    <div class="eyebrow"><span class="ic"><svg><use href="#i-yontrack"/></svg></span> Summary</div>
+    <div class="body" style="display:grid; align-content:safe center; gap:2.6cqi">
+      <div class="lockup"><svg aria-hidden="true"><use href="#i-scout-logo"/></svg><div><span class="name">Scout</span><span class="by">by Yontrack</span></div></div>
+      <h1 style="font-size:3.6cqi">Your delivery history, read honestly.</h1>
+      <div class="cols" style="font-size:.95em">
+        <ul class="pts">
+          <li>A <b>harvester</b> turns whatever the organization has, spreadsheets included, into a <b>ledger</b> of facts with provenance.</li>
+          <li>Yontrack imports it <b>quietly</b>, below the rules that describe the present.</li>
+          <li>Vulnerabilities become <b>findings with a history</b>, fanned out across the estate.</li>
+        </ul>
+        <ul class="pts">
+          <li><b>Readings</b> are derived from the model: import a history and its scorecard exists.</li>
+          <li>Every cell of the <b>estate view</b> is measured, estimated or unknown, and traces back to a fact and its evidence.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="foot"><span>Scout · by Yontrack</span><span>22 / 24</span></div>
+  </div>
+</section>
+
+<!-- 22 · UI mock-up -->
+<section class="slide" aria-label="Estate screen mock-up">
+  <div class="in">
+    <div class="eyebrow"><span class="ic"><svg><use href="#i-estate"/></svg></span> What it could look like · the estate screen</div>
+    <div class="body">
+      <div class="mock" role="img" aria-label="Mock-up of an estate screen in the Yontrack web UI">
+        <div class="mock-bar"><svg aria-hidden="true"><use href="#i-logo"/></svg><b>Yontrack</b><span class="nav"><span>Home</span><span>Projects</span><span class="on">Scorecards</span><span>Environments</span></span><span class="sp"></span><span class="search">Search…</span><span class="avatar">D</span></div>
+        <div class="mock-page">
+          <div class="mock-crumb">Scorecards / Payments platform</div>
+          <div class="mock-head"><h4>Payments platform</h4><span class="mock-chip">6 projects · label <code>domain:payments</code></span><span class="mock-chip">legacy-erp · imported</span><span class="mock-chip">Marker: production</span><span class="mock-chip">Targets: critical 7 d · high 30 d</span><span class="mock-chip">Window: 90 days</span><span class="sp"></span><span class="mock-toggle"><i></i> Measured only</span></div>
+          <div class="mock-grid">
+            <div class="mock-panel">
+              <h5><span class="ic"><svg><use href="#i-reading"/></svg></span> Readings</h5>
+              <table>
+                <thead><tr><th>Project</th><th>Lead time</th><th>Frequency</th><th>Success</th><th>Tests</th><th>Security</th><th>Remediation</th></tr></thead>
+                <tbody>
+                  <tr><td class="proj">gateway</td><td class="ok">1.1 d</td><td class="ok">31</td><td class="ok">100 %</td><td class="ok">99 %</td><td class="ok">gating</td><td class="ok">4 d</td></tr>
+                  <tr><td class="proj">app</td><td class="ok">3.2 d</td><td class="ok">14</td><td class="ok">93 %</td><td class="ok">96 %</td><td class="ok">gating</td><td class="ok">11 d</td></tr>
+                  <tr><td class="proj">billing</td><td class="ok">6.8 d</td><td class="ok">7</td><td class="warn">71 %</td><td class="ok">88 %</td><td class="ok">covered</td><td class="warn">34 d · 3 overdue</td></tr>
+                  <tr><td class="proj">ledger-sync</td><td class="ok">4.0 d</td><td class="ok">9</td><td class="ok">89 %</td><td class="warn">61 % · flaky</td><td class="warn">reported</td><td class="warn">2 overdue</td></tr>
+                  <tr><td class="proj">legacy-erp</td><td class="est">≈ 21 d</td><td class="est">≈ 2</td><td class="unk">unknown<small>no deployment record</small></td><td class="unk">unknown<small>no test data</small></td><td class="ok">reported</td><td class="unk">unknown<small>no scan</small></td></tr>
+                  <tr><td class="proj">notifier</td><td class="ok">0.6 d</td><td class="ok">22</td><td class="ok">100 %</td><td class="ok">97 %</td><td class="warn">none</td><td class="unk">unknown<small>no scan</small></td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="mock-panel">
+              <h5><span class="ic"><svg><use href="#i-fanout"/></svg></span> Fan-out · CVE-2026-1234 <span class="sev">HIGH</span></h5>
+              <table>
+                <thead><tr><th>Project</th><th>Exposed on</th><th>Since</th></tr></thead>
+                <tbody>
+                  <tr><td class="proj">billing</td><td class="br">main, release/5.3</td><td class="warn">41 d</td></tr>
+                  <tr><td class="proj">ledger-sync</td><td class="br">release/2.x</td><td class="warn">33 d</td></tr>
+                  <tr><td class="proj">app</td><td class="br">release/5.3</td><td class="ok">fixed on main</td></tr>
+                  <tr><td class="proj">gateway</td><td class="br">—</td><td class="ok">resolved 12 d ago</td></tr>
+                  <tr><td class="proj">notifier</td><td class="br">—</td><td class="est">accepted until Nov</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+      <p class="muted" style="font-size:.8em; margin-top:.8cqi">Illustrative mock-up with example figures, not a screenshot.</p>
+    </div>
+    <div class="foot"><span>Mock-up</span><span>23 / 24</span></div>
+  </div>
+</section>
+
+<!-- Appendix · Vocabulary -->
+<section class="slide" aria-label="Vocabulary and icons">
+  <div class="in">
+    <div class="eyebrow"><span class="ic"><svg><use href="#i-fact"/></svg></span> Appendix · the words and their marks</div>
+    <div class="body">
+      <h2>One word per thing, one mark per word</h2>
+      <div class="gloss">
+        <div class="g"><span class="ic"><svg><use href="#i-source"/></svg></span><div><b>Source</b><span>A system or document delivery facts come from.</span></div></div>
+        <div class="g"><span class="ic"><svg><use href="#i-harvester"/></svg></span><div><b>Harvester</b><span>The tool, and the whole producer side inside the organization.</span></div></div>
+        <div class="g"><span class="ic"><svg><use href="#i-collector"/></svg></span><div><b>Collector</b><span>Reads one source kind from an export. Not: connector, plugin.</span></div></div>
+        <div class="g"><span class="ic"><svg><use href="#i-export"/></svg></span><div><b>Export</b><span>A collector's raw input, fetched live or handed over. Not: dump, snapshot.</span></div></div>
+        <div class="g"><span class="ic"><svg><use href="#i-mapping"/></svg></span><div><b>Mapping</b><span>The organization's YAML from local vocabulary to Yontrack structure.</span></div></div>
+        <div class="g"><span class="ic"><svg><use href="#i-facts"/></svg></span><div><b>Facts file</b><span>Hand-authored, agent-drafted, human-reviewed estimated facts.</span></div></div>
+        <div class="g"><span class="ic"><svg><use href="#i-reconcile"/></svg></span><div><b>Reconciliation report</b><span>What a collect run writes beside a ledger: gaps, disagreements, stale sources.</span></div></div>
+        <div class="g"><span class="ic"><svg><use href="#i-ledger"/></svg></span><div><b>Ledger</b><span>An append-only, versioned file of facts with provenance. Not: bundle, snapshot, ingestion.</span></div></div>
+        <div class="g"><span class="ic"><svg><use href="#i-fact"/></svg></span><div><b>Fact</b><span>One thing that happened, at one time, with an id, a basis and its evidence.</span></div></div>
+        <div class="g"><span class="ic"><svg><use href="#i-ship"/></svg></span><div><b>Shipper</b><span>One of two documented ways to move a ledger. A procedure, with no command behind it.</span></div></div>
+        <div class="g"><span class="ic"><svg><use href="#i-import"/></svg></span><div><b>Import run</b><span>One application of one ledger to one instance, with status, counts and errors.</span></div></div>
+        <div class="g"><span class="ic"><svg><use href="#i-quiet"/></svg></span><div><b>Quiet import</b><span>Events suppressed, model side effects kept.</span></div></div>
+        <div class="g"><span class="ic"><svg><use href="#i-finding"/></svg></span><div><b>Finding</b><span>One vulnerability on one component in one project, with a history.</span></div></div>
+        <div class="g"><span class="ic"><svg><use href="#i-observation"/></svg></span><div><b>Observation</b><span>One sighting of a finding by one scan of one build, with its severity.</span></div></div>
+        <div class="g"><span class="ic"><svg><use href="#i-reading"/></svg></span><div><b>Reading</b><span>One measurement of one project at one moment, for one estate. Not: indicator, metric, score.</span></div></div>
+        <div class="g"><span class="ic"><svg><use href="#i-estate"/></svg></span><div><b>Estate</b><span>Projects read together, with the expectations they are read against. Not: portfolio.</span></div></div>
+      </div>
+      <div class="basis">
+        <div class="b"><span class="ic" style="color:var(--accent-ink)"><svg><use href="#i-measured"/></svg></span><b>Measured</b><span class="muted">taken from a system record</span></div>
+        <div class="b"><span class="ic" style="color:var(--amber)"><svg><use href="#i-estimated"/></svg></span><b>Estimated</b><span class="muted">entered by judgement, with evidence</span></div>
+        <div class="b"><span class="ic" style="color:var(--unknown)"><svg><use href="#i-unknown"/></svg></span><b>Unknown</b><span class="muted">no data to compute from, with a reason</span></div>
+        <div class="b"><span class="ic" style="color:var(--accent-ink)"><svg><use href="#i-marker"/></svg></span><b>Deployment marker</b><span class="muted">what "reached production" means in this estate</span></div>
+      </div>
+    </div>
+    <div class="foot"><span>Appendix</span><span>24 / 24</span></div>
+  </div>
+</section>
+
+</main>
+
+<script>
+(function(){
+  var slides = Array.prototype.slice.call(document.querySelectorAll('.slide'));
+  var count = document.getElementById('count');
+  var prog = document.getElementById('prog');
+  var modeBtn = document.getElementById('mode');
+  var narrow = window.matchMedia('(max-width: 720px)');
+  var current = 0;
+
+  function fromHash(){
+    var n = parseInt((location.hash || '').replace('#',''), 10);
+    return isNaN(n) ? 0 : Math.min(Math.max(n - 1, 0), slides.length - 1);
+  }
+  function show(i, push){
+    current = Math.min(Math.max(i, 0), slides.length - 1);
+    slides.forEach(function(s, k){ s.classList.toggle('is-active', k === current); });
+    count.textContent = (current + 1) + ' / ' + slides.length;
+    prog.style.width = ((current + 1) / slides.length * 100) + '%';
+    if (push !== false) history.replaceState(null, '', '#' + (current + 1));
+    if (document.body.classList.contains('scroll') || narrow.matches) {
+      slides[current].scrollIntoView({block: 'start'});
+    }
+  }
+  function setScroll(on){
+    document.body.classList.toggle('scroll', on);
+    modeBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    if (on) slides[current].scrollIntoView({block: 'start'});
+    else window.scrollTo(0, 0);
+  }
+
+  document.getElementById('prev').addEventListener('click', function(){ show(current - 1); });
+  document.getElementById('next').addEventListener('click', function(){ show(current + 1); });
+  modeBtn.addEventListener('click', function(){ setScroll(!document.body.classList.contains('scroll')); });
+
+  document.addEventListener('keydown', function(e){
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    var t = e.target; if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return;
+    switch (e.key) {
+      case 'ArrowRight': case 'PageDown': case ' ': show(current + 1); e.preventDefault(); break;
+      case 'ArrowLeft': case 'PageUp': show(current - 1); e.preventDefault(); break;
+      case 'Home': show(0); e.preventDefault(); break;
+      case 'End': show(slides.length - 1); e.preventDefault(); break;
+      case 'o': case 'O': setScroll(!document.body.classList.contains('scroll')); break;
+    }
+  });
+  window.addEventListener('hashchange', function(){ show(fromHash(), false); });
+  show(fromHash(), false);
+})();
+</script>
+</body>
+</html>
