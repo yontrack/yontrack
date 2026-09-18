@@ -21,8 +21,14 @@ on:
 
 # A newer push supersedes a pull request's analysis, but never a push's: every push to main has
 # a SECURITY.CODE to report on its build.
+#
+# Hence the two grouping keys. A pull request groups on its ref, so that pushing again to the
+# same pull request cancels the analysis in flight. A push groups on its commit, so that two
+# commits analyse in parallel rather than queueing -- ci.yml stopped queueing for the same
+# reason, and leaving this one keyed on the branch would just move the bottleneck here. See
+# ADR 0014.
 concurrency:
-  group: codeql-${{ github.ref }}
+  group: codeql-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:

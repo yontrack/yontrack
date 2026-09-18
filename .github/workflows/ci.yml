@@ -34,9 +34,18 @@ on:
         type: boolean
         default: true
 
-# `disableConcurrentBuilds()`. Jenkins queued rather than cancelled, hence no cancel-in-progress.
+# Keyed on the commit, not the branch. A group of `ci-refs/heads/main` serialised the whole
+# repository -- the workflow merges into main and never pushes the working branch, so every run
+# there is -- and two sessions working in parallel queued behind each other for 9-14 minutes on
+# top of the ~21 the run itself costs. Different commits now run at the same time; a re-run of
+# the *same* commit still cannot overlap itself, which is what keeps two runs from writing
+# validations onto one Yontrack build. See ADR 0014.
+#
+# Still no cancel-in-progress: `disableConcurrentBuilds()` queued rather than cancelled, and
+# every push to main needs its own Yontrack build validated for the promotion chain to mean
+# anything.
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.sha }}
   cancel-in-progress: false
 
 permissions:
@@ -231,6 +240,20 @@ jobs:
     name: Yontrack
     needs: setup
     if: needs.setup.outputs.full_run == 'true'
+    # The one thing that cannot run in parallel. Yontrack orders builds by insertion id --
+    # `StructureJdbcRepository.getPreviousBuild` is `ORDER BY ID DESC`, and the comment above it
+    # states that a higher id *is* a later build and that the whole build model rests on it. Two
+    # runs registering inside the same few seconds could therefore record main's commits in the
+    # wrong order, and `getPreviousBuild` being wrong poisons the change log the SILVER/GOLD
+    # notification renders, the "latest BRONZE on main" default of demo-deploy.yml, and every
+    # auto-versioning boundary.
+    #
+    # A job-level group keyed on the branch serialises registration -- twelve seconds of it --
+    # while the rest of the run stays parallel. Everything downstream declares `needs: yontrack`,
+    # so it inherits the ordering for free. See ADR 0014.
+    concurrency:
+      group: ci-yontrack-${{ github.ref }}
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     timeout-minutes: 15
     outputs:

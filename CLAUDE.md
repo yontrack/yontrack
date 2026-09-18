@@ -200,10 +200,13 @@ Check the `main` build before applying `status:ready` — the workflow is `CI` (
 which runs on every push:
 
 ```bash
-# Latest CI run on main for the commit that was just pushed
-gh run list --workflow=ci.yml --branch main --limit 1 --json headSha,status,conclusion,url
+# The CI run for the commit that was just pushed. Match on the SHA, never on "the latest run":
+# runs on main go in parallel now (ADR 0014), so another session's newer run can finish first.
+gh run list --workflow=ci.yml --branch main --limit 10 \
+  --json databaseId,headSha,status,conclusion,url \
+  --jq ".[] | select(.headSha == \"$(git rev-parse HEAD)\")"
 
-# Block until it finishes (use the run id from the command above)
+# Block until it finishes (use the databaseId from the command above)
 gh run watch <run-id>
 ```
 
