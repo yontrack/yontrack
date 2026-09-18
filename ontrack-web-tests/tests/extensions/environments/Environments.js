@@ -123,6 +123,21 @@ export class EnvironmentsPage {
     }
 }
 
+/**
+ * Both dialogs have a **Description**, and an Ant Design `Form.Item` names its control after the
+ * field - so once each dialog has been opened once, two `id="description"` inputs are in the page.
+ * A closed Ant Design modal stays mounted, and a duplicated id makes `label[for="description"]`
+ * point at whichever one is *first* in the document, which is the one belonging to the dialog that
+ * was opened first and is now hidden. Looking a Description up by its label therefore finds an
+ * invisible field and waits out the whole timeout, and scoping the label lookup to the visible
+ * dialog does not help - the association is computed against the document, not against the scope.
+ *
+ * So the Description is reached by its id *within* the open dialog: a plain CSS lookup inside a
+ * subtree, which has no such document-wide behaviour. Every other field of these two dialogs has a
+ * name of its own and is left alone.
+ */
+const descriptionField = (dialog) => dialog.locator('#description')
+
 export class EnvironmentDialog {
     constructor(page) {
         this.page = page
@@ -132,7 +147,7 @@ export class EnvironmentDialog {
         const dialog = this.page.getByRole('dialog')
         await expect(dialog.getByLabel('Name')).toBeVisible()
         await dialog.getByLabel('Name').fill(name)
-        await dialog.getByLabel('Description').fill(description)
+        await descriptionField(dialog).fill(description)
         await dialog.getByLabel('Order').fill(order.toString())
         const tagsField = dialog.getByTestId('tags')
         for (const tag of tags) {
@@ -166,7 +181,7 @@ export class SlotDialog {
         }
 
         if (description) {
-            await this.page.getByLabel('Description').fill(description)
+            await descriptionField(dialog).fill(description)
         }
 
         await this.page.getByTestId('environmentIds').locator('div').nth(1).click()
