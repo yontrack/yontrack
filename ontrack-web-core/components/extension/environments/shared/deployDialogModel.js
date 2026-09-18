@@ -65,22 +65,20 @@ export const slotChoices = (eligibleSlots = []) =>
 /**
  * The choices offered when the dialog was opened **from a slot**: the builds that could come here.
  *
- * The eligibility of each one comes from its own `journey` - the entry for *this* slot - which is
- * the same answer, computed the same way, that the journey chip shows elsewhere. A build which has
- * already been here (superseded) or is here now is still a choice: redeploying is a thing people do.
- * Only a build the rules refuse is not.
+ * Every one of them is deployable, and that asymmetry with [slotChoices] is deliberate rather than
+ * an omission. "Non-eligible choices are listed with the rule that refuses them" is a question a
+ * person asks about *a build* - "why can I not deploy 107 to production?" - and the server answers
+ * it that way round, as `EligibleSlot.nonEligibleRules`. The other way round has no equivalent: a
+ * slot's ineligible builds are every build of the project that is not on offer, which is a list of
+ * everything rather than an explanation. So the slot asks for the builds its rules already accept,
+ * and the explaining is done in the from-a-build direction, where the question is actually asked.
  */
 export const buildChoices = (builds = [], slot) =>
-    builds.map(build => {
-        const entry = (build.journey ?? []).find(it => it.slot?.id === slot?.id)
-        const state = entry?.state
-        return {
-            key: build.id,
-            eligible: state !== 'NOT_ELIGIBLE',
-            state,
-            nonEligibleRules: entry?.nonEligibleRules ?? [],
-            slot,
-            build,
-            cancels: cancelledDeployment(slot),
-        }
-    })
+    builds.map(build => ({
+        key: build.id,
+        eligible: true,
+        nonEligibleRules: [],
+        slot,
+        build,
+        cancels: cancelledDeployment(slot),
+    }))

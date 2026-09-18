@@ -281,7 +281,6 @@ export const gqlSlotDrawer = gql`
                 slotById(id: $slotId) {
                     id
                     qualifier
-                    blocked
                     behind
                     environment {
                         id
@@ -357,7 +356,7 @@ export const gqlDeployDialogStart = gql`
                 `
 
 /**
- * From a slot: the builds that could come here, each with its journey entry for this slot.
+ * From a slot: the deployable builds that could come here.
  */
 export const gqlDeployDialogBuilds = gql`
             query DeployDialogBuilds($slotId: String!) {
@@ -378,18 +377,16 @@ export const gqlDeployDialogBuilds = gql`
                             name
                         }
                     }
-                    eligibleBuilds(size: 10) {
+                    # Deployable, so every row offered is one the slot's rules already accept.
+                    # See buildChoices for why this direction does not explain refusals.
+                    eligibleBuilds(size: 5, deployable: true) {
                         pageItems {
                             ...SharedBuildData
-                            journey {
-                                ...BuildJourneyData
-                            }
                         }
                     }
                 }
             }
             ${gqlSharedBuildData}
-            ${gqlBuildJourneyData}
         `
 
 /**

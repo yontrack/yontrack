@@ -12,6 +12,13 @@ import net.nemerosa.ontrack.model.structure.Build
  * They live beside [SlotService] rather than in it because each of them is a *composition* of what
  * [SlotService] already answers (the current deployment, its checks, the last deployed one, the
  * eligible builds, the slot graph) into the single word a cell has room for.
+ *
+ * **Each method answers about one slot, and nothing here batches.** That is deliberate and it is
+ * also the known limit: a caller asking [isBlocked] of a hundred slots pays a hundred times over,
+ * because every one of them re-reads the slot's deployment and re-runs its checks. It is the right
+ * shape for the drawer, the slot page and a list of a handful of environments; it is the wrong
+ * shape for the project x environment matrix, which is why the redesign lists *a matrix query* as
+ * a backend need of its own rather than as a hundred calls to these. Batch there, not here.
  */
 interface SlotStatusService {
 

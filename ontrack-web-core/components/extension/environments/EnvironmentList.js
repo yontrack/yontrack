@@ -162,7 +162,7 @@ export default function EnvironmentList() {
                 slotId={slotDrawer.slotId}
                 open={slotDrawer.open}
                 onClose={slotDrawer.close}
-                onDeploy={(slot) => deployDialog.start({slot})}
+                onDeploy={(slot, build) => deployDialog.start({slot, build})}
             />
             <DeployDialog dialog={deployDialog}/>
         </>

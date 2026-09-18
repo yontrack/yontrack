@@ -80,38 +80,24 @@ describe('choosing a build, from a slot', () => {
 
     const theSlot = slot('production', 20)
 
-    const build = (name, state, nonEligibleRules = []) => ({
-        id: name,
-        name,
-        journey: [
-            // Another slot's entry, to make sure the right one is picked out.
-            {slot: {id: 'staging'}, state: 'DEPLOYED', nonEligibleRules: []},
-            {slot: {id: 'production'}, state, nonEligibleRules},
-        ],
-    })
+    const build = (name) => ({id: name, name})
 
-    it("reads each build's eligibility from its own journey entry for this slot", () => {
-        const choices = buildChoices([build('107', 'ELIGIBLE')], theSlot)
-        expect(choices[0].eligible).toBe(true)
-        expect(choices[0].state).toBe('ELIGIBLE')
-    })
-
-    it('still offers a build which has been here before', () => {
-        // Redeploying a superseded build is a thing people do, and it is not the rules refusing.
-        const choices = buildChoices([build('104', 'SUPERSEDED')], theSlot)
-        expect(choices[0].eligible).toBe(true)
-    })
-
-    it('refuses a build the rules refuse, with their reasons', () => {
-        const rules = [{id: 'r1', name: 'gold', ruleId: 'promotion', ruleConfig: {promotion: 'GOLD'}}]
-        const choices = buildChoices([build('108', 'NOT_ELIGIBLE', rules)], theSlot)
-        expect(choices[0].eligible).toBe(false)
-        expect(choices[0].nonEligibleRules).toEqual(rules)
+    it('offers every build the slot came back with', () => {
+        // The query asks for deployable builds only, so the server has already applied the slot's
+        // rules - see the note on `buildChoices` for why this direction does not explain refusals.
+        const choices = buildChoices([build('107'), build('104')], theSlot)
+        expect(choices.map(choice => choice.eligible)).toEqual([true, true])
+        expect(choices.map(choice => choice.key)).toEqual(['107', '104'])
     })
 
     it('carries the cancellation the choice would cause', () => {
         const busy = slot('production', 20, {current: pipeline(12, 'RUNNING', '105')})
-        const choices = buildChoices([build('107', 'ELIGIBLE')], busy)
+        const choices = buildChoices([build('107')], busy)
         expect(choices[0].cancels.number).toBe(12)
+    })
+
+    it('carries no cancellation when the slot is idle', () => {
+        const choices = buildChoices([build('107')], theSlot)
+        expect(choices[0].cancels).toBeNull()
     })
 })

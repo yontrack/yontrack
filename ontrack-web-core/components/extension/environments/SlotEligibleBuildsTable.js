@@ -62,7 +62,7 @@ export default function SlotEligibleBuildsTable({slot, onChange, showEligibleBui
                                     icon={<FaPlay color="green"/>}
                                     title="Deploy this build into this slot"
                                     data-testid={`slot-eligible-deploy-${build.id}`}
-                                    onClick={() => deployDialog.start({slot})}
+                                    onClick={() => deployDialog.start({slot, build})}
                                 />
                             }
                         </Space>

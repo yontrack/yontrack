@@ -21,7 +21,6 @@ import {
     gqlDeployDialogSlots,
     gqlDeployDialogStart,
 } from "@components/extension/environments/shared/environmentsSharedGraphQL"
-import {journeyStates} from "@components/extension/environments/shared/JourneyChip"
 
 /**
  * Opening the deploy dialog.
@@ -30,6 +29,11 @@ import {journeyStates} from "@components/extension/environments/shared/JourneyCh
  * which slot; `start({slot})` opens it on a slot and asks which build. Everything else about the
  * dialog is the same in both directions, which is the point: the redesign found four entry points
  * with four different UIs, and four different answers to "why can I not deploy this?".
+ *
+ * A caller which already knows *both* - a Deploy button beside one build in one slot - passes both,
+ * and the dialog narrows to that single choice rather than asking a question whose answer it has
+ * been given. It is still the dialog rather than a bare confirmation, because the cancellation
+ * warning and the refusal reason are the whole reason this exists.
  *
  * @param {function} onSuccess Called with the new deployment's id. The drawer refreshes itself; a
  *   page-level caller navigates to the deployment.
@@ -70,6 +74,8 @@ export default function DeployDialog({dialog}) {
     const context = dialog.context
     const fromBuild = !!context?.build
     const fromSlot = !!context?.slot && !fromBuild
+    // Both known: the from-build list, narrowed to the one slot the caller named.
+    const onlySlot = fromBuild ? context?.slot : null
 
     return (
         <Modal
@@ -90,7 +96,7 @@ export default function DeployDialog({dialog}) {
             // would offer an environment the build has since left, or hide one it has since reached.
             destroyOnClose
         >
-            {fromBuild && <DeployFromBuild dialog={dialog} build={context.build}/>}
+            {fromBuild && <DeployFromBuild dialog={dialog} build={context.build} onlySlot={onlySlot}/>}
             {fromSlot && <DeployToSlot dialog={dialog} slot={context.slot}/>}
         </Modal>
     )
@@ -99,7 +105,7 @@ export default function DeployDialog({dialog}) {
 /**
  * From a build: which slot?
  */
-function DeployFromBuild({dialog, build}) {
+function DeployFromBuild({dialog, build, onlySlot}) {
 
     const query = useQuery(
         gqlDeployDialogSlots,
@@ -112,7 +118,8 @@ function DeployFromBuild({dialog, build}) {
         }
     )
 
-    const choices = slotChoices(query.data ?? [])
+    const all = slotChoices(query.data ?? [])
+    const choices = onlySlot ? all.filter(choice => choice.slot.id === onlySlot.id) : all
 
     return (
         <DeployChoices
@@ -120,7 +127,11 @@ function DeployFromBuild({dialog, build}) {
             query={query}
             choices={choices}
             buildOf={() => build}
-            emptyText="This build's project has no deployment slot."
+            emptyText={
+                onlySlot ?
+                    "This build cannot be deployed here." :
+                    "This build's project has no deployment slot."
+            }
             label={choice => slotDisplayNameWithoutProject(choice.slot)}
             testIdPrefix="deploy-dialog-slot"
         />
@@ -232,12 +243,6 @@ function DeployChoices({dialog, query, choices, buildOf, emptyText, label, testI
                                     promotionLevel={topPromotionRun(choice.build).promotionLevel}
                                     size={16}
                                 />
-                            }
-                            {
-                                choice.state && journeyStates[choice.state] &&
-                                <Tag color={journeyStates[choice.state].color}>
-                                    {journeyStates[choice.state].label}
-                                </Tag>
                             }
                             {
                                 !choice.eligible &&

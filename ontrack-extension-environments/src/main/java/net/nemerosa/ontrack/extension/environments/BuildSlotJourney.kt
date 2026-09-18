@@ -34,8 +34,9 @@ enum class BuildSlotJourneyState {
  * @property slot The slot.
  * @property state Where the build stands in it.
  * @property pipeline The build's most recent deployment in this slot, or `null` when it has never
- *   had one - which is exactly the [BuildSlotJourneyState.ELIGIBLE] and
- *   [BuildSlotJourneyState.NOT_ELIGIBLE] cases.
+ *   had one. Note that it is *not* null in every [BuildSlotJourneyState.ELIGIBLE] case: a build
+ *   whose only deployment here was cancelled is eligible again and keeps that cancelled deployment,
+ *   which is what lets a reader tell "never tried" from "tried and was called off".
  * @property nonEligibleRules The admission rules refusing this build, empty unless [state] is
  *   [BuildSlotJourneyState.NOT_ELIGIBLE]. It is what lets the UI say *why* in a tooltip instead of
  *   showing a greyed-out chip with no explanation.

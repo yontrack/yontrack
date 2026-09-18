@@ -193,12 +193,11 @@ describe('the deploy dialog, opened from a slot', () => {
         return dialog
     }
 
-    const build = (name, state, nonEligibleRules = []) => ({
+    const build = (name) => ({
         id: name,
         name,
         releaseProperty: null,
         promotionRuns: [],
-        journey: [{slot: {id: 'production'}, state, nonEligibleRules}],
     })
 
     const withBuilds = (theSlot, ...builds) => {
@@ -224,26 +223,16 @@ describe('the deploy dialog, opened from a slot', () => {
         expect(screen.getByText('Deploy to production · petclinic [canary]')).toBeInTheDocument()
     })
 
-    it('offers an eligible build', () => {
+    it('offers a deployable build', () => {
         const production = slot('production', 20)
-        withBuilds(production, build('107', 'ELIGIBLE'))
+        withBuilds(production, build('107'))
         openFromSlot(production)
         expect(screen.getByTestId('deploy-dialog-build-start-107')).toBeInTheDocument()
     })
 
-    it('lists a build the rules refuse, with the rule that refuses it', () => {
-        const production = slot('production', 20)
-        withBuilds(production, build('108', 'NOT_ELIGIBLE', [goldRule]))
-        openFromSlot(production)
-        expect(screen.getByTestId('deploy-dialog-build-ineligible-108')).toHaveTextContent('Not eligible')
-        expect(screen.getByTestId('deploy-dialog-build-reasons-108'))
-            .toHaveTextContent('GOLD promotion is required')
-        expect(screen.queryByTestId('deploy-dialog-build-start-108')).not.toBeInTheDocument()
-    })
-
     it('starts the deployment of the build that was chosen', async () => {
         const production = slot('production', 20)
-        withBuilds(production, build('107', 'ELIGIBLE'))
+        withBuilds(production, build('107'))
         openFromSlot(production)
         fireEvent.click(screen.getByTestId('deploy-dialog-build-start-107'))
         await waitFor(() => expect(callGraphQL).toHaveBeenCalled())
@@ -252,9 +241,58 @@ describe('the deploy dialog, opened from a slot', () => {
 
     it('warns about the deployment it would cancel', () => {
         const busy = slot('production', 20, {current: pipeline(12, 'RUNNING', '105')})
-        withBuilds(busy, build('107', 'ELIGIBLE'))
+        withBuilds(busy, build('107'))
         openFromSlot(busy)
         expect(screen.getByTestId('deploy-dialog-build-cancels-107'))
             .toHaveTextContent('Deployment #12 (build 105, RUNNING) will be cancelled.')
+    })
+
+    it('says so when the slot has nothing it can take', () => {
+        const production = slot('production', 20)
+        withBuilds(production)
+        openFromSlot(production)
+        expect(screen.getByTestId('deploy-dialog-empty'))
+            .toHaveTextContent('No build of this project can be deployed here.')
+    })
+})
+
+describe('the deploy dialog, opened on a build AND a slot', () => {
+
+    const openOnBoth = (theSlot) => {
+        const dialog = {
+            context: {build: {id: 100, name: '107'}, slot: theSlot},
+            open: true,
+            close: jest.fn(),
+            onSuccess: jest.fn(),
+        }
+        render(<DeployDialog dialog={dialog}/>)
+        return dialog
+    }
+
+    it('narrows to the slot the caller named rather than asking again', () => {
+        // A Deploy button beside one build in one slot has already answered the question; asking it
+        // again is what made the old per-row buttons and the dialog feel like two different things.
+        withSlots(
+            {eligible: true, nonEligibleRules: [], slot: slot('staging', 10)},
+            {eligible: true, nonEligibleRules: [], slot: slot('production', 20)},
+        )
+        openOnBoth(slot('production', 20))
+        expect(screen.getByTestId('deploy-dialog-slot-production')).toBeInTheDocument()
+        expect(screen.queryByTestId('deploy-dialog-slot-staging')).not.toBeInTheDocument()
+    })
+
+    it('still warns about the deployment it would cancel', () => {
+        const busy = slot('production', 20, {current: pipeline(12, 'RUNNING', '105')})
+        withSlots({eligible: true, nonEligibleRules: [], slot: busy})
+        openOnBoth(busy)
+        expect(screen.getByTestId('deploy-dialog-slot-cancels-production'))
+            .toHaveTextContent('Deployment #12 (build 105, RUNNING) will be cancelled.')
+    })
+
+    it('still says why that one slot refuses the build', () => {
+        withSlots({eligible: false, nonEligibleRules: [goldRule], slot: slot('production', 20)})
+        openOnBoth(slot('production', 20))
+        expect(screen.getByTestId('deploy-dialog-slot-reasons-production'))
+            .toHaveTextContent('GOLD promotion is required')
     })
 })

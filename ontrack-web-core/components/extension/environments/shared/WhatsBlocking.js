@@ -88,7 +88,7 @@ export default function WhatsBlocking({deployment, onChange, actions = true}) {
                 </Typography.Text>
                 {
                     /* Inline fix: answer a rule waiting on somebody. */
-                    item.kind === 'rule' && item.needsInput && canAct &&
+                    item.kind === 'rule' && !item.ok && item.needsInput && canAct &&
                     <Button
                         size="small"
                         icon={<FaHandPaper color="orange"/>}

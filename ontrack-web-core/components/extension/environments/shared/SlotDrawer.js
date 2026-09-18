@@ -64,7 +64,16 @@ export default function SlotDrawer({slotId, open, onClose, onDeploy}) {
             // Every opening asks the server again, and a closed drawer costs nothing.
             destroyOnClose
         >
-            {open && slotId && <SlotDrawerContent slotId={slotId} onClose={onClose} onDeploy={onDeploy}/>}
+            {
+                /*
+                 * `key` so that switching slots while the drawer is open remounts the content.
+                 * `useQuery` never puts `finished` back to false on a deps change, so without this
+                 * the drawer would keep drawing the previous slot's Now / In flight / Next / Recent
+                 * under the new slot's title until the new answer landed.
+                 */
+                open && slotId &&
+                <SlotDrawerContent key={slotId} slotId={slotId} onClose={onClose} onDeploy={onDeploy}/>
+            }
         </Drawer>
     )
 }

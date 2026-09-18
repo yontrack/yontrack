@@ -44,7 +44,7 @@ export default function EnvironmentCard({environment, showSlots = true, onSlotCl
                                 >
                                     <Flex vertical={true} gap={4}>
                                         <Flex justify="space-between" align="center" gap={16}>
-                                            <SlotTitle slot={slot} showLastDeployed={true}/>
+                                            <SlotTitle slot={slot}/>
                                             <SlotLink slot={slot} text="Slot"/>
                                         </Flex>
                                         <SlotCell slot={slot} onClick={onSlotClick}/>
