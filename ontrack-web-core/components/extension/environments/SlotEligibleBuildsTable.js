@@ -5,9 +5,19 @@ import {Space} from "antd";
 import BuildLink from "@components/builds/BuildLink";
 import PromotionRuns from "@components/promotionRuns/PromotionRuns";
 import {isAuthorized} from "@components/common/authorizations";
-import SlotPipelineCreateButton from "@components/extension/environments/SlotPipelineCreateButton";
+import {Button} from "antd";
+import {FaPlay} from "react-icons/fa";
+import DeployDialog, {useDeployDialog} from "@components/extension/environments/shared/DeployDialog";
 
 export default function SlotEligibleBuildsTable({slot, onChange, showEligibleBuilds = false}) {
+
+    /*
+     * The one way to start a deployment (#1797). `SlotPipelineCreateButton` used to start it from
+     * here behind a `Popconfirm` warning that "all currently active deployments" would be cancelled
+     * without saying which, or what was in them; the dialog names the deployment it would cancel.
+     */
+    const deployDialog = useDeployDialog({onSuccess: onChange})
+
     return (
         <>
             <StandardTable
@@ -48,16 +58,18 @@ export default function SlotEligibleBuildsTable({slot, onChange, showEligibleBui
                             <PromotionRuns promotionRuns={build.promotionRuns}/>
                             {
                                 isAuthorized(slot, "pipeline", "create") &&
-                                <SlotPipelineCreateButton
-                                    slot={slot}
-                                    build={build}
-                                    onStart={onChange}
+                                <Button
+                                    icon={<FaPlay color="green"/>}
+                                    title="Deploy this build into this slot"
+                                    data-testid={`slot-eligible-deploy-${build.id}`}
+                                    onClick={() => deployDialog.start({slot})}
                                 />
                             }
                         </Space>
                     }
                 ]}
             />
+            <DeployDialog dialog={deployDialog}/>
         </>
     )
 }

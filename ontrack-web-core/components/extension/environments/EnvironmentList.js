@@ -8,6 +8,10 @@ import {useEventForRefresh} from "@components/common/EventsContext";
 import {gql} from "graphql-request";
 import {gqlSlotData} from "@components/extension/environments/EnvironmentGraphQL";
 import SelectProject from "@components/projects/SelectProject";
+import {gqlSlotCellData} from "@components/extension/environments/shared/environmentsSharedGraphQL";
+import SlotDrawer from "@components/extension/environments/shared/SlotDrawer";
+import {useSlotDrawer} from "@components/extension/environments/shared/useSlotDrawer";
+import DeployDialog, {useDeployDialog} from "@components/extension/environments/shared/DeployDialog";
 
 export default function EnvironmentList() {
 
@@ -46,11 +50,13 @@ export default function EnvironmentList() {
                             image
                             slots(projects: $filterProjects) {
                                 ...SlotData
+                                ...SlotCellData
                             }
                         }
                     }
 
                     ${gqlSlotData}
+                    ${gqlSlotCellData}
                 `,
                 {
                     filterProjects: filter.projects,
@@ -63,6 +69,14 @@ export default function EnvironmentList() {
             })
         }
     }, [client, environmentCreated, environmentDeleted, slotCreated, filter])
+
+    /*
+     * The slot drawer, reachable from this screen before the matrix that replaces it arrives in
+     * phase 2 (#1797). It lives here rather than in `EnvironmentCard` so that one drawer serves
+     * every card, and so its `?slot=` address is owned by the screen rather than by a card.
+     */
+    const slotDrawer = useSlotDrawer()
+    const deployDialog = useDeployDialog()
 
     const [form] = Form.useForm()
 
@@ -137,12 +151,20 @@ export default function EnvironmentList() {
                                 <EnvironmentCard
                                     key={environment.id}
                                     environment={environment}
+                                    onSlotClick={slotDrawer.openSlot}
                                 />
                             ))
                         }
                     </>
                 </Space>
             </LoadingContainer>
+            <SlotDrawer
+                slotId={slotDrawer.slotId}
+                open={slotDrawer.open}
+                onClose={slotDrawer.close}
+                onDeploy={(slot) => deployDialog.start({slot})}
+            />
+            <DeployDialog dialog={deployDialog}/>
         </>
     )
 }

@@ -580,6 +580,8 @@ type Build implements Authorizable & ProjectEntity {
   information: [EntityInformation!]!
   "Link to a Jenkins Build"
   jenkinsBuildProperty: Property
+  "State of this build in every slot of its project, in environment order"
+  journey: [BuildSlotJourney!]!
   "List of links."
   linkProperty: Property
   "Associates an arbitrary message (and its type) to an entity. Will be displayed as a decorator in the UI."
@@ -785,6 +787,18 @@ type BuildPromotionInfoItem {
   data: BuildPromotionInfoItemData!
   "promotionLevel field"
   promotionLevel: PromotionLevel
+}
+
+"Where one build stands in one slot of its project"
+type BuildSlotJourney {
+  "Admission rules of the slot refusing this build. Empty unless the state is NOT_ELIGIBLE."
+  nonEligibleRules: [SlotAdmissionRuleConfig!]!
+  "pipeline field"
+  pipeline: SlotPipeline
+  "slot field"
+  slot: Slot!
+  "Where the build stands in this slot"
+  state: BuildSlotJourneyState!
 }
 
 "Output type for the bulkUpdatePromotionLevelById mutation."
@@ -7412,6 +7426,10 @@ type Slot implements Authorizable {
   admissionRules: [SlotAdmissionRuleConfig!]!
   "Authorizations for this context"
   authorizations: [Authorization!]!
+  "Does a slot upstream of this one in the project's slot graph hold a newer build?"
+  behind: Boolean!
+  "Is the in-flight deployment of this slot held up by a failing, non-overridden admission rule or workflow? False when nothing is in flight."
+  blocked: Boolean!
   "Current pipeline in the slot"
   currentPipeline: SlotPipeline
   "description field"
@@ -7433,6 +7451,11 @@ type Slot implements Authorizable {
   id: ID!
   "Last deployed pipeline in the slot"
   lastDeployedPipeline: SlotPipeline
+  "Eligible builds newer than the one this slot holds, newest first"
+  nextBuilds(
+    "Maximum number of builds to return (defaults to 3)"
+    count: Int
+  ): [Build!]!
   "Paginated list of pipelines"
   pipelines(
     "Name of the branch to get the pipelines for"
@@ -8580,6 +8603,15 @@ enum AutoVersioningNotificationScope {
 enum AutoVersioningPushMode {
   PR
   PUSH
+}
+
+"Where a build stands in a slot"
+enum BuildSlotJourneyState {
+  DEPLOYED
+  ELIGIBLE
+  IN_PROGRESS
+  NOT_ELIGIBLE
+  SUPERSEDED
 }
 
 "CHML values"
