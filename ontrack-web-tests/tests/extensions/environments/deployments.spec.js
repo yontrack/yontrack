@@ -5,7 +5,7 @@ import {BuildPage} from "../../core/builds/BuildPage";
 import {getBuildEnvironmentSection} from "./BuildEnvironmentSection";
 
 test('starting a deployment from the build page', async ({page, ontrack}) => {
-    const {environment, project} = await createSlot(ontrack)
+    const {environment, project, slot} = await createSlot(ontrack)
 
     const branch = await project.createBranch()
     const build = await branch.createBuild()
@@ -21,6 +21,7 @@ test('starting a deployment from the build page', async ({page, ontrack}) => {
     // Expecting a deployment button for this build & environment
     await buildEnvironmentSection.expectBuildDeployButton({environment})
 
-    // Launching the deployment & expecting to be on a pipeline page
-    await buildEnvironmentSection.buildDeploy({environment})
+    // Launching the deployment. Since #1797 the cell's button opens the shared deploy dialog, where
+    // the slot is chosen.
+    await buildEnvironmentSection.buildDeploy({environment, slot})
 })

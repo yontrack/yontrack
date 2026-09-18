@@ -262,6 +262,25 @@ cancelled. A slot has many pipelines over time; each names exactly one build.
 _Avoid_: deployment, release pipeline, and above all the bare *pipeline*, which
 already means the branch's promotion pipeline in *pipeline view*
 
+**What the environments UI calls them**:
+The screens do not use these names. The terms above are the domain's, and the
+environments UI redesign deliberately renames two of them for the people reading
+it, who are release managers rather than modellers. The mapping is one way — code,
+GraphQL fields and this document keep the domain's terms — and it is the only
+place the two vocabularies are allowed to disagree:
+
+| Domain term     | On screen                                            |
+|-----------------|------------------------------------------------------|
+| Slot pipeline   | **Deployment** — "Deployment #3", the deployment page |
+| Slot            | **"production · petclinic [canary]"** — environment, then project, then the qualifier. The word *slot* appears only in Setup |
+| Environment     | *environment*, unchanged                              |
+| Admission rule  | *rule*, and in "What's blocking" simply a **check**, counted beside the workflows as "2 of 3 checks passed" |
+
+Two adjectives are new on screen and have no domain term behind them, being
+readings composed of several: a slot is **blocked** when its in-flight deployment
+is held up by a failing, non-overridden check of the phase it is in, and **behind**
+when a slot upstream of it in the project's slot graph holds a newer build.
+
 ### Notifications
 
 **Notification record**:

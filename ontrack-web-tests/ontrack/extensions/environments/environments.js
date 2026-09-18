@@ -232,6 +232,35 @@ export class EnvironmentsExtension {
         }
     }
 
+    /**
+     * The slot's most recent deployment, whatever became of it.
+     *
+     * What a test uses to assert that an action taken *through the UI* actually reached the server,
+     * rather than asserting that the UI redrew itself the way the UI was told to.
+     */
+    async getCurrentPipeline({slot}) {
+        const data = await graphQLCall(
+            this.ontrack.connection,
+            gql`
+                query SlotCurrentPipeline($id: String!) {
+                    slotById(id: $id) {
+                        currentPipeline {
+                            id
+                            number
+                            status
+                            build {
+                                id
+                                name
+                            }
+                        }
+                    }
+                }
+            `,
+            {id: slot.id}
+        )
+        return data?.slotById?.currentPipeline
+    }
+
     async addAdmissionRule({slot, description = "", ruleId, ruleConfig}) {
         const data = await graphQLCallMutation(
             this.ontrack.connection,
