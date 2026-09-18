@@ -83,7 +83,9 @@ class SlotWorkflowDeliveryMapIT : AbstractQLKTITSupport() {
             // The gate has to pass before the deployment can start at all, which is exactly what
             // makes a CANDIDATE workflow a prerequisite on the map
             val pipeline = slotTestSupport.createPipeline(branchName = "main", slot = slot)
-            slotWorkflowTestSupport.waitForSlotWorkflowsToFinish(pipeline, SlotPipelineStatus.CANDIDATE)
+            // To succeed, not merely to finish: the deployment below can only run once the gate has
+            // passed, and the checkpoint asserted at the end is the workflow's SUCCESS
+            slotWorkflowTestSupport.waitForSlotWorkflowsToSucceed(pipeline, SlotPipelineStatus.CANDIDATE)
             slotTestSupport.runAndFinishDeployment(pipeline)
 
             val instance = slotWorkflowService.getSlotWorkflowInstancesByPipeline(pipeline)

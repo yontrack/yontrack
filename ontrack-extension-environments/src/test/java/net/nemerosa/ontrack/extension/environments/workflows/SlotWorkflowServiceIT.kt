@@ -147,8 +147,10 @@ class SlotWorkflowServiceIT : AbstractDSLTestSupport() {
             // Creating a pipeline (this triggers the workflow)
             val pipeline = slotTestSupport.createPipeline(slot = slot)
 
-            // Waiting for the pipeline's workflows to finish
-            slotWorkflowTestSupport.waitForSlotWorkflowsToFinish(pipeline, SlotPipelineStatus.CANDIDATE)
+            // Waiting for the pipeline's workflows to succeed: the check below is about the gate
+            // their success opens, so a failed workflow must fail here and not as an unexplained
+            // "cannot start deployment"
+            slotWorkflowTestSupport.waitForSlotWorkflowsToSucceed(pipeline, SlotPipelineStatus.CANDIDATE)
 
             // Checking the pipeline can start its deployment
             val status = slotService.runDeployment(pipeline.id, dryRun = true)

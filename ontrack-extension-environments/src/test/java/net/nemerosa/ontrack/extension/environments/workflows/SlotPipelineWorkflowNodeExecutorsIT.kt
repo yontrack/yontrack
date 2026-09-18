@@ -345,7 +345,18 @@ class SlotPipelineWorkflowNodeExecutorsIT : AbstractNotificationTestSupport() {
     fun `Deployment workflow passes a context to notifications`() {
         asAdmin {
             val mockChannelTarget = uid("mock-")
-            startNewTransaction {
+
+            // Everything the notification reads - the slot, the build, the workflow registration and
+            // the pipeline itself - is set up and committed *here*, before the transaction which
+            // finishes the deployment and thereby triggers the workflow.
+            //
+            // Finishing a deployment starts its DONE workflows on the workflow engine's own threads,
+            // in their own transactions: a workflow node cannot see the data of the transaction which
+            // started it until that transaction commits. Creating the pipeline and finishing it in one
+            // single transaction leaves the node racing that commit, and on a loaded runner the node
+            // wins: it fails with "Slot pipeline ... was not found" and nothing is notified. See #1812,
+            // which found the same shape in SlotPipelineChangelogIT.
+            val pipeline = inNewTransaction {
                 val slot = slotTestSupport.slot()
                 val build = slot.project.branch<Build> {
                     build()
@@ -353,7 +364,6 @@ class SlotPipelineWorkflowNodeExecutorsIT : AbstractNotificationTestSupport() {
 
                 slotWorkflowService.addSlotWorkflow(
                     SlotWorkflow(
-                        pauseMs = 500,
                         slot = slot,
                         trigger = SlotPipelineStatus.DONE,
                         workflow = WorkflowParser.parseYamlWorkflow(
@@ -373,25 +383,31 @@ class SlotPipelineWorkflowNodeExecutorsIT : AbstractNotificationTestSupport() {
                     )
                 )
 
-                // Starting and finishing a deployment
-                val pipeline = slotService.startPipeline(slot, build)
-                slotTestSupport.runAndFinishDeployment(pipeline)
-
-                pipeline
-            } then { pipeline ->
-                slotWorkflowTestSupport.waitForSlotWorkflowsToFinish(pipeline, SlotPipelineStatus.DONE)
-
-                // Checks the messages
-                val messages = mockNotificationChannel.targetMessages(mockChannelTarget)
-                assertEquals(
-                    listOf(
-                        """
-                            Deployment ${pipeline.fullName()} (id = ${pipeline.id}) is done
-                        """.trimIndent().trim(),
-                    ),
-                    messages.map { it.trim() }
-                )
+                // Starting the deployment, without finishing it yet
+                slotService.startPipeline(slot, build)
             }
+
+            // Finishing the deployment, which triggers the workflow
+            inNewTransaction {
+                slotTestSupport.runAndFinishDeployment(pipeline)
+            }
+
+            // Waits for the completion of the workflows, and checks that they actually succeeded:
+            // a failed workflow is "finished" too, and would otherwise be diagnosed below as a
+            // missing notification rather than as the node error it is
+            slotWorkflowTestSupport.waitForSlotWorkflowsToSucceed(pipeline, SlotPipelineStatus.DONE)
+
+            // Checks the messages. The workflow having succeeded, the notification is already
+            // recorded - the channel is written before the node reports its success.
+            val messages = mockNotificationChannel.targetMessages(mockChannelTarget)
+            assertEquals(
+                listOf(
+                    """
+                        Deployment ${pipeline.fullName()} (id = ${pipeline.id}) is done
+                    """.trimIndent().trim(),
+                ),
+                messages.map { it.trim() }
+            )
         }
     }
 }
