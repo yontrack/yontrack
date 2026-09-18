@@ -40,10 +40,30 @@ change is for, so this is not a theoretical window.
 
 So the guard moved rather than going away. The `yontrack` job carries a *job-level*
 concurrency group, `ci-yontrack-${{ github.ref }}`, which serialises registration -- a twelve
-second job -- while everything around it runs in parallel. Every other job declares
-`needs: yontrack`, directly or through `build`, so the ordering propagates without anything
-else having to know about it. Queue time does not count against a job's `timeout-minutes`, and
-a job pending on a group holds no runner.
+second job -- while everything around it runs in parallel. Queue time does not count against a
+job's `timeout-minutes`, and a job pending on a group holds no runner.
+
+That is worth stating precisely, because it is less than it looks. The group makes registration
+**mutually exclusive**; it does not **order** it by commit. Which run enters the group first is
+whichever reaches the job first, and a run reaches it 65-95 s after starting -- `setup`
+resolving the version, then the checkout here. Two pushes further apart than that spread
+register in commit order. Two pushes inside it can still invert, and the guard has only
+narrowed the window from "two registrations in the same instant" to "the spread in
+time-to-register".
+
+This is not hypothetical, and the transition to this scheme demonstrated it within the hour.
+Run 253 was created under the old ref-keyed group and queued 18 minutes behind an earlier run,
+while runs 254 and 255 -- created once the commit-keyed group was in place -- started within
+three seconds of their pushes and registered first. Yontrack recorded the three builds in the
+order 254, 255, 253, so the oldest of the three commits owns the newest build id. That
+particular inversion was an artefact of old and new configuration running side by side and
+cannot recur once every run uses this file; the 30-second steady-state window is what remains.
+
+Closing that window entirely would mean a barrier rather than a mutex: the job would have to
+wait until every run on the same branch with a lower `run_number` had passed its own
+registration, polling the runs API to find out. That is real complexity for a race that needs
+two merges within half a minute of each other, so it is deliberately not built. If build order
+on `main` is ever observed to invert in steady state, this is the shape of the fix.
 
 `.github/workflows/codeql.yml` had the same per-ref queue and is keyed the same way now, except
 that a pull request still groups on its ref so that `cancel-in-progress` can supersede an
@@ -58,8 +78,12 @@ serialised would have moved the bottleneck rather than removing it.
 - Runs on `main` can now complete out of order, so "the latest completed run" is no longer
   "the newest commit". Anything asking whether `main` is green must ask about a commit.
   `CLAUDE.md` already does, keying `status:ready` on `headSha`.
-- Yontrack's build order still matches `main`'s commit order, which is what the change log,
-  the promotion chain and auto-versioning read.
+- Yontrack's build order follows `main`'s commit order for any two pushes more than ~30 s
+  apart, which is what the change log, the promotion chain and auto-versioning read. Closer
+  than that it can invert, and the section above says why and what the fix would be. An
+  inverted pair gives the older build the newer id, so `getPreviousBuild` walks the wrong way
+  for one build and `demo-deploy.yml` would offer the wrong "latest BRONZE"; the next build
+  registered puts the sequence right again.
 - `gradle/actions/setup-gradle` writes its cache from the default branch, so two overlapping
   runs on `main` race for one cache key. The loser logs that the entry already exists. It costs
   a little cache freshness and nothing else.

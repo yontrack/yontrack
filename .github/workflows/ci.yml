@@ -249,8 +249,13 @@ jobs:
     # auto-versioning boundary.
     #
     # A job-level group keyed on the branch serialises registration -- twelve seconds of it --
-    # while the rest of the run stays parallel. Everything downstream declares `needs: yontrack`,
-    # so it inherits the ordering for free. See ADR 0014.
+    # while the rest of the run stays parallel.
+    #
+    # Read what that buys precisely: the group makes registration mutually exclusive, it does
+    # not order it by commit. Which run enters first is whichever reaches this job first, and a
+    # run reaches it 65-95 s after starting (`setup`, then the checkout here). Two pushes
+    # further apart than that spread register in order; two pushes inside it can still invert.
+    # ADR 0014 records the residual window and what closing it would take.
     concurrency:
       group: ci-yontrack-${{ github.ref }}
       cancel-in-progress: false
