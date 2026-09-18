@@ -18,6 +18,7 @@ import {
 } from "@components/extension/environments/shared/environmentsSharedGraphQL"
 import {gqlDeploymentPage} from "@components/extension/environments/deployment/deploymentGraphQL"
 import {gqlSlotDeployments, gqlSlotPage} from "@components/extension/environments/slot/slotGraphQL"
+import {gqlBuildJourney} from "@components/extension/environments/journey/buildJourneyGraphQL"
 import {gqlSetup} from "@components/extension/environments/setup/setupGraphQL"
 import {gqlSlotData} from "@components/extension/environments/EnvironmentGraphQL"
 
@@ -92,6 +93,7 @@ describe('the shared environments documents', () => {
     check('the slot page query', gqlSlotPage)
     check('the slot deployments query', gqlSlotDeployments)
     check('the Setup page query', gqlSetup)
+    check('the build journey query', gqlBuildJourney)
 
     it('asks the slot whether it is blocked and whether it is behind', () => {
         // The two flags the cell exists to carry; without them it draws neither mark and a held-up
@@ -104,6 +106,13 @@ describe('the shared environments documents', () => {
         // Two different builds, and the cell must never show the second in place of the first.
         expect(gqlSlotCellData).toContain('lastDeployedPipeline')
         expect(gqlSlotCellData).toContain('currentPipeline')
+    })
+
+    it('asks the journey for what the chip needs to draw an environment icon', () => {
+        // Without `order` and `image` the chip would have to fetch each environment separately -
+        // one request per chip, on a strip of them. See `EnvironmentImage`.
+        expect(gqlBuildJourneyData).toMatch(/^\s+order$/m)
+        expect(gqlBuildJourneyData).toMatch(/^\s+image$/m)
     })
 
     it('asks each refusing rule for its configuration, not only its name', () => {
@@ -120,6 +129,8 @@ describe('the shared environments documents', () => {
 
     it('asks the slot for its authorizations, which is what hides the actions', () => {
         expect(gqlDeployDialogSlots).toContain('authorizations')
+        // The journey strip's own Deploy button is gated on them - see `canDeployFromJourney`.
+        expect(gqlBuildJourneyData).toContain('authorizations')
         expect(gqlDeployDialogBuilds).toContain('authorizations')
         expect(gqlSlotDrawer).toContain('authorizations')
         expect(gqlDeploymentPage).toContain('authorizations')

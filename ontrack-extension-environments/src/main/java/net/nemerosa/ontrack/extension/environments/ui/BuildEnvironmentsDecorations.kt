@@ -28,6 +28,8 @@ class BuildEnvironmentsDecorations(
                             BuildEnvironmentsDecorationsData(
                                 environmentId = it.slot.environment.id,
                                 environmentName = it.slot.environment.name,
+                                environmentOrder = it.slot.environment.order,
+                                environmentImage = it.slot.environment.image,
                                 slotId = it.slot.id,
                                 qualifier = it.slot.qualifier,
                                 pipelineId = it.id,

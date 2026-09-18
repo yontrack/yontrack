@@ -1,5 +1,6 @@
-import {Tag, Tooltip} from "antd"
+import {Space, Tag, Tooltip} from "antd"
 import SlotAdmissionRuleSummary from "@components/extension/environments/SlotAdmissionRuleSummary"
+import EnvironmentImage from "@components/extension/environments/shared/EnvironmentImage"
 import {slotDisplayNameWithoutProject} from "@components/extension/environments/shared/slotCellModel"
 
 /**
@@ -36,8 +37,12 @@ export const journeyStates = {
  *   chip is inert when absent.
  * @param {boolean} showSlot Whether to name the environment on the chip itself. The journey strip
  *   does (one chip per environment); a decoration beside a build does not.
+ * @param {boolean} showIcon Whether to draw the environment's icon on the chip. The icon is what
+ *   makes a strip - and a decoration which has dropped the environment's name - readable at a
+ *   glance, and it is drawn from the environment the caller already has rather than fetched, so a
+ *   row of chips costs no request. It needs `order` and `image` on the entry's environment.
  */
-export default function JourneyChip({entry, onClick, showSlot = true}) {
+export default function JourneyChip({entry, onClick, showSlot = true, showIcon = false}) {
 
     if (!entry) return null
 
@@ -76,7 +81,19 @@ export default function JourneyChip({entry, onClick, showSlot = true}) {
                 onClick={activate}
                 style={{cursor: activate ? 'pointer' : undefined, marginInlineEnd: 4}}
             >
-                {showSlot ? `${slotName} — ${state.label}` : state.label}
+                <Space size={4}>
+                    {
+                        showIcon && entry.slot?.environment &&
+                        // No tooltip of its own: the chip already has one, and two overlays on the
+                        // same few pixels means whichever wins hides the other's text.
+                        <EnvironmentImage
+                            environment={entry.slot.environment}
+                            size={14}
+                            tooltipText=""
+                        />
+                    }
+                    {showSlot ? `${slotName} — ${state.label}` : state.label}
+                </Space>
             </Tag>
         </Tooltip>
     )

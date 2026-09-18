@@ -36,7 +36,7 @@ const entry = (state, {qualifier = '', nonEligibleRules = []} = {}) => ({
     slot: {
         id: 'slot-1',
         qualifier,
-        environment: {id: 'env-1', name: 'production', order: 20},
+        environment: {id: 'env-1', name: 'production', order: 20, image: false},
         project: {id: 1, name: 'petclinic'},
     },
 })
@@ -69,6 +69,18 @@ describe('the journey chip', () => {
         render(<JourneyChip entry={entry('ELIGIBLE')} showSlot={false}/>)
         expect(screen.getByTestId('journey-chip-slot-1')).toHaveTextContent('Eligible')
         expect(screen.getByTestId('journey-chip-slot-1')).not.toHaveTextContent('production')
+    })
+
+    it('draws no environment icon unless asked', () => {
+        // The delivery map and the build search column sit under an icon of their own already.
+        render(<JourneyChip entry={entry('DEPLOYED')}/>)
+        expect(screen.queryByRole('img', {name: 'production'})).toBeNull()
+    })
+
+    it('draws the environment icon from the environment it was given', () => {
+        // Not fetched: a strip of chips would otherwise cost one request per environment.
+        render(<JourneyChip entry={entry('DEPLOYED')} showIcon/>)
+        expect(screen.getByRole('img', {name: 'production'})).toBeVisible()
     })
 
     it('keeps the refusal off the chip and in the tooltip', () => {

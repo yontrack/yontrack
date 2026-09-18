@@ -18,10 +18,10 @@ test('starting a deployment from the build page', async ({page, ontrack}) => {
     // Gets the build environment section
     const buildEnvironmentSection = await getBuildEnvironmentSection(page, build)
 
-    // Expecting a deployment button for this build & environment
-    await buildEnvironmentSection.expectBuildDeployButton({environment})
+    // The build has never been here and nothing refuses it: the strip says it could come.
+    await buildEnvironmentSection.expectState(slot, 'ELIGIBLE')
 
     // Launching the deployment. Since #1797 the cell's button opens the shared deploy dialog, where
-    // the slot is chosen.
+    // the slot is chosen; since #1794 there is one such button for the cell rather than one per slot.
     await buildEnvironmentSection.buildDeploy({environment, slot})
 })

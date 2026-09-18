@@ -30,6 +30,15 @@ export class SlotDrawerPanel {
         await expect(this.page.getByTestId('slot-drawer-never-deployed')).toBeVisible()
     }
 
+    /**
+     * What the slot is holding - the "Now" section.
+     */
+    async expectDeployed(buildName) {
+        const section = this.page.getByTestId('slot-drawer-now')
+        await expect(section).toBeVisible()
+        await expect(section).toContainText(buildName)
+    }
+
     async expectInFlight(buildName) {
         const section = this.page.getByTestId('slot-drawer-in-flight')
         await expect(section).toBeVisible()

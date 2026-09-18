@@ -152,6 +152,11 @@ export const gqlSharedSlotWorkflowData = gql`
 
 /**
  * A build's state in one slot.
+ *
+ * `environment` carries `order` and `image` so the chip can draw the environment's icon from what
+ * it already has - see `EnvironmentImage`. `authorizations` is on the slot rather than on the build
+ * because the right to deploy is granted per project and read per slot, and the journey strip's own
+ * Deploy button is shown only to somebody who has it *somewhere* in this project.
  */
 export const gqlBuildJourneyData = gql`
     fragment BuildJourneyData on BuildSlotJourney {
@@ -174,10 +179,16 @@ export const gqlBuildJourneyData = gql`
                 id
                 name
                 order
+                image
             }
             project {
                 id
                 name
+            }
+            authorizations {
+                name
+                action
+                authorized
             }
         }
     }

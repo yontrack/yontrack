@@ -17,7 +17,10 @@ export default function BuildContent({build}) {
     if (user.authorizations.environment?.view) {
         defaultLayout = [
             {i: "promotions", x: 0, y: 0, w: 5, h: 6},
-            {i: "environments", x: 0, y: 6, w: 5, h: 9},
+            // Since #1794 the cell is a single wrapping strip of chips, not a timeline of
+            // expandable rows, so it needs a fraction of the height it used to. The grid compacts
+            // vertically, so the rows below close the gap on their own.
+            {i: "environments", x: 0, y: 6, w: 5, h: 4},
             {i: "validations", x: 5, y: 0, w: 7, h: 15},
             {i: "using", x: 0, y: 15, w: 6, h: 9},
             {i: "usedBy", x: 6, y: 24, w: 6, h: 9},

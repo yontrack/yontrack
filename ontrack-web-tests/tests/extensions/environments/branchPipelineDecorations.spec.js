@@ -31,13 +31,19 @@ test('a deployed build shows its environment on the pipeline timeline', async ({
     const decorations = pipelinePage.buildDecorations(build)
     await expect(decorations).toBeVisible()
 
-    // The environment icon is a link to the slot, so following it is how a user gets from "this
-    // build is somewhere" to "here is where". The slot id names the environment AND the project,
-    // which is why the href is the assertion and the icon's tooltip - an antd overlay rendered in a
-    // portal on hover, not a `title` attribute - is not.
+    // The chip is a link to the slot, so following it is how a user gets from "this build is
+    // somewhere" to "here is where". The slot id names the environment AND the project, which is
+    // why the href is the assertion and the chip's tooltip - an antd overlay rendered in a portal
+    // on hover, not a `title` attribute - is not.
     const link = decorations.getByRole('link')
     await expect(link).toHaveCount(1)
     await expect(link).toHaveAttribute('href', `/extension/environments/slot/${slot.id}`)
+
+    // Since #1794 the decoration is the journey chip the build page's strip is made of, in its
+    // compact form: it says what the build is doing there rather than only that it was involved.
+    const chip = decorations.getByTestId(`journey-chip-${slot.id}`)
+    await expect(chip).toHaveAttribute('data-state', 'DEPLOYED')
+    await expect(chip).toContainText('Deployed')
 })
 
 test('a build deployed nowhere shows no environment', async ({page, ontrack}) => {

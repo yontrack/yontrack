@@ -1,112 +1,97 @@
-import GridCell from "@components/grid/GridCell";
-import {useQuery} from "@components/services/useQuery";
-import {gql} from "graphql-request";
-import {
-    gqlSlotData,
-    gqlSlotPipelineBuildData,
-    gqlSlotPipelineDataNoBuild
-} from "@components/extension/environments/EnvironmentGraphQL";
-import {List, Space} from "antd";
-import {useRefresh} from "@components/common/RefreshUtils";
-import SelectEnvironmentName from "@components/extension/environments/SelectEnvironmentName";
-import {useState} from "react";
-import {AutoRefreshButton, AutoRefreshContextProvider} from "@components/common/AutoRefresh";
-import BuildEnvironment from "@components/builds/environments/BuildEnvironment";
+import {Button, Space} from "antd"
+import {FaPlay} from "react-icons/fa"
+import {useRouter} from "next/router"
+import GridCell from "@components/grid/GridCell"
+import {useQuery} from "@components/services/GraphQL"
+import Freshness, {useFreshness} from "@components/extension/environments/shared/Freshness"
+import SlotDrawer from "@components/extension/environments/shared/SlotDrawer"
+import {useSlotDrawer} from "@components/extension/environments/shared/useSlotDrawer"
+import DeployDialog, {useDeployDialog} from "@components/extension/environments/shared/DeployDialog"
+import BuildJourneyStrip from "@components/extension/environments/journey/BuildJourneyStrip"
+import {gqlBuildJourney} from "@components/extension/environments/journey/buildJourneyGraphQL"
+import {canDeployFromJourney} from "@components/extension/environments/journey/buildJourneyModel"
+import {slotPipelineUri} from "@components/extension/environments/EnvironmentsLinksUtils"
+import {buildKnownName} from "@components/common/Titles"
 
+/**
+ * The build page's "Environments" cell: the build's journey strip (#1794).
+ *
+ * The cell is deliberately thin. It owns the query, the polling, the drawer and the deploy dialog;
+ * everything it draws is the strip, and everything a reader can do from it leads into one of the
+ * three shared components the redesign settled on. The three pieces it used to own - a per-slot
+ * deploy button, a per-slot "currently deployed" line and an expandable deployment panel - are all
+ * in the drawer a chip opens.
+ */
 export default function BuildContentEnvironments({build}) {
 
-    const [refreshState, refresh] = useRefresh()
+    const router = useRouter()
 
-    const [environmentName, setEnvironmentName] = useState()
+    const freshness = useFreshness()
 
-    const {data, loading} = useQuery(
-        gql`
-            ${gqlSlotPipelineDataNoBuild}
-            ${gqlSlotData}
-            ${gqlSlotPipelineBuildData}
-            query BuildEnvironments(
-                $id: Int!,
-                $environment: String,
-            ) {
-                build(id: $id) {
-                    branch {
-                        project {
-                            name
-                        }
-                    }
-                    slots(environment: $environment) {
-                        ...SlotData
-                        lastDeployedPipeline {
-                            build {
-                                ...SlotPipelineBuildData
-                            }
-                        }
-                        currentPipeline {
-                            ...SlotPipelineDataNoBuild
-                            build {
-                                ...SlotPipelineBuildData
-                            }
-                        }
-                        pipelines(buildId: $id, size: 2) {
-                            pageItems {
-                                ...SlotPipelineDataNoBuild
-                            }
-                        }
-                        authorizations {
-                            name
-                            action
-                            authorized
-                        }
-                    }
-                }
-            }
-        `,
+    const {data: journey, loading, finished} = useQuery(
+        gqlBuildJourney,
         {
-            variables: {
-                id: Number(build.id),
-                environment: environmentName,
-            },
-            deps: [refreshState, environmentName],
+            variables: {buildId: Number(build.id)},
+            deps: [build.id, freshness.refreshCount],
+            initialData: null,
+            dataFn: data => data.build?.journey ?? [],
         }
     )
 
+    const slotDrawer = useSlotDrawer()
+
+    /*
+     * The deploy dialog opened from the build: it offers every slot of the project, with the rule
+     * refusing the ones that refuse. That is the same dialog the "Start deployment" user menu
+     * action opens, which is the point - the redesign collapsed four entry points into one.
+     */
+    const deployDialog = useDeployDialog({
+        onSuccess: (pipelineId) => {
+            if (pipelineId) router.push(slotPipelineUri(pipelineId))
+        },
+    })
+
     return (
         <>
-            <AutoRefreshContextProvider onRefresh={refresh}>
-                <GridCell id="environments"
-                          title="Environments"
-                          loading={loading}
-                          padding={true}
-                          extra={
-                              <Space>
-                                  {
-                                      data?.build?.branch?.project?.name &&
-                                      <SelectEnvironmentName
-                                          projects={[data.build.branch.project.name]}
-                                          value={environmentName}
-                                          onChange={setEnvironmentName}
-                                      />
-                                  }
-                                  <AutoRefreshButton/>
-                              </Space>
-                          }
-                >
-                    <List
-                        itemLayout="vertical"
-                        size="small"
-                        dataSource={data?.build?.slots}
-                        renderItem={(slot) =>
-                            <>
-                                <List.Item
-                                    key={slot.id}
-                                >
-                                    <BuildEnvironment slot={slot} build={build} refresh={refresh}/>
-                                </List.Item>
-                            </>
+            <GridCell
+                id="environments"
+                title="Environments"
+                // `finished` as well as `loading`: `useQuery` starts with `loading` false, and a
+                // strip which said "This project has no deployment slot" for a tick before its
+                // chips arrived would be read as an answer rather than as a wait.
+                loading={loading || !finished}
+                padding={true}
+                extra={
+                    <Space>
+                        {
+                            canDeployFromJourney(journey) &&
+                            <Button
+                                size="small"
+                                icon={<FaPlay color="green"/>}
+                                title={`Start deploying ${buildKnownName(build)}`}
+                                data-testid="build-journey-deploy"
+                                onClick={() => deployDialog.start({build})}
+                            >
+                                Deploy
+                            </Button>
                         }
-                    />
-                </GridCell>
-            </AutoRefreshContextProvider>
+                        <Freshness
+                            refreshedAt={freshness.refreshedAt}
+                            refresh={freshness.refresh}
+                            testId="build-journey-freshness"
+                        />
+                    </Space>
+                }
+            >
+                <BuildJourneyStrip journey={journey} onSlotClick={slotDrawer.openSlot}/>
+            </GridCell>
+            <SlotDrawer
+                slotId={slotDrawer.slotId}
+                open={slotDrawer.open}
+                onClose={slotDrawer.close}
+                onDeploy={(slot, deployedBuild) => deployDialog.start({slot, build: deployedBuild})}
+            />
+            <DeployDialog dialog={deployDialog}/>
         </>
     )
 }

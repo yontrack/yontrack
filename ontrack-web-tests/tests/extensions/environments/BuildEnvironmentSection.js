@@ -7,6 +7,13 @@ export const getBuildEnvironmentSection = async (page, build) => {
     return new BuildEnvironmentSection(page, section, build)
 }
 
+/**
+ * The build page's "Environments" cell: the build's journey strip since #1794.
+ *
+ * One chip per slot of the project, in environment order, each carrying this build's state there.
+ * Everything operational - the deployment's details, the slot's history, what it could move to
+ * next - is behind the chip, in the shared slot drawer.
+ */
 export class BuildEnvironmentSection {
 
     constructor(page, section, build) {
@@ -15,9 +22,36 @@ export class BuildEnvironmentSection {
         this.build = build
     }
 
-    async expectBuildDeployButton({environment}) {
-        await expect(this.section.getByRole('link', {name: environment.name})).toBeVisible()
-        await expect(this.section.getByRole('button', {name: this.build.name})).toBeVisible()
+    /**
+     * One chip, addressed by its slot.
+     *
+     * Scoped to the section: a build page carries environment decorations of its own, which are the
+     * same chips, and an unscoped test id would match both.
+     */
+    chip(slot) {
+        return this.section.getByTestId(`journey-chip-${slot.id}`)
+    }
+
+    /**
+     * The build's state in one slot, as the server's enum spells it - `DEPLOYED`, `SUPERSEDED`,
+     * `IN_PROGRESS`, `ELIGIBLE`, `NOT_ELIGIBLE`.
+     *
+     * The state is asserted through `data-state` rather than through the chip's words so that a
+     * change of wording is a change of wording rather than a broken test.
+     */
+    async expectState(slot, state) {
+        await expect(this.chip(slot)).toHaveAttribute('data-state', state)
+    }
+
+    async expectNoChip(slot) {
+        await expect(this.chip(slot)).toHaveCount(0)
+    }
+
+    /**
+     * Opens the slot drawer from a chip.
+     */
+    async openDrawer(slot) {
+        await this.chip(slot).click()
     }
 
     /**
@@ -43,9 +77,9 @@ export class BuildEnvironmentSection {
      * dialog says rather than about what it does.
      */
     async openDeployDialog() {
-        // The collapsed row's own button, named after the build - `BuildSlotInfo`, not the expanded
-        // deployment panel underneath it.
-        await this.section.getByRole('button', {name: this.build.name}).first().click()
+        // One button for the cell since #1794 - the environment is chosen in the dialog - rather
+        // than one per slot row.
+        await this.section.getByTestId('build-journey-deploy').click()
         const dialog = new DeployDialog(this.page)
         await dialog.expectOpen()
         return dialog
