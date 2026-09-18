@@ -1,21 +1,34 @@
-import {Handle, Position} from "reactflow";
-import {Card, Divider, Space} from "antd";
-import EnvironmentTitle from "@components/extension/environments/EnvironmentTitle";
-import Link from "next/link";
-import {slotPipelineUri} from "@components/extension/environments/EnvironmentsLinksUtils";
-import BuildLink from "@components/builds/BuildLink";
-import PromotionRuns from "@components/promotionRuns/PromotionRuns";
-import {
-    useProjectEnvironmentsContext
-} from "@components/extension/environments/project/ProjectEnvironmentsContextProvider";
+import {createContext, useContext} from "react"
+import {Handle, Position} from "reactflow"
+import {Card, Space, Typography} from "antd"
+import SlotCell from "@components/extension/environments/shared/SlotCell"
+import EnvironmentImage from "@components/extension/environments/shared/EnvironmentImage"
+import {slotDisplayNameWithoutProject} from "@components/extension/environments/shared/slotCellModel"
 
+/**
+ * What a node does when it is activated, read from context rather than carried in its `data`.
+ *
+ * React Flow's nodes are built once, by the effect which lays them out, and whatever the handler
+ * closed over at that moment is what it would keep using - a router query from before the qualifier
+ * was switched, say, which would then be written back over the current one on the next click.
+ * Context is read at render time by the node itself and cannot go stale.
+ */
+export const SlotGraphNodeContext = createContext({onSlotClick: undefined})
+
+/**
+ * One node of the project's slot graph, which **is** a slot cell (#1795).
+ *
+ * The whole point of the phase: the graph and the matrix are two arrangements of the same unit, so a
+ * reader who has learnt to read one cell has learnt to read the other. The node adds only what the
+ * graph needs and the matrix's table already had - the environment's name and icon, which a matrix
+ * carries in its column header and a free-floating node has nowhere else to get.
+ */
 export default function SlotGraphNode({data}) {
 
-    const {selectedSlot, setSelectedSlot} = useProjectEnvironmentsContext()
+    const {onSlotClick} = useContext(SlotGraphNodeContext)
+    const slot = data?.slot
 
-    const onSlotSelected = () => {
-        setSelectedSlot(data.slot)
-    }
+    if (!slot) return null
 
     return (
         <>
@@ -23,33 +36,23 @@ export default function SlotGraphNode({data}) {
             <Handle type="source" position={Position.Right}/>
 
             <Card
-                hoverable={true}
-                onClick={onSlotSelected}
+                size="small"
+                data-testid={`slot-graph-node-${slot.id}`}
+                styles={{body: {padding: '0.5em 0.75em'}}}
                 style={{
-                    border: selectedSlot?.id === data.slot.id
-                        ? 'solid 5px var(--ot-graph-node-border-selected)'
-                        : 'solid 2px var(--ot-graph-node-border)',
-                    backgroundColor: selectedSlot?.id === data.slot.id ? 'var(--ot-graph-node-bg-selected)' : 'var(--ot-graph-node-bg)',
-                    // filter: selectedSlot?.id === data.slot.id ? undefined : 'opacity(33%)',
+                    width: 240,
+                    border: 'solid 2px var(--ot-graph-node-border)',
+                    backgroundColor: 'var(--ot-graph-node-bg)',
                 }}
             >
-                <Space direction="vertical">
-                    <div className="ot-action">
-                        <EnvironmentTitle environment={data.slot.environment} tags={false} editable={false}/>
-                    </div>
-                    {
-                        data.slot.lastDeployedPipeline &&
-                        <>
-                            <Space>
-                                <Link href={slotPipelineUri(data.slot.lastDeployedPipeline.id)}>
-                                    #{data.slot.lastDeployedPipeline.number}
-                                </Link>
-                                <Divider type="vertical"/>
-                                <BuildLink build={data.slot.lastDeployedPipeline.build}/>
-                            </Space>
-                            <PromotionRuns promotionRuns={data.slot.lastDeployedPipeline.build.promotionRuns}/>
-                        </>
-                    }
+                <Space direction="vertical" size={2} className="ot-line">
+                    <Space size={6}>
+                        <EnvironmentImage environment={slot.environment}/>
+                        <Typography.Text strong>
+                            {slotDisplayNameWithoutProject(slot)}
+                        </Typography.Text>
+                    </Space>
+                    <SlotCell slot={slot} onClick={onSlotClick}/>
                 </Space>
             </Card>
         </>

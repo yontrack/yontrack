@@ -48,6 +48,9 @@ export const ENVIRONMENTS_DOC_URI =
  * @param {boolean} emptyStates Whether to explain an empty matrix at length. The page does; a widget
  *   has room for one line.
  * @param {number} pollingIntervalMs How often to ask again. 0 disables polling.
+ * @param {?Object} freshness A `useFreshness` state to share rather than one of its own. The project
+ *   environments screen (#1795) draws the matrix as one of two views and owns a single "Updated N s
+ *   ago" for both, so the age a reader sees does not jump when they switch view.
  */
 export default function EnvironmentMatrix({
                                               filter,
@@ -56,9 +59,13 @@ export default function EnvironmentMatrix({
                                               paged = true,
                                               emptyStates = true,
                                               pollingIntervalMs = FRESHNESS_INTERVAL_MS,
+                                              freshness: sharedFreshness,
                                           }) {
 
-    const freshness = useFreshness({intervalMs: pollingIntervalMs})
+    // Hooks cannot be skipped, so the matrix's own is created either way and simply not used when
+    // the screen above has one to share. Its timer is the only cost, and it is one `setInterval`.
+    const ownFreshness = useFreshness({intervalMs: sharedFreshness ? 0 : pollingIntervalMs})
+    const freshness = sharedFreshness ?? ownFreshness
 
     /*
      * Polling every thirty seconds is right for a deployment somebody else started; it is far too
