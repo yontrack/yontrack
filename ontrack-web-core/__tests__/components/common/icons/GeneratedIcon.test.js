@@ -19,6 +19,25 @@ import '@testing-library/jest-dom';
 
 import GeneratedIcon, {generateInitials} from "@components/common/icons/GeneratedIcon";
 
+// WCAG 2.x relative luminance and contrast ratio, recomputed here rather than
+// imported: the point is to check the pair the component actually renders, not
+// to ask `getTextColorForBackground` whether it agrees with itself.
+// Ref: https://www.w3.org/TR/WCAG21/#dfn-relative-luminance
+const luminance = (color) => {
+    const linearize = (c) => {
+        const v = c / 255
+        return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4)
+    }
+    // jsdom normalises both `#rrggbb` and a colour name to `rgb(r, g, b)`.
+    const [r, g, b] = color.match(/\d+/g).map(Number)
+    return 0.2126 * linearize(r) + 0.7152 * linearize(g) + 0.0722 * linearize(b)
+}
+
+const contrastRatio = (a, b) => {
+    const la = luminance(a), lb = luminance(b)
+    return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05)
+}
+
 describe('GeneratedIcon', () => {
 
     it('name initials', () => {
@@ -68,6 +87,19 @@ describe('GeneratedIcon', () => {
         render(<GeneratedIcon id="icon" name="staging-live" colorIndex={4} size={12}/>)
         expect(parseFloat(screen.getByTestId('icon').style.fontSize)).toBeGreaterThanOrEqual(9)
     })
+
+    // The initials sit on a generated hue, so the foreground is picked by WCAG
+    // contrast rather than by a brightness threshold (#1815). Colour index 198
+    // is the worst of the 720 distinct generated hues, and the one the previous
+    // rule got wrong at 3.91:1.
+    it.each([0, 4, 15, 20, 109, 198, 12345])(
+        'draws initials that clear WCAG AA on generated colour %i',
+        (colorIndex) => {
+            render(<GeneratedIcon id="icon" name="staging-live" colorIndex={colorIndex}/>)
+            const style = screen.getByTestId('icon').style
+            expect(contrastRatio(style.color, style.backgroundColor)).toBeGreaterThanOrEqual(4.5)
+        }
+    )
 
     it('greys out a disabled icon', () => {
         render(<GeneratedIcon id="icon" name="staging-live" colorIndex={4} disabled={true}/>)
