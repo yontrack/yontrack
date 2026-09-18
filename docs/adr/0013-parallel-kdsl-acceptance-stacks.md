@@ -72,6 +72,25 @@ this change red on `main`. Ports below 1024 are therefore probed by opening a
 connection instead: something answers, or nothing does. macOS binds privileged
 ports happily, which is why the local verification passed.
 
+**An unprivileged port is probed on both wildcard families, not on one.** The
+bind probe used a plain `ServerSocket`, and on macOS that reads a busy port as
+free. The JVM opens an AF_INET6 dual-stack socket whenever the host has IPv6 --
+even when the bind address is an explicit `0.0.0.0`, which it maps into the v6
+socket -- and macOS defaults `net.inet6.ip6.v6only` to 1, so the bind succeeds
+happily beside an existing IPv4 listener. Docker publishes on `0.0.0.0`.
+`KdslStack.resolve` therefore accepted a slot whose Elasticsearch port was
+already published by another worktree's *development* stack, and
+`kdslAcceptanceTestComposeUp` was the one that found out: `ports are not
+available: exposing port TCP 0.0.0.0:9300 ... address already in use`. The next
+slot was genuinely free. Linux defaults `bindv6only` to 0 and does refuse the
+bind, so this only ever bit a developer machine -- the one case the slots exist
+for. The probe now binds `0.0.0.0` and `::` with the family chosen explicitly,
+through `ServerSocketChannel.open(family)`, and a family the host does not have
+counts as free rather than as busy: otherwise a JVM run with
+`-Djava.net.preferIPv4Stack=true`, or a container with IPv6 switched off, would
+fail the v6 probe on every port and report every slot as taken. `dev-stack.sh`
+was never affected -- it probes with `lsof`, which is family-agnostic.
+
 **The slot is claimed at execution time, not at configuration time.** The
 first version resolved it where the Compose extension is configured, in
 `ontrack-kdsl-acceptance/build.gradle.kts` -- and Gradle configures that file

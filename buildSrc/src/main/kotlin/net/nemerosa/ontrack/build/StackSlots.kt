@@ -1,9 +1,13 @@
 package net.nemerosa.ontrack.build
 
 import java.io.File
+import java.net.InetAddress
 import java.net.InetSocketAddress
-import java.net.ServerSocket
+import java.net.ProtocolFamily
 import java.net.Socket
+import java.net.StandardProtocolFamily
+import java.net.StandardSocketOptions
+import java.nio.channels.ServerSocketChannel
 import java.util.zip.CRC32
 
 /**
@@ -134,6 +138,7 @@ object StackSlots {
      *
      * Binding is the stricter test -- it fails for a listener on any address,
      * which is what Docker publishes -- and is used wherever it is allowed.
+     * It binds both wildcard families, for the reason [Wildcard] gives.
      * A privileged port cannot be bound by an unprivileged process on Linux
      * at all, so there a bind failure says nothing about whether the port is
      * in use: a CI runner would read every slot as taken. Those ports are
@@ -144,12 +149,46 @@ object StackSlots {
     fun portFree(port: Int): Boolean =
         if (port < FIRST_UNPRIVILEGED_PORT) nothingAnswersOn(port) else nothingBoundOn(port)
 
+    /**
+     * The two wildcard addresses a listener can sit on. Both are probed: a
+     * port is free only when neither family has anything on it.
+     *
+     * A single `ServerSocket` bind is not enough, and on macOS it is wrong in
+     * exactly the case the slots exist for. The JVM opens an AF_INET6
+     * dual-stack socket whenever the host has IPv6 -- even for an explicit
+     * `0.0.0.0`, which it maps into the v6 socket -- and macOS defaults
+     * `net.inet6.ip6.v6only` to 1, so that bind succeeds happily *beside* an
+     * existing IPv4 listener. Docker publishes on `0.0.0.0`, so the port of a
+     * stack that is up reads as free, a second stack takes the same slot, and
+     * `docker compose up` is the one that finds out: "ports are not available
+     * ... bind: address already in use". Linux defaults `bindv6only` to 0 and
+     * does refuse the bind, which is why this only ever bites a developer
+     * machine. Choosing the family explicitly makes the probe say the same
+     * thing on both.
+     */
+    private enum class Wildcard(val family: ProtocolFamily, val address: String) {
+        IPV4(StandardProtocolFamily.INET, "0.0.0.0"),
+        IPV6(StandardProtocolFamily.INET6, "::"),
+    }
+
     fun nothingBoundOn(port: Int): Boolean =
+        Wildcard.values().all { nothingBoundOn(it, port) }
+
+    /**
+     * A family the host does not have cannot be holding the port, so it reads
+     * as free rather than as busy. Without that, a JVM started with
+     * `-Djava.net.preferIPv4Stack=true`, or a container with IPv6 switched
+     * off, would fail the IPv6 probe on every port and report every slot as
+     * taken.
+     */
+    private fun nothingBoundOn(wildcard: Wildcard, port: Int): Boolean =
         try {
-            ServerSocket().use { socket ->
-                socket.reuseAddress = false
-                socket.bind(InetSocketAddress(port))
+            ServerSocketChannel.open(wildcard.family).use { channel ->
+                channel.setOption(StandardSocketOptions.SO_REUSEADDR, false)
+                channel.bind(InetSocketAddress(InetAddress.getByName(wildcard.address), port))
             }
+            true
+        } catch (unavailable: UnsupportedOperationException) {
             true
         } catch (ignored: Exception) {
             false

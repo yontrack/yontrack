@@ -1,6 +1,10 @@
 package net.nemerosa.ontrack.build
 
 import java.io.File
+import java.net.InetAddress
+import java.net.InetSocketAddress
+import java.net.StandardProtocolFamily
+import java.nio.channels.ServerSocketChannel
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -127,6 +131,21 @@ class StackSlotsTest {
     }
 
     @Test
+    fun `a listener on IPv4 only makes the port busy`() {
+        // Docker publishes on 0.0.0.0, so the listener facing a slot's port
+        // is very often IPv4-only. A `ServerSocket` bind probe does not see
+        // it on macOS: the JVM opens an AF_INET6 dual-stack socket and maps
+        // an address of 0.0.0.0 into it, and a v6 bind coexists with a v4
+        // listener there. The probe has to bind the family itself.
+        ipv4OnlyListener().use { taken ->
+            val port = (taken.localAddress as InetSocketAddress).port
+            assertFalse(StackSlots.nothingBoundOn(port), "an IPv4-only listener on $port makes it busy")
+            assertFalse(StackSlots.portFree(port), "an IPv4-only listener on $port makes it busy")
+            assertFalse(StackSlots.nothingAnswersOn(port), "something answers on $port")
+        }
+    }
+
+    @Test
     fun `main checkout takes slot zero when the ports are free`() {
         assertEquals(0, resolve(mainCheckout = true) { true })
     }
@@ -202,6 +221,15 @@ class StackSlotsTest {
         stackName = "integration test",
         portFree = portFree,
     )
+
+    /**
+     * An IPv4 listener on the wildcard address, the way Docker publishes a
+     * port. `ServerSocket` cannot produce one -- it opens an AF_INET6 socket
+     * whenever the host has IPv6 -- so the family is chosen explicitly.
+     */
+    private fun ipv4OnlyListener(): ServerSocketChannel =
+        ServerSocketChannel.open(StandardProtocolFamily.INET)
+            .apply { bind(InetSocketAddress(InetAddress.getByName("0.0.0.0"), 0)) }
 
     private fun createTempDir(): File =
         java.nio.file.Files.createTempDirectory("stack-slots-test").toFile()
