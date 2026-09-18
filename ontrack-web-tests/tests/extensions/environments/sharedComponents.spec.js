@@ -75,11 +75,13 @@ test('the dialog warns, by name, about the deployment it would cancel', async ({
 
 test('the dialog lists a slot which refuses the build, with the rule that refuses it', async ({page, ontrack}) => {
     const {project, slot} = await createSlot(ontrack)
-    // GOLD is required, and the build below has no promotion at all.
+    // The slot requires a GOLD promotion. The branch below never defines one, which is what makes
+    // the build ineligible: `PromotionSlotAdmissionRule.isBuildEligible` asks whether the *branch*
+    // has the promotion level at all - "could a build of this branch ever get here" - and leaves
+    // "is this particular build promoted" to the deployability check further on.
     await ontrack.environments.addPromotionRule({slot, promotion: "GOLD"})
 
     const branch = await project.createBranch()
-    await branch.createPromotionLevel("GOLD")
     const build = await branch.createBuild()
 
     await login(page, ontrack)
@@ -107,10 +109,13 @@ test('starting a deployment through the dialog, from a slot', async ({page, ontr
 
     await page.getByTestId(`slot-eligible-deploy-${build.id}`).click()
 
+    // A Deploy button beside one build in one slot names both, so the dialog narrows to that one
+    // choice rather than asking again which build - it still goes through the dialog, because the
+    // cancellation warning and the refusal reason are the whole reason it exists.
     const dialog = new DeployDialog(page)
     await dialog.expectOpen()
-    await dialog.expectBuildOffered(build)
-    await dialog.deployBuild(build)
+    await dialog.expectOnlySlot(slot)
+    await dialog.deployToSlot(slot)
     await expect(page.getByRole('dialog')).toHaveCount(0)
 
     await expect.poll(async () => {

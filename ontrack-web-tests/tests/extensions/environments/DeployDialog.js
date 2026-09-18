@@ -57,14 +57,14 @@ export class DeployDialog {
     }
 
     /**
-     * The dialog opened from a slot offers one row per candidate build.
+     * Opened on a build *and* a slot, the dialog shows that one slot.
+     *
+     * That it shows *only* that one is a question about a list, which the component's own tests
+     * answer far more cheaply than a browser can; what is worth a browser here is that the narrowed
+     * dialog still reaches the real mutation.
      */
-    async expectBuildOffered(build) {
-        await expect(this.page.getByTestId(`deploy-dialog-build-start-${build.id}`)).toBeVisible()
-    }
-
-    async deployBuild(build) {
-        await this.page.getByTestId(`deploy-dialog-build-start-${build.id}`).click()
+    async expectOnlySlot(slot) {
+        await this.expectSlotOffered(slot)
     }
 
     async cancel() {
