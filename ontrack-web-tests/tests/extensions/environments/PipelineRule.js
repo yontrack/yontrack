@@ -54,6 +54,16 @@ export class PipelineRule {
     }
 
     /**
+     * The rule's own account of what happened to it - since #1793 the manual approval says who
+     * approved, when and what they wrote, and, while it is still waiting, who is being waited on.
+     */
+    async expectApprovalDetail(text) {
+        const detail = this.page.getByTestId(`${this.prefix}-detail-${this.ruleConfigId}`)
+        await expect(detail).toBeVisible()
+        await expect(detail).toContainText(text)
+    }
+
+    /**
      * The inline fix on a rule which is waiting for somebody: "Answer".
      */
     locatorManualInputButton() {

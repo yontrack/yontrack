@@ -86,15 +86,26 @@ interface SlotService {
     ): SlotPipeline
 
     /**
+     * The deployments of a slot, newest first, filtered and paginated.
      *
+     * @param buildId Only the deployments of that build.
+     * @param buildName Only the deployments of a build with that name.
+     * @param branchName Only the deployments of a build on that branch.
+     * @param done Finished or not - which is not the same question as [status], since an unfinished
+     *   deployment may be a candidate or a running one.
+     * @param status Exactly that status.
+     * @param user Somebody who acted on the deployment, anywhere in its audit trail.
      */
     fun findPipelines(
         slot: Slot,
         offset: Int = 0,
         size: Int = 10,
         buildId: Int? = null,
+        buildName: String? = null,
         branchName: String? = null,
         done: Boolean? = null,
+        status: SlotPipelineStatus? = null,
+        user: String? = null,
     ): PaginatedList<SlotPipeline>
 
     /**

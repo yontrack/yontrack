@@ -113,32 +113,59 @@ class SlotPipelineRepository(
         }.firstOrNull()
     }
 
+    /**
+     * The deployments of a slot, newest first, filtered and paginated.
+     *
+     * One query builder rather than the two near-identical ones this used to be (a "for a build"
+     * copy and an "everything else" copy, each repeating the `done` clause): the slot page's
+     * Deployments tab (#1793) combines a build, a status and a user in the same request, and three
+     * more copies is not how that gets written.
+     *
+     * @param buildId Only the deployments of that build.
+     * @param buildName Only the deployments of a build with that name - what the slot page's
+     *   Deployments tab types into its Build box, since a reader knows a build by its name and not
+     *   by its id.
+     * @param branchName Only the deployments of a build on that branch.
+     * @param done Finished (`DONE`) or not. Kept beside [status] because it is a *different*
+     *   question: `done = false` is every unfinished deployment, cancelled ones included, which no
+     *   single status names.
+     * @param status Exactly that status - what the tab's Status filter asks.
+     * @param user Somebody who acted on the deployment: they started it, ran it, finished it,
+     *   cancelled it, answered a rule or overrode one. "Who" on a deployment is not one column but
+     *   its whole audit trail, so this matches any of its changes.
+     */
     fun findPipelines(
         slot: Slot,
         offset: Int,
         size: Int,
         buildId: Int?,
+        buildName: String? = null,
         branchName: String? = null,
         done: Boolean? = null,
+        status: SlotPipelineStatus? = null,
+        user: String? = null,
     ): PaginatedList<SlotPipeline> {
-        return if (buildId != null) {
-            findPipelinesForBuild(slot, offset, size, buildId, done)
-        } else {
-            findAllPipelines(slot, offset, size, branchName, done)
-        }
-    }
-
-    private fun findAllPipelines(
-        slot: Slot,
-        offset: Int,
-        size: Int,
-        branchName: String?,
-        done: Boolean?,
-    ): PaginatedList<SlotPipeline> {
-        var query = "WHERE SLOT_ID = :slotId"
-        val params = mutableMapOf(
+        var query = "WHERE P.SLOT_ID = :slotId"
+        val params = mutableMapOf<String, Any?>(
             "slotId" to slot.id,
         )
+
+        if (buildId != null) {
+            params["buildId"] = buildId
+            query += " AND P.BUILD_ID = :buildId "
+        }
+
+        if (!buildName.isNullOrBlank()) {
+            params["buildName"] = buildName
+            query += """
+                AND EXISTS (
+                    SELECT 1
+                    FROM BUILDS B
+                    WHERE B.ID = P.BUILD_ID
+                      AND B.NAME = :buildName
+                )
+            """
+        }
 
         if (!branchName.isNullOrBlank()) {
             params["branchName"] = branchName
@@ -159,10 +186,27 @@ class SlotPipelineRepository(
 
         if (done != null) {
             query += if (done) {
-                " AND STATUS = 'DONE' "
+                " AND P.STATUS = 'DONE' "
             } else {
-                " AND STATUS <> 'DONE' "
+                " AND P.STATUS <> 'DONE' "
             }
+        }
+
+        if (status != null) {
+            params["status"] = status.name
+            query += " AND P.STATUS = :status "
+        }
+
+        if (!user.isNullOrBlank()) {
+            params["user"] = user
+            query += """
+                AND EXISTS (
+                    SELECT 1
+                    FROM ENV_SLOT_PIPELINE_CHANGE C
+                    WHERE C.PIPELINE_ID = P.ID
+                      AND C."USER" = :user
+                )
+            """
         }
 
         val count = namedParameterJdbcTemplate!!.queryForObject(
@@ -176,60 +220,10 @@ class SlotPipelineRepository(
         ) ?: 0
         val list = namedParameterJdbcTemplate!!.query(
             """
-                SELECT *
+                SELECT P.*
                 FROM ENV_SLOT_PIPELINE P
                 $query
-                ORDER BY NUMBER DESC
-                LIMIT :size
-                OFFSET :offset
-            """.trimIndent(),
-            params + mapOf(
-                "offset" to offset,
-                "size" to size,
-            )
-        ) { rs, _ ->
-            toPipeline(rs)
-        }
-        return PaginatedList.create(items = list, offset = offset, pageSize = size, total = count)
-    }
-
-    private fun findPipelinesForBuild(
-        slot: Slot,
-        offset: Int,
-        size: Int,
-        buildId: Int,
-        done: Boolean?
-    ): PaginatedList<SlotPipeline> {
-        val params = mutableMapOf(
-            "slotId" to slot.id,
-            "buildId" to buildId,
-        )
-        var query = """
-            WHERE SLOT_ID = :slotId
-            AND BUILD_ID = :buildId
-        """.trimIndent()
-        if (done != null) {
-            query += if (done) {
-                " AND STATUS = 'DONE' "
-            } else {
-                " AND STATUS <> 'DONE' "
-            }
-        }
-        val count = namedParameterJdbcTemplate!!.queryForObject(
-            """
-                SELECT COUNT(*)
-                FROM ENV_SLOT_PIPELINE
-               $query
-            """.trimIndent(),
-            params,
-            Int::class.java
-        ) ?: 0
-        val list = namedParameterJdbcTemplate!!.query(
-            """
-                SELECT *
-                FROM ENV_SLOT_PIPELINE
-                $query
-                ORDER BY NUMBER DESC
+                ORDER BY P.NUMBER DESC
                 LIMIT :size
                 OFFSET :offset
             """.trimIndent(),

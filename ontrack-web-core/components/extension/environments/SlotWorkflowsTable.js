@@ -10,7 +10,15 @@ import SlotWorkflowEditButton from "@components/extension/environments/SlotWorkf
 import SlotWorkflowDeleteButton from "@components/extension/environments/SlotWorkflowDeleteButton";
 import ShowWorkflowButton from "@components/extension/workflows/ShowWorkflowButton";
 
-export default function SlotWorkflowsTable({slot, onChange}) {
+/**
+ * The workflows of a slot - the second half of the slot page's **Setup** tab.
+ *
+ * @param {Object} slot The slot, with its authorizations.
+ * @param {number} reloadCount Bumped by the page after any change, so the list is asked again. The
+ *   slot object itself does not change when a workflow is added, so it cannot carry that signal.
+ * @param {function} onChange Called after a change.
+ */
+export default function SlotWorkflowsTable({slot, reloadCount = 0, onChange}) {
 
     const client = useGraphQLClient()
 
@@ -50,7 +58,7 @@ export default function SlotWorkflowsTable({slot, onChange}) {
                 setLoading(false)
             })
         }
-    }, [client, slot])
+    }, [client, slot, reloadCount])
 
     const dialog = useSlotWorkflowDialog({
         onSuccess: onChange,
@@ -66,14 +74,18 @@ export default function SlotWorkflowsTable({slot, onChange}) {
             <Table
                 dataSource={workflows}
                 loading={loading}
+                rowKey={slotWorkflow => slotWorkflow.id}
                 pagination={false}
                 size="small"
+                data-testid={`slot-workflows-${slot.id}`}
+                onRow={slotWorkflow => ({'data-testid': `slot-workflow-${slotWorkflow.id}`})}
                 footer={() =>
                     <Space>
                         {
                             isAuthorized(slot, "slot", "edit") &&
                             <Button
                                 icon={<FaPlus/>}
+                                data-testid="slot-add-workflow"
                                 onClick={addWorkflow}
                             >
                                 Add workflow

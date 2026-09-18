@@ -95,6 +95,14 @@ export const gqlSharedAdmissionRuleData = gql`
             timestamp
             message
         }
+        # What somebody answered this rule, and who. Only the rules that ask for an answer have any
+        # - the manual approval is the one in the box today - and that is what lets "What's
+        # blocking" show who approved and what they wrote rather than only that it was approved.
+        data {
+            user
+            timestamp
+            data
+        }
         admissionRuleConfig {
             id
             name
@@ -239,24 +247,7 @@ export const gqlSlotDrawerDeployment = gql`
                         }
                     }
                     admissionRules {
-                        canBeOverridden
-                        overridden
-                        check {
-                            ok
-                            reason
-                        }
-                        override {
-                            user
-                            timestamp
-                            message
-                        }
-                        admissionRuleConfig {
-                            id
-                            name
-                            description
-                            ruleId
-                            ruleConfig
-                        }
+                        ...SharedAdmissionRuleData
                     }
                     slot {
                         id
@@ -274,6 +265,7 @@ export const gqlSlotDrawerDeployment = gql`
                     }
                 }
             }
+            ${gqlSharedAdmissionRuleData}
             ${gqlSharedSlotWorkflowData}
         `
 

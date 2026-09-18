@@ -7500,12 +7500,18 @@ type Slot implements Authorizable {
     branchName: String,
     "Filtering on a build"
     buildId: Int,
+    "Filtering on the name of a build"
+    buildName: String,
     "Filtering on finished pipelines"
     done: Boolean,
     "Offset for the page"
     offset: Int = 0,
     "Size of the page"
-    size: Int = 20
+    size: Int = 20,
+    "Filtering on an exact status"
+    status: SlotPipelineStatus,
+    "Filtering on a user who acted on the deployment, anywhere in its audit trail"
+    user: String
   ): SlotPipelinePaginated
   "project field"
   project: Project!

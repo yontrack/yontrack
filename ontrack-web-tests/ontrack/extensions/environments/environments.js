@@ -297,6 +297,32 @@ export class EnvironmentsExtension {
         return data.saveSlotAdmissionRuleConfig.admissionRuleConfig.id
     }
 
+    /**
+     * The id of a slot's configured rule for a given rule type.
+     *
+     * A test which configured a rule *through the UI* has no id in hand, and the id is what every
+     * `data-testid` on that rule is built from.
+     */
+    async findAdmissionRuleId({slot, ruleId}) {
+        const data = await graphQLCall(
+            this.ontrack.connection,
+            gql`
+                query SlotAdmissionRules($id: String!) {
+                    slotById(id: $id) {
+                        admissionRules {
+                            id
+                            ruleId
+                        }
+                    }
+                }
+            `,
+            {id: slot.id}
+        )
+        const rule = data.slotById.admissionRules.find(it => it.ruleId === ruleId)
+        if (!rule) throw new Error(`No ${ruleId} admission rule on slot ${slot.id}`)
+        return rule.id
+    }
+
     async addManualApproval({slot}) {
         return await this.addAdmissionRule({
             slot,

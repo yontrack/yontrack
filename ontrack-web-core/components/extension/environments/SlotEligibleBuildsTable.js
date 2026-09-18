@@ -9,14 +9,21 @@ import {Button} from "antd";
 import {FaPlay} from "react-icons/fa";
 import DeployDialog, {useDeployDialog} from "@components/extension/environments/shared/DeployDialog";
 
-export default function SlotEligibleBuildsTable({slot, onChange, showEligibleBuilds = false}) {
+/**
+ * @param {function} onDeploy Where Deploy goes when the caller already owns a deploy dialog. The
+ *   slot page does: its header block offers Deploy too, and a second mounted `DeployDialog` would
+ *   put a second copy of every one of its test ids - and of its buttons - in the same document
+ *   (#1793). Left out, the table mounts and owns one, which is what a standalone rendering wants.
+ */
+export default function SlotEligibleBuildsTable({slot, onChange, onDeploy, showEligibleBuilds = false}) {
 
     /*
      * The one way to start a deployment (#1797). `SlotPipelineCreateButton` used to start it from
      * here behind a `Popconfirm` warning that "all currently active deployments" would be cancelled
      * without saying which, or what was in them; the dialog names the deployment it would cancel.
      */
-    const deployDialog = useDeployDialog({onSuccess: onChange})
+    const ownDialog = useDeployDialog({onSuccess: onChange})
+    const deploy = onDeploy ?? ((slot, build) => ownDialog.start({slot, build}))
 
     return (
         <>
@@ -62,14 +69,14 @@ export default function SlotEligibleBuildsTable({slot, onChange, showEligibleBui
                                     icon={<FaPlay color="green"/>}
                                     title="Deploy this build into this slot"
                                     data-testid={`slot-eligible-deploy-${build.id}`}
-                                    onClick={() => deployDialog.start({slot, build})}
+                                    onClick={() => deploy(slot, build)}
                                 />
                             }
                         </Space>
                     }
                 ]}
             />
-            <DeployDialog dialog={deployDialog}/>
+            {!onDeploy && <DeployDialog dialog={ownDialog}/>}
         </>
     )
 }

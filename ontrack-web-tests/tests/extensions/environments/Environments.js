@@ -1,4 +1,5 @@
 import {expect} from "@playwright/test";
+import {SetupPage} from "./SetupPage";
 
 /**
  * The Environments home - since #1791 the project x environment matrix.
@@ -27,26 +28,41 @@ export class EnvironmentsPage {
     }
 
     /**
-     * Setup is one header command holding what used to be two: the matrix is an operational screen,
-     * and creating environments and slots moved behind it.
+     * Setup is one header command: the matrix is an operational screen, and creating environments
+     * and slots moved out of it. Since #1793 it is a link to the Setup page rather than a dropdown
+     * of the two dialogs it used to carry.
      */
-    async setup(item) {
+    async setup() {
         await this.page.getByTestId('environments-setup').click()
-        await this.page.getByRole('menuitem', {name: item}).click()
+        const setup = new SetupPage(this.page, this.ontrack)
+        await setup.expectOnPage()
+        return setup
     }
 
+    /**
+     * Creates an environment through Setup and comes back to the matrix *as it was*.
+     *
+     * The tests below are about what the matrix then shows, so coming back is part of the action
+     * rather than something each of them has to remember - and coming back to the **same URL**
+     * matters: the scope and the project search live in the query string, and a matrix reopened
+     * without them pages twenty projects at a time over a stack shared with every other test.
+     */
     async createEnvironment({name, description, order, tags}) {
-        await this.setup("New environment")
-        const dialog = new EnvironmentDialog(this.page)
-        await dialog.set({name, description, order, tags})
-        await dialog.ok()
+        await this.#throughSetup(setup => setup.createEnvironment({name, description, order, tags}))
     }
 
     async createSlot({projectName, qualifier, description, environmentNames}) {
-        await this.setup("New slot")
-        const dialog = new SlotDialog(this.page)
-        await dialog.set({projectName, qualifier, description, environmentNames})
-        await dialog.ok()
+        await this.#throughSetup(
+            setup => setup.createSlot({projectName, qualifier, description, environmentNames})
+        )
+    }
+
+    async #throughSetup(action) {
+        const matrixUrl = this.page.url()
+        const setup = await this.setup()
+        await action(setup)
+        await this.page.goto(matrixUrl)
+        await this.expectOnPage()
     }
 
     /**
@@ -120,81 +136,5 @@ export class EnvironmentsPage {
 
     async checkFreshness() {
         await expect(this.page.getByTestId('matrix-freshness-age')).toContainText('Updated')
-    }
-}
-
-/**
- * Both dialogs have a **Description**, and an Ant Design `Form.Item` names its control after the
- * field - so once each dialog has been opened once, two `id="description"` inputs are in the page.
- * A closed Ant Design modal stays mounted, and a duplicated id makes `label[for="description"]`
- * point at whichever one is *first* in the document, which is the one belonging to the dialog that
- * was opened first and is now hidden. Looking a Description up by its label therefore finds an
- * invisible field and waits out the whole timeout, and scoping the label lookup to the visible
- * dialog does not help - the association is computed against the document, not against the scope.
- *
- * So the Description is reached by its id *within* the open dialog: a plain CSS lookup inside a
- * subtree, which has no such document-wide behaviour. Every other field of these two dialogs has a
- * name of its own and is left alone.
- */
-const descriptionField = (dialog) => dialog.locator('#description')
-
-export class EnvironmentDialog {
-    constructor(page) {
-        this.page = page
-    }
-
-    async set({name, description, order, tags}) {
-        const dialog = this.page.getByRole('dialog')
-        await expect(dialog.getByLabel('Name')).toBeVisible()
-        await dialog.getByLabel('Name').fill(name)
-        await descriptionField(dialog).fill(description)
-        await dialog.getByLabel('Order').fill(order.toString())
-        const tagsField = dialog.getByTestId('tags')
-        for (const tag of tags) {
-            await tagsField.click()
-            await tagsField.type(tag)
-        }
-    }
-
-    async ok() {
-        await this.page.getByRole('button', {name: 'OK'}).click()
-        // Waiting for the dialog to be gone
-        await expect(this.page.getByRole('button', {name: 'OK'})).toHaveCount(0)
-    }
-}
-
-export class SlotDialog {
-    constructor(page) {
-        this.page = page
-    }
-
-    async set({projectName, qualifier, description, environmentNames}) {
-        const dialog = this.page.getByRole('dialog')
-        await expect(dialog.getByLabel('Project', {exact: true})).toBeVisible()
-
-        await this.page.getByTestId('projectId').getByLabel('Project').click()
-        await this.page.getByTestId('projectId').getByLabel('Project').fill(projectName)
-        await this.page.getByTitle(projectName, {exact: true}).locator('div').click()
-
-        if (qualifier) {
-            await this.page.getByLabel('Qualifier').fill(qualifier)
-        }
-
-        if (description) {
-            await descriptionField(dialog).fill(description)
-        }
-
-        await this.page.getByTestId('environmentIds').locator('div').nth(1).click()
-        for (const environmentName of environmentNames) {
-            await this.page.getByLabel('Environments').type(environmentName)
-            await this.page.getByLabel('Environments').press('Enter')
-        }
-        await this.page.getByLabel('Environments').press('Escape')
-    }
-
-    async ok() {
-        await this.page.getByRole('button', {name: 'OK'}).click()
-        // Waiting for the dialog to be gone
-        await expect(this.page.getByRole('button', {name: 'OK'})).toHaveCount(0)
     }
 }

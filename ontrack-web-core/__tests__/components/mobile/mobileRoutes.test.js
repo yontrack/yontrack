@@ -78,6 +78,20 @@ describe('mobileEquivalent', () => {
             .toEqual(`/mobile/workflow-instance/${id}`)
     })
 
+    it('leaves the slot page and Setup desktop-only', () => {
+        // #1793 added `/extension/environments/setup` and rebuilt the slot page.
+        // Both stay desktop-only by design - a phone gets the interstitial,
+        // which offers the desktop page that works, rather than a mobile screen
+        // that does not exist. Asserted rather than assumed: adding a desktop
+        // route is a mobile decision, and this is where that decision is
+        // recorded.
+        expect(mobileEquivalent('/extension/environments/setup')).toBeNull()
+        expect(describeDesktopRoute('/extension/environments/setup')).toEqual('an environment')
+        expect(isRedirectExempt('/extension/environments/setup')).toBe(false)
+
+        expect(mobileEquivalent('/extension/environments/slot/7')).toBeNull()
+    })
+
     it('leaves the rest of the workflows pages to the interstitial', () => {
         // Only the instance page has a mobile screen. The audit page and the
         // definitions do not, and they have to keep reaching the interstitial

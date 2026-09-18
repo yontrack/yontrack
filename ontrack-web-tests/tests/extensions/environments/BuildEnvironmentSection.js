@@ -31,7 +31,10 @@ export class BuildEnvironmentSection {
         const dialog = await this.openDeployDialog()
         await dialog.deployToSlot(slot)
         // On success the cell takes the user to the new deployment, as it always has.
-        await expect(this.page.getByText(`Slot ${environment.name} - ${this.build.branch.project.name}`)).toBeVisible()
+        // "staging · petclinic" since #1793, and both the title and the breadcrumb carry it.
+        await expect(
+            this.page.getByText(`${environment.name} · ${this.build.branch.project.name}`).first()
+        ).toBeVisible()
         await expect(this.page.getByRole('link', {name: this.build.name})).toBeVisible()
     }
 

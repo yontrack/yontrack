@@ -107,6 +107,9 @@ test('starting a deployment through the dialog, from a slot', async ({page, ontr
     const slotPage = new SlotPage(page, slot)
     await slotPage.goTo()
 
+    // The eligible builds are a tab of their own since #1793, and Ant Design mounts a tab's content
+    // only once the tab is selected.
+    await slotPage.getSlotBuilds()
     await page.getByTestId(`slot-eligible-deploy-${build.id}`).click()
 
     // A Deploy button beside one build in one slot names both, so the dialog narrows to that one

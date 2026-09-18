@@ -42,7 +42,13 @@ export default function DeleteEnvironmentButton({environment}) {
     return (
         <>
             {
-                user.authorizations.environment?.create &&
+                /*
+                 * `environment.delete`, not `environment.create` (#1793). The two are different
+                 * global functions - `EnvironmentDelete` and `EnvironmentSave` - so gating a
+                 * deletion on the right to create was offering it to somebody the backend would
+                 * then refuse, and hiding it from somebody allowed to do it.
+                 */
+                user.authorizations.environment?.delete &&
                 <>
                     <InlineConfirmCommand
                         title="Environment deletion"

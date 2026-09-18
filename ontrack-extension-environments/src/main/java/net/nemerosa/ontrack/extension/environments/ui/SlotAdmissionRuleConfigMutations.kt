@@ -24,9 +24,33 @@ class SlotAdmissionRuleConfigMutations(
         ) { input ->
             if (!input.id.isNullOrBlank()) {
                 if (!input.slotId.isNullOrBlank()) {
-                    error("If ID is provided, the ID of slot is not needed.")
+                    throw SlotAdmissionRuleConfigInputException.SlotNotNeeded()
                 } else {
-                    TODO("Saving the configuration of an existing rule")
+                    /*
+                     * Editing an existing rule (#1793). Until now a rule could only be deleted and
+                     * added back, which changes its id - and the id is what a deployment's stored
+                     * rule state is keyed on, so "delete and re-add" quietly detaches the answers
+                     * already given to it.
+                     *
+                     * The slot is taken from the stored rule rather than from the input: a rule
+                     * belongs to one slot for its whole life, and the input carries no slot here by
+                     * the branch above.
+                     */
+                    val existing = slotService.findAdmissionRuleConfigById(input.id)
+                        ?: throw SlotAdmissionRuleConfigInputException.NotFound(input.id)
+                    // Getting the rule and checking the configuration, exactly as on creation
+                    val rule = slotAdmissionRuleRegistry.getRule(input.ruleId)
+                    rule.checkConfig(input.ruleConfig)
+                    val config = SlotAdmissionRuleConfig(
+                        id = existing.id,
+                        slot = existing.slot,
+                        name = input.name?.takeIf { it.isNotBlank() } ?: rule.id,
+                        description = input.description,
+                        ruleId = input.ruleId,
+                        ruleConfig = input.ruleConfig,
+                    )
+                    slotService.saveAdmissionRuleConfig(config)
+                    config
                 }
             } else if (!input.slotId.isNullOrBlank()) {
                 val slot = slotService.getSlotById(input.slotId)

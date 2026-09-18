@@ -410,8 +410,11 @@ class SlotServiceImpl(
         offset: Int,
         size: Int,
         buildId: Int?,
+        buildName: String?,
         branchName: String?,
-        done: Boolean?
+        done: Boolean?,
+        status: SlotPipelineStatus?,
+        user: String?,
     ): PaginatedList<SlotPipeline> {
         securityService.checkSlotAccess<SlotView>(slot)
         return slotPipelineRepository.findPipelines(
@@ -419,8 +422,11 @@ class SlotServiceImpl(
             offset = offset,
             size = size,
             buildId = buildId,
+            buildName = buildName,
             branchName = branchName,
             done = done,
+            status = status,
+            user = user,
         )
     }
 

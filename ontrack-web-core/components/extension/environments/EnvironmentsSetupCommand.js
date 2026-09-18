@@ -1,63 +1,41 @@
 import {useContext} from "react"
-import {Button, Dropdown, Space, Typography} from "antd"
 import {FaCog} from "react-icons/fa"
+import {Command} from "@components/common/Commands"
 import {UserContext} from "@components/providers/UserProvider"
-import NewEnvironmentDialog, {useNewEnvironmentDialog} from "@components/extension/environments/NewEnvironmentDialog"
-import NewSlotDialog, {useNewSlotDialog} from "@components/extension/environments/NewSlotDialog"
+import {environmentsSetupUri} from "@components/extension/environments/EnvironmentsLinksUtils"
 
 /**
- * **Setup** - where configuring environments and slots moves to, out of the operational screens.
+ * **Setup** - the way from the Environments home to the page where configuring happens.
  *
  * The redesign takes "New environment" and "New slot" off the matrix's header: creating things is
- * not what somebody came to the Environments home to do, and in practice it is done as code. The
- * Setup *page* that will hold them arrives with phase 4 of the redesign; until then this command is
- * the doorway, and behind it are the same two dialogs the header used to carry. A reader gets one
- * header button instead of two, and the day the page exists this command points at it instead -
- * which is a change of one `href` rather than a change to the header again.
+ * not what somebody came to the Environments home to do, and in practice it is done as code. #1791
+ * put them behind this command as a dropdown of two dialogs, as a stepping stone; since #1793 the
+ * Setup page exists and this is a plain link to it, which is what the redesign always said it would
+ * become.
  *
  * Hidden without any configuration right at all, like every other unauthorised action in Yontrack:
- * a Setup menu whose every entry is missing is worse than no Setup menu.
+ * a Setup page whose every control is missing is worse than no Setup button.
  */
 export default function EnvironmentsSetupCommand() {
 
     const user = useContext(UserContext)
 
-    const newEnvironmentDialog = useNewEnvironmentDialog()
-    const newSlotDialog = useNewSlotDialog()
-
     const canCreateEnvironment = !!user.authorizations?.environment?.create
-    // The slot dialog is gated on `environment.view` today, which is a known defect of its own
-    // (noted in the redesign's list) - this command repeats the existing gate rather than silently
-    // tightening or loosening it.
-    const canCreateSlot = !!user.authorizations?.environment?.view
+    const canEditEnvironment = !!user.authorizations?.environment?.edit
+    const canDeleteEnvironment = !!user.authorizations?.environment?.delete
+    // The global half of the `slot` context: "can create a slot on at least one project". See
+    // `EnvironmentsAuthorizationContributor`.
+    const canCreateSlot = !!user.authorizations?.slot?.create
 
-    if (!canCreateEnvironment && !canCreateSlot) return null
-
-    const items = []
-    if (canCreateEnvironment) {
-        items.push({key: 'new-environment', label: "New environment"})
-    }
-    if (canCreateSlot) {
-        items.push({key: 'new-slot', label: "New slot"})
-    }
-
-    const onClick = ({key}) => {
-        if (key === 'new-environment') newEnvironmentDialog.start({})
-        if (key === 'new-slot') newSlotDialog.start({})
-    }
+    if (!canCreateEnvironment && !canEditEnvironment && !canDeleteEnvironment && !canCreateSlot) return null
 
     return (
-        <>
-            <Dropdown menu={{items, onClick}} trigger={['click']}>
-                <Button type="text" data-testid="environments-setup" title="Set up environments and slots">
-                    <Space size={8}>
-                        <FaCog/>
-                        <Typography.Text>Setup</Typography.Text>
-                    </Space>
-                </Button>
-            </Dropdown>
-            <NewEnvironmentDialog newEnvironmentDialog={newEnvironmentDialog}/>
-            <NewSlotDialog newSlotDialog={newSlotDialog}/>
-        </>
+        <Command
+            icon={<FaCog/>}
+            href={environmentsSetupUri}
+            text="Setup"
+            title="Set up environments and slots"
+            testId="environments-setup"
+        />
     )
 }

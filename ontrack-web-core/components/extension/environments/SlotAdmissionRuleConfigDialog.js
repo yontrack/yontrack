@@ -6,6 +6,17 @@ import {useState} from "react";
 import SlotAdmissionRuleForm from "@components/extension/environments/SlotAdmissionRuleForm";
 import {gql} from "graphql-request";
 
+/**
+ * Adding an admission rule to a slot, or editing one that is already there.
+ *
+ * One dialog for both, because they are the same six fields and a second dialog would be a second
+ * place for them to drift. Which of the two it is comes from the context: `start({slot})` adds,
+ * `start({slot, rule})` edits.
+ *
+ * The mutation's shape says the same thing - `saveSlotAdmissionRuleConfig` takes *either* an `id`
+ * (this rule) *or* a `slotId` (a new rule on that slot) and refuses both, so the dialog sends one or
+ * the other rather than a flag.
+ */
 export const useSlotAdmissionRuleConfigDialog = ({onSuccess}) => {
 
     const [currentValues, setCurrentValues] = useState({})
@@ -13,24 +24,26 @@ export const useSlotAdmissionRuleConfigDialog = ({onSuccess}) => {
     return useFormDialog({
         onSuccess: onSuccess,
         init: (form, context) => {
-            setCurrentValues({...context})
-            // form.setFieldValue('id', context.id)
-            form.setFieldValue('name', context.name)
-            form.setFieldValue('description', context.description)
-            form.setFieldValue('ruleId', context.ruleId)
-            form.setFieldValue('ruleConfig', context.ruleConfig)
+            const rule = context?.rule
+            setCurrentValues({...rule})
+            form.setFieldValue('name', rule?.name)
+            form.setFieldValue('description', rule?.description)
+            form.setFieldValue('ruleId', rule?.ruleId)
+            form.setFieldValue('ruleConfig', rule?.ruleConfig)
         },
         currentValues,
         setCurrentValues,
         query: gql`
             mutation SaveAdmissionRuleConfig(
-                $slotId: String!,
+                $id: String,
+                $slotId: String,
                 $name: String,
                 $description: String!,
                 $ruleId: String!,
                 $ruleConfig: JSON!,
             ) {
                 saveSlotAdmissionRuleConfig(input: {
+                    id: $id,
                     slotId: $slotId,
                     name: $name,
                     description: $description,
@@ -45,10 +58,12 @@ export const useSlotAdmissionRuleConfigDialog = ({onSuccess}) => {
         `,
         userNode: 'saveSlotAdmissionRuleConfig',
         prepareValues: (values, context) => {
+            const editing = !!context?.rule
             return {
                 ...values,
                 description: values.description ?? '',
-                slotId: context.slot.id,
+                id: editing ? context.rule.id : null,
+                slotId: editing ? null : context.slot.id,
             }
         },
     })
@@ -68,7 +83,7 @@ export default function SlotAdmissionRuleConfigDialog({dialog}) {
 
     return (
         <>
-            <FormDialog dialog={dialog} onValuesChange={onValuesChange}>
+            <FormDialog dialog={dialog} onValuesChange={onValuesChange} id="slot-admission-rule-dialog">
                 <Form.Item
                     name="name"
                     label="Name"

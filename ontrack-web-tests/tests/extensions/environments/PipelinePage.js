@@ -47,8 +47,14 @@ export class PipelinePage {
     }
 
     async expectOnPage() {
-        // The breadcrumb still names the slot, and the title now names both.
-        await expect(this.page.getByText(`Slot ${this.pipeline.slot.environment.name} - ${this.pipeline.slot.project.name}`)).toBeVisible()
+        /*
+         * The breadcrumb names the slot and the title names it too, both as
+         * "staging · petclinic" since #1793 - the word *slot* now appears only in Setup. Two
+         * elements legitimately carry that string, so `first()` rather than a strict match.
+         */
+        await expect(
+            this.page.getByText(`${this.pipeline.slot.environment.name} · ${this.pipeline.slot.project.name}`).first()
+        ).toBeVisible()
         await expect(this.page.getByText(`Deployment #${this.pipeline.number}`)).toBeVisible()
     }
 

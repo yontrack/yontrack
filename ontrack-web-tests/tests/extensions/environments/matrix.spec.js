@@ -170,8 +170,13 @@ test('the Setup command replaces the two creation commands on the header', async
     // ...and the experimental banner is gone from this screen
     await expect(page.getByText('still under experiment')).toHaveCount(0)
 
-    // ...they are both behind Setup
-    await page.getByTestId('environments-setup').click()
-    await expect(page.getByRole('menuitem', {name: 'New environment'})).toBeVisible()
-    await expect(page.getByRole('menuitem', {name: 'New slot'})).toBeVisible()
+    // ...they are both on the Setup page, which the command now leads to (#1793). Until then the
+    // command was a dropdown holding the two dialogs directly; it is a link now, which is the change
+    // of one `href` the stepping stone was built for.
+    const setup = await matrix.setup()
+    await expect(page.getByTestId('setup-new-environment')).toBeVisible()
+    await setup.selectTab("Slots")
+    await expect(page.getByTestId('setup-new-slot')).toBeVisible()
+    // ...and the experimental banner lives there, once, rather than on every screen of the feature.
+    await setup.expectExperimentalNote()
 })

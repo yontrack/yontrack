@@ -83,8 +83,18 @@ class SlotAdmissionRuleConfigRepository(
         )
     }
 
+    /**
+     * The configured rule with this id, or `null`.
+     *
+     * `query(...).firstOrNull()` rather than `queryForObject`: the latter *throws*
+     * `EmptyResultDataAccessException` when nothing matches, so this method never returned the null
+     * its own type promises. Every caller was written against that promise -
+     * `deleteSlotAdmissionRuleConfig` does nothing when the rule is already gone, and
+     * `saveSlotAdmissionRuleConfig` turns a missing id into a message the dialog can show - and all
+     * of them got an `INTERNAL_ERROR` with no message instead (#1793).
+     */
     fun findAdmissionRuleConfigById(id: String): SlotAdmissionRuleConfig? =
-        namedParameterJdbcTemplate!!.queryForObject(
+        namedParameterJdbcTemplate!!.query(
             """
                 SELECT *
                     FROM ENV_SLOT_ADMISSION_RULE_CONFIGS
@@ -98,7 +108,7 @@ class SlotAdmissionRuleConfigRepository(
                 rs,
                 slot = slotRepository.getSlotById(rs.getString("slot_id"))
             )
-        }
+        }.firstOrNull()
 
     fun getAdmissionRuleConfigById(slot: Slot, id: String): SlotAdmissionRuleConfig =
         namedParameterJdbcTemplate!!.queryForObject(

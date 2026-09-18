@@ -43,23 +43,26 @@ test('pipeline lifecycle', async ({page, ontrack}) => {
 
 test('pipeline lifecycle from the slot page', async ({page, ontrack}) => {
     const {slot, project} = await createSlot(ontrack)
-    const {pipeline} = await createPipeline({project, slot})
+    const {pipeline, build} = await createPipeline({project, slot})
 
     await login(page, ontrack)
     const slotPage = new SlotPage(page, slot)
     await slotPage.goTo()
 
+    /*
+     * Driven from the header block rather than from a row of the deployments table (#1793): the
+     * table is the archive and carries no actions, and the header block is the slot drawer - so
+     * this also checks that the drawer's actions work where the page embeds them.
+     */
+    await slotPage.expectInFlight(build.name)
+    await slotPage.startDeployment()
+    await slotPage.finishDeployment()
+    await slotPage.expectNothingInFlight()
+    await slotPage.expectHeaderNow(build.name)
+
+    // ... and the deployment is in the history, done.
     const slotPipelineTable = await slotPage.getSlotPipelineTable()
-    const slotPipelineRow = await slotPipelineTable.getSlotPipelineRow(pipeline.id)
-
-    await slotPipelineRow.checkRunAction({})
-    await slotPipelineRow.running()
-    await slotPipelineRow.checkRunAction({visible: false})
-
-    await slotPipelineRow.checkFinishAction({})
-    await slotPipelineRow.finish()
-    await slotPipelineRow.checkFinishAction({visible: false})
-
+    await slotPipelineTable.expectRow(pipeline, {status: 'Deployed'})
 })
 
 test('starting a pipeline in forced DONE', async ({page, ontrack}) => {

@@ -14,8 +14,11 @@ import {
     gqlSlotDrawerFinish,
     gqlSlotDrawerRun,
     gqlSlotDrawerTitle,
+    gqlSharedAdmissionRuleData,
 } from "@components/extension/environments/shared/environmentsSharedGraphQL"
 import {gqlDeploymentPage} from "@components/extension/environments/deployment/deploymentGraphQL"
+import {gqlSlotDeployments, gqlSlotPage} from "@components/extension/environments/slot/slotGraphQL"
+import {gqlSetup} from "@components/extension/environments/setup/setupGraphQL"
 import {gqlSlotData} from "@components/extension/environments/EnvironmentGraphQL"
 
 /**
@@ -86,6 +89,9 @@ describe('the shared environments documents', () => {
     check('the deploy dialog builds query', gqlDeployDialogBuilds)
     check('the deploy dialog start mutation', gqlDeployDialogStart)
     check('the deployment page query', gqlDeploymentPage)
+    check('the slot page query', gqlSlotPage)
+    check('the slot deployments query', gqlSlotDeployments)
+    check('the Setup page query', gqlSetup)
 
     it('asks the slot whether it is blocked and whether it is behind', () => {
         // The two flags the cell exists to carry; without them it draws neither mark and a held-up
@@ -117,6 +123,22 @@ describe('the shared environments documents', () => {
         expect(gqlDeployDialogBuilds).toContain('authorizations')
         expect(gqlSlotDrawer).toContain('authorizations')
         expect(gqlDeploymentPage).toContain('authorizations')
+        // The slot page hides its whole Setup tab on `slot.edit`.
+        expect(gqlSlotPage).toContain('authorizations')
+    })
+
+    it('asks each admission rule for the answer given to it', () => {
+        // Who approved, and what they wrote. It is what lets the manual approval's `Check` component
+        // say more than "this must be approved manually" - see #1793.
+        expect(gqlSharedAdmissionRuleData).toMatch(/data\s*{[^}]*user/)
+    })
+
+    it('sends every deployments filter to the server', () => {
+        // Filtering the page that came back instead would make the answer depend on how much of the
+        // history happened to be on it.
+        expect(gqlSlotDeployments).toContain('status: $status')
+        expect(gqlSlotDeployments).toContain('buildName: $buildName')
+        expect(gqlSlotDeployments).toContain('user: $user')
     })
 
     it('asks the deployment for the three phases of workflows, not only the current one', () => {

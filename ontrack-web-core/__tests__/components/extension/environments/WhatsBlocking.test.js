@@ -37,17 +37,25 @@ jest.mock("../../../../components/extension/environments/SlotAdmissionRuleSummar
     __esModule: true,
     default: ({ruleId}) => <span>{ruleId}</span>,
 }))
+// So does `SlotAdmissionRuleCheck`, which is the rule's own account of what happened to it (#1793).
+// Stood in for here: what belongs to this component is *which rows get one*, not what a given rule
+// chooses to say - that is the rule component's own business.
+jest.mock("../../../../components/extension/environments/SlotAdmissionRuleCheck", () => ({
+    __esModule: true,
+    default: ({ruleData}) => <span>{`answered by ${ruleData?.user ?? 'nobody'}`}</span>,
+}))
 
 import WhatsBlocking from "@components/extension/environments/shared/WhatsBlocking"
 
 const granted = (name, action) => ({name, action, authorized: true})
 const refused = (name, action) => ({name, action, authorized: false})
 
-const rule = (id, {ok = true, overridden = false, canBeOverridden = true} = {}) => ({
+const rule = (id, {ok = true, overridden = false, canBeOverridden = true, data = null} = {}) => ({
     canBeOverridden,
     overridden,
     check: {ok, reason: ok ? null : `${id} refuses`},
     override: overridden ? {user: 'admin', timestamp: '2026-09-18T10:00:00Z', message: 'Approved by hand'} : null,
+    data,
     admissionRuleConfig: {id, name: id, ruleId: 'manual', ruleConfig: {}},
 })
 
@@ -95,6 +103,37 @@ describe("what's blocking", () => {
             .toHaveTextContent('Overridden by admin')
         expect(screen.getByTestId('whats-blocking-override-detail-rule-r1'))
             .toHaveTextContent('Approved by hand')
+    })
+
+    it('shows what was answered to a rule, under its row', () => {
+        // The approval details were in the deployment's stored rule data all along and reached no
+        // screen: an approval nobody can attribute is not much of an approval.
+        // A *rejected* approval, because that is the row a reader is looking at: an approved one
+        // passes and folds away behind "1 check passed", which is the right place for it.
+        render(<WhatsBlocking deployment={deployment({
+            rules: [
+                rule('r1', {
+                    ok: false,
+                    data: {user: 'admin', timestamp: '2026-09-18T10:00:00Z', data: {approval: false}},
+                }),
+            ],
+        })}/>)
+        expect(screen.getByTestId('whats-blocking-detail-r1')).toHaveTextContent('answered by admin')
+    })
+
+    it('shows who is being waited on by a rule still asking for an answer', () => {
+        render(<WhatsBlocking deployment={deployment({
+            rules: [rule('r1', {ok: false})],
+            requiredInputs: [{config: {id: 'r1'}}],
+        })}/>)
+        expect(screen.getByTestId('whats-blocking-detail-r1')).toBeInTheDocument()
+    })
+
+    it('adds nothing under a rule which asks nobody anything', () => {
+        // A promotion or branch-pattern rule has nothing to add beyond the summary already on the
+        // row, and drawing its `Check` there would restate the summary underneath itself.
+        render(<WhatsBlocking deployment={deployment({rules: [rule('r1', {ok: false})]})}/>)
+        expect(screen.queryByTestId('whats-blocking-detail-r1')).not.toBeInTheDocument()
     })
 
     it('offers Answer on a rule waiting for input', () => {

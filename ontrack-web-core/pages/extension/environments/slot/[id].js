@@ -1,6 +1,6 @@
 import {useRouter} from "next/router";
 import MainLayout from "@components/layouts/MainLayout";
-import SlotView from "@components/extension/environments/SlotView";
+import SlotView from "@components/extension/environments/slot/SlotView";
 
 export default function SlotPage() {
     const router = useRouter()

@@ -75,6 +75,10 @@ export const phaseItems = (deployment, phase) => {
                 override: rule.override,
                 canBeOverridden: !!rule.canBeOverridden,
                 needsInput: awaitingInput.has(config?.id),
+                // What was answered to this rule, and by whom. Only a rule that asks for an answer
+                // ever has any, which is what makes it the right condition for drawing the rule's
+                // own `Check` component under the row - see `WhatsBlocking`.
+                data: rule.data ?? null,
                 rule,
             })
         });

@@ -3,6 +3,7 @@ import {FaCheck, FaExclamationCircle, FaHandPaper} from "react-icons/fa"
 import CheckIcon from "@components/common/CheckIcon"
 import {isAuthorized} from "@components/common/authorizations"
 import SlotAdmissionRuleSummary from "@components/extension/environments/SlotAdmissionRuleSummary"
+import SlotAdmissionRuleCheck from "@components/extension/environments/SlotAdmissionRuleCheck"
 import WorkflowInstanceLink from "@components/extension/workflows/WorkflowInstanceLink"
 import SlotPipelineInputDialog, {
     useSlotPipelineInputDialog,
@@ -158,6 +159,27 @@ export default function WhatsBlocking({
                         <TimestampText value={item.override.timestamp} relative={true}/>
                         {item.override.message ? ` — ${item.override.message}` : ''}
                     </Typography.Text>
+                </div>
+            }
+            {
+                /*
+                 * The rule's own account of what happened to it - who approved, what they wrote,
+                 * or who is being waited on.
+                 *
+                 * Drawn only for the rules that *ask* somebody a question: either the deployment
+                 * carries an answer to this one, or it is blocking while waiting for one. A
+                 * promotion or branch-pattern rule has nothing to add beyond the summary already on
+                 * the row, and drawing its `Check` there would restate the summary underneath
+                 * itself.
+                 */
+                item.kind === 'rule' && (item.data || (!item.ok && item.needsInput)) &&
+                <div data-testid={`${testId}-detail-${item.rule.admissionRuleConfig.id}`}>
+                    <SlotAdmissionRuleCheck
+                        check={item.rule.check}
+                        ruleId={item.rule.admissionRuleConfig.ruleId}
+                        ruleConfig={item.rule.admissionRuleConfig.ruleConfig}
+                        ruleData={item.data}
+                    />
                 </div>
             }
             {

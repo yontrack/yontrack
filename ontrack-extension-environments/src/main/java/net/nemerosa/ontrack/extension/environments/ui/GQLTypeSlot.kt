@@ -100,21 +100,33 @@ class GQLTypeSlot(
                     fieldDescription = "Paginated list of pipelines",
                     arguments = listOf(
                         intArgument("buildId", "Filtering on a build"),
+                        stringArgument(ARG_BUILD_NAME, "Filtering on the name of a build"),
                         stringArgument(ARG_BRANCH_NAME, "Name of the branch to get the pipelines for"),
                         booleanArgument(ARG_DONE, "Filtering on finished pipelines"),
+                        enumArgument<SlotPipelineStatus>(ARG_STATUS, "Filtering on an exact status"),
+                        stringArgument(
+                            ARG_USER,
+                            "Filtering on a user who acted on the deployment, anywhere in its audit trail"
+                        ),
                     ),
                     itemType = gqlTypeSlotPipeline.typeName,
                     itemPaginatedListProvider = { env, slot, offset, size ->
                         val buildId: Int? = env.getArgument("buildId")
+                        val buildName: String? = env.getArgument(ARG_BUILD_NAME)
                         val branchName: String? = env.getArgument(ARG_BRANCH_NAME)
                         val done: Boolean? = env.getArgument(ARG_DONE)
+                        val status = env.getArgument<String?>(ARG_STATUS)?.let { SlotPipelineStatus.valueOf(it) }
+                        val user: String? = env.getArgument(ARG_USER)
                         slotService.findPipelines(
                             slot = slot,
                             offset = offset,
                             size = size,
                             buildId = buildId,
+                            buildName = buildName,
                             branchName = branchName,
                             done = done,
+                            status = status,
+                            user = user,
                         )
                     }
                 )
@@ -199,8 +211,11 @@ class GQLTypeSlot(
     }
 
     companion object {
+        const val ARG_BUILD_NAME = "buildName"
         const val ARG_BRANCH_NAME = "branchName"
         const val ARG_DONE = "done"
+        const val ARG_STATUS = "status"
+        const val ARG_USER = "user"
 
         /**
          * The "Next" section of the slot drawer shows up to three builds.

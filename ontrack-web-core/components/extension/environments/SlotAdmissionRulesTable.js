@@ -3,69 +3,67 @@ import {gql} from "graphql-request";
 import SlotAdmissionRuleConfigDialog, {
     useSlotAdmissionRuleConfigDialog
 } from "@components/extension/environments/SlotAdmissionRuleConfigDialog";
-import {useGraphQLClient} from "@components/providers/ConnectionContextProvider";
-import {useEffect, useState} from "react";
+import {useQuery} from "@components/services/GraphQL";
 import {FaPlus} from "react-icons/fa";
 import {isAuthorized} from "@components/common/authorizations";
 import SlotAdmissionRuleSummary from "@components/extension/environments/SlotAdmissionRuleSummary";
 import SlotAdmissionRuleActions from "@components/extension/environments/SlotAdmissionRuleActions";
 
-export default function SlotAdmissionRulesTable({slot, onChange}) {
+/**
+ * The configured admission rules of a slot - the first half of the slot page's **Setup** tab.
+ *
+ * One dialog is mounted for the whole table rather than one per row: an Ant Design `Form.Item` names
+ * its control after its field, a closed modal stays in the document, and N mounted copies of this
+ * dialog would put N inputs with `id="description"` in the page - after which `getByLabel` finds
+ * whichever is first, which may be an invisible one.
+ */
+export default function SlotAdmissionRulesTable({slot, reloadCount = 0, onChange}) {
 
-    const client = useGraphQLClient()
-
-    const [loading, setLoading] = useState(true)
-    const [rules, setRules] = useState([])
-
-    useEffect(() => {
-        if (client) {
-            setLoading(true)
-            client.request(
-                gql`
-                    query SlotAdmissionRules($id: String!) {
-                        slotById(id: $id) {
-                            admissionRules {
-                                id
-                                name
-                                description
-                                ruleId
-                                ruleConfig
-                            }
-                        }
+    const {data, loading} = useQuery(
+        gql`
+            query SlotAdmissionRules($id: String!) {
+                slotById(id: $id) {
+                    admissionRules {
+                        id
+                        name
+                        description
+                        ruleId
+                        ruleConfig
                     }
-                `,
-                {id: slot.id}
-            ).then(data => {
-                setRules(data.slotById.admissionRules)
-            }).finally(() => {
-                setLoading(false)
-            })
+                }
+            }
+        `,
+        {
+            variables: {id: slot.id},
+            deps: [slot.id, reloadCount],
+            dataFn: data => data.slotById.admissionRules,
+            initialData: [],
         }
-    }, [client, slot])
+    )
 
     const dialog = useSlotAdmissionRuleConfigDialog({
         onSuccess: onChange,
     })
 
-    const addRule = async () => {
-        dialog.start({slot})
-    }
-
     return (
         <>
             <SlotAdmissionRuleConfigDialog dialog={dialog}/>
             <Table
-                dataSource={rules}
+                dataSource={data ?? []}
                 loading={loading}
+                rowKey={rule => rule.id}
                 pagination={false}
                 size="small"
+                data-testid={`slot-rules-${slot.id}`}
+                onRow={rule => ({'data-testid': `slot-rule-${rule.id}`})}
                 footer={() =>
                     <Space>
                         {
                             isAuthorized(slot, "slot", "edit") &&
                             <Button
                                 icon={<FaPlus/>}
-                                onClick={addRule}
+                                data-testid="slot-add-rule"
+                                onClick={() => dialog.start({slot})}
                             >
                                 Add admission rule
                             </Button>
@@ -91,7 +89,12 @@ export default function SlotAdmissionRulesTable({slot, onChange}) {
                 <Table.Column
                     key="actions"
                     title="Actions"
-                    render={(_, rule) => <SlotAdmissionRuleActions id={rule.id} onChange={onChange}/>}
+                    render={(_, rule) => <SlotAdmissionRuleActions
+                        slot={slot}
+                        rule={rule}
+                        dialog={dialog}
+                        onChange={onChange}
+                    />}
                 />
             </Table>
         </>
