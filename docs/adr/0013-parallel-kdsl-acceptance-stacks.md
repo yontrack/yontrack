@@ -72,6 +72,21 @@ this change red on `main`. Ports below 1024 are therefore probed by opening a
 connection instead: something answers, or nothing does. macOS binds privileged
 ports happily, which is why the local verification passed.
 
+**The slot is claimed at execution time, not at configuration time.** The
+first version resolved it where the Compose extension is configured, in
+`ontrack-kdsl-acceptance/build.gradle.kts` -- and Gradle configures that file
+on *every* invocation in the checkout. A probe that found all four slots taken
+therefore failed builds that were never going to start an acceptance stack:
+`./gradlew :ontrack-extension-environments:integrationTest` died in three
+seconds because another worktree's *development* stack held the ports the
+acceptance prober wanted. The slot now resolves lazily, on first use, and a
+`kdslStackSlot` task is what uses it first -- so nothing is probed unless an
+acceptance task runs, and "no free slot" is reported plainly against that task
+rather than wrapped in Gradle's "Failed to query the value of property
+'environment'". The Compose *project names* stay eager: they come from the
+checkout path alone and claim nothing. `ItStack` was given the same treatment,
+for the same reason.
+
 The resolved slot is recorded in `.yontrack-kdsl/instance.env` and reused by
 the next build, so a stack that is already up is never moved out from under
 itself. That file is also how anything outside Gradle discovers the ports,

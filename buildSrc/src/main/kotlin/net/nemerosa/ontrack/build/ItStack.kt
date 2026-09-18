@@ -36,7 +36,24 @@ object ItStack {
     const val INSTANCE_ENV_PATH = ".yontrack-it/instance.env"
     const val SLOT_KEY = "IT_SLOT"
 
-    /** Resolves the whole instance for a checkout. */
+    /**
+     * The Compose project name of a checkout's integration test stack.
+     *
+     * It comes from the checkout path alone: naming a project claims no slot
+     * and probes no port. That is what lets the Compose extension be
+     * configured without [resolve] running -- see its note.
+     */
+    fun names(rootDir: File): ItStackNames = ItStackNames(StackSlots.slug(rootDir.absolutePath))
+
+    /**
+     * Resolves the whole instance for a checkout.
+     *
+     * This *claims a slot*: unless one is already recorded it probes every
+     * port of every slot, and fails the build when none of them is free. Call
+     * it from a task that is running, never from the configuration of a build
+     * file -- a build that is not going to touch the integration test stack
+     * must neither pay for the probe nor die on it.
+     */
     fun resolve(rootDir: File, instanceEnv: File = File(rootDir, INSTANCE_ENV_PATH)): ItStackInstance {
         val path = rootDir.absolutePath
         val slot = StackSlots.resolveSlot(
@@ -53,6 +70,18 @@ object ItStack {
 }
 
 /**
+ * The Compose project name of a checkout's integration test stack.
+ *
+ * Split out of [ItStackInstance] because it is the half that needs no slot: a
+ * project is named after the checkout, not after the ports it publishes.
+ * See [ItStack.names].
+ */
+data class ItStackNames(val slug: String) {
+
+    val projectName: String = "yontrack-it-$slug"
+}
+
+/**
  * The resolved integration test stack for one checkout: its Compose project
  * name and the host ports its middleware publishes.
  */
@@ -61,7 +90,9 @@ data class ItStackInstance(
     val slot: Int,
 ) {
 
-    val projectName: String = "yontrack-it-$slug"
+    private val names = ItStackNames(slug)
+
+    val projectName: String get() = names.projectName
 
     val postgresPort: Int = StackSlots.port(ItStack.BASE_POSTGRES, slot)
     val elasticPort: Int = StackSlots.port(ItStack.BASE_ELASTIC, slot)

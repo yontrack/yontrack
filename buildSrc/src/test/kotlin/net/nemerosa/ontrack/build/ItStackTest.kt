@@ -22,6 +22,16 @@ class ItStackTest {
     }
 
     @Test
+    fun `the compose project name needs no slot`() {
+        // The Compose project is what the extension is configured with, and
+        // configuration must claim no slot and probe no port.
+        val names = ItStack.names(File("/home/dev/feature-a"))
+        assertEquals("feature-a", names.slug)
+        assertEquals("yontrack-it-feature-a", names.projectName)
+        assertEquals(names.projectName, ItStackInstance(slug = names.slug, slot = 3).projectName)
+    }
+
+    @Test
     fun `slot zero reproduces the historical ports`() {
         val instance = ItStackInstance(slug = "yontrack", slot = 0)
         assertEquals(5432, instance.postgresPort)

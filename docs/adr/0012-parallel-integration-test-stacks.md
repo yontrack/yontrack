@@ -54,6 +54,13 @@ the four system properties passing by hand; `.yontrack-it/instance.env`
 carries them as ready-made `-D` lines. On the main working copy the defaults
 still work, which is the common case.
 
+**The slot is claimed at execution time, not at configuration time.** It is
+resolved lazily and used first by a `itStackSlot` task, so a Gradle invocation
+that never starts the middleware -- which is most of them, since this is the
+root build file -- probes no port and cannot fail on one.
+[ADR 0013](0013-parallel-kdsl-acceptance-stacks.md) has the story: the
+acceptance stack is where the eager version actually bit.
+
 ## Considered options
 
 **Letting Compose assign random host ports** and reading them back through the

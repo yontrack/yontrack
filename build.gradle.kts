@@ -1,6 +1,7 @@
 import com.avast.gradle.dockercompose.ComposeExtension
 import net.nemerosa.ontrack.build.DependencyLocking
 import net.nemerosa.ontrack.build.ItStack
+import net.nemerosa.ontrack.build.ItStackInstance
 import org.springframework.boot.gradle.plugin.SpringBootPlugin
 
 // Locks the plugin classpath of the root project into buildscript-gradle.lockfile (#1752). It has
@@ -66,13 +67,21 @@ subprojects {
 // the same time. The main working copy takes slot 0 and keeps the historical
 // ports -- which is what every CI runner, a fresh clone, also gets.
 // See docs/adr/0012-parallel-integration-test-stacks.md.
-val itStack = ItStack.resolve(rootDir)
+//
+// As in ontrack-kdsl-acceptance, claiming the slot probes ports and fails when
+// none is free, so it happens at *execution* time rather than here: this is the
+// root build file, configured by every Gradle invocation, and no invocation
+// should pay for -- or die on -- a probe for a stack it is not going to start.
+// Naming the Compose project costs nothing and stays eager.
+val itNames = ItStack.names(rootDir)
+val itStack: ItStackInstance by lazy { ItStack.resolve(rootDir) }
+val itComposeEnvironment: Provider<Map<String, String>> = provider { itStack.composeEnvironment }
 
 configure<ComposeExtension> {
     createNested("integrationTest").apply {
         useComposeFiles.addAll(listOf("compose/docker-compose-it.yml"))
-        setProjectName(itStack.projectName)
-        environment.putAll(itStack.composeEnvironment)
+        setProjectName(itNames.projectName)
+        environment.putAll(itComposeEnvironment)
     }
     createNested("local").apply {
         useComposeFiles.addAll(listOf("compose/docker-compose-local.yml"))
@@ -80,12 +89,27 @@ configure<ComposeExtension> {
     }
 }
 
-tasks.named("integrationTestComposeUp") {
+// The one place the slot is claimed on purpose, rather than as a side effect of
+// a Compose task reading its ports. The Compose tasks run it first, so a
+// checkout with no free slot fails here, with the message as it is written --
+// rather than inside Gradle's provider machinery, which buries it under three
+// layers of "Failed to query the value of property 'environment'".
+val itStackSlot by tasks.registering {
+    group = "verification"
+    description = "Claims this checkout's integration test slot and records it in ${ItStack.INSTANCE_ENV_PATH}"
     doFirst {
         // Recorded before the stack comes up rather than after, so that the
         // ports are discoverable even when it fails to start.
         itStack.writeInstanceEnv(rootProject.file(ItStack.INSTANCE_ENV_PATH))
         logger.lifecycle("[it-stack] ${itStack.describe()}")
+    }
+}
+
+// Compose builds before it starts, and both phases read the ports, so the claim
+// has to come before the earliest of them.
+listOf("integrationTestComposeBuild", "integrationTestComposeUp").forEach { name ->
+    tasks.named(name) {
+        dependsOn(itStackSlot)
     }
 }
 
@@ -171,7 +195,12 @@ configure(javaProjects) {
         // Point the tests at this checkout's instance of the stack. Without
         // these the defaults baked into the code -- localhost:5432 and
         // friends -- would send every worktree to the same containers.
-        itStack.systemProperties.forEach { (key, value) -> systemProperty(key, value) }
+        // Contributed as an argument provider rather than as plain system
+        // properties so that the slot is claimed when the task runs rather
+        // than when the root build file is configured.
+        jvmArgumentProviders.add(CommandLineArgumentProvider {
+            itStack.systemProperties.map { (key, value) -> "-D$key=$value" }
+        })
     }
 
     // Synchronization with shutting down the database

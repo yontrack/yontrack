@@ -44,6 +44,29 @@ class KdslStackTest {
     }
 
     @Test
+    fun `the compose project names need no slot`() {
+        // Naming the three Compose projects is what the Compose extension is
+        // configured with, and configuration must claim no slot and probe no
+        // port -- so the names come from the checkout path alone.
+        val names = KdslStack.names(File("/home/dev/feature-a"))
+        assertEquals("feature-a", names.slug)
+        assertEquals("yontrack-kdsl-feature-a", names.projectName)
+        assertEquals("yontrack-kdsl-ldap-feature-a", names.ldapProjectName)
+        assertEquals("yontrack-kdsl-oidc-feature-a", names.oidcProjectName)
+    }
+
+    @Test
+    fun `a resolved instance carries the same project names`() {
+        // The extension is configured from the names and the stack is brought
+        // up under the instance's project, so the two must not drift apart.
+        val names = KdslStack.names(File("/home/dev/feature-a"))
+        val instance = KdslStackInstance(slug = names.slug, slot = 2)
+        assertEquals(names.projectName, instance.projectName)
+        assertEquals(names.ldapProjectName, instance.ldapProjectName)
+        assertEquals(names.oidcProjectName, instance.oidcProjectName)
+    }
+
+    @Test
     fun `the three variants get three different compose projects`() {
         val instance = KdslStackInstance(slug = "feature-a", slot = 1)
         val projects = setOf(instance.projectName, instance.ldapProjectName, instance.oidcProjectName)

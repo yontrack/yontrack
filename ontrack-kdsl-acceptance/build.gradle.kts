@@ -1,5 +1,6 @@
 import com.avast.gradle.dockercompose.ComposeExtension
 import net.nemerosa.ontrack.build.KdslStack
+import net.nemerosa.ontrack.build.KdslStackInstance
 
 plugins {
     `java-library`
@@ -42,14 +43,25 @@ val ontrackVersion: String = System.getenv("ONTRACK_VERSION")?.takeIf { it.isNot
 // also gets. The three variants share one slot: they are sequenced below so
 // that they are never up at the same time.
 // See docs/adr/0013-parallel-kdsl-acceptance-stacks.md.
-val kdslStack = KdslStack.resolve(rootDir)
+//
+// Claiming the slot probes the ports of every slot and fails when none is
+// free, so it happens at *execution* time, not here. This file is configured
+// by every Gradle invocation in the checkout, and a build that is never going
+// to run the acceptance tests -- `:ontrack-extension-x:integrationTest`, say --
+// used to die on a "no free slot" raised by a stack it does not touch. Naming
+// the three Compose projects costs nothing and stays eager; everything derived
+// from the slot goes through `kdslStack`, which resolves once, lazily, and
+// therefore reports a failure against the task that asked for it.
+val kdslNames = KdslStack.names(rootDir)
+val kdslStack: KdslStackInstance by lazy { KdslStack.resolve(rootDir) }
+val kdslComposeEnvironment: Provider<Map<String, String>> = provider { kdslStack.composeEnvironment }
 
 configure<ComposeExtension> {
     createNested("kdslAcceptanceTest").apply {
         useComposeFiles.addAll(listOf("${rootDir}/compose/docker-compose-kdsl.yml"))
-        setProjectName(kdslStack.projectName)
+        setProjectName(kdslNames.projectName)
         environment.put("ONTRACK_VERSION", ontrackVersion)
-        environment.putAll(kdslStack.composeEnvironment)
+        environment.putAll(kdslComposeEnvironment)
         captureContainersOutput.set(true)
         captureContainersOutputToFiles.set(file("build/logs/kdsl/containers"))
         composeLogToFile.set(file("build/logs/kdsl/compose"))
@@ -57,9 +69,9 @@ configure<ComposeExtension> {
     }
     createNested("kdslLdap").apply {
         useComposeFiles.addAll(listOf("${rootDir}/compose/docker-compose-kdsl-ldap.yml"))
-        setProjectName(kdslStack.ldapProjectName)
+        setProjectName(kdslNames.ldapProjectName)
         environment.put("ONTRACK_VERSION", ontrackVersion)
-        environment.putAll(kdslStack.composeEnvironment)
+        environment.putAll(kdslComposeEnvironment)
         captureContainersOutput.set(true)
         captureContainersOutputToFiles.set(file("build/logs/kdsl-ldap/containers"))
         composeLogToFile.set(file("build/logs/kdsl-ldap/compose"))
@@ -67,9 +79,9 @@ configure<ComposeExtension> {
     }
     createNested("kdslOidc").apply {
         useComposeFiles.addAll(listOf("${rootDir}/compose/docker-compose-kdsl-oidc.yml"))
-        setProjectName(kdslStack.oidcProjectName)
+        setProjectName(kdslNames.oidcProjectName)
         environment.put("ONTRACK_VERSION", ontrackVersion)
-        environment.putAll(kdslStack.composeEnvironment)
+        environment.putAll(kdslComposeEnvironment)
         captureContainersOutput.set(true)
         captureContainersOutputToFiles.set(file("build/logs/kdsl-oidc/containers"))
         composeLogToFile.set(file("build/logs/kdsl-oidc/compose"))
@@ -79,17 +91,37 @@ configure<ComposeExtension> {
 
 val isCI = System.getenv("CI") == "true"
 
-val kdslAcceptanceTestComposeUp by tasks.named("kdslAcceptanceTestComposeUp") {
-    if (!isCI) {
-        dependsOn(":ontrack-ui:dockerBuild")
-        dependsOn(":ontrack-web-core:dockerBuild")
-    }
+// The one place the slot is claimed on purpose, rather than as a side effect of
+// a Compose task reading its ports. Every acceptance task runs it first, so a
+// checkout with no free slot fails here, with the message as it is written --
+// rather than inside Gradle's provider machinery, which buries it under three
+// layers of "Failed to query the value of property 'environment'".
+val kdslStackSlot by tasks.registering {
+    group = "verification"
+    description = "Claims this checkout's KDSL acceptance slot and records it in ${KdslStack.INSTANCE_ENV_PATH}"
     doFirst {
         // Recorded before the stack comes up rather than after, so that the
         // ports are discoverable even when it fails to start -- and it is
         // then that they are most wanted.
         kdslStack.writeInstanceEnv(rootProject.file(KdslStack.INSTANCE_ENV_PATH))
         logger.lifecycle("[kdsl-stack] ${kdslStack.describe()}")
+    }
+}
+
+// Both the build and the up task of each variant read the ports, and Compose
+// builds before it starts, so the claim has to come before the earliest of them.
+listOf("kdslAcceptanceTest", "kdslLdap", "kdslOidc").forEach { variant ->
+    listOf("ComposeBuild", "ComposeUp").forEach { phase ->
+        tasks.named("$variant$phase") {
+            dependsOn(kdslStackSlot)
+        }
+    }
+}
+
+val kdslAcceptanceTestComposeUp by tasks.named("kdslAcceptanceTestComposeUp") {
+    if (!isCI) {
+        dependsOn(":ontrack-ui:dockerBuild")
+        dependsOn(":ontrack-web-core:dockerBuild")
     }
 }
 
@@ -134,9 +166,14 @@ val kdslAcceptanceTest by tasks.registering(Test::class) {
     // the ACCProperties defaults -- localhost:8080 and friends -- would send
     // every worktree to the same containers. An explicitly provided value
     // still wins, so a run against an instance elsewhere keeps working.
-    kdslStack.systemProperties.forEach { (key, value) ->
-        systemProperty(key, System.getProperty(key) ?: value)
-    }
+    // Contributed as an argument provider rather than as plain system
+    // properties so that the slot is claimed when the task runs rather than
+    // when this file is configured.
+    jvmArgumentProviders.add(CommandLineArgumentProvider {
+        kdslStack.systemProperties.map { (key, value) ->
+            "-D$key=${System.getProperty(key) ?: value}"
+        }
+    })
     minHeapSize = "512m"
     maxHeapSize = "3072m"
     dependsOn(kdslAcceptanceTestComposeUp)

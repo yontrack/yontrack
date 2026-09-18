@@ -63,7 +63,24 @@ object KdslStack {
     const val INSTANCE_ENV_PATH = ".yontrack-kdsl/instance.env"
     const val SLOT_KEY = "KDSL_SLOT"
 
-    /** Resolves the whole instance for a checkout. */
+    /**
+     * The Compose project names of a checkout's three acceptance stacks.
+     *
+     * They come from the checkout path alone: naming a project claims no slot
+     * and probes no port. That is what lets the Compose extension be
+     * configured without [resolve] running -- see its note.
+     */
+    fun names(rootDir: File): KdslStackNames = KdslStackNames(StackSlots.slug(rootDir.absolutePath))
+
+    /**
+     * Resolves the whole instance for a checkout.
+     *
+     * This *claims a slot*: unless one is already recorded it probes every
+     * port of every slot, and fails the build when none of them is free. Call
+     * it from a task that is running, never from the configuration of a build
+     * file -- a build that is not going to touch the acceptance stack must
+     * neither pay for the probe nor die on it.
+     */
     fun resolve(rootDir: File, instanceEnv: File = File(rootDir, INSTANCE_ENV_PATH)): KdslStackInstance {
         val path = rootDir.absolutePath
         val slot = StackSlots.resolveSlot(
@@ -80,6 +97,20 @@ object KdslStack {
 }
 
 /**
+ * The Compose project name of each of the three acceptance variants.
+ *
+ * Split out of [KdslStackInstance] because it is the half that needs no slot:
+ * a project is named after the checkout, not after the ports it publishes.
+ * See [KdslStack.names].
+ */
+data class KdslStackNames(val slug: String) {
+
+    val projectName: String = "yontrack-kdsl-$slug"
+    val ldapProjectName: String = "yontrack-kdsl-ldap-$slug"
+    val oidcProjectName: String = "yontrack-kdsl-oidc-$slug"
+}
+
+/**
  * The resolved KDSL acceptance stack for one checkout: the Compose project
  * name of each of the three variants, and the host ports they publish.
  */
@@ -88,9 +119,11 @@ data class KdslStackInstance(
     val slot: Int,
 ) {
 
-    val projectName: String = "yontrack-kdsl-$slug"
-    val ldapProjectName: String = "yontrack-kdsl-ldap-$slug"
-    val oidcProjectName: String = "yontrack-kdsl-oidc-$slug"
+    private val names = KdslStackNames(slug)
+
+    val projectName: String get() = names.projectName
+    val ldapProjectName: String get() = names.ldapProjectName
+    val oidcProjectName: String get() = names.oidcProjectName
 
     val uiPort: Int = StackSlots.port(KdslStack.BASE_UI, slot)
     val ldapPort: Int = StackSlots.port(KdslStack.BASE_LDAP, slot)

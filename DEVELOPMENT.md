@@ -245,6 +245,12 @@ yourself.
 The `-ldap` and `-oidc` variants share the same slot: they are sequenced never
 to be up at the same time.
 
+A slot is claimed by the `kdslStackSlot` task, which every acceptance task
+runs first -- never while Gradle is configuring the build. A `./gradlew` that
+is not going to start an acceptance stack therefore probes nothing, and cannot
+fail on a slot it was not going to use. `integrationTestComposeUp` is fronted
+by `itStackSlot` in the same way.
+
 The arithmetic lives in `KdslStack` in `buildSrc`, is covered by
 `KdslStackTest`, and is explained in
 `docs/adr/0013-parallel-kdsl-acceptance-stacks.md`.
