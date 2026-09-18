@@ -11,7 +11,6 @@ import net.nemerosa.ontrack.extension.queue.QueueNoAsync
 import net.nemerosa.ontrack.extension.scm.mock.MockSCMTester
 import net.nemerosa.ontrack.extension.workflows.registry.WorkflowParser
 import net.nemerosa.ontrack.it.AbstractDSLTestSupport
-import net.nemerosa.ontrack.it.waitUntil
 import net.nemerosa.ontrack.test.TestUtils.uid
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -43,7 +42,17 @@ class SlotPipelineChangelogIT : AbstractDSLTestSupport() {
     fun `Sending a changelog since last deployment`() {
         val target = uid("t-")
         asAdmin {
-            startNewTransaction {
+
+            // Everything the changelog notification reads - the two builds, the SCM configuration,
+            // the first (DONE) deployment and the second pipeline itself - is set up and committed
+            // *here*, before the deployment which triggers the workflow.
+            //
+            // Finishing a deployment starts its DONE workflows on the workflow engine's own threads,
+            // in their own transactions: a workflow node cannot see the data of the transaction which
+            // started it until that transaction commits. Setting the second pipeline up and finishing
+            // it in one single transaction leaves the node racing that commit, and on a loaded runner
+            // the node wins: it fails with "Slot pipeline ... was not found" and nothing is notified.
+            val secondDeployment = inNewTransaction {
                 val slot = slotTestSupport.slot()
                 val project = slot.project
                 val branch = project.branch("main")
@@ -95,30 +104,33 @@ class SlotPipelineChangelogIT : AbstractDSLTestSupport() {
                     }
                 }
 
-                // Creating & finishing a second deployment
-                val secondDeployment = slotService.startPipeline(slot, secondBuild)
-                slotTestSupport.runAndFinishDeployment(secondDeployment)
-
-                // Returning the second pipeline
-                secondDeployment
-            } then { secondDeployment ->
-
-                // Waits for the completion of workflows
-                slotWorkflowTestSupport.waitForSlotWorkflowsToFinish(
-                    pipeline = secondDeployment,
-                    trigger = SlotPipelineStatus.DONE,
-                )
-
-                // Expecting a changelog
-                waitUntil(
-                    message = "Waiting for notification to be sent",
-                ) {
-                    val message = mockNotificationChannel.targetMessages(target).firstOrNull()
-                    message != null && message.trim() == """
-                        * ISS-22 Some fixes are needed
-                    """.trimIndent().trim()
-                }
+                // Creating the second deployment, without running it yet
+                slotService.startPipeline(slot, secondBuild)
             }
+
+            // Running & finishing the second deployment, which triggers the changelog workflow
+            inNewTransaction {
+                slotTestSupport.runAndFinishDeployment(secondDeployment)
+            }
+
+            // Waits for the completion of the workflows, and checks that they actually succeeded:
+            // a failed workflow is "finished" too, and would otherwise be diagnosed below as a
+            // timeout on a notification which was never going to come
+            slotWorkflowTestSupport.waitForSlotWorkflowsToSucceed(
+                pipeline = secondDeployment,
+                trigger = SlotPipelineStatus.DONE,
+            )
+
+            // Expecting a changelog. The workflow having succeeded, the notification is already
+            // recorded - the channel is written before the node reports its success - so this wait
+            // only has to observe it, and does not need the minute the previous wait here allowed.
+            mockNotificationChannel.waitUntilReceivedMessage(
+                what = "Waiting for notification to be sent",
+                target = target,
+                expectedMessage = """
+                    * ISS-22 Some fixes are needed
+                """.trimIndent().trim(),
+            )
         }
     }
 
