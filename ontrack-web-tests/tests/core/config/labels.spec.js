@@ -24,7 +24,9 @@ test('label creation from the user menu', async ({page, ontrack}) => {
     const [saved] = await ontrack.labels().findLabels(label)
     expect(saved).toBeDefined()
     expect(saved.description).toBe("Some label")
-    expect(saved.color.toLowerCase()).toBe("#1677ff")
+    // The picker was never opened, so the label carries LabelDialog's defaultColor - the
+    // brand gray. See issue #1814.
+    expect(saved.color.toLowerCase()).toBe("#e6e1e9")
 })
 
 test('label edition', async ({page, ontrack}) => {

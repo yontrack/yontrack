@@ -68,8 +68,9 @@ class RGBColorTest {
      * the picker's default blue. The deliberate decision (issue #1813) was to follow WCAG anyway
      * and hand these to black, rather than carve out a hue exception or a hand-picked floor.
      *
-     * `#1677FF` is `defaultColor` in `LabelDialog`, so it is what every label created without
-     * touching the colour picker gets. Its flip to black text is expected, not a regression.
+     * `#1677FF` is antd's primary blue. It was `defaultColor` in `LabelDialog` until #1814 moved
+     * that to the brand gray, and it stays covered here: it is the clearest example of the band,
+     * and plenty of labels were created with it while it was the default.
      */
     @Test
     fun `Black and white on the debatable band is decided by WCAG, not by convention`() {
