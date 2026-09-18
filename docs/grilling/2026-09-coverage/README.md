@@ -1,20 +1,31 @@
-# Test coverage — design and proposed issue breakdown
+# Test coverage — design and issue breakdown
 
 Outcome of the grilling session of 2026-09-17 on collecting, displaying and recording test coverage
 for Yontrack.
 
-The breakdown below is a **proposal**: the GitHub issues are created once this document has been
-reviewed. Letters are placeholders until then; dependencies will be recorded as native GitHub
-dependencies.
+The issues below are created, on milestone 5.5 under `initiative: coverage`. The *Blocked by*
+column is recorded as native GitHub dependencies as well as stated here.
 
 | # | Issue | Blocked by |
 |---|---|---|
-| A | Backend coverage of the unit and integration tests, behind `-Pcoverage` | — |
-| B | JaCoCo agent in the KDSL and UI test stacks | — |
-| C | Coverage of the frontend Jest tests | — |
-| D | Coverage report job: per-type and merged reports, figures, CI artifacts | A, B, C |
-| E | `COVERAGE.*` validation stamps with `metrics` data | D |
-| F | Dev guide page `doc/dev-guide/coverage.md` and local merge | A, B, D |
+| #1818 | Backend coverage of the unit and integration tests, behind `-Pcoverage` | — |
+| #1819 | JaCoCo agent in the KDSL and UI test stacks | — |
+| #1820 | Coverage of the frontend Jest tests | — |
+| #1821 | Coverage report job: per-type and merged reports, figures, CI artifacts | #1818, #1819, #1820 |
+| #1822 | `COVERAGE.*` validation stamps with `metrics` data | #1821 |
+| #1823 | Dev guide page `doc/dev-guide/coverage.md` and local merge | #1818, #1819, #1821 |
+
+Three points were settled against the code while the issues were written, and the sections below
+are left as the session recorded them — the issues carry the resolution:
+
+- Applying the Gradle `jacoco` plugin *conditionally* on `-Pcoverage` is not workable under the
+  STRICT dependency locking of #1752: the configurations it adds would appear and disappear with
+  the property, so the lockfiles could only be right for one of the two invocations. #1818 applies
+  the plugin unconditionally and gates the agent instead.
+- The UI test matrix is **five** legs, not four: `main` has been sharded three ways since the
+  session (`.github/workflows/ci.yml`). The `COVERAGE.UI` figure still merges all of them.
+- "Every push build on `main` and `release/*`" needs a gate of its own. `setup.full_run` is true on
+  any non-Dependabot push, working branches included, so #1821 adds a separate `coverage` output.
 
 ## Where we start from
 
@@ -74,19 +85,19 @@ dependencies.
   code. On the frontend, the same principle means that `collectCoverageFrom` lists all production
   sources, so files no test imports count as 0% (as JaCoCo does for classes).
 
-### Collection (A, B, C)
+### Collection (#1818, #1819, #1820)
 
-- **Unit and integration tests (A):**
+- **Unit and integration tests (#1818):**
   - use the Gradle `jacoco` plugin, enabled only by `-Pcoverage`;
   - produce one `.exec` file per test task, collected per job or shard as a CI artifact.
-- **KDSL and UI tests (B):**
+- **KDSL and UI tests (#1819):**
   - a CI-only **compose override** mounts the agent jar into the backend container and sets
     `JAVA_TOOL_OPTIONS=-javaagent:...,output=tcpserver`. The released image is unchanged;
   - it applies to the `kdsl`, `kdsl-ldap` and `kdsl-oidc` compose files;
   - before the stack goes down, `jacococli dump` fetches the data. This works however the
     container stops;
   - the same override works locally.
-- **Jest (C):** `jest --coverage`, producing lcov and a JSON summary, only when coverage is enabled.
+- **Jest (#1820):** `jest --coverage`, producing lcov and a JSON summary, only when coverage is enabled.
 - **Report inputs:** the JaCoCo report needs the exact class files that ran. The `build` job
   uploads the production classes and sources, which Jib also packages into the image, as an
   artifact.
@@ -99,7 +110,7 @@ dependencies.
 - **Overhead:** watched informally through the run times already recorded on the test stamps. No
   back-off rule for now; a nightly run is the fallback if it becomes a problem.
 
-### Display (D)
+### Display (#1821)
 
 - A new **coverage report job** runs after `integration`, `kdsl` and `ui-tests`, even if they
   failed. It produces:
@@ -110,7 +121,7 @@ dependencies.
 - Line-level origin (a source view with badges showing which types hit each line) is **not
   planned**. Class-level origin from the Sessions page and the per-type reports are enough for now.
 
-### Recording in Yontrack (E)
+### Recording in Yontrack (#1822)
 
 - Six stamps use the **`metrics`** data type and are declared in `.yontrack/ci.yaml`:
 
@@ -133,7 +144,7 @@ dependencies.
   previous build, needs new code, since no existing data type compares builds. It will be decided
   once a baseline exists.
 
-### Local runs (F)
+### Local runs (#1823)
 
 - `./gradlew test integrationTest kdslAcceptanceTest -Pcoverage`, then a merge and report task,
   produces the same reports and figures locally.
