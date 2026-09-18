@@ -28,6 +28,14 @@ jest.mock("../../../../../components/branches/views/deliverymap/DeliveryMapGraph
     default: () => <div data-testid="delivery-map-graph"/>,
 }))
 
+// The slot drawer the checkpoints open (#1796): it mounts a router and a deploy dialog, neither of
+// which this view has anything to say about. A pass-through, so that the view is still shown to
+// wrap its content in it.
+jest.mock("../../../../../components/extension/environments/deliverymap/DeliveryMapSlotDrawer", () => ({
+    __esModule: true,
+    default: ({children}) => <div data-testid="delivery-map-slot-drawer-host">{children}</div>,
+}))
+
 import {useQuery} from "@components/services/GraphQL";
 import DeliveryMapContentView from "@components/branches/views/deliverymap/DeliveryMapContentView";
 
@@ -53,6 +61,13 @@ describe('delivery map content view', () => {
         render(<DeliveryMapContentView branch={branch}/>)
         expect(screen.getByTestId('delivery-map-header')).toBeInTheDocument()
         expect(screen.getByRole('button', {name: /Auto refresh/})).toBeInTheDocument()
+    })
+
+    it('wraps the map in the slot drawer host, so a slot checkpoint has somewhere to open', () => {
+        answering({data: {checkpoints: [], edges: [], head: null}})
+        render(<DeliveryMapContentView branch={branch}/>)
+        const host = screen.getByTestId('delivery-map-slot-drawer-host')
+        expect(host).toContainElement(screen.getByTestId('delivery-map-header'))
     })
 
     it('says the branch has nothing on its map when that is what came back', () => {

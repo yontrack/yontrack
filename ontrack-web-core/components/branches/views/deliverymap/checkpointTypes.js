@@ -54,14 +54,15 @@ export const checkpointTypes = {
         width: 260,
         height: 110,
     },
-    // Wider and taller than a promotion level. The width is set by the longest thing a slot ever
-    // says - "Unreachable from this branch" - and the height by the third line it may draw, saying
-    // either that its build comes from another branch or that this branch can never reach it.
-    // Measured against the widest content on purpose: a node narrower than its reservation only
-    // leaves a gap, while one wider than it covers whatever elk placed beside it.
+    // Wider and taller than a promotion level. The width is set by the longest LINE a slot ever
+    // draws - the build, its age, its lag marker and, since #1796, the journey chip stating that it
+    // is deployed - and the height by the third line it may draw, saying either that its build comes
+    // from another branch or that this branch can never reach it. Measured against the widest
+    // content on purpose: a node narrower than its reservation only leaves a gap, while one wider
+    // than it covers whatever elk placed beside it.
     'slot': {
         component: SlotCheckpoint,
-        width: 430,
+        width: 510,
         height: 110,
     },
     // A workflow fired by a promotion. Two lines - the name and the run - so no taller than a

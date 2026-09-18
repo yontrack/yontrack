@@ -1,5 +1,6 @@
 import {
     canDeployFromJourney,
+    currentDeploymentJourneyEntries,
     decorationJourneyEntries,
 } from "@components/extension/environments/journey/buildJourneyModel"
 
@@ -83,5 +84,54 @@ describe('the decoration stubs, read as journey entries', () => {
     it('draws nothing for a build deployed nowhere', () => {
         expect(decorationJourneyEntries([])).toEqual([])
         expect(decorationJourneyEntries(undefined)).toEqual([])
+    })
+})
+
+describe("a build's current deployments, read as journey entries", () => {
+
+    const pipeline = (name, order, {qualifier = ''} = {}) => ({
+        id: `pipeline-${name}`,
+        number: 12,
+        status: 'DONE',
+        slot: {
+            id: `slot-${name}`,
+            qualifier,
+            environment: {id: `env-${name}`, name, order, image: false},
+            project: {id: 1, name: 'petclinic'},
+        },
+    })
+
+    it('states the build is deployed, which is what a current deployment means', () => {
+        const [entry] = currentDeploymentJourneyEntries([pipeline('production', 20)])
+        expect(entry.state).toBe('DEPLOYED')
+        expect(entry.slot.id).toBe('slot-production')
+        expect(entry.pipeline.id).toBe('pipeline-production')
+        // Nothing is refusing a build which is already there
+        expect(entry.nonEligibleRules).toEqual([])
+    })
+
+    it('orders the chips by environment, as the journey strip does', () => {
+        const entries = currentDeploymentJourneyEntries([
+            pipeline('production', 20),
+            pipeline('staging', 10),
+        ])
+        expect(entries.map(entry => entry.slot.environment.name)).toEqual(['staging', 'production'])
+    })
+
+    it('keeps one chip per qualifier of the same environment', () => {
+        const entries = currentDeploymentJourneyEntries([
+            pipeline('production', 20),
+            pipeline('production', 20, {qualifier: 'canary'}),
+        ])
+        expect(entries).toHaveLength(2)
+    })
+
+    it('draws nothing for a build deployed nowhere', () => {
+        expect(currentDeploymentJourneyEntries([])).toEqual([])
+        expect(currentDeploymentJourneyEntries(undefined)).toEqual([])
+    })
+
+    it('drops a deployment the server sent with no slot rather than drawing a nameless chip', () => {
+        expect(currentDeploymentJourneyEntries([{id: 'orphan'}])).toEqual([])
     })
 })

@@ -5,7 +5,7 @@ import {useEffect, useState} from "react";
 import LoadingInline from "@components/common/LoadingInline";
 import {gql} from "graphql-request";
 import {Space} from "antd";
-import SlotPipelineStatus from "@components/extension/environments/SlotPipelineStatus";
+import SlotPipelineStatusLabel from "@components/extension/environments/SlotPipelineStatusLabel";
 
 export default function SlotPipelineLink({pipelineId, status, numberOnly = false}) {
 
@@ -59,7 +59,7 @@ export default function SlotPipelineLink({pipelineId, status, numberOnly = false
                                 </>
                             }
                         </Link>
-                        {status && <SlotPipelineStatus pipeline={pipeline}/>}
+                        {status && <SlotPipelineStatusLabel status={pipeline.status}/>}
                     </Space>
                 }
             </LoadingInline>

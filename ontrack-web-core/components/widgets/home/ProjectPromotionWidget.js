@@ -8,7 +8,7 @@ import {DashboardWidgetCellContext} from "@components/dashboards/DashboardWidget
 import {useGraphQLClient} from "@components/providers/ConnectionContextProvider";
 import BuildLink from "@components/builds/BuildLink";
 import PromotionRuns from "@components/promotionRuns/PromotionRuns";
-import BuildLastDeployedEnvironment from "@components/extension/environments/BuildLastDeployedEnvironment";
+import BuildDeploymentChips from "@components/extension/environments/journey/BuildDeploymentChips";
 
 const {Column} = Table;
 
@@ -141,7 +141,12 @@ export default function ProjectPromotionWidget({project, promotions, depth, labe
                             displayTooltip={true}
                         />
                         <PromotionRuns promotionRuns={run.build.promotionRuns}/>
-                        <BuildLastDeployedEnvironment build={run.build}/>
+                        {/* Inert, like the build decorations and unlike the build search table:
+                            a dashboard may hold several of these widgets, and a drawer per
+                            widget means every one of them opening at once on `?slot=<id>`. The
+                            chip states where the build is; the matrix widget beside it is where
+                            a slot is operated. */}
+                        <BuildDeploymentChips build={run.build}/>
                     </Space>}
                 />
                 {

@@ -18,7 +18,7 @@ import {
 } from "@components/extension/environments/shared/environmentsSharedGraphQL"
 import {gqlDeploymentPage} from "@components/extension/environments/deployment/deploymentGraphQL"
 import {gqlSlotDeployments, gqlSlotPage} from "@components/extension/environments/slot/slotGraphQL"
-import {gqlBuildJourney} from "@components/extension/environments/journey/buildJourneyGraphQL"
+import {gqlBuildCurrentDeployments, gqlBuildJourney} from "@components/extension/environments/journey/buildJourneyGraphQL"
 import {gqlSetup} from "@components/extension/environments/setup/setupGraphQL"
 import {gqlSlotData} from "@components/extension/environments/EnvironmentGraphQL"
 
@@ -94,6 +94,7 @@ describe('the shared environments documents', () => {
     check('the slot deployments query', gqlSlotDeployments)
     check('the Setup page query', gqlSetup)
     check('the build journey query', gqlBuildJourney)
+    check('the build current deployments query', gqlBuildCurrentDeployments)
 
     it('asks the slot whether it is blocked and whether it is behind', () => {
         // The two flags the cell exists to carry; without them it draws neither mark and a held-up

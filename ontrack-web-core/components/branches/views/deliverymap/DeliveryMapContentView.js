@@ -21,6 +21,7 @@ import DeliveryMapVisibility from "@components/branches/views/deliverymap/Delive
 import DeliveryMapGraph from "@components/branches/views/deliverymap/DeliveryMapGraph";
 import DeliveryMapEmpty from "@components/branches/views/deliverymap/DeliveryMapEmpty";
 import DeliveryMapNoDependencies from "@components/branches/views/deliverymap/DeliveryMapNoDependencies";
+import DeliveryMapSlotDrawer from "@components/extension/environments/deliverymap/DeliveryMapSlotDrawer";
 
 /**
  * The delivery map branch content view: what a build on this branch has to pass through on its way
@@ -43,7 +44,13 @@ import DeliveryMapNoDependencies from "@components/branches/views/deliverymap/De
 export default function DeliveryMapContentView({branch}) {
     return (
         <AutoRefreshContextProvider>
-            <DeliveryMapContent branch={branch}/>
+            {/* The slot drawer a slot checkpoint opens, and the deploy dialog behind it. Core to
+                extension, like the registry's entry for the slot kind and for the same reason: the
+                kinds on this map are an open set, and the extension contributing one owns both the
+                checkpoint and what clicking it does. */}
+            <DeliveryMapSlotDrawer>
+                <DeliveryMapContent branch={branch}/>
+            </DeliveryMapSlotDrawer>
         </AutoRefreshContextProvider>
     )
 }

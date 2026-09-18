@@ -45,11 +45,10 @@ class SlotPipeline {
 }
 
 enum SlotPipelineStatus {
-    ONGOING
+    CANDIDATE
+    RUNNING
     CANCELLED
-    DEPLOYING
-    ERROR
-    DEPLOYED
+    DONE
 }
 
 SlotPipeline --> Build: build

@@ -43,3 +43,32 @@ export const decorationJourneyEntries = (data) =>
             },
         },
     })).sort((a, b) => (a.slot.environment.order ?? 0) - (b.slot.environment.order ?? 0))
+
+/**
+ * A build's current deployments, read as journey entries.
+ *
+ * `Build.currentDeployments` answers *"where is this build deployed right now"* - one pipeline per
+ * qualifier of the slots still holding it - which is the same question the decoration asks and
+ * therefore gets the same answer: every entry is `DEPLOYED`. The build search "Deployments" column
+ * and `ProjectPromotionWidget` read it (#1796), so both state deployment in the five words the rest
+ * of the redesign uses rather than in an environment icon whose meaning had to be learnt.
+ *
+ * Sorted by environment order, lowest first, exactly as the journey strip is: a reader who has
+ * learnt to read a strip of chips left to right reads this one the same way. The server answers
+ * highest environment first, which is the order the column's predecessor needed to take its `[0]`.
+ *
+ * @param {?Array} deployments `Build.currentDeployments`
+ * @return {Array} Entries shaped like `BuildJourneyData`, in environment order
+ */
+export const currentDeploymentJourneyEntries = (deployments) =>
+    (deployments ?? [])
+        // A pipeline with no slot has nothing a chip could name; the server does not send one, and
+        // drawing a nameless chip if it ever did would be worse than drawing none.
+        .filter(pipeline => !!pipeline?.slot)
+        .map(pipeline => ({
+            state: 'DEPLOYED',
+            nonEligibleRules: [],
+            pipeline: {id: pipeline.id, number: pipeline.number, status: pipeline.status},
+            slot: pipeline.slot,
+        }))
+        .sort((a, b) => (a.slot.environment?.order ?? 0) - (b.slot.environment?.order ?? 0))

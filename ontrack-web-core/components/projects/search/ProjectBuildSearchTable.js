@@ -7,7 +7,12 @@ import ProjectBuildSearchUnselect from "@components/projects/search/ProjectBuild
 import ProjectBuildSearchChangeLogButton from "@components/projects/search/ProjectBuildSearchChangeLogButton";
 import {useContext} from "react";
 import {UserContext} from "@components/providers/UserProvider";
-import BuildLastDeployedEnvironment from "@components/extension/environments/BuildLastDeployedEnvironment";
+import BuildDeploymentChips from "@components/extension/environments/journey/BuildDeploymentChips";
+import SlotDrawer from "@components/extension/environments/shared/SlotDrawer";
+import {useSlotDrawer} from "@components/extension/environments/shared/useSlotDrawer";
+import DeployDialog, {useDeployDialog} from "@components/extension/environments/shared/DeployDialog";
+import {slotPipelineUri} from "@components/extension/environments/EnvironmentsLinksUtils";
+import {useRouter} from "next/router";
 
 export default function ProjectBuildSearchTable({
                                                     builds,
@@ -19,6 +24,23 @@ export default function ProjectBuildSearchTable({
                                                 }) {
 
     const user = useContext(UserContext)
+
+    /*
+     * One drawer for the whole table, opened by any row's chip. Per row it would be one drawer
+     * per build, and `?slot=<id>` would open all of them at once.
+     */
+    const slotDrawer = useSlotDrawer()
+
+    /*
+     * The drawer offers Deploy on the builds a slot is waiting for, so the dialog comes with it.
+     * Without it that button would be drawn and do nothing.
+     */
+    const router = useRouter()
+    const deployDialog = useDeployDialog({
+        onSuccess: (pipelineId) => {
+            if (pipelineId) router.push(slotPipelineUri(pipelineId))
+        },
+    })
 
     return (
         <>
@@ -61,7 +83,13 @@ export default function ProjectBuildSearchTable({
                                     {
                                         user.authorizations.environment?.view &&
                                         <Table.Summary.Cell index={3} colSpan={1}>
-                                            <BuildLastDeployedEnvironment build={build}/>
+                                            {/* A selected build stays in the table below as
+                                                well, so this copy takes a test id of its own */}
+                                            <BuildDeploymentChips
+                                                build={build}
+                                                onSlotClick={slotDrawer.openSlot}
+                                                testId={`build-deployments-selected-${build.id}`}
+                                            />
                                         </Table.Summary.Cell>
                                     }
                                     <Table.Summary.Cell index={user.authorizations.environment?.view ? 4 : 3}
@@ -97,7 +125,8 @@ export default function ProjectBuildSearchTable({
                     <Table.Column
                         key="environments"
                         title="Deployments"
-                        render={(_, build) => <BuildLastDeployedEnvironment build={build}/>}
+                        render={(_, build) =>
+                            <BuildDeploymentChips build={build} onSlotClick={slotDrawer.openSlot}/>}
                     />
                 }
                 <Table.Column
@@ -120,6 +149,13 @@ export default function ProjectBuildSearchTable({
                     }
                 />
             </Table>
+            <SlotDrawer
+                slotId={slotDrawer.slotId}
+                open={slotDrawer.open}
+                onClose={slotDrawer.close}
+                onDeploy={(slot, build) => deployDialog.start({slot, build})}
+            />
+            <DeployDialog dialog={deployDialog}/>
         </>
     )
 }

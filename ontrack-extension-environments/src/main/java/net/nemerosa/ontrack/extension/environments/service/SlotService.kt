@@ -294,11 +294,6 @@ interface SlotService {
     fun findEligibleSlotsByBuild(build: Build): List<Slot>
 
     /**
-     * Gets all the slot pipelines where the given [build] is the last being deployed.
-     */
-    fun findSlotPipelinesWhereBuildIsLastDeployed(build: Build): List<SlotPipeline>
-
-    /**
      * Deletes a deployment using its ID.
      */
     fun deleteDeployment(id: String)

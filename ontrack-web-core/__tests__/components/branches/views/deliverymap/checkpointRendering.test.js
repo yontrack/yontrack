@@ -28,6 +28,7 @@ import UnknownCheckpoint from "@components/branches/views/deliverymap/checkpoint
 import UnresolvedCheckpoint
     from "@components/branches/views/deliverymap/checkpoints/UnresolvedCheckpoint";
 import SlotCheckpoint from "@components/extension/environments/deliverymap/SlotCheckpoint";
+import {DeliveryMapSlotContext} from "@components/extension/environments/deliverymap/deliveryMapSlotContext";
 import CheckpointArrival from "@components/branches/views/deliverymap/checkpoints/CheckpointArrival";
 
 beforeEach(() => {
@@ -207,11 +208,47 @@ describe('slot checkpoint', () => {
         expect(screen.queryByText("Never deployed")).not.toBeInTheDocument()
     })
 
-    it('links to the slot, where the admission rules can actually be read', () => {
+    it('states the build is deployed there, in the same word as every other surface', () => {
+        // The journey chip, not a wording of the map's own: "Deployed" reads the same here, on the
+        // build page strip, on the decorations and in the matrix (#1796)
+        withEvents(<SlotCheckpoint checkpoint={slot({}, {
+            build: build("20260901-7"),
+            time: "2026-09-01T10:00:00",
+        })}/>)
+        expect(screen.getByTestId('journey-chip-abc')).toHaveTextContent("Deployed")
+    })
+
+    it('states nothing about a build when nothing has ever been deployed there', () => {
         withEvents(<SlotCheckpoint checkpoint={slot({})}/>)
-        expect(screen.getByText("production").closest('a')).toHaveAttribute(
-            'href', '/extension/environments/slot/abc',
+        expect(screen.queryByTestId('journey-chip-abc')).not.toBeInTheDocument()
+    })
+
+    it('states nothing about a build on a slot this branch can never reach', () => {
+        // "Unreachable from this branch" says more than "Not eligible" and says it about the
+        // BRANCH, which is the question the map is answering
+        withEvents(<SlotCheckpoint checkpoint={slot({unreachable: true})}/>)
+        expect(screen.queryByTestId('journey-chip-abc')).not.toBeInTheDocument()
+    })
+
+    it('opens the slot drawer rather than navigating away from the map', () => {
+        // The map is expensive to lay out and a reader clicking a slot wants to look, not to leave
+        const onSlotClick = jest.fn()
+        render(
+            <EventsContext.Provider value={{fireEvent: jest.fn(), subscribeToEvent: jest.fn()}}>
+                <DeliveryMapSlotContext.Provider value={{onSlotClick}}>
+                    <SlotCheckpoint checkpoint={slot({})}/>
+                </DeliveryMapSlotContext.Provider>
+            </EventsContext.Provider>
         )
+        fireEvent.click(screen.getByTestId('slot-checkpoint-name-abc'))
+        expect(onSlotClick).toHaveBeenCalledWith('abc')
+    })
+
+    it('still names the slot when the map has nowhere to open a drawer', () => {
+        // The registry draws a checkpoint wherever it is asked to; a missing context makes the name
+        // inert rather than making the node throw
+        withEvents(<SlotCheckpoint checkpoint={slot({})}/>)
+        expect(screen.getByTestId('slot-checkpoint-name-abc')).toHaveTextContent("production")
     })
 
 })

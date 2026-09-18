@@ -97,17 +97,6 @@ class SlotServiceImpl(
         }.sortedBy { it.environment.order }
     }
 
-    override fun findSlotPipelinesWhereBuildIsLastDeployed(build: Build): List<SlotPipeline> {
-        val projectSlots = findSlotsByProject(build.project)
-        return projectSlots.mapNotNull { slot ->
-            getCurrentPipeline(slot)
-        }.filter { pipeline ->
-            pipeline.build.id == build.id
-        }.sortedByDescending { pipeline ->
-            pipeline.slot.environment.order
-        }
-    }
-
     override fun deleteDeployment(id: String) {
         val deployment = findPipelineById(id)
         if (deployment != null) {

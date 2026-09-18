@@ -67,7 +67,7 @@ interface ProjectEntity {
 }
 
 "Information about the promotion of a build"
-union BuildPromotionInfoItemData = EnvironmentBuildCount | PromotionLevel | PromotionRun | SlotPipeline
+union BuildPromotionInfoItemData = PromotionLevel | PromotionRun
 
 type Account {
   "List of authorized projects"
@@ -2035,16 +2035,6 @@ type Environment {
   ): [Slot!]!
   "tags field"
   tags: [String!]!
-}
-
-"Number of environments where a build is deployed"
-type EnvironmentBuildCount {
-  "Associated build"
-  build: Build!
-  "Number of environments where a build is deployed"
-  count: Int
-  "ID of the count (build ID)"
-  id: ID!
 }
 
 type EnvironmentMatrix {

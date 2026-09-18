@@ -150,3 +150,13 @@ actually deployed, like in a GitOps repository.
 ### CasC
 
 TBD
+
+!!! warning "Removed setting: `settings.environments`"
+
+    The environments extension used to contribute a `buildDisplayOption` setting, which chose how a
+    build's environments were drawn on the promotion dots of the build page. Those dots are gone —
+    a build's environments are now the **journey strip** on the build page, which always shows every
+    slot of the project — and the setting went with them.
+
+    A `casc.ontrack.config.settings.environments` block left in a configuration-as-code file is
+    rejected as an unknown settings section, so remove it when upgrading.
