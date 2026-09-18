@@ -1,6 +1,7 @@
 import FormDialog, {useFormDialog} from "@components/form/FormDialog";
 import {ColorPicker, Form, Input} from "antd";
 import {gql} from "graphql-request";
+import {brand} from "@components/common/brand/Colors";
 
 /**
  * Same rules as `LabelForm` on the server side.
@@ -8,7 +9,14 @@ import {gql} from "graphql-request";
 export const labelNameRegex = /^[A-Za-z0-9.\-_]+$/
 export const labelColorRegex = /^#[a-fA-F0-9]{6}$/
 
-const defaultColor = '#1677FF'
+/**
+ * The colour a new label gets when the picker is never opened.
+ *
+ * It is the brand gray rather than antd's own blue: a quiet neutral reads as
+ * "unclassified" and lets the labels somebody did colour on purpose stand out.
+ * Taken from the palette rather than written out again, so it follows the brand.
+ */
+const defaultColor = brand.colors.gray
 
 /**
  * The Ant Design `ColorPicker` puts a `Color` object in the form, not a string,
