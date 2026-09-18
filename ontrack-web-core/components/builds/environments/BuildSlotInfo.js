@@ -6,7 +6,8 @@ import {FaChevronCircleDown, FaChevronCircleRight} from "react-icons/fa";
 import EnvironmentCurrentBuild from "@components/builds/environments/EnvironmentCurrentBuild";
 import EnvironmentBuild from "@components/builds/environments/EnvironmentBuild";
 import {isAuthorized} from "@components/common/authorizations";
-import SlotPipelineCreateButton from "@components/extension/environments/SlotPipelineCreateButton";
+import {FaPlay} from "react-icons/fa";
+import DeployDialog, {useDeployDialog} from "@components/extension/environments/shared/DeployDialog";
 import {buildKnownName} from "@components/common/Titles";
 import {useRouter} from "next/router";
 
@@ -23,8 +24,17 @@ export default function BuildSlotInfo({slot, build, showDetails = false, setShow
     }
 
     const navigateToPipeline = async (pipelineId) => {
-        await router.push(slotPipelineUri(pipelineId))
+        if (pipelineId) await router.push(slotPipelineUri(pipelineId))
     }
+
+    /*
+     * The build page's environments cell is one of the four entry points the redesign collapses
+     * into the deploy dialog (#1797). It opens from the *build*, so the dialog offers every slot of
+     * the project - including the ones refusing it, with the rule that refuses - rather than this
+     * row's slot behind a `Popconfirm` which said only that "all currently active deployments"
+     * would be cancelled.
+     */
+    const deployDialog = useDeployDialog({onSuccess: navigateToPipeline})
 
     return (
         <>
@@ -41,13 +51,14 @@ export default function BuildSlotInfo({slot, build, showDetails = false, setShow
                         <EnvironmentCurrentBuild slot={slot} build={build}/>
                         {
                             isAuthorized(slot, "pipeline", "create") &&
-                            <SlotPipelineCreateButton
-                                slot={slot}
-                                build={build}
-                                onStart={navigateToPipeline}
-                                text={buildKnownName(build)}
+                            <Button
+                                icon={<FaPlay color="green"/>}
                                 title={`Start deploying ${buildKnownName(build)}`}
-                            />
+                                data-testid={`build-slot-deploy-${slot.id}`}
+                                onClick={() => deployDialog.start({build})}
+                            >
+                                {buildKnownName(build)}
+                            </Button>
                         }
                         <Button
                             type="text"
@@ -74,6 +85,7 @@ export default function BuildSlotInfo({slot, build, showDetails = false, setShow
                         <EnvironmentCurrentBuild slot={slot} build={build}/>
                     </>
                 }
+            <DeployDialog dialog={deployDialog}/>
         </>
     )
 }

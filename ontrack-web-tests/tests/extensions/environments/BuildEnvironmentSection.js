@@ -28,13 +28,11 @@ export class BuildEnvironmentSection {
      * refusal reasons live.
      */
     async buildDeploy({environment, slot}) {
-        await this.section.getByRole('button', {name: this.build.name}).click()
-        const dialog = new DeployDialog(this.page)
-        await dialog.expectOpen()
+        const dialog = await this.openDeployDialog()
         await dialog.deployToSlot(slot)
-        // The dialog closes and the page behind it reloads the cell.
-        await expect(this.page.getByRole('dialog')).toHaveCount(0)
-        await expect(this.section.getByRole('link', {name: environment.name})).toBeVisible()
+        // On success the cell takes the user to the new deployment, as it always has.
+        await expect(this.page.getByText(`Slot ${environment.name} - ${this.build.branch.project.name}`)).toBeVisible()
+        await expect(this.page.getByRole('link', {name: this.build.name})).toBeVisible()
     }
 
     /**
@@ -42,7 +40,9 @@ export class BuildEnvironmentSection {
      * dialog says rather than about what it does.
      */
     async openDeployDialog() {
-        await this.section.getByRole('button', {name: this.build.name}).click()
+        // The collapsed row's own button, named after the build - `BuildSlotInfo`, not the expanded
+        // deployment panel underneath it.
+        await this.section.getByRole('button', {name: this.build.name}).first().click()
         const dialog = new DeployDialog(this.page)
         await dialog.expectOpen()
         return dialog
