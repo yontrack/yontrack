@@ -26,6 +26,9 @@ internal object SlotAdmissionRules {
 
     /** `BranchPatternSlotAdmissionRule.ID` on the server side. */
     const val BRANCH_PATTERN = "branchPattern"
+
+    /** `ManualApprovalSlotAdmissionRule.ID` on the server side. */
+    const val MANUAL = "manual"
 }
 
 /**

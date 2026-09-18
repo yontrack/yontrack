@@ -79,7 +79,6 @@ export const useDeploymentFinishAction = ({deployment, onSuccess, onError}) => {
             mutation FinishDeployment($id: String!) {
                 finishSlotPipelineDeployment(input: {
                     pipelineId: $id,
-                    # TODO Forcing
                     forcing: false,
                     message: null,
                 }) {

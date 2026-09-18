@@ -14,14 +14,15 @@ import SlotPipelineOverrideWorkflowDialog, {
     useSlotPipelineOverrideWorkflowDialog,
 } from "@components/extension/environments/SlotPipelineOverrideWorkflowDialog"
 import TimestampText from "@components/common/TimestampText"
-import {checksSummary, currentPhaseItems, isClear} from "@components/extension/environments/shared/whatsBlockingModel"
+import {checksSummary, currentPhase, isClear, phaseItems} from "@components/extension/environments/shared/whatsBlockingModel"
 
 /**
  * Why a deployment is not moving, and what to do about it.
  *
- * Job 3 of the redesign. The deployment page today lists every rule and every workflow of every
- * phase with equal weight, and the one that is failing has to be found among them; this list shows
- * **the current phase only**, **failing items first**, and puts the fix on the failing row itself.
+ * Job 3 of the redesign. The deployment page used to list every rule and every workflow of every
+ * phase with equal weight, and the one that is failing had to be found among them; this list shows
+ * **one phase** - by default the one the deployment is in - **failing items first**, and puts the
+ * fix on the failing row itself.
  *
  * Three things follow from that and are worth stating, because each one is a decision that could
  * have gone the other way:
@@ -39,8 +40,19 @@ import {checksSummary, currentPhaseItems, isClear} from "@components/extension/e
  * @param {function} onChange Called after any inline fix, so the caller can ask the server again.
  * @param {boolean} actions Whether the inline fixes are offered at all - a read-only rendering (an
  *   earlier phase on the deployment page) passes false.
+ * @param {string} phase Which phase to list - `CANDIDATE`, `RUNNING` or `DONE`. Left out, it is the
+ *   phase the deployment is currently in, which is what the drawer always wants. The deployment
+ *   page names one explicitly to draw a phase that is already over.
+ * @param {string} testId Prefix of every test id below, so that a page showing several phases at
+ *   once does not put the same id on two rows.
  */
-export default function WhatsBlocking({deployment, onChange, actions = true}) {
+export default function WhatsBlocking({
+                                          deployment,
+                                          onChange,
+                                          actions = true,
+                                          phase = undefined,
+                                          testId = 'whats-blocking',
+                                      }) {
 
     /*
      * `useSlotPipelineInputDialog` narrows to one rule through its *hook* argument, which a list
@@ -54,7 +66,8 @@ export default function WhatsBlocking({deployment, onChange, actions = true}) {
     // Computed in the render body rather than kept in state: it is a function of the deployment and
     // of nothing else, and a list that is briefly empty before an effect fills it would flash
     // "nothing is blocking" over a deployment which is blocked.
-    const items = currentPhaseItems(deployment)
+    const shownPhase = phase === undefined ? currentPhase(deployment) : phase
+    const items = phaseItems(deployment, shownPhase)
     const summary = checksSummary(items)
     const clear = isClear(items)
 
@@ -69,19 +82,21 @@ export default function WhatsBlocking({deployment, onChange, actions = true}) {
     const canAct = actions && isAuthorized(deployment?.slot ?? {}, 'pipeline', 'create')
     const canOverride = actions && isAuthorized(deployment?.slot ?? {}, 'pipeline', 'override')
 
-    const settled = deployment?.status !== 'CANDIDATE' && deployment?.status !== 'RUNNING'
+    // Only the *current* phase can report "this deployment is finished": a named phase is being
+    // shown as history, and history does not block anything by definition.
+    const settled = phase === undefined && !shownPhase
 
     const row = (item) => (
-        <div key={item.key} className="ot-whats-blocking-row" data-testid={`whats-blocking-${item.key}`}>
+        <div key={item.key} className="ot-whats-blocking-row" data-testid={`${testId}-${item.key}`}>
             <Space size={6} wrap>
-                <CheckIcon id={`whats-blocking-${item.key}`} value={item.ok}/>
+                <CheckIcon id={`${testId}-${item.key}`} value={item.ok}/>
                 {
                     item.kind === 'rule' ?
                         <SlotAdmissionRuleSummary
                             ruleId={item.rule.admissionRuleConfig.ruleId}
                             ruleConfig={item.rule.admissionRuleConfig.ruleConfig}
                         /> :
-                        <WorkflowLabel item={item}/>
+                        <WorkflowLabel item={item} testId={testId}/>
                 }
                 <Typography.Text type="secondary">
                     {item.ok ? 'Passed' : 'Blocking'}
@@ -92,7 +107,7 @@ export default function WhatsBlocking({deployment, onChange, actions = true}) {
                     <Button
                         size="small"
                         icon={<FaHandPaper color="orange"/>}
-                        data-testid={`whats-blocking-answer-${item.rule.admissionRuleConfig.id}`}
+                        data-testid={`${testId}-answer-${item.rule.admissionRuleConfig.id}`}
                         onClick={() => inputDialog.start({
                             pipeline: {id: deployment.id},
                             onChange,
@@ -108,7 +123,7 @@ export default function WhatsBlocking({deployment, onChange, actions = true}) {
                         size="small"
                         danger
                         icon={<FaExclamationCircle/>}
-                        data-testid={`whats-blocking-override-${item.rule.admissionRuleConfig.id}`}
+                        data-testid={`${testId}-override-${item.rule.admissionRuleConfig.id}`}
                         onClick={() => overrideRuleDialog.start({pipeline: deployment, rule: item.rule})}
                     >
                         Override
@@ -121,7 +136,7 @@ export default function WhatsBlocking({deployment, onChange, actions = true}) {
                         size="small"
                         danger
                         icon={<FaExclamationCircle/>}
-                        data-testid={`whats-blocking-override-${item.slotWorkflow.id}`}
+                        data-testid={`${testId}-override-${item.slotWorkflow.id}`}
                         onClick={() => overrideWorkflowDialog.start({
                             deployment,
                             slotWorkflow: item.slotWorkflow,
@@ -137,7 +152,7 @@ export default function WhatsBlocking({deployment, onChange, actions = true}) {
                  * why. Hiding it would leave a green tick with no story behind it.
                  */
                 item.overridden && item.override &&
-                <div data-testid={`whats-blocking-override-detail-${item.key}`}>
+                <div data-testid={`${testId}-override-detail-${item.key}`}>
                     <Typography.Text type="secondary">
                         {`Overridden by ${item.override.user} `}
                         <TimestampText value={item.override.timestamp} relative={true}/>
@@ -155,16 +170,16 @@ export default function WhatsBlocking({deployment, onChange, actions = true}) {
     )
 
     return (
-        <div data-testid="whats-blocking">
+        <div data-testid={testId}>
             {
                 settled &&
-                <Typography.Text type="secondary" data-testid="whats-blocking-settled">
+                <Typography.Text type="secondary" data-testid={`${testId}-settled`}>
                     This deployment is finished — nothing is blocking it.
                 </Typography.Text>
             }
             {
                 !settled && items.length === 0 &&
-                <Space data-testid="whats-blocking-none">
+                <Space data-testid={`${testId}-none`}>
                     <FaCheck color="green"/>
                     <Typography.Text type="secondary">Nothing is blocking this deployment.</Typography.Text>
                 </Space>
@@ -172,12 +187,12 @@ export default function WhatsBlocking({deployment, onChange, actions = true}) {
             {
                 !settled && items.length > 0 &&
                 <Space direction="vertical" size={4} className="ot-line">
-                    <Typography.Text type="secondary" data-testid="whats-blocking-summary">
+                    <Typography.Text type="secondary" data-testid={`${testId}-summary`}>
                         {summary.text}
                     </Typography.Text>
                     {
                         clear &&
-                        <Space data-testid="whats-blocking-clear">
+                        <Space data-testid={`${testId}-clear`}>
                             <FaCheck color="green"/>
                             <Typography.Text type="secondary">Nothing is blocking this deployment.</Typography.Text>
                         </Space>
@@ -188,7 +203,7 @@ export default function WhatsBlocking({deployment, onChange, actions = true}) {
                         <Collapse
                             ghost
                             size="small"
-                            data-testid="whats-blocking-passed"
+                            data-testid={`${testId}-passed`}
                             items={[
                                 {
                                     key: 'passed',
@@ -202,9 +217,20 @@ export default function WhatsBlocking({deployment, onChange, actions = true}) {
                     }
                 </Space>
             }
-            <SlotPipelineInputDialog dialog={inputDialog}/>
-            <SlotPipelineOverrideRuleDialog dialog={overrideRuleDialog}/>
-            <SlotPipelineOverrideWorkflowDialog dialog={overrideWorkflowDialog}/>
+            {
+                /*
+                 * Mounted only where they can be opened. The deployment page draws this component
+                 * several times over - the current phase, and each phase already gone - and three
+                 * dialogs per rendering would put four fields labelled "Message" in one document,
+                 * which is how a `getByLabel` ends up filling an invisible one.
+                 */
+                actions &&
+                <>
+                    <SlotPipelineInputDialog dialog={inputDialog}/>
+                    <SlotPipelineOverrideRuleDialog dialog={overrideRuleDialog}/>
+                    <SlotPipelineOverrideWorkflowDialog dialog={overrideWorkflowDialog}/>
+                </>
+            }
         </div>
     )
 }
@@ -215,17 +241,17 @@ export default function WhatsBlocking({deployment, onChange, actions = true}) {
  * "Open workflow" is that link rather than a button: the workflow instance page is a place, and a
  * link is how Yontrack goes to places.
  */
-function WorkflowLabel({item}) {
+function WorkflowLabel({item, testId}) {
     const instance = item.slotWorkflow.slotWorkflowInstanceForPipeline
     const name = item.slotWorkflow.workflow?.name
     if (instance) {
         return <WorkflowInstanceLink
-            id={`whats-blocking-workflow-${item.slotWorkflow.id}`}
+            id={`${testId}-workflow-link-${item.slotWorkflow.id}`}
             workflowInstanceId={instance.workflowInstance.id}
             name={name}
         />
     }
-    return <Typography.Text data-testid={`whats-blocking-workflow-${item.slotWorkflow.id}`}>
+    return <Typography.Text data-testid={`${testId}-workflow-link-${item.slotWorkflow.id}`}>
         {name}
     </Typography.Text>
 }

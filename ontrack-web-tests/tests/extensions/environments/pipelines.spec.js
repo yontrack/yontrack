@@ -205,41 +205,37 @@ const checkForcedPipeline = async ({
                                        expectedMessage,
                                    }) => {
 
-    // Pipeline is done
+    // Pipeline is done: no action at all, not merely disabled ones.
     await pipelinePage.checkRunAction({visible: false})
     await pipelinePage.checkFinishAction({visible: false})
+    await pipelinePage.checkCancelAction({visible: false})
+    await pipelinePage.expectStep('DONE')
 
-    // Checks the admission rule
+    // A finished deployment shows every phase, expanded and read-only, rather than the one it is
+    // "in" - it is in none. Each phase is addressed through its own section.
 
-    const promotionRule = await pipelinePage.getAdmissionRule(promotionRuleId)
-    await promotionRule.expectToBeVisible()
+    const candidatePhase = await pipelinePage.openPhase('CANDIDATE')
+    const promotionRule = await candidatePhase.getAdmissionRule(promotionRuleId)
     await promotionRule.expectToBeUnchecked()
 
-    // Checks the workflows
-
     if (candidateWorkflow) {
-        const candidateWorkflowInstance = await pipelinePage.getWorkflow(candidateWorkflow.id)
-        await candidateWorkflowInstance.checkState({
-            status: "Not started",
-            name: "On candidate"
-        })
+        const candidateWorkflowInstance = await candidatePhase.getWorkflow(candidateWorkflow.id)
+        await candidateWorkflowInstance.checkState({name: "On candidate", ok: false})
     }
 
-    const runningWorkflowInstance = await pipelinePage.getWorkflow(runningWorkflow.id)
-    await runningWorkflowInstance.checkState({
-        status: "Not started",
-        name: "On running"
-    })
+    // The RUNNING phase is shown although a forced deployment was never running: its workflows did
+    // not run, and that is part of what forcing left behind.
+    const runningPhase = await pipelinePage.openPhase('RUNNING')
+    const runningWorkflowInstance = await runningPhase.getWorkflow(runningWorkflow.id)
+    await runningWorkflowInstance.checkState({name: "On running", ok: false})
 
-    const doneWorkflowInstance = await pipelinePage.getWorkflow(doneWorkflow.id)
-    await doneWorkflowInstance.checkState({
-        status: "Success",
-        name: "On done"
-    })
+    const donePhase = await pipelinePage.openPhase('DONE')
+    const doneWorkflowInstance = await donePhase.getWorkflow(doneWorkflow.id, {passed: true})
+    await doneWorkflowInstance.checkState({name: "On done", ok: true})
 
-    // Checks the forcing message
+    // The forcing message is in the audit timeline, which is where every override's justification
+    // now lives (#1792).
 
-    const doneStatus = await pipelinePage.getDoneStatus()
-    await doneStatus.expectForcingMessage(expectedMessage)
+    await pipelinePage.expectTimelineEntry(expectedMessage)
 
 }

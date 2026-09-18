@@ -177,10 +177,14 @@ export const gqlBuildJourneyData = gql`
 
 /**
  * Cancelling whatever is in flight.
+ *
+ * The reason is an argument rather than a constant because it lands in the deployment's audit
+ * trail: a cancellation recorded as coming from the drawer when it came from the deployment page
+ * is the sort of small untruth that makes an audit trail not worth reading.
  */
-export const gqlSlotDrawerCancel = gql`
-            mutation SlotDrawerCancel($id: String!) {
-                cancelSlotPipeline(input: {pipelineId: $id, reason: "Cancelled from the slot drawer."}) {
+export const gqlSlotCancel = gql`
+            mutation SlotCancel($id: String!, $reason: String!) {
+                cancelSlotPipeline(input: {pipelineId: $id, reason: $reason}) {
                     errors { message }
                 }
             }

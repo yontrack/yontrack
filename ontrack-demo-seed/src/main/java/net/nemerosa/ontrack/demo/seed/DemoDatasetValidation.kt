@@ -297,6 +297,12 @@ fun DemoDataset.validate() {
                 problems += "The ${deployment.environment} environment deploys ${ref.build} of " +
                         "${ref.project}/${ref.branch}, which the dataset never creates."
 
+            // A deployment left as a candidate is the one case where the rules are ALLOWED to
+            // refuse the build: being blocked is what the dataset is asking for (#1792). The
+            // checks below say "the server would accept this deployment", which is a question
+            // about starting one, and nothing starts here.
+            deployment.stopAt == DeploymentStop.CANDIDATE -> Unit
+
             else -> {
                 val build = builds.getValue(ref)
                 slot.admissionRules.forEach { rule ->

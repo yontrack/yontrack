@@ -8,6 +8,7 @@ import net.nemerosa.ontrack.extension.environments.security.SlotUpdate
 import net.nemerosa.ontrack.extension.environments.security.SlotView
 import net.nemerosa.ontrack.extension.environments.service.checkSlotAccess
 import net.nemerosa.ontrack.extension.environments.service.isSlotAccessible
+import net.nemerosa.ontrack.extension.environments.storage.SlotPipelineChangeRepository
 import net.nemerosa.ontrack.extension.environments.templating.DeploymentTemplatingContextData
 import net.nemerosa.ontrack.extension.environments.templating.DeploymentTemplatingContextHandler
 import net.nemerosa.ontrack.extension.environments.trigger.SlotPipelineTrigger
@@ -36,6 +37,7 @@ class SlotWorkflowServiceImpl(
     private val slotPipelineTrigger: SlotPipelineTrigger,
     private val deploymentTemplatingContextHandler: DeploymentTemplatingContextHandler,
     private val workflowNodeExecutorService: WorkflowNodeExecutorService,
+    private val slotPipelineChangeRepository: SlotPipelineChangeRepository,
 ) : SlotWorkflowService {
 
     override fun addSlotWorkflow(slotWorkflow: SlotWorkflow) {
@@ -180,6 +182,24 @@ class SlotWorkflowServiceImpl(
             user = user,
             timestamp = timestamp,
             message = message,
+        )
+        /*
+         * Overriding a workflow is a decision somebody took on purpose, and until #1792 it left no
+         * trace anywhere a person could read: the override was stored on the instance, the check
+         * turned green, and the reason went nowhere. `SlotPipelineChangeType.WORKFLOW_OVERRIDDEN`
+         * has existed since the change log was written and was the one type nothing ever produced.
+         * The deployment page's audit timeline is what reads it.
+         */
+        slotPipelineChangeRepository.save(
+            SlotPipelineChange(
+                pipeline = slotWorkflowInstance.pipeline,
+                user = user,
+                timestamp = timestamp,
+                type = SlotPipelineChangeType.WORKFLOW_OVERRIDDEN,
+                status = slotWorkflowInstance.pipeline.status,
+                message = """Workflow "${slotWorkflowInstance.slotWorkflow.workflow.name}" overridden""",
+                overrideMessage = message,
+            )
         )
         // OK
         return SlotAdmissionRuleOverride(

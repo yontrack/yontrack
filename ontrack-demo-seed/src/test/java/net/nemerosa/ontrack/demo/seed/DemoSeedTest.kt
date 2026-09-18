@@ -763,9 +763,11 @@ class DemoSeedTest {
             "One project has two qualifiers, so the matrix has one project row to nest under",
         )
 
-        // Never deployed: the only slot of the dataset where a cell reads that.
+        // Never deployed: the only slot of the dataset where a cell reads that. What the cell
+        // reads is `lastDeployedPipeline`, so the blocked candidate parked on this slot (#1792)
+        // leaves it intact - it is HELD builds which have to be empty, not deployments.
         assertTrue(
-            canary.getValue(DemoContent.PRODUCTION).deployments.isEmpty(),
+            canary.getValue(DemoContent.PRODUCTION).heldBuilds.isEmpty(),
             "Nothing has ever gone out to the production canary",
         )
 
@@ -774,6 +776,56 @@ class DemoSeedTest {
             "107",
             canary.getValue(DemoContent.STAGING).heldBuilds.last().name,
             "The staging canary holds the head of main, which the production canary is behind",
+        )
+    }
+
+    /**
+     * The demo's answer to "show me why a deployment is stuck" (#1792). Before it, every check of
+     * every slot in the dataset either passed or belonged to the deliberately broken [UI] slot,
+     * whose builds are not even eligible - so "What's blocking" had nothing but green ticks to
+     * draw anywhere.
+     *
+     * The three things it must not disturb are asserted beside it, because each is a reading the
+     * matrix takes from this very slot.
+     */
+    @Test
+    fun `the demo leaves one blocked candidate, so What's blocking has a failing check to show`() {
+        val target = InMemoryDemoTarget()
+        seed(target).run(DemoContent.dataset(changelog))
+
+        val slot = target.environments()
+            .flatMap { (it as InMemoryDemoTarget.InMemoryEnvironment).slots }
+            .single {
+                it.environment.name == DemoContent.PRODUCTION &&
+                        it.project.name == DemoContent.SERVICE &&
+                        it.qualifier == DemoContent.CANARY_QUALIFIER
+            }
+
+        val candidates = slot.deployments.filter { it.stopAt == DeploymentStop.CANDIDATE }
+        assertEquals(1, candidates.size, "Exactly one deployment is left as a candidate")
+        assertEquals("104", candidates.single().build.name)
+
+        // What makes it blocked rather than merely waiting: a rule which asks a person.
+        assertTrue(
+            slot.admissionRules.any { it.ruleId == SlotAdmissionRules.MANUAL },
+            "The slot carries a manual approval, which is the check with an Answer on it",
+        )
+
+        // ...and what it must not take away from the matrix.
+        assertTrue(
+            slot.heldBuilds.isEmpty(),
+            "The slot still HOLDS nothing, so its cell still reads Never deployed",
+        )
+        val stagingCanary = target.environments()
+            .flatMap { (it as InMemoryDemoTarget.InMemoryEnvironment).slots }
+            .single {
+                it.environment.name == DemoContent.STAGING &&
+                        it.qualifier == DemoContent.CANARY_QUALIFIER
+            }
+        assertEquals(
+            "107",
+            stagingCanary.heldBuilds.last().name,
+            "The candidate is OLDER than what the slot upstream holds, so this one still reads behind",
         )
     }
 

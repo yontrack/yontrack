@@ -19,7 +19,7 @@ import {
 } from "@components/extension/environments/shared/slotCellModel"
 import {
     gqlSlotDrawer,
-    gqlSlotDrawerCancel,
+    gqlSlotCancel,
     gqlSlotDrawerDeployment,
     gqlSlotDrawerFinish,
     gqlSlotDrawerRun,
@@ -163,11 +163,11 @@ function SlotDrawerBody({slotId, query, refreshedAt, refresh, onDeploy, acting, 
 
     const canAct = isAuthorized(slot ?? {}, 'pipeline', 'create')
 
-    const act = async (mutation, userNode, statusNode) => {
+    const act = async (mutation, userNode, statusNode, variables = {}) => {
         setActing(true)
         setError(null)
         try {
-            const data = await callGraphQL({query: mutation, variables: {id: inFlight.id}})
+            const data = await callGraphQL({query: mutation, variables: {id: inFlight.id, ...variables}})
             const payload = data?.[userNode]
             const errors = payload?.errors
             if (errors && errors.length > 0) {
@@ -197,9 +197,10 @@ function SlotDrawerBody({slotId, query, refreshedAt, refresh, onDeploy, acting, 
     )
 
     const cancel = () => act(
-        gqlSlotDrawerCancel,
+        gqlSlotCancel,
         'cancelSlotPipeline',
         null,
+        {reason: "Cancelled from the slot drawer."},
     )
 
     if (query.error) {

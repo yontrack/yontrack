@@ -9,12 +9,13 @@ import {
     gqlDeployDialogStart,
     gqlSlotCellData,
     gqlSlotDrawer,
-    gqlSlotDrawerCancel,
+    gqlSlotCancel,
     gqlSlotDrawerDeployment,
     gqlSlotDrawerFinish,
     gqlSlotDrawerRun,
     gqlSlotDrawerTitle,
 } from "@components/extension/environments/shared/environmentsSharedGraphQL"
+import {gqlDeploymentPage} from "@components/extension/environments/deployment/deploymentGraphQL"
 import {gqlSlotData} from "@components/extension/environments/EnvironmentGraphQL"
 
 /**
@@ -80,10 +81,11 @@ describe('the shared environments documents', () => {
     check('the drawer deployment query', gqlSlotDrawerDeployment)
     check('the drawer run mutation', gqlSlotDrawerRun)
     check('the drawer finish mutation', gqlSlotDrawerFinish)
-    check('the drawer cancel mutation', gqlSlotDrawerCancel)
+    check('the cancel mutation', gqlSlotCancel)
     check('the deploy dialog slots query', gqlDeployDialogSlots)
     check('the deploy dialog builds query', gqlDeployDialogBuilds)
     check('the deploy dialog start mutation', gqlDeployDialogStart)
+    check('the deployment page query', gqlDeploymentPage)
 
     it('asks the slot whether it is blocked and whether it is behind', () => {
         // The two flags the cell exists to carry; without them it draws neither mark and a held-up
@@ -114,5 +116,21 @@ describe('the shared environments documents', () => {
         expect(gqlDeployDialogSlots).toContain('authorizations')
         expect(gqlDeployDialogBuilds).toContain('authorizations')
         expect(gqlSlotDrawer).toContain('authorizations')
+        expect(gqlDeploymentPage).toContain('authorizations')
+    })
+
+    it('asks the deployment for the three phases of workflows, not only the current one', () => {
+        // A finished deployment shows all three, read-only; asking for the current phase alone
+        // would leave a page whose record has its middle missing (#1792).
+        expect(gqlDeploymentPage).toContain('candidateWorkflows')
+        expect(gqlDeploymentPage).toContain('runningWorkflows')
+        expect(gqlDeploymentPage).toContain('doneWorkflows')
+    })
+
+    it('asks the deployment for its changes, which are the audit timeline', () => {
+        // Including `overrideMessage`: the justification somebody wrote is the one thing the old
+        // page never showed, and the timeline is the only place it now appears.
+        expect(gqlDeploymentPage).toContain('changes')
+        expect(gqlDeploymentPage).toContain('overrideMessage')
     })
 })

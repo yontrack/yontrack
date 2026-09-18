@@ -28,8 +28,34 @@
  *   the slot's `candidateWorkflows` / `runningWorkflows`.
  * @return {Array} The items of the current phase, failing ones first.
  */
-export const currentPhaseItems = (deployment) => {
-    if (!deployment) return []
+export const currentPhaseItems = (deployment) => phaseItems(deployment, currentPhase(deployment))
+
+/**
+ * The phase a deployment is *in*, which is not the same thing as its status.
+ *
+ * A settled deployment - `DONE` or `CANCELLED` - is in no phase at all: nothing is holding it up
+ * any more, and that is the answer the list gives rather than an empty box.
+ */
+export const currentPhase = (deployment) => {
+    if (deployment?.status === 'CANDIDATE') return 'CANDIDATE'
+    if (deployment?.status === 'RUNNING') return 'RUNNING'
+    return null
+}
+
+/**
+ * The checks of *one named* phase of a deployment, in the same normalised shape.
+ *
+ * The deployment page needs this where the drawer only ever needed [currentPhaseItems]: it shows
+ * the phases a deployment has already been through, collapsed and read-only, and a finished one
+ * shows all three. One function so that an earlier phase is drawn from the same rows as the
+ * current one and the two cannot disagree about what passed.
+ *
+ * @param {Object} deployment The deployment.
+ * @param {string|null} phase `CANDIDATE`, `RUNNING`, `DONE`, or null for "no phase".
+ * @return {Array} The items of that phase, failing ones first.
+ */
+export const phaseItems = (deployment, phase) => {
+    if (!deployment || !phase) return []
 
     const awaitingInput = new Set(
         (deployment.requiredInputs ?? []).map(input => input.config?.id).filter(Boolean)
@@ -37,7 +63,7 @@ export const currentPhaseItems = (deployment) => {
 
     const items = []
 
-    if (deployment.status === 'CANDIDATE') {
+    if (phase === 'CANDIDATE') {
         (deployment.admissionRules ?? []).forEach(rule => {
             const config = rule.admissionRuleConfig
             items.push({
@@ -55,8 +81,12 @@ export const currentPhaseItems = (deployment) => {
         (deployment.slot?.candidateWorkflows ?? []).forEach(slotWorkflow => {
             items.push(workflowItem(slotWorkflow))
         })
-    } else if (deployment.status === 'RUNNING') {
+    } else if (phase === 'RUNNING') {
         (deployment.slot?.runningWorkflows ?? []).forEach(slotWorkflow => {
+            items.push(workflowItem(slotWorkflow))
+        })
+    } else if (phase === 'DONE') {
+        (deployment.slot?.doneWorkflows ?? []).forEach(slotWorkflow => {
             items.push(workflowItem(slotWorkflow))
         })
     }

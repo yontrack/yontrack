@@ -1,5 +1,6 @@
 package net.nemerosa.ontrack.extension.environments.workflows
 
+import net.nemerosa.ontrack.extension.environments.SlotPipelineChangeType
 import net.nemerosa.ontrack.extension.environments.SlotPipelineStatus
 import net.nemerosa.ontrack.extension.environments.SlotTestSupport
 import net.nemerosa.ontrack.extension.environments.events.EnvironmentsEventsFactory
@@ -257,6 +258,45 @@ class SlotWorkflowServiceIT : AbstractDSLTestSupport() {
             // Reloading the pipeline's status
             val deployedPipeline = slotService.getPipelineById(pipeline.id)
             assertEquals(SlotPipelineStatus.DONE, deployedPipeline.status)
+        }
+    }
+
+    @Test
+    fun `Overriding a workflow is recorded in the deployment's audit trail`() {
+        /*
+         * `SlotPipelineChangeType.WORKFLOW_OVERRIDDEN` existed from the start and nothing ever
+         * produced it: the override was stored on the workflow instance and left no trace in
+         * `SlotPipeline.changes`, so the deployment page's audit timeline (#1792) had a green
+         * check with no decision behind it. This is the test that says it does now.
+         */
+        slotWorkflowTestSupport.withSlotWorkflow(
+            trigger = SlotPipelineStatus.RUNNING,
+            error = true,
+        ) { slot, slotWorkflow ->
+            val pipeline = slotTestSupport.createPipeline(slot = slot)
+            slotService.runDeployment(pipeline.id, dryRun = false)
+            slotWorkflowTestSupport.waitForSlotWorkflowsToFinish(pipeline, SlotPipelineStatus.RUNNING)
+
+            val instance = slotWorkflowService.findSlotWorkflowInstanceByPipelineAndSlotWorkflow(pipeline, slotWorkflow)
+                ?: fail("Could not find slot workflow instance")
+
+            slotWorkflowService.overrideSlotWorkflowInstance(
+                slotWorkflowInstanceId = instance.id,
+                message = "Checked by hand with the on-call",
+            )
+
+            val change = slotService.getPipelineChanges(pipeline)
+                .firstOrNull { it.type == SlotPipelineChangeType.WORKFLOW_OVERRIDDEN }
+                ?: fail("No workflow override recorded in the pipeline changes")
+
+            assertEquals("Checked by hand with the on-call", change.overrideMessage)
+            assertEquals(securityService.currentUser?.name, change.user)
+            // The workflow is named in the message, because the timeline shows one line per change
+            // and "Workflow overridden" alone does not say which one.
+            assertEquals(
+                """Workflow "${slotWorkflow.workflow.name}" overridden""",
+                change.message,
+            )
         }
     }
 

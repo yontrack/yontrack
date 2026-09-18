@@ -280,7 +280,6 @@ export default function SlotPipelineSteps({pipelineId, reloadState, onChange}) {
     useEffect(() => {
         if (data) {
             const pipeline = data.slotPipelineById
-            console.log("Regenerating items...")
             const items = generateItems(pipeline, reloadState, onChange)
             setItems(items)
         }

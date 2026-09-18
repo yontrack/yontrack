@@ -97,16 +97,14 @@ test('workflows on creation participate into the pipeline check list', async ({p
     const pipelinePage = new PipelinePage(page, pipeline, ontrack)
     await pipelinePage.goTo()
 
-    await pipelinePage.expectRuleStatusProgress({value: 100})
+    await pipelinePage.expectChecksSummary({passed: 1, total: 1})
     await pipelinePage.checkRunAction({})
     await pipelinePage.expectNoPipelineErrorMessage()
 
-    // Check workflow state in the UI
-    const pipelineWorkflow = await pipelinePage.getWorkflow(slotWorkflow.id)
-    await pipelineWorkflow.checkState({
-        status: 'Success',
-        name: 'Test',
-    })
+    // Check workflow state in the UI. It passed, so it is behind "1 check passed" - the redesign
+    // shows what is blocking first and folds what is not.
+    const pipelineWorkflow = await pipelinePage.getWorkflow(slotWorkflow.id, {passed: true})
+    await pipelineWorkflow.checkState({name: 'Test', ok: true})
 })
 
 test('workflows on creation participate into the pipeline progress', async ({page, ontrack}) => {
@@ -148,7 +146,7 @@ test('workflows on creation participate into the pipeline progress', async ({pag
     const pipelinePage = new PipelinePage(page, pipeline, ontrack)
     await pipelinePage.goTo()
 
-    await pipelinePage.expectRuleStatusProgress({value: 50})
+    await pipelinePage.expectChecksSummary({passed: 1, total: 2})
     await pipelinePage.expectPipelineErrorMessage("Workflow is in error")
 })
 
@@ -286,7 +284,9 @@ test('going to the workflow instance from a pipeline workflow', async ({page, on
     const pipelinePage = new PipelinePage(page, pipeline, ontrack)
     await pipelinePage.goTo()
 
-    const pipelineWorkflow = await pipelinePage.getWorkflow(slotWorkflow.id)
+    // It succeeded, so it is folded behind "1 check passed" - the link out to the run is still
+    // there, one click away.
+    const pipelineWorkflow = await pipelinePage.getWorkflow(slotWorkflow.id, {passed: true})
     const workflowInstancePage = await pipelineWorkflow.goToWorkflowInstance()
 
     await workflowInstancePage.checkStatus('Success')
@@ -314,23 +314,25 @@ test('a workflow status can be overridden for a pipeline', async ({page, ontrack
     const pipelinePage = new PipelinePage(page, pipeline, ontrack)
     await pipelinePage.goTo()
 
-    await pipelinePage.expectRuleStatusProgress({value: 0, overridden: false})
+    await pipelinePage.expectChecksSummary({passed: 0, total: 1})
     await pipelinePage.checkRunAction({disabled: true})
 
     const pipelineWorkflow = await pipelinePage.getWorkflow(slotWorkflowError.id)
-    await pipelineWorkflow.checkState({
-        status: "Error",
-        name: "Workflow not working"
-    })
+    await pipelineWorkflow.checkState({name: "Workflow not working", ok: false})
 
     await pipelineWorkflow.checkWorkflowOverridden({overridden: false})
     await pipelineWorkflow.checkOverrideWorkflowButton({visible: true})
 
     await pipelineWorkflow.overrideWorkflow({message: "Ignoring the workflow result"})
 
+    // An overridden check passes and is shown anyway: it is the one row whose story matters more
+    // than its verdict.
     await pipelineWorkflow.checkWorkflowOverridden({overridden: true})
     await pipelineWorkflow.checkOverrideWorkflowButton({visible: false})
 
-    await pipelinePage.expectRuleStatusProgress({value: 100, overridden: true})
+    await pipelinePage.expectChecksSummary({passed: 1, total: 1})
     await pipelinePage.checkRunAction({})
+
+    // ...and, since #1792, the override is in the audit timeline with the reason that was given.
+    await pipelinePage.expectTimelineEntry("Ignoring the workflow result")
 })

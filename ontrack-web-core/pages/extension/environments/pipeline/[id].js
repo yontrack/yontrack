@@ -1,6 +1,6 @@
 import {useRouter} from "next/router";
 import MainLayout from "@components/layouts/MainLayout";
-import SlotPipelineView from "@components/extension/environments/SlotPipelineView";
+import DeploymentView from "@components/extension/environments/deployment/DeploymentView";
 
 export default function SlotPipelinePage() {
     const router = useRouter()
@@ -10,7 +10,7 @@ export default function SlotPipelinePage() {
         <>
             <main>
                 <MainLayout>
-                    <SlotPipelineView id={id}/>
+                    <DeploymentView id={id}/>
                 </MainLayout>
             </main>
         </>

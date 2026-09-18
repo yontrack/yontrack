@@ -323,6 +323,14 @@ data class DeploymentSpec(
  */
 enum class DeploymentStop {
     /**
+     * Created and left as a candidate: the deployment has not started, and the slot's admission
+     * rules are what say why. This is the only stop under which the dataset may name a build the
+     * rules refuse - that is the point of it (#1792), and both [validate] and the in-memory target
+     * relax their checks accordingly.
+     */
+    CANDIDATE,
+
+    /**
      * Started and left running: the deployment is on its way, and completing or cancelling it
      * is something a person can still do.
      */

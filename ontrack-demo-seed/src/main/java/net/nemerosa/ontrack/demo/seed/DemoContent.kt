@@ -883,6 +883,19 @@ object DemoContent {
                             ruleId = SlotAdmissionRules.ENVIRONMENT,
                             config = mapOf("environmentName" to STAGING, "qualifier" to CANARY_QUALIFIER),
                         ),
+                        // The one rule of the demo which asks a PERSON for something, and the
+                        // reason the deployment page's "What's blocking" has a row with an
+                        // Answer button on it (#1792). Every other rule of the dataset either
+                        // passes or is broken beyond repair; a manual approval is the third
+                        // kind - blocking, legitimate, and something the reader can clear
+                        // from the screen they are already on.
+                        SlotAdmissionRuleSpec(
+                            name = "approval",
+                            ruleId = SlotAdmissionRules.MANUAL,
+                            config = mapOf(
+                                "message" to "Confirm the canary window is open before rolling out.",
+                            ),
+                        ),
                     ),
                 ),
             ),
@@ -931,6 +944,28 @@ object DemoContent {
         // being DONE is what makes the slot *hold* 1.4.6 - the thing the production canary is
         // then behind.
         DeploymentSpec(STAGING, BuildRef(SERVICE, MAIN, "107"), qualifier = CANARY_QUALIFIER),
+        // The demo's one BLOCKED candidate, and the only deployment that stops at
+        // [DeploymentStop.CANDIDATE]. Without it the dataset has nothing for "What's blocking" to
+        // show but green ticks - which is the one thing the deployment page exists for (#1792).
+        //
+        // 1.4.3 rather than the head of `main`, and on this slot rather than another, for three
+        // reasons that all have to hold at once:
+        //
+        // * it is GOLD, so the production canary's promotion rule ADMITS it - a candidate refused
+        //   by every rule would say nothing about a rule that is merely waiting;
+        // * the staging canary holds 107 and this one is 104, so the `stagingCanary` rule refuses
+        //   it and the list has a blocking check with an Override beside the approval's Answer;
+        // * 104 < 107 keeps the slot reading **behind** the one upstream of it, which `Slot.behind`
+        //   computes from the in-flight build as well as the deployed one. A candidate of 107 here
+        //   would silently take that reading away from the matrix (#1791).
+        //
+        // It leaves `lastDeployedPipeline` empty, so the slot still reads "Never deployed" too.
+        DeploymentSpec(
+            PRODUCTION,
+            BuildRef(SERVICE, MAIN, "104"),
+            stopAt = DeploymentStop.CANDIDATE,
+            qualifier = CANARY_QUALIFIER,
+        ),
     )
 
     /**

@@ -492,7 +492,12 @@ class InMemoryDemoTarget(
             require(build.branch.project == project) {
                 "Cannot deploy ${build.branch.project.name} build on the ${project.name} slot"
             }
-            admissionRules.forEach { rule -> check(rule, build) }
+            // A candidate is deliberately allowed to be refused - see [DeploymentStop.CANDIDATE].
+            // The checks below ask whether the server would let this deployment START, and a
+            // candidate never does.
+            if (stopAt != DeploymentStop.CANDIDATE) {
+                admissionRules.forEach { rule -> check(rule, build) }
+            }
             deployments += InMemoryDeployment(build, stopAt)
         }
 

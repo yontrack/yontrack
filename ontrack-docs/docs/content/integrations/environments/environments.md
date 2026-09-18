@@ -29,6 +29,28 @@ and in each cell what that project currently has running in that environment.
 Creating environments and slots is behind the **Setup** command, out of the way of the operational
 screens — and is usually not done by hand at all, see below.
 
+## The deployment page
+
+Clicking a deployment — from the matrix cell's drawer, from a slot, or from a build — opens that
+one deployment. It answers three questions, in three places:
+
+* The **header** names the build, its branch and its top promotion, says when the deployment started
+  and who started it, and draws where it has got to: Candidate → Running → Deployed, or → Cancelled.
+  Beside the bar is the **one** action that would move it — *Start the deployment* on a candidate,
+  *Finish the deployment* on a running one — with *Cancel* as a secondary action. The action is
+  disabled while something is blocking, and is not shown at all to a user without the right, or on a
+  deployment which is over.
+* **What's blocking** lists the checks of the phase the deployment is *in*, failing ones first, with
+  the fix on the failing row itself: *Answer* a rule waiting on somebody, *Override* a rule or a
+  workflow which refuses. Checks which passed are folded behind "N of M checks passed". The phases
+  already over are below, collapsed and read-only; a finished deployment has no current phase and
+  shows all of them, expanded.
+* The **timeline** down the side is the audit trail, newest first: every status change, every answer
+  given to a rule, and every override — with the justification its author wrote.
+
+The page refreshes itself every 30 seconds and says when it last did. *Force deployment* and
+*Delete deployment* remain header commands, and are hidden from a user without the right.
+
 ## Configuration
 
 While environments and their slots can be configured through the UI, it's recommenced to use either:

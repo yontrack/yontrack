@@ -25,5 +25,9 @@ test('overriding a rule', async ({page, ontrack}) => {
 
     // We can now deploy because the rule has been overridden
     await pipelinePage.checkRunAction({disabled: false})
-    await pipelinePage.expectRuleStatusProgress({present: true, value: 100, overridden: true})
+    await pipelinePage.expectChecksSummary({passed: 1, total: 1})
+
+    // The override, its author and its reason are in the audit timeline - the only place on the
+    // page which shows the message, and the reason the side column exists (#1792).
+    await pipelinePage.expectTimelineEntry("We cannot wait")
 })

@@ -31,7 +31,7 @@ export const manualApprovalInPipelinePage = async (page, ontrack) => {
     const admissionRule = await pipelinePage.getAdmissionRule(ruleConfigId)
     await admissionRule.expectManualInputButton()
     await admissionRule.checkOverrideRuleButton({visible: true})
-    await pipelinePage.expectRuleStatusProgress({value: 0})
+    await pipelinePage.expectChecksSummary({passed: 0, total: 1})
 
     await admissionRule.manualInput({
         actions: async (dialog) => {
@@ -42,7 +42,7 @@ export const manualApprovalInPipelinePage = async (page, ontrack) => {
 
     await admissionRule.expectManualInputButton(false)
     await admissionRule.checkOverrideRuleButton({visible: false})
-    await pipelinePage.expectRuleStatusProgress({value: 100})
+    await pipelinePage.expectChecksSummary({passed: 1, total: 1})
 
     return {
         project,

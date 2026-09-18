@@ -342,7 +342,11 @@ private class KdslDemoSlot(val slot: Slot) : DemoSlot {
      * completed or cancelled by a person.
      */
     override fun deploy(build: DemoBuild, stopAt: DeploymentStop) {
-        val pipeline = slot.createPipeline((build as KdslDemoBuild).build).startDeploying()
+        val pipeline = slot.createPipeline((build as KdslDemoBuild).build)
+        // A candidate is left exactly where it was created: what the slot's rules refuse is the
+        // whole content of that deployment, and starting it would either fail or hide it.
+        if (stopAt == DeploymentStop.CANDIDATE) return
+        pipeline.startDeploying()
         if (stopAt == DeploymentStop.DONE) {
             pipeline.finishDeployment()
         }
