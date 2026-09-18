@@ -1,11 +1,13 @@
 package net.nemerosa.ontrack.extension.environments.ui
 
+import graphql.Scalars.GraphQLBoolean
 import graphql.schema.GraphQLObjectType
 import graphql.schema.GraphQLTypeReference
 import net.nemerosa.ontrack.extension.environments.Slot
 import net.nemerosa.ontrack.extension.environments.SlotPipeline
 import net.nemerosa.ontrack.extension.environments.SlotPipelineStatus
 import net.nemerosa.ontrack.extension.environments.service.SlotService
+import net.nemerosa.ontrack.extension.environments.service.SlotStatusService
 import net.nemerosa.ontrack.extension.environments.workflows.SlotWorkflow
 import net.nemerosa.ontrack.extension.environments.workflows.SlotWorkflowService
 import net.nemerosa.ontrack.graphql.schema.GQLType
@@ -25,6 +27,7 @@ class GQLTypeSlot(
     private val gqlInterfaceAuthorizableService: GQLInterfaceAuthorizableService,
     private val paginatedListFactory: GQLPaginatedListFactory,
     private val slotWorkflowService: SlotWorkflowService,
+    private val slotStatusService: SlotStatusService,
 ) : GQLType {
 
     override fun getTypeName(): String = Slot::class.java.simpleName
@@ -128,6 +131,46 @@ class GQLTypeSlot(
                         slotService.getAdmissionRuleConfigs(slot)
                     }
             }
+            // Blocked
+            .field {
+                it.name("blocked")
+                    .description(
+                        "Is the in-flight deployment of this slot held up by a failing, " +
+                                "non-overridden admission rule or workflow? False when nothing is in flight."
+                    )
+                    .type(GraphQLBoolean.toNotNull())
+                    .dataFetcher { env ->
+                        val slot: Slot = env.getSource()!!
+                        slotStatusService.isBlocked(slot)
+                    }
+            }
+            // Behind
+            .field {
+                it.name("behind")
+                    .description("Does a slot upstream of this one in the project's slot graph hold a newer build?")
+                    .type(GraphQLBoolean.toNotNull())
+                    .dataFetcher { env ->
+                        val slot: Slot = env.getSource()!!
+                        slotStatusService.isBehind(slot)
+                    }
+            }
+            // Next builds
+            .field {
+                it.name("nextBuilds")
+                    .description("Eligible builds newer than the one this slot holds, newest first")
+                    .type(listType(GraphQLTypeReference(GQLTypeBuild.BUILD)))
+                    .argument(
+                        intArgument(
+                            "count",
+                            "Maximum number of builds to return (defaults to $DEFAULT_NEXT_BUILDS_COUNT)"
+                        )
+                    )
+                    .dataFetcher { env ->
+                        val slot: Slot = env.getSource()!!
+                        val count: Int = env.getArgument("count") ?: DEFAULT_NEXT_BUILDS_COUNT
+                        slotStatusService.getNextBuilds(slot, count = count)
+                    }
+            }
             // List of workflows
             .field {
                 it.name("workflows")
@@ -149,5 +192,10 @@ class GQLTypeSlot(
     companion object {
         const val ARG_BRANCH_NAME = "branchName"
         const val ARG_DONE = "done"
+
+        /**
+         * The "Next" section of the slot drawer shows up to three builds.
+         */
+        const val DEFAULT_NEXT_BUILDS_COUNT = 3
     }
 }
