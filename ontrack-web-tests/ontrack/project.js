@@ -82,9 +82,32 @@ export const projectInstance = (ontrack, data) => {
     }
 
     project.createBranch = async (name) => createBranch(project, name)
+    project.favourite = async () => favouriteProject(project)
 
     // Notifications methods
     registerNotificationExtensions(project)
 
     return project
+}
+
+/**
+ * Marks the project as a favourite of the account the connection authenticates as - which is the
+ * same account the browser signs in with, so what this sets is what the UI then shows. The same
+ * shape as `branch.favourite`, for the same reason.
+ */
+const favouriteProject = async (project) => {
+    await graphQLCallMutation(
+        project.ontrack.connection,
+        'favouriteProject',
+        gql`
+            mutation FavouriteProject($projectId: Int!) {
+                favouriteProject(input: {id: $projectId}) {
+                    errors {
+                        message
+                    }
+                }
+            }
+        `,
+        {projectId: Number(project.id)}
+    )
 }

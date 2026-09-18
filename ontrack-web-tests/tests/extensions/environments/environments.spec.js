@@ -3,13 +3,23 @@ const {HomePage} = require("../../core/home/home");
 const {generate} = require("@ontrack/utils");
 const {test} = require("../../fixtures/connection");
 
-test('creating an environment', async ({page, ontrack}) => {
-    // Login
+/**
+ * Creating an environment, and the rule the matrix is built on: **a column exists only where a
+ * visible row has a slot**.
+ *
+ * The two halves belong in one test because the first is not observable without the second. On the
+ * old environments list a new environment was a card of its own straight away; on the matrix it is a
+ * column, and a column no project can fill is noise on a screen that is already wide. So the
+ * environment is created, checked to be absent, given a slot, and checked to be there.
+ */
+test('creating an environment, which becomes a column once something has a slot in it', async ({page, ontrack}) => {
+    const project = await ontrack.createProject()
+
     await login(page, ontrack)
-    // Going to the environment page, using the button in the home page
     const homePage = new HomePage(page, ontrack)
     const environmentsPage = await homePage.selectEnvironments()
-    // Creating a new environment
+
+    // "New environment" moved off the header and behind Setup
     const name = generate("env-")
     await environmentsPage.createEnvironment({
         name: name,
@@ -17,6 +27,19 @@ test('creating an environment', async ({page, ontrack}) => {
         order: 100,
         tags: ['test'],
     })
-    // Checks that the environment card is visible
+
+    await environmentsPage.selectScope('All')
+
+    const environment = await ontrack.environments.findEnvironmentByName(name)
+    await environmentsPage.checkEnvironmentIsNotVisible(environment)
+
+    // ...and now it has something to show
+    await environmentsPage.createSlot({
+        projectName: project.name,
+        qualifier: '',
+        description: "Slot",
+        environmentNames: [name],
+    })
     await environmentsPage.checkEnvironmentIsVisible(name)
+    await environmentsPage.checkProjectIsVisible(project)
 })

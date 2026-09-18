@@ -234,6 +234,17 @@ fun DemoDataset.validate() {
     val projectNames = projects.map { it.name }.toSet()
     environments.forEach { environment ->
         checkName(environment.name, "Environment")
+        environment.slots
+            .groupBy { it.project to it.qualifier }
+            .filterValues { it.size > 1 }
+            .keys
+            .forEach { (project, qualifier) ->
+                // The server refuses the second one - ENV_SLOTS is unique on the three - and the
+                // seed would stop half way through, leaving the demo deleted and not rebuilt.
+                problems += "The ${environment.name} environment declares the $project slot" +
+                        (qualifier.takeIf { it.isNotBlank() }?.let { " [$it]" } ?: "") +
+                        " more than once."
+            }
         environment.slots.forEach { slot ->
             if (slot.project !in projectNames) {
                 problems += "The ${environment.name} environment has a slot for ${slot.project}, " +
@@ -267,15 +278,20 @@ fun DemoDataset.validate() {
     deployments.forEach { deployment ->
         val ref = deployment.build
         val environment = environments.find { it.name == deployment.environment }
-        val slot = environment?.slots?.find { it.project == ref.project }
+        // Matched on the qualifier too: two slots of the same project in the same environment are
+        // two different slots, and deploying to the wrong one is exactly the mistake this catches.
+        val slot = environment?.slots?.find {
+            it.project == ref.project && it.qualifier == deployment.qualifier
+        }
         when {
             environment == null ->
                 problems += "A deployment names the ${deployment.environment} environment, " +
                         "which the dataset never creates."
 
             slot == null ->
-                problems += "A deployment puts a ${ref.project} build in ${deployment.environment}, " +
-                        "which has no slot for that project."
+                problems += "A deployment puts a ${ref.project} build in ${deployment.environment}" +
+                        (deployment.qualifier.takeIf { it.isNotBlank() }?.let { " [$it]" } ?: "") +
+                        ", which has no slot for that project and qualifier."
 
             ref !in buildRefs ->
                 problems += "The ${deployment.environment} environment deploys ${ref.build} of " +

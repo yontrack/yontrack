@@ -243,14 +243,20 @@ class SlotPipelineRepository(
         return PaginatedList.create(items = list, offset = offset, pageSize = size, total = count)
     }
 
-    private fun toPipeline(rs: ResultSet) = SlotPipeline(
+    private fun toPipeline(rs: ResultSet) = toPipeline(rs, slotRepository.getSlotById(rs.getString("SLOT_ID")))
+
+    /**
+     * The same, for a caller which already holds the slot - a batch, which must not read the same
+     * slot back once per row.
+     */
+    private fun toPipeline(rs: ResultSet, slot: Slot) = SlotPipeline(
         id = rs.getString("ID"),
         start = Time.fromStorage(rs.getString("START"))!!,
         end = Time.fromStorage(rs.getString("END")),
         number = rs.getInt("NUMBER"),
         status = SlotPipelineStatus.valueOf(rs.getString("STATUS")),
         build = buildJdbcRepositoryAccessor.getBuild(id(rs, "BUILD_ID")),
-        slot = slotRepository.getSlotById(rs.getString("SLOT_ID")),
+        slot = slot,
     )
 
     fun findPipelineById(id: String): SlotPipeline? =
@@ -282,6 +288,47 @@ class SlotPipelineRepository(
         ) { rs, _ ->
             toPipeline(rs)
         }.firstOrNull()
+
+    /**
+     * The most recent deployment of each of these slots, whatever became of it, in one query.
+     *
+     * The batched form of [net.nemerosa.ontrack.extension.environments.service.SlotService.getCurrentPipeline].
+     * `DISTINCT ON` is Postgres' way of saying "the first row of each group" and, with the matching
+     * `ORDER BY`, it is the same "highest number wins" the single-slot query uses.
+     *
+     * @param slots The slots to look at, passed rather than their ids so the pipelines can be built
+     *   without reading each slot back.
+     * @return Pipelines by slot id, a slot with no deployment at all simply being absent.
+     */
+    fun findCurrentPipelinesBySlots(slots: Collection<Slot>): Map<String, SlotPipeline> =
+        findPipelinesBySlots(slots, doneOnly = false)
+
+    /**
+     * The last **deployed** pipeline of each of these slots - what the slot is actually holding.
+     *
+     * The batched form of
+     * [net.nemerosa.ontrack.extension.environments.service.SlotService.getLastDeployedPipeline].
+     */
+    fun findLastDeployedPipelinesBySlots(slots: Collection<Slot>): Map<String, SlotPipeline> =
+        findPipelinesBySlots(slots, doneOnly = true)
+
+    private fun findPipelinesBySlots(slots: Collection<Slot>, doneOnly: Boolean): Map<String, SlotPipeline> {
+        if (slots.isEmpty()) return emptyMap()
+        val slotsById = slots.associateBy { it.id }
+        val statusCriteria = if (doneOnly) "AND STATUS = '${SlotPipelineStatus.DONE}'" else ""
+        return namedParameterJdbcTemplate!!.query(
+            """
+                SELECT DISTINCT ON (SLOT_ID) *
+                FROM ENV_SLOT_PIPELINE
+                WHERE SLOT_ID IN (:slotIds)
+                $statusCriteria
+                ORDER BY SLOT_ID, NUMBER DESC
+            """.trimIndent(),
+            mapOf("slotIds" to slotsById.keys),
+        ) { rs, _ ->
+            toPipeline(rs, slotsById.getValue(rs.getString("SLOT_ID")))
+        }.associateBy { it.slot.id }
+    }
 
     fun findPipelineByBuild(build: Build): List<SlotPipeline> =
         namedParameterJdbcTemplate!!.query(

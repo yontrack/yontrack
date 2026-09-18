@@ -739,6 +739,69 @@ class DemoSeedTest {
     }
 
     /**
+     * What the matrix home (#1791) has to show and what nothing in the demo showed before it: a
+     * project with more than one qualifier, a slot which has never been deployed, and a slot which
+     * is *behind* the one upstream of it. One pair of `canary` slots carries all three.
+     */
+    @Test
+    fun `the demo has a canary qualifier, never deployed, behind the slot upstream of it`() {
+        val target = InMemoryDemoTarget()
+        seed(target).run(DemoContent.dataset(changelog))
+
+        val canary = target.environments()
+            .flatMap { (it as InMemoryDemoTarget.InMemoryEnvironment).slots }
+            .filter { it.qualifier == DemoContent.CANARY_QUALIFIER }
+            .associateBy { it.environment.name }
+
+        assertEquals(
+            setOf(DemoContent.STAGING, DemoContent.PRODUCTION),
+            canary.keys,
+            "The canary qualifier exists in both environments, which is what gives it a graph",
+        )
+        assertTrue(
+            canary.values.all { it.project.name == DemoContent.SERVICE },
+            "One project has two qualifiers, so the matrix has one project row to nest under",
+        )
+
+        // Never deployed: the only slot of the dataset where a cell reads that.
+        assertTrue(
+            canary.getValue(DemoContent.PRODUCTION).deployments.isEmpty(),
+            "Nothing has ever gone out to the production canary",
+        )
+
+        // ...and behind, because the slot upstream of it holds something newer than nothing.
+        assertEquals(
+            "107",
+            canary.getValue(DemoContent.STAGING).heldBuilds.last().name,
+            "The staging canary holds the head of main, which the production canary is behind",
+        )
+    }
+
+    /**
+     * The canary slots are an addition *beside* the demo's existing story, not a change to it. Every
+     * reading the rest of the demo depends on is taken from the default qualifier, so this pins that
+     * the two histories do not touch.
+     */
+    @Test
+    fun `the canary slots leave the default qualifier's history alone`() {
+        val target = InMemoryDemoTarget()
+        seed(target).run(DemoContent.dataset(changelog))
+
+        val defaults = target.environments()
+            .flatMap { (it as InMemoryDemoTarget.InMemoryEnvironment).slots }
+            .filter { it.project.name == DemoContent.SERVICE && it.qualifier == "" }
+            .associateBy { it.environment.name }
+
+        assertEquals("89", defaults.getValue(DemoContent.STAGING).heldBuilds.last().name)
+        assertEquals("104", defaults.getValue(DemoContent.PRODUCTION).heldBuilds.last().name)
+        assertEquals(
+            1,
+            defaults.getValue(DemoContent.STAGING).deployments.count { it.stopAt == DeploymentStop.RUNNING },
+            "The one running deployment is still the one on the default staging slot",
+        )
+    }
+
+    /**
      * The one thing the demo's slot story hangs on, and the one an edit is most likely to
      * break: production holds a build of `main`, staging a build of the maintenance branch, so
      * the delivery map of `main` has a slot naming another branch's build to draw.
@@ -750,7 +813,9 @@ class DemoSeedTest {
 
         val slots = target.environments()
             .flatMap { (it as InMemoryDemoTarget.InMemoryEnvironment).slots }
-            .filter { it.project.name == DemoContent.SERVICE }
+            // The default qualifier: [SERVICE] also has a `canary` slot in both environments, and
+            // its history is deliberately a different one.
+            .filter { it.project.name == DemoContent.SERVICE && it.qualifier == "" }
             .associateBy { it.environment.name }
 
         // What the slot HOLDS, which is its last DONE deployment: staging also carries a
@@ -784,7 +849,11 @@ class DemoSeedTest {
 
         val staging = target.environments()
             .flatMap { (it as InMemoryDemoTarget.InMemoryEnvironment).slots }
-            .single { it.environment.name == DemoContent.STAGING && it.project.name == DemoContent.SERVICE }
+            .single {
+                it.environment.name == DemoContent.STAGING &&
+                        it.project.name == DemoContent.SERVICE &&
+                        it.qualifier == ""
+            }
 
         val running = staging.deployments.filter { it.stopAt == DeploymentStop.RUNNING }
         assertEquals(1, running.size, "Exactly one deployment is left running")

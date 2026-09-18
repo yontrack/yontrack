@@ -268,10 +268,15 @@ data class EnvironmentSpec(
  * @property admissionRules What has to be true of a build before it can be deployed here.
  * They are also what the delivery map reads to join a slot to the rest of the map: without
  * one, a slot is drawn unconnected.
+ * @property qualifier Which of a project's parallel deployments this slot is. The empty string
+ * is the default one and is what a project with a single deployment per environment uses; a
+ * named one - `canary` - is a second slot of the same project in the same environment, with a
+ * graph, a history and a set of rules of its own. It is what makes the matrix nest rows.
  */
 data class SlotSpec(
     val project: String,
     val description: String,
+    val qualifier: String = "",
     val admissionRules: List<SlotAdmissionRuleSpec> = emptyList(),
     val workflows: List<SlotWorkflowSpec> = emptyList(),
 )
@@ -305,6 +310,7 @@ data class DeploymentSpec(
     val environment: String,
     val build: BuildRef,
     val stopAt: DeploymentStop = DeploymentStop.DONE,
+    val qualifier: String = "",
 )
 
 /**

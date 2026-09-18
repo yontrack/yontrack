@@ -137,12 +137,15 @@ const catalogue = [
     },
     {
         slug: 'environments',
-        description: 'The environments and what is deployed in each',
-        path: '/extension/environments/environments',
-        // Matched on the prefix: the card carries the environment's ID, which the seed does
-        // not fix, so there is no name to wait on here.
+        description: 'The project x environment matrix: what is running where',
+        // `scope=all` rather than the bare route: the matrix opens on Favourites, and which
+        // projects the screenshot account happens to have starred is not a property of the
+        // documentation.
+        path: '/extension/environments/environments?scope=all',
+        // Matched on the prefix: a cell carries its slot's ID, which the seed does not fix, so
+        // there is no name to wait on here.
         ready: async (page) => {
-            await expect(page.locator('[data-testid^="environment-"]').first()).toBeVisible()
+            await expect(page.locator('[data-testid^="slot-cell-"]').first()).toBeVisible()
         },
     },
 ]

@@ -233,3 +233,33 @@ export function getLocalDeliveryMapVisibility() {
 export function setLocalDeliveryMapVisibility(visibility) {
     localStorage.setItem(deliveryMapVisibility, JSON.stringify(visibility))
 }
+
+const environmentMatrixFilter = 'environment-matrix-filter'
+
+/**
+ * The toolbar state of the Environments matrix, as this browser last left it.
+ *
+ * A per-browser convenience and not a server preference: it says how one reader was looking at the
+ * matrix a moment ago, and the URL is what carries a choice worth sharing or bookmarking. When the
+ * two disagree the URL wins - see `filterFromQuery`.
+ *
+ * @returns the stored filter, or null when there is none or it cannot be read
+ */
+export function getLocalEnvironmentMatrixFilter() {
+    const json = localStorage.getItem(environmentMatrixFilter)
+    if (json) {
+        try {
+            const parsed = JSON.parse(json)
+            // A corrupted entry must not leave the matrix unable to render at all
+            return parsed && typeof parsed === 'object' ? parsed : null
+        } catch (ignored) {
+            return null
+        }
+    } else {
+        return null
+    }
+}
+
+export function setLocalEnvironmentMatrixFilter(filter) {
+    localStorage.setItem(environmentMatrixFilter, JSON.stringify(filter))
+}

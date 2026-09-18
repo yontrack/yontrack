@@ -1,9 +1,9 @@
-import {Form, Input, Select} from "antd";
+import {Form, Input, InputNumber, Select} from "antd";
 import {useContext} from "react";
 import {DashboardWidgetCellContext} from "@components/dashboards/DashboardWidgetCellContextProvider";
 import SelectProject from "@components/projects/SelectProject";
 
-export default function EnvironmentListWidgetForm({title, tags, projects}) {
+export default function EnvironmentListWidgetForm({title, tags, projects, rowLimit = 10}) {
 
     const {widgetEditionForm} = useContext(DashboardWidgetCellContext)
 
@@ -39,6 +39,14 @@ export default function EnvironmentListWidgetForm({title, tags, projects}) {
                         width="100%"
                         placeholder="Project names"
                     />
+                </Form.Item>
+                <Form.Item
+                    name="rowLimit"
+                    label="Row limit"
+                    initialValue={rowLimit}
+                    extra="How many projects to show. The widget does not page inside its cell."
+                >
+                    <InputNumber min={1} max={100}/>
                 </Form.Item>
             </Form>
         </>

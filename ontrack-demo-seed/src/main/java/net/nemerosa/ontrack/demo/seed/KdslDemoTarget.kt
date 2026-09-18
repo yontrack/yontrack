@@ -323,10 +323,11 @@ private class KdslDemoEnvironment(val environment: Environment) : DemoEnvironmen
 
     override fun delete() = environment.delete()
 
-    override fun createSlot(project: DemoProject, description: String): DemoSlot =
+    override fun createSlot(project: DemoProject, qualifier: String, description: String): DemoSlot =
         KdslDemoSlot(
             environment.createSlot(
                 project = (project as KdslDemoProject).project,
+                qualifier = qualifier,
                 description = description,
             )
         )

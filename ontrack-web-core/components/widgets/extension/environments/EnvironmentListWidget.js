@@ -1,109 +1,51 @@
-import {useContext, useEffect, useState} from "react";
+import {useContext, useEffect} from "react";
 import {DashboardWidgetCellContext} from "@components/dashboards/DashboardWidgetCellContextProvider";
-import {useGraphQLClient} from "@components/providers/ConnectionContextProvider";
-import {gql} from "graphql-request";
-import {Table} from "antd";
-import EnvironmentName from "@components/extension/environments/EnvironmentName";
-import {gqlSlotPipelineData} from "@components/extension/environments/EnvironmentGraphQL";
-import SlotTitle from "@components/extension/environments/SlotTitle";
-import EnvironmentQualifiedProject from "@components/widgets/extension/environments/EnvironmentQualifiedProject";
+import EnvironmentMatrix from "@components/extension/environments/matrix/EnvironmentMatrix";
+import {
+    defaultMatrixFilter,
+    SCOPE_ALL,
+} from "@components/extension/environments/matrix/environmentMatrixModel";
 
-export default function EnvironmentListWidget({title = '', tags = [], projects = []}) {
-
-    const client = useGraphQLClient()
-    const [loading, setLoading] = useState(true)
-    const [environments, setEnvironments] = useState([])
-    const [qualifiedProjects, setQualifiedProjects] = useState([])
-    useEffect(() => {
-        if (client) {
-            setLoading(true)
-            client.request(
-                gql`
-                    query EnvironmentList(
-                        $tags: [String!]!,
-                        $projects: [String!],
-                    ) {
-                        environments(filter: {tags: $tags, projects: $projects}) {
-                            id
-                            name
-                            order
-                            tags
-                            slots(projects: $projects) {
-                                id
-                                project {
-                                    id
-                                    name
-                                }
-                                qualifier
-                                lastDeployedPipeline {
-                                    ...SlotPipelineData
-                                }
-                            }
-                        }
-                    }
-                    ${gqlSlotPipelineData}
-                `,
-                {
-                    tags,
-                    projects,
-                }
-            ).then(data => {
-                setEnvironments(data.environments)
-                // Grouping slots per qualified projects
-                const qualifiedProjects = []
-                data.environments.forEach(environment => {
-                    environment.slots.forEach(slot => {
-                        const qualifiedProject = {
-                            key: `${slot.project.name}-${slot.qualifier}`,
-                            project: slot.project,
-                            qualifier: slot.qualifier,
-                        }
-                        const existingQualifiedProject = qualifiedProjects.find(it => it.key === qualifiedProject.key)
-                        if (!existingQualifiedProject) {
-                            qualifiedProjects.push(qualifiedProject)
-                        }
-                    })
-                })
-                setQualifiedProjects(qualifiedProjects)
-            }).finally(() => {
-                setLoading(false)
-            })
-        }
-    }, [client, tags, projects])
+/**
+ * The "Environments list" widget - now the matrix, in a dashboard cell.
+ *
+ * Same widget key, because widget keys are stored inside people's dashboards and changing one would
+ * silently empty every dashboard carrying it. What changed is what it draws: the old table put
+ * environments down the side and a column per qualified project across, which is the matrix
+ * transposed and reading the wrong way round for the question it is on a dashboard to answer.
+ *
+ * Its filter is *pinned*, not steerable: a dashboard cell says which projects and tags it is about,
+ * and a toolbar inside it would be a second place to change something the widget's own configuration
+ * already decides.
+ *
+ * @param {string} title Overrides the cell's title
+ * @param {Array<string>} tags Environment tags to restrict the columns to
+ * @param {Array<string>} projects Project names to restrict the rows to
+ * @param {number} rowLimit How many projects to show. A dashboard cell is short, so the widget shows
+ *   its first rows and stops rather than paging inside a tile.
+ */
+export default function EnvironmentListWidget({title = '', tags = [], projects = [], rowLimit = 10}) {
 
     const {setTitle} = useContext(DashboardWidgetCellContext)
     useEffect(() => {
         setTitle(title ? title : "Environments")
     }, [title])
 
+    const filter = {
+        ...defaultMatrixFilter(),
+        // Every project the widget was configured with, favourites or not: a dashboard is shared and
+        // "my favourites" is not a property of the dashboard.
+        scope: SCOPE_ALL,
+        tags,
+        projects,
+    }
+
     return (
-        <>
-            <Table
-                loading={loading}
-                dataSource={environments}
-                pagination={false}
-                size="small"
-            >
-
-                <Table.Column
-                    key="name"
-                    title="Environment"
-                    render={(_, environment) => <EnvironmentName environment={environment}/>}
-                />
-
-                {
-                    qualifiedProjects.map(qualifiedProject => <Table.Column
-                        key={qualifiedProject.key}
-                        title={<SlotTitle slot={qualifiedProject}/>}
-                        render={(_, environment) => <EnvironmentQualifiedProject
-                            environment={environment}
-                            qualifiedProject={qualifiedProject}
-                        />}
-                    />)
-                }
-
-            </Table>
-        </>
+        <EnvironmentMatrix
+            filter={filter}
+            pageSize={rowLimit}
+            paged={false}
+            emptyStates={false}
+        />
     )
-
 }

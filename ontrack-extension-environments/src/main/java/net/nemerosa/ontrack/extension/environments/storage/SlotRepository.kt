@@ -115,6 +115,48 @@ class SlotRepository(
         }
     }
 
+    /**
+     * The slots of these ids, in one query.
+     *
+     * The matrix asks for a page's worth of slots at once; so does every batch loader behind
+     * `Slot.blocked` and friends. Asking for them one by one is the fan-out those exist to remove.
+     */
+    fun findSlotsByIds(ids: Collection<String>): List<Slot> {
+        if (ids.isEmpty()) return emptyList()
+        return namedParameterJdbcTemplate!!.query(
+            """
+                SELECT *
+                FROM ENV_SLOTS
+                WHERE ID IN (:ids)
+            """.trimIndent(),
+            mapOf("ids" to ids),
+        ) { rs, _ ->
+            toSlot(rs)
+        }
+    }
+
+    /**
+     * Every slot of these projects, whatever its qualifier or environment, in one query.
+     *
+     * "Behind" is the reason this exists: a slot is behind when a slot *upstream of it* holds a
+     * newer build, and upstream is read from the whole project-and-qualifier graph - which includes
+     * slots the matrix may be hiding behind a tag filter. Computing it from the visible slots alone
+     * would make the flag depend on the filter.
+     */
+    fun findSlotsByProjectIds(projectIds: Collection<Int>): List<Slot> {
+        if (projectIds.isEmpty()) return emptyList()
+        return namedParameterJdbcTemplate!!.query(
+            """
+                SELECT *
+                FROM ENV_SLOTS
+                WHERE PROJECT_ID IN (:projectIds)
+            """.trimIndent(),
+            mapOf("projectIds" to projectIds),
+        ) { rs, _ ->
+            toSlot(rs)
+        }
+    }
+
     fun findSlotByProjectAndEnvironment(environment: Environment, project: Project, qualifier: String): Slot? =
         namedParameterJdbcTemplate!!.query(
             """

@@ -136,7 +136,7 @@ class InMemoryDemoTarget(
         environments.forEach { environment ->
             add("environment ${environment.name} #${environment.order} \"${environment.description}\" ${environment.tags}")
             environment.slots.forEach { slot ->
-                add("  slot ${slot.project.name} \"${slot.description}\"")
+                add("  slot ${slot.project.name}${qualifierSuffix(slot.qualifier)} \"${slot.description}\"")
                 slot.admissionRules.forEach { add("    rule ${it.name} ${it.ruleId} ${it.config}") }
                 slot.workflows.forEach { add("    workflow on ${it.trigger}: ${it.yaml.lines().first()}") }
                 slot.deployments.forEach {
@@ -426,17 +426,22 @@ class InMemoryDemoTarget(
             environments -= this
         }
 
-        override fun createSlot(project: DemoProject, description: String): DemoSlot {
+        override fun createSlot(project: DemoProject, qualifier: String, description: String): DemoSlot {
             project as InMemoryProject
             require(project in projects) { "Slot points at deleted project ${project.name}" }
-            require(slots.none { it.project == project }) { "Slot for ${project.name} already exists in $name" }
-            return InMemorySlot(this, project, description).also { slots += it }
+            // Unique on the *three*, as ENV_SLOTS is on the server: a project can have several
+            // slots in one environment as long as each carries a different qualifier.
+            require(slots.none { it.project == project && it.qualifier == qualifier }) {
+                "Slot for ${project.name}${qualifierSuffix(qualifier)} already exists in $name"
+            }
+            return InMemorySlot(this, project, qualifier, description).also { slots += it }
         }
     }
 
     inner class InMemorySlot(
         val environment: InMemoryEnvironment,
         val project: InMemoryProject,
+        val qualifier: String,
         val description: String,
     ) : DemoSlot {
 
@@ -507,8 +512,12 @@ class InMemoryDemoTarget(
 
                 SlotAdmissionRules.ENVIRONMENT -> {
                     val previousName = rule.config["environmentName"] as? String
+                    // The rule names a qualifier as well as an environment, and the default one is
+                    // the empty string: with two slots of the same project in one environment,
+                    // matching on the project alone would read the wrong slot's history.
+                    val previousQualifier = rule.config["qualifier"] as? String ?: ""
                     val previous = environments.find { it.name == previousName }
-                        ?.slots?.find { it.project == project }
+                        ?.slots?.find { it.project == project && it.qualifier == previousQualifier }
                     // What the other slot is HOLDING, not what it last started: the server's
                     // `environment` rule refuses a previous pipeline which has not reached DONE
                     require(previous?.heldBuilds?.lastOrNull() == build) {
@@ -592,3 +601,13 @@ class InMemoryDemoTarget(
 
     }
 }
+
+/**
+ * How a qualifier reads beside a slot: " [canary]", or nothing at all for the default one.
+ *
+ * The empty qualifier is not drawn, here as on screen: every slot has one, and printing "[]" beside
+ * every slot of every environment would be noise in a snapshot whose whole value is that a diff
+ * means something changed.
+ */
+private fun qualifierSuffix(qualifier: String): String =
+    qualifier.takeIf { it.isNotBlank() }?.let { " [$it]" } ?: ""

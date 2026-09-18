@@ -58,9 +58,10 @@ describe('the shared environments documents', () => {
         ${gqlBuildJourneyData}
     `)
 
-    // The environments list spreads the cell's fragment beside its own, which is where the two
-    // could collide - two fragments selecting `environment` and `project` with different subsets.
-    check('the environments list, with the cell fragment beside its own', `
+    // Two fragments selecting `environment` and `project` with different subsets are where the two
+    // could collide, so one document spreads both. The `environments` query is the one still shaped
+    // that way now that the home page is the matrix (#1791).
+    check('the environments query, with the cell fragment beside the slot one', `
         query CheckEnvironmentList($filterProjects: [String!], $filterTags: [String!]) {
             environments(filter: {projects: $filterProjects, tags: $filterTags}) {
                 id

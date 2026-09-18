@@ -2,6 +2,7 @@ package net.nemerosa.ontrack.extension.environments.service
 
 import net.nemerosa.ontrack.extension.environments.BuildSlotJourney
 import net.nemerosa.ontrack.extension.environments.Slot
+import net.nemerosa.ontrack.extension.environments.SlotPipeline
 import net.nemerosa.ontrack.model.structure.Build
 
 /**
@@ -13,12 +14,13 @@ import net.nemerosa.ontrack.model.structure.Build
  * [SlotService] already answers (the current deployment, its checks, the last deployed one, the
  * eligible builds, the slot graph) into the single word a cell has room for.
  *
- * **Each method answers about one slot, and nothing here batches.** That is deliberate and it is
- * also the known limit: a caller asking [isBlocked] of a hundred slots pays a hundred times over,
- * because every one of them re-reads the slot's deployment and re-runs its checks. It is the right
- * shape for the drawer, the slot page and a list of a handful of environments; it is the wrong
- * shape for the project x environment matrix, which is why the redesign lists *a matrix query* as
- * a backend need of its own rather than as a hundred calls to these. Batch there, not here.
+ * **The single-slot methods are the readable form; [getSlotStatuses] is the one that scales.** Each
+ * of [isBlocked] and [isBehind] re-reads the slot's deployments and, for `behind`, rebuilds the
+ * project's slot graph, so a caller asking them of a hundred slots pays a hundred times over. That
+ * is the right shape for the drawer and the slot page, which look at one slot. Anything drawing
+ * *many* slots - the matrix, the widgets, the project graph - asks [getSlotStatuses] once instead,
+ * and the GraphQL fields go through batch loaders so that a query selecting `blocked` on a hundred
+ * slots resolves them together (see `SlotStatusDataLoader`).
  */
 interface SlotStatusService {
 
@@ -58,4 +60,45 @@ interface SlotStatusService {
      */
     fun getBuildJourney(build: Build): List<BuildSlotJourney>
 
+    /**
+     * Everything a slot cell draws, for many slots at once.
+     *
+     * This is the method the matrix is built on, and the one the GraphQL batch loaders call. What it
+     * costs, and what it deliberately still costs:
+     *
+     * * **one** query for the slots of every project involved - not of every slot asked for, because
+     *   `behind` reads the whole project-and-qualifier graph and a slot hidden by a column filter is
+     *   still upstream of a visible one;
+     * * **one** query for the current deployments and **one** for the last deployed ones, over that
+     *   whole set;
+     * * `blocked` then costs a check *per deployment still in flight*. That is not a fan-out over
+     *   slots: an idle slot is never blocked and is never looked at. A matrix of a hundred slots
+     *   with three deployments on the way runs three checks, and a site where a hundred deployments
+     *   are genuinely in flight at once is paying for a hundred real deployments.
+     *
+     * @param slots Slots to read. Ones the current user cannot see are left out of the answer rather
+     *   than answered with defaults.
+     * @return The readings by slot id.
+     */
+    fun getSlotStatuses(slots: Collection<Slot>): Map<String, SlotStatus>
+
 }
+
+/**
+ * What [SlotStatusService.getSlotStatuses] answers about one slot: everything a slot cell draws.
+ *
+ * @property slot The slot itself
+ * @property currentPipeline Its most recent deployment, whatever became of it - null when it has
+ *   never had one. *Not* necessarily in flight: `finished` says which.
+ * @property lastDeployedPipeline The last deployment which actually completed - what the slot is
+ *   holding - or null when nothing ever reached it.
+ * @property blocked See [SlotStatusService.isBlocked]
+ * @property behind See [SlotStatusService.isBehind]
+ */
+data class SlotStatus(
+    val slot: Slot,
+    val currentPipeline: SlotPipeline?,
+    val lastDeployedPipeline: SlotPipeline?,
+    val blocked: Boolean,
+    val behind: Boolean,
+)

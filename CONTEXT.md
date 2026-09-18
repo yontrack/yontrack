@@ -281,6 +281,16 @@ readings composed of several: a slot is **blocked** when its in-flight deploymen
 is held up by a failing, non-overridden check of the phase it is in, and **behind**
 when a slot upstream of it in the project's slot graph holds a newer build.
 
+**Matrix**:
+The Environments home: projects down, environments across, a slot in each cell. A
+**row** is a project *and a qualifier* — the default qualifier's row is the
+project's own, and the others nest under it — and a **column** is an environment,
+drawn only where some visible row has a slot in it. The matrix is a reading and
+not a thing: no domain object is a matrix, and the server query answering it
+composes slots, projects and environments into the shape the screen draws.
+_Avoid_: dashboard, grid, overview. *Dashboard* is already Yontrack's home page of
+widgets, one of which happens to render this matrix.
+
 ### Notifications
 
 **Notification record**:

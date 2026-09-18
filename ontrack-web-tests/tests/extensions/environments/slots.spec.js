@@ -27,9 +27,11 @@ test('creating a slot for several environments', async ({page, ontrack}) => {
         description: "Slot",
         environmentNames: [env1.name, env2.name],
     })
-    // Checks that the slot card is visible for each environment
-    await environmentsPage.checkSlotIsVisible(env1, project.name)
-    await environmentsPage.checkSlotIsVisible(env2, project.name)
+    // One row for the project, and a column for each environment it now has a slot in
+    await environmentsPage.selectScope('All')
+    await environmentsPage.checkProjectIsVisible(project)
+    await environmentsPage.checkEnvironmentIsVisible(env1.name)
+    await environmentsPage.checkEnvironmentIsVisible(env2.name)
 })
 
 test('deleting a slot', async ({page, ontrack}) => {
@@ -44,9 +46,11 @@ test('deleting a slot', async ({page, ontrack}) => {
     // Deleting the slot
     await slotPage.delete()
 
-    // We're back in the environment page
+    // We're back in the environments page. The environment itself is no longer a column of the
+    // matrix - its only slot has just been deleted, and a column with nothing in it is not drawn.
     const environmentsPage = new EnvironmentsPage(page, ontrack)
-    await environmentsPage.checkEnvironmentIsVisible(slot.environment.name)
+    await environmentsPage.expectOnPage()
+    await environmentsPage.checkEnvironmentIsNotVisible(slot.environment)
 })
 
 test('eligible and deployable builds for a slot', async ({page, ontrack}) => {

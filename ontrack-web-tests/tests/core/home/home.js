@@ -24,7 +24,9 @@ export class HomePage {
 
     async selectEnvironments() {
         await this.page.getByRole('button', {name: 'Environments'}).click()
-        return new EnvironmentsPage(this.page, this.ontrack)
+        const environmentsPage = new EnvironmentsPage(this.page, this.ontrack)
+        await environmentsPage.expectOnPage()
+        return environmentsPage
     }
 
     async search(token) {

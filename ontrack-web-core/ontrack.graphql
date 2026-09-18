@@ -2047,6 +2047,35 @@ type EnvironmentBuildCount {
   id: ID!
 }
 
+type EnvironmentMatrix {
+  "Columns of the matrix, by environment order. Only the environments having at least one slot among the rows of this page."
+  environments: [Environment!]!
+  "Does the current user have any favourite project at all? The matrix opens on Favourites, and on All for a user who has never starred anything."
+  hasFavourites: Boolean!
+  "Index of the first project of this page"
+  offset: Int!
+  "Rows of the matrix, by project name"
+  projects: [EnvironmentMatrixProject!]!
+  "Number of projects asked for in this page"
+  size: Int!
+  "Total number of projects matching the filter, before per-project visibility is applied"
+  totalProjects: Int!
+}
+
+type EnvironmentMatrixProject {
+  "The project"
+  project: Project!
+  "Rows for this project, the default (empty) qualifier first. A project with only the default qualifier has exactly one row, which is the project's own row."
+  rows: [EnvironmentMatrixRow!]!
+}
+
+type EnvironmentMatrixRow {
+  "Qualifier of this row, the empty string being the default one"
+  qualifier: String!
+  "Slots of this row, by environment order. Only the slots which exist: an environment with no slot for this project and qualifier is simply absent."
+  slots: [Slot!]!
+}
+
 "EventSubscriptionPayload"
 type EventSubscriptionPayload {
   "Channel to send this event to"
@@ -5691,6 +5720,15 @@ type Query {
     "Name of the environment"
     name: String!
   ): Environment
+  "Projects x environments, as the Environments home draws them"
+  environmentMatrix(
+    "What narrows the matrix down. Applied before paging."
+    filter: EnvironmentMatrixFilter,
+    "Index of the first project to return"
+    offset: Int,
+    "Number of projects to return (defaults to 20)"
+    size: Int
+  ): EnvironmentMatrix!
   "List of environments"
   environments(
     "Filter on the environments"
@@ -10164,6 +10202,23 @@ input EnableSubscriptionInput {
 }
 
 input EnvironmentFilter {
+  "projects field"
+  projects: [String!]
+  "tags field"
+  tags: [String!]
+}
+
+input EnvironmentMatrixFilter {
+  "activity field"
+  activity: Boolean
+  "environments field"
+  environments: [String!]
+  "favourites field"
+  favourites: Boolean
+  "label field"
+  label: Int
+  "project field"
+  project: String
   "projects field"
   projects: [String!]
   "tags field"

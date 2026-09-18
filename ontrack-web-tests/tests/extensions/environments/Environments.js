@@ -1,5 +1,14 @@
 import {expect} from "@playwright/test";
 
+/**
+ * The Environments home - since #1791 the project x environment matrix.
+ *
+ * `goTo` lands on `?scope=all` rather than on the bare route. The matrix opens on **Favourites**,
+ * and a project a test has just created is nobody's favourite, so the bare route would show an empty
+ * matrix for one render and then - because the test account usually has no favourite at all - be
+ * moved onto All by the screen itself. Asking for All outright makes every test below deterministic
+ * whatever the account happens to have starred. The Favourites behaviour has tests of its own.
+ */
 export class EnvironmentsPage {
 
     constructor(page, ontrack) {
@@ -7,46 +16,99 @@ export class EnvironmentsPage {
         this.ontrack = ontrack
     }
 
-    async goTo() {
-        await this.page.goto(`${this.ontrack.connection.ui}/extension/environments/environments`)
-        await expect(this.page.getByRole('button', {name: 'New environment'})).toBeVisible()
+    async goTo({query = 'scope=all'} = {}) {
+        const suffix = query ? `?${query}` : ''
+        await this.page.goto(`${this.ontrack.connection.ui}/extension/environments/environments${suffix}`)
+        await this.expectOnPage()
+    }
+
+    async expectOnPage() {
+        await expect(this.page.getByTestId('matrix-toolbar')).toBeVisible()
+    }
+
+    /**
+     * Setup is one header command holding what used to be two: the matrix is an operational screen,
+     * and creating environments and slots moved behind it.
+     */
+    async setup(item) {
+        await this.page.getByTestId('environments-setup').click()
+        await this.page.getByRole('menuitem', {name: item}).click()
     }
 
     async createEnvironment({name, description, order, tags}) {
-        await this.page.getByRole('button', {name: "New environment"}).click()
+        await this.setup("New environment")
         const dialog = new EnvironmentDialog(this.page)
         await dialog.set({name, description, order, tags})
         await dialog.ok()
     }
 
     async createSlot({projectName, qualifier, description, environmentNames}) {
-        await this.page.getByRole('button', {name: "New slot"}).click()
+        await this.setup("New slot")
         const dialog = new SlotDialog(this.page)
         await dialog.set({projectName, qualifier, description, environmentNames})
         await dialog.ok()
     }
 
+    /**
+     * An environment is a *column* of the matrix, so it is visible only when some visible row has a
+     * slot in it - which is the rule the matrix is built on and worth asserting through rather than
+     * around.
+     */
     async checkEnvironmentIsVisible(name) {
-        // Getting the ID of the environment
         let environmentId = null
         await expect.poll(async () => {
-            console.log(`Getting env with name ${name}`)
             const environment = await this.ontrack.environments.findEnvironmentByName(name)
             environmentId = environment?.id
             return environmentId
         }).toBeDefined()
         if (!environmentId) throw new Error(`Environment with name ${name} not found`)
-        // Card
-        const card = this.page.getByTestId(`environment-${environmentId}`)
-        // Looking for the name
-        await expect(card.getByText(name, {exact: true})).toBeVisible()
+        await expect(this.page.getByTestId(`matrix-column-${environmentId}`)).toBeVisible()
     }
 
-    async checkSlotIsVisible(environment, projectName, qualifier) {
-        const row = this.page.getByTestId(`environment-${environment.id}`)
-        await expect(row.getByText(projectName, {exact: true})).toBeVisible()
+    async checkEnvironmentIsNotVisible(environment) {
+        await expect(this.page.getByTestId(`matrix-column-${environment.id}`)).toHaveCount(0)
     }
 
+    async checkSlotIsVisible(slot) {
+        await expect(this.page.getByTestId(`slot-cell-${slot.id}`)).toBeVisible()
+    }
+
+    async checkSlotIsNotVisible(slot) {
+        await expect(this.page.getByTestId(`slot-cell-${slot.id}`)).toHaveCount(0)
+    }
+
+    async checkProjectIsVisible(project) {
+        await expect(this.page.getByText(project.name, {exact: true})).toBeVisible()
+    }
+
+    async checkProjectIsNotVisible(project) {
+        await expect(this.page.getByText(project.name, {exact: true})).toHaveCount(0)
+    }
+
+    /**
+     * A qualifier row, nested under its project's row.
+     */
+    async checkQualifierRow(project, qualifier) {
+        await expect(this.page.getByTestId(`matrix-qualifier-${project.id}-${qualifier}`)).toBeVisible()
+    }
+
+    async searchProject(text) {
+        const search = this.page.getByTestId('matrix-search-project').getByRole('textbox')
+        await search.fill(text)
+        await search.press('Enter')
+    }
+
+    async toggleActivity() {
+        await this.page.getByTestId('matrix-activity').getByRole('checkbox').click()
+    }
+
+    async selectScope(name) {
+        await this.page.getByTestId('matrix-scope').getByText(name, {exact: true}).click()
+    }
+
+    async checkFreshness() {
+        await expect(this.page.getByTestId('matrix-freshness-age')).toContainText('Updated')
+    }
 }
 
 export class EnvironmentDialog {

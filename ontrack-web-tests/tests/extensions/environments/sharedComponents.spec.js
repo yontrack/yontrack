@@ -124,7 +124,7 @@ test('starting a deployment through the dialog, from a slot', async ({page, ontr
     }).toBe(build.name)
 })
 
-test('the drawer opens from an environment card and survives a reload through its address', async ({page, ontrack}) => {
+test('the drawer opens from a matrix cell and survives a reload through its address', async ({page, ontrack}) => {
     const {environment, project, slot} = await createSlot(ontrack)
     const branch = await project.createBranch()
     const build = await branch.createBuild()
@@ -132,7 +132,9 @@ test('the drawer opens from an environment card and survives a reload through it
 
     await login(page, ontrack)
     const environments = new EnvironmentsPage(page, ontrack)
-    await environments.goTo()
+    // Filtered on this project: the matrix pages twenty projects at a time and the stack is shared,
+    // so an unfiltered first page is no guarantee that this one's row is on it.
+    await environments.goTo({query: `scope=all&project=${project.name}`})
 
     const drawer = new SlotDrawerPanel(page, slot)
     await drawer.expectClosed()

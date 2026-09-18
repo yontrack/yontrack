@@ -52,6 +52,22 @@ object DemoContent {
     const val PRODUCTION = "production"
 
     /**
+     * The demo's one slot qualifier, and the reason the matrix has anything to nest.
+     *
+     * A qualifier names one of a project's parallel deployments into the same environment. Every
+     * other slot of the dataset uses the default one - the empty string - which is what a project
+     * deploying once per environment has; [SERVICE] has this one as well, so the matrix draws a
+     * project row with a row under it, and the drawer, the slot page and the delivery map all have
+     * a slot whose name carries a qualifier to render.
+     *
+     * Deliberately named after the [CANARY] promotion level and deliberately *not* that constant: a
+     * promotion level says something about a build, a qualifier says which deployment of a project
+     * a slot is, and the demo happens to spell both "canary" because that is what a canary release
+     * is called on both sides.
+     */
+    const val CANARY_QUALIFIER = "canary"
+
+    /**
      * The SCM branch [MAIN] of [SERVICE] follows. The mock SCM's branches are named as a
      * real repository's, so a slash is fine here where it is not in a Yontrack entity name.
      */
@@ -759,6 +775,22 @@ object DemoContent {
                         ),
                     ),
                 ),
+                // The upstream half of the `canary` story - see the production slot below for
+                // why the qualifier is in the demo at all. It holds 107, the head of `main`,
+                // which is newer than anything the canary production slot holds (nothing), and
+                // that is what makes production [canary] read "behind".
+                SlotSpec(
+                    project = SERVICE,
+                    qualifier = CANARY_QUALIFIER,
+                    description = "Sample application on the staging canary.",
+                    admissionRules = listOf(
+                        SlotAdmissionRuleSpec(
+                            name = "silver",
+                            ruleId = SlotAdmissionRules.PROMOTION,
+                            config = mapOf("promotion" to SILVER),
+                        ),
+                    ),
+                ),
             ),
         ),
         EnvironmentSpec(
@@ -820,6 +852,39 @@ object DemoContent {
                         ),
                     ),
                 ),
+                // The one slot of the demo which has NEVER been deployed, and the reason the
+                // matrix has anything to nest. It earns its place three times over (#1791):
+                //
+                // * [SERVICE] now has two qualifiers, so the matrix draws a project row with a
+                //   `canary` row under it - the only nesting in the dataset;
+                // * nothing has ever reached it, so a cell reads "Never deployed", which no
+                //   other slot shows;
+                // * the staging canary slot beside it holds 107 while this one holds nothing,
+                //   so it reads **behind** - which the demo could not show at all before. The
+                //   default qualifier cannot: staging holds 89 and production 104, so
+                //   production is *ahead* of the slot upstream of it, which is what a pair of
+                //   environments mid-release actually looks like and is worth keeping.
+                //
+                // Its rules are the production ones minus the branch pattern, so it is a
+                // plausible canary and not a slot with nothing configured: a build has to be
+                // GOLD and to be what the staging canary is holding.
+                SlotSpec(
+                    project = SERVICE,
+                    qualifier = CANARY_QUALIFIER,
+                    description = "Sample application on the production canary. Nothing has gone out to it yet.",
+                    admissionRules = listOf(
+                        SlotAdmissionRuleSpec(
+                            name = "gold",
+                            ruleId = SlotAdmissionRules.PROMOTION,
+                            config = mapOf("promotion" to GOLD),
+                        ),
+                        SlotAdmissionRuleSpec(
+                            name = "stagingCanary",
+                            ruleId = SlotAdmissionRules.ENVIRONMENT,
+                            config = mapOf("environmentName" to STAGING, "qualifier" to CANARY_QUALIFIER),
+                        ),
+                    ),
+                ),
             ),
         ),
     )
@@ -860,6 +925,12 @@ object DemoContent {
         DeploymentSpec(PRODUCTION, BuildRef(SERVICE, MAIN, "104")),
         DeploymentSpec(STAGING, BuildRef(SERVICE, MAINTENANCE, "89")),
         DeploymentSpec(STAGING, BuildRef(SERVICE, MAIN, "107"), stopAt = DeploymentStop.RUNNING),
+        // Last, and on a slot of its own: the [CANARY_QUALIFIER] qualifier has its own history, its own
+        // graph and its own "only the last pipeline can be deployed", so nothing above is
+        // disturbed by it. 107 carries SILVER, which is all the staging canary asks for, and
+        // being DONE is what makes the slot *hold* 1.4.6 - the thing the production canary is
+        // then behind.
+        DeploymentSpec(STAGING, BuildRef(SERVICE, MAIN, "107"), qualifier = CANARY_QUALIFIER),
     )
 
     /**

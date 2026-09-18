@@ -110,7 +110,9 @@ class DemoSeed(
             }
         }
 
-        val slots = mutableMapOf<Pair<String, String>, DemoSlot>()
+        // Keyed by environment, project *and* qualifier: a project can have several slots in the
+        // same environment, and `canary` is a different slot from the default one.
+        val slots = mutableMapOf<Triple<String, String, String>, DemoSlot>()
         dataset.environments.forEach { spec ->
             log("Creating environment ${spec.name}")
             val environment = target.createEnvironment(
@@ -120,14 +122,18 @@ class DemoSeed(
                 tags = spec.tags,
             )
             spec.slots.forEach { slotSpec ->
-                val slot = environment.createSlot(projects.getValue(slotSpec.project), slotSpec.description)
+                val slot = environment.createSlot(
+                    projects.getValue(slotSpec.project),
+                    slotSpec.qualifier,
+                    slotSpec.description,
+                )
                 // Before any deployment: the rules are what a deployment is checked against, and
                 // adding them afterwards would leave the slot holding a build it now refuses
                 slotSpec.admissionRules.forEach { ruleSpec ->
-                    log("Adding admission rule ${ruleSpec.name} to slot ${spec.name}/${slotSpec.project}")
+                    log("Adding admission rule ${ruleSpec.name} to slot ${slotName(spec, slotSpec)}")
                     slot.addAdmissionRule(ruleSpec)
                 }
-                slots[spec.name to slotSpec.project] = slot
+                slots[Triple(spec.name, slotSpec.project, slotSpec.qualifier)] = slot
             }
         }
 
@@ -136,7 +142,8 @@ class DemoSeed(
         dataset.deployments.forEach { spec ->
             val ref = spec.build
             log("Deploying ${ref.build} of ${ref.project}/${ref.branch} to ${spec.environment} (${spec.stopAt})")
-            slots.getValue(spec.environment to ref.project).deploy(builds.resolve(ref), spec.stopAt)
+            slots.getValue(Triple(spec.environment, ref.project, spec.qualifier))
+                .deploy(builds.resolve(ref), spec.stopAt)
         }
 
         // AFTER the deployments, unlike the admission rules. A `CANDIDATE` or `RUNNING` workflow is
@@ -146,8 +153,9 @@ class DemoSeed(
         dataset.environments.forEach { spec ->
             spec.slots.forEach { slotSpec ->
                 slotSpec.workflows.forEach { workflowSpec ->
-                    log("Adding ${workflowSpec.trigger} workflow to slot ${spec.name}/${slotSpec.project}")
-                    slots.getValue(spec.name to slotSpec.project).addWorkflow(workflowSpec)
+                    log("Adding ${workflowSpec.trigger} workflow to slot ${slotName(spec, slotSpec)}")
+                    slots.getValue(Triple(spec.name, slotSpec.project, slotSpec.qualifier))
+                        .addWorkflow(workflowSpec)
                 }
             }
         }
@@ -242,4 +250,9 @@ class DemoSeed(
     // validate() has already ruled out a reference the dataset does not create.
     private fun Map<BuildRef, DemoBuild>.resolve(ref: BuildRef): DemoBuild =
         getValue(ref)
+
+    /** How a slot reads in the log: "production/petclinic", or "production/petclinic [canary]". */
+    private fun slotName(spec: EnvironmentSpec, slotSpec: SlotSpec): String =
+        "${spec.name}/${slotSpec.project}" +
+                (slotSpec.qualifier.takeIf { it.isNotBlank() }?.let { " [$it]" } ?: "")
 }

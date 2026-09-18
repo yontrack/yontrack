@@ -207,7 +207,7 @@ interface DemoBuild {
 interface DemoEnvironment {
     val name: String
     fun delete()
-    fun createSlot(project: DemoProject, description: String): DemoSlot
+    fun createSlot(project: DemoProject, qualifier: String, description: String): DemoSlot
 }
 
 interface DemoSlot {
