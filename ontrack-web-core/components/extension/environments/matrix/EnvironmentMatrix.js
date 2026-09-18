@@ -96,13 +96,17 @@ export default function EnvironmentMatrix({
      * "Favourites by default, All when the user has none." The screen cannot tell "you have no
      * favourite" from "your favourites have no slot" on its own - the two deserve opposite answers,
      * one a silent switch and the other a hint - so the server says which it is and this moves the
-     * scope once.
+     * scope.
+     *
+     * It *replaces* the history entry rather than adding one: a correction the screen made on its
+     * own is not a step the reader took, and a Back onto it would either appear to do nothing or,
+     * where the preference cannot be stored, undo itself and trap the reader on the page.
      */
     useEffect(() => {
         if (onFilter && matrix && filter.scope === SCOPE_FAVOURITES && matrix.hasFavourites === false) {
-            onFilter({scope: SCOPE_ALL})
+            onFilter({scope: SCOPE_ALL}, {replace: true})
         }
-    }, [matrix?.hasFavourites])
+    }, [matrix?.hasFavourites, filter.scope])
 
     // Which projects are open: the server's answer decides until the reader says otherwise, and
     // then the reader's choice stands. Derived in the render body rather than kept in step by an
@@ -123,7 +127,11 @@ export default function EnvironmentMatrix({
      */
     const emptyState = !empty ? null :
         (emptyStates && environmentsCount === 0) ? 'no-environment' :
-            (emptyStates && filter.scope === SCOPE_FAVOURITES && matrix.hasFavourites) ? 'favourites' :
+            // Whatever the reason the Favourites scope is empty, the way out of it is the same
+            // button. Offering it only to somebody who *has* a favourite leaves the one who
+            // deliberately picked Favourites with none looking at "nothing matches" and no way
+            // back - and they reached that screen by clicking, so they can reach it again.
+            (emptyStates && filter.scope === SCOPE_FAVOURITES) ? 'favourites' :
                 'filter'
 
     return (

@@ -49,7 +49,14 @@ export const useMatrixFilter = () => {
         ? filterFromQuery(router?.query, stored)
         : defaultMatrixFilter()
 
-    const apply = (changes) => {
+    /**
+     * @param {Object} changes The filter fields to change
+     * @param {boolean} replace Whether to replace the current history entry rather than add one.
+     *   A change the *reader* made is a step they can take back; a correction the screen made on
+     *   its own is not, and pushing one leaves a Back button that appears to do nothing - or, when
+     *   the preference cannot be stored, one that undoes itself and traps the reader on the page.
+     */
+    const apply = (changes, {replace = false} = {}) => {
         const next = {...filter, ...changes}
         try {
             setLocalEnvironmentMatrixFilter(next)
@@ -64,7 +71,8 @@ export const useMatrixFilter = () => {
         delete query.label
         delete query.tags
         delete query.activity
-        router.push(
+        const navigate = replace ? router.replace : router.push
+        navigate(
             {pathname: router.pathname, query: {...query, ...filterToQuery(next)}},
             undefined,
             {shallow: true},

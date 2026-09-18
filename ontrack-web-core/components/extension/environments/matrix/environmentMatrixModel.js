@@ -160,10 +160,19 @@ export const projectRowKey = (project) => `project-${project.id}`
  * Three is the spec's number, and the reason is the screen and not the data: a project with two
  * qualifiers adds two lines, a project with twelve pushes everything below it off the page, and the
  * matrix exists to be read in one glance.
+ *
+ * The count is of the *nested* rows and not of all of them, because the default qualifier's row is
+ * the project's own and is never nested. A project whose only row is a qualified one - every slot
+ * under `canary`, none under the default qualifier - has one row and one child, and it has to open:
+ * left shut it is a project name with an arrow and a line of blank cells, and a reader has no reason
+ * to suspect there is anything behind it.
  */
 export const defaultExpandedKeys = (projects, limit = 3) =>
     (projects ?? [])
-        .filter(entry => (entry.rows ?? []).length > 1 && (entry.rows ?? []).length <= limit)
+        .filter(entry => {
+            const nested = (entry.rows ?? []).filter(row => row.qualifier !== '')
+            return nested.length > 0 && nested.length <= limit
+        })
         .map(entry => projectRowKey(entry.project))
 
 /**

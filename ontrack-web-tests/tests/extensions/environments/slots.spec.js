@@ -1,3 +1,4 @@
+import {expect} from "@playwright/test";
 import {login} from "../../core/login";
 import {HomePage} from "../../core/home/home";
 import {createSlot} from "./slotFixtures";
@@ -27,15 +28,17 @@ test('creating a slot for several environments', async ({page, ontrack}) => {
         description: "Slot",
         environmentNames: [env1.name, env2.name],
     })
-    // One row for the project, and a column for each environment it now has a slot in
+    // One row for the project, and a column for each environment it now has a slot in. Narrowed to
+    // this project: the matrix pages twenty at a time over a shared stack.
     await environmentsPage.selectScope('All')
+    await environmentsPage.searchProject(project.name)
     await environmentsPage.checkProjectIsVisible(project)
     await environmentsPage.checkEnvironmentIsVisible(env1.name)
     await environmentsPage.checkEnvironmentIsVisible(env2.name)
 })
 
 test('deleting a slot', async ({page, ontrack}) => {
-    const {slot} = await createSlot(ontrack)
+    const {project, slot} = await createSlot(ontrack)
 
     // Login
     await login(page, ontrack)
@@ -46,10 +49,15 @@ test('deleting a slot', async ({page, ontrack}) => {
     // Deleting the slot
     await slotPage.delete()
 
-    // We're back in the environments page. The environment itself is no longer a column of the
-    // matrix - its only slot has just been deleted, and a column with nothing in it is not drawn.
+    // We're back in the environments page. The project has no slot left at all, so it has no row -
+    // and the environment, whose only slot it was, is no longer a column either.
+    //
+    // The empty state is asserted *first* and on purpose: it is the positive fact that says the
+    // matrix has answered. A bare "the column is absent" passes just as well while the table is
+    // still loading, which would make this test unable to fail.
     const environmentsPage = new EnvironmentsPage(page, ontrack)
-    await environmentsPage.expectOnPage()
+    await environmentsPage.goTo({query: `scope=all&project=${project.name}`})
+    await expect(page.getByTestId('matrix-empty-filter')).toBeVisible()
     await environmentsPage.checkEnvironmentIsNotVisible(slot.environment)
 })
 

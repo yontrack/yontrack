@@ -28,7 +28,10 @@ test('creating an environment, which becomes a column once something has a slot 
         tags: ['test'],
     })
 
+    // All projects, narrowed to this one: the matrix pages twenty projects at a time and the stack
+    // is shared, so without the search this project's row may simply not be on the first page.
     await environmentsPage.selectScope('All')
+    await environmentsPage.searchProject(project.name)
 
     const environment = await ontrack.environments.findEnvironmentByName(name)
     await environmentsPage.checkEnvironmentIsNotVisible(environment)

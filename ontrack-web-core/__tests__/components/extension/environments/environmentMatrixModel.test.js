@@ -213,17 +213,33 @@ describe('the matrix rows', () => {
     })
 
     it('opens the projects with few enough qualifiers to be read at a glance', () => {
+        // The default qualifier's row is the project's own and is never nested, so what decides is
+        // the number of rows *under* it.
         const withQualifiers = (id, count) => ({
             project: {id, name: `p${id}`},
-            rows: Array.from({length: count}, (_, index) => ({qualifier: `q${index}`, slots: []})),
+            rows: [
+                {qualifier: '', slots: []},
+                ...Array.from({length: count}, (_, index) => ({qualifier: `q${index}`, slots: []})),
+            ],
         })
         const keys = defaultExpandedKeys([
-            withQualifiers(1, 1),
-            withQualifiers(2, 3),
-            withQualifiers(3, 4),
+            withQualifiers(1, 0),
+            withQualifiers(2, 1),
+            withQualifiers(3, 3),
+            withQualifiers(4, 4),
         ])
-        // One row expands nothing (there is no arrow), three open, four stay shut
-        expect(keys).toEqual([projectRowKey({id: 2})])
+        // Nothing nested expands nothing (there is no arrow), one and three open, four stay shut
+        expect(keys).toEqual([projectRowKey({id: 2}), projectRowKey({id: 3})])
+    })
+
+    it('opens a project whose only row is a qualified one', () => {
+        // Every slot under `canary` and none under the default qualifier: one row, one child. Left
+        // shut it is a project name with an arrow and a line of blank cells, and nothing on screen
+        // says there is anything behind it.
+        const keys = defaultExpandedKeys([
+            {project, rows: [{qualifier: 'canary', slots: [slot('s1', 'e1')]}]},
+        ])
+        expect(keys).toEqual([projectRowKey(project)])
     })
 })
 

@@ -126,17 +126,32 @@ class EnvironmentMatrixRepository(
         }
         if (activity) {
             // "Only with activity" hides *rows*, and a row is a project and a qualifier across every
-            // environment - so a slot is kept when anything is moving anywhere on its row, not only
-            // on itself. Otherwise turning the filter on would leave a row showing the one cell that
-            // happens to be busy and blank out the environments it came from.
+            // *visible* environment - so a slot is kept when anything is moving anywhere on its row,
+            // not only on itself. Otherwise turning the filter on would leave a row showing the one
+            // cell that happens to be busy and blank out the environments it came from.
+            //
+            // "Visible" matters: the row is looked at through the same column filters as the matrix
+            // itself. Without that, a row could be kept because something is moving in an
+            // environment this matrix is not showing, and it would be drawn with every cell quiet -
+            // which is exactly what the filter was turned on to hide.
+            var rowCriteria = """
+                RS.PROJECT_ID = S.PROJECT_ID
+                  AND RS.QUALIFIER = S.QUALIFIER
+                  AND RP.STATUS IN ($ACTIVE_STATUSES)
+            """.trimIndent()
+            if (tags.isNotEmpty()) {
+                rowCriteria += " AND RE.TAGS && CAST(:tags AS TEXT[])"
+            }
+            if (environmentNames.isNotEmpty()) {
+                rowCriteria += " AND RE.NAME IN (:environmentNames)"
+            }
             where += """
                 AND EXISTS (
                     SELECT 1
                     FROM ENV_SLOTS RS
+                    INNER JOIN ENVIRONMENTS RE ON RE.ID = RS.ENVIRONMENT_ID
                     INNER JOIN ENV_SLOT_PIPELINE RP ON RP.SLOT_ID = RS.ID
-                    WHERE RS.PROJECT_ID = S.PROJECT_ID
-                      AND RS.QUALIFIER = S.QUALIFIER
-                      AND RP.STATUS IN ($ACTIVE_STATUSES)
+                    WHERE $rowCriteria
                 )
             """.trimIndent()
         }
@@ -159,8 +174,11 @@ class EnvironmentMatrixRepository(
         val params = mutableMapOf<String, Any?>()
 
         if (!filter.project.isNullOrBlank()) {
-            criteria += "P.NAME ILIKE :projectName"
-            params["projectName"] = "%${filter.project.trim()}%"
+            // Escaped, and the escape character declared: a search box takes whatever somebody
+            // types, and `_` is a single-character wildcard in LIKE - so a search for `a_b` would
+            // otherwise also match `axb`, which is not what typing a project name means.
+            criteria += "P.NAME ILIKE :projectName ESCAPE '\\'"
+            params["projectName"] = "%${filter.project.trim().escapeLike()}%"
         }
 
         if (filter.onFavourites) {
@@ -221,6 +239,13 @@ class EnvironmentMatrixRepository(
          */
         private val ACTIVE_STATUSES: String = SlotPipelineStatus.activeStatuses
             .joinToString(", ") { "'${it.name}'" }
+
+        /**
+         * The LIKE metacharacters, escaped with a backslash - which the query declares as its
+         * `ESCAPE` character rather than relying on the server's default.
+         */
+        private fun String.escapeLike(): String =
+            replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
         /**
          * A `TEXT[]` literal, which is how a list of tags is compared with the `&&` (overlaps)

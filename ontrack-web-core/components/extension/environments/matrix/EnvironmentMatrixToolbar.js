@@ -42,6 +42,15 @@ export default function EnvironmentMatrixToolbar({filter, onFilter, freshness}) 
     return (
         <Space wrap size="middle" data-testid="matrix-toolbar">
             <Input.Search
+                /*
+                 * Keyed on the filter, and uncontrolled between two keys. The box has to hold what
+                 * somebody is typing, which is not yet the filter, *and* to show what the address
+                 * says when the address changes under it - a Back off a project search un-filters
+                 * the matrix, and a box still reading the old text would then describe a screen
+                 * that is not there. Remounting on the filter's value gives both: free typing
+                 * while the filter is unchanged, a reset the moment it is.
+                 */
+                key={filter.project}
                 placeholder="Project"
                 allowClear
                 defaultValue={filter.project}
