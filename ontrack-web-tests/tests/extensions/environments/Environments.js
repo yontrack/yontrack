@@ -92,14 +92,26 @@ export class EnvironmentsPage {
         await expect(this.page.getByTestId(`matrix-qualifier-${project.id}-${qualifier}`)).toBeVisible()
     }
 
+    /**
+     * `data-testid` on an Ant Design `Input.Search` lands on the `<input>` itself, not on a wrapper
+     * around it - `Input` forwards the props it does not know straight to the control. So the test
+     * id *is* the box, and looking for a control inside it finds nothing and waits out the whole
+     * timeout.
+     */
     async searchProject(text) {
-        const search = this.page.getByTestId('matrix-search-project').getByRole('textbox')
+        const search = this.page.getByTestId('matrix-search-project')
         await search.fill(text)
         await search.press('Enter')
     }
 
+    /**
+     * Same story as `searchProject`: `data-testid` on a `Checkbox` ends up on the `<input>`. The
+     * click goes to the label's text rather than to that input, which Ant Design draws at zero
+     * opacity under its own box - clicking what a reader can actually see is one less thing that
+     * can silently stop being clickable.
+     */
     async toggleActivity() {
-        await this.page.getByTestId('matrix-activity').getByRole('checkbox').click()
+        await this.page.getByTestId('matrix-toolbar').getByText('Only with activity').click()
     }
 
     async selectScope(name) {
