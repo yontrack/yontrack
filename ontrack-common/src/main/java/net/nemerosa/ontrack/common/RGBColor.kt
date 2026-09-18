@@ -1,5 +1,7 @@
 package net.nemerosa.ontrack.common
 
+import kotlin.math.pow
+
 /**
  * Regular expression to validate a colour.
  */
@@ -23,24 +25,43 @@ data class RGBColor(
     }
 
     /**
-     * Returns black, or white, depending on the color, in order to maximize the constrast.
+     * WCAG 2.x relative luminance of the colour, between 0.0 (black) and 1.0 (white).
+     *
+     * This is perceived brightness, not HSL lightness: each channel is linearised out of sRGB's
+     * gamma encoding, then weighted by how much the eye actually gets from it - green far more
+     * than red, red far more than blue. A saturated colour has a low HSL lightness however bright
+     * it looks (`#FFEB3B` yellow sits at 0.615), which is why lightness is the wrong quantity to
+     * decide a foreground colour on.
+     *
+     * Ref: https://www.w3.org/TR/WCAG21/#dfn-relative-luminance
      */
-    fun toBlackOrWhite(): RGBColor {
-        // Ref: http://www.niwa.nu/2013/05/math-behind-colorspace-conversions-rgb-hsl/
-        val r = red / 255.0
-        val g = green / 255.0
-        val b = blue / 255.0
+    fun relativeLuminance(): Double =
+        0.2126 * linearize(red) + 0.7152 * linearize(green) + 0.0722 * linearize(blue)
 
-        val min = minOf(r, g, b)
-        val max = maxOf(r, g, b)
-
-        val l = (min + max) / 2
-
-        return when {
-            l <= 0.75 -> WHITE
-            else -> BLACK
-        }
+    /**
+     * WCAG 2.x contrast ratio between this colour and [other], between 1.0 (identical luminance)
+     * and 21.0 (black against white).
+     *
+     * Ref: https://www.w3.org/TR/WCAG21/#dfn-contrast-ratio
+     */
+    fun contrastRatio(other: RGBColor): Double {
+        val a = relativeLuminance()
+        val b = other.relativeLuminance()
+        val lighter = maxOf(a, b)
+        val darker = minOf(a, b)
+        return (lighter + 0.05) / (darker + 0.05)
     }
+
+    /**
+     * Returns black, or white, whichever contrasts better against this colour - used as the
+     * foreground colour for text drawn on top of it, such as a label chip.
+     *
+     * The choice is the WCAG contrast ratio itself rather than a hand-picked brightness threshold:
+     * whichever of the two the standard scores higher wins, which puts the crossover at a relative
+     * luminance of about 0.179. Ties go to black.
+     */
+    fun toBlackOrWhite(): RGBColor =
+        if (contrastRatio(BLACK) >= contrastRatio(WHITE)) BLACK else WHITE
 
     override fun toString(): String {
         return "#${toHex(red)}${toHex(green)}${toHex(blue)}"
@@ -61,6 +82,19 @@ data class RGBColor(
          * White
          */
         val WHITE = RGBColor(255, 255, 255)
+
+        /**
+         * Undoes the sRGB gamma encoding of one 0..255 channel, giving the linear 0.0..1.0 value
+         * the relative luminance weights apply to.
+         */
+        private fun linearize(component: Int): Double {
+            val c = component / 255.0
+            return if (c <= 0.04045) {
+                c / 12.92
+            } else {
+                ((c + 0.055) / 1.055).pow(2.4)
+            }
+        }
 
         /**
          *
