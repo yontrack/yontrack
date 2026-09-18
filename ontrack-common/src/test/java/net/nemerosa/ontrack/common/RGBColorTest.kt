@@ -62,6 +62,23 @@ class RGBColorTest {
         "#111100" blackAndWhiteTo RGBColor.WHITE
     }
 
+    /**
+     * The band where white scores between 3:1 and AA's 4.5:1 and black scores a little better.
+     * Both are legible here, and the convention in most tag UIs is white - white on red, white on
+     * the picker's default blue. The deliberate decision (issue #1813) was to follow WCAG anyway
+     * and hand these to black, rather than carve out a hue exception or a hand-picked floor.
+     *
+     * `#1677FF` is `defaultColor` in `LabelDialog`, so it is what every label created without
+     * touching the colour picker gets. Its flip to black text is expected, not a regression.
+     */
+    @Test
+    fun `Black and white on the debatable band is decided by WCAG, not by convention`() {
+        "#ff4d4f" blackAndWhiteTo RGBColor.BLACK // Ant red-5
+        "#eb2f96" blackAndWhiteTo RGBColor.BLACK // Ant magenta-6
+        "#f5222d" blackAndWhiteTo RGBColor.BLACK // Ant red-6
+        "#1677ff" blackAndWhiteTo RGBColor.BLACK // The label colour picker's default
+    }
+
     @Test
     fun `Black and white on pale colors`() {
         "#e0f6e4" blackAndWhiteTo RGBColor.BLACK
