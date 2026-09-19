@@ -29,6 +29,20 @@ class GitLabCannotCreateBranchException(project: String, branch: String, source:
 )
 
 /**
+ * GitLab refused to create a merge request, or created one it did not return.
+ */
+class GitLabCannotCreateMergeRequestException(project: String, from: String, to: String) : GitLabClientException(
+    "Cannot create a merge request from $from to $to in the GitLab project $project."
+)
+
+/**
+ * GitLab accepted the merge call but returned nothing to read the outcome from.
+ */
+class GitLabCannotMergeMergeRequestException(project: String, iid: Int) : GitLabClientException(
+    "No answer from GitLab when merging the merge request !$iid of the project $project."
+)
+
+/**
  * GitLab answered with a redirect, which this client does not follow.
  *
  * Following one would replay the `PRIVATE-TOKEN` header onto whatever host the `Location` names - the same

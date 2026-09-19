@@ -7,6 +7,7 @@ import net.nemerosa.ontrack.extension.gitlab.GitLabIssueServiceExtension
 import net.nemerosa.ontrack.extension.gitlab.client.GitLabClient
 import net.nemerosa.ontrack.extension.gitlab.client.GitLabClientFactory
 import net.nemerosa.ontrack.extension.gitlab.model.GitLabConfiguration
+import net.nemerosa.ontrack.extension.gitlab.model.GitLabMergeRequest
 import net.nemerosa.ontrack.extension.gitlab.model.GitLabProject
 import net.nemerosa.ontrack.extension.gitlab.service.GitLabConfigurationService
 import net.nemerosa.ontrack.extension.issues.IssueServiceRegistry
@@ -146,7 +147,7 @@ class GitLabSCMExtensionTest {
     @Test
     fun `A merge request is a pull request named by its iid`() {
         projects("group/project")
-        every { client.getMergeRequest("group/project", 12) } returns net.nemerosa.ontrack.extension.gitlab.model.GitLabMergeRequest(
+        every { client.getMergeRequest("group/project", 12) } returns GitLabMergeRequest(
             id = 1200,
             iid = 12,
             title = "Some merge request",
@@ -156,36 +157,23 @@ class GitLabSCMExtensionTest {
             web_url = "https://gitlab.com/group/project/-/merge_requests/12",
         )
         val scm = extension.getSCMPath("gl", "group/project/ontrack.yaml")?.scm
-        val pr = scm?.getPullRequestByName("#12")
+        val pr = scm?.getPullRequestByName("PR-12")
         assertEquals("12", pr?.id)
-        assertEquals("#12", pr?.name)
+        assertEquals("PR-12", pr?.name)
         assertEquals("https://gitlab.com/group/project/-/merge_requests/12", pr?.link)
         assertEquals(SCMPullRequestStatus.MERGED, pr?.status)
     }
 
+    /**
+     * `#12` is an **issue** reference on GitLab - the very form this module's issue service parses - so it
+     * is not a merge request name, and is not accepted as one.
+     */
     @Test
     fun `A name which is not a merge request reference is null`() {
         projects("group/project")
         val scm = extension.getSCMPath("gl", "group/project/ontrack.yaml")?.scm
-        assertNull(scm?.getPullRequestByName("PR-12"))
-        assertNull(scm?.getPullRequestByName("#not-a-number"))
-    }
-
-    @Test
-    fun `Creating a merge request is not supported yet`() {
-        projects("group/project")
-        val scm = extension.getSCMPath("gl", "group/project/ontrack.yaml")?.scm
-        assertThrows<GitLabSCMPullRequestNotSupportedException> {
-            scm?.createPR(
-                from = "feature/one",
-                to = "main",
-                title = "Some title",
-                description = "Some description",
-                autoApproval = false,
-                remoteAutoMerge = false,
-                message = "Some message",
-                reviewers = emptyList(),
-            )
-        }
+        assertNull(scm?.getPullRequestByName("#12"))
+        assertNull(scm?.getPullRequestByName("!12"))
+        assertNull(scm?.getPullRequestByName("PR-not-a-number"))
     }
 }

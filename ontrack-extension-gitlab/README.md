@@ -102,12 +102,14 @@ Issue #1835 adds the switch that lets the pipeline tests run in their own workfl
 ### Writing a real test
 
 * Read the group and the project from the test environment — never hardcode `yontrack-test`.
-* Name every branch and every merge request for the run: the name carries the creation time and the
-  CI run, so that parallel shards, worktrees and developers never collide.
-* Don't bother deleting what a test creates when it fails. Before the first real test of a JVM, the
-  suite sweeps what an earlier run left behind: it closes the merge requests of test branches **older
-  than a day** and deletes those branches. Branches not named by the test naming helper are never
-  touched.
+* Name every branch and every merge request with `gitLabTestBranch()`. The name carries the
+  `yontrack-it/` prefix, the creation time and the CI run, so that parallel shards, worktrees and
+  developers never collide and a leftover can be dated and traced back.
+* Delete what a test creates in a `finally`, as `GitLabMergeRequestIT` does — deleting a branch which
+  is already gone is not an error, so the cleanup is unconditional and a merged merge request needs no
+  special case. A leftover therefore only ever comes from a killed run; the automatic sweep of
+  anything older than a day is not implemented yet, so clean those up in the GitLab UI. Nothing
+  outside the `yontrack-it/` prefix is ever deleted.
 * Trigger a pipeline only in a test that is meant to cost minutes, and pass `MOCK_DURATION` as low as
   the assertion allows.
 
@@ -130,8 +132,8 @@ A new free namespace gets **no shared runner until gitlab.com's identity verific
   a loop is wrong.
 * **Rate limits**: poll no faster than **every 10 seconds**. The announced tier-aware limits drop
   Free to a 100 requests/minute burst.
-* **Leftovers**: a killed run leaves branches and merge requests behind. They are swept by the next
-  run a day later — to clean up sooner, delete the test branches in the GitLab UI.
+* **Leftovers**: a test deletes its own branch in a `finally`, so only a killed run leaves branches
+  and merge requests behind. Delete the `yontrack-it/` branches in the GitLab UI when that happens.
 * **Token expiry**: a GitLab personal access token lasts **365 days at most**. There is no such thing
   as a non-expiring one, so this is an annual chore.
 

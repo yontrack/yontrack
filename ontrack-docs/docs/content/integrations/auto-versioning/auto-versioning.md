@@ -709,7 +709,8 @@ If set to `true`, the fate of the pull request depends on the `autoApprovalMode`
 
 `SCM`
 
-:    Yontrack relies on the SCM (GitHub for example) for the lifecycle of the pull request, in a "fire and forget" mode:
+:    Yontrack relies on the SCM (GitHub or [GitLab](../../start/configuration/gitlab.md#auto-versioning-merge-requests),
+for example) for the lifecycle of the pull request, in a "fire and forget" mode:
 
 :    * PR is approved automatically
 :    * PR is set for auto-merge

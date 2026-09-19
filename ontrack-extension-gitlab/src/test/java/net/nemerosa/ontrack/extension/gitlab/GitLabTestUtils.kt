@@ -6,6 +6,8 @@ import net.nemerosa.ontrack.test.getOptionalEnv
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.condition.EnabledIf
 import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 
 /**
@@ -106,6 +108,27 @@ fun readGitLabTestEnv(lookup: (String) -> String? = ::getOptionalEnv): GitLabTes
 
 val gitLabTestEnv: GitLabTestEnv by lazy {
     readGitLabTestEnv()
+}
+
+/**
+ * Prefix every branch a real test creates in the fixture project carries.
+ *
+ * It is what tells a leftover of the test suite apart from anything else in the project, and nothing outside
+ * that prefix is ever deleted.
+ */
+const val GITLAB_TEST_BRANCH_PREFIX = "yontrack-it/"
+
+/**
+ * Name for a branch - and for the merge request opened from it - that a real test creates.
+ *
+ * It carries the creation time and, in CI, the run which created it, so that parallel shards, worktrees and
+ * developers never collide and a leftover can be dated and traced back. A test deletes what it created in a
+ * `finally`, so a leftover only ever comes from a killed run.
+ */
+fun gitLabTestBranch(purpose: String = "mr"): String {
+    val run = getOptionalEnv("GITHUB_RUN_ID")?.takeIf { it.isNotBlank() } ?: "local"
+    val stamp = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss").format(LocalDateTime.now())
+    return "$GITLAB_TEST_BRANCH_PREFIX$purpose-$stamp-$run-${uid("")}"
 }
 
 /**

@@ -41,6 +41,21 @@ class GitLabTestEnvTest {
         assertTrue(GitLabTestProperties.TOKEN in (ex.message ?: ""), ex.message)
     }
 
+    /**
+     * A leftover of a killed run has to be recognisable and datable, and two runs must never collide.
+     */
+    @Test
+    fun `A test branch name carries its prefix and is unique`() {
+        val first = gitLabTestBranch()
+        val second = gitLabTestBranch()
+        assertTrue(first.startsWith(GITLAB_TEST_BRANCH_PREFIX), first)
+        assertTrue(first != second, "Two names of the same run differ")
+        assertTrue(
+            gitLabTestBranch("cleanup").startsWith("${GITLAB_TEST_BRANCH_PREFIX}cleanup-"),
+            "The purpose is part of the name",
+        )
+    }
+
     @Test
     fun `Reading the environment`() {
         val env = readGitLabTestEnv(complete::get)

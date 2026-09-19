@@ -4,6 +4,7 @@ import net.nemerosa.ontrack.extension.gitlab.model.GitLabBranch
 import net.nemerosa.ontrack.extension.gitlab.model.GitLabCommit
 import net.nemerosa.ontrack.extension.gitlab.model.GitLabCompare
 import net.nemerosa.ontrack.extension.gitlab.model.GitLabConfiguration
+import net.nemerosa.ontrack.extension.gitlab.model.GitLabFile
 import net.nemerosa.ontrack.extension.gitlab.model.GitLabIssue
 import net.nemerosa.ontrack.extension.gitlab.model.GitLabMergeRequest
 import net.nemerosa.ontrack.extension.gitlab.model.GitLabProject
@@ -89,6 +90,17 @@ class DefaultGitLabClient(
          */
         const val MAX_RETRY_SECONDS = 60L
 
+        /**
+         * How many times a file which is not found is read again when the caller asked to retry. Aligned
+         * with GitHub's own `notFoundRetries`.
+         */
+        const val NOT_FOUND_RETRIES = 6
+
+        /**
+         * Waited between two reads of a file which is not found. Aligned with GitHub's `notFoundInterval`.
+         */
+        const val NOT_FOUND_RETRY_SECONDS = 5L
+
         val CONNECT_TIMEOUT: Duration = Duration.ofSeconds(10)
         val READ_TIMEOUT: Duration = Duration.ofSeconds(30)
 
@@ -133,8 +145,10 @@ class DefaultGitLabClient(
     }
 
     override fun validate() {
-        getForObject<GitLabUser>(uri("/user"))
+        getCurrentUser()
     }
+
+    override fun getCurrentUser(): GitLabUser = getForObject<GitLabUser>(uri("/user"))
 
     override fun getProjects(): List<GitLabProject> =
         paginate(
@@ -221,7 +235,18 @@ class DefaultGitLabClient(
         }
     }
 
-    override fun download(project: String, ref: String, path: String): ByteArray? =
+    override fun download(project: String, ref: String, path: String, retryOnNotFound: Boolean): ByteArray? {
+        if (!retryOnNotFound) return downloadOnce(project, ref, path)
+        var attempts = 0
+        while (true) {
+            downloadOnce(project, ref, path)?.let { return it }
+            attempts++
+            if (attempts >= NOT_FOUND_RETRIES) return null
+            sleeper(NOT_FOUND_RETRY_SECONDS)
+        }
+    }
+
+    private fun downloadOnce(project: String, ref: String, path: String): ByteArray? =
         notFoundAsNull {
             withRateLimit {
                 template.exchange(
@@ -238,24 +263,125 @@ class DefaultGitLabClient(
         }
 
     /**
-     * GitLab has one endpoint for the file, `POST` to create it and `PUT` to replace it, and answers 400 when
-     * the verb does not match what the repository holds. Rather than reading the file first, the update is
-     * tried and the creation is the fallback.
+     * GitLab has one endpoint for the file, `POST` to create it and `PUT` to replace it, and answers 400
+     * when the verb does not match what the repository holds.
+     *
+     * The file is therefore **read first**, which settles two things in one request. It says which of the
+     * two verbs to use, rather than trying one and reading a bare 400 as "the other one then" - a 400 that
+     * actually meant a bad branch or an empty commit message used to be retried as a creation and fail
+     * twice. And it gives the file's `last_commit_id`, which the update sends back so that GitLab rejects
+     * the write when the file moved in between: auto-versioning is exactly the workload where two orders
+     * can be writing the same file at the same time, and without it the later write wins silently.
+     *
+     * Note that the [SCM][net.nemerosa.ontrack.extension.scm.service.SCM] interface's own `commit` argument
+     * cannot serve here: it is the head of the upgrade branch, while GitLab's `last_commit_id` is the last
+     * commit **of that file**, which is almost never the same commit.
      */
     override fun upload(project: String, branch: String, path: String, content: ByteArray, message: String) {
-        val uri = projectUri(project, "repository/files/${encodePathSegment(path.trimStart('/'))}")
-        val body = mapOf(
-            "branch" to branch,
-            "content" to Base64.getEncoder().encodeToString(content),
-            "encoding" to "base64",
-            "commit_message" to message,
-        )
-        try {
-            withRateLimit { template.exchange(uri, HttpMethod.PUT, authEntity(body), Void::class.java) }
-        } catch (_: HttpClientErrorException.BadRequest) {
-            withRateLimit { template.exchange(uri, HttpMethod.POST, authEntity(body), Void::class.java) }
+        val filePath = encodePathSegment(path.trimStart('/'))
+        val existing = getFile(project, branch, path)
+        val uri = projectUri(project, "repository/files/$filePath")
+        val body = buildMap {
+            put("branch", branch)
+            put("content", Base64.getEncoder().encodeToString(content))
+            put("encoding", "base64")
+            put("commit_message", message)
+            existing?.last_commit_id?.takeIf { it.isNotBlank() }?.let { put("last_commit_id", it) }
+        }
+        val method = if (existing != null) HttpMethod.PUT else HttpMethod.POST
+        withRateLimit { template.exchange(uri, method, authEntity(body), Void::class.java) }
+    }
+
+    /**
+     * Metadata of a file - its `last_commit_id` above all - or `null` when the file is not there.
+     */
+    private fun getFile(project: String, ref: String, path: String): GitLabFile? =
+        notFoundAsNull {
+            getForObject<GitLabFile>(
+                projectUri(
+                    project,
+                    "repository/files/${encodePathSegment(path.trimStart('/'))}",
+                    "ref" to encodeQueryValue(ref),
+                )
+            )
+        }
+
+    override fun createMergeRequest(
+        project: String,
+        sourceBranch: String,
+        targetBranch: String,
+        title: String,
+        description: String,
+        reviewerIds: List<Long>,
+        removeSourceBranch: Boolean,
+        squash: Boolean,
+    ): GitLabMergeRequest {
+        val body = buildMap<String, Any> {
+            put("source_branch", sourceBranch)
+            put("target_branch", targetBranch)
+            put("title", title)
+            put("description", description)
+            put("remove_source_branch", removeSourceBranch)
+            put("squash", squash)
+            if (reviewerIds.isNotEmpty()) put("reviewer_ids", reviewerIds)
+        }
+        return withRateLimit {
+            template.exchange(
+                projectUri(project, "merge_requests"),
+                HttpMethod.POST,
+                authEntity(body),
+                GitLabMergeRequest::class.java,
+            )
+        }.body ?: throw GitLabCannotCreateMergeRequestException(project, sourceBranch, targetBranch)
+    }
+
+    override fun approveMergeRequest(project: String, iid: Int) {
+        withRateLimit {
+            template.exchange(
+                projectUri(project, "merge_requests/$iid/approve"),
+                HttpMethod.POST,
+                authEntity(emptyMap<String, Any>()),
+                Void::class.java,
+            )
         }
     }
+
+    override fun mergeMergeRequest(
+        project: String,
+        iid: Int,
+        sha: String,
+        message: String,
+        squash: Boolean,
+        removeSourceBranch: Boolean,
+        autoMerge: Boolean,
+    ): GitLabMergeRequest {
+        val body = buildMap<String, Any> {
+            // Always sent: 19.2 can make it mandatory, and a mismatch is a 409 rather than a wrong merge
+            put("sha", sha)
+            put("merge_commit_message", message)
+            put("squash", squash)
+            if (squash) put("squash_commit_message", message)
+            put("should_remove_source_branch", removeSourceBranch)
+            // `auto_merge`, not `merge_when_pipeline_succeeds`, deprecated in 17.11
+            if (autoMerge) put("auto_merge", true)
+        }
+        return withRateLimit {
+            template.exchange(
+                projectUri(project, "merge_requests/$iid/merge"),
+                HttpMethod.PUT,
+                authEntity(body),
+                GitLabMergeRequest::class.java,
+            )
+        }.body ?: throw GitLabCannotMergeMergeRequestException(project, iid)
+    }
+
+    override fun findUserByUsername(username: String): GitLabUser? =
+        notFoundAsNull {
+            getForList(
+                uri("/users", "username" to encodeQueryValue(username)),
+                object : ParameterizedTypeReference<List<GitLabUser>>() {}
+            ).firstOrNull { it.username.equals(username, ignoreCase = true) }
+        }
 
     override fun getCommits(
         project: String,

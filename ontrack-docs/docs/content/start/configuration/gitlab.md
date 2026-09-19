@@ -131,15 +131,14 @@ A project with the GitLab property has an SCM of engine `gitlab`. It gives the p
 * **change logs** between two builds, whose commits are set by the _Git commit_ property;
 * links to the commits and to the comparison between two commits;
 * branch creation and deletion, file download and upload — one commit per upload;
+* merge request creation, approval and merging, which is what
+  [auto-versioning](../../integrations/auto-versioning/auto-versioning.md) uses in `PR` mode — see
+  [Auto-versioning merge requests](#auto-versioning-merge-requests) below;
 * merge request information for branches which are merge requests;
 * branch merges, through Yontrack's local clone of the repository.
 
-!!! note "Merge request creation"
-
-    Creating a merge request — what [auto-versioning](../../integrations/auto-versioning/auto-versioning.md) does in
-    `PR` mode — is not available yet. Yontrack refuses it with an explicit error rather than leaving a
-    half-finished merge request behind. It arrives with
-    [issue #1830](https://github.com/yontrack/yontrack/issues/1830).
+A file upload sends GitLab the file's `last_commit_id`, so that a file which changed between the moment
+Yontrack read it and the moment it writes it back is **refused** rather than silently overwritten.
 
 ### Change logs
 
@@ -183,13 +182,69 @@ lookups.
 
 A reference naming no project of the configuration is an error, rather than an empty file.
 
+### Auto-versioning merge requests
+
+When [auto-versioning](../../integrations/auto-versioning/auto-versioning.md) runs with `pushMode: PR`, Yontrack
+opens a **merge request** on GitLab with the version change, and — when the auto-versioning configuration asks
+for auto-approval — approves it and gets it merged.
+
+GitLab is the second SCM after GitHub to support **both** approval modes rather than refuse one:
+
+| `autoApprovalMode` | What Yontrack does                                                                                        |
+|--------------------|-----------------------------------------------------------------------------------------------------------|
+| `CLIENT`           | Approves the merge request, then waits until GitLab reports it as mergeable and merges it itself           |
+| `SCM`              | Approves the merge request, then hands the merge back to GitLab with `auto_merge` and does not wait        |
+
+Yontrack approves in **both** modes: on a project which requires an approval, an `auto_merge` request with no
+approval would simply sit there.
+
+Three things are worth knowing about how the merge behaves:
+
+* Yontrack polls GitLab's **`detailed_merge_status`**. A status which can resolve itself — the pipeline is
+  still running, GitLab is still working the merge out — is waited on, up to the *auto merge timeout*. A status
+  which needs a human — a conflict, a rebase, an approval still missing — ends the wait **at once**, and the
+  auto-versioning order reports a timeout rather than burning the whole timeout first.
+* Yontrack always sends the merge request's `sha` when merging. GitLab can be configured to require it, and a
+  `sha` which no longer matches the source branch is refused — so a merge request which moved between the
+  check and the merge is never merged blind.
+* Whether the commits are squashed is read back from GitLab's `squash_on_merge` rather than assumed from the
+  Yontrack setting: a GitLab project can force squashing either way.
+
+!!! warning "Self-approval depends on the project"
+
+    Yontrack approves with the token of the GitLab configuration — the same identity that opened the merge
+    request. GitLab does not forbid that, but whether it is allowed is the project setting
+    **_Prevent approval by author_** (`merge_requests_author_approval`). If the project forbids it, the merge
+    request is created and then blocks on `not_approved`.
+
+    A production deployment therefore often wants a **separate approver identity**: a second GitLab
+    configuration whose token belongs to another user, used by the projects that auto-version. Yontrack needs
+    no second identity of its own — unlike Bitbucket Cloud, where self-approval is impossible — but the GitLab
+    project has to allow the one it is given.
+
+!!! note "Merge trains"
+
+    On a project using **merge trains**, GitLab 19.1 and later routes an `auto_merge` request into the train
+    instead of merging it directly. The merge request is still merged, through the train, and Yontrack does not
+    try to detect or work around it: in `SCM` mode Yontrack has handed the merge over and does not wait for it
+    either way.
+
+Note that Yontrack never uses `approvals_before_merge`, deprecated since GitLab 16.0, nor
+`merge_when_pipeline_succeeds`, deprecated since 17.11, nor `merge_status`, deprecated since 15.6. Nothing in
+the merge request support depends on Premium: approve and unapprove are Free endpoints, and only approval
+*rules* are Premium.
+
 ### Settings
 
 In the UI, go to _Settings_ > _GitLab_.
 
-| Setting      | Default | Description                                          |
-|--------------|---------|------------------------------------------------------|
-| `maxCommits` | `1000`  | Maximum number of commits to return for a change log |
+| Setting              | Default   | Description                                                                              |
+|----------------------|-----------|------------------------------------------------------------------------------------------|
+| `maxCommits`         | `1000`    | Maximum number of commits to return for a change log                                     |
+| `squash`             | `true`    | Squash the commits of an auto-versioning merge request when it is merged                 |
+| `removeSourceBranch` | `true`    | Delete the source branch when an auto-versioning merge request is merged                 |
+| `autoMergeTimeout`   | `600000`  | Milliseconds to wait for an auto-versioning merge request to become mergeable            |
+| `autoMergeInterval`  | `30000`   | Milliseconds between two checks of the merge request's status. Each check is one request. |
 
 As code:
 
@@ -199,7 +254,14 @@ ontrack:
     settings:
       gitlab:
         maxCommits: 1000
+        squash: true
+        removeSourceBranch: true
+        autoMergeTimeout: 600000
+        autoMergeInterval: 30000
 ```
+
+There is deliberately **no merge strategy** setting as there is for Bitbucket Cloud: GitLab's merge API offers
+`squash` and `should_remove_source_branch` and nothing equivalent to a three-way choice.
 
 ## Proxies
 

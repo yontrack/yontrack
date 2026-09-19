@@ -52,6 +52,18 @@ class DefaultGitLabClientTest {
     }
 
     @Test
+    fun `The current user is the owner of the token`() {
+        val client = client()
+        val server = MockRestServiceServer.bindTo(client.template).build()
+        server.expect(requestTo("https://gitlab.com/api/v4/user"))
+            .andRespond(withSuccess("""{"id":7,"username":"bot"}""", MediaType.APPLICATION_JSON))
+        val user = client.getCurrentUser()
+        assertEquals(7L, user.id)
+        assertEquals("bot", user.username)
+        server.verify()
+    }
+
+    @Test
     fun `A configuration URL with a trailing slash does not double the separator`() {
         val client = client(config.copy(url = "https://gitlab.example.com/"))
         val server = MockRestServiceServer.bindTo(client.template).build()
@@ -565,14 +577,66 @@ class DefaultGitLabClientTest {
     }
 
     @Test
-    fun `Uploading a file replaces it when it is already there`() {
+    fun `Downloading a file which is not there yet is retried when the caller asks for it`() {
         val client = client()
         val server = MockRestServiceServer.bindTo(client.template).build()
+        val uri = "https://gitlab.com/api/v4/projects/group%2Fproject/repository/files/app.yaml/raw?ref=main"
+        server.expect(requestTo(uri)).andRespond(withStatus(HttpStatus.NOT_FOUND))
+        server.expect(requestTo(uri)).andRespond(withSuccess("name: app", MediaType.TEXT_PLAIN))
+        assertEquals(
+            "name: app",
+            client.download("group/project", "main", "app.yaml", retryOnNotFound = true)?.decodeToString(),
+        )
+        assertEquals(listOf(DefaultGitLabClient.NOT_FOUND_RETRY_SECONDS), slept)
+        server.verify()
+    }
+
+    @Test
+    fun `Downloading a file which stays missing gives up after a bounded number of retries`() {
+        val client = client()
+        val server = MockRestServiceServer.bindTo(client.template).build()
+        val uri = "https://gitlab.com/api/v4/projects/group%2Fproject/repository/files/app.yaml/raw?ref=main"
+        repeat(DefaultGitLabClient.NOT_FOUND_RETRIES) {
+            server.expect(requestTo(uri)).andRespond(withStatus(HttpStatus.NOT_FOUND))
+        }
+        assertNull(client.download("group/project", "main", "app.yaml", retryOnNotFound = true))
+        assertEquals(DefaultGitLabClient.NOT_FOUND_RETRIES - 1, slept.size)
+        server.verify()
+    }
+
+    @Test
+    fun `Downloading a file which is not there is not retried by default`() {
+        val client = client()
+        val server = MockRestServiceServer.bindTo(client.template).build()
+        server.expect(requestTo(Matchers.startsWith("https://gitlab.com/api/v4/projects/group%2Fproject/repository/files/")))
+            .andRespond(withStatus(HttpStatus.NOT_FOUND))
+        assertNull(client.download("group/project", "main", "app.yaml"))
+        assertTrue(slept.isEmpty(), "Nothing was waited for")
+        server.verify()
+    }
+
+    /**
+     * The file is read before being written, which says which verb to use and gives the `last_commit_id`
+     * that protects the write against a concurrent one.
+     */
+    @Test
+    fun `Uploading a file replaces it and sends back its last commit id`() {
+        val client = client()
+        val server = MockRestServiceServer.bindTo(client.template).build()
+        server.expect(requestTo("https://gitlab.com/api/v4/projects/group%2Fproject/repository/files/app.yaml?ref=main"))
+            .andExpect(method(HttpMethod.GET))
+            .andRespond(
+                withSuccess(
+                    """{"file_path":"app.yaml","ref":"main","blob_id":"b1","last_commit_id":"c1"}""",
+                    MediaType.APPLICATION_JSON,
+                )
+            )
         server.expect(requestTo("https://gitlab.com/api/v4/projects/group%2Fproject/repository/files/app.yaml"))
             .andExpect(method(HttpMethod.PUT))
             .andExpect(jsonPath("$.branch").value("main"))
             .andExpect(jsonPath("$.encoding").value("base64"))
             .andExpect(jsonPath("$.commit_message").value("Some message"))
+            .andExpect(jsonPath("$.last_commit_id").value("c1"))
             .andExpect(jsonPath("$.content").value(Base64.getEncoder().encodeToString("name: app".toByteArray())))
             .andRespond(withSuccess("{}", MediaType.APPLICATION_JSON))
         client.upload("group/project", "main", "app.yaml", "name: app".toByteArray(), "Some message")
@@ -580,18 +644,159 @@ class DefaultGitLabClientTest {
     }
 
     @Test
-    fun `Uploading a file creates it when the update is refused`() {
+    fun `Uploading a file which is not there creates it`() {
         val client = client()
         val server = MockRestServiceServer.bindTo(client.template).build()
-        server.expect(requestTo("https://gitlab.com/api/v4/projects/group%2Fproject/repository/files/app.yaml"))
-            .andExpect(method(HttpMethod.PUT))
-            .andRespond(withStatus(HttpStatus.BAD_REQUEST))
+        server.expect(requestTo("https://gitlab.com/api/v4/projects/group%2Fproject/repository/files/app.yaml?ref=main"))
+            .andExpect(method(HttpMethod.GET))
+            .andRespond(withStatus(HttpStatus.NOT_FOUND))
         server.expect(requestTo("https://gitlab.com/api/v4/projects/group%2Fproject/repository/files/app.yaml"))
             .andExpect(method(HttpMethod.POST))
+            .andExpect(jsonPath("$.branch").value("main"))
+            .andExpect(jsonPath("$.last_commit_id").doesNotExist())
             .andRespond(withSuccess("{}", MediaType.APPLICATION_JSON))
         client.upload("group/project", "main", "app.yaml", "name: app".toByteArray(), "Some message")
         server.verify()
     }
+
+    @Test
+    fun `Creating a merge request`() {
+        val client = client()
+        val server = MockRestServiceServer.bindTo(client.template).build()
+        server.expect(requestTo("https://gitlab.com/api/v4/projects/group%2Fproject/merge_requests"))
+            .andExpect(method(HttpMethod.POST))
+            .andExpect(header(DefaultGitLabClient.PRIVATE_TOKEN_HEADER, "secret"))
+            .andExpect(jsonPath("$.source_branch").value("feature/one"))
+            .andExpect(jsonPath("$.target_branch").value("main"))
+            .andExpect(jsonPath("$.title").value("Some title"))
+            .andExpect(jsonPath("$.description").value("Some description"))
+            .andExpect(jsonPath("$.remove_source_branch").value(true))
+            .andExpect(jsonPath("$.squash").value(true))
+            .andExpect(jsonPath("$.reviewer_ids[0]").value(42))
+            // Deprecated since 16.0, and a Premium concept: never sent
+            .andExpect(jsonPath("$.approvals_before_merge").doesNotExist())
+            .andRespond(withSuccess(mergeRequestJson(iid = 12), MediaType.APPLICATION_JSON))
+        val mr = client.createMergeRequest(
+            project = "group/project",
+            sourceBranch = "feature/one",
+            targetBranch = "main",
+            title = "Some title",
+            description = "Some description",
+            reviewerIds = listOf(42),
+            removeSourceBranch = true,
+            squash = true,
+        )
+        assertEquals(12L, mr.iid, "iid of the merge request")
+        assertEquals("abcdef", mr.sha)
+        assertEquals("mergeable", mr.detailed_merge_status)
+        assertTrue(mr.squash_on_merge, "The squash is read back from squash_on_merge")
+        server.verify()
+    }
+
+    @Test
+    fun `Creating a merge request without reviewers sends none`() {
+        val client = client()
+        val server = MockRestServiceServer.bindTo(client.template).build()
+        server.expect(requestTo("https://gitlab.com/api/v4/projects/group%2Fproject/merge_requests"))
+            .andExpect(jsonPath("$.reviewer_ids").doesNotExist())
+            .andRespond(withSuccess(mergeRequestJson(iid = 12), MediaType.APPLICATION_JSON))
+        client.createMergeRequest(
+            project = "group/project",
+            sourceBranch = "feature/one",
+            targetBranch = "main",
+            title = "Some title",
+            description = "Some description",
+            reviewerIds = emptyList(),
+            removeSourceBranch = false,
+            squash = false,
+        )
+        server.verify()
+    }
+
+    @Test
+    fun `Approving a merge request`() {
+        val client = client()
+        val server = MockRestServiceServer.bindTo(client.template).build()
+        server.expect(requestTo("https://gitlab.com/api/v4/projects/group%2Fproject/merge_requests/12/approve"))
+            .andExpect(method(HttpMethod.POST))
+            .andExpect(header(DefaultGitLabClient.PRIVATE_TOKEN_HEADER, "secret"))
+            .andRespond(withSuccess("{}", MediaType.APPLICATION_JSON))
+        client.approveMergeRequest("group/project", 12)
+        server.verify()
+    }
+
+    @Test
+    fun `Merging a merge request always sends the sha`() {
+        val client = client()
+        val server = MockRestServiceServer.bindTo(client.template).build()
+        server.expect(requestTo("https://gitlab.com/api/v4/projects/group%2Fproject/merge_requests/12/merge"))
+            .andExpect(method(HttpMethod.PUT))
+            .andExpect(jsonPath("$.sha").value("abcdef"))
+            .andExpect(jsonPath("$.merge_commit_message").value("Some message"))
+            .andExpect(jsonPath("$.squash").value(true))
+            .andExpect(jsonPath("$.squash_commit_message").value("Some message"))
+            .andExpect(jsonPath("$.should_remove_source_branch").value(true))
+            .andExpect(jsonPath("$.auto_merge").doesNotExist())
+            .andRespond(withSuccess(mergeRequestJson(iid = 12, state = "merged"), MediaType.APPLICATION_JSON))
+        val merged = client.mergeMergeRequest(
+            project = "group/project",
+            iid = 12,
+            sha = "abcdef",
+            message = "Some message",
+            squash = true,
+            removeSourceBranch = true,
+            autoMerge = false,
+        )
+        assertEquals("merged", merged.state)
+        server.verify()
+    }
+
+    /**
+     * `auto_merge`, not `merge_when_pipeline_succeeds`, deprecated in 17.11.
+     */
+    @Test
+    fun `Asking GitLab to merge on its own sends auto merge`() {
+        val client = client()
+        val server = MockRestServiceServer.bindTo(client.template).build()
+        server.expect(requestTo("https://gitlab.com/api/v4/projects/group%2Fproject/merge_requests/12/merge"))
+            .andExpect(method(HttpMethod.PUT))
+            .andExpect(jsonPath("$.sha").value("abcdef"))
+            .andExpect(jsonPath("$.auto_merge").value(true))
+            .andExpect(jsonPath("$.merge_when_pipeline_succeeds").doesNotExist())
+            .andRespond(withSuccess(mergeRequestJson(iid = 12), MediaType.APPLICATION_JSON))
+        client.mergeMergeRequest(
+            project = "group/project",
+            iid = 12,
+            sha = "abcdef",
+            message = "Some message",
+            squash = false,
+            removeSourceBranch = true,
+            autoMerge = true,
+        )
+        server.verify()
+    }
+
+    @Test
+    fun `Looking a user up by its exact username`() {
+        val client = client()
+        val server = MockRestServiceServer.bindTo(client.template).build()
+        server.expect(requestTo("https://gitlab.com/api/v4/users?username=alice"))
+            .andExpect(method(HttpMethod.GET))
+            .andRespond(withSuccess("""[{"id":42,"username":"alice"}]""", MediaType.APPLICATION_JSON))
+        assertEquals(42, client.findUserByUsername("alice")?.id)
+        server.verify()
+    }
+
+    @Test
+    fun `An unknown user is null rather than an error`() {
+        val client = client()
+        val server = MockRestServiceServer.bindTo(client.template).build()
+        server.expect(requestTo("https://gitlab.com/api/v4/users?username=ghost"))
+            .andRespond(withSuccess("[]", MediaType.APPLICATION_JSON))
+        assertNull(client.findUserByUsername("ghost"))
+        server.verify()
+    }
+
 
     @Test
     fun `Comparing two references goes through the merge base and returns the commits most recent first`() {
@@ -761,15 +966,23 @@ class DefaultGitLabClientTest {
         }
     """.trimIndent()
 
-    private fun mergeRequestJson() = """
+    private fun mergeRequestJson(
+        iid: Int = 3,
+        state: String = "opened",
+        detailedMergeStatus: String = "mergeable",
+    ) = """
         {
-            "id": 300,
-            "iid": 3,
+            "id": ${iid * 100},
+            "iid": $iid,
             "title": "Some merge request",
-            "state": "opened",
+            "state": "$state",
             "source_branch": "feature/one",
             "target_branch": "main",
-            "web_url": "https://gitlab.com/group/project/-/merge_requests/3"
+            "web_url": "https://gitlab.com/group/project/-/merge_requests/$iid",
+            "sha": "abcdef",
+            "detailed_merge_status": "$detailedMergeStatus",
+            "squash_on_merge": true,
+            "has_conflicts": false
         }
     """.trimIndent()
 

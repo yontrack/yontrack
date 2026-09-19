@@ -125,6 +125,19 @@ data class GitLabCommit(
 
 /**
  * A merge request.
+ *
+ * [iid] is the number inside the project, which every merge request endpoint takes and which Yontrack names
+ * a pull request by; [id] is global to the instance and means nothing to a user.
+ *
+ * Three of the fields exist for the auto-versioning merge, and each of them replaces something GitLab has
+ * deprecated:
+ *
+ * * [detailed_merge_status] replaces `merge_status`, deprecated since 15.6, and is what the auto-versioning
+ *   polling reads - see [mergeability];
+ * * [sha] is the head of the source branch, which the merge call sends back: GitLab 19.2 added a project
+ *   setting making `sha` mandatory on merge, and a mismatch is a 409 rather than a merge of the wrong thing;
+ * * [squash_on_merge] is what GitLab will **actually** do, which project settings can force either way, as
+ *   opposed to `squash`, which is only what was asked for.
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 data class GitLabMergeRequest(
@@ -135,6 +148,83 @@ data class GitLabMergeRequest(
     val source_branch: String = "",
     val target_branch: String = "",
     val web_url: String = "",
+    val sha: String? = null,
+    val detailed_merge_status: String? = null,
+    val squash_on_merge: Boolean = false,
+    val has_conflicts: Boolean = false,
+) {
+    /**
+     * Can this merge request be merged, not yet, or not at all - read from [detailed_merge_status].
+     */
+    val mergeability: GitLabMergeability get() = GitLabMergeability.of(detailed_merge_status)
+}
+
+/**
+ * What a merge request's `detailed_merge_status` means to a caller waiting to merge it.
+ *
+ * GitLab has a good twenty values there and keeps adding to them, so they are not enumerated: only the ones
+ * known to be **transient** are listed, and anything else which is not `mergeable` is taken to need a human.
+ * A status GitLab invents next therefore costs a give-up and a report rather than a caller waiting out its
+ * whole timeout - and never a merge.
+ */
+enum class GitLabMergeability {
+
+    /** Ready to be merged now. */
+    MERGEABLE,
+
+    /** Not yet, but it can become mergeable on its own: waiting is the right answer. */
+    PENDING,
+
+    /** Not mergeable without someone doing something - a conflict, a rebase, a missing approval. */
+    BLOCKED;
+
+    companion object {
+
+        /**
+         * The `detailed_merge_status` of a merge request which can be merged now.
+         */
+        const val MERGEABLE_STATUS = "mergeable"
+
+        /**
+         * The statuses which resolve themselves: GitLab is still computing the merge, or the pipeline has
+         * not finished running yet.
+         */
+        val PENDING_STATUSES: Set<String> = setOf(
+            "checking",
+            "unchecked",
+            "preparing",
+            "approvals_syncing",
+            "ci_must_pass",
+            "ci_still_running",
+        )
+
+        /**
+         * A merge request carrying no status at all is taken as [PENDING] rather than [BLOCKED]: the field
+         * is only ever absent on a GitLab older than 15.6 or on a partial answer, and waiting out the
+         * timeout is the safe reading of "not known".
+         */
+        fun of(status: String?): GitLabMergeability = when {
+            status.isNullOrBlank() -> PENDING
+            status == MERGEABLE_STATUS -> MERGEABLE
+            status in PENDING_STATUSES -> PENDING
+            else -> BLOCKED
+        }
+    }
+}
+
+/**
+ * A file of a repository, as `GET /projects/:id/repository/files/:path` returns it.
+ *
+ * Only [last_commit_id] is read from it: it is what an update sends back to GitLab so that a file changed
+ * since it was read is rejected rather than silently overwritten. The content itself comes from the `/raw`
+ * endpoint instead, which does not base64-encode it.
+ */
+@JsonIgnoreProperties(ignoreUnknown = true)
+data class GitLabFile(
+    val file_path: String = "",
+    val ref: String = "",
+    val blob_id: String? = null,
+    val last_commit_id: String? = null,
 )
 
 /**

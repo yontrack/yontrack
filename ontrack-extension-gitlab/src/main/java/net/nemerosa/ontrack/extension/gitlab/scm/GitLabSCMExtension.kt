@@ -1,5 +1,8 @@
 package net.nemerosa.ontrack.extension.gitlab.scm
 
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeoutOrNull
 import net.nemerosa.ontrack.extension.git.casc.GitConfigService
 import net.nemerosa.ontrack.extension.git.model.getCommitLink
 import net.nemerosa.ontrack.extension.git.model.gitRepository
@@ -12,6 +15,8 @@ import net.nemerosa.ontrack.extension.gitlab.client.GitLabClient
 import net.nemerosa.ontrack.extension.gitlab.client.GitLabClientFactory
 import net.nemerosa.ontrack.extension.gitlab.model.GitLabConfiguration
 import net.nemerosa.ontrack.extension.gitlab.model.GitLabIssueServiceConfiguration
+import net.nemerosa.ontrack.extension.gitlab.model.GitLabMergeRequest
+import net.nemerosa.ontrack.extension.gitlab.model.GitLabMergeability
 import net.nemerosa.ontrack.extension.gitlab.property.GitLabGitConfiguration
 import net.nemerosa.ontrack.extension.gitlab.property.GitLabProjectConfigurationProperty
 import net.nemerosa.ontrack.extension.gitlab.property.GitLabProjectConfigurationPropertyType
@@ -168,9 +173,15 @@ class GitLabSCMExtension(
             val ref = scmBranch?.takeIf { it.isNotBlank() }
                 ?: client.getProject(repository)?.default_branch
                 ?: return null
-            return client.download(repository, ref, path)
+            return client.download(repository, ref, path, retryOnNotFound)
         }
 
+        /**
+         * The `commit` argument is not used, and cannot be: it is the head of the upgrade branch, while
+         * GitLab's optimistic concurrency on a file is `last_commit_id`, the last commit **of that file**.
+         * The client reads it itself, which is where the protection lives - see
+         * [net.nemerosa.ontrack.extension.gitlab.client.GitLabClient.upload].
+         */
         override fun upload(scmBranch: String, commit: String, path: String, content: ByteArray, message: String) {
             client.upload(
                 project = repository,
@@ -182,10 +193,19 @@ class GitLabSCMExtension(
         }
 
         /**
-         * Creating a merge request is the business of the auto-versioning support, which arrives with
-         * [issue #1830](https://github.com/yontrack/yontrack/issues/1830). Refusing here is deliberate: a
-         * half-built merge request - created but never approved, never merged, never cleaned up - would be
-         * worse than an error naming what is missing.
+         * Creates a merge request, and - when the auto-versioning order asks for it - approves and merges it.
+         *
+         * GitLab is the second SCM after GitHub to honour **both** values of auto-versioning's
+         * `AutoApprovalMode` rather than reject one:
+         *
+         * * `CLIENT` - Yontrack approves, polls `detailed_merge_status` until GitLab says `mergeable`, and
+         *   merges itself;
+         * * `SCM` - Yontrack approves and hands the merge back to GitLab with `auto_merge`, which merges as
+         *   soon as everything passes.
+         *
+         * The approval is the same call in both modes, and it is a **Free** endpoint: only approval *rules*
+         * are Premium. There is no separate approver identity either - GitLab does not forbid self-approval,
+         * it is the project setting `merge_requests_author_approval`, which is a deployment concern.
          */
         override fun createPR(
             from: String,
@@ -196,30 +216,174 @@ class GitLabSCMExtension(
             remoteAutoMerge: Boolean,
             message: String,
             reviewers: List<String>,
-        ): SCMPullRequest =
-            throw GitLabSCMPullRequestNotSupportedException()
+        ): SCMPullRequest {
+            val settings = settings()
+            val mr = client.createMergeRequest(
+                project = repository,
+                sourceBranch = from,
+                targetBranch = to,
+                title = title,
+                description = description,
+                reviewerIds = resolveReviewers(reviewers),
+                removeSourceBranch = settings.removeSourceBranch,
+                squash = settings.squash,
+            )
+            if (!autoApproval) {
+                return toSCMPullRequest(mr, toStatus(mr.state))
+            }
+            // Approving, in both modes: an `auto_merge` on a project which requires an approval would
+            // otherwise sit there for ever
+            client.approveMergeRequest(repository, mr.iid.toInt())
+            val status = if (remoteAutoMerge) {
+                autoMerge(mr, message, settings)
+            } else {
+                waitAndMerge(mr, message, settings)
+            }
+            return toSCMPullRequest(mr, status)
+        }
 
         /**
-         * A GitLab merge request is named by its `iid` inside the project, which Yontrack writes `#123`.
+         * Turns the reviewer names of the auto-versioning configuration into the numeric `reviewer_ids` the
+         * merge request API takes. A name GitLab does not know is skipped rather than failing the order: a
+         * missing reviewer is not a reason to leave the version behind.
+         */
+        private fun resolveReviewers(reviewers: List<String>): List<Long> =
+            reviewers.mapNotNull { username ->
+                val user = client.findUserByUsername(username)
+                if (user == null) {
+                    logger.warn("[gitlab] Unknown reviewer $username on $repository, ignored.")
+                }
+                user?.id
+            }
+
+        /**
+         * Hands the merge back to GitLab with `auto_merge`.
+         *
+         * The merge request stays open until GitLab merges it, so the status is [SCMPullRequestStatus.OPEN]
+         * unless GitLab merged it on the spot - which it does when there is nothing left to wait for.
+         *
+         * On a project using **merge trains**, GitLab 19.1 and later routes this into the train rather than
+         * merging directly. That is documented rather than enforced: the merge request is still merged, just
+         * through the train, and Yontrack has nothing useful to do about it.
+         */
+        private fun autoMerge(
+            mr: GitLabMergeRequest,
+            message: String,
+            settings: GitLabSettings,
+        ): SCMPullRequestStatus {
+            val merged = merge(mr, message, settings, autoMerge = true)
+            return toStatus(merged.state)
+        }
+
+        /**
+         * Polls the merge request until GitLab reports it as mergeable, then merges it.
+         *
+         * The poll reads **`detailed_merge_status`**, never `merge_status`, which has been deprecated since
+         * 15.6. A status which cannot resolve itself - a conflict, a rebase needed, an approval still
+         * missing - ends the wait at once instead of burning the whole timeout.
+         */
+        private fun waitAndMerge(
+            mr: GitLabMergeRequest,
+            message: String,
+            settings: GitLabSettings,
+        ): SCMPullRequestStatus {
+            val iid = mr.iid.toInt()
+            val ready: GitLabMergeRequest? = runBlocking {
+                withTimeoutOrNull(timeMillis = settings.autoMergeTimeout) {
+                    var current: GitLabMergeRequest? = mr
+                    var mergeable: GitLabMergeRequest? = null
+                    while (mergeable == null) {
+                        val state = current ?: break
+                        when (state.mergeability) {
+                            GitLabMergeability.MERGEABLE -> mergeable = state
+                            GitLabMergeability.BLOCKED -> {
+                                logger.warn(
+                                    "[gitlab] Merge request $PR_NAME_PREFIX$iid of $repository cannot be " +
+                                            "merged: ${state.detailed_merge_status}"
+                                )
+                                break
+                            }
+
+                            GitLabMergeability.PENDING -> {
+                                delay(settings.autoMergeInterval)
+                                current = client.getMergeRequest(repository, iid)
+                            }
+                        }
+                    }
+                    mergeable
+                }
+            }
+            if (ready == null) {
+                // Timed out, blocked, or gone: the caller reads the outcome from the status
+                return client.getMergeRequest(repository, iid)?.let { toStatus(it.state) }
+                    ?: SCMPullRequestStatus.UNKNOWN
+            }
+            val merged = merge(ready, message, settings, autoMerge = false)
+            return toStatus(merged.state)
+        }
+
+        /**
+         * The merge call itself, which always sends the `sha` of the merge request: GitLab 19.2 added a
+         * project setting making it mandatory, and a `sha` which no longer matches the source branch is
+         * answered with a 409 rather than merging something nobody reviewed.
+         *
+         * What is squashed is read back from **`squash_on_merge`** rather than repeated from the setting.
+         * The setting is what was *asked for*, at creation time; `squash_on_merge` is what GitLab will
+         * actually do, and a project can force it either way - on with "Require", off with "Do not allow".
+         * Echoing the setting here would ask for the opposite of what the project decided.
+         */
+        private fun merge(
+            mr: GitLabMergeRequest,
+            message: String,
+            settings: GitLabSettings,
+            autoMerge: Boolean,
+        ): GitLabMergeRequest {
+            val sha = mr.sha
+                ?: client.getMergeRequest(repository, mr.iid.toInt())?.sha
+                ?: throw GitLabSCMNoMergeRequestShaException(repository, mr.iid.toInt())
+            return client.mergeMergeRequest(
+                project = repository,
+                iid = mr.iid.toInt(),
+                sha = sha,
+                message = message,
+                squash = mr.squash_on_merge,
+                removeSourceBranch = settings.removeSourceBranch,
+                autoMerge = autoMerge,
+            )
+        }
+
+        /**
+         * A GitLab merge request is named by its `iid` inside the project, which Yontrack writes
+         * `PR-123` - as it does on Bitbucket Cloud.
+         *
+         * Not `#123`: on GitLab that is the syntax of an **issue** reference, which the GitLab issue service
+         * of this very module parses. A merge request is `!123` there, and a name mixing the two conventions
+         * would read as an issue wherever it is shown.
          */
         override fun getPullRequestByName(prName: String): SCMPullRequest? =
-            prName.takeIf { it.startsWith("#") }
-                ?.substringAfter("#")
+            prName.takeIf { it.startsWith(PR_NAME_PREFIX) }
+                ?.substringAfter(PR_NAME_PREFIX)
                 ?.toIntOrNull()
                 ?.let { client.getMergeRequest(repository, it) }
-                ?.let { mr ->
-                    SCMPullRequest(
-                        id = mr.iid.toString(),
-                        name = "#${mr.iid}",
-                        link = mr.web_url,
-                        status = when (mr.state) {
-                            "opened", "locked" -> SCMPullRequestStatus.OPEN
-                            "merged" -> SCMPullRequestStatus.MERGED
-                            "closed" -> SCMPullRequestStatus.DECLINED
-                            else -> SCMPullRequestStatus.UNKNOWN
-                        },
-                    )
-                }
+                ?.let { toSCMPullRequest(it, toStatus(it.state)) }
+
+        private fun toSCMPullRequest(mr: GitLabMergeRequest, status: SCMPullRequestStatus) = SCMPullRequest(
+            id = mr.iid.toString(),
+            name = "$PR_NAME_PREFIX${mr.iid}",
+            link = mr.web_url,
+            status = status,
+        )
+
+        private fun toStatus(state: String?): SCMPullRequestStatus =
+            when (state) {
+                "opened", "locked" -> SCMPullRequestStatus.OPEN
+                "merged" -> SCMPullRequestStatus.MERGED
+                "closed" -> SCMPullRequestStatus.DECLINED
+                else -> SCMPullRequestStatus.UNKNOWN
+            }
+
+        private fun settings(): GitLabSettings =
+            cachedSettingsService.getCachedSettings(GitLabSettings::class.java)
 
         /**
          * Through the local clone, as for Bitbucket Cloud and Bitbucket Server. The clone is synchronised
@@ -249,7 +413,7 @@ class GitLabSCMExtension(
          * Bitbucket Cloud.
          */
         override suspend fun getCommits(fromCommit: String, toCommit: String): List<SCMCommit> {
-            val maxCommits = cachedSettingsService.getCachedSettings(GitLabSettings::class.java).maxCommits
+            val maxCommits = settings().maxCommits
             val commits = client.getCommits(repository, fromCommit, toCommit, maxCommits)
                 .takeIf { it.isNotEmpty() }
                 ?: client.getCommits(repository, toCommit, fromCommit, maxCommits)
@@ -341,6 +505,13 @@ class GitLabSCMExtension(
 
     companion object {
         const val TYPE = "gitlab"
+
+        /**
+         * How Yontrack names a GitLab merge request, as on Bitbucket Cloud.
+         *
+         * Not `#`, which on GitLab names an **issue** - the form this module's own issue service parses.
+         */
+        const val PR_NAME_PREFIX = "PR-"
     }
 }
 
@@ -352,6 +523,7 @@ class GitLabSCMProjectNotFoundException(configuration: String, ref: String) : In
     "No GitLab project of the configuration $configuration matches the reference: $ref."
 )
 
-class GitLabSCMPullRequestNotSupportedException : InputException(
-    "Creating a GitLab merge request is not supported yet. See https://github.com/yontrack/yontrack/issues/1830."
+class GitLabSCMNoMergeRequestShaException(project: String, iid: Int) : InputException(
+    "The GitLab merge request ${GitLabSCMExtension.PR_NAME_PREFIX}$iid of the project $project carries no " +
+            "sha, which is mandatory to merge it."
 )
