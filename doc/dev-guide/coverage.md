@@ -86,6 +86,13 @@ therefore badly undercounted and the percentage flatters itself. `line` has no s
 unloaded file reports every one of its lines as uncovered, which is what the denominator decision
 asks for. The comment in `ontrack-web-core/jest.coverage.js` has the detail.
 
+It is also **the one figure that does not reproduce**. Two consecutive runs of
+`:ontrack-web-core:testCoverage` on the same commit and the same machine gave 55.1 and 54.1, on
+branch totals of 3139 and 3108: the denominator itself moves, because which files v8 attributes
+branch ranges to depends on what it happened to load and optimise. So do not read a couple of
+points between your run and CI's as a difference in the code, or as the two paths having diverged —
+everything else here is exact. `line` is stable to a hundredth over the same runs.
+
 ### Why `COVERAGE.KDSL` and `COVERAGE.UI` look high
 
 Because they measure a **running instance**, not just the test's own calls. The agent is attached
@@ -143,7 +150,11 @@ three honestly at 0%, and `coverageReport` prints which sessions were not produc
 One figure does not survive a partial run. `unique_line` means "covered by this type and by no
 other", so with only the unit tests collected every unit line is unique and `unique_line` comes out
 equal to `line` — against CI's 3.8, because there four other types cover most of the same lines.
-`line` and `branch` are read from one report each and are comparable with CI whatever else ran.
+`line` and `branch` are read from one report each and are comparable with CI whatever else ran —
+exactly, for the four backend types. A local `./gradlew test -Pcoverage` on the commit this page
+was written for gave `COVERAGE.UNIT` 20.2 / 21.9, which is what the `coverage` job of the same
+commit recorded. The one exception is `COVERAGE.UI_UNIT`'s `branch`, which does not reproduce
+against itself either — see [above](#coverageui_units-branch).
 
 The acceptance suites are the expensive half, and they work the same way:
 
