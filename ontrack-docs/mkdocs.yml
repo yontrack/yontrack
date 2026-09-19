@@ -132,6 +132,7 @@ nav:
               - GitHub: content/reference/ci-config/scm-engines/github.md
               - Bitbucket Server: content/reference/ci-config/scm-engines/bitbucket-server.md
               - Bitbucket Cloud: content/reference/ci-config/scm-engines/bitbucket-cloud.md
+              - GitLab: content/reference/ci-config/scm-engines/gitlab.md
       - Event types: content/generated/events/index.md
       - Metrics: content/generated/metrics/index.md
       - Notification channels: content/generated/notifications/index.md

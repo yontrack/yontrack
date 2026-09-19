@@ -8,8 +8,11 @@ dependencies {
     implementation("org.apache.commons:commons-lang3")
     implementation(project(":ontrack-ui-graphql"))
     implementation(project(":ontrack-extension-casc"))
+    implementation(project(":ontrack-extension-config"))
 
     testImplementation(project(":ontrack-test-utils"))
+    testImplementation(project(":ontrack-extension-jenkins"))
+    testImplementation(testFixtures(project(":ontrack-extension-config")))
     testImplementation(testFixtures(project(":ontrack-it-utils")))
     testImplementation("org.springframework.boot:spring-boot-starter-actuator")
     testImplementation("org.yaml:snakeyaml")

@@ -5,3 +5,4 @@ List of SCM engines supported by the [CI Configuration](../../../configuration/c
 * [`github`](github.md) - GitHub repositories
 * [`bitbucket-server`](bitbucket-server.md) - Bitbucket Server repositories
 * [`bitbucket-cloud`](bitbucket-cloud.md) - Bitbucket Cloud repositories
+* [`gitlab`](gitlab.md) - GitLab projects, on gitlab.com or self-managed
