@@ -6,6 +6,9 @@
 .pnp.js
 
 # testing
+# Where `./gradlew :ontrack-web-core:testCoverage -Pcoverage` writes the Jest coverage
+# reports (#1820): the HTML report, the lcov data and the `coverage-summary.json` whose
+# `total.lines.pct` and `total.branches.pct` the coverage job of #1821 reads.
 /coverage
 
 # next.js

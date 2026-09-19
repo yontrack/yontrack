@@ -1,4 +1,5 @@
 const nextJest = require('next/jest')
+const coverage = require('./jest.coverage')
 
 /** @type {import('jest').Config} */
 const createJestConfig = nextJest({
@@ -9,6 +10,11 @@ const createJestConfig = nextJest({
 // Add any custom config to be passed to Jest
 const config = {
     coverageProvider: 'v8',
+    // What `npm run test:coverage` collects and where it writes it (#1820). Nothing here has any
+    // effect on a plain `npm run test`, which never passes `--coverage`: coverage is collected on
+    // coverage runs only. See `jest.coverage.js` for the denominator and for the contract the
+    // JSON summary is.
+    ...coverage,
     testEnvironment: 'jsdom',
     // The default 5s budget is tight for the component tests: the first `render()` in a worker pays
     // antd's cssinjs cold start, which on a contended CI agent can blow past 5s before the test's own
