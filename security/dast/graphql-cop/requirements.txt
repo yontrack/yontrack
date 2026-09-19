@@ -10,8 +10,9 @@
 # imports it only for --tor.
 #
 # Move this file and GRAPHQL_COP_REF in .github/workflows/dast-passive.yml together.
-requests==2.25.1 \
-    --hash=sha256:c210084e36a42ae6b9219e00e48287def368a26d03a048ddad7bfee44f75871e
+requests==2.33.0 \
+    --hash=sha256:3324635456fa185245e24865e810cecec7b4caf933d7eb133dcde67d48cee69b \
+    --hash=sha256:c7ebc5e8b0f21837386ad0e1c8fe8b829fa5f544d8df3b2253bff14ef29d7652
 simplejson==3.17.6 \
     --hash=sha256:f63600ec06982cdf480899026f4fda622776f5fabed9a869fdb32d72bc17e99a
 termcolor==2.2.0 \
