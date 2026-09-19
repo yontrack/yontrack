@@ -158,6 +158,67 @@ assert_eq "unit " "$(COVERAGE_EXPECTED_SESSIONS='unit' cr_expected | tr '\n' ' '
     "and the whole list can be stated outright"
 
 # ===============================================================================================
+# Completeness per test type (#1822)
+#
+# `check` answers the all-or-nothing question. `status` answers it once per backend test type,
+# which is what lets a lost `kdsl` shard fail COVERAGE.KDSL without blanking COVERAGE.UNIT. The
+# second field of each line is either `ok` or a sentence that goes straight into the FAILED
+# stamp's description, so it must stay on one line.
+# ===============================================================================================
+
+assert_eq "integration" "$(cr_type_of_session integration-4)" "a session names its type"
+assert_eq "ui" "$(cr_type_of_session ui-ldap)" "including the unsharded Playwright legs"
+assert_eq "unit" "$(cr_type_of_session unit)" "and the one session that is its own type"
+assert_eq "" "$(cr_type_of_session something-else)" "anything else belongs to no type"
+
+complete_artefacts "$WORK/artefacts"
+rm -rf "$WORK/exec"
+cr_collect "$WORK/artefacts" "$WORK/exec" > /dev/null 2>&1
+output="$(cr_status "$WORK/exec" 2>&1)"
+status=$?
+assert_eq "0" "$status" "a complete set is ok for every type: $output"
+assert_eq "unit ok integration ok kdsl ok ui ok " "$(tr '\t\n' '  ' <<< "$output")" \
+    "one line per backend type, in report order"
+
+# One lost KDSL shard: KDSL is not ok, and the three other types still are. This is the whole
+# point of reporting per type -- #1821 turned any gap into a red job, and a flaky leg losing its
+# artefact must not cost `main` its green build nor blank out the figures that did arrive.
+complete_artefacts "$WORK/artefacts"
+rm -rf "$WORK/artefacts/coverage-kdsl-2"
+rm -rf "$WORK/exec"
+cr_collect "$WORK/artefacts" "$WORK/exec" > /dev/null 2>&1
+output="$(cr_status "$WORK/exec" 2>&1)"
+status=$?
+assert_eq "1" "$status" "an incomplete type makes the whole command fail"
+assert_contains "$output" "kdsl	no execution data for: kdsl-2" "naming what the type is missing"
+assert_contains "$output" "unit	ok" "while the unit tests are untouched"
+assert_contains "$output" "integration	ok" "and so are the integration tests"
+assert_contains "$output" "ui	ok" "and the Playwright legs"
+assert_eq "1" "$(grep -c 'no execution data' <<< "$output")" "exactly one type is named"
+
+# A whole type gone -- every Playwright leg lost. Its line names all five sessions, on one line,
+# because that line is a validation run description.
+complete_artefacts "$WORK/artefacts"
+rm -rf "$WORK/artefacts"/coverage-ui-*
+rm -rf "$WORK/exec"
+cr_collect "$WORK/artefacts" "$WORK/exec" > /dev/null 2>&1
+output="$(cr_status "$WORK/exec" 2>&1)"
+assert_contains "$output" "ui	no execution data for: ui-ldap ui-main-1 ui-main-2 ui-main-3 ui-oidc" \
+    "a type with nothing at all names every session it wanted"
+assert_eq "4" "$(wc -l <<< "$output" | tr -d ' ')" "and still reports one line per type"
+
+# An unexpected session is charged to its own type, and never silently to another.
+complete_artefacts "$WORK/artefacts"
+mv "$WORK/artefacts/coverage-ui-ldap-1/build/jacoco/ui-ldap.exec" \
+   "$WORK/artefacts/coverage-ui-ldap-1/build/jacoco/ui-ldap-1.exec"
+rm -rf "$WORK/exec"
+cr_collect "$WORK/artefacts" "$WORK/exec" > /dev/null 2>&1
+output="$(cr_status "$WORK/exec" 2>&1)"
+assert_contains "$output" "unexpected sessions: ui-ldap-1" "an unexpected session is reported"
+assert_contains "$output" "no execution data for: ui-ldap" "beside the session it displaced"
+assert_contains "$output" "kdsl	ok" "and costs no other type anything"
+
+# ===============================================================================================
 # The denominator
 # ===============================================================================================
 

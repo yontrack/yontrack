@@ -96,6 +96,57 @@ configuration:
             warningValue: 1
             failedLevel: HIGH
             failedValue: 1
+        # Test coverage, reported by the `coverage` job in ci.yml on the push builds of `main` and
+        # `release/*` - the ones registered here - and on a workflow_dispatch that asks for it
+        # (#1822). Six stamps: four backend test types, their merged total, and the frontend unit
+        # tests. Every figure is a percentage from 0 to 100 with one decimal.
+        #
+        # What each metric means, defined once in scripts/coverage-metrics.sh and computed there:
+        #
+        #   line         covered lines over all lines of the denominator
+        #   branch       covered branches over all branches
+        #   unique_line  lines covered by THIS test type and by no other backend type, over the
+        #                same denominator as `line` - so the four are directly comparable, and
+        #                sum to at most COVERAGE.TOTAL's `line`. It is what says whether a whole
+        #                test level could be deleted without losing coverage.
+        #
+        # The denominator is every production module; the test tooling, the KDSL clients and the
+        # web modules are excluded, and the list lives in scripts/coverage-report.sh. A class no
+        # test touches counts as 0%, which is the point.
+        #
+        # COVERAGE.UI is the Playwright legs, measured inside the backend container - backend
+        # coverage exercised through the UI, not frontend coverage. The only frontend figure is
+        # COVERAGE.UI_UNIT, from Jest. Read its `branch` with care: under Jest's v8 coverage
+        # provider a file no test loads counts as ONE uncovered branch rather than its real branch
+        # count, so the denominator is badly undercounted and the percentage flatters itself. The
+        # comment in ontrack-web-core/jest.coverage.js has the detail. `line` has no such problem.
+        #
+        # Recording only, like the SECURITY stamps: no thresholds, no promotion. `metrics` has no
+        # notion of pass or fail - MetricsValidationDataType.computeStatus returns null and the
+        # run falls back to PASSED - so a stamp here is green whenever its figures exist. A test
+        # leg whose execution data never arrived sends FAILED instead, with the missing sessions
+        # in the description; the figures for the types that did arrive are still recorded, minus
+        # their `unique_line`, which cannot be honest while another type is missing.
+        #
+        # Spelled as the `metrics` alias rather than as the data type's class name, unlike
+        # SECURITY.SECRETS above. The caution that one carries is about an alias reaching an
+        # instance older than the release that introduced it, and this one does not: the alias
+        # has been in the codebase since 2025-10 and the instance runs 5.4.2. Verified against the
+        # instance itself rather than inferred, by asking it to resolve this exact block through
+        # `effectiveCIConfiguration` - the read-only dry run of this parser - which returned
+        # net.nemerosa.ontrack.extension.general.validation.MetricsValidationDataType.
+        COVERAGE.UNIT:
+          metrics: {}
+        COVERAGE.INTEGRATION:
+          metrics: {}
+        COVERAGE.KDSL:
+          metrics: {}
+        COVERAGE.UI:
+          metrics: {}
+        COVERAGE.TOTAL:
+          metrics: {}
+        COVERAGE.UI_UNIT:
+          metrics: {}
         # Reported by the `docs` job in ci.yml, which now runs on every full run: the site
         # built and was archived as a run artefact for the release to carry forward (#1668).
         # Distinct from DOCUMENTATION below, which records the S3 publication at release time

@@ -17,6 +17,11 @@
 #   expected                    Prints the session IDs a complete run produces, one per line.
 #   check EXECDIR               Fails, naming them, when the sessions found are not exactly the
 #                               expected ones. See *Completeness* below.
+#   status EXECDIR              The same question asked once per backend test type: one
+#                               `<type><TAB>ok` or `<type><TAB><reason>` line per type, in report
+#                               order, and a non-zero exit when any of them is not ok. The reason
+#                               is one line and is written to be read as a sentence, because it
+#                               becomes the description of a FAILED COVERAGE.* run (#1822).
 #   classfiles [TREE]           Prints the class directories the reports measure -- the
 #                               denominator. See *Denominator* below.
 #   sourcefiles [TREE]          Prints the matching source directories.
@@ -57,6 +62,13 @@
 #
 # An *unexpected* session fails too: it means a leg was renamed or a suffix leaked where it should
 # not have, and two legs writing one session ID silently lose a leg.
+#
+# `check` gives the all-or-nothing answer and `status` gives it per backend test type. The second
+# is what #1822 records: a lost `kdsl` shard fails COVERAGE.KDSL and COVERAGE.TOTAL, and leaves
+# COVERAGE.UNIT, COVERAGE.INTEGRATION and COVERAGE.UI reporting their real `line` and `branch`.
+# Their `unique_line` is dropped in that case and not merely left alone -- "covered by this type
+# and by no other" is measured *against* the other types, so a type whose data is missing inflates
+# every other type's unique share. `line` and `branch` read one report and are unaffected.
 #
 # Denominator
 # -----------
@@ -217,6 +229,62 @@ cr_expected() {
     } | sort -u
 }
 
+# The backend test type a session belongs to. Empty for a name that matches none of them, which
+# `collect` cannot produce -- it files every session under its type's directory -- but which an
+# explicit COVERAGE_EXPECTED_SESSIONS can.
+cr_type_of_session() {
+    case "$1" in
+        unit) echo unit ;;
+        integration-*) echo integration ;;
+        kdsl-*) echo kdsl ;;
+        ui-*) echo ui ;;
+        *) echo "" ;;
+    esac
+}
+
+# The sessions present for one type: a session directory of that type holding at least one .exec.
+cr_sessions_of_type() {
+    local execdir="${1:-}" type="${2:-}" dir
+    for dir in "$execdir/$type"/*; do
+        [ -d "$dir" ] || continue
+        [ -n "$(find "$dir" -name '*.exec' -type f -print -quit)" ] || continue
+        basename "$dir"
+    done | sort -u
+}
+
+cr_expected_of_type() {
+    local type="${1:-}" session
+    while IFS= read -r session; do
+        [ "$(cr_type_of_session "$session")" = "$type" ] && echo "$session"
+    done < <(cr_expected)
+    return 0
+}
+
+# Completeness, one answer per backend test type. See *Completeness* above.
+cr_status() {
+    local execdir="${1:-}" type found expected missing unexpected reason status=0
+    [ -n "$execdir" ] || { cr_fail "No execution data directory"; return 1; }
+    for type in "${CR_TYPES[@]}"; do
+        found="$(cr_sessions_of_type "$execdir" "$type")" || return 1
+        expected="$(cr_expected_of_type "$type")" || return 1
+        missing="$(comm -23 <(echo "$expected") <(echo "$found") | tr '\n' ' ' | sed 's/ *$//')"
+        unexpected="$(comm -13 <(echo "$expected") <(echo "$found") | tr '\n' ' ' | sed 's/ *$//')"
+        reason=""
+        [ -n "$missing" ] && reason="no execution data for: $missing"
+        if [ -n "$unexpected" ]; then
+            [ -n "$reason" ] && reason="$reason; "
+            reason="${reason}unexpected sessions: $unexpected"
+        fi
+        if [ -n "$reason" ]; then
+            printf '%s\t%s\n' "$type" "$reason"
+            status=1
+        else
+            printf '%s\tok\n' "$type"
+        fi
+    done
+    return $status
+}
+
 cr_check() {
     local execdir="${1:-}" found expected missing unexpected status=0
     found="$(cr_sessions "$execdir")" || return 1
@@ -339,12 +407,13 @@ cr_main() {
         sessions) cr_sessions "${1:-}" ;;
         expected) cr_expected ;;
         check) cr_check "${1:-}" ;;
+        status) cr_status "${1:-}" ;;
         classfiles) cr_classfiles "${1:-}" ;;
         sourcefiles) cr_sourcefiles "${1:-}" ;;
         report) cr_report "$@" ;;
         execinfo) cr_execinfo "${1:-}" ;;
         *)
-            echo "Usage: $0 collect|sessions|expected|check|classfiles|sourcefiles|report|execinfo ..." >&2
+            echo "Usage: $0 collect|sessions|expected|check|status|classfiles|sourcefiles|report|execinfo ..." >&2
             return 1
             ;;
     esac

@@ -44,8 +44,14 @@
 # **Partial figures are never emitted.** Anything missing -- a report, the Jest summary, a
 # denominator that does not match the merged one -- fails, writes no output, and says what was
 # missing. A figure computed over part of the suite reads as a real coverage drop, which is worse
-# than no figure at all. Completeness of the *execution data* is checked one step earlier, by
-# `scripts/coverage-report.sh check`.
+# than no figure at all.
+#
+# Completeness of the *execution data* is a separate question, asked by
+# `scripts/coverage-report.sh status` and answered per backend test type. This script computes
+# every figure regardless: a type whose legs all reported has an honest `line` and `branch` even
+# when another type lost everything, since each is read from that type's own report. Which of
+# these figures may be sent to which stamp is `scripts/coverage-validate.sh`'s decision, and
+# `unique_line` is the one that does not survive a missing type -- see its header (#1822).
 
 set -uo pipefail
 

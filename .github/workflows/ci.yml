@@ -1538,22 +1538,32 @@ jobs:
 
   coverage:
     name: Coverage report
-    needs: [setup, build, integration, kdsl, ui-tests]
+    needs: [setup, yontrack, build, integration, kdsl, ui-tests]
     if: >-
       ${{ !cancelled()
         && needs.setup.outputs.coverage == 'true'
+        && needs.yontrack.result != 'failure'
         && needs.build.result == 'success'
         && needs.integration.result != 'skipped'
         && needs.kdsl.result != 'skipped'
         && needs.ui-tests.result != 'skipped' }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
-    # Read by #1822, which records the figures as COVERAGE.* stamps: `complete` says whether every
-    # leg reported, and `metrics` is the JSON document whose contract is in coverage-metrics.sh.
+    # `complete` says whether every leg reported and `metrics` is the JSON document whose contract
+    # is in coverage-metrics.sh. This job records them itself, as the six COVERAGE.* stamps
+    # (#1822); they stay as outputs because they are the only machine-readable summary of the run
+    # and cost nothing.
     outputs:
       complete: ${{ steps.check.outcome }}
       metrics: ${{ steps.metrics.outputs.metrics }}
     steps:
+      # The run time reported for this job's validations is measured from here. A `run:` step is
+      # the earliest point a workflow can observe: the runner's own "Set up job" precedes every
+      # step and is not visible to any of them.
+      - name: Record the job start
+        id: job_start
+        run: echo "started=$(date +%s)" >> "$GITHUB_OUTPUT"
+
       - uses: actions/checkout@v4
 
       # jacococli is a plain JVM tool; nothing here runs Gradle.
@@ -1561,6 +1571,18 @@ jobs:
         with:
           distribution: zulu
           java-version: "21"
+
+      # Before the reports, not after: a report step that fails must still be able to send its
+      # six FAILED stamps. The build this job runs for is always registered — `coverage` is only
+      # ever true on a run where `full_run` is true too, so the `yontrack` job has run.
+      - name: Link to the Yontrack build
+        id: link
+        uses: nemerosa/ontrack-github-actions-cli-library/ontrack-cli-workflow-build@v1.0.3
+        with:
+          project: ${{ needs.yontrack.outputs.project }}
+          yontrack-url: ${{ vars.YONTRACK_URL }}
+          yontrack-token: ${{ secrets.YONTRACK_TOKEN }}
+          version: ${{ env.YONTRACK_CLI_VERSION }}
 
       - name: Collect the coverage artefacts
         id: download
@@ -1581,9 +1603,13 @@ jobs:
       # the missing file is the signal, and this is where it is read. A shard whose artefact never
       # arrived, or a leg whose dump produced nothing, leaves its session out and is named here.
       #
-      # `continue-on-error` so that the reports are still built and uploaded — they are useful even
-      # when a leg is missing — but the figures are then not computed (partial figures are never
-      # emitted) and the last step of this job fails it.
+      # Asked per backend test type rather than all-or-nothing (#1822): each type's answer becomes
+      # one stamp, either `ok` or a one-line reason that goes straight into a FAILED run's
+      # description. `coverage-status.txt` is what the stamps step reads; a file that is not there
+      # is not the same as one saying everything is fine, and that script treats it as such.
+      #
+      # `continue-on-error` so that the reports are still built and uploaded: they are useful even
+      # when a leg is missing, and the incomplete legs have stamps of their own to go to.
       - name: Check that every leg reported
         id: check
         continue-on-error: true
@@ -1593,10 +1619,14 @@ jobs:
           COVERAGE_UI_MAIN_SHARDS: ${{ env.UI_MAIN_SHARDS }}
         run: |
           set -uo pipefail
-          # What the execution data itself says, for the record. Informational: the check below is
+          # What the execution data itself says, for the record. Informational: the status below is
           # what decides, and it reads the files rather than jacococli's output format.
           scripts/coverage-report.sh execinfo coverage-exec || true
-          scripts/coverage-report.sh check coverage-exec
+
+          scripts/coverage-report.sh status coverage-exec > coverage-status.txt
+          status=$?
+          cat coverage-status.txt
+          exit $status
 
       # COVERAGE_TREE is the `coverage-classes` artefact of the `build` job: the exact production
       # classes that ran, and their sources. This runner's own checkout has the sources but never
@@ -1617,9 +1647,16 @@ jobs:
             cp -R coverage-artifacts/coverage-jest/. coverage-reports/jest/
           fi
 
+      # Run whatever the completeness check said. The figures of a type whose legs all reported are
+      # computed from that type's own report and are right regardless of what another type lost;
+      # which of them may be *sent* is decided one step down, per stamp.
+      #
+      # `continue-on-error`: when no figure can be computed at all — a report missing, the Jest
+      # summary gone — the six stamps still go out, as FAILED. A stamp that never arrives is a
+      # hole in the history that nothing explains; a red one says what happened.
       - name: Compute the figures
         id: metrics
-        if: ${{ steps.check.outcome == 'success' }}
+        continue-on-error: true
         env:
           COVERAGE_JEST_SUMMARY: coverage-artifacts/coverage-jest/coverage-summary.json
         run: |
@@ -1636,6 +1673,41 @@ jobs:
           path: coverage-reports/**
           if-no-files-found: warn
           retention-days: 30
+
+      # After the upload, so that the artefact every stamp's description points at exists by the
+      # time the stamp does.
+      #
+      # The six COVERAGE.* stamps (#1822). Recording only — declared with the `metrics` data type
+      # in .yontrack/ci.yaml, in no promotion, no threshold — so a stamp is PASSED whenever its
+      # figures exist and FAILED when its test type lost its execution data.
+      #
+      # Which figure may be sent for which stamp, given what a run lost, is the whole judgement of
+      # that issue, so it lives in scripts/coverage-validate.sh where it is tested
+      # (scripts/coverage-validate-test.sh) rather than in workflow YAML where it is not. Its
+      # header states the rules; the short of it is that an incomplete type sends FAILED with the
+      # missing sessions named, COVERAGE.TOTAL follows any incomplete type, and the types that did
+      # report keep their `line` and `branch` but lose `unique_line`, which is measured against the
+      # other types and inflates as soon as one of them is missing.
+      #
+      # #1821 failed the whole job on a gap, because there was then nowhere else to put the
+      # signal. There is now: a FAILED stamp with its reason lands on the build, stays in the
+      # history and charts, and gates nothing. Reddening `main` for a flaky UI leg that lost its
+      # artefact would assert that the product is broken, which is a different and much louder
+      # claim than the one being made. The run still says so — see the warning at the end.
+      - name: Record the COVERAGE.* stamps
+        if: ${{ !cancelled() && steps.link.outcome == 'success' }}
+        env:
+          STARTED: ${{ steps.job_start.outputs.started }}
+          COVERAGE_REPORTS_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -uo pipefail
+          run_time_flag=""
+          if [ -n "${STARTED:-}" ]; then
+            run_time_flag="--run-time $(( $(date +%s) - STARTED ))"
+          fi
+          # shellcheck disable=SC2086  # deliberate: see YONTRACK_RUN_INFO
+          scripts/coverage-validate.sh coverage-status.txt coverage-reports/coverage-metrics.json \
+            -- $run_time_flag $YONTRACK_RUN_INFO
 
       - name: Summarise the reports
         if: always()
@@ -1659,19 +1731,21 @@ jobs:
             echo "| \`coverage-metrics.json\` | the six sets of figures |"
             if [ "$CHECK" != "success" ]; then
               echo
-              echo "**No figures were computed: some legs reported no execution data.** See the"
-              echo "*Check that every leg reported* step."
+              echo "**Some legs reported no execution data.** Their \`COVERAGE.*\` stamps are FAILED"
+              echo "on the Yontrack build and name what was missing; the types that did report keep"
+              echo "their \`line\` and \`branch\` but no \`unique_line\`, and \`COVERAGE.TOTAL\` is FAILED."
+              echo "See the *Check that every leg reported* step."
             fi
           } >> "$GITHUB_STEP_SUMMARY"
 
-      # Last, so that the reports are built and uploaded first. An incomplete set is a failure of
-      # this job and not a smaller number: a merged figure over four fifths of the suite reads as a
-      # real coverage drop, which is worse than no figure at all.
-      - name: Fail on an incomplete set
+      # An incomplete set is never a smaller number — that is what the FAILED stamps above are
+      # for — but it must not be quiet either. An annotation, not a failure: the claim being made
+      # is "a coverage leg lost its data", and failing the run would make it "the build is
+      # broken". See the stamps step for the whole of that argument (#1822).
+      - name: Warn on an incomplete set
         if: ${{ always() && steps.check.outcome == 'failure' }}
         run: |
-          echo "::error::Some test legs reported no coverage execution data; no figures were computed."
-          exit 1
+          echo "::warning::Some test legs reported no coverage execution data. The affected COVERAGE.* stamps are FAILED on the Yontrack build and name what was missing; the others carry no unique_line."
 
   # ---------------------------------------------------------------------------------------------
   # Trivy scan of the two Docker images, reported as CHML counts (#1749).

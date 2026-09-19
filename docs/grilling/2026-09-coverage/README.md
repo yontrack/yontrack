@@ -134,8 +134,10 @@ are left as the session recorded them — the issues carry the resolution:
   | `COVERAGE.TOTAL` | `line`, `branch` |
   | `COVERAGE.UI_UNIT` | `line`, `branch` |
 
-- **Icons:** proposed in [`icons/`](icons/), one per stamp and named after it. Each is a 128×128
-  PNG under 16 KB: a 75% coverage ring on a background whose colour identifies the test type.
+- **Icons:** one per stamp and named after it. Each is a 128×128 PNG under 16 KB: a 75% coverage
+  ring on a background whose colour identifies the test type. #1822 moved them out of this dated
+  directory to [`.yontrack/images/validations/`](../../../.yontrack/images/validations/), beside
+  the `ci.yaml` that names the stamps; the README there says how they are uploaded.
 - **Record only:** the stamps are PASSED whenever figures exist. They are in **no promotion**, like
   the `SECURITY.*` stamps.
 - **Collection failure** (a missing shard or leg, or a failed dump) sends the stamp as **FAILED**,
