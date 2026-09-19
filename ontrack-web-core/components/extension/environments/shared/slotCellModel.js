@@ -27,9 +27,9 @@ export const inFlightDeployment = (slot) =>
 /**
  * The build a slot is holding: the last one actually deployed.
  *
- * Deliberately *not* the in-flight build. "89 · 1.3.9" is what is running in that environment right
- * now; "→ 107 candidate" is what is trying to replace it, and the cell shows the second as an
- * overlay on the first rather than in its place.
+ * Deliberately *not* the in-flight build. "1.3.9" is what is running in that environment right now;
+ * "→ 1.4.0 candidate" is what is trying to replace it, and the cell shows the second as an overlay
+ * on the first rather than in its place.
  */
 export const deployedBuild = (slot) => slot?.lastDeployedPipeline?.build ?? null
 
@@ -47,13 +47,24 @@ export const topPromotionRun = (build) => {
 }
 
 /**
- * How a build is named in a cell: "104 · 1.4.3", or just "104" when it carries no release.
+ * How a build is named in a cell: its display name.
+ *
+ * `Build.displayName` is a non-null String the server resolves through `BuildDisplayNameService`,
+ * falling back to the build's own name when no display name provider answers - so "1.4.3" for a
+ * build carrying a release, "104" for one that does not, and the cell never has to know which case
+ * it is in.
+ *
+ * This deliberately replaces reading `releaseProperty.value`. That field is the property's **JSON
+ * value** - `{"name": "1.4.3"}`, not a string - and interpolating it produced `[object Object]`
+ * across the matrix, the drawer and the deploy dialog (#1824). `displayName` removes the class of
+ * bug rather than the instance: there is no shape left for a caller to get wrong.
+ *
+ * The fallback to `name` is for a caller whose query forgot to ask for `displayName`; the label
+ * degrades to the build number instead of going blank. `||` and not `??` so that an empty display
+ * name falls back too - a blank cell is the one answer that is never right, and it is what the
+ * mobile UI already does (`build.displayName || build.name`).
  */
-export const buildLabel = (build) => {
-    if (!build) return ''
-    const release = build.releaseProperty?.value
-    return release ? `${build.name} · ${release}` : build.name
-}
+export const buildLabel = (build) => build?.displayName || build?.name || ''
 
 /**
  * A compact age - "3d", "5h", "12m", "now" - for the one line a cell has.
@@ -99,10 +110,14 @@ export const slotDisplayNameWithoutProject = (slot) => {
 }
 
 /**
- * The overlay line of a cell: "→ 107 candidate", or `null` when nothing is in flight.
+ * The overlay line of a cell: "→ 1.4.0 candidate", or `null` when nothing is in flight.
+ *
+ * Named through `buildLabel` like the deployed build above it. A cell showing "1.3.9" on one line
+ * and "→ 107" on the next would be naming two builds two different ways in the space of two lines,
+ * and the overlay's whole job is to be compared with the line above it.
  */
 export const inFlightLabel = (slot) => {
     const pipeline = inFlightDeployment(slot)
     if (!pipeline) return null
-    return `→ ${pipeline.build?.name} ${pipeline.status?.toLowerCase()}`
+    return `→ ${buildLabel(pipeline.build)} ${pipeline.status?.toLowerCase()}`
 }

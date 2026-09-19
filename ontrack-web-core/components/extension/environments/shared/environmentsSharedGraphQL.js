@@ -5,14 +5,19 @@ import {gql} from "graphql-request"
  *
  * `promotionRuns(lastPerLevel: true)` comes back in the branch's own promotion order, lowest rung
  * first, so the *last* entry is the top promotion - see `topPromotionRun` in `slotCellModel`.
+ *
+ * `displayName` and not `releaseProperty { value }`: the property's value is JSON, and every screen
+ * asking for it had to know its shape to get a name out of it - which is how #1824 put
+ * `[object Object]` on the matrix, the drawer and the deploy dialog. `displayName` is a non-null
+ * String the server has already resolved, falling back to `name`, so there is no shape left to get
+ * wrong. `name` stays as the label's fallback, and for the few sentences that name the build number
+ * deliberately - "Deployment #12 (build 105, RUNNING) will be cancelled."
  */
 export const gqlSharedBuildData = gql`
     fragment SharedBuildData on Build {
         id
         name
-        releaseProperty {
-            value
-        }
+        displayName
         branch {
             id
             name

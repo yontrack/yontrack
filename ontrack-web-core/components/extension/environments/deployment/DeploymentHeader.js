@@ -51,13 +51,14 @@ export default function DeploymentHeader({
         <Space direction="vertical" size={8} className="ot-line" data-testid="deployment-header">
 
             <Space size={12} wrap>
+                {/*
+                  * `BuildLink` names the build through `buildKnownName`, which is the display name.
+                  * There was a second `Typography.Text` here rendering
+                  * `build.releaseProperty.value` beside it - the property's JSON object, which React
+                  * refuses as a child, so the whole page was an error screen for any build carrying
+                  * a release (#1824). The link already says the name, so nothing replaces it.
+                  */}
                 <BuildLink build={build}/>
-                {
-                    build?.releaseProperty?.value &&
-                    <Typography.Text strong data-testid="deployment-release">
-                        {build.releaseProperty.value}
-                    </Typography.Text>
-                }
                 {
                     build?.branch &&
                     <Typography.Text type="secondary">({build.branch.name})</Typography.Text>

@@ -318,7 +318,7 @@ function SlotSummaryBody({
                             <Typography.Text type="secondary" data-testid={`${testId}-next-none`}>
                                 {
                                     deployedBuild || inFlight ?
-                                        `No eligible build newer than ${(inFlight ?? deployed).build.name}.` :
+                                        `No eligible build newer than ${buildLabel((inFlight ?? deployed).build)}.` :
                                         'No eligible build.'
                                 }
                             </Typography.Text>

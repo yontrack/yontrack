@@ -16,9 +16,11 @@ Object.defineProperty(window, 'matchMedia', {
 })
 
 // The build link and the promotion image both reach for things a DOM-less render has no use for.
+// The stand-in names the build the way the real `BuildLink` does - through `buildKnownName`, which
+// prefers the display name - so a test asserting on the name is asserting on the real behaviour.
 jest.mock("../../../../components/builds/BuildLink", () => ({
     __esModule: true,
-    default: ({build}) => <span>{build?.name}</span>,
+    default: ({build}) => <span>{build?.displayName ?? build?.name}</span>,
 }))
 jest.mock("../../../../components/promotionLevels/PromotionLevelImage", () => ({
     __esModule: true,
@@ -36,6 +38,7 @@ const deployment = ({
                         finishAction = {ok: true},
                         changes = [],
                         authorizations = [granted('pipeline', 'create')],
+                        build = {id: 1, name: '107', displayName: '107', branch: {id: 1, name: 'main'}, promotionRuns: []},
                     } = {}) => ({
     id: 'p-1',
     number: 3,
@@ -46,7 +49,7 @@ const deployment = ({
     runAction,
     finishAction,
     changes,
-    build: {id: 1, name: '107', branch: {id: 1, name: 'main'}, promotionRuns: []},
+    build,
     slot: {id: 'slot-1', authorizations},
 })
 
@@ -110,6 +113,28 @@ describe('the deployment header', () => {
     it('offers nothing at all on a cancelled one', () => {
         header({status: 'CANCELLED'})
         expect(screen.queryByTestId('deployment-actions')).not.toBeInTheDocument()
+    })
+
+    /*
+     * #1824. The header used to render `build.releaseProperty.value` - the property's JSON object -
+     * as a React child, which React refuses, so the deployment page was an error screen for every
+     * build carrying a release. The fixture below is the shape the server actually returns, which
+     * the old fixture was not: it had no release at all, which is why nothing here went red.
+     */
+    it('names a build carrying a release, without choking on the property JSON', () => {
+        header({
+            build: {
+                id: 1,
+                name: '89',
+                displayName: '1.3.9',
+                releaseProperty: {value: {name: '1.3.9'}},
+                branch: {id: 1, name: 'release-1.3'},
+                promotionRuns: [],
+            },
+        })
+        expect(screen.getByTestId('deployment-header')).toBeInTheDocument()
+        expect(screen.getByText('1.3.9')).toBeInTheDocument()
+        expect(screen.queryByText(/object Object/)).not.toBeInTheDocument()
     })
 
     it('draws Cancelled in place of the step the deployment never reached', () => {

@@ -193,10 +193,10 @@ describe('the deploy dialog, opened from a slot', () => {
         return dialog
     }
 
-    const build = (name) => ({
+    const build = (name, displayName) => ({
         id: name,
         name,
-        releaseProperty: null,
+        displayName: displayName ?? name,
         promotionRuns: [],
     })
 

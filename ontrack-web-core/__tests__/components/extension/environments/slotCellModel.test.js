@@ -17,10 +17,17 @@ import {
  * them wrong is wrong in four places at once. They are worth their own tests.
  */
 
-const build = (name, {release, promotions = []} = {}) => ({
+/**
+ * A build as the server hands it over.
+ *
+ * `displayName` is `String!` and the server falls back to the build's name when no display name
+ * provider answers, so the fixture never leaves it unset - a fixture that did would be testing a
+ * shape the server cannot produce, which is exactly how #1824 went unnoticed.
+ */
+const build = (name, {displayName, promotions = []} = {}) => ({
     id: name,
     name,
-    releaseProperty: release ? {value: release} : null,
+    displayName: displayName ?? name,
     promotionRuns: promotions.map(level => ({id: `run-${level}`, promotionLevel: {id: level, name: level}})),
 })
 
@@ -98,12 +105,24 @@ describe('the top promotion', () => {
 
 describe('the build label', () => {
 
-    it('carries the release beside the name', () => {
-        expect(buildLabel(build('104', {release: '1.4.3'}))).toBe('104 · 1.4.3')
+    it('is the display name', () => {
+        expect(buildLabel(build('104', {displayName: '1.4.3'}))).toBe('1.4.3')
     })
 
-    it('is just the name when there is no release', () => {
+    it('is the build name when the server has no display name to give', () => {
         expect(buildLabel(build('104'))).toBe('104')
+    })
+
+    it('falls back to the name when a caller forgot to ask for the display name', () => {
+        expect(buildLabel({id: '104', name: '104'})).toBe('104')
+    })
+
+    it('falls back to the name rather than going blank on an empty display name', () => {
+        expect(buildLabel({id: '104', name: '104', displayName: ''})).toBe('104')
+    })
+
+    it('is empty for no build at all', () => {
+        expect(buildLabel(null)).toBe('')
     })
 })
 

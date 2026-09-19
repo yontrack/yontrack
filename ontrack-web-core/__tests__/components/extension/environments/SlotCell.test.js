@@ -26,10 +26,10 @@ import SlotCell from "@components/extension/environments/shared/SlotCell"
  * another: the in-flight build is not the deployed build.
  */
 
-const build = (name, {release, promotions = []} = {}) => ({
+const build = (name, {displayName, promotions = []} = {}) => ({
     id: name,
     name,
-    releaseProperty: release ? {value: release} : null,
+    displayName: displayName ?? name,
     promotionRuns: promotions.map(level => ({
         id: `run-${level}`,
         promotionLevel: {id: level, name: level, image: false},
@@ -60,11 +60,11 @@ const slot = (overrides = {}) => ({
 
 describe('the slot cell', () => {
 
-    it('shows the deployed build and its release', () => {
+    it('shows the deployed build by its display name', () => {
         render(<SlotCell slot={slot({
-            lastDeployedPipeline: pipeline(1, 'DONE', build('104', {release: '1.4.3'}), {end: '2026-09-01T10:00:00Z'}),
+            lastDeployedPipeline: pipeline(1, 'DONE', build('104', {displayName: '1.4.3'}), {end: '2026-09-01T10:00:00Z'}),
         })}/>)
-        expect(screen.getByTestId('slot-cell-slot-1-deployed')).toHaveTextContent('104 · 1.4.3')
+        expect(screen.getByTestId('slot-cell-slot-1-deployed')).toHaveTextContent('1.4.3')
     })
 
     it('says so when a slot has never been deployed', () => {
