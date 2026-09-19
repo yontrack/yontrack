@@ -72,3 +72,6 @@ ontrack-extension-*/node_modules
 
 # Values captured by ontrack-extension-bitbucket-cloud/scripts/bitbucket-cloud-test-workspace.sh (tokens in clear)
 /.bitbucket-cloud-test.env
+
+# Values captured by ontrack-extension-gitlab/scripts/gitlab-test-project.sh (token in clear)
+/.gitlab-test.env

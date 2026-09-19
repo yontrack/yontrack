@@ -1,0 +1,32 @@
+# Pipeline of the fixture project of the GitLab test group.
+#
+# Committed by ontrack-extension-gitlab/scripts/gitlab-test-project.sh and checked by
+# GitLabTestFixtureTest.
+#
+# A Free namespace gets 400 compute minutes a month, and the tests push branches and open merge
+# requests all the time: nothing here may run on a push. The `workflow` rules below create a
+# pipeline only when MOCK_RESULT is passed, which only an explicit API trigger does — a push, a
+# merge request and a tag create no pipeline at all, and therefore cost nothing.
+
+workflow:
+  rules:
+    - if: $MOCK_RESULT
+    - when: never
+
+mock:
+  stage: test
+  image: alpine:3.22
+  # A runaway job would eat the month's compute minutes on its own.
+  timeout: 5 minutes
+  interruptible: true
+  rules:
+    - if: $MOCK_RESULT
+  script:
+    - echo "MOCK_MESSAGE=${MOCK_MESSAGE}"
+    - echo "MOCK_RESULT=${MOCK_RESULT}"
+    - echo "MOCK_DURATION=${MOCK_DURATION}"
+    # How long the test wants the pipeline to take, in seconds.
+    - sleep "${MOCK_DURATION:-0}"
+    - if [ "${MOCK_RESULT}" = "failure" ]; then echo "Failing on demand"; exit 1; fi
+    - if [ "${MOCK_RESULT}" != "success" ]; then echo "Unknown MOCK_RESULT=${MOCK_RESULT}"; exit 1; fi
+    - echo "Succeeding on demand"
