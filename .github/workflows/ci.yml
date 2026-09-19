@@ -33,6 +33,13 @@ on:
         description: Skipping integration tests for Bitbucket Cloud
         type: boolean
         default: true
+      # Coverage is collected on main and release/* only (#1821). This forces it on for a run
+      # started by hand, which is the only way to exercise the whole chain -- five test jobs, the
+      # artefacts and the report job - from a working branch before it is merged.
+      COVERAGE:
+        description: Collecting test coverage on this branch too
+        type: boolean
+        default: false
 
 # Keyed on the commit, not the branch. A group of `ci-refs/heads/main` serialised the whole
 # repository -- the workflow merges into main and never pushes the working branch, so every run
@@ -91,6 +98,12 @@ env:
   # what a *complete* set of shard artefacts looks like — see the check there. Keep in step with
   # the matrix; getting it wrong fails the INTEGRATION stamp loudly, which is the safe direction.
   INTEGRATION_SHARDS: "5"
+  # The same, for the two other sharded matrices. Only the `coverage` job reads them — it is what
+  # a *complete* set of execution data looks like, and a session missing from that set is a leg
+  # whose data was silently lost (#1821). Keep them in step with the matrices below; getting one
+  # wrong fails the coverage job loudly, which is the safe direction.
+  KDSL_SHARDS: "2"
+  UI_MAIN_SHARDS: "3"
   # Run-scoped tag used to hand the Docker images from `build` to the jobs that consume them.
   # Keyed on the run, deliberately not on the attempt: re-running just the failed jobs must
   # still find the images the original `build` attempt pushed. A re-run of `build` itself
@@ -123,6 +136,7 @@ jobs:
       version: ${{ steps.version.outputs.version }}
       base_version: ${{ steps.version.outputs.base_version }}
       full_run: ${{ steps.params.outputs.full_run }}
+      coverage: ${{ steps.params.outputs.coverage }}
       skip_kdsl_acceptance: ${{ steps.params.outputs.skip_kdsl_acceptance }}
       skip_next_ui_tests: ${{ steps.params.outputs.skip_next_ui_tests }}
       skip_github_it: ${{ steps.params.outputs.skip_github_it }}
@@ -161,7 +175,9 @@ jobs:
           IN_SKIP_NEXT_UI_TESTS: ${{ inputs.SKIP_NEXT_UI_TESTS }}
           IN_SKIP_GITHUB_IT: ${{ inputs.SKIP_GITHUB_IT }}
           IN_SKIP_BITBUCKET_CLOUD_IT: ${{ inputs.SKIP_BITBUCKET_CLOUD_IT }}
+          IN_COVERAGE: ${{ inputs.COVERAGE }}
           ACTOR: ${{ github.actor }}
+          REF: ${{ github.ref }}
         run: |
           set -euo pipefail
 
@@ -191,8 +207,26 @@ jobs:
             full_run=true
           fi
 
+          # Test coverage (#1821) is collected on the push builds of `main` and `release/*` only —
+          # the ones CI registers in Yontrack and records the COVERAGE.* stamps on. `full_run` is
+          # not that gate: it is true on any non-Dependabot push, working branches included, so
+          # keying coverage off it would instrument every branch build for figures nobody reads.
+          #
+          # The workflow_dispatch input forces it on, which is how the whole chain is exercised
+          # from a working branch before it is merged.
+          coverage=false
+          if [ "$full_run" = "true" ]; then
+            case "$REF" in
+              refs/heads/main|refs/heads/release/*) coverage=true ;;
+            esac
+            if [ "$EVENT_NAME" = "workflow_dispatch" ] && [ "$IN_COVERAGE" = "true" ]; then
+              coverage=true
+            fi
+          fi
+
           {
             echo "full_run=$full_run"
+            echo "coverage=$coverage"
             echo "skip_kdsl_acceptance=$(resolve "$IN_SKIP_KDSL_ACCEPTANCE" false)"
             echo "skip_next_ui_tests=$(resolve "$IN_SKIP_NEXT_UI_TESTS" false)"
             echo "skip_github_it=$(resolve "$IN_SKIP_GITHUB_IT" true)"
@@ -307,6 +341,7 @@ jobs:
       VERSION: ${{ needs.setup.outputs.version }}
       BASE_VERSION: ${{ needs.setup.outputs.base_version }}
       FULL_RUN: ${{ needs.setup.outputs.full_run }}
+      COVERAGE: ${{ needs.setup.outputs.coverage }}
     steps:
       # The run time reported for this job's validations is measured from here. A `run:` step is
       # the earliest point a workflow can observe: the runner's own "Set up job" precedes every
@@ -362,7 +397,21 @@ jobs:
           # The versioning plugin's own tests. They gate the version computation every other
           # job depends on, and `build` does not reach into buildSrc on its own.
           ./gradlew :buildSrc:test --stacktrace --console plain
-          ./gradlew build -x integrationTest -x buildDocs \
+
+          # Test coverage (#1821). `-Pcoverage` turns the JaCoCo agent on for the `test` tasks
+          # (#1818) and `:ontrack-web-core:testCoverage` runs the Jest suite a second time with
+          # `--coverage` (#1820) — a second task on a second npm script, deliberately, so that an
+          # ordinary run pays for neither. Both are off on every other branch, which is what keeps
+          # a pull request's build exactly what it was.
+          coverage_args=""
+          coverage_tasks=""
+          if [ "${COVERAGE:-false}" = "true" ]; then
+            coverage_args="-Pcoverage"
+            coverage_tasks=":ontrack-web-core:testCoverage"
+          fi
+
+          # shellcheck disable=SC2086  # deliberate: both are empty or a single word
+          ./gradlew build $coverage_tasks -x integrationTest -x buildDocs $coverage_args \
             --stacktrace \
             --parallel \
             --console plain
@@ -421,6 +470,57 @@ jobs:
           path: |
             **/build/reports/tests/**
             **/build/test-results/**/*.xml
+          if-no-files-found: ignore
+          retention-days: 7
+
+      # --- Test coverage (#1821) ------------------------------------------------------------
+      #
+      # always(), not !cancelled() and not failure(): a job killed by timeout-minutes counts as
+      # cancelled, and an artefact lost there leaves the report job computing a merged figure over
+      # part of the suite — which reads as a real coverage drop rather than as the accident it is.
+      # `kdsl` and `ui-tests` already upload their JUnit reports this way for the same reason.
+      #
+      # 7 days: only the `coverage` job reads these, and it runs minutes later. The reports it
+      # produces from them are the 30-day artefacts.
+
+      - name: Upload the unit test coverage
+        if: ${{ always() && env.COVERAGE == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-unit
+          path: '**/build/jacoco/test.exec'
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Upload the Jest coverage
+        if: ${{ always() && env.COVERAGE == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-jest
+          path: ontrack-web-core/coverage/**
+          if-no-files-found: ignore
+          retention-days: 7
+
+      # A JaCoCo report needs the *exact* class files that were executed, plus the sources. The
+      # `integration`, `kdsl` and `ui-tests` runners have their own checkouts and their own — or
+      # no — build output, and the report job has neither, so they travel from here.
+      #
+      # These are the production classes Jib packages into the image, which is what makes them
+      # valid against the data the agent collects inside that container (#1819).
+      #
+      # Everything is uploaded and the exclusion list is applied on the report, in
+      # scripts/coverage-report.sh: the denominator is one decision written down in one place, and
+      # a copy of it in this glob would be a second one, free to drift.
+      - name: Upload the classes and sources
+        if: ${{ always() && env.COVERAGE == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-classes
+          path: |
+            **/build/classes/java/main/**
+            **/build/classes/kotlin/main/**
+            **/src/main/java/**
+            **/src/main/kotlin/**
           if-no-files-found: ignore
           retention-days: 7
 
@@ -528,6 +628,12 @@ jobs:
               ontrack-extension-issues
               ontrack-extension-artifactory
     env:
+      # Test coverage (#1821). The suffix names this shard in the session ID of the execution data
+      # the agent writes — `integration-3` — so that the merged report's Sessions page shows which
+      # leg a class was covered from. Set whatever the gate says: without `-Pcoverage` the agent is
+      # off and the name is never used.
+      COVERAGE: ${{ needs.setup.outputs.coverage }}
+      COVERAGE_SESSION_SUFFIX: ${{ matrix.shard }}
       # Bitbucket Cloud system tests, against the test workspace provisioned by
       # ontrack-extension-bitbucket-cloud/scripts/bitbucket-cloud-test-workspace.sh (see the module's README).
       # The tests skip when no credential is set, and fail when only some are.
@@ -619,11 +725,15 @@ jobs:
             TASKS="$TASKS :$module:integrationTest"
           done
           echo "Running:$TASKS"
+          coverage_args=""
+          if [ "${COVERAGE:-false}" = "true" ]; then
+            coverage_args="-Pcoverage"
+          fi
           # integrationTest forks a 3072m JVM per module and --parallel will happily run
           # several at once; two workers is what a 16 GB runner takes alongside the compose
           # stack without turning into an OOM.
           # shellcheck disable=SC2086
-          ./gradlew $TASKS \
+          ./gradlew $TASKS $coverage_args \
             --stacktrace \
             --parallel \
             --max-workers 2 \
@@ -659,6 +769,16 @@ jobs:
           path: |
             **/build/test-results/integrationTest/**/*.xml
             build/integration-run-time.txt
+          if-no-files-found: ignore
+          retention-days: 7
+
+      # always(), not !cancelled(): see the coverage uploads in `build`.
+      - name: Upload the integration test coverage
+        if: ${{ always() && env.COVERAGE == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-integration-${{ matrix.shard }}
+          path: '**/build/jacoco/integrationTest.exec'
           if-no-files-found: ignore
           retention-days: 7
 
@@ -812,6 +932,12 @@ jobs:
       # leave the shards computing a partition of the wrong size.
       SHARD_INDEX: ${{ matrix.shard }}
       SHARD_TOTAL: ${{ strategy.job-total }}
+      # Test coverage (#1821). The backend of this stack runs in a container, so the agent gets in
+      # through the Compose override of #1819 and its data is dumped over TCP below. The suffix
+      # names the shard: `kdsl-1`, `kdsl-2`. COVERAGE_SESSION is left alone — this variant's
+      # default session type is already `kdsl`; it is the Playwright job that renames it.
+      COVERAGE: ${{ needs.setup.outputs.coverage }}
+      COVERAGE_SESSION_SUFFIX: ${{ matrix.shard }}
       BASE_VERSION: ${{ needs.setup.outputs.base_version }}
       # The compose files resolve the images as nemerosa/ontrack:${ONTRACK_VERSION:-latest}.
       ONTRACK_VERSION: ${{ needs.setup.outputs.base_version }}
@@ -869,20 +995,48 @@ jobs:
       # up itself. Each shard runs on its own runner and therefore brings up its own stack, which
       # is what makes the shards independent — the suite shares one admin user and one set of
       # global settings, so two shards could not have shared an instance.
+      #
+      # `-Pcoverage` matters here as much as on the test step: it is what makes the Compose files
+      # include compose/docker-compose-coverage.yml, which mounts the agent into the backend
+      # container and publishes its port. Without it on *this* step there is no agent to dump from.
       - name: Start the environment
         run: |
-          ./gradlew :ontrack-kdsl-acceptance:kdslAcceptanceTestComposeUp \
+          coverage_args=""
+          if [ "${COVERAGE:-false}" = "true" ]; then
+            coverage_args="-Pcoverage"
+          fi
+          # shellcheck disable=SC2086  # deliberate: empty or a single word
+          ./gradlew :ontrack-kdsl-acceptance:kdslAcceptanceTestComposeUp $coverage_args \
             --stacktrace --console plain
 
       - name: KDSL acceptance tests
         id: kdsl
         run: |
-          ./gradlew :ontrack-kdsl-acceptance:kdslAcceptanceTest \
+          coverage_args=""
+          if [ "${COVERAGE:-false}" = "true" ]; then
+            coverage_args="-Pcoverage"
+          fi
+          # shellcheck disable=SC2086  # deliberate: empty or a single word
+          ./gradlew :ontrack-kdsl-acceptance:kdslAcceptanceTest $coverage_args \
             -Dshard.index="$SHARD_INDEX" \
             -Dshard.total="$SHARD_TOTAL" \
             --stacktrace \
             --parallel \
             --console plain
+
+      # The stack is brought up by this workflow under `isCI`, so nothing here stops it and the
+      # dump is a step of its own rather than a Gradle finalizer. It runs whatever the tests did:
+      # `output=tcpserver` means the data is still in the container's agent, and a red suite's
+      # coverage is worth exactly as much as a green one's.
+      #
+      # A dump that cannot reach the agent warns rather than failing (#1819) and writes nothing.
+      # The missing file is the signal, and `scripts/coverage-report.sh check` turns it into a
+      # named, failing session rather than a quietly smaller figure.
+      - name: Dump the coverage of the backend container
+        if: ${{ always() && env.COVERAGE == 'true' }}
+        run: |
+          ./gradlew :ontrack-kdsl-acceptance:kdslAcceptanceTestCoverageDump -Pcoverage \
+            --stacktrace --console plain
 
       # KDSL.ACCEPTANCE is validated from kdsl-report, which has no span of its own worth reporting.
       # Each shard therefore hands its own job duration over inside its artefact and the reporting
@@ -923,6 +1077,18 @@ jobs:
         with:
           name: kdsl-logs-shard-${{ matrix.shard }}
           path: ontrack-kdsl-acceptance/build/logs/**
+          if-no-files-found: ignore
+          retention-days: 7
+
+      # always(), not !cancelled(): see the coverage uploads in `build`. The file is named after
+      # its session — `kdsl-1.exec` — by the dump task, which is what lets the report job tell the
+      # legs apart without trusting the artefact name.
+      - name: Upload the KDSL coverage
+        if: ${{ always() && env.COVERAGE == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-kdsl-${{ matrix.shard }}
+          path: build/jacoco/*.exec
           if-no-files-found: ignore
           retention-days: 7
 
@@ -1068,6 +1234,19 @@ jobs:
     env:
       BASE_VERSION: ${{ needs.setup.outputs.base_version }}
       ONTRACK_VERSION: ${{ needs.setup.outputs.base_version }}
+      # Test coverage (#1821). Two variables, and they do different things.
+      #
+      # COVERAGE_SESSION renames the one Compose variant two suites share: `docker-compose-kdsl.yml`
+      # serves both the KDSL acceptance suite and the `main` Playwright leg, and its default session
+      # type is `kdsl`. It is set unconditionally here because Coverage.containerSessionId honours it
+      # for that variant *only* — ldap and oidc keep their own names however this is set, which is
+      # what stops one job-level variable from collapsing three legs onto one session ID (#1819).
+      #
+      # COVERAGE_SESSION_SUFFIX applies to every variant, so it is set on the sharded legs only:
+      # `ui-main-1`…`ui-main-3`, but plain `ui-ldap` and `ui-oidc`.
+      COVERAGE: ${{ needs.setup.outputs.coverage }}
+      COVERAGE_SESSION: ui-main
+      COVERAGE_SESSION_SUFFIX: ${{ matrix.shards > 1 && matrix.shard || '' }}
     steps:
       # The run time reported for this job's validations is measured from here. A `run:` step is
       # the earliest point a workflow can observe: the runner's own "Set up job" precedes every
@@ -1136,10 +1315,18 @@ jobs:
       # Only uiTest guards its compose dependency behind `isCI`, so only that variant needs the
       # stack started here. uiLdapTest and uiOidcTest dependOn their own composeUp
       # unconditionally (ontrack-web-tests/build.gradle.kts) and would otherwise start it twice.
+      #
+      # `-Pcoverage` is what pulls compose/docker-compose-coverage.yml into the Compose files, so
+      # it belongs on this step as much as on the test one.
       - name: Start the environment
         if: matrix.variant == 'main'
         run: |
-          ./gradlew :ontrack-kdsl-acceptance:kdslAcceptanceTestComposeUp \
+          coverage_args=""
+          if [ "${COVERAGE:-false}" = "true" ]; then
+            coverage_args="-Pcoverage"
+          fi
+          # shellcheck disable=SC2086  # deliberate: empty or a single word
+          ./gradlew :ontrack-kdsl-acceptance:kdslAcceptanceTestComposeUp $coverage_args \
             --stacktrace --console plain
 
       # Playwright reads --shard from the command line only, so the Gradle build appends it to the
@@ -1148,11 +1335,30 @@ jobs:
       - name: UI tests
         id: test
         run: |
-          ./gradlew ":ontrack-web-tests:${{ matrix.task }}" \
+          coverage_args=""
+          if [ "${COVERAGE:-false}" = "true" ]; then
+            coverage_args="-Pcoverage"
+          fi
+          # shellcheck disable=SC2086  # deliberate: empty or a single word
+          ./gradlew ":ontrack-web-tests:${{ matrix.task }}" $coverage_args \
             -Dshard.index=${{ matrix.shard }} \
             -Dshard.total=${{ matrix.shards }} \
             --stacktrace \
             --console plain
+
+      # `main` only, and that asymmetry is the point. Only `uiTest` guards its Compose dependency
+      # behind `isCI`, so only that leg's stack is owned by the workflow and still up at this point;
+      # `uiLdapTest` and `uiOidcTest` bring their own up and take it down as a finalizer, with the
+      # dump ordered before it (#1819), so their data has already left the container by now and a
+      # dump here would only find nothing listening.
+      #
+      # Like the KDSL one, this runs whatever the tests did: the data is in the agent, not in a
+      # file the suite writes, so a red leg's coverage is as collectable as a green one's.
+      - name: Dump the coverage of the backend container
+        if: ${{ always() && env.COVERAGE == 'true' && matrix.variant == 'main' }}
+        run: |
+          ./gradlew :ontrack-kdsl-acceptance:kdslAcceptanceTestCoverageDump -Pcoverage \
+            --stacktrace --console plain
 
       # PLAYWRIGHT is validated from ui-tests-report, which has no span of its own worth
       # reporting — collecting artefacts takes seconds where the tests take minutes. Each variant
@@ -1208,6 +1414,17 @@ jobs:
         with:
           name: kdsl-logs-ui-${{ matrix.variant }}-${{ matrix.shard }}
           path: ontrack-kdsl-acceptance/build/logs/**
+          if-no-files-found: ignore
+          retention-days: 7
+
+      # always(), not !cancelled(): see the coverage uploads in `build`. The file inside is named
+      # after its session — `ui-main-2.exec`, `ui-ldap.exec` — not after this artefact.
+      - name: Upload the UI test coverage
+        if: ${{ always() && env.COVERAGE == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-ui-${{ matrix.variant }}-${{ matrix.shard }}
+          path: build/jacoco/*.exec
           if-no-files-found: ignore
           retention-days: 7
 
@@ -1296,6 +1513,165 @@ jobs:
               junit --pattern "ontrack-web-tests/reports/*/junit/*.xml" --fail-when-no-results \
               $run_time_flag $YONTRACK_RUN_INFO
           fi
+
+  # ---------------------------------------------------------------------------------------------
+  # Test coverage: the reports and the six sets of figures (#1821).
+  #
+  # Where the rest of `initiative: coverage` becomes visible. The five test jobs above collect
+  # JaCoCo execution data — the Gradle test JVMs directly (#1818), the backend *container* of the
+  # acceptance stacks over TCP (#1819) — and Jest writes its own summary (#1820). This job turns
+  # all of it into one HTML report per backend test type, one merged report whose *Sessions* page
+  # is the class-level origin view, and the figures #1822 records as COVERAGE.* stamps.
+  #
+  # `!cancelled()` rather than a success check on the test jobs: a red suite still produces
+  # coverage, and that figure is worth having. `build` is the exception — it is what produces the
+  # class files every report is measured against.
+  #
+  # A *skipped* suite is different from a failed one: SKIP_KDSL_ACCEPTANCE or SKIP_NEXT_UI_TESTS
+  # means a whole type was never meant to run, and there is no honest merged figure to compute, so
+  # the job does not run at all rather than reporting a drop that is really an absence.
+  #
+  # The logic lives in scripts/coverage-report.sh and scripts/coverage-metrics.sh, not here. #1823
+  # gives a contributor the same reports and the same figures from Gradle, and one definition that
+  # both paths call is the only way CI and a local run cannot disagree about what "72.4" means.
+  # ---------------------------------------------------------------------------------------------
+
+  coverage:
+    name: Coverage report
+    needs: [setup, build, integration, kdsl, ui-tests]
+    if: >-
+      ${{ !cancelled()
+        && needs.setup.outputs.coverage == 'true'
+        && needs.build.result == 'success'
+        && needs.integration.result != 'skipped'
+        && needs.kdsl.result != 'skipped'
+        && needs.ui-tests.result != 'skipped' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    # Read by #1822, which records the figures as COVERAGE.* stamps: `complete` says whether every
+    # leg reported, and `metrics` is the JSON document whose contract is in coverage-metrics.sh.
+    outputs:
+      complete: ${{ steps.check.outcome }}
+      metrics: ${{ steps.metrics.outputs.metrics }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # jacococli is a plain JVM tool; nothing here runs Gradle.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: zulu
+          java-version: "21"
+
+      - name: Collect the coverage artefacts
+        id: download
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          pattern: coverage-*
+          path: coverage-artifacts
+
+      - name: Lay the execution data out
+        run: |
+          set -euo pipefail
+          mkdir -p coverage-artifacts
+          ls coverage-artifacts
+          scripts/coverage-report.sh collect coverage-artifacts coverage-exec
+
+      # The loud half of the promise #1819 made when it let a failed dump warn instead of failing:
+      # the missing file is the signal, and this is where it is read. A shard whose artefact never
+      # arrived, or a leg whose dump produced nothing, leaves its session out and is named here.
+      #
+      # `continue-on-error` so that the reports are still built and uploaded — they are useful even
+      # when a leg is missing — but the figures are then not computed (partial figures are never
+      # emitted) and the last step of this job fails it.
+      - name: Check that every leg reported
+        id: check
+        continue-on-error: true
+        env:
+          COVERAGE_INTEGRATION_SHARDS: ${{ env.INTEGRATION_SHARDS }}
+          COVERAGE_KDSL_SHARDS: ${{ env.KDSL_SHARDS }}
+          COVERAGE_UI_MAIN_SHARDS: ${{ env.UI_MAIN_SHARDS }}
+        run: |
+          set -uo pipefail
+          # What the execution data itself says, for the record. Informational: the check below is
+          # what decides, and it reads the files rather than jacococli's output format.
+          scripts/coverage-report.sh execinfo coverage-exec || true
+          scripts/coverage-report.sh check coverage-exec
+
+      # COVERAGE_TREE is the `coverage-classes` artefact of the `build` job: the exact production
+      # classes that ran, and their sources. This runner's own checkout has the sources but never
+      # the classes, and a report measured against classes compiled here would not be the ones the
+      # container executed.
+      - name: Build the reports
+        id: report
+        env:
+          COVERAGE_TREE: coverage-artifacts/coverage-classes
+        run: |
+          set -euo pipefail
+          scripts/coverage-report.sh report coverage-exec coverage-reports
+
+          # The Jest report, passed through. It is the frontend half of the picture and there is
+          # nothing to merge it with — COVERAGE.UI_UNIT comes from its own summary, not from JaCoCo.
+          if [ -d coverage-artifacts/coverage-jest ]; then
+            mkdir -p coverage-reports/jest
+            cp -R coverage-artifacts/coverage-jest/. coverage-reports/jest/
+          fi
+
+      - name: Compute the figures
+        id: metrics
+        if: ${{ steps.check.outcome == 'success' }}
+        env:
+          COVERAGE_JEST_SUMMARY: coverage-artifacts/coverage-jest/coverage-summary.json
+        run: |
+          set -euo pipefail
+          scripts/coverage-metrics.sh coverage-reports coverage-reports/coverage-metrics.json
+
+      # 30 days: these are what a Yontrack validation run links to, and what anyone looking at a
+      # figure goes to in order to understand it.
+      - name: Upload the coverage reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-reports
+          path: coverage-reports/**
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Summarise the reports
+        if: always()
+        env:
+          CHECK: ${{ steps.check.outcome }}
+        run: |
+          {
+            echo "### Coverage reports"
+            echo
+            echo "In the \`coverage-reports\` artefact of this run:"
+            echo
+            echo "| Path | What |"
+            echo "|------|------|"
+            echo "| \`merged/html/index.html\` | every backend test type merged; \`jacoco-sessions.html\` says which leg covered what |"
+            echo "| \`unit/html/index.html\` | JVM unit tests |"
+            echo "| \`integration/html/index.html\` | integration tests |"
+            echo "| \`kdsl/html/index.html\` | KDSL acceptance tests, from inside the backend container |"
+            echo "| \`ui/html/index.html\` | Playwright tests, from inside the backend container |"
+            echo "| \`jest/index.html\` | frontend unit tests |"
+            echo "| \`*/jacoco.xml\` | what the figures are computed from |"
+            echo "| \`coverage-metrics.json\` | the six sets of figures |"
+            if [ "$CHECK" != "success" ]; then
+              echo
+              echo "**No figures were computed: some legs reported no execution data.** See the"
+              echo "*Check that every leg reported* step."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # Last, so that the reports are built and uploaded first. An incomplete set is a failure of
+      # this job and not a smaller number: a merged figure over four fifths of the suite reads as a
+      # real coverage drop, which is worse than no figure at all.
+      - name: Fail on an incomplete set
+        if: ${{ always() && steps.check.outcome == 'failure' }}
+        run: |
+          echo "::error::Some test legs reported no coverage execution data; no figures were computed."
+          exit 1
 
   # ---------------------------------------------------------------------------------------------
   # Trivy scan of the two Docker images, reported as CHML counts (#1749).
