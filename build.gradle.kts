@@ -18,11 +18,11 @@ buildscript {
 }
 
 plugins {
-    kotlin("jvm") version "2.2.20"
-    kotlin("plugin.spring") version "2.2.20"
+    kotlin("jvm") version "2.4.20"
+    kotlin("plugin.spring") version "2.4.20"
     id("org.springframework.boot") version "3.5.16" apply false
-    id("com.avast.gradle.docker-compose") version "0.17.12"
-    id("com.google.cloud.tools.jib") version "3.5.1" apply false
+    id("com.avast.gradle.docker-compose") version "0.17.21"
+    id("com.google.cloud.tools.jib") version "3.5.4" apply false
     id("com.github.node-gradle.node") version "7.1.0" apply false
     // Versioning logic moved into buildSrc plugin
     id("net.nemerosa.ontrack.versioning")
@@ -301,11 +301,11 @@ configure(javaProjects) {
 
     val kotlinVersion = "2.2.20"
     val kotlinCoroutinesVersion = "1.10.2"
-    val jjwtVersion = "0.12.6"
-    val greenMailVersion = "1.6.15"
-    val mockkVersion = "1.13.17"
-    val jgitVersion = "6.6.1.202309021850-r"
-    val tomcatVersion = "10.1.59"
+    val jjwtVersion = "0.13.0"
+    val greenMailVersion = "2.1.13"
+    val mockkVersion = "1.14.11"
+    val jgitVersion = "7.8.0.202609011348-r"
+    val tomcatVersion = "11.0.26"
     val amqpClientVersion = "5.36.0"
     val postgresqlVersion = "42.7.13"
     val msgpackCoreVersion = "0.9.12"
@@ -322,16 +322,16 @@ configure(javaProjects) {
 
     // The former `dependencyManagement { dependencies { ... } }` entries, one constraint each.
     val versionConstraints = listOf(
-        "commons-io:commons-io:2.18.0",
-        "org.jsoup:jsoup:1.19.1",
+        "commons-io:commons-io:2.22.0",
+        "org.jsoup:jsoup:1.23.2",
         "org.apache.commons:commons-math3:3.6.1",
-        "org.apache.commons:commons-text:1.13.0",
-        "org.jgrapht:jgrapht-core:1.5.2",
-        "com.opencsv:opencsv:5.10",
-        "com.networknt:json-schema-validator:1.5.5",
-        "org.gitlab4j:gitlab4j-api:6.1.0",
-        "com.slack.api:slack-api-client:1.38.0",
-        "org.springframework.vault:spring-vault-core:3.1.2",
+        "org.apache.commons:commons-text:1.15.0",
+        "org.jgrapht:jgrapht-core:1.5.3",
+        "com.opencsv:opencsv:5.12.0",
+        "com.networknt:json-schema-validator:3.0.7",
+        "org.gitlab4j:gitlab4j-api:6.3.0",
+        "com.slack.api:slack-api-client:1.51.0",
+        "org.springframework.vault:spring-vault-core:4.1.0",
 
         "io.jsonwebtoken:jjwt-api:$jjwtVersion",
         "io.jsonwebtoken:jjwt-impl:$jjwtVersion",
