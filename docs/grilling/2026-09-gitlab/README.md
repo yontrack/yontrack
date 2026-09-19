@@ -4,29 +4,28 @@ Outcome of the grilling session of 2026-09-19 on full GitLab support in Yontrack
 and the Yontrack skills. The session settled 28 questions. This document records the decisions and
 their reasons, not the questions.
 
-It is the design input for **14 issues** to be created under the label `initiative: gitlab`, with
-`status:todo` and `ready-for-agent`; the `yontrack/yontrack` ones in milestone `5.5`, the CLI and
-skills ones with no milestone. Dependencies are to be recorded as native GitHub dependencies,
-across repositories too.
+All 14 issues carry the label `initiative: gitlab`, `status:todo` and `ready-for-agent`. The
+`yontrack/yontrack` ones are in milestone `5.5`; the CLI and skills ones have no milestone.
+Dependencies are recorded as native GitHub dependencies, across repositories too.
 
-**No issue has been created yet, and no label has been moved.** That is a separate go-ahead.
+`#588` has been moved into milestone `5.5` and the initiative; it is closed by issue 2.
 
 | # | Issue | Repo | Blocked by |
 |---|---|---|---|
-| 1 | GitLab test project runbook | `yontrack/yontrack` | — |
-| 2 | GitLab configuration and client rework | `yontrack/yontrack` | 1 |
-| 3 | GitLab issue service rework | `yontrack/yontrack` | 2 |
-| 4 | GitLab SCM implementation and change log | `yontrack/yontrack` | 2 |
-| 5 | Auto-versioning merge requests on GitLab | `yontrack/yontrack` | 4 |
-| 6 | CI config SCM engine `gitlab` | `yontrack/yontrack` | 2 |
-| 7 | CI config CI engine `gitlab-ci` | `yontrack/yontrack` | 6 |
-| 8 | GitLab pipeline notification channel | `yontrack/yontrack` | 2 |
-| 9 | Auto-versioning post-processing through a GitLab pipeline | `yontrack/yontrack` | 8 |
-| 10 | Real GitLab pipeline tests on BRONZE | `yontrack/yontrack` | 9 |
-| 11 | `project set-property gitlab` | `yontrack/yontrack-cli` | — |
-| 12 | `run-info` defaults for GitLab CI | `yontrack/yontrack-cli` | 7, `yontrack-cli#71` |
-| 13 | README: using the CLI in GitLab CI | `yontrack/yontrack-cli` | 7, 11, 12 |
-| 14 | `yontrack-gitlab-ci` skill | `yontrack/yontrack-skills` | 13 |
+| 1 | [GitLab test project runbook](https://github.com/yontrack/yontrack/issues/1826) | `yontrack/yontrack` | — |
+| 2 | [GitLab configuration and client rework](https://github.com/yontrack/yontrack/issues/1827) | `yontrack/yontrack` | 1 |
+| 3 | [GitLab issue service rework](https://github.com/yontrack/yontrack/issues/1828) | `yontrack/yontrack` | 2 |
+| 4 | [GitLab SCM implementation and change log](https://github.com/yontrack/yontrack/issues/1829) | `yontrack/yontrack` | 2 |
+| 5 | [Auto-versioning merge requests on GitLab](https://github.com/yontrack/yontrack/issues/1830) | `yontrack/yontrack` | 4 |
+| 6 | [CI config SCM engine `gitlab`](https://github.com/yontrack/yontrack/issues/1831) | `yontrack/yontrack` | 2 |
+| 7 | [CI config CI engine `gitlab-ci`](https://github.com/yontrack/yontrack/issues/1832) | `yontrack/yontrack` | 6 |
+| 8 | [GitLab pipeline notification channel](https://github.com/yontrack/yontrack/issues/1833) | `yontrack/yontrack` | 2 |
+| 9 | [Auto-versioning post-processing through a GitLab pipeline](https://github.com/yontrack/yontrack/issues/1834) | `yontrack/yontrack` | 8 |
+| 10 | [Real GitLab pipeline tests on BRONZE](https://github.com/yontrack/yontrack/issues/1835) | `yontrack/yontrack` | 9 |
+| 11 | [`project set-property gitlab`](https://github.com/yontrack/yontrack-cli/issues/74) | `yontrack/yontrack-cli` | — |
+| 12 | [`run-info` defaults for GitLab CI](https://github.com/yontrack/yontrack-cli/issues/75) | `yontrack/yontrack-cli` | 7, [`yontrack-cli#71`](https://github.com/yontrack/yontrack-cli/issues/71) |
+| 13 | [README: using the CLI in GitLab CI](https://github.com/yontrack/yontrack-cli/issues/76) | `yontrack/yontrack-cli` | 7, 11, 12 |
+| 14 | [`yontrack-gitlab-ci` skill](https://github.com/yontrack/yontrack-skills/issues/3) | `yontrack/yontrack-skills` | 13 |
 
 Issue 11 has no blocker at all and can be picked up on day one — see *CLI and skills*. Issue 12
 carries a **cross-initiative** dependency on the Bitbucket initiative's `yontrack-cli#71`, which is
