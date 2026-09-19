@@ -1,18 +1,22 @@
 package net.nemerosa.ontrack.extension.gitlab.client
 
+import net.nemerosa.ontrack.extension.gitlab.model.GitLabBranch
 import net.nemerosa.ontrack.extension.gitlab.model.GitLabCommit
+import net.nemerosa.ontrack.extension.gitlab.model.GitLabCompare
 import net.nemerosa.ontrack.extension.gitlab.model.GitLabConfiguration
 import net.nemerosa.ontrack.extension.gitlab.model.GitLabIssue
 import net.nemerosa.ontrack.extension.gitlab.model.GitLabMergeRequest
 import net.nemerosa.ontrack.extension.gitlab.model.GitLabProject
 import net.nemerosa.ontrack.extension.gitlab.model.GitLabUser
 import org.springframework.core.ParameterizedTypeReference
+import org.springframework.http.HttpEntity
 import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpMethod
+import org.springframework.http.HttpStatusCode
 import org.springframework.http.ResponseEntity
-import org.springframework.http.client.ClientHttpRequestFactory
-import org.springframework.http.client.ClientHttpRequestInterceptor
+import org.springframework.http.client.ClientHttpResponse
 import org.springframework.http.client.SimpleClientHttpRequestFactory
+import org.springframework.web.client.DefaultResponseErrorHandler
 import org.springframework.web.client.HttpClientErrorException
 import org.springframework.web.client.RestTemplate
 import org.springframework.web.util.UriComponentsBuilder
@@ -23,6 +27,7 @@ import java.nio.charset.StandardCharsets
 import java.security.SecureRandom
 import java.security.cert.X509Certificate
 import java.time.Duration
+import java.util.Base64
 import javax.net.ssl.HostnameVerifier
 import javax.net.ssl.HttpsURLConnection
 import javax.net.ssl.SSLContext
@@ -98,6 +103,16 @@ class DefaultGitLabClient(
             URLEncoder.encode(path.trim('/'), StandardCharsets.UTF_8).replace("+", "%20")
 
         /**
+         * URL-encodes a value which must sit inside a **single** path segment - a branch name, a file path.
+         *
+         * Every `/` becomes `%2F`, which is how GitLab expects a branch like `feature/one` or a file like
+         * `src/main/app.yaml` to be named in a URL. Unlike [encodeProjectPath] the outer slashes are kept:
+         * a file path is not a project path and trimming them would change which file is named.
+         */
+        fun encodePathSegment(value: String): String =
+            URLEncoder.encode(value, StandardCharsets.UTF_8).replace("+", "%20")
+
+        /**
          * URL-encodes the value of a query parameter.
          *
          * The URIs are built from already-encoded components, so a value carrying a `#` - an issue
@@ -163,6 +178,112 @@ class DefaultGitLabClient(
                 ?.id
         }
 
+    override fun getProject(project: String): GitLabProject? =
+        notFoundAsNull {
+            getForObject<GitLabProject>(uri("/projects/${encodeProjectPath(project)}"))
+        }
+
+    override fun getBranch(project: String, branch: String): GitLabBranch? =
+        notFoundAsNull {
+            getForObject<GitLabBranch>(projectUri(project, "repository/branches/${encodePathSegment(branch)}"))
+        }
+
+    override fun getBranchLastCommit(project: String, branch: String): String? =
+        getBranch(project, branch)?.commit?.id
+
+    override fun createBranch(project: String, sourceBranch: String, newBranch: String): String {
+        val created: GitLabBranch = withRateLimit {
+            template.exchange(
+                projectUri(
+                    project,
+                    "repository/branches",
+                    "branch" to encodeQueryValue(newBranch),
+                    "ref" to encodeQueryValue(sourceBranch),
+                ),
+                HttpMethod.POST,
+                authEntity(),
+                GitLabBranch::class.java,
+            )
+        }.body ?: throw GitLabCannotCreateBranchException(project, newBranch, sourceBranch)
+        return created.commit?.id ?: throw GitLabCannotCreateBranchException(project, newBranch, sourceBranch)
+    }
+
+    override fun deleteBranch(project: String, branch: String) {
+        notFoundAsNull {
+            withRateLimit {
+                template.exchange(
+                    projectUri(project, "repository/branches/${encodePathSegment(branch)}"),
+                    HttpMethod.DELETE,
+                    authEntity(),
+                    Void::class.java,
+                )
+            }
+        }
+    }
+
+    override fun download(project: String, ref: String, path: String): ByteArray? =
+        notFoundAsNull {
+            withRateLimit {
+                template.exchange(
+                    projectUri(
+                        project,
+                        "repository/files/${encodePathSegment(path.trimStart('/'))}/raw",
+                        "ref" to encodeQueryValue(ref),
+                    ),
+                    HttpMethod.GET,
+                    authEntity(),
+                    ByteArray::class.java,
+                )
+            }.body
+        }
+
+    /**
+     * GitLab has one endpoint for the file, `POST` to create it and `PUT` to replace it, and answers 400 when
+     * the verb does not match what the repository holds. Rather than reading the file first, the update is
+     * tried and the creation is the fallback.
+     */
+    override fun upload(project: String, branch: String, path: String, content: ByteArray, message: String) {
+        val uri = projectUri(project, "repository/files/${encodePathSegment(path.trimStart('/'))}")
+        val body = mapOf(
+            "branch" to branch,
+            "content" to Base64.getEncoder().encodeToString(content),
+            "encoding" to "base64",
+            "commit_message" to message,
+        )
+        try {
+            withRateLimit { template.exchange(uri, HttpMethod.PUT, authEntity(body), Void::class.java) }
+        } catch (_: HttpClientErrorException.BadRequest) {
+            withRateLimit { template.exchange(uri, HttpMethod.POST, authEntity(body), Void::class.java) }
+        }
+    }
+
+    override fun getCommits(
+        project: String,
+        fromRef: String,
+        toRef: String,
+        maxCommits: Int,
+    ): List<GitLabCommit> {
+        val compare = notFoundAsNull {
+            getForObject<GitLabCompare>(
+                projectUri(
+                    project,
+                    "repository/compare",
+                    "from" to encodeQueryValue(fromRef),
+                    "to" to encodeQueryValue(toRef),
+                    // `false` is GitLab's `from...to`: against the merge base rather than the plain diff
+                    "straight" to "false",
+                )
+            )
+        } ?: return emptyList()
+        // GitLab returns the commits oldest first, while a change log reads most recent first
+        return compare.commits.reversed().take(maxCommits.coerceAtLeast(0))
+    }
+
+    override fun getCommit(project: String, commit: String): GitLabCommit? =
+        notFoundAsNull {
+            getForObject<GitLabCommit>(projectUri(project, "repository/commits/${encodePathSegment(commit)}"))
+        }
+
     /**
      * Root of the API, with a single separator whatever the configuration's URL ends with.
      */
@@ -181,13 +302,14 @@ class DefaultGitLabClient(
         uri("/projects/${encodeProjectPath(project)}/$path", *query)
 
     private inline fun <reified T : Any> getForObject(uri: URI): T =
-        withRateLimit { template.getForObject(uri, T::class.java) } ?: throw GitLabNoResponseException(uri.toString())
+        withRateLimit { template.exchange(uri, HttpMethod.GET, authEntity(), T::class.java) }.body
+            ?: throw GitLabNoResponseException(uri.toString())
 
     /**
      * A single page of a list endpoint, for the calls which only ever want the first one.
      */
     private fun <T> getForList(uri: URI, type: ParameterizedTypeReference<List<T>>): List<T> =
-        withRateLimit { template.exchange(uri, HttpMethod.GET, null, type) }.body ?: emptyList()
+        withRateLimit { template.exchange(uri, HttpMethod.GET, authEntity(), type) }.body ?: emptyList()
 
     /**
      * Items of every page, following the `Link` header GitLab sends: several endpoints return no total at
@@ -203,7 +325,7 @@ class DefaultGitLabClient(
         var pages = 0
         while (next != null && pages < MAX_PAGES) {
             val response: ResponseEntity<List<T>> =
-                withRateLimit { template.exchange(next!!, HttpMethod.GET, null, type) }
+                withRateLimit { template.exchange(next!!, HttpMethod.GET, authEntity(), type) }
             results += response.body ?: emptyList()
             next = nextPage(response.headers)
             pages++
@@ -211,10 +333,64 @@ class DefaultGitLabClient(
         return results
     }
 
+    /**
+     * URI of the next page, from the `Link` header of the previous response - **when it stays on the
+     * configured instance**.
+     *
+     * That check is the whole point of this function. The header is written by the remote server, and the
+     * personal access token travels on every request this client makes: a `Link` pointing at another host
+     * would not merely fetch a foreign URL, it would hand GitLab's token to whoever sent the header. The
+     * target is therefore accepted only when its scheme, host and port are those of
+     * [GitLabConfiguration.url] and its path is under [API_PATH]; anything else simply ends the pagination.
+     *
+     * See the `java/ssrf` alert https://github.com/yontrack/yontrack/security/code-scanning/355.
+     */
     private fun nextPage(headers: HttpHeaders): URI? =
         headers[HttpHeaders.LINK]
             ?.firstNotNullOfOrNull { NEXT_LINK.find(it)?.groupValues?.get(1) }
-            ?.let { URI.create(it) }
+            ?.let { link ->
+                val uri = try {
+                    // Normalised first, so that a `..` cannot walk out of the API path past the check below
+                    URI.create(link.trim()).normalize()
+                } catch (_: IllegalArgumentException) {
+                    null
+                }
+                uri?.takeIf { isOnInstance(it) }
+            }
+
+    /**
+     * Is [uri] the same origin as the configured instance, and under the API path?
+     *
+     * The port is compared after defaulting it from the scheme, so that `https://gitlab.com` and
+     * `https://gitlab.com:443` are the same origin and `https://gitlab.com:8443` is not.
+     */
+    internal fun isOnInstance(uri: URI): Boolean {
+        val expected = try {
+            URI.create(apiRoot)
+        } catch (_: IllegalArgumentException) {
+            return false
+        }
+        if (!uri.isAbsolute || uri.host.isNullOrBlank()) return false
+        // No credentials smuggled into the authority: the token is the only one this client sends
+        if (uri.rawUserInfo != null) return false
+        if (!uri.scheme.equals(expected.scheme, ignoreCase = true)) return false
+        if (!uri.host.equals(expected.host, ignoreCase = true)) return false
+        if (defaultedPort(uri) != defaultedPort(expected)) return false
+        val path = uri.rawPath ?: return false
+        val expectedPath = expected.rawPath ?: return false
+        return path == expectedPath || path.startsWith(expectedPath.trimEnd('/') + "/")
+    }
+
+    private fun defaultedPort(uri: URI): Int =
+        if (uri.port >= 0) {
+            uri.port
+        } else {
+            when (uri.scheme?.lowercase()) {
+                "https" -> 443
+                "http" -> 80
+                else -> -1
+            }
+        }
 
     /**
      * Runs [code], waiting out a 429 as long as GitLab keeps asking for it.
@@ -241,40 +417,84 @@ class DefaultGitLabClient(
             null
         }
 
+    /**
+     * The personal access token, which a configuration must carry.
+     */
+    private fun token(): String = configuration.token?.takeIf { it.isNotBlank() }
+        ?: error("GitLab configuration ${configuration.name} has no token.")
+
+    /**
+     * Headers carrying the token, built **per request** rather than installed as an interceptor on the
+     * template.
+     *
+     * An interceptor stamps the credential on whatever URL the template is handed, this instance's or not.
+     * Attaching it call by call keeps the token tied to the URIs this client builds itself from
+     * [GitLabConfiguration.url]. Together with the origin check of [nextPage] it is the fix for the
+     * `java/ssrf` alert https://github.com/yontrack/yontrack/security/code-scanning/355.
+     */
+    private fun authHeaders(): HttpHeaders = HttpHeaders().apply {
+        set(PRIVATE_TOKEN_HEADER, token())
+    }
+
+    private fun authEntity(): HttpEntity<Void> = HttpEntity(authHeaders())
+
+    private fun <T> authEntity(body: T): HttpEntity<T> = HttpEntity(body, authHeaders())
+
     internal val template: RestTemplate by lazy {
-        val token = configuration.token?.takeIf { it.isNotBlank() }
-            ?: error("GitLab configuration ${configuration.name} has no token.")
+        // Fails early, and on the configuration rather than on the first call
+        token()
         RestTemplate(requestFactory()).apply {
-            interceptors = listOf(
-                ClientHttpRequestInterceptor { request, body, execution ->
-                    request.headers.set(PRIVATE_TOKEN_HEADER, token)
-                    execution.execute(request, body)
-                }
-            )
+            errorHandler = RedirectRejectingErrorHandler()
         }
     }
 
     /**
      * `SimpleClientHttpRequestFactory` goes through the JDK's `HttpURLConnection`, which reads the JVM proxy
      * settings - the whole point of issue #588 - and is where an ignored SSL certificate is arranged.
+     *
+     * It is also where **redirects are turned off**, which is the third leg of the `java/ssrf` fix. Left to
+     * itself `prepareConnection` calls `setInstanceFollowRedirects(true)` for a GET, and `HttpURLConnection`
+     * replays the request properties - the `PRIVATE-TOKEN` header among them - onto the redirected request,
+     * stripping nothing. A 302 from a hostile or compromised response would therefore hand the personal
+     * access token to an arbitrary host, exactly as a cross-host `Link` header would, by another route.
+     * Nothing this client calls redirects: every GitLab API v4 endpoint it uses answers directly.
      */
-    private fun requestFactory(): ClientHttpRequestFactory {
-        val factory = if (configuration.ignoreSslCertificate) {
-            object : SimpleClientHttpRequestFactory() {
-                override fun prepareConnection(connection: HttpURLConnection, httpMethod: String) {
-                    if (connection is HttpsURLConnection) {
-                        connection.sslSocketFactory = trustAllSslContext().socketFactory
-                        connection.hostnameVerifier = HostnameVerifier { _, _ -> true }
-                    }
-                    super.prepareConnection(connection, httpMethod)
+    internal fun requestFactory(): SimpleClientHttpRequestFactory {
+        val ignoreSsl = configuration.ignoreSslCertificate
+        val factory = object : SimpleClientHttpRequestFactory() {
+            override fun prepareConnection(connection: HttpURLConnection, httpMethod: String) {
+                if (ignoreSsl && connection is HttpsURLConnection) {
+                    connection.sslSocketFactory = trustAllSslContext().socketFactory
+                    connection.hostnameVerifier = HostnameVerifier { _, _ -> true }
                 }
+                super.prepareConnection(connection, httpMethod)
+                // After the super call, which turns them back on for a GET
+                connection.instanceFollowRedirects = false
             }
-        } else {
-            SimpleClientHttpRequestFactory()
         }
         factory.setConnectTimeout(CONNECT_TIMEOUT)
         factory.setReadTimeout(READ_TIMEOUT)
         return factory
+    }
+
+    /**
+     * Turns the redirect the client no longer follows into an error naming it, rather than letting it reach
+     * the callers as an answer with no body.
+     */
+    private class RedirectRejectingErrorHandler : DefaultResponseErrorHandler() {
+
+        override fun hasError(statusCode: HttpStatusCode): Boolean =
+            statusCode.is3xxRedirection || super.hasError(statusCode)
+
+        override fun handleError(url: URI, method: HttpMethod, response: ClientHttpResponse) {
+            if (response.statusCode.is3xxRedirection) {
+                throw GitLabRedirectException(
+                    url.toString(),
+                    response.headers.getFirst(HttpHeaders.LOCATION),
+                )
+            }
+            super.handleError(url, method, response)
+        }
     }
 
     private fun trustAllSslContext(): SSLContext {

@@ -63,7 +63,9 @@ public class GitLabGitConfiguration implements GitConfiguration {
     @Override
     public String getCommitLink() {
         return format(
-                "%s/%s/commit/{commit}",
+                // `/-/` is GitLab's canonical form; the legacy one without it only redirects, and a change
+                // log must not render two link shapes for the same project.
+                "%s/%s/-/commit/{commit}",
                 property.getConfiguration().getUrl(),
                 property.getRepository()
         );
@@ -72,7 +74,7 @@ public class GitLabGitConfiguration implements GitConfiguration {
     @Override
     public String getFileAtCommitLink() {
         return format(
-                "%s/%s/blob/{commit}/{path}",
+                "%s/%s/-/blob/{commit}/{path}",
                 property.getConfiguration().getUrl(),
                 property.getRepository()
         );

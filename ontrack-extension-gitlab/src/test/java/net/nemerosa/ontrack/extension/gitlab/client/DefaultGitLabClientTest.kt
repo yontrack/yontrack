@@ -8,7 +8,9 @@ import org.springframework.http.HttpMethod
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
 import org.springframework.test.web.client.MockRestServiceServer
+import org.hamcrest.Matchers
 import org.springframework.test.web.client.match.MockRestRequestMatchers.header
+import org.springframework.test.web.client.match.MockRestRequestMatchers.jsonPath
 import org.springframework.test.web.client.match.MockRestRequestMatchers.method
 import org.springframework.test.web.client.match.MockRestRequestMatchers.queryParam
 import org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo
@@ -16,6 +18,7 @@ import org.springframework.test.web.client.response.MockRestResponseCreators.wit
 import org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess
 import java.time.LocalDateTime
 import java.time.Month
+import java.util.Base64
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -107,6 +110,116 @@ class DefaultGitLabClientTest {
                     .headers(HttpHeaders().apply { set(HttpHeaders.LINK, """<https://gitlab.com/api/v4/projects?page=1>; rel="first"""") })
             )
         assertEquals(listOf("group/one"), client.getProjects().map { it.path_with_namespace })
+        server.verify()
+    }
+
+    @Test
+    fun `A next link pointing at another host is refused`() {
+        // The `Link` header comes from the remote server, and the client stamps the personal access token on
+        // every request: following it off the instance would hand the token to whoever sent it.
+        // See https://github.com/yontrack/yontrack/security/code-scanning/355
+        val client = client()
+        val server = MockRestServiceServer.bindTo(client.template).build()
+        server.expect(requestTo(requestToProjects()))
+            .andRespond(
+                withSuccess(projectPage("group/one"), MediaType.APPLICATION_JSON)
+                    .headers(
+                        HttpHeaders().apply {
+                            set(HttpHeaders.LINK, """<https://attacker.example/api/v4/projects?page=2>; rel="next"""")
+                        }
+                    )
+            )
+        assertEquals(listOf("group/one"), client.getProjects().map { it.path_with_namespace })
+        // `MockRestServiceServer` fails on any request it was not told to expect, so a call to the foreign
+        // host would fail here rather than pass silently.
+        server.verify()
+    }
+
+    @Test
+    fun `A next link on another scheme or port is refused`() {
+        listOf(
+            "http://gitlab.com/api/v4/projects?page=2",
+            "https://gitlab.com:8443/api/v4/projects?page=2",
+            "https://gitlab.com.attacker.example/api/v4/projects?page=2",
+        ).forEach { link ->
+            val client = client()
+            val server = MockRestServiceServer.bindTo(client.template).build()
+            server.expect(requestTo(requestToProjects()))
+                .andRespond(
+                    withSuccess(projectPage("group/one"), MediaType.APPLICATION_JSON)
+                        .headers(HttpHeaders().apply { set(HttpHeaders.LINK, """<$link>; rel="next"""") })
+                )
+            assertEquals(listOf("group/one"), client.getProjects().map { it.path_with_namespace }, "Refused: $link")
+            server.verify()
+        }
+    }
+
+    @Test
+    fun `A next link which walks out of the API path is refused`() {
+        listOf(
+            // Only a prefix of `/api/v4`, not a segment of it
+            "https://gitlab.com/api/v4evil?page=2",
+            // Normalised back out of the API path
+            "https://gitlab.com/api/v4/../../evil?page=2",
+            // Credentials smuggled into the authority
+            "https://someone:else@gitlab.com/api/v4/projects?page=2",
+        ).forEach { link ->
+            val client = client()
+            val server = MockRestServiceServer.bindTo(client.template).build()
+            server.expect(requestTo(requestToProjects()))
+                .andRespond(
+                    withSuccess(projectPage("group/one"), MediaType.APPLICATION_JSON)
+                        .headers(HttpHeaders().apply { set(HttpHeaders.LINK, """<$link>; rel="next"""") })
+                )
+            assertEquals(listOf("group/one"), client.getProjects().map { it.path_with_namespace }, "Refused: $link")
+            server.verify()
+        }
+    }
+
+    @Test
+    fun `A next link outside the API path is refused`() {
+        val client = client()
+        val server = MockRestServiceServer.bindTo(client.template).build()
+        server.expect(requestTo(requestToProjects()))
+            .andRespond(
+                withSuccess(projectPage("group/one"), MediaType.APPLICATION_JSON)
+                    .headers(
+                        HttpHeaders().apply {
+                            set(HttpHeaders.LINK, """<https://gitlab.com/-/redirect?to=evil>; rel="next"""")
+                        }
+                    )
+            )
+        assertEquals(listOf("group/one"), client.getProjects().map { it.path_with_namespace })
+        server.verify()
+    }
+
+    @Test
+    fun `A next link is followed on the configured instance, whatever its own URL form`() {
+        val client = client(config.copy(url = "https://gitlab.example.com/"))
+        val server = MockRestServiceServer.bindTo(client.template).build()
+        val first =
+            "https://gitlab.example.com/api/v4/projects?membership=true&simple=true&order_by=path&sort=asc&per_page=100&page=1"
+        val second = "https://gitlab.example.com/api/v4/projects?page=2"
+        server.expect(requestTo(first))
+            .andRespond(
+                withSuccess(projectPage("group/one"), MediaType.APPLICATION_JSON)
+                    .headers(HttpHeaders().apply { set(HttpHeaders.LINK, """<$second>; rel="next"""") })
+            )
+        server.expect(requestTo(second))
+            .andExpect(header(DefaultGitLabClient.PRIVATE_TOKEN_HEADER, "secret"))
+            .andRespond(withSuccess(projectPage("group/two"), MediaType.APPLICATION_JSON))
+        assertEquals(listOf("group/one", "group/two"), client.getProjects().map { it.path_with_namespace })
+        server.verify()
+    }
+
+    @Test
+    fun `The token travels on every request, paginated ones included`() {
+        val client = client()
+        val server = MockRestServiceServer.bindTo(client.template).build()
+        server.expect(requestTo(requestToProjects()))
+            .andExpect(header(DefaultGitLabClient.PRIVATE_TOKEN_HEADER, "secret"))
+            .andRespond(withSuccess(projectPage("group/one"), MediaType.APPLICATION_JSON))
+        client.getProjects()
         server.verify()
     }
 
@@ -329,6 +442,277 @@ class DefaultGitLabClientTest {
         assertEquals(DefaultGitLabClient.MAX_RETRIES, slept.size)
         server.verify()
     }
+
+    @Test
+    fun `Getting a project by its full path`() {
+        val client = client()
+        val server = MockRestServiceServer.bindTo(client.template).build()
+        server.expect(requestTo("https://gitlab.com/api/v4/projects/group%2Fsub%2Fproject"))
+            .andExpect(method(HttpMethod.GET))
+            .andRespond(
+                withSuccess(
+                    """{"id":7,"name":"project","path_with_namespace":"group/sub/project","default_branch":"main"}""",
+                    MediaType.APPLICATION_JSON
+                )
+            )
+        val project = client.getProject("group/sub/project")
+        assertEquals("group/sub/project", project?.path_with_namespace)
+        assertEquals("main", project?.default_branch)
+        server.verify()
+    }
+
+    @Test
+    fun `An unknown project is null`() {
+        val client = client()
+        val server = MockRestServiceServer.bindTo(client.template).build()
+        server.expect(requestTo("https://gitlab.com/api/v4/projects/group%2Fnope"))
+            .andRespond(withStatus(HttpStatus.NOT_FOUND))
+        assertNull(client.getProject("group/nope"))
+        server.verify()
+    }
+
+    @Test
+    fun `The head of a branch, whose name is a single path segment`() {
+        val client = client()
+        val server = MockRestServiceServer.bindTo(client.template).build()
+        // `feature/one` is one segment of the URL, so its slash is encoded
+        server.expect(requestTo("https://gitlab.com/api/v4/projects/group%2Fproject/repository/branches/feature%2Fone"))
+            .andExpect(method(HttpMethod.GET))
+            .andExpect(header(DefaultGitLabClient.PRIVATE_TOKEN_HEADER, "secret"))
+            .andRespond(withSuccess(branchJson("feature/one", "abcdef1234"), MediaType.APPLICATION_JSON))
+        assertEquals("abcdef1234", client.getBranchLastCommit("group/project", "feature/one"))
+        server.verify()
+    }
+
+    @Test
+    fun `The head of an unknown branch is null`() {
+        val client = client()
+        val server = MockRestServiceServer.bindTo(client.template).build()
+        server.expect(requestTo("https://gitlab.com/api/v4/projects/group%2Fproject/repository/branches/nope"))
+            .andRespond(withStatus(HttpStatus.NOT_FOUND))
+        assertNull(client.getBranchLastCommit("group/project", "nope"))
+        server.verify()
+    }
+
+    @Test
+    fun `Creating a branch returns the head of the new branch`() {
+        val client = client()
+        val server = MockRestServiceServer.bindTo(client.template).build()
+        server.expect(
+            requestTo("https://gitlab.com/api/v4/projects/group%2Fproject/repository/branches?branch=release%2F1.0&ref=main")
+        )
+            .andExpect(method(HttpMethod.POST))
+            .andRespond(withSuccess(branchJson("release/1.0", "1234abcd"), MediaType.APPLICATION_JSON))
+        assertEquals("1234abcd", client.createBranch("group/project", "main", "release/1.0"))
+        server.verify()
+    }
+
+    @Test
+    fun `Creating a branch GitLab does not describe back is an error`() {
+        val client = client()
+        val server = MockRestServiceServer.bindTo(client.template).build()
+        server.expect(requestTo(Matchers.startsWith("https://gitlab.com/api/v4/projects/group%2Fproject/repository/branches")))
+            .andRespond(withSuccess("""{"name":"release/1.0"}""", MediaType.APPLICATION_JSON))
+        assertThrows<GitLabCannotCreateBranchException> {
+            client.createBranch("group/project", "main", "release/1.0")
+        }
+        server.verify()
+    }
+
+    @Test
+    fun `Deleting a branch`() {
+        val client = client()
+        val server = MockRestServiceServer.bindTo(client.template).build()
+        server.expect(requestTo("https://gitlab.com/api/v4/projects/group%2Fproject/repository/branches/feature%2Fone"))
+            .andExpect(method(HttpMethod.DELETE))
+            .andRespond(withStatus(HttpStatus.NO_CONTENT))
+        client.deleteBranch("group/project", "feature/one")
+        server.verify()
+    }
+
+    @Test
+    fun `Deleting a branch which does not exist is not an error`() {
+        val client = client()
+        val server = MockRestServiceServer.bindTo(client.template).build()
+        server.expect(requestTo("https://gitlab.com/api/v4/projects/group%2Fproject/repository/branches/nope"))
+            .andRespond(withStatus(HttpStatus.NOT_FOUND))
+        client.deleteBranch("group/project", "nope")
+        server.verify()
+    }
+
+    @Test
+    fun `Downloading a file at a ref`() {
+        val client = client()
+        val server = MockRestServiceServer.bindTo(client.template).build()
+        server.expect(
+            requestTo("https://gitlab.com/api/v4/projects/group%2Fproject/repository/files/src%2Fmain%2Fapp.yaml/raw?ref=main")
+        )
+            .andExpect(method(HttpMethod.GET))
+            .andExpect(header(DefaultGitLabClient.PRIVATE_TOKEN_HEADER, "secret"))
+            .andRespond(withSuccess("name: app", MediaType.TEXT_PLAIN))
+        assertEquals("name: app", client.download("group/project", "main", "src/main/app.yaml")?.decodeToString())
+        server.verify()
+    }
+
+    @Test
+    fun `Downloading a file which does not exist is null`() {
+        val client = client()
+        val server = MockRestServiceServer.bindTo(client.template).build()
+        server.expect(requestTo(Matchers.startsWith("https://gitlab.com/api/v4/projects/group%2Fproject/repository/files/")))
+            .andRespond(withStatus(HttpStatus.NOT_FOUND))
+        assertNull(client.download("group/project", "main", "nope.yaml"))
+        server.verify()
+    }
+
+    @Test
+    fun `Uploading a file replaces it when it is already there`() {
+        val client = client()
+        val server = MockRestServiceServer.bindTo(client.template).build()
+        server.expect(requestTo("https://gitlab.com/api/v4/projects/group%2Fproject/repository/files/app.yaml"))
+            .andExpect(method(HttpMethod.PUT))
+            .andExpect(jsonPath("$.branch").value("main"))
+            .andExpect(jsonPath("$.encoding").value("base64"))
+            .andExpect(jsonPath("$.commit_message").value("Some message"))
+            .andExpect(jsonPath("$.content").value(Base64.getEncoder().encodeToString("name: app".toByteArray())))
+            .andRespond(withSuccess("{}", MediaType.APPLICATION_JSON))
+        client.upload("group/project", "main", "app.yaml", "name: app".toByteArray(), "Some message")
+        server.verify()
+    }
+
+    @Test
+    fun `Uploading a file creates it when the update is refused`() {
+        val client = client()
+        val server = MockRestServiceServer.bindTo(client.template).build()
+        server.expect(requestTo("https://gitlab.com/api/v4/projects/group%2Fproject/repository/files/app.yaml"))
+            .andExpect(method(HttpMethod.PUT))
+            .andRespond(withStatus(HttpStatus.BAD_REQUEST))
+        server.expect(requestTo("https://gitlab.com/api/v4/projects/group%2Fproject/repository/files/app.yaml"))
+            .andExpect(method(HttpMethod.POST))
+            .andRespond(withSuccess("{}", MediaType.APPLICATION_JSON))
+        client.upload("group/project", "main", "app.yaml", "name: app".toByteArray(), "Some message")
+        server.verify()
+    }
+
+    @Test
+    fun `Comparing two references goes through the merge base and returns the commits most recent first`() {
+        val client = client()
+        val server = MockRestServiceServer.bindTo(client.template).build()
+        server.expect(
+            requestTo("https://gitlab.com/api/v4/projects/group%2Fproject/repository/compare?from=v1&to=v2&straight=false")
+        )
+            .andExpect(method(HttpMethod.GET))
+            // `straight=false` is the merge-base comparison, `from...to`
+            .andExpect(queryParam("straight", "false"))
+            .andRespond(
+                withSuccess(
+                    compareJson(
+                        // GitLab returns them oldest first
+                        commitJson("aaa", "First", "2026-09-17T10:00:00.000Z"),
+                        commitJson("bbb", "Second", "2026-09-18T10:00:00.000Z"),
+                        commitJson("ccc", "Third", "2026-09-19T10:00:00.000Z"),
+                    ),
+                    MediaType.APPLICATION_JSON
+                )
+            )
+        assertEquals(
+            listOf("ccc", "bbb", "aaa"),
+            client.getCommits("group/project", "v1", "v2", 100).map { it.id },
+        )
+        server.verify()
+    }
+
+    @Test
+    fun `A comparison is capped at the maximum number of commits`() {
+        val client = client()
+        val server = MockRestServiceServer.bindTo(client.template).build()
+        server.expect(requestTo(Matchers.startsWith("https://gitlab.com/api/v4/projects/group%2Fproject/repository/compare")))
+            .andRespond(
+                withSuccess(
+                    compareJson(
+                        commitJson("aaa", "First", "2026-09-17T10:00:00.000Z"),
+                        commitJson("bbb", "Second", "2026-09-18T10:00:00.000Z"),
+                        commitJson("ccc", "Third", "2026-09-19T10:00:00.000Z"),
+                    ),
+                    MediaType.APPLICATION_JSON
+                )
+            )
+        assertEquals(listOf("ccc", "bbb"), client.getCommits("group/project", "v1", "v2", 2).map { it.id })
+        server.verify()
+    }
+
+    @Test
+    fun `Comparing against an unknown reference is empty rather than an error`() {
+        val client = client()
+        val server = MockRestServiceServer.bindTo(client.template).build()
+        server.expect(requestTo(Matchers.startsWith("https://gitlab.com/api/v4/projects/group%2Fproject/repository/compare")))
+            .andRespond(withStatus(HttpStatus.NOT_FOUND))
+        assertEquals(emptyList(), client.getCommits("group/project", "v1", "nope", 100))
+        server.verify()
+    }
+
+    @Test
+    fun `Getting a single commit`() {
+        val client = client()
+        val server = MockRestServiceServer.bindTo(client.template).build()
+        server.expect(requestTo("https://gitlab.com/api/v4/projects/group%2Fproject/repository/commits/abcdef"))
+            .andExpect(method(HttpMethod.GET))
+            .andRespond(
+                withSuccess(
+                    """
+                        {
+                            "id": "abcdef",
+                            "short_id": "abcdef",
+                            "title": "Some commit",
+                            "message": "Some commit\n\nWith a body",
+                            "committed_date": "2026-09-19T10:00:00.000Z",
+                            "author_name": "A Bot",
+                            "author_email": "bot@example.com",
+                            "web_url": "https://gitlab.com/group/project/-/commit/abcdef"
+                        }
+                    """.trimIndent(),
+                    MediaType.APPLICATION_JSON
+                )
+            )
+        val commit = client.getCommit("group/project", "abcdef")
+        assertEquals("abcdef", commit?.id)
+        assertEquals("A Bot", commit?.author_name)
+        assertEquals("bot@example.com", commit?.author_email)
+        assertEquals(
+            LocalDateTime.of(2026, Month.SEPTEMBER, 19, 10, 0, 0),
+            commit?.committedTime,
+        )
+        server.verify()
+    }
+
+    @Test
+    fun `An unknown commit is null`() {
+        val client = client()
+        val server = MockRestServiceServer.bindTo(client.template).build()
+        server.expect(requestTo("https://gitlab.com/api/v4/projects/group%2Fproject/repository/commits/nope"))
+            .andRespond(withStatus(HttpStatus.NOT_FOUND))
+        assertNull(client.getCommit("group/project", "nope"))
+        server.verify()
+    }
+
+    private fun branchJson(name: String, commitId: String) = """
+        {
+            "name": "$name",
+            "commit": {
+                "id": "$commitId",
+                "short_id": "${commitId.take(8)}",
+                "title": "Head of $name"
+            }
+        }
+    """.trimIndent()
+
+    private fun compareJson(vararg commits: String) = """
+        {
+            "commit": ${commits.lastOrNull() ?: "null"},
+            "commits": [${commits.joinToString(",")}],
+            "compare_timeout": false,
+            "compare_same_ref": false
+        }
+    """.trimIndent()
 
     private fun requestToProjects() =
         "https://gitlab.com/api/v4/projects?membership=true&simple=true&order_by=path&sort=asc&per_page=100&page=1"

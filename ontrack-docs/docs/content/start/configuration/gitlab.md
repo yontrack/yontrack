@@ -124,6 +124,83 @@ project's commits** for the `#123` reference (`GET /projects/:id/search?scope=co
 recent match. The search is a substring one, so Yontrack discards the commits which merely start with the
 same digits: a search for `#12` does not return the commit of `#123`.
 
+## SCM
+
+A project with the GitLab property has an SCM of engine `gitlab`. It gives the project:
+
+* **change logs** between two builds, whose commits are set by the _Git commit_ property;
+* links to the commits and to the comparison between two commits;
+* branch creation and deletion, file download and upload — one commit per upload;
+* merge request information for branches which are merge requests;
+* branch merges, through Yontrack's local clone of the repository.
+
+!!! note "Merge request creation"
+
+    Creating a merge request — what [auto-versioning](../../integrations/auto-versioning/auto-versioning.md) does in
+    `PR` mode — is not available yet. Yontrack refuses it with an explicit error rather than leaving a
+    half-finished merge request behind. It arrives with
+    [issue #1830](https://github.com/yontrack/yontrack/issues/1830).
+
+### Change logs
+
+The commits between two builds are read from GitLab's comparison endpoint
+(`GET /projects/:id/repository/compare?from=…&to=…&straight=false`). `straight=false` is GitLab's `from...to`
+form: the commits reachable from the second reference but not from the **merge base** of the two, which is what
+a change log means and what GitHub and Bitbucket Cloud give. When the two builds are given in the reverse
+order, the order is swapped.
+
+The number of commits a change log returns is capped by the **max commits** setting (see below). The comparison
+itself is one request whatever the range: GitLab returns the whole answer at once, and gives up on its own on
+very large ranges.
+
+Going through all the commits of a repository — looking for the build of a commit, or for the branches that
+contain one — does **not** use the API: Yontrack reads them from its local clone of the repository, as it does
+for GitHub and Bitbucket Cloud. That matters more on GitLab than elsewhere, because gitlab.com's announced
+tier-aware rate limits drop the Free tier to a burst of a hundred requests a minute.
+
+### File references
+
+Files stored in GitLab can be referenced by `scm://` URIs, wherever Yontrack accepts them:
+
+```
+scm://gitlab/<configuration>/<project path>/<path>
+```
+
+* `<configuration>` — name of the GitLab configuration
+* `<project path>` — **full path** of the GitLab project, subgroups included
+* `<path>` — path to the file, read on the default branch of the project
+
+For example, `scm://gitlab/gitlab.com/my-group/my-project/config/settings.yaml`, or
+`scm://gitlab/gitlab.com/my-group/my-subgroup/my-project/config/settings.yaml`.
+
+A GitLab project path is arbitrarily deep, so — unlike GitHub's `owner/repository` — no fixed number of leading
+segments tells the project apart from the file path: `my-group/my-project/src/app.yaml` has exactly the same
+shape as a project three subgroups down. Yontrack therefore **asks GitLab** rather than guessing: it offers each
+candidate prefix of at least two segments to the API and keeps the one GitLab recognises as a project. At most
+one of them ever can, since a GitLab project holds no namespace of its own — if `group/sub/project` is a
+project then `group/sub` is necessarily a group — so the reference is unambiguous, at the cost of a few
+lookups.
+
+A reference naming no project of the configuration is an error, rather than an empty file.
+
+### Settings
+
+In the UI, go to _Settings_ > _GitLab_.
+
+| Setting      | Default | Description                                          |
+|--------------|---------|------------------------------------------------------|
+| `maxCommits` | `1000`  | Maximum number of commits to return for a change log |
+
+As code:
+
+```yaml
+ontrack:
+  config:
+    settings:
+      gitlab:
+        maxCommits: 1000
+```
+
 ## Proxies
 
 Yontrack honours the standard JVM proxy settings — `http.proxyHost`, `http.proxyPort`, `https.proxyHost`,
@@ -138,3 +215,8 @@ Self-managed instances are supported at whatever URL the configuration names. Tw
   store, or has `ignoreSslCertificate` set on its configuration. The first is preferable.
 * **Access tokens** — project and group access tokens are available on any self-managed licence, Free
   included, and Yontrack accepts one anywhere it accepts a personal access token.
+* **Redirects** — Yontrack does **not** follow them when calling the API, and reports the `Location` as an
+  error instead. Following one would replay the access token onto whatever host it names. No GitLab API v4
+  endpoint Yontrack calls redirects, so hitting this means the configuration's `url` is not the one the
+  instance answers on — typically an `http://` URL on an instance which forces `https://`. Fix the URL rather
+  than working around it: the token was being sent in clear over that first request.

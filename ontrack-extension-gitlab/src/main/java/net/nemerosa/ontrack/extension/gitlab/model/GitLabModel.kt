@@ -36,6 +36,7 @@ data class GitLabProject(
     val name: String = "",
     val path_with_namespace: String = "",
     val web_url: String? = null,
+    val default_branch: String? = null,
 )
 
 /**
@@ -94,6 +95,8 @@ data class GitLabCommit(
     val message: String? = null,
     val committed_date: String? = null,
     val web_url: String? = null,
+    val author_name: String? = null,
+    val author_email: String? = null,
 ) {
     /**
      * [committed_date] as a UTC date and time, or `null` when GitLab sent none or an unreadable one.
@@ -132,4 +135,30 @@ data class GitLabMergeRequest(
     val source_branch: String = "",
     val target_branch: String = "",
     val web_url: String = "",
+)
+
+/**
+ * A branch, as returned by `/projects/:id/repository/branches`.
+ *
+ * [commit] is the branch's head; GitLab nests the whole commit object rather than only its SHA.
+ */
+@JsonIgnoreProperties(ignoreUnknown = true)
+data class GitLabBranch(
+    val name: String = "",
+    val commit: GitLabCommit? = null,
+    val default: Boolean = false,
+)
+
+/**
+ * The answer of `/projects/:id/repository/compare`.
+ *
+ * [commits] are the commits of the comparison, oldest first. [compare_timeout] is GitLab telling that it gave
+ * up before walking the whole range, which makes [commits] incomplete rather than wrong.
+ */
+@JsonIgnoreProperties(ignoreUnknown = true)
+data class GitLabCompare(
+    val commit: GitLabCommit? = null,
+    val commits: List<GitLabCommit> = emptyList(),
+    val compare_timeout: Boolean = false,
+    val compare_same_ref: Boolean = false,
 )

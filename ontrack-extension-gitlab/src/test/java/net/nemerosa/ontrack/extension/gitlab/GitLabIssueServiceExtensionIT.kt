@@ -1,8 +1,6 @@
 package net.nemerosa.ontrack.extension.gitlab
 
 import net.nemerosa.ontrack.extension.gitlab.model.GitLabIssueServiceConfiguration
-import net.nemerosa.ontrack.extension.gitlab.property.GitLabProjectConfigurationProperty
-import net.nemerosa.ontrack.extension.gitlab.property.GitLabProjectConfigurationPropertyType
 import net.nemerosa.ontrack.test.TestUtils.uid
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -76,25 +74,6 @@ class GitLabIssueServiceExtensionIT : AbstractGitLabTestSupport() {
                 }
             }
         }
-    }
-
-    /**
-     * Sets the GitLab property of the project this is called on.
-     */
-    private fun net.nemerosa.ontrack.model.structure.Project.setGitLabProperty(
-        configurationName: String,
-        repository: String,
-    ) {
-        setProperty(
-            this,
-            GitLabProjectConfigurationPropertyType::class.java,
-            GitLabProjectConfigurationProperty(
-                configuration = gitConfigurationService.getConfiguration(configurationName),
-                issueServiceConfigurationIdentifier = null,
-                repository = repository,
-                indexationInterval = 0,
-            )
-        )
     }
 
 }

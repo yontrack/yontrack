@@ -1,7 +1,10 @@
 package net.nemerosa.ontrack.extension.gitlab
 
 import net.nemerosa.ontrack.extension.gitlab.model.GitLabConfiguration
+import net.nemerosa.ontrack.extension.gitlab.property.GitLabProjectConfigurationProperty
+import net.nemerosa.ontrack.extension.gitlab.property.GitLabProjectConfigurationPropertyType
 import net.nemerosa.ontrack.extension.gitlab.service.GitLabConfigurationService
+import net.nemerosa.ontrack.model.structure.Project
 import net.nemerosa.ontrack.graphql.AbstractQLKTITSupport
 import net.nemerosa.ontrack.model.security.GlobalSettings
 import net.nemerosa.ontrack.test.TestUtils.uid
@@ -24,6 +27,26 @@ abstract class AbstractGitLabTestSupport : AbstractQLKTITSupport() {
                 )
             }
         }
+    }
+
+    /**
+     * Sets the GitLab property of the project this is called on.
+     */
+    protected fun Project.setGitLabProperty(
+        configurationName: String,
+        repository: String,
+        issueServiceConfigurationIdentifier: String? = null,
+    ) {
+        setProperty(
+            this,
+            GitLabProjectConfigurationPropertyType::class.java,
+            GitLabProjectConfigurationProperty(
+                configuration = gitConfigurationService.getConfiguration(configurationName),
+                issueServiceConfigurationIdentifier = issueServiceConfigurationIdentifier,
+                repository = repository,
+                indexationInterval = 0,
+            )
+        )
     }
 
 }
