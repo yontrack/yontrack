@@ -41,4 +41,17 @@ interface GitLabClient {
      */
     fun getMergeRequest(project: String, iid: Int): GitLabMergeRequest?
 
+    /**
+     * Gets the most recent commit of a project whose message names an issue.
+     *
+     * GitLab has no "commits of an issue" endpoint - the issue's own timeline is a Premium feature - so
+     * this searches the project's commits for the `#123` reference, as the GitHub client searches for it
+     * through the commit search API.
+     *
+     * @param project Full path of the project, like `group/subgroup/project`
+     * @param iid Number of the issue **inside the project**
+     * @return Full SHA of the most recent commit naming the issue, or `null` when there is none
+     */
+    fun getIssueLastCommit(project: String, iid: Int): String?
+
 }

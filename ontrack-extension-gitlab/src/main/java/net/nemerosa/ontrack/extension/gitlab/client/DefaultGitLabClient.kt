@@ -1,5 +1,6 @@
 package net.nemerosa.ontrack.extension.gitlab.client
 
+import net.nemerosa.ontrack.extension.gitlab.model.GitLabCommit
 import net.nemerosa.ontrack.extension.gitlab.model.GitLabConfiguration
 import net.nemerosa.ontrack.extension.gitlab.model.GitLabIssue
 import net.nemerosa.ontrack.extension.gitlab.model.GitLabMergeRequest
@@ -97,6 +98,15 @@ class DefaultGitLabClient(
             URLEncoder.encode(path.trim('/'), StandardCharsets.UTF_8).replace("+", "%20")
 
         /**
+         * URL-encodes the value of a query parameter.
+         *
+         * The URIs are built from already-encoded components, so a value carrying a `#` - an issue
+         * reference, say - has to arrive encoded or it would be read as the start of a fragment.
+         */
+        fun encodeQueryValue(value: String): String =
+            URLEncoder.encode(value, StandardCharsets.UTF_8).replace("+", "%20")
+
+        /**
          * How long to wait after a 429, from the headers GitLab sent.
          */
         fun retryAfterSeconds(headers: HttpHeaders?, now: Long): Long {
@@ -133,6 +143,26 @@ class DefaultGitLabClient(
             getForObject<GitLabMergeRequest>(projectUri(project, "merge_requests/$iid"))
         }
 
+    override fun getIssueLastCommit(project: String, iid: Int): String? =
+        notFoundAsNull {
+            val commits = getForList(
+                projectUri(
+                    project,
+                    "search",
+                    "scope" to "commits",
+                    "search" to encodeQueryValue("#$iid"),
+                    "per_page" to PAGE_SIZE.toString(),
+                ),
+                object : ParameterizedTypeReference<List<GitLabCommit>>() {}
+            )
+            // The search is a substring one and its order is GitLab's, so both the false positives and the
+            // ordering are settled here rather than trusted.
+            commits
+                .filter { it.mentionsIssue(iid) }
+                .maxWithOrNull(compareBy(nullsFirst()) { it.committedTime })
+                ?.id
+        }
+
     /**
      * Root of the API, with a single separator whatever the configuration's URL ends with.
      */
@@ -152,6 +182,12 @@ class DefaultGitLabClient(
 
     private inline fun <reified T : Any> getForObject(uri: URI): T =
         withRateLimit { template.getForObject(uri, T::class.java) } ?: throw GitLabNoResponseException(uri.toString())
+
+    /**
+     * A single page of a list endpoint, for the calls which only ever want the first one.
+     */
+    private fun <T> getForList(uri: URI, type: ParameterizedTypeReference<List<T>>): List<T> =
+        withRateLimit { template.exchange(uri, HttpMethod.GET, null, type) }.body ?: emptyList()
 
     /**
      * Items of every page, following the `Link` header GitLab sends: several endpoints return no total at

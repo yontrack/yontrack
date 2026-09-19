@@ -4,11 +4,15 @@ import net.nemerosa.ontrack.extension.gitlab.client.GitLabClientFactory
 import net.nemerosa.ontrack.extension.gitlab.model.GitLabIssueServiceConfiguration
 import net.nemerosa.ontrack.extension.gitlab.model.GitLabIssueWrapper
 import net.nemerosa.ontrack.extension.gitlab.property.GitLabGitConfiguration
+import net.nemerosa.ontrack.extension.gitlab.property.GitLabProjectConfigurationProperty
+import net.nemerosa.ontrack.extension.gitlab.property.GitLabProjectConfigurationPropertyType
 import net.nemerosa.ontrack.extension.gitlab.service.GitLabConfigurationService
 import net.nemerosa.ontrack.extension.issues.IssueRepositoryContext
 import net.nemerosa.ontrack.extension.issues.model.Issue
 import net.nemerosa.ontrack.extension.issues.model.IssueServiceConfiguration
 import net.nemerosa.ontrack.extension.issues.support.AbstractIssueServiceExtension
+import net.nemerosa.ontrack.model.structure.PropertyService
+import net.nemerosa.ontrack.model.structure.forEachEntityWithProperty
 import net.nemerosa.ontrack.model.support.MessageAnnotation.Companion.of
 import net.nemerosa.ontrack.model.support.MessageAnnotator
 import net.nemerosa.ontrack.model.support.RegexMessageAnnotator
@@ -21,16 +25,36 @@ class GitLabIssueServiceExtension(
     extensionFeature: GitLabExtensionFeature,
     private val configurationService: GitLabConfigurationService,
     private val gitLabClientFactory: GitLabClientFactory,
+    private val propertyService: PropertyService,
 ) : AbstractIssueServiceExtension(
     extensionFeature,
     GITLAB_SERVICE_ID,
     "GitLab",
 ) {
     /**
-     * The GitLab configurations are not selectable outside GitLab configurations and this method returns an empty list.
+     * The GitLab projects Yontrack already knows about, each usable as an issue service.
+     *
+     * An issue service configuration is a *configuration and a project path*, and nothing but a GitLab
+     * project property carries that pair: a configuration on its own names an instance, not a project, and
+     * asking the instance for its projects would put a remote call behind every opening of the property
+     * form. So the list is the set of `configuration:project` pairs the instance is already configured
+     * with, deduplicated - several Yontrack projects may well be following the same GitLab project.
+     *
+     * A project whose own GitLab property is the one that produced an entry does not need it: it selects
+     * `self` instead, which [net.nemerosa.ontrack.extension.gitlab.property.GitLabConfigurator] resolves.
+     * The entries are for everybody else - a plain Git project, or a project whose code and issues do not
+     * live in the same GitLab project.
      */
     override fun getConfigurationList(): List<IssueServiceConfiguration> {
-        return emptyList()
+        val configurations = mutableMapOf<String, GitLabIssueServiceConfiguration>()
+        propertyService.forEachEntityWithProperty<GitLabProjectConfigurationPropertyType, GitLabProjectConfigurationProperty> { _, property ->
+            val configuration = GitLabIssueServiceConfiguration(
+                configuration = property.configuration,
+                repository = property.repository,
+            )
+            configurations[configuration.name] = configuration
+        }
+        return configurations.values.sortedBy { it.name }
     }
 
     /**
@@ -135,7 +159,12 @@ class GitLabIssueServiceExtension(
         repositoryContext: IssueRepositoryContext,
         key: String
     ): String? {
-        TODO("Not yet implemented")
+        val configuration = issueServiceConfiguration as GitLabIssueServiceConfiguration
+        val client = gitLabClientFactory.create(configuration.configuration)
+        return client.getIssueLastCommit(
+            configuration.repository,
+            getIssueId(key)
+        )
     }
 
     companion object {

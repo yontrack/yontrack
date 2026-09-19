@@ -50,6 +50,16 @@ class DefaultGitLabClientIT {
     }
 
     @TestOnGitLab
+    fun `An issue no commit names has no last commit`() {
+        assertNull(client.getIssueLastCommit(gitLabTestEnv.projectPath, UNKNOWN_IID))
+    }
+
+    @TestOnGitLab
+    fun `Searching the commits of an unknown project is null rather than an error`() {
+        assertNull(client.getIssueLastCommit("${gitLabTestEnv.group}/no-such-project", 1))
+    }
+
+    @TestOnGitLab
     fun `An unknown project is not found rather than an error`() {
         assertNull(client.getIssue("${gitLabTestEnv.group}/no-such-project", 1))
     }

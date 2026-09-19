@@ -81,6 +81,46 @@ data class GitLabIssue(
 }
 
 /**
+ * A commit, as returned by the repository and search endpoints.
+ *
+ * [id] is the full SHA, which is what Yontrack stores and links on; [short_id] is GitLab's abbreviation
+ * of it and is only ever displayed by GitLab itself.
+ */
+@JsonIgnoreProperties(ignoreUnknown = true)
+data class GitLabCommit(
+    val id: String = "",
+    val short_id: String = "",
+    val title: String = "",
+    val message: String? = null,
+    val committed_date: String? = null,
+    val web_url: String? = null,
+) {
+    /**
+     * [committed_date] as a UTC date and time, or `null` when GitLab sent none or an unreadable one.
+     *
+     * Unlike an issue's update time this does **not** fall back on _now_: a commit with no date must sort
+     * last rather than first.
+     */
+    val committedTime: LocalDateTime?
+        get() = committed_date?.let {
+            try {
+                OffsetDateTime.parse(it).withOffsetSameInstant(ZoneOffset.UTC).toLocalDateTime()
+            } catch (_: DateTimeParseException) {
+                null
+            }
+        }
+
+    /**
+     * Does this commit name issue [iid], as opposed to merely starting with its digits?
+     *
+     * GitLab's basic commit search is a substring search, so a search for `#12` also brings back the
+     * commits of `#123`.
+     */
+    fun mentionsIssue(iid: Int): Boolean =
+        Regex("#$iid(?!\\d)").containsMatchIn(message ?: title)
+}
+
+/**
  * A merge request.
  */
 @JsonIgnoreProperties(ignoreUnknown = true)

@@ -24,4 +24,18 @@ data class GitLabIssueWrapper(
 
     val labels: List<String> get() = gitlabIssue.labels
 
+    /**
+     * GitLab's own state - `opened` or `closed`.
+     *
+     * It is the same text as [status], flattened onto the wrapper because the whole wrapper is what the
+     * frontend reads as the issue's `rawIssue`, and the display components should not have to reach into
+     * GitLab's own API model to find it.
+     */
+    val state: String get() = gitlabIssue.state
+
+    /**
+     * Title of the milestone the issue belongs to, if any - the text [milestoneUrl] links.
+     */
+    val milestoneTitle: String? get() = gitlabIssue.milestone?.title
+
 }

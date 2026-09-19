@@ -10,6 +10,7 @@ import org.springframework.http.MediaType
 import org.springframework.test.web.client.MockRestServiceServer
 import org.springframework.test.web.client.match.MockRestRequestMatchers.header
 import org.springframework.test.web.client.match.MockRestRequestMatchers.method
+import org.springframework.test.web.client.match.MockRestRequestMatchers.queryParam
 import org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo
 import org.springframework.test.web.client.response.MockRestResponseCreators.withStatus
 import org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess
@@ -172,6 +173,99 @@ class DefaultGitLabClientTest {
     }
 
     @Test
+    fun `The last commit of an issue is the most recent one mentioning it`() {
+        val client = client()
+        val server = MockRestServiceServer.bindTo(client.template).build()
+        server.expect(requestTo(requestToCommitSearch("group%2Fproject", 12)))
+            .andExpect(method(HttpMethod.GET))
+            .andRespond(
+                withSuccess(
+                    commitSearchJson(
+                        commitJson("aaa", "Fixes #12", "2026-09-17T10:00:00.000Z"),
+                        commitJson("ccc", "Last word on #12", "2026-09-19T10:00:00.000Z"),
+                        commitJson("bbb", "More on #12", "2026-09-18T10:00:00.000Z"),
+                    ),
+                    MediaType.APPLICATION_JSON
+                )
+            )
+        assertEquals("ccc", client.getIssueLastCommit("group/project", 12))
+        server.verify()
+    }
+
+    @Test
+    fun `The issue number is searched for as a reference, hash included`() {
+        val client = client()
+        val server = MockRestServiceServer.bindTo(client.template).build()
+        // The `#` must reach GitLab encoded, or it would be taken for the start of a fragment and the
+        // search would run on an empty term.
+        server.expect(requestTo(requestToCommitSearch("group%2Fproject", 12)))
+            .andExpect(queryParam("scope", "commits"))
+            // The matcher reads the query as it goes on the wire, and `%2312` is the point: an
+            // unencoded `#` would have started a fragment and left the search term empty.
+            .andExpect(queryParam("search", "%2312"))
+            .andExpect { request -> assertNull(request.uri.fragment, "The issue reference is not a fragment") }
+            .andRespond(withSuccess("[]", MediaType.APPLICATION_JSON))
+        assertNull(client.getIssueLastCommit("group/project", 12))
+        server.verify()
+    }
+
+    @Test
+    fun `A commit mentioning a longer issue number is not a match`() {
+        val client = client()
+        val server = MockRestServiceServer.bindTo(client.template).build()
+        server.expect(requestTo(requestToCommitSearch("group%2Fproject", 12)))
+            .andRespond(
+                withSuccess(
+                    commitSearchJson(
+                        commitJson("aaa", "Fixes #123", "2026-09-19T10:00:00.000Z"),
+                        commitJson("bbb", "Fixes #12", "2026-09-17T10:00:00.000Z"),
+                    ),
+                    MediaType.APPLICATION_JSON
+                )
+            )
+        assertEquals("bbb", client.getIssueLastCommit("group/project", 12))
+        server.verify()
+    }
+
+    @Test
+    fun `No commit for an issue is null rather than an error`() {
+        val client = client()
+        val server = MockRestServiceServer.bindTo(client.template).build()
+        server.expect(requestTo(requestToCommitSearch("group%2Fproject", 99)))
+            .andRespond(withSuccess("[]", MediaType.APPLICATION_JSON))
+        assertNull(client.getIssueLastCommit("group/project", 99))
+        server.verify()
+    }
+
+    @Test
+    fun `Searching the commits of an unknown project is null`() {
+        val client = client()
+        val server = MockRestServiceServer.bindTo(client.template).build()
+        server.expect(requestTo(requestToCommitSearch("group%2Fnope", 12)))
+            .andRespond(withStatus(HttpStatus.NOT_FOUND))
+        assertNull(client.getIssueLastCommit("group/nope", 12))
+        server.verify()
+    }
+
+    @Test
+    fun `A commit without a date is only kept when no dated commit matches`() {
+        val client = client()
+        val server = MockRestServiceServer.bindTo(client.template).build()
+        server.expect(requestTo(requestToCommitSearch("group%2Fproject", 12)))
+            .andRespond(
+                withSuccess(
+                    commitSearchJson(
+                        """{"id":"aaa","short_id":"aaa","title":"Fixes #12","message":"Fixes #12"}""",
+                        commitJson("bbb", "More on #12", "2026-09-18T10:00:00.000Z"),
+                    ),
+                    MediaType.APPLICATION_JSON
+                )
+            )
+        assertEquals("bbb", client.getIssueLastCommit("group/project", 12))
+        server.verify()
+    }
+
+    @Test
     fun `A 429 is retried after the delay GitLab asks for`() {
         val client = client()
         val server = MockRestServiceServer.bindTo(client.template).build()
@@ -265,6 +359,21 @@ class DefaultGitLabClientTest {
                 "iid": 7,
                 "title": "v1"
             }
+        }
+    """.trimIndent()
+
+    private fun requestToCommitSearch(encodedProject: String, iid: Int) =
+        "https://gitlab.com/api/v4/projects/$encodedProject/search?scope=commits&search=%23$iid&per_page=100"
+
+    private fun commitSearchJson(vararg commits: String) = commits.joinToString(",", "[", "]")
+
+    private fun commitJson(id: String, message: String, committedDate: String) = """
+        {
+            "id": "$id",
+            "short_id": "${id.take(8)}",
+            "title": "${message.lineSequence().first()}",
+            "message": "$message",
+            "committed_date": "$committedDate"
         }
     """.trimIndent()
 

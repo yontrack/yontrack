@@ -89,6 +89,41 @@ The GitLab project property links a Yontrack project to a GitLab project:
 The `repository` field holds the whole path — `group/project`, or `group/subgroup/project` for a project in a
 subgroup — exactly as it appears in the GitLab URL. Yontrack URL-encodes it when calling the API.
 
+## Issues
+
+Yontrack reads GitLab issues, and shows them in change logs and on the issue information page: state,
+labels and milestone.
+
+### Referencing an issue
+
+Only the **`#123`** form is recognised, and it is looked up in the GitLab project the issue service names.
+Two things GitLab itself understands are deliberately not parsed:
+
+* **cross-project references** — `group/project#123` needs access to another project and is ambiguous about
+  which one Yontrack should call, so it is not supported;
+* **closing keywords** — `Closes #123`, `Fixes #123` and the rest are an instance-wide, administrator-editable
+  pattern in GitLab. Yontrack links the issue either way; it does not try to tell a closing reference from a
+  plain one.
+
+### Choosing the issue service
+
+The `issueServiceConfigurationIdentifier` of the project property says where a commit's `#123` is resolved:
+
+* **left empty**, or set to `self` — the project's **own** GitLab project. This is the usual case, and what
+  the _GitLab issues_ entry of the UI's issue-service list means.
+* **set to another service** — any other issue service the instance offers, JIRA included. Every GitLab
+  project already configured in Yontrack appears there as `configuration:group/project`, so a project whose
+  code and issues do not live together — or a plain Git project, with no GitLab property of its own — can
+  point at the GitLab project that holds its issues.
+
+### The last commit of an issue
+
+Some Yontrack features ask an issue service for the last commit that mentions an issue. GitLab has no
+endpoint for it — an issue's own timeline of related commits is a paid feature — so Yontrack **searches the
+project's commits** for the `#123` reference (`GET /projects/:id/search?scope=commits`) and keeps the most
+recent match. The search is a substring one, so Yontrack discards the commits which merely start with the
+same digits: a search for `#12` does not return the commit of `#123`.
+
 ## Proxies
 
 Yontrack honours the standard JVM proxy settings — `http.proxyHost`, `http.proxyPort`, `https.proxyHost`,

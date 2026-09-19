@@ -11,8 +11,11 @@ import net.nemerosa.ontrack.extension.gitlab.model.GitLabMilestone
 import net.nemerosa.ontrack.extension.gitlab.model.GitLabIssueServiceConfiguration
 import net.nemerosa.ontrack.extension.gitlab.model.GitLabIssueWrapper
 import net.nemerosa.ontrack.extension.gitlab.service.GitLabConfigurationService
+import net.nemerosa.ontrack.extension.issues.IssueRepositoryContext
 import net.nemerosa.ontrack.extension.issues.model.Issue
 import net.nemerosa.ontrack.extension.scm.SCMExtensionFeature
+import net.nemerosa.ontrack.json.asJson
+import net.nemerosa.ontrack.model.structure.PropertyService
 import net.nemerosa.ontrack.extension.stale.StaleExtensionFeature
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -21,17 +24,21 @@ import kotlin.test.*
 
 class GitLabIssueServiceExtensionTest {
 
+    private val repositoryContext = IssueRepositoryContext("gitlab", "nemerosa/ontrack")
+
     private lateinit var extension: GitLabIssueServiceExtension
     private lateinit var configuration: GitLabIssueServiceConfiguration
     private lateinit var configurationService: GitLabConfigurationService
     private lateinit var engineConfiguration: GitLabConfiguration
     private lateinit var gitLabClientFactory: GitLabClientFactory
+    private lateinit var propertyService: PropertyService
     private lateinit var issue: GitLabIssue
 
     @BeforeEach
     fun init() {
         configurationService = mockk<GitLabConfigurationService>()
         gitLabClientFactory = mockk<GitLabClientFactory>()
+        propertyService = mockk<PropertyService>(relaxed = true)
         extension = GitLabIssueServiceExtension(
             extensionFeature = GitLabExtensionFeature(
                 GitExtensionFeature(
@@ -40,7 +47,8 @@ class GitLabIssueServiceExtensionTest {
                 )
             ),
             configurationService = configurationService,
-            gitLabClientFactory = gitLabClientFactory
+            gitLabClientFactory = gitLabClientFactory,
+            propertyService = propertyService,
         )
         engineConfiguration = GitLabConfiguration(
             name = "test",
@@ -57,15 +65,60 @@ class GitLabIssueServiceExtensionTest {
             title = "Issue 1",
             state = "opened",
             web_url = "url/16",
-            labels = emptyList(),
+            labels = listOf("bug", "urgent"),
             updated_at = "2026-09-19T10:11:12.000Z",
             milestone = GitLabMilestone(id = 700, iid = 7, title = "v1"),
         )
     }
 
     @Test
-    fun list_of_configurations_is_not_exposed() {
+    fun `No GitLab project configured at all means no GitLab issue service to select`() {
         assertTrue(extension.getConfigurationList().isEmpty())
+    }
+
+    @Test
+    fun `The last commit of an issue is searched in the project of the configuration`() {
+        val client = mockk<GitLabClient>()
+        every { client.getIssueLastCommit("nemerosa/ontrack", 16) } returns "abcdef"
+        every { gitLabClientFactory.create(configuration.configuration) } returns client
+        assertEquals(
+            "abcdef",
+            extension.getLastCommit(configuration, repositoryContext, "#16"),
+        )
+    }
+
+    @Test
+    fun `The last commit of an issue is null when no commit names it`() {
+        val client = mockk<GitLabClient>()
+        every { client.getIssueLastCommit("nemerosa/ontrack", 16) } returns null
+        every { gitLabClientFactory.create(configuration.configuration) } returns client
+        assertNull(extension.getLastCommit(configuration, repositoryContext, "16"))
+    }
+
+    @Test
+    fun `The raw issue the frontend reads carries the state, the labels and the milestone`() {
+        val found = get_issue_test("16", 16)
+        assertNotNull(found)
+        val json = found.asJson()
+        assertEquals("opened", json.path("state").asText())
+        assertEquals("v1", json.path("milestoneTitle").asText())
+        assertEquals("url/nemerosa/ontrack/-/milestones/7", json.path("milestoneUrl").asText())
+        assertEquals("#16", json.path("displayKey").asText())
+        assertEquals("Issue 1", json.path("summary").asText())
+        assertEquals(
+            listOf("bug", "urgent"),
+            json.path("labels").map { it.asText() },
+        )
+    }
+
+    @Test
+    fun `The types of an issue are its labels`() {
+        val found = get_issue_test("16", 16)
+        assertNotNull(found)
+        assertEquals(
+            setOf("bug", "urgent"),
+            extension.getIssueTypes(configuration, found),
+        )
     }
 
     @Test
