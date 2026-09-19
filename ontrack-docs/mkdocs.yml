@@ -59,6 +59,7 @@ nav:
           - content/start/configuration.md
           - GitHub: content/start/configuration/github.md
           - Bitbucket Cloud: content/start/configuration/bitbucket-cloud.md
+          - GitLab: content/start/configuration/gitlab.md
           - Jenkins: content/start/configuration/jenkins.md
       - Feeding:
           - content/start/feeding.md

@@ -9,7 +9,6 @@ a surprise that they play a major role in Ontrack.
 
 //* <<usage-git,Generic Git repositories>>
 //* <<usage-github,GitHub Cloud & Enterprise>>
-//* <<usage-gitlab,GitLab>>
 //* <<usage-bitbucket,Bitbucket Cloud & Server>>
 
 include::feature-scm-catalog.adoc[]

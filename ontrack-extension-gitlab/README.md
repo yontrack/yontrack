@@ -24,8 +24,8 @@ The module has two kinds of tests:
   covered with `MockRestServiceServer`, and the pipeline channel and the post-processing with their
   DEV-profile mocks.
 * **real** tests, which run against the gitlab.com group dedicated to the tests. They are
-  **skipped** when no credential is set. Issue #1827 introduces them, together with the annotation
-  and the environment they read.
+  **skipped** when no credential is set. `@TestOnGitLab` is the annotation that gates them, and
+  `GitLabTestProperties` / `gitLabTestEnv` the environment they read (`GitLabTestUtils.kt`).
 
 Real tests are split by what they cost:
 
@@ -95,8 +95,9 @@ are kept apart because the group is what a test sweeps and the project is what i
 
 The instance is always `https://gitlab.com`: there is no URL secret. The real tests are skipped when
 no credential is set, and **fail** when only some are, so that a half-configured CI does not pass
-silently. Issue #1827 wires the secrets into the integration shard, and issue #1835 adds the switch
-that lets the pipeline tests run in their own workflow only.
+silently. The secrets are passed to integration shard 5 by `.github/workflows/ci.yml`, whose
+`SKIP_GITLAB_IT` input (default `true`) is what turns the real tests on for a run started by hand.
+Issue #1835 adds the switch that lets the pipeline tests run in their own workflow only.
 
 ### Writing a real test
 
