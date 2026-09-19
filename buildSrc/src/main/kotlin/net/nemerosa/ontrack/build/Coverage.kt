@@ -64,10 +64,100 @@ object Coverage {
      */
     fun sessionId(taskName: String, suffix: String?): String? {
         val type = SESSION_TYPES[taskName] ?: return null
-        val slug = suffix?.trim()?.lowercase()?.replace(Regex("[^a-z0-9]+"), "-")?.trim('-')
-        return if (slug.isNullOrEmpty()) type else "$type-$slug"
+        return join(type, suffix)
     }
 
     /** Where a test task's execution data goes, relative to the project's build directory. */
     fun execFilePath(taskName: String): String = "jacoco/$taskName.exec"
+
+    // ===========================================================================================
+    // The backend *container* of the KDSL and UI acceptance stacks (#1819)
+    //
+    // Here the code under test does not run in a Gradle JVM at all: it runs in the
+    // `nemerosa/ontrack` container the three `compose/docker-compose-kdsl*.yml` files start. The
+    // agent gets in through a coverage-only Compose override, never through the released image,
+    // and its data is pulled over TCP by `jacococli dump` before the stack goes down.
+    // ===========================================================================================
+
+    /**
+     * Environment variable the CI workflow uses to *name* the session type of the one Compose
+     * variant two suites share, [SHARED_VARIANT].
+     *
+     * It exists because `kdslAcceptanceTest` is brought up both by the KDSL acceptance tests
+     * (`kdsl`) and by the main Playwright leg (`ui-main`), and the variant alone cannot tell them
+     * apart: the workflow says which one it is (#1821). A local run leaves it unset and gets the
+     * default.
+     *
+     * It deliberately renames *only* that variant. Setting it once for a job that runs several
+     * legs must not collapse `ui-ldap` and `ui-oidc` onto the same name -- they would then dump
+     * over each other's `.exec`, and the merged report would lose a leg without saying so.
+     */
+    const val SESSION_OVERRIDE_ENV = "COVERAGE_SESSION"
+
+    /**
+     * The Compose variable through which the resolved session ID reaches
+     * `compose/docker-compose-coverage.yml`, which puts it in the agent's `sessionid` option.
+     */
+    const val COMPOSE_SESSION_VARIABLE = "YONTRACK_COVERAGE_SESSION"
+
+    /** Where the agent jar is staged, relative to the root project's build directory. */
+    const val AGENT_JAR_PATH = "jacoco/jacocoagent.jar"
+
+    /** Where the agent jar is mounted inside the backend container. */
+    const val AGENT_JAR_CONTAINER_PATH = "/jacoco/jacocoagent.jar"
+
+    /** The agent's `tcpserver` port *inside* the container; the host side is offset per slot. */
+    const val AGENT_CONTAINER_PORT = 6300
+
+    /**
+     * The one Compose variant two suites share: the KDSL acceptance tests and the main Playwright
+     * leg both run against `docker-compose-kdsl.yml`. It is the only variant
+     * [SESSION_OVERRIDE_ENV] renames.
+     */
+    const val SHARED_VARIANT = "kdslAcceptanceTest"
+
+    /**
+     * The Compose variant of each acceptance stack, mapped to the session type it runs by default.
+     *
+     * `kdslLdap` and `kdslOidc` are only ever exercised by Playwright, so their defaults are the
+     * final names and nothing renames them. [SHARED_VARIANT] defaults to `kdsl` and is renamed to
+     * `ui-main` by the Playwright job -- see [SESSION_OVERRIDE_ENV].
+     */
+    private val CONTAINER_SESSION_TYPES: Map<String, String> = mapOf(
+        SHARED_VARIANT to "kdsl",
+        "kdslLdap" to "ui-ldap",
+        "kdslOidc" to "ui-oidc",
+    )
+
+    /**
+     * The JaCoCo session ID of the backend container of an acceptance stack.
+     *
+     * @param variant the Compose variant, e.g. `kdslOidc`
+     * @param override value of [SESSION_OVERRIDE_ENV]; honoured for [SHARED_VARIANT] only
+     * @param suffix value of [SESSION_SUFFIX_ENV], usually the shard number
+     * @return the session ID, or `null` when the variant is not one of the three
+     */
+    fun containerSessionId(variant: String, override: String?, suffix: String?): String? {
+        val default = CONTAINER_SESSION_TYPES[variant] ?: return null
+        val type = if (variant == SHARED_VARIANT) slug(override) ?: default else default
+        return join(type, suffix)
+    }
+
+    /**
+     * Where a container run's execution data is dumped, relative to the *root* project's build
+     * directory -- next to the agent jar, so that one directory holds the whole of what the
+     * acceptance stacks contribute and #1821 has one place to look.
+     *
+     * Named after the session rather than after the variant, because the `kdslAcceptanceTest`
+     * variant produces `kdsl` on one job and `ui-main-2` on another, and the two must not
+     * overwrite each other.
+     */
+    fun containerExecFilePath(sessionId: String): String = "jacoco/$sessionId.exec"
+
+    private fun join(type: String, suffix: String?): String =
+        slug(suffix)?.let { "$type-$it" } ?: type
+
+    /** Lowercases and slugifies a fragment; `null` for anything that is blank or only separators. */
+    private fun slug(value: String?): String? =
+        value?.trim()?.lowercase()?.replace(Regex("[^a-z0-9]+"), "-")?.trim('-')?.takeIf { it.isNotEmpty() }
 }

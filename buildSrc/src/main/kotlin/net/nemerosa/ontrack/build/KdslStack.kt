@@ -40,6 +40,17 @@ object KdslStack {
     const val BASE_POSTGRES = 5432
     const val BASE_RABBIT = 5672
     const val BASE_RABBIT_MGMT = 15672
+
+    /**
+     * The JaCoCo agent's `tcpserver` port, published by the coverage-only
+     * Compose override (#1819). It is here, and not hardcoded in the override,
+     * for the same reason as every other port: two checkouts running the
+     * acceptance tests at once must not fight over it.
+     *
+     * 6300 is JaCoCo's own default. Over four slots it spans 6300-6600, which
+     * sits in the gap between RabbitMQ's 5672-5972 and Keycloak's 8008-8308.
+     */
+    const val BASE_JACOCO = 6300
     const val BASE_KEYCLOAK = 8008
     const val BASE_ONTRACK = 8080
     const val BASE_INFLUXDB = 8086
@@ -53,6 +64,7 @@ object KdslStack {
         BASE_POSTGRES,
         BASE_RABBIT,
         BASE_RABBIT_MGMT,
+        BASE_JACOCO,
         BASE_KEYCLOAK,
         BASE_ONTRACK,
         BASE_INFLUXDB,
@@ -131,6 +143,7 @@ data class KdslStackInstance(
     val postgresPort: Int = StackSlots.port(KdslStack.BASE_POSTGRES, slot)
     val rabbitPort: Int = StackSlots.port(KdslStack.BASE_RABBIT, slot)
     val rabbitManagementPort: Int = StackSlots.port(KdslStack.BASE_RABBIT_MGMT, slot)
+    val jacocoPort: Int = StackSlots.port(KdslStack.BASE_JACOCO, slot)
     val keycloakPort: Int = StackSlots.port(KdslStack.BASE_KEYCLOAK, slot)
     val ontrackPort: Int = StackSlots.port(KdslStack.BASE_ONTRACK, slot)
     val influxdbPort: Int = StackSlots.port(KdslStack.BASE_INFLUXDB, slot)
@@ -151,6 +164,7 @@ data class KdslStackInstance(
         "YONTRACK_KDSL_POSTGRES_PORT" to postgresPort.toString(),
         "YONTRACK_KDSL_RABBIT_PORT" to rabbitPort.toString(),
         "YONTRACK_KDSL_RABBIT_MGMT_PORT" to rabbitManagementPort.toString(),
+        "YONTRACK_KDSL_JACOCO_PORT" to jacocoPort.toString(),
         "YONTRACK_KDSL_KEYCLOAK_PORT" to keycloakPort.toString(),
         "YONTRACK_KDSL_ONTRACK_PORT" to ontrackPort.toString(),
         "YONTRACK_KDSL_INFLUXDB_PORT" to influxdbPort.toString(),

@@ -1,0 +1,41 @@
+# Coverage-only override for the KDSL and UI acceptance stacks (#1819).
+#
+# Applied *on top of* `docker-compose-kdsl.yml` or one of its `-ldap` / `-oidc` variants, and only
+# when the build is run with `-Pcoverage`:
+#
+#     docker compose -f compose/docker-compose-kdsl.yml -f compose/docker-compose-coverage.yml up
+#
+# The Gradle build appends it to `useComposeFiles` in `ontrack-kdsl-acceptance/build.gradle.kts`.
+#
+# Why an override and not the image: the acceptance tests exercise the *released*
+# `nemerosa/ontrack` image, and it must stay exactly as published. Nothing in
+# `ontrack-ui/build.gradle.kts` changes; the agent arrives from outside, as a read-only bind mount
+# plus one environment variable.
+#
+# Why JAVA_TOOL_OPTIONS: the image is built by Jib with its default entrypoint, so the JAVA_OPTIONS
+# the base file sets never reaches the JVM. JAVA_TOOL_OPTIONS is read by the JVM itself and is the
+# only hook there is.
+#
+# Why output=tcpserver: nothing is written when the JVM exits, so the data survives however the
+# container stops -- including a `compose down` that kills it. It is pulled over TCP by
+# `jacococli dump` while the container is still up, which the build runs after the test task and
+# before the stack goes down.
+#
+# Why the port is a variable: every published port of these stacks is offset per slot so that
+# several checkouts run side by side (ADR 0013). YONTRACK_KDSL_JACOCO_PORT comes from `KdslStack`
+# in buildSrc and is recorded in `.yontrack-kdsl/instance.env`; the default reproduces JaCoCo's own
+# 6300 for a run of this file by hand.
+#
+# YONTRACK_COVERAGE_SESSION is the JaCoCo session ID naming the origin of the data -- `kdsl-1`,
+# `ui-oidc` and so on -- which the merged report's Sessions page reads back (#1821). `Coverage` in
+# buildSrc computes it.
+
+services:
+
+  ontrack:
+    volumes:
+      - ../build/jacoco/jacocoagent.jar:/jacoco/jacocoagent.jar:ro
+    environment:
+      JAVA_TOOL_OPTIONS: "-javaagent:/jacoco/jacocoagent.jar=output=tcpserver,address=*,port=6300,sessionid=${YONTRACK_COVERAGE_SESSION:-backend}"
+    ports:
+      - "${YONTRACK_KDSL_JACOCO_PORT:-6300}:6300"

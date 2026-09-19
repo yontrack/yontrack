@@ -1,5 +1,6 @@
 import com.github.gradle.node.NodeExtension
 import com.github.gradle.node.npm.task.NpmTask
+import net.nemerosa.ontrack.build.Coverage
 
 plugins {
     id("com.github.node-gradle.node")
@@ -16,6 +17,16 @@ configure<NodeExtension> {
 // Test environment
 
 val isCI = System.getenv("CI") == "true"
+
+// Backend coverage of the Playwright legs (#1819). The code they exercise runs in the
+// `nemerosa/ontrack` container of the acceptance stacks, so the agent and the dump live in
+// :ontrack-kdsl-acceptance; all this leg has to do is make sure the data is pulled out before its
+// stack is stopped. Gated on `-Pcoverage`, so the task graph of an ordinary run is unchanged.
+//
+// The `main` leg shares the `kdslAcceptanceTest` Compose variant with the KDSL suite, whose
+// default session type is `kdsl`; the CI workflow names it `ui-main` through COVERAGE_SESSION
+// (#1821). A local run leaves it at the default, and its data lands in `build/jacoco/kdsl.exec`.
+val coverage = providers.gradleProperty(Coverage.GRADLE_PROPERTY).isPresent
 
 val playwrightInstall by tasks.registering(NpmTask::class) {
     dependsOn("npmInstall")
@@ -60,6 +71,10 @@ val uiTest by tasks.registering(NpmTask::class) {
     // stamp's glob is reports/*/junit/*.xml and is unaffected.
     environment.put("JUNIT_REPORT_PATH", "reports/main/junit/report$shardSuffix.xml")
     environment.put("HTML_REPORT_PATH", "reports/main/html")
+
+    if (coverage) {
+        finalizedBy(":ontrack-kdsl-acceptance:kdslAcceptanceTestCoverageDump")
+    }
 }
 
 // Specialized tests
@@ -75,6 +90,10 @@ val uiLdapTest by tasks.registering(NpmTask::class) {
     args.set(listOf("run", "test-ldap"))
     environment.put("JUNIT_REPORT_PATH", "reports/ldap/junit/report.xml")
     environment.put("HTML_REPORT_PATH", "reports/ldap/html")
+
+    if (coverage) {
+        finalizedBy(":ontrack-kdsl-acceptance:kdslLdapCoverageDump")
+    }
 }
 
 val uiOidcTest by tasks.registering(NpmTask::class) {
@@ -88,6 +107,10 @@ val uiOidcTest by tasks.registering(NpmTask::class) {
     args.set(listOf("run", "test-oidc"))
     environment.put("JUNIT_REPORT_PATH", "reports/oidc/junit/report.xml")
     environment.put("HTML_REPORT_PATH", "reports/oidc/html")
+
+    if (coverage) {
+        finalizedBy(":ontrack-kdsl-acceptance:kdslOidcCoverageDump")
+    }
 }
 
 // All tests

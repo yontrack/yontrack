@@ -231,6 +231,13 @@ from 1 to 3, which offsets every port by `slot * 100`:
 | Postgres       | 5432   | 5532   |
 | Elasticsearch  | 9200   | 9300   |
 | RabbitMQ       | 5672   | 5772   |
+| JaCoCo agent   | 6300   | 6400   |
+
+The JaCoCo agent port is only *published* under `-Pcoverage`, which adds
+`compose/docker-compose-coverage.yml` on top of the base file and puts the
+agent into the backend container (#1819); it is reserved per slot all the
+same, so that an ordinary run and a coverage run in two worktrees cannot
+collide. The released image is never touched.
 
 Four slots rather than the integration stack's ten: the management port's
 range runs into Elasticsearch's beyond that, and an acceptance stack is heavy

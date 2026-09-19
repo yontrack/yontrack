@@ -40,7 +40,26 @@ class KdslStackTest {
         assertEquals(8286, instance.influxdbPort)
         assertEquals(9000, instance.ontrackManagementPort)
         assertEquals(9400, instance.elasticPort)
+        assertEquals(6500, instance.jacocoPort)
         assertEquals("http://localhost:9000/manage", instance.ontrackManagementUrl)
+    }
+
+    @Test
+    fun `the JaCoCo agent port is offset per slot like every other port`() {
+        // The coverage override publishes the agent's tcpserver (#1819). A port in a compose file
+        // and not here is not wired, and a hardcoded 6300 would make two checkouts collide.
+        assertEquals(6300, KdslStackInstance(slug = "yontrack", slot = 0).jacocoPort)
+        assertEquals(6400, KdslStackInstance(slug = "feature-a", slot = 1).jacocoPort)
+        assertEquals(6600, KdslStackInstance(slug = "feature-a", slot = 3).jacocoPort)
+        assertTrue(KdslStack.BASE_JACOCO in KdslStack.BASE_PORTS, "the agent port must be probed too")
+    }
+
+    @Test
+    fun `no two base ports collide over the slot range`() {
+        // 6300 sits between RabbitMQ's 5672 and Keycloak's 8008, and the slots offset by 100 each:
+        // adding a port is only safe as long as no slot of one lands on another slot of another.
+        val all = (0..KdslStack.SLOT_MAX).flatMap { StackSlots.ports(KdslStack.BASE_PORTS, it) }
+        assertEquals(all.size, all.toSet().size, "two ports of the same or different slots collide")
     }
 
     @Test
@@ -117,6 +136,7 @@ class KdslStackTest {
             assertEquals(3, StackSlots.readRecordedSlot(file, KdslStack.SLOT_KEY))
             val text = file.readText()
             assertTrue(text.contains("YONTRACK_KDSL_ONTRACK_PORT=8380"), text)
+            assertTrue(text.contains("YONTRACK_KDSL_JACOCO_PORT=6600"), text)
             assertTrue(text.contains("KDSL_OIDC_PROJECT=yontrack-kdsl-oidc-feature-a"), text)
         } finally {
             dir.deleteRecursively()
