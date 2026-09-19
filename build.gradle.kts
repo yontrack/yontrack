@@ -1,4 +1,5 @@
 import com.avast.gradle.dockercompose.ComposeExtension
+import net.nemerosa.ontrack.build.Coverage
 import net.nemerosa.ontrack.build.DependencyLocking
 import net.nemerosa.ontrack.build.ItStack
 import net.nemerosa.ontrack.build.ItStackInstance
@@ -152,6 +153,27 @@ configure(javaProjects) {
     apply(plugin = "org.jetbrains.kotlin.jvm")
     apply(plugin = "org.jetbrains.kotlin.plugin.spring")
 
+    // ===============================================================================================================
+    // Test coverage collection (#1818)
+    //
+    // The plugin is applied *unconditionally* and only the agent is gated on `-Pcoverage`. That
+    // split is not the obvious reading of "behind a property", and it is deliberate: under the
+    // STRICT dependency locking of #1752 a configuration with no lock state fails the build, and
+    // `resolveAndLockAll --write-locks` records whatever configurations exist when it runs.
+    // Applying the plugin conditionally would make `jacocoAgent` and `jacocoAnt` appear and
+    // disappear with the property, so the lockfiles could only ever be right for one of the two
+    // invocations. Applied always, gated on the agent, there is one lock state for every build.
+    //
+    // No report task is wired here and nothing hangs off `check`: the reports, their exclusions
+    // and the COVERAGE.* stamps belong to #1821 and #1822.
+    // ===============================================================================================================
+
+    apply(plugin = "jacoco")
+
+    configure<JacocoPluginExtension> {
+        toolVersion = Coverage.JACOCO_VERSION
+    }
+
     java {
         toolchain {
             languageVersion = JavaLanguageVersion.of(21)
@@ -206,6 +228,29 @@ configure(javaProjects) {
     // Synchronization with shutting down the database
     rootProject.tasks.named("integrationTestComposeDown") {
         mustRunAfter(integrationTest)
+    }
+
+    // The agent, on the test tasks whose Gradle JVM is measured -- `test` and `integrationTest`,
+    // per Coverage.SESSION_TYPES. Off unless `-Pcoverage` is set: instrumentation costs run time on
+    // every build, and the design accepts that cost on coverage runs only.
+    //
+    // Each task writes its own `build/jacoco/<task>.exec`, tagged with a session ID naming its
+    // origin (`unit`, `integration`, or `integration-<shard>` when COVERAGE_SESSION_SUFFIX is set
+    // by the CI workflow). The merged report's Sessions page reads those back (#1821).
+    val coverageEnabled = providers.gradleProperty(Coverage.GRADLE_PROPERTY).isPresent
+    val coverageSessionSuffix = providers.environmentVariable(Coverage.SESSION_SUFFIX_ENV).orNull
+
+    tasks.withType<Test>().configureEach {
+        val coverageSessionId = Coverage.sessionId(name, coverageSessionSuffix)
+        extensions.configure<JacocoTaskExtension> {
+            isEnabled = coverageEnabled && coverageSessionId != null
+            if (coverageSessionId != null) {
+                setDestinationFile(
+                    layout.buildDirectory.file(Coverage.execFilePath(name)).get().asFile
+                )
+                sessionId = coverageSessionId
+            }
+        }
     }
 
     // Inclusion in lifecycle
