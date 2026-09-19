@@ -3,17 +3,17 @@ package net.nemerosa.ontrack.extension.gitlab
 import io.mockk.every
 import io.mockk.mockk
 import net.nemerosa.ontrack.extension.git.GitExtensionFeature
-import net.nemerosa.ontrack.extension.gitlab.client.OntrackGitLabClient
-import net.nemerosa.ontrack.extension.gitlab.client.OntrackGitLabClientFactory
+import net.nemerosa.ontrack.extension.gitlab.client.GitLabClient
+import net.nemerosa.ontrack.extension.gitlab.client.GitLabClientFactory
 import net.nemerosa.ontrack.extension.gitlab.model.GitLabConfiguration
 import net.nemerosa.ontrack.extension.gitlab.model.GitLabIssue
+import net.nemerosa.ontrack.extension.gitlab.model.GitLabMilestone
 import net.nemerosa.ontrack.extension.gitlab.model.GitLabIssueServiceConfiguration
 import net.nemerosa.ontrack.extension.gitlab.model.GitLabIssueWrapper
 import net.nemerosa.ontrack.extension.gitlab.service.GitLabConfigurationService
 import net.nemerosa.ontrack.extension.issues.model.Issue
 import net.nemerosa.ontrack.extension.scm.SCMExtensionFeature
 import net.nemerosa.ontrack.extension.stale.StaleExtensionFeature
-import org.gitlab4j.models.Constants
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import java.util.*
@@ -25,13 +25,13 @@ class GitLabIssueServiceExtensionTest {
     private lateinit var configuration: GitLabIssueServiceConfiguration
     private lateinit var configurationService: GitLabConfigurationService
     private lateinit var engineConfiguration: GitLabConfiguration
-    private lateinit var gitHubClientFactory: OntrackGitLabClientFactory
-    private lateinit var issueWrapper: GitLabIssueWrapper
+    private lateinit var gitLabClientFactory: GitLabClientFactory
+    private lateinit var issue: GitLabIssue
 
     @BeforeEach
     fun init() {
         configurationService = mockk<GitLabConfigurationService>()
-        gitHubClientFactory = mockk<OntrackGitLabClientFactory>()
+        gitLabClientFactory = mockk<GitLabClientFactory>()
         extension = GitLabIssueServiceExtension(
             extensionFeature = GitLabExtensionFeature(
                 GitExtensionFeature(
@@ -40,29 +40,26 @@ class GitLabIssueServiceExtensionTest {
                 )
             ),
             configurationService = configurationService,
-            gitLabClientFactory = gitHubClientFactory
+            gitLabClientFactory = gitLabClientFactory
         )
         engineConfiguration = GitLabConfiguration(
-            "test",
-            "url",
-            "",
-            "",
-            false
+            name = "test",
+            url = "url",
+            token = "token",
         )
         configuration = GitLabIssueServiceConfiguration(
             engineConfiguration,
             "nemerosa/ontrack"
         )
-        issueWrapper = GitLabIssueWrapper(
-            GitLabIssue().apply {
-                id = 1
-                webUrl = "url/1"
-                title = "Issue 1"
-                state = Constants.IssueState.OPENED
-                updatedAt = Date()
-                labels = emptyList()
-            },
-            "url/xxx"
+        issue = GitLabIssue(
+            id = 1000,
+            iid = 16,
+            title = "Issue 1",
+            state = "opened",
+            web_url = "url/16",
+            labels = emptyList(),
+            updated_at = "2026-09-19T10:11:12.000Z",
+            milestone = GitLabMilestone(id = 700, iid = 7, title = "v1"),
         )
     }
 
@@ -116,16 +113,27 @@ class GitLabIssueServiceExtensionTest {
 
     @Test
     fun get_issue_from_display_key() {
-        val issue = get_issue_test("#16", 16)
-        assertNotNull(issue)
-        assertEquals(issueWrapper, issue)
+        val found = get_issue_test("#16", 16)
+        assertNotNull(found)
+        assertEquals("#16", found.displayKey)
+        assertEquals("16", found.key)
+        assertEquals("Issue 1", found.summary)
+        assertEquals("url/16", found.url)
+        assertEquals("opened", found.status.name)
     }
 
     @Test
     fun get_issue_from_key() {
-        val issue = get_issue_test("16", 16)
-        assertNotNull(issue)
-        assertEquals(issueWrapper, issue)
+        val found = get_issue_test("16", 16)
+        assertNotNull(found)
+        assertEquals("#16", found.displayKey)
+    }
+
+    @Test
+    fun `The milestone URL is built from the configuration when GitLab sends none`() {
+        val found = get_issue_test("16", 16)
+        assertTrue(found is GitLabIssueWrapper)
+        assertEquals("url/nemerosa/ontrack/-/milestones/7", found.milestoneUrl)
     }
 
     @Test
@@ -134,15 +142,15 @@ class GitLabIssueServiceExtensionTest {
     }
 
     private fun get_issue_test(token: String, id: Int): Issue? {
-        val client = mockk<OntrackGitLabClient>()
+        val client = mockk<GitLabClient>()
         every {
             client.getIssue(configuration.repository, id)
-        } returns issueWrapper
+        } returns issue
         every {
             client.getIssue(configuration.repository, not(id))
         } returns null
         every {
-            gitHubClientFactory.create(configuration.configuration)
+            gitLabClientFactory.create(configuration.configuration)
         } returns client
         return extension.getIssue(configuration, token)
     }
@@ -152,9 +160,9 @@ class GitLabIssueServiceExtensionTest {
         every {
             configurationService.getConfiguration("Test")
         } returns GitLabConfiguration(
-            "Test",
-            "https://gitlab.test.com", null, null,
-            false
+            name = "Test",
+            url = "https://gitlab.test.com",
+            token = "token",
         )
         val configuration = extension.getConfigurationByName("Test:nemerosa/ontrack")
         assertNotNull(configuration) {

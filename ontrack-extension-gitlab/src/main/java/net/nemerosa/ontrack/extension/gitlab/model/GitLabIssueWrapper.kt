@@ -1,23 +1,27 @@
 package net.nemerosa.ontrack.extension.gitlab.model
 
-import net.nemerosa.ontrack.common.Time
 import net.nemerosa.ontrack.extension.issues.model.Issue
 import net.nemerosa.ontrack.extension.issues.model.IssueStatus
 import java.time.LocalDateTime
 
-typealias GitLabIssue = org.gitlab4j.api.models.Issue
-
-class GitLabIssueWrapper(
-        val gitlabIssue: GitLabIssue,
-        val milestoneUrl: String?
+/**
+ * A GitLab issue, seen as a Yontrack [Issue].
+ *
+ * The key is the issue's `iid` - its number **inside its project**, the one a `#123` reference names and the
+ * one the API is called with - and not the instance-wide `id`, which means nothing to a user.
+ */
+data class GitLabIssueWrapper(
+    val gitlabIssue: GitLabIssue,
+    val milestoneUrl: String?,
 ) : Issue {
 
-    override val url: String = gitlabIssue.webUrl
-    override val key: String = gitlabIssue.id.toString()
-    override val displayKey: String = "#${gitlabIssue.id}"
-    override val summary: String = gitlabIssue.title
-    override val status: IssueStatus = GitLabIssueStatusWrapper(gitlabIssue.state.name)
-    override val updateTime: LocalDateTime = Time.from(gitlabIssue.updatedAt.time)
-    val labels: List<String> = gitlabIssue.labels
+    override val url: String get() = gitlabIssue.web_url
+    override val key: String get() = gitlabIssue.iid.toString()
+    override val displayKey: String get() = "#${gitlabIssue.iid}"
+    override val summary: String get() = gitlabIssue.title
+    override val status: IssueStatus get() = GitLabIssueStatusWrapper(gitlabIssue.state)
+    override val updateTime: LocalDateTime get() = gitlabIssue.updateTime
+
+    val labels: List<String> get() = gitlabIssue.labels
 
 }

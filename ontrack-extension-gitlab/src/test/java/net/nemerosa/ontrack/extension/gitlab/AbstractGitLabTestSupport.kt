@@ -17,11 +17,9 @@ abstract class AbstractGitLabTestSupport : AbstractQLKTITSupport() {
             asUser().with(GlobalSettings::class.java).call {
                 gitConfigurationService.newConfiguration(
                     GitLabConfiguration(
-                        gitConfigurationName,
-                        "https://gitlab.com/nemerosa/test",
-                        null,
-                        null,
-                        false
+                        name = gitConfigurationName,
+                        url = "https://gitlab.com/nemerosa/test",
+                        token = "token",
                     )
                 )
             }

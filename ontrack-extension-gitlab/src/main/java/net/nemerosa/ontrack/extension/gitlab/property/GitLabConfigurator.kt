@@ -4,7 +4,7 @@ import net.nemerosa.ontrack.extension.git.model.GitConfiguration
 import net.nemerosa.ontrack.extension.git.model.GitConfigurator
 import net.nemerosa.ontrack.extension.git.model.GitPullRequest
 import net.nemerosa.ontrack.extension.gitlab.GitLabIssueServiceExtension
-import net.nemerosa.ontrack.extension.gitlab.client.OntrackGitLabClientFactory
+import net.nemerosa.ontrack.extension.gitlab.client.GitLabClientFactory
 import net.nemerosa.ontrack.extension.gitlab.model.GitLabIssueServiceConfiguration
 import net.nemerosa.ontrack.extension.issues.IssueServiceRegistry
 import net.nemerosa.ontrack.extension.issues.model.ConfiguredIssueService
@@ -18,7 +18,7 @@ class GitLabConfigurator(
         private val propertyService: PropertyService,
         private val issueServiceRegistry: IssueServiceRegistry,
         private val issueServiceExtension: GitLabIssueServiceExtension,
-        private val ontrackGitLabClientFactory: OntrackGitLabClientFactory
+        private val gitLabClientFactory: GitLabClientFactory
 ) : GitConfigurator {
 
     override fun isProjectConfigured(project: Project): Boolean {
@@ -31,13 +31,27 @@ class GitLabConfigurator(
                 ?.run { getGitConfiguration(this) }
     }
 
+    /**
+     * A GitLab merge request is Yontrack's pull request: the mapping is done here rather than in the client,
+     * which stays on GitLab's own model.
+     */
     override fun getPullRequest(configuration: GitConfiguration, id: Int): GitPullRequest? =
             if (configuration is GitLabGitConfiguration) {
-                val client = ontrackGitLabClientFactory.create(configuration.property.configuration)
-                client.getPullRequest(
+                val client = gitLabClientFactory.create(configuration.property.configuration)
+                client.getMergeRequest(
                         configuration.property.repository,
                         id
-                )
+                )?.let { mergeRequest ->
+                    GitPullRequest(
+                            id,
+                            "#$id",
+                            mergeRequest.source_branch,
+                            mergeRequest.target_branch,
+                            mergeRequest.title,
+                            mergeRequest.state,
+                            mergeRequest.web_url
+                    )
+                }
             } else {
                 null
             }

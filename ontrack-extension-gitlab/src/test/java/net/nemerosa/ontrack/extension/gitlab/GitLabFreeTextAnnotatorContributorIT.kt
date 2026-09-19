@@ -56,11 +56,9 @@ class GitLabFreeTextAnnotatorContributorIT : AbstractDSLTestSupport() {
             asUser().with(GlobalSettings::class.java).call {
                 gitLabConfigurationService.newConfiguration(
                         GitLabConfiguration(
-                                gitConfigurationName,
-                                "https://gitlab.com",
-                                null,
-                                null,
-                                false
+                                name = gitConfigurationName,
+                                url = "https://gitlab.com",
+                                token = "token",
                         )
                 )
             }

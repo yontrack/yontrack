@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.extension.gitlab
 
-import net.nemerosa.ontrack.extension.gitlab.client.OntrackGitLabClientFactory
+import net.nemerosa.ontrack.extension.gitlab.client.GitLabClientFactory
 import net.nemerosa.ontrack.extension.gitlab.model.GitLabIssueServiceConfiguration
 import net.nemerosa.ontrack.extension.gitlab.model.GitLabIssueWrapper
 import net.nemerosa.ontrack.extension.gitlab.property.GitLabGitConfiguration
@@ -20,7 +20,7 @@ import java.util.regex.Pattern
 class GitLabIssueServiceExtension(
     extensionFeature: GitLabExtensionFeature,
     private val configurationService: GitLabConfigurationService,
-    private val gitLabClientFactory: OntrackGitLabClientFactory,
+    private val gitLabClientFactory: GitLabClientFactory,
 ) : AbstractIssueServiceExtension(
     extensionFeature,
     GITLAB_SERVICE_ID,
@@ -93,9 +93,15 @@ class GitLabIssueServiceExtension(
     override fun getIssue(issueServiceConfiguration: IssueServiceConfiguration, issueKey: String): Issue? {
         val configuration = issueServiceConfiguration as GitLabIssueServiceConfiguration
         val client = gitLabClientFactory.create(configuration.configuration)
-        return client.getIssue(
+        val issue = client.getIssue(
             configuration.repository,
             getIssueId(issueKey)
+        ) ?: return null
+        return GitLabIssueWrapper(
+            gitlabIssue = issue,
+            milestoneUrl = issue.milestone?.let { milestone ->
+                milestone.web_url ?: "${configuration.configuration.url.trimEnd('/')}/${configuration.repository}/-/milestones/${milestone.iid}"
+            },
         )
     }
 

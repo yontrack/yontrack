@@ -18,11 +18,6 @@ export default function GitLabConfigurationsPage() {
             render: (value) => <Link href={value}>{value}</Link>,
         },
         {
-            title: "User",
-            key: "user",
-            dataIndex: "user",
-        },
-        {
             title: "Ignore SSL",
             key: "ignoreSslCertificate",
             dataIndex: "ignoreSslCertificate",
@@ -43,23 +38,16 @@ export default function GitLabConfigurationsPage() {
             key="url"
             name="url"
             label="GitLab URL"
+            extra="URL of the GitLab instance, like https://gitlab.com."
             rules={[{required: true, message: 'URL is required.',},]}
         >
             <Input/>
         </Form.Item>,
         <Form.Item
-            key="user"
-            name="user"
-            label="User"
-            extra="User used by Yontrack to connect to GitLab."
-        >
-            <Input/>
-        </Form.Item>,
-        <Form.Item
-            key="password"
-            name="password"
+            key="token"
+            name="token"
             label="Token"
-            extra="Token used by Yontrack to connect to GitLab."
+            extra="Personal access token used by Yontrack to connect to GitLab, with the api scope."
         >
             <Input.Password/>
         </Form.Item>,
@@ -67,7 +55,9 @@ export default function GitLabConfigurationsPage() {
             key="ignoreSslCertificate"
             name="ignoreSslCertificate"
             label="Ignore SSL certificate"
-            extra="Check to ignore the SSL certificate of the GitLab server."
+            extra="Check to accept any SSL certificate of the GitLab server."
+            valuePropName="checked"
+            initialValue={false}
         >
             <Switch/>
         </Form.Item>,

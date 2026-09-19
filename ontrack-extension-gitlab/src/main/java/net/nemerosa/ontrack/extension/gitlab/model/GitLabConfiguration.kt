@@ -1,56 +1,51 @@
 package net.nemerosa.ontrack.extension.gitlab.model
 
-import com.fasterxml.jackson.annotation.JsonProperty
-import net.nemerosa.ontrack.model.support.UserPasswordConfiguration
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties
+import net.nemerosa.ontrack.common.api.APIDescription
+import net.nemerosa.ontrack.model.annotations.APILabel
+import net.nemerosa.ontrack.model.support.CredentialsConfiguration
 
 /**
- * Configuration for accessing a GitLab application.
+ * Configuration for accessing a GitLab instance, gitlab.com or self-managed.
+ *
+ * There is no user: GitLab's API has no password authentication, and a personal access token is the only
+ * credential usable against the REST API - deploy tokens are barred from it and job tokens live only for the
+ * duration of a job. HTTPS Git authentication uses the constant user name
+ * [net.nemerosa.ontrack.extension.gitlab.property.GitLabGitConfiguration.GIT_USER].
+ *
+ * @property name Name of this configuration
+ * @property url URL of the GitLab instance
+ * @property token Personal access token, with the `api` scope
+ * @property ignoreSslCertificate Accepts any SSL certificate, for a self-managed instance behind an internal CA
  */
-open class GitLabConfiguration(
-    name: String,
+@JsonIgnoreProperties(ignoreUnknown = true)
+data class GitLabConfiguration(
+    @APIDescription("Name of the configuration")
+    override val name: String,
+    @APILabel("GitLab URL")
+    @APIDescription("URL of the GitLab instance, like https://gitlab.com")
     val url: String,
-    user: String?,
-    password: String?,
-    @get:JsonProperty("ignoreSslCertificate")
-    val isIgnoreSslCertificate: Boolean
-) : UserPasswordConfiguration<GitLabConfiguration>(name, user, password) {
+    @APIDescription("Personal access token used by Yontrack to connect to GitLab, with the `api` scope")
+    val token: String? = null,
+    @APILabel("Ignore SSL certificate")
+    @APIDescription("Accepts any SSL certificate, for a self-managed instance behind an internal certificate authority")
+    val ignoreSslCertificate: Boolean = false,
+) : CredentialsConfiguration<GitLabConfiguration> {
 
-    override fun obfuscate(): GitLabConfiguration {
-        return this.withPassword("")
-    }
+    override fun obfuscate(): GitLabConfiguration = copy(token = "")
 
-    override fun withPassword(password: String?): GitLabConfiguration {
-        return GitLabConfiguration(
-            name,
-            url,
-            user,
-            password,
-            isIgnoreSslCertificate
-        )
-    }
+    override fun injectCredentials(oldConfig: GitLabConfiguration): GitLabConfiguration =
+        if (token.isNullOrBlank()) {
+            copy(token = oldConfig.token)
+        } else {
+            this
+        }
 
-    override fun equals(other: Any?): Boolean {
-        if (this === other) return true
-        if (javaClass != other?.javaClass) return false
+    override fun encrypt(crypting: (plain: String?) -> String?): GitLabConfiguration =
+        copy(token = crypting(token?.takeIf { it.isNotBlank() }))
 
-        other as GitLabConfiguration
+    override fun decrypt(decrypting: (encrypted: String?) -> String?): GitLabConfiguration =
+        copy(token = decrypting(token?.takeIf { it.isNotBlank() }))
 
-        if (name != other.name) return false
-        if (url != other.url) return false
-        if (user != other.user) return false
-        if (password != other.password) return false
-        if (isIgnoreSslCertificate != other.isIgnoreSslCertificate) return false
-
-        return true
-    }
-
-    override fun hashCode(): Int {
-        var result = name.hashCode()
-        result = 31 * result + url.hashCode()
-        result = 31 * result + (user?.hashCode() ?: 0)
-        result = 31 * result + (password?.hashCode() ?: 0)
-        result = 31 * result + isIgnoreSslCertificate.hashCode()
-        return result
-    }
-
+    override fun toString(): String = "GitLabConfiguration(name=$name, url=$url)"
 }

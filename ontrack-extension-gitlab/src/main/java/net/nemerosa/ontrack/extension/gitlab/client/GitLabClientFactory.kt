@@ -5,11 +5,11 @@ import net.nemerosa.ontrack.extension.gitlab.model.GitLabConfiguration
 /**
  * Creates a client for accessing GitLab.
  */
-interface OntrackGitLabClientFactory {
+interface GitLabClientFactory {
 
     /**
-     * Given a GitLab engine configuration, creates a GitLab client.
+     * Given a GitLab configuration, creates a GitLab client.
      */
-    fun create(configuration: GitLabConfiguration): OntrackGitLabClient
+    fun create(configuration: GitLabConfiguration): GitLabClient
 
 }

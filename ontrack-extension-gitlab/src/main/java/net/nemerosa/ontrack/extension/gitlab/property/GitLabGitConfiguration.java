@@ -12,6 +12,14 @@ public class GitLabGitConfiguration implements GitConfiguration {
 
     public static final String CONFIGURATION_REPOSITORY_SEPARATOR = ":";
 
+    /**
+     * User name used for HTTPS Git authentication.
+     *
+     * <p>GitLab accepts any user name beside a personal access token, and the configuration therefore holds
+     * none: {@code oauth2} is the name GitLab's own documentation uses.
+     */
+    public static final String GIT_USER = "oauth2";
+
     private final GitLabProjectConfigurationProperty property;
     private final ConfiguredIssueService configuredIssueService;
 
@@ -47,8 +55,8 @@ public class GitLabGitConfiguration implements GitConfiguration {
     @Override
     public GitRepositoryAuthenticator getAuthenticator() {
         return new UsernamePasswordGitRepositoryAuthenticator(
-                property.getConfiguration().getUser(),
-                property.getConfiguration().getPassword()
+                GIT_USER,
+                property.getConfiguration().getToken()
         );
     }
 

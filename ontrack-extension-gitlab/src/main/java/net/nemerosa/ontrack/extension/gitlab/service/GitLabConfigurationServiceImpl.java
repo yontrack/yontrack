@@ -1,7 +1,6 @@
 package net.nemerosa.ontrack.extension.gitlab.service;
 
-import net.nemerosa.ontrack.extension.gitlab.client.OntrackGitLabClient;
-import net.nemerosa.ontrack.extension.gitlab.client.OntrackGitLabClientFactory;
+import net.nemerosa.ontrack.extension.gitlab.client.GitLabClientFactory;
 import net.nemerosa.ontrack.extension.gitlab.model.GitLabConfiguration;
 import net.nemerosa.ontrack.extension.support.AbstractConfigurationService;
 import net.nemerosa.ontrack.model.events.EventFactory;
@@ -24,7 +23,7 @@ public class GitLabConfigurationServiceImpl extends AbstractConfigurationService
 
     private final Logger logger = LoggerFactory.getLogger(GitLabConfigurationServiceImpl.class);
 
-    private final OntrackGitLabClientFactory gitLabClientFactory;
+    private final GitLabClientFactory gitLabClientFactory;
 
     @Autowired
     public GitLabConfigurationServiceImpl(
@@ -33,7 +32,7 @@ public class GitLabConfigurationServiceImpl extends AbstractConfigurationService
             EncryptionService encryptionService,
             EventPostService eventPostService,
             EventFactory eventFactory,
-            OntrackGitLabClientFactory gitLabClientFactory,
+            GitLabClientFactory gitLabClientFactory,
             OntrackConfigProperties ontrackConfigProperties
     ) {
         super(
@@ -57,10 +56,8 @@ public class GitLabConfigurationServiceImpl extends AbstractConfigurationService
     @Override
     protected ConnectionResult validate(GitLabConfiguration configuration) {
         try {
-            // Gets the client
-            OntrackGitLabClient client = gitLabClientFactory.create(configuration);
-            // Gets the list of repositories
-            client.getRepositories();
+            // Checks the connection and the token
+            gitLabClientFactory.create(configuration).validate();
             // OK
             return ConnectionResult.ok();
         } catch (Exception ex) {

@@ -329,7 +329,6 @@ configure(javaProjects) {
         "org.jgrapht:jgrapht-core:1.5.2",
         "com.opencsv:opencsv:5.10",
         "com.networknt:json-schema-validator:1.5.5",
-        "org.gitlab4j:gitlab4j-api:6.1.0",
         "com.slack.api:slack-api-client:1.38.0",
         "org.springframework.vault:spring-vault-core:3.1.2",
 
