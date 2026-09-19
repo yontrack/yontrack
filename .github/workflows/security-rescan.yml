@@ -77,7 +77,7 @@ jobs:
       newest_build: ${{ steps.targets.outputs.newest_build }}
       newest_version: ${{ steps.targets.outputs.newest_version }}
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # Straight GraphQL rather than the CLI: `build search` refuses `--output json` for more
       # than one build, and picking the two minors needs every RELEASE-promoted build at once.
@@ -145,7 +145,7 @@ jobs:
         id: job_start
         run: echo "started=$(date +%s)" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # Installed directly rather than through ontrack-github-actions-cli-config, which registers
       # a build as a side effect. This workflow reports on builds that already exist; it must not
@@ -182,7 +182,7 @@ jobs:
       # rather than anonymous: the anonymous pull limit is shared by every job on the runner's
       # egress address, and a rate-limited pull would read as a scanner error.
       - name: Log in to Docker Hub
-        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         with:
           username: ${{ secrets.DOCKER_HUB_USR }}
           password: ${{ secrets.DOCKER_HUB_PSW }}
@@ -320,7 +320,7 @@ jobs:
         id: job_start
         run: echo "started=$(date +%s)" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install the Yontrack CLI
         env:

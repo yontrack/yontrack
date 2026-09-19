@@ -142,7 +142,7 @@ jobs:
       skip_github_it: ${{ steps.params.outputs.skip_github_it }}
       skip_bitbucket_cloud_it: ${{ steps.params.outputs.skip_bitbucket_cloud_it }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           # findLatestPatchVersion() reads `git tag -l`; without the tags every version
           # computes as `.0`.
@@ -158,12 +158,12 @@ jobs:
           git config --global user.name "Yontrack"
           git config --global init.defaultBranch main
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v6
         with:
           distribution: zulu
           java-version: "21"
 
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v6
 
       # `inputs` is only populated on workflow_dispatch, so every parameter needs a fallback
       # for `push` and `pull_request`. The booleans arrive as the strings "true"/"false".
@@ -298,7 +298,7 @@ jobs:
     outputs:
       project: ${{ steps.config.outputs.projectName }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Register the build
         id: config
@@ -351,7 +351,7 @@ jobs:
         id: job_start
         run: echo "started=$(date +%s)" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -365,17 +365,17 @@ jobs:
           git config --global user.name "Yontrack"
           git config --global init.defaultBranch main
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v6
         with:
           distribution: zulu
           java-version: "21"
 
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v6
 
       # No actions/setup-node: the Gradle node plugin downloads its own Node (24.21.0 for
       # ontrack-web-core), and a runner-level Node would fight it.
       - name: Cache the npm downloads
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.npm
           key: npm-${{ runner.os }}-${{ hashFiles('ontrack-web-core/package-lock.json') }}
@@ -464,7 +464,7 @@ jobs:
       # name in the log, with no stack trace.
       - name: Upload the test reports
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: build-test-reports
           path: |
@@ -485,7 +485,7 @@ jobs:
 
       - name: Upload the unit test coverage
         if: ${{ always() && env.COVERAGE == 'true' }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-unit
           path: '**/build/jacoco/test.exec'
@@ -494,7 +494,7 @@ jobs:
 
       - name: Upload the Jest coverage
         if: ${{ always() && env.COVERAGE == 'true' }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-jest
           path: ontrack-web-core/coverage/**
@@ -513,7 +513,7 @@ jobs:
       # a copy of it in this glob would be a second one, free to drift.
       - name: Upload the classes and sources
         if: ${{ always() && env.COVERAGE == 'true' }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-classes
           path: |
@@ -536,7 +536,7 @@ jobs:
       # faster than `docker save` through upload-artifact.
       - name: Log in to GHCR
         if: env.FULL_RUN == 'true'
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -688,7 +688,7 @@ jobs:
         id: job_start
         run: echo "started=$(date +%s)" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -702,12 +702,12 @@ jobs:
           git config --global user.name "Yontrack"
           git config --global init.defaultBranch main
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v6
         with:
           distribution: zulu
           java-version: "21"
 
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v6
 
       # ontrack-docs' documentation ITs shell out to `dot`.
       - name: Install graphviz
@@ -763,7 +763,7 @@ jobs:
       # aggregator would have seen an empty set on every green run (#1656).
       - name: Upload the test results
         if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: integration-results-shard-${{ matrix.shard }}
           path: |
@@ -775,7 +775,7 @@ jobs:
       # always(), not !cancelled(): see the coverage uploads in `build`.
       - name: Upload the integration test coverage
         if: ${{ always() && env.COVERAGE == 'true' }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-integration-${{ matrix.shard }}
           path: '**/build/jacoco/integrationTest.exec'
@@ -798,13 +798,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Collect the test results
         id: collect
         if: ${{ !cancelled() }}
         continue-on-error: true
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: integration-results-shard-*
           path: integration-results
@@ -954,7 +954,7 @@ jobs:
         id: job_start
         run: echo "started=$(date +%s)" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -968,15 +968,15 @@ jobs:
           git config --global user.name "Yontrack"
           git config --global init.defaultBranch main
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v6
         with:
           distribution: zulu
           java-version: "21"
 
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v6
 
       - name: Log in to GHCR
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -1062,7 +1062,7 @@ jobs:
       # skipping the upload there would leave the report job with a partial, all-green set.
       - name: Upload the test results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: kdsl-results-shard-${{ matrix.shard }}
           path: |
@@ -1073,7 +1073,7 @@ jobs:
 
       - name: Upload the KDSL logs
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: kdsl-logs-shard-${{ matrix.shard }}
           path: ontrack-kdsl-acceptance/build/logs/**
@@ -1085,7 +1085,7 @@ jobs:
       # legs apart without trusting the artefact name.
       - name: Upload the KDSL coverage
         if: ${{ always() && env.COVERAGE == 'true' }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-kdsl-${{ matrix.shard }}
           path: build/jacoco/*.exec
@@ -1107,13 +1107,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Collect the test results
         id: collect
         if: ${{ !cancelled() }}
         continue-on-error: true
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: kdsl-results-shard-*
           path: kdsl-results
@@ -1256,7 +1256,7 @@ jobs:
         id: job_start
         run: echo "started=$(date +%s)" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -1270,22 +1270,22 @@ jobs:
           git config --global user.name "Yontrack"
           git config --global init.defaultBranch main
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v6
         with:
           distribution: zulu
           java-version: "21"
 
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v6
 
       - name: Cache the npm downloads
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.npm
           key: npm-${{ runner.os }}-${{ hashFiles('ontrack-web-tests/package-lock.json') }}
           restore-keys: npm-${{ runner.os }}-
 
       - name: Cache the Playwright browsers
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('ontrack-web-tests/package-lock.json') }}
@@ -1298,7 +1298,7 @@ jobs:
         run: npx --yes playwright install-deps chromium
 
       - name: Log in to GHCR
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -1390,7 +1390,7 @@ jobs:
       # would otherwise be uploading under one name.
       - name: Upload the JUnit report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-junit-${{ matrix.variant }}-${{ matrix.shard }}
           path: |
@@ -1401,7 +1401,7 @@ jobs:
 
       - name: Upload the HTML report
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-html-${{ matrix.variant }}-${{ matrix.shard }}
           path: ontrack-web-tests/reports/${{ matrix.variant }}/html/**
@@ -1410,7 +1410,7 @@ jobs:
 
       - name: Upload the KDSL logs
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: kdsl-logs-ui-${{ matrix.variant }}-${{ matrix.shard }}
           path: ontrack-kdsl-acceptance/build/logs/**
@@ -1421,7 +1421,7 @@ jobs:
       # after its session — `ui-main-2.exec`, `ui-ldap.exec` — not after this artefact.
       - name: Upload the UI test coverage
         if: ${{ always() && env.COVERAGE == 'true' }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-ui-${{ matrix.variant }}-${{ matrix.shard }}
           path: build/jacoco/*.exec
@@ -1441,13 +1441,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Collect the JUnit reports
         id: collect
         if: ${{ !cancelled() }}
         continue-on-error: true
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: playwright-junit-*
           path: playwright-junit
@@ -1564,10 +1564,10 @@ jobs:
         id: job_start
         run: echo "started=$(date +%s)" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # jacococli is a plain JVM tool; nothing here runs Gradle.
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v6
         with:
           distribution: zulu
           java-version: "21"
@@ -1587,7 +1587,7 @@ jobs:
       - name: Collect the coverage artefacts
         id: download
         continue-on-error: true
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: coverage-*
           path: coverage-artifacts
@@ -1667,7 +1667,7 @@ jobs:
       # figure goes to in order to understand it.
       - name: Upload the coverage reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-reports
           path: coverage-reports/**
@@ -1788,12 +1788,12 @@ jobs:
         run: echo "started=$(date +%s)" >> "$GITHUB_OUTPUT"
 
       # Pinned by commit SHA, like every action this job uses - see the composite action's header.
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # Trivy pulls the images straight from the registry with the Docker credentials, rather than
       # through the daemon: no `docker pull` of a backend image it only needs to read.
       - name: Log in to GHCR
-        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -1944,7 +1944,7 @@ jobs:
         id: job_start
         run: echo "started=$(date +%s)" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -1958,12 +1958,12 @@ jobs:
           git config --global user.name "Yontrack"
           git config --global init.defaultBranch main
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v6
         with:
           distribution: zulu
           java-version: "21"
 
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v6
 
       # python3 and venv are already on ubuntu-latest, which createVenv/installDeps need.
       - name: Install graphviz
@@ -2005,7 +2005,7 @@ jobs:
       # retention setting, so the effective release deadline is whichever is shorter.
       - name: Archive the documentation
         id: artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: docs-site
           path: ontrack-docs/site
