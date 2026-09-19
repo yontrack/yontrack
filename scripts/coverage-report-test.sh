@@ -219,6 +219,78 @@ assert_contains "$output" "no execution data for: ui-ldap" "beside the session i
 assert_contains "$output" "kdsl	ok" "and costs no other type anything"
 
 # ===============================================================================================
+# Staging what a *local* run leaves in the checkout (#1823)
+# ===============================================================================================
+
+# The session a local file belongs to: the Gradle test JVMs are named after their task, the
+# container dumps after their session, and neither carries a shard.
+assert_eq "unit" "$(cr_session_of_local ontrack-model/build/jacoco/test.exec)" \
+    "a module's unit data, whatever the module"
+assert_eq "integration" "$(cr_session_of_local ontrack-ui/build/jacoco/integrationTest.exec)" \
+    "a module's integration data, unsharded locally"
+assert_eq "kdsl" "$(cr_session_of_local build/jacoco/kdsl.exec)" \
+    "a container dump is named after its session"
+assert_eq "ui-ldap" "$(cr_session_of_local build/jacoco/ui-ldap.exec)" "and so is the ldap leg"
+
+# The unsharded names a local run produces have to map to a type. `kdsl-1` did; a bare `kdsl` fell
+# through before #1823 and would have been staged nowhere.
+assert_eq "unit" "$(cr_type_of_session unit)" "unit"
+assert_eq "integration" "$(cr_type_of_session integration)" "an unsharded integration session"
+assert_eq "kdsl" "$(cr_type_of_session kdsl)" "an unsharded KDSL session"
+assert_eq "kdsl" "$(cr_type_of_session kdsl-2)" "a sharded one still works"
+assert_eq "ui" "$(cr_type_of_session ui-main)" "an unsharded main Playwright session"
+assert_eq "" "$(cr_type_of_session something-else)" "and a name of no type is still of no type"
+
+LOCAL="$WORK/local"
+exec_file "$LOCAL/ontrack-model/build/jacoco/test.exec"
+exec_file "$LOCAL/ontrack-service/build/jacoco/test.exec"
+exec_file "$LOCAL/ontrack-service/build/jacoco/integrationTest.exec"
+exec_file "$LOCAL/build/jacoco/kdsl.exec"
+exec_file "$LOCAL/build/jacoco/ui-ldap.exec"
+# The agent jar (#1819) is staged in that same directory and is not execution data.
+touch "$LOCAL/build/jacoco/jacocoagent.jar"
+# node_modules is never walked: a dependency shipping a `build/jacoco` of its own is not ours.
+exec_file "$LOCAL/ontrack-web-core/node_modules/some-package/build/jacoco/test.exec"
+
+output="$(cr_stage "$LOCAL" "$WORK/localexec" 2>&1)"
+status=$?
+assert_eq "0" "$status" "a local tree stages: $output"
+
+sessions="$(cr_sessions "$WORK/localexec" | tr '\n' ' ')"
+assert_eq "integration kdsl ui-ldap unit " "$sessions" "the sessions a partial local run produces"
+assert_eq "2" "$(find "$WORK/localexec/unit/unit" -name '*.exec' | wc -l | tr -d ' ')" \
+    "both modules' unit data lands under the one local session"
+assert_not_contains "$output" "node_modules" "node_modules is not staged"
+assert_not_contains "$output" "jacocoagent" "and neither is the agent jar"
+
+# What a local run did not produce is stated, not failed: a contributor who ran only the unit
+# tests gets the unit report, and the other three types honestly at 0%.
+assert_contains "$output" "Not produced by this run: ui-main ui-oidc" \
+    "the sessions a complete local run would add are named"
+
+# The local expected set is the unsharded one, not the CI one. A local run has one `integration`
+# session, never five, and `check`'s CI list must not condemn it.
+assert_not_contains "$output" "integration-1" "the CI shards are not expected of a local run"
+
+# Staged the same way `collect` stages, so everything downstream is blind to which one ran --
+# given the expected set of a local run rather than of a CI one.
+output="$(COVERAGE_EXPECTED_SESSIONS="unit integration kdsl ui-ldap" cr_status "$WORK/localexec" 2>&1)"
+status=$?
+assert_eq "0" "$status" "status reads a staged local tree: $output"
+assert_contains "$output" "unit	ok" "the unit type is complete locally"
+assert_contains "$output" "integration	ok" "and so is the integration one, with its single session"
+
+# Nothing to stage is a mistake worth naming: an all-zero report reads as a catastrophe.
+output="$(cr_stage "$WORK/empty-tree" "$WORK/emptyexec" 2>&1)"
+status=$?
+assert_eq "1" "$status" "staging from a tree that does not exist fails"
+mkdir -p "$WORK/empty-tree"
+output="$(cr_stage "$WORK/empty-tree" "$WORK/emptyexec" 2>&1)"
+status=$?
+assert_eq "1" "$status" "and so does staging from a tree with no execution data"
+assert_contains "$output" "-Pcoverage" "saying what was probably forgotten"
+
+# ===============================================================================================
 # The denominator
 # ===============================================================================================
 

@@ -9,6 +9,7 @@
   * [Model](components/core/README.md) - core model of Ontrack
   * [Properties](components/properties/README.md)
 * Delivery
+  * [Test coverage](coverage.md) - what the COVERAGE.* figures measure, and how to get them locally
   * [Demo seed and reset](demo-seed.md) - resetting the demo environment through the Yontrack API
   * [Demo smoke test](demo-smoke.md) - verifying the demo deployment and reporting DEMO.SMOKE
   * [Demo screenshots](demo-screenshots.md) - capturing the release-notes images from the demo

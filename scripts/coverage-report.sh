@@ -10,6 +10,9 @@
 #
 # Usage: scripts/coverage-report.sh <command> ...
 #
+#   stage TREE EXECDIR          The local half of `collect` (#1823): lays out the execution data a
+#                               run in a checkout leaves behind, in the same shape, so that
+#                               everything downstream is blind to which one ran. See *Local runs*.
 #   collect ARTEFACTS EXECDIR   Lays the downloaded `coverage-*` artefact directories out as
 #                               EXECDIR/<type>/<session>/NNN.exec, one directory per backend test
 #                               type (`unit`, `integration`, `kdsl`, `ui`) and one per session.
@@ -70,6 +73,28 @@
 # and by no other" is measured *against* the other types, so a type whose data is missing inflates
 # every other type's unique share. `line` and `branch` read one report and are unaffected.
 #
+# Local runs
+# ----------
+# A contributor gets the same reports and the same figures from the same code, through
+# `./gradlew coverageReport` (#1823), which calls `stage`, `report` and
+# `scripts/coverage-metrics.sh` -- this file's `report`, this repository's exclusion list, that
+# script's figures. `doc/dev-guide/coverage.md` is the page.
+#
+# Two things a local run cannot reproduce, and neither is a divergence in what a number *means*:
+#
+#   * no shards. CI runs the integration tests five ways, the KDSL tests two and the main
+#     Playwright leg three; a checkout runs each once. The merged figure is the same, and the
+#     *Sessions* page is shorter. So the expected set of a local run is CR_LOCAL_SESSIONS below,
+#     not `expected`'s -- a legitimate local run must not be condemned for missing `integration-4`.
+#   * the shared acceptance stack is named once. `kdslAcceptanceTest` is the Compose variant of
+#     both the KDSL suite and the main Playwright leg, and only the CI workflow renames it
+#     (Coverage.SESSION_OVERRIDE_ENV), so locally `./gradlew uiTest -Pcoverage` dumps its backend
+#     as `kdsl` unless COVERAGE_SESSION=ui-main says otherwise.
+#
+# `stage` therefore *states* what a run did not produce and carries on, where `check` fails. A
+# contributor who ran only the unit tests wants the unit report, with the other three types
+# honestly at 0%; CI, which asked for all thirteen sessions, wants to be told when four arrived.
+#
 # Denominator
 # -----------
 # The exclusion list below is the denominator decision of
@@ -96,6 +121,11 @@ CR_EXCLUDED_MODULES=(
 
 # The four backend test types, in report order.
 CR_TYPES=(unit integration kdsl ui)
+
+# What a complete *local* run produces: the same four types, unsharded, with the main Playwright
+# leg only ever named `ui-main` by an explicit COVERAGE_SESSION. See *Local runs* above. It is the
+# default expected set of `stage`, and COVERAGE_EXPECTED_SESSIONS still overrides it.
+CR_LOCAL_SESSIONS="unit integration kdsl ui-main ui-ldap ui-oidc"
 
 cr_fail() { echo "ERROR: $*" >&2; return 1; }
 
@@ -199,6 +229,71 @@ cr_collect() {
     done
 }
 
+# The session an execution data file *in a checkout* carries (#1823).
+#
+# The three paths are the three the workflow's uploads match, which is what keeps one definition:
+# `**/build/jacoco/test.exec` and `**/build/jacoco/integrationTest.exec` are written by the Gradle
+# test JVMs and named after their task (Coverage.execFilePath), while the root project's
+# `build/jacoco/<session>.exec` files are the acceptance stacks' dumps, already named after their
+# session (Coverage.containerExecFilePath). A local run is never sharded, so the task names map
+# straight onto the bare type -- the same answer Coverage.sessionId gives with no suffix.
+cr_session_of_local() {
+    local base
+    base="$(basename "$1" .exec)"
+    case "$base" in
+        test) echo "unit" ;;
+        integrationTest) echo "integration" ;;
+        *) echo "$base" ;;
+    esac
+}
+
+# The local counterpart of `collect`. See *Local runs* at the top.
+cr_stage() {
+    local tree="${1:-}" execdir="${2:-}" file session type target count=0 present
+    [ -n "$tree" ] || { cr_fail "No checkout to stage from"; return 1; }
+    [ -n "$execdir" ] || { cr_fail "No output directory"; return 1; }
+    [ -d "$tree" ] || { cr_fail "No checkout at $tree"; return 1; }
+    # Emptied rather than added to: a session left over from a previous `stage` would be merged
+    # into this run's reports without appearing anywhere in its output.
+    rm -rf "$execdir"
+    mkdir -p "$execdir" || return 1
+
+    while IFS= read -r file; do
+        session="$(cr_session_of_local "$file")"
+        type="$(cr_type_of_session "$session")"
+        if [ -z "$type" ]; then
+            echo "Ignoring $file: '$session' names no backend test type" >&2
+            continue
+        fi
+        target="$execdir/$type/$session"
+        mkdir -p "$target" || return 1
+        present="$(find "$target" -name '*.exec' -type f | wc -l | tr -d ' ')"
+        cp "$file" "$(printf '%s/%03d.exec' "$target" "$((present + 1))")" || return 1
+        count=$((count + 1))
+        echo "$session <- ${file#"$tree"/}"
+    done < <(find "$tree" -type f -name '*.exec' -path '*/build/jacoco/*' \
+        -not -path '*/node_modules/*' | sort)
+
+    # No execution data at all is not a 0% run, it is a run that collected nothing: the agent is
+    # off unless `-Pcoverage` is set, and a report over an empty set reads as every suite failing
+    # at once.
+    [ "$count" -gt 0 ] || {
+        cr_fail "No execution data under $tree: a test task collects it only with -Pcoverage."
+        return 1
+    }
+
+    local found expected missing
+    found="$(cr_sessions "$execdir")" || return 1
+    expected="$(COVERAGE_EXPECTED_SESSIONS="${COVERAGE_EXPECTED_SESSIONS:-$CR_LOCAL_SESSIONS}" cr_expected)" || return 1
+    echo "Sessions staged: $(tr '\n' ' ' <<< "$found")"
+    missing="$(comm -23 <(echo "$expected") <(echo "$found") | tr '\n' ' ' | sed 's/ *$//')"
+    if [ -n "$missing" ]; then
+        echo "Not produced by this run: $missing"
+        echo "  The reports cover what ran; a type with no execution data reports 0%."
+    fi
+    return 0
+}
+
 # The sessions actually present: a session directory holding at least one .exec file.
 cr_sessions() {
     local execdir="${1:-}" dir
@@ -232,12 +327,16 @@ cr_expected() {
 # The backend test type a session belongs to. Empty for a name that matches none of them, which
 # `collect` cannot produce -- it files every session under its type's directory -- but which an
 # explicit COVERAGE_EXPECTED_SESSIONS can.
+#
+# Both the sharded and the unsharded form of every type: CI produces `integration-4` and `kdsl-1`,
+# a local run produces `integration` and `kdsl` (#1823), and `stage` files a session by what this
+# answers.
 cr_type_of_session() {
     case "$1" in
-        unit) echo unit ;;
-        integration-*) echo integration ;;
-        kdsl-*) echo kdsl ;;
-        ui-*) echo ui ;;
+        unit|unit-*) echo unit ;;
+        integration|integration-*) echo integration ;;
+        kdsl|kdsl-*) echo kdsl ;;
+        ui|ui-*) echo ui ;;
         *) echo "" ;;
     esac
 }
@@ -403,6 +502,7 @@ cr_main() {
     local command="${1:-}"
     [ $# -gt 0 ] && shift
     case "$command" in
+        stage) cr_stage "$@" ;;
         collect) cr_collect "$@" ;;
         sessions) cr_sessions "${1:-}" ;;
         expected) cr_expected ;;
@@ -413,7 +513,7 @@ cr_main() {
         report) cr_report "$@" ;;
         execinfo) cr_execinfo "${1:-}" ;;
         *)
-            echo "Usage: $0 collect|sessions|expected|check|status|classfiles|sourcefiles|report|execinfo ..." >&2
+            echo "Usage: $0 stage|collect|sessions|expected|check|status|classfiles|sourcefiles|report|execinfo ..." >&2
             return 1
             ;;
     esac

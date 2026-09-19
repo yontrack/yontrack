@@ -419,3 +419,102 @@ configure(javaProjects) {
     }
 
 }
+
+// ===================================================================================================================
+// The local merge-and-report path (#1823)
+//
+// `./gradlew coverageReport` gives a contributor the reports and the figures the `coverage` job of
+// .github/workflows/ci.yml produces, from the execution data this checkout already holds:
+//
+//     ./gradlew test integrationTest -Pcoverage      # and kdslAcceptanceTest / uiTest, if you have the time
+//     ./gradlew coverageReport
+//
+// It reimplements nothing. The exclusion list, the `jacococli report` invocations and the six sets
+// of figures are `scripts/coverage-report.sh` and `scripts/coverage-metrics.sh`, which the
+// workflow calls too -- the whole point being that CI and a local run cannot disagree about what
+// "72.4" means. What this adds is the entry point and the two things Gradle knows and a shell
+// script does not: where the execution data is, and where the JaCoCo command line tool is.
+//
+// `doc/dev-guide/coverage.md` is the page; it also says what a local run cannot reproduce.
+// ===================================================================================================================
+
+val coverageExecDir: Directory = layout.buildDirectory.dir("coverage/exec").get()
+val coverageReportDir: Directory = layout.buildDirectory.dir("coverage/reports").get()
+
+// The command line tool, resolved by Gradle rather than downloaded by the script: it is then the
+// exact artefact this build is locked to, and a local run needs no network. It is the `jacocoCli`
+// configuration `ontrack-kdsl-acceptance` already declares for its container dumps (#1819) --
+// a second one here would need its own lock state for no gain. Read through a provider because
+// that project is evaluated after this script; by the time a task runs, it is there.
+//
+// `org.jacoco.cli` pulls `org.jacoco.core` and `org.jacoco.report` with it, and the dump task uses
+// all three as a classpath. The script wants one `java -jar`, so it gets the `nodeps` artefact,
+// which is the shaded one and needs nothing else.
+val jacocoCliJar: Provider<String> = provider {
+    project(":ontrack-kdsl-acceptance").configurations.getByName("jacocoCli")
+        .single { it.name.startsWith("org.jacoco.cli") }
+        .absolutePath
+}
+
+val coverageStage by tasks.registering(Exec::class) {
+    group = "verification"
+    description = "Lays this checkout's JaCoCo execution data out the way the CI artefacts are laid out"
+    workingDir = rootDir
+    commandLine(
+        "$rootDir/scripts/coverage-report.sh", "stage",
+        rootDir.absolutePath, coverageExecDir.asFile.absolutePath,
+    )
+    // Never up to date: the whole question is what the last test run left behind.
+    outputs.upToDateWhen { false }
+}
+
+val coverageJacocoReport by tasks.registering(Exec::class) {
+    group = "verification"
+    description = "Builds the per-type and merged JaCoCo reports from the staged execution data"
+    dependsOn(coverageStage)
+    workingDir = rootDir
+    commandLine(
+        "$rootDir/scripts/coverage-report.sh", "report",
+        coverageExecDir.asFile.absolutePath, coverageReportDir.asFile.absolutePath,
+    )
+    // The checkout itself, where CI passes the `coverage-classes` artefact: the classes that ran
+    // locally are the ones in this build directory.
+    environment("COVERAGE_TREE", rootDir.absolutePath)
+    outputs.upToDateWhen { false }
+    doFirst {
+        environment("COVERAGE_JACOCO_CLI", jacocoCliJar.get())
+    }
+}
+
+val coverageFigures by tasks.registering(Exec::class) {
+    group = "verification"
+    description = "Prints the six sets of coverage figures from the reports"
+    dependsOn(coverageJacocoReport)
+    workingDir = rootDir
+    commandLine("$rootDir/scripts/coverage-metrics.sh", coverageReportDir.asFile.absolutePath)
+    outputs.upToDateWhen { false }
+    // The figures are all-or-nothing by design -- coverage-metrics.sh emits no partial document --
+    // and the commonest local reason to have none is a frontend suite that was never run. That is
+    // not a reason to throw away the HTML reports that were just built, so it warns.
+    isIgnoreExitValue = true
+    doLast {
+        if (executionResult.get().exitValue != 0) {
+            logger.warn(
+                "[coverage] no figures: scripts/coverage-metrics.sh failed. The commonest cause is a " +
+                        "missing Jest summary -- run `./gradlew :ontrack-web-core:testCoverage -Pcoverage` " +
+                        "for COVERAGE.UI_UNIT. The JaCoCo reports below are unaffected."
+            )
+        }
+    }
+}
+
+tasks.register("coverageReport") {
+    group = "verification"
+    description = "Merges this checkout's coverage execution data into the same reports and figures as CI"
+    dependsOn(coverageFigures)
+    doLast {
+        logger.lifecycle("[coverage] reports: ${coverageReportDir.asFile}")
+        logger.lifecycle("[coverage]   merged, with its Sessions page: ${coverageReportDir.asFile}/merged/html/index.html")
+        logger.lifecycle("[coverage] see doc/dev-guide/coverage.md for what these figures mean")
+    }
+}
