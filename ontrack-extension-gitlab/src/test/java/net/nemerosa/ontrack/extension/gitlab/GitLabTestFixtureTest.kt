@@ -38,46 +38,90 @@ class GitLabTestFixtureTest {
             ?: error("No ${GitLabTestFixture.JOB_MOCK} job in ${GitLabTestFixture.CI_FILE}")
 
     private val mockScript: String
-        get() = (mockJob["script"] as? List<*>)?.joinToString("\n")
-            ?: error("No script in the ${GitLabTestFixture.JOB_MOCK} job")
+        get() = script(GitLabTestFixture.JOB_MOCK)
+
+    @Suppress("UNCHECKED_CAST")
+    private fun job(name: String): Map<String, Any?> =
+        ci[name] as? Map<String, Any?> ?: error("No $name job in ${GitLabTestFixture.CI_FILE}")
+
+    private fun script(name: String): String =
+        (job(name)["script"] as? List<*>)?.joinToString("\n")
+            ?: error("No script in the $name job")
+
+    private fun ifRules(rules: Any?): List<String> =
+        (rules as? List<*>)?.mapNotNull { (it as? Map<*, *>)?.get("if")?.toString() }
+            ?: error("No rules")
+
+    private val avScript: String
+        get() = script(GitLabTestFixture.JOB_AV)
 
     @Test
     fun `No pipeline runs unless a test asks for one, so that pushes consume no compute minutes`() {
         @Suppress("UNCHECKED_CAST")
         val rules = ci["workflow"].let { it as? Map<String, Any?> }?.get("rules") as? List<*>
             ?: error("No workflow rules in ${GitLabTestFixture.CI_FILE}")
-        // The only way in is the trigger variable...
+        // The only ways in are the two trigger variables, one per job...
         assertEquals(
-            listOf("\$${GitLabTestFixture.VARIABLE_RESULT}"),
-            rules.mapNotNull { (it as? Map<*, *>)?.get("if")?.toString() },
+            listOf(
+                "\$${GitLabTestFixture.VARIABLE_RESULT}",
+                "\$${GitLabTestFixture.VARIABLE_UPGRADE_BRANCH}",
+            ),
+            ifRules(rules),
         )
         // ... and everything else is turned away.
         assertEquals("never", (rules.last() as? Map<*, *>)?.get("when"))
     }
 
     @Test
-    fun `The mock job is the only job`() {
+    fun `The mock and auto-versioning jobs are the only jobs`() {
         assertEquals(
-            setOf(GitLabTestFixture.JOB_MOCK),
+            setOf(GitLabTestFixture.JOB_MOCK, GitLabTestFixture.JOB_AV),
             ci.keys - globalKeywords,
         )
     }
 
     @Test
-    fun `The mock job runs on the same trigger variable as the pipeline`() {
-        val rules = mockJob["rules"] as? List<*> ?: error("No rules in the mock job")
+    fun `Each job runs on its own trigger variable, so that one test never starts the other job`() {
         assertEquals(
             listOf("\$${GitLabTestFixture.VARIABLE_RESULT}"),
-            rules.mapNotNull { (it as? Map<*, *>)?.get("if")?.toString() },
+            ifRules(mockJob["rules"]),
+        )
+        assertEquals(
+            listOf("\$${GitLabTestFixture.VARIABLE_UPGRADE_BRANCH}"),
+            ifRules(job(GitLabTestFixture.JOB_AV)["rules"]),
         )
     }
 
     @Test
-    fun `The mock job is capped in time`() {
-        val timeout = mockJob["timeout"]?.toString() ?: error("No timeout in the mock job")
-        val minutes = Regex("^(\\d+) minutes?$").matchEntire(timeout)?.groupValues?.get(1)?.toInt()
-        assertNotNull(minutes, "Expected a timeout in minutes, got '$timeout'")
-        assertTrue(minutes in 1..10, "Expected a timeout of 10 minutes at most, got '$timeout'")
+    fun `Every job is capped in time`() {
+        listOf(GitLabTestFixture.JOB_MOCK, GitLabTestFixture.JOB_AV).forEach { name ->
+            val timeout = job(name)["timeout"]?.toString() ?: error("No timeout in the $name job")
+            val minutes = Regex("^(\\d+) minutes?$").matchEntire(timeout)?.groupValues?.get(1)?.toInt()
+            assertNotNull(minutes, "Expected a timeout in minutes for $name, got '$timeout'")
+            assertTrue(minutes in 1..10, "Expected a timeout of 10 minutes at most for $name, got '$timeout'")
+        }
+    }
+
+    @Test
+    fun `The auto-versioning job requires every variable the post-processing sends`() {
+        GitLabTestFixture.POST_PROCESSING_VARIABLES.forEach { variable ->
+            assertTrue(
+                avScript.contains(variable),
+                "The ${GitLabTestFixture.JOB_AV} job does not check $variable",
+            )
+        }
+        assertTrue(
+            avScript.contains("exit 1"),
+            "The ${GitLabTestFixture.JOB_AV} job does not fail on a missing variable",
+        )
+    }
+
+    @Test
+    fun `The auto-versioning job runs the command it is given, which is how a test asks it to fail`() {
+        assertTrue(
+            avScript.contains("sh -c") && avScript.contains(GitLabTestFixture.VARIABLE_DOCKER_COMMAND),
+            "The ${GitLabTestFixture.JOB_AV} job does not run ${GitLabTestFixture.VARIABLE_DOCKER_COMMAND}",
+        )
     }
 
     @Test

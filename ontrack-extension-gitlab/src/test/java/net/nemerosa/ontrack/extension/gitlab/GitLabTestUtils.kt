@@ -37,6 +37,15 @@ object GitLabTestProperties {
     /** Expiry date of the token, `YYYY-MM-DD`. */
     const val TOKEN_EXPIRY = "$PREFIX.token.expiry"
 
+    /**
+     * `true` to also run the real tests which **start a pipeline**.
+     *
+     * The credentials are not enough: a pipeline consumes the fixture namespace's compute minutes, of which
+     * a Free namespace gets 400 a month, and integration shard 5 runs on every push. Only
+     * `.github/workflows/gitlab-real.yml` turns this on - see the module's README (#1835).
+     */
+    const val PIPELINES = "$PREFIX.pipelines"
+
     /** The credentials: when none of them is set, the real tests are skipped. */
     val CREDENTIALS = listOf(GROUP, PROJECT, TOKEN)
 
@@ -93,6 +102,12 @@ fun gitLabTestEnabled(lookup: (String) -> String? = ::getOptionalEnv): Boolean {
     }
     return true
 }
+
+/**
+ * Are the real tests which **start a pipeline** to run? They need the credentials and their own switch.
+ */
+fun gitLabPipelinesTestEnabled(lookup: (String) -> String? = ::getOptionalEnv): Boolean =
+    lookup(GitLabTestProperties.PIPELINES) == "true" && gitLabTestEnabled(lookup)
 
 fun readGitLabTestEnv(lookup: (String) -> String? = ::getOptionalEnv): GitLabTestEnv {
     fun required(property: String): String =
@@ -163,6 +178,20 @@ fun gitLabTestConfigMock(name: String = uid("C")) = GitLabConfiguration(
 annotation class TestOnGitLab
 
 /**
+ * Annotation to use on tests which **start a real pipeline** in the fixture project.
+ *
+ * They consume the fixture namespace's compute minutes - 400 a month on Free - so the credentials are not
+ * enough to enable them: they also need [GitLabTestProperties.PIPELINES], which only
+ * `.github/workflows/gitlab-real.yml` sets. Integration shard 5 of `ci.yml` pins it to `false`, so a push
+ * costs nothing however well provisioned the checkout is.
+ */
+@Target(AnnotationTarget.CLASS, AnnotationTarget.FUNCTION)
+@Retention(AnnotationRetention.RUNTIME)
+@Test
+@EnabledIf("net.nemerosa.ontrack.extension.gitlab.TestOnGitLabCondition#isTestOnGitLabPipelinesEnabled")
+annotation class TestOnGitLabPipelines
+
+/**
  * Testing if the environment is set for testing against GitLab.
  */
 class TestOnGitLabCondition {
@@ -170,5 +199,8 @@ class TestOnGitLabCondition {
     companion object {
         @JvmStatic
         fun isTestOnGitLabEnabled(): Boolean = gitLabTestEnabled()
+
+        @JvmStatic
+        fun isTestOnGitLabPipelinesEnabled(): Boolean = gitLabPipelinesTestEnabled()
     }
 }

@@ -509,7 +509,7 @@ say "Only the pipeline tests need a runner, and they are the only thing here tha
 say "a Free namespace gets 400 compute minutes a month."
 open_url "https://gitlab.com/$(full_path)/-/settings/ci_cd"
 step "Settings → CI/CD → Runners → enable 'Instance runners' for this project."
-note "Nothing runs on a push: the fixture pipeline only exists when MOCK_RESULT is passed."
+note "Nothing runs on a push: a pipeline exists only when MOCK_RESULT or UPGRADE_BRANCH is passed."
 pause "Done? Press Enter to check"
 expect true "the shared runners are enabled on the project" shared_runners
 pause
@@ -517,10 +517,12 @@ pause
 # ── 8 ─────────────────────────────────────────────────────────────────────
 stage "The fixture content"
 say "The wizard commits, as the bot, on $MAIN_BRANCH:"
-step ".gitlab-ci.yml — one 'mock' job, which ends as MOCK_RESULT asks after MOCK_DURATION seconds"
+step ".gitlab-ci.yml — a 'mock' job, which ends as MOCK_RESULT asks after MOCK_DURATION seconds,"
+step "               and an 'av' job, which stands in for an auto-versioning post-processing pipeline"
 step "gradle.properties — the file the auto-versioning tests edit (version=…)"
 note "From $FIXTURE_DIR"
-note "The pipeline is created only when MOCK_RESULT is passed, so a branch the tests push runs nothing."
+note "One trigger variable per job — MOCK_RESULT and UPGRADE_BRANCH — and no pipeline at all without one,"
+note "so a branch the tests push, a merge request they open and a tag they create run nothing."
 if ! have_jq; then
   warn "jq is missing — install it and re-run the wizard to commit the fixture"
   SKIPPED+=("the commit of the fixture content (jq is missing)")

@@ -668,6 +668,11 @@ jobs:
       ONTRACK_TEST_EXTENSION_GITLAB_TOKEN: ${{ secrets.ONTRACK_TEST_EXTENSION_GITLAB_TOKEN }}
       ONTRACK_TEST_EXTENSION_GITLAB_TOKEN_EXPIRY: ${{ vars.ONTRACK_TEST_EXTENSION_GITLAB_TOKEN_EXPIRY }}
       ONTRACK_TEST_EXTENSION_GITLAB_IGNORE: ${{ needs.setup.outputs.skip_gitlab_it }}
+      # Pinned off, exactly as the Bitbucket Cloud switch above: the tests which start a pipeline are the
+      # ones which cost compute minutes, and .github/workflows/gitlab-real.yml is the only place which
+      # turns this on (#1835). Without it a checkout which does have the secrets would start a pipeline
+      # per real pipeline test, on every push of every branch.
+      ONTRACK_TEST_EXTENSION_GITLAB_PIPELINES: "false"
       # GitHub system tests: credentials first, then the fixture values below, which are plain
       # configuration and deliberately not secrets.
       ONTRACK_TEST_EXTENSION_GITHUB_USER: ${{ secrets.ONTRACK_TEST_EXTENSION_GITHUB_USER }}

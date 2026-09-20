@@ -27,12 +27,44 @@ The module has two kinds of tests:
   **skipped** when no credential is set. `@TestOnGitLab` is the annotation that gates them, and
   `GitLabTestProperties` / `gitLabTestEnv` the environment they read (`GitLabTestUtils.kt`).
 
-Real tests are split by what they cost:
+Real tests are split by what they cost, and the split is an annotation:
 
-| Kind                                                        | Where they run                                                                  |
-|-------------------------------------------------------------|----------------------------------------------------------------------------------|
-| **API-only** — SCM, change log, auto-versioning merge requests | integration shard 5 of `.github/workflows/ci.yml`, skipped by default            |
-| **Pipeline** — anything that starts a job                    | a dedicated workflow, on `main` only (issue #1835) — they consume compute minutes |
+| Kind                                                           | Annotation                 | Where they run                                                              |
+|----------------------------------------------------------------|----------------------------|-----------------------------------------------------------------------------|
+| **API-only** — SCM, change log, auto-versioning merge requests | `@TestOnGitLab`            | integration shard 5 of `.github/workflows/ci.yml`, skipped by default       |
+| **Pipeline** — anything that starts a job                      | `@TestOnGitLabPipelines`   | `.github/workflows/gitlab-real.yml`, on `main` only — they cost compute minutes |
+
+`@TestOnGitLabPipelines` needs the credentials **and** `ontrack.test.extension.gitlab.pipelines`,
+which only `gitlab-real.yml` sets — `ci.yml` pins it to `false`. So a checkout that is fully
+provisioned still starts no pipeline on a push, and `./gradlew :ontrack-extension-gitlab:integrationTest`
+on a developer's machine starts none either unless it is asked to.
+
+### Real pipeline tests, on BRONZE
+
+`.github/workflows/gitlab-real.yml` runs the two pipeline suites —
+`GitLabPipelineNotificationChannelRealIT` and `GitLabPostProcessingRealIT`, four pipelines in all —
+and reports the **`GITLAB.REAL`** validation on the build that was promoted. It is dispatched by the
+`On BRONZE - GitLab pipelines` subscription in `.yontrack/ci.yaml`, through the `github-workflow`
+notification channel, in the same way the GOLD promotion dispatches `release.yml`.
+
+Three things keep it inside the budget, and all three are deliberate:
+
+* the subscription lives in the **`^main$`** block of `custom.configs`, not in the defaults —
+  BRONZE is granted on every green build of every branch, and this is what restricts it to `main`;
+* the workflow's `concurrency` group **cancels in progress**, so a burst of commits collapses into
+  one run rather than one run per commit;
+* the switch above, so nothing else in CI can start a pipeline by accident.
+
+`GITLAB.REAL` is **recording only**: declared in `.yontrack/ci.yaml`, part of no promotion, and
+nothing waits for it — like the `SECURITY.*` and `COVERAGE.*` stamps. That is the one difference
+from the Bitbucket Cloud equivalent, which is a silent side job of `release.yml`: fired on BRONZE,
+the result should be something you can see on the build.
+
+**Until the fixture is provisioned**, no `ONTRACK_TEST_EXTENSION_GITLAB_*` secret exists, and the
+workflow stops at its first step with a warning annotation, reporting no validation at all. It is
+not red: the tests never ran, so "the real GitLab tests failed" would be untrue, and a red run on
+every BRONZE of `main` is how a genuine failure later gets ignored. A **partial** set of credentials
+is a different matter and does fail, in `gitLabTestEnabled`, as it does everywhere else.
 
 ### The test fixture
 
@@ -54,10 +86,23 @@ The fixture project's content lives in
 [`src/test/resources/gitlab-fixture/`](src/test/resources/gitlab-fixture), from where the wizard
 commits it, and `GitLabTestFixture` names what the tests rely on:
 
-* `.gitlab-ci.yml`, with a **single `mock` job** which ends as `MOCK_RESULT` asks (`success` or
-  `failure`), after `MOCK_DURATION` seconds, echoing `MOCK_MESSAGE`. The `workflow` rules create a
-  pipeline **only when `MOCK_RESULT` is passed**, so a branch the tests push, a merge request they
-  open and a tag they create run nothing at all and cost nothing. The job is capped at five minutes.
+* `.gitlab-ci.yml`, with **two jobs and one trigger variable each**, so that a test never starts
+  the other one:
+
+  | Job    | Trigger variable | What it does                                                                                                        |
+  |--------|------------------|---------------------------------------------------------------------------------------------------------------------|
+  | `mock` | `MOCK_RESULT`    | ends as `MOCK_RESULT` asks (`success` or `failure`), after `MOCK_DURATION` seconds, echoing `MOCK_MESSAGE`          |
+  | `av`   | `UPGRADE_BRANCH` | checks it received every variable the auto-versioning post-processing sends, then runs `DOCKER_COMMAND` — `true` succeeds, `false` fails |
+
+  The `workflow` rules create a pipeline **only when one of the two is passed**, so a branch the
+  tests push, a merge request they open and a tag they create run nothing at all and cost nothing.
+  Both jobs are capped at five minutes.
+
+  `av` deliberately **pushes nothing back** on the upgrade branch, where the Bitbucket Cloud
+  fixture's equivalent commits the version. What Yontrack answers for is triggering the pipeline
+  with the right variables on the right ref, waiting for it and reporting it; committing is the
+  pipeline's own business, and doing it here would mean a write token as a CI/CD variable of the
+  fixture project, with a rotation of its own.
 * `gradle.properties` with a `version` entry, edited by the auto-versioning tests.
 
 `GitLabTestFixtureTest` keeps those files honest.
@@ -89,6 +134,7 @@ name upper-cased with `_` for `.`. CI passes them as environment variables from 
 | `token`                                       | secret `TOKEN`                                 | the bot's personal access token, scope `api`     |
 | `token.expiry`                                | **variable** `TOKEN_EXPIRY`                    | the token's expiry date, `YYYY-MM-DD`            |
 | `ignore`                                      | a workflow input                               | `true` skips the real tests                      |
+| `pipelines`                                   | set by `gitlab-real.yml` only                  | `true` also runs the tests that start a pipeline |
 
 The full path GitLab takes wherever an `:id` appears is `<group>/<project>`, URL-encoded — the two
 are kept apart because the group is what a test sweeps and the project is what it acts on.
@@ -96,8 +142,8 @@ are kept apart because the group is what a test sweeps and the project is what i
 The instance is always `https://gitlab.com`: there is no URL secret. The real tests are skipped when
 no credential is set, and **fail** when only some are, so that a half-configured CI does not pass
 silently. The secrets are passed to integration shard 5 by `.github/workflows/ci.yml`, whose
-`SKIP_GITLAB_IT` input (default `true`) is what turns the real tests on for a run started by hand.
-Issue #1835 adds the switch that lets the pipeline tests run in their own workflow only.
+`SKIP_GITLAB_IT` input (default `true`) is what turns the real tests on for a run started by hand,
+and to `.github/workflows/gitlab-real.yml`, which is the only one to set `pipelines`.
 
 ### Writing a real test
 
@@ -110,8 +156,10 @@ Issue #1835 adds the switch that lets the pipeline tests run in their own workfl
   special case. A leftover therefore only ever comes from a killed run; the automatic sweep of
   anything older than a day is not implemented yet, so clean those up in the GitLab UI. Nothing
   outside the `yontrack-it/` prefix is ever deleted.
-* Trigger a pipeline only in a test that is meant to cost minutes, and pass `MOCK_DURATION` as low as
-  the assertion allows.
+* Trigger a pipeline only in a test that is meant to cost minutes, annotate it with
+  `@TestOnGitLabPipelines` rather than `@TestOnGitLab`, and pass `MOCK_DURATION` as low as the
+  assertion allows. A pipeline test which can be replaced by a mocked one, or whose point another
+  pipeline test already makes, is a compute minute spent on every BRONZE of `main` for nothing.
 
 ### Cost
 
@@ -120,8 +168,9 @@ what the Bitbucket Cloud fixture gets, and still the constraint that shapes the 
 
 * nothing runs on a push, by construction of the fixture's `workflow` rules;
 * API-only tests — SCM, change log, merge requests, approvals — consume **no** compute minute at all;
-* pipeline tests run on `main` only, collapsing a burst of commits into one run (issue #1835), which
-  lands around 20–40 runs a month.
+* pipeline tests run on `main` only, collapsing a burst of commits into one run, which lands around
+  20–40 runs a month. Four pipelines a run, each a few seconds of job time plus the runner's own
+  start-up.
 
 A new free namespace gets **no shared runner until gitlab.com's identity verification is done**
 (phone, and a payment card on a new account). Until then every pipeline stays pending.

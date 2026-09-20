@@ -1,0 +1,250 @@
+name: GitLab pipelines (real)
+
+# Runs the GitLab tests which actually execute a pipeline against the real gitlab.com fixture, and
+# reports GITLAB.REAL on the build which was promoted (#1835).
+#
+# Dispatched by the `On BRONZE - GitLab pipelines` notification through the `github-workflow`
+# channel - see .yontrack/ci.yaml - the same mechanism by which GOLD dispatches release.yml. That
+# subscription lives in the `^main$` block of `custom.configs`, which is what restricts this to
+# `main`: BRONZE is granted on every green build of every branch, and a fixture namespace on the
+# Free tier gets 400 compute minutes a month.
+#
+# The `concurrency` group below is the other half of that budget. A burst of commits on main
+# grants a burst of BRONZEs; `cancel-in-progress` collapses them into one run, whose stamp lands on
+# the last build of the burst. Between the two, this lands around 20-40 runs a month.
+#
+# Why these tests are not in ci.yml: integration shard 5 already runs the module's API-only real
+# tests, which cost nothing. `ONTRACK_TEST_EXTENSION_GITLAB_PIPELINES` is the switch which tells the
+# two apart, pinned to `false` there and set to `true` here and nowhere else.
+#
+# It tests `main` as it is now, not the exact commit of the build being stamped. The two only differ
+# when something landed between the promotion and this run, and `cancel-in-progress` means the run
+# which survives is the one for the newest build anyway.
+
+on:
+  workflow_dispatch:
+    inputs:
+      # Always sent by the `github-workflow` notification channel, whether or not it is asked for:
+      # GitHub's API gives no way to learn the run ID of a dispatch, so Yontrack passes a
+      # correlation ID and then finds the run by the artifact named after it below. GitHub rejects
+      # any input a workflow does not declare, so omitting this fails the dispatch with
+      # `422 Unexpected inputs provided: ["id"]`.
+      # See ontrack-docs/docs/content/integrations/notifications/github-workflow.md.
+      id:
+        description: 'Correlation ID, set by Yontrack. "manual" when dispatched by hand.'
+        required: true
+        default: manual
+        type: string
+      version:
+        description: 'Version of the build which was promoted (e.g. 5.5.0-rc-12), as the build displays it'
+        required: true
+        type: string
+      project:
+        description: 'Yontrack project holding the build'
+        required: false
+        default: yontrack
+        type: string
+      branch:
+        description: 'Yontrack branch holding the build'
+        required: false
+        default: main
+        type: string
+
+# One run at a time, and cancel rather than queue - the opposite of the release and demo groups.
+# Queueing would run one pipeline suite per commit of a burst, which is precisely the spend this
+# workflow exists to avoid; the newest build is also the one worth stamping.
+concurrency:
+  group: gitlab-real
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  # Pinned, as everywhere else: an unpinned CLI lets a Yontrack release turn a green pipeline red.
+  YONTRACK_CLI_VERSION: '5.2.0'
+  GITLAB_REAL_PROJECT: ${{ inputs.project }}
+  GITLAB_REAL_BRANCH: ${{ inputs.branch }}
+  GITLAB_REAL_VERSION: ${{ inputs.version }}
+
+jobs:
+  gitlab-real:
+    name: Real GitLab pipeline tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      ONTRACK_TEST_EXTENSION_GITLAB_GROUP: ${{ secrets.ONTRACK_TEST_EXTENSION_GITLAB_GROUP }}
+      ONTRACK_TEST_EXTENSION_GITLAB_PROJECT: ${{ secrets.ONTRACK_TEST_EXTENSION_GITLAB_PROJECT }}
+      ONTRACK_TEST_EXTENSION_GITLAB_TOKEN: ${{ secrets.ONTRACK_TEST_EXTENSION_GITLAB_TOKEN }}
+      ONTRACK_TEST_EXTENSION_GITLAB_TOKEN_EXPIRY: ${{ vars.ONTRACK_TEST_EXTENSION_GITLAB_TOKEN_EXPIRY }}
+      # The one place this is ever true. Everything else - ci.yml's integration shard 5, a developer's
+      # checkout - leaves it unset or pins it to false, and pays no compute minute.
+      ONTRACK_TEST_EXTENSION_GITLAB_PIPELINES: "true"
+    steps:
+      # The run time reported for the validation is measured from here.
+      - name: Record the job start
+        id: job_start
+        run: echo "started=$(date +%s)" >> "$GITHUB_OUTPUT"
+
+      # How Yontrack finds this run: it polls the run's artifacts for this name, 10 times at 10s
+      # intervals, and gives up after that. So this goes before the checkout, and needs no checkout
+      # of its own - the file is empty and only its name carries the ID.
+      - name: Correlation preparation
+        run: touch inputs.properties
+
+      - name: Correlation file archiving
+        uses: actions/upload-artifact@v7
+        with:
+          name: inputs-${{ inputs.id }}.properties
+          path: inputs.properties
+          if-no-files-found: error
+
+      # ------------------------------------------------------------------------------------------
+      # The fixture is provisioned by hand, by a human with a gitlab.com account, and may not exist
+      # at all - see ontrack-extension-gitlab/scripts/gitlab-test-project.sh and the module's
+      # README. When it does not, this stops here, loudly, and reports nothing.
+      #
+      # Stopping rather than failing, and reporting no GITLAB.REAL rather than a FAILED one: the
+      # tests never ran, so "the real GitLab tests failed" would be a lie, and a red run on every
+      # single BRONZE of main is how a real failure later gets ignored. The absent stamp is the
+      # honest signal, and the annotation below is what says why.
+      #
+      # A PARTIAL set of credentials is a different thing entirely and is not caught here: it
+      # reaches `gitLabTestEnabled`, which fails the tests outright rather than skipping them, so a
+      # half-rotated secret turns this workflow red as it should.
+      # ------------------------------------------------------------------------------------------
+      - name: Check the fixture is provisioned
+        id: fixture
+        run: |
+          set -uo pipefail
+          if [ -n "${ONTRACK_TEST_EXTENSION_GITLAB_GROUP:-}" ] \
+            || [ -n "${ONTRACK_TEST_EXTENSION_GITLAB_PROJECT:-}" ] \
+            || [ -n "${ONTRACK_TEST_EXTENSION_GITLAB_TOKEN:-}" ]; then
+            echo "provisioned=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "provisioned=false" >> "$GITHUB_OUTPUT"
+          message="The gitlab.com test fixture is not provisioned: no ONTRACK_TEST_EXTENSION_GITLAB_* secret is set. Run ontrack-extension-gitlab/scripts/gitlab-test-project.sh to create it. No GITLAB.REAL validation is reported."
+          echo "::warning title=GitLab fixture not provisioned::$message"
+          {
+            echo "### GitLab pipelines (real) - not run"
+            echo
+            echo "$message"
+            echo
+            echo "See \`ontrack-extension-gitlab/README.md\` for what the fixture is and what it costs."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/checkout@v7
+        if: ${{ steps.fixture.outputs.provisioned == 'true' }}
+
+      # Same identity as the integration shards of ci.yml: the Git test utilities commit in freshly
+      # initialised repositories.
+      - name: Configure git
+        if: ${{ steps.fixture.outputs.provisioned == 'true' }}
+        run: |
+          git config --global user.email "yontrack@nemerosa.net"
+          git config --global user.name "Yontrack"
+          git config --global init.defaultBranch main
+
+      - uses: actions/setup-java@v6
+        if: ${{ steps.fixture.outputs.provisioned == 'true' }}
+        with:
+          distribution: zulu
+          java-version: "21"
+
+      - uses: gradle/actions/setup-gradle@v6
+        if: ${{ steps.fixture.outputs.provisioned == 'true' }}
+
+      # Only the tests which start pipelines: everything else in the module ran on the build's own
+      # CI. integrationTest brings its own middleware up and down.
+      - name: Real GitLab pipeline tests
+        id: test
+        if: ${{ steps.fixture.outputs.provisioned == 'true' }}
+        run: |
+          ./gradlew :ontrack-extension-gitlab:integrationTest \
+            --tests '*GitLabPipelineNotificationChannelRealIT' \
+            --tests '*GitLabPostProcessingRealIT' \
+            --stacktrace \
+            --console plain
+
+      - name: Upload the test results
+        if: ${{ !cancelled() && steps.fixture.outputs.provisioned == 'true' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: gitlab-real-results
+          path: ontrack-extension-gitlab/build/test-results/integrationTest/
+          if-no-files-found: ignore
+
+      # ------------------------------------------------------------------------------------------
+      # Report, whatever happened - as long as the tests actually ran.
+      #
+      # `!cancelled()` and not `success()`: a run which fails must land a FAILED GITLAB.REAL on the
+      # build rather than leave the stamp absent, which is indistinguishable from "never dispatched".
+      # A cancelled run - the collapsing this workflow relies on - reports nothing, and the run which
+      # replaced it reports on a newer build.
+      # ------------------------------------------------------------------------------------------
+      - name: Install the Yontrack CLI
+        if: ${{ !cancelled() && steps.fixture.outputs.provisioned == 'true' }}
+        run: |
+          set -euo pipefail
+          curl -sSfL -o /usr/local/bin/yontrack \
+            "https://github.com/nemerosa/ontrack-cli/releases/download/${YONTRACK_CLI_VERSION}/yontrack-linux-amd64"
+          chmod +x /usr/local/bin/yontrack
+          # --cli only: the bare `version` also asks the server, which is not configured yet.
+          yontrack version --cli
+
+      - name: Configure the CLI
+        if: ${{ !cancelled() && steps.fixture.outputs.provisioned == 'true' }}
+        env:
+          YONTRACK_URL: ${{ vars.YONTRACK_URL }}
+          YONTRACK_TOKEN: ${{ secrets.YONTRACK_TOKEN }}
+        run: |
+          set -euo pipefail
+          yontrack config create prod "$YONTRACK_URL" --token "$YONTRACK_TOKEN" --override
+
+      # GITLAB.REAL is reported with `yontrack validate --build`, which takes the build *name*. The
+      # promotion workflow can only pass the version: `${build}` renders the display name, which is
+      # the release property, and no templating source exposes the raw name. Same resolution as
+      # demo-smoke.yml, through the same shared helper, so the two stamp the same build.
+      - name: Resolve the build
+        id: resolve
+        if: ${{ !cancelled() && steps.fixture.outputs.provisioned == 'true' }}
+        env:
+          DEMO_PROJECT: ${{ env.GITLAB_REAL_PROJECT }}
+          DEMO_BRANCH: ${{ env.GITLAB_REAL_BRANCH }}
+          DEMO_VERSION: ${{ env.GITLAB_REAL_VERSION }}
+        run: scripts/demo-smoke.sh resolve
+
+      - name: Validate GITLAB.REAL
+        if: ${{ !cancelled() && steps.fixture.outputs.provisioned == 'true' && steps.resolve.outputs.build != '' }}
+        env:
+          STARTED: ${{ steps.job_start.outputs.started }}
+          TEST: ${{ steps.test.outcome }}
+          BUILD: ${{ steps.resolve.outputs.build }}
+        run: |
+          set -uo pipefail
+          run_time_flag=""
+          if [ -n "${STARTED:-}" ]; then
+            run_time_flag="--run-time $(( $(date +%s) - STARTED ))"
+          fi
+          if [ "$TEST" = "success" ]; then
+            status=PASSED
+          else
+            status=FAILED
+          fi
+          {
+            echo "### GitLab pipelines (real) \`$GITLAB_REAL_VERSION\` - \`$status\`"
+            echo
+            echo "| Step | Outcome |"
+            echo "|---|---|"
+            echo "| Real pipeline tests | ${TEST:-skipped} |"
+          } >> "$GITHUB_STEP_SUMMARY"
+          # shellcheck disable=SC2086  # deliberate: run info is a set of flags, not one word
+          yontrack validate \
+            --project "$GITLAB_REAL_PROJECT" --branch "$GITLAB_REAL_BRANCH" --build "$BUILD" \
+            --validation GITLAB.REAL --status "$status" \
+            $run_time_flag \
+            --source-type github-workflow \
+            --source-uri "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" \
+            --trigger-type "${GITHUB_EVENT_NAME}" \
+            --trigger-data "$GITLAB_REAL_VERSION"

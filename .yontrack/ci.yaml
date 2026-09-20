@@ -156,6 +156,22 @@ configuration:
         # Reported by .github/workflows/demo-smoke.yml, which the demo slot dispatches once
         # it has marked the deployment done. SILVER, below, requires it.
         DEMO.SMOKE: {}
+        # The GitLab tests which actually execute a pipeline against the gitlab.com fixture,
+        # reported by .github/workflows/gitlab-real.yml (#1835). The module's other real tests are
+        # API-only and run in integration shard 5 with everything else; these ones spend compute
+        # minutes out of a Free namespace's 400 a month, which is why they have a workflow, a
+        # switch and a stamp of their own.
+        #
+        # Recording only, like the SECURITY and COVERAGE stamps: no thresholds, in no promotion,
+        # and nothing in ci.yml waits for it. That is the whole difference from the Bitbucket
+        # Cloud equivalent, which is a silent side job of release.yml - fired on BRONZE, the
+        # result should be something you can see on the build.
+        #
+        # Only ever reported on main: the subscription which dispatches the workflow is in the
+        # `^main$` block of `custom.configs` below, not in the defaults. The stamp is declared here
+        # all the same, because a validation stamp has to exist on the branch it is reported on and
+        # the defaults are where every other one is declared.
+        GITLAB.REAL: {}
         # The four publication stamps, all reported by .github/workflows/release.yml, which the
         # GOLD workflow below dispatches. They are what RELEASE is granted on: GOLD triggers the
         # publication, RELEASE records that it succeeded (#1672, #1673).
@@ -585,6 +601,44 @@ configuration:
             SILVER:
               validations:
                 - DEMO.SMOKE
+          # Real GitLab pipeline tests, on main only (#1835).
+          #
+          # This is what restricts them to main, and it is the point of the issue: BRONZE is
+          # granted on every green build of every branch, and each run of this workflow spends
+          # compute minutes out of the fixture namespace's 400 a month. Restricted here, and
+          # collapsed by the workflow's own `concurrency: cancel-in-progress`, it lands around
+          # 20-40 runs a month.
+          #
+          # A name of its own rather than an extra node on `On BRONZE`:
+          # `NotificationsCIConfigExtension.mergeConfig` matches subscriptions by name, so reusing
+          # `On BRONZE` here would REPLACE the default's Slack message instead of adding to it.
+          #
+          # ASYNC: the workflow takes tens of minutes - a Gradle build, its own middleware, and
+          # four real pipelines - and nothing depends on its outcome. Waiting for it in SYNC mode
+          # would hang the promotion's workflow for all of that, and a run cancelled by the
+          # collapsing above would report an error on a promotion which is perfectly fine.
+          #
+          # Only `version` is passed. `${build}` renders the display name rather than the name, so
+          # the workflow resolves the build itself, exactly as demo-smoke.yml does; `project` and
+          # `branch` are left to the workflow's own defaults, `yontrack` and `main`, which is what
+          # this block is scoped to anyway.
+          notificationsConfig:
+            notifications:
+              - name: On BRONZE - GitLab pipelines
+                promotion: BRONZE
+                events:
+                  - new_promotion_run
+                channel: github-workflow
+                channelConfig:
+                  config: github.com
+                  owner: yontrack
+                  repository: yontrack
+                  workflowId: gitlab-real.yml
+                  reference: main
+                  callMode: ASYNC
+                  inputs:
+                    - name: version
+                      value: "${build.release}"
 
       # SILVER on a release branch: the same promotion means something else, so it says something
       # else. The default's text - "deployed to the demo", "has passed its smoke tests", a demo

@@ -1,5 +1,7 @@
 package net.nemerosa.ontrack.extension.gitlab
 
+import net.nemerosa.ontrack.extension.gitlab.autoversioning.AbstractGitLabPostProcessing
+
 /**
  * Content of the fixture project of the GitLab test group.
  *
@@ -20,10 +22,53 @@ object GitLabTestFixture {
     const val VERSION_PROPERTY = "version"
 
     /**
-     * The only job of the fixture project: it ends as [VARIABLE_RESULT] asks, after
+     * The pipeline job of the fixture project: it ends as [VARIABLE_RESULT] asks, after
      * [VARIABLE_DURATION] seconds, echoing [VARIABLE_MESSAGE].
      */
     const val JOB_MOCK = "mock"
+
+    /**
+     * The auto-versioning post-processing job of the fixture project.
+     *
+     * It stands in for the pipeline a user writes to run an upgrade command on the upgrade branch: it checks
+     * that it received every variable the post-processing sends, then runs [AbstractGitLabPostProcessing.VAR_DOCKER_COMMAND]
+     * - which is what lets a test ask for a success (`true`) or a failure (`false`).
+     *
+     * It deliberately does **not** push anything back. What Yontrack answers for is triggering the pipeline
+     * with the right variables on the right ref, waiting for it and reporting it; committing is the
+     * pipeline's own business, and doing it here would mean a write token as a CI/CD variable of the
+     * fixture project, with its own rotation.
+     */
+    const val JOB_AV = "av"
+
+    /**
+     * Variables the auto-versioning post-processing passes, which [JOB_AV] requires.
+     *
+     * Read from the post-processing itself rather than copied, so that renaming one there breaks
+     * `GitLabTestFixtureTest` rather than the pipeline at run time.
+     */
+    val POST_PROCESSING_VARIABLES = listOf(
+        AbstractGitLabPostProcessing.VAR_REPOSITORY,
+        AbstractGitLabPostProcessing.VAR_UPGRADE_BRANCH,
+        AbstractGitLabPostProcessing.VAR_DOCKER_IMAGE,
+        AbstractGitLabPostProcessing.VAR_DOCKER_COMMAND,
+        AbstractGitLabPostProcessing.VAR_COMMIT_MESSAGE,
+        AbstractGitLabPostProcessing.VAR_VERSION,
+    )
+
+    /**
+     * The post-processing variable which triggers [JOB_AV], and the pipeline with it.
+     */
+    val VARIABLE_UPGRADE_BRANCH = AbstractGitLabPostProcessing.VAR_UPGRADE_BRANCH
+
+    /** Command [JOB_AV] runs, and therefore what decides whether the pipeline succeeds. */
+    val VARIABLE_DOCKER_COMMAND = AbstractGitLabPostProcessing.VAR_DOCKER_COMMAND
+
+    /**
+     * A [VARIABLE_DOCKER_COMMAND] which succeeds. `false` is the one which fails, should a test ever need
+     * to pay a compute minute for a failing post-processing.
+     */
+    const val COMMAND_SUCCESS = "true"
 
     /**
      * Asks the mock job for its outcome: [RESULT_SUCCESS] or [RESULT_FAILURE].

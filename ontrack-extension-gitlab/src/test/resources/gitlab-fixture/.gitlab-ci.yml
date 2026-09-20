@@ -5,12 +5,19 @@
 #
 # A Free namespace gets 400 compute minutes a month, and the tests push branches and open merge
 # requests all the time: nothing here may run on a push. The `workflow` rules below create a
-# pipeline only when MOCK_RESULT is passed, which only an explicit API trigger does — a push, a
-# merge request and a tag create no pipeline at all, and therefore cost nothing.
+# pipeline only when one of the two trigger variables is passed, which only an explicit API
+# trigger does — a push, a merge request and a tag create no pipeline at all, and therefore cost
+# nothing.
+#
+# Two jobs, one trigger variable each, so that a test never starts the other one:
+#
+#   mock  MOCK_RESULT      the pipeline the `gitlab-pipeline` notification channel triggers
+#   av    UPGRADE_BRANCH   the pipeline the auto-versioning post-processing triggers
 
 workflow:
   rules:
     - if: $MOCK_RESULT
+    - if: $UPGRADE_BRANCH
     - when: never
 
 mock:
@@ -30,3 +37,32 @@ mock:
     - if [ "${MOCK_RESULT}" = "failure" ]; then echo "Failing on demand"; exit 1; fi
     - if [ "${MOCK_RESULT}" != "success" ]; then echo "Unknown MOCK_RESULT=${MOCK_RESULT}"; exit 1; fi
     - echo "Succeeding on demand"
+
+# Stands in for the pipeline a user writes for the GitLab auto-versioning post-processing. It
+# checks that Yontrack sent every variable the post-processing promises, then runs DOCKER_COMMAND
+# — which is how a test asks for a success (`true`) or a failure (`false`).
+#
+# It deliberately pushes nothing back on UPGRADE_BRANCH. What Yontrack answers for is triggering
+# the pipeline with the right variables on the right ref, waiting for it and reporting it;
+# committing is the pipeline's own business, and doing it here would mean a write token as a
+# CI/CD variable of the fixture project, with a rotation of its own.
+av:
+  stage: test
+  image: alpine:3.22
+  timeout: 5 minutes
+  interruptible: true
+  rules:
+    - if: $UPGRADE_BRANCH
+  script:
+    - |
+      set -e
+      for name in REPOSITORY UPGRADE_BRANCH DOCKER_IMAGE DOCKER_COMMAND COMMIT_MESSAGE VERSION; do
+        eval "value=\${$name:-}"
+        echo "$name=$value"
+        if [ -z "$value" ]; then
+          echo "Missing post-processing variable $name"
+          exit 1
+        fi
+      done
+      echo "Running the upgrade command"
+      sh -c "$DOCKER_COMMAND"

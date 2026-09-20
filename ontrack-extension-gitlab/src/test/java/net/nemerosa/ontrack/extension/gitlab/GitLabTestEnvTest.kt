@@ -41,6 +41,30 @@ class GitLabTestEnvTest {
         assertTrue(GitLabTestProperties.TOKEN in (ex.message ?: ""), ex.message)
     }
 
+    @Test
+    fun `Pipeline tests need their own switch on top of the credentials`() {
+        assertFalse(
+            gitLabPipelinesTestEnabled(complete::get),
+            "Credentials alone do not start pipelines: that is what integration shard 5 runs with",
+        )
+        val values = complete + (GitLabTestProperties.PIPELINES to "true")
+        assertTrue(gitLabPipelinesTestEnabled(values::get))
+    }
+
+    @Test
+    fun `The pipeline switch is worthless without the credentials`() {
+        val values = mapOf(GitLabTestProperties.PIPELINES to "true")
+        assertFalse(gitLabPipelinesTestEnabled(values::get))
+    }
+
+    @Test
+    fun `The pipeline switch does not override the ignore flag`() {
+        val values = complete +
+                (GitLabTestProperties.PIPELINES to "true") +
+                (GitLabTestProperties.IGNORE to "true")
+        assertFalse(gitLabPipelinesTestEnabled(values::get))
+    }
+
     /**
      * A leftover of a killed run has to be recognisable and datable, and two runs must never collide.
      */
@@ -82,6 +106,10 @@ class GitLabTestEnvTest {
         assertEquals(
             "ONTRACK_TEST_EXTENSION_GITLAB_GROUP",
             GitLabTestProperties.envName(GitLabTestProperties.GROUP)
+        )
+        assertEquals(
+            "ONTRACK_TEST_EXTENSION_GITLAB_PIPELINES",
+            GitLabTestProperties.envName(GitLabTestProperties.PIPELINES)
         )
     }
 
