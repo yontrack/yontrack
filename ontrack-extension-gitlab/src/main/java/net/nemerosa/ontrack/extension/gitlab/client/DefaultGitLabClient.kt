@@ -468,38 +468,57 @@ class DefaultGitLabClient(
     /**
      * Items of every page, following the `Link` header GitLab sends: several endpoints return no total at
      * all, so nothing here counts pages from a total.
+     *
+     * **Only the page number is taken from that header.** Every URL this loop calls is built here from
+     * [first], which the client composed itself; the remote server chooses how far the paging goes and
+     * nothing else of the request. See [nextPage].
      */
     private fun <T> paginate(first: URI, type: ParameterizedTypeReference<List<T>>): List<T> {
         val results = mutableListOf<T>()
-        var next: URI? = UriComponentsBuilder.fromUri(first)
-            .queryParam("per_page", PAGE_SIZE)
-            .queryParam("page", 1)
-            .build(true)
-            .toUri()
+        var page: Int? = 1
         var pages = 0
-        while (next != null && pages < MAX_PAGES) {
+        while (page != null && pages < MAX_PAGES) {
+            val current = page
             val response: ResponseEntity<List<T>> =
-                withRateLimit { template.exchange(next!!, HttpMethod.GET, authEntity(), type) }
+                withRateLimit { template.exchange(pageUri(first, current), HttpMethod.GET, authEntity(), type) }
             results += response.body ?: emptyList()
-            next = nextPage(response.headers)
+            // Strictly forward, so that a server repeating a page number cannot spin this loop
+            page = nextPage(response.headers)?.takeIf { it > current }
             pages++
         }
         return results
     }
 
     /**
-     * URI of the next page, from the `Link` header of the previous response - **when it stays on the
-     * configured instance**.
-     *
-     * That check is the whole point of this function. The header is written by the remote server, and the
-     * personal access token travels on every request this client makes: a `Link` pointing at another host
-     * would not merely fetch a foreign URL, it would hand GitLab's token to whoever sent the header. The
-     * target is therefore accepted only when its scheme, host and port are those of
-     * [GitLabConfiguration.url] and its path is under [API_PATH]; anything else simply ends the pagination.
-     *
-     * See the `java/ssrf` alert https://github.com/yontrack/yontrack/security/code-scanning/355.
+     * URI of one page of [first], the only shape of URL [paginate] ever calls.
      */
-    private fun nextPage(headers: HttpHeaders): URI? =
+    private fun pageUri(first: URI, page: Int): URI =
+        UriComponentsBuilder.fromUri(first)
+            .replaceQueryParam("per_page", PAGE_SIZE)
+            .replaceQueryParam("page", page)
+            .build(true)
+            .toUri()
+
+    /**
+     * Number of the next page, from the `Link` header of the previous response - **and nothing else of it**.
+     *
+     * The header is written by the remote server, and the personal access token travels on every request
+     * this client makes: a `Link` pointing at another host would not merely fetch a foreign URL, it would
+     * hand GitLab's token to whoever sent the header. So the target is never requested as it stands. It is
+     * reduced to its `page` query parameter, an integer, which [paginate] applies to a URL it built itself.
+     * Host, path, and every other parameter of the header are dropped, whatever they say.
+     *
+     * The origin check of [isOnInstance] stays in front of that as a second line: a `rel="next"` which is
+     * not even on the configured instance is a broken or hostile answer, and its page number is worth no
+     * more than the rest of it.
+     *
+     * A target carrying no usable `page` ends the pagination - which is also what GitLab's keyset
+     * pagination would do, and no endpoint here asks for it.
+     *
+     * See the `java/ssrf` alerts https://github.com/yontrack/yontrack/security/code-scanning/355
+     * and https://github.com/yontrack/yontrack/security/code-scanning/357.
+     */
+    private fun nextPage(headers: HttpHeaders): Int? =
         headers[HttpHeaders.LINK]
             ?.firstNotNullOfOrNull { NEXT_LINK.find(it)?.groupValues?.get(1) }
             ?.let { link ->
@@ -509,8 +528,19 @@ class DefaultGitLabClient(
                 } catch (_: IllegalArgumentException) {
                     null
                 }
-                uri?.takeIf { isOnInstance(it) }
+                uri?.takeIf { isOnInstance(it) }?.let { pageNumber(it) }
             }
+
+    /**
+     * The `page` query parameter of [uri], when it holds a usable one.
+     */
+    private fun pageNumber(uri: URI): Int? =
+        uri.rawQuery
+            ?.splitToSequence('&')
+            ?.firstOrNull { it.substringBefore('=') == "page" }
+            ?.substringAfter('=', "")
+            ?.toIntOrNull()
+            ?.takeIf { it > 0 }
 
     /**
      * Is [uri] the same origin as the configured instance, and under the API path?

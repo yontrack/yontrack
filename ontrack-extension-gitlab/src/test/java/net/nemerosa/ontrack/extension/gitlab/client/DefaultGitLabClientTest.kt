@@ -212,17 +212,67 @@ class DefaultGitLabClientTest {
         val server = MockRestServiceServer.bindTo(client.template).build()
         val first =
             "https://gitlab.example.com/api/v4/projects?membership=true&simple=true&order_by=path&sort=asc&per_page=100&page=1"
-        val second = "https://gitlab.example.com/api/v4/projects?page=2"
+        // The header's own URL form does not matter: only its page number is kept
+        val link = "https://gitlab.example.com/api/v4/projects?page=2"
+        val second =
+            "https://gitlab.example.com/api/v4/projects?membership=true&simple=true&order_by=path&sort=asc&per_page=100&page=2"
         server.expect(requestTo(first))
             .andRespond(
                 withSuccess(projectPage("group/one"), MediaType.APPLICATION_JSON)
-                    .headers(HttpHeaders().apply { set(HttpHeaders.LINK, """<$second>; rel="next"""") })
+                    .headers(HttpHeaders().apply { set(HttpHeaders.LINK, """<$link>; rel="next"""") })
             )
         server.expect(requestTo(second))
             .andExpect(header(DefaultGitLabClient.PRIVATE_TOKEN_HEADER, "secret"))
             .andRespond(withSuccess(projectPage("group/two"), MediaType.APPLICATION_JSON))
         assertEquals(listOf("group/one", "group/two"), client.getProjects().map { it.path_with_namespace })
         server.verify()
+    }
+
+    @Test
+    fun `Only the page number of a next link is used`() {
+        // The `Link` header is remote input: the URL it names is never requested as it stands. Everything
+        // but its page number is dropped, and the request is rebuilt from the URL the client composed.
+        // See https://github.com/yontrack/yontrack/security/code-scanning/357
+        val client = client()
+        val server = MockRestServiceServer.bindTo(client.template).build()
+        val link = "https://gitlab.com/api/v4/projects?membership=false&order_by=id&private_token=stolen&page=2"
+        val second =
+            "https://gitlab.com/api/v4/projects?membership=true&simple=true&order_by=path&sort=asc&per_page=100&page=2"
+        server.expect(requestTo(requestToProjects()))
+            .andRespond(
+                withSuccess(projectPage("group/one"), MediaType.APPLICATION_JSON)
+                    .headers(HttpHeaders().apply { set(HttpHeaders.LINK, """<$link>; rel="next"""") })
+            )
+        server.expect(requestTo(second))
+            .andRespond(withSuccess(projectPage("group/two"), MediaType.APPLICATION_JSON))
+        assertEquals(listOf("group/one", "group/two"), client.getProjects().map { it.path_with_namespace })
+        server.verify()
+    }
+
+    @Test
+    fun `A next link with no usable page number ends the pagination`() {
+        listOf(
+            // Keyset pagination, which no endpoint here asks for
+            "https://gitlab.com/api/v4/projects?cursor=eyJpZCI6IjEifQ",
+            // `per_page` is not `page`
+            "https://gitlab.com/api/v4/projects?per_page=100",
+            "https://gitlab.com/api/v4/projects?page=",
+            "https://gitlab.com/api/v4/projects?page=evil",
+            "https://gitlab.com/api/v4/projects?page=0",
+            "https://gitlab.com/api/v4/projects?page=-1",
+            // Never backwards, and never the page just read
+            "https://gitlab.com/api/v4/projects?page=1",
+        ).forEach { link ->
+            val client = client()
+            val server = MockRestServiceServer.bindTo(client.template).build()
+            server.expect(requestTo(requestToProjects()))
+                .andRespond(
+                    withSuccess(projectPage("group/one"), MediaType.APPLICATION_JSON)
+                        .headers(HttpHeaders().apply { set(HttpHeaders.LINK, """<$link>; rel="next"""") })
+                )
+            assertEquals(listOf("group/one"), client.getProjects().map { it.path_with_namespace }, "Stopped: $link")
+            server.verify()
+        }
     }
 
     @Test
