@@ -202,7 +202,7 @@ A new free namespace gets **no shared runner until gitlab.com's identity verific
 
 ### Renewal
 
-The token expires on: **<!-- token-expiry -->not provisioned yet<!-- /token-expiry -->**.
+The token expires on: **<!-- token-expiry -->2027-09-20<!-- /token-expiry -->**.
 
 Before that date, re-run the wizard: mint a new token in stage 4 (Enter keeps everything else), let
 it replace the secrets, and commit the date it writes above.
