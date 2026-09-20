@@ -325,6 +325,8 @@ project_field() {
 project_path_with_namespace() { project_field path_with_namespace; }
 author_approval()             { project_field merge_requests_author_approval; }
 shared_runners()              { project_field shared_runners_enabled; }
+# 'unavailable' on a GitLab old enough not to have the setting, where nothing is restricted.
+pipeline_variables_role()     { project_field ci_pipeline_variables_minimum_override_role; }
 
 # file_action PATH — 'update' when the file is already on the main branch, 'create' otherwise.
 file_action() {
@@ -379,6 +381,11 @@ smoke_pipeline() {
   id=$(printf '%s' "$response" | jq -r '.id // empty' 2>/dev/null || true)
   if [[ -z "$id" ]]; then
     warn "no pipeline was created — GitLab answered: $(printf '%s' "$response" | head -c 200)"
+    case "$response" in
+      *"set pipeline variables"*)
+        note "That is the setting from the runners stage: Settings → CI/CD → Variables →"
+        note "'Minimum role to use pipeline variables' → Owner. Re-run the wizard once it is set." ;;
+    esac
     SKIPPED+=("the pipeline smoke test")
     return
   fi
@@ -504,7 +511,7 @@ done
 pause
 
 # ── 7 ─────────────────────────────────────────────────────────────────────
-stage "Shared runners"
+stage "Runners and pipeline variables"
 say "Only the pipeline tests need a runner, and they are the only thing here that costs anything:"
 say "a Free namespace gets 400 compute minutes a month."
 open_url "https://gitlab.com/$(full_path)/-/settings/ci_cd"
@@ -512,6 +519,28 @@ step "Settings → CI/CD → Runners → enable 'Instance runners' for this proj
 note "Nothing runs on a push: a pipeline exists only when MOCK_RESULT or UPGRADE_BRANCH is passed."
 pause "Done? Press Enter to check"
 expect true "the shared runners are enabled on the project" shared_runners
+
+say ""
+say "Every test here passes variables — they are how the fixture picks which job runs — and recent"
+say "GitLab versions refuse them by default on a NEW project, whatever role the caller has."
+step "Same page: Variables → 'Minimum role to use pipeline variables' → Owner."
+note "That is ci_pipeline_variables_minimum_override_role, which now defaults to no_one_allowed."
+note "Without it every trigger fails with 400 'Insufficient permissions to set pipeline variables',"
+note "the bot being the owner notwithstanding: it is the project setting, not the role."
+pause "Done? Press Enter to check"
+while true; do
+  role=$(pipeline_variables_role)
+  case "$role" in
+    owner|maintainer|developer)
+      ok "pipeline variables are allowed (minimum role: $role)"; break ;;
+    unavailable)
+      note "this GitLab does not report ci_pipeline_variables_minimum_override_role — nothing to set."
+      break ;;
+    *)
+      warn "pipeline variables are refused (ci_pipeline_variables_minimum_override_role=$role)"
+      confirm "Fixed it — check again?" || { SKIPPED+=("ci_pipeline_variables_minimum_override_role on $(full_path)"); break; } ;;
+  esac
+done
 pause
 
 # ── 8 ─────────────────────────────────────────────────────────────────────

@@ -76,7 +76,21 @@ A **Free** gitlab.com setup, containing:
 | a **group**, e.g. `yontrack-test`                  | holds the fixture project                                                                                |
 | a **fixture project**, e.g. `yontrack-fixture`     | carries the pipeline; shared runners enabled                                                             |
 | `merge_requests_author_approval = true` on it      | lets the bot approve its own merge request — GitLab's answer to what needed a second account on Bitbucket |
+| `ci_pipeline_variables_minimum_override_role`      | lets the bot pass pipeline variables; a new project refuses them outright                                |
 | one **personal access token**, scope `api`         | the only credential; project and group access tokens are Premium on gitlab.com                           |
+
+**Pipeline variables have to be switched on.** Every pipeline test passes variables — they are how
+the fixture picks which of its two jobs runs — and recent GitLab versions default a *new* project's
+`ci_pipeline_variables_minimum_override_role` to `no_one_allowed`. Until it is set to `owner`, every
+trigger comes back `400 Bad Request` with `Insufficient permissions to set pipeline variables`, and
+the bot owning the project makes no difference: it is the project setting that refuses, not the role.
+Settings → CI/CD → Variables → *Minimum role to use pipeline variables*, or:
+
+```bash
+curl -sS --request PUT --header "PRIVATE-TOKEN: $TOKEN" \
+  "https://gitlab.com/api/v4/projects/<group>%2F<project>" \
+  --data "ci_pipeline_variables_minimum_override_role=owner"
+```
 
 **One account, not two.** GitLab does not forbid self-approval the way Bitbucket Cloud does — it is
 the project setting above — so a second gitlab.com account, with its own 2FA, rotation and recovery,
