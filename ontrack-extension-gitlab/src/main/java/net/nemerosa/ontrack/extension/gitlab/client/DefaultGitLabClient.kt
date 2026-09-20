@@ -7,6 +7,7 @@ import net.nemerosa.ontrack.extension.gitlab.model.GitLabConfiguration
 import net.nemerosa.ontrack.extension.gitlab.model.GitLabFile
 import net.nemerosa.ontrack.extension.gitlab.model.GitLabIssue
 import net.nemerosa.ontrack.extension.gitlab.model.GitLabMergeRequest
+import net.nemerosa.ontrack.extension.gitlab.model.GitLabPipeline
 import net.nemerosa.ontrack.extension.gitlab.model.GitLabProject
 import net.nemerosa.ontrack.extension.gitlab.model.GitLabUser
 import org.springframework.core.ParameterizedTypeReference
@@ -408,6 +409,33 @@ class DefaultGitLabClient(
     override fun getCommit(project: String, commit: String): GitLabCommit? =
         notFoundAsNull {
             getForObject<GitLabCommit>(projectUri(project, "repository/commits/${encodePathSegment(commit)}"))
+        }
+
+    /**
+     * The variables go over as GitLab's array of hashes, `[{"key": "K", "value": "V"}]`, which is the only
+     * form `POST /projects/:id/pipeline` accepts for them.
+     *
+     * Nothing of the configuration travels in that body: the personal access token is attached to the
+     * request by [authEntity], as a header, and never as a variable.
+     */
+    override fun triggerPipeline(project: String, ref: String, variables: Map<String, String>): GitLabPipeline {
+        val body = mapOf(
+            "ref" to ref,
+            "variables" to variables.map { (key, value) -> mapOf("key" to key, "value" to value) },
+        )
+        return withRateLimit {
+            template.exchange(
+                projectUri(project, "pipeline"),
+                HttpMethod.POST,
+                authEntity(body),
+                GitLabPipeline::class.java,
+            )
+        }.body ?: throw GitLabCannotTriggerPipelineException(project, ref)
+    }
+
+    override fun getPipeline(project: String, pipelineId: Long): GitLabPipeline? =
+        notFoundAsNull {
+            getForObject<GitLabPipeline>(projectUri(project, "pipelines/$pipelineId"))
         }
 
     /**

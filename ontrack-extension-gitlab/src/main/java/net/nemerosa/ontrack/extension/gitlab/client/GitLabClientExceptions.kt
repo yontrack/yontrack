@@ -54,3 +54,21 @@ class GitLabRedirectException(uri: String, location: String?) : GitLabClientExce
     "GitLab redirected $uri to ${location ?: "an unnamed location"}. Yontrack does not follow redirects, " +
             "because the redirected request would carry the access token. Check the URL of the configuration."
 )
+
+/**
+ * GitLab accepted the pipeline call but returned nothing to read the pipeline from.
+ */
+class GitLabCannotTriggerPipelineException(project: String, ref: String) : GitLabClientException(
+    "No answer from GitLab when triggering a pipeline on $ref in the project $project."
+)
+
+/**
+ * A pipeline which was triggered cannot be read back.
+ *
+ * GitLab answering 404 on a pipeline it has just created means the token lost its access to the project, or
+ * the pipeline was deleted while it was being followed. Either way the caller is better off being told than
+ * waiting out its whole timeout.
+ */
+class GitLabPipelineNotFoundException(project: String, pipelineId: Long) : GitLabClientException(
+    "The pipeline $pipelineId of the GitLab project $project cannot be found."
+)

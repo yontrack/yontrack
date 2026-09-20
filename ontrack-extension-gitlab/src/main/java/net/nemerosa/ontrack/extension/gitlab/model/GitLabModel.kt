@@ -252,3 +252,81 @@ data class GitLabCompare(
     val compare_timeout: Boolean = false,
     val compare_same_ref: Boolean = false,
 )
+
+/**
+ * A pipeline, as `POST /projects/:id/pipeline` and `GET /projects/:id/pipelines/:pipeline_id` return it.
+ *
+ * [id] is the identifier of the pipeline **in the instance** and is the one every pipeline endpoint takes;
+ * [iid] is its number inside the project, which is what GitLab's own UI displays. Both are exposed, because
+ * a user reading a notification recognises the `iid` while anything calling back into the API needs the `id`.
+ *
+ * [status] is not turned into an enum: GitLab keeps adding to the list - `waiting_for_resource` and
+ * `canceling` are both recent - and a value nobody knows must still be reportable. See [completed].
+ */
+@JsonIgnoreProperties(ignoreUnknown = true)
+data class GitLabPipeline(
+    val id: Long = 0,
+    val iid: Long = 0,
+    val project_id: Long = 0,
+    val ref: String? = null,
+    val sha: String? = null,
+    val status: String = "",
+    val source: String? = null,
+    val web_url: String? = null,
+) {
+    /**
+     * Is the pipeline over?
+     *
+     * Read from [GitLabPipelineStatuses.isCompleted], which lists the statuses which are **not** over rather
+     * than the ones which are.
+     */
+    val completed: Boolean get() = GitLabPipelineStatuses.isCompleted(status)
+}
+
+/**
+ * What a pipeline's `status` means to a caller waiting for it.
+ *
+ * Only the **in-flight** statuses are listed, and anything else counts as completed. The reasoning is
+ * [GitLabMergeability]'s: GitLab invents new statuses, and a caller which does not recognise one is better
+ * off reporting it than waiting out its whole timeout on it.
+ */
+object GitLabPipelineStatuses {
+
+    /**
+     * The status of a pipeline which completed successfully. Everything else which is completed is a failure
+     * of one kind or another - `failed`, `canceled`, `skipped`, or `manual` for a pipeline waiting on a
+     * manual job which is never going to be run by Yontrack.
+     */
+    const val SUCCESS = "success"
+
+    /**
+     * Statuses of a pipeline which is still going to move on its own.
+     *
+     * The five the GitLab documentation calls "in progress" - `created`, `waiting_for_resource`, `preparing`,
+     * `pending` and `running` - plus `scheduled`, for a delayed pipeline, and `canceling`, which is a
+     * cancellation in progress and does reach `canceled`.
+     */
+    val IN_FLIGHT: Set<String> = setOf(
+        "created",
+        "waiting_for_resource",
+        "preparing",
+        "pending",
+        "running",
+        "scheduled",
+        "canceling",
+    )
+
+    /**
+     * A blank status is taken as in flight: it is only ever seen on a partial answer, and polling once more
+     * is the safe reading of "not known".
+     */
+    fun isCompleted(status: String?): Boolean = when {
+        status.isNullOrBlank() -> false
+        else -> status !in IN_FLIGHT
+    }
+
+    /**
+     * Did the pipeline complete successfully?
+     */
+    fun isSuccessful(status: String?): Boolean = status == SUCCESS
+}

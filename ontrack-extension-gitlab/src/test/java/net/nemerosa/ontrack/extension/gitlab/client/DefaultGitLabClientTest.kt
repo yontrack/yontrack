@@ -9,6 +9,7 @@ import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
 import org.springframework.test.web.client.MockRestServiceServer
 import org.hamcrest.Matchers
+import org.springframework.test.web.client.match.MockRestRequestMatchers.content
 import org.springframework.test.web.client.match.MockRestRequestMatchers.header
 import org.springframework.test.web.client.match.MockRestRequestMatchers.jsonPath
 import org.springframework.test.web.client.match.MockRestRequestMatchers.method
@@ -898,6 +899,112 @@ class DefaultGitLabClientTest {
         assertNull(client.getCommit("group/project", "nope"))
         server.verify()
     }
+
+    @Test
+    fun `Triggering a pipeline sends the ref and the variables as an array of hashes`() {
+        val client = client()
+        val server = MockRestServiceServer.bindTo(client.template).build()
+        server.expect(requestTo("https://gitlab.com/api/v4/projects/group%2Fsub%2Fproject/pipeline"))
+            .andExpect(method(HttpMethod.POST))
+            .andExpect(header(DefaultGitLabClient.PRIVATE_TOKEN_HEADER, "secret"))
+            .andExpect(
+                content().json(
+                    """
+                        {
+                            "ref": "main",
+                            "variables": [
+                                {"key": "VERSION", "value": "1.0.0"},
+                                {"key": "TARGET", "value": "prod"}
+                            ]
+                        }
+                    """.trimIndent(),
+                    true
+                )
+            )
+            .andRespond(withSuccess(pipelineJson(status = "created"), MediaType.APPLICATION_JSON))
+        val pipeline = client.triggerPipeline(
+            "group/sub/project",
+            "main",
+            linkedMapOf("VERSION" to "1.0.0", "TARGET" to "prod"),
+        )
+        assertEquals(61L, pipeline.id)
+        assertEquals(21L, pipeline.iid)
+        assertEquals("created", pipeline.status)
+        assertEquals(false, pipeline.completed)
+        server.verify()
+    }
+
+    @Test
+    fun `Triggering a pipeline without any variable sends an empty array`() {
+        val client = client()
+        val server = MockRestServiceServer.bindTo(client.template).build()
+        server.expect(requestTo("https://gitlab.com/api/v4/projects/group%2Fproject/pipeline"))
+            .andExpect(method(HttpMethod.POST))
+            .andExpect(content().json("""{"ref": "release/1.0", "variables": []}""", true))
+            .andRespond(withSuccess(pipelineJson(), MediaType.APPLICATION_JSON))
+        client.triggerPipeline("group/project", "release/1.0", emptyMap())
+        server.verify()
+    }
+
+    @Test
+    fun `The token never travels in the body of a pipeline trigger`() {
+        val client = client()
+        val server = MockRestServiceServer.bindTo(client.template).build()
+        server.expect(requestTo("https://gitlab.com/api/v4/projects/group%2Fproject/pipeline"))
+            .andExpect(header(DefaultGitLabClient.PRIVATE_TOKEN_HEADER, "secret"))
+            .andExpect(content().string(Matchers.not(Matchers.containsString("secret"))))
+            .andRespond(withSuccess(pipelineJson(), MediaType.APPLICATION_JSON))
+        client.triggerPipeline("group/project", "main", mapOf("VERSION" to "1.0.0"))
+        server.verify()
+    }
+
+    @Test
+    fun `A pipeline GitLab does not describe back is an error`() {
+        val client = client()
+        val server = MockRestServiceServer.bindTo(client.template).build()
+        server.expect(requestTo("https://gitlab.com/api/v4/projects/group%2Fproject/pipeline"))
+            .andRespond(withStatus(HttpStatus.CREATED))
+        assertThrows<GitLabCannotTriggerPipelineException> {
+            client.triggerPipeline("group/project", "main", emptyMap())
+        }
+        server.verify()
+    }
+
+    @Test
+    fun `Getting a pipeline by its instance id`() {
+        val client = client()
+        val server = MockRestServiceServer.bindTo(client.template).build()
+        server.expect(requestTo("https://gitlab.com/api/v4/projects/group%2Fproject/pipelines/61"))
+            .andExpect(method(HttpMethod.GET))
+            .andRespond(withSuccess(pipelineJson(status = "success"), MediaType.APPLICATION_JSON))
+        val pipeline = client.getPipeline("group/project", 61)
+        assertEquals("success", pipeline?.status)
+        assertEquals(true, pipeline?.completed)
+        server.verify()
+    }
+
+    @Test
+    fun `An unknown pipeline is null`() {
+        val client = client()
+        val server = MockRestServiceServer.bindTo(client.template).build()
+        server.expect(requestTo("https://gitlab.com/api/v4/projects/group%2Fproject/pipelines/999"))
+            .andRespond(withStatus(HttpStatus.NOT_FOUND))
+        assertNull(client.getPipeline("group/project", 999))
+        server.verify()
+    }
+
+    private fun pipelineJson(status: String = "pending") = """
+        {
+            "id": 61,
+            "iid": 21,
+            "project_id": 7,
+            "ref": "main",
+            "sha": "abcdef",
+            "status": "$status",
+            "source": "api",
+            "web_url": "https://gitlab.com/group/project/-/pipelines/61"
+        }
+    """.trimIndent()
 
     private fun branchJson(name: String, commitId: String) = """
         {

@@ -4,6 +4,7 @@ import net.nemerosa.ontrack.extension.gitlab.model.GitLabBranch
 import net.nemerosa.ontrack.extension.gitlab.model.GitLabCommit
 import net.nemerosa.ontrack.extension.gitlab.model.GitLabIssue
 import net.nemerosa.ontrack.extension.gitlab.model.GitLabMergeRequest
+import net.nemerosa.ontrack.extension.gitlab.model.GitLabPipeline
 import net.nemerosa.ontrack.extension.gitlab.model.GitLabProject
 import net.nemerosa.ontrack.extension.gitlab.model.GitLabUser
 
@@ -227,5 +228,39 @@ interface GitLabClient {
      * @return The commit, or `null` when there is no such commit
      */
     fun getCommit(project: String, commit: String): GitLabCommit?
+
+
+    /**
+     * Triggers a pipeline on a reference.
+     *
+     * `POST /projects/:id/pipeline` answers with the pipeline object, its [GitLabPipeline.id] included,
+     * **straight away** - unlike a GitHub workflow dispatch, which answers with nothing and has to be
+     * correlated afterwards.
+     *
+     * Pipeline **trigger tokens** (`POST /projects/:id/trigger/pipeline`) are deliberately not used: they
+     * would mean a second secret, per project, for a capability the configuration's own token already has.
+     *
+     * The token needs the **Developer** role on the project, or Maintainer when [ref] is a protected branch.
+     *
+     * @param project Full path of the project
+     * @param ref Branch or tag to run the pipeline on
+     * @param variables Variables to pass to the pipeline. They are sent as GitLab's array of hashes,
+     * `[{"key": "K", "value": "V"}]`, and are **not** masked: a secret belongs in a GitLab CI/CD variable of
+     * the project, not here.
+     * @return The pipeline GitLab created
+     */
+    fun triggerPipeline(project: String, ref: String, variables: Map<String, String>): GitLabPipeline
+
+    /**
+     * Gets a pipeline of a project.
+     *
+     * `GET /projects/:id/pipelines/:pipeline_id`
+     *
+     * @param project Full path of the project
+     * @param pipelineId Identifier of the pipeline **in the instance**, as [triggerPipeline] returns it -
+     * not the `iid` GitLab's UI displays
+     * @return The pipeline, or `null` when there is no such pipeline
+     */
+    fun getPipeline(project: String, pipelineId: Long): GitLabPipeline?
 
 }
