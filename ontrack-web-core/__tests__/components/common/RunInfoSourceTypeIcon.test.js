@@ -23,6 +23,11 @@ describe('RunInfoSourceTypeIcon', () => {
         expect(screen.getByRole('img', {name: 'Bitbucket Pipelines'})).toBeInTheDocument()
     })
 
+    it('renders the GitLab icon for the gitlab-pipeline source type', () => {
+        render(<RunInfoSourceTypeIcon type="gitlab-pipeline"/>)
+        expect(screen.getByRole('img', {name: 'GitLab CI/CD'})).toBeInTheDocument()
+    })
+
     it('renders nothing for an unknown source type', () => {
         const {container} = render(<RunInfoSourceTypeIcon type="something-else"/>)
         expect(container).toBeEmptyDOMElement()

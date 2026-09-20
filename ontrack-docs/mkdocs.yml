@@ -64,6 +64,7 @@ nav:
       - Feeding:
           - content/start/feeding.md
           - GitHub: content/start/feeding/github.md
+          - GitLab: content/start/feeding/gitlab.md
           - Jenkins: content/start/feeding/jenkins.md
   - Mobile UI: content/mobile/index.md
   - Security:
@@ -127,6 +128,7 @@ nav:
           - CI Engines:
               - content/reference/ci-config/ci-engines/index.md
               - Bitbucket Pipelines: content/reference/ci-config/ci-engines/bitbucket-pipelines.md
+              - GitLab CI: content/reference/ci-config/ci-engines/gitlab-ci.md
           - SCM Engines:
               - content/reference/ci-config/scm-engines/index.md
               - GitHub: content/reference/ci-config/scm-engines/github.md

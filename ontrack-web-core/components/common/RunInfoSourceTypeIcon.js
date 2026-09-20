@@ -1,4 +1,4 @@
-import {FaBitbucket, FaGithub, FaJenkins} from "react-icons/fa";
+import {FaBitbucket, FaGithub, FaGitlab, FaJenkins} from "react-icons/fa";
 
 /**
  * The icons name themselves with `aria-label` rather than react-icons' `title`: an SVG <title>
@@ -19,6 +19,10 @@ export default function RunInfoSourceTypeIcon({type}) {
             {
                 // `bitbucket-pipeline` is what the CLI sends from Bitbucket Pipelines.
                 type === 'bitbucket-pipeline' && <FaBitbucket role="img" aria-label="Bitbucket Pipelines"/>
+            }
+            {
+                // `gitlab-pipeline` is what the CLI sends from GitLab CI/CD.
+                type === 'gitlab-pipeline' && <FaGitlab role="img" aria-label="GitLab CI/CD"/>
             }
         </>
     )
