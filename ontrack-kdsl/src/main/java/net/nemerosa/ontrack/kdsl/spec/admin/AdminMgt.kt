@@ -8,7 +8,6 @@ import net.nemerosa.ontrack.kdsl.connector.graphql.schema.CreateUserMutation
 import net.nemerosa.ontrack.kdsl.connector.graphql.schema.GrantGlobalRoleToAccountMutation
 import net.nemerosa.ontrack.kdsl.connector.graphqlConnector
 import net.nemerosa.ontrack.kdsl.connector.parse
-import java.net.URLEncoder
 
 /**
  * Admin interface to Ontrack.
@@ -22,7 +21,13 @@ class AdminMgt(connector: Connector) : Connected(connector) {
      * @param count Number of entries to return
      */
     fun logEntries(text: String = "", count: Int = 1): List<LogEntry> =
-        connector.get("/rest/admin/logs?count=$count&text=${URLEncoder.encode(text, "UTF-8")}")
+        connector.get(
+            path = "/rest/admin/logs",
+            query = mapOf(
+                "count" to count.toString(),
+                "text" to text,
+            ),
+        )
             .body
             .parse<LogEntries>()
             .resources
