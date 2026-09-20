@@ -11,6 +11,7 @@ dependencies {
     implementation(project(":ontrack-extension-casc"))
     implementation(project(":ontrack-extension-config"))
     implementation(project(":ontrack-extension-notifications"))
+    implementation(project(":ontrack-extension-auto-versioning"))
 
     testImplementation(project(":ontrack-test-utils"))
     testImplementation(project(":ontrack-extension-jenkins"))

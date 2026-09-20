@@ -99,6 +99,7 @@ nav:
           - Jenkins post-processing: content/integrations/auto-versioning/jenkins.md
           - GitHub post-processing: content/integrations/auto-versioning/github.md
           - Bitbucket Cloud post-processing: content/integrations/auto-versioning/bitbucket-cloud.md
+          - GitLab post-processing: content/integrations/auto-versioning/gitlab.md
       - Changelogs: content/integrations/changelogs/changelogs.md
       - Workflows: content/integrations/workflows/workflows.md
       - Environments: content/integrations/environments/environments.md

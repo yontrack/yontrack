@@ -653,6 +653,7 @@ Three post-processing mechanisms are supported:
 * [Jenkins pipeline](jenkins.md) — `postProcessing: jenkins`
 * [GitHub Actions workflow](github.md) — `postProcessing: github`
 * [Bitbucket pipeline](bitbucket-cloud.md) — `postProcessing: bitbucket-cloud`
+* [GitLab pipeline](gitlab.md) — `postProcessing: gitlab`
 
 Post-processing runs on the [upgrade branch](#the-upgrade-branch), after all paths (default & additional) have been
 updated, and before the change lands on the target branch.
