@@ -1,8 +1,16 @@
 name: Demo smoke
 
-# Verifies the demo deployment and reports DEMO.SMOKE on the build that was deployed.
+# Verifies a deployment and reports DEMO.SMOKE on the build that was deployed.
 #
-# Dispatched by the demo slot's RUNNING workflow through the `github-workflow` notification
+# Two instances go through it, chosen by the `target` input: the public demo, deployed from
+# `main`, and v6.dev.yontrack.com, deployed from the next-major branch (see
+# doc/dev-guide/major-branch.md). Everything below is the same for both except the URL, the
+# credentials and the concurrency group, each marked where it differs.
+#
+# On v6 the seed is the point rather than the verification: the environment has no data of its
+# own, and this is what provisions it on every deployment.
+#
+# Dispatched by the slot's RUNNING workflow through the `github-workflow` notification
 # channel - see .yontrack/ci.yaml - once the slot has marked the deployment done. That moment
 # is when the gitops PR merged, which is well before ArgoCD has synced and the pods are
 # serving, so the first thing this workflow does is wait for the version it was told about to
@@ -31,9 +39,20 @@ on:
         default: manual
         type: string
       version:
-        description: 'Version deployed to the demo (e.g. 5.3.0-rc-41), which the demo must report'
+        description: 'Version deployed (e.g. 5.3.0-rc-41), which the instance must report'
         required: true
         type: string
+      # The instance to verify. Everything that is per-instance - URL, API token, UI
+      # credentials, concurrency group - is resolved from this one value, so that the two
+      # targets cannot drift apart into two workflows.
+      target:
+        description: 'Instance to verify'
+        required: false
+        default: demo
+        type: choice
+        options:
+          - demo
+          - v6
       project:
         description: 'Yontrack project holding the build'
         required: false
@@ -42,19 +61,26 @@ on:
       branch:
         description: 'Yontrack branch holding the build'
         required: false
+        # `main` suits the demo, which is the default target. A v6 dispatch passes `v6`.
         default: main
         type: string
 
-# One thing at a time on the demo, and queue rather than cancel: the seed wipes the instance, so
+# One thing at a time on a given instance, and queue rather than cancel: the seed wipes it, so
 # two overlapping runs would reset it under each other's feet.
 #
-# The group is `demo-instance` rather than `demo-smoke` because it is shared with
+# Per target, and that is the point: a v6 run has no reason to queue behind a demo run. The
+# demo's group is `demo-instance` rather than `demo-smoke` because it is shared with
 # .github/workflows/dast-passive.yml (#1765): the passive DAST scan crawls the demo for minutes,
 # and a reset starting underneath it would have the scanner walking an instance that is being
 # deleted around it - which reads as a broken scan, or worse as a clean one. Anything else that
-# touches the demo joins this group too.
+# touches the demo joins that group too. Nothing scans v6, so `v6-instance` has only this
+# workflow in it today.
+#
+# `github.event.inputs` rather than `inputs`: the `inputs` context is not available to
+# `concurrency`, and an unresolved expression here would silently collapse both targets into one
+# group.
 concurrency:
-  group: demo-instance
+  group: ${{ github.event.inputs.target == 'v6' && 'v6-instance' || 'demo-instance' }}
   cancel-in-progress: false
 
 permissions:
@@ -62,10 +88,14 @@ permissions:
 
 env:
   YONTRACK_CLI_VERSION: '5.2.0'
-  # The demo, not the Yontrack instance the validation is reported to. Everything the smoke
-  # test asks of it goes through /graphql: the chart's ingress routes only /graphql and /hook
-  # to the backend, so /rest/* lands on the Next UI and answers 404.
-  DEMO_URL: ${{ vars.DEMO_URL || 'https://demo.dev.yontrack.com' }}
+  TARGET: ${{ inputs.target }}
+  # The instance under test, not the Yontrack instance the validation is reported to. Everything
+  # the smoke test asks of it goes through /graphql: the chart's ingress routes only /graphql and
+  # /hook to the backend, so /rest/* lands on the Next UI and answers 404.
+  #
+  # The `vars.*` overrides exist so an instance can be repointed without a commit. The literals
+  # are the deployed hostnames.
+  DEMO_URL: ${{ inputs.target == 'v6' && (vars.V6_URL || 'https://v6.dev.yontrack.com') || (vars.DEMO_URL || 'https://demo.dev.yontrack.com') }}
   DEMO_SEEDED_PROJECT: petclinic
   DEMO_PROJECT: ${{ inputs.project }}
   DEMO_BRANCH: ${{ inputs.branch }}
@@ -73,9 +103,23 @@ env:
 
 jobs:
   smoke:
-    name: Smoke-test the demo
+    name: Smoke-test ${{ inputs.target }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    # The target's own credentials, resolved once and mapped onto the DEMO_* names the script and
+    # the Playwright spec read. Two instances, two databases, two Keycloak realms: nothing is
+    # shared, and a v6 run authenticating with the demo's token would simply be refused.
+    #
+    # Here rather than in the workflow-level `env` above, which is the natural home for the rest:
+    # the `secrets` context is not available to that one.
+    #
+    # An absent secret is an empty string, which is falsy, so a missing `V6_TOKEN` would fall
+    # through to the demo's. That would not touch the demo - DEMO_URL is already v6's - but it
+    # would fail deep inside the poll. `Check the target's credentials` below stops it at the door.
+    env:
+      TARGET_TOKEN: ${{ inputs.target == 'v6' && secrets.V6_TOKEN || secrets.DEMO_TOKEN }}
+      TARGET_USERNAME: ${{ inputs.target == 'v6' && secrets.V6_USERNAME || secrets.DEMO_USERNAME }}
+      TARGET_PASSWORD: ${{ inputs.target == 'v6' && secrets.V6_PASSWORD || secrets.DEMO_PASSWORD }}
     steps:
       # The run time reported for the validation is measured from here.
       - name: Record the job start
@@ -95,6 +139,26 @@ jobs:
           name: inputs-${{ inputs.id }}.properties
           path: inputs.properties
           if-no-files-found: error
+
+      # After the correlation artifact and before anything that talks to the instance. Not
+      # earlier: a run that dies before the artifact exists is a run Yontrack cannot find, and
+      # the promotion's workflow then reports "no run" instead of the real reason.
+      #
+      # A missing secret otherwise surfaces deep inside the poll, where it reads as a broken
+      # deployment rather than as an unconfigured target.
+      - name: Check the target's credentials
+        run: |
+          set -euo pipefail
+          missing=""
+          for name in TARGET_TOKEN TARGET_USERNAME TARGET_PASSWORD; do
+            [ -n "${!name:-}" ] || missing="$missing $name"
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::Target '$TARGET' has no credentials configured:$missing." \
+                 "See doc/dev-guide/demo-smoke.md."
+            exit 1
+          fi
+          echo "Target '$TARGET' at $DEMO_URL"
 
       # The seed builds one project out of the commits since the last release tag, so it needs
       # tags and history. Without this it degrades quietly to an empty changelog project.
@@ -126,7 +190,7 @@ jobs:
       # The slot workflow can only pass the version: `${build}` renders the display name, which
       # is the release property, and no templating source exposes the raw name. Resolved first,
       # and outside the smoke steps, so that a failure here reads as "Yontrack does not know
-      # this version" rather than as a broken demo.
+      # this version" rather than as a broken deployment.
       - name: Resolve the build
         id: resolve
         run: scripts/demo-smoke.sh resolve
@@ -138,7 +202,7 @@ jobs:
       - name: Wait for the deployed version
         id: poll
         env:
-          DEMO_TOKEN: ${{ secrets.DEMO_TOKEN }}
+          DEMO_TOKEN: ${{ env.TARGET_TOKEN }}
           DEMO_POLL_TIMEOUT: '600'
         run: scripts/demo-smoke.sh poll
 
@@ -156,13 +220,13 @@ jobs:
       - name: Build the seed program
         run: ./gradlew :ontrack-demo-seed:installDist --console plain
 
-      - name: Reset and seed the demo
+      - name: Reset and seed the instance
         id: seed
         env:
-          # The seed talks to the demo, not to the Yontrack instance the CLI is configured
-          # against. Scoped to this step for that reason.
+          # The seed talks to the instance under test, not to the Yontrack instance the CLI is
+          # configured against. Scoped to this step for that reason.
           YONTRACK_URL: ${{ env.DEMO_URL }}
-          YONTRACK_TOKEN: ${{ secrets.DEMO_TOKEN }}
+          YONTRACK_TOKEN: ${{ env.TARGET_TOKEN }}
         run: ontrack-demo-seed/build/install/ontrack-demo-seed/bin/ontrack-demo-seed
 
       # ------------------------------------------------------------------------------------
@@ -174,16 +238,21 @@ jobs:
       # reset onwards `scan-project` would have no project at all and the cross-project
       # authorization scan would test nothing (issue #1768).
       #
-      # `reloadCasc` over /graphql is the only remote reload that reaches the demo: the REST
+      # `reloadCasc` over /graphql is the only remote reload that reaches the instance: the REST
       # reload and upload endpoints are not routed by the chart's ingress. It is declarative
-      # and therefore idempotent, which it has to be - this runs on every main BRONZE
-      # deployment. The canonical declaration is security/dast/casc.yaml.
+      # and therefore idempotent, which it has to be - this runs on every BRONZE deployment.
+      # The canonical declaration of the scanner roles is security/dast/casc.yaml.
+      #
+      # Runs on every target, and nothing here is demo-specific: the mutation re-applies
+      # whatever CasC the *instance* carries, not a file sent from here, so on v6 it restores
+      # v6's own declaration after the seed. The project-role assertion that follows it passes
+      # on an instance that declares no DAST group at all - see dsm_casc_project_role.
       # ------------------------------------------------------------------------------------
 
       - name: Re-apply the CasC and check the scanner's project role
         id: casc
         env:
-          DEMO_TOKEN: ${{ secrets.DEMO_TOKEN }}
+          DEMO_TOKEN: ${{ env.TARGET_TOKEN }}
         run: scripts/demo-smoke.sh casc
 
       # ------------------------------------------------------------------------------------
@@ -193,7 +262,7 @@ jobs:
       - name: Check the seeded dataset over GraphQL
         id: assert
         env:
-          DEMO_TOKEN: ${{ secrets.DEMO_TOKEN }}
+          DEMO_TOKEN: ${{ env.TARGET_TOKEN }}
         run: scripts/demo-smoke.sh assert
 
       - uses: actions/setup-node@v7
@@ -215,8 +284,8 @@ jobs:
         id: playwright
         working-directory: ontrack-web-tests
         env:
-          DEMO_USERNAME: ${{ secrets.DEMO_USERNAME }}
-          DEMO_PASSWORD: ${{ secrets.DEMO_PASSWORD }}
+          DEMO_USERNAME: ${{ env.TARGET_USERNAME }}
+          DEMO_PASSWORD: ${{ env.TARGET_PASSWORD }}
         run: npm run test-demo
 
       - name: Upload the Playwright report
@@ -234,9 +303,9 @@ jobs:
       # 5. Report, whatever happened.
       # ------------------------------------------------------------------------------------
 
-      # `!cancelled()` and not `success()`: a demo that never came up must land a FAILED
+      # `!cancelled()` and not `success()`: an instance that never came up must land a FAILED
       # DEMO.SMOKE on the build rather than leave the stamp absent, which is indistinguishable
-      # from "not deployed yet" and is how a broken demo times out silently.
+      # from "not deployed yet" and is how a broken deployment times out silently.
       - name: Validate DEMO.SMOKE
         if: ${{ !cancelled() && steps.resolve.outputs.build != '' }}
         env:
@@ -261,11 +330,11 @@ jobs:
             status=FAILED
           fi
           {
-            echo "### Demo smoke \`$DEMO_VERSION\` - \`$status\`"
+            echo "### Smoke \`$TARGET\` \`$DEMO_VERSION\` - \`$status\`"
             echo
             echo "| Step | Outcome |"
             echo "|---|---|"
-            echo "| Version \`$DEMO_VERSION\` answering | ${POLL:-skipped} |"
+            echo "| Version \`$DEMO_VERSION\` answering at $DEMO_URL | ${POLL:-skipped} |"
             echo "| Reset and seed | ${SEED:-skipped} |"
             echo "| CasC re-applied, scanner project role back | ${CASC:-skipped} |"
             echo "| Seeded dataset over GraphQL | ${ASSERT:-skipped} |"

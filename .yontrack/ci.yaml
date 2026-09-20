@@ -424,13 +424,14 @@ configuration:
         slots:
           - project: yontrack
             environments:
-              # The next-major slot. Same shape as the demo slot below - admitted on BRONZE,
-              # deployed immediately, auto-versioned into the gitops repository - with the smoke
-              # node left out: demo-smoke.yml resets and re-seeds the demo's data, and v6 is a
-              # development environment whose data is left as it is. Nothing reports DEMO.SMOKE on
-              # a v6 build, and nothing on v6 asks for it: the `^main$` block under
-              # `custom.configs` is what adds DEMO.SMOKE to SILVER, so on v6 SILVER keeps the
-              # default's weaker meaning, "the build is green". See doc/dev-guide/major-branch.md.
+              # The next-major slot. The demo slot below, for another instance: admitted on
+              # BRONZE, deployed immediately, auto-versioned into the gitops repository, then
+              # smoke-tested by the same workflow. See doc/dev-guide/major-branch.md.
+              #
+              # The smoke test is what provisions the environment's data: v6 has no data of its
+              # own, and demo-smoke.yml's reset-and-seed is what puts some there on every
+              # deployment. Verification comes with it, so the `^v6$` block under `custom.configs`
+              # adds DEMO.SMOKE to SILVER exactly as the `^main$` one does.
               - name: v6.dev.yontrack.com
                 admissionRules:
                   # Anchored: the eligible-builds query uses PostgreSQL's unanchored `~`, so a bare
@@ -486,6 +487,41 @@ configuration:
                         data: {}
                         parents:
                           - id: "auto-versioning"
+                      # As on the demo slot: "deployed" means the gitops PR merged, not that the
+                      # pods are serving, and demo-smoke.yml closes that gap by polling until the
+                      # version it is given is the version answering.
+                      #
+                      # Three inputs rather than the demo's one. `target` picks the instance -
+                      # its URL and its credentials - and `branch` has to be spelled out because
+                      # the workflow's own default is `main`; leaving it out would have the run
+                      # look for a v6 version on main's branch and fail to resolve the build.
+                      # `project` keeps the default, `yontrack`.
+                      #
+                      # `reference: v6`, not `main`: the run checks out the ref it is dispatched
+                      # on, and the seed program and the Playwright spec it then builds should be
+                      # the ones belonging to the code under test. The workflow file itself is the
+                      # same on both branches - v6 takes it from main like everything else.
+                      - id: "smoke"
+                        description: "Seeding and smoke-testing the v6 deployment"
+                        parents:
+                          - id: "deploy"
+                        executorId: "notification"
+                        data:
+                          channel: "github-workflow"
+                          channelConfig:
+                            config: github.com
+                            owner: yontrack
+                            repository: yontrack
+                            workflowId: demo-smoke.yml
+                            reference: v6
+                            callMode: ASYNC
+                            inputs:
+                              - name: version
+                                value: "${build.release}"
+                              - name: target
+                                value: "v6"
+                              - name: branch
+                                value: "v6"
               - name: demo.dev.yontrack.com
                 admissionRules:
                   - name: "branchPattern"
@@ -749,26 +785,30 @@ configuration:
                     - name: version
                       value: "${build.release}"
 
-      # SILVER on the next-major branch: like a release branch, the default's text - "deployed to
-      # the demo", "has passed its smoke tests", the demo URL - is false on all three counts, and
-      # for the same reason: a v6 build never goes near the demo. It goes to v6.dev.yontrack.com,
-      # and it is not smoke-tested there.
+      # SILVER on the next-major branch, and it means what it means on main: the build is
+      # deployed to its environment and verified there. The v6 slot deploys on BRONZE and
+      # dispatches demo-smoke.yml against v6.dev.yontrack.com, so DEMO.SMOKE is added here for
+      # the same reason the `^main$` block adds it - and, as there, only the branch that can
+      # satisfy it declares it. The defaults carry the weakest form (#1702).
       #
-      # Same mechanism as the `^release/.*$` block below: `NotificationsCIConfigExtension.mergeConfig`
-      # matches subscriptions by name, so a same-named `On SILVER` REPLACES the default's rather
-      # than adding a second one. The name has to stay in step with the default's above.
+      # The message is replaced rather than added to: the default's text names the demo and its
+      # URL, which is the wrong instance here. Same mechanism as the `^release/.*$` block below -
+      # `NotificationsCIConfigExtension.mergeConfig` matches subscriptions by name, so a
+      # same-named `On SILVER` REPLACES the default's. The name has to stay in step with it.
       #
-      # Nothing else is added here. SILVER keeps the defaults' weaker meaning on v6 - BRONZE alone,
-      # "the build is green" - because only the `^main$` block adds DEMO.SMOKE, and there is no
-      # smoke test on v6 to add. GOLD stays the human gate, so nothing releases itself off v6
-      # either. See doc/dev-guide/major-branch.md.
+      # GOLD stays the human gate, so nothing releases itself off v6 either.
+      # See doc/dev-guide/major-branch.md.
       #
-      # Scoped to `^v6$` and not to `^v\d+$` as the versioning rules are: the message names an
+      # Scoped to `^v6$` and not to `^v\d+$` as the versioning rules are: this names an
       # environment, and a future `v7` would need its own environment and its own message anyway.
       - conditions:
           - name: branch
             config: '^v6$'
         branch:
+          promotions:
+            SILVER:
+              validations:
+                - DEMO.SMOKE
           notificationsConfig:
             notifications:
               - name: On SILVER
@@ -780,7 +820,7 @@ configuration:
                   channel: '#notifications'
                   type: 'SUCCESS'
                 contentTemplate: |
-                  ${build} is green on ${branch} and deployed.
+                  ${build} is deployed to v6 and has passed its smoke tests.
 
                   Environment: https://v6.dev.yontrack.com
 
