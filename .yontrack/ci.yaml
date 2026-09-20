@@ -403,6 +403,15 @@ configuration:
     project:
       environments:
         environments:
+          # The next major in development. Fed by the `v6` branch alone, which is a second `main`
+          # with a VERSION file of its own - see doc/dev-guide/major-branch.md. Ordered before the
+          # demo because it carries the least mature code of the three, and tagged `release` like
+          # the others so that it shows up in the same environment matrix.
+          - name: v6.dev.yontrack.com
+            description: Next major in development, running the last BRONZE build on v6
+            order: 20
+            tags:
+              - release
           - name: demo.dev.yontrack.com
             description: Public demo, running the last BRONZE build on main
             order: 50
@@ -415,6 +424,68 @@ configuration:
         slots:
           - project: yontrack
             environments:
+              # The next-major slot. Same shape as the demo slot below - admitted on BRONZE,
+              # deployed immediately, auto-versioned into the gitops repository - with the smoke
+              # node left out: demo-smoke.yml resets and re-seeds the demo's data, and v6 is a
+              # development environment whose data is left as it is. Nothing reports DEMO.SMOKE on
+              # a v6 build, and nothing on v6 asks for it: the `^main$` block under
+              # `custom.configs` is what adds DEMO.SMOKE to SILVER, so on v6 SILVER keeps the
+              # default's weaker meaning, "the build is green". See doc/dev-guide/major-branch.md.
+              - name: v6.dev.yontrack.com
+                admissionRules:
+                  # Anchored: the eligible-builds query uses PostgreSQL's unanchored `~`, so a bare
+                  # `v6` would also admit builds of `claude/v6-spring-boot-4` and friends. The
+                  # branch here is the YONTRACK branch name, which for `v6` is `v6`.
+                  - name: "branchPattern"
+                    ruleId: "branchPattern"
+                    ruleConfig:
+                      includes:
+                        - "^v6$"
+                      lastBranchOnly: true
+                  - name: "promotion"
+                    ruleId: "promotion"
+                    ruleConfig:
+                      promotion: "BRONZE"
+                workflows:
+                  # As on the demo slot: without a CANDIDATE workflow asking for the deployment to
+                  # start, the pipeline sits as a candidate and the RUNNING workflow never fires.
+                  - trigger: "CANDIDATE"
+                    name: "Starting the deployment"
+                    nodes:
+                      - id: "deploying"
+                        description: "Moving the pipeline to running"
+                        executorId: "slot-pipeline-deploying"
+                        data: {}
+                  - trigger: "RUNNING"
+                    name: "Deploying"
+                    nodes:
+                      - id: "auto-versioning"
+                        description: "Updating version"
+                        executorId: "auto-versioning"
+                        data:
+                          targetProject: "yontrack-infra-gitops"
+                          targetBranch: "main"
+                          targetPath: "yontrack-helmfile.d/values/yontrack-v6/yontrack.yaml"
+                          targetPropertyType: "yaml-path"
+                          targetProperty: "image.tag"
+                          # The `release` property, which ci.yml sets on every build, is the
+                          # version - `6.0.0-rc-12` on v6, since the branch versions like main -
+                          # and that IS the durable GHCR tag. Same reasoning as the demo and self
+                          # slots, see #1660 and #1661.
+                          targetVersion: "${build.release}"
+                          autoApproval: true
+                          prTitleTemplate: "Deploying ${sourceProject} version ${VERSION} to v6"
+                          prBodyTemplateFormat: "markdown"
+                          prBodyTemplate: |
+                            Deployment of ${sourceProject} version ${VERSION} to the v6 environment.
+
+                            ${av.semanticChangelog?issues=true&emojis=true}
+                      - id: "deploy"
+                        description: "Marking the deployment as finished"
+                        executorId: "slot-pipeline-deployed"
+                        data: {}
+                        parents:
+                          - id: "auto-versioning"
               - name: demo.dev.yontrack.com
                 admissionRules:
                   - name: "branchPattern"
@@ -677,6 +748,43 @@ configuration:
                   inputs:
                     - name: version
                       value: "${build.release}"
+
+      # SILVER on the next-major branch: like a release branch, the default's text - "deployed to
+      # the demo", "has passed its smoke tests", the demo URL - is false on all three counts, and
+      # for the same reason: a v6 build never goes near the demo. It goes to v6.dev.yontrack.com,
+      # and it is not smoke-tested there.
+      #
+      # Same mechanism as the `^release/.*$` block below: `NotificationsCIConfigExtension.mergeConfig`
+      # matches subscriptions by name, so a same-named `On SILVER` REPLACES the default's rather
+      # than adding a second one. The name has to stay in step with the default's above.
+      #
+      # Nothing else is added here. SILVER keeps the defaults' weaker meaning on v6 - BRONZE alone,
+      # "the build is green" - because only the `^main$` block adds DEMO.SMOKE, and there is no
+      # smoke test on v6 to add. GOLD stays the human gate, so nothing releases itself off v6
+      # either. See doc/dev-guide/major-branch.md.
+      #
+      # Scoped to `^v6$` and not to `^v\d+$` as the versioning rules are: the message names an
+      # environment, and a future `v7` would need its own environment and its own message anyway.
+      - conditions:
+          - name: branch
+            config: '^v6$'
+        branch:
+          notificationsConfig:
+            notifications:
+              - name: On SILVER
+                promotion: SILVER
+                events:
+                  - new_promotion_run
+                channel: slack
+                channelConfig:
+                  channel: '#notifications'
+                  type: 'SUCCESS'
+                contentTemplate: |
+                  ${build} is green on ${branch} and deployed.
+
+                  Environment: https://v6.dev.yontrack.com
+
+                  ${promotionRun.semanticChangelog?issues=true&emojis=true}
 
       # SILVER on a release branch: the same promotion means something else, so it says something
       # else. The default's text - "deployed to the demo", "has passed its smoke tests", a demo

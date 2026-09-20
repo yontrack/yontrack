@@ -37,9 +37,10 @@ on:
         description: Skipping integration tests for GitLab
         type: boolean
         default: true
-      # Coverage is collected on main and release/* only (#1821). This forces it on for a run
-      # started by hand, which is the only way to exercise the whole chain -- five test jobs, the
-      # artefacts and the report job - from a working branch before it is merged.
+      # Coverage is collected on main, release/* and the next-major branch only (#1821). This
+      # forces it on for a run started by hand, which is the only way to exercise the whole chain
+      # -- five test jobs, the artefacts and the report job - from a working branch before it is
+      # merged.
       COVERAGE:
         description: Collecting test coverage on this branch too
         type: boolean
@@ -213,10 +214,11 @@ jobs:
             full_run=true
           fi
 
-          # Test coverage (#1821) is collected on the push builds of `main` and `release/*` only —
-          # the ones CI registers in Yontrack and records the COVERAGE.* stamps on. `full_run` is
-          # not that gate: it is true on any non-Dependabot push, working branches included, so
-          # keying coverage off it would instrument every branch build for figures nobody reads.
+          # Test coverage (#1821) is collected on the push builds of `main`, `release/*` and the
+          # next-major branch `v<major>` only — the ones CI registers in Yontrack and records the
+          # COVERAGE.* stamps on. `full_run` is not that gate: it is true on any non-Dependabot
+          # push, working branches included, so keying coverage off it would instrument every
+          # branch build for figures nobody reads.
           #
           # The workflow_dispatch input forces it on, which is how the whole chain is exercised
           # from a working branch before it is merged.
@@ -224,6 +226,7 @@ jobs:
           if [ "$full_run" = "true" ]; then
             case "$REF" in
               refs/heads/main|refs/heads/release/*) coverage=true ;;
+              refs/heads/v[0-9]|refs/heads/v[0-9][0-9]) coverage=true ;;
             esac
             if [ "$EVENT_NAME" = "workflow_dispatch" ] && [ "$IN_COVERAGE" = "true" ]; then
               coverage=true
@@ -263,8 +266,14 @@ jobs:
           # the same pipeline and are published by release.yml just as main's are, so their GHCR
           # tags need the same `-rc-<run>` suffix to keep from colliding with a published version.
           # See doc/dev-guide/patch-release.md.
+          #
+          # `v<major>` is the development branch of the next major - a second `main`, with its own
+          # VERSION file, its own promotion chain and its own environment - so it produces release
+          # candidates just as main does. See doc/dev-guide/major-branch.md. Two patterns rather
+          # than a regex because `case` globs cannot express `v[0-9]+`; `v6-spring-boot-4` is a
+          # feature branch and deliberately matches neither, exactly as in `VersionCalculator`.
           case "$BRANCH_NAME" in
-            main|release/*) VERSION="${BASE_VERSION}-rc-${RUN_NUMBER}" ;;
+            main|release/*|v[0-9]|v[0-9][0-9]) VERSION="${BASE_VERSION}-rc-${RUN_NUMBER}" ;;
           esac
 
           echo "base_version=$BASE_VERSION" >> "$GITHUB_OUTPUT"
@@ -563,9 +572,10 @@ jobs:
           # the gitops diff and the running pod — which is what lets a BRONZE rc build be
           # deployed to an environment at all.
           #
-          # This never collides across branches: on main and release/* the version carries the
-          # `-rc-<run_number>` suffix, on a release run it is the release itself, and on a
-          # feature branch VersionCalculator already appends the branch name and short commit.
+          # This never collides across branches: on main, release/* and the next-major branch the
+          # version carries the `-rc-<run_number>` suffix, on a release run it is the release
+          # itself, and on a feature branch VersionCalculator already appends the branch name and
+          # short commit.
           docker tag "nemerosa/ontrack:$BASE_VERSION" "$GHCR_ONTRACK:$VERSION"
           docker tag "nemerosa/ontrack-ui:$BASE_VERSION" "$GHCR_ONTRACK_UI:$VERSION"
           docker push "$GHCR_ONTRACK:$VERSION"

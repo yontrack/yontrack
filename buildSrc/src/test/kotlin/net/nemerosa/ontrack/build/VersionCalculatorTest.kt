@@ -178,6 +178,51 @@ class VersionCalculatorTest {
         assertEquals("5.3-claude-github-actions-pipeline-deadbee", version)
     }
 
+    // --- GITHUB_REF_NAME=v6 -> main versioning ---
+
+    /**
+     * The next-major development branch (`v6`) is a second `main`: its own VERSION file, its own
+     * promotion chain, its own environment. So it versions like `main` - from the VERSION file it
+     * carries and the tags of that major - and not like a feature branch.
+     */
+    @Test
+    fun `a major branch under GitHub Actions versions like main`() {
+        val version = calculator(
+            githubRefName = "v6",
+            gitBranch = "HEAD",
+            versionFile = "6.0",
+            tags = listOf("5.5.0", "5.5.1"),
+            shortCommit = "deadbee",
+        ).computeVersion()
+        assertEquals("6.0.0", version)
+    }
+
+    @Test
+    fun `a major branch takes the next patch of its own major`() {
+        val version = calculator(
+            githubRefName = "v6",
+            gitBranch = "HEAD",
+            versionFile = "6.0",
+            tags = listOf("6.0.0", "6.0.3", "5.5.9"),
+        ).computeVersion()
+        assertEquals("6.0.4", version)
+    }
+
+    /**
+     * Digits only, and a full match: a branch working *towards* the next major is still a feature
+     * branch, and must keep the feature version shape.
+     */
+    @Test
+    fun `a branch named after a major but with a suffix is a feature branch`() {
+        val version = calculator(
+            githubRefName = "v6-spring-boot-4",
+            gitBranch = "HEAD",
+            versionFile = "6.0",
+            shortCommit = "deadbee",
+        ).computeVersion()
+        assertEquals("6.0-v6-spring-boot-4-deadbee", version)
+    }
+
     // --- Feature branches ---
 
     @Test

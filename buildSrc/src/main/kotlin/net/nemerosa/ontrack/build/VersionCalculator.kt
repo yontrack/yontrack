@@ -27,7 +27,7 @@ internal class VersionCalculator(
     fun computeVersion(): String {
         val currentBranch = currentBranch()
         return when {
-            currentBranch == "main" -> computeMainVersion()
+            currentBranch == "main" || MAJOR_BRANCH.matches(currentBranch) -> computeMainVersion()
             currentBranch.startsWith("release/") -> computeReleaseVersion(currentBranch)
             else -> computeFeatureVersion(currentBranch)
         }
@@ -82,5 +82,21 @@ internal class VersionCalculator(
         val commitHash = gitShortCommit()
         val sanitizedBranch = branchName.replace(Regex("[^a-zA-Z0-9._-]"), "-")
         return "$targetVersion-$sanitizedBranch-$commitHash"
+    }
+
+    companion object {
+        /**
+         * A `v<major>` branch is the long-lived development branch of the next major - `v6` while
+         * `main` is still building 5.x. It is a second `main`, not a feature branch: it carries its
+         * own `VERSION` file (`6.0`), it is built and promoted like `main`, and it has a deployment
+         * environment of its own. So it takes the same versioning path, which reads that `VERSION`
+         * and the `6.0.<n>` tags.
+         *
+         * Anchored and digits-only on purpose: `v6` is a major branch, `v6-spring-boot-4` is a
+         * feature branch working towards it and must keep the feature version shape.
+         *
+         * See doc/dev-guide/major-branch.md.
+         */
+        private val MAJOR_BRANCH = Regex("v\\d+")
     }
 }

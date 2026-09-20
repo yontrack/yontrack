@@ -17,6 +17,7 @@
   * [Releasing](release.md) - GOLD publishes, RELEASE records that it did
   * [Patch releases](patch-release.md) - fixing the previous minor from a release/X.Y branch
   * [Minor cutover](minor-cutover.md) - moving main to the next minor and retiring the old release branch
+  * [Next-major branch](major-branch.md) - developing the next major on v6, and what the pipeline does differently there
 * Security
   * [Passive DAST scan](dast.md) - scanning the running demo with OWASP ZAP, reporting SECURITY.DAST
 * Workflows
