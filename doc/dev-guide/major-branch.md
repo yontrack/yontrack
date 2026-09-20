@@ -46,26 +46,21 @@ Same `ci.yml`, same `.yontrack/ci.yaml`, and the branch conditions do the rest.
 | Builds, tests, promotions to BRONZE | yes | yes |
 | Test coverage (`COVERAGE.*`) | yes | yes |
 | Deployed on BRONZE | demo.dev.yontrack.com | v6.dev.yontrack.com |
-| Demo smoke test (`DEMO.SMOKE`) | yes | **no** |
-| What SILVER means | deployed to the demo and verified there | the build is green and deployed |
+| Smoke-tested and seeded (`DEMO.SMOKE`) | yes | yes |
+| What SILVER means | deployed and verified | deployed and verified |
 | Real GitLab / Bitbucket pipeline tests | yes | **no** |
+| DAST scanned | yes | no — but the CasC reload runs on both |
 | Released by `release.yml` | yes | no — nobody grants GOLD on `v6` |
 
-Two of those are worth spelling out.
+One of those is worth spelling out. **No third-party pipeline tests:** the real GitLab and Bitbucket
+Cloud runs are scoped `^main$` and metered against free minutes in the fixture namespaces.
+Extending them to `v6` would roughly double that spend for no extra signal — they exercise
+integrations, not the code under change.
 
-**No smoke test.** `demo-smoke.yml` resets and re-seeds the demo's data as part of verifying it.
-`v6` is a development environment whose data is left as it is, so the slot's `RUNNING` workflow
-stops at the deployment: `auto-versioning`, then `slot-pipeline-deployed`, and no `smoke` node.
-
-Nothing then reports `DEMO.SMOKE` on a `v6` build, and nothing asks for it: only the `^main$`
-block in `.yontrack/ci.yaml` adds `DEMO.SMOKE` to SILVER, so on `v6` SILVER keeps the defaults'
-weaker meaning — BRONZE alone, "the build is green". This is the same inversion the release
-branches rely on, and for the same reason: `PromotionLevelConfiguration.merge` is additive only, so
-the defaults declare the weakest form and each branch kind adds what it can satisfy (#1702).
-
-**No third-party pipeline tests.** The real GitLab and Bitbucket Cloud runs are scoped `^main$` and
-metered against free minutes in the fixture namespaces. Extending them to `v6` would roughly double
-that spend for no extra signal — they exercise integrations, not the code under change.
+The DAST row needs no exception in the workflow. `reloadCasc` re-applies whatever CasC the
+*instance* carries, not a file sent from the runner, so on `v6` it restores `v6`'s own declaration
+after the seed; and the project-role assertion that follows passes on an instance that declares no
+DAST group at all.
 
 ## The environment
 
@@ -78,6 +73,31 @@ auto-approval. ArgoCD does the rest.
 The values file and everything below it — namespace, chart values, DNS, certificate, Keycloak
 client — live in `yontrack/yontrack-infra-gitops`, not here. **Until that side exists, the slot
 deploys into a PR that nothing consumes.**
+
+### Seeding it
+
+`v6` has no data of its own, and the seed is what gives it some. The slot's third node dispatches
+[demo-smoke.yml](../../.github/workflows/demo-smoke.yml) with `target: v6`, exactly as the demo slot
+dispatches it for itself: it polls until the deployed version is the version answering, resets and
+re-seeds the instance, asserts the seeded dataset over GraphQL, signs in through Keycloak, and
+reports `DEMO.SMOKE` on the build. **The environment's data is therefore a function of the build
+deployed, not an accumulation** — the same contract as the demo's.
+
+One workflow serves both instances, parameterised by `target`. It resolves that into the URL
+(`vars.V6_URL`, default `https://v6.dev.yontrack.com`), the credentials, and the concurrency group
+(`v6-instance`, so a v6 run never queues behind a demo run). It is dispatched with `reference: v6`
+so the seed program and the Playwright spec that run are the ones belonging to the code under test.
+
+**`v6` needs three repository secrets of its own**, and the workflow fails at the door with a named
+error until they exist:
+
+| Secret | What it is |
+|---|---|
+| `V6_TOKEN` | API token on the v6 instance — the seed deletes and recreates every project with it |
+| `V6_USERNAME` | Keycloak user the Playwright sign-in check uses |
+| `V6_PASSWORD` | its password |
+
+Nothing is shared with the demo: two instances, two databases, two Keycloak realms.
 
 ## Keeping `v6` in step
 

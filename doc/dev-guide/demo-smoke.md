@@ -1,20 +1,40 @@
 # Demo smoke test
 
-The demo slot marks itself deployed when the gitops PR merges. That is well before ArgoCD has
-synced and the pods are serving, so "deployed" on its own says nothing about whether the demo
+A slot marks itself deployed when the gitops PR merges. That is well before ArgoCD has
+synced and the pods are serving, so "deployed" on its own says nothing about whether the instance
 works. `.github/workflows/demo-smoke.yml` closes that gap and reports `DEMO.SMOKE` on the
 build.
 
 `SILVER` requires that stamp, on top of `BRONZE`, so a green run of this workflow is what
 promotes the build to `SILVER` - see [`SILVER`](#silver) below.
 
+## Two instances, one workflow
+
+The `target` input picks the instance: `demo` (the default) or `v6`, the next-major environment -
+see [the next-major branch](major-branch.md). Everything the workflow does is the same for both;
+only three things are resolved from `target`:
+
+| | `demo` | `v6` |
+|---|---|---|
+| URL | `vars.DEMO_URL`, default `https://demo.dev.yontrack.com` | `vars.V6_URL`, default `https://v6.dev.yontrack.com` |
+| Credentials | `secrets.DEMO_TOKEN` / `DEMO_USERNAME` / `DEMO_PASSWORD` | `secrets.V6_TOKEN` / `V6_USERNAME` / `V6_PASSWORD` |
+| Concurrency group | `demo-instance`, shared with the passive DAST scan | `v6-instance`, this workflow alone |
+
+Two instances, two databases, two Keycloak realms: nothing is shared. A missing secret is an
+empty string, so an unconfigured target would otherwise fall through to the demo's credentials
+and fail deep inside the poll; `Check the target's credentials` stops that at the door, right
+after the correlation artifact is published and before anything talks to the instance.
+
+On `v6` the seed is the point rather than the verification: the environment has no data of its
+own, and this workflow is what provisions it on every deployment.
+
 ## What it does
 
 | # | Step | Why |
 |---|------|-----|
 | 1 | Resolve the build the version names | `yontrack validate --build` takes the build *name*, and the slot can only pass the version |
-| 2 | Poll until the demo reports that version | The whole deployment contract: the version asked for is the version answering |
-| 3 | Reset and seed | The demo's state is a function of the build - see [Demo seed and reset](demo-seed.md) |
+| 2 | Poll until the instance reports that version | The whole deployment contract: the version asked for is the version answering |
+| 3 | Reset and seed | The instance's state is a function of the build - see [Demo seed and reset](demo-seed.md) |
 | 4 | Re-apply the CasC | The seed deleted the projects, and their permissions with them - see [Re-applying the CasC](#re-applying-the-casc) below |
 | 5 | Check the seeded dataset over GraphQL | The seed ran and left something behind |
 | 6 | Check the UI signs in and renders | Keycloak's realm, and the UI pod reaching the backend pod |
@@ -63,19 +83,25 @@ DAST CasC there and nothing to restore, and the step says so and passes.
 
 ## `SILVER`
 
-`.yontrack/ci.yaml` declares `SILVER` as `promotions: [BRONZE]` plus
-`validations: [DEMO.SMOKE]`. It needs no workflow node of its own, and nothing dispatches it:
+`.yontrack/ci.yaml` declares `SILVER` as `promotions: [BRONZE]` in its defaults, and adds
+`validations: [DEMO.SMOKE]` in the `^main$` and `^v6$` blocks - the branches that have an
+instance to be verified on. It needs no workflow node of its own, and nothing dispatches it:
 auto-promotion grants it as soon as both prerequisites hold, and `DEMO.SMOKE` is always the
 later of the two.
 
 ```
-BRONZE -> the demo slot admits the build -> deploy -> demo-smoke.yml -> DEMO.SMOKE -> SILVER
+BRONZE -> the slot admits the build -> deploy -> demo-smoke.yml -> DEMO.SMOKE -> SILVER
 ```
 
-So `BRONZE` means "the build is green" and `SILVER` means "it is running on the demo and was
-verified there" - which is what someone needs before deciding on `GOLD`. A Slack notification
-on `SILVER` to `#notifications` carries the demo URL and the version and says exactly that.
+So `BRONZE` means "the build is green" and `SILVER` means "it is running on its environment and
+was verified there" - which is what someone needs before deciding on `GOLD`. A Slack notification
+on `SILVER` to `#notifications` carries the instance's URL and the version and says exactly that.
 The `BRONZE` notification stays: knowing a build is green is useful on its own.
+
+A release branch is the exception: it is never deployed, so nothing adds `DEMO.SMOKE` there and
+`SILVER` keeps the defaults' weaker meaning, "the build is green" (#1702). The merge is additive
+only, which is why the defaults carry the weakest form and each branch kind adds what it can
+satisfy.
 
 Two things this does *not* do:
 
@@ -116,11 +142,18 @@ build to report against. It runs first, before any of the smoke steps, so that f
 
 ## Running it
 
-Dispatched by the demo slot's `RUNNING` workflow through the `github-workflow` notification
-channel (`.yontrack/ci.yaml`), which passes only the version. `project` and `branch` come from
-the workflow's own defaults, `yontrack` and `main`, which is what the slot is scoped to anyway.
+Dispatched by a slot's `RUNNING` workflow through the `github-workflow` notification channel
+(`.yontrack/ci.yaml`).
 
-It can also be dispatched by hand from the Actions tab with a version.
+The demo slot passes only the version: `project` and `branch` come from the workflow's own
+defaults, `yontrack` and `main`, which is what that slot is scoped to anyway.
+
+The v6 slot passes `version`, `target: v6` and `branch: v6` - the branch has to be spelled out
+because the default is `main`, and a v6 version would not resolve there. It also dispatches with
+`reference: v6` rather than `main`, so the seed program and the Playwright spec that run are the
+ones belonging to the code under test; the workflow file itself is the same on both branches.
+
+It can also be dispatched by hand from the Actions tab with a version and a target.
 
 ### The `id` input
 
@@ -147,6 +180,9 @@ See [the channel's documentation](../../ontrack-docs/docs/content/integrations/n
 | `vars.DEMO_URL` | The demo, defaulting to `https://demo.dev.yontrack.com` |
 | `secrets.DEMO_TOKEN` | API token on the demo - admin-level, since the seed deletes every project |
 | `secrets.DEMO_USERNAME`, `secrets.DEMO_PASSWORD` | Keycloak credentials the browser signs in with |
+| `vars.V6_URL` | The v6 instance, defaulting to `https://v6.dev.yontrack.com` |
+| `secrets.V6_TOKEN` | API token on it - admin-level, for the same reason |
+| `secrets.V6_USERNAME`, `secrets.V6_PASSWORD` | Its Keycloak credentials |
 
 ## The pieces
 
