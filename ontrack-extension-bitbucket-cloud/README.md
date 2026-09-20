@@ -16,6 +16,44 @@ The module has two kinds of tests:
 * **real** tests, annotated `@TestOnBitbucketCloud`, which run against a Bitbucket Cloud workspace dedicated to
   the tests. They are **skipped** when no credential is set.
 
+Real tests are split by what they cost, and the split is an annotation:
+
+| Kind                                                    | Annotation                        | Where they run                                                                     |
+|---------------------------------------------------------|-----------------------------------|-------------------------------------------------------------------------------------|
+| **API-only** — SCM, change log, pull requests           | `@TestOnBitbucketCloud`           | integration shard 5 of `.github/workflows/ci.yml`, skipped by default               |
+| **Pipeline** — anything that starts a pipeline          | `@TestOnBitbucketCloudPipelines`  | `.github/workflows/bitbucket-real.yml`, on `main` only — they cost build minutes    |
+
+`@TestOnBitbucketCloudPipelines` needs the credentials **and** `ontrack.test.extension.bitbucket.cloud.pipelines`,
+which only `bitbucket-real.yml` sets — `ci.yml` pins it to `false`. So a checkout that is fully provisioned still
+starts no pipeline on a push, and `./gradlew :ontrack-extension-bitbucket-cloud:integrationTest` on a developer's
+machine starts none either unless it is asked to.
+
+### Real pipeline tests, on BRONZE
+
+`.github/workflows/bitbucket-real.yml` runs the two pipeline suites —
+`BitbucketPipelinesNotificationChannelRealIT` and `BitbucketCloudPostProcessingRealIT`, four pipelines in all —
+and reports the **`BITBUCKET.REAL`** validation on the build that was promoted. It is dispatched by the
+`On BRONZE - Bitbucket pipelines` subscription in `.yontrack/ci.yaml`, through the `github-workflow` notification
+channel, in the same way the GOLD promotion dispatches `release.yml`. This is the exact counterpart of the GitLab
+arrangement in [`ontrack-extension-gitlab/README.md`](../ontrack-extension-gitlab/README.md); it replaced a silent
+side job of `release.yml`, which reported nothing.
+
+`BITBUCKET.REAL` is **recording only**: declared in `.yontrack/ci.yaml`, part of no promotion, and nothing waits
+for it — like the `SECURITY.*` and `COVERAGE.*` stamps.
+
+**Three guards keep it inside the 50 minutes a month**, one more than GitLab needs on its 400:
+
+* the subscription lives in the **`^main$`** block of `custom.configs`, not in the defaults — BRONZE is granted on
+  every green build of every branch;
+* the workflow's `concurrency` group **cancels in progress**, so a burst of commits collapses into one run;
+* a **cooldown**: a run whose predecessor finished less than `COOLDOWN_DAYS` (7) ago stops before the tests and
+  reports nothing, which lands about four runs a month. Dispatch the workflow by hand with `force` to run it now.
+
+An **absent** `BITBUCKET.REAL` on a build is therefore the normal case, and it never means failure: a run that is
+skipped by the cooldown, or that finds no credential at all, reports nothing rather than a FAILED stamp. A run that
+does execute the tests always reports, PASSED or FAILED. A **partial** set of credentials is a different matter and
+does fail, in `bitbucketCloudTestEnabled`, as it does everywhere else.
+
 ### The test workspace
 
 A **Free** Bitbucket Cloud workspace, e.g. `yontrack-test`, containing:
@@ -74,7 +112,7 @@ upper-cased with `_` for `.`. CI passes them as environment variables from secre
 | `access.token`                                         | secret `ACCESS_TOKEN`                                   | repository access token (Bearer)     |
 | `tokens.expiry`                                        | **variable** `TOKENS_EXPIRY`                            | earliest expiry of the three tokens, `YYYY-MM-DD` |
 | `ignore`                                               | `SKIP_BITBUCKET_CLOUD_IT` workflow input                | `true` skips the real tests          |
-| `pipelines`                                            | `"false"` in `ci.yml`                                   | `true` runs the real **pipeline** tests |
+| `pipelines`                                            | set by `bitbucket-real.yml` only                        | `true` also runs the tests that start a pipeline |
 
 The real tests are skipped when none of the credentials is set, and **fail** when only some are, so that a
 half-configured CI does not pass silently.
@@ -93,8 +131,9 @@ set -a; source .bitbucket-cloud-test.env; set +a
 ./gradlew :ontrack-extension-bitbucket-cloud:integrationTest
 ```
 
-In CI, they run in the integration shard of `.github/workflows/ci.yml` when the workflow is dispatched with
-`SKIP_BITBUCKET_CLOUD_IT` unticked.
+In CI, the API-only ones run in the integration shard of `.github/workflows/ci.yml` when the workflow is
+dispatched with `SKIP_BITBUCKET_CLOUD_IT` unticked, and the pipeline ones in
+`.github/workflows/bitbucket-real.yml`, which is the only place to set `pipelines`.
 
 ### Writing a real test
 
@@ -109,8 +148,9 @@ In CI, they run in the integration shard of `.github/workflows/ci.yml` when the 
 ### Cost
 
 The Free plan costs nothing and has **50 build minutes a month** and five users. Every fixture step is capped at
-5 minutes. Pipeline tests are therefore off in `ci.yml` and run in the **release workflow only**, through the
-`pipelines` switch.
+5 minutes. Pipeline tests are therefore off in `ci.yml` and run in **`bitbucket-real.yml` only**, through the
+`pipelines` switch, on BRONZE of `main` and behind the cooldown described above — four pipelines a run, about four
+runs a month.
 
 ### Reliability
 

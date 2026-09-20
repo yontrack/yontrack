@@ -56,9 +56,12 @@ Three things keep it inside the budget, and all three are deliberate:
 * the switch above, so nothing else in CI can start a pipeline by accident.
 
 `GITLAB.REAL` is **recording only**: declared in `.yontrack/ci.yaml`, part of no promotion, and
-nothing waits for it — like the `SECURITY.*` and `COVERAGE.*` stamps. That is the one difference
-from the Bitbucket Cloud equivalent, which is a silent side job of `release.yml`: fired on BRONZE,
-the result should be something you can see on the build.
+nothing waits for it — like the `SECURITY.*` and `COVERAGE.*` stamps.
+
+`.github/workflows/bitbucket-real.yml` and `BITBUCKET.REAL` are the same arrangement for Bitbucket
+Cloud. The only difference is the budget: a Free Bitbucket workspace gets 50 build minutes a month
+against this namespace's 400, so that workflow adds a **cooldown** to the two guards below and skips
+most of the BRONZEs it is dispatched for.
 
 **Until the fixture is provisioned**, no `ONTRACK_TEST_EXTENSION_GITLAB_*` secret exists, and the
 workflow stops at its first step with a warning annotation, reporting no validation at all. It is

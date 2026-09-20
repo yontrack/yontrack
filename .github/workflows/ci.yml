@@ -655,8 +655,9 @@ jobs:
       ONTRACK_TEST_EXTENSION_BITBUCKET_CLOUD_TOKENS_EXPIRY: ${{ vars.ONTRACK_TEST_EXTENSION_BITBUCKET_CLOUD_TOKENS_EXPIRY }}
       ONTRACK_TEST_EXTENSION_BITBUCKET_CLOUD_IGNORE: ${{ needs.setup.outputs.skip_bitbucket_cloud_it }}
       # Real pipeline tests consume build minutes (Free plan: 50 a month), so they never run in this workflow.
-      # The release workflow is the only one to turn this switch on - see the Bitbucket Pipelines
-      # notification channel (#1761).
+      # Pinned off exactly as the GitLab switch below: .github/workflows/bitbucket-real.yml is the only
+      # place which turns this on, on BRONZE of main and behind a cooldown, and reports BITBUCKET.REAL
+      # on the promoted build (#1761).
       ONTRACK_TEST_EXTENSION_BITBUCKET_CLOUD_PIPELINES: "false"
       # GitLab system tests, against the gitlab.com group provisioned by
       # ontrack-extension-gitlab/scripts/gitlab-test-project.sh (see the module's README).

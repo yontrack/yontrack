@@ -1,0 +1,319 @@
+name: Bitbucket pipelines (real)
+
+# Runs the Bitbucket Cloud tests which actually execute a pipeline against the real bitbucket.org
+# fixture, and reports BITBUCKET.REAL on the build which was promoted.
+#
+# The exact counterpart of .github/workflows/gitlab-real.yml, and deliberately so: the two
+# integrations cost the same kind of money, and the result of both should be visible on the build
+# rather than buried in a side job of a workflow which is about something else. This job used to
+# be `bitbucket-pipelines` in release.yml, reporting nothing (#1761).
+#
+# Dispatched by the `On BRONZE - Bitbucket pipelines` notification through the `github-workflow`
+# channel - see .yontrack/ci.yaml - the same mechanism by which GOLD dispatches release.yml. That
+# subscription lives in the `^main$` block of `custom.configs`, which is what restricts this to
+# `main`: BRONZE is granted on every green build of every branch.
+#
+# Why these tests are not in ci.yml: integration shard 5 already runs the module's API-only real
+# tests, which cost nothing. `ONTRACK_TEST_EXTENSION_BITBUCKET_CLOUD_PIPELINES` is the switch which
+# tells the two apart, pinned to `false` there and set to `true` here and nowhere else.
+#
+# It tests `main` as it is now, not the exact commit of the build being stamped. The two only differ
+# when something landed between the promotion and this run, and `cancel-in-progress` means the run
+# which survives is the one for the newest build anyway.
+#
+# ------------------------------------------------------------------------------------------------
+# The budget, which is where this parts company with gitlab-real.yml
+# ------------------------------------------------------------------------------------------------
+# A Free gitlab.com namespace gets 400 compute minutes a month; a Free Bitbucket Cloud workspace
+# gets **50**. The GitLab workflow spends its budget with `^main$` plus `cancel-in-progress` alone,
+# which lands 20-40 runs a month. The same two guards here would spend the whole month's minutes in
+# its first days - four pipelines a run, each billed as at least a minute - and every run after that
+# would come back "build minutes exceeded" and stamp a FAILED BITBUCKET.REAL on a build which is
+# perfectly fine. A false red on every BRONZE is how a genuine failure later gets ignored.
+#
+# So there is a third guard: a cooldown. A run whose predecessor finished less than
+# `COOLDOWN_DAYS` ago stops before the tests and reports nothing, which lands ~4 runs a month
+# inside a 50-minute budget. `force` bypasses it for a manual dispatch.
+
+on:
+  workflow_dispatch:
+    inputs:
+      # Always sent by the `github-workflow` notification channel, whether or not it is asked for:
+      # GitHub's API gives no way to learn the run ID of a dispatch, so Yontrack passes a
+      # correlation ID and then finds the run by the artifact named after it below. GitHub rejects
+      # any input a workflow does not declare, so omitting this fails the dispatch with
+      # `422 Unexpected inputs provided: ["id"]`.
+      # See ontrack-docs/docs/content/integrations/notifications/github-workflow.md.
+      id:
+        description: 'Correlation ID, set by Yontrack. "manual" when dispatched by hand.'
+        required: true
+        default: manual
+        type: string
+      version:
+        description: 'Version of the build which was promoted (e.g. 5.5.0-rc-12), as the build displays it'
+        required: true
+        type: string
+      project:
+        description: 'Yontrack project holding the build'
+        required: false
+        default: yontrack
+        type: string
+      branch:
+        description: 'Yontrack branch holding the build'
+        required: false
+        default: main
+        type: string
+      force:
+        description: 'Run even if the cooldown since the previous run has not elapsed'
+        required: false
+        default: false
+        type: boolean
+
+# One run at a time, and cancel rather than queue - the opposite of the release and demo groups.
+# Queueing would run one pipeline suite per commit of a burst, which is precisely the spend this
+# workflow exists to avoid; the newest build is also the one worth stamping.
+concurrency:
+  group: bitbucket-real
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  actions: read # the cooldown reads this workflow's own previous runs
+
+env:
+  # Pinned, as everywhere else: an unpinned CLI lets a Yontrack release turn a green pipeline red.
+  YONTRACK_CLI_VERSION: '5.2.0'
+  BITBUCKET_REAL_PROJECT: ${{ inputs.project }}
+  BITBUCKET_REAL_BRANCH: ${{ inputs.branch }}
+  BITBUCKET_REAL_VERSION: ${{ inputs.version }}
+  # Days between two runs. See the budget note above: four pipelines a run against 50 minutes a
+  # month. Seven days lands about four runs a month and leaves room for the manual `force` ones.
+  COOLDOWN_DAYS: '7'
+
+jobs:
+  bitbucket-real:
+    name: Real Bitbucket pipeline tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      ONTRACK_TEST_EXTENSION_BITBUCKET_CLOUD_WORKSPACE: ${{ secrets.ONTRACK_TEST_EXTENSION_BITBUCKET_CLOUD_WORKSPACE }}
+      ONTRACK_TEST_EXTENSION_BITBUCKET_CLOUD_PROJECT: ${{ secrets.ONTRACK_TEST_EXTENSION_BITBUCKET_CLOUD_PROJECT }}
+      ONTRACK_TEST_EXTENSION_BITBUCKET_CLOUD_REPOSITORY: ${{ secrets.ONTRACK_TEST_EXTENSION_BITBUCKET_CLOUD_REPOSITORY }}
+      ONTRACK_TEST_EXTENSION_BITBUCKET_CLOUD_BOT_EMAIL: ${{ secrets.ONTRACK_TEST_EXTENSION_BITBUCKET_CLOUD_BOT_EMAIL }}
+      ONTRACK_TEST_EXTENSION_BITBUCKET_CLOUD_BOT_TOKEN: ${{ secrets.ONTRACK_TEST_EXTENSION_BITBUCKET_CLOUD_BOT_TOKEN }}
+      ONTRACK_TEST_EXTENSION_BITBUCKET_CLOUD_APPROVER_EMAIL: ${{ secrets.ONTRACK_TEST_EXTENSION_BITBUCKET_CLOUD_APPROVER_EMAIL }}
+      ONTRACK_TEST_EXTENSION_BITBUCKET_CLOUD_APPROVER_TOKEN: ${{ secrets.ONTRACK_TEST_EXTENSION_BITBUCKET_CLOUD_APPROVER_TOKEN }}
+      ONTRACK_TEST_EXTENSION_BITBUCKET_CLOUD_ACCESS_TOKEN: ${{ secrets.ONTRACK_TEST_EXTENSION_BITBUCKET_CLOUD_ACCESS_TOKEN }}
+      ONTRACK_TEST_EXTENSION_BITBUCKET_CLOUD_TOKENS_EXPIRY: ${{ vars.ONTRACK_TEST_EXTENSION_BITBUCKET_CLOUD_TOKENS_EXPIRY }}
+      # The one place this is ever true. Everything else - ci.yml's integration shard 5, a
+      # developer's checkout - leaves it unset or pins it to false, and pays no build minute.
+      ONTRACK_TEST_EXTENSION_BITBUCKET_CLOUD_PIPELINES: "true"
+    steps:
+      # The run time reported for the validation is measured from here.
+      - name: Record the job start
+        id: job_start
+        run: echo "started=$(date +%s)" >> "$GITHUB_OUTPUT"
+
+      # How Yontrack finds this run: it polls the run's artifacts for this name, 10 times at 10s
+      # intervals, and gives up after that. So this goes before the checkout, and needs no checkout
+      # of its own - the file is empty and only its name carries the ID.
+      - name: Correlation preparation
+        run: touch inputs.properties
+
+      - name: Correlation file archiving
+        uses: actions/upload-artifact@v7
+        with:
+          name: inputs-${{ inputs.id }}.properties
+          path: inputs.properties
+          if-no-files-found: error
+
+      # ------------------------------------------------------------------------------------------
+      # Whether to run at all. Two independent reasons not to, neither of them a failure:
+      #
+      # * the fixture is provisioned by hand, by a human with a bitbucket.org account, and may not
+      #   exist at all - see ontrack-extension-bitbucket-cloud/scripts/bitbucket-cloud-test-workspace.sh
+      #   and the module's README;
+      # * the cooldown of the budget note above has not elapsed.
+      #
+      # Stopping rather than failing, and reporting no BITBUCKET.REAL rather than a FAILED one: the
+      # tests never ran, so "the real Bitbucket tests failed" would be a lie, and a red run on every
+      # BRONZE of main is how a real failure later gets ignored. The absent stamp is the honest
+      # signal, and the annotation below is what says why.
+      #
+      # A PARTIAL set of credentials is a different thing entirely and is not caught here: it
+      # reaches `bitbucketCloudTestEnabled`, which fails the tests outright rather than skipping
+      # them, so a half-rotated secret turns this workflow red as it should.
+      # ------------------------------------------------------------------------------------------
+      - name: Decide whether to run
+        id: gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FORCE: ${{ inputs.force }}
+        run: |
+          set -uo pipefail
+
+          skip() {
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "::warning title=$1::$2"
+            {
+              echo "### Bitbucket pipelines (real) - not run"
+              echo
+              echo "$2"
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          }
+
+          if [ -z "${ONTRACK_TEST_EXTENSION_BITBUCKET_CLOUD_WORKSPACE:-}" ] \
+            && [ -z "${ONTRACK_TEST_EXTENSION_BITBUCKET_CLOUD_REPOSITORY:-}" ] \
+            && [ -z "${ONTRACK_TEST_EXTENSION_BITBUCKET_CLOUD_BOT_TOKEN:-}" ]; then
+            skip "Bitbucket Cloud fixture not provisioned" \
+              "The bitbucket.org test workspace is not provisioned: no ONTRACK_TEST_EXTENSION_BITBUCKET_CLOUD_* secret is set. Run ontrack-extension-bitbucket-cloud/scripts/bitbucket-cloud-test-workspace.sh to create it. No BITBUCKET.REAL validation is reported."
+          fi
+
+          if [ "$FORCE" = "true" ]; then
+            echo "Cooldown bypassed by the \`force\` input."
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # The most recent run of THIS workflow which actually reached the end, whatever its
+          # conclusion. `cancel-in-progress` collapses bursts into cancelled runs which spent
+          # nothing, so those must not start the clock; `status=completed` still includes them,
+          # which is why the conclusion is filtered too. The current run is `in_progress` and so
+          # is never its own predecessor.
+          previous=$(gh run list \
+            --workflow=bitbucket-real.yml --status=completed --limit 20 \
+            --json conclusion,updatedAt \
+            --jq '[.[] | select(.conclusion == "success" or .conclusion == "failure")] | .[0].updatedAt // empty')
+
+          if [ -z "$previous" ]; then
+            echo "No previous completed run: nothing to wait for."
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          previous_ts=$(date -u -d "$previous" +%s)
+          elapsed_days=$(( ( $(date -u +%s) - previous_ts ) / 86400 ))
+          if [ "$elapsed_days" -lt "$COOLDOWN_DAYS" ]; then
+            skip "Bitbucket pipelines cooldown" \
+              "The previous run finished $elapsed_days day(s) ago, less than the $COOLDOWN_DAYS-day cooldown. The bitbucket.org workspace has 50 build minutes a month, so these tests run about once a week and not on every BRONZE. No BITBUCKET.REAL validation is reported. Dispatch this workflow by hand with \`force\` to run it now."
+          fi
+
+          echo "Previous run finished $elapsed_days day(s) ago: running."
+          echo "run=true" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v7
+        if: ${{ steps.gate.outputs.run == 'true' }}
+
+      # Same identity as the integration shards of ci.yml: the Git test utilities commit in freshly
+      # initialised repositories.
+      - name: Configure git
+        if: ${{ steps.gate.outputs.run == 'true' }}
+        run: |
+          git config --global user.email "yontrack@nemerosa.net"
+          git config --global user.name "Yontrack"
+          git config --global init.defaultBranch main
+
+      - uses: actions/setup-java@v6
+        if: ${{ steps.gate.outputs.run == 'true' }}
+        with:
+          distribution: zulu
+          java-version: "21"
+
+      - uses: gradle/actions/setup-gradle@v6
+        if: ${{ steps.gate.outputs.run == 'true' }}
+
+      # Only the tests which start pipelines: everything else in the module ran on the build's own
+      # CI. integrationTest brings its own middleware up and down.
+      - name: Real Bitbucket pipeline tests
+        id: test
+        if: ${{ steps.gate.outputs.run == 'true' }}
+        run: |
+          ./gradlew :ontrack-extension-bitbucket-cloud:integrationTest \
+            --tests '*BitbucketPipelinesNotificationChannelRealIT' \
+            --tests '*BitbucketCloudPostProcessingRealIT' \
+            --stacktrace \
+            --console plain
+
+      - name: Upload the test results
+        if: ${{ !cancelled() && steps.gate.outputs.run == 'true' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: bitbucket-real-results
+          path: ontrack-extension-bitbucket-cloud/build/test-results/integrationTest/
+          if-no-files-found: ignore
+
+      # ------------------------------------------------------------------------------------------
+      # Report, whatever happened - as long as the tests actually ran.
+      #
+      # `!cancelled()` and not `success()`: a run which fails must land a FAILED BITBUCKET.REAL on
+      # the build rather than leave the stamp absent, which is indistinguishable from "never
+      # dispatched". A cancelled run - the collapsing this workflow relies on - reports nothing, and
+      # the run which replaced it reports on a newer build.
+      # ------------------------------------------------------------------------------------------
+      - name: Install the Yontrack CLI
+        if: ${{ !cancelled() && steps.gate.outputs.run == 'true' }}
+        run: |
+          set -euo pipefail
+          curl -sSfL -o /usr/local/bin/yontrack \
+            "https://github.com/nemerosa/ontrack-cli/releases/download/${YONTRACK_CLI_VERSION}/yontrack-linux-amd64"
+          chmod +x /usr/local/bin/yontrack
+          # --cli only: the bare `version` also asks the server, which is not configured yet.
+          yontrack version --cli
+
+      - name: Configure the CLI
+        if: ${{ !cancelled() && steps.gate.outputs.run == 'true' }}
+        env:
+          YONTRACK_URL: ${{ vars.YONTRACK_URL }}
+          YONTRACK_TOKEN: ${{ secrets.YONTRACK_TOKEN }}
+        run: |
+          set -euo pipefail
+          yontrack config create prod "$YONTRACK_URL" --token "$YONTRACK_TOKEN" --override
+
+      # BITBUCKET.REAL is reported with `yontrack validate --build`, which takes the build *name*.
+      # The promotion workflow can only pass the version: `${build}` renders the display name, which
+      # is the release property, and no templating source exposes the raw name. Same resolution as
+      # demo-smoke.yml and gitlab-real.yml, through the same shared helper, so they stamp the same
+      # build.
+      - name: Resolve the build
+        id: resolve
+        if: ${{ !cancelled() && steps.gate.outputs.run == 'true' }}
+        env:
+          DEMO_PROJECT: ${{ env.BITBUCKET_REAL_PROJECT }}
+          DEMO_BRANCH: ${{ env.BITBUCKET_REAL_BRANCH }}
+          DEMO_VERSION: ${{ env.BITBUCKET_REAL_VERSION }}
+        run: scripts/demo-smoke.sh resolve
+
+      - name: Validate BITBUCKET.REAL
+        if: ${{ !cancelled() && steps.gate.outputs.run == 'true' && steps.resolve.outputs.build != '' }}
+        env:
+          STARTED: ${{ steps.job_start.outputs.started }}
+          TEST: ${{ steps.test.outcome }}
+          BUILD: ${{ steps.resolve.outputs.build }}
+        run: |
+          set -uo pipefail
+          run_time_flag=""
+          if [ -n "${STARTED:-}" ]; then
+            run_time_flag="--run-time $(( $(date +%s) - STARTED ))"
+          fi
+          if [ "$TEST" = "success" ]; then
+            status=PASSED
+          else
+            status=FAILED
+          fi
+          {
+            echo "### Bitbucket pipelines (real) \`$BITBUCKET_REAL_VERSION\` - \`$status\`"
+            echo
+            echo "| Step | Outcome |"
+            echo "|---|---|"
+            echo "| Real pipeline tests | ${TEST:-skipped} |"
+          } >> "$GITHUB_STEP_SUMMARY"
+          # shellcheck disable=SC2086  # deliberate: run info is a set of flags, not one word
+          yontrack validate \
+            --project "$BITBUCKET_REAL_PROJECT" --branch "$BITBUCKET_REAL_BRANCH" --build "$BUILD" \
+            --validation BITBUCKET.REAL --status "$status" \
+            $run_time_flag \
+            --source-type github-workflow \
+            --source-uri "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" \
+            --trigger-type "${GITHUB_EVENT_NAME}" \
+            --trigger-data "$BITBUCKET_REAL_VERSION"

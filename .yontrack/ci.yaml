@@ -163,15 +163,28 @@ configuration:
         # switch and a stamp of their own.
         #
         # Recording only, like the SECURITY and COVERAGE stamps: no thresholds, in no promotion,
-        # and nothing in ci.yml waits for it. That is the whole difference from the Bitbucket
-        # Cloud equivalent, which is a silent side job of release.yml - fired on BRONZE, the
-        # result should be something you can see on the build.
+        # and nothing in ci.yml waits for it.
         #
         # Only ever reported on main: the subscription which dispatches the workflow is in the
         # `^main$` block of `custom.configs` below, not in the defaults. The stamp is declared here
         # all the same, because a validation stamp has to exist on the branch it is reported on and
         # the defaults are where every other one is declared.
         GITLAB.REAL: {}
+        # The Bitbucket Cloud equivalent, and deliberately identical: the tests which actually
+        # execute a pipeline against the bitbucket.org fixture, reported by
+        # .github/workflows/bitbucket-real.yml. Everything said of GITLAB.REAL above holds here -
+        # recording only, main only, declared in the defaults because that is where stamps are
+        # declared.
+        #
+        # These used to run as a silent side job of release.yml (#1761), reporting nothing. Fired
+        # on BRONZE, the result is something you can see on the build.
+        #
+        # The one difference is the budget, and it is in the workflow rather than here: a Free
+        # Bitbucket workspace gets 50 build minutes a month against a Free gitlab.com namespace's
+        # 400, so bitbucket-real.yml adds a cooldown on top of the `^main$` scope and the
+        # cancel-in-progress collapsing, and skips - reporting nothing - when it has run too
+        # recently. An absent BITBUCKET.REAL on a build is therefore normal.
+        BITBUCKET.REAL: {}
         # The four publication stamps, all reported by .github/workflows/release.yml, which the
         # GOLD workflow below dispatches. They are what RELEASE is granted on: GOLD triggers the
         # publication, RELEASE records that it succeeded (#1672, #1673).
@@ -634,6 +647,31 @@ configuration:
                   owner: yontrack
                   repository: yontrack
                   workflowId: gitlab-real.yml
+                  reference: main
+                  callMode: ASYNC
+                  inputs:
+                    - name: version
+                      value: "${build.release}"
+
+              # Real Bitbucket Cloud pipeline tests, on main only - the same arrangement, for the
+              # same reasons, as the GitLab one above. What used to be a silent side job of
+              # release.yml (#1761) now fires here and reports BITBUCKET.REAL on the build.
+              #
+              # Its budget is tighter than GitLab's - 50 build minutes a month against 400 - so the
+              # workflow carries a cooldown of its own on top of this `^main$` scope and its
+              # cancel-in-progress collapsing, and skips most of the BRONZEs it is dispatched for.
+              # That guard is in bitbucket-real.yml rather than here because CasC has nowhere to
+              # express "at most once a week".
+              - name: On BRONZE - Bitbucket pipelines
+                promotion: BRONZE
+                events:
+                  - new_promotion_run
+                channel: github-workflow
+                channelConfig:
+                  config: github.com
+                  owner: yontrack
+                  repository: yontrack
+                  workflowId: bitbucket-real.yml
                   reference: main
                   callMode: ASYNC
                   inputs:

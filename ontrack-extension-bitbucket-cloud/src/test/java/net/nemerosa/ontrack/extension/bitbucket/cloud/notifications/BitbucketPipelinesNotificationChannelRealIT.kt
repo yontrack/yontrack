@@ -19,7 +19,8 @@ import kotlin.test.assertNotNull
 /**
  * The `bitbucket-pipelines` channel against the custom pipelines of the fixture repository.
  *
- * Every test runs a real pipeline and consumes build minutes, which is why they only run in the release workflow.
+ * Every test runs a real pipeline and consumes build minutes, which is why only
+ * `.github/workflows/bitbucket-real.yml` runs them - see the module's README (#1761).
  * Three pipelines in total, each of a few seconds of build time.
  */
 @AsAdminTest

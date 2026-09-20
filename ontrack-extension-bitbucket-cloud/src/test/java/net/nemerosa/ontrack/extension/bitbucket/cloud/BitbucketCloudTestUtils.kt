@@ -25,7 +25,10 @@ object BitbucketCloudTestProperties {
     /** `true` to skip the real tests even when the credentials are set. */
     const val IGNORE = "$PREFIX.ignore"
 
-    /** `true` to run the real **pipeline** tests, which consume build minutes. Release workflow only. */
+    /**
+     * `true` to run the real **pipeline** tests, which consume build minutes. Only
+     * `.github/workflows/bitbucket-real.yml` sets this - see the module's README (#1761).
+     */
     const val PIPELINES = "$PREFIX.pipelines"
 
     const val WORKSPACE = "$PREFIX.workspace"

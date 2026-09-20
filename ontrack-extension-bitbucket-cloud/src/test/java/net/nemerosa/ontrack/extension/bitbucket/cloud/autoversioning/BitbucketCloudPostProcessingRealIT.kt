@@ -25,7 +25,8 @@ import kotlin.test.assertTrue
  * The `bitbucket-cloud` post-processing against the `yontrack-auto-versioning` custom pipeline of the fixture
  * repository, which commits the version to `post-processing.txt` on the upgrade branch.
  *
- * Runs one real pipeline and consumes build minutes, which is why it only runs in the release workflow.
+ * Runs one real pipeline and consumes build minutes, which is why only
+ * `.github/workflows/bitbucket-real.yml` runs it - see the module's README (#1761).
  */
 @AsAdminTest
 class BitbucketCloudPostProcessingRealIT : AbstractBitbucketCloudTestSupport() {
