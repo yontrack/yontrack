@@ -48,6 +48,14 @@ class BitbucketServerSCMEngineTest {
         assertTrue(engine.matchesUrl("ssh://git@bitbucket.dev.yontrack.com:7999/nemerosa/ontrack.git"))
     }
 
+    @Test
+    fun `Detection of Bitbucket Server SCM engine rejects a host merely containing the configured one`() {
+        bitbucketServerConfig()
+        assertFalse(engine.matchesUrl("https://bitbucket.dev.yontrack.com.attacker.example/scm/nemerosa/ontrack.git"))
+        assertFalse(engine.matchesUrl("https://attacker.example/bitbucket.dev.yontrack.com/nemerosa/ontrack.git"))
+        assertFalse(engine.matchesUrl("https://bitbucket.dev.yontrack.com@attacker.example/nemerosa/ontrack.git"))
+    }
+
     private fun bitbucketServerConfig(
         url: String = BitbucketServerFixtures.BITBUCKET_SERVER_URL,
     ) {

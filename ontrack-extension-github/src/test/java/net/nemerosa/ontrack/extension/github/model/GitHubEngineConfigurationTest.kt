@@ -565,4 +565,32 @@ class GitHubEngineConfigurationTest {
         assertFalse(config.matchesUrl("https://github.dev.yontrack.com/nemerosa/yontrack.git"))
         assertFalse(config.matchesUrl("git@github.dev.yontrack.com:nemerosa/ontrack.git"))
     }
+
+    @Test
+    fun `SCM URL matching is an origin comparison, not a substring test`() {
+        val config = GitHubEngineConfiguration(
+            "Test",
+            "https://github.com",
+            oauth2Token = "xxx",
+        )
+        // The configured host as a suffix of the actual host
+        assertFalse(config.matchesUrl("https://github.com.attacker.example/nemerosa/yontrack.git"))
+        // The configured host in the path
+        assertFalse(config.matchesUrl("https://attacker.example/github.com/nemerosa/yontrack.git"))
+        // The configured host in the user information
+        assertFalse(config.matchesUrl("https://github.com@attacker.example/nemerosa/yontrack.git"))
+        // The configured host as the SSH user
+        assertFalse(config.matchesUrl("git@github.com.attacker.example:nemerosa/yontrack.git"))
+    }
+
+    @Test
+    fun `SCM URL matching ignores the scheme and the port`() {
+        val config = GitHubEngineConfiguration(
+            "Test",
+            "https://github.dev.yontrack.com",
+            oauth2Token = "xxx",
+        )
+        assertTrue(config.matchesUrl("ssh://git@github.dev.yontrack.com:7999/nemerosa/yontrack.git"))
+        assertTrue(config.matchesUrl("http://github.dev.yontrack.com/nemerosa/yontrack.git"))
+    }
 }

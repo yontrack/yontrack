@@ -3,6 +3,7 @@ package net.nemerosa.ontrack.extension.github.model
 import com.fasterxml.jackson.annotation.JsonAlias
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import net.nemerosa.ontrack.extension.github.app.GitHubApp
+import net.nemerosa.ontrack.extension.scm.support.SCMUrl
 import net.nemerosa.ontrack.model.annotations.APIIgnore
 import net.nemerosa.ontrack.model.docs.DocumentationIgnore
 import net.nemerosa.ontrack.model.docs.SelfDocumented
@@ -141,20 +142,16 @@ open class GitHubEngineConfiguration(
     /**
      * Checks if a given "git clone" URL is associated with this configuration.
      *
+     * The URL belongs to this configuration when it names the same host, scheme and port aside - see
+     * [SCMUrl]. This is an origin comparison, never a substring test: the name of this configuration is a
+     * reference to a stored credential, and a URL on another host must not be able to select it.
+     *
      * @param url URL to test (like `https://github.dev.yontrack.com/scm/nemerosa/ontrack.git`
      * or `https://github.com/scm/nemerosa/ontrack.git`
      * or `git@github.com:nemerosa/ontrack.git`)
      * @return `true` if the URL is associated with this configuration
      */
-    fun matchesUrl(url: String): Boolean {
-        // Extract the host from the configuration URL
-        val configHost = this.url
-            .removePrefix("https://")
-            .removePrefix("http://")
-            .removeSuffix("/")
-        // Check if the provided URL contains the configuration host
-        return url.contains(configHost)
-    }
+    fun matchesUrl(url: String): Boolean = SCMUrl.sameHost(this.url, url)
 
     override fun equals(other: Any?): Boolean {
         if (this === other) return true

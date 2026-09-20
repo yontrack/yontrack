@@ -5,6 +5,7 @@ plugins {
 dependencies {
     api(project(":ontrack-extension-git"))
 
+    implementation(project(":ontrack-extension-scm"))
     implementation(project(":ontrack-extension-casc"))
     implementation("org.apache.commons:commons-lang3")
     implementation(project(":ontrack-ui-graphql"))

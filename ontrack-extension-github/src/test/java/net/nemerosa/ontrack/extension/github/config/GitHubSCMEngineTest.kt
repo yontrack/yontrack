@@ -46,6 +46,20 @@ class GitHubSCMEngineTest {
     }
 
     @Test
+    fun `Detection of GitHub SCM engine rejects a host merely containing the configured one`() {
+        every { gitHubConfigurationService.configurations } returns listOf(
+            GitHubEngineConfiguration(
+                name = "Test",
+                url = "https://github.com",
+                oauth2Token = "xxx",
+            ),
+        )
+        assertFalse(engine.matchesUrl("https://github.com.attacker.example/nemerosa/ontrack.git"))
+        assertFalse(engine.matchesUrl("https://attacker.example/github.com/nemerosa/ontrack.git"))
+        assertFalse(engine.matchesUrl("https://github.com@attacker.example/nemerosa/ontrack.git"))
+    }
+
+    @Test
     fun `Detection of the GitHub repository when no matching config`() {
         every { gitHubConfigurationService.configurations } returns emptyList()
         assertFailsWith<GitHubSCMRepositoryNotDetectedException> {
