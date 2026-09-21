@@ -74,10 +74,10 @@ class AsyncIngestionHookQueueListener(
     private fun SimpleRabbitListenerEndpoint.configure(
         queue: String,
     ): SimpleRabbitListenerEndpoint {
-        id = queue
+        setId(queue)
         setQueueNames(queue)
         concurrency = "1-1" // No concurrency, we want the events to be processed in turn
-        messageListener = listener
+        setMessageListener(listener)
         return this
     }
 
@@ -86,6 +86,7 @@ class AsyncIngestionHookQueueListener(
             val body = message.body.toString(Charsets.UTF_8)
             val payload = body.parseAsJson().parse<IngestionHookPayload>()
             val queue = message.messageProperties.consumerQueue
+                ?: error("No consumer queue for the message")
             meterRegistry.increment(
                 payload,
                 IngestionMetrics.Queue.consumedCount,

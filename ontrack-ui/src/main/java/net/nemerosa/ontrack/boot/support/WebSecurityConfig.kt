@@ -7,9 +7,9 @@ import com.nimbusds.jwt.proc.ConfigurableJWTProcessor
 import net.nemerosa.ontrack.model.support.OntrackConfigProperties
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
-import org.springframework.boot.actuate.autoconfigure.security.servlet.EndpointRequest
+import org.springframework.boot.security.autoconfigure.actuate.web.servlet.EndpointRequest
 import org.springframework.boot.actuate.endpoint.web.WebServerNamespace
-import org.springframework.boot.web.context.WebServerApplicationContext
+import org.springframework.boot.web.server.context.WebServerApplicationContext
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.security.config.annotation.web.builders.HttpSecurity

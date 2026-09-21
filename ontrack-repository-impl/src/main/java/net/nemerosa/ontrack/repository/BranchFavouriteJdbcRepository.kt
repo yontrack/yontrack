@@ -18,7 +18,7 @@ class BranchFavouriteJdbcRepository(
                 """,
                 params("accountId", accountId),
                 Int::class.java
-        )
+        ).filterNotNull()
     }
 
     override fun isBranchFavourite(accountId: Int, branchId: Int): Boolean {

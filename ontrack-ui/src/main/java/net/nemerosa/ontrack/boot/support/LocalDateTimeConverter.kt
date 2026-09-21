@@ -7,7 +7,7 @@ import java.time.LocalDateTime
 import java.time.ZonedDateTime
 
 @Component
-class LocalDateTimeConverter : Converter<String, LocalDateTime> {
+class LocalDateTimeConverter : Converter<String, LocalDateTime?> {
 
     override fun convert(source: String): LocalDateTime? {
         return if (source.isBlank()) {

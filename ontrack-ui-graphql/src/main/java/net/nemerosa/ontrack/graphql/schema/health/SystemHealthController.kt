@@ -3,7 +3,7 @@ package net.nemerosa.ontrack.graphql.schema.health
 import net.nemerosa.ontrack.model.security.GlobalSettings
 import net.nemerosa.ontrack.model.security.SecurityService
 import net.nemerosa.ontrack.model.support.ConnectorGlobalStatusService
-import org.springframework.boot.actuate.health.HealthEndpoint
+import org.springframework.boot.health.actuate.endpoint.HealthEndpoint
 import org.springframework.graphql.data.method.annotation.QueryMapping
 import org.springframework.stereotype.Controller
 

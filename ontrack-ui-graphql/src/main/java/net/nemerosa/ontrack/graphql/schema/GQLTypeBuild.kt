@@ -160,7 +160,7 @@ class GQLTypeBuild(
                     },
                     itemListProvider = { env, build, offset, size ->
                         val vsName: String? = env.getArgument(ARG_VALIDATION_STAMP)
-                        val sortingMode = env.getArgument<String?>(ARG_SORTING_MODE)
+                        val sortingMode = env.getArgument<String>(ARG_SORTING_MODE)
                             ?.let { ValidationRunSortingMode.valueOf(it) }
                             ?: ValidationRunSortingMode.ID
                         if (vsName.isNullOrBlank()) {

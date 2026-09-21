@@ -13,6 +13,8 @@ dependencies {
     api("org.springframework.boot:spring-boot")
     api("org.springframework.boot:spring-boot-actuator")
     api("org.springframework.boot:spring-boot-autoconfigure")
+    api("org.springframework.boot:spring-boot-health")
+    api("org.springframework.boot:spring-boot-restclient")
     api("org.slf4j:slf4j-api")
 
     implementation("org.apache.commons:commons-lang3")

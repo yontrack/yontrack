@@ -20,7 +20,7 @@ fun DefinitionBuilder.durationArgument(): DefinitionBuilder =
     }
 
 fun DataFetchingEnvironment.getDurationArgument() =
-    getArgument<Int?>(ARG_DURATION)?.let { seconds ->
+    getArgument<Int>(ARG_DURATION)?.let { seconds ->
         Duration.ofSeconds(seconds.toLong())
     }
 
@@ -32,6 +32,6 @@ fun DefinitionBuilder.rateArgument(): DefinitionBuilder =
     }
 
 fun DataFetchingEnvironment.getRateArgument() =
-    getArgument<String?>(ARG_RATE)?.let {
+    getArgument<String>(ARG_RATE)?.let {
         Rating.valueOf(it)
     }

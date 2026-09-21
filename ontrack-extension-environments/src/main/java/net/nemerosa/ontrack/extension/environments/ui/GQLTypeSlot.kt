@@ -115,7 +115,7 @@ class GQLTypeSlot(
                         val buildName: String? = env.getArgument(ARG_BUILD_NAME)
                         val branchName: String? = env.getArgument(ARG_BRANCH_NAME)
                         val done: Boolean? = env.getArgument(ARG_DONE)
-                        val status = env.getArgument<String?>(ARG_STATUS)?.let { SlotPipelineStatus.valueOf(it) }
+                        val status = env.getArgument<String>(ARG_STATUS)?.let { SlotPipelineStatus.valueOf(it) }
                         val user: String? = env.getArgument(ARG_USER)
                         slotService.findPipelines(
                             slot = slot,
@@ -183,7 +183,7 @@ class GQLTypeSlot(
                     .argument(enumArgument<SlotPipelineStatus>("trigger", "Type of trigger to filter on"))
                     .dataFetcher { env ->
                         val source: Slot = env.getSource()!!
-                        val trigger = env.getArgument<String?>("trigger")?.let {
+                        val trigger = env.getArgument<String>("trigger")?.let {
                             SlotPipelineStatus.valueOf(it)
                         }
                         slotWorkflowService.getSlotWorkflowsBySlot(source)

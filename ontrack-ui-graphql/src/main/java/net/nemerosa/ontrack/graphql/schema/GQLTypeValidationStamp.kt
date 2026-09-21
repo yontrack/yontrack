@@ -174,7 +174,7 @@ class GQLTypeValidationStamp(
                 return@DataFetcher structureService.getValidationRunsForValidationStamp(
                         validationStamp,
                         0,
-                        environment.getArgument<Int?>("count") ?: 50
+                        environment.getArgument<Int>("count") ?: 50
                 )
             }
 

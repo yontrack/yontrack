@@ -66,10 +66,10 @@ class QueueListener(
         queue: String,
         queueProcessor: QueueProcessor<*>
     ): SimpleRabbitListenerEndpoint {
-        id = queue
+        setId(queue)
         setQueueNames(queue)
         concurrency = "${queueProcessor.minConcurrency}-${queueProcessor.maxConcurrency}"
-        messageListener = createMessageListener(queueProcessor)
+        setMessageListener(createMessageListener(queueProcessor))
         if (queueProcessor.ackMode != QueueAckMode.AUTO) {
             setAckMode(AcknowledgeMode.MANUAL)
         }
@@ -91,6 +91,7 @@ class QueueListener(
 
             try {
                 val queue: String = message.messageProperties.consumerQueue
+                    ?: error("No consumer queue for the message")
                 val body = message.body.toString(Charsets.UTF_8).parseAsJson()
                 val qp = QueuePayload.parse(body)
                 meterRegistry.queueMessageReceived(qp)

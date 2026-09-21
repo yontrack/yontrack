@@ -17,12 +17,12 @@ class ArtifactoryClientImpl(
         return restTemplate.postForObject<JsonNode>(
             "/api/search/aql",
             query,
-        )
+        )!!
     }
 
     override val buildNames: List<String>
         get() {
-            val node = restTemplate.getForObject<JsonNode>("/api/build")
+            val node = restTemplate.getForObject<JsonNode>("/api/build")!!
             val names = mutableListOf<String>()
             node.path("build")
                 .forEach { numberNode ->
@@ -36,7 +36,7 @@ class ArtifactoryClientImpl(
 
     override fun getBuildNumbers(buildName: String): List<String> {
         try {
-            val node = restTemplate.getForObject<JsonNode>("/api/build/${buildName}")
+            val node = restTemplate.getForObject<JsonNode>("/api/build/${buildName}")!!
             val numbers = mutableListOf<String>()
             node.path("buildsNumbers").forEach { numberNode ->
                 val number = numberNode.path("uri").asText().trimStart('/')
@@ -52,7 +52,7 @@ class ArtifactoryClientImpl(
     }
 
     override fun getBuildInfo(buildName: String, buildNumber: String): JsonNode {
-        return restTemplate.getForObject<JsonNode>("/api/build/${buildName}/${buildNumber}").path("buildInfo")
+        return restTemplate.getForObject<JsonNode>("/api/build/${buildName}/${buildNumber}")!!.path("buildInfo")
     }
 
     override fun getStatuses(buildInfo: JsonNode): List<ArtifactoryStatus> {

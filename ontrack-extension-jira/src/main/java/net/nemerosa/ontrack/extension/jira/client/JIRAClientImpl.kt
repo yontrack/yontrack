@@ -53,7 +53,7 @@ class JIRAClientImpl(
                     "applicationType" to applicationType,
                     "dataType" to "repository"
                 )
-            )
+            )!!
             val repositories = details.path("details").firstOrNull()?.path("repositories")
             if (repositories != null && repositories.isArray) {
                 // Gets the matching repository
@@ -71,7 +71,7 @@ class JIRAClientImpl(
 
     private fun fetchIssue(key: String, configuration: JIRAConfiguration): JIRAIssue? {
         try {
-            val node = restTemplate.getForObject<JsonNode>("/rest/api/2/issue/$key?expand=names")
+            val node = restTemplate.getForObject<JsonNode>("/rest/api/2/issue/$key?expand=names")!!
             return toIssue(configuration, node)
         } catch (_: Forbidden) {
             // The issue cannot be accessed
@@ -85,7 +85,7 @@ class JIRAClientImpl(
 
     override fun searchIssueStubs(jiraConfiguration: JIRAConfiguration, jql: String): List<JIRAIssueStub> =
         try {
-            val node = restTemplate.getForObject<JsonNode>("/rest/api/2/search?jql=$jql")
+            val node = restTemplate.getForObject<JsonNode>("/rest/api/2/search?jql=$jql")!!
             node.path("issues").map {
                 it.getRequiredTextField("key")
             }.map { key ->
@@ -181,7 +181,7 @@ class JIRAClientImpl(
 
     override val projects: List<String>
         get() {
-            val node = restTemplate.getForObject<JsonNode>("/rest/api/2/project")
+            val node = restTemplate.getForObject<JsonNode>("/rest/api/2/project")!!
             return node.map {
                 it.getRequiredTextField("key")
             }

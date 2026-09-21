@@ -1,5 +1,6 @@
 package net.nemerosa.ontrack.extension.gitlab.client
 
+import net.nemerosa.ontrack.extension.support.client.jackson2ClientMessageConverters
 import net.nemerosa.ontrack.extension.gitlab.model.GitLabBranch
 import net.nemerosa.ontrack.extension.gitlab.model.GitLabCommit
 import net.nemerosa.ontrack.extension.gitlab.model.GitLabCompare
@@ -622,12 +623,13 @@ class DefaultGitLabClient(
 
     private fun authEntity(): HttpEntity<Void> = HttpEntity(authHeaders())
 
-    private fun <T> authEntity(body: T): HttpEntity<T> = HttpEntity(body, authHeaders())
+    private fun <T : Any> authEntity(body: T): HttpEntity<T> = HttpEntity(body, authHeaders())
 
     internal val template: RestTemplate by lazy {
         // Fails early, and on the configuration rather than on the first call
         token()
         RestTemplate(requestFactory()).apply {
+            setMessageConverters(jackson2ClientMessageConverters())
             errorHandler = RedirectRejectingErrorHandler()
         }
     }

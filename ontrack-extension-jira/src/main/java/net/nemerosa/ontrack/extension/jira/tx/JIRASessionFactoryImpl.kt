@@ -39,7 +39,7 @@ class JIRASessionFactoryImpl(
                     )
                 }
             } else {
-                this.basicAuthentication(configuration.user, configuration.password)
+                this.basicAuthentication(requireNotNull(configuration.user) { "Username must not be null" }, requireNotNull(configuration.password) { "Password must not be null" })
             }
         }
 

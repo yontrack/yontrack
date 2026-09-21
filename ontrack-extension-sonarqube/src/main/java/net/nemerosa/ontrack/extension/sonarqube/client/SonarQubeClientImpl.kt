@@ -7,7 +7,7 @@ import net.nemerosa.ontrack.extension.sonarqube.client.model.ProjectAnalysisSear
 import net.nemerosa.ontrack.extension.sonarqube.configuration.SonarQubeConfiguration
 import net.nemerosa.ontrack.json.asJson
 import org.slf4j.LoggerFactory
-import org.springframework.boot.web.client.RestTemplateBuilder
+import net.nemerosa.ontrack.extension.support.client.jackson2RestTemplateBuilder
 import org.springframework.http.HttpStatus
 import org.springframework.web.client.HttpClientErrorException
 import org.springframework.web.client.RestTemplate
@@ -93,14 +93,14 @@ class SonarQubeClientImpl(
 
     }
 
-    internal val restTemplate: RestTemplate = RestTemplateBuilder()
+    internal val restTemplate: RestTemplate = jackson2RestTemplateBuilder()
         .rootUri(configuration.url)
         // SonarQube requires a strict encoding per value (esp. for "+" characters which are no longer encoded with Spring 5)
         // See https://github.com/spring-projects/spring-framework/issues/20750
         .uriTemplateHandler(DefaultUriBuilderFactory().apply {
             encodingMode = DefaultUriBuilderFactory.EncodingMode.VALUES_ONLY
         })
-        .basicAuthentication(configuration.password, "") // See https://docs.sonarqube.org/latest/extend/web-api/
+        .basicAuthentication(requireNotNull(configuration.password) { "Username must not be null" }, "") // See https://docs.sonarqube.org/latest/extend/web-api/
         .build()
 
     private fun <T, R : PagedResult> paginateUntil(

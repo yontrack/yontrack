@@ -44,7 +44,7 @@ class GQLRootQueryEventSubscriptions(
                     .description("Can the user create subscriptions in the current context")
                     .type(GraphQLBoolean.toNotNull())
                     .dataFetcher { env ->
-                        val projectEntity: ProjectEntity? = env.getContext<GraphQLContext>().get(CONTEXT_PROJECT_ENTITY)
+                        val projectEntity: ProjectEntity? = env.graphQlContext.get(CONTEXT_PROJECT_ENTITY)
                         if (projectEntity != null) {
                             securityService.isProjectFunctionGranted(
                                 projectEntity,
@@ -66,7 +66,7 @@ class GQLRootQueryEventSubscriptions(
                 // Pagination from the root arguments
                 val filter = rawFilter.withPage(offset, size)
                 // Setting the context
-                getProjectEntity(filter)?.let { env.getContext<GraphQLContext>().put(CONTEXT_PROJECT_ENTITY, it) }
+                getProjectEntity(filter)?.let { env.graphQlContext.put(CONTEXT_PROJECT_ENTITY, it) }
                 // Getting the list
                 eventSubscriptionService.filterSubscriptions(filter).map {
                     EventSubscriptionPayload(

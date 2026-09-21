@@ -35,7 +35,7 @@ class GQLRootQueryProperties(
             }
             .dataFetcher { env ->
                 val type: String? = env.getArgument(ARG_TYPE)
-                val projectEntityType: ProjectEntityType? = env.getArgument<String?>(ARG_PROJECT_ENTITY_TYPE)?.let {
+                val projectEntityType: ProjectEntityType? = env.getArgument<String>(ARG_PROJECT_ENTITY_TYPE)?.let {
                     ProjectEntityType.valueOf(it)
                 }
                 // Gets the list of properties

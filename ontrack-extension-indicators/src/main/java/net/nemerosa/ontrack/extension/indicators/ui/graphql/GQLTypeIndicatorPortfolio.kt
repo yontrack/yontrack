@@ -92,7 +92,7 @@ class GQLTypeIndicatorPortfolio(
                             .dataFetcher { env ->
                                 val portfolio: IndicatorPortfolio = env.getSource()!!
                                 val duration = env.getDurationArgument()
-                                val id: String? = env.getArgument<String?>("id")?.takeIf { it.isNotBlank() }
+                                val id: String? = env.getArgument<String>("id")?.takeIf { it.isNotBlank() }
                                 val view = if (id != null) {
                                     indicatorViewService.findIndicatorViewById(id)
                                         // Not returning any stat if no view

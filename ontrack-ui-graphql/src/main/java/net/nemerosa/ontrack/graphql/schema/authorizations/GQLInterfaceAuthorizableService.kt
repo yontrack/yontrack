@@ -14,7 +14,7 @@ class GQLInterfaceAuthorizableService(
     private val authorizationService: AuthorizationService,
 ) {
 
-    fun <X, T : Any> apply(
+    fun <X : Any, T : Any> apply(
         builder: GraphQLObjectType.Builder,
         kClass: KClass<T>,
         contextConverter: (X) -> T,

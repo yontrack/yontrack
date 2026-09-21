@@ -24,7 +24,7 @@ class JiraServiceDeskImpl(
     ): List<JIRAIssueStub> =
         try {
             val node =
-                restTemplate.getForObject<JsonNode>("/rest/servicedeskapi/request?serviceDeskId=$serviceDeskId&requestTypeId=$requestTypeId&requestStatus=${requestStatus.requestStatus}&searchTerm=$searchTerm")
+                restTemplate.getForObject<JsonNode>("/rest/servicedeskapi/request?serviceDeskId=$serviceDeskId&requestTypeId=$requestTypeId&requestStatus=${requestStatus.requestStatus}&searchTerm=$searchTerm")!!
             node.path("values").map {
                 JIRAIssueStub(
                     key = it.getRequiredTextField("issueKey"),
@@ -49,7 +49,7 @@ class JiraServiceDeskImpl(
         val node = restTemplate.postForObject<JsonNode>(
             "/rest/servicedeskapi/request",
             payload
-        )
+        )!!
 
         return JIRAIssueStub(
             key = node.getRequiredTextField("issueKey"),

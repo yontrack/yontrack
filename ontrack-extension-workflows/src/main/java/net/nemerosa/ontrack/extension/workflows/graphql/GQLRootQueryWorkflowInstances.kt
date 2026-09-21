@@ -47,7 +47,7 @@ class GQLRootQueryWorkflowInstances(
                 securityService.checkGlobalFunction(WorkflowAudit::class.java)
                 val id: String? = env.getArgument(ARG_ID)
                 val name: String? = env.getArgument(ARG_NAME)
-                val status: WorkflowInstanceStatus? = env.getArgument<String?>(ARG_STATUS)?.let {
+                val status: WorkflowInstanceStatus? = env.getArgument<String>(ARG_STATUS)?.let {
                     WorkflowInstanceStatus.valueOf(it)
                 }
                 val triggerId: String? = env.getArgument(ARG_TRIGGER_ID)

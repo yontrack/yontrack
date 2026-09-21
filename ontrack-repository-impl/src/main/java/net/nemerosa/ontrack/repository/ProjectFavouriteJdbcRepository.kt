@@ -16,7 +16,7 @@ class ProjectFavouriteJdbcRepository(dataSource: DataSource) : AbstractJdbcRepos
                 """,
                 params("accountId", accountId),
                 Int::class.java
-        )
+        ).filterNotNull()
     }
 
     override fun isProjectFavourite(accountId: Int, projectId: Int): Boolean {

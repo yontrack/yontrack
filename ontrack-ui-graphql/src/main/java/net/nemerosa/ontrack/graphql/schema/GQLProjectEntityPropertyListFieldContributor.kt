@@ -53,7 +53,7 @@ class GQLProjectEntityPropertyListFieldContributor(
             if (projectEntityClass.isInstance(o)) {
                 // Filters
                 val typeFilter: String? = environment.getArgument("type")
-                val hasValue: Boolean = environment.getArgument<Boolean?>("hasValue") ?: false
+                val hasValue: Boolean = environment.getArgument<Boolean>("hasValue") ?: false
                 // Gets the raw list
                 propertyService.getProperties(o as ProjectEntity)
                     .filter { property: Property<*> ->

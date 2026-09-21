@@ -101,7 +101,7 @@ class SecurityServiceImpl : SecurityService {
         return {
             val oldContext = SecurityContextHolder.getContext()
             try {
-                SecurityContextHolder.setContext(context)
+                SecurityContextHolder.setContext(context ?: SecurityContextHolder.createEmptyContext())
                 // Result
                 supplier()
             } finally {

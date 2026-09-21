@@ -37,5 +37,5 @@ dependencies {
     testRuntimeOnly(project(":ontrack-service"))
     testRuntimeOnly(project(":ontrack-repository-impl"))
 
-    testRuntimeOnly("org.springframework.boot:spring-boot-starter-web")
+    testRuntimeOnly("org.springframework.boot:spring-boot-starter-webmvc")
 }

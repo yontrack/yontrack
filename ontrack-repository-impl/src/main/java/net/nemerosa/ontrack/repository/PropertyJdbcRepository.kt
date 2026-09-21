@@ -33,7 +33,7 @@ class PropertyJdbcRepository(
                 """,
             params("type", typeName).addValue("entityId", entityId.value),
             Int::class.java
-        ).isNotEmpty()
+        ).filterNotNull().isNotEmpty()
     }
 
     @Cacheable(cacheNames = ["properties"], key = "#typeName + #entityType.name() + #entityId.value")
@@ -184,7 +184,7 @@ class PropertyJdbcRepository(
             sql,
             params,
             Int::class.java
-        ).map { id -> ID.of(id) }
+        ).filterNotNull().map { id -> ID.of(id) }
     }
 
     @Throws(SQLException::class)

@@ -17,7 +17,7 @@ inline fun <reified T : Any> parseOptionalArgument(argName: String, env: DataFet
     parseOptionalArgument(T::class, argName, env)
 
 fun <T : Any> parseOptionalArgument(type: KClass<T>, argName: String, env: DataFetchingEnvironment): T? {
-    val input = env.getArgument<Any?>(argName) ?: return null
+    val input = env.getArgument<Any>(argName) ?: return null
     return input.asJson().parseInto(type)
 }
 

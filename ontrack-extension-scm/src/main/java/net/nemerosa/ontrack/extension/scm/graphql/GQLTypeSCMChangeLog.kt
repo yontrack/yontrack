@@ -108,7 +108,7 @@ class GQLTypeSCMChangeLog(
                     .type(GraphQLString)
                     .dataFetcher { env ->
                         val changeLog = env.getSource<SCMChangeLog>()!!
-                        val renderer = env.getArgument<String?>(RENDER_ARG_RENDERER)
+                        val renderer = env.getArgument<String>(RENDER_ARG_RENDERER)
                             ?.let { eventRendererRegistry.findEventRendererById(it) }
                             ?: PlainEventRenderer.INSTANCE
                         val config = parseOptionalArgument<ChangeLogTemplatingServiceConfig>(RENDER_ARG_CONFIG, env)
@@ -139,7 +139,7 @@ class GQLTypeSCMChangeLog(
                     .type(GraphQLString)
                     .dataFetcher { env ->
                         val changeLog = env.getSource<SCMChangeLog>()!!
-                        val renderer = env.getArgument<String?>(RENDER_ARG_RENDERER)
+                        val renderer = env.getArgument<String>(RENDER_ARG_RENDERER)
                             ?.let { eventRendererRegistry.findEventRendererById(it) }
                             ?: PlainEventRenderer.INSTANCE
                         val config =

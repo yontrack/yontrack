@@ -28,6 +28,7 @@ class NewTxRollbackedExtension : BeforeTestExecutionCallback, AfterTestExecution
     override fun afterTestExecution(exc: ExtensionContext) {
         val transactionManager = getTransactionManager(exc)
         val status = exc.getStore(namespace).get(TX_STATUS, TransactionStatus::class.java)
+            ?: error("No transaction status stored for the test")
         transactionManager.rollback(status)
         logger.info("[${exc.displayName}] TX ROLLBACK")
     }

@@ -10,7 +10,7 @@ dependencies {
 
     implementation(project(":ontrack-job"))
     implementation("org.jetbrains.kotlin:kotlin-reflect")
-    implementation("org.springframework.boot:spring-boot-starter-web")
+    implementation("org.springframework.boot:spring-boot-starter-webmvc")
     implementation("org.springframework.boot:spring-boot-starter-graphql")
     implementation("org.springframework.boot:spring-boot-starter-actuator")
     implementation("org.springframework:spring-tx")

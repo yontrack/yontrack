@@ -8,7 +8,7 @@ import net.nemerosa.ontrack.extension.stash.model.BitbucketRepository
 import net.nemerosa.ontrack.extension.stash.model.StashConfiguration
 import net.nemerosa.ontrack.extension.stash.scm.BitbucketServerPR
 import net.nemerosa.ontrack.json.parse
-import org.springframework.boot.web.client.RestTemplateBuilder
+import net.nemerosa.ontrack.extension.support.client.jackson2RestTemplateBuilder
 import org.springframework.core.io.ByteArrayResource
 import org.springframework.http.HttpEntity
 import org.springframework.http.HttpHeaders
@@ -87,7 +87,7 @@ class BitbucketClientImpl(
         // Get open pull requests from the branch
         val response = template.getForObject<PendingPRsResponse>(
             "/rest/api/1.0/projects/${repo.project}/repos/${repo.repository}/pull-requests?state=OPEN&direction=OUTGOING&at=refs/heads/$branch"
-        )
+        )!!
         // Declining all PRs
         response.values.forEach { pr ->
             template.postForObject<JsonNode>(
@@ -95,14 +95,14 @@ class BitbucketClientImpl(
                 mapOf(
                     "version" to pr.version,
                 )
-            )
+            )!!
         }
     }
 
     override fun isBranchExisting(repo: BitbucketRepository, branch: String): Boolean {
         val response = template.getForObject<FindBranchesResponse>(
             "/rest/api/1.0/projects/${repo.project}/repos/${repo.repository}/branches?filterText=${branch}"
-        )
+        )!!
         return response.values.any { it.displayId == branch }
     }
 
@@ -112,7 +112,7 @@ class BitbucketClientImpl(
     ): List<String> {
         val response = template.getForObject<BranchInfoCommitResponse>(
             "/rest/branch-utils/1.0/projects/${repo.project}/repos/${repo.repository}/branches/info/${commit}"
-        )
+        )!!
         return response.values.filter { it.type == "BRANCH" }.map { it.displayId }
     }
 
@@ -120,7 +120,7 @@ class BitbucketClientImpl(
         if (isBranchExisting(repo, branch)) {
             val response = template.getForObject<GetBranchLastCommitResponse>(
                 "/rest/api/1.0/projects/${repo.project}/repos/${repo.repository}/commits?limit=1&until=refs/heads/${branch}"
-            )
+            )!!
             return response.values.firstOrNull()?.id
         } else {
             return null
@@ -217,7 +217,7 @@ class BitbucketClientImpl(
     override fun isPRMergeable(repo: BitbucketRepository, prId: Int): Boolean {
         val response = template.getForObject<PRMergeableResponse>(
             "/rest/api/latest/projects/${repo.project}/repos/${repo.repository}/pull-requests/${prId}/merge",
-        )
+        )!!
         return response.outcome == "CLEAN"
                 && response.vetoes.isNullOrEmpty()
                 && !response.conflicted
@@ -226,7 +226,7 @@ class BitbucketClientImpl(
     override fun mergePR(repo: BitbucketRepository, prId: Int, message: String) {
         val pr = template.getForObject<PRResponse>(
             "/rest/api/latest/projects/${repo.project}/repos/${repo.repository}/pull-requests/${prId}"
-        )
+        )!!
         template.postForObject(
             "/rest/api/latest/projects/${repo.project}/repos/${repo.repository}/pull-requests/${prId}/merge",
             mapOf(
@@ -244,7 +244,7 @@ class BitbucketClientImpl(
     ): List<BitbucketServerCommit> =
         template.getForObject<JsonNode>(
             "/rest/api/latest/projects/${repo.project}/repos/${repo.repository}/commits?since=$fromCommit&until=$toCommit&limit=$maxCommits"
-        ).path("values").map {
+        )!!.path("values").map {
             it.parse<BitbucketServerCommit>()
         }
 
@@ -255,7 +255,7 @@ class BitbucketClientImpl(
         try {
             template.getForObject<JsonNode>(
                 "/rest/api/latest/projects/${repository.project}/repos/${repository.repository}/commits/${commit}"
-            ).parse<BitbucketServerCommit>()
+            )!!.parse<BitbucketServerCommit>()
         } catch (_: NotFound) {
             null
         }
@@ -266,7 +266,7 @@ class BitbucketClientImpl(
         while (!isLastPage) {
             val response = template.getForObject<JsonNode>(
                 "/rest/api/latest/projects/${repo.project}/repos/${repo.repository}/commits?start=$start&limit=$maxCommits"
-            )
+            )!!
             response.path("values").forEach {
                 code(it.parse<BitbucketServerCommit>())
             }
@@ -277,15 +277,15 @@ class BitbucketClientImpl(
         }
     }
 
-    private val template = RestTemplateBuilder()
+    private val template = jackson2RestTemplateBuilder()
         .rootUri(configuration.url)
         .basicAuthentication(
-            configuration.user,
-            configuration.password
+            requireNotNull(configuration.user) { "Username must not be null" },
+            requireNotNull(configuration.password) { "Password must not be null" }
         )
         .build()
 
-    private fun tokenTemplate(token: String) = RestTemplateBuilder()
+    private fun tokenTemplate(token: String) = jackson2RestTemplateBuilder()
         .rootUri(configuration.url)
         .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer $token")
         .build()

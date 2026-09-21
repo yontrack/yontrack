@@ -87,12 +87,12 @@ class GQLRootQuerySCMCatalog(
                 ?.run { SCMCatalogProjectFilterLink.valueOf(this) }
                 ?: SCMCatalogProjectFilterLink.ALL
         val project: String? = env.getArgument<String>(ARG_PROJECT)
-        val beforeLastActivity: LocalDate? = env.getArgument<String?>(ARG_BEFORE_LAST_ACTIVITY)?.run { JDKLocalDateDeserializer.parse(this) }
-        val afterLastActivity: LocalDate? = env.getArgument<String?>(ARG_AFTER_LAST_ACTIVITY)?.run { JDKLocalDateDeserializer.parse(this) }
-        val beforeCreatedAt: LocalDate? = env.getArgument<String?>(ARG_BEFORE_CREATED_AT)?.run { JDKLocalDateDeserializer.parse(this) }
-        val afterCreatedAt: LocalDate? = env.getArgument<String?>(ARG_AFTER_CREATED_AT)?.run { JDKLocalDateDeserializer.parse(this) }
+        val beforeLastActivity: LocalDate? = env.getArgument<String>(ARG_BEFORE_LAST_ACTIVITY)?.run { JDKLocalDateDeserializer.parse(this) }
+        val afterLastActivity: LocalDate? = env.getArgument<String>(ARG_AFTER_LAST_ACTIVITY)?.run { JDKLocalDateDeserializer.parse(this) }
+        val beforeCreatedAt: LocalDate? = env.getArgument<String>(ARG_BEFORE_CREATED_AT)?.run { JDKLocalDateDeserializer.parse(this) }
+        val afterCreatedAt: LocalDate? = env.getArgument<String>(ARG_AFTER_CREATED_AT)?.run { JDKLocalDateDeserializer.parse(this) }
         val team: String? = env.getArgument(ARG_TEAM)
-        val sortOn: SCMCatalogProjectFilterSort? = env.getArgument<String?>(ARG_SORT_ON)?.run { SCMCatalogProjectFilterSort.valueOf(this) }
+        val sortOn: SCMCatalogProjectFilterSort? = env.getArgument<String>(ARG_SORT_ON)?.run { SCMCatalogProjectFilterSort.valueOf(this) }
         val sortAscending: Boolean = env.getArgument(ARG_SORT_ASCENDING) ?: true
         val filter = SCMCatalogProjectFilter(
                 offset = offset,

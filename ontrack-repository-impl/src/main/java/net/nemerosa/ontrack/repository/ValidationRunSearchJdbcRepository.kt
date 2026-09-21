@@ -34,7 +34,7 @@ class ValidationRunSearchJdbcRepository(
                 sql,
                 params,
                 Int::class.java
-        ).map { id ->
+        ).filterNotNull().map { id ->
             structureRepository.getValidationRun(ID.of(id)) {
                 validationRunStatusService(it)
             }

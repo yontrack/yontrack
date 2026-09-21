@@ -8,7 +8,7 @@ dependencies {
 
     implementation(project(":ontrack-repository-support"))
     implementation("io.micrometer:micrometer-core")
-    implementation("org.springframework.boot:spring-boot-starter-web")
+    implementation("org.springframework.boot:spring-boot-starter-webmvc")
     implementation("com.opencsv:opencsv")
 
     testImplementation(testFixtures(project(":ontrack-it-utils")))

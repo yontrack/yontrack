@@ -35,13 +35,13 @@ class PromotionLevelJdbcRepository(
             jdbcTemplate!!.queryForList(
                 """SELECT DISTINCT(NAME) FROM PROMOTION_LEVELS ORDER BY NAME""",
                 String::class.java
-            )
+            ).filterNotNull()
         } else {
             namedParameterJdbcTemplate!!.queryForList(
                 """SELECT DISTINCT(NAME) FROM PROMOTION_LEVELS WHERE NAME ILIKE :name ORDER BY NAME""",
                 mapOf("name" to "%$token%"),
                 String::class.java
-            )
+            ).filterNotNull()
         }
 
     override fun findPromotionLevelNamesByProject(project: Project, token: String?): List<String> =
@@ -58,7 +58,7 @@ class PromotionLevelJdbcRepository(
                     "projectId" to project.id()
                 ),
                 String::class.java
-            )
+            ).filterNotNull()
         } else {
             namedParameterJdbcTemplate!!.queryForList(
                 """
@@ -74,7 +74,7 @@ class PromotionLevelJdbcRepository(
                     "token" to "%${token}%",
                 ),
                 String::class.java
-            )
+            ).filterNotNull()
         }
 
     override fun findByToken(token: String?): List<PromotionLevel> =

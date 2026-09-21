@@ -9,7 +9,7 @@ dependencies {
     implementation(project(":ontrack-extension-scm"))
     implementation(project(":ontrack-ui-graphql"))
     implementation("org.slf4j:slf4j-api")
-    implementation("org.springframework.boot:spring-boot-starter-web")
+    implementation("org.springframework.boot:spring-boot-starter-webmvc")
     implementation("io.micrometer:micrometer-core")
 
     implementation("org.springframework:spring-tx")

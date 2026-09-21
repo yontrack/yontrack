@@ -50,7 +50,7 @@ class GQLRootQueryEnvironmentMatrix(
             )
             .type(gqlTypeEnvironmentMatrix.typeRef.toNotNull())
             .dataFetcher { env ->
-                val filter = env.getArgument<Any?>(ARG_FILTER)
+                val filter = env.getArgument<Any>(ARG_FILTER)
                     ?.let { gqlInputEnvironmentMatrixFilter.convert(it) }
                     ?: EnvironmentMatrixFilter()
                 environmentMatrixService.matrix(

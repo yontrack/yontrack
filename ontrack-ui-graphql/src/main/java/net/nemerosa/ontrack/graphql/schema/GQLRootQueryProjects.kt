@@ -71,7 +71,7 @@ class GQLRootQueryProjects(
             val id: Int? = environment.getArgument(ARG_ID)
             val name: String? = environment.getArgument(ARG_NAME)
             val namePattern: String? = environment.getArgument(ARG_NAME_PATTERN)
-            val favourites = environment.getArgument<Boolean?>(ARG_FAVOURITES) ?: false
+            val favourites = environment.getArgument<Boolean>(ARG_FAVOURITES) ?: false
             val labels: List<String>? = environment.getArgument<List<String>>(ARG_LABELS)
             // Per ID
             when {

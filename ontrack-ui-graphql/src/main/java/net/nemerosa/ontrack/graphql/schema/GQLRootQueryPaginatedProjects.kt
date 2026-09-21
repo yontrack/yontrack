@@ -37,7 +37,7 @@ class GQLRootQueryPaginatedProjects(
             ),
             itemPaginatedListProvider = { env, offset, size ->
                 val name: String? = env.getArgument("name")
-                val labels: List<String> = env.getArgument<List<String>?>(ARG_LABELS) ?: emptyList()
+                val labels: List<String> = env.getArgument<List<String>>(ARG_LABELS) ?: emptyList()
                 // The filtering is done on the whole list of projects, before the page is
                 // extracted - filtering the page would give a wrong total and hide items.
                 val items = structureService.findProjects(name, labels)

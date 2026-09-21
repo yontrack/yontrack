@@ -59,7 +59,7 @@ class GQLContributorRecordings(
         size: Int
     ): PaginatedList<R> {
         // Parsing of the filter
-        val filterJson = environment.getArgument<Any?>(ARG_FILTER)?.asJson()
+        val filterJson = environment.getArgument<Any>(ARG_FILTER)?.asJson()
         val filter = filterJson?.run { parseInto(filterType) }
         // Pagination
         return recordingsQueryService.findByFilter(this, filter, offset, size)

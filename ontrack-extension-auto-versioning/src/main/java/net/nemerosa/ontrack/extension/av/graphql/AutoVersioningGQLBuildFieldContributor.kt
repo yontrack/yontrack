@@ -66,7 +66,7 @@ class AutoVersioningGQLBuildFieldContributor(
                         }
 
                         // Getting the dependencies right
-                        val direction = env.getArgument<String?>(ARG_DIRECTION)
+                        val direction = env.getArgument<String>(ARG_DIRECTION)
                             ?.takeIf { it.isNotBlank() }
                             ?.let { AutoVersioningDirection.valueOf(it) }
                             ?: AutoVersioningDirection.DOWN

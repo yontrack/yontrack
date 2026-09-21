@@ -56,6 +56,6 @@ class AccountIdpGroupJdbcRepository(dataSource: DataSource) : AbstractJdbcReposi
             """.trimIndent(),
             mapOf("accountId" to accountId),
             String::class.java
-        )
+        ).filterNotNull()
     }
 }

@@ -35,7 +35,7 @@ object GQLScalarUUID {
                         override fun parseLiteral(input: Any): UUID =
                                 when (input) {
                                     is StringValue -> try {
-                                        parse(input.value)
+                                        parse(input.value ?: throw CoercingParseLiteralException("Cannot parse literal: $input"))
                                     } catch (ex: IllegalArgumentException) {
                                         throw CoercingParseLiteralException("Cannot parse literal: $input", ex)
                                     }

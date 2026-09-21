@@ -574,7 +574,7 @@ class CoreBuildFilterJdbcRepository(
                 sql,
                 params,
                 Int::class.java
-            )
+            ).filterNotNull()
             .map { id -> structureRepository.getBuild(ID.of(id)) }
     }
 

@@ -54,7 +54,7 @@ class StorageJdbcRepository(
             "SELECT NAME FROM STORAGE WHERE STORE = :store ORDER BY NAME",
             params("store", store),
             String::class.java
-        )
+        ).filterNotNull()
     }
 
     override fun count(store: String, context: String, query: String?, queryVariables: Map<String, *>?): Int {

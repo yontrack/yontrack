@@ -1,7 +1,7 @@
 package net.nemerosa.ontrack.extension.support.client
 
 import org.springframework.boot.autoconfigure.condition.ConditionalOnNotWebApplication
-import org.springframework.boot.web.client.RestTemplateBuilder
+import org.springframework.boot.restclient.RestTemplateBuilder
 import org.springframework.http.HttpMethod
 import org.springframework.stereotype.Component
 import org.springframework.test.web.client.ExpectedCount

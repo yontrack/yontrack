@@ -28,7 +28,7 @@ class GQLRootQueryEnvironments(
             )
             .type(listType(gqlTypeEnvironment.typeRef))
             .dataFetcher { env ->
-                val filterInput = env.getArgument<Any?>(ARG_FILTER)
+                val filterInput = env.getArgument<Any>(ARG_FILTER)
                 val filter = filterInput?.let { gqlInputEnvironmentFilter.convert(it) }
                     ?: EnvironmentFilter()
                 environmentService.findAll(filter)

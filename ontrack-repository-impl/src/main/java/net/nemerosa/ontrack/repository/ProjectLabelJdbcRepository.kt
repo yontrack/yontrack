@@ -48,7 +48,7 @@ class ProjectLabelJdbcRepository(
                        """,
             params("label", label),
             Integer::class.java
-        ).map { it.toInt() }
+        ).filterNotNull().map { it.toInt() }
 
     override fun associateProjectToLabel(project: Int, label: Int) {
         val params = params("project", project).addValue("label", label)

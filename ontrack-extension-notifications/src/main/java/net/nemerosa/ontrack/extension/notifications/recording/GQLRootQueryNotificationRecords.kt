@@ -57,14 +57,14 @@ class GQLRootQueryNotificationRecords(
                 ),
             ),
             itemPaginatedListProvider = { env, offset, size ->
-                val resultType = env.getArgument<String?>(ARG_FILTER_RESULT_TYPE)?.let {
+                val resultType = env.getArgument<String>(ARG_FILTER_RESULT_TYPE)?.let {
                     NotificationResultType.valueOf(it)
                 }
                 val channel: String? = env.getArgument(ARG_FILTER_CHANNEL)
                 val sourceId: String? = env.getArgument(ARG_FILTER_SOURCE_ID)
                 val sourceData: JsonNode? = env.getArgument(ARG_FILTER_SOURCE_DATA)
 
-                val eventEntityType = env.getArgument<String?>(ARG_FILTER_EVENT_ENTITY_TYPE)
+                val eventEntityType = env.getArgument<String>(ARG_FILTER_EVENT_ENTITY_TYPE)
                     ?.takeIf { it.isNotBlank() }
                     ?.let { ProjectEntityType.valueOf(it) }
                 val eventEntityNumericId: Int? = env.getArgument(ARG_FILTER_EVENT_ENTITY_ID)

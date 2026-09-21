@@ -4,7 +4,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import com.fasterxml.jackson.annotation.JsonProperty
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
-import org.springframework.boot.web.client.RestTemplateBuilder
+import net.nemerosa.ontrack.extension.support.client.jackson2RestTemplateBuilder
 import org.springframework.http.client.HttpComponentsClientHttpRequestFactory
 import org.springframework.web.client.RestTemplate
 import org.springframework.web.client.getForObject
@@ -17,7 +17,7 @@ class TFCClientImpl(
     private val logger: Logger = LoggerFactory.getLogger(TFCClientImpl::class.java)
 
     private val client: RestTemplate by lazy {
-        RestTemplateBuilder()
+        jackson2RestTemplateBuilder()
             .requestFactory(HttpComponentsClientHttpRequestFactory::class.java)
             .rootUri("$url/api/v2")
             .defaultHeader("Authorization", "Bearer $token")
@@ -26,7 +26,7 @@ class TFCClientImpl(
     }
 
     override val organizations: List<TFCOrganization>
-        get() = client.getForObject<TOrganizations>("/organizations")
+        get() = client.getForObject<TOrganizations>("/organizations")!!
             .data.map { data ->
                 TFCOrganization(
                     id = data.attributes.externalId,
@@ -35,7 +35,7 @@ class TFCClientImpl(
             }
 
     override fun getWorkspaceVariables(workspaceId: String): List<TFCVariable> =
-        client.getForObject<TWorkspaceVariables>("/workspaces/$workspaceId/vars")
+        client.getForObject<TWorkspaceVariables>("/workspaces/$workspaceId/vars")!!
             .data.map { data ->
                 TFCVariable(
                     id = data.id,

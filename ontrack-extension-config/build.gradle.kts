@@ -7,7 +7,7 @@ dependencies {
     api(project(":ontrack-extension-support"))
 
     implementation("org.jetbrains.kotlin:kotlin-reflect")
-    implementation("org.springframework.boot:spring-boot-starter-web")
+    implementation("org.springframework.boot:spring-boot-starter-webmvc")
     implementation(project(":ontrack-ui-graphql"))
     implementation(project(":ontrack-extension-license"))
     implementation(project(":ontrack-extension-casc"))

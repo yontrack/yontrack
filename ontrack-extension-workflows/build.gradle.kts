@@ -18,7 +18,7 @@ dependencies {
     implementation(project(":ontrack-extension-casc"))
     implementation(project(":ontrack-extension-config"))
     implementation(project(":ontrack-repository-support"))
-    implementation("org.springframework.boot:spring-boot-starter-web")
+    implementation("org.springframework.boot:spring-boot-starter-webmvc")
 
     testImplementation(testFixtures(project(":ontrack-model")))
     testImplementation(testFixtures(project(":ontrack-ui-graphql")))

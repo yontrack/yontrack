@@ -2,7 +2,7 @@ package net.nemerosa.ontrack.extension.elastic.metrics
 
 import net.nemerosa.ontrack.common.api.APIDescription
 import net.nemerosa.ontrack.common.api.APIName
-import org.springframework.boot.autoconfigure.elasticsearch.ElasticsearchProperties
+import org.springframework.boot.elasticsearch.autoconfigure.ElasticsearchProperties
 import org.springframework.boot.context.properties.ConfigurationProperties
 import org.springframework.boot.convert.DurationUnit
 import org.springframework.stereotype.Component

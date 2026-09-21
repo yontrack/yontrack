@@ -4,7 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode
 import net.nemerosa.ontrack.extension.bitbucket.cloud.configuration.BitbucketCloudAuthType
 import net.nemerosa.ontrack.extension.bitbucket.cloud.configuration.BitbucketCloudConfiguration
 import net.nemerosa.ontrack.extension.bitbucket.cloud.model.*
-import org.springframework.boot.web.client.RestTemplateBuilder
+import net.nemerosa.ontrack.extension.support.client.jackson2RestTemplateBuilder
 import org.springframework.core.io.ByteArrayResource
 import org.springframework.http.HttpEntity
 import org.springframework.http.HttpHeaders
@@ -366,7 +366,7 @@ class DefaultBitbucketCloudClient(
         template.getForObject(path, responseType.java) ?: throw BitbucketCloudNoResponseException(path)
 
     internal val template: RestTemplate by lazy {
-        RestTemplateBuilder()
+        jackson2RestTemplateBuilder()
             .rootUri(ROOT_URI)
             .defaultHeader(HttpHeaders.AUTHORIZATION, authorizationHeader(configuration))
             .build()

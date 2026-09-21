@@ -43,7 +43,7 @@ class DocumentsJdbcRepository(
         return jdbcTemplate!!.queryForList(
                 "SELECT DISTINCT(STORE) FROM DOCUMENTS",
                 String::class.java
-        ).sorted()
+        ).filterNotNull().sorted()
     }
 
     override fun getDocumentNames(store: String): List<String> {
@@ -51,7 +51,7 @@ class DocumentsJdbcRepository(
                 "SELECT NAME FROM DOCUMENTS WHERE STORE = :store ORDER BY NAME",
                 params(STORE, store),
                 String::class.java
-        )
+        ).filterNotNull()
     }
 
     override fun getSize(store: String): Long {

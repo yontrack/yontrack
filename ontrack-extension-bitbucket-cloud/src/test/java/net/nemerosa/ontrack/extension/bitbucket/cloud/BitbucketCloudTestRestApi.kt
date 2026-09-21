@@ -1,7 +1,7 @@
 package net.nemerosa.ontrack.extension.bitbucket.cloud
 
 import com.fasterxml.jackson.databind.JsonNode
-import org.springframework.boot.web.client.RestTemplateBuilder
+import net.nemerosa.ontrack.extension.support.client.jackson2RestTemplateBuilder
 import org.springframework.web.client.RestTemplate
 import org.springframework.web.util.UriComponentsBuilder
 import java.net.URI
@@ -61,7 +61,7 @@ class BitbucketCloudTestRestApi(
 
         fun of(env: BitbucketCloudTestEnv, identity: BitbucketCloudTestIdentity = env.bot) =
             BitbucketCloudTestRestApi(
-                template = RestTemplateBuilder().basicAuthentication(identity.email, identity.token).build(),
+                template = jackson2RestTemplateBuilder().basicAuthentication(identity.email, identity.token).build(),
                 workspace = env.workspace,
                 repository = env.repository,
             )

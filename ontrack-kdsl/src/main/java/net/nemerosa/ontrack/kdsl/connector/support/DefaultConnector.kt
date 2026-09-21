@@ -4,7 +4,6 @@ import net.nemerosa.ontrack.kdsl.connector.Connector
 import net.nemerosa.ontrack.kdsl.connector.ConnectorResponse
 import net.nemerosa.ontrack.kdsl.connector.ConnectorResponseBody
 import net.nemerosa.ontrack.kdsl.connector.FileContent
-import org.springframework.boot.web.client.RestTemplateBuilder
 import org.springframework.core.io.ByteArrayResource
 import org.springframework.http.HttpEntity
 import org.springframework.http.HttpHeaders
@@ -66,7 +65,7 @@ class DefaultConnector(
         private val response: ResponseEntity<ByteArray>,
     ) : ConnectorResponse {
         override val statusCode: Int
-            get() = response.statusCodeValue
+            get() = response.statusCode.value()
         override val body: ConnectorResponseBody = object : ConnectorResponseBody {
             override fun asTextOrNull(charset: Charset): String? =
                 response.body?.toString(charset)
@@ -135,7 +134,7 @@ class DefaultConnector(
         headers: Map<String, String>,
         noAuth: Boolean = false,
     ): RestTemplate {
-        var builder = RestTemplateBuilder().rootUri(url)
+        var builder = jackson2RestTemplateBuilder().rootUri(url)
         defaultHeaders.forEach { (name, value) ->
             if ((name != "Authorization" && name != X_ONTRACK_TOKEN) || !noAuth) {
                 builder = builder.defaultHeader(name, value)

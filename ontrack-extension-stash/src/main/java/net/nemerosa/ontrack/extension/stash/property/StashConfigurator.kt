@@ -8,7 +8,7 @@ import net.nemerosa.ontrack.extension.issues.IssueServiceRegistry
 import net.nemerosa.ontrack.extension.issues.model.ConfiguredIssueService
 import net.nemerosa.ontrack.model.structure.Project
 import net.nemerosa.ontrack.model.structure.PropertyService
-import org.springframework.boot.web.client.RestTemplateBuilder
+import net.nemerosa.ontrack.extension.support.client.jackson2RestTemplateBuilder
 import org.springframework.stereotype.Component
 import org.springframework.web.client.getForObject
 
@@ -32,15 +32,15 @@ class StashConfigurator(
 
     override fun getPullRequest(configuration: GitConfiguration, id: Int): GitPullRequest? =
         if (configuration is StashGitConfiguration) {
-            val restTemplate = RestTemplateBuilder()
+            val restTemplate = jackson2RestTemplateBuilder()
                 .rootUri(configuration.configuration.url)
                 .basicAuthentication(
-                    configuration.configuration.user,
-                    configuration.configuration.password,
+                    requireNotNull(configuration.configuration.user) { "Username must not be null" },
+                    requireNotNull(configuration.configuration.password) { "Password must not be null" },
                 )
                 .build()
             val json =
-                restTemplate.getForObject<JsonNode>("rest/api/1.0/projects/${configuration.project}/repos/${configuration.repository}/pull-requests/$id")
+                restTemplate.getForObject<JsonNode>("rest/api/1.0/projects/${configuration.project}/repos/${configuration.repository}/pull-requests/$id")!!
             GitPullRequest(
                 id = id,
                 key = "PR-$id",

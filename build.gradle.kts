@@ -18,9 +18,9 @@ buildscript {
 }
 
 plugins {
-    kotlin("jvm") version "2.2.20"
-    kotlin("plugin.spring") version "2.2.20"
-    id("org.springframework.boot") version "3.5.16" apply false
+    kotlin("jvm") version "2.3.21"
+    kotlin("plugin.spring") version "2.3.21"
+    id("org.springframework.boot") version "4.1.1" apply false
     id("com.avast.gradle.docker-compose") version "0.17.12"
     id("com.google.cloud.tools.jib") version "3.5.1" apply false
     id("com.github.node-gradle.node") version "7.1.0" apply false
@@ -188,7 +188,7 @@ configure(javaProjects) {
         jvmToolchain(21)
         compilerOptions {
             freeCompilerArgs.addAll("-Xjsr305=strict", "-Xannotation-default-target=param-property")
-            languageVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_2)
+            languageVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_3)
         }
     }
 
@@ -287,9 +287,10 @@ configure(javaProjects) {
     // lockfiles introduced by #1752, which is why the switch was done after locking rather than with
     // it.
     //
-    // `platform`, not `enforcedPlatform`: this build compiles with a Kotlin far newer than the one
-    // the BOM pins, and an enforced platform would force org.jetbrains.kotlin:* back down to the
-    // BOM's 1.9.25 with nothing able to lift it again.
+    // `platform`, not `enforcedPlatform`: an enforced platform would force org.jetbrains.kotlin:*
+    // to the Kotlin the BOM pins with nothing able to lift it again, and this build has compiled
+    // with a newer Kotlin than the BOM's before (Boot 3.5 pinned 1.9.25). Boot 4.1.1 pins 2.3.21,
+    // the version below, so for now the two agree.
     //
     // The BOM property overrides that went with the plugin -- `extra["kotlin.version"]` and
     // `extra["kotlin-coroutines.version"]`, which io.spring.dependency-management resolved against
@@ -303,15 +304,13 @@ configure(javaProjects) {
     // module declared without one.
     // ===============================================================================================================
 
-    val kotlinVersion = "2.2.20"
+    val kotlinVersion = "2.3.21"
     val kotlinCoroutinesVersion = "1.10.2"
     val jjwtVersion = "0.12.6"
     val greenMailVersion = "1.6.15"
     val mockkVersion = "1.13.17"
     val jgitVersion = "6.6.1.202309021850-r"
-    val tomcatVersion = "10.1.59"
     val amqpClientVersion = "5.36.0"
-    val postgresqlVersion = "42.7.13"
     val msgpackCoreVersion = "0.9.12"
     val commonsBeanutilsVersion = "1.11.0"
 
@@ -351,21 +350,11 @@ configure(javaProjects) {
         // Git repository support TODO Will be removed in V6
         "org.eclipse.jgit:org.eclipse.jgit:$jgitVersion",
 
-        // Tomcat pinned past the Boot BOM (3.5.16 manages 10.1.55) to fix CVE-2026-65182,
-        // CVE-2026-65905 and CVE-2026-68525 (fixed in 10.1.58). Remove this pin once the
-        // Spring Boot BOM manages Tomcat >= 10.1.58.
-        "org.apache.tomcat.embed:tomcat-embed-core:$tomcatVersion",
-        "org.apache.tomcat.embed:tomcat-embed-el:$tomcatVersion",
-        "org.apache.tomcat.embed:tomcat-embed-websocket:$tomcatVersion",
-
         // Transitive libraries pinned past their managed versions to clear the HIGHs of the backend
         // image scan. Each pin goes once its source brings a fixed version by itself.
-        // - amqp-client (Boot BOM manages 5.25.0): CVE-2026-63337, CVE-2026-69219, CVE-2026-69220,
+        // - amqp-client (Boot BOM manages 5.30.0): CVE-2026-63337, CVE-2026-69219, CVE-2026-69220,
         //   CVE-2026-75516 (fixed in 5.34.0). Remove once the Spring Boot BOM manages >= 5.34.0.
         "com.rabbitmq:amqp-client:$amqpClientVersion",
-        // - PostgreSQL JDBC driver (Boot BOM manages 42.7.11): CVE-2026-54291 (fixed in 42.7.12).
-        //   Remove once the Spring Boot BOM manages >= 42.7.12.
-        "org.postgresql:postgresql:$postgresqlVersion",
         // - msgpack-core (0.9.8 via influxdb-java 2.25): CVE-2026-21452 (fixed in 0.9.11).
         //   Remove once influxdb-java brings msgpack-core >= 0.9.11.
         "org.msgpack:msgpack-core:$msgpackCoreVersion",
@@ -383,10 +372,16 @@ configure(javaProjects) {
     // `configurations.matching` rather than a direct lookup: `api` and `compileOnlyApi` only exist
     // once java-library is applied, which happens when the subproject's own build script is
     // evaluated -- after this one.
+    //
+    // Not on `testApi` / `testCompileOnlyApi`, though: nothing declares a dependency there, and
+    // Kotlin 2.3 warns about any dependency in the API buckets of the test source set.
     sourceSets.configureEach {
-        val buckets = setOf(
-            apiConfigurationName,
-            compileOnlyApiConfigurationName,
+        val apiBuckets = if (name == SourceSet.TEST_SOURCE_SET_NAME) {
+            emptySet()
+        } else {
+            setOf(apiConfigurationName, compileOnlyApiConfigurationName)
+        }
+        val buckets = apiBuckets + setOf(
             implementationConfigurationName,
             compileOnlyConfigurationName,
             runtimeOnlyConfigurationName,
@@ -406,6 +401,8 @@ configure(javaProjects) {
         implementation("jakarta.validation:jakarta.validation-api")
 
         runtimeOnly("org.hibernate.validator:hibernate-validator")
+        // The Validator bean, auto-configured by spring-boot-autoconfigure before Spring Boot 4
+        runtimeOnly("org.springframework.boot:spring-boot-validation")
 
         testImplementation("org.springframework.boot:spring-boot-starter-test")
         testImplementation("org.jetbrains.kotlin:kotlin-test")

@@ -23,13 +23,13 @@ class GQLRootQueryAutoVersioningAuditEntries(
             fieldDescription = "List of audit entries for auto versioning processing orders",
             itemType = gqlTypeAutoVersioningAuditEntry.typeName,
             itemListCounter = { env ->
-                val filterInput = env.getArgument<Any?>("filter")
+                val filterInput = env.getArgument<Any>("filter")
                 val filter = filterInput?.let { gqlinputAutoVersioningAuditQueryFilter.convert(it) }
                     ?: AutoVersioningAuditQueryFilter()
                 autoVersioningAuditQueryService.countByFilter(filter)
             },
             itemListProvider = { env, offset, count ->
-                val filterInput = env.getArgument<Any?>("filter")
+                val filterInput = env.getArgument<Any>("filter")
                 val filter = (filterInput?.let { gqlinputAutoVersioningAuditQueryFilter.convert(it) }
                     ?: AutoVersioningAuditQueryFilter())
                     .withOffset(offset)

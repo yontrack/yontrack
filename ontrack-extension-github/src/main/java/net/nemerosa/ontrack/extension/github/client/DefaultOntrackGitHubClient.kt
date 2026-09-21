@@ -20,7 +20,7 @@ import net.nemerosa.ontrack.model.metrics.increment
 import org.apache.commons.codec.binary.Base64
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
-import org.springframework.boot.web.client.RestTemplateBuilder
+import net.nemerosa.ontrack.extension.support.client.jackson2RestTemplateBuilder
 import org.springframework.http.HttpHeaders
 import org.springframework.http.MediaType
 import org.springframework.web.client.HttpClientErrorException
@@ -52,7 +52,7 @@ class DefaultOntrackGitHubClient(
     override fun getRateLimit(): GitHubRateLimit? =
         try {
             createGitHubRestTemplate()("Gets rate limit") {
-                getForObject<JsonNode>("/rate_limit").getJsonField("resources")?.run {
+                getForObject<JsonNode>("/rate_limit")!!.getJsonField("resources")?.run {
                     parse()
                 }
             }
@@ -83,7 +83,7 @@ class DefaultOntrackGitHubClient(
             val client = createGitHubRestTemplate()
             // Gets the organization names
             client("Gets list of organizations") {
-                getForObject<JsonNode>("/user/orgs?per_page=100").map { node ->
+                getForObject<JsonNode>("/user/orgs?per_page=100")!!.map { node ->
                     node.parse()
                 }
             }
@@ -142,7 +142,7 @@ class DefaultOntrackGitHubClient(
         // Gets the issue
         return try {
             client("Get issue $repository#$id") {
-                getForObject<JsonNode>("/repos/$owner/$name/issues/$id").let {
+                getForObject<JsonNode>("/repos/$owner/$name/issues/$id")!!.let {
                     GitHubIssue(
                         id = id,
                         url = it.getRequiredTextField("html_url"),
@@ -357,7 +357,7 @@ class DefaultOntrackGitHubClient(
     override fun createGitHubRestTemplate(token: String?): RestTemplate =
         createGitHubTemplate(graphql = false, token = token)
 
-    private fun createGitHubTemplate(graphql: Boolean, token: String?): RestTemplate = RestTemplateBuilder()
+    private fun createGitHubTemplate(graphql: Boolean, token: String?): RestTemplate = jackson2RestTemplateBuilder()
         .rootUri(getApiRoot(configuration.url, graphql))
         .connectTimeout(timeout)
         .readTimeout(timeout)
@@ -368,11 +368,11 @@ class DefaultOntrackGitHubClient(
                 when (configuration.authenticationType) {
                     GitHubAuthenticationType.ANONYMOUS -> this // Nothing to be done
                     GitHubAuthenticationType.PASSWORD -> {
-                        basicAuthentication(configuration.user, configuration.password)
+                        basicAuthentication(requireNotNull(configuration.user) { "Username must not be null" }, requireNotNull(configuration.password) { "Password must not be null" })
                     }
 
                     GitHubAuthenticationType.USER_TOKEN -> {
-                        basicAuthentication(configuration.user, configuration.oauth2Token)
+                        basicAuthentication(requireNotNull(configuration.user) { "Username must not be null" }, requireNotNull(configuration.oauth2Token) { "Password must not be null" })
                     }
 
                     GitHubAuthenticationType.TOKEN -> {
@@ -401,7 +401,7 @@ class DefaultOntrackGitHubClient(
         // Getting the PR
         return try {
             client("Get PR $repository#$pr") {
-                getForObject<GitHubPR?>("/repos/$owner/$name/pulls/$pr")
+                getForObject<GitHubPR>("/repos/$owner/$name/pulls/$pr")
             }
         } catch (ex: GitHubErrorsException) {
             if (ex.status == 404) {
@@ -421,7 +421,7 @@ class DefaultOntrackGitHubClient(
         // Getting the PR
         return try {
             client("Get PR $repository#$id") {
-                getForObject<JsonNode?>("/repos/$owner/$name/pulls/$id")?.run {
+                getForObject<JsonNode>("/repos/$owner/$name/pulls/$id")?.run {
                     GitPullRequest(
                         id = id,
                         key = "#$id",
@@ -520,7 +520,7 @@ class DefaultOntrackGitHubClient(
                     "$this?ref=$branch"
                 }
                 client("Get file content $repository/$path@$branch") {
-                    getForObject<GitHubGetContentResponse>(restPath).let {
+                    getForObject<GitHubGetContentResponse>(restPath)!!.let {
                         GitHubFile(
                             content = it.content,
                             sha = it.sha,
@@ -836,7 +836,7 @@ class DefaultOntrackGitHubClient(
         return client<List<GitHubCommit>>("Comparing commits") {
             getForObject<JsonNode>(
                 "/repos/$owner/$name/compare/$base...$head"
-            ).path("commits").map { commitNode ->
+            )!!.path("commits").map { commitNode ->
                 commitNode.parse()
             }
         }.reversed()
@@ -853,7 +853,7 @@ class DefaultOntrackGitHubClient(
         // Call
         return try {
             client("Getting commit $commit") {
-                getForObject<GitHubCommit?>(
+                getForObject<GitHubCommit>(
                     "/repos/$owner/$name/commits/$commit"
                 )
             }
@@ -906,7 +906,7 @@ class DefaultOntrackGitHubClient(
 
     override fun getWorkflowRun(repository: String, runId: Long): WorkflowRun {
         val client = createGitHubRestTemplate()
-        return client.getForObject<WorkflowRun>("/repos/$repository/actions/runs/$runId")
+        return client.getForObject<WorkflowRun>("/repos/$repository/actions/runs/$runId")!!
     }
 
     override fun waitUntilWorkflowRun(repository: String, runId: Long, retries: Int, retriesDelaySeconds: Int) {
@@ -938,7 +938,7 @@ class DefaultOntrackGitHubClient(
                 "sort" to "committer-date",
                 "order" to "desc"
             )
-            val node = client.getForObject<JsonNode>(url, params)
+            val node = client.getForObject<JsonNode>(url, params)!!
             val items = node.path("items")
             if (items.isArray && items.size() > 0) {
                 items[0].path("sha").asText(null)
@@ -1041,7 +1041,7 @@ class DefaultOntrackGitHubClient(
         branch: String,
     ): List<WorkflowRun> {
         val encodedBranch = URLEncoder.encode(branch, Charsets.UTF_8)
-        return client.getForObject<JsonNode>("/repos/$repository/actions/runs?event=workflow_dispatch&branch=$encodedBranch")
+        return client.getForObject<JsonNode>("/repos/$repository/actions/runs?event=workflow_dispatch&branch=$encodedBranch")!!
             .path("workflow_runs")
             .map {
                 it.parse()
@@ -1055,7 +1055,7 @@ class DefaultOntrackGitHubClient(
         id: String,
     ): Boolean {
         val expectedName = "inputs-$id.properties"
-        val artifacts = client.getForObject<JsonNode>("/repos/$repository/actions/runs/$runId/artifacts")
+        val artifacts = client.getForObject<JsonNode>("/repos/$repository/actions/runs/$runId/artifacts")!!
             .path("artifacts")
             .map {
                 it.parse<Artifact>()

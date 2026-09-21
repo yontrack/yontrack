@@ -5,7 +5,8 @@ plugins {
 
 dependencies {
     api(project(":ontrack-json"))
-    api("org.springframework.boot:spring-boot-starter-web")
+    api("org.springframework.boot:spring-boot-starter-webmvc")
+    api("org.springframework.boot:spring-boot-restclient")
 
     implementation("com.apollographql.apollo:apollo-runtime:4.1.1")
     implementation("org.apache.httpcomponents.client5:httpclient5")

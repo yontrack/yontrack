@@ -9,12 +9,12 @@ plugins {
 apply(plugin = "org.springframework.boot")
 
 dependencies {
-    api("org.springframework.boot:spring-boot-starter-web")
+    api("org.springframework.boot:spring-boot-starter-webmvc")
     api("org.springframework.boot:spring-boot-starter-security")
     api("org.springframework.boot:spring-boot-starter-actuator")
-    api("org.springframework.boot:spring-boot-starter-aop")
+    api("org.springframework.boot:spring-boot-starter-aspectj")
     api("org.springframework.boot:spring-boot-starter-jdbc")
-    api("org.springframework.boot:spring-boot-starter-oauth2-resource-server")
+    api("org.springframework.boot:spring-boot-starter-security-oauth2-resource-server")
     api(project(":ontrack-ui-support"))
     api(project(":ontrack-ui-graphql"))
     api(project(":ontrack-extension-api"))

@@ -52,7 +52,7 @@ class AutoVersioningTrailGQLPromotionLevelFieldContributor(
                         .build()
                 ),
                 itemPaginatedListProvider = { env, pl, offset, size ->
-                    val filter = env.getArgument<Any?>(ARG_FILTER)
+                    val filter = env.getArgument<Any>(ARG_FILTER)
                         .let { gqlInputAutoVersioningTrailFilter.convert(it) }
                     autoVersioningTrackingService.getPromotionPaginatedTrail(
                         pl,

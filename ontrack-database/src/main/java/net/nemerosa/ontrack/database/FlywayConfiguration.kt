@@ -1,7 +1,7 @@
 package net.nemerosa.ontrack.database
 
 import org.flywaydb.core.api.configuration.FluentConfiguration
-import org.springframework.boot.autoconfigure.flyway.FlywayConfigurationCustomizer
+import org.springframework.boot.flyway.autoconfigure.FlywayConfigurationCustomizer
 import org.springframework.stereotype.Component
 
 @Component
