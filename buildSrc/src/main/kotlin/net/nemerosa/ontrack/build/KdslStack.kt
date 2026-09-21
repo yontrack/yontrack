@@ -186,6 +186,21 @@ data class KdslStackInstance(
         "ontrack.acceptance.influxdb.url" to influxdbUrl,
     )
 
+    /**
+     * The variables `ontrack-web-tests/ontrack/connection.js` reads, pointing
+     * the Playwright suite at *this* instance. Its defaults are the slot-0
+     * ports, so without them a linked worktree gets its token from -- and
+     * runs against -- another checkout's stack, or none at all (#1847).
+     *
+     * `ONTRACK_MGT_URL` is the management *root*: the fixture appends
+     * `/manage` itself, so it is not [ontrackManagementUrl].
+     */
+    val playwrightEnvironment: Map<String, String> = mapOf(
+        "ONTRACK_MGT_URL" to "http://localhost:$ontrackManagementPort",
+        "ONTRACK_UI_URL" to uiUrl,
+        "ONTRACK_BACKEND_URL" to ontrackUrl,
+    )
+
     fun writeInstanceEnv(file: File) {
         StackSlots.writeInstanceEnv(
             file = file,

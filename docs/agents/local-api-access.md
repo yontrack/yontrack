@@ -92,3 +92,8 @@ Set all three, every time:
 Running one spec this way against a stack you already have up takes seconds, against minutes
 for `./gradlew uiTest`, which builds and starts its own stack. Use the Gradle task for a full
 verification run and this for the edit-run loop.
+
+The Gradle tasks — `uiTest`, `uiLdapTest`, `uiOidcTest` — need none of this: they run against
+the KDSL acceptance stack, not the dev stack, and set the three variables themselves from that
+stack's slot (the one in `.yontrack-kdsl/instance.env`). A variable already set in the
+environment still wins. On CI they are left alone.

@@ -1,6 +1,8 @@
 import com.github.gradle.node.NodeExtension
 import com.github.gradle.node.npm.task.NpmTask
 import net.nemerosa.ontrack.build.Coverage
+import net.nemerosa.ontrack.build.KdslStack
+import net.nemerosa.ontrack.build.KdslStackInstance
 
 plugins {
     id("com.github.node-gradle.node")
@@ -27,6 +29,19 @@ val isCI = System.getenv("CI") == "true"
 // default session type is `kdsl`; the CI workflow names it `ui-main` through COVERAGE_SESSION
 // (#1821). A local run leaves it at the default, and its data lands in `build/jacoco/kdsl.exec`.
 val coverage = providers.gradleProperty(Coverage.GRADLE_PROPERTY).isPresent
+
+// Pointing Playwright at this checkout's KDSL acceptance stack (#1847). Its fixture defaults to the
+// slot-0 ports, which in a linked worktree are another checkout's stack, or none at all.
+//
+// Resolved lazily, like in :ontrack-kdsl-acceptance, so that configuring this file claims no slot.
+// The provider is only read when a test task runs, after the ComposeUp it depends on -- whose
+// `kdslStackSlot` has recorded the slot in .yontrack-kdsl/instance.env by then, so this resolves to
+// the very instance that is up. The three variants share that slot. An explicitly set variable
+// still wins, the way an explicit `-D` does for kdslAcceptanceTest.
+val kdslStack: KdslStackInstance by lazy { KdslStack.resolve(rootDir) }
+val playwrightEnvironment: Provider<Map<String, String>> = provider {
+    kdslStack.playwrightEnvironment.filterKeys { System.getenv(it) == null }
+}
 
 val playwrightInstall by tasks.registering(NpmTask::class) {
     dependsOn("npmInstall")
@@ -58,6 +73,7 @@ val uiTest by tasks.registering(NpmTask::class) {
     if (!isCI) {
         dependsOn(":ontrack-kdsl-acceptance:kdslAcceptanceTestComposeUp")
         finalizedBy(":ontrack-kdsl-acceptance:kdslAcceptanceTestComposeDown")
+        environment.putAll(playwrightEnvironment)
     }
 
     args.set(
@@ -83,6 +99,9 @@ val uiLdapTest by tasks.registering(NpmTask::class) {
     dependsOn(playwrightSetup)
     dependsOn(":ontrack-kdsl-acceptance:kdslLdapComposeUp")
     finalizedBy(":ontrack-kdsl-acceptance:kdslLdapComposeDown")
+    if (!isCI) {
+        environment.putAll(playwrightEnvironment)
+    }
 
     shouldRunAfter(uiTest)
     shouldRunAfter(":ontrack-kdsl-acceptance:kdslAcceptanceTestComposeDown")
@@ -100,6 +119,9 @@ val uiOidcTest by tasks.registering(NpmTask::class) {
     dependsOn(playwrightSetup)
     dependsOn(":ontrack-kdsl-acceptance:kdslOidcComposeUp")
     finalizedBy(":ontrack-kdsl-acceptance:kdslOidcComposeDown")
+    if (!isCI) {
+        environment.putAll(playwrightEnvironment)
+    }
 
     shouldRunAfter(uiLdapTest)
     shouldRunAfter(":ontrack-kdsl-acceptance:kdslLdapComposeDown")
