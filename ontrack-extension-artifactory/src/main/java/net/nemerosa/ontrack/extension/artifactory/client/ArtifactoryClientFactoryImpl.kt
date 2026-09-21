@@ -10,7 +10,7 @@ class ArtifactoryClientFactoryImpl() :
 
     override fun getClient(configuration: ArtifactoryConfiguration): ArtifactoryClient {
         val restTemplate = restTemplateBuilder()
-            .rootUri(configuration.url)
+            .baseUri(configuration.url)
             .basicAuthentication(requireNotNull(configuration.user) { "Username must not be null" }, requireNotNull(configuration.password) { "Password must not be null" })
             .build()
         return ArtifactoryClientImpl(restTemplate)

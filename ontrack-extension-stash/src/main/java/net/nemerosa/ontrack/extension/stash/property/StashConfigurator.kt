@@ -33,7 +33,7 @@ class StashConfigurator(
     override fun getPullRequest(configuration: GitConfiguration, id: Int): GitPullRequest? =
         if (configuration is StashGitConfiguration) {
             val restTemplate = restTemplateBuilder()
-                .rootUri(configuration.configuration.url)
+                .baseUri(configuration.configuration.url)
                 .basicAuthentication(
                     requireNotNull(configuration.configuration.user) { "Username must not be null" },
                     requireNotNull(configuration.configuration.password) { "Password must not be null" },

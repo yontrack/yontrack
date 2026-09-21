@@ -14,7 +14,7 @@ open class DefaultRestTemplateProvider : RestTemplateProvider {
         configuration: RestTemplateBuilder.() -> RestTemplateBuilder
     ): RestTemplate =
         restTemplateBuilder()
-            .rootUri(rootUri)
+            .baseUri(rootUri)
             .run {
                 configuration()
             }

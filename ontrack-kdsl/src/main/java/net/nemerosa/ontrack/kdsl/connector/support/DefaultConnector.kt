@@ -134,7 +134,7 @@ class DefaultConnector(
         headers: Map<String, String>,
         noAuth: Boolean = false,
     ): RestTemplate {
-        var builder = restTemplateBuilder().rootUri(url)
+        var builder = restTemplateBuilder().baseUri(url)
         defaultHeaders.forEach { (name, value) ->
             if ((name != "Authorization" && name != X_ONTRACK_TOKEN) || !noAuth) {
                 builder = builder.defaultHeader(name, value)

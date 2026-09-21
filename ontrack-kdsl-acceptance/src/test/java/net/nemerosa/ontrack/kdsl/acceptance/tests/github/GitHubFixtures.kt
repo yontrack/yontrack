@@ -11,7 +11,7 @@ import org.springframework.web.client.RestTemplate
 
 val gitHubClient: RestTemplate by lazy {
     restTemplateBuilder()
-        .rootUri("https://api.github.com")
+        .baseUri("https://api.github.com")
         .defaultHeader(
             HttpHeaders.AUTHORIZATION,
             "Bearer ${ACCProperties.GitHub.token}"

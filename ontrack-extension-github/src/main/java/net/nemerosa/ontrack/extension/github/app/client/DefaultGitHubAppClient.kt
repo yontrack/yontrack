@@ -30,7 +30,7 @@ class DefaultGitHubAppClient : GitHubAppClient {
             ?: throw GitHubAppClientCannotGetInstallationTokenException(appInstallationId)
 
     private fun client(jwt: String): RestTemplate = restTemplateBuilder()
-        .rootUri("https://api.github.com")
+        .baseUri("https://api.github.com")
         .defaultHeader("Authorization", "Bearer $jwt")
         .build()
 

@@ -367,7 +367,7 @@ class DefaultBitbucketCloudClient(
 
     internal val template: RestTemplate by lazy {
         restTemplateBuilder()
-            .rootUri(ROOT_URI)
+            .baseUri(ROOT_URI)
             .defaultHeader(HttpHeaders.AUTHORIZATION, authorizationHeader(configuration))
             .build()
     }

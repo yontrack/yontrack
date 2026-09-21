@@ -18,7 +18,7 @@ class DefaultJenkinsClientFactory(
         return DefaultJenkinsClient(
             url = configuration.url,
             client = restTemplateBuilder()
-                .rootUri(configuration.url)
+                .baseUri(configuration.url)
                 .basicAuthentication(requireNotNull(configuration.user) { "Username must not be null" }, requireNotNull(configuration.password) { "Password must not be null" })
                 .readTimeout(Duration.ofSeconds(jenkinsConfigurationProperties.timeout.toLong()))
                 .build()

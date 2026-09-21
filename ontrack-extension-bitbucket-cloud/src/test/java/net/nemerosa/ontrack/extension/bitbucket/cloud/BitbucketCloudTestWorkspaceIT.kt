@@ -16,13 +16,13 @@ class BitbucketCloudTestWorkspaceIT {
 
     private fun basic(identity: BitbucketCloudTestIdentity): RestTemplate =
         restTemplateBuilder()
-            .rootUri(BitbucketCloudTestRestApi.ROOT)
+            .baseUri(BitbucketCloudTestRestApi.ROOT)
             .basicAuthentication(identity.email, identity.token)
             .build()
 
     private fun bearer(token: String): RestTemplate =
         restTemplateBuilder()
-            .rootUri(BitbucketCloudTestRestApi.ROOT)
+            .baseUri(BitbucketCloudTestRestApi.ROOT)
             .defaultHeader("Authorization", "Bearer $token")
             .build()
 

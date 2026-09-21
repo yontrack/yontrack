@@ -94,10 +94,10 @@ class SonarQubeClientImpl(
     }
 
     internal val restTemplate: RestTemplate = restTemplateBuilder()
-        .rootUri(configuration.url)
         // SonarQube requires a strict encoding per value (esp. for "+" characters which are no longer encoded with Spring 5)
         // See https://github.com/spring-projects/spring-framework/issues/20750
-        .uriTemplateHandler(DefaultUriBuilderFactory().apply {
+        // The base URI is set on this handler, which baseUri(...) would otherwise replace
+        .uriTemplateHandler(DefaultUriBuilderFactory(configuration.url).apply {
             encodingMode = DefaultUriBuilderFactory.EncodingMode.VALUES_ONLY
         })
         .basicAuthentication(requireNotNull(configuration.password) { "Username must not be null" }, "") // See https://docs.sonarqube.org/latest/extend/web-api/

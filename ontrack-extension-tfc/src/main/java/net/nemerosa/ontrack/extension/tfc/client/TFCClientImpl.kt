@@ -19,7 +19,7 @@ class TFCClientImpl(
     private val client: RestTemplate by lazy {
         restTemplateBuilder()
             .requestFactory(HttpComponentsClientHttpRequestFactory::class.java)
-            .rootUri("$url/api/v2")
+            .baseUri("$url/api/v2")
             .defaultHeader("Authorization", "Bearer $token")
             .defaultHeader("Content-Type", "application/vnd.api+json")
             .build()

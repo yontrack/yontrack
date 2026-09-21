@@ -358,7 +358,7 @@ class DefaultOntrackGitHubClient(
         createGitHubTemplate(graphql = false, token = token)
 
     private fun createGitHubTemplate(graphql: Boolean, token: String?): RestTemplate = restTemplateBuilder()
-        .rootUri(getApiRoot(configuration.url, graphql))
+        .baseUri(getApiRoot(configuration.url, graphql))
         .connectTimeout(timeout)
         .readTimeout(timeout)
         .run {

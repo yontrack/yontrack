@@ -278,7 +278,7 @@ class BitbucketClientImpl(
     }
 
     private val template = restTemplateBuilder()
-        .rootUri(configuration.url)
+        .baseUri(configuration.url)
         .basicAuthentication(
             requireNotNull(configuration.user) { "Username must not be null" },
             requireNotNull(configuration.password) { "Password must not be null" }
@@ -286,7 +286,7 @@ class BitbucketClientImpl(
         .build()
 
     private fun tokenTemplate(token: String) = restTemplateBuilder()
-        .rootUri(configuration.url)
+        .baseUri(configuration.url)
         .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer $token")
         .build()
 
