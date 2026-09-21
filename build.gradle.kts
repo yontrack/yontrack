@@ -308,7 +308,7 @@ configure(javaProjects) {
     val kotlinCoroutinesVersion = "1.10.2"
     val jjwtVersion = "0.12.6"
     val greenMailVersion = "1.6.15"
-    val mockkVersion = "1.13.17"
+    val mockkVersion = "1.14.11"
     val jgitVersion = "6.6.1.202309021850-r"
     val amqpClientVersion = "5.36.0"
     val msgpackCoreVersion = "0.9.12"
