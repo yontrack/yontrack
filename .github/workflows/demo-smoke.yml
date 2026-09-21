@@ -227,6 +227,10 @@ jobs:
           # configured against. Scoped to this step for that reason.
           YONTRACK_URL: ${{ env.DEMO_URL }}
           YONTRACK_TOKEN: ${{ env.TARGET_TOKEN }}
+          # The seed refuses any URL not matching `demo.`/localhost, since it deletes every
+          # project. v6 is not `demo.`, so it is allowed explicitly - and only its exact host, so
+          # a mistyped V6_URL still stops here. Empty for the demo target: the default applies.
+          DEMO_SEED_URL_PATTERN: ${{ inputs.target == 'v6' && '^https://v6\.dev\.yontrack\.com(?=[:/]|$)' || '' }}
         run: ontrack-demo-seed/build/install/ontrack-demo-seed/bin/ontrack-demo-seed
 
       # ------------------------------------------------------------------------------------
