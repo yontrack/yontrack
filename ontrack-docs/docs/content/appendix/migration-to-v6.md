@@ -7,7 +7,7 @@ adds its own section.
 ## Spring Boot 4
 
 Yontrack 6 runs on Spring Boot 4.1, Spring Framework 7, Spring Security 7 and Kotlin 2.3. JSON is
-still handled by Jackson 2: the move to Jackson 3 is a separate 6.0 change.
+handled by Jackson 3: see [Jackson 3](#jackson-3).
 
 ### For deployers
 
@@ -48,11 +48,11 @@ dependencies, so an extension gets both through it. The starters were renamed as
 
 Other breaks:
 
-* **REST clients** — build them from `jackson2RestTemplateBuilder()`, or give them
-  `jackson2ClientMessageConverters()`, both in `net.nemerosa.ontrack.extension.support.client`,
-  rather than from `RestTemplateBuilder()` or `RestTemplate()`. Jackson 3 is always on the
-  classpath under Spring Boot 4, and Spring Framework 7 then reads JSON with it by default — it
-  cannot read a Jackson 2 `JsonNode` nor a Kotlin class through the Jackson 2 Kotlin module.
+* **REST clients** — build them from `restTemplateBuilder()`, or give them
+  `clientMessageConverters()`, both in `net.nemerosa.ontrack.extension.support.client`, rather
+  than from `RestTemplateBuilder()` or `RestTemplate()`. Their JSON mapper behaves as the one of
+  the 5.x clients — unknown properties ignored, properties written in their declaration order —
+  where the default one of Spring Framework 7 has the Jackson 3 defaults.
   `RestTemplateProvider` already does it.
 * **Elasticsearch** — the low-level client bean is a `Rest5Client`
   (`co.elastic.clients.transport.rest5_client.low_level`), no longer an
@@ -71,8 +71,47 @@ Other breaks:
 
 The KDSL builds its HTTP client with `spring-boot-restclient`; a program which built its own
 `RestTemplate` alongside it should build it from
-`net.nemerosa.ontrack.kdsl.connector.support.jackson2RestTemplateBuilder()`, for the reason given
+`net.nemerosa.ontrack.kdsl.connector.support.restTemplateBuilder()`, for the reason given
 above.
+
+## Jackson 3
+
+Yontrack 6 reads and writes JSON with Jackson 3 (`tools.jackson`) instead of Jackson 2
+(`com.fasterxml.jackson`). The JSON it stores does not change.
+
+### For deployers
+
+Nothing: the data stored by Yontrack 5 is read as it is.
+
+### For REST API clients
+
+The dates in the answers of the REST API (`/rest/...`) are written as the rest of Yontrack writes
+them — as a UTC timestamp string, `"2025-11-04T09:12:30.123400Z"` — where Yontrack 5 wrote them as
+an array of numbers, `[2025,11,4,9,12,30,123400000]`. The GraphQL API does not change.
+
+### For extension authors
+
+Replace `com.fasterxml.jackson` by `tools.jackson` in the imports, except for the annotations,
+which Jackson 3 keeps in `com.fasterxml.jackson.annotation`. `JacksonException` replaces
+`JsonProcessingException` and is unchecked; several classes and methods were renamed
+(`JsonSerializer` → `ValueSerializer`, `TextNode` → `StringNode`, `fields()` → `properties()`, …).
+The [Jackson 3 migration guide](https://github.com/FasterXML/jackson/blob/main/jackson3/MIGRATING_TO_JACKSON_3.md)
+lists them. Build a mapper with `ObjectMapperFactory.create()`, or `builder()` to add to it, rather
+than with Jackson's own defaults, and REST clients with `restTemplateBuilder()` or
+`clientMessageConverters()` (see above).
+`ObjectMapperFactory.create(viewClass)` is gone: write with `create().writerWithView(viewClass)`. Two
+changes compile and still break:
+
+* **`JsonNode.map`** — in Kotlin, `node.map { ... }` now calls the new `JsonNode.map(Function)`
+  member, which maps the node itself, instead of iterating over its elements. Write
+  `node.values().map { ... }`.
+* **Strict accessors** — `stringValue()` (formerly `textValue()`) and `intValue()` throw on a node of
+  another type, and `asText()` throws on an object or an array; `asText()` of a JSON `null` is `""`,
+  no longer `"null"`.
+
+### For KDSL users
+
+`JsonNode` in the KDSL API is now `tools.jackson.databind.JsonNode`.
 
 ## Java 25
 

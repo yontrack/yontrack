@@ -31,3 +31,8 @@ explicitly:
 
 Each of them carries a test which fails if Jackson 3 takes over, and each points at #1843, which
 removes them.
+
+## Follow-up: done
+
+#1843 moved Yontrack to Jackson 3 and removed `spring-boot-jackson2` along with the pins above;
+see [ADR 0016](0016-jackson-3-with-jackson-2-defaults-and-one-mapper.md).
