@@ -70,7 +70,7 @@ env:
   CI: "true"
   # Pinned: an unpinned CLI lets a Yontrack release turn a green pipeline red in a repository
   # nobody touched.
-  YONTRACK_CLI_VERSION: "5.1.1"
+  YONTRACK_CLI_VERSION: "5.7.0"
   # Run info reported with every validation. The Jenkins shared library computed this silently;
   # the Go CLI is purely declarative and sends `runInfo: null` unless the flags are spelled out,
   # which is how the migration dropped it (#1655) and left a hole in
@@ -1876,12 +1876,8 @@ jobs:
             run_time_flag="--run-time $(( $(date +%s) - STARTED ))"
           fi
           if [ "$OUTCOME" = "success" ]; then
-            # `--build` is spelled out, unlike every other validation in this file. In CLI 5.1.1
-            # `chml` reads the build from its flag only - it calls GetProjectBranchFlags, not
-            # GetProjectBranchBuildFlags - so the YONTRACK_BUILD_NAME the workflow-build action
-            # exports is ignored and the call fails with "Build not found: yontrack/main/".
             # shellcheck disable=SC2086  # deliberate: see YONTRACK_RUN_INFO
-            yontrack validate --validation SECURITY.IMAGE.BACKEND --build "$YONTRACK_BUILD_NAME" \
+            yontrack validate --validation SECURITY.IMAGE.BACKEND \
               chml --critical "$CRITICAL" --high "$HIGH" --medium "$MEDIUM" --low "$LOW" \
               $run_time_flag $YONTRACK_RUN_INFO
           else
@@ -1905,9 +1901,8 @@ jobs:
             run_time_flag="--run-time $(( $(date +%s) - STARTED ))"
           fi
           if [ "$OUTCOME" = "success" ]; then
-            # `--build` spelled out: see SECURITY.IMAGE.BACKEND above.
             # shellcheck disable=SC2086  # deliberate: see YONTRACK_RUN_INFO
-            yontrack validate --validation SECURITY.IMAGE.UI --build "$YONTRACK_BUILD_NAME" \
+            yontrack validate --validation SECURITY.IMAGE.UI \
               chml --critical "$CRITICAL" --high "$HIGH" --medium "$MEDIUM" --low "$LOW" \
               $run_time_flag $YONTRACK_RUN_INFO
           else
