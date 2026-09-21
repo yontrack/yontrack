@@ -35,7 +35,8 @@ The match is anchored and digits-only, in `VersionCalculator` and in `ci.yml` al
 | `v6-spring-boot-4`  | `6.0-v6-spring-boot-4-1a2b3c4` |
 
 A branch working *towards* the next major is still a feature branch and keeps the feature version
-shape. Feature branches for `v6` work are cut from `v6` and merged back into it, never into `main`.
+shape. Feature branches for `v6` work are cut from a freshly fetched `origin/v6` and merged back into it,
+never into `main`.
 
 ## The pipeline on `v6`
 

@@ -131,8 +131,13 @@ ports. Read the file that belongs to the stack you mean:
 
 Every change follows this lifecycle, end to end — don't stop after step 2:
 
-1. **Branch locally** — before making any change, create a branch named `claude/<short-description>-pipeline`
-   (use the `/fix-issue` skill when working from a GitHub issue)
+1. **Branch locally, from the latest base** — before making any change, `git fetch origin` and create
+   a branch named `claude/<short-description>-pipeline` from `origin/main` — or from `origin/v6` for
+   6.0 work (`doc/dev-guide/major-branch.md`). A worktree or checkout starts wherever it was created,
+   often an older commit: the branch point is `origin/<base>` itself, so check
+   `git merge-base HEAD origin/<base>` equals `git rev-parse origin/<base>` before the first commit.
+   A `git fetch` that fails in the sandbox has not fetched — rerun it outside rather than trusting
+   the stale ref (use the `/fix-issue` skill when working from a GitHub issue)
 2. **Mark the issue as in progress** — when the change comes from a GitHub issue, move it to
    `status:wip` as soon as work starts (see *Issue status labels* below)
 3. **Implement and test** on that branch, following the TDD order below, and commit there —

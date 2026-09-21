@@ -47,11 +47,16 @@ Examples:
 
 ## Step 3 — Create the branch
 
+The base is `main`, or `v6` for an issue in the 6.0 milestone (`doc/dev-guide/major-branch.md`).
+Branch from the freshly fetched remote ref, never from wherever the worktree happens to stand:
+
 ```bash
-git checkout -b claude/{short-description}-pipeline
+git fetch origin            # outside the sandbox - a sandboxed fetch fails and leaves the ref stale
+git checkout -b claude/{short-description}-pipeline origin/<base>
 ```
 
-Confirm the branch was created before proceeding.
+Confirm the branch was created and `git merge-base HEAD origin/<base>` equals
+`git rev-parse origin/<base>` before proceeding.
 
 ---
 
