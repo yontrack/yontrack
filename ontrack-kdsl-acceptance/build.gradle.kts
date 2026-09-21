@@ -131,7 +131,7 @@ val isCI = System.getenv("CI") == "true"
 // checkout with no free slot fails here, with the message as it is written --
 // rather than inside Gradle's provider machinery, which buries it under three
 // layers of "Failed to query the value of property 'environment'".
-val kdslStackSlot by tasks.registering {
+val kdslStackSlot = tasks.register("kdslStackSlot") {
     group = "verification"
     description = "Claims this checkout's KDSL acceptance slot and records it in ${KdslStack.INSTANCE_ENV_PATH}"
     doFirst {
@@ -153,7 +153,7 @@ listOf("kdslAcceptanceTest", "kdslLdap", "kdslOidc").forEach { variant ->
     }
 }
 
-val kdslAcceptanceTestComposeUp by tasks.named("kdslAcceptanceTestComposeUp") {
+val kdslAcceptanceTestComposeUp = tasks.named("kdslAcceptanceTestComposeUp") {
     if (!isCI) {
         dependsOn(":ontrack-ui:dockerBuild")
         dependsOn(":ontrack-web-core:dockerBuild")
@@ -190,7 +190,7 @@ dependencies {
 // Where the override expects the jar: `compose/docker-compose-coverage.yml` bind-mounts
 // `../build/jacoco/jacocoagent.jar`, which Compose resolves against the directory of the base
 // file, i.e. the repository root's build directory.
-val coverageAgentJar by tasks.registering(Copy::class) {
+val coverageAgentJar = tasks.register<Copy>("coverageAgentJar") {
     group = "verification"
     description = "Stages the JaCoCo agent jar where the Compose coverage override mounts it from"
     from(jacocoAgentRuntime)
@@ -268,7 +268,7 @@ if (coverage) {
 
 // Post-acceptance tests: stopping the environment
 
-val kdslAcceptanceTestComposeDown by tasks.named("kdslAcceptanceTestComposeDown")
+val kdslAcceptanceTestComposeDown = tasks.named("kdslAcceptanceTestComposeDown")
 
 tasks.named("kdslLdapComposeUp") {
     dependsOn(kdslAcceptanceTestComposeDown)
@@ -287,7 +287,7 @@ tasks.named<Test>("test") {
 
 // Running the acceptance tests
 
-val kdslAcceptanceTest by tasks.registering(Test::class) {
+val kdslAcceptanceTest = tasks.register<Test>("kdslAcceptanceTest") {
     useJUnitPlatform()
     mustRunAfter("test")
     include("**/ACC*.class")

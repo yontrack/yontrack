@@ -95,7 +95,7 @@ configure<ComposeExtension> {
 // checkout with no free slot fails here, with the message as it is written --
 // rather than inside Gradle's provider machinery, which buries it under three
 // layers of "Failed to query the value of property 'environment'".
-val itStackSlot by tasks.registering {
+val itStackSlot = tasks.register("itStackSlot") {
     group = "verification"
     description = "Claims this checkout's integration test slot and records it in ${ItStack.INSTANCE_ENV_PATH}"
     doFirst {
@@ -197,7 +197,7 @@ configure(javaProjects) {
         exclude("**/*IT.class")
     }
 
-    val integrationTest by tasks.registering(Test::class) {
+    val integrationTest = tasks.register<Test>("integrationTest") {
         group = "verification"
         description = "Integration tests"
         useJUnitPlatform()
@@ -455,7 +455,7 @@ val jacocoCliJar: Provider<String> = provider {
         .absolutePath
 }
 
-val coverageStage by tasks.registering(Exec::class) {
+val coverageStage = tasks.register<Exec>("coverageStage") {
     group = "verification"
     description = "Lays this checkout's JaCoCo execution data out the way the CI artefacts are laid out"
     workingDir = rootDir
@@ -467,7 +467,7 @@ val coverageStage by tasks.registering(Exec::class) {
     outputs.upToDateWhen { false }
 }
 
-val coverageJacocoReport by tasks.registering(Exec::class) {
+val coverageJacocoReport = tasks.register<Exec>("coverageJacocoReport") {
     group = "verification"
     description = "Builds the per-type and merged JaCoCo reports from the staged execution data"
     dependsOn(coverageStage)
@@ -485,7 +485,7 @@ val coverageJacocoReport by tasks.registering(Exec::class) {
     }
 }
 
-val coverageFigures by tasks.registering(Exec::class) {
+val coverageFigures = tasks.register<Exec>("coverageFigures") {
     group = "verification"
     description = "Prints the six sets of coverage figures from the reports"
     dependsOn(coverageJacocoReport)

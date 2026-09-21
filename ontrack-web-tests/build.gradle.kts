@@ -28,12 +28,12 @@ val isCI = System.getenv("CI") == "true"
 // (#1821). A local run leaves it at the default, and its data lands in `build/jacoco/kdsl.exec`.
 val coverage = providers.gradleProperty(Coverage.GRADLE_PROPERTY).isPresent
 
-val playwrightInstall by tasks.registering(NpmTask::class) {
+val playwrightInstall = tasks.register<NpmTask>("playwrightInstall") {
     dependsOn("npmInstall")
     args.set(listOf("run", "playwright-install"))
 }
 
-val playwrightSetup by tasks.registering(NpmTask::class) {
+val playwrightSetup = tasks.register<NpmTask>("playwrightSetup") {
     dependsOn(playwrightInstall)
     args.set(listOf("run", "playwright-setup"))
 }
@@ -53,7 +53,7 @@ val shardTotal: Int = System.getProperty("shard.total")?.toIntOrNull() ?: 1
 val isSharded = shardTotal > 1
 val shardSuffix = if (isSharded) "-$shardIndex" else ""
 
-val uiTest by tasks.registering(NpmTask::class) {
+val uiTest = tasks.register<NpmTask>("uiTest") {
     dependsOn(playwrightSetup)
     if (!isCI) {
         dependsOn(":ontrack-kdsl-acceptance:kdslAcceptanceTestComposeUp")
@@ -79,7 +79,7 @@ val uiTest by tasks.registering(NpmTask::class) {
 
 // Specialized tests
 
-val uiLdapTest by tasks.registering(NpmTask::class) {
+val uiLdapTest = tasks.register<NpmTask>("uiLdapTest") {
     dependsOn(playwrightSetup)
     dependsOn(":ontrack-kdsl-acceptance:kdslLdapComposeUp")
     finalizedBy(":ontrack-kdsl-acceptance:kdslLdapComposeDown")
@@ -96,7 +96,7 @@ val uiLdapTest by tasks.registering(NpmTask::class) {
     }
 }
 
-val uiOidcTest by tasks.registering(NpmTask::class) {
+val uiOidcTest = tasks.register<NpmTask>("uiOidcTest") {
     dependsOn(playwrightSetup)
     dependsOn(":ontrack-kdsl-acceptance:kdslOidcComposeUp")
     finalizedBy(":ontrack-kdsl-acceptance:kdslOidcComposeDown")
@@ -115,7 +115,7 @@ val uiOidcTest by tasks.registering(NpmTask::class) {
 
 // All tests
 
-val uiTests by tasks.registering {
+val uiTests = tasks.register("uiTests") {
     dependsOn(uiTest)
     dependsOn(uiLdapTest)
     dependsOn(uiOidcTest)

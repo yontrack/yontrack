@@ -146,7 +146,7 @@ tasks.named("jibDockerBuild") {
     shouldRunAfter("integrationTest")
 }
 
-val jibDockerBuildYontrack by tasks.registering(Exec::class) {
+val jibDockerBuildYontrack = tasks.register<Exec>("jibDockerBuildYontrack") {
     dependsOn("jibDockerBuild")
     commandLine(
         "sh", "-c",
@@ -155,7 +155,7 @@ val jibDockerBuildYontrack by tasks.registering(Exec::class) {
     )
 }
 
-val jibYontrack by tasks.registering(Exec::class) {
+val jibYontrack = tasks.register<Exec>("jibYontrack") {
     dependsOn("jib")
     commandLine("sh", "-c", """
         docker pull nemerosa/ontrack:${project.version} && \
@@ -166,6 +166,6 @@ val jibYontrack by tasks.registering(Exec::class) {
     """)
 }
 
-val dockerBuild by tasks.registering {
+val dockerBuild = tasks.register("dockerBuild") {
     dependsOn("jibDockerBuild", jibDockerBuildYontrack)
 }

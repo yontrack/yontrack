@@ -13,12 +13,12 @@ configure<NodeExtension> {
     download.set(true)
 }
 
-val webBuild by tasks.registering(NpmTask::class) {
+val webBuild = tasks.register<NpmTask>("webBuild") {
     dependsOn("npmInstall")
     args.set(listOf("run", "build"))
 }
 
-val test by tasks.registering(NpmTask::class) {
+val test = tasks.register<NpmTask>("test") {
     dependsOn("npmInstall")
     args.set(listOf("run", "test"))
 }
@@ -45,7 +45,7 @@ tasks.named("build") {
 
 val coverageEnabled = providers.gradleProperty(Coverage.GRADLE_PROPERTY).isPresent
 
-val testCoverage by tasks.registering(NpmTask::class) {
+val testCoverage = tasks.register<NpmTask>("testCoverage") {
     group = "verification"
     description = "Runs the Jest tests with coverage, writing the reports to `coverage/`. Requires -P${Coverage.GRADLE_PROPERTY}."
     dependsOn("npmInstall")
@@ -57,7 +57,7 @@ val testCoverage by tasks.registering(NpmTask::class) {
 
 // Docker image
 
-val dockerBuild by tasks.registering(Exec::class) {
+val dockerBuild = tasks.register<Exec>("dockerBuild") {
     dependsOn(test)
     workingDir = projectDir
     commandLine("sh", "-c", """
