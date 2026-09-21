@@ -106,6 +106,35 @@ class KdslStackTest {
     }
 
     @Test
+    fun `the Playwright suite is pointed at the slot of the stack`() {
+        // Without these, connection.js falls back to the slot-0 ports and every test of a linked
+        // worktree fails in its fixture, getting a token from the wrong stack (#1847).
+        val instance = KdslStackInstance(slug = "feature-a", slot = 2)
+        assertEquals(
+            mapOf(
+                // The management root: the fixture appends /manage itself.
+                "ONTRACK_MGT_URL" to "http://localhost:9000",
+                "ONTRACK_UI_URL" to "http://localhost:3200",
+                "ONTRACK_BACKEND_URL" to "http://localhost:8280",
+            ),
+            instance.playwrightEnvironment,
+        )
+    }
+
+    @Test
+    fun `slot zero gives Playwright its historical defaults`() {
+        // The defaults of ontrack-web-tests/ontrack/connection.js.
+        assertEquals(
+            mapOf(
+                "ONTRACK_MGT_URL" to "http://localhost:8800",
+                "ONTRACK_UI_URL" to "http://localhost:3000",
+                "ONTRACK_BACKEND_URL" to "http://localhost:8080",
+            ),
+            KdslStackInstance(slug = "yontrack", slot = 0).playwrightEnvironment,
+        )
+    }
+
+    @Test
     fun `the internal url is never offset`() {
         // ontrack.acceptance.connection.internal.url is how Yontrack reaches
         // itself from inside its own container, where 8080 is always right
