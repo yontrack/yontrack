@@ -19,6 +19,7 @@ dependencies {
     implementation("org.jgrapht:jgrapht-core")
     implementation("com.github.ben-manes.caffeine:caffeine")
     implementation("co.elastic.clients:elasticsearch-java")
+    implementation("org.springframework.boot:spring-boot-elasticsearch")
     implementation("org.springframework.boot:spring-boot-jackson2")
     implementation("org.flywaydb:flyway-core")
     implementation("org.springframework.boot:spring-boot-flyway")

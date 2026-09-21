@@ -4,7 +4,8 @@ import co.elastic.clients.elasticsearch.ElasticsearchClient
 import co.elastic.clients.elasticsearch._types.query_dsl.TextQueryType
 import co.elastic.clients.elasticsearch.core.BulkRequest
 import co.elastic.clients.json.jackson.JacksonJsonpMapper
-import co.elastic.clients.transport.rest_client.RestClientTransport
+import co.elastic.clients.transport.rest5_client.Rest5ClientTransport
+import co.elastic.clients.transport.rest5_client.low_level.Rest5Client
 import com.fasterxml.jackson.databind.node.ObjectNode
 import io.micrometer.core.instrument.MeterRegistry
 import io.micrometer.core.instrument.binder.MeterBinder
@@ -16,12 +17,9 @@ import net.nemerosa.ontrack.model.metrics.increment
 import net.nemerosa.ontrack.model.structure.SearchNodeResults
 import net.nemerosa.ontrack.model.structure.SearchResultNode
 import net.nemerosa.ontrack.model.support.time
-import org.apache.http.HttpHost
-import org.apache.http.auth.AuthScope
-import org.apache.http.auth.Credentials
-import org.apache.http.auth.UsernamePasswordCredentials
-import org.apache.http.impl.client.BasicCredentialsProvider
-import org.elasticsearch.client.RestClient
+import org.apache.hc.client5.http.auth.AuthScope
+import org.apache.hc.client5.http.auth.UsernamePasswordCredentials
+import org.apache.hc.client5.http.impl.auth.BasicCredentialsProvider
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
@@ -43,7 +41,7 @@ import kotlin.concurrent.withLock
 )
 class DefaultElasticMetricsClient(
         private val elasticMetricsConfigProperties: ElasticMetricsConfigProperties,
-        private val defaultLowLevelClient: RestClient,
+        private val defaultLowLevelClient: Rest5Client,
 ) : ElasticMetricsClient, MeterBinder {
 
     private val logger: Logger = LoggerFactory.getLogger(DefaultElasticMetricsClient::class.java)
@@ -308,29 +306,27 @@ class DefaultElasticMetricsClient(
             // Using the custom ES instance
             ElasticMetricsTarget.CUSTOM -> customClient()
         }
-        val transport = RestClientTransport(restClient, JacksonJsonpMapper())
+        val transport = Rest5ClientTransport(restClient, JacksonJsonpMapper())
         ElasticsearchClient(transport)
     }
 
-    private fun customClient(): RestClient {
+    private fun customClient(): Rest5Client {
         val hosts = elasticMetricsConfigProperties.custom.uris.map { value ->
             val uri = URI(value)
-            HttpHost.create(
-                    URI(
-                            uri.scheme, null, uri.host, uri.port, uri.path, uri.query, uri.fragment
-                    ).toString()
-            )
+            URI(uri.scheme, null, uri.host, uri.port, uri.path, uri.query, uri.fragment)
         }
-        val builder = RestClient.builder(*hosts.toTypedArray())
+        val builder = Rest5Client.builder(hosts)
         if (!elasticMetricsConfigProperties.custom.username.isNullOrBlank()) {
             builder.setHttpClientConfigCallback {
                 it.setDefaultCredentialsProvider(
                         BasicCredentialsProvider().apply {
-                            val credentials: Credentials = UsernamePasswordCredentials(
-                                    elasticMetricsConfigProperties.custom.username,
-                                    elasticMetricsConfigProperties.custom.password
+                            setCredentials(
+                                    AuthScope(null, -1),
+                                    UsernamePasswordCredentials(
+                                            elasticMetricsConfigProperties.custom.username,
+                                            elasticMetricsConfigProperties.custom.password?.toCharArray(),
+                                    )
                             )
-                            setCredentials(AuthScope.ANY, credentials)
                         }
                 )
             }

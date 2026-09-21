@@ -7,7 +7,9 @@ dependencies {
 
     implementation("org.springframework.boot:spring-boot-starter-data-elasticsearch")
     implementation("co.elastic.clients:elasticsearch-java")
+    implementation("org.springframework.boot:spring-boot-elasticsearch")
     implementation("io.micrometer:micrometer-core")
+    implementation("commons-codec:commons-codec")
 
     testImplementation(testFixtures(project(":ontrack-it-utils")))
     testImplementation(project(":ontrack-extension-general"))

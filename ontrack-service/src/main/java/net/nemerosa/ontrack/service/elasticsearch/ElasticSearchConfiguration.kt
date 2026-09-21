@@ -2,15 +2,15 @@ package net.nemerosa.ontrack.service.elasticsearch
 
 import co.elastic.clients.json.JsonpMapper
 import co.elastic.clients.json.jackson.JacksonJsonpMapper
+import co.elastic.clients.transport.rest5_client.low_level.Rest5Client
 import com.fasterxml.jackson.databind.ObjectMapper
-import org.elasticsearch.client.RestClient
 import org.springframework.boot.elasticsearch.health.ElasticsearchRestClientHealthIndicator
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 
 @Configuration
 class ElasticSearchConfiguration(
-    val restClient: RestClient,
+    val restClient: Rest5Client,
 ) {
 
     @Bean
