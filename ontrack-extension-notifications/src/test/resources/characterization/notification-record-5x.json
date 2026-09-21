@@ -1,0 +1,39 @@
+{
+  "id": "0b6c3f1e-7a0e-4c1d-9a61-7f0c6d1e2b3a",
+  "source": {
+    "id": "entity-subscription",
+    "data": {
+      "entityType": "BRANCH",
+      "entityId": 12,
+      "subscription": "on-promotion"
+    }
+  },
+  "timestamp": "2025-11-04T09:12:34.567891Z",
+  "channel": "slack",
+  "channelConfig": {
+    "channel": "#builds",
+    "type": "SUCCESS"
+  },
+  "event": {
+    "eventType": "new_promotion_run",
+    "signature": {
+      "time": "2025-11-04T09:12:30Z",
+      "user": {
+        "name": "admin"
+      }
+    },
+    "entities": {
+      "BUILD": 42
+    },
+    "values": {}
+  },
+  "result": {
+    "type": "OK",
+    "message": null,
+    "output": {
+      "ts": "1730711554.000100",
+      "count": 1,
+      "delivered": true
+    }
+  }
+}
