@@ -195,6 +195,10 @@ configure(javaProjects) {
     tasks.named<Test>("test") {
         useJUnitPlatform()
         exclude("**/*IT.class")
+        // A module whose tests are all *IT classes still has test classes left after the
+        // exclusion -- fixtures, support code -- and Gradle 9 fails a test task which has
+        // sources but discovers no test in them. The exclusion is what empties it, on purpose.
+        failOnNoDiscoveredTests = false
     }
 
     val integrationTest = tasks.register<Test>("integrationTest") {
