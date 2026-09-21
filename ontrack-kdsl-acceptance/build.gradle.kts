@@ -291,6 +291,10 @@ val kdslAcceptanceTest = tasks.register<Test>("kdslAcceptanceTest") {
     useJUnitPlatform()
     mustRunAfter("test")
     include("**/ACC*.class")
+    // Gradle 9 no longer gives a registered Test task the test source set by convention: without
+    // these two the task is silently NO-SOURCE.
+    testClassesDirs = sourceSets["test"].output.classesDirs
+    classpath = sourceSets["test"].runtimeClasspath
     val testFilter = System.getProperty("test.filter")
     if (testFilter != null) {
         filter {
