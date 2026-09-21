@@ -119,7 +119,7 @@ class ElasticSearchIndexService(
             val operation = BulkOperation.Builder()
                 .index<Any?> { op ->
                     op
-                        .id(item.id)
+                        .id(item.documentId)
                         .index(indexer.indexName)
                         .document(item.fields)
                 }.build()
@@ -147,7 +147,7 @@ class ElasticSearchIndexService(
         logger.debug("Create index ${indexer.indexName}")
         val indexRequest = IndexRequest.Builder<Any>()
             .index(indexer.indexName)
-            .id(item.id)
+            .id(item.documentId)
             .document(item.fields)
             .build()
         client.index(indexRequest)
@@ -159,7 +159,7 @@ class ElasticSearchIndexService(
         logger.debug("Update index ${indexer.indexName}")
         val indexRequest = IndexRequest.Builder<Any>()
             .index(indexer.indexName)
-            .id(item.id)
+            .id(item.documentId)
             .document(item.fields)
             .build()
         client.index(indexRequest)
@@ -186,9 +186,9 @@ class ElasticSearchIndexService(
             val action = batchSearchIndexAction(indexer, item, mode)
             if (ontrackConfigProperties.search.index.logging && logger.isDebugEnabled) {
                 if (action.action != null) {
-                    logger.debug("[search][batch-index] index=${indexer.indexName},item=${item.id},mode=$mode,action=${action.action::class.java.simpleName}")
+                    logger.debug("[search][batch-index] index=${indexer.indexName},item=${item.documentId},mode=$mode,action=${action.action::class.java.simpleName}")
                 } else if (ontrackConfigProperties.search.index.tracing) {
-                    logger.debug("[search][batch-index] index=${indexer.indexName},item=${item.id},mode=$mode,action=none")
+                    logger.debug("[search][batch-index] index=${indexer.indexName},item=${item.documentId},mode=$mode,action=none")
                 }
             }
             acc + action
@@ -213,7 +213,7 @@ class ElasticSearchIndexService(
         // Gets the existing item using its ID
         val getRequest = GetRequest.Builder()
             .index(indexer.indexName)
-            .id(item.id)
+            .id(item.documentId)
             .build()
         val response = client.get(getRequest, Any::class.java)
         // If item exists
@@ -223,7 +223,7 @@ class ElasticSearchIndexService(
                 BatchIndexMode.UPDATE -> BatchSearchIndexAction(
                     BulkOperation.Builder().index<Any> { indexBuilder ->
                         indexBuilder.index(indexer.indexName)
-                        indexBuilder.id(item.id)
+                        indexBuilder.id(item.documentId)
                         indexBuilder.document(item.fields)
                     }.build(),
                     BatchIndexResults.UPDATE
@@ -235,7 +235,7 @@ class ElasticSearchIndexService(
             BatchSearchIndexAction(
                 BulkOperation.Builder().index<Any> { indexBuilder ->
                     indexBuilder.index(indexer.indexName)
-                    indexBuilder.id(item.id)
+                    indexBuilder.id(item.documentId)
                     indexBuilder.document(item.fields)
                 }.build(),
                 BatchIndexResults.ADD

@@ -29,7 +29,11 @@ test('searching for a commit', async ({page, ontrack}) => {
     await mockSCMContext.configureProjectForMockSCM(project)
     const branch = await project.createBranch()
     const build = await branch.createBuild()
-    const scmBranch = "main"
+    // Mock commit IDs only depend on the SCM branch and the position on it: on "main", the
+    // commit would share its ID with the first commit of every other mock repository, and its
+    // result could be crowded out of the first page of results. A release branch, so that the
+    // default branching model shows it in the branch info of the commit.
+    const scmBranch = `release/${generate("search-")}`
     await mockSCMContext.configureBranchForMockSCM(branch, scmBranch)
 
     const commitMessage = "Build commit message"
@@ -45,13 +49,13 @@ test('searching for a commit', async ({page, ontrack}) => {
     const homePage = new HomePage(page, ontrack)
     const searchPage = await homePage.search(commitId)
 
-    await searchPage.expectScmCommitResultPresent({commitId})
+    await searchPage.expectScmCommitResultPresent({project, commitId})
 
-    await searchPage.clickScmCommitResult({commitId})
+    await searchPage.clickScmCommitResult({project, commitId})
 
     const scmCommitPage = new SCMCommitPage(page, ontrack, commitId, project)
     await scmCommitPage.expectOnPage(commitMessage)
-    await scmCommitPage.expectBranchInfo({scmBranch: "main", build: build.name})
+    await scmCommitPage.expectBranchInfo({scmBranch, build: build.name})
 })
 
 test('searching for an issue', async ({page, ontrack}) => {

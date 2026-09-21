@@ -89,10 +89,12 @@ class ElasticSearchV5Migration(
         private val store: String = ElasticSearchV5Migration::class.java.name
 
         /**
-         * Bumped whenever the mapping of an index changes, to force a one-off reset of all the
-         * indexes. Last bumped for the exact match sub-fields of the build index.
+         * Bumped whenever the mapping of an index or the ID of its documents changes, to force a
+         * one-off reset of all the indexes. Last bumped for the project-scoped IDs of the SCM
+         * commit documents, whose stale documents keyed by the bare commit ID would otherwise
+         * stay in the index as duplicates.
          */
-        private const val KEY = "migration-2"
+        private const val KEY = "migration-3"
     }
 
     data class ElasticSearchV5MigrationStatus(val migrated: Boolean)
