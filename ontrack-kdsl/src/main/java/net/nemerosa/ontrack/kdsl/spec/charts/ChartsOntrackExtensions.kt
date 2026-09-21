@@ -1,7 +1,7 @@
 package net.nemerosa.ontrack.kdsl.spec.charts
 
 import com.apollographql.apollo.api.Optional
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 import net.nemerosa.ontrack.kdsl.connector.graphql.GraphQLMissingDataException
 import net.nemerosa.ontrack.kdsl.connector.graphql.schema.GetChartQuery
 import net.nemerosa.ontrack.kdsl.connector.graphqlConnector

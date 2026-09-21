@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.extension.bitbucket.cloud.scm
 
-import com.fasterxml.jackson.databind.node.NullNode
+import tools.jackson.databind.node.NullNode
 import io.mockk.every
 import net.nemerosa.ontrack.extension.av.config.AutoApprovalMode
 import net.nemerosa.ontrack.extension.av.config.AutoVersioningPushMode

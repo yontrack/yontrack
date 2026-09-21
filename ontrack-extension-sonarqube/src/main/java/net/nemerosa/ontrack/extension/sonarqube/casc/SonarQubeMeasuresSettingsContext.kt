@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.extension.sonarqube.casc
 
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 import net.nemerosa.ontrack.extension.casc.context.settings.AbstractSubSettingsContext
 import net.nemerosa.ontrack.extension.sonarqube.measures.SonarQubeMeasuresSettings
 import net.nemerosa.ontrack.model.settings.CachedSettingsService

@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.json;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
+import tools.jackson.core.JacksonException;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -13,7 +13,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 public class JDKLocalTimeSerializerTest {
 
     @Test
-    public void toJson() throws JsonProcessingException {
+    public void toJson() throws JacksonException {
         assertEquals(
                 "\"20:44\"",
                 ObjectMapperFactory.create().writeValueAsString(LocalTime.of(20, 44))
@@ -21,7 +21,7 @@ public class JDKLocalTimeSerializerTest {
     }
 
     @Test
-    public void toJson_null() throws JsonProcessingException {
+    public void toJson_null() throws JacksonException {
         assertEquals(
                 "{\"time\":null}",
                 ObjectMapperFactory.create().writeValueAsString(new LTContainer(null))

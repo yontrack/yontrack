@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.model.structure
 
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 
 /**
  * Given a [data type id][ValidationDataType] and its configuration as JSON, returns

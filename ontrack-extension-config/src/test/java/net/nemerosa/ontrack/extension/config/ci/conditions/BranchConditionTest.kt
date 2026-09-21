@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.extension.config.ci.conditions
 
-import com.fasterxml.jackson.databind.node.TextNode
+import tools.jackson.databind.node.StringNode
 import io.mockk.every
 import io.mockk.mockk
 import net.nemerosa.ontrack.extension.config.ci.engine.CIEngine
@@ -20,7 +20,7 @@ class BranchConditionTest {
             condition.matches(
                 conditionRegistry = mockk(),
                 ciEngine = ciEngine,
-                config = TextNode("release.*"),
+                config = StringNode("release.*"),
                 env = emptyMap(),
             )
         )
@@ -34,7 +34,7 @@ class BranchConditionTest {
             condition.matches(
                 conditionRegistry = mockk(),
                 ciEngine = ciEngine,
-                config = TextNode("release.*"),
+                config = StringNode("release.*"),
                 env = emptyMap(),
             )
         )

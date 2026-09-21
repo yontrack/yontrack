@@ -1,22 +1,25 @@
 package net.nemerosa.ontrack.extension.github.ingestion.config.parser
 
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.dataformat.yaml.YAMLFactory
-import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator
+import tools.jackson.dataformat.yaml.YAMLFactory
 import net.nemerosa.ontrack.extension.github.ingestion.config.model.IngestionConfig
 import net.nemerosa.ontrack.extension.github.ingestion.config.model.IngestionConfig.Companion.V1_VERSION
 import net.nemerosa.ontrack.extension.github.ingestion.config.model.IngestionConfig.Companion.V2_VERSION
 import net.nemerosa.ontrack.json.getTextField
+import tools.jackson.dataformat.yaml.YAMLWriteFeature
+import tools.jackson.dataformat.yaml.YAMLMapper
 
 object ConfigParser {
 
     private const val FIELD_VERSION = "version"
 
-    private val yamlFactory = YAMLFactory().apply {
-        enable(YAMLGenerator.Feature.LITERAL_BLOCK_STYLE)
-    }
-
-    private val mapper = ObjectMapper(yamlFactory)
+    private val mapper = YAMLMapper.builder(
+        YAMLFactory.builder()
+            .configureForJackson2()
+            .enable(YAMLWriteFeature.LITERAL_BLOCK_STYLE)
+            .build()
+    )
+        .configureForJackson2()
+        .build()
 
     fun parseYaml(yaml: String): IngestionConfig =
         try {

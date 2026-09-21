@@ -47,7 +47,7 @@ class MetricsValidationDataTypeRunGraphQLMutation(
     override fun readInput(input: EnvMutationInput): MetricsValidationData {
         return input.getRequiredInput<Any>("metrics")
             .asJson()
-            .map { entry ->
+            .values().map { entry ->
                 entry.parse<MetricsEntryInput>()
             }
             .let { entries ->

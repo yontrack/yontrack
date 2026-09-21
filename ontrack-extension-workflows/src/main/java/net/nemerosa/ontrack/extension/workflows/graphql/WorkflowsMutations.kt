@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.extension.workflows.graphql
 
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 import net.nemerosa.ontrack.extension.workflows.acl.WorkflowRegistration
 import net.nemerosa.ontrack.extension.workflows.acl.WorkflowStop
 import net.nemerosa.ontrack.extension.workflows.definition.WorkflowValidation

@@ -182,7 +182,7 @@ class SlotStatusGraphQLIT : AbstractQLKTITSupport() {
             ) { data ->
                 assertEquals(
                     listOf(build3.name, build2.name),
-                    data.path("slotById").path("nextBuilds").map { it.path("name").asText() },
+                    data.path("slotById").path("nextBuilds").values().map { it.path("name").asText() },
                     "Newest first, and only the ones newer than the deployed build"
                 )
             }
@@ -265,7 +265,7 @@ class SlotStatusGraphQLIT : AbstractQLKTITSupport() {
             ) { data ->
                 assertEquals(
                     listOf(accepted.name),
-                    data.path("slotById").path("nextBuilds").map { it.path("name").asText() },
+                    data.path("slotById").path("nextBuilds").values().map { it.path("name").asText() },
                     "Only the builds the rules accept"
                 )
             }

@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.extension.github.ingestion.processing.buildid
 
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 import net.nemerosa.ontrack.extension.github.ingestion.processing.events.WorkflowRun
 import net.nemerosa.ontrack.extension.github.ingestion.processing.model.normalizeName
 import net.nemerosa.ontrack.model.structure.Branch

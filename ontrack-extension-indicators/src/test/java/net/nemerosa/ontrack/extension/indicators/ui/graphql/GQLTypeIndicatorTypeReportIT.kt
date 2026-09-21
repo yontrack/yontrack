@@ -57,7 +57,7 @@ class GQLTypeIndicatorTypeReportIT : AbstractIndicatorsTestSupport() {
                 }
             """).let { data ->
                 val reports = data.path("indicatorTypes").path("types").first().path("indicators")
-                val projectNames = reports.map { it.path("project").path("name").asText() }
+                val projectNames = reports.values().map { it.path("project").path("name").asText() }
                 val expectedProjectNames = expectedProjects.map { index ->
                     projects[index].name
                 }

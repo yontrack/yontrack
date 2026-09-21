@@ -10,9 +10,10 @@ import java.time.LocalDateTime
 import kotlin.test.assertEquals
 
 /**
- * The search documents are written by the `JsonpMapper` of the Elasticsearch client, and their
- * fields hold Jackson 2 types. Spring Boot 4 would give the client a Jackson 3 mapper, which writes
- * a Jackson 2 `JsonNode` as a bean.
+ * The search documents are written by the `JsonpMapper` of the Elasticsearch client, with the one
+ * mapper configuration of Yontrack (ADR 0016) rather than the Jackson 3 defaults Spring Boot would
+ * give the client: a `JsonNode` is written as its content, and a date as the rest of Yontrack writes
+ * it.
  */
 class ElasticSearchJsonpMapperIT : AbstractDSLTestSupport() {
 
@@ -20,7 +21,7 @@ class ElasticSearchJsonpMapperIT : AbstractDSLTestSupport() {
     private lateinit var jsonpMapper: JsonpMapper
 
     @Test
-    fun `search documents are written with Jackson 2`() {
+    fun `search documents are written with the Yontrack mapper`() {
         val document = mapOf(
             "node" to mapOf("name" to "test", "count" to 2).asJson(),
             "time" to LocalDateTime.of(2026, 9, 21, 10, 30),
@@ -32,7 +33,7 @@ class ElasticSearchJsonpMapperIT : AbstractDSLTestSupport() {
         }
 
         assertEquals(
-            """{"node":{"name":"test","count":2},"time":"2026-09-21T10:30:00"}""",
+            """{"node":{"name":"test","count":2},"time":"2026-09-21T10:30:00Z"}""",
             output.toString()
         )
     }

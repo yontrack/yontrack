@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.extension.environments.ui
 
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 import net.nemerosa.ontrack.extension.environments.EnvironmentTestSupport
 import net.nemerosa.ontrack.extension.environments.SlotAdmissionRuleTestFixtures
 import net.nemerosa.ontrack.extension.environments.SlotTestSupport
@@ -90,7 +90,7 @@ class GQLBuildJourneyFieldContributorIT : AbstractQLKTITSupport() {
                         assertEquals("NOT_ELIGIBLE", entry.path("state").asText())
                         assertEquals(
                             listOf("releaseBranchesOnly"),
-                            entry.path("nonEligibleRules").map { it.path("name").asText() }
+                            entry.path("nonEligibleRules").values().map { it.path("name").asText() }
                         )
                         assertTrue(entry.path("pipeline").isNull, "No deployment yet")
                     }

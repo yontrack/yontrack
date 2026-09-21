@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.extension.jira.notifications
 
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 import net.nemerosa.ontrack.extension.jira.JIRAConfigurationService
 import net.nemerosa.ontrack.extension.jira.JIRAFixtures
 import net.nemerosa.ontrack.extension.notifications.AbstractNotificationTestSupport

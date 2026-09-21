@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.extension.config.ci.conditions
 
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 import net.nemerosa.ontrack.extension.config.ci.engine.CIEngine
 import kotlin.reflect.KClass
 

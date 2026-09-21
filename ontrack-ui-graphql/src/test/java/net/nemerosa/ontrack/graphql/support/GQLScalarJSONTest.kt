@@ -1,8 +1,8 @@
 package net.nemerosa.ontrack.graphql.support
 
-import com.fasterxml.jackson.databind.JsonNode
-import com.fasterxml.jackson.databind.node.ArrayNode
-import com.fasterxml.jackson.databind.node.ObjectNode
+import tools.jackson.databind.JsonNode
+import tools.jackson.databind.node.ArrayNode
+import tools.jackson.databind.node.ObjectNode
 import graphql.language.*
 import net.nemerosa.ontrack.json.asJson
 import net.nemerosa.ontrack.test.assertIs
@@ -78,7 +78,7 @@ class GQLScalarJSONTest {
         assertIs<ArrayNode>(value) {
             assertEquals(
                 listOf("one", "two"),
-                it.map { it.asText() }
+                it.values().map { it.asText() }
             )
         }
     }

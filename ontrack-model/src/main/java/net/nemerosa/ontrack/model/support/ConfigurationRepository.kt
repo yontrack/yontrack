@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.model.support
 
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 
 interface ConfigurationRepository {
     /**

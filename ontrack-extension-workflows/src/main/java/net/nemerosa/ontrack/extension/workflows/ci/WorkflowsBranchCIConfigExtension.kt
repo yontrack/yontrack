@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.extension.workflows.ci
 
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 import net.nemerosa.ontrack.common.mergeMap
 import net.nemerosa.ontrack.extension.config.extensions.CIConfigExtension
 import net.nemerosa.ontrack.extension.notifications.subscriptions.EventSubscriptionFilter

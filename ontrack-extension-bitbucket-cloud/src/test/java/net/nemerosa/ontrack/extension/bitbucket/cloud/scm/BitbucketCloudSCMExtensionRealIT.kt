@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.extension.bitbucket.cloud.scm
 
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 import net.nemerosa.ontrack.extension.bitbucket.cloud.*
 import net.nemerosa.ontrack.extension.bitbucket.cloud.configuration.BitbucketCloudConfiguration
 import net.nemerosa.ontrack.extension.bitbucket.cloud.property.BitbucketCloudConfigurator
@@ -17,7 +17,7 @@ import net.nemerosa.ontrack.model.files.downloadDocument
 import net.nemerosa.ontrack.model.structure.Project
 import kotlinx.coroutines.runBlocking
 import org.springframework.beans.factory.annotation.Autowired
-import net.nemerosa.ontrack.extension.support.client.jackson2RestTemplateBuilder
+import net.nemerosa.ontrack.extension.support.client.restTemplateBuilder
 import kotlin.test.*
 
 /**
@@ -147,7 +147,7 @@ class BitbucketCloudSCMExtensionRealIT : AbstractBitbucketCloudTestSupport() {
             var prId: Int? = null
             try {
                 scm.upload(branch, base, "yontrack-test/pr.txt", "PR".toByteArray(), "Change for a pull request")
-                val pr = jackson2RestTemplateBuilder()
+                val pr = restTemplateBuilder()
                     .basicAuthentication(env.bot.email, env.bot.token)
                     .build()
                     .postForObject(

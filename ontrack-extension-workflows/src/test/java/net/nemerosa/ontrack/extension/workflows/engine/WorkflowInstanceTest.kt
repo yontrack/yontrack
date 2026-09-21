@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.extension.workflows.engine
 
-import com.fasterxml.jackson.databind.node.TextNode
+import tools.jackson.databind.node.StringNode
 import net.nemerosa.ontrack.common.Time
 import net.nemerosa.ontrack.extension.workflows.registry.WorkflowParser
 import net.nemerosa.ontrack.model.events.MockEventType
@@ -12,7 +12,7 @@ class WorkflowInstanceTest {
     @Test
     fun `Success node`() {
         val workflowInstance = WorkflowInstanceFixtures.simpleLinear()
-        val next = workflowInstance.successNode("start", TextNode("Processing"))
+        val next = workflowInstance.successNode("start", StringNode("Processing"))
         assertEquals(workflowInstance.id, next.id)
         assertEquals(workflowInstance.workflow, next.workflow)
         val output = next.nodesExecutions.find { it.id == "start" }?.output

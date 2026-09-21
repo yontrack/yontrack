@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.extension.artifactory.property
 
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 import net.nemerosa.ontrack.extension.artifactory.ArtifactoryExtensionFeature
 import net.nemerosa.ontrack.extension.artifactory.configuration.ArtifactoryConfiguration
 import net.nemerosa.ontrack.extension.artifactory.configuration.ArtifactoryConfigurationService

@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.graphql
 
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 import net.nemerosa.ontrack.it.AsAdminTest
 import net.nemerosa.ontrack.it.NoAuthTest
 import net.nemerosa.ontrack.model.security.*
@@ -97,7 +97,7 @@ class AdminQLIT : AbstractQLKTITSupport() {
         assertEquals(g.id(), data["accountGroups"].first()["id"].asInt())
         assertEquals(
             setOf(a1.id(), a3.id()),
-            data["accountGroups"].first()["accounts"].map { it["id"].asInt() }.toSet()
+            data["accountGroups"].first()["accounts"].values().map { it["id"].asInt() }.toSet()
         )
     }
 
@@ -159,7 +159,7 @@ class AdminQLIT : AbstractQLKTITSupport() {
                 )
             )
             val data = run("""{ accounts(id: ${a.id}) { groups { name } } }""")
-            assertEquals(listOf(g1.name, g2.name), data["accounts"].first()["groups"].map { it.path("name").asText() })
+            assertEquals(listOf(g1.name, g2.name), data["accounts"].first()["groups"].values().map { it.path("name").asText() })
         }
     }
 
@@ -360,7 +360,7 @@ class AdminQLIT : AbstractQLKTITSupport() {
 //                    id
 //                }
 //            }""")
-//            assertEquals(setOf(group1.id()), data["accountGroups"].map { it.id }.toSet())
+//            assertEquals(setOf(group1.id()), data["accountGroups"].values().map { it.id }.toSet())
 //        }
     }
 

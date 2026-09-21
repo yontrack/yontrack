@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.service.templating
 
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 import net.nemerosa.ontrack.model.events.EventRenderer
 import net.nemerosa.ontrack.model.structure.EntityDisplayNameService
 import net.nemerosa.ontrack.model.structure.ProjectEntity

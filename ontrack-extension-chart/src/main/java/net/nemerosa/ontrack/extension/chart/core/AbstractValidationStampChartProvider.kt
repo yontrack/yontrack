@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.extension.chart.core
 
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 import net.nemerosa.ontrack.extension.chart.Chart
 import net.nemerosa.ontrack.extension.chart.ChartProvider
 import net.nemerosa.ontrack.extension.chart.GetChartOptions

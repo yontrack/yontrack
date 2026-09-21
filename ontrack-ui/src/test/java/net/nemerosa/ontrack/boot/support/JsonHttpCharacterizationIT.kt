@@ -31,7 +31,7 @@ import kotlin.test.assertEquals
 
 /**
  * The JSON a client reads over HTTP, pinned before the Jackson 3 migration (#1843), from a REST
- * endpoint and from GraphQL. Written on Jackson 2, and meant to pass unchanged on Jackson 3 — except
+ * endpoint and from GraphQL. Written on Jackson 2, and passing unchanged on Jackson 3 — except
  * where the migration deliberately gives the MVC converters the `ObjectMapperFactory` configuration,
  * which is recorded on the migration page.
  *
@@ -109,8 +109,11 @@ class JsonHttpCharacterizationIT : AbstractDSLTestSupport() {
         val json = body.parseAsJson()
         assertEquals(build.id(), json.path("id").asInt())
         assertEquals(build.name, json.path("name").asText())
+        // Written as an array of numbers by 5.x, whose MVC converter had a mapper of its own: the
+        // converter has the one mapper configuration since 6.0 (ADR 0016), and the migration page
+        // records the change.
         assertEquals(
-            """{"time":[2025,11,4,9,12,30,123400000],"user":{"name":"admin"}}""",
+            """{"time":"2025-11-04T09:12:30.123400Z","user":{"name":"admin"}}""",
             json.path("signature").toString(),
             "Signature of the build as written by the MVC converters: $body"
         )

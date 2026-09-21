@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.extension.casc.upload
 
-import com.fasterxml.jackson.databind.node.TextNode
+import tools.jackson.databind.node.StringNode
 import net.nemerosa.ontrack.it.AbstractDSLTestSupport
 import net.nemerosa.ontrack.model.support.StorageService
 import net.nemerosa.ontrack.test.assertIs
@@ -29,7 +29,7 @@ class CascUploadServiceIT : AbstractDSLTestSupport() {
                     "default"
                 )
             ) { stored ->
-                assertIs<TextNode>(stored) { text ->
+                assertIs<StringNode>(stored) { text ->
                     assertEquals(sampleYaml, text.asText())
                 }
             }

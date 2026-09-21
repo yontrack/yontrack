@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.kdsl.acceptance.tests.tfc
 
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 
 /**
  * Contains information linked to a hook response. Used in hook records to follow-up on more information.

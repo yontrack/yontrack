@@ -1,7 +1,7 @@
 package net.nemerosa.ontrack.extension.github.client
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 import io.micrometer.core.instrument.MeterRegistry
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
@@ -20,7 +20,7 @@ import net.nemerosa.ontrack.model.metrics.increment
 import org.apache.commons.codec.binary.Base64
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
-import net.nemerosa.ontrack.extension.support.client.jackson2RestTemplateBuilder
+import net.nemerosa.ontrack.extension.support.client.restTemplateBuilder
 import org.springframework.http.HttpHeaders
 import org.springframework.http.MediaType
 import org.springframework.web.client.HttpClientErrorException
@@ -83,7 +83,7 @@ class DefaultOntrackGitHubClient(
             val client = createGitHubRestTemplate()
             // Gets the organization names
             client("Gets list of organizations") {
-                getForObject<JsonNode>("/user/orgs?per_page=100")!!.map { node ->
+                getForObject<JsonNode>("/user/orgs?per_page=100")!!.values().map { node ->
                     node.parse()
                 }
             }
@@ -304,7 +304,7 @@ class DefaultOntrackGitHubClient(
             if (response != null) {
                 val errors = response.path("errors")
                 if (errors != null && errors.isArray && errors.size() > 0) {
-                    val messages: List<String> = errors.map { it.path("message").asText() }
+                    val messages: List<String> = errors.values().map { it.path("message").asText() }
                     throw GitHubNoGraphQLErrorsException(message, messages)
                 } else {
                     val data = response.path("data")
@@ -357,7 +357,7 @@ class DefaultOntrackGitHubClient(
     override fun createGitHubRestTemplate(token: String?): RestTemplate =
         createGitHubTemplate(graphql = false, token = token)
 
-    private fun createGitHubTemplate(graphql: Boolean, token: String?): RestTemplate = jackson2RestTemplateBuilder()
+    private fun createGitHubTemplate(graphql: Boolean, token: String?): RestTemplate = restTemplateBuilder()
         .rootUri(getApiRoot(configuration.url, graphql))
         .connectTimeout(timeout)
         .readTimeout(timeout)
@@ -836,7 +836,7 @@ class DefaultOntrackGitHubClient(
         return client<List<GitHubCommit>>("Comparing commits") {
             getForObject<JsonNode>(
                 "/repos/$owner/$name/compare/$base...$head"
-            )!!.path("commits").map { commitNode ->
+            )!!.path("commits").values().map { commitNode ->
                 commitNode.parse()
             }
         }.reversed()
@@ -1043,7 +1043,7 @@ class DefaultOntrackGitHubClient(
         val encodedBranch = URLEncoder.encode(branch, Charsets.UTF_8)
         return client.getForObject<JsonNode>("/repos/$repository/actions/runs?event=workflow_dispatch&branch=$encodedBranch")!!
             .path("workflow_runs")
-            .map {
+            .values().map {
                 it.parse()
             }
     }
@@ -1057,7 +1057,7 @@ class DefaultOntrackGitHubClient(
         val expectedName = "inputs-$id.properties"
         val artifacts = client.getForObject<JsonNode>("/repos/$repository/actions/runs/$runId/artifacts")!!
             .path("artifacts")
-            .map {
+            .values().map {
                 it.parse<Artifact>()
             }
         return artifacts.any {
@@ -1082,7 +1082,7 @@ class DefaultOntrackGitHubClient(
         val field = "labels"
         return if (has(field)) {
             val list = get(field)
-            list.map { node ->
+            list.values().map { node ->
                 GitHubLabel(
                     name = node.getRequiredTextField("name"),
                     color = node.getRequiredTextField("color"),

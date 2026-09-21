@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.extension.config.ci.conditions
 
-import com.fasterxml.jackson.databind.node.TextNode
+import tools.jackson.databind.node.StringNode
 import io.mockk.every
 import io.mockk.mockk
 import net.nemerosa.ontrack.extension.config.ci.engine.CIEngine
@@ -46,7 +46,7 @@ class OrConditionTest {
         val config = listOf(
             CIConditionConfig(
                 name = "branch",
-                config = TextNode("release/.*"),
+                config = StringNode("release/.*"),
             ),
             CIConditionConfig(
                 name = "environment-regex",
@@ -72,7 +72,7 @@ class OrConditionTest {
         val config = listOf(
             CIConditionConfig(
                 name = "branch",
-                config = TextNode("release/.*"),
+                config = StringNode("release/.*"),
             ),
             CIConditionConfig(
                 name = "environment-regex",
@@ -100,7 +100,7 @@ class OrConditionTest {
         val config = listOf(
             CIConditionConfig(
                 name = "branch",
-                config = TextNode("release/.*"),
+                config = StringNode("release/.*"),
             ),
             CIConditionConfig(
                 name = "environment-regex",

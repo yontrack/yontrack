@@ -1,9 +1,9 @@
 package net.nemerosa.ontrack.json
 
-import com.fasterxml.jackson.core.JsonProcessingException
-import com.fasterxml.jackson.databind.JsonNode
-import com.fasterxml.jackson.databind.exc.MismatchedInputException
-import com.fasterxml.jackson.databind.node.*
+import tools.jackson.core.JacksonException
+import tools.jackson.databind.JsonNode
+import tools.jackson.databind.exc.MismatchedInputException
+import tools.jackson.databind.node.*
 import java.io.IOException
 import java.time.LocalDate
 import kotlin.reflect.KClass
@@ -51,9 +51,9 @@ fun JsonNode?.toObject(): Any? =
             is BooleanNode -> booleanValue()
             is NumericNode -> numberValue()
             is BinaryNode -> binaryValue()
-            is TextNode -> textValue()
+            is StringNode -> stringValue()
 
-            is ArrayNode -> map { it.toObject() }
+            is ArrayNode -> values().map { it.toObject() }
 
             is ObjectNode -> properties().asSequence().map { (k, v) ->
                 k to v.toObject()
@@ -71,7 +71,7 @@ fun JsonNode?.toObject(): Any? =
 fun JsonNode.asJsonString(): String =
     try {
         mapper.writeValueAsString(this)
-    } catch (e: JsonProcessingException) {
+    } catch (e: JacksonException) {
         throw JsonParseException(e)
     }
 
@@ -91,7 +91,7 @@ fun <T : Any> JsonNode.parseInto(type: KClass<T>): T =
         throw JsonParseException(
             userFriendlyMessage(ex)
         )
-    } catch (ex: JsonProcessingException) {
+    } catch (ex: JacksonException) {
         throw JsonParseException(ex)
     }
 
@@ -100,7 +100,7 @@ fun userFriendlyMessage(ex: MismatchedInputException): String {
         .joinToString(separator = ".") { ref ->
             // A Reference can point to either a field or an array index
             // If ref.fieldName is null, we assume it's an array index
-            ref.fieldName ?: "[${ref.index}]"
+            ref.propertyName ?: "[${ref.index}]"
         }
 
     // ex.location might be null in some cases, so check for nullability
@@ -127,7 +127,7 @@ fun userFriendlyMessage(ex: MismatchedInputException): String {
  */
 fun JsonNode.format(): String = try {
     mapper.writeValueAsString(this)
-} catch (e: JsonProcessingException) {
+} catch (e: JacksonException) {
     throw JsonParseException(e)
 }
 
@@ -354,8 +354,8 @@ fun ObjectNode.mergeObject(
 ): JsonNode {
     // All field names
     val names = mutableSetOf<String>()
-    this.fieldNames().forEach { names += it }
-    node.fieldNames().forEach { names += it }
+    this.propertyNames().forEach { names += it }
+    node.propertyNames().forEach { names += it }
     // Looping over all the fields
     val target = objectNode()
     names.forEach { name ->
@@ -369,7 +369,7 @@ fun ObjectNode.mergeObject(
             null
         }
         if (value != null) {
-            target.set<JsonNode>(name, value)
+            target.set(name, value)
         }
     }
     // OK

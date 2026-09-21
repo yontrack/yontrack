@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.service
 
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 import net.nemerosa.ontrack.json.getDateField
 import net.nemerosa.ontrack.json.getIntField
 import net.nemerosa.ontrack.json.getTextField

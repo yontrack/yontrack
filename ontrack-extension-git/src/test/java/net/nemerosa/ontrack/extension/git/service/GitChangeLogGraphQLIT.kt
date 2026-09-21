@@ -73,7 +73,7 @@ class GitChangeLogGraphQLIT : AbstractGitTestSupport() {
                 }
             }"""
             )
-            val messages = data["branches"][0]["gitChangeLog"]["commits"].map {
+            val messages = data["branches"][0]["gitChangeLog"]["commits"].values().map {
                 it["commit"]["shortMessage"].asText()
             }
             assertEquals(
@@ -360,7 +360,7 @@ class GitChangeLogGraphQLIT : AbstractGitTestSupport() {
                 }
             }"""
             )
-            val messages = data["gitChangeLog"]["commits"].map {
+            val messages = data["gitChangeLog"]["commits"].values().map {
                 it["commit"]["shortMessage"].asText()
             }
             assertEquals(

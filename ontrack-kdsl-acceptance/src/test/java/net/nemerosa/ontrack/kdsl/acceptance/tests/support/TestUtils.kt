@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.kdsl.acceptance.tests.support
 
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking

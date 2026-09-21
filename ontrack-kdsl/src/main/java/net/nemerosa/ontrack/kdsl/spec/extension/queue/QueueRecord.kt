@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.kdsl.spec.extension.queue
 
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 import java.time.LocalDateTime
 
 data class QueueRecord(

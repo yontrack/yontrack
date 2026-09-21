@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.extension.general
 
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 import net.nemerosa.ontrack.json.asJson
 import net.nemerosa.ontrack.json.parse
 import net.nemerosa.ontrack.model.json.schema.JsonArrayType
@@ -16,7 +16,7 @@ class MetaInfoPropertyAlias : PropertyAlias {
 
     override val type: String = MetaInfoPropertyType::class.java.name
 
-    override fun parseConfig(data: JsonNode): JsonNode = data.map {
+    override fun parseConfig(data: JsonNode): JsonNode = data.values().map {
         it.parse<MetaInfoPropertyItem>()
     }.let {
         MetaInfoProperty(items = it)

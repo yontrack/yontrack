@@ -21,7 +21,7 @@ class InternalEndpointMgt(connector: Connector) : Connected(connector) {
      */
     val payloads: List<InternalEndpointPayload>
         get() = connector.get("$PATH/payloads")
-            .body.asJson().map {
+            .body.asJson().values().map {
                 it.parse()
             }
 

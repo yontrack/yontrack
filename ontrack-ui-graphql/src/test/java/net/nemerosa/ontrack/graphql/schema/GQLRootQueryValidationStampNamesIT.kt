@@ -37,7 +37,7 @@ class GQLRootQueryValidationStampNamesIT: AbstractQLKTITSupport() {
                     validationStampNames(token: "$prefix")
                 }"""
                 ) { data ->
-                    val names = data["validationStampNames"].map { it.asText() }
+                    val names = data["validationStampNames"].values().map { it.asText() }
                     assertTrue(names.contains(vsa.name), "Contains the first VS")
                     assertTrue(names.contains(vsb.name), "Contains the second VS")
                 }
@@ -48,7 +48,7 @@ class GQLRootQueryValidationStampNamesIT: AbstractQLKTITSupport() {
                     validationStampNames(token: "${vsa.name}")
                 }"""
                 ) { data ->
-                    val names = data["validationStampNames"].map { it.asText() }
+                    val names = data["validationStampNames"].values().map { it.asText() }
                     assertEquals(listOf(vsa.name), names)
                 }
 
@@ -61,7 +61,7 @@ class GQLRootQueryValidationStampNamesIT: AbstractQLKTITSupport() {
                     validationStampNames(token: "$prefix")
                 }"""
                 ) { data ->
-                    val names = data["validationStampNames"].map { it.asText() }
+                    val names = data["validationStampNames"].values().map { it.asText() }
                     assertTrue(names.contains(vsa.name), "Contains the first VS")
                     assertFalse(names.contains(vsb.name), "No access to the second VS")
                 }

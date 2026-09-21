@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.extension.stash.property
 
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 import net.nemerosa.ontrack.extension.git.model.GitConfiguration
 import net.nemerosa.ontrack.extension.git.model.GitConfigurator
 import net.nemerosa.ontrack.extension.git.model.GitPullRequest
@@ -8,7 +8,7 @@ import net.nemerosa.ontrack.extension.issues.IssueServiceRegistry
 import net.nemerosa.ontrack.extension.issues.model.ConfiguredIssueService
 import net.nemerosa.ontrack.model.structure.Project
 import net.nemerosa.ontrack.model.structure.PropertyService
-import net.nemerosa.ontrack.extension.support.client.jackson2RestTemplateBuilder
+import net.nemerosa.ontrack.extension.support.client.restTemplateBuilder
 import org.springframework.stereotype.Component
 import org.springframework.web.client.getForObject
 
@@ -32,7 +32,7 @@ class StashConfigurator(
 
     override fun getPullRequest(configuration: GitConfiguration, id: Int): GitPullRequest? =
         if (configuration is StashGitConfiguration) {
-            val restTemplate = jackson2RestTemplateBuilder()
+            val restTemplate = restTemplateBuilder()
                 .rootUri(configuration.configuration.url)
                 .basicAuthentication(
                     requireNotNull(configuration.configuration.user) { "Username must not be null" },

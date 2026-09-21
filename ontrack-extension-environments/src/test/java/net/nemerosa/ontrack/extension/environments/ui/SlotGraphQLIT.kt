@@ -89,7 +89,7 @@ class SlotGraphQLIT : AbstractQLKTITSupport() {
                     assertEquals(slot.environment.id, environmentId)
                     assertEquals(
                         listOf(slot.id),
-                        environment.path("slots").map {
+                        environment.path("slots").values().map {
                             it.path("id").asText()
                         }
                     )
@@ -222,7 +222,7 @@ class SlotGraphQLIT : AbstractQLKTITSupport() {
                         assertEquals(false, refused.path("eligible").asBoolean())
                         assertEquals(
                             listOf("releaseBranchesOnly" to "branchPattern"),
-                            refused.path("nonEligibleRules").map {
+                            refused.path("nonEligibleRules").values().map {
                                 it.path("name").asText() to it.path("ruleId").asText()
                             },
                             "The rule which refuses the build is named, not merely counted",
@@ -255,7 +255,7 @@ class SlotGraphQLIT : AbstractQLKTITSupport() {
                     ) { data ->
                         val pipelineIds = data.path("build")
                             .path("slotPipelines")
-                            .map { it.path("id").asText() }
+                            .values().map { it.path("id").asText() }
                         assertEquals(
                             listOf(
                                 pipeline2.id,
@@ -309,7 +309,7 @@ class SlotGraphQLIT : AbstractQLKTITSupport() {
                     .path("pageItems")
                 assertEquals(
                     listOf(build2.id(), build1.id()),
-                    builds.map {
+                    builds.values().map {
                         it.path("id").asInt()
                     }
                 )
@@ -333,7 +333,7 @@ class SlotGraphQLIT : AbstractQLKTITSupport() {
                     .path("pageItems")
                 assertEquals(
                     listOf(build1.id()),
-                    builds.map {
+                    builds.values().map {
                         it.path("id").asInt()
                     }
                 )
@@ -377,7 +377,7 @@ class SlotGraphQLIT : AbstractQLKTITSupport() {
                     ),
                     data.path("build")
                         .path("eligibleSlots")
-                        .map { it.path("id").asText() }
+                        .values().map { it.path("id").asText() }
                         .toSet()
                 )
             }
@@ -466,7 +466,7 @@ class SlotGraphQLIT : AbstractQLKTITSupport() {
             ) { data ->
                 val deploymentIds = data.path("slotById").path("pipelines")
                     .path("pageItems")
-                    .map { it.path("id").asText() }
+                    .values().map { it.path("id").asText() }
                 assertEquals(
                     listOf(pipeline122.id, pipeline121.id),
                     deploymentIds
@@ -505,7 +505,7 @@ class SlotGraphQLIT : AbstractQLKTITSupport() {
             ) { data ->
                 val deploymentIds = data.path("slotById").path("pipelines")
                     .path("pageItems")
-                    .map { it.path("id").asText() }
+                    .values().map { it.path("id").asText() }
                 assertEquals(
                     listOf(pipelineFinished.id, firstPipelineFinished.id),
                     deploymentIds

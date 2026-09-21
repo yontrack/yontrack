@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.extension.git.casc
 
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 import net.nemerosa.ontrack.extension.casc.context.AbstractCascContext
 import net.nemerosa.ontrack.git.support.GitConnectionConfig
 import net.nemerosa.ontrack.json.asJson

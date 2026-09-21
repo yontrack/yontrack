@@ -202,11 +202,11 @@ class BuildLinksGraphQLIT : AbstractQLKTITSupport() {
                 val items = data.path("build").path("usingQualified").path("pageItems")
                 assertEquals(
                     listOf(build2.id(), build2.id()),
-                    items.map { it.path("build").getRequiredIntField("id") }
+                    items.values().map { it.path("build").getRequiredIntField("id") }
                 )
                 assertEquals(
                     setOf("dep1", "dep2"),
-                    items.map { it.getRequiredTextField("qualifier") }.toSet()
+                    items.values().map { it.getRequiredTextField("qualifier") }.toSet()
                 )
             }
         }
@@ -238,11 +238,11 @@ class BuildLinksGraphQLIT : AbstractQLKTITSupport() {
                 val items = data.path("build").path("usedByQualified").path("pageItems")
                 assertEquals(
                     listOf(build1.id(), build1.id()),
-                    items.map { it.path("build").getRequiredIntField("id") }
+                    items.values().map { it.path("build").getRequiredIntField("id") }
                 )
                 assertEquals(
                     setOf("dep1", "dep2"),
-                    items.map { it.getRequiredTextField("qualifier") }.toSet()
+                    items.values().map { it.getRequiredTextField("qualifier") }.toSet()
                 )
             }
         }

@@ -1,7 +1,7 @@
 package net.nemerosa.ontrack.extension.general.validation
 
-import com.fasterxml.jackson.databind.JsonNode
-import com.fasterxml.jackson.databind.node.NullNode
+import tools.jackson.databind.JsonNode
+import tools.jackson.databind.node.NullNode
 import net.nemerosa.ontrack.extension.general.GeneralExtensionFeature
 import net.nemerosa.ontrack.json.asJson
 import net.nemerosa.ontrack.json.getTextField
@@ -30,7 +30,7 @@ class TextValidationDataType(
 
     override fun toJson(data: String): JsonNode = data.asJson()
 
-    override fun fromJson(node: JsonNode): String? = node.textValue()
+    override fun fromJson(node: JsonNode): String? = node.stringValueOpt().orElse(null)
 
     override fun fromForm(node: JsonNode?): String? = node?.getTextField("value")
 

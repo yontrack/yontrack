@@ -63,7 +63,7 @@ class ProjectGraphQLIT : AbstractQLKTITSupport() {
                     listOf("B2", "B1"),
                     data.path("projects").first()
                         .path("branches")
-                        .map {
+                        .values().map {
                             it.path("name").asText()
                         }
                 )
@@ -91,7 +91,7 @@ class ProjectGraphQLIT : AbstractQLKTITSupport() {
             ) { data ->
                 assertEquals(
                     listOf("B2", "B1"),
-                    data.path("project").path("branches").map { it.path("name").asText() }
+                    data.path("project").path("branches").values().map { it.path("name").asText() }
                 )
             }
         }
@@ -117,7 +117,7 @@ class ProjectGraphQLIT : AbstractQLKTITSupport() {
             ) { data ->
                 assertEquals(
                     listOf("B1"),
-                    data.path("project").path("branches").map { it.path("name").asText() }
+                    data.path("project").path("branches").values().map { it.path("name").asText() }
                 )
             }
         }
@@ -143,7 +143,7 @@ class ProjectGraphQLIT : AbstractQLKTITSupport() {
             ) { data ->
                 assertEquals(
                     listOf("B2"),
-                    data.path("project").path("branches").map { it.path("name").asText() }
+                    data.path("project").path("branches").values().map { it.path("name").asText() }
                 )
             }
         }
@@ -159,7 +159,7 @@ class ProjectGraphQLIT : AbstractQLKTITSupport() {
                     listOf("B2"),
                     data.path("projects").first()
                         .path("branches")
-                        .map {
+                        .values().map {
                             it.path("name").asText()
                         }
                 )
@@ -194,7 +194,7 @@ class ProjectGraphQLIT : AbstractQLKTITSupport() {
                     listOf("11.9.0"),
                     data.path("projects").first()
                         .path("branches")
-                        .map {
+                        .values().map {
                             it.path("name").asText()
                         }
                 )
@@ -225,7 +225,7 @@ class ProjectGraphQLIT : AbstractQLKTITSupport() {
                         data.path("projects").first()
                             .path("branches").first()
                             .path("promotionLevels")
-                            .map {
+                            .values().map {
                                 it.path("name").asText()
                             }
                     )
@@ -258,7 +258,7 @@ class ProjectGraphQLIT : AbstractQLKTITSupport() {
                         data.path("projects").first()
                             .path("branches").first()
                             .path("validationStamps")
-                            .map {
+                            .values().map {
                                 it.path("name").asText()
                             }
                     )
@@ -301,7 +301,7 @@ class ProjectGraphQLIT : AbstractQLKTITSupport() {
                         data.path("projects").first()
                             .path("branches").first()
                             .path("promotionLevels").first()
-                            .path("promotionRuns").map {
+                            .path("promotionRuns").values().map {
                                 it.path("build").path("name").asText()
                             }
                     )
@@ -343,7 +343,7 @@ class ProjectGraphQLIT : AbstractQLKTITSupport() {
                         data.path("projects").first()
                             .path("branches").first()
                             .path("validationStamps").first()
-                            .path("validationRuns").map {
+                            .path("validationRuns").values().map {
                                 it.path("build").path("name").asText()
                             }
                     )
@@ -382,7 +382,7 @@ class ProjectGraphQLIT : AbstractQLKTITSupport() {
                         data.path("projects").first()
                             .path("branches").first()
                             .path("builds").first()
-                            .path("promotionRuns").map {
+                            .path("promotionRuns").values().map {
                                 it.path("promotionLevel").path("name").asText()
                             }
                     )
@@ -421,7 +421,7 @@ class ProjectGraphQLIT : AbstractQLKTITSupport() {
                         data.path("projects").first()
                             .path("branches").first()
                             .path("builds").first()
-                            .path("promotionRuns").map {
+                            .path("promotionRuns").values().map {
                                 it.path("promotionLevel").path("name").asText()
                             }
                     )
@@ -463,7 +463,7 @@ class ProjectGraphQLIT : AbstractQLKTITSupport() {
                         data.path("projects").first()
                             .path("branches").first()
                             .path("promotionLevels").first()
-                            .path("promotionRuns").map {
+                            .path("promotionRuns").values().map {
                                 it.path("build").path("name").asText()
                             }
                     )
@@ -505,7 +505,7 @@ class ProjectGraphQLIT : AbstractQLKTITSupport() {
                         data.path("projects").first()
                             .path("branches").first()
                             .path("promotionLevels").first()
-                            .path("promotionRuns").map {
+                            .path("promotionRuns").values().map {
                                 it.path("build").path("name").asText()
                             }
                     )
@@ -537,7 +537,7 @@ class ProjectGraphQLIT : AbstractQLKTITSupport() {
         ) { data ->
             assertEquals(
                 setOf(p1.name, p3.name, p4.name),
-                data.path("projects").map { it.path("name").asText() }.toSet()
+                data.path("projects").values().map { it.path("name").asText() }.toSet()
             )
         }
     }
@@ -565,7 +565,7 @@ class ProjectGraphQLIT : AbstractQLKTITSupport() {
         ) { data ->
             assertEquals(
                 setOf(p1.name, p3.name),
-                data.path("projects").map { it.path("name").asText() }.toSet()
+                data.path("projects").values().map { it.path("name").asText() }.toSet()
             )
         }
     }
@@ -593,7 +593,7 @@ class ProjectGraphQLIT : AbstractQLKTITSupport() {
         ) { data ->
             assertEquals(
                 setOf(p1.name),
-                data.path("projects").map { it.path("name").asText() }.toSet()
+                data.path("projects").values().map { it.path("name").asText() }.toSet()
             )
         }
     }
@@ -616,7 +616,7 @@ class ProjectGraphQLIT : AbstractQLKTITSupport() {
                 }
             }"""
             ).let { data ->
-                val names = data.path("projects").map { it.path("name").asText() }
+                val names = data.path("projects").values().map { it.path("name").asText() }
                 assertEquals(
                     (0..4).map { "X$rootA$it" },
                     names
@@ -644,7 +644,7 @@ class ProjectGraphQLIT : AbstractQLKTITSupport() {
                     }
                 }"""
                 ).let { data ->
-                    val names = data.path("projects").map { it.path("name").asText() }
+                    val names = data.path("projects").values().map { it.path("name").asText() }
                     assertEquals(
                         (0..2).map { "X$rootA$it" },
                         names
@@ -672,7 +672,7 @@ class ProjectGraphQLIT : AbstractQLKTITSupport() {
                     }
                 }"""
                 ).let { data ->
-                    val names = data.path("projects").path(0).path("branches").map {
+                    val names = data.path("projects").path(0).path("branches").values().map {
                         it.path("name").asText()
                     }
                     assertEquals(
@@ -1169,7 +1169,7 @@ class ProjectGraphQLIT : AbstractQLKTITSupport() {
                 """
                 )
             }
-            val branchIds: Set<Int> = data["projects"][0]["branches"].map { it["id"].asInt() }.toSet()
+            val branchIds: Set<Int> = data["projects"][0]["branches"].values().map { it["id"].asInt() }.toSet()
             assertEquals(
                 setOf(fav.id()),
                 branchIds
@@ -1271,11 +1271,11 @@ class ProjectGraphQLIT : AbstractQLKTITSupport() {
                         data["projects"][0]["branches"][0]["validationStamps"][0]["validationRuns"][0]["validationRunStatuses"]
                     assertEquals(
                         listOf("EXPLAINED", "INVESTIGATING", "FAILED"),
-                        validationRunStatuses.map { it["statusID"]["id"].asText() }
+                        validationRunStatuses.values().map { it["statusID"]["id"].asText() }
                     )
                     assertEquals(
                         listOf("Explained", "Investigating", "Validation failed"),
-                        validationRunStatuses.map { it["description"].asText() }
+                        validationRunStatuses.values().map { it["description"].asText() }
                     )
                 }
             }

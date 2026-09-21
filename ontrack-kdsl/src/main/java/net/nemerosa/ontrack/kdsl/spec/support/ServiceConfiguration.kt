@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.kdsl.spec.support
 
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 
 data class ServiceConfiguration(
     val id: String,

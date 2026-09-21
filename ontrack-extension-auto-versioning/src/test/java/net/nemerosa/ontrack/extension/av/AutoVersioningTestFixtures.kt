@@ -1,7 +1,7 @@
 package net.nemerosa.ontrack.extension.av
 
-import com.fasterxml.jackson.databind.JsonNode
-import com.fasterxml.jackson.databind.node.NullNode
+import tools.jackson.databind.JsonNode
+import tools.jackson.databind.node.NullNode
 import net.nemerosa.ontrack.extension.av.config.*
 import net.nemerosa.ontrack.extension.av.dispatcher.AutoVersioningOrder
 import net.nemerosa.ontrack.model.structure.Branch

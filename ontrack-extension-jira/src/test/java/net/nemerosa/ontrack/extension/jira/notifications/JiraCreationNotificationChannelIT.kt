@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.extension.jira.notifications
 
-import com.fasterxml.jackson.databind.node.TextNode
+import tools.jackson.databind.node.StringNode
 import net.nemerosa.ontrack.extension.jira.JIRAConfigurationService
 import net.nemerosa.ontrack.extension.jira.JIRAFixtures
 import net.nemerosa.ontrack.extension.notifications.AbstractNotificationTestSupport
@@ -86,11 +86,11 @@ class JiraCreationNotificationChannelIT : AbstractNotificationTestSupport() {
                             customFields = listOf(
                                 JiraCustomField(
                                     "duedate",
-                                    TextNode("2024-04-16")
+                                    StringNode("2024-04-16")
                                 ),
                                 JiraCustomField(
                                     "customfield_11000",
-                                    TextNode("Some direct value")
+                                    StringNode("Some direct value")
                                 ),
                                 JiraCustomField(
                                     "customfield_12000",
@@ -208,11 +208,11 @@ class JiraCreationNotificationChannelIT : AbstractNotificationTestSupport() {
                             customFields = listOf(
                                 JiraCustomField(
                                     "duedate",
-                                    TextNode("2024-04-16")
+                                    StringNode("2024-04-16")
                                 ),
                                 JiraCustomField(
                                     "customfield_11000",
-                                    TextNode("Some direct value")
+                                    StringNode("Some direct value")
                                 ),
                                 JiraCustomField(
                                     "customfield_12000",

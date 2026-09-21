@@ -67,7 +67,7 @@ class GQLProjectPromotionLevelNamesFieldContributorIT : AbstractQLKTITSupport() 
             ) { data ->
                 val names = data.path("project")
                     .path("promotionLevelNames")
-                    .map { it.asText() }
+                    .values().map { it.asText() }
                 assertEquals(expected, names)
             }
         }

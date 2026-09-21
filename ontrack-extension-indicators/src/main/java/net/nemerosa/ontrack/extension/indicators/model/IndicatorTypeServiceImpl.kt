@@ -1,7 +1,7 @@
 package net.nemerosa.ontrack.extension.indicators.model
 
-import com.fasterxml.jackson.databind.JsonNode
-import com.fasterxml.jackson.databind.node.NullNode
+import tools.jackson.databind.JsonNode
+import tools.jackson.databind.node.NullNode
 import net.nemerosa.ontrack.extension.indicators.acl.IndicatorTypeManagement
 import net.nemerosa.ontrack.model.Ack
 import net.nemerosa.ontrack.model.security.GlobalSettings

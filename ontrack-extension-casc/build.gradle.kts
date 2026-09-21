@@ -14,7 +14,7 @@ dependencies {
 
     implementation("org.springframework:spring-tx")
     implementation("org.springframework.boot:spring-boot")
-    implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml")
+    implementation("tools.jackson.dataformat:jackson-dataformat-yaml")
 
     testImplementation(testFixtures(project(":ontrack-it-utils")))
     testImplementation(testFixtures(project(":ontrack-extension-scm")))

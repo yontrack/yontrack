@@ -1,10 +1,10 @@
 package net.nemerosa.ontrack.kdsl.spec.extension.github
 
-import com.fasterxml.jackson.core.JsonParser
-import com.fasterxml.jackson.databind.DeserializationContext
-import com.fasterxml.jackson.databind.JsonDeserializer
-import com.fasterxml.jackson.databind.JsonNode
-import com.fasterxml.jackson.databind.annotation.JsonDeserialize
+import tools.jackson.core.JsonParser
+import tools.jackson.databind.DeserializationContext
+import tools.jackson.databind.ValueDeserializer
+import tools.jackson.databind.JsonNode
+import tools.jackson.databind.annotation.JsonDeserialize
 import net.nemerosa.ontrack.json.getTextField
 import net.nemerosa.ontrack.json.parse
 import net.nemerosa.ontrack.kdsl.spec.Project
@@ -37,7 +37,7 @@ class GitHubProjectConfigurationProperty(
 const val GITHUB_PROJECT_CONFIGURATION_PROPERTY =
         "net.nemerosa.ontrack.extension.github.property.GitHubProjectConfigurationPropertyType"
 
-class GitHubProjectConfigurationPropertyDeserializer : JsonDeserializer<GitHubProjectConfigurationProperty>() {
+class GitHubProjectConfigurationPropertyDeserializer : ValueDeserializer<GitHubProjectConfigurationProperty>() {
     override fun deserialize(p: JsonParser, ctxt: DeserializationContext): GitHubProjectConfigurationProperty {
         val node: JsonNode = p.readValueAsTree()
         return GitHubProjectConfigurationProperty(

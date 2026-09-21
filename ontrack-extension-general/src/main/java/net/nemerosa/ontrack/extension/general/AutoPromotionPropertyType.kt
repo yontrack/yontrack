@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.extension.general
 
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 import net.nemerosa.ontrack.extension.support.AbstractPropertyType
 import net.nemerosa.ontrack.json.asJson
 import net.nemerosa.ontrack.json.getBooleanField
@@ -68,7 +68,7 @@ class AutoPromotionPropertyType(
 
     private fun readValidationStamps(validationStampIds: JsonNode?): List<ValidationStamp> =
         if (validationStampIds != null && validationStampIds.isArray) {
-            validationStampIds.map { idNode ->
+            validationStampIds.values().map { idNode ->
                 val id = idNode.asInt()
                 structureService.getValidationStamp(ID.of(id))
             }
@@ -78,7 +78,7 @@ class AutoPromotionPropertyType(
 
     private fun readPromotionLevels(promotionLevelIds: JsonNode?): List<PromotionLevel> =
         if (promotionLevelIds != null && promotionLevelIds.isArray) {
-            promotionLevelIds.map { idNode ->
+            promotionLevelIds.values().map { idNode ->
                 val id = idNode.asInt()
                 structureService.getPromotionLevel(ID.of(id))
             }

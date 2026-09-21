@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.extension.chart.core
 
-import com.fasterxml.jackson.databind.node.NullNode
+import tools.jackson.databind.node.NullNode
 import net.nemerosa.ontrack.extension.chart.ChartDefinition
 import net.nemerosa.ontrack.graphql.AbstractQLKTITSupport
 import net.nemerosa.ontrack.it.AsAdminTest
@@ -30,7 +30,7 @@ internal class GQLValidationStampChartsFieldContributorIT : AbstractQLKTITSuppor
                     }
                 }"""
                 ) { data ->
-                    val charts = data.path("validationStamp").path("charts").map {
+                    val charts = data.path("validationStamp").path("charts").values().map {
                         it.parse<ChartDefinition>()
                     }.associateBy { it.id }
                     assertEquals(3, charts.size)

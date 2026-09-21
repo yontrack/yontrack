@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.extension.notifications.recording
 
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 import graphql.Scalars.GraphQLString
 import graphql.schema.GraphQLArgument
 import graphql.schema.GraphQLFieldDefinition

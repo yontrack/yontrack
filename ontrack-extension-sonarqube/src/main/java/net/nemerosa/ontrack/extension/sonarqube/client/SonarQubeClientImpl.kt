@@ -7,7 +7,7 @@ import net.nemerosa.ontrack.extension.sonarqube.client.model.ProjectAnalysisSear
 import net.nemerosa.ontrack.extension.sonarqube.configuration.SonarQubeConfiguration
 import net.nemerosa.ontrack.json.asJson
 import org.slf4j.LoggerFactory
-import net.nemerosa.ontrack.extension.support.client.jackson2RestTemplateBuilder
+import net.nemerosa.ontrack.extension.support.client.restTemplateBuilder
 import org.springframework.http.HttpStatus
 import org.springframework.web.client.HttpClientErrorException
 import org.springframework.web.client.RestTemplate
@@ -93,7 +93,7 @@ class SonarQubeClientImpl(
 
     }
 
-    internal val restTemplate: RestTemplate = jackson2RestTemplateBuilder()
+    internal val restTemplate: RestTemplate = restTemplateBuilder()
         .rootUri(configuration.url)
         // SonarQube requires a strict encoding per value (esp. for "+" characters which are no longer encoded with Spring 5)
         // See https://github.com/spring-projects/spring-framework/issues/20750

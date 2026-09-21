@@ -103,11 +103,11 @@ class PromotionLevelGraphQLIT : AbstractQLKTITSupport() {
                     }
                 }""")
                 val promotion = data["promotionLevel"]
-                assertEquals(pl.name, promotion["name"].textValue())
+                assertEquals(pl.name, promotion["name"].stringValue())
                 assertEquals("A description linking to https://documentation.org/reference",
-                    promotion["description"].textValue())
+                    promotion["description"].stringValue())
                 assertEquals("""A description linking to <a href="https://documentation.org/reference" target="_blank">https://documentation.org/reference</a>""",
-                    promotion["annotatedDescription"].textValue())
+                    promotion["annotatedDescription"].stringValue())
             }
         }
     }

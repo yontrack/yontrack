@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.service
 
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 import net.nemerosa.ontrack.model.Ack
 import net.nemerosa.ontrack.model.buildfilter.*
 import net.nemerosa.ontrack.model.exceptions.BuildFilterNotFoundException

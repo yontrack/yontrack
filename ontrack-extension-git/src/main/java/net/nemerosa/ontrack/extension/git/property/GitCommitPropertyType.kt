@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.extension.git.property
 
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 import net.nemerosa.ontrack.extension.git.GitExtensionFeature
 import net.nemerosa.ontrack.extension.git.service.GitService
 import net.nemerosa.ontrack.extension.scm.index.SCMBuildCommitIndexService

@@ -1,9 +1,9 @@
 package net.nemerosa.ontrack.test;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.TreeNode;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.core.TreeNode;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import net.nemerosa.ontrack.json.ObjectMapperFactory;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.Validate;
@@ -47,7 +47,7 @@ public final class TestUtils {
         );
     }
 
-    public static void assertJsonWrite(JsonNode expectedJson, Object objectToWrite, Class<?> viewClass) throws JsonProcessingException {
+    public static void assertJsonWrite(JsonNode expectedJson, Object objectToWrite, Class<?> viewClass) throws JacksonException {
         assertJsonWrite(
                 mapper,
                 expectedJson,
@@ -56,14 +56,14 @@ public final class TestUtils {
         );
     }
 
-    public static void assertJsonWrite(ObjectMapper mapper, JsonNode expectedJson, Object objectToWrite, Class<?> viewClass) throws JsonProcessingException {
+    public static void assertJsonWrite(ObjectMapper mapper, JsonNode expectedJson, Object objectToWrite, Class<?> viewClass) throws JacksonException {
         assertEquals(
                 mapper.writeValueAsString(expectedJson),
                 mapper.writerWithView(viewClass).writeValueAsString(objectToWrite)
         );
     }
 
-    public static <T> void assertJsonRead(T expectedResult, JsonNode jsonToRead, Class<T> type) throws JsonProcessingException {
+    public static <T> void assertJsonRead(T expectedResult, JsonNode jsonToRead, Class<T> type) throws JacksonException {
         assertEquals(
                 expectedResult,
                 mapper.treeToValue(jsonToRead, type)

@@ -1,8 +1,8 @@
 package net.nemerosa.ontrack.json;
 
-import com.fasterxml.jackson.core.JsonParser;
-import com.fasterxml.jackson.databind.DeserializationContext;
-import com.fasterxml.jackson.databind.JsonDeserializer;
+import tools.jackson.core.JsonParser;
+import tools.jackson.databind.DeserializationContext;
+import tools.jackson.databind.ValueDeserializer;
 import org.apache.commons.lang3.StringUtils;
 
 import java.io.IOException;
@@ -12,10 +12,10 @@ import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 
-public class JDKLocalDateTimeDeserializer extends JsonDeserializer<LocalDateTime> {
+public class JDKLocalDateTimeDeserializer extends ValueDeserializer<LocalDateTime> {
 
     @Override
-    public LocalDateTime deserialize(JsonParser jp, DeserializationContext ctxt) throws IOException {
+    public LocalDateTime deserialize(JsonParser jp, DeserializationContext ctxt) {
         String s = jp.readValueAs(String.class);
         if (StringUtils.isNotBlank(s)) {
             // Tries first with local date time

@@ -1,7 +1,7 @@
 package net.nemerosa.ontrack.kdsl.acceptance.tests.general
 
 import com.apollographql.apollo.api.Optional
-import com.fasterxml.jackson.databind.node.TextNode
+import tools.jackson.databind.node.StringNode
 import net.nemerosa.ontrack.kdsl.acceptance.tests.AbstractACCDSLTestSupport
 import net.nemerosa.ontrack.kdsl.connector.graphql.GraphQLClientException
 import net.nemerosa.ontrack.kdsl.connector.graphql.schema.type.PromotionLevelFieldInput
@@ -71,7 +71,7 @@ class ACCPromotionLevelFields : AbstractACCDSLTestSupport() {
                         fieldValues = listOf(
                             PromotionRunFieldValueInput(
                                 name = "ticket",
-                                value = Optional.present(TextNode("PROJ-42")),
+                                value = Optional.present(StringNode("PROJ-42")),
                             )
                         )
                     )
@@ -129,7 +129,7 @@ class ACCPromotionLevelFields : AbstractACCDSLTestSupport() {
                         fieldValues = listOf(
                             PromotionRunFieldValueInput(
                                 name = "ref",
-                                value = Optional.present(TextNode("https://example.com/ticket/42")),
+                                value = Optional.present(StringNode("https://example.com/ticket/42")),
                             )
                         )
                     )
@@ -165,7 +165,7 @@ class ACCPromotionLevelFields : AbstractACCDSLTestSupport() {
                             fieldValues = listOf(
                                 PromotionRunFieldValueInput(
                                     name = "env",
-                                    value = Optional.present(TextNode("dev")),
+                                    value = Optional.present(StringNode("dev")),
                                 )
                             )
                         )

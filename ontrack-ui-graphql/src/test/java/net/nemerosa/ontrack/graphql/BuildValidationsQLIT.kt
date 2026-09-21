@@ -52,7 +52,7 @@ class BuildValidationsQLIT : AbstractQLKTITSupport() {
                         listOf(
                                 "VS1", "VS2", "VS3"
                         ),
-                        validations.map {
+                        validations.values().map {
                             it.path("validationStamp").path("name").asText()
                         }
                 )
@@ -60,8 +60,8 @@ class BuildValidationsQLIT : AbstractQLKTITSupport() {
                 assertEquals(
                         listOf(listOf("PASSED")),
                         validations[0].path("validationRuns")
-                                .map { runStatus ->
-                                    runStatus.path("validationRunStatuses").map { status ->
+                                .values().map { runStatus ->
+                                    runStatus.path("validationRunStatuses").values().map { status ->
                                         status.path("statusID").path("id").asText()
                                     }
                                 }
@@ -70,8 +70,8 @@ class BuildValidationsQLIT : AbstractQLKTITSupport() {
                 assertEquals(
                         listOf(listOf("PASSED"), listOf("FAILED")),
                         validations[1].path("validationRuns")
-                                .map { runStatus ->
-                                    runStatus.path("validationRunStatuses").map { status ->
+                                .values().map { runStatus ->
+                                    runStatus.path("validationRunStatuses").values().map { status ->
                                         status.path("statusID").path("id").asText()
                                     }
                                 }
@@ -80,8 +80,8 @@ class BuildValidationsQLIT : AbstractQLKTITSupport() {
                 assertEquals(
                         emptyList(),
                         validations[2].path("validationRuns")
-                                .map { runStatus ->
-                                    runStatus.path("validationRunStatuses").map { status ->
+                                .values().map { runStatus ->
+                                    runStatus.path("validationRunStatuses").values().map { status ->
                                         status.path("statusID").path("id").asText()
                                     }
                                 }
@@ -117,7 +117,7 @@ class BuildValidationsQLIT : AbstractQLKTITSupport() {
                         listOf(
                                 "VS1"
                         ),
-                        validations.map {
+                        validations.values().map {
                             it.path("validationStamp").path("name").asText()
                         }
                 )
@@ -125,8 +125,8 @@ class BuildValidationsQLIT : AbstractQLKTITSupport() {
                 assertEquals(
                         listOf(listOf("PASSED")),
                         validations[0].path("validationRuns")
-                                .map { runStatus ->
-                                    runStatus.path("validationRunStatuses").map { status ->
+                                .values().map { runStatus ->
+                                    runStatus.path("validationRunStatuses").values().map { status ->
                                         status.path("statusID").path("id").asText()
                                     }
                                 }
@@ -162,7 +162,7 @@ class BuildValidationsQLIT : AbstractQLKTITSupport() {
                         listOf(
                                 "VS1", "VS2", "VS3"
                         ),
-                        validations.map {
+                        validations.values().map {
                             it.path("validationStamp").path("name").asText()
                         }
                 )
@@ -170,8 +170,8 @@ class BuildValidationsQLIT : AbstractQLKTITSupport() {
                 assertEquals(
                         listOf(listOf("PASSED")),
                         validations[0].path("validationRuns")
-                                .map { runStatus ->
-                                    runStatus.path("validationRunStatuses").map { status ->
+                                .values().map { runStatus ->
+                                    runStatus.path("validationRunStatuses").values().map { status ->
                                         status.path("statusID").path("id").asText()
                                     }
                                 }
@@ -180,8 +180,8 @@ class BuildValidationsQLIT : AbstractQLKTITSupport() {
                 assertEquals(
                         listOf(listOf("PASSED")),
                         validations[1].path("validationRuns")
-                                .map { runStatus ->
-                                    runStatus.path("validationRunStatuses").map { status ->
+                                .values().map { runStatus ->
+                                    runStatus.path("validationRunStatuses").values().map { status ->
                                         status.path("statusID").path("id").asText()
                                     }
                                 }
@@ -190,8 +190,8 @@ class BuildValidationsQLIT : AbstractQLKTITSupport() {
                 assertEquals(
                         emptyList(),
                         validations[2].path("validationRuns")
-                                .map { runStatus ->
-                                    runStatus.path("validationRunStatuses").map { status ->
+                                .values().map { runStatus ->
+                                    runStatus.path("validationRunStatuses").values().map { status ->
                                         status.path("statusID").path("id").asText()
                                     }
                                 }

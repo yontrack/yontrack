@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.extension.config.ci.conditions
 
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 import net.nemerosa.ontrack.common.api.APIDescription
 import net.nemerosa.ontrack.extension.config.ci.engine.CIEngine
 import net.nemerosa.ontrack.extension.config.ci.model.CIConditionConfig
@@ -37,7 +37,7 @@ class OrCondition : Condition {
         config: JsonNode,
         env: Map<String, String>
     ): Boolean {
-        val conditionConfigs = config.map { it.parse<CIConditionConfig>() }
+        val conditionConfigs = config.values().map { it.parse<CIConditionConfig>() }
         if (conditionConfigs.isEmpty()) {
             return false
         } else {

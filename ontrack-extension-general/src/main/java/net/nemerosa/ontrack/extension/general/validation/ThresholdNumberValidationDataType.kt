@@ -1,7 +1,7 @@
 package net.nemerosa.ontrack.extension.general.validation
 
-import com.fasterxml.jackson.databind.JsonNode
-import com.fasterxml.jackson.databind.node.IntNode
+import tools.jackson.databind.JsonNode
+import tools.jackson.databind.node.IntNode
 import net.nemerosa.ontrack.extension.general.GeneralExtensionFeature
 import net.nemerosa.ontrack.model.structure.NumericValidationDataType
 import org.springframework.stereotype.Component

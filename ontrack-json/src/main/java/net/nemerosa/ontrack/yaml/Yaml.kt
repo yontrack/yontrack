@@ -1,30 +1,32 @@
 package net.nemerosa.ontrack.yaml
 
-import com.fasterxml.jackson.databind.JsonNode
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.dataformat.yaml.YAMLFactory
-import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator
-import com.fasterxml.jackson.module.kotlin.KotlinModule
-import com.fasterxml.jackson.module.kotlin.readValues
+import tools.jackson.databind.JsonNode
+import tools.jackson.dataformat.yaml.YAMLFactory
+import tools.jackson.dataformat.yaml.YAMLMapper
+import tools.jackson.dataformat.yaml.YAMLWriteFeature
+import tools.jackson.module.kotlin.KotlinModule
+import tools.jackson.module.kotlin.readValues
 import java.io.StringWriter
 
 class Yaml {
 
-    private val yamlFactory = YAMLFactory().apply {
-        enable(YAMLGenerator.Feature.LITERAL_BLOCK_STYLE)
+    private val yamlFactory = YAMLFactory.builder()
+        .configureForJackson2()
+        .enable(YAMLWriteFeature.LITERAL_BLOCK_STYLE)
         // The document start marker is written explicitly, as a separator only (see [write])
-        disable(YAMLGenerator.Feature.WRITE_DOC_START_MARKER)
-    }
+        .disable(YAMLWriteFeature.WRITE_DOC_START_MARKER)
+        .build()
 
-    private val mapper = ObjectMapper(yamlFactory).apply {
-        registerModule(KotlinModule.Builder().build())
-    }
+    private val mapper = YAMLMapper.builder(yamlFactory)
+        .configureForJackson2()
+        .addModule(KotlinModule.Builder().build())
+        .build()
 
     /**
      * Reads some Yaml as a list of documents
      */
     fun read(content: String): List<JsonNode> {
-        val parser = yamlFactory.createParser(content)
+        val parser = mapper.createParser(content)
         return mapper
             .readValues<JsonNode>(parser)
             .readAll()
@@ -40,8 +42,9 @@ class Yaml {
             if (index > 0) {
                 writer.append("---\n")
             }
-            val generator = yamlFactory.createGenerator(writer)
-            generator.writeObject(node)
+            mapper.createGenerator(writer).use { generator ->
+                generator.writeTree(node)
+            }
             writer.append('\n')
         }
         return writer.toString()

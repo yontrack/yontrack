@@ -51,7 +51,7 @@ class GQLRootQueryLastActiveProjectsIT: AbstractQLKTITSupport() {
                         pb.name,
                         pd.name,
                     ),
-                    data.path("lastActiveProjects").map {
+                    data.path("lastActiveProjects").values().map {
                         it.getRequiredTextField("name")
                     }
                 )

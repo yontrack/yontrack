@@ -1,8 +1,6 @@
 package net.nemerosa.ontrack.extension.github.autoversioning
 
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.dataformat.yaml.YAMLFactory
-import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator
+import tools.jackson.dataformat.yaml.YAMLFactory
 import net.nemerosa.ontrack.extension.av.config.AutoVersioningConfigurationService
 import net.nemerosa.ontrack.extension.github.ingestion.FileLoaderService
 import net.nemerosa.ontrack.extension.github.ingestion.processing.IngestionEventProcessingResultDetails
@@ -13,6 +11,8 @@ import net.nemerosa.ontrack.extension.github.ingestion.support.IngestionModelAcc
 import net.nemerosa.ontrack.extension.github.ingestion.support.getOrCreateBranch
 import net.nemerosa.ontrack.json.parse
 import org.springframework.stereotype.Component
+import tools.jackson.dataformat.yaml.YAMLWriteFeature
+import tools.jackson.dataformat.yaml.YAMLMapper
 
 /**
  * This push listener uses the `.github/ontrack/auto-versioning.yml` file to define the auto versioning
@@ -25,11 +25,14 @@ class AutoVersioningConfigPushPayloadListener(
     private val fileLoaderService: FileLoaderService,
 ) : PushPayloadListener {
 
-    private val yamlFactory = YAMLFactory().apply {
-        enable(YAMLGenerator.Feature.LITERAL_BLOCK_STYLE)
-    }
-
-    private val mapper = ObjectMapper(yamlFactory)
+    private val mapper = YAMLMapper.builder(
+        YAMLFactory.builder()
+            .configureForJackson2()
+            .enable(YAMLWriteFeature.LITERAL_BLOCK_STYLE)
+            .build()
+    )
+        .configureForJackson2()
+        .build()
 
     companion object {
         const val AUTO_VERSIONING_CONFIG_FILE_PATH = ".github/ontrack/auto-versioning.yml"

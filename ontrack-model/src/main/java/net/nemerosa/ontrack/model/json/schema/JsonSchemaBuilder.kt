@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.model.json.schema
 
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 import net.nemerosa.ontrack.common.hasDefaultValue
 import net.nemerosa.ontrack.model.annotations.APIIgnore
 import net.nemerosa.ontrack.model.annotations.APIOptional

@@ -25,7 +25,7 @@ class SearchResultTypesGraphQLIT : AbstractQLKTITSupport() {
             }
         }""")
         val types = data["searchResultTypes"]
-        assertTrue(types.map { it["id"].asText() }.isNotEmpty())
+        assertTrue(types.values().map { it["id"].asText() }.isNotEmpty())
     }
 
 }

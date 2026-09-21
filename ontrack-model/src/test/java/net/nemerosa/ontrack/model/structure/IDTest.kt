@@ -1,7 +1,7 @@
 package net.nemerosa.ontrack.model.structure
 
-import com.fasterxml.jackson.core.JsonProcessingException
-import com.fasterxml.jackson.databind.node.IntNode
+import tools.jackson.core.JacksonException
+import tools.jackson.databind.node.IntNode
 import net.nemerosa.ontrack.model.structure.ID.Companion.isDefined
 import net.nemerosa.ontrack.model.structure.ID.Companion.of
 import net.nemerosa.ontrack.test.TestUtils
@@ -54,7 +54,7 @@ class IDTest {
     }
 
     @Test
-    @Throws(JsonProcessingException::class)
+    @Throws(JacksonException::class)
     fun read_from_json() {
         TestUtils.assertJsonRead(
             of(9),
@@ -64,7 +64,7 @@ class IDTest {
     }
 
     @Test
-    @Throws(JsonProcessingException::class)
+    @Throws(JacksonException::class)
     fun unset_to_json() {
         TestUtils.assertJsonWrite(
             IntNode(0),

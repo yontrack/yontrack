@@ -13,7 +13,7 @@ open class DefaultRestTemplateProvider : RestTemplateProvider {
         rootUri: String,
         configuration: RestTemplateBuilder.() -> RestTemplateBuilder
     ): RestTemplate =
-        jackson2RestTemplateBuilder()
+        restTemplateBuilder()
             .rootUri(rootUri)
             .run {
                 configuration()

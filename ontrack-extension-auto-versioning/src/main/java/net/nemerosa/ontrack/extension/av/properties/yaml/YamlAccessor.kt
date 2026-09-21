@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.extension.av.properties.yaml
 
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 import net.nemerosa.ontrack.extension.av.properties.support.JsonPropertyAccessor
 import net.nemerosa.ontrack.yaml.Yaml
 import org.springframework.expression.EvaluationContext

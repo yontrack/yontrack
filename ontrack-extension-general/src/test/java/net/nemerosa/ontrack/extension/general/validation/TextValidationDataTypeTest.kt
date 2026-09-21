@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.extension.general.validation
 
-import com.fasterxml.jackson.databind.node.TextNode
+import tools.jackson.databind.node.StringNode
 import net.nemerosa.ontrack.extension.general.GeneralExtensionFeature
 import net.nemerosa.ontrack.test.assertIs
 import org.junit.jupiter.api.Test
@@ -13,14 +13,14 @@ class TextValidationDataTypeTest {
     @Test
     fun toJson() {
         val json = dataType.toJson("Some text")
-        assertIs<TextNode>(json) {
+        assertIs<StringNode>(json) {
             assertEquals("Some text", it.asText())
         }
     }
 
     @Test
     fun fromJson() {
-        val data = dataType.fromJson(TextNode("Some text"))
+        val data = dataType.fromJson(StringNode("Some text"))
         assertEquals("Some text", data)
     }
 

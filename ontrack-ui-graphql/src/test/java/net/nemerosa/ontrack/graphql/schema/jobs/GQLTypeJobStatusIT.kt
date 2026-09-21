@@ -50,7 +50,7 @@ class GQLTypeJobStatusIT : AbstractQLKTITSupport() {
             ) { data ->
                 val items = data.path("jobs").path("pageItems")[0]
                     .path("jobHistory")
-                    .map { it.path("status").asText() }
+                    .values().map { it.path("status").asText() }
                 assertEquals(14, items.size)
                 assertEquals(7, items.count { it == JobHistoryItemStatus.ERROR.name })
             }
@@ -82,7 +82,7 @@ class GQLTypeJobStatusIT : AbstractQLKTITSupport() {
             ) { data ->
                 val items = data.path("jobs").path("pageItems")[0]
                     .path("jobHistory")
-                    .map { it.path("status").asText() }
+                    .values().map { it.path("status").asText() }
                 assertEquals(7, items.size)
                 assertEquals(0, items.count { it == JobHistoryItemStatus.ERROR.name })
             }

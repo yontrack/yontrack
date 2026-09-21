@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.extension.workflows.definition
 
-import com.fasterxml.jackson.databind.node.TextNode
+import tools.jackson.databind.node.StringNode
 import net.nemerosa.ontrack.extension.workflows.registry.WorkflowParser
 
 object WorkflowFixtures {
@@ -30,13 +30,13 @@ object WorkflowFixtures {
                 WorkflowNode(
                     id = "start",
                     executorId = "mock",
-                    data = TextNode("Start node"),
+                    data = StringNode("Start node"),
                     parents = emptyList(),
                 ),
                 WorkflowNode(
                     id = "end",
                     executorId = "mock",
-                    data = TextNode("End node"),
+                    data = StringNode("End node"),
                     parents = listOf(
                         WorkflowParentNode(
                             id = "start"
@@ -54,7 +54,7 @@ object WorkflowFixtures {
                 WorkflowNode(
                     id = "start",
                     executorId = "mock",
-                    data = TextNode("Start node"),
+                    data = StringNode("Start node"),
                     parents = listOf(
                         WorkflowParentNode(
                             id = "end",
@@ -64,7 +64,7 @@ object WorkflowFixtures {
                 WorkflowNode(
                     id = "end",
                     executorId = "mock",
-                    data = TextNode("End node"),
+                    data = StringNode("End node"),
                     parents = listOf(
                         WorkflowParentNode(
                             id = "start"

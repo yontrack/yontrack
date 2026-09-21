@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.extension.av.workflows
 
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 import io.mockk.mockk
 import net.nemerosa.ontrack.extension.av.versionrules.AutoVersioningVersionRule
 import net.nemerosa.ontrack.extension.av.versionrules.AutoVersioningVersionRuleRegistry

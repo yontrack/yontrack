@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.extension.casc.schema.json
 
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 import net.nemerosa.ontrack.extension.casc.context.OntrackContext
 import net.nemerosa.ontrack.json.asJson
 import net.nemerosa.ontrack.model.json.schema.*

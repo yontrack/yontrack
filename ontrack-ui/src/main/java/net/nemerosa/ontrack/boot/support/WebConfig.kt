@@ -8,16 +8,18 @@ import org.springframework.context.annotation.Configuration
 import org.springframework.http.converter.ByteArrayHttpMessageConverter
 import org.springframework.http.converter.HttpMessageConverter
 import org.springframework.http.converter.StringHttpMessageConverter
-import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter
+import org.springframework.http.converter.json.JacksonJsonHttpMessageConverter
 import org.springframework.web.filter.ShallowEtagHeaderFilter
 import org.springframework.web.servlet.config.annotation.ContentNegotiationConfigurer
 import org.springframework.web.servlet.config.annotation.CorsRegistry
 import org.springframework.web.servlet.config.annotation.ViewControllerRegistry
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer
+import tools.jackson.databind.json.JsonMapper
 
 @Configuration
 class WebConfig(
     private val ontrackConfigProperties: OntrackConfigProperties,
+    private val jsonMapper: JsonMapper,
 ) : WebMvcConfigurer {
 
     /**
@@ -47,8 +49,8 @@ class WebConfig(
         converters.add(StringHttpMessageConverter())
         // Documents
         converters.add(DocumentHttpMessageConverter())
-        // JSON
-        converters.add(MappingJackson2HttpMessageConverter())
+        // JSON, with the one mapper configuration of Yontrack (ADR 0016)
+        converters.add(JacksonJsonHttpMessageConverter(jsonMapper))
     }
 
     /**

@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.extension.notifications.subscriptions
 
-import com.fasterxml.jackson.databind.node.ObjectNode
+import tools.jackson.databind.node.ObjectNode
 import net.nemerosa.ontrack.extension.notifications.channels.NotificationChannelRegistry
 import net.nemerosa.ontrack.extension.notifications.channels.getChannel
 import net.nemerosa.ontrack.json.format
@@ -123,7 +123,7 @@ class GlobalSubscriptionStore(
             val name = record.path("name").asText()
             if (name.isNullOrBlank()) {
                 val generatedName = EventSubscription.computeName(
-                    events = record.path("events").map { it.asText() },
+                    events = record.path("events").values().map { it.asText() },
                     keywords = record.getTextField("keywords"),
                     channel = record.getRequiredTextField("channel"),
                     channelConfig = record.path("channelConfig"),

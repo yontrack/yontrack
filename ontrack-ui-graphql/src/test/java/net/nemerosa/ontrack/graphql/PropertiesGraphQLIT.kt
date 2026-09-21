@@ -247,7 +247,7 @@ class PropertiesGraphQLIT : AbstractQLKTITSupport() {
                     )
                     assertEquals(
                         ProjectEntityType.entries.map { it.name }.toSet(),
-                        property.path("supportedEntityTypes").map { it.asText() }.toSet()
+                        property.path("supportedEntityTypes").values().map { it.asText() }.toSet()
                     )
                 }
                 // Checks we find the build links display property
@@ -266,7 +266,7 @@ class PropertiesGraphQLIT : AbstractQLKTITSupport() {
                     )
                     assertEquals(
                         setOf(ProjectEntityType.PROJECT.name),
-                        property.path("supportedEntityTypes").map { it.asText() }.toSet()
+                        property.path("supportedEntityTypes").values().map { it.asText() }.toSet()
                     )
                 }
                 // Checks we DON'T find the promotion dependencies property
@@ -306,7 +306,7 @@ class PropertiesGraphQLIT : AbstractQLKTITSupport() {
                 )
                 assertEquals(
                     ProjectEntityType.values().map { it.name }.toSet(),
-                    property.path("supportedEntityTypes").map { it.asText() }.toSet()
+                    property.path("supportedEntityTypes").values().map { it.asText() }.toSet()
                 )
             }
         }

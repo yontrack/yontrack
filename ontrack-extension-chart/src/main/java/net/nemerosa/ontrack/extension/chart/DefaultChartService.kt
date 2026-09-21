@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.extension.chart
 
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 import net.nemerosa.ontrack.json.asJson
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional

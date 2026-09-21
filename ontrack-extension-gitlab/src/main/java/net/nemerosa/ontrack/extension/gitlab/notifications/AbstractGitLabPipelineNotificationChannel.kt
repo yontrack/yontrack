@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.extension.gitlab.notifications
 
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 import net.nemerosa.ontrack.extension.gitlab.pipelines.GitLabPipelinesService
 import net.nemerosa.ontrack.extension.gitlab.service.GitLabConfigurationService
 import net.nemerosa.ontrack.extension.notifications.channels.AbstractNotificationChannel

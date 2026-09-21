@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.extension.jenkins.model
 
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 import io.mockk.every
 import io.mockk.mockk
 import net.nemerosa.ontrack.extension.indicators.IndicatorsExtensionFeature

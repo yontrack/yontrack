@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.service.dashboards
 
-import com.fasterxml.jackson.databind.node.NullNode
+import tools.jackson.databind.node.NullNode
 import net.nemerosa.ontrack.it.AbstractDSLTestSupport
 import net.nemerosa.ontrack.model.dashboards.Dashboard
 import net.nemerosa.ontrack.model.dashboards.DashboardContextUserScope

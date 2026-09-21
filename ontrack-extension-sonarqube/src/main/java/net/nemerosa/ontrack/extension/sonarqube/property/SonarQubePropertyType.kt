@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.extension.sonarqube.property
 
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 import net.nemerosa.ontrack.extension.sonarqube.SonarQubeExtensionFeature
 import net.nemerosa.ontrack.extension.sonarqube.configuration.SonarQubeConfiguration
 import net.nemerosa.ontrack.extension.sonarqube.configuration.SonarQubeConfigurationService
@@ -51,7 +51,7 @@ class SonarQubePropertyType(
             configuration = configuration,
             key = node.path("key").asText(),
             validationStamp = node.path("validationStamp").asText().ifBlank { SonarQubeProperty.DEFAULT_VALIDATION_STAMP },
-            measures = node.path("measures").map { it.asText() },
+            measures = node.path("measures").values().map { it.asText() },
             override = node.path("override").asBoolean(),
             branchModel = node.path("branchModel").asBoolean(),
             branchPattern = node.getTextField("branchPattern"),

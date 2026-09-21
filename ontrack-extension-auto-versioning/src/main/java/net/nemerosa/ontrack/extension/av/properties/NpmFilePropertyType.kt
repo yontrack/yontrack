@@ -1,8 +1,8 @@
 package net.nemerosa.ontrack.extension.av.properties
 
-import com.fasterxml.jackson.databind.JsonNode
-import com.fasterxml.jackson.databind.node.ObjectNode
-import com.fasterxml.jackson.databind.node.TextNode
+import tools.jackson.databind.JsonNode
+import tools.jackson.databind.node.ObjectNode
+import tools.jackson.databind.node.StringNode
 import org.springframework.stereotype.Component
 
 @Component
@@ -37,7 +37,7 @@ class NpmFilePropertyType : AbstractJsonFilePropertyType() {
     override fun readProperty(content: JsonNode, targetProperty: String?): String? {
         val property = targetProperty ?: error("targetProperty must be defined")
         val dependencies: JsonNode? = getDependencies(content, targetProperty)
-        val value = dependencies?.get(property)?.textValue()
+        val value = dependencies?.get(property)?.stringValueOpt()?.orElse(null)
         return value?.run {
             if (startsWith("^")) {
                 substring(1)

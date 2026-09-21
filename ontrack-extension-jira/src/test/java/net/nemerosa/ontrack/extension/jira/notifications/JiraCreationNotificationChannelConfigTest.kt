@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.extension.jira.notifications
 
-import com.fasterxml.jackson.databind.node.TextNode
+import tools.jackson.databind.node.StringNode
 import net.nemerosa.ontrack.json.asJson
 import net.nemerosa.ontrack.json.parse
 import org.junit.jupiter.api.Test
@@ -68,8 +68,8 @@ class JiraCreationNotificationChannelConfigTest {
                 assignee = null,
                 titleTemplate = "Summary test",
                 customFields = listOf(
-                    JiraCustomField("duedate", TextNode("2024-04-16")),
-                    JiraCustomField("customfield_11000", TextNode("Some direct value")),
+                    JiraCustomField("duedate", StringNode("2024-04-16")),
+                    JiraCustomField("customfield_11000", StringNode("Some direct value")),
                     JiraCustomField(
                         "customfield_12000", mapOf(
                             "value" to "Some map value"

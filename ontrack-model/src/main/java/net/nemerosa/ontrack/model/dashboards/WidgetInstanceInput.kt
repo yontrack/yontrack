@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.model.dashboards
 
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 
 data class WidgetInstanceInput(
     val uuid: String?,

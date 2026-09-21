@@ -1,8 +1,8 @@
 package net.nemerosa.ontrack.it
 
-import com.fasterxml.jackson.databind.JsonNode
-import com.fasterxml.jackson.databind.node.IntNode
-import com.fasterxml.jackson.databind.node.NullNode
+import tools.jackson.databind.JsonNode
+import tools.jackson.databind.node.IntNode
+import tools.jackson.databind.node.NullNode
 import net.nemerosa.ontrack.json.toJson
 import net.nemerosa.ontrack.model.json.schema.JsonEmptyType
 import net.nemerosa.ontrack.model.json.schema.JsonType

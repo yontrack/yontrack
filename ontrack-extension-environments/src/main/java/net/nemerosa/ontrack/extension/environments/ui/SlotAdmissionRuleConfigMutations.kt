@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.extension.environments.ui
 
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 import net.nemerosa.ontrack.extension.environments.SlotAdmissionRuleConfig
 import net.nemerosa.ontrack.extension.environments.rules.SlotAdmissionRuleRegistry
 import net.nemerosa.ontrack.extension.environments.service.SlotService

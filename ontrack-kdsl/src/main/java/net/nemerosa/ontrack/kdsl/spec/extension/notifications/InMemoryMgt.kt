@@ -12,6 +12,6 @@ class InMemoryMgt(connector: Connector) : Connected(connector) {
      * Gets the list of messages for a given group
      */
     fun group(group: String): List<String> = connector.get("/extension/notifications/in-memory/group/$group")
-        .body.asJson().map { it.asText() }
+        .body.asJson().values().map { it.asText() }
 
 }

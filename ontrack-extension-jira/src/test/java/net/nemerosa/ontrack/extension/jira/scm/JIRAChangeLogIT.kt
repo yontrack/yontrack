@@ -121,7 +121,7 @@ class JIRAChangeLogIT : AbstractQLKTITSupport() {
                                     "ISS-22" to "Some fixes are needed",
                                     "ISS-23" to "Some nicer UI",
                                 ),
-                                issues.map { issue ->
+                                issues.values().map { issue ->
                                     issue.path("displayKey").asText() to issue.path("summary").asText()
                                 }
                             )
@@ -130,7 +130,7 @@ class JIRAChangeLogIT : AbstractQLKTITSupport() {
                                 (1..3).map {
                                     "unknown"
                                 },
-                                issues.map { issue ->
+                                issues.values().map { issue ->
                                     issue.path("rawIssue").path("assignee").asText()
                                 }
                             )

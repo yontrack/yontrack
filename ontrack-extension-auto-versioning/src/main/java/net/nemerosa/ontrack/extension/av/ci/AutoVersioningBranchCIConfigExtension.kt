@@ -1,7 +1,7 @@
 package net.nemerosa.ontrack.extension.av.ci
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 import net.nemerosa.ontrack.common.FilterHelper
 import net.nemerosa.ontrack.common.mergeList
 import net.nemerosa.ontrack.extension.av.AutoVersioningExtensionFeature
@@ -42,7 +42,7 @@ class AutoVersioningBranchCIConfigExtension(
         custom: JsonNode
     ): AutoVersioningBranchCIConfig = mergeList<JsonNode>(
         target = defaults.configurations.map { it.asJson() },
-        changes = custom.path("configurations").map { it },
+        changes = custom.path("configurations").values().map { it },
         idFn = { cfg -> cfg.parse<AVCfgID>() }
     ) { e, existing ->
         existing.merge(e)

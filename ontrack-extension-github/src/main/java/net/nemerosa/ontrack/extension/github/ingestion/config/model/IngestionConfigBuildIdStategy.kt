@@ -1,7 +1,7 @@
 package net.nemerosa.ontrack.extension.github.ingestion.config.model
 
-import com.fasterxml.jackson.databind.JsonNode
-import com.fasterxml.jackson.databind.node.NullNode
+import tools.jackson.databind.JsonNode
+import tools.jackson.databind.node.NullNode
 import net.nemerosa.ontrack.common.api.APIDescription
 
 @APIDescription("Build identification strategy")

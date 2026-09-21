@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.extension.git.support
 
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 import net.nemerosa.ontrack.extension.git.model.BuildGitCommitLink
 import net.nemerosa.ontrack.extension.git.model.GitBranchConfiguration
 import net.nemerosa.ontrack.extension.git.property.GitCommitPropertyType

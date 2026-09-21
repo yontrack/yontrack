@@ -1,7 +1,7 @@
 package net.nemerosa.ontrack.extension.bitbucket.cloud
 
-import com.fasterxml.jackson.databind.JsonNode
-import net.nemerosa.ontrack.extension.support.client.jackson2RestTemplateBuilder
+import tools.jackson.databind.JsonNode
+import net.nemerosa.ontrack.extension.support.client.restTemplateBuilder
 import org.springframework.web.client.RestTemplate
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -15,13 +15,13 @@ class BitbucketCloudTestWorkspaceIT {
     private val env: BitbucketCloudTestEnv get() = bitbucketCloudTestEnv
 
     private fun basic(identity: BitbucketCloudTestIdentity): RestTemplate =
-        jackson2RestTemplateBuilder()
+        restTemplateBuilder()
             .rootUri(BitbucketCloudTestRestApi.ROOT)
             .basicAuthentication(identity.email, identity.token)
             .build()
 
     private fun bearer(token: String): RestTemplate =
-        jackson2RestTemplateBuilder()
+        restTemplateBuilder()
             .rootUri(BitbucketCloudTestRestApi.ROOT)
             .defaultHeader("Authorization", "Bearer $token")
             .build()

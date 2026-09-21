@@ -1,10 +1,10 @@
 package net.nemerosa.ontrack.kdsl.spec.extension.jenkins
 
-import com.fasterxml.jackson.core.JsonParser
-import com.fasterxml.jackson.databind.DeserializationContext
-import com.fasterxml.jackson.databind.JsonDeserializer
-import com.fasterxml.jackson.databind.JsonNode
-import com.fasterxml.jackson.databind.annotation.JsonDeserialize
+import tools.jackson.core.JsonParser
+import tools.jackson.databind.DeserializationContext
+import tools.jackson.databind.ValueDeserializer
+import tools.jackson.databind.JsonNode
+import tools.jackson.databind.annotation.JsonDeserialize
 import net.nemerosa.ontrack.json.parse
 import net.nemerosa.ontrack.kdsl.spec.Build
 import net.nemerosa.ontrack.kdsl.spec.deleteProperty
@@ -35,7 +35,7 @@ data class JenkinsBuildProperty(
     val url: String? = null,
 )
 
-class JenkinsBuildPropertyDeserializer : JsonDeserializer<JenkinsBuildProperty>() {
+class JenkinsBuildPropertyDeserializer : ValueDeserializer<JenkinsBuildProperty>() {
     override fun deserialize(p: JsonParser, ctxt: DeserializationContext): JenkinsBuildProperty {
         val node: JsonNode = p.readValueAsTree()
         return JenkinsBuildProperty(

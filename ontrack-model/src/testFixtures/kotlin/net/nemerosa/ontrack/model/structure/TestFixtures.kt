@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.model.structure
 
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 import net.nemerosa.ontrack.json.asJson
 import net.nemerosa.ontrack.model.structure.Signature.Companion.of
 import java.time.LocalDateTime

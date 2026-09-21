@@ -1,7 +1,7 @@
 package net.nemerosa.ontrack.repository
 
-import com.fasterxml.jackson.core.JsonProcessingException
-import com.fasterxml.jackson.databind.node.IntNode
+import tools.jackson.core.JacksonException
+import tools.jackson.databind.node.IntNode
 import net.nemerosa.ontrack.common.Time
 import net.nemerosa.ontrack.model.structure.Signature
 import net.nemerosa.ontrack.repository.support.store.EntityDataStore
@@ -225,7 +225,7 @@ class EntityDataStoreIT : AbstractRepositoryTestSupport() {
     }
 
     @Test
-    @Throws(JsonProcessingException::class)
+    @Throws(JacksonException::class)
     fun addObject() { // Entity
         val branch = do_create_branch()
         // Adds some data
@@ -247,7 +247,7 @@ class EntityDataStoreIT : AbstractRepositoryTestSupport() {
     }
 
     @Test
-    @Throws(JsonProcessingException::class)
+    @Throws(JacksonException::class)
     fun replaceOrAddObject() { // Entity
         val branch = do_create_branch()
         // Adds some data

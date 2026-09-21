@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.model.structure
 
-import com.fasterxml.jackson.core.JsonProcessingException
+import tools.jackson.core.JacksonException
 import net.nemerosa.ontrack.json.asJson
 import net.nemerosa.ontrack.test.TestUtils
 import org.junit.jupiter.api.Test
@@ -32,7 +32,7 @@ class BuildRequestTest {
     }
 
     @Test
-    @Throws(JsonProcessingException::class)
+    @Throws(JacksonException::class)
     fun from_json_without_properties() {
         TestUtils.assertJsonRead<BuildRequest?>(
             BuildRequest(
@@ -49,7 +49,7 @@ class BuildRequestTest {
     }
 
     @Test
-    @Throws(JsonProcessingException::class)
+    @Throws(JacksonException::class)
     fun from_json_with_properties() {
         TestUtils.assertJsonRead<BuildRequest?>(
             BuildRequest(

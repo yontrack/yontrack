@@ -33,15 +33,15 @@ class BitbucketCloudConfigurationCascContextIT : AbstractCascTestSupport() {
         assertEquals("BitbucketCloudConfigurationCascData", items.path("title").asText())
         assertEquals(
             setOf("name", "authType", "email", "token", "autoMergeEmail", "autoMergeToken"),
-            items.path("properties").fieldNames().asSequence().toSet()
+            items.path("properties").propertyNames().asSequence().toSet()
         )
         assertEquals(
             setOf("name", "authType", "token"),
-            items.path("required").map { it.asText() }.toSet()
+            items.path("required").values().map { it.asText() }.toSet()
         )
         assertEquals(
             setOf("API_TOKEN", "ACCESS_TOKEN"),
-            items.path("properties").path("authType").path("enum").map { it.asText() }.toSet()
+            items.path("properties").path("authType").path("enum").values().map { it.asText() }.toSet()
         )
         assertEquals(false, items.path("additionalProperties").asBoolean(true))
     }

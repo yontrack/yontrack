@@ -14,7 +14,7 @@ class YontrackPromotionNotificationChannelConfigSerializationTest {
             waitForPromotionTimeout = Duration.ofMinutes(30)
         )
         val json = config.asJson()
-        assertEquals("30m", json.path("waitForPromotionTimeout").textValue())
+        assertEquals("30m", json.path("waitForPromotionTimeout").stringValue())
     }
 
     @Test
@@ -25,6 +25,6 @@ class YontrackPromotionNotificationChannelConfigSerializationTest {
             waitForPromotionTimeout = Duration.ofMinutes(30).plusSeconds(5)
         )
         val json = config.asJson()
-        assertEquals("1805s", json.path("waitForPromotionTimeout").textValue())
+        assertEquals("1805s", json.path("waitForPromotionTimeout").stringValue())
     }
 }

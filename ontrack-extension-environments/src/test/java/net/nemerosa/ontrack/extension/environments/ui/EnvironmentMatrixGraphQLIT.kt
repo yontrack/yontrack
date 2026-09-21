@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.extension.environments.ui
 
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 import net.nemerosa.ontrack.extension.environments.Environment
 import net.nemerosa.ontrack.extension.environments.EnvironmentTestSupport
 import net.nemerosa.ontrack.extension.environments.Slot
@@ -102,10 +102,10 @@ class EnvironmentMatrixGraphQLIT : AbstractQLKTITSupport() {
     }
 
     private fun JsonNode.projectNames(): List<String> =
-        path("projects").map { it.path("project").path("name").asText() }
+        path("projects").values().map { it.path("project").path("name").asText() }
 
     private fun JsonNode.environmentNames(): List<String> =
-        path("environments").map { it.path("name").asText() }
+        path("environments").values().map { it.path("name").asText() }
 
     private fun JsonNode.rows(projectName: String): List<JsonNode> =
         path("projects").first { it.path("project").path("name").asText() == projectName }
@@ -147,7 +147,7 @@ class EnvironmentMatrixGraphQLIT : AbstractQLKTITSupport() {
                 assertEquals("", rows[0].path("qualifier").asText())
                 assertEquals(
                     listOf(staging.id, production.id),
-                    rows[0].path("slots").map { it.path("id").asText() },
+                    rows[0].path("slots").values().map { it.path("id").asText() },
                     "Slots by environment order"
                 )
             }
@@ -187,11 +187,11 @@ class EnvironmentMatrixGraphQLIT : AbstractQLKTITSupport() {
                 )
                 assertEquals(
                     listOf(staging.id, production.id),
-                    rows[0].path("slots").map { it.path("id").asText() },
+                    rows[0].path("slots").values().map { it.path("id").asText() },
                 )
                 assertEquals(
                     listOf(canary.id),
-                    rows[1].path("slots").map { it.path("id").asText() },
+                    rows[1].path("slots").values().map { it.path("id").asText() },
                     "The canary row carries only the slots which exist for that qualifier"
                 )
             }
@@ -224,7 +224,7 @@ class EnvironmentMatrixGraphQLIT : AbstractQLKTITSupport() {
                 )
                 assertEquals(
                     listOf(production.id),
-                    matrix.rows(project.name)[0].path("slots").map { it.path("id").asText() },
+                    matrix.rows(project.name)[0].path("slots").values().map { it.path("id").asText() },
                 )
             }
         }

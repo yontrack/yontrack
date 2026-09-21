@@ -94,7 +94,7 @@ class GitHubSCMChangeLogIT : AbstractGitHubTestSupport() {
                         // List of commit messages
                         assertEquals(
                             githubTestEnv.issues.messages,
-                            changeLog.path("commits").map {
+                            changeLog.path("commits").values().map {
                                 it.path("commit").path("message").asText()
                             }
                         )
@@ -128,7 +128,7 @@ class GitHubSCMChangeLogIT : AbstractGitHubTestSupport() {
                         // Labels
                         assertEquals(
                             githubTestEnv.issues.issueLabels,
-                            issue.path("rawIssue").path("labels").map {
+                            issue.path("rawIssue").path("labels").values().map {
                                 it.path("name").asText()
                             }
                         )

@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.extension.notifications.ci
 
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 import net.nemerosa.ontrack.common.syncForward
 import net.nemerosa.ontrack.extension.config.extensions.CIConfigExtension
 import net.nemerosa.ontrack.extension.notifications.NotificationsExtensionFeature

@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.extension.jira.client
 
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 import net.nemerosa.ontrack.extension.jira.JIRAConfiguration
 import net.nemerosa.ontrack.extension.jira.model.*
 import net.nemerosa.ontrack.extension.jira.notifications.JiraCustomField
@@ -86,7 +86,7 @@ class JIRAClientImpl(
     override fun searchIssueStubs(jiraConfiguration: JIRAConfiguration, jql: String): List<JIRAIssueStub> =
         try {
             val node = restTemplate.getForObject<JsonNode>("/rest/api/2/search?jql=$jql")!!
-            node.path("issues").map {
+            node.path("issues").values().map {
                 it.getRequiredTextField("key")
             }.map { key ->
                 JIRAIssueStub(
@@ -182,7 +182,7 @@ class JIRAClientImpl(
     override val projects: List<String>
         get() {
             val node = restTemplate.getForObject<JsonNode>("/rest/api/2/project")!!
-            return node.map {
+            return node.values().map {
                 it.getRequiredTextField("key")
             }
         }
@@ -198,7 +198,7 @@ class JIRAClientImpl(
             // Translation of fields
             val fields = ArrayList<JIRAField>()
             val names = node.path("names")
-            val nameFields = names.fields()
+            val nameFields = names.properties().iterator()
             while (nameFields.hasNext()) {
                 val nameField = nameFields.next()
                 val name = nameField.key

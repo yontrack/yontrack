@@ -1,17 +1,17 @@
 package net.nemerosa.ontrack.extension.scm.changelog
 
-import com.fasterxml.jackson.core.JsonParser
-import com.fasterxml.jackson.databind.DeserializationContext
-import com.fasterxml.jackson.databind.JsonDeserializer
-import com.fasterxml.jackson.databind.JsonNode
-import com.fasterxml.jackson.databind.node.ObjectNode
-import com.fasterxml.jackson.databind.node.TextNode
+import tools.jackson.core.JsonParser
+import tools.jackson.databind.DeserializationContext
+import tools.jackson.databind.ValueDeserializer
+import tools.jackson.databind.JsonNode
+import tools.jackson.databind.node.ObjectNode
+import tools.jackson.databind.node.StringNode
 
-class SemanticChangeLogSectionDeserializer : JsonDeserializer<SemanticChangeLogSection>() {
+class SemanticChangeLogSectionDeserializer : ValueDeserializer<SemanticChangeLogSection>() {
     override fun deserialize(p: JsonParser, ctxt: DeserializationContext): SemanticChangeLogSection {
         val node: JsonNode = p.readValueAsTree()
-        return if (node is TextNode) {
-            val text = node.textValue()
+        return if (node is StringNode) {
+            val text = node.stringValue()
             if (text.contains("=")) {
                 val type = text.substringBefore("=")
                 val title = text.substringAfter("=")
@@ -20,8 +20,8 @@ class SemanticChangeLogSectionDeserializer : JsonDeserializer<SemanticChangeLogS
                 SemanticChangeLogSection(text, text)
             }
         } else if (node is ObjectNode) {
-            val type = node.get("type")?.textValue() ?: ""
-            val title = node.get("title")?.textValue() ?: ""
+            val type = node.get("type")?.stringValueOpt()?.orElse(null) ?: ""
+            val title = node.get("title")?.stringValueOpt()?.orElse(null) ?: ""
             SemanticChangeLogSection(type, title)
         } else {
             throw IllegalArgumentException("Unsupported JSON node type for SemanticChangeLogSection: $node")

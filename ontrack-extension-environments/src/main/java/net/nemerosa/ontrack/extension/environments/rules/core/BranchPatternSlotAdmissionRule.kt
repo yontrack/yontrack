@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.extension.environments.rules.core
 
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 import net.nemerosa.ontrack.common.FilterHelper
 import net.nemerosa.ontrack.extension.environments.*
 import net.nemerosa.ontrack.json.parse

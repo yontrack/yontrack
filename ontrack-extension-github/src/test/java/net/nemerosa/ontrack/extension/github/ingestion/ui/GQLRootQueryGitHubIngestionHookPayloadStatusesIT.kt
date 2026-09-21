@@ -14,7 +14,7 @@ class GQLRootQueryGitHubIngestionHookPayloadStatusesIT : AbstractIngestionTestSu
         ).let { data ->
             assertEquals(
                 IngestionHookPayloadStatus.values().map { it.name }.toSet(),
-                data.path("gitHubIngestionHookPayloadStatuses").map { it.asText() }.toSet(),
+                data.path("gitHubIngestionHookPayloadStatuses").values().map { it.asText() }.toSet(),
             )
         }
     }

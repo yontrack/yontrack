@@ -9,7 +9,7 @@ import net.nemerosa.ontrack.kdsl.spec.setProperty
  * Sets a promotion dependencies property on a promotion level.
  */
 var PromotionLevel.promotionDependencies: List<String>?
-    get() = getProperty(PROMOTION_DEPENDENCIES_PROPERTY)?.path("dependencies")?.map { it.asText() }
+    get() = getProperty(PROMOTION_DEPENDENCIES_PROPERTY)?.path("dependencies")?.values()?.map { it.asText() }
     set(value) {
         if (value != null) {
             setProperty(PROMOTION_DEPENDENCIES_PROPERTY, mapOf("dependencies" to value))

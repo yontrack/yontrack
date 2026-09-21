@@ -1,7 +1,7 @@
 package net.nemerosa.ontrack.repository
 
-import com.fasterxml.jackson.databind.JsonNode
-import com.fasterxml.jackson.databind.node.TextNode
+import tools.jackson.databind.JsonNode
+import tools.jackson.databind.node.StringNode
 import net.nemerosa.ontrack.json.format
 import net.nemerosa.ontrack.model.structure.ProjectEntity
 import net.nemerosa.ontrack.model.structure.ProjectEntityID
@@ -17,7 +17,7 @@ class EntityDataJdbcRepository(
 ) : AbstractJdbcRepository(dataSource), EntityDataRepository {
 
     override fun store(entity: ProjectEntity, key: String, value: String) {
-        storeJson(entity, key, TextNode(value))
+        storeJson(entity, key, StringNode(value))
     }
 
     override fun storeJson(entity: ProjectEntity, key: String, value: JsonNode) {

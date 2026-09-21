@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.extension.scm.index
 
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 import java.time.LocalDateTime
 
 data class SCMBuildCommitIndexData(

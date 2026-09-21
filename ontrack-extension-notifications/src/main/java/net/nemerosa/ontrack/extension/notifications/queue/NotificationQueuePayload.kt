@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.extension.notifications.queue
 
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 import net.nemerosa.ontrack.extension.notifications.model.NotificationSourceData
 import net.nemerosa.ontrack.model.events.SerializableEvent
 import net.nemerosa.ontrack.model.structure.ProjectEntityType

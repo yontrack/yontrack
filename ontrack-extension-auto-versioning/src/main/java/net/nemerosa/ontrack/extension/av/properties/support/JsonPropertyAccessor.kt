@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.extension.av.properties.support
 
-import com.fasterxml.jackson.databind.node.*
+import tools.jackson.databind.node.*
 import org.springframework.expression.AccessException
 import org.springframework.expression.EvaluationContext
 import org.springframework.expression.PropertyAccessor
@@ -25,7 +25,7 @@ class JsonPropertyAccessor : PropertyAccessor {
                 is Int -> target.set(name, IntNode(newValue)) as ObjectNode
                 is Long -> target.set(name, LongNode(newValue)) as ObjectNode
                 is Boolean -> target.set(name, BooleanNode.valueOf(newValue)) as ObjectNode
-                is String -> target.set(name, TextNode(newValue)) as ObjectNode
+                is String -> target.set(name, StringNode(newValue)) as ObjectNode
                 else -> throw AccessException("Cannot set value for field $name on $target")
             }
         } else {
@@ -39,7 +39,7 @@ class JsonPropertyAccessor : PropertyAccessor {
                 is IntNode -> node.intValue()
                 is LongNode -> node.longValue()
                 is BooleanNode -> node.booleanValue()
-                is TextNode -> node.textValue()
+                is StringNode -> node.stringValue()
                 is NullNode -> null
                 else -> node
             }

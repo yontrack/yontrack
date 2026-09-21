@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.extension.general
 
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 import net.nemerosa.ontrack.extension.support.AbstractPropertyType
 import net.nemerosa.ontrack.json.parse
 import net.nemerosa.ontrack.model.extension.ValidationStampPropertyType

@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.service.json.schema
 
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 import net.nemerosa.ontrack.model.json.schema.JsonSchemaDefinition
 import net.nemerosa.ontrack.model.json.schema.JsonSchemaProvider
 import net.nemerosa.ontrack.model.json.schema.JsonSchemaService

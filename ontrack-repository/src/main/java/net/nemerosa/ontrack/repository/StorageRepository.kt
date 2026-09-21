@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.repository
 
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 
 /**
  * Stores and retrieves arbitrary data using JSON.

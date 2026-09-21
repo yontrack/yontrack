@@ -21,7 +21,7 @@ fun Build.setMetaInfoProperty(name: String, value: String, category: String? = n
  * Sets a meta info property on a build.
  */
 var Build.metaInfoProperty: List<MetaInfoPropertyItem>?
-    get() = getProperty(META_INFO_PROPERTY)?.path("items")?.map {
+    get() = getProperty(META_INFO_PROPERTY)?.path("items")?.values()?.map {
         it.parse<MetaInfoPropertyItem>()
     }
     set(value) {

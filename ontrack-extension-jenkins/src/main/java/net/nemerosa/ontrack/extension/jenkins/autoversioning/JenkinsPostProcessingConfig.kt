@@ -1,7 +1,7 @@
 package net.nemerosa.ontrack.extension.jenkins.autoversioning
 
-import com.fasterxml.jackson.databind.JsonNode
-import com.fasterxml.jackson.databind.node.ObjectNode
+import tools.jackson.databind.JsonNode
+import tools.jackson.databind.node.ObjectNode
 import net.nemerosa.ontrack.json.asJson
 import net.nemerosa.ontrack.json.parse
 
@@ -36,7 +36,7 @@ data class JenkinsPostProcessingConfig(
             } else if (credentials.isTextual) {
                 // Parsing the credentials from text
                 val credentialsList = JenkinsPostProcessingConfigCredentials.parseLines(credentials.asText())
-                (config as ObjectNode).set<JsonNode>(
+                (config as ObjectNode).set(
                     JenkinsPostProcessingConfig::credentials.name,
                     credentialsList.asJson()
                 )

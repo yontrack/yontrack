@@ -2,8 +2,10 @@ package net.nemerosa.ontrack.extension.github.app
 
 import net.nemerosa.ontrack.extension.github.app.client.GitHubAppAccount
 import net.nemerosa.ontrack.extension.github.app.client.GitHubAppInstallation
+import net.nemerosa.ontrack.json.parseAsJson
 import net.nemerosa.ontrack.test.TestUtils
 import org.junit.jupiter.api.Test
+import java.util.*
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
@@ -25,6 +27,20 @@ class GitHubAppTest {
         val token = testJwt()
         // Simple check
         assertTrue(token.isNotBlank(), "JWT has been generated")
+    }
+
+    @Test
+    fun `The JWT carries the app ID and its validity as numeric dates`() {
+        val (header, payload) = testJwt().split(".").take(2).map {
+            String(Base64.getUrlDecoder().decode(it)).parseAsJson()
+        }
+        assertEquals("RS256", header.path("alg").asString())
+        assertEquals(testAppId, payload.path("iss").asString())
+        val iat = payload.path("iat")
+        val exp = payload.path("exp")
+        assertTrue(iat.isIntegralNumber, "Issued at is a number of seconds: $payload")
+        assertTrue(exp.isIntegralNumber, "Expiration is a number of seconds: $payload")
+        assertEquals(11 * 60L, exp.asLong() - iat.asLong(), "Valid from 1 minute before to 10 minutes after now")
     }
 
     @Test

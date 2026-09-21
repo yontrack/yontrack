@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.kdsl.spec.extension.general
 
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 import net.nemerosa.ontrack.kdsl.spec.PromotionLevel
 import net.nemerosa.ontrack.kdsl.spec.deleteProperty
 import net.nemerosa.ontrack.kdsl.spec.getProperty
@@ -37,7 +37,7 @@ var PromotionLevel.autoPromotion: AutoPromotionProperty?
  */
 private fun JsonNode.parseIds(): List<UInt> =
     if (isArray) {
-        map { item ->
+        values().map { item ->
             if (item.isObject) {
                 item.path("id").asInt().toUInt()
             } else {

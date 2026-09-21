@@ -193,7 +193,7 @@ class GQLRootQueryGitHubIngestionHookPayloadsIT : AbstractIngestionTestSupport()
                             expected.map { no ->
                                 "Payload #$no"
                             },
-                            data.path("gitHubIngestionHookPayloads").path("pageItems").map { node ->
+                            data.path("gitHubIngestionHookPayloads").path("pageItems").values().map { node ->
                                 node.getRequiredTextField("message")
                             }
                     )

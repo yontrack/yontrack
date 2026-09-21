@@ -24,10 +24,9 @@ class VaultConfidentialStore(
     private fun kvOps() = vaultOperations.opsForKeyValue(kvPath, VaultKeyValueOperationsSupport.KeyValueBackend.unversioned())
 
     /*
-     * Vault is given plain maps, and what it gives back is read with Jackson 2 here: Spring Vault 4
-     * maps its payloads with Jackson 3, which cannot read nor write a Jackson 2 `JsonNode`.
-     *
-     * The stored secret keeps its 5.x shape, `{"data": {"payload": "<Base64>"}}`.
+     * Vault is given plain maps, and what it gives back is read with the Yontrack mapper here rather
+     * than with the one of Spring Vault, so that the stored secret keeps its 5.x shape,
+     * `{"data": {"payload": "<Base64>"}}`, whatever the mapper configuration of Spring Vault.
      */
 
     override fun store(key: String, payload: ByteArray) {

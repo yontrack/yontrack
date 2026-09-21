@@ -1,7 +1,7 @@
 package net.nemerosa.ontrack.extension.notifications.core
 
-import com.fasterxml.jackson.databind.JsonNode
-import com.fasterxml.jackson.databind.node.TextNode
+import tools.jackson.databind.JsonNode
+import tools.jackson.databind.node.StringNode
 import net.nemerosa.ontrack.common.Time
 import net.nemerosa.ontrack.common.api.APIDescription
 import net.nemerosa.ontrack.common.parseDuration
@@ -99,7 +99,7 @@ class YontrackPromotionNotificationChannel(
         val resolvedFields = config.fields.map { field ->
             PromotionRunFieldValue(
                 name = field.name,
-                value = TextNode(
+                value = StringNode(
                     eventTemplatingService.render(
                         template = field.value,
                         event = event,

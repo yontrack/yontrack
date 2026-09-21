@@ -1,7 +1,7 @@
 package net.nemerosa.ontrack.extension.jira.client
 
-import com.fasterxml.jackson.databind.JsonNode
-import com.fasterxml.jackson.databind.ObjectMapper
+import tools.jackson.databind.JsonNode
+import tools.jackson.databind.ObjectMapper
 import io.mockk.every
 import io.mockk.mockk
 import net.nemerosa.ontrack.extension.jira.JIRAConfiguration
@@ -37,7 +37,7 @@ class JIRAClientImplTest {
         // Configuration to test with
         val config = config()
         // Issue to parse
-        val node = ObjectMapper().readTree(this::class.java.getResource("/issue.json"))
+        val node = ObjectMapper().readTree(this::class.java.getResource("/issue.json")!!.readText())
         // Parsing the issue
         val issue = JIRAClientImpl.toIssue(config, node)
         // Checking the issue
@@ -57,7 +57,7 @@ class JIRAClientImplTest {
         // Configuration to test with
         val config = config()
         // Issue to parse
-        val node = ObjectMapper().readTree(this::class.java.getResource("/issue-link-inward.json"))
+        val node = ObjectMapper().readTree(this::class.java.getResource("/issue-link-inward.json")!!.readText())
         // Parsing the issue
         val issue = JIRAClientImpl.toIssue(config, node)
         // Checking the issue
@@ -89,7 +89,7 @@ class JIRAClientImplTest {
         // Configuration to test with
         val config = config()
         // Issue to parse
-        val node = ObjectMapper().readTree(this::class.java.getResource("/issue-link-outward.json"))
+        val node = ObjectMapper().readTree(this::class.java.getResource("/issue-link-outward.json")!!.readText())
         // Parsing the issue
         val issue = JIRAClientImpl.toIssue(config, node)
         // Checking the issue
@@ -121,7 +121,7 @@ class JIRAClientImplTest {
         // Configuration to test with
         val config = config()
         // Issue to parse
-        val node = ObjectMapper().readTree(this::class.java.getResource("/issue-link-both.json"))
+        val node = ObjectMapper().readTree(this::class.java.getResource("/issue-link-both.json")!!.readText())
         // Parsing the issue
         val issue = JIRAClientImpl.toIssue(config, node)
         // Checking the issue

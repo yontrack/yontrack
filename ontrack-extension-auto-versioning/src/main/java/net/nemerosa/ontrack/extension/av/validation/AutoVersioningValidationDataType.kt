@@ -1,7 +1,7 @@
 package net.nemerosa.ontrack.extension.av.validation
 
-import com.fasterxml.jackson.databind.JsonNode
-import com.fasterxml.jackson.databind.node.NullNode
+import tools.jackson.databind.JsonNode
+import tools.jackson.databind.node.NullNode
 import net.nemerosa.ontrack.extension.av.AutoVersioningExtensionFeature
 import net.nemerosa.ontrack.json.asJson
 import net.nemerosa.ontrack.json.parse
@@ -40,10 +40,10 @@ class AutoVersioningValidationDataType(
     override fun fromForm(node: JsonNode?): AutoVersioningValidationData? = node?.parse()
 
     override fun fromJson(node: JsonNode): AutoVersioningValidationData? = AutoVersioningValidationData(
-        project = node["project"].textValue(),
-        version = node["version"].textValue(),
+        project = node["project"].stringValueOpt().orElse(null),
+        version = node["version"].stringValueOpt().orElse(null),
         latestVersion = node.path("latestVersion").asText(), // Might not be there in legacy storage
-        path = node["path"].textValue(),
+        path = node["path"].stringValueOpt().orElse(null),
         time = node["time"].longValue()
     )
 

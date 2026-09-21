@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.extension.general.deliverymap
 
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 import net.nemerosa.ontrack.extension.general.AutoPromotionProperty
 import net.nemerosa.ontrack.extension.general.AutoPromotionPropertyType
 import net.nemerosa.ontrack.extension.general.PromotionDependenciesProperty
@@ -108,7 +108,7 @@ class DeliveryMapIT : AbstractQLKTITSupport() {
                     assertEquals("CI-.*", aggregate.getRequiredTextField("name"))
                     assertEquals(
                         listOf("CI-BUILD", "CI-TEST"),
-                        aggregate.path("members").map { it.getRequiredTextField("name") },
+                        aggregate.path("members").values().map { it.getRequiredTextField("name") },
                     )
                     // One edge for the whole pattern, not one per stamp
                     assertEquals(1, map.edges.size)

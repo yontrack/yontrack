@@ -1,7 +1,7 @@
 package net.nemerosa.ontrack.kdsl.acceptance.tests.github
 
 import net.nemerosa.ontrack.kdsl.acceptance.tests.ACCProperties
-import net.nemerosa.ontrack.kdsl.connector.support.jackson2RestTemplateBuilder
+import net.nemerosa.ontrack.kdsl.connector.support.restTemplateBuilder
 import org.springframework.http.HttpHeaders
 import org.springframework.web.client.RestTemplate
 
@@ -10,7 +10,7 @@ import org.springframework.web.client.RestTemplate
  */
 
 val gitHubClient: RestTemplate by lazy {
-    jackson2RestTemplateBuilder()
+    restTemplateBuilder()
         .rootUri("https://api.github.com")
         .defaultHeader(
             HttpHeaders.AUTHORIZATION,

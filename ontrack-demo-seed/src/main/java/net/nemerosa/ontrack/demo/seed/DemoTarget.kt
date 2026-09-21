@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.demo.seed
 
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 import java.time.LocalDateTime
 
 /**

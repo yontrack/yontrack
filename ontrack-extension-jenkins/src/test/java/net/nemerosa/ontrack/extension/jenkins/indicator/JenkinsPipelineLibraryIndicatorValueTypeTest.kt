@@ -1,8 +1,8 @@
 package net.nemerosa.ontrack.extension.jenkins.indicator
 
-import com.fasterxml.jackson.databind.node.IntNode
-import com.fasterxml.jackson.databind.node.NullNode
-import com.fasterxml.jackson.databind.node.TextNode
+import tools.jackson.databind.node.IntNode
+import tools.jackson.databind.node.NullNode
+import tools.jackson.databind.node.StringNode
 import net.nemerosa.ontrack.extension.indicators.IndicatorsExtensionFeature
 import net.nemerosa.ontrack.extension.jenkins.JenkinsExtensionFeature
 import net.nemerosa.ontrack.extension.scm.SCMExtensionFeature
@@ -32,7 +32,7 @@ class JenkinsPipelineLibraryIndicatorValueTypeTest {
     @Test
     fun `From client JSON`() {
         assertNull(type.fromClientJson(config(), NullNode.instance))
-        assertNull(type.fromClientJson(config(), TextNode("1.0.1")))
+        assertNull(type.fromClientJson(config(), StringNode("1.0.1")))
         assertNull(type.fromClientJson(config(), mapOf("test" to 42).asJson()))
         assertEquals(
             version("1.0.1"),

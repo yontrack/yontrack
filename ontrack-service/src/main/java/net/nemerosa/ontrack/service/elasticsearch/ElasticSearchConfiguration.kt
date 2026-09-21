@@ -1,12 +1,12 @@
 package net.nemerosa.ontrack.service.elasticsearch
 
 import co.elastic.clients.json.JsonpMapper
-import co.elastic.clients.json.jackson.JacksonJsonpMapper
+import co.elastic.clients.json.jackson.Jackson3JsonpMapper
 import co.elastic.clients.transport.rest5_client.low_level.Rest5Client
-import com.fasterxml.jackson.databind.ObjectMapper
 import org.springframework.boot.elasticsearch.health.ElasticsearchRestClientHealthIndicator
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+import tools.jackson.databind.json.JsonMapper
 
 @Configuration
 class ElasticSearchConfiguration(
@@ -18,15 +18,12 @@ class ElasticSearchConfiguration(
         ElasticsearchRestClientHealthIndicator(restClient)
 
     /**
-     * The search documents hold Jackson 2 types. Spring Boot 4 gives the Elasticsearch client a
-     * Jackson 3 mapper as soon as Jackson 3 is on the classpath, which it always is; this restores
-     * the mapper Spring Boot 3 configured, over the Jackson 2 `ObjectMapper` which
-     * `spring-boot-jackson2` auto-configures.
-     *
-     * To be removed by the Jackson 3 migration (#1843).
+     * The search documents are written with the one mapper configuration of Yontrack (ADR 0016).
+     * Spring Boot would give the Elasticsearch client a mapper of its own, with the Jackson 3
+     * defaults.
      */
     @Bean
-    fun jacksonJsonpMapper(objectMapper: ObjectMapper): JsonpMapper =
-        JacksonJsonpMapper(objectMapper)
+    fun jacksonJsonpMapper(jsonMapper: JsonMapper): JsonpMapper =
+        Jackson3JsonpMapper(jsonMapper)
 
 }

@@ -19,7 +19,7 @@ apollo {
         schemaFile.set(file("ontrack.graphql"))
         mapScalar("LocalDateTime", "java.time.LocalDateTime")
         mapScalar("UUID", "java.util.UUID")
-        mapScalar("JSON", "com.fasterxml.jackson.databind.JsonNode")
+        mapScalar("JSON", "tools.jackson.databind.JsonNode")
         mapScalar("Long", "kotlin.Long")
     }
 }

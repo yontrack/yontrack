@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.kdsl.spec
 
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 import net.nemerosa.ontrack.kdsl.connector.Connector
 import net.nemerosa.ontrack.kdsl.connector.graphql.schema.type.ProjectEntityType
 

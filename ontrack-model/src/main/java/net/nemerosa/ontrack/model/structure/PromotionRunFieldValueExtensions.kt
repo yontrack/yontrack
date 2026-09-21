@@ -1,5 +1,5 @@
 package net.nemerosa.ontrack.model.structure
 
-import com.fasterxml.jackson.databind.node.TextNode
+import tools.jackson.databind.node.StringNode
 
-fun fieldValue(name: String, value: String) = PromotionRunFieldValue(name, TextNode(value))
+fun fieldValue(name: String, value: String) = PromotionRunFieldValue(name, StringNode(value))

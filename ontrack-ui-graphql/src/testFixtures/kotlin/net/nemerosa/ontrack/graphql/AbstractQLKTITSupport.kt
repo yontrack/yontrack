@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.graphql
 
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 import graphql.ErrorClassification
 import net.nemerosa.ontrack.it.AbstractDSLTestSupport
 import org.springframework.beans.factory.annotation.Autowired

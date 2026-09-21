@@ -32,7 +32,7 @@ class GitBranchModelMatcherProviderGraphQLIT : AbstractGitTestSupport() {
                         }
                     """)
                 }
-                val names = data["projects"][0]["branches"].map { it["name"].asText() }
+                val names = data["projects"][0]["branches"].values().map { it["name"].asText() }
                 // Checks the branches
                 assertEquals(
                         setOf(
@@ -77,7 +77,7 @@ class GitBranchModelMatcherProviderGraphQLIT : AbstractGitTestSupport() {
                         }
                     """)
                 }
-                val names = data["projects"][0]["branches"].map { it["name"].asText() }
+                val names = data["projects"][0]["branches"].values().map { it["name"].asText() }
                 // Checks the branches
                 assertEquals(
                         setOf(
@@ -109,7 +109,7 @@ class GitBranchModelMatcherProviderGraphQLIT : AbstractGitTestSupport() {
                         }
                     """)
             }
-            val names = data["projects"][0]["branches"].map { it["name"].asText() }
+            val names = data["projects"][0]["branches"].values().map { it["name"].asText() }
             // Checks the branches
             assertEquals(
                     setOf(

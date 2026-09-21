@@ -1,10 +1,10 @@
 package net.nemerosa.ontrack.kdsl.spec.extension.bitbucket.cloud
 
-import com.fasterxml.jackson.core.JsonParser
-import com.fasterxml.jackson.databind.DeserializationContext
-import com.fasterxml.jackson.databind.JsonDeserializer
-import com.fasterxml.jackson.databind.JsonNode
-import com.fasterxml.jackson.databind.annotation.JsonDeserialize
+import tools.jackson.core.JsonParser
+import tools.jackson.databind.DeserializationContext
+import tools.jackson.databind.ValueDeserializer
+import tools.jackson.databind.JsonNode
+import tools.jackson.databind.annotation.JsonDeserialize
 import net.nemerosa.ontrack.json.getTextField
 import net.nemerosa.ontrack.json.parse
 import net.nemerosa.ontrack.kdsl.spec.Project
@@ -45,7 +45,7 @@ const val BITBUCKET_CLOUD_PROJECT_CONFIGURATION_PROPERTY =
 /**
  * The property is read back with its configuration as an object, and set with its configuration name.
  */
-class BitbucketCloudProjectConfigurationPropertyDeserializer : JsonDeserializer<BitbucketCloudProjectConfigurationProperty>() {
+class BitbucketCloudProjectConfigurationPropertyDeserializer : ValueDeserializer<BitbucketCloudProjectConfigurationProperty>() {
     override fun deserialize(p: JsonParser, ctxt: DeserializationContext): BitbucketCloudProjectConfigurationProperty {
         val node: JsonNode = p.readValueAsTree()
         val configuration = node.path("configuration")

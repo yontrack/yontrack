@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.json
 
-import com.fasterxml.jackson.databind.node.*
+import tools.jackson.databind.node.*
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 
@@ -28,7 +28,7 @@ class KTJsonUtilsTest {
         assertEquals(true, BooleanNode.TRUE.toObject())
         assertEquals(10, IntNode(10).toObject())
         assertEquals(10L, LongNode(10L).toObject())
-        assertEquals("Test", TextNode("Test").toObject())
+        assertEquals("Test", StringNode("Test").toObject())
     }
 
     @Test

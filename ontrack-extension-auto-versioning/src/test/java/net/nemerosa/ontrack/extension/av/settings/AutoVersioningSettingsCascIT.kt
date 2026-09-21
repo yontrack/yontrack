@@ -129,7 +129,7 @@ class AutoVersioningSettingsCascIT : AbstractCascTestSupport() {
                         auditCleanupDuration: xxxx
                         auditRetentionDuration: 30d
             """.trimIndent(),
-            message = "\$.ontrack.config.settings.auto-versioning.auditCleanupDuration: does not match the regex pattern ^\\d+|P(?:\\d+Y)?(?:\\d+M)?(?:\\d+D)?(?:T(?:\\d+H)?(?:\\d+M)?(?:\\d+S)?)?|(\\d+)([smhdwMy]|ms)\$"
+            message = "/ontrack/config/settings/auto-versioning/auditCleanupDuration: does not match the regex pattern ^\\d+|P(?:\\d+Y)?(?:\\d+M)?(?:\\d+D)?(?:T(?:\\d+H)?(?:\\d+M)?(?:\\d+S)?)?|(\\d+)([smhdwMy]|ms)\$"
         )
     }
 

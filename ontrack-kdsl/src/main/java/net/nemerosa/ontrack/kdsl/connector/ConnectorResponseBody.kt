@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.kdsl.connector
 
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 import net.nemerosa.ontrack.json.parse
 import net.nemerosa.ontrack.json.parseAsJson
 import java.nio.charset.Charset

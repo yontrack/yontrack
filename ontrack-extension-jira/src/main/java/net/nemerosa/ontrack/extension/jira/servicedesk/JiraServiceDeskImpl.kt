@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.extension.jira.servicedesk
 
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 import net.nemerosa.ontrack.extension.jira.model.JIRAIssueStub
 import net.nemerosa.ontrack.extension.jira.notifications.JiraCustomField
 import net.nemerosa.ontrack.json.getRequiredTextField
@@ -25,7 +25,7 @@ class JiraServiceDeskImpl(
         try {
             val node =
                 restTemplate.getForObject<JsonNode>("/rest/servicedeskapi/request?serviceDeskId=$serviceDeskId&requestTypeId=$requestTypeId&requestStatus=${requestStatus.requestStatus}&searchTerm=$searchTerm")!!
-            node.path("values").map {
+            node.path("values").values().map {
                 JIRAIssueStub(
                     key = it.getRequiredTextField("issueKey"),
                     url = it.path("_links").getRequiredTextField("web")

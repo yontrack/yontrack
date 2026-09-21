@@ -102,7 +102,7 @@ class LabelGraphQLIT : AbstractQLKTITSupport() {
                 }
             }
         """).apply {
-            val names = path("projects").map { it["name"].textValue() }
+            val names = path("projects").values().map { it["name"].stringValue() }
             assertTrue(p0.name in names)
             assertTrue(p1.name in names)
             assertTrue(p2.name in names)
@@ -115,7 +115,7 @@ class LabelGraphQLIT : AbstractQLKTITSupport() {
                 }
             }
         """, mapOf("labels" to listOf(l1.getDisplay()))).apply {
-            val names = path("projects").map { it["name"].textValue() }
+            val names = path("projects").values().map { it["name"].stringValue() }
             assertFalse(p0.name in names)
             assertTrue(p1.name in names)
             assertTrue(p2.name in names)
@@ -128,7 +128,7 @@ class LabelGraphQLIT : AbstractQLKTITSupport() {
                 }
             }
         """, mapOf("labels" to listOf(l1.getDisplay(), l2.getDisplay()))).apply {
-            val names = path("projects").map { it["name"].textValue() }
+            val names = path("projects").values().map { it["name"].stringValue() }
             assertFalse(p0.name in names)
             assertFalse(p1.name in names)
             assertTrue(p2.name in names)
@@ -156,7 +156,7 @@ class LabelGraphQLIT : AbstractQLKTITSupport() {
             val node = path("label")
             assertEquals(label.category, node["category"].asText())
             assertEquals(label.name, node["name"].asText())
-            assertEquals(listOf(project.name), node["projects"].map { it["name"].asText() })
+            assertEquals(listOf(project.name), node["projects"].values().map { it["name"].asText() })
         }
     }
 

@@ -9,12 +9,12 @@ import org.springframework.test.web.client.RequestMatcher
 import org.springframework.test.web.client.match.MockRestRequestMatchers.method
 import org.springframework.test.web.client.response.MockRestResponseCreators.withNoContent
 import org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess
-import net.nemerosa.ontrack.extension.support.client.jackson2RestTemplateBuilder
+import net.nemerosa.ontrack.extension.support.client.restTemplateBuilder
 import kotlin.test.assertEquals
 
 class BitbucketCloudTestRestApiTest {
 
-    private val template = jackson2RestTemplateBuilder().build()
+    private val template = restTemplateBuilder().build()
     private val server = MockRestServiceServer.bindTo(template).build()
     private val api = BitbucketCloudTestRestApi(
         template = template,

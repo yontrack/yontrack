@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.graphql
 
-import com.fasterxml.jackson.databind.node.TextNode
+import tools.jackson.databind.node.StringNode
 import net.nemerosa.ontrack.extension.general.ReleaseProperty
 import net.nemerosa.ontrack.extension.general.ReleasePropertyType
 import net.nemerosa.ontrack.extension.general.validation.TestSummaryValidationConfig
@@ -383,7 +383,7 @@ class ValidationRunGraphQLIT : AbstractQLKTITSupport() {
                     }"""
                     )
                     val descriptions =
-                        data["validationRuns"][0]["validationRunStatuses"].map { it["annotatedDescription"].asText() }
+                        data["validationRuns"][0]["validationRunStatuses"].values().map { it["annotatedDescription"].asText() }
                     assertEquals(
                         listOf(
                             """See <a href="https://issues/browser/ONT-1234" target="_blank">https://issues/browser/ONT-1234</a>""",
@@ -425,11 +425,11 @@ class ValidationRunGraphQLIT : AbstractQLKTITSupport() {
                     val validationRunStatuses = data["validationRuns"][0]["validationRunStatuses"]
                     assertEquals(
                         listOf("EXPLAINED", "INVESTIGATING", "FAILED"),
-                        validationRunStatuses.map { it["statusID"]["id"].asText() }
+                        validationRunStatuses.values().map { it["statusID"]["id"].asText() }
                     )
                     assertEquals(
                         listOf("Explained", "Investigating", "Validation failed"),
-                        validationRunStatuses.map { it["description"].asText() }
+                        validationRunStatuses.values().map { it["description"].asText() }
                     )
                 }
             }
@@ -507,7 +507,7 @@ class ValidationRunGraphQLIT : AbstractQLKTITSupport() {
 
         // Gets the data
         val runData = data["validationRuns"][0]["data"]["data"]
-        assertIs<TextNode>(runData) {
+        assertIs<StringNode>(runData) {
             assertEquals("Some text", it.asText())
         }
     }

@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.test
 
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 import net.nemerosa.ontrack.test.TestUtils.uid
 import java.util.*
 import kotlin.io.encoding.Base64

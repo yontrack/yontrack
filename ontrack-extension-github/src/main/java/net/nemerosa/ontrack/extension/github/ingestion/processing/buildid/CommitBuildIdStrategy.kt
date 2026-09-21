@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.extension.github.ingestion.processing.buildid
 
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 import net.nemerosa.ontrack.extension.git.property.GitCommitProperty
 import net.nemerosa.ontrack.extension.git.property.GitCommitPropertyType
 import net.nemerosa.ontrack.extension.github.ingestion.processing.events.WorkflowRun

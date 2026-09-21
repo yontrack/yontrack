@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.extension.github.client
 
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 import net.nemerosa.ontrack.extension.git.model.GitPullRequest
 import net.nemerosa.ontrack.extension.github.model.*
 import org.springframework.web.client.RestTemplate

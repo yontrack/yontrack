@@ -6,7 +6,7 @@ import net.nemerosa.ontrack.model.dashboards.Dashboard
 import net.nemerosa.ontrack.model.dashboards.DashboardContextUserScope
 import net.nemerosa.ontrack.model.dashboards.WidgetInstance
 import net.nemerosa.ontrack.model.dashboards.WidgetLayout
-import com.fasterxml.jackson.databind.node.NullNode
+import tools.jackson.databind.node.NullNode
 import kotlin.test.Test
 import kotlin.test.assertEquals
 

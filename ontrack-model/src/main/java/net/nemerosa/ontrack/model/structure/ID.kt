@@ -1,8 +1,8 @@
 package net.nemerosa.ontrack.model.structure
 
 import com.fasterxml.jackson.annotation.JsonIgnore
-import com.fasterxml.jackson.databind.annotation.JsonDeserialize
-import com.fasterxml.jackson.databind.annotation.JsonSerialize
+import tools.jackson.databind.annotation.JsonDeserialize
+import tools.jackson.databind.annotation.JsonSerialize
 import net.nemerosa.ontrack.model.support.IDJsonDeserializer
 import net.nemerosa.ontrack.model.support.IDJsonSerializer
 import java.io.Serializable

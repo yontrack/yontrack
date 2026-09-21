@@ -26,7 +26,7 @@ class GQLRootQueryPredefinedValidationStampsIT : AbstractQLKTITSupport() {
             """
             ) { data ->
                 assertEquals(
-                    data.path("predefinedValidationStamps").map {
+                    data.path("predefinedValidationStamps").values().map {
                         it.path("id").asInt() to it.path("name").asText()
                     },
                     pvss.sortedBy { it.name }.map {
@@ -57,7 +57,7 @@ class GQLRootQueryPredefinedValidationStampsIT : AbstractQLKTITSupport() {
             """
             ) { data ->
                 assertEquals(
-                    data.path("predefinedValidationStamps").map {
+                    data.path("predefinedValidationStamps").values().map {
                         it.path("id").asInt() to it.path("name").asText()
                     },
                     pvss.sortedBy { it.name }.map {
@@ -92,7 +92,7 @@ class GQLRootQueryPredefinedValidationStampsIT : AbstractQLKTITSupport() {
                         pvss[0].run { id() to name },
                         pvss[9].run { id() to name },
                     ),
-                    data.path("predefinedValidationStamps").map {
+                    data.path("predefinedValidationStamps").values().map {
                         it.path("id").asInt() to it.path("name").asText()
                     },
                 )

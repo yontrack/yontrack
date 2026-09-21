@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.extension.recordings.store
 
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 import java.time.LocalDateTime
 
 data class StoredRecording(

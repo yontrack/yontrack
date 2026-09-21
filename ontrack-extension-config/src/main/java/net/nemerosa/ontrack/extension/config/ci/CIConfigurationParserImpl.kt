@@ -1,7 +1,7 @@
 package net.nemerosa.ontrack.extension.config.ci
 
-import com.fasterxml.jackson.databind.JsonNode
-import com.fasterxml.jackson.databind.node.ObjectNode
+import tools.jackson.databind.JsonNode
+import tools.jackson.databind.node.ObjectNode
 import net.nemerosa.ontrack.extension.api.ExtensionManager
 import net.nemerosa.ontrack.extension.config.ci.model.*
 import net.nemerosa.ontrack.extension.config.ci.properties.PropertyAliasService
@@ -152,7 +152,7 @@ class CIConfigurationParserImpl(
 
     private fun convertValidationData(name: String, config: JsonNode): ValidationStampDataConfiguration? {
         return if (config is ObjectNode) {
-            val names = config.fieldNames().asSequence().toList().toMutableList()
+            val names = config.propertyNames().asSequence().toList().toMutableList()
             names.remove("description")
             if (names.isEmpty()) {
                 null

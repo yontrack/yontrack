@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.kdsl.spec.extension.notifications
 
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 
 data class NotificationSourceData(
     val id: String,

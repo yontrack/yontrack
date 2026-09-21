@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.extension.notifications.channels
 
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 import net.nemerosa.ontrack.extension.notifications.subscriptions.EventSubscriptionConfigException
 import net.nemerosa.ontrack.json.parseInto
 import kotlin.reflect.KClass

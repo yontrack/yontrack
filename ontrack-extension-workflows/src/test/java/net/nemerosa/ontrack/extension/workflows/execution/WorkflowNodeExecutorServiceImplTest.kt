@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.extension.workflows.execution
 
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 import io.mockk.every
 import io.mockk.mockk
 import net.nemerosa.ontrack.extension.api.ExtensionManager

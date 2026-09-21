@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.service.dashboards
 
-import com.fasterxml.jackson.databind.node.NullNode
+import tools.jackson.databind.node.NullNode
 import net.nemerosa.ontrack.json.asJson
 import net.nemerosa.ontrack.json.parse
 import net.nemerosa.ontrack.model.dashboards.*
@@ -199,7 +199,7 @@ class DashboardServiceImpl(
         val documents = yamlUtil.read(yaml)
         val definitions = documents.flatMap { doc ->
             if (doc.isArray) {
-                doc.map { it.parse<DashboardDefinition>() }
+                doc.values().map { it.parse<DashboardDefinition>() }
             } else {
                 listOf(doc.parse())
             }

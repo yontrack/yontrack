@@ -33,7 +33,7 @@ class GQLRootQueryPromotionLevelNamesIT : AbstractQLKTITSupport() {
                         promotionLevelNames
                     }"""
         ) { data ->
-            val names = data["promotionLevelNames"].map { it.asText() }
+            val names = data["promotionLevelNames"].values().map { it.asText() }
             assertTrue(names.contains(pla.name), "Contains the first PL")
             assertTrue(names.contains(plb.name), "Contains the second PL")
         }
@@ -44,7 +44,7 @@ class GQLRootQueryPromotionLevelNamesIT : AbstractQLKTITSupport() {
                     promotionLevelNames(token: "$prefix")
                 }"""
         ) { data ->
-            val names = data["promotionLevelNames"].map { it.asText() }
+            val names = data["promotionLevelNames"].values().map { it.asText() }
             assertTrue(names.contains(pla.name), "Contains the first PL")
             assertTrue(names.contains(plb.name), "Contains the second PL")
         }
@@ -55,7 +55,7 @@ class GQLRootQueryPromotionLevelNamesIT : AbstractQLKTITSupport() {
                     promotionLevelNames(token: "${pla.name}")
                 }"""
         ) { data ->
-            val names = data["promotionLevelNames"].map { it.asText() }
+            val names = data["promotionLevelNames"].values().map { it.asText() }
             assertEquals(listOf(pla.name), names)
         }
     }

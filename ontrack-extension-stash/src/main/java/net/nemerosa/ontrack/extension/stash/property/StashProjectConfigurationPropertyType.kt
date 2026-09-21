@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.extension.stash.property
 
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 import net.nemerosa.ontrack.extension.git.property.AbstractGitProjectConfigurationPropertyType
 import net.nemerosa.ontrack.extension.stash.StashExtensionFeature
 import net.nemerosa.ontrack.extension.stash.model.StashConfiguration

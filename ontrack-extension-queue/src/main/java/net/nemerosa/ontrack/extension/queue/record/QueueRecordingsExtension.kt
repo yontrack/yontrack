@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.extension.queue.record
 
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 import graphql.schema.GraphQLFieldDefinition
 import net.nemerosa.ontrack.extension.queue.QueueExtensionFeature
 import net.nemerosa.ontrack.extension.recordings.RecordingsExtension

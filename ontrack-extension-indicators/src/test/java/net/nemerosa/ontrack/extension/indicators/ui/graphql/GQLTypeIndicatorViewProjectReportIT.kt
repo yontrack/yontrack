@@ -167,9 +167,9 @@ class GQLTypeIndicatorViewProjectReportIT : AbstractIndicatorsTestSupport() {
             """
             ).let { data ->
                 val reports = data.path("indicatorViewList").path("views").first().path("reports")
-                val projectNames = reports.map { it.path("project").path("name").asText() }
+                val projectNames = reports.values().map { it.path("project").path("name").asText() }
                 val actualRatings =
-                    reports.map {
+                    reports.values().map {
                         it.path("viewStats").path(0).path("stats").path("avgRating").asText()
                     }.map {
                         Rating.valueOf(it)

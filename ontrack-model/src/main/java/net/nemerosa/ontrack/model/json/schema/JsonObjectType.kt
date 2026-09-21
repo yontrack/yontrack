@@ -1,10 +1,10 @@
 package net.nemerosa.ontrack.model.json.schema
 
 import com.fasterxml.jackson.annotation.JsonInclude
-import com.fasterxml.jackson.core.JsonGenerator
-import com.fasterxml.jackson.databind.JsonSerializer
-import com.fasterxml.jackson.databind.SerializerProvider
-import com.fasterxml.jackson.databind.annotation.JsonSerialize
+import tools.jackson.core.JsonGenerator
+import tools.jackson.databind.ValueSerializer
+import tools.jackson.databind.SerializationContext
+import tools.jackson.databind.annotation.JsonSerialize
 
 class JsonObjectType(
     title: String,
@@ -41,27 +41,27 @@ class JsonRefProperty(
     val ref: String,
 )
 
-class JsonOneOfSerializer : JsonSerializer<JsonOneOf>() {
-    override fun serialize(value: JsonOneOf, gen: JsonGenerator, serializers: SerializerProvider) {
+class JsonOneOfSerializer : ValueSerializer<JsonOneOf>() {
+    override fun serialize(value: JsonOneOf, gen: JsonGenerator, serializers: SerializationContext) {
         gen.writeStartArray()
         value.conditions.forEach {
             gen.writeStartObject()
-            gen.writeObjectField("properties", it)
+            gen.writePOJOProperty("properties", it)
             gen.writeEndObject()
         }
         gen.writeEndArray()
     }
 }
 
-class JsonConditionSerializer : JsonSerializer<JsonCondition>() {
-    override fun serialize(condition: JsonCondition, gen: JsonGenerator, serializers: SerializerProvider) {
+class JsonConditionSerializer : ValueSerializer<JsonCondition>() {
+    override fun serialize(condition: JsonCondition, gen: JsonGenerator, serializers: SerializationContext) {
         gen.writeStartObject()
-        gen.writeObjectField(
+        gen.writePOJOProperty(
             condition.constProperty.name, mapOf(
                 "const" to condition.constProperty.value,
             )
         )
-        gen.writeObjectField(
+        gen.writePOJOProperty(
             condition.refProperty.name, mapOf(
                 "\$ref" to "#/\$defs/${condition.refProperty.ref}"
             )

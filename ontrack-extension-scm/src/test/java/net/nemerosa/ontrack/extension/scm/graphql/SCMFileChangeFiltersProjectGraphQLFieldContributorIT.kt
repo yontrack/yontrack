@@ -47,7 +47,7 @@ class SCMFileChangeFiltersProjectGraphQLFieldContributorIT : AbstractQLKTITSuppo
                     assertEquals(1, filters.size())
                     val filterNode = filters.path(0)
                     assertEquals(filterName, filterNode.getRequiredTextField("name"))
-                    assertEquals(listOf("some-dir/**"), filterNode.path("patterns").map { it.asText() })
+                    assertEquals(listOf("some-dir/**"), filterNode.path("patterns").values().map { it.asText() })
                 }
             }
         }
@@ -83,7 +83,7 @@ class SCMFileChangeFiltersProjectGraphQLFieldContributorIT : AbstractQLKTITSuppo
                     assertEquals(1, filters.size())
                     val filterNode = filters.path(0)
                     assertEquals(filterName, filterNode.getRequiredTextField("name"))
-                    assertEquals(listOf("some-dir/**"), filterNode.path("patterns").map { it.asText() })
+                    assertEquals(listOf("some-dir/**"), filterNode.path("patterns").values().map { it.asText() })
                 }
             }
         }

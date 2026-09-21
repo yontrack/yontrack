@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.graphql
 
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 import net.nemerosa.ontrack.json.parse
 import net.nemerosa.ontrack.model.security.Authorization
 import kotlin.test.assertEquals

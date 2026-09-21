@@ -1,8 +1,8 @@
 package net.nemerosa.ontrack.extension.indicators.model
 
-import com.fasterxml.jackson.databind.JsonNode
-import com.fasterxml.jackson.databind.node.NullNode
-import com.fasterxml.jackson.databind.node.ObjectNode
+import tools.jackson.databind.JsonNode
+import tools.jackson.databind.node.NullNode
+import tools.jackson.databind.node.ObjectNode
 import net.nemerosa.ontrack.extension.indicators.acl.IndicatorEdit
 import net.nemerosa.ontrack.extension.indicators.store.IndicatorStore
 import net.nemerosa.ontrack.extension.indicators.store.StoredIndicator

@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.extension.config.model
 
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 
 data class ConditionConfig(
     val name: String,

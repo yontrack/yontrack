@@ -1,7 +1,7 @@
 package net.nemerosa.ontrack.kdsl.spec.dashboards
 
 import com.apollographql.apollo.api.Optional
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 import net.nemerosa.ontrack.kdsl.connector.graphql.convert
 import net.nemerosa.ontrack.kdsl.connector.graphql.schema.DeleteDashboardMutation
 import net.nemerosa.ontrack.kdsl.connector.graphql.schema.SaveDashboardMutation

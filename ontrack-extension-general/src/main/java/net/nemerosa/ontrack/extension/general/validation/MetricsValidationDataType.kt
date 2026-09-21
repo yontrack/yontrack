@@ -1,7 +1,7 @@
 package net.nemerosa.ontrack.extension.general.validation
 
-import com.fasterxml.jackson.databind.JsonNode
-import com.fasterxml.jackson.databind.node.NullNode
+import tools.jackson.databind.JsonNode
+import tools.jackson.databind.node.NullNode
 import net.nemerosa.ontrack.extension.general.GeneralExtensionFeature
 import net.nemerosa.ontrack.json.parse
 import net.nemerosa.ontrack.json.toJson

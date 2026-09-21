@@ -26,7 +26,7 @@ class BitbucketCloudMockMgt(connector: Connector) : Connected(connector) {
                 "workspace" to workspace,
                 "repository" to repository,
             ),
-        ).body.asJson().map {
+        ).body.asJson().values().map {
             // Element by element: a reified List<T> loses T and yields maps
             it.parse<MockBitbucketPipelineRun>()
         }

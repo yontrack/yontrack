@@ -1,7 +1,7 @@
 package net.nemerosa.ontrack.graphql.support
 
-import com.fasterxml.jackson.databind.JsonNode
-import com.fasterxml.jackson.databind.node.*
+import tools.jackson.databind.JsonNode
+import tools.jackson.databind.node.*
 import graphql.language.*
 import graphql.schema.Coercing
 import graphql.schema.CoercingParseValueException
@@ -57,7 +57,7 @@ object GQLScalarJSON {
                         is String -> try {
                             mapper.readTree(input)
                         } catch (_: Exception) {
-                            TextNode(input)
+                            StringNode(input)
                         }
                         is JsonNode -> input
                         else -> input.asJson()
@@ -67,7 +67,7 @@ object GQLScalarJSON {
                     when (input) {
                         is NullValue -> NullNode.instance
                         is FloatValue -> DoubleNode.valueOf(input.value.toDouble())
-                        is StringValue -> TextNode.valueOf(input.value)
+                        is StringValue -> StringNode.valueOf(input.value)
                         is IntValue -> IntNode.valueOf(input.value.toInt())
                         is BooleanValue -> BooleanNode.valueOf(input.isValue)
                         is ArrayValue -> {
@@ -81,7 +81,7 @@ object GQLScalarJSON {
                         is ObjectValue -> {
                             val `object` = ObjectNode(mapper.nodeFactory)
                             input.objectFields.forEach { of ->
-                                `object`.set<JsonNode>(of.name, parseLiteral(of.value))
+                                `object`.set(of.name, parseLiteral(of.value))
                             }
                             `object`
                         }
@@ -96,15 +96,15 @@ object GQLScalarJSON {
                         is ArrayNode ->
                             ArrayNode(
                                 factory,
-                                map { it.obfuscate() }
+                                values().map { it.obfuscate() }
                             )
                         // Filters at field level
                         is ObjectNode ->
                             ObjectNode(
                                 factory,
-                                fields().asSequence()
+                                properties().asSequence()
                                     .filter { (name, value) ->
-                                        if (value is TextNode || value is NullNode) {
+                                        if (value is StringNode || value is NullNode) {
                                             // Keeping the field only if name not containing any forbidden token
                                             forbiddenFields.none { part ->
                                                 name.contains(part, ignoreCase = true)

@@ -3,10 +3,10 @@ package net.nemerosa.ontrack.extension.elastic.metrics
 import co.elastic.clients.elasticsearch.ElasticsearchClient
 import co.elastic.clients.elasticsearch._types.query_dsl.TextQueryType
 import co.elastic.clients.elasticsearch.core.BulkRequest
-import co.elastic.clients.json.jackson.JacksonJsonpMapper
+import co.elastic.clients.json.jackson.Jackson3JsonpMapper
 import co.elastic.clients.transport.rest5_client.Rest5ClientTransport
 import co.elastic.clients.transport.rest5_client.low_level.Rest5Client
-import com.fasterxml.jackson.databind.node.ObjectNode
+import tools.jackson.databind.node.ObjectNode
 import io.micrometer.core.instrument.MeterRegistry
 import io.micrometer.core.instrument.binder.MeterBinder
 import kotlinx.coroutines.*
@@ -30,6 +30,7 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
+import tools.jackson.databind.json.JsonMapper
 
 @DelicateCoroutinesApi
 @Component
@@ -42,6 +43,7 @@ import kotlin.concurrent.withLock
 class DefaultElasticMetricsClient(
         private val elasticMetricsConfigProperties: ElasticMetricsConfigProperties,
         private val defaultLowLevelClient: Rest5Client,
+        private val jsonMapper: JsonMapper,
 ) : ElasticMetricsClient, MeterBinder {
 
     private val logger: Logger = LoggerFactory.getLogger(DefaultElasticMetricsClient::class.java)
@@ -306,7 +308,7 @@ class DefaultElasticMetricsClient(
             // Using the custom ES instance
             ElasticMetricsTarget.CUSTOM -> customClient()
         }
-        val transport = Rest5ClientTransport(restClient, JacksonJsonpMapper())
+        val transport = Rest5ClientTransport(restClient, Jackson3JsonpMapper(jsonMapper))
         ElasticsearchClient(transport)
     }
 

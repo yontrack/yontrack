@@ -49,7 +49,7 @@ class BranchGraphQLIT : AbstractQLKTITSupport() {
             run("""{branches (project: "${name}") { name } }""") { data ->
                 assertEquals(
                         listOf("B2", "B1"),
-                        data.path("branches").map { it.path("name").asText() }
+                        data.path("branches").values().map { it.path("name").asText() }
                 )
             }
         }
@@ -64,7 +64,7 @@ class BranchGraphQLIT : AbstractQLKTITSupport() {
             run("""{branches (project: "${project.name}", name: "C.*") { name } }""") { data ->
                 assertEquals(
                         listOf("C1"),
-                        data.path("branches").map { it.path("name").asText() }
+                        data.path("branches").values().map { it.path("name").asText() }
                 )
             }
         }
@@ -248,7 +248,7 @@ class BranchGraphQLIT : AbstractQLKTITSupport() {
             assertEquals(
                     setOf(p1.name, p3.name, p4.name),
                     data.path("branches")
-                            .map { it.path("name").asText() }
+                            .values().map { it.path("name").asText() }
                             .toSet()
             )
         }
@@ -274,7 +274,7 @@ class BranchGraphQLIT : AbstractQLKTITSupport() {
             assertEquals(
                     setOf(p1.name, p3.name),
                     data.path("branches")
-                            .map { it.path("name").asText() }
+                            .values().map { it.path("name").asText() }
                             .toSet()
             )
         }
@@ -300,7 +300,7 @@ class BranchGraphQLIT : AbstractQLKTITSupport() {
             assertEquals(
                     setOf(p1.name),
                     data.path("branches")
-                            .map { it.path("name").asText() }
+                            .values().map { it.path("name").asText() }
                             .toSet()
             )
         }
@@ -622,7 +622,7 @@ class BranchGraphQLIT : AbstractQLKTITSupport() {
                     }
                 """)
         }
-        val branchIds: Set<Int> = data["branches"].map { it["id"].asInt() }.toSet()
+        val branchIds: Set<Int> = data["branches"].values().map { it["id"].asInt() }.toSet()
         assertEquals(
                 setOf(branch1.id(), branch2.id()),
                 branchIds
@@ -649,7 +649,7 @@ class BranchGraphQLIT : AbstractQLKTITSupport() {
                     }
                 """)
             }
-            val branchIds: Set<Int> = data["branches"].map { it["id"].asInt() }.toSet()
+            val branchIds: Set<Int> = data["branches"].values().map { it["id"].asInt() }.toSet()
             assertEquals(
                     setOf(fav.id()),
                     branchIds
@@ -670,7 +670,7 @@ class BranchGraphQLIT : AbstractQLKTITSupport() {
         val data = run("""{branches (name: "$name") { id } }""")
         assertEquals(
                 setOf(b1.id(), b2.id()),
-                data["branches"].map { it["id"].asInt() }.toSet()
+                data["branches"].values().map { it["id"].asInt() }.toSet()
         )
     }
 

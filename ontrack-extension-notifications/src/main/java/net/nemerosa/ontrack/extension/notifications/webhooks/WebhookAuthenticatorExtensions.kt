@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.extension.notifications.webhooks
 
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 import net.nemerosa.ontrack.json.asJson
 
 fun <C> WebhookAuthenticator<C>.obfuscateJson(config: JsonNode): JsonNode {

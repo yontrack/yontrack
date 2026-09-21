@@ -56,7 +56,7 @@ class WorkflowInstanceAccessIT : AbstractWorkflowTestSupport() {
             ) { data ->
                 assertEquals(
                     listOf(instance.id),
-                    data.path("workflowInstances").path("pageItems").map { it.path("id").asText() }
+                    data.path("workflowInstances").path("pageItems").values().map { it.path("id").asText() }
                 )
             }
         }

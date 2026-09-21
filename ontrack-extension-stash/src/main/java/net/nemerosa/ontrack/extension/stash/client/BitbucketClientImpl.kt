@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.extension.stash.client
 
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 import net.nemerosa.ontrack.common.BaseException
 import net.nemerosa.ontrack.common.Time
 import net.nemerosa.ontrack.extension.stash.model.BitbucketProject
@@ -8,7 +8,7 @@ import net.nemerosa.ontrack.extension.stash.model.BitbucketRepository
 import net.nemerosa.ontrack.extension.stash.model.StashConfiguration
 import net.nemerosa.ontrack.extension.stash.scm.BitbucketServerPR
 import net.nemerosa.ontrack.json.parse
-import net.nemerosa.ontrack.extension.support.client.jackson2RestTemplateBuilder
+import net.nemerosa.ontrack.extension.support.client.restTemplateBuilder
 import org.springframework.core.io.ByteArrayResource
 import org.springframework.http.HttpEntity
 import org.springframework.http.HttpHeaders
@@ -244,7 +244,7 @@ class BitbucketClientImpl(
     ): List<BitbucketServerCommit> =
         template.getForObject<JsonNode>(
             "/rest/api/latest/projects/${repo.project}/repos/${repo.repository}/commits?since=$fromCommit&until=$toCommit&limit=$maxCommits"
-        )!!.path("values").map {
+        )!!.path("values").values().map {
             it.parse<BitbucketServerCommit>()
         }
 
@@ -277,7 +277,7 @@ class BitbucketClientImpl(
         }
     }
 
-    private val template = jackson2RestTemplateBuilder()
+    private val template = restTemplateBuilder()
         .rootUri(configuration.url)
         .basicAuthentication(
             requireNotNull(configuration.user) { "Username must not be null" },
@@ -285,7 +285,7 @@ class BitbucketClientImpl(
         )
         .build()
 
-    private fun tokenTemplate(token: String) = jackson2RestTemplateBuilder()
+    private fun tokenTemplate(token: String) = restTemplateBuilder()
         .rootUri(configuration.url)
         .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer $token")
         .build()

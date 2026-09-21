@@ -4,7 +4,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import com.fasterxml.jackson.annotation.JsonProperty
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
-import net.nemerosa.ontrack.extension.support.client.jackson2RestTemplateBuilder
+import net.nemerosa.ontrack.extension.support.client.restTemplateBuilder
 import org.springframework.http.client.HttpComponentsClientHttpRequestFactory
 import org.springframework.web.client.RestTemplate
 import org.springframework.web.client.getForObject
@@ -17,7 +17,7 @@ class TFCClientImpl(
     private val logger: Logger = LoggerFactory.getLogger(TFCClientImpl::class.java)
 
     private val client: RestTemplate by lazy {
-        jackson2RestTemplateBuilder()
+        restTemplateBuilder()
             .requestFactory(HttpComponentsClientHttpRequestFactory::class.java)
             .rootUri("$url/api/v2")
             .defaultHeader("Authorization", "Bearer $token")

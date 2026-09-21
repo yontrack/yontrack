@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.extension.bitbucket.cloud.property
 
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 import net.nemerosa.ontrack.extension.bitbucket.cloud.BitbucketCloudExtensionFeature
 import net.nemerosa.ontrack.extension.bitbucket.cloud.client.BitbucketCloudClientFactory
 import net.nemerosa.ontrack.extension.bitbucket.cloud.configuration.BitbucketCloudConfiguration

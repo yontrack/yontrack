@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.extension.github.service
 
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 import net.nemerosa.ontrack.extension.github.model.GitHubEngineConfiguration
 import net.nemerosa.ontrack.json.getTextField
 import net.nemerosa.ontrack.json.parse

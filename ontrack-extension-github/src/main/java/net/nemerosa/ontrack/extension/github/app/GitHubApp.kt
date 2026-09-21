@@ -33,6 +33,7 @@ class GitHubApp(
 
             // Encoding the JWT
             return Jwts.builder()
+                .json(JwtJsonSerializer())
                 .setIssuer(appId)
                 .setIssuedAt(issuedAt)
                 .setExpiration(expiresAt)

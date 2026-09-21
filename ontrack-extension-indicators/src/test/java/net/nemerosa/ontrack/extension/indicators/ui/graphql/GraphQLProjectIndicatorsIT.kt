@@ -36,7 +36,7 @@ class GraphQLProjectIndicatorsIT : AbstractIndicatorsTestSupport() {
                     }
                 }
             """)
-            val portfolioIds = data["projects"][0]["indicatorPortfolios"].map { it["id"].asText() }
+            val portfolioIds = data["projects"][0]["indicatorPortfolios"].values().map { it["id"].asText() }
             assertEquals(
                     setOf(portfolio1.id, portfolio2.id),
                     portfolioIds.toSet()

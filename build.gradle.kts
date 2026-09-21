@@ -331,13 +331,15 @@ configure(javaProjects) {
         "org.apache.commons:commons-text:1.13.0",
         "org.jgrapht:jgrapht-core:1.5.2",
         "com.opencsv:opencsv:5.10",
-        "com.networknt:json-schema-validator:1.5.5",
+        // Jackson 3 from 3.0 on (#1843); 3.0.6 is the last one on Jackson 3.1, as the Spring Boot BOM
+        "com.networknt:json-schema-validator:3.0.6",
+        // Jackson 3 providers from 3.0 on; the Spring Boot BOM manages 2.10 (#1843)
+        "com.jayway.jsonpath:json-path:3.0.0",
         "com.slack.api:slack-api-client:1.38.0",
         "org.springframework.vault:spring-vault-core:4.1.0",
 
         "io.jsonwebtoken:jjwt-api:$jjwtVersion",
         "io.jsonwebtoken:jjwt-impl:$jjwtVersion",
-        "io.jsonwebtoken:jjwt-jackson:$jjwtVersion",
 
         "com.icegreen:greenmail:$greenMailVersion",
         "com.icegreen:greenmail-spring:$greenMailVersion",

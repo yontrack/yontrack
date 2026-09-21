@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.extension.notifications.webhooks
 
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 import jakarta.annotation.PostConstruct
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking

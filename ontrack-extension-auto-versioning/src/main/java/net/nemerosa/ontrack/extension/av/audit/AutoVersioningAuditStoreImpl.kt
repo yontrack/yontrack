@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.extension.av.audit
 
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 import net.nemerosa.ontrack.extension.av.config.AutoApprovalMode
 import net.nemerosa.ontrack.extension.av.config.AutoVersioningPushMode
 import net.nemerosa.ontrack.extension.av.config.AutoVersioningSourceConfigPath
@@ -284,7 +284,7 @@ class AutoVersioningAuditStoreImpl(
 
     private fun ResultSet.getJsonStringArray(name: String): List<String> {
         val json = getString(name)
-        return readJson(json)?.map { it.asText() } ?: emptyList()
+        return readJson(json)?.values()?.map { it.asText() } ?: emptyList()
     }
 
     private fun ResultSet.toEntry(): AutoVersioningAuditEntry {
@@ -295,7 +295,7 @@ class AutoVersioningAuditStoreImpl(
         val targetPath = AutoVersioningSourceConfigPath.toString(getJsonStringArray("TARGET_PATHS"))
 
         val additionalPaths =
-            readJson(this, "ADDITIONAL_PATHS").map {
+            readJson(this, "ADDITIONAL_PATHS").values().map {
                 it.parse<AutoVersioningSourceConfigPath>()
             }
 
@@ -343,7 +343,7 @@ class AutoVersioningAuditStoreImpl(
             ?: error("States cannot be empty for an auto-versioning audit entry")
 
     private fun readStates(json: JsonNode): List<AutoVersioningAuditEntryState> =
-        json.map { it.parse<AutoVersioningAuditEntryState>() }
+        json.values().map { it.parse<AutoVersioningAuditEntryState>() }
 
     override fun countByState(state: AutoVersioningAuditState): Int =
         namedParameterJdbcTemplate!!.queryForObject(

@@ -1,14 +1,14 @@
 package net.nemerosa.ontrack.extension.av.properties
 
-import com.fasterxml.jackson.databind.JsonNode
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.databind.SerializationFeature
+import tools.jackson.databind.JsonNode
+import tools.jackson.databind.SerializationFeature
+import tools.jackson.databind.json.JsonMapper
 
 abstract class AbstractJsonFilePropertyType : AbstractTextFilePropertyType() {
 
-    private val mapper = ObjectMapper().apply {
-        enable(SerializationFeature.INDENT_OUTPUT)
-    }
+    private val mapper = JsonMapper.builderWithJackson2Defaults()
+        .enable(SerializationFeature.INDENT_OUTPUT)
+        .build()
 
     override fun readProperty(content: String, targetProperty: String?): String? {
         val json = mapper.readTree(content)

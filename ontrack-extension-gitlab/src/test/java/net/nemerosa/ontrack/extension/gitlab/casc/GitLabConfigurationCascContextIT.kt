@@ -41,11 +41,11 @@ class GitLabConfigurationCascContextIT : AbstractCascTestSupport() {
         assertEquals("GitLabConfigurationCascData", items.path("title").asText())
         assertEquals(
             setOf("name", "url", "token", "ignoreSslCertificate"),
-            items.path("properties").fieldNames().asSequence().toSet()
+            items.path("properties").propertyNames().asSequence().toSet()
         )
         assertEquals(
             setOf("name", "url", "token"),
-            items.path("required").map { it.asText() }.toSet()
+            items.path("required").values().map { it.asText() }.toSet()
         )
         assertEquals(false, items.path("additionalProperties").asBoolean(true))
     }

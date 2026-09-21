@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.extension.environments.service
 
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 import net.nemerosa.ontrack.common.Time
 import net.nemerosa.ontrack.extension.environments.*
 import net.nemerosa.ontrack.extension.environments.events.EnvironmentsEventsFactory

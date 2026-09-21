@@ -1,7 +1,7 @@
 package net.nemerosa.ontrack.extension.git.support
 
-import com.fasterxml.jackson.core.JsonProcessingException
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.core.JacksonException
+import tools.jackson.databind.JsonNode
 import net.nemerosa.ontrack.extension.git.model.GitBranchConfiguration
 import net.nemerosa.ontrack.extension.git.model.IndexableBuildGitCommitLink
 import net.nemerosa.ontrack.extension.scm.support.TagPattern
@@ -34,7 +34,7 @@ class TagPatternBuildNameGitCommitLink(
     override fun parseData(node: JsonNode?): TagPattern {
         try {
             return ObjectMapperFactory.create().treeToValue(node!!, TagPattern::class.java)
-        } catch (e: JsonProcessingException) {
+        } catch (e: JacksonException) {
             throw JsonParsingException(e)
         }
 

@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.extension.indicators.ui
 
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 import net.nemerosa.ontrack.model.structure.ID
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*

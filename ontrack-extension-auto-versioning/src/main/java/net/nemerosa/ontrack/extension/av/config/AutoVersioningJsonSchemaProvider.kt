@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.extension.av.config
 
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 import net.nemerosa.ontrack.json.asJson
 import net.nemerosa.ontrack.model.json.schema.AbstractJsonSchemaProvider
 import net.nemerosa.ontrack.model.json.schema.JsonSchemaBuilderService

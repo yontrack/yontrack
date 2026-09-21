@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.model.structure
 
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 
 /**
  * This service allows to store and retrieve arbitrary data with some

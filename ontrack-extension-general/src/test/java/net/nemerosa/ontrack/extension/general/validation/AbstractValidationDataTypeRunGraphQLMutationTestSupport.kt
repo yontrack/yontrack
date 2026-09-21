@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.extension.general.validation
 
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 import net.nemerosa.ontrack.graphql.AbstractQLKTITSupport
 import net.nemerosa.ontrack.model.structure.Build
 import net.nemerosa.ontrack.model.structure.RunInfoInput

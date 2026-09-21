@@ -1070,7 +1070,7 @@ class BuildGraphQLIT : AbstractQLKTITSupport() {
                         }
                     }"""
                     ).run {
-                        this["builds"][0]["usingQualified"]["pageItems"].map { it["build"]["name"].asText() }.toSet()
+                        this["builds"][0]["usingQualified"]["pageItems"].values().map { it["build"]["name"].asText() }.toSet()
                     }.run {
                         assertEquals(
                             setOf("1.0", "2.0", "3.0"),
@@ -1092,7 +1092,7 @@ class BuildGraphQLIT : AbstractQLKTITSupport() {
                         }
                     }"""
                     ).run {
-                        this["builds"][0]["usingQualified"]["pageItems"].map { it["build"]["name"].asText() }.toSet()
+                        this["builds"][0]["usingQualified"]["pageItems"].values().map { it["build"]["name"].asText() }.toSet()
                     }.run {
                         assertEquals(
                             setOf("1.0", "2.0"),
@@ -1114,7 +1114,7 @@ class BuildGraphQLIT : AbstractQLKTITSupport() {
                         }
                     }"""
                     ).run {
-                        this["builds"][0]["usingQualified"]["pageItems"].map { it["build"]["name"].asText() }.toSet()
+                        this["builds"][0]["usingQualified"]["pageItems"].values().map { it["build"]["name"].asText() }.toSet()
                     }.run {
                         assertEquals(
                             setOf("2.0"),
@@ -1171,7 +1171,7 @@ class BuildGraphQLIT : AbstractQLKTITSupport() {
                         }
                     }"""
             ).run {
-                this["builds"][0]["usedByQualified"]["pageItems"].map { it["build"]["name"].asText() }.toSet()
+                this["builds"][0]["usedByQualified"]["pageItems"].values().map { it["build"]["name"].asText() }.toSet()
             }.run {
                 assertEquals(
                     setOf("1.0", "2.0", "3.0"),
@@ -1192,7 +1192,7 @@ class BuildGraphQLIT : AbstractQLKTITSupport() {
                         }
                     }"""
             ).run {
-                this["builds"][0]["usedByQualified"]["pageItems"].map { it["build"]["name"].asText() }.toSet()
+                this["builds"][0]["usedByQualified"]["pageItems"].values().map { it["build"]["name"].asText() }.toSet()
             }.run {
                 assertEquals(
                     setOf("3.0"),
@@ -1213,7 +1213,7 @@ class BuildGraphQLIT : AbstractQLKTITSupport() {
                         }
                     }"""
             ).run {
-                this["builds"][0]["usedByQualified"]["pageItems"].map { it["build"]["name"].asText() }.toSet()
+                this["builds"][0]["usedByQualified"]["pageItems"].values().map { it["build"]["name"].asText() }.toSet()
             }.run {
                 assertEquals(
                     setOf("1.0", "2.0"),
@@ -1234,7 +1234,7 @@ class BuildGraphQLIT : AbstractQLKTITSupport() {
                         }
                     }"""
             ).run {
-                this["builds"][0]["usedByQualified"]["pageItems"].map { it["build"]["name"].asText() }.toSet()
+                this["builds"][0]["usedByQualified"]["pageItems"].values().map { it["build"]["name"].asText() }.toSet()
             }.run {
                 assertEquals(
                     setOf("2.0"),
@@ -1255,7 +1255,7 @@ class BuildGraphQLIT : AbstractQLKTITSupport() {
                         }
                     }"""
             ).run {
-                this["builds"][0]["usedByQualified"]["pageItems"].map { it["build"]["name"].asText() }.toSet()
+                this["builds"][0]["usedByQualified"]["pageItems"].values().map { it["build"]["name"].asText() }.toSet()
             }.run {
                 assertEquals(
                     setOf("2.0"),
@@ -1456,7 +1456,7 @@ class BuildGraphQLIT : AbstractQLKTITSupport() {
                     }
                     // Dependencies Ids
                     val dependencies =
-                        data["builds"][0]["usingQualified"]["pageItems"].map { it["build"]["id"].asInt() }
+                        data["builds"][0]["usingQualified"]["pageItems"].values().map { it["build"]["id"].asInt() }
                     assertEquals(
                         setOf(dep1.id(), dep2.id()),
                         dependencies.toSet()
@@ -1615,10 +1615,10 @@ class BuildGraphQLIT : AbstractQLKTITSupport() {
                         }"""
                         ) { data ->
                             val build = data.path("builds").path(0)
-                            val actualRunIds = build.path("validationRunsPaginated").path("pageItems").map {
+                            val actualRunIds = build.path("validationRunsPaginated").path("pageItems").values().map {
                                 it.getRequiredIntField("id")
                             }
-                            val runTimes = build.path("validationRunsPaginated").path("pageItems").map {
+                            val runTimes = build.path("validationRunsPaginated").path("pageItems").values().map {
                                 it.path("runInfo").getRequiredIntField("runTime")
                             }
                             val expectedRunIds = runs.map { it.id() }
@@ -1747,7 +1747,7 @@ class BuildGraphQLIT : AbstractQLKTITSupport() {
                     """.trimIndent(),
                     mapOf("validationStamps" to listOf(vs1.name, vs3.name))
                 ) { data ->
-                    val vsIds = data.path("build").path("validations").map { run ->
+                    val vsIds = data.path("build").path("validations").values().map { run ->
                         run.path("validationStamp").path("id").asInt()
                     }
                     assertEquals(
@@ -1859,7 +1859,7 @@ class BuildGraphQLIT : AbstractQLKTITSupport() {
                 }
             """.trimIndent()
         ) { data ->
-            val ids = data.path("build").path("usingQualified").path("pageItems").map {
+            val ids = data.path("build").path("usingQualified").path("pageItems").values().map {
                 it.path("build").path("id").asInt()
             }
             assertEquals(targets[1].id(), ids[0])
@@ -1891,7 +1891,7 @@ class BuildGraphQLIT : AbstractQLKTITSupport() {
                 }
             """.trimIndent()
         ) { data ->
-            val ids = data.path("build").path("usingQualified").path("pageItems").map {
+            val ids = data.path("build").path("usingQualified").path("pageItems").values().map {
                 it.path("build").path("id").asInt()
             }
             assertEquals(targets.reversed().map { it.id() }, ids)
@@ -1928,7 +1928,7 @@ class BuildGraphQLIT : AbstractQLKTITSupport() {
                 }
             """.trimIndent()
         ) { data ->
-            val ids = data.path("build").path("usedByQualified").path("pageItems").map {
+            val ids = data.path("build").path("usedByQualified").path("pageItems").values().map {
                 it.path("build").path("id").asInt()
             }
             assertEquals(sources[1].id(), ids[0])
@@ -1960,7 +1960,7 @@ class BuildGraphQLIT : AbstractQLKTITSupport() {
                 }
             """.trimIndent()
         ) { data ->
-            val ids = data.path("build").path("usedByQualified").path("pageItems").map {
+            val ids = data.path("build").path("usedByQualified").path("pageItems").values().map {
                 it.path("build").path("id").asInt()
             }
             assertEquals(sources.reversed().map { it.id() }, ids)

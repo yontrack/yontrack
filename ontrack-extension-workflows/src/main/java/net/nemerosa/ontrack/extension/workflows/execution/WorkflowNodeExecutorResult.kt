@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.extension.workflows.execution
 
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 import net.nemerosa.ontrack.model.events.SerializableEvent
 
 /**

@@ -26,7 +26,7 @@ class GQLRootQueryPredefinedPromotionLevelsIT : AbstractQLKTITSupport() {
             """
             ) { data ->
                 assertEquals(
-                    data.path("predefinedPromotionLevels").map {
+                    data.path("predefinedPromotionLevels").values().map {
                         it.path("id").asInt() to it.path("name").asText()
                     },
                     ppls.map {
@@ -57,7 +57,7 @@ class GQLRootQueryPredefinedPromotionLevelsIT : AbstractQLKTITSupport() {
             """
             ) { data ->
                 assertEquals(
-                    data.path("predefinedPromotionLevels").map {
+                    data.path("predefinedPromotionLevels").values().map {
                         it.path("id").asInt() to it.path("name").asText()
                     },
                     ppls.map {
@@ -88,7 +88,7 @@ class GQLRootQueryPredefinedPromotionLevelsIT : AbstractQLKTITSupport() {
             """
             ) { data ->
                 assertEquals(
-                    data.path("predefinedPromotionLevels").map {
+                    data.path("predefinedPromotionLevels").values().map {
                         it.path("id").asInt() to it.path("name").asText()
                     },
                     listOf(

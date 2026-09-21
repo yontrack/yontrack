@@ -50,7 +50,7 @@ class GQLRootQuerySCMChangeLogByNameIT : AbstractQLKTITSupport() {
                             "ISS-21 Some fixes for a feature",
                             "ISS-21 Some commits for a feature",
                         ),
-                        changeLog.path("commits").map { it.path("commit").path("message").asText() }
+                        changeLog.path("commits").values().map { it.path("commit").path("message").asText() }
                     )
                 }
             }

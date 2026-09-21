@@ -1,13 +1,13 @@
 package net.nemerosa.ontrack.model.support
 
-import com.fasterxml.jackson.core.JsonGenerator
-import com.fasterxml.jackson.databind.JsonSerializer
-import com.fasterxml.jackson.databind.SerializerProvider
+import tools.jackson.core.JsonGenerator
+import tools.jackson.databind.ValueSerializer
+import tools.jackson.databind.SerializationContext
 import net.nemerosa.ontrack.model.structure.ID
 
-class IDJsonSerializer : JsonSerializer<ID>() {
+class IDJsonSerializer : ValueSerializer<ID>() {
 
-    override fun serialize(value: ID?, jgen: JsonGenerator, provider: SerializerProvider) {
+    override fun serialize(value: ID?, jgen: JsonGenerator, provider: SerializationContext) {
         if (value != null) {
             jgen.writeNumber(value.value)
         } else {

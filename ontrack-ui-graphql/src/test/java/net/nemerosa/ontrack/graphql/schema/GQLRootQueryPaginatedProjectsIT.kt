@@ -58,7 +58,7 @@ class GQLRootQueryPaginatedProjectsIT : AbstractQLKTITSupport() {
         ) { data ->
             val items = data["paginatedProjects"]["pageItems"]
             assertEquals(2, items.size())
-            val names = items.map { it["name"].asText() }.toSet()
+            val names = items.values().map { it["name"].asText() }.toSet()
             assertEquals(setOf("Project A", "Project B"), names)
         }
     }
@@ -147,7 +147,7 @@ class GQLRootQueryPaginatedProjectsIT : AbstractQLKTITSupport() {
             mapOf("name" to name, "labels" to labels)
         ) { data ->
             val projects = data["paginatedProjects"]
-            assertEquals(expected, projects["pageItems"].map { it["name"].asText() }.toSet())
+            assertEquals(expected, projects["pageItems"].values().map { it["name"].asText() }.toSet())
             assertEquals(expected.size, projects["pageInfo"]["totalSize"].asInt())
         }
     }

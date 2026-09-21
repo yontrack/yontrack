@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.extension.hook.records
 
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 import graphql.schema.GraphQLFieldDefinition
 import net.nemerosa.ontrack.extension.hook.HookExtensionFeature
 import net.nemerosa.ontrack.extension.recordings.RecordingsExtension

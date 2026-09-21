@@ -1,10 +1,8 @@
 package net.nemerosa.ontrack.extension.casc
 
-import com.fasterxml.jackson.databind.JsonNode
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.databind.node.NullNode
-import com.fasterxml.jackson.databind.node.ObjectNode
-import com.fasterxml.jackson.dataformat.yaml.YAMLFactory
+import tools.jackson.databind.JsonNode
+import tools.jackson.databind.node.NullNode
+import tools.jackson.databind.node.ObjectNode
 import net.nemerosa.ontrack.extension.casc.context.OntrackContext
 import net.nemerosa.ontrack.json.asJson
 import net.nemerosa.ontrack.json.merge
@@ -12,6 +10,7 @@ import net.nemerosa.ontrack.model.security.GlobalSettings
 import net.nemerosa.ontrack.model.security.SecurityService
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import tools.jackson.dataformat.yaml.YAMLMapper
 
 @Service
 @Transactional
@@ -21,7 +20,7 @@ class CascServiceImpl(
     private val preprocessors: List<CascPreprocessor>,
 ) : CascService {
 
-    private val mapper = ObjectMapper(YAMLFactory())
+    private val mapper = YAMLMapper.builder().configureForJackson2().build()
 
     override fun runYaml(yaml: List<String>) {
         // Parsing each YAML content

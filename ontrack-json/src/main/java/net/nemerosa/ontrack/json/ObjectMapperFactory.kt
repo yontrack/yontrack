@@ -1,16 +1,18 @@
 package net.nemerosa.ontrack.json
 
-import com.fasterxml.jackson.core.Version
-import com.fasterxml.jackson.core.json.JsonWriteFeature
-import com.fasterxml.jackson.databind.DeserializationFeature
-import com.fasterxml.jackson.databind.MapperFeature
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.databind.SerializationFeature
-import com.fasterxml.jackson.databind.json.JsonMapper
-import com.fasterxml.jackson.databind.module.SimpleModule
-import com.fasterxml.jackson.datatype.jsr310.deser.DurationDeserializer
-import com.fasterxml.jackson.datatype.jsr310.ser.DurationSerializer
-import com.fasterxml.jackson.module.kotlin.KotlinModule
+import tools.jackson.core.Version
+import tools.jackson.core.json.JsonWriteFeature
+import tools.jackson.databind.DeserializationFeature
+import tools.jackson.databind.MapperFeature
+import tools.jackson.databind.SerializationFeature
+import tools.jackson.databind.cfg.DateTimeFeature
+import tools.jackson.databind.cfg.EnumFeature
+import tools.jackson.databind.cfg.JsonNodeFeature
+import tools.jackson.databind.json.JsonMapper
+import tools.jackson.databind.module.SimpleModule
+import tools.jackson.databind.ext.javatime.deser.DurationDeserializer
+import tools.jackson.databind.ext.javatime.ser.DurationSerializer
+import tools.jackson.module.kotlin.KotlinModule
 import java.time.*
 
 /**
@@ -34,28 +36,42 @@ object ObjectMapperFactory {
     )
 
     @JvmStatic
-    fun create(): ObjectMapper =
-        JsonMapper.builder()
+    fun create(): JsonMapper = builder().build()
+
+    /**
+     * The builder of [create], for a caller which must add to the configuration.
+     */
+    @JvmStatic
+    fun builder(): JsonMapper.Builder =
+        JsonMapper.builderWithJackson2Defaults()
             // Support for JDK 8 times
             .addModule(jdkTimeModule())
             // Support for Kotlin
             .addModule(KotlinModule.Builder().build())
             // Common features
             .enable(DeserializationFeature.ACCEPT_SINGLE_VALUE_AS_ARRAY)
-            // Jackson 2 defaults, which Jackson 3 changes
-            .enable(MapperFeature.DEFAULT_VIEW_INCLUSION)
-            .disable(MapperFeature.SORT_PROPERTIES_ALPHABETICALLY)
-            .enable(MapperFeature.USE_GETTERS_AS_SETTERS)
-            .enable(MapperFeature.ALLOW_FINAL_FIELDS_AS_MUTATORS)
-            .disable(MapperFeature.FIX_FIELD_NAME_UPPER_CASE_PREFIX)
+            // Jackson 2 defaults, which Jackson 3 changes. `builderWithJackson2Defaults` sets most
+            // of them already; they are repeated so that the whole configuration reads here.
+            .disable(DateTimeFeature.ONE_BASED_MONTHS)
+            .enable(DateTimeFeature.WRITE_DATES_AS_TIMESTAMPS)
+            .enable(DateTimeFeature.WRITE_DURATIONS_AS_TIMESTAMPS)
+            .enable(DateTimeFeature.WRITE_UTC_AS_OFFSET)
             .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
             .disable(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES)
             .disable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
-            .enable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
-            .enable(SerializationFeature.WRITE_DURATIONS_AS_TIMESTAMPS)
+            .disable(EnumFeature.READ_ENUMS_USING_TO_STRING)
+            .disable(EnumFeature.WRITE_ENUMS_USING_TO_STRING)
+            .enable(JsonNodeFeature.STRIP_TRAILING_BIGDECIMAL_ZEROES)
+            .enable(MapperFeature.ALLOW_FINAL_FIELDS_AS_MUTATORS)
+            .disable(MapperFeature.DETECT_PARAMETER_NAMES)
+            .disable(MapperFeature.FIX_FIELD_NAME_UPPER_CASE_PREFIX)
+            .disable(MapperFeature.SORT_PROPERTIES_ALPHABETICALLY)
+            .enable(MapperFeature.USE_GETTERS_AS_SETTERS)
             .enable(SerializationFeature.FAIL_ON_EMPTY_BEANS)
+            // ... and the ones `builderWithJackson2Defaults` does not set
+            .enable(MapperFeature.DEFAULT_VIEW_INCLUSION)
             .disable(JsonWriteFeature.ESCAPE_FORWARD_SLASHES)
-            .build()
+            .disable(JsonWriteFeature.COMBINE_UNICODE_SURROGATES_IN_UTF8)
 
     private fun jdkTimeModule(): SimpleModule {
         val jdkTimeModule = SimpleModule(

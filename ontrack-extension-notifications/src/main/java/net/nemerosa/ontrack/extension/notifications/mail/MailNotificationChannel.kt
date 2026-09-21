@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.extension.notifications.mail
 
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 import jakarta.annotation.PostConstruct
 import net.nemerosa.ontrack.common.RunProfile
 import net.nemerosa.ontrack.common.api.APIDescription

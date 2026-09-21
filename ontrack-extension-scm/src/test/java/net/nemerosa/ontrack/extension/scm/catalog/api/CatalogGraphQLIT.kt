@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.extension.scm.catalog.api
 
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 import net.nemerosa.ontrack.extension.scm.catalog.CatalogFixtures.entry
 import net.nemerosa.ontrack.extension.scm.catalog.CatalogFixtures.team
 import net.nemerosa.ontrack.extension.scm.catalog.CatalogLinkService

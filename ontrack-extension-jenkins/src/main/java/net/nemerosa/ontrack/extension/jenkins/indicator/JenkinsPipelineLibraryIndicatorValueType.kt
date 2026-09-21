@@ -1,8 +1,8 @@
 package net.nemerosa.ontrack.extension.jenkins.indicator
 
-import com.fasterxml.jackson.databind.JsonNode
-import com.fasterxml.jackson.databind.node.NullNode
-import com.fasterxml.jackson.databind.node.TextNode
+import tools.jackson.databind.JsonNode
+import tools.jackson.databind.node.NullNode
+import tools.jackson.databind.node.StringNode
 import net.nemerosa.ontrack.common.Version
 import net.nemerosa.ontrack.extension.indicators.model.IndicatorCompliance
 import net.nemerosa.ontrack.extension.indicators.model.IndicatorValueType
@@ -74,12 +74,12 @@ class JenkinsPipelineLibraryIndicatorValueType(
         valueConfig: JenkinsPipelineLibraryIndicatorValueTypeConfig,
         value: JsonNode,
     ): JenkinsPipelineLibraryVersion? =
-        value.takeIf { !it.isNull }?.asText()?.takeIf { it.isNotBlank() }?.run { JenkinsPipelineLibraryVersion(this) }
+        value.takeIf { it.isValueNode && !it.isNull }?.asText()?.takeIf { it.isNotBlank() }?.run { JenkinsPipelineLibraryVersion(this) }
 
     override fun toStoredJson(
         config: JenkinsPipelineLibraryIndicatorValueTypeConfig,
         value: JenkinsPipelineLibraryVersion?,
-    ): JsonNode = value?.let { TextNode.valueOf(it.value) } ?: NullNode.instance
+    ): JsonNode = value?.let { StringNode.valueOf(it.value) } ?: NullNode.instance
 
     override fun toConfigForm(config: JenkinsPipelineLibraryIndicatorValueTypeConfig): JsonNode =
         config.settings.asJson()

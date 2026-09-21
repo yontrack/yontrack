@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.repository
 
-import com.fasterxml.jackson.core.JsonProcessingException
+import tools.jackson.core.JacksonException
 import net.nemerosa.ontrack.json.asJson
 import net.nemerosa.ontrack.json.getIntField
 import net.nemerosa.ontrack.test.TestUtils.uid
@@ -56,7 +56,7 @@ class StorageJdbcRepositoryIT : AbstractRepositoryTestSupport() {
     }
 
     @Test
-    @Throws(JsonProcessingException::class)
+    @Throws(JacksonException::class)
     fun get_data() {
         val store = uid("C")
         val data1 = mapOf("name" to "1").asJson()

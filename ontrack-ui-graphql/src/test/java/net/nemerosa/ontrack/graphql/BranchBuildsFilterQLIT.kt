@@ -32,7 +32,7 @@ class BranchBuildsFilterQLIT : AbstractQLKTITSupport() {
                     """) { data ->
                         assertEquals(
                                 listOf(name),
-                                data.path("branches").first().path("builds").map { it.path("name").asText() }
+                                data.path("branches").first().path("builds").values().map { it.path("name").asText() }
                         )
                     }
 
@@ -47,7 +47,7 @@ class BranchBuildsFilterQLIT : AbstractQLKTITSupport() {
                     """) { data ->
                         assertEquals(
                                 emptyList(),
-                                data.path("branches").first().path("builds").map { it.path("name").asText() }
+                                data.path("branches").first().path("builds").values().map { it.path("name").asText() }
                         )
                     }
                 }
@@ -80,7 +80,7 @@ class BranchBuildsFilterQLIT : AbstractQLKTITSupport() {
                                 listOf(name),
                                 data.path("branches").first()
                                         .path("builds")
-                                        .map { it.path("name").asText() }
+                                        .values().map { it.path("name").asText() }
                         )
                         assertEquals(
                                 "PASSED",
@@ -118,7 +118,7 @@ class BranchBuildsFilterQLIT : AbstractQLKTITSupport() {
                             listOf(passed.name),
                             data.path("branches").first()
                                     .path("builds")
-                                    .map { it.path("name").asText() }
+                                    .values().map { it.path("name").asText() }
                     )
                 }
             }
@@ -149,7 +149,7 @@ class BranchBuildsFilterQLIT : AbstractQLKTITSupport() {
                             listOf("3", "2"),
                             data.path("branches").first()
                                     .path("builds")
-                                    .map { it.path("name").asText() }
+                                    .values().map { it.path("name").asText() }
                     )
                 }
             }
@@ -183,7 +183,7 @@ class BranchBuildsFilterQLIT : AbstractQLKTITSupport() {
                             listOf("4", "3", "2"),
                             data.path("branches").first()
                                     .path("builds")
-                                    .map { it.path("name").asText() }
+                                    .values().map { it.path("name").asText() }
                     )
                 }
             }
@@ -214,7 +214,7 @@ class BranchBuildsFilterQLIT : AbstractQLKTITSupport() {
                             listOf("3", "1"),
                             data.path("branches").first()
                                     .path("builds")
-                                    .map { it.path("name").asText() }
+                                    .values().map { it.path("name").asText() }
                     )
                 }
             }
@@ -246,7 +246,7 @@ class BranchBuildsFilterQLIT : AbstractQLKTITSupport() {
                             listOf("4", "3"),
                             data.path("branches").first()
                                     .path("builds")
-                                    .map { it.path("name").asText() }
+                                    .values().map { it.path("name").asText() }
                     )
                 }
             }
@@ -282,7 +282,7 @@ class BranchBuildsFilterQLIT : AbstractQLKTITSupport() {
                             listOf("4", "2"),
                             data.path("branches").first()
                                     .path("builds")
-                                    .map { it.path("name").asText() }
+                                    .values().map { it.path("name").asText() }
                     )
                 }
             }
@@ -314,7 +314,7 @@ class BranchBuildsFilterQLIT : AbstractQLKTITSupport() {
                             listOf("2"),
                             data.path("branches").first()
                                     .path("builds")
-                                    .map { it.path("name").asText() }
+                                    .values().map { it.path("name").asText() }
                     )
                 }
             }
@@ -353,7 +353,7 @@ class BranchBuildsFilterQLIT : AbstractQLKTITSupport() {
                             listOf("1"),
                             data.path("branches").first()
                                     .path("builds")
-                                    .map { it.path("name").asText() }
+                                    .values().map { it.path("name").asText() }
                     )
                 }
             }
@@ -392,7 +392,7 @@ class BranchBuildsFilterQLIT : AbstractQLKTITSupport() {
                             listOf("4", "3"),
                             data.path("branches").first()
                                     .path("builds")
-                                    .map { it.path("name").asText() }
+                                    .values().map { it.path("name").asText() }
                     )
                 }
             }
@@ -434,7 +434,7 @@ class BranchBuildsFilterQLIT : AbstractQLKTITSupport() {
                             listOf("4", "3", "2", "1"),
                             data.path("branches").first()
                                     .path("builds")
-                                    .map { it.path("name").asText() }
+                                    .values().map { it.path("name").asText() }
                     )
                 }
             }
@@ -473,7 +473,7 @@ class BranchBuildsFilterQLIT : AbstractQLKTITSupport() {
                     listOf("1.0"),
                     data.path("branches").first()
                             .path("builds")
-                            .map { it.path("name").asText() }
+                            .values().map { it.path("name").asText() }
             )
         }
     }
@@ -510,7 +510,7 @@ class BranchBuildsFilterQLIT : AbstractQLKTITSupport() {
                     listOf("2.0"),
                     data.path("branches").first()
                             .path("builds")
-                            .map { it.path("name").asText() }
+                            .values().map { it.path("name").asText() }
             )
         }
     }
@@ -547,7 +547,7 @@ class BranchBuildsFilterQLIT : AbstractQLKTITSupport() {
                             listOf("5", "3", "2"),
                             data.path("branches").first()
                                     .path("builds")
-                                    .map { it.path("name").asText() }
+                                    .values().map { it.path("name").asText() }
                     )
                 }
             }

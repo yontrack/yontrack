@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.extension.config.model
 
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 import net.nemerosa.ontrack.extension.api.ExtensionManager
 import net.nemerosa.ontrack.extension.config.ci.CIConfigPRNotSupportedException
 import net.nemerosa.ontrack.extension.config.ci.engine.CIEngine

@@ -1,9 +1,9 @@
 package net.nemerosa.ontrack.extension.casc
 
-import com.networknt.schema.JsonSchema
-import com.networknt.schema.JsonSchemaFactory
-import com.networknt.schema.SpecVersion
-import com.networknt.schema.ValidationMessage
+import com.networknt.schema.Error
+import com.networknt.schema.Schema
+import com.networknt.schema.SchemaRegistry
+import com.networknt.schema.SpecificationVersion
 import net.nemerosa.ontrack.extension.casc.schema.json.CascJsonSchemaService
 import net.nemerosa.ontrack.it.AbstractDSLTestSupport
 import net.nemerosa.ontrack.yaml.Yaml
@@ -22,7 +22,7 @@ abstract class AbstractCascTestSupport : AbstractDSLTestSupport() {
     @Autowired
     protected lateinit var cascJsonSchemaService: CascJsonSchemaService
 
-    private val jsonSchemaFactory: JsonSchemaFactory = JsonSchemaFactory.getInstance(SpecVersion.VersionFlag.V202012)
+    private val schemaRegistry: SchemaRegistry = SchemaRegistry.withDefaultDialect(SpecificationVersion.DRAFT_2020_12)
 
     /**
      * Runs a CasC from a series of YAML texts
@@ -37,7 +37,7 @@ abstract class AbstractCascTestSupport : AbstractDSLTestSupport() {
         val validationMessages = validateYaml(yamlSource)
         if (validationMessages.isNotEmpty()) {
             validationMessages.forEach {
-                println("* ${it.message}")
+                println("* $it")
             }
             fail("YAML failed to validate")
         }
@@ -47,18 +47,21 @@ abstract class AbstractCascTestSupport : AbstractDSLTestSupport() {
         val validationMessages = validateYaml(yamlSource)
         assertTrue(
             validationMessages.any {
-                it.message.equals(message, ignoreCase = true)
+                it.toString().equals(message, ignoreCase = true)
             },
             "Expected validation message to be equal to $message but was $validationMessages",
         )
     }
 
-    protected fun validateYaml(yamlSource: String): Set<ValidationMessage> {
+    /**
+     * Each [Error] reads as `<instance location, as a JSON pointer>: <message>`.
+     */
+    protected fun validateYaml(yamlSource: String): List<Error> {
         val schemaNode = asAdmin {
             cascJsonSchemaService.createJsonSchema()
         }
         val yamlNode = Yaml().read(yamlSource).single()
-        val schema: JsonSchema = jsonSchemaFactory.getSchema(schemaNode)
+        val schema: Schema = schemaRegistry.getSchema(schemaNode)
         return schema.validate(yamlNode)
     }
 

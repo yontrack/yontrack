@@ -10,7 +10,7 @@ class MockSlackMgt(connector: Connector) : Connected(connector) {
         return connector.get(
             path = "/extension/slack/mock/channel/${channel.trimStart('#')}"
         ).body.asJsonOrNull()
-            ?.map { node ->
+            ?.values()?.map { node ->
                 node.parse<MockSlackMessage>()
             }
             ?: emptyList()

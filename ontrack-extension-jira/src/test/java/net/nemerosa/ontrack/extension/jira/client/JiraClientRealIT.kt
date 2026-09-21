@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.extension.jira.client
 
-import com.fasterxml.jackson.databind.node.TextNode
+import tools.jackson.databind.node.StringNode
 import net.nemerosa.ontrack.extension.jira.notifications.JiraCustomField
 import net.nemerosa.ontrack.it.AbstractDSLTestSupport
 import net.nemerosa.ontrack.test.TestUtils.uid
@@ -40,7 +40,7 @@ class JiraClientRealIT : AbstractDSLTestSupport() {
                     customFields = listOf(
                         JiraCustomField(
                             name = "duedate",
-                            value = TextNode("2024-04-18")
+                            value = StringNode("2024-04-18")
                         ),
                     )
                 )

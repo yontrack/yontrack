@@ -1,13 +1,13 @@
 package net.nemerosa.ontrack.extension.indicators.support
 
-import com.fasterxml.jackson.core.JsonGenerator
-import com.fasterxml.jackson.core.JsonParser
-import com.fasterxml.jackson.databind.DeserializationContext
-import com.fasterxml.jackson.databind.JsonDeserializer
-import com.fasterxml.jackson.databind.JsonSerializer
-import com.fasterxml.jackson.databind.SerializerProvider
-import com.fasterxml.jackson.databind.annotation.JsonDeserialize
-import com.fasterxml.jackson.databind.annotation.JsonSerialize
+import tools.jackson.core.JsonGenerator
+import tools.jackson.core.JsonParser
+import tools.jackson.databind.DeserializationContext
+import tools.jackson.databind.ValueDeserializer
+import tools.jackson.databind.ValueSerializer
+import tools.jackson.databind.SerializationContext
+import tools.jackson.databind.annotation.JsonDeserialize
+import tools.jackson.databind.annotation.JsonSerialize
 
 /**
  * Representation of a value strictly between 0 and 100.
@@ -32,13 +32,13 @@ data class Percentage(
 
 fun Int.percent() = Percentage(this)
 
-class PercentageJsonSerializer : JsonSerializer<Percentage>() {
-    override fun serialize(value: Percentage, gen: JsonGenerator, serializers: SerializerProvider) {
+class PercentageJsonSerializer : ValueSerializer<Percentage>() {
+    override fun serialize(value: Percentage, gen: JsonGenerator, serializers: SerializationContext) {
         gen.writeNumber(value.value)
     }
 }
 
-class PercentageJsonDeserializer : JsonDeserializer<Percentage>() {
+class PercentageJsonDeserializer : ValueDeserializer<Percentage>() {
     override fun deserialize(p: JsonParser, ctxt: DeserializationContext): Percentage =
             p.readValueAs(Int::class.java).percent()
 

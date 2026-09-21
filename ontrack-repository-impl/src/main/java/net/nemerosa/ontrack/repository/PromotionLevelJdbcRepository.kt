@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.repository
 
-import com.fasterxml.jackson.databind.node.ArrayNode
+import tools.jackson.databind.node.ArrayNode
 import net.nemerosa.ontrack.model.structure.Branch
 import net.nemerosa.ontrack.model.structure.ID
 import net.nemerosa.ontrack.model.structure.Project
@@ -153,7 +153,7 @@ class PromotionLevelJdbcRepository(
             val optionsJson = rs.getString("options")
             val options = if (optionsJson != null) {
                 val node = readJson(optionsJson)
-                (node as? ArrayNode)?.map { it.asText() } ?: emptyList()
+                (node as? ArrayNode)?.values()?.map { it.asText() } ?: emptyList()
             } else {
                 emptyList()
             }

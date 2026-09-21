@@ -208,6 +208,6 @@ class GitConnectionRetryConfigTest {
             retryInterval = Duration.ofSeconds(10)
         )
         val json = config.asJson()
-        assertEquals("10s", json.path("retryInterval").textValue())
+        assertEquals("10s", json.path("retryInterval").stringValue())
     }
 }

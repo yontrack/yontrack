@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.service.dashboards.widgets
 
-import com.fasterxml.jackson.databind.node.ObjectNode
+import tools.jackson.databind.node.ObjectNode
 import net.nemerosa.ontrack.json.asJson
 import net.nemerosa.ontrack.model.dashboards.widgets.BranchStatusesWidget
 import net.nemerosa.ontrack.model.dashboards.widgets.BranchStatusesWidgetConfig
@@ -32,11 +32,11 @@ class BranchStatusesWidgetWarningMigration(
                 if (widget.key == branchStatusesWidget.key) {
                     widget.adaptConfig { cfg ->
                         val config = cfg as ObjectNode
-                        val promotionNames = config.path("promotions").map { it.asText() }
-                        val validationNames = config.path("validations").map { it.asText() }
+                        val promotionNames = config.path("promotions").values().map { it.asText() }
+                        val validationNames = config.path("validations").values().map { it.asText() }
                         config.remove("promotions")
                         config.remove("validations")
-                        config.set<ObjectNode>(
+                        config.set(
                             "promotionConfigs",
                             promotionNames.map { name ->
                                 BranchStatusesWidgetConfig.PromotionConfig(
@@ -45,7 +45,7 @@ class BranchStatusesWidgetWarningMigration(
                                 )
                             }.asJson()
                         )
-                        config.set<ObjectNode>(
+                        config.set(
                             "validationConfigs",
                             validationNames.map { name ->
                                 BranchStatusesWidgetConfig.ValidationConfig(

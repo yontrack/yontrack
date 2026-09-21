@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.model.json.schema
 
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 
 /**
  * Component that can provide a JSON schema.

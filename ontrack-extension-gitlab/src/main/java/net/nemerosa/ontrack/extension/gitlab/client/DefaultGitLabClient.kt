@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.extension.gitlab.client
 
-import net.nemerosa.ontrack.extension.support.client.jackson2ClientMessageConverters
+import net.nemerosa.ontrack.extension.support.client.clientMessageConverters
 import net.nemerosa.ontrack.extension.gitlab.model.GitLabBranch
 import net.nemerosa.ontrack.extension.gitlab.model.GitLabCommit
 import net.nemerosa.ontrack.extension.gitlab.model.GitLabCompare
@@ -629,7 +629,7 @@ class DefaultGitLabClient(
         // Fails early, and on the configuration rather than on the first call
         token()
         RestTemplate(requestFactory()).apply {
-            setMessageConverters(jackson2ClientMessageConverters())
+            setMessageConverters(clientMessageConverters())
             errorHandler = RedirectRejectingErrorHandler()
         }
     }

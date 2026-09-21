@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.json
 
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 import kotlin.reflect.KProperty0
 
 fun patchString(
@@ -80,7 +80,7 @@ fun patchStringList(
     val name = property.name
     val patchValue = changes.path(name)
     return if (patchValue.isArray) {
-        patchValue.map { it.asText() }
+        patchValue.values().map { it.asText() }
     } else {
         property.get()
     }

@@ -271,7 +271,7 @@ internal class GQLRootQueryNotificationRecordsIT : AbstractNotificationTestSuppo
                             }"""
                         ) { data ->
                             val targets = data.path("notificationRecords").path("pageItems")
-                                .map { record ->
+                                .values().map { record ->
                                     record.path("channelConfig").path("target").asText()
                                 }
                             assertEquals(
@@ -298,7 +298,7 @@ internal class GQLRootQueryNotificationRecordsIT : AbstractNotificationTestSuppo
                             }"""
                         ) { data ->
                             val targets = data.path("notificationRecords").path("pageItems")
-                                .map { record ->
+                                .values().map { record ->
                                     record.path("channelConfig").path("target").asText()
                                 }
                             assertEquals(

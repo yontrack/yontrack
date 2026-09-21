@@ -25,7 +25,7 @@ class GitLabMockMgt(connector: Connector) : Connected(connector) {
                 "config" to config,
                 "project" to project,
             ),
-        ).body.asJson().map {
+        ).body.asJson().values().map {
             // Element by element: a reified List<T> loses T and yields maps
             it.parse<MockGitLabPipelineRun>()
         }

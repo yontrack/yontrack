@@ -1,13 +1,12 @@
 package net.nemerosa.ontrack.extension.bitbucket.cloud
 
-import com.fasterxml.jackson.databind.JsonNode
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.dataformat.yaml.YAMLFactory
+import tools.jackson.databind.JsonNode
 import org.junit.jupiter.api.Test
 import java.util.*
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
+import tools.jackson.dataformat.yaml.YAMLMapper
 
 /**
  * Checks the content the wizard uploads to the fixture repository.
@@ -20,7 +19,7 @@ class BitbucketCloudTestFixtureTest {
             ?: error("Missing fixture resource $name")
 
     private val pipelines: JsonNode by lazy {
-        ObjectMapper(YAMLFactory()).readTree(resource(BitbucketCloudTestFixture.PIPELINES_FILE))
+        YAMLMapper().readTree(resource(BitbucketCloudTestFixture.PIPELINES_FILE))
     }
 
     private fun declaredVariables(pipeline: String): Set<String> =
@@ -32,12 +31,12 @@ class BitbucketCloudTestFixtureTest {
 
     @Test
     fun `Only custom pipelines, so that no push to the fixture repository consumes build minutes`() {
-        assertEquals(listOf("custom"), pipelines.path("pipelines").fieldNames().asSequence().toList())
+        assertEquals(listOf("custom"), pipelines.path("pipelines").propertyNames().asSequence().toList())
     }
 
     @Test
     fun `The pipelines the tests rely on are declared`() {
-        val custom = pipelines.path("pipelines").path("custom").fieldNames().asSequence().toSet()
+        val custom = pipelines.path("pipelines").path("custom").propertyNames().asSequence().toSet()
         assertEquals(
             setOf(
                 BitbucketCloudTestFixture.PIPELINE_ECHO,

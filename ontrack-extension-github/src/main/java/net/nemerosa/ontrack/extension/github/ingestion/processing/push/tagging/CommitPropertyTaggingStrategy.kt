@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.extension.github.ingestion.processing.push.tagging
 
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 import net.nemerosa.ontrack.extension.git.property.GitCommitPropertyType
 import net.nemerosa.ontrack.extension.github.ingestion.processing.push.PushPayload
 import net.nemerosa.ontrack.model.structure.*

@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.extension.workflows.templating
 
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 import net.nemerosa.ontrack.extension.workflows.engine.WorkflowInstance
 import net.nemerosa.ontrack.extension.workflows.engine.WorkflowInstanceNodeStatus
 import net.nemerosa.ontrack.json.JsonPathUtils

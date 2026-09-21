@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.extension.config.ci
 
-import com.fasterxml.jackson.databind.node.TextNode
+import tools.jackson.databind.node.StringNode
 import net.nemerosa.ontrack.extension.config.model.*
 import net.nemerosa.ontrack.it.AbstractDSLTestSupport
 import net.nemerosa.ontrack.json.asJson
@@ -308,7 +308,7 @@ class CIConfigurationParserIT : AbstractDSLTestSupport() {
                                 conditions = listOf(
                                     ConditionConfig(
                                         name = "branch",
-                                        config = TextNode("release.*")
+                                        config = StringNode("release.*")
                                     )
                                 ),
                                 branch = BranchConfiguration(

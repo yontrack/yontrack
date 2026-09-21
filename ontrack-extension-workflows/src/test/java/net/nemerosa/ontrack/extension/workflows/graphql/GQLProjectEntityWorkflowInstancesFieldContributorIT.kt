@@ -190,7 +190,7 @@ internal class GQLProjectEntityWorkflowInstancesFieldContributorIT : AbstractWor
                             .flatMap { build -> build.path("promotionRuns") }
                             .associate { runNode ->
                                 runNode.path("id").asInt() to
-                                        runNode.path("workflowInstances").map { it.path("id").asText() }
+                                        runNode.path("workflowInstances").values().map { it.path("id").asText() }
                             }
                         assertEquals(listOf(firstInstance), instancesByRun[first.id()])
                         assertEquals(listOf(secondInstance), instancesByRun[second.id()])

@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.extension.config.extensions
 
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 import net.nemerosa.ontrack.json.parse
 import net.nemerosa.ontrack.model.extension.Extension
 import net.nemerosa.ontrack.model.json.schema.JsonType

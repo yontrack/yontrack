@@ -55,7 +55,7 @@ internal class AutoVersioningGQLBranchFieldContributorIT : AbstractAutoVersionin
                         assertJsonNotNull(autoVersioning, "No auto versioning returned") {
                             assertEquals(
                                 config.configurations.map { it.sourceProject },
-                                path("configurations").map {
+                                path("configurations").values().map {
                                     it.path("sourceProject").asText()
                                 }
                             )

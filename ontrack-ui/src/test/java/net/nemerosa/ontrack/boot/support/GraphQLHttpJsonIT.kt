@@ -24,9 +24,9 @@ import kotlin.test.assertTrue
 /**
  * The GraphQL answer, as a client reads it over HTTP.
  *
- * The values of the `JSON` scalar are Jackson 2 nodes, and the HTTP layer must write them with
- * Jackson 2: Spring Boot 4 brings Jackson 3 along, and Jackson 3 would write such a node as a bean
- * -- `{"array":false,"containerNode":true,...}` -- instead of as its content.
+ * The values of the `JSON` scalar are Jackson nodes, and the HTTP layer must write them as their
+ * content, not as a bean -- `{"array":false,"containerNode":true,...}` -- which is what a mapper of
+ * another Jackson generation than the nodes' would do.
  *
  * Not transactional: the token the call authenticates with must be committed for the server, on
  * its own threads, to find it.
@@ -61,7 +61,7 @@ class GraphQLHttpJsonIT : AbstractDSLTestSupport() {
         assertEquals(200, response.statusCode(), response.body())
 
         val health = response.body().parseAsJson().path("data").path("systemHealth").path("health")
-        assertTrue(health.path("status").isTextual, "The health has a textual status: $health")
+        assertTrue(health.path("status").isString, "The health has a textual status: $health")
         assertFalse(health.has("containerNode"), "The health is not written as a Jackson node bean: $health")
     }
 

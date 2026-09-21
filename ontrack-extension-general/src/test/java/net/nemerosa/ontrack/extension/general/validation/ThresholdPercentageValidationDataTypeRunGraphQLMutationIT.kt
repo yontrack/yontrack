@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.extension.general.validation
 
-import com.fasterxml.jackson.databind.node.IntNode
+import tools.jackson.databind.node.IntNode
 import net.nemerosa.ontrack.model.structure.config
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired

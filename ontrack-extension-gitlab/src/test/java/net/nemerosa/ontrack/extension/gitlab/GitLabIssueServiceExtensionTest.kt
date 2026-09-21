@@ -107,7 +107,7 @@ class GitLabIssueServiceExtensionTest {
         assertEquals("Issue 1", json.path("summary").asText())
         assertEquals(
             listOf("bug", "urgent"),
-            json.path("labels").map { it.asText() },
+            json.path("labels").values().map { it.asText() },
         )
     }
 

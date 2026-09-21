@@ -202,7 +202,7 @@ class EventJdbcRepository(
     private fun loadValues(rs: ResultSet): Map<String, NameValue> {
         val map: MutableMap<String, NameValue> = LinkedHashMap()
         val node = readJson(rs, "event_values")
-        val i = node.fields()
+        val i = node.properties().iterator()
         while (i.hasNext()) {
             val (key, nameValue) = i.next()
             map[key] = NameValue(

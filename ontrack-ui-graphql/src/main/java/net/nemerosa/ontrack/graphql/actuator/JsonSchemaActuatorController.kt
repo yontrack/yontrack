@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.graphql.actuator
 
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 import graphql.introspection.IntrospectionQuery
 import net.nemerosa.ontrack.json.asJson
 import org.springframework.boot.actuate.endpoint.annotation.Endpoint

@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.extension.queue.ui
 
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 import net.nemerosa.ontrack.extension.queue.QueueProcessor
 import net.nemerosa.ontrack.extension.queue.dispatching.QueueDispatchResult
 import net.nemerosa.ontrack.extension.queue.dispatching.QueueDispatcher

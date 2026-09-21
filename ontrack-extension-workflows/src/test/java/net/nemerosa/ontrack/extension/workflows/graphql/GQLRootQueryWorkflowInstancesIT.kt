@@ -32,7 +32,7 @@ class GQLRootQueryWorkflowInstancesIT : AbstractQLKTITSupport() {
             ) { data ->
                 val ids = data.path("workflowInstances")
                     .path("pageItems")
-                    .map { it.getRequiredTextField("id") }
+                    .values().map { it.getRequiredTextField("id") }
                 assertEquals(
                     listOf(instance.id),
                     ids

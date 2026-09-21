@@ -71,7 +71,7 @@ class GQLBuildSlotPipelinesFieldContributorIT : AbstractQLKTITSupport() {
             """.trimIndent()
         ) { data ->
             ids = data.path("build").path("currentDeployments")
-                .map { it.path("id").asText() }
+                .values().map { it.path("id").asText() }
                 .toSet()
         }
         return ids

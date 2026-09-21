@@ -28,7 +28,7 @@ class BuildLinksQLIT : AbstractQLKTITSupport() {
             ) { data ->
                 val names = data.path("build")
                     .path("usingQualified").path("pageItems")
-                    .map {
+                    .values().map {
                         it.path("build").path("name").asText()
                     }
                 assertEquals(
@@ -62,7 +62,7 @@ class BuildLinksQLIT : AbstractQLKTITSupport() {
             ) { data ->
                 val names = data.path("build")
                     .path("usingQualified").path("pageItems")
-                    .map {
+                    .values().map {
                         it.path("build").path("name").asText()
                     }
                 assertEquals(
@@ -95,7 +95,7 @@ class BuildLinksQLIT : AbstractQLKTITSupport() {
             ) { data ->
                 val names = data.path("build")
                     .path("usingQualified").path("pageItems")
-                    .map {
+                    .values().map {
                         it.path("build").path("name").asText()
                     }
                 assertEquals(
@@ -134,7 +134,7 @@ class BuildLinksQLIT : AbstractQLKTITSupport() {
             ) { data ->
                 val names = data.path("build")
                     .path("usingQualified").path("pageItems")
-                    .map {
+                    .values().map {
                         it.path("build").path("name").asText()
                     }
                 assertEquals(
@@ -169,7 +169,7 @@ class BuildLinksQLIT : AbstractQLKTITSupport() {
             ) { data ->
                 val names = data.path("build")
                     .path("usingQualified").path("pageItems")
-                    .map {
+                    .values().map {
                         it.path("build").path("name").asText()
                     }
                 assertEquals(
@@ -280,7 +280,7 @@ class BuildLinksQLIT : AbstractQLKTITSupport() {
         """) { data ->
             val items = data.path("build").path("usingQualified").path("pageItems")
             assertEquals(2, items.size(), "Only the 'dep' link to project A should have been deleted")
-            val remaining = items.map { it.path("build").path("id").asText() to it.path("qualifier").asText() }
+            val remaining = items.values().map { it.path("build").path("id").asText() to it.path("qualifier").asText() }
             assertTrue(remaining.any { it.first == tA.id.toString() && it.second == "" }, "Link to A with qualifier '' should remain")
             assertTrue(remaining.any { it.first == tB.id.toString() && it.second == "" }, "Link to B should remain")
         }

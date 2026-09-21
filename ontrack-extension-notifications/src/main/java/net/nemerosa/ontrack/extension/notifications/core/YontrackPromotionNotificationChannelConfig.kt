@@ -1,7 +1,7 @@
 package net.nemerosa.ontrack.extension.notifications.core
 
-import com.fasterxml.jackson.databind.annotation.JsonDeserialize
-import com.fasterxml.jackson.databind.annotation.JsonSerialize
+import tools.jackson.databind.annotation.JsonDeserialize
+import tools.jackson.databind.annotation.JsonSerialize
 import net.nemerosa.ontrack.common.api.APIDescription
 import net.nemerosa.ontrack.model.docs.DocumentationList
 import net.nemerosa.ontrack.model.json.DurationDeserializer

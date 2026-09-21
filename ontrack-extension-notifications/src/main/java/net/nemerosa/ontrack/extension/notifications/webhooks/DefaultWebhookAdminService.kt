@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.extension.notifications.webhooks
 
-import com.fasterxml.jackson.databind.node.NullNode
+import tools.jackson.databind.node.NullNode
 import net.nemerosa.ontrack.json.asJson
 import net.nemerosa.ontrack.json.format
 import net.nemerosa.ontrack.json.parseAsJson

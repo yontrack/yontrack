@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.extension.environments.workflows.executors
 
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 import net.nemerosa.ontrack.extension.environments.EnvironmentsExtensionFeature
 import net.nemerosa.ontrack.extension.environments.EnvironmentsLicense
 import net.nemerosa.ontrack.extension.environments.Slot

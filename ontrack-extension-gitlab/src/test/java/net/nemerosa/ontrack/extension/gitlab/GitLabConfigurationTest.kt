@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.extension.gitlab
 
-import com.fasterxml.jackson.core.JsonProcessingException
+import tools.jackson.core.JacksonException
 import net.nemerosa.ontrack.extension.gitlab.model.GitLabConfiguration
 import net.nemerosa.ontrack.json.asJson
 import net.nemerosa.ontrack.json.parse
@@ -24,7 +24,7 @@ class GitLabConfigurationTest {
     }
 
     @Test
-    @Throws(JsonProcessingException::class)
+    @Throws(JacksonException::class)
     fun fromJson() {
         TestUtils.assertJsonRead<GitLabConfiguration?>(
             configurationFixture(),

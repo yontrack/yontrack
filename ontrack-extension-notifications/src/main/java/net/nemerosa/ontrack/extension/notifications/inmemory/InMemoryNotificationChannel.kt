@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.extension.notifications.inmemory
 
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import net.nemerosa.ontrack.common.RunProfile

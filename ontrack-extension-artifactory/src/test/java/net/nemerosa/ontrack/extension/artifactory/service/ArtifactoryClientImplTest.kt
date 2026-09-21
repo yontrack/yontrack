@@ -13,14 +13,14 @@ import org.springframework.test.web.client.match.MockRestRequestMatchers.method
 import org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo
 import org.springframework.test.web.client.response.MockRestResponseCreators.withStatus
 import org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess
-import net.nemerosa.ontrack.extension.support.client.jackson2RestTemplateBuilder
+import net.nemerosa.ontrack.extension.support.client.restTemplateBuilder
 import kotlin.test.assertEquals
 
 class ArtifactoryClientImplTest {
 
     @Test
     fun buildNumbers() {
-        val restTemplate = jackson2RestTemplateBuilder().build()
+        val restTemplate = restTemplateBuilder().build()
         val server = MockRestServiceServer.bindTo(restTemplate).build()
 
         val client = ArtifactoryClientImpl(restTemplate)
@@ -56,7 +56,7 @@ class ArtifactoryClientImplTest {
 
     @Test
     fun buildNumbersEmptyForBuildNotFound() {
-        val restTemplate = jackson2RestTemplateBuilder().build()
+        val restTemplate = restTemplateBuilder().build()
         val server = MockRestServiceServer.bindTo(restTemplate).build()
 
         server.expect(

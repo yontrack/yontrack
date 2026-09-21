@@ -1,7 +1,7 @@
 package net.nemerosa.ontrack.boot.ui
 
-import com.fasterxml.jackson.core.JsonProcessingException
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.core.JacksonException
+import tools.jackson.databind.JsonNode
 import net.nemerosa.ontrack.json.ObjectMapperFactory
 import net.nemerosa.ontrack.model.Ack
 import net.nemerosa.ontrack.model.security.GlobalSettings
@@ -66,7 +66,7 @@ class SettingsController(
         val settings: T
         try {
             settings = objectMapper.treeToValue(settingsNode!!, settingsManager.settingsClass)
-        } catch (e: JsonProcessingException) {
+        } catch (e: JacksonException) {
             throw SettingsValidationException(e)
         }
 

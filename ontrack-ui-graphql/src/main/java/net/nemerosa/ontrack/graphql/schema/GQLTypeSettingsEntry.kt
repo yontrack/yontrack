@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.graphql.schema
 
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 import graphql.schema.GraphQLObjectType
 import net.nemerosa.ontrack.graphql.support.GraphQLBeanConverter
 import net.nemerosa.ontrack.json.asJson

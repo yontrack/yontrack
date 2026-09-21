@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.extension.jira.notifications
 
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 import net.nemerosa.ontrack.common.api.APIDescription
 import net.nemerosa.ontrack.common.mergeList
 import net.nemerosa.ontrack.extension.jira.JIRAConfiguration
@@ -52,7 +52,7 @@ class JiraCreationNotificationChannel(
         titleTemplate = patchString(changes, a::titleTemplate),
         customFields = if (changes.has(JiraCreationNotificationChannelConfig::customFields.name)) {
             val customChanges = changes.path(JiraCreationNotificationChannelConfig::customFields.name)
-                .map { it.parse<JiraCustomField>() }
+                .values().map { it.parse<JiraCustomField>() }
             mergeList(a.customFields, customChanges, JiraCustomField::name) { e, _ -> e }
         } else {
             a.customFields

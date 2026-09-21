@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.extension.casc.entities
 
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 import net.nemerosa.ontrack.model.structure.ProjectEntity
 
 abstract class AbstractCascEntityContext : CascEntityContext {
@@ -48,7 +48,7 @@ abstract class AbstractCascEntityContext : CascEntityContext {
         // We need to respect the order of contexts set by [CascEntityContext.priority]
         // Map each JSON field to its corresponding context and order them by decreasing priority
         val fieldContexts = mutableListOf<FieldContext>()
-        node.fields().forEach { (name, value) ->
+        node.properties().forEach { (name, value) ->
             val context = mapping[name]
             if (context != null) {
                 fieldContexts += FieldContext(

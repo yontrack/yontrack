@@ -50,7 +50,7 @@ class CascGraphQLIT : AbstractQLKTITSupport() {
                 }
             """
             ).let { data ->
-                val locations = data.path("casc").path("locations").map { it.asText() }
+                val locations = data.path("casc").path("locations").values().map { it.asText() }
                 assertEquals(
                     listOf(
                         "classpath:casc/settings-security.yaml",

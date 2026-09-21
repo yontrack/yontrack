@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.repository.support.store;
 
-import com.fasterxml.jackson.databind.node.IntNode;
+import tools.jackson.databind.node.IntNode;
 import net.nemerosa.ontrack.common.Time;
 import net.nemerosa.ontrack.model.structure.NameDescription;
 import net.nemerosa.ontrack.model.structure.Project;

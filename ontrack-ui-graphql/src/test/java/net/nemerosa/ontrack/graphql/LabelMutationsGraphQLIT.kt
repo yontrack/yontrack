@@ -268,7 +268,7 @@ class LabelMutationsGraphQLIT : AbstractQLKTITSupport() {
                 assertEquals(id(), node.path("id").asInt())
                 assertEquals(
                     setOf(l2.id, l3.id),
-                    node.path("labels").map { it.path("id").asInt() }.toSet()
+                    node.path("labels").values().map { it.path("id").asInt() }.toSet()
                 )
             }
             assertEquals(setOf(l2.id, l3.id), projectLabelIds(this))

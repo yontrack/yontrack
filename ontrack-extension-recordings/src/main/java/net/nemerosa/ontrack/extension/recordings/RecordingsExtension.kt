@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.extension.recordings
 
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 import graphql.schema.GraphQLFieldDefinition
 import graphql.schema.GraphQLType
 import net.nemerosa.ontrack.graphql.schema.GQLTypeCache

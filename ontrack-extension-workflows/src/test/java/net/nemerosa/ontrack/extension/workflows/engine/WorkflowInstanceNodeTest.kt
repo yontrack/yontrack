@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.extension.workflows.engine
 
-import com.fasterxml.jackson.databind.node.TextNode
+import tools.jackson.databind.node.StringNode
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 
@@ -14,7 +14,7 @@ class WorkflowInstanceNodeTest {
             output = null,
             error = null,
         )
-        val next = node.success(TextNode("test"))
+        val next = node.success(StringNode("test"))
         assertEquals(node.id, next.id)
         assertEquals(WorkflowInstanceNodeStatus.SUCCESS, next.status)
         assertEquals("test", next.output?.asText())

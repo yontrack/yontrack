@@ -35,7 +35,7 @@ class DashboardControllerIT : AbstractQLKTITSupport() {
                     }
                 """
                 ) { data ->
-                    val uuids = data.path("userDashboards").map { it.getRequiredTextField("uuid") }
+                    val uuids = data.path("userDashboards").values().map { it.getRequiredTextField("uuid") }
                     assertEquals(listOf("0"), uuids)
                 }
             }

@@ -1,17 +1,20 @@
 package net.nemerosa.ontrack.extension.av.config
 
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.dataformat.yaml.YAMLFactory
-import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator
+import tools.jackson.dataformat.yaml.YAMLFactory
+import tools.jackson.dataformat.yaml.YAMLWriteFeature
+import tools.jackson.dataformat.yaml.YAMLMapper
 
 object AutoVersioningConfigParser {
 
-    private val yamlFactory = YAMLFactory().apply {
-        enable(YAMLGenerator.Feature.LITERAL_BLOCK_STYLE)
-        disable(YAMLGenerator.Feature.WRITE_DOC_START_MARKER)
-    }
+    private val yamlFactory = YAMLFactory.builder()
+        .configureForJackson2()
+        .enable(YAMLWriteFeature.LITERAL_BLOCK_STYLE)
+        .disable(YAMLWriteFeature.WRITE_DOC_START_MARKER)
+        .build()
 
-    private val mapper = ObjectMapper(yamlFactory)
+    private val mapper = YAMLMapper.builder(yamlFactory)
+        .configureForJackson2()
+        .build()
 
     /**
      * Renders a configuration as YAML, omitting default fields

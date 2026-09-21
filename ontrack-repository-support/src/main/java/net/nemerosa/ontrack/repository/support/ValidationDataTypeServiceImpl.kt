@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.repository.support
 
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 import net.nemerosa.ontrack.model.exceptions.*
 import net.nemerosa.ontrack.model.structure.*
 import org.springframework.stereotype.Service
