@@ -1,14 +1,27 @@
 package net.nemerosa.ontrack.json
 
 import com.fasterxml.jackson.core.Version
+import com.fasterxml.jackson.core.json.JsonWriteFeature
 import com.fasterxml.jackson.databind.DeserializationFeature
+import com.fasterxml.jackson.databind.MapperFeature
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.databind.SerializationFeature
+import com.fasterxml.jackson.databind.json.JsonMapper
 import com.fasterxml.jackson.databind.module.SimpleModule
 import com.fasterxml.jackson.datatype.jsr310.deser.DurationDeserializer
 import com.fasterxml.jackson.datatype.jsr310.ser.DurationSerializer
 import com.fasterxml.jackson.module.kotlin.KotlinModule
 import java.time.*
 
+/**
+ * The one JSON mapper configuration of Yontrack.
+ *
+ * Every setting whose default differs between Jackson 2 and Jackson 3 is written out, at its
+ * Jackson 2 value: the JSON Yontrack stores and exchanges must not change with the Jackson version
+ * (see ADR 0016). Adopting a Jackson 3 default is a decision of its own.
+ *
+ * To write with a JSON view, use `create().writerWithView(view)`.
+ */
 object ObjectMapperFactory {
 
     private val JSON_MODULE_VERSION: Version = Version(
@@ -21,23 +34,30 @@ object ObjectMapperFactory {
     )
 
     @JvmStatic
-    fun create(): ObjectMapper {
-        val mapper = ObjectMapper()
-        // Support for JDK 8 times
-        jdkTime(mapper)
-        // Support for Kotlin
-        mapper.registerModule(KotlinModule.Builder().build())
-        // Common features
-        mapper.configure(DeserializationFeature.ACCEPT_SINGLE_VALUE_AS_ARRAY, true)
-        // OK
-        return mapper
-    }
+    fun create(): ObjectMapper =
+        JsonMapper.builder()
+            // Support for JDK 8 times
+            .addModule(jdkTimeModule())
+            // Support for Kotlin
+            .addModule(KotlinModule.Builder().build())
+            // Common features
+            .enable(DeserializationFeature.ACCEPT_SINGLE_VALUE_AS_ARRAY)
+            // Jackson 2 defaults, which Jackson 3 changes
+            .enable(MapperFeature.DEFAULT_VIEW_INCLUSION)
+            .disable(MapperFeature.SORT_PROPERTIES_ALPHABETICALLY)
+            .enable(MapperFeature.USE_GETTERS_AS_SETTERS)
+            .enable(MapperFeature.ALLOW_FINAL_FIELDS_AS_MUTATORS)
+            .disable(MapperFeature.FIX_FIELD_NAME_UPPER_CASE_PREFIX)
+            .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+            .disable(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES)
+            .disable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
+            .enable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
+            .enable(SerializationFeature.WRITE_DURATIONS_AS_TIMESTAMPS)
+            .enable(SerializationFeature.FAIL_ON_EMPTY_BEANS)
+            .disable(JsonWriteFeature.ESCAPE_FORWARD_SLASHES)
+            .build()
 
-    fun create(viewClass: Class<*>?): ObjectMapper {
-        return CustomObjectMapper(viewClass)
-    }
-
-    private fun jdkTime(mapper: ObjectMapper) {
+    private fun jdkTimeModule(): SimpleModule {
         val jdkTimeModule = SimpleModule(
             "JDKTimeModule",
             JSON_MODULE_VERSION
@@ -58,12 +78,6 @@ object ObjectMapperFactory {
         jdkTimeModule.addSerializer(Duration::class.java, DurationSerializer.INSTANCE)
         jdkTimeModule.addDeserializer(Duration::class.java, DurationDeserializer.INSTANCE)
         // OK
-        mapper.registerModule(jdkTimeModule)
-    }
-
-    private class CustomObjectMapper(viewClass: Class<*>?) : ObjectMapper() {
-        init {
-            this._serializationConfig = _serializationConfig.withView(viewClass)
-        }
+        return jdkTimeModule
     }
 }
