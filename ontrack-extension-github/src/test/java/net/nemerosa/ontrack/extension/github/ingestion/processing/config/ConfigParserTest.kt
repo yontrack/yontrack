@@ -3,7 +3,7 @@ package net.nemerosa.ontrack.extension.github.ingestion.processing.config
 import net.nemerosa.ontrack.extension.github.ingestion.config.model.*
 import net.nemerosa.ontrack.extension.github.ingestion.config.parser.ConfigParser
 import net.nemerosa.ontrack.extension.github.ingestion.config.parser.ConfigParsingException
-import org.junit.Test
+import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 

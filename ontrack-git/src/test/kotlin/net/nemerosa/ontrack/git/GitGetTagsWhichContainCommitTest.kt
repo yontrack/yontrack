@@ -2,9 +2,9 @@ package net.nemerosa.ontrack.git
 
 
 import net.nemerosa.ontrack.git.support.GitRepo
-import org.junit.AfterClass
-import org.junit.BeforeClass
-import org.junit.Test
+import org.junit.jupiter.api.AfterAll
+import org.junit.jupiter.api.BeforeAll
+import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 
 /**
@@ -39,7 +39,7 @@ class GitGetTagsWhichContainCommitTest {
         /**
          * Preparation of the Git repository
          */
-        @BeforeClass
+        @BeforeAll
         @JvmStatic
         fun `Git repository`() {
             // Gets a repository
@@ -85,7 +85,7 @@ class GitGetTagsWhichContainCommitTest {
         /**
          * Removing the Git repository
          */
-        @AfterClass
+        @AfterAll
         @JvmStatic
         fun `Git repository deletion`() {
             repo.close()

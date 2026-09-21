@@ -32,8 +32,13 @@ dependencies {
     testImplementation(testFixtures(project(":ontrack-model")))
     testImplementation(testFixtures(project(":ontrack-extension-config")))
 
-    testImplementation("com.icegreen:greenmail")
-    testImplementation("com.icegreen:greenmail-spring")
+    // GreenMail 1.x depends on junit:junit for its GreenMailRule only; the tests use GreenMailBean (#1844)
+    testImplementation("com.icegreen:greenmail") {
+        exclude(group = "junit", module = "junit")
+    }
+    testImplementation("com.icegreen:greenmail-spring") {
+        exclude(group = "junit", module = "junit")
+    }
 
     testFixturesImplementation("org.springframework.boot:spring-boot-starter-test")
     testFixturesImplementation(testFixtures(project(":ontrack-it-utils")))

@@ -12,8 +12,8 @@ import net.nemerosa.ontrack.model.structure.NameDescription.Companion.nd
 import net.nemerosa.ontrack.model.structure.Project
 import net.nemerosa.ontrack.model.structure.Property
 import net.nemerosa.ontrack.model.structure.PropertyService
-import org.junit.Before
-import org.junit.Test
+import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 
@@ -25,7 +25,7 @@ class JenkinsJobDecorationExtensionTest {
     private lateinit var branch: Branch
     private lateinit var jenkinsJobProperty: Property<JenkinsJobProperty>
 
-    @Before
+    @BeforeEach
     fun before() {
         propertyService = mockk()
         jenkinsClientFactory = mockk()

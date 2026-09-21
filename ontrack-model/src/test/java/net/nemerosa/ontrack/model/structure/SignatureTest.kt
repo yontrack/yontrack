@@ -2,7 +2,7 @@ package net.nemerosa.ontrack.model.structure
 
 import net.nemerosa.ontrack.model.structure.Signature.Companion.of
 import net.nemerosa.ontrack.test.TestUtils
-import org.junit.Test
+import org.junit.jupiter.api.Test
 import java.time.LocalDateTime
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull

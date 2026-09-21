@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.extension.av.properties.yaml
 
-import org.junit.Test
+import org.junit.jupiter.api.Test
 import org.springframework.expression.spel.standard.SpelExpressionParser
 import org.springframework.expression.spel.support.SimpleEvaluationContext
 import kotlin.test.assertEquals

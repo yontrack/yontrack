@@ -6,7 +6,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode
 import graphql.language.*
 import net.nemerosa.ontrack.json.asJson
 import net.nemerosa.ontrack.test.assertIs
-import org.junit.Test
+import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 

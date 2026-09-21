@@ -1,7 +1,7 @@
 package net.nemerosa.ontrack.graphql.support
 
 import net.nemerosa.ontrack.test.assertIs
-import org.junit.Test
+import org.junit.jupiter.api.Test
 import java.time.LocalDateTime
 import kotlin.test.assertEquals
 

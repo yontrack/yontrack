@@ -3,7 +3,7 @@ package net.nemerosa.ontrack.extension.scm.catalog
 import net.nemerosa.ontrack.common.Time
 import net.nemerosa.ontrack.json.asJson
 import net.nemerosa.ontrack.json.parse
-import org.junit.Test
+import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull

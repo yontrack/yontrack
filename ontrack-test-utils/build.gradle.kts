@@ -3,7 +3,7 @@ plugins {
 }
 
 dependencies {
-    api("junit:junit")
+    api("org.junit.jupiter:junit-jupiter-api")
     api(project(":ontrack-json"))
 
     implementation("org.apache.commons:commons-lang3")

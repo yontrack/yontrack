@@ -5,9 +5,9 @@ import net.nemerosa.ontrack.job.*
 import net.nemerosa.ontrack.job.orchestrator.TestJob.Companion.getKey
 import net.nemerosa.ontrack.job.support.DefaultJobScheduler
 import net.nemerosa.ontrack.job.support.TaskExecutor
-import org.junit.After
-import org.junit.Before
-import org.junit.Test
+import org.junit.jupiter.api.AfterEach
+import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Test
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledExecutorService
 import java.util.function.Supplier
@@ -21,13 +21,13 @@ class JobOrchestratorTest {
     private lateinit var taskExecutor: TaskExecutor
     private lateinit var scheduledExecutorService: ScheduledExecutorService
 
-    @Before
+    @BeforeEach
     fun before() {
         scheduledExecutorService = Executors.newSingleThreadScheduledExecutor()
         taskExecutor = mockk()
     }
 
-    @After
+    @AfterEach
     fun after() {
         scheduledExecutorService.shutdownNow()
     }

@@ -10,14 +10,14 @@ import net.nemerosa.ontrack.model.settings.PredefinedPromotionLevelService;
 import net.nemerosa.ontrack.model.settings.PredefinedValidationStampService;
 import net.nemerosa.ontrack.model.structure.*;
 import net.nemerosa.ontrack.repository.*;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static net.nemerosa.ontrack.model.structure.NameDescription.nd;
-import static org.junit.Assert.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.Mockito.*;
 
 public class StructureServiceImplTest {
@@ -27,7 +27,7 @@ public class StructureServiceImplTest {
     private PromotionLevel copper;
     private Build build;
 
-    @Before
+    @BeforeEach
     public void before() {
         SecurityService securityService = mock(SecurityService.class);
         ValidationRunStatusService validationRunStatusService = mock(ValidationRunStatusService.class);

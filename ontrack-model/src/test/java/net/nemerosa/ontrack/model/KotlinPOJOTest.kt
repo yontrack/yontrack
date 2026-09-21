@@ -3,7 +3,7 @@ package net.nemerosa.ontrack.model
 import net.nemerosa.ontrack.json.asJson
 import net.nemerosa.ontrack.test.TestUtils.assertJsonRead
 import net.nemerosa.ontrack.test.TestUtils.assertJsonWrite
-import org.junit.Test
+import org.junit.jupiter.api.Test
 
 class KotlinPOJOTest {
 

@@ -9,7 +9,7 @@ import net.nemerosa.ontrack.extension.github.ingestion.processing.model.User
 import net.nemerosa.ontrack.extension.github.ingestion.processing.model.WorkflowJobStepStatus
 import net.nemerosa.ontrack.json.asJson
 import net.nemerosa.ontrack.json.parse
-import org.junit.Test
+import org.junit.jupiter.api.Test
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import kotlin.test.assertEquals

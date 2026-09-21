@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.extension.github.model
 
-import org.junit.Test
+import org.junit.jupiter.api.Test
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import kotlin.test.assertEquals

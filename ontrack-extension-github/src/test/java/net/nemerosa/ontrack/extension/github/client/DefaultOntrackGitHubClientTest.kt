@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.extension.github.client
 
-import org.junit.Test
+import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 
 class DefaultOntrackGitHubClientTest {

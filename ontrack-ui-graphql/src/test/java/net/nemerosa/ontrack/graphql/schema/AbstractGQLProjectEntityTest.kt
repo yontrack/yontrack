@@ -3,7 +3,7 @@ package net.nemerosa.ontrack.graphql.schema
 import net.nemerosa.ontrack.common.Time
 import net.nemerosa.ontrack.graphql.schema.GQLTypeCreation.Companion.getCreationFromSignature
 import net.nemerosa.ontrack.model.structure.Signature.Companion.of
-import org.junit.Test
+import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 

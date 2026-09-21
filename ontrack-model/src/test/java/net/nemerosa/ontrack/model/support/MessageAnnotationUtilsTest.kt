@@ -1,8 +1,12 @@
 package net.nemerosa.ontrack.model.support
 
 import net.nemerosa.ontrack.model.support.tree.support.Markup
-import org.junit.Assert.*
-import org.junit.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
+import kotlin.test.assertFalse
+import kotlin.test.assertNull
+import kotlin.test.assertNotNull
+import org.junit.jupiter.api.Test
 
 class MessageAnnotationUtilsTest {
 

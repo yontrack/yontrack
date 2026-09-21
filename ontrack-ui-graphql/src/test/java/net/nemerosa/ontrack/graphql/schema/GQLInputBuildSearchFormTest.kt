@@ -3,7 +3,7 @@ package net.nemerosa.ontrack.graphql.schema
 import graphql.schema.GraphQLInputObjectType
 import net.nemerosa.ontrack.graphql.support.typeName
 import net.nemerosa.ontrack.model.structure.BuildSearchForm
-import org.junit.Test
+import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 

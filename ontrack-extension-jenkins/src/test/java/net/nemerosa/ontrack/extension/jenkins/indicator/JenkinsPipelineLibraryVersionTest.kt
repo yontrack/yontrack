@@ -1,7 +1,7 @@
 package net.nemerosa.ontrack.extension.jenkins.indicator
 
-import org.junit.Assert.*
-import org.junit.Test
+import kotlin.test.assertTrue
+import org.junit.jupiter.api.Test
 
 class JenkinsPipelineLibraryVersionTest {
 

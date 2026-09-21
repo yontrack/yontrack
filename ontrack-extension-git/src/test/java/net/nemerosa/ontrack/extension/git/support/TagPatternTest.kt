@@ -1,7 +1,7 @@
 package net.nemerosa.ontrack.extension.git.support
 
 import net.nemerosa.ontrack.extension.scm.support.TagPattern
-import org.junit.Test
+import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull

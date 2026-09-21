@@ -1,9 +1,9 @@
 package net.nemerosa.ontrack.extension.jenkins.model;
 
 import net.nemerosa.ontrack.extension.jenkins.JenkinsConfiguration;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 public class JenkinsConfigurationTest {
 

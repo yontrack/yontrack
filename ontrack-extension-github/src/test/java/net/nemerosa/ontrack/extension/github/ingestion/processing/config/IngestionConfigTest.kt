@@ -1,7 +1,7 @@
 package net.nemerosa.ontrack.extension.github.ingestion.processing.config
 
 import net.nemerosa.ontrack.extension.github.ingestion.config.model.*
-import org.junit.Test
+import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 
 class IngestionConfigTest {

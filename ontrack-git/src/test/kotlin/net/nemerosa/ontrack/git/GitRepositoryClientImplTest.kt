@@ -2,7 +2,7 @@ package net.nemerosa.ontrack.git
 
 import net.nemerosa.ontrack.common.Time
 import net.nemerosa.ontrack.git.support.GitRepo
-import org.junit.Test
+import org.junit.jupiter.api.Test
 import java.util.function.Consumer
 import java.util.stream.Collectors
 import kotlin.test.assertEquals

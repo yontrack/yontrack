@@ -1,13 +1,13 @@
 package net.nemerosa.ontrack.repository.support;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;
 
 import static net.nemerosa.ontrack.repository.support.AbstractJdbcRepository.dateTimeForDB;
 import static net.nemerosa.ontrack.repository.support.AbstractJdbcRepository.dateTimeFromDB;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNull;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 public class AbstractJdbcRepositoryTest {
 

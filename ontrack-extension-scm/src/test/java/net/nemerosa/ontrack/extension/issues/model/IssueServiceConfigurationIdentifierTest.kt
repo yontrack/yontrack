@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.extension.issues.model
 
-import org.junit.Test
+import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull

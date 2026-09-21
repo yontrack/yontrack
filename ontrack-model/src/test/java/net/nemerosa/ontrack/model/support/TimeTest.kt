@@ -5,7 +5,7 @@ import net.nemerosa.ontrack.common.Time
 import net.nemerosa.ontrack.common.truncate
 import net.nemerosa.ontrack.json.ObjectMapperFactory
 import net.nemerosa.ontrack.model.structure.Signature.Companion.of
-import org.junit.Test
+import org.junit.jupiter.api.Test
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import kotlin.test.assertEquals

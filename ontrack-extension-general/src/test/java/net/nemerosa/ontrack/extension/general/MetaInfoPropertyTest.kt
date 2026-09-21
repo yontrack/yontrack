@@ -1,7 +1,7 @@
 package net.nemerosa.ontrack.extension.general
 
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertTrue
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 import org.junit.jupiter.api.Test
 
 class MetaInfoPropertyTest {

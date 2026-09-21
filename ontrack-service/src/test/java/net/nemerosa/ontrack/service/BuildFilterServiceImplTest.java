@@ -9,20 +9,20 @@ import net.nemerosa.ontrack.model.structure.StandardBuildFilterData;
 import net.nemerosa.ontrack.model.structure.StructureService;
 import net.nemerosa.ontrack.repository.BuildFilterRepository;
 import net.nemerosa.ontrack.repository.CoreBuildFilterRepository;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import java.util.Collections;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 
 public class BuildFilterServiceImplTest {
 
     private BuildFilterService service;
 
-    @Before
+    @BeforeEach
     public void before() {
         BuildFilterRepository buildFilterRepository = mock(BuildFilterRepository.class);
         StructureService structureService = mock(StructureService.class);

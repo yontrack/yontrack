@@ -264,15 +264,15 @@ configure(javaProjects) {
 
     // `org.hamcrest:hamcrest-core:3.0` is an empty deprecation stub -- a single class named
     // HamcrestCoreIsDeprecated -- standing in for `org.hamcrest:hamcrest`, which carries the real
-    // org.hamcrest.core classes and is on the test classpaths anyway. It arrives through junit:junit 4,
-    // and the build has always excluded it, but only on the junit-vintage-engine edge; junit:junit also
-    // comes in through ontrack-test-utils, and under io.spring.dependency-management the module stayed
-    // on every classpath regardless. With the BOM as a platform it lands on the runtime test classpaths
+    // org.hamcrest.core classes and is on the test classpaths anyway. It used to arrive through junit:junit 4,
+    // and the build excluded it only on the junit-vintage-engine edge while junit:junit also came in
+    // through ontrack-test-utils. With the BOM as a platform it landed on the runtime test classpaths
     // but not on the compile ones, and that is not a state dependency locking can hold:
     // `resolveAndLockAll` resolves with the lock constraints off and records no hamcrest-core on
     // testCompileClasspath, while the compile tasks resolve with them on and find one -- "Resolved
-    // 'org.hamcrest:hamcrest-core:3.0' which is not part of the dependency lock state". Excluding it from
-    // every configuration is what the build meant in the first place, and it is absent either way. #1753
+    // 'org.hamcrest:hamcrest-core:3.0' which is not part of the dependency lock state". #1753
+    // junit:junit and the vintage engine are gone since #1844; the exclusion stays so that no other path
+    // can bring the stub back into that state.
     configurations.configureEach {
         exclude(group = "org.hamcrest", module = "hamcrest-core")
     }
@@ -407,7 +407,6 @@ configure(javaProjects) {
         testImplementation("org.springframework.boot:spring-boot-starter-test")
         testImplementation("org.jetbrains.kotlin:kotlin-test")
         testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
-        testImplementation("org.junit.vintage:junit-vintage-engine")
         testImplementation("io.mockk:mockk")
         testImplementation("io.mockk:mockk-jvm")
         testImplementation("io.mockk:mockk-dsl")

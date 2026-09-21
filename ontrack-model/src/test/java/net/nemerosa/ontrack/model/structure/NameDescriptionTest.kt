@@ -1,7 +1,7 @@
 package net.nemerosa.ontrack.model.structure
 
 import net.nemerosa.ontrack.model.structure.NameDescription.Companion.escapeName
-import org.junit.Test
+import org.junit.jupiter.api.Test
 import java.util.regex.Pattern
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse

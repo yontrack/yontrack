@@ -2,8 +2,8 @@ package net.nemerosa.ontrack.job.support
 
 import net.nemerosa.ontrack.job.*
 import net.nemerosa.ontrack.test.assertPresent
-import org.junit.After
-import org.junit.Before
+import org.junit.jupiter.api.AfterEach
+import org.junit.jupiter.api.BeforeEach
 import java.time.Duration
 import java.util.*
 import java.util.concurrent.CompletableFuture
@@ -16,7 +16,7 @@ abstract class AbstractJobTest {
     protected lateinit var schedulerPool: SynchronousScheduledExecutorService
     protected lateinit var jobPool: SynchronousScheduledExecutorService
 
-    @Before
+    @BeforeEach
     fun before() {
         schedulerPool = SynchronousScheduledExecutorService()
         scheduler = object : TaskExecutor {
@@ -40,7 +40,7 @@ abstract class AbstractJobTest {
         jobPool = SynchronousScheduledExecutorService()
     }
 
-    @After
+    @AfterEach
     fun after() {
         schedulerPool.shutdownNow()
         jobPool.shutdownNow()

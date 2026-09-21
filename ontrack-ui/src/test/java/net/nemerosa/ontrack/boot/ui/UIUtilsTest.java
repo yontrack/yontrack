@@ -2,11 +2,11 @@ package net.nemerosa.ontrack.boot.ui;
 
 import net.nemerosa.ontrack.common.Document;
 import net.nemerosa.ontrack.ui.support.UIUtils;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletResponse;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNull;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 public class UIUtilsTest {
 

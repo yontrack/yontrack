@@ -11,8 +11,8 @@ import net.nemerosa.ontrack.extension.github.app.client.GitHubAppInstallationTok
 import net.nemerosa.ontrack.model.support.OntrackConfigProperties
 import net.nemerosa.ontrack.test.TestUtils
 import net.nemerosa.ontrack.test.TestUtils.uid
-import org.junit.Before
-import org.junit.Test
+import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
@@ -21,7 +21,7 @@ class DefaultGitHubAppTokenServiceTest {
     private lateinit var client: GitHubAppClient
     private lateinit var service: GitHubAppTokenService
 
-    @Before
+    @BeforeEach
     fun before() {
         client = mockk()
         service = DefaultGitHubAppTokenService(client, OntrackConfigProperties())

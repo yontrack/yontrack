@@ -4,7 +4,7 @@ import net.nemerosa.ontrack.extension.github.ingestion.processing.events.Workflo
 import net.nemerosa.ontrack.extension.github.ingestion.processing.events.WorkflowJobPayload
 import net.nemerosa.ontrack.json.parse
 import net.nemerosa.ontrack.test.TestUtils
-import org.junit.Test
+import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 
 class WorkflowJobPayloadTest {

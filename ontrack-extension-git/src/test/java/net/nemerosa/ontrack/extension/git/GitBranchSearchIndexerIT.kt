@@ -2,22 +2,22 @@ package net.nemerosa.ontrack.extension.git
 
 import net.nemerosa.ontrack.extension.git.property.GitBranchConfigurationPropertyType
 import net.nemerosa.ontrack.model.structure.SearchRequest
-import org.junit.Before
-import org.junit.Ignore
-import org.junit.Test
+import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Disabled
+import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import kotlin.test.assertTrue
 
 /**
  * Testing the search on Git branches.
  */
-@Ignore("flaky")
+@Disabled("flaky")
 class GitBranchSearchIndexerIT : AbstractGitSearchTestSupport() {
 
     @Autowired
     protected lateinit var gitBranchSearchIndexer: GitBranchSearchIndexer
 
-    @Before
+    @BeforeEach
     fun before() {
         searchIndexService.resetIndex(gitBranchSearchIndexer, reindex = false, logErrors = false)
     }

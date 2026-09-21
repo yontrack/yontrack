@@ -6,8 +6,8 @@ import net.nemerosa.ontrack.extension.github.ingestion.IngestionConfigProperties
 import net.nemerosa.ontrack.extension.github.ingestion.IngestionHookFixtures
 import net.nemerosa.ontrack.extension.github.ingestion.settings.GitHubIngestionSettings
 import net.nemerosa.ontrack.model.settings.CachedSettingsService
-import org.junit.Before
-import org.junit.Test
+import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 
 class DefaultIngestionHookSignatureServiceTest {
@@ -16,7 +16,7 @@ class DefaultIngestionHookSignatureServiceTest {
     private lateinit var cachedSettingsService: CachedSettingsService
     private lateinit var ingestionConfigProperties: IngestionConfigProperties
 
-    @Before
+    @BeforeEach
     fun before() {
         ingestionConfigProperties = IngestionConfigProperties()
         cachedSettingsService = mockk()

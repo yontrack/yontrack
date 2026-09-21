@@ -1,9 +1,10 @@
 package net.nemerosa.ontrack.extension.api.model
 
-import org.junit.Test
+import org.junit.jupiter.api.Test
 
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
+import kotlin.test.assertFailsWith
 
 class IssueChangeLogExportRequestTest {
 
@@ -42,11 +43,13 @@ class IssueChangeLogExportRequestTest {
         assertEquals(setOf("feature", "enhancement"), spec["Features"])
     }
 
-    @Test(expected = ExportRequestGroupingFormatException::class)
+    @Test
     fun group_format_exception_equal_sign() {
-        val request = IssueChangeLogExportRequest()
-        request.grouping = "Bugs=bug=test"
-        request.groupingSpecification
+        assertFailsWith<ExportRequestGroupingFormatException> {
+            val request = IssueChangeLogExportRequest()
+            request.grouping = "Bugs=bug=test"
+            request.groupingSpecification
+        }
     }
 
     @Test

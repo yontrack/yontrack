@@ -11,9 +11,10 @@ import net.nemerosa.ontrack.model.security.EncryptionService;
 import net.nemerosa.ontrack.model.security.SecurityService;
 import net.nemerosa.ontrack.model.support.ConfigurationRepository;
 import net.nemerosa.ontrack.model.support.OntrackConfigProperties;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.*;
 
 public class JenkinsServiceTest {
@@ -22,7 +23,7 @@ public class JenkinsServiceTest {
     private JenkinsConfigurationService jenkinsService;
     private EncryptionService encryptionService;
 
-    @Before
+    @BeforeEach
     public void before() {
         SecurityService securityService = mock(SecurityService.class);
         configurationRepository = mock(ConfigurationRepository.class);
@@ -38,9 +39,11 @@ public class JenkinsServiceTest {
                 mock(EventPostService.class), mock(EventFactory.class), jenkinsClientFactory, ontrackConfigProperties);
     }
 
-    @Test(expected = IllegalStateException.class)
+    @Test
     public void update_name_check() {
-        jenkinsService.updateConfiguration("test", new JenkinsConfiguration("Test", "http://host", "user", ""));
+        assertThrows(IllegalStateException.class, () ->
+                jenkinsService.updateConfiguration("test", new JenkinsConfiguration("Test", "http://host", "user", ""))
+        );
     }
 
     @Test

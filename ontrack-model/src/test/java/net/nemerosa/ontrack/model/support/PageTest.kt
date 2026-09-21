@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.model.support
 
-import org.junit.Test
+import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 
 class PageTest {

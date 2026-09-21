@@ -2,7 +2,7 @@ package net.nemerosa.ontrack.model.support.tree;
 
 import net.nemerosa.ontrack.model.support.tree.support.Markup;
 import net.nemerosa.ontrack.test.TestUtils;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 

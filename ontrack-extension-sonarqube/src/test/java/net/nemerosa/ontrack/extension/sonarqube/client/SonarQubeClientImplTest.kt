@@ -1,7 +1,7 @@
 package net.nemerosa.ontrack.extension.sonarqube.client
 
 import net.nemerosa.ontrack.extension.sonarqube.configuration.SonarQubeConfiguration
-import org.junit.Test
+import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 
 class SonarQubeClientImplTest {

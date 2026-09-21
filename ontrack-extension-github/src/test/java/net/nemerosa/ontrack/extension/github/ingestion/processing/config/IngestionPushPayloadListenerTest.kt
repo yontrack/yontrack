@@ -10,8 +10,8 @@ import net.nemerosa.ontrack.extension.github.ingestion.support.IngestionModelAcc
 import net.nemerosa.ontrack.model.structure.Branch
 import net.nemerosa.ontrack.model.structure.NameDescription
 import net.nemerosa.ontrack.model.structure.Project
-import org.junit.Before
-import org.junit.Test
+import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 
 class IngestionPushPayloadListenerTest {
@@ -22,7 +22,7 @@ class IngestionPushPayloadListenerTest {
 
     private lateinit var branch: Branch
 
-    @Before
+    @BeforeEach
     fun before() {
         configService = mockk(relaxed = true)
         ingestionModelAccessService = mockk()

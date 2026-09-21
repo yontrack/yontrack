@@ -2,7 +2,7 @@ package net.nemerosa.ontrack.graphql
 
 import net.nemerosa.ontrack.graphql.schema.CreateBranchInput
 import net.nemerosa.ontrack.graphql.support.GraphQLBeanConverter
-import org.junit.Test
+import org.junit.jupiter.api.Test
 import kotlin.test.assertNotNull
 
 class BranchGraphQLTest {

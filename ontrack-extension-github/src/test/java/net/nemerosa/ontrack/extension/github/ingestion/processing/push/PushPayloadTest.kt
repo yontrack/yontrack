@@ -2,7 +2,7 @@ package net.nemerosa.ontrack.extension.github.ingestion.processing.push
 
 import net.nemerosa.ontrack.extension.github.ingestion.IngestionHookFixtures
 import net.nemerosa.ontrack.extension.github.ingestion.processing.model.Commit
-import org.junit.Test
+import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 
 class PushPayloadTest {

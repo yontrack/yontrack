@@ -2,17 +2,17 @@ package net.nemerosa.ontrack.extension.jenkins.model;
 
 import net.nemerosa.ontrack.extension.jenkins.JenkinsConfiguration;
 import net.nemerosa.ontrack.extension.jenkins.JenkinsJobProperty;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 public class JenkinsJobPropertyTest {
 
     private JenkinsConfiguration configuration;
     private JenkinsJobProperty property;
 
-    @Before
+    @BeforeEach
     public void before() {
         configuration = new JenkinsConfiguration(
                 "MyConfig",

@@ -6,7 +6,7 @@ import net.nemerosa.ontrack.job.support.AbstractJobTest
 import net.nemerosa.ontrack.job.support.ConfigurableJob
 import net.nemerosa.ontrack.test.assertNotPresent
 import net.nemerosa.ontrack.test.assertPresent
-import org.junit.Test
+import org.junit.jupiter.api.Test
 import org.springframework.transaction.PlatformTransactionManager
 import java.util.stream.Stream
 import kotlin.test.assertFalse

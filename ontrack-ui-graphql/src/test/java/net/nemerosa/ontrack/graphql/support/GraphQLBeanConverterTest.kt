@@ -5,8 +5,8 @@ import net.nemerosa.ontrack.graphql.schema.GQLTypeCache
 import net.nemerosa.ontrack.graphql.schema.UpdateProjectInput
 import net.nemerosa.ontrack.model.structure.NameDescriptionState
 import net.nemerosa.ontrack.test.assertIs
-import org.junit.Before
-import org.junit.Test
+import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.fail
@@ -15,7 +15,7 @@ class GraphQLBeanConverterTest {
 
     private lateinit var cache: GQLTypeCache
 
-    @Before
+    @BeforeEach
     fun before() {
         cache = GQLTypeCache()
     }

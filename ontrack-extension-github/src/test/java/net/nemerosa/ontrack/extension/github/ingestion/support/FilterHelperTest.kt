@@ -2,7 +2,7 @@ package net.nemerosa.ontrack.extension.github.ingestion.support
 
 import net.nemerosa.ontrack.extension.github.ingestion.support.FilterHelper.excludes
 import net.nemerosa.ontrack.extension.github.ingestion.support.FilterHelper.includes
-import org.junit.Test
+import org.junit.jupiter.api.Test
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 

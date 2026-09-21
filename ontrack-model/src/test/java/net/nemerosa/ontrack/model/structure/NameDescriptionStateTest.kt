@@ -2,7 +2,7 @@ package net.nemerosa.ontrack.model.structure
 
 import net.nemerosa.ontrack.json.asJson
 import net.nemerosa.ontrack.json.parse
-import org.junit.Test
+import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 
 class NameDescriptionStateTest {

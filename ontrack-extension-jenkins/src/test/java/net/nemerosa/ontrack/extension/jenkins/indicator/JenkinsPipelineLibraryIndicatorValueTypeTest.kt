@@ -7,7 +7,7 @@ import net.nemerosa.ontrack.extension.indicators.IndicatorsExtensionFeature
 import net.nemerosa.ontrack.extension.jenkins.JenkinsExtensionFeature
 import net.nemerosa.ontrack.extension.scm.SCMExtensionFeature
 import net.nemerosa.ontrack.json.asJson
-import org.junit.Test
+import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue

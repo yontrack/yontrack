@@ -6,7 +6,7 @@ import net.nemerosa.ontrack.job.orchestrator.JobOrchestrator
 import net.nemerosa.ontrack.job.orchestrator.JobOrchestratorSupplier
 import net.nemerosa.ontrack.test.assertNotPresent
 import net.nemerosa.ontrack.test.assertPresent
-import org.junit.Test
+import org.junit.jupiter.api.Test
 import java.util.concurrent.TimeUnit
 import kotlin.test.*
 
@@ -289,24 +289,30 @@ class JobSchedulingTest : AbstractJobTest() {
         }
     }
 
-    @Test(expected = JobNotScheduledException::class)
+    @Test
     fun pause_for_not_schedule_job() {
-        scheduler {
-            scheduler.pause(JobCategory.of("test").getType("test").getKey("x"))
+        assertFailsWith<JobNotScheduledException> {
+            scheduler {
+                scheduler.pause(JobCategory.of("test").getType("test").getKey("x"))
+            }
         }
     }
 
-    @Test(expected = JobNotScheduledException::class)
+    @Test
     fun resume_for_not_schedule_job() {
-        scheduler {
-            scheduler.resume(JobCategory.of("test").getType("test").getKey("x"))
+        assertFailsWith<JobNotScheduledException> {
+            scheduler {
+                scheduler.resume(JobCategory.of("test").getType("test").getKey("x"))
+            }
         }
     }
 
-    @Test(expected = JobNotScheduledException::class)
+    @Test
     fun fire_immediately_for_not_schedule_job() {
-        scheduler {
-            scheduler.fireImmediately(JobCategory.of("test").getType("test").getKey("x"))
+        assertFailsWith<JobNotScheduledException> {
+            scheduler {
+                scheduler.fireImmediately(JobCategory.of("test").getType("test").getKey("x"))
+            }
         }
     }
 

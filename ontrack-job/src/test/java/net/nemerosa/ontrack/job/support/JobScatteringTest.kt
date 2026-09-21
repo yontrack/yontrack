@@ -6,7 +6,7 @@ import net.nemerosa.ontrack.job.Schedule.Companion.everyMinutes
 import net.nemerosa.ontrack.job.orchestrator.JobOrchestrator
 import net.nemerosa.ontrack.job.orchestrator.JobOrchestratorSupplier
 import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics
-import org.junit.Test
+import org.junit.jupiter.api.Test
 import java.util.concurrent.TimeUnit
 import java.util.function.Consumer
 import kotlin.jvm.optionals.getOrNull

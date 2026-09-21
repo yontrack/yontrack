@@ -5,11 +5,12 @@ import com.fasterxml.jackson.databind.node.IntNode
 import net.nemerosa.ontrack.model.structure.ID.Companion.isDefined
 import net.nemerosa.ontrack.model.structure.ID.Companion.of
 import net.nemerosa.ontrack.test.TestUtils
-import org.junit.Test
+import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
+import kotlin.test.assertFailsWith
 
 class IDTest {
     @Test
@@ -30,14 +31,18 @@ class IDTest {
         assertEquals("1", id.toString())
     }
 
-    @Test(expected = IllegalArgumentException::class)
+    @Test
     fun not_zero() {
-        of(0)
+        assertFailsWith<IllegalArgumentException> {
+            of(0)
+        }
     }
 
-    @Test(expected = IllegalArgumentException::class)
+    @Test
     fun not_negative() {
-        of(-1)
+        assertFailsWith<IllegalArgumentException> {
+            of(-1)
+        }
     }
 
     @Test

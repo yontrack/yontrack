@@ -3,7 +3,7 @@ package net.nemerosa.ontrack.model.security
 import net.nemerosa.ontrack.json.asJson
 import net.nemerosa.ontrack.json.parse
 import net.nemerosa.ontrack.model.structure.ID
-import org.junit.Test
+import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 
 class AccountGroupMappingInputTest {

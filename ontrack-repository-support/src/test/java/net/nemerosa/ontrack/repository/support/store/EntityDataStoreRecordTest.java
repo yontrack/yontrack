@@ -5,14 +5,14 @@ import net.nemerosa.ontrack.common.Time;
 import net.nemerosa.ontrack.model.structure.NameDescription;
 import net.nemerosa.ontrack.model.structure.Project;
 import net.nemerosa.ontrack.model.structure.Signature;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class EntityDataStoreRecordTest {
 
@@ -30,8 +30,8 @@ public class EntityDataStoreRecordTest {
         );
         records.sort(Comparator.naturalOrder());
         assertTrue(
-                "Newest record is first",
-                records.get(0).getId() == 1
+                records.get(0).getId() == 1,
+                "Newest record is first"
         );
     }
 
@@ -47,8 +47,8 @@ public class EntityDataStoreRecordTest {
         );
         records.sort(Comparator.naturalOrder());
         assertTrue(
-                "Newest record is first by ID if dates are equal",
-                records.get(0).getId() == 2
+                records.get(0).getId() == 2,
+                "Newest record is first by ID if dates are equal"
         );
     }
 

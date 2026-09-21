@@ -2,7 +2,7 @@ package net.nemerosa.ontrack.graphql.schema
 
 import net.nemerosa.ontrack.graphql.support.GraphQLBeanConverter
 import net.nemerosa.ontrack.graphql.support.typeName
-import org.junit.Test
+import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 
