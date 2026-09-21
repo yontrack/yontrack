@@ -10,7 +10,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.stereotype.Component
 import org.springframework.vault.core.VaultKeyValueOperationsSupport
 import org.springframework.vault.core.VaultOperations
-import org.springframework.vault.core.get
+import java.util.*
 
 @Component
 @ConditionalOnProperty(name = [OntrackConfigProperties.KEY_STORE], havingValue = VaultExtensionFeature.VAULT_KEY_STORE_PROPERTY)
@@ -23,14 +23,23 @@ class VaultConfidentialStore(
 
     private fun kvOps() = vaultOperations.opsForKeyValue(kvPath, VaultKeyValueOperationsSupport.KeyValueBackend.unversioned())
 
+    /*
+     * Vault is given plain maps, and what it gives back is read with Jackson 2 here: Spring Vault 4
+     * maps its payloads with Jackson 3, which cannot read nor write a Jackson 2 `JsonNode`.
+     *
+     * The stored secret keeps its 5.x shape, `{"data": {"payload": "<Base64>"}}`.
+     */
+
     override fun store(key: String, payload: ByteArray) {
         Validate.notNull(payload, "Key payload must not be null")
-        kvOps().put("${configProperties.prefix}/$key", VaultPayload(Key(payload).asJson()))
+        val secret = mapOf("data" to mapOf("payload" to Base64.getEncoder().encodeToString(payload)))
+        kvOps().put("${configProperties.prefix}/$key", secret)
     }
 
     override fun load(key: String): ByteArray? {
-        val payload = kvOps().get<VaultPayload>("${configProperties.prefix}/$key")
-        return payload?.data?.data?.parseOrNull<Key>()?.payload
+        val secret = kvOps().get("${configProperties.prefix}/$key")?.data ?: return null
+        // Next to `data`, Vault answers with `metadata`, which is not part of the payload
+        return secret["data"]?.asJson()?.parseOrNull<Key>()?.payload
     }
 
     init {

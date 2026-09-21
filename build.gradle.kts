@@ -333,7 +333,7 @@ configure(javaProjects) {
         "com.opencsv:opencsv:5.10",
         "com.networknt:json-schema-validator:1.5.5",
         "com.slack.api:slack-api-client:1.38.0",
-        "org.springframework.vault:spring-vault-core:3.1.2",
+        "org.springframework.vault:spring-vault-core:4.1.0",
 
         "io.jsonwebtoken:jjwt-api:$jjwtVersion",
         "io.jsonwebtoken:jjwt-impl:$jjwtVersion",

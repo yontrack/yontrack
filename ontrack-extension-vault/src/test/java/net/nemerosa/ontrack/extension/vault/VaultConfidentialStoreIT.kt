@@ -8,7 +8,10 @@ import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.test.annotation.DirtiesContext
 import org.springframework.test.context.TestPropertySource
+import org.springframework.vault.core.VaultKeyValueOperationsSupport
+import org.springframework.vault.core.VaultOperations
 import java.nio.charset.Charset
+import java.util.*
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 
@@ -24,6 +27,15 @@ class VaultConfidentialStoreIT : AbstractDSLTestSupport() {
     @Autowired
     private lateinit var store: ConfidentialStore
 
+    @Autowired
+    private lateinit var vaultOperations: VaultOperations
+
+    @Autowired
+    private lateinit var configProperties: VaultConfigProperties
+
+    private fun kvOps() =
+        vaultOperations.opsForKeyValue("/secret/data", VaultKeyValueOperationsSupport.KeyValueBackend.unversioned())
+
     @Test
     fun `Check Vault store is loaded`() {
         assertIs<VaultConfidentialStore>(store) {}
@@ -34,6 +46,30 @@ class VaultConfidentialStoreIT : AbstractDSLTestSupport() {
         val id = uid("K")
         store.store(id, KEY_BYTES)
         // Retriving the key
+        val bytes = store.load(id)
+        assertNotNull(bytes) {
+            assertEquals(KEY_BYTES.toTypedArray().toList(), it.toTypedArray().toList())
+        }
+    }
+
+    @Test
+    fun `A key is stored in Vault as its payload in Base64`() {
+        val id = uid("K")
+        store.store(id, KEY_BYTES)
+        val raw = kvOps().get("${configProperties.prefix}/$id")?.data
+        assertEquals(
+            mapOf("payload" to Base64.getEncoder().encodeToString(KEY_BYTES)),
+            raw?.get("data")
+        )
+    }
+
+    @Test
+    fun `A key stored by Yontrack 5 is read back`() {
+        val id = uid("K")
+        kvOps().put(
+            "${configProperties.prefix}/$id",
+            mapOf("data" to mapOf("payload" to Base64.getEncoder().encodeToString(KEY_BYTES)))
+        )
         val bytes = store.load(id)
         assertNotNull(bytes) {
             assertEquals(KEY_BYTES.toTypedArray().toList(), it.toTypedArray().toList())
