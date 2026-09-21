@@ -168,9 +168,9 @@ yontrack-config:
     # YONTRACK_URL and YONTRACK_TOKEN are defined as project or group CI/CD variables
     - yontrack ci config
       --file .yontrack/ci.yaml
-      --env GITLAB_CI --env CI_PROJECT_URL --env CI_PROJECT_PATH --env CI_PROJECT_NAME
-      --env CI_COMMIT_SHA --env CI_COMMIT_REF_NAME --env CI_MERGE_REQUEST_IID
-      --env CI_PIPELINE_ID --env CI_PIPELINE_IID --env CI_PIPELINE_URL
+      --env GITLAB_CI="$GITLAB_CI" --env CI_PROJECT_URL="$CI_PROJECT_URL" --env CI_PROJECT_PATH="$CI_PROJECT_PATH" --env CI_PROJECT_NAME="$CI_PROJECT_NAME"
+      --env CI_COMMIT_SHA="$CI_COMMIT_SHA" --env CI_COMMIT_REF_NAME="$CI_COMMIT_REF_NAME" --env CI_MERGE_REQUEST_IID="$CI_MERGE_REQUEST_IID"
+      --env CI_PIPELINE_ID="$CI_PIPELINE_ID" --env CI_PIPELINE_IID="$CI_PIPELINE_IID" --env CI_PIPELINE_URL="$CI_PIPELINE_URL"
 ```
 
 It expects the `.yontrack/ci.yaml` file to be present in the root of the repository.

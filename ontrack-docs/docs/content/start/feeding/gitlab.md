@@ -50,16 +50,16 @@ yontrack-config:
     # The Yontrack CLI is installed and pointed at $YONTRACK_URL with $YONTRACK_TOKEN beforehand
     - yontrack ci config
       --file .yontrack/ci.yaml
-      --env GITLAB_CI
-      --env CI_PROJECT_URL
-      --env CI_PROJECT_PATH
-      --env CI_PROJECT_NAME
-      --env CI_COMMIT_SHA
-      --env CI_COMMIT_REF_NAME
-      --env CI_MERGE_REQUEST_IID
-      --env CI_PIPELINE_ID
-      --env CI_PIPELINE_IID
-      --env CI_PIPELINE_URL
+      --env GITLAB_CI="$GITLAB_CI"
+      --env CI_PROJECT_URL="$CI_PROJECT_URL"
+      --env CI_PROJECT_PATH="$CI_PROJECT_PATH"
+      --env CI_PROJECT_NAME="$CI_PROJECT_NAME"
+      --env CI_COMMIT_SHA="$CI_COMMIT_SHA"
+      --env CI_COMMIT_REF_NAME="$CI_COMMIT_REF_NAME"
+      --env CI_MERGE_REQUEST_IID="$CI_MERGE_REQUEST_IID"
+      --env CI_PIPELINE_ID="$CI_PIPELINE_ID"
+      --env CI_PIPELINE_IID="$CI_PIPELINE_IID"
+      --env CI_PIPELINE_URL="$CI_PIPELINE_URL"
 ```
 
 The [`gitlab-ci` CI engine](../../reference/ci-config/ci-engines/gitlab-ci.md) and the
@@ -122,8 +122,7 @@ all. If you feed Yontrack from tag pipelines, give the branch explicitly:
 
 ```yaml
   script:
-    - export BRANCH_NAME=main
-    - yontrack ci config --file .yontrack/ci.yaml --env BRANCH_NAME --env GITLAB_CI # ... and the rest
+    - yontrack ci config --file .yontrack/ci.yaml --env BRANCH_NAME=main --env GITLAB_CI="$GITLAB_CI" # ... and the rest
 ```
 
 ## See also
