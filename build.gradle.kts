@@ -397,6 +397,19 @@ configure(javaProjects) {
         }
     }
 
+    // No Jackson 2 (#1843, ADR 0016). The Elasticsearch client is the last library to bring it, for
+    // its `JacksonJsonpMapper` only: Yontrack gives the client the `Jackson3JsonpMapper`. The rule
+    // removes it wherever the client comes from -- Spring Data Elasticsearch brings it too.
+    dependencies.components.withModule("co.elastic.clients:elasticsearch-java") {
+        allVariants {
+            withDependencies {
+                removeAll {
+                    it.group == "com.fasterxml.jackson.core" && it.name in setOf("jackson-core", "jackson-databind")
+                }
+            }
+        }
+    }
+
     dependencies {
         implementation(kotlin("stdlib"))
         implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core")
