@@ -2,10 +2,13 @@ package net.nemerosa.ontrack.service.elasticsearch
 
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import net.nemerosa.ontrack.model.security.SecurityService
 import net.nemerosa.ontrack.model.structure.SearchIndexService
+import net.nemerosa.ontrack.model.structure.SearchIndexStartupReset
 import net.nemerosa.ontrack.model.structure.SearchService
 import net.nemerosa.ontrack.model.support.OntrackConfigProperties
 import net.nemerosa.ontrack.model.support.StartupService
@@ -28,11 +31,17 @@ class ElasticSearchV5Migration(
     private val searchIndexService: SearchIndexService,
     private val securityService: SecurityService,
     private val ontrackConfigProperties: OntrackConfigProperties,
-) : StartupService {
+) : StartupService, SearchIndexStartupReset {
 
     private val logger: Logger = LoggerFactory.getLogger(ElasticSearchV5Migration::class.java)
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    /**
+     * Reset launched at startup, if any.
+     */
+    @Volatile
+    private var reset: Job? = null
 
     override fun getName(): String? = "ElasticSearch V5 migration"
 
@@ -47,7 +56,7 @@ class ElasticSearchV5Migration(
             ?.migrated ?: false
         if (!migrated || ontrackConfigProperties.search.index.reset) {
             logger.info("Launching the reset of all ElasticSearch indexes for migration to V5 (ES9)...")
-            scope.launch {
+            reset = scope.launch {
                 logger.info("Removing all ElasticSearch indexes for migration to V5 (ES9)...")
                 try {
                     securityService.asAdmin {
@@ -70,6 +79,10 @@ class ElasticSearchV5Migration(
         } else {
             logger.info("ElasticSearch indexes have already been migrated to V5 (ES9).")
         }
+    }
+
+    override fun awaitCompletion() {
+        reset?.let { runBlocking { it.join() } }
     }
 
     companion object {
