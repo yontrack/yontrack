@@ -15,8 +15,15 @@ export class SearchPage {
         await expect(link).toBeVisible({timeout: 20_000}) // Waiting a bit longer, in case ES is not ready yet
     }
 
-    async expectScmCommitResultPresent({commitId}) {
-        const link = this.page.getByRole('link', {name: commitId, exact: true})
+    /**
+     * The same commit can be found in several projects: its result is told apart by its link.
+     */
+    scmCommitResultLink({project, commitId}) {
+        return this.page.locator(`a[href="/extension/scm/${project.name}/commit-info/${commitId}"]`)
+    }
+
+    async expectScmCommitResultPresent({project, commitId}) {
+        const link = this.scmCommitResultLink({project, commitId})
         await expect(link).toBeVisible({timeout: 20_000}) // Waiting a bit longer, in case ES is not ready yet
     }
 
@@ -30,8 +37,8 @@ export class SearchPage {
         await link.click()
     }
 
-    async clickScmCommitResult({commitId}) {
-        const link = this.page.getByRole('link', {name: commitId, exact: true})
+    async clickScmCommitResult({project, commitId}) {
+        const link = this.scmCommitResultLink({project, commitId})
         await link.click()
     }
 

@@ -55,7 +55,7 @@ class ReleasePropertyType(
     }
 
     override fun onPropertyDeleted(entity: ProjectEntity, oldValue: ReleaseProperty) {
-        searchIndexService.deleteSearchIndex(releaseSearchExtension, ReleaseSearchItem(entity, oldValue).id)
+        searchIndexService.deleteSearchIndex(releaseSearchExtension, ReleaseSearchItem(entity, oldValue).documentId)
         eventPostService.post(
             eventFactory.updateBuildDisplayName(
                 build = entity as Build,

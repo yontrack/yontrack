@@ -103,7 +103,7 @@ class BuildLinkSearchExtension(
 
     override fun onBuildLinkDeleted(from: Build, to: Build, qualifier: String) {
         process(from, to, qualifier) { item ->
-            searchIndexService.deleteSearchIndex(this, item.id)
+            searchIndexService.deleteSearchIndex(this, item.documentId)
         }
     }
 

@@ -62,23 +62,24 @@ Pass the GitLab CI/CD variables to Yontrack with the Yontrack CLI:
 ```shell
 yontrack ci config \
   --file .yontrack/ci.yaml \
-  --env GITLAB_CI \
-  --env CI_PROJECT_URL \
-  --env CI_PROJECT_PATH \
-  --env CI_PROJECT_NAME \
-  --env CI_COMMIT_SHA \
-  --env CI_COMMIT_REF_NAME \
-  --env CI_MERGE_REQUEST_IID \
-  --env CI_PIPELINE_ID \
-  --env CI_PIPELINE_IID \
-  --env CI_PIPELINE_URL
+  --env GITLAB_CI="$GITLAB_CI" \
+  --env CI_PROJECT_URL="$CI_PROJECT_URL" \
+  --env CI_PROJECT_PATH="$CI_PROJECT_PATH" \
+  --env CI_PROJECT_NAME="$CI_PROJECT_NAME" \
+  --env CI_COMMIT_SHA="$CI_COMMIT_SHA" \
+  --env CI_COMMIT_REF_NAME="$CI_COMMIT_REF_NAME" \
+  --env CI_MERGE_REQUEST_IID="$CI_MERGE_REQUEST_IID" \
+  --env CI_PIPELINE_ID="$CI_PIPELINE_ID" \
+  --env CI_PIPELINE_IID="$CI_PIPELINE_IID" \
+  --env CI_PIPELINE_URL="$CI_PIPELINE_URL"
 ```
 
 !!! note
 
     Unlike the other CI engines, the variables are listed one by one rather than passed wholesale with
     `--env-all CI_`. The `CI_` namespace contains `CI_REPOSITORY_URL` and `CI_JOB_TOKEN`, which both carry the
-    job token: none of them is used by this engine, and there is no reason to send them to Yontrack at all.
+    job token: none of them is used by this engine, and there is no reason to send them to Yontrack at all. Each
+    `--env` takes a `KEY=VALUE` pair: the CLI rejects a bare variable name.
 
 These environment variables are used for:
 

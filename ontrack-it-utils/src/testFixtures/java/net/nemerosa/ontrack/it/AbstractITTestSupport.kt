@@ -8,7 +8,9 @@ import net.nemerosa.ontrack.common.RunProfile
 import net.nemerosa.ontrack.it.AbstractITTestSupport.AbstractIntegrationTestConfiguration
 import net.nemerosa.ontrack.json.ObjectMapperFactory.create
 import net.nemerosa.ontrack.model.structure.NameDescription
+import net.nemerosa.ontrack.model.structure.SearchIndexStartupReset
 import net.nemerosa.ontrack.test.TestUtils
+import org.junit.jupiter.api.BeforeEach
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
@@ -52,6 +54,18 @@ abstract class AbstractITTestSupport {
 
     @Autowired
     protected lateinit var dataSource: DataSource
+
+    @Autowired(required = false)
+    private var searchIndexStartupReset: SearchIndexStartupReset? = null
+
+    /**
+     * On a fresh stack, the search indexes are reset in the background at startup, which would
+     * delete the documents a test indexes in the meantime.
+     */
+    @BeforeEach
+    fun awaitSearchIndexStartupReset() {
+        searchIndexStartupReset?.awaitCompletion()
+    }
 
     /**
      * Named Jdbc template for tests that need direct access to the database
