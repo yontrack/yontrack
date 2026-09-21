@@ -1,6 +1,7 @@
 package net.nemerosa.ontrack.extension.general
 
 import org.apache.commons.lang3.StringUtils
+import org.apache.commons.lang3.Strings
 import java.util.regex.Pattern
 
 data class MetaInfoPropertyItem(
@@ -15,9 +16,9 @@ data class MetaInfoPropertyItem(
      * or contains wildcards (*).
      */
     fun matchNameValue(namePattern: String, valuePattern: String): Boolean {
-        return StringUtils.equals(this.name, namePattern) && (StringUtils.isBlank(valuePattern) ||
-                StringUtils.equals("*", valuePattern) ||
-                Pattern.matches(StringUtils.replace(valuePattern, "*", ".*"), this.value))
+        return Strings.CS.equals(this.name, namePattern) && (StringUtils.isBlank(valuePattern) ||
+                Strings.CS.equals("*", valuePattern) ||
+                Pattern.matches(Strings.CS.replace(valuePattern, "*", ".*"), this.value))
     }
 
     /**

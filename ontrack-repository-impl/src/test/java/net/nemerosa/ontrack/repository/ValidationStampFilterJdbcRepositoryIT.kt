@@ -7,7 +7,7 @@ import net.nemerosa.ontrack.model.structure.NameDescription
 import net.nemerosa.ontrack.model.structure.Project
 import net.nemerosa.ontrack.model.structure.ValidationStampFilter
 import net.nemerosa.ontrack.test.TestUtils.uid
-import org.apache.commons.lang3.StringUtils
+import org.apache.commons.lang3.Strings
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -225,7 +225,7 @@ class ValidationStampFilterJdbcRepositoryIT : AbstractRepositoryTestSupport() {
     fun global_filters() {
         val name = createFilters()
         val list = filterRepository.globalValidationStampFilters
-            .filter { f -> StringUtils.equals(name, f.name) }
+            .filter { f -> Strings.CS.equals(name, f.name) }
         assertEquals(1, list.size.toLong())
         assertEquals(name, list[0].name)
         assertEquals(listOf("GLOBAL"), list[0].vsNames)
@@ -235,7 +235,7 @@ class ValidationStampFilterJdbcRepositoryIT : AbstractRepositoryTestSupport() {
     fun project_filters() {
         val name = createFilters()
         val list = filterRepository.getProjectValidationStampFilters(branch.project)
-            .filter { f -> StringUtils.equals(name, f.name) }
+            .filter { f -> Strings.CS.equals(name, f.name) }
         assertEquals(1, list.size.toLong())
         assertEquals(name, list[0].name)
         assertEquals(listOf("PROJECT"), list[0].vsNames)
@@ -245,7 +245,7 @@ class ValidationStampFilterJdbcRepositoryIT : AbstractRepositoryTestSupport() {
     fun branch_filters() {
         val name = createFilters()
         val list = filterRepository.getBranchValidationStampFilters(branch)
-            .filter { f -> StringUtils.equals(name, f.name) }
+            .filter { f -> Strings.CS.equals(name, f.name) }
         assertEquals(1, list.size.toLong())
         assertEquals(name, list[0].name)
         assertEquals(listOf("BRANCH"), list[0].vsNames)

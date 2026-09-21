@@ -11,6 +11,7 @@ import net.nemerosa.ontrack.model.structure.ProjectEntity
 import net.nemerosa.ontrack.model.structure.ProjectEntityType
 import net.nemerosa.ontrack.model.structure.PropertySearchArguments
 import org.apache.commons.lang3.StringUtils
+import org.apache.commons.lang3.Strings
 import org.springframework.stereotype.Component
 import java.util.*
 
@@ -43,7 +44,7 @@ class MetaInfoPropertyType(
     }
 
     override fun containsValue(value: MetaInfoProperty, propertyValue: String): Boolean {
-        val pos = StringUtils.indexOf(propertyValue, ":")
+        val pos = Strings.CS.indexOf(propertyValue, ":")
         return if (pos > 0) {
             val entryValue = StringUtils.substringAfter(propertyValue, ":")
             val name = StringUtils.substringBefore(propertyValue, ":")

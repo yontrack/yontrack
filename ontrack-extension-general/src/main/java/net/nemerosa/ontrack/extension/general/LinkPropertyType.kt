@@ -11,7 +11,7 @@ import net.nemerosa.ontrack.model.structure.ProjectEntity
 import net.nemerosa.ontrack.model.structure.ProjectEntityType
 import net.nemerosa.ontrack.model.structure.PropertySearchArguments
 import net.nemerosa.ontrack.model.support.NameValue
-import org.apache.commons.lang3.StringUtils
+import org.apache.commons.lang3.Strings
 import org.springframework.stereotype.Component
 import java.util.*
 
@@ -65,6 +65,6 @@ class LinkPropertyType(
             value.links.map {
                 it.value
             }.any {
-                StringUtils.containsIgnoreCase(it, propertyValue)
+                Strings.CI.contains(it, propertyValue)
             }
 }

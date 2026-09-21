@@ -9,7 +9,7 @@ import net.nemerosa.ontrack.model.security.SecurityService
 import net.nemerosa.ontrack.model.settings.SettingsManager
 import net.nemerosa.ontrack.model.settings.SettingsManagerNotFoundException
 import net.nemerosa.ontrack.model.settings.SettingsValidationException
-import org.apache.commons.lang3.StringUtils
+import org.apache.commons.lang3.Strings
 import org.springframework.http.HttpStatus
 import org.springframework.web.bind.annotation.*
 
@@ -33,7 +33,7 @@ class SettingsController(
         securityService.checkGlobalFunction(GlobalSettings::class.java)
         @Suppress("UNCHECKED_CAST") val settings: T? = settingsManagers
                 .filter { candidate ->
-                    StringUtils.equals(
+                    Strings.CS.equals(
                             type,
                             getSettingsManagerName(candidate)
                     )
@@ -55,7 +55,7 @@ class SettingsController(
         @Suppress("UNCHECKED_CAST")
         val settingsManager: SettingsManager<T> = (settingsManagers
                 .firstOrNull { candidate ->
-                    StringUtils.equals(
+                    Strings.CS.equals(
                             type,
                             getSettingsManagerName(candidate)
                     )

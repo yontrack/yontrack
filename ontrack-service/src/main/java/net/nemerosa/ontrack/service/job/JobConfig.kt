@@ -36,7 +36,7 @@ class JobConfig(
     private fun jobTaskScheduler(): TaskScheduler = ThreadPoolTaskScheduler().apply {
         poolSize = ontrackConfigProperties.jobs.poolSize
         setThreadFactory(
-            BasicThreadFactory.Builder()
+            BasicThreadFactory.builder()
                 .daemon(true)
                 .namingPattern("job-%s")
                 .build()

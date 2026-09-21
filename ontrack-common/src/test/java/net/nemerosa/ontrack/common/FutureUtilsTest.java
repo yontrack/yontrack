@@ -55,7 +55,7 @@ public class FutureUtilsTest {
 
     private final ExecutorService executor = Executors.newFixedThreadPool(
             2,
-            new BasicThreadFactory.Builder().daemon(true).build()
+            BasicThreadFactory.builder().daemon(true).build()
     );
 
     @Test

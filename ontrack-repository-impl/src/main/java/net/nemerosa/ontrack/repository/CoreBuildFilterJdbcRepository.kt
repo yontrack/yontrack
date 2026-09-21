@@ -8,6 +8,7 @@ import net.nemerosa.ontrack.model.support.OntrackConfigProperties
 import net.nemerosa.ontrack.repository.support.AbstractJdbcRepository
 import net.nemerosa.ontrack.repository.support.createSQL
 import org.apache.commons.lang3.StringUtils
+import org.apache.commons.lang3.Strings
 import org.apache.commons.lang3.StringUtils.isNotBlank
 import org.springframework.dao.DataAccessException
 import org.springframework.stereotype.Repository
@@ -446,9 +447,9 @@ class CoreBuildFilterJdbcRepository(
             params["fromProject"] = project
             val buildPattern = StringUtils.substringAfter(linkedFrom, ":")
             if (isNotBlank(buildPattern)) {
-                if (StringUtils.contains(buildPattern, "*")) {
+                if (Strings.CS.contains(buildPattern, "*")) {
                     criteria.add("BDFROM.NAME LIKE :buildFrom")
-                    params["buildFrom"] = StringUtils.replace(buildPattern, "*", "%")
+                    params["buildFrom"] = Strings.CS.replace(buildPattern, "*", "%")
                 } else {
                     criteria.add("BDFROM.NAME = :buildFrom")
                     params["buildFrom"] = buildPattern
@@ -479,9 +480,9 @@ class CoreBuildFilterJdbcRepository(
             params["toProject"] = project
             val buildPattern = StringUtils.substringAfter(linkedTo, ":")
             if (isNotBlank(buildPattern)) {
-                if (StringUtils.contains(buildPattern, "*")) {
+                if (Strings.CS.contains(buildPattern, "*")) {
                     criteria.add("BDTO.NAME LIKE :buildTo")
-                    params["buildTo"] = StringUtils.replace(buildPattern, "*", "%")
+                    params["buildTo"] = Strings.CS.replace(buildPattern, "*", "%")
                 } else {
                     criteria.add("BDTO.NAME = :buildTo")
                     params["buildTo"] = buildPattern
@@ -647,9 +648,9 @@ class CoreBuildFilterJdbcRepository(
         params["branch"] = branch.id()
 
         // Since build
-        if (StringUtils.contains(sinceBuild, "*")) {
+        if (Strings.CS.contains(sinceBuild, "*")) {
             sql.append(" AND B.NAME LIKE :buildName")
-            params["buildName"] = StringUtils.replace(sinceBuild, "*", "%")
+            params["buildName"] = Strings.CS.replace(sinceBuild, "*", "%")
         } else {
             sql.append(" AND B.NAME = :buildName")
             params["buildName"] = sinceBuild

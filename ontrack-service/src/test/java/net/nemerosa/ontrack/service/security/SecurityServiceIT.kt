@@ -4,7 +4,7 @@ import net.nemerosa.ontrack.it.AbstractDSLTestSupport
 import net.nemerosa.ontrack.it.AsAdminTest
 import net.nemerosa.ontrack.it.NoAuthTest
 import net.nemerosa.ontrack.model.security.*
-import org.apache.commons.lang3.StringUtils
+import org.apache.commons.lang3.Strings
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.security.access.AccessDeniedException
@@ -112,8 +112,8 @@ class SecurityServiceIT : AbstractDSLTestSupport() {
                 val list = structureService.projectList
                 // Checks we only have the two projects (among all others)
                 assertTrue(list.size >= 2)
-                assertTrue(list.stream().anyMatch { (_, name2) -> StringUtils.equals(name, name2) })
-                assertTrue(list.stream().anyMatch { (_, name2) -> StringUtils.equals(name1, name2) })
+                assertTrue(list.stream().anyMatch { (_, name2) -> Strings.CS.equals(name, name2) })
+                assertTrue(list.stream().anyMatch { (_, name2) -> Strings.CS.equals(name1, name2) })
                 // Access to the projects
                 assertTrue(structureService.findProjectByName(name).isPresent)
                 assertNotNull(structureService.getProject(id))
@@ -139,8 +139,8 @@ class SecurityServiceIT : AbstractDSLTestSupport() {
                 val list = structureService.projectList
                 // Checks we only have the two projects (among all others)
                 assertTrue(list.size >= 2)
-                assertTrue(list.stream().anyMatch { (_, name2) -> StringUtils.equals(name, name2) })
-                assertTrue(list.stream().anyMatch { (_, name2) -> StringUtils.equals(name1, name2) })
+                assertTrue(list.stream().anyMatch { (_, name2) -> Strings.CS.equals(name, name2) })
+                assertTrue(list.stream().anyMatch { (_, name2) -> Strings.CS.equals(name1, name2) })
                 // Access to the projects
                 assertTrue(structureService.findProjectByName(name).isPresent)
                 assertNotNull(structureService.getProject(id))

@@ -11,6 +11,7 @@ import net.nemerosa.ontrack.git.model.*
 import net.nemerosa.ontrack.git.model.plot.GitPlotRenderer
 import org.apache.commons.io.FileUtils
 import org.apache.commons.lang3.StringUtils
+import org.apache.commons.lang3.Strings
 import org.eclipse.jgit.api.*
 import org.eclipse.jgit.api.errors.GitAPIException
 import org.eclipse.jgit.api.errors.InvalidRemoteException
@@ -92,7 +93,7 @@ class GitRepositoryClientImpl(
                 return git.lsRemote()
                     .setHeads(true)
                     .invoke<LsRemoteCommand, Collection<Ref>>("Getting remote branches at ${repository.remote}")
-                    .map { ref -> StringUtils.removeStart(ref.name, "refs/heads/") }
+                    .map { ref -> Strings.CS.removeStart(ref.name, "refs/heads/") }
             } catch (e: GitAPIException) {
                 throw GitRepositoryAPIException(repository.remote, e)
             }
@@ -116,8 +117,8 @@ class GitRepositoryClientImpl(
                 val branchRefs = git.branchList().setListMode(ListBranchCommand.ListMode.REMOTE).call()
                 val index = TreeMap<String, GitCommit>()
                 for (ref in branchRefs) {
-                    val branchName = StringUtils.removeStart(ref.name, "refs/remotes/origin/")
-                    if (!StringUtils.equals("HEAD", branchName)) {
+                    val branchName = Strings.CS.removeStart(ref.name, "refs/remotes/origin/")
+                    if (!Strings.CS.equals("HEAD", branchName)) {
                         val revCommit = revWalk.parseCommit(ref.objectId)
                         val gitCommit = toCommit(revCommit)
                         index[branchName] = gitCommit
@@ -163,9 +164,9 @@ class GitRepositoryClientImpl(
                 .setListMode(ListBranchCommand.ListMode.REMOTE)
                 .call()
             return list.asSequence().map {
-                StringUtils.removeStart(it.name, "refs/remotes/origin/")
+                Strings.CS.removeStart(it.name, "refs/remotes/origin/")
             }.map {
-                StringUtils.removeStart(it, "refs/heads/")
+                Strings.CS.removeStart(it, "refs/heads/")
             }.filter {
                 it != "HEAD"
             }.distinct().sorted().toList()

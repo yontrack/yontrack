@@ -13,7 +13,7 @@ import net.nemerosa.ontrack.model.structure.Project
 import net.nemerosa.ontrack.model.structure.ValidationStampFilter
 import net.nemerosa.ontrack.model.structure.ValidationStampFilterService
 import net.nemerosa.ontrack.test.TestUtils.uid
-import org.apache.commons.lang3.StringUtils
+import org.apache.commons.lang3.Strings
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -309,7 +309,7 @@ class ValidationStampFilterServiceIT : AbstractDSLTestSupport() {
         val name = createFilters()
         asUser().with(GlobalSettings::class.java).execute {
             val list = filterService.globalValidationStampFilters
-                .filter { f -> StringUtils.equals(name, f.name) }
+                .filter { f -> Strings.CS.equals(name, f.name) }
             assertEquals(1, list.size.toLong())
             assertEquals(name, list[0].name)
             assertEquals(listOf("GLOBAL"), list[0].vsNames)
@@ -321,7 +321,7 @@ class ValidationStampFilterServiceIT : AbstractDSLTestSupport() {
         val name = createFilters()
         val list = asUser().withView(branch).call {
             filterService.getProjectValidationStampFilters(branch.project, false)
-                .filter { f -> StringUtils.equals(name, f.name) }
+                .filter { f -> Strings.CS.equals(name, f.name) }
         }
         assertEquals(1, list.size.toLong())
         assertEquals(name, list[0].name)
@@ -333,7 +333,7 @@ class ValidationStampFilterServiceIT : AbstractDSLTestSupport() {
         val name = createFilters()
         val list = asUser().withView(branch).call {
             filterService.getProjectValidationStampFilters(branch.project, true)
-                .filter { f -> StringUtils.equals(name, f.name) }
+                .filter { f -> Strings.CS.equals(name, f.name) }
         }
         assertEquals(1, list.size.toLong())
         assertEquals(name, list[0].name)
@@ -345,7 +345,7 @@ class ValidationStampFilterServiceIT : AbstractDSLTestSupport() {
         val name = createFilters()
         val list = asUser().withView(branch).call {
             filterService.getBranchValidationStampFilters(branch, false)
-                .filter { f -> StringUtils.equals(name, f.name) }
+                .filter { f -> Strings.CS.equals(name, f.name) }
         }
         assertEquals(1, list.size.toLong())
         assertEquals(name, list[0].name)
@@ -357,7 +357,7 @@ class ValidationStampFilterServiceIT : AbstractDSLTestSupport() {
         val name = createFilters()
         val list = asUser().withView(branch).call {
             filterService.getBranchValidationStampFilters(branch, true)
-                .filter { f -> StringUtils.equals(name, f.name) }
+                .filter { f -> Strings.CS.equals(name, f.name) }
         }
         assertEquals(1, list.size.toLong())
         assertEquals(name, list[0].name)

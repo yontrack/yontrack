@@ -13,7 +13,7 @@ import net.nemerosa.ontrack.model.security.SecurityService
 import net.nemerosa.ontrack.model.structure.*
 import net.nemerosa.ontrack.model.support.AbstractBranchJob
 import net.nemerosa.ontrack.model.support.ConfigurationServiceListener
-import org.apache.commons.lang3.StringUtils
+import org.apache.commons.lang3.Strings
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import java.util.regex.Pattern
@@ -103,7 +103,7 @@ class ArtifactoryPromotionSyncServiceImpl(
         listener.message(log)
         // Build name filter
         val buildNamePattern = Pattern.compile(
-            StringUtils.replace(StringUtils.replace(buildNameFilter, ".", "\\."), "*", ".*")
+            Strings.CS.replace(Strings.CS.replace(buildNameFilter, ".", "\\."), "*", ".*")
         )
         // Gets an Artifactory client
         val client = artifactoryClientFactory.getClient(configuration)

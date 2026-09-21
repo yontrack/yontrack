@@ -8,7 +8,7 @@ import net.nemerosa.ontrack.model.security.ProjectConfig
 import net.nemerosa.ontrack.model.security.SecurityService
 import net.nemerosa.ontrack.model.structure.ID
 import net.nemerosa.ontrack.model.structure.StructureService
-import org.apache.commons.lang3.StringUtils
+import org.apache.commons.lang3.Strings
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 
@@ -60,7 +60,7 @@ class SCMController(
         @RequestBody filter: SCMFileChangeFilter
     ): ResponseEntity<SCMFileChangeFilter> {
         check(
-            StringUtils.equals(
+            Strings.CS.equals(
                 name,
                 filter.name
             )

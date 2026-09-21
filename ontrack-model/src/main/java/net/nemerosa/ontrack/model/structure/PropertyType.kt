@@ -5,7 +5,7 @@ import net.nemerosa.ontrack.model.extension.Extension
 import net.nemerosa.ontrack.model.json.schema.JsonType
 import net.nemerosa.ontrack.model.json.schema.JsonTypeBuilder
 import net.nemerosa.ontrack.model.security.SecurityService
-import org.apache.commons.lang3.StringUtils
+import org.apache.commons.lang3.Strings
 
 /**
  * Defines the type for a property.
@@ -99,7 +99,7 @@ interface PropertyType<T> : Extension {
      * @return `true` is found
      */
     fun containsValue(value: T, propertyValue: String): Boolean {
-        return StringUtils.containsIgnoreCase(value.toString(), propertyValue)
+        return Strings.CI.contains(value.toString(), propertyValue)
     }
 
     val typeName: String

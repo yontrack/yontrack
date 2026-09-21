@@ -6,7 +6,7 @@ import net.nemerosa.ontrack.model.buildfilter.BuildFilterInput;
 import net.nemerosa.ontrack.model.buildfilter.BuildFilterResource;
 import net.nemerosa.ontrack.model.buildfilter.BuildFilterService;
 import net.nemerosa.ontrack.model.structure.ID;
-import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.Strings;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -52,7 +52,7 @@ public class BuildFilterController {
      */
     @RequestMapping(value = "branches/{branchId}/filters/{name}", method = RequestMethod.PUT)
     public ResponseEntity<Ack> saveFilter(@PathVariable ID branchId, @PathVariable String name, @RequestBody @Valid BuildFilterInput input) {
-        if (!StringUtils.equals(name, input.getName())) {
+        if (!Strings.CS.equals(name, input.getName())) {
             throw new IllegalArgumentException("The input name must be identical to the one in the URI.");
         }
         return ResponseEntity.ok(
