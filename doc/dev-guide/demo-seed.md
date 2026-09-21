@@ -35,7 +35,7 @@ carry a Gradle build with it:
 ontrack-demo-seed/build/install/ontrack-demo-seed/bin/ontrack-demo-seed
 ```
 
-The launcher runs on whatever `java` it finds, so it needs a JDK 21 on the `PATH` or a
+The launcher runs on whatever `java` it finds, so it needs a JDK 25 on the `PATH` or a
 `JAVA_HOME` pointing at one — the same JDK the rest of the build requires.
 
 | Variable                  | Default              | Meaning                                            |

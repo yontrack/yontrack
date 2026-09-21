@@ -150,7 +150,7 @@ jobs:
         if: ${{ steps.fixture.outputs.provisioned == 'true' }}
         with:
           distribution: zulu
-          java-version: "21"
+          java-version: "25"
 
       - uses: gradle/actions/setup-gradle@v6
         if: ${{ steps.fixture.outputs.provisioned == 'true' }}

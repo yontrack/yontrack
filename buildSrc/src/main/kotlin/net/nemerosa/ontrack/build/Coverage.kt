@@ -19,10 +19,10 @@ object Coverage {
     /**
      * The JaCoCo version, for the Gradle plugin's `toolVersion` and for every jar the other
      * coverage issues need (`org.jacoco:org.jacoco.agent:<version>:runtime`,
-     * `org.jacoco:org.jacoco.cli:<version>:nodeps`). 0.8.13 reads JDK 21 class files, which is what
-     * this build produces.
+     * `org.jacoco:org.jacoco.cli:<version>:nodeps`). 0.8.14 is the first release that reads JDK 25
+     * class files, which is what this build produces.
      */
-    const val JACOCO_VERSION = "0.8.13"
+    const val JACOCO_VERSION = "0.8.14"
 
     /**
      * Gradle property gating the agent: `./gradlew test -Pcoverage`. The `jacoco` plugin itself is

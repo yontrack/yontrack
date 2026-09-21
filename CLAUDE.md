@@ -11,7 +11,7 @@ branches, builds, promotions, and validations across the software delivery lifec
 - **Search:** Elasticsearch
 - **Messaging:** RabbitMQ
 - **Auth:** OIDC/JWT
-- **Build:** Gradle (Kotlin DSL), JDK 21 required
+- **Build:** Gradle (Kotlin DSL), JDK 25 required
 
 ---
 

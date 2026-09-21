@@ -167,7 +167,7 @@ jobs:
       - uses: actions/setup-java@v6
         with:
           distribution: zulu
-          java-version: "21"
+          java-version: "25"
 
       - uses: gradle/actions/setup-gradle@v6
 
@@ -384,7 +384,7 @@ jobs:
       - uses: actions/setup-java@v6
         with:
           distribution: zulu
-          java-version: "21"
+          java-version: "25"
 
       - uses: gradle/actions/setup-gradle@v6
 
@@ -738,7 +738,7 @@ jobs:
       - uses: actions/setup-java@v6
         with:
           distribution: zulu
-          java-version: "21"
+          java-version: "25"
 
       - uses: gradle/actions/setup-gradle@v6
 
@@ -1004,7 +1004,7 @@ jobs:
       - uses: actions/setup-java@v6
         with:
           distribution: zulu
-          java-version: "21"
+          java-version: "25"
 
       - uses: gradle/actions/setup-gradle@v6
 
@@ -1306,7 +1306,7 @@ jobs:
       - uses: actions/setup-java@v6
         with:
           distribution: zulu
-          java-version: "21"
+          java-version: "25"
 
       - uses: gradle/actions/setup-gradle@v6
 
@@ -1603,7 +1603,7 @@ jobs:
       - uses: actions/setup-java@v6
         with:
           distribution: zulu
-          java-version: "21"
+          java-version: "25"
 
       # Before the reports, not after: a report step that fails must still be able to send its
       # six FAILED stamps. The build this job runs for is always registered — `coverage` is only
@@ -1989,7 +1989,7 @@ jobs:
       - uses: actions/setup-java@v6
         with:
           distribution: zulu
-          java-version: "21"
+          java-version: "25"
 
       - uses: gradle/actions/setup-gradle@v6
 

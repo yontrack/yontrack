@@ -73,3 +73,22 @@ The KDSL builds its HTTP client with `spring-boot-restclient`; a program which b
 `RestTemplate` alongside it should build it from
 `net.nemerosa.ontrack.kdsl.connector.support.jackson2RestTemplateBuilder()`, for the reason given
 above.
+
+## Java 25
+
+Yontrack 6 is built for and runs on **JDK 25**, an LTS release. Yontrack 5 ran on JDK 21.
+
+### For deployers
+
+* **Docker image** — the `nemerosa/ontrack` image now runs on `azul/zulu-openjdk-alpine:25`.
+  Nothing changes for an installation that runs the image.
+* **Running the JAR yourself** — the minimum runtime is now JDK 25: the classes are compiled for
+  it, and an older JVM refuses to load them.
+* **Runtime warnings** — JDK 25 warns about libraries (Netty, Kotlin coroutines, …) which still
+  use `sun.misc.Unsafe` memory access or restricted native methods. These warnings are expected
+  and harmless.
+
+### For extension authors
+
+An extension must be compiled with a JDK 25 toolchain, since it compiles against Yontrack
+classes which target JDK 25.

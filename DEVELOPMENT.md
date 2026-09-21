@@ -6,7 +6,7 @@ To start developing with Yontrack, follow these instructions.
 
 You need:
 
-* JDK 21
+* JDK 25
 * Docker (Desktop)
 
 ## Getting the code
