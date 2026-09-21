@@ -1,12 +1,9 @@
 package net.nemerosa.ontrack.boot.support
 
-import com.nimbusds.jose.JOSEObjectType
-import com.nimbusds.jose.proc.DefaultJOSEObjectTypeVerifier
-import com.nimbusds.jose.proc.SecurityContext
-import com.nimbusds.jwt.proc.ConfigurableJWTProcessor
 import net.nemerosa.ontrack.model.support.OntrackConfigProperties
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
+import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression
 import org.springframework.boot.security.autoconfigure.actuate.web.servlet.EndpointRequest
 import org.springframework.boot.actuate.endpoint.web.WebServerNamespace
 import org.springframework.boot.web.server.context.WebServerApplicationContext
@@ -15,15 +12,14 @@ import org.springframework.context.annotation.Configuration
 import org.springframework.security.config.annotation.web.builders.HttpSecurity
 import org.springframework.security.config.annotation.web.invoke
 import org.springframework.security.config.http.SessionCreationPolicy
-import org.springframework.security.oauth2.jwt.JwtDecoder
-import org.springframework.security.oauth2.jwt.NimbusJwtDecoder
-import org.springframework.security.oauth2.jwt.SupplierJwtDecoder
+import org.springframework.security.oauth2.core.OAuth2TokenValidator
+import org.springframework.security.oauth2.jwt.Jwt
+import org.springframework.security.oauth2.jwt.JwtTypeValidator
 import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter
 import org.springframework.security.web.SecurityFilterChain
 import org.springframework.security.web.util.matcher.OrRequestMatcher
 import org.springframework.security.web.util.matcher.RequestMatcher
 import org.springframework.web.context.support.WebApplicationContextUtils
-import java.util.function.Supplier
 
 @Configuration
 class WebSecurityConfig(
@@ -66,10 +62,7 @@ class WebSecurityConfig(
      * API login
      */
     @Bean
-    fun apiWebSecurity(
-        http: HttpSecurity,
-        jwtDecoder: JwtDecoder,
-    ): SecurityFilterChain {
+    fun apiWebSecurity(http: HttpSecurity): SecurityFilterChain {
         http {
             authorizeHttpRequests {
                 authorize("/hook/secured/**", permitAll)
@@ -80,11 +73,7 @@ class WebSecurityConfig(
             cors { }
             sessionManagement { sessionCreationPolicy = SessionCreationPolicy.STATELESS }
             oauth2ResourceServer {
-                jwt {
-                    if (ontrackConfigProperties.security.authorization.jwt.typ.isNotBlank()) {
-                        this.jwtDecoder = customJwtDecoder(jwtDecoder, ontrackConfigProperties.security.authorization.jwt.typ)
-                    }
-                }
+                jwt { }
             }
             addFilterAfter<BearerTokenAuthenticationFilter>(tokenSecurityFilter)
             addFilterAfter<TokenSecurityFilter>(webSecurityFilter)
@@ -92,33 +81,18 @@ class WebSecurityConfig(
         return http.build()
     }
 
-    private fun customJwtDecoder(jwtDecoder: JwtDecoder, typ: String): JwtDecoder {
-        if (jwtDecoder is NimbusJwtDecoder) {
-            @Suppress("UNCHECKED_CAST")
-            val jwtProcessor = jwtDecoder::class
-                .java
-                .getDeclaredField("jwtProcessor")
-                .apply { isAccessible = true }
-                .get(jwtDecoder) as ConfigurableJWTProcessor<SecurityContext>
-            logger.info("Using a custom JWT `typ`: $typ")
-            jwtProcessor.jwsTypeVerifier = DefaultJOSEObjectTypeVerifier(
-                setOf(
-                    JOSEObjectType(typ)
-                )
-            )
-            return jwtDecoder
-        } else if (jwtDecoder is SupplierJwtDecoder) {
-            @Suppress("UNCHECKED_CAST")
-            val delegate = jwtDecoder::class
-                .java
-                .getDeclaredField("delegate")
-                .apply { isAccessible = true }
-                .get(jwtDecoder) as Supplier<JwtDecoder>
-            val delegateDecoder = delegate.get()
-            return customJwtDecoder(delegateDecoder, typ)
-        } else {
-            return jwtDecoder
-        }
+    /**
+     * Custom JWT `typ`, accepted in place of the standard `JWT`.
+     *
+     * Spring Boot adds every `OAuth2TokenValidator<Jwt>` bean to the validators of the JWT decoder
+     * it configures, and Spring Security then leaves out its default `JwtTypeValidator.jwt()`.
+     */
+    @Bean
+    @ConditionalOnExpression("'\${ontrack.config.security.authorization.jwt.typ:}'.trim() != ''")
+    fun jwtTypeValidator(): OAuth2TokenValidator<Jwt> {
+        val typ = ontrackConfigProperties.security.authorization.jwt.typ.trim()
+        logger.info("Using a custom JWT `typ`: $typ")
+        return JwtTypeValidator(typ)
     }
 
 }

@@ -12,6 +12,7 @@ import net.nemerosa.ontrack.test.TestUtils
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration
 import org.springframework.boot.jdbc.autoconfigure.DataSourceProperties
 import org.springframework.boot.test.context.SpringBootTest
@@ -66,7 +67,13 @@ abstract class AbstractITTestSupport {
 
         private val logger: Logger = LoggerFactory.getLogger(AbstractITTestSupport::class.java)
 
+        /**
+         * No identity provider in the tests: the JWT decoder is a mock, unless a test gives the
+         * resource server a public key to check the tokens with, to run the real decoder of Spring
+         * Boot (see `AbstractJwtTypeIT`).
+         */
         @Bean
+        @ConditionalOnExpression("'\${spring.security.oauth2.resourceserver.jwt.public-key-location:}' == ''")
         fun jwtDecoder(): JwtDecoder = mockk<JwtDecoder>(relaxed = true)
 
         @Bean
