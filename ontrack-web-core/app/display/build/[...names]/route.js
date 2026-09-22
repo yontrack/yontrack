@@ -84,7 +84,8 @@ const findBuildByName = async (request, project, branch, name) => {
     }
 }
 
-export async function GET(request, {params}) {
+export async function GET(request, props) {
+    const params = await props.params
     const names = params.names
     if (names.length < 3) {
         return NextResponse.json({error: 'Missing build name'}, {status: 400})

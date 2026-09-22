@@ -6,6 +6,7 @@ import MobileBuildScreen from "./BuildScreen"
  *
  * The screen itself is a client component; the page is only the route.
  */
-export default function MobileBuildPage({params}) {
+export default async function MobileBuildPage(props) {
+    const params = await props.params
     return <MobileBuildScreen id={params.id}/>
 }

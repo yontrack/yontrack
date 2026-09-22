@@ -1,10 +1,10 @@
 /**
- * The decision the middleware takes on every page request: leave this request
+ * The decision the proxy takes on every page request: leave this request
  * on the desktop UI, or send it to the mobile one.
  *
- * Kept apart from `middleware.js` as a pure function of the four facts that
+ * Kept apart from `proxy.js` as a pure function of the four facts that
  * matter, so the rules can be tested without building a `NextRequest` and
- * without the edge runtime. `middleware.js` is the thin adapter over it.
+ * without a server runtime. `proxy.js` is the thin adapter over it.
  */
 import {isPhoneUserAgent} from "@components/mobile/userAgent"
 import {
@@ -41,7 +41,7 @@ const STRIPPED_BY_BROWSERS = /[\u0000-\u0020\u007f]/
  *
  * It ends up in a `window.location.assign` on the interstitial, so a host- or
  * scheme-carrying value would turn that page into an open redirect. The
- * middleware builds the target itself, but the interstitial reads it back off a
+ * proxy builds the target itself, but the interstitial reads it back off a
  * query string anyone can type.
  *
  * @param {unknown} url

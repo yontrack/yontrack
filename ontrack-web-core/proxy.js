@@ -1,7 +1,7 @@
 /**
  * Sends phones to the mobile UI.
  *
- * The middleware is the only place this decision can be taken before anything is
+ * The proxy is the only place this decision can be taken before anything is
  * rendered, which is what makes it a redirect rather than a flash of the desktop
  * UI followed by a jump. A **redirect** and not a rewrite, deliberately: the PWA
  * is scoped to `/mobile`, and a scope only works if that path actually appears
@@ -21,7 +21,7 @@ import {frameAncestorsOverride} from "@components/security/securityHeaders"
  *
  * The default framing header comes from `headers()` in `next.config.js`, which
  * is fixed when the image is built. `YONTRACK_UI_FRAME_ANCESTORS` is read here
- * instead because the middleware runs with the environment of the running
+ * instead because the proxy runs with the environment of the running
  * container, and a header it sets replaces the config's one of the same name.
  * Pages only, like everything else in this file: framing a JSON answer or a
  * script means nothing (#1770).
@@ -34,7 +34,7 @@ const withFraming = (response) => {
     return response
 }
 
-export function middleware(request) {
+export function proxy(request) {
 
     const decision = decideMobileRedirect({
         pathname: request.nextUrl.pathname,
@@ -73,7 +73,7 @@ export const config = {
      * it used to do. A workflow instance id is `ISO_LOCAL_DATE_TIME-UUID` and
      * the timestamp is not truncated, so the id carries fractional seconds and
      * therefore a dot - `/extension/workflows/instances/2026-09-12T14:27:57.595125-<uuid>`
-     * would have been read as a file and the middleware would never have run on
+     * would have been read as a file and the proxy would never have run on
      * it. `mobileRoutes.js` makes the same distinction in `LOOKS_LIKE_A_FILE`,
      * and the two have to agree.
      */

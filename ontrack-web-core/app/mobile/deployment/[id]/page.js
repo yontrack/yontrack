@@ -7,6 +7,7 @@ import MobileDeploymentScreen from "./DeploymentScreen"
  *
  * The screen itself is a client component; the page is only the route.
  */
-export default function MobileDeploymentPage({params}) {
+export default async function MobileDeploymentPage(props) {
+    const params = await props.params
     return <MobileDeploymentScreen id={params.id}/>
 }

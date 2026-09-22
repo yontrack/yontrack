@@ -171,7 +171,7 @@ describe('isRedirectExempt', () => {
         ['/auth/signin', 'the sign-in page'],
         ['/api/protected/graphql', 'the API'],
         // `/display/...` answers with a redirect to the real page, which the
-        // middleware then sees on its own terms.
+        // proxy then sees on its own terms.
         ['/display/build/my-project/main/1', 'a display redirect'],
         ['/_next/static/chunks/main.js', 'a build asset'],
         ['/favicon.ico', 'a static file'],
@@ -183,7 +183,7 @@ describe('isRedirectExempt', () => {
     it('does not read a dot in the middle of an id as a file extension', () => {
         // A workflow instance id carries the fractional seconds of its
         // timestamp. Read as a file it would be exempted here and never reach
-        // its mobile screen - which is also why the `middleware.js` matcher asks
+        // its mobile screen - which is also why the `proxy.js` matcher asks
         // for an extension rather than for a dot.
         const id = '2026-09-12T14:27:57.595125-eb0102b5-1432-4821-8ae2-0edf5a4a0b3f'
         expect(isRedirectExempt(`/extension/workflows/instances/${id}`)).toBe(false)

@@ -3,7 +3,7 @@ import {isPhoneUserAgent} from "@components/mobile/userAgent"
 /*
  * Real user agent strings, kept verbatim. A hand-simplified UA would let a
  * regression through: the whole point of these is the shape of the strings the
- * middleware actually sees.
+ * proxy actually sees.
  */
 const PHONES = {
     'iPhone Safari': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1',

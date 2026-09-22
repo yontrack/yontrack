@@ -1,11 +1,13 @@
 /**
- * The Next.js Image Optimization API stays off (#1789).
+ * The Next.js Image Optimization API stays off (#1789, #1787).
  *
- * GHSA-2xp9-vwfh-vxw4 is an unauthenticated RCE in `/_next/image`, and the
- * `next` version in use has no fix. With `images.unoptimized`, Next answers
- * that endpoint with a 404 instead of running the optimizer. This test keeps
- * the mitigation from being dropped by accident; the Next.js upgrade (#1787)
- * is where it gets reconsidered.
+ * A deliberate choice, not a stop-gap. It was turned off against
+ * GHSA-2xp9-vwfh-vxw4, an unauthenticated RCE in `/_next/image`, and it stays
+ * off after the Next.js 16 upgrade that fixes it: the UI serves no image that
+ * needs resizing, so the optimizer is attack surface for no benefit. With
+ * `images.unoptimized`, Next answers that endpoint with a 404 instead of
+ * running the optimizer. This test keeps it from being turned back on by
+ * accident.
  */
 import nextConfig from "../../../next.config"
 

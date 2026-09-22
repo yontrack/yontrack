@@ -3,7 +3,8 @@ import {graphQL} from "@/app/api/protected/graphql/graphql";
 import {gql} from "graphql-request";
 import {redirect} from "next/navigation";
 
-export async function GET(request, {params}) {
+export async function GET(request, props) {
+    const params = await props.params
     const names = params.names
     if (names.length < 2) {
         return NextResponse.json({error: 'Missing branch name'}, {status: 400})

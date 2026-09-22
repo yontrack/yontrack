@@ -1,7 +1,7 @@
 import {Button, Dropdown, Form, InputNumber, Popover, Select, Space, Typography} from "antd";
 import {useEffect, useState} from "react";
 import dayjs from "dayjs";
-import * as duration from "dayjs/plugin/duration";
+import duration from "dayjs/plugin/duration";
 import {FaHourglassHalf} from "react-icons/fa";
 
 dayjs.extend(duration);

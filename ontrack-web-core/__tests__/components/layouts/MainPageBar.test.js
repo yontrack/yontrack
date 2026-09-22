@@ -2,11 +2,13 @@ import "@testing-library/jest-dom"
 import {render, screen} from "@testing-library/react"
 import MainPageBar from "@components/layouts/MainPageBar"
 
-// `react-dom/server` reaches for `TextEncoder`, which jsdom does not provide.
-// Node's own is a drop-in, and it has to be in place before the module is
-// loaded - hence the `require` below rather than an import up here.
+// `react-dom/server` reaches for `TextEncoder` and - since React 19 -
+// `MessageChannel`, neither of which jsdom provides. Node's own are drop-ins,
+// and they have to be in place before the module is loaded - hence the
+// `require` below rather than an import up here.
 global.TextEncoder ??= require("util").TextEncoder
 global.TextDecoder ??= require("util").TextDecoder
+global.MessageChannel ??= require("worker_threads").MessageChannel
 const {renderToString} = require("react-dom/server")
 
 /**

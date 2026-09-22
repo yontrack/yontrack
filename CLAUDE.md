@@ -6,7 +6,7 @@ branches, builds, promotions, and validations across the software delivery lifec
 ## Tech Stack
 
 - **Backend:** Kotlin + Java, Spring Boot 3.5+, Spring GraphQL, Spring Security
-- **Frontend:** React, Next.js 13, Ant Design v5, graphql-request
+- **Frontend:** React 19, Next.js 16 (Turbopack), Ant Design v5, graphql-request
 - **Database:** PostgreSQL with Flyway migrations
 - **Search:** Elasticsearch
 - **Messaging:** RabbitMQ

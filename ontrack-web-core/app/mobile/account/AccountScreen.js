@@ -76,7 +76,7 @@ export default function MobileAccountScreen() {
      * `signOut()` with no argument defaults `callbackUrl` to the current URL.
      * Signing out of `/mobile/build/12` would therefore leave that build as the
      * callback, and signing back in would return to it - on a shared phone, the
-     * wrong souvenir. `/mobile` is redirect-exempt so the middleware leaves it
+     * wrong souvenir. `/mobile` is redirect-exempt so the proxy leaves it
      * alone, and `AuthProvider` sends the unauthenticated visitor to the sign-in
      * page on its own.
      */

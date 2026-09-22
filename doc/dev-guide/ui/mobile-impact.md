@@ -39,7 +39,7 @@ the second one is not the one you are looking at.
 | Authorization helpers (`isAuthorized`, the `authorizations` field) | `MainLayout`, `MainPage`, `MainPageBar`, `NavBar`, `UserMenu` |
 | Theme tokens (`styles/globals.css`) and the pre-paint theme script | The mobile shell: `MobileLayout`, `MobileHeader`, `MobileBottomNav` |
 | A handful of display primitives — `ValidationChip`, `PromotionLevelImage`, `TimestampText`, `DurationMs`, `EntityIcon`, `CheckIcon`, `SlotPipelineStatusLabel`, `SlotWorkflowTrigger`, `WorkflowInstanceStatus`, `WorkflowInstanceNodeStatus`, and the `workflowNodeDepths` ordering function | The provider stack: `/mobile` is its own App Router root and assembles its own |
-| The admission rule components under `components/framework/environments-slot-admission-rule/` | `Dynamic` itself — its webpack context belongs to the Pages Router layer, so a `/mobile` screen gets a second React and renders "Error". Mobile screens name their components statically |
+| The admission rule components under `components/framework/environments-slot-admission-rule/` | `Dynamic` itself — its bundler context belongs to the Pages Router layer, so a `/mobile` screen gets a second React and renders "Error". Mobile screens name their components statically |
 | The next-auth session and the `/api/protected/graphql` proxy | Every screen, and the lists and cards they are built from |
 
 The boundary is deliberately sharp, and the layout half of it is the load-bearing one:
@@ -68,7 +68,7 @@ change reaches the mobile UI; the right column is where it cannot.
   build, and the mobile deployment screen draws the rule's own input, using the very components
   under `components/framework/environments-slot-admission-rule/` that the desktop pipeline page
   uses — but named **statically**, in `components/mobile/deployments/admissionRuleComponents.js`,
-  because `Dynamic` resolves into the wrong webpack layer under `/mobile`. Adding a rule there
+  because `Dynamic` resolves into the wrong bundler layer under `/mobile`. Adding a rule there
   without adding it to that table is caught by `admissionRuleComponents.test.js`, which reads
   the directory off disk; a rule with a `Check` and no `Summary` still leaves a phone unable to
   say why an environment refuses.
@@ -157,7 +157,7 @@ probably has none — say so and move on.
 ## Routes: adding a desktop page is a mobile decision
 
 `components/mobile/mobileRoutes.js` is the single source of truth for the split. The
-middleware reads it to decide, for a phone, between a mobile screen and the interstitial:
+proxy reads it to decide, for a phone, between a mobile screen and the interstitial:
 
 - `mobileEquivalent(pathname)` — the desktop routes that have a mobile screen. Deliberately
   short; a route earns an entry only once the screen behind it exists and does the job.
@@ -166,7 +166,7 @@ middleware reads it to decide, for a phone, between a mobile screen and the inte
   can name where the user was going.
 
 **A dot in an id is not a file extension.** `LOOKS_LIKE_A_FILE` here and the `matcher` in
-`middleware.js` both keep static files out of the redirect, and both ask for a real *extension*
+`proxy.js` both keep static files out of the redirect, and both ask for a real *extension*
 rather than for a dot anywhere: a workflow instance id carries the fractional seconds of its
 timestamp, and reading that as a file would have exempted the whole route (#1737). A new id
 shape with a dot in it is a change to both.

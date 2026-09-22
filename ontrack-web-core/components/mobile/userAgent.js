@@ -1,9 +1,9 @@
 /**
  * Phone detection, from the user agent alone.
  *
- * The middleware is the only place the mobile/desktop decision can be taken
+ * The proxy is the only place the mobile/desktop decision can be taken
  * early enough to be a redirect rather than a flash of the wrong UI, and the
- * only thing a middleware knows about the device is the `User-Agent` header.
+ * only thing a proxy knows about the device is the `User-Agent` header.
  * Viewport width is a client-side fact and arrives far too late.
  *
  * User agent sniffing is a blunt instrument, so the rules below are written to

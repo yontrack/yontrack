@@ -6,6 +6,7 @@ import MobileProjectScreen from "./ProjectScreen"
  *
  * The screen itself is a client component; the page is only the route.
  */
-export default function MobileProjectPage({params}) {
+export default async function MobileProjectPage(props) {
+    const params = await props.params
     return <MobileProjectScreen id={params.id}/>
 }

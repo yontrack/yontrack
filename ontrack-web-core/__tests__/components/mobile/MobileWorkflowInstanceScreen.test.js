@@ -127,16 +127,20 @@ describe('the mobile workflow instance screen', () => {
 
     describe('the route parameter', () => {
 
-        it('is decoded before it reaches the query', () => {
+        it('is decoded before it reaches the query', async () => {
             // An instance id is `ISO_LOCAL_DATE_TIME-UUID`, so it carries colons,
             // and the App Router hands a dynamic segment back exactly as it
             // appears in the URL - percent-encoded. Passed on as it arrives it is
             // an id no instance has, and the screen says a run that is right
             // there could not be found.
             instance()
-            render(<MobileWorkflowInstancePage params={{
-                id: '2026-09-12T14%3A27%3A57.595125-eb0102b5-1432-4821-8ae2-0edf5a4a0b3f',
-            }}/>)
+            // A server component, and since Next 16 the params arrive as a
+            // promise: the page is awaited, and what it returns is rendered.
+            render(await MobileWorkflowInstancePage({
+                params: Promise.resolve({
+                    id: '2026-09-12T14%3A27%3A57.595125-eb0102b5-1432-4821-8ae2-0edf5a4a0b3f',
+                }),
+            }))
             const asked = calls.filter(call => !call.progress).map(call => call.variables.id)
             expect(asked).toContain('2026-09-12T14:27:57.595125-eb0102b5-1432-4821-8ae2-0edf5a4a0b3f')
         })

@@ -1,7 +1,9 @@
 import {backend, getAccessToken} from "@/app/api/protected/backend";
 import {NextResponse} from "next/server";
 
-export const getImage = ({uri}) => async (request, {params}) => {
+// Next 16 passes the dynamic segments as a promise (#1787)
+export const getImage = ({uri}) => async (request, props) => {
+    const params = await props.params
     if (params.id) {
         try {
             const dataURL = await fetchImageDataURL(uri(params))
@@ -14,7 +16,8 @@ export const getImage = ({uri}) => async (request, {params}) => {
     }
 }
 
-export const putImage = ({uri}) => async (request, {params}) => {
+export const putImage = ({uri}) => async (request, props) => {
+    const params = await props.params
     if (params.id) {
         const data = await request.text()
         return putImageData(uri(params), data)

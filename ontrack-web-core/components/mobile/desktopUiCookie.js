@@ -2,7 +2,7 @@
  * The cookie that opts a device out of the mobile UI.
  *
  * Its own module because it is read from both sides of a boundary that must not
- * be crossed: the middleware, running on the edge with no DOM, and the browser,
+ * be crossed: the proxy, running on the server with no DOM, and the browser,
  * through `cookies-next`. Neither should have to import the other's module to
  * learn the name.
  *

@@ -6,6 +6,7 @@ import MobileBranchScreen from "./BranchScreen"
  *
  * The screen itself is a client component; the page is only the route.
  */
-export default function MobileBranchPage({params}) {
+export default async function MobileBranchPage(props) {
+    const params = await props.params
     return <MobileBranchScreen id={params.id}/>
 }

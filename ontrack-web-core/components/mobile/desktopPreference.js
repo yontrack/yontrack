@@ -10,7 +10,7 @@
  * menu.
  *
  * Both directions are the same pair of steps in the same order: remember the
- * choice, *then* navigate. The order is not cosmetic - the middleware reads that
+ * choice, *then* navigate. The order is not cosmetic - the proxy reads that
  * cookie on the very request the navigation makes, so writing it afterwards
  * would have the user bounced straight back and the button looking broken.
  * Keeping both directions here is what keeps that ordering in one place.

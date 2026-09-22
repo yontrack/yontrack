@@ -140,7 +140,7 @@ describe('the mobile account screen', () => {
 
         it('goes through the switch, and lands on the desktop home', () => {
             // Through `switchToDesktopUI`, so the cookie is written *before* the
-            // navigation - write it after and the middleware bounces the user
+            // navigation - write it after and the proxy bounces the user
             // straight back, with the button looking broken. The desktop home
             // and not a computed target: by the time the user is on the account
             // screen, the screen they came from is gone.

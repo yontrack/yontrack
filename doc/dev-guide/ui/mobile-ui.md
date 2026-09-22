@@ -32,7 +32,7 @@ rather than everything badly, and it says so when a user arrives somewhere it do
 | Services, GraphQL fragments and mutations | Every layout component |
 | The promotion level field mapping (`promotionLevelFields`) | The promote dialog and the promote sheet around it |
 | `SelectLabel` and the `LabelChip` it draws its options with (#1806) — a control, not a layout, and the one place the `category:name` display strings are produced | Every other label affordance: no chip on a mobile row, no assignment, no label page |
-| The admission rule components themselves (`.../environments-slot-admission-rule/*`) | The rule-id lookup: `Dynamic` resolves into the wrong webpack layer under `/mobile` |
+| The admission rule components themselves (`.../environments-slot-admission-rule/*`) | The rule-id lookup: `Dynamic` resolves into the wrong bundler layer under `/mobile` |
 | Authorization helpers | `MainLayout`, `MainPage`, `MainPageBar`, `NavBar`, `UserMenu` |
 | Theme tokens (`styles/globals.css`) and the pre-paint theme script | The mobile shell: `MobileLayout`, `MobileHeader`, `MobileBottomNav` |
 | The next-auth session and the `/api/protected/graphql` proxy | The provider stack — see below |
@@ -60,16 +60,17 @@ shorter than the mark is tall because at the mark's 24px it would be 194px wide 
 375px header.
 
 `priority` is deliberately not set on either. Next reports the mark as the largest contentful
-paint and suggests it, but adding it does not silence the warning and Next 13 implements it by
-passing React a camelCase `fetchPriority`, which React 18.3 rejects on every render. Both marks
-are inline SVGs of about a kilobyte, served straight from `/public` — `next/image` passes SVGs
-through rather than sending them to the optimizer, which answers `400` for them.
+paint and suggests it, but a preload buys nothing here: both marks are inline SVGs of about a
+kilobyte, served straight from `/public`, and the image optimizer is off (#1789, #1787). (It
+was first left off because Next 13 implemented it by passing React a camelCase
+`fetchPriority`, which React 18.3 rejected on every render; that no longer applies on Next 16
+and React 19, and the decision stands for the reason above.)
 
 ## The redirect
 
-`middleware.js` sends phones to `/mobile`:
+`proxy.js` sends phones to `/mobile`:
 
-- **User agent detection, phones only.** It is the only thing a middleware knows about the
+- **User agent detection, phones only.** It is the only thing a proxy knows about the
   device; viewport width is a client-side fact and arrives far too late. Tablets keep the
   desktop UI — they have the width for it. The rules are written to fail *towards* the desktop
   UI, which is the complete one. See `components/mobile/userAgent.js`.
@@ -103,7 +104,7 @@ through rather than sending them to the optimizer, which answers `400` for them.
   around it. Making it long-lived is a decision of its own, not a consequence of #1729.
 
 The decision itself is a pure function in `components/mobile/mobileRedirect.js`, so it can be
-tested without a request or the edge runtime. `middleware.js` is the adapter over it.
+tested without a request or a server runtime. `proxy.js` is the adapter over it.
 
 ## The route map
 
@@ -147,8 +148,8 @@ there — a failure with no error anywhere and nothing in a log. The page does
 way.
 
 **A dot in an id is not a file extension.** Two heuristics keep static files out of the
-redirect: `LOOKS_LIKE_A_FILE` here, and the `matcher` in `middleware.js`, which decides whether
-the middleware runs at all. Both used to read *any* dot in the last path segment as a file. A
+redirect: `LOOKS_LIKE_A_FILE` here, and the `matcher` in `proxy.js`, which decides whether
+the proxy runs at all. Both used to read *any* dot in the last path segment as a file. A
 workflow instance id is `ISO_LOCAL_DATE_TIME-UUID` and `Time.now()` is not truncated, so the id
 carries fractional seconds and therefore a dot — and
 `/extension/workflows/instances/2026-09-12T14:27:57.595125-<uuid>` was exempted as a file before
@@ -579,7 +580,7 @@ the build screen's promotion uses — the mobile provider stack has no `EventsCo
 
 The desktop UI chooses a rule's components **at runtime**: `SlotAdmissionRuleSummary` and
 `SlotAdmissionRuleDataForm` both go through `components/common/Dynamic.js`, which is
-``lazy(() => import(`../${path}`))``. That template literal makes webpack build a *context
+``lazy(() => import(`../${path}`))``. That template literal makes the bundler build a *context
 module* over `components/`, and the context it builds belongs to the **Pages Router** layer —
 which is where the whole desktop UI lives. `/mobile` is an App Router root, compiled in a
 separate layer with its own React copy, so a component pulled in through that context renders
@@ -894,7 +895,7 @@ that makes a phone app feel like a form.
 **It lands them on `/mobile`** — `signOut({callbackUrl: MOBILE_HOME})`, not the default.
 `signOut()` with no argument defaults `callbackUrl` to the *current* URL, so signing out of
 `/mobile/build/12` would leave that build as the callback and signing back in would return to
-it: on a shared phone, the wrong souvenir. `/mobile` is redirect-exempt so the middleware
+it: on a shared phone, the wrong souvenir. `/mobile` is redirect-exempt so the proxy
 leaves it alone, `AuthProvider` sends the unauthenticated visitor to the sign-in page on its
 own, and signing back in lands on the mobile home. `mobile.spec.js` asserts that last hop
 rather than restating the default, which is the only way the decision stays made.
@@ -1036,7 +1037,7 @@ segment where it means "follow the operating system", and a second one two rows 
 Landing on "the desktop equivalent of the screen behind" would need an inverse mobile→desktop
 map to keep in sync with `mobileRoutes.js`, plus history this screen does not have — by the time
 the user is on `/mobile/account`, the screen they came from is gone. The interstitial has a real
-target only because the middleware handed it one. No inverse route map is built, and none is
+target only because the proxy handed it one. No inverse route map is built, and none is
 stubbed.
 
 **A caption under it**, one line of secondary text in the same shape as `themeModeCaption`: the
@@ -1049,7 +1050,7 @@ which is why it is recorded here.
 
 **`switchToDesktopUI` is untouched**, and the new control goes through it like the existing one:
 it remains the single place the remember-then-navigate ordering lives, and writing the cookie
-*after* the navigation would have the middleware bounce the user straight back with the button
+*after* the navigation would have the proxy bounce the user straight back with the button
 looking broken. The cookie stays a **session** cookie; making it long-lived remains a decision
 of its own. Sign out still leaves it alone. `/mobile/account` still stands in for no desktop
 route.

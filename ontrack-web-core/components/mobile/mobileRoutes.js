@@ -3,7 +3,7 @@
  * call the ones that do not.
  *
  * This module is the single source of truth for the mobile/desktop split, read
- * by the middleware (to decide between a redirect and the interstitial) and by
+ * by the proxy (to decide between a redirect and the interstitial) and by
  * the interstitial itself (to name the destination).
  *
  * Adding a desktop route means deciding what a phone user following a link to it
@@ -163,7 +163,7 @@ const ENTITY_EQUIVALENTS = [
      * merely different: `Time.now()` is not truncated, so the id carries one
      * and the id therefore carries a **dot**. Both of the redirect's
      * "this is a file, leave it alone" heuristics - `LOOKS_LIKE_A_FILE` below
-     * and the matcher in `middleware.js` - used to read any dot as a file
+     * and the matcher in `proxy.js` - used to read any dot as a file
      * extension, and would have exempted this path before ever reaching the
      * table. Both now ask for a real extension instead.
      *
@@ -186,9 +186,9 @@ const ENTITY_EQUIVALENTS = [
  *   redirecting the sign-in page would strand a phone user in a loop.
  * - `/api/...` is data, not a page.
  * - `/display/...` answers with a redirect to the real page, which the
- *   middleware then sees on its own terms.
+ *   proxy then sees on its own terms.
  *
- * The matcher in `middleware.js` already keeps `/api` and `/_next` out; they are
+ * The matcher in `proxy.js` already keeps `/api` and `/_next` out; they are
  * repeated here so the decision is complete on its own and testable without a
  * request.
  */

@@ -19,7 +19,7 @@ module.exports = {
      * settled for both halves of the build.
      *
      * The roots are the production ones of `ontrack-web-core`: the `app` router (the `/mobile` UI
-     * among it), the shared `components` tree, the `pages` router and the `middleware.js` that
+     * among it), the shared `components` tree, the `pages` router and the `proxy.js` that
      * routes between them. `styles` is CSS, `public` is static assets, and `__tests__` is the test
      * tree - none of them is production JavaScript. `.jsx` is not in use today and is matched
      * anyway, so that the first one to appear is counted rather than silently skipped.
@@ -31,7 +31,7 @@ module.exports = {
         'app/**/*.{js,jsx}',
         'components/**/*.{js,jsx}',
         'pages/**/*.{js,jsx}',
-        'middleware.js',
+        'proxy.js',
         '!**/node_modules/**',
     ],
 

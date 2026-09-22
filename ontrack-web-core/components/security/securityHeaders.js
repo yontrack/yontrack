@@ -2,7 +2,7 @@
  * The security headers the UI sends on every response (#1770).
  *
  * CommonJS on purpose: `next.config.js` is loaded by Node without any
- * transpilation and has to `require` this file, while `middleware.js` imports
+ * transpilation and has to `require` this file, while `proxy.js` imports
  * it like any other module.
  *
  * Two layers, because of *when* each one is evaluated:
@@ -11,9 +11,9 @@
  *   that at **build** time and writes the result into the routes manifest, so
  *   it covers every route - pages, `/mobile`, `/api/*`, static assets - but
  *   cannot read anything from the environment of a running container.
- * - `frameAncestorsOverride()` is applied by `middleware.js` at **run** time,
+ * - `frameAncestorsOverride()` is applied by `proxy.js` at **run** time,
  *   from `YONTRACK_UI_FRAME_ANCESTORS`, for the customers who embed Yontrack
- *   pages in another site. A header set by the middleware replaces the one of
+ *   pages in another site. A header set by the proxy replaces the one of
  *   the same name coming from the config.
  *
  * No `Strict-Transport-Security`: HSTS belongs to whatever terminates TLS in
@@ -114,7 +114,7 @@ function securityHeaders({development = false} = {}) {
  */
 const NOT_A_SOURCE_LIST = /[;,\r\n]/
 
-/** The middleware asks on every page request; a wrong value is said once. */
+/** The proxy asks on every page request; a wrong value is said once. */
 let refusalLogged = false
 
 /**

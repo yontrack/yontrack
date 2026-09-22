@@ -30,7 +30,7 @@ afterEach(clearCookies)
 describe('switching this device between the two UIs', () => {
 
     it('remembers the desktop choice before navigating', () => {
-        // Order, not decoration: the middleware reads the cookie on the very
+        // Order, not decoration: the proxy reads the cookie on the very
         // request this navigation makes.
         switchToDesktopUI('/build/56')
         expect(document.cookie).toContain(`${DESKTOP_UI_COOKIE_NAME}=desktop`)

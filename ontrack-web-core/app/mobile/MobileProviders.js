@@ -14,6 +14,8 @@
  * message channel, the signed-in user, their preferences and the reference data.
  */
 
+// antd 5 renders its portals (messages, modals, wave effect) through an API React 19 removed (#1787)
+import '@ant-design/v5-patch-for-react-19'
 import {SessionProvider} from "next-auth/react"
 import ThemeProvider from "@components/providers/ThemeProvider"
 import MessageContextProvider from "@components/providers/MessageProvider"

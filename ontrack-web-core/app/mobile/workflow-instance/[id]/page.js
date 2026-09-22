@@ -15,6 +15,7 @@ import MobileWorkflowInstanceScreen from "./WorkflowInstanceScreen"
  * could not be found" for a run that is right there. No other mobile route hits
  * this, because no other entity id has a character a browser encodes.
  */
-export default function MobileWorkflowInstancePage({params}) {
+export default async function MobileWorkflowInstancePage(props) {
+    const params = await props.params
     return <MobileWorkflowInstanceScreen id={decodeURIComponent(params.id)}/>
 }
