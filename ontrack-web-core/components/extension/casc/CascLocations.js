@@ -1,7 +1,7 @@
 import {useQuery} from "@components/services/useQuery";
 import {gql} from "graphql-request";
 import LoadingContainer from "@components/common/LoadingContainer";
-import {List} from "antd";
+import ItemList from "@components/common/ItemList";
 
 export default function CascLocations() {
 
@@ -20,16 +20,13 @@ export default function CascLocations() {
             <LoadingContainer loading={loading}>
                 {
                     data &&
-                    <List
-                        dataSource={data.casc.locations}
-                        renderItem={(item) => (
-                            <List.Item>
-                                <List.Item.Meta
-                                    title={item}
-                                />
-                            </List.Item>
-                        )}
-                    />
+                    <ItemList>
+                        {
+                            data.casc.locations.map(item =>
+                                <ItemList.Item key={item} title={item}/>
+                            )
+                        }
+                    </ItemList>
                 }
             </LoadingContainer>
         </>

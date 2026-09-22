@@ -3,7 +3,7 @@ import Head from "next/head";
 import {subBranchTitle} from "@components/common/Titles";
 import {downToBranchBreadcrumbs} from "@components/common/Breadcrumbs";
 import MainPage from "@components/layouts/MainPage";
-import {Input, List, Skeleton, Space, Typography} from "antd";
+import {Input, Skeleton, Space, Typography} from "antd";
 import {gql} from "graphql-request";
 import {CloseCommand} from "@components/common/Commands";
 import {branchUri} from "@components/common/Links";
@@ -16,6 +16,7 @@ import {useMutation, useQuery} from "@components/services/GraphQL";
 import SortableList, {SortableItem, SortableKnob} from "react-easy-sort";
 import ConfirmCommand from "@components/common/ConfirmCommand";
 import {FaTrash} from "react-icons/fa";
+import ItemList from "@components/common/ItemList";
 
 export default function BranchValidationStampsView({id}) {
 
@@ -144,28 +145,30 @@ export default function BranchValidationStampsView({id}) {
                         onSearch={value => setFilterText(value)}
                         style={{marginBottom: 16, maxWidth: 320}}
                     />
-                    <SortableList onSortEnd={onSortEnd} handle=".drag-handle" allowDrag={!filterText}>
-                        <List
-                            itemLayout="horizontal"
-                            dataSource={filteredStamps}
-                            renderItem={(vs, index) => (
+                    <ItemList component={SortableList} as="ul" onSortEnd={onSortEnd} allowDrag={!filterText}>
+                        {
+                            filteredStamps.map((vs, index) => (
                                 <SortableItem key={vs.id} index={index}>
-                                    <List.Item className="no-select">
-                                        <SortableKnob><div style={{cursor: 'grab', marginRight: 8}}>☰</div></SortableKnob>
-                                        <List.Item.Meta
-                                            title={
-                                                <Space>
-                                                    <ValidationStampLink validationStamp={vs}/>
-                                                    {vs.description && <Typography.Text type="secondary">{vs.description}</Typography.Text>}
-                                                </Space>
-                                            }
-                                            description={
-                                                <div style={{display: 'flex', gap: 32, alignItems: 'flex-start'}}>
-                                                    {vs.dataType && <Typography.Text type="secondary">{vs.dataType.descriptor.displayName}</Typography.Text>}
-                                                    {vs.dataType && <div><ValidationDataType dataType={vs.dataType}/></div>}
-                                                </div>
-                                            }
-                                        />
+                                    <ItemList.Item
+                                        className="no-select"
+                                        data-testid={`validation-stamp-item-${vs.name}`}
+                                        avatar={
+                                            <SortableKnob><div style={{cursor: 'grab'}}>☰</div></SortableKnob>
+                                        }
+                                        title={
+                                            <Space>
+                                                <ValidationStampLink validationStamp={vs}/>
+                                                {vs.description && <Typography.Text type="secondary">{vs.description}</Typography.Text>}
+                                            </Space>
+                                        }
+                                        description={
+                                            vs.dataType &&
+                                            <div style={{display: 'flex', gap: 32, alignItems: 'flex-start'}}>
+                                                <Typography.Text type="secondary">{vs.dataType.descriptor.displayName}</Typography.Text>
+                                                <div><ValidationDataType dataType={vs.dataType}/></div>
+                                            </div>
+                                        }
+                                    >
                                         {isAuthorized(vs, 'validation_stamp', 'delete') && (
                                             <ConfirmCommand
                                                 icon={<FaTrash/>}
@@ -186,11 +189,11 @@ export default function BranchValidationStampsView({id}) {
                                                 onSuccess={() => eventsContext.fireEvent("validationStamp.deleted")}
                                             />
                                         )}
-                                    </List.Item>
+                                    </ItemList.Item>
                                 </SortableItem>
-                            )}
-                        />
-                    </SortableList>
+                            ))
+                        }
+                    </ItemList>
                 </MainPage>
             </Skeleton>
         </>

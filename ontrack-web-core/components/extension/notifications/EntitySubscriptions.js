@@ -1,7 +1,8 @@
 import {useGraphQLClient} from "@components/providers/ConnectionContextProvider";
 import {useEffect, useState} from "react";
 import {gql} from "graphql-request";
-import {List, Tag, Typography} from "antd";
+import {Tag, Typography} from "antd";
+import ItemList from "@components/common/ItemList";
 import SubscriptionLink from "@components/extension/notifications/SubscriptionLink";
 import SubscriptionsLink from "@components/extension/notifications/SubscriptionsLink";
 
@@ -51,33 +52,28 @@ export default function EntitySubscriptions({type, id}) {
 
     return (
         <>
-            <List
-                dataSource={subscriptions}
-                header={
-                    <Typography.Title type="secondary" level={5}>Subscriptions (<SubscriptionsLink entity={{type, id}}
-                                                                                                   text={pageInfo.totalSize}
-                    />)</Typography.Title>
-                }
-                size="small"
-                renderItem={(subscription) => (
-                    <List.Item>
-                        <List.Item.Meta
+            <Typography.Title type="secondary" level={5}>Subscriptions (<SubscriptionsLink entity={{type, id}}
+                                                                                           text={pageInfo.totalSize}
+            />)</Typography.Title>
+            <ItemList size="small">
+                {
+                    subscriptions.map(subscription =>
+                        <ItemList.Item
+                            key={subscription.name}
                             title={<SubscriptionLink entity={{type, id}} subscription={subscription}/>}
                             avatar={<Tag>{subscription.channel}</Tag>}
                         />
-                    </List.Item>
-                )}
-                footer={
-                    <div style={{paddingLeft: 16}}>
-                        {
-                            pageInfo.nextPage &&
-                            <SubscriptionsLink entity={{type, id}}
-                                               text="More..."
-                            />
-                        }
-                    </div>
+                    )
                 }
-            />
+            </ItemList>
+            {
+                pageInfo.nextPage &&
+                <div style={{paddingLeft: 16}}>
+                    <SubscriptionsLink entity={{type, id}}
+                                       text="More..."
+                    />
+                </div>
+            }
         </>
     )
 }

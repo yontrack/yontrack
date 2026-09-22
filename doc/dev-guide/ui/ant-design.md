@@ -10,7 +10,7 @@ algorithms and sets `cssVar: true` — do not recreate an older look through the
 ## Props to use
 
 antd 6 renamed a number of props. The old names still work but log a deprecation warning, and the
-console is expected to stay free of them (see *Known exception* below). The ones this code base
+console is expected to stay free of them. The ones this code base
 meets:
 
 | Component                  | Write                                          | Not                                  |
@@ -29,10 +29,12 @@ meets:
 
 `CloseableAlert` and `InlineError` keep a `message` prop: they are our own components, not `Alert`.
 
-## Known exception
+## Lists
 
-`List` / `List.Item` are deprecated in antd 6 but not removed. Replacing them is a redesign rather than
-a rename (#1853); until then their warning is the one accepted in the console.
+`List` / `List.Item` are deprecated in antd 6 and not used: `ItemList` (`components/common/ItemList.js`)
+replaced them (#1853), and ESLint flags the import. `CLAUDE.md` (*Frontend Development Patterns* ›
+*Lists*) says when to use `ItemList`, a `Table`, a `Row` / `Col` grid or, in `/mobile`,
+`MobileEntityList`.
 
 ## Testing against antd
 

@@ -1,4 +1,5 @@
-import {List, Space, Typography} from "antd";
+import {Space, Typography} from "antd";
+import ItemList from "@components/common/ItemList";
 import Timestamp from "@components/common/Timestamp";
 import ValidationRunStatus from "@components/validationRuns/ValidationRunStatus";
 import AnnotatedDescription from "@components/common/AnnotatedDescription";
@@ -70,23 +71,21 @@ export default function ValidationRunStatusList({run, onRunChanged}) {
 
     return (
         <>
-            <List
-                dataSource={run.validationRunStatuses}
-                renderItem={vrs => (
-                    <List.Item
-                        key={vrs.id}
-                        style={{padding: 8, paddingLeft: 24}}
-                        actions={[
-                            <Timestamp
-                                key={vrs.id}
-                                prefix={
-                                    `${vrs.creation.user} @`
-                                }
-                                value={vrs.creation.time}
-                            />
-                        ]}
-                    >
-                        <List.Item.Meta
+            <ItemList>
+                {
+                    run.validationRunStatuses.map(vrs => (
+                        <ItemList.Item
+                            key={vrs.id}
+                            style={{padding: 8, paddingLeft: 24}}
+                            actions={[
+                                <Timestamp
+                                    key={vrs.id}
+                                    prefix={
+                                        `${vrs.creation.user} @`
+                                    }
+                                    value={vrs.creation.time}
+                                />
+                            ]}
                             title={
                                 <Space>
                                     <ValidationRunStatus
@@ -107,10 +106,9 @@ export default function ValidationRunStatusList({run, onRunChanged}) {
                                 />
                             }
                         />
-                    </List.Item>
-                )}
-            >
-            </List>
+                    ))
+                }
+            </ItemList>
         </>
     )
 }

@@ -1,5 +1,6 @@
 import {useState} from "react";
-import {List, Modal, Typography} from "antd";
+import {Modal, Typography} from "antd";
+import ItemList from "@components/common/ItemList";
 import Rows from "@components/common/Rows";
 import ValidationRunStatus from "@components/validationRuns/ValidationRunStatus";
 import Columns from "@components/common/Columns";
@@ -77,29 +78,30 @@ export default function ValidationGroupDialog({dialog}) {
                             }
                         </Typography.Title>
                     </Columns>
-                    <List
-                        dataSource={dialog.group.validations}
-                        renderItem={(validation) =>
-                            <List.Item>
-                                <Columns>
-                                    <ValidationStamp
-                                        validationStamp={validation.validationStamp}
-                                        displayTooltip={false}
-                                        displayLink={false}
-                                        onClick={dialog.showRunHistory(validation.validationRuns[0])}
-                                    />
-                                    <Timestamp
-                                        prefix="Validated on"
-                                        value={validation.validationRuns[0].lastStatus.creation.time}
-                                    />
-                                    <AnnotatedDescription
-                                        entity={validation.validationRuns[0].lastStatus}
-                                        disabled={false}
-                                    />
-                                </Columns>
-                            </List.Item>
+                    <ItemList>
+                        {
+                            (dialog.group.validations ?? []).map((validation, index) =>
+                                <ItemList.Item key={index}>
+                                    <Columns>
+                                        <ValidationStamp
+                                            validationStamp={validation.validationStamp}
+                                            displayTooltip={false}
+                                            displayLink={false}
+                                            onClick={dialog.showRunHistory(validation.validationRuns[0])}
+                                        />
+                                        <Timestamp
+                                            prefix="Validated on"
+                                            value={validation.validationRuns[0].lastStatus.creation.time}
+                                        />
+                                        <AnnotatedDescription
+                                            entity={validation.validationRuns[0].lastStatus}
+                                            disabled={false}
+                                        />
+                                    </Columns>
+                                </ItemList.Item>
+                            )
                         }
-                    />
+                    </ItemList>
                 </Rows>
             </Modal>
             <ValidationRunHistoryDialog

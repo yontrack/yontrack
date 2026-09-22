@@ -1,4 +1,5 @@
-import {List, Skeleton, Space, Typography} from "antd";
+import {Skeleton, Space, Typography} from "antd";
+import ItemList from "@components/common/ItemList";
 
 export default function ListSection({title, extraTitle, icon, loading, items, emptyText}) {
     return (
@@ -12,20 +13,19 @@ export default function ListSection({title, extraTitle, icon, loading, items, em
                     </Space>
                 </Typography.Title>
                 <Skeleton active loading={loading}>
-                    <List
-                        itemLayout="horizontal"
-                        dataSource={items}
-                        locale={emptyText ? {emptyText} : undefined}
-                        renderItem={(item) =>
-                            <List.Item data-testid={item.id}>
-                                <List.Item.Meta
+                    <ItemList emptyText={emptyText}>
+                        {
+                            (items ?? []).map(item =>
+                                <ItemList.Item
+                                    key={item.id}
+                                    data-testid={item.id}
                                     avatar={item.icon}
                                     title={item.title}
                                     description={item.content}
                                 />
-                            </List.Item>
+                            )
                         }
-                    />
+                    </ItemList>
                 </Skeleton>
             </Space>
         </>

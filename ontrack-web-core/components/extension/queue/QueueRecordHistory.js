@@ -1,17 +1,15 @@
-import {List, Typography} from "antd";
+import {Typography} from "antd";
 import TimestampText from "@components/common/TimestampText";
+import ItemList from "@components/common/ItemList";
 
 export default function QueueRecordHistory({record}) {
     return (
         <>
-            <List
-                style={{
-                    width: "100%",
-                }}
-                dataSource={record.history}
-                renderItem={(item) =>
-                    <List.Item>
-                        <List.Item.Meta
+            <ItemList>
+                {
+                    (record.history ?? []).map((item, index) =>
+                        <ItemList.Item
+                            key={index}
                             title={
                                 <Typography.Text code>{item.state}</Typography.Text>
                             }
@@ -19,9 +17,9 @@ export default function QueueRecordHistory({record}) {
                                 <TimestampText value={item.time}/>
                             }
                         />
-                    </List.Item>
+                    )
                 }
-            />
+            </ItemList>
         </>
     )
 }

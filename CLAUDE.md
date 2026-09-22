@@ -35,6 +35,8 @@ These rules apply unconditionally. Follow them in every change, without exceptio
   that still uses `useGraphQLClient` elsewhere.
 - **Always** import `useQuery` from `@components/services/GraphQL` — the identically named hook in
   `@components/services/useQuery` is deprecated (it wraps `useGraphQLClient`)
+- **Never** use antd's `List` / `List.Item` — deprecated in antd 6. Use `ItemList` from
+  `@components/common/ItemList` (see *Lists* below); ESLint flags the import
 - **Never** store a value in `useState` + `useEffect` when it's purely derived from props/state —
   compute it directly in the render body instead (e.g. `const items = changeLog ? [...] : []`, not
   `useState([])` filled by a `useEffect`). Beyond being an unnecessary extra render, a value that's
@@ -725,6 +727,23 @@ const {mutate, loading, error} = useMutation(MUTATION, {
     onSuccess: (userNode) => { /* ... */ },
 })
 ```
+
+### Lists
+
+Pick the component by the shape of the data, never antd's deprecated `List`:
+
+- **`ItemList`** (`@components/common/ItemList`) — a plain vertical list of items, each with an
+  optional `avatar`, `title`, `description`, `actions` and free `children`. Semantic `ul` > `li`,
+  a divider between items, `size="small"` for a denser one, `emptyText` when there is nothing.
+  Extra props such as `data-testid` land on the `ul` / `li`, so tests use `getByRole('listitem')`
+  or `getByTestId`, never antd class names. For drag-to-reorder, render it through react-easy-sort:
+  `<ItemList component={SortableList} as="ul" onSortEnd={…}>` with each `ItemList.Item` wrapped
+  in a `SortableItem` (see `BranchValidationStampsView`).
+- **`Table`** — the items share columns worth sorting, filtering or comparing side by side.
+- **`Row` / `Col`** — a grid of cards, e.g. `<Row gutter={[16, 16]}>` with `<Col xs={24} md={12}>`
+  (see `SubscriptionsView`).
+- **`MobileEntityList`** (`@components/mobile/entities/MobileEntityList`) — lists in the `/mobile`
+  UI, which keeps its own components.
 
 ### Permissions
 

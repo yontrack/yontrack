@@ -1,7 +1,7 @@
 import Head from "next/head";
 import {useEffect, useMemo, useState} from "react";
 import MainPage from "@components/layouts/MainPage";
-import {List, Skeleton} from "antd";
+import {Col, Empty, Row, Skeleton} from "antd";
 import {useGraphQLClient} from "@components/providers/ConnectionContextProvider";
 import {gql} from "graphql-request";
 import {FaPlus} from "react-icons/fa";
@@ -123,27 +123,25 @@ export default function SubscriptionsView({
                 commands={commands}
             >
                 <Skeleton active loading={loading}>
-                    <List
-                        grid={{
-                            gutter: 16,
-                            column: 2,
-                        }}
-                        dataSource={items}
-                        itemLayout="horizontal"
-                        renderItem={(item) => (
-                            <List.Item>
-                                <SubscriptionCard
-                                    subscription={item}
-                                    entity={additionalFilter.entity}
-                                    actions={getActions(item)}
-                                    managePermission={managePermission}
-                                    onRenamed={reload}
-                                />
-                            </List.Item>
-                        )}
-                    >
-
-                    </List>
+                    {
+                        items.length === 0 &&
+                        <Empty image={Empty.PRESENTED_IMAGE_SIMPLE}/>
+                    }
+                    <Row gutter={[16, 16]}>
+                        {
+                            items.map(item =>
+                                <Col key={item.name} xs={24} md={12}>
+                                    <SubscriptionCard
+                                        subscription={item}
+                                        entity={additionalFilter.entity}
+                                        actions={getActions(item)}
+                                        managePermission={managePermission}
+                                        onRenamed={reload}
+                                    />
+                                </Col>
+                            )
+                        }
+                    </Row>
                 </Skeleton>
             </MainPage>
             <SubscriptionDialog subscriptionDialog={subscriptionDialog}/>

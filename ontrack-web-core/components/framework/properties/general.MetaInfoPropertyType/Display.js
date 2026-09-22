@@ -1,16 +1,16 @@
-import {List, Space, Tag, Typography} from "antd";
+import {Space, Tag, Typography} from "antd";
+import ItemList from "@components/common/ItemList";
 import Link from "next/link";
 
 export default function Display({property}) {
 
     return (
         <>
-            <List
-                itemLayout="horizontal"
-                dataSource={property.value.items}
-                renderItem={(item, index) => (
-                    <List.Item>
-                        <List.Item.Meta
+            <ItemList>
+                {
+                    property.value.items.map((item, index) =>
+                        <ItemList.Item
+                            key={index}
                             title={
                                 <Space>
                                     {
@@ -20,18 +20,19 @@ export default function Display({property}) {
                                     {item.name}
                                 </Space>
                             }
-                        />
-                        {
-                            !item.link &&
-                            <Typography.Text>{item.value}</Typography.Text>
-                        }
-                        {
-                            item.link &&
-                            <Link href={item.link}>{item.value}</Link>
-                        }
-                    </List.Item>
-                )}
-            />
+                        >
+                            {
+                                !item.link &&
+                                <Typography.Text>{item.value}</Typography.Text>
+                            }
+                            {
+                                item.link &&
+                                <Link href={item.link}>{item.value}</Link>
+                            }
+                        </ItemList.Item>
+                    )
+                }
+            </ItemList>
         </>
     )
 }

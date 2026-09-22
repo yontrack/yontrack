@@ -18,5 +18,17 @@ export default defineConfig([
             "react-hooks/preserve-manual-memoization": "off",
         },
     },
+    {
+        // antd 6 deprecates `List` (#1853). Advisory only: lint does not run in CI.
+        rules: {
+            "no-restricted-imports": ["error", {
+                paths: [{
+                    name: "antd",
+                    importNames: ["List"],
+                    message: "antd's List is deprecated - use ItemList from @components/common/ItemList.",
+                }],
+            }],
+        },
+    },
     globalIgnores(["build/**", "reports/**", "coverage/**"]),
 ])

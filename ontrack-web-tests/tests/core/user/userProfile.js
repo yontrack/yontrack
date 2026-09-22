@@ -1,4 +1,4 @@
-import {checkListContainsItemText} from "../../support/antd-list-support";
+import {checkListContainsItemText} from "../../support/list-support";
 
 const {expect} = require("@playwright/test");
 

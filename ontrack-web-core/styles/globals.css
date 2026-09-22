@@ -178,6 +178,21 @@ body {
 }
 
 /**
+ * `ItemList` (components/common/ItemList.js): a bare list, with a divider between its items. The
+ * divider colour is antd's `colorSplit` token, set on the list by the component.
+ */
+.ot-item-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    width: 100%;
+}
+
+.ot-item-list > li + li {
+    border-block-start: 1px solid var(--ot-item-list-split);
+}
+
+/**
  * Spinning Yontrack logo
  */
 .logo-spin {

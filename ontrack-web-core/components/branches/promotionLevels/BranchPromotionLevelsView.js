@@ -4,7 +4,7 @@ import Head from "next/head";
 import {subBranchTitle} from "@components/common/Titles";
 import {downToBranchBreadcrumbs} from "@components/common/Breadcrumbs";
 import MainPage from "@components/layouts/MainPage";
-import {List, Skeleton, Space} from "antd";
+import {Skeleton, Space} from "antd";
 import {gql} from "graphql-request";
 import {CloseCommand} from "@components/common/Commands";
 import {branchUri} from "@components/common/Links";
@@ -16,6 +16,7 @@ import PromotionLevelCreateCommand from "@components/promotionLevels/PromotionLe
 import {EventsContext, useEventForRefresh} from "@components/common/EventsContext";
 import SortableList, {SortableItem, SortableKnob} from "react-easy-sort";
 import EntitySubscriptions from "@components/extension/notifications/EntitySubscriptions";
+import ItemList from "@components/common/ItemList";
 
 export default function BranchPromotionLevelsView({id}) {
 
@@ -132,31 +133,32 @@ export default function BranchPromotionLevelsView({id}) {
                     breadcrumbs={downToBranchBreadcrumbs({branch})}
                     commands={commands}
                 >
-                    <SortableList onSortEnd={onSortEnd} handle=".drag-handle">
-                        <List
-                            itemLayout="horizontal"
-                            dataSource={branch.promotionLevels}
-                            renderItem={(pl, index) => (
+                    <ItemList component={SortableList} as="ul" onSortEnd={onSortEnd}>
+                        {
+                            (branch.promotionLevels ?? []).map((pl, index) => (
                                 <SortableItem key={pl.id} index={index}>
-                                    <List.Item className="no-select">
-                                        <SortableKnob><div style={{ cursor: 'grab', marginRight: 8 }}>☰</div></SortableKnob>
-                                        <List.Item.Meta
-                                            title={
-                                                <Space>
-                                                    <PromotionLevelLink promotionLevel={pl}/>
-                                                    <Decorations entity={pl}/>
-                                                </Space>
-                                            }
-                                            description={pl.description}
-                                        />
+                                    <ItemList.Item
+                                        className="no-select"
+                                        data-testid={`promotion-level-item-${pl.name}`}
+                                        avatar={
+                                            <SortableKnob><div style={{cursor: 'grab'}}>☰</div></SortableKnob>
+                                        }
+                                        title={
+                                            <Space>
+                                                <PromotionLevelLink promotionLevel={pl}/>
+                                                <Decorations entity={pl}/>
+                                            </Space>
+                                        }
+                                        description={pl.description}
+                                    >
                                         <div style={{width: '50%'}}>
                                             <EntitySubscriptions type="PROMOTION_LEVEL" id={pl.id}/>
                                         </div>
-                                    </List.Item>
+                                    </ItemList.Item>
                                 </SortableItem>
-                            )}
-                        />
-                    </SortableList>
+                            ))
+                        }
+                    </ItemList>
                 </MainPage>
             </Skeleton>
         </>

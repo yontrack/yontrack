@@ -1,31 +1,28 @@
-import {List} from "antd";
 import HealthIndicator from "@components/core/admin/health/HealthIndicator";
+import ItemList from "@components/common/ItemList";
 
 export default function HealthComponents({health}) {
     return (
         <>
-            <List>
-                <List.Item>
-                    <List.Item.Meta
-                        avatar={<HealthIndicator status={health.status}/>}
-                        title="Global health"
-                    />
-                </List.Item>
+            <ItemList>
+                <ItemList.Item
+                    avatar={<HealthIndicator status={health.status}/>}
+                    title="Global health"
+                />
                 {
                     Object.keys(health.components).map(name => {
                         const component = health.components[name]
                         return (
-                            <List.Item key={name}>
-                                <List.Item.Meta
-                                    avatar={<HealthIndicator status={component.status}/>}
-                                    title={name}
-                                    description={JSON.stringify(component.details, null, 2)}
-                                />
-                            </List.Item>
+                            <ItemList.Item
+                                key={name}
+                                avatar={<HealthIndicator status={component.status}/>}
+                                title={name}
+                                description={JSON.stringify(component.details, null, 2)}
+                            />
                         )
                     })
                 }
-            </List>
+            </ItemList>
         </>
     )
 }

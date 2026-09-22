@@ -1,5 +1,9 @@
 import {expect} from "@playwright/test";
 import {waitUntilCondition} from "../../support/timing";
+import {dragOnto} from "../../support/drag";
+
+// Each validation stamp is a list item whose test id carries its name
+const ITEM_TEST_ID_PREFIX = 'validation-stamp-item-'
 
 export class BranchValidationStampsPage {
 
@@ -26,10 +30,8 @@ export class BranchValidationStampsPage {
         await this.page.getByRole('button', {name: "OK"}).click()
     }
 
-    // Each list item contains a link whose text is "{initials}{name}" due to GeneratedIcon.
-    // We locate items using hasText on the name portion.
     getListItem(name) {
-        return this.page.locator('.ant-list-item').filter({hasText: name})
+        return this.page.getByTestId(`${ITEM_TEST_ID_PREFIX}${name}`)
     }
 
     async checkValidationStampVisible({name}) {
@@ -51,18 +53,12 @@ export class BranchValidationStampsPage {
         await expect(dialog).not.toBeVisible()
     }
 
-    // Returns the validation stamp names in display order.
-    // Each list item's link contains: GeneratedIcon (initials) + name text as two ant-space-items.
-    // We take the second ant-space-item (index 1) to get just the name.
+    // Returns the validation stamp names in display order
     async getValidationStampNames() {
-        const items = this.page.locator('.ant-list-item')
-        const count = await items.count()
-        const names = []
-        for (let i = 0; i < count; i++) {
-            const nameSpan = items.nth(i).locator('a').nth(0).locator('.ant-space-item').nth(1)
-            names.push((await nameSpan.textContent()).trim())
-        }
-        return names
+        const testIds = await this.page
+            .getByTestId(new RegExp(`^${ITEM_TEST_ID_PREFIX}`))
+            .evaluateAll(items => items.map(item => item.dataset.testid))
+        return testIds.map(testId => testId.substring(ITEM_TEST_ID_PREFIX.length))
     }
 
     getDragHandle(name) {
@@ -70,21 +66,7 @@ export class BranchValidationStampsPage {
     }
 
     async dragToReorder(fromName, toName) {
-        const fromHandle = this.getDragHandle(fromName)
-        const toHandle = this.getDragHandle(toName)
-
-        const fromBox = await fromHandle.boundingBox()
-        const toBox = await toHandle.boundingBox()
-
-        const fromX = fromBox.x + fromBox.width / 2
-        const fromY = fromBox.y + fromBox.height / 2
-        const toX = toBox.x + toBox.width / 2
-        const toY = toBox.y + toBox.height / 2
-
-        await this.page.mouse.move(fromX, fromY)
-        await this.page.mouse.down()
-        await this.page.mouse.move(toX, toY, {steps: 10})
-        await this.page.mouse.up()
+        await dragOnto(this.page, this.getDragHandle(fromName), this.getDragHandle(toName))
     }
 
     async waitForOrder(expectedNames) {
