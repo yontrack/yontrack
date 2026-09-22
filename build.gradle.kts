@@ -313,6 +313,7 @@ configure(javaProjects) {
     val amqpClientVersion = "5.36.0"
     val msgpackCoreVersion = "0.9.12"
     val commonsBeanutilsVersion = "1.11.0"
+    val tomcatVersion = "11.0.26"
 
     // The BOMs. The Spring Boot one is what io.spring.dependency-management imported; the other two
     // are the BOMs it imports itself, restated at the versions this build wants, in place of the
@@ -363,6 +364,12 @@ configure(javaProjects) {
         // - commons-beanutils (1.10.0 via opencsv 5.10): CVE-2025-48734 (fixed in 1.11.0).
         //   Remove once opencsv brings commons-beanutils >= 1.11.0.
         "commons-beanutils:commons-beanutils:$commonsBeanutilsVersion",
+        // - tomcat-embed-* (Boot BOM 4.1.1 manages 11.0.24): CVE-2026-65182, CVE-2026-65905,
+        //   CVE-2026-68525, all CRITICAL (fixed in 11.0.25). All three modules, to keep Tomcat aligned.
+        //   Remove once the Spring Boot BOM manages >= 11.0.25.
+        "org.apache.tomcat.embed:tomcat-embed-core:$tomcatVersion",
+        "org.apache.tomcat.embed:tomcat-embed-el:$tomcatVersion",
+        "org.apache.tomcat.embed:tomcat-embed-websocket:$tomcatVersion",
     )
 
     // Declared on every dependency bucket of every source set -- main, test, and the testFixtures
