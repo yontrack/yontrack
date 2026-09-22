@@ -5,7 +5,7 @@ import {extractProjectEntityInfo} from "@components/entities/ProjectEntityPageIn
 export default function EventDetails({event}) {
     return (
         <>
-            <Space direction="vertical">
+            <Space orientation="vertical">
                 <EventDisplay event={event.eventType.id}/>
                 {
                     Object.keys(event.entities).map((entityType) => {

@@ -26,11 +26,13 @@ export default function BuildNode({data}) {
                         border: 'solid 2px var(--ot-graph-node-border)'
                     }
                 }
-                bodyStyle={{
-                    overflow: 'hidden'
+                styles={{
+                    body: {
+                        overflow: 'hidden'
+                    },
                 }}
             >
-                <Space direction="vertical" className="ot-line">
+                <Space orientation="vertical" className="ot-line">
                     <Typography.Text>
                         {build && <ProjectLink project={build.branch.project} shorten={false}/>}
                     </Typography.Text>

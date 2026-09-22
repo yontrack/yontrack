@@ -18,7 +18,7 @@ export default function WorkflowInstanceGraphInfoItems({selectedNode, className}
                 <FaTag/>
                 <Typography.Text strong>{selectedNode.workflowNode.id}</Typography.Text>
             </Space>,
-            children: <Space direction="vertical">
+            children: <Space orientation="vertical">
                 <WorkflowInstanceNodeStatus status={selectedNode.nodeExecution.status}/>
                 <Space>
                     <FaPlay/>
@@ -78,7 +78,7 @@ export default function WorkflowInstanceGraphInfoItems({selectedNode, className}
                     <>
                         <Alert
                             type="error"
-                            message="Error"
+                            title="Error"
                             description={selectedNode.nodeExecution.error}
                         />
                     </>
@@ -106,7 +106,7 @@ export default function WorkflowInstanceGraphInfoItems({selectedNode, className}
                 className={className}
                 defaultActiveKey={['node', 'outcome']}
             />
-            {/*<Space direction="vertical" className="ot-line">*/}
+            {/*<Space orientation="vertical" className="ot-line">*/}
             {/*    /!* Execution ID and configuration *!/*/}
             {/*    <Typography.Text strong italic*/}
             {/*                     className="ot-workflow-node-info-title">Execution</Typography.Text>*/}

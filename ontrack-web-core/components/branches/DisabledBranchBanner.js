@@ -8,7 +8,7 @@ export default function DisabledBranchBanner({branch}) {
                 <Alert
                     data-testid="banner-disabled"
                     type="warning"
-                    message={
+                    title={
                         <>
                             This branch is <b>disabled</b>. No auto-versioning or notifications
                             until it&apos;s enabled again.

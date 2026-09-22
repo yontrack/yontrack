@@ -11,7 +11,7 @@ export default function BranchLastPromotionBox({branch}) {
 
     return (
         <>
-            <Space direction="vertical" size={4}>
+            <Space orientation="vertical" size={4}>
                 <BranchLink branch={branch}/>
                 {
                     lastPromotionLevel ?

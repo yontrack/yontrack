@@ -422,6 +422,18 @@ button.ot-validation-stamp-filter-edition {
 }
 
 /**
+ * Branch builds table
+ */
+
+/* The toolbar is the title of the first column, spanning the three leading ones. antd 6's table
+   measures each column's width from a hidden row holding that column's title alone, colSpan
+   ignored, so the toolbar would widen the narrow range selector column to its own width and
+   leave it mostly blank (#1852). The real header still lays it out across its three columns. */
+.ant-table-measure-row .ot-branch-builds-toolbar {
+    display: none;
+}
+
+/**
  * Auto refresh
  */
 
@@ -663,9 +675,9 @@ button.ot-validation-stamp-filter-edition {
 }
 
 /* The search box is the only thing in the row that gives. A basis rather than a
-   width: antd's `Input` is `width: 100%` and would otherwise eat whatever the
+   width: antd's `Input.Search` is `width: 100%` and would otherwise eat whatever the
    row has left, truncating the name beside it even on a 1280px screen. */
-.ot-navbar-actions .ant-input-group-wrapper {
+.ot-navbar-actions .ot-search-box {
     flex: 0 1 260px;
     min-width: 0;
 }

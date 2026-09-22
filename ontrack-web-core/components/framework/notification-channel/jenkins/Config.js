@@ -30,7 +30,7 @@ export default function JenkinsNotificationChannelConfig({config, job, parameter
 
     return (
         <>
-            <Space direction="vertical">
+            <Space orientation="vertical">
                 <Space size={4}>
                     <Typography.Text>Triggering job at</Typography.Text>
                     {

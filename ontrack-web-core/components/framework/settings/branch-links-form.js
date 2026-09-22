@@ -8,7 +8,7 @@ export default function BranchLinksForm({id, ...values}) {
                 <Form.Item>
                     <Alert
                         type="warning"
-                        message="Settings valid only for legacy (V4) branch graph. Will be removed in V5."
+                        title="Settings valid only for legacy (V4) branch graph. Will be removed in V5."
                     />
                 </Form.Item>
                 <Form.Item

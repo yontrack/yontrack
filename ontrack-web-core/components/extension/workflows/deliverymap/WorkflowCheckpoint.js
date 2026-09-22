@@ -21,7 +21,7 @@ export default function WorkflowCheckpoint({checkpoint}) {
     const {workflowInstanceId} = checkpoint.data ?? {}
 
     return (
-        <Space direction="vertical" size={0}>
+        <Space orientation="vertical" size={0}>
             {/* The icon says WHAT this checkpoint is, the way a promotion level's medal and a slot's
                 environment do. It is outside the link so that the name alone is the click target */}
             <Space size={4}>

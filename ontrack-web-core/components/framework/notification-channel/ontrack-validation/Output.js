@@ -29,7 +29,7 @@ export default function OntrackValidationNotificationChannelOutput({runId}) {
 
     return (
         <>
-            <Space direction="vertical">
+            <Space orientation="vertical">
                 Validation created.
                 <LoadingInline loading={loading}>
                     {

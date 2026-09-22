@@ -3,7 +3,7 @@ import AutoDisablingBranchPatternsMode from "@components/extension/stale/AutoDis
 
 export default function Display({property}) {
     return (
-        <Space direction="vertical">
+        <Space orientation="vertical">
             {
                 property.value.items.map((item, index) => (
                     <>

@@ -19,7 +19,7 @@ export default function MobileFavouritesEmpty() {
             <Empty
                 image={Empty.PRESENTED_IMAGE_SIMPLE}
                 description={
-                    <Space direction="vertical" size="small">
+                    <Space orientation="vertical" size="small">
                         <Typography.Text strong>No favourites yet</Typography.Text>
                         <Typography.Text type="secondary">
                             Star the projects and branches you follow and they show up here,

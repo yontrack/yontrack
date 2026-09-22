@@ -115,7 +115,7 @@ export default function DeploymentView({id}) {
             >
                 {
                     error &&
-                    <Alert type="error" showIcon message="Could not load the deployment."
+                    <Alert type="error" showIcon title="Could not load the deployment."
                            description={error} data-testid="deployment-load-error"/>
                 }
                 {
@@ -124,12 +124,12 @@ export default function DeploymentView({id}) {
                 }
                 {
                     !error && finished && !deployment &&
-                    <Alert type="warning" showIcon message="No such deployment."
+                    <Alert type="warning" showIcon title="No such deployment."
                            data-testid="deployment-missing"/>
                 }
                 {
                     deployment &&
-                    <Space direction="vertical" size={16} className="ot-line"
+                    <Space orientation="vertical" size={16} className="ot-line"
                            data-testid={`deployment-${deployment.id}`}>
 
                         <Card size="small">
@@ -151,14 +151,14 @@ export default function DeploymentView({id}) {
 
                         {
                             actionError &&
-                            <Alert type="error" showIcon message={actionError}
+                            <Alert type="error" showIcon title={actionError}
                                    data-testid="deployment-action-error"/>
                         }
 
                         <Row gutter={16}>
                             <Col span={16}>
                                 <PageSection title="What's blocking" padding={true}>
-                                    <Space direction="vertical" size={16} className="ot-line">
+                                    <Space orientation="vertical" size={16} className="ot-line">
                                         <WhatsBlocking deployment={deployment} onChange={refresh}/>
                                         <DeploymentPhases deployment={deployment}/>
                                     </Space>

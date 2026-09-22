@@ -54,8 +54,8 @@ export default function SearchBoxTypeResults({type, query, onSelect, onResults})
         <div style={{
             padding: '8px 12px'
         }}>
-            <Space direction="vertical" style={{width: '100%'}}>
-                <Space direction="horizontal">
+            <Space orientation="vertical" style={{width: '100%'}}>
+                <Space orientation="horizontal">
                     <SearchResultType type={type} displayName={true} popover={false}/>
                     {loading && <Spin size="small"/>}
                     {!loading && !error && (

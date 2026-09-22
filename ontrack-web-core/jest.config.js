@@ -20,8 +20,13 @@ const config = {
     // antd's cssinjs cold start, which on a contended CI agent can blow past 5s before the test's own
     // `waitFor` (1s) ever gets a chance to run.
     testTimeout: 20000,
-    // Add more setup options before each test is run
-    // setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
+    // Polyfills jsdom lacks and antd needs, before each test file
+    setupFiles: ['<rootDir>/jest.setup.js'],
+    moduleNameMapper: {
+        // The CommonJS build of @ant-design/icons 6 requires the ESM build of @ant-design/colors,
+        // which Jest does not transform: point it at the CommonJS build of the same file (#1852).
+        '^@ant-design/colors/es/(.*)$': '@ant-design/colors/lib/$1',
+    },
     // Reports for JUnit
     reporters: [
         "default",

@@ -8,7 +8,7 @@ export default function BuildLink({build, buildNameOnly, text, displayTooltip, t
         <>
             {
                 displayTooltip && <Popover content={
-                    <Space direction="vertical">
+                    <Space orientation="vertical">
                         <Typography.Text>{tooltipText}</Typography.Text>
                         <Typography.Text>
                             {build.name}

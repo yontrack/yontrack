@@ -70,7 +70,7 @@ export default function Display({
 
     return (
         <div data-testid="av-post-processing-github">
-            <Space direction="vertical">
+            <Space orientation="vertical">
                 <Typography.Text code>github</Typography.Text>
                 <Descriptions
                     items={items}

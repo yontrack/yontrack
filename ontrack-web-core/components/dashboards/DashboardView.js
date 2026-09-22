@@ -116,10 +116,10 @@ export default function DashboardView() {
             {
                 dashboard && edition &&
                 <>
-                    <Space direction="vertical" className="ot-line">
+                    <Space orientation="vertical" className="ot-line">
                         <Alert
                             type="info"
-                            message="Dashboard in edition mode"
+                            title="Dashboard in edition mode"
                             action={
                                 <Space>
                                     <Button
@@ -129,7 +129,7 @@ export default function DashboardView() {
                                     >
                                         Add a widget...
                                     </Button>
-                                    <Divider type="vertical"/>
+                                    <Divider orientation="vertical"/>
                                     <Button
                                         type="primary"
                                         onClick={onSave}

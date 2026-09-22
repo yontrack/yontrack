@@ -26,7 +26,7 @@ function ExpirationWarning({message, description}) {
                 content={description}
                 placement="bottomLeft"
             >
-                <Alert type="warning" message={message} showIcon/>
+                <Alert type="warning" title={message} showIcon/>
             </Popover>
         </>
     )
@@ -207,7 +207,7 @@ export default function BranchStatusesWidget({
                                 message: "Promotion expired",
                                 description: (run, period) => `The promotion level has not been granted since ${run}. It must be granted at least every ${period}`,
                             })
-                            return <Space direction="vertical">
+                            return <Space orientation="vertical">
                                 {
                                     <Space size={8}>
                                         <BuildLink
@@ -245,7 +245,7 @@ export default function BranchStatusesWidget({
                                 message: "Validation expired",
                                 description: (run, period) => `The validation has not been run since ${run}. It must be run at least every ${period}`,
                             })
-                            return <Space direction="vertical">
+                            return <Space orientation="vertical">
                                 {
                                     <Space size={8}>
                                         <ValidationRunStatus

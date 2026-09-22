@@ -11,7 +11,7 @@ export default function GitLabPipelineNotificationChannelConfig({
                                                                     timeoutSeconds,
                                                                 }) {
     return (
-        <Space direction="vertical">
+        <Space orientation="vertical">
             <Space size={4} wrap>
                 <Typography.Text>Triggering a pipeline on</Typography.Text>
                 <Typography.Text code>{project}@{ref}</Typography.Text>

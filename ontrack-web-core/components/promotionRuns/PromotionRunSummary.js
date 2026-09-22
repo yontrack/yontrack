@@ -63,7 +63,7 @@ export default function PromotionRunSummary({run}) {
 
     return (
         <Card size="small" data-testid="promotion-run-summary">
-            <Space direction="vertical" className="ot-line">
+            <Space orientation="vertical" className="ot-line">
                 <Descriptions items={items} column={2} size="small"/>
                 {
                     run.fieldValues?.length > 0 &&

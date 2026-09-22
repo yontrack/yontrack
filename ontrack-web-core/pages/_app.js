@@ -1,6 +1,4 @@
 import 'antd/dist/reset.css'
-// antd 5 renders its portals (messages, modals, wave effect) through an API React 19 removed (#1787)
-import '@ant-design/v5-patch-for-react-19'
 import '@/styles/globals.css'
 import 'react-grid-layout/css/styles.css'
 import 'react-resizable/css/styles.css'

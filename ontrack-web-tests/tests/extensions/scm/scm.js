@@ -354,12 +354,12 @@ export class SCMChangeLogPage {
     }
 
     async selectExportFormat(format) {
-        await this.page.getByRole('button', {name: 'ellipsis'}).click()
+        await this.page.getByRole('button', {name: 'Export options'}).click()
         await this.page.getByRole('menuitem', {name: format}).click()
     }
 
     async launchExport() {
-        await this.page.getByRole('button', {name: 'Export'}).click()
+        await this.page.getByRole('button', {name: 'Export', exact: true}).click()
     }
 
     async checkExportedContent(expectedValue, close = true) {
@@ -378,7 +378,7 @@ export class SCMChangeLogPage {
 
     async selectExportOptions({format, groups}) {
         console.log("Filling export config: ", {format, groups})
-        await this.page.getByRole('button', {name: 'ellipsis'}).click()
+        await this.page.getByRole('button', {name: 'Export options'}).click()
         await this.page.getByRole('menuitem', {name: 'Options'}).click()
 
         const addGroupButton = this.page.getByRole('button', {name: "Add group"})

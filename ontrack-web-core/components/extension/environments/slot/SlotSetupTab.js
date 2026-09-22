@@ -26,13 +26,13 @@ export default function SlotSetupTab({slot, reloadCount = 0, onChange}) {
         return <Alert
             type="info"
             showIcon
-            message="You are not allowed to configure this slot."
+            title="You are not allowed to configure this slot."
             data-testid="slot-setup-unauthorized"
         />
     }
 
     return (
-        <Space direction="vertical" size={16} className="ot-line" data-testid="slot-setup">
+        <Space orientation="vertical" size={16} className="ot-line" data-testid="slot-setup">
             <PageSection title="Admission rules" padding={false}>
                 <SlotAdmissionRulesTable slot={slot} reloadCount={reloadCount} onChange={onChange}/>
             </PageSection>

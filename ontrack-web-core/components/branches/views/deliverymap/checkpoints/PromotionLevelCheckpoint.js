@@ -20,7 +20,7 @@ export default function PromotionLevelCheckpoint({checkpoint}) {
     }
 
     return (
-        <Space direction="vertical" size={0}>
+        <Space orientation="vertical" size={0}>
             <PromotionLevelLink promotionLevel={promotionLevel}/>
             <CheckpointArrival arrival={checkpoint.arrival} nothingText="Never promoted"/>
         </Space>

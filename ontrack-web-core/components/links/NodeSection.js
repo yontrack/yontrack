@@ -4,7 +4,7 @@ export function NodeSection({icon, title, children}) {
     return (
         <>
             <Space
-                direction="vertical"
+                orientation="vertical"
                 style={{
                     borderTop: "solid 1px gray",
                     padding: '8px',

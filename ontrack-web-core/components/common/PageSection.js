@@ -20,15 +20,17 @@ export default function PageSection({
             style={{
                 height: height,
             }}
-            headStyle={{
-                height: 48,
-                backgroundColor: 'var(--ot-bg-section-head)'
-            }}
-            bodyStyle={{
-                padding: padding ? 16 : 0,
-                height: 'calc(100% - 47px)',
-                width: '100%',
-                overflowY: 'auto',
+            styles={{
+                header: {
+                    height: 48,
+                    backgroundColor: 'var(--ot-bg-section-head)'
+                },
+                body: {
+                    padding: padding ? 16 : 0,
+                    height: 'calc(100% - 47px)',
+                    width: '100%',
+                    overflowY: 'auto',
+                },
             }}
         >
             <Skeleton active loading={loading}>

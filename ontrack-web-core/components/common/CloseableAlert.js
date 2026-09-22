@@ -22,7 +22,7 @@ export default function CloseableAlert({id, message, type = "warning"}) {
                 <Alert
                     showIcon={true}
                     closable={true}
-                    message={message}
+                    title={message}
                     type={type}
                     onClose={onClose}
                 />

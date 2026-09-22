@@ -21,7 +21,7 @@ export default function SlotEligibleBuildsTab({slot, onChange, onDeploy}) {
     const [showEligibleBuilds, setShowEligibleBuilds] = useState(false)
 
     return (
-        <Space direction="vertical" size={16} className="ot-line" data-testid="slotBuilds">
+        <Space orientation="vertical" size={16} className="ot-line" data-testid="slotBuilds">
             <SlotBuildEligibilitySwitch
                 value={showEligibleBuilds}
                 onChange={setShowEligibleBuilds}

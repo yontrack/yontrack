@@ -157,7 +157,7 @@ export default function ValidationRunHistoryDialog({dialog, onChange}) {
             <Modal
                 open={dialog.open}
                 closable={false}
-                destroyOnClose={true}
+                destroyOnHidden={true}
                 cancelButtonProps={{style: {display: 'none'}}}
                 onOk={onOk}
                 onCancel={onOk}

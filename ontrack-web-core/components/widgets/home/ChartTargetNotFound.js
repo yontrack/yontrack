@@ -16,7 +16,7 @@ export default function ChartTargetNotFound({entity, name, project, branch}) {
             <Alert
                 type="warning"
                 showIcon
-                message={`${entity} ${name} does not exist on branch ${branch} of project ${project}.`}
+                title={`${entity} ${name} does not exist on branch ${branch} of project ${project}.`}
                 description="Edit the dashboard to reconfigure this widget."
             />
         </PaddedContent>

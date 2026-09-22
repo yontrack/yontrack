@@ -50,7 +50,7 @@ export default function GroupMappingsView() {
                     <CloseCommand key="close" href={accountManagementUri}/>,
                 ]}
             >
-                <Space direction="vertical" className="ot-line">
+                <Space orientation="vertical" className="ot-line">
                     <Typography.Paragraph italic type="secondary">
                         This page allows you to map groups sent by the identity provider
                         in its JWT access token to groups in Yontrack.

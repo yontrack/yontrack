@@ -45,7 +45,7 @@ export default function SlotGraphNode({data}) {
                     backgroundColor: 'var(--ot-graph-node-bg)',
                 }}
             >
-                <Space direction="vertical" size={2} className="ot-line">
+                <Space orientation="vertical" size={2} className="ot-line">
                     <Space size={6}>
                         <EnvironmentImage environment={slot.environment}/>
                         <Typography.Text strong>

@@ -38,7 +38,7 @@ export default function BuildLinksTree({build, changeDependencyLinksMode}) {
     return (
         <>
             <Skeleton active loading={loading}>
-                <Space direction="vertical" className="ot-line">
+                <Space orientation="vertical" className="ot-line">
                     <CloseableAlert
                         id="tree-view-alert"
                         message={

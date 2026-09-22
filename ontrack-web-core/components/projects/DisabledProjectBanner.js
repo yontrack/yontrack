@@ -8,7 +8,7 @@ export default function DisabledProjectBanner({project}) {
                 <Alert
                     data-testid="banner-disabled"
                     type="warning"
-                    message={
+                    title={
                         <>
                             This project is <b>disabled</b>. No auto-versioning or notifications
                             until it&apos;s enabled again.

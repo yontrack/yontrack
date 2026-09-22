@@ -55,7 +55,7 @@ export default function PipelineStageCard({
                 opacity: reached ? 1 : 0.45,
             }}
         >
-            <Space direction="vertical" size={token.marginXXS} style={{width: '100%'}}>
+            <Space orientation="vertical" size={token.marginXXS} style={{width: '100%'}}>
                 <PromotionLevel
                     promotionLevel={promotionLevel}
                     size={26}

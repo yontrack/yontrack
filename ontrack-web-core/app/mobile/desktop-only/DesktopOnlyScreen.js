@@ -29,7 +29,7 @@ export default function DesktopOnlyScreen({target}) {
             <Alert
                 type="info"
                 showIcon
-                message={
+                title={
                     <span data-testid="desktop-only-destination">
                         {
                             description ?
@@ -40,7 +40,7 @@ export default function DesktopOnlyScreen({target}) {
                 }
                 description="The mobile version does not have this page yet."
             />
-            <Space direction="vertical" size="small" style={{width: '100%'}}>
+            <Space orientation="vertical" size="small" style={{width: '100%'}}>
                 <DesktopVersionButton href={target} type="primary" block/>
                 {/*
                   A plain link, not a button: it goes nowhere special and

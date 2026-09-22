@@ -57,7 +57,7 @@ export default function ProjectEnvironments({project}) {
 
     return (
         <>
-            <Space direction="vertical" className="ot-line" size="middle">
+            <Space orientation="vertical" className="ot-line" size="middle">
                 <ProjectEnvironmentsToolbar
                     view={view}
                     qualifier={qualifier}

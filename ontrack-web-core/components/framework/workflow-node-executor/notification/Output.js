@@ -8,7 +8,7 @@ export default function NotificationWorkflowNodeExecutorOutput({data, nodeData})
 
     return (
         <>
-            <Space direction="vertical">
+            <Space orientation="vertical">
                 {/* Backward compatibility */}
                 {
                     data && !data.result && !data.recordId &&

@@ -6,7 +6,7 @@ import {Dynamic} from "@components/common/Dynamic";
 export default function SCMIssueInfo({scmIssueInfo}) {
     return (
         <>
-            <Space direction="vertical" className="ot-line">
+            <Space orientation="vertical" className="ot-line">
                 <PageSection
                     title={
                         <Space size="small">
@@ -16,7 +16,7 @@ export default function SCMIssueInfo({scmIssueInfo}) {
                                 href={scmIssueInfo.issue.url}
                                 copyable
                             >{scmIssueInfo.issue.displayKey}</Typography.Link>
-                            <Divider type="vertical"/>
+                            <Divider orientation="vertical"/>
                             <Typography.Text type="secondary">{scmIssueInfo.issue.summary}</Typography.Text>
                         </Space>
                     }

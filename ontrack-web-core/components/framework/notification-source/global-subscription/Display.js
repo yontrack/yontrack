@@ -4,7 +4,7 @@ import SubscriptionLink from "@components/extension/notifications/SubscriptionLi
 export default function EntitySubscriptionNotificationSource({subscriptionName}) {
     return (
         <>
-            <Space direction="vertical">
+            <Space orientation="vertical">
                 <SubscriptionLink
                     subscription={{name: subscriptionName}}
                 />

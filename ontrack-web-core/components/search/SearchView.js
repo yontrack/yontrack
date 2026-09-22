@@ -124,12 +124,12 @@ export default function SearchView() {
                 ]}
             >
                 <Skeleton active loading={searching}>
-                    <Space direction="vertical" className="ot-line">
+                    <Space orientation="vertical" className="ot-line">
                         <SearchInput
                             searching={searching}
                             q={q}
                         />
-                        <Space direction="horizontal" wrap className="ot-line">
+                        <Space orientation="horizontal" wrap className="ot-line">
                             <Button
                                 style={{height: 48}}
                                 onClick={() => selectType('')}

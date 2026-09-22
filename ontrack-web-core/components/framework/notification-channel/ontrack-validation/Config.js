@@ -3,7 +3,7 @@ import {Space, Typography} from "antd";
 export default function OntrackValidationNotificationChannelConfig({project, branch, build, validation}) {
     return (
         <>
-            <Space direction="vertical">
+            <Space orientation="vertical">
                 <Space>
                     Project:
                     <Typography.Text code>{project}</Typography.Text>

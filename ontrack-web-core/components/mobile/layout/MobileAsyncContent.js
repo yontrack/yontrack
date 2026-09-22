@@ -31,7 +31,7 @@ export default function MobileAsyncContent({state, errorMessage, isEmpty, empty,
     const {loading, error, finished} = state
 
     if (error) {
-        return <Alert type="error" showIcon message={errorMessage} description={error}/>
+        return <Alert type="error" showIcon title={errorMessage} description={error}/>
     }
 
     const skeleton = <Skeleton active title={false} paragraph={{rows}}/>

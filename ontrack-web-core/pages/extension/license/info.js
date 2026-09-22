@@ -110,19 +110,19 @@ export default function LicenseInfoPage() {
         <StandardPage
             pageTitle="License info">
             <LoadingContainer loading={loading}>
-                <Space direction="vertical" className="ot-line">
+                <Space orientation="vertical" className="ot-line">
                     {
                         licenseInfo?.license &&
                         licenseInfo?.licenseControl && (
                             licenseInfo.licenseControl.active ?
                                 <Alert
                                     type="success"
-                                    message="License is active."
+                                    title="License is active."
                                     showIcon
                                 /> :
                                 <Alert
                                     type="error"
-                                    message="License is disabled."
+                                    title="License is disabled."
                                     showIcon
                                 />
                         )
@@ -131,7 +131,7 @@ export default function LicenseInfoPage() {
                         title=""
                         padding={true}
                     >
-                        <Space direction="vertical" className="ot-line">
+                        <Space orientation="vertical" className="ot-line">
                             <Descriptions
                                 items={licenseItems}
                                 bordered={true}
@@ -144,7 +144,7 @@ export default function LicenseInfoPage() {
                                             <Card
                                                 title={feature.name}
                                             >
-                                                <Space direction="vertical" className="ot-line">
+                                                <Space orientation="vertical" className="ot-line">
                                                     {
                                                         feature.enabled ?
                                                             <Tag color="success">Enabled</Tag> :

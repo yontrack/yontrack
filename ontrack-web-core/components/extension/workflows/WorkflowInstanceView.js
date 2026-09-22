@@ -249,7 +249,7 @@ export default function WorkflowInstanceView({id}) {
                 <AutoRefreshContextProvider onRefresh={reloadInstanceNodeExecutions}>
                     <WorkflowNodeExecutorContextProvider>
                         <Skeleton loading={loading} active>
-                            <Space direction="vertical">
+                            <Space orientation="vertical">
                                 <Descriptions
                                     items={items}
                                     column={12}

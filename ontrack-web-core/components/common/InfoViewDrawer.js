@@ -64,9 +64,9 @@ export default function InfoViewDrawer({id, entityType, entityName, entity, widt
                 placement="right"
                 open={expanded}
                 onClose={toggleExpanded}
-                width={width}
+                size={width}
             >
-                <Space direction="vertical" size={16} className="ot-line">
+                <Space orientation="vertical" size={16} className="ot-line">
                     <PropertiesSection
                         entityType={entityType}
                         entityId={entity.id}

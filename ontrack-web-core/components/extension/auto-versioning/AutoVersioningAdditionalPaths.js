@@ -5,7 +5,7 @@ export default function AutoVersioningAdditionalPaths({additionalPaths}) {
     return (
         <>
             {
-                additionalPaths && additionalPaths.length > 0 && <Space direction="vertical">
+                additionalPaths && additionalPaths.length > 0 && <Space orientation="vertical">
                     {
                         additionalPaths.map((configPath, index) =>
                             <div key={index} className="ot-form-list-item">

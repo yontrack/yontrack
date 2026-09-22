@@ -146,7 +146,7 @@ export default function EditWorkflowDialog({dialog}) {
                 okText="Save"
                 width={900}
             >
-                <Space direction="vertical" className="ot-line">
+                <Space orientation="vertical" className="ot-line">
                     <FormErrors errors={formErrors}/>
                     {/* Workflow name */}
                     <Row>

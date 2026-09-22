@@ -83,7 +83,7 @@ export default function ValidationStamp({
     />
 
     if (displayTooltip) {
-        const tooltipContent = tooltip ? tooltip : <Space direction="vertical">
+        const tooltipContent = tooltip ? tooltip : <Space orientation="vertical">
             <Typography.Text>{validationStamp.name}</Typography.Text>
             <AnnotatedDescription entity={validationStamp}/>
         </Space>

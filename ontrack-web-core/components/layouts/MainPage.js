@@ -33,7 +33,7 @@ export default function MainPage({pageId = '', title, breadcrumbs, commands, des
                             description={description}
                         />
                     }
-                    <Space direction="vertical" className="ot-line">
+                    <Space orientation="vertical" className="ot-line">
                         {warning}
                         <MainGlobalMessages/>
                         {children}

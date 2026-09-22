@@ -35,7 +35,7 @@ export default function GitLabPipelineNotificationChannelForm({prefix}) {
             >
                 <Form.List name={prefixedFormName(prefix, 'variables')}>
                     {(fields, {add, remove}) => (
-                        <Space direction="vertical" style={{width: '100%'}}>
+                        <Space orientation="vertical" style={{width: '100%'}}>
                             {fields.map(({key, name, ...restField}) => (
                                 <Space key={key}>
                                     <Form.Item

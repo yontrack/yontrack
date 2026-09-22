@@ -3,7 +3,7 @@ import {List, Skeleton, Space, Typography} from "antd";
 export default function ListSection({title, extraTitle, icon, loading, items, emptyText}) {
     return (
         <>
-            <Space direction="vertical" className="ot-line">
+            <Space orientation="vertical" className="ot-line">
                 <Typography.Title level={3}>
                     <Space>
                         {icon}

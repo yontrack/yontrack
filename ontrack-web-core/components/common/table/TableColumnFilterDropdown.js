@@ -10,7 +10,7 @@ export default function TableColumnFilterDropdown({confirm, clearFilters, childr
 
     return (
         <>
-            <Space direction="vertical" size={0}>
+            <Space orientation="vertical" size={0}>
                 <Space style={{padding: 8}}>
                     {children}
                 </Space>

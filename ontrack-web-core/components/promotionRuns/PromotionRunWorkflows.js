@@ -81,11 +81,11 @@ export default function PromotionRunWorkflows({promotionRunId}) {
                             type="error"
                             showIcon
                             data-testid="promotion-run-workflows-error"
-                            message="The workflows of this promotion could not be loaded."
+                            title="The workflows of this promotion could not be loaded."
                             description={error}
                         /> :
                         instances.length > 0 ?
-                            <Space direction="vertical" className="ot-line">
+                            <Space orientation="vertical" className="ot-line">
                                 {
                                     instances.map(instance =>
                                         <WorkflowInstanceCard key={instance.id} instance={instance}/>

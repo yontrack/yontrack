@@ -85,7 +85,7 @@ export default function SlotPipelineInputDialog({dialog}) {
         <>
             <FormDialog dialog={dialog}>
                 <LoadingContainer loading={dialog.loading}>
-                    <Space direction="vertical" className="ot-line">
+                    <Space orientation="vertical" className="ot-line">
                         {
                             dialog.inputs.map((input, index) => (
                                 <SlotPipelineInput

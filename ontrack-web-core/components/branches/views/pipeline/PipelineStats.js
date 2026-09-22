@@ -24,7 +24,7 @@ export default function PipelineStats({totalBuilds, latestBuild, loading}) {
     const version = buildVersion(latestBuild)
 
     const stat = (id, label, children) => (
-        <Space direction="vertical" size={0} data-testid={`pipeline-stat-${id}`}>
+        <Space orientation="vertical" size={0} data-testid={`pipeline-stat-${id}`}>
             <Typography.Text type="secondary" style={{fontSize: token.fontSizeSM}}>{label}</Typography.Text>
             <Typography.Text style={{fontSize: token.fontSizeHeading4}}>{children}</Typography.Text>
         </Space>

@@ -60,7 +60,7 @@ export default function ValidationRunCell({build, validationStamp, onChange}) {
                         displayText={false}
                         tooltip={true}
                         tooltipContent={
-                            <Space direction="vertical" size={0}>
+                            <Space orientation="vertical" size={0}>
                                 {/* Description */}
                                 {
                                     (run.lastStatus.description || run.lastStatus.annotatedDescription) &&

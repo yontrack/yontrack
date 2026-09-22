@@ -7,7 +7,7 @@ export default function SlotPipelineDeployingWorkflowNodeExecutorOutput({data}) 
 
     return (
         <>
-            <Space direction="vertical" className="ot-line">
+            <Space orientation="vertical" className="ot-line">
                 <SlotPipelineLink pipelineId={pipelineId} status={true}/>
             </Space>
         </>

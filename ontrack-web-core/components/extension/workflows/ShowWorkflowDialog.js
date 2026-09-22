@@ -33,7 +33,7 @@ export default function ShowWorkflowDialog({dialog}) {
                 footer={null}
                 width={900}
             >
-                <Space direction="vertical" className="ot-line">
+                <Space orientation="vertical" className="ot-line">
                     <Typography.Title level={3}>{dialog.workflow.name}</Typography.Title>
                     <WorkflowGraph
                         workflowNodes={dialog.workflow.nodes}

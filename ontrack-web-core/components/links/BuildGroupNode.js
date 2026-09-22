@@ -39,7 +39,7 @@ export default function BuildGroupNode({data}) {
             <Handle type="source" position={Position.Top}/>
             <Handle type="source" position={Position.Bottom}/>
             <LoadingContainer loading={!group.firstBuild}>
-                <Space direction="vertical" size={16} className="ot-line">
+                <Space orientation="vertical" size={16} className="ot-line">
                     {/* First build */}
                     <BuildNode data={{build: group.firstBuild}}/>
                     {/* Ellipsis */}

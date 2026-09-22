@@ -39,7 +39,7 @@ export default function BranchLinkNode({data}) {
                 }}
                 data-testid={`ot-branch-link-node-${sourceBranch.project.name}-${targetBranch.project.name}`}
             >
-                <Space direction="vertical">
+                <Space orientation="vertical">
                     <Space>
                         <FaLink/>
                         <ProjectLink project={targetBuild.branch.project}/>

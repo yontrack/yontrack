@@ -56,7 +56,7 @@ export default function DashboardCommandMenu() {
             const link = `${window.location.origin}${router.pathname}?dashboard=${selectedDashboard.uuid}`
             if (copy(link)) {
                 messageApi.success(
-                    <Space direction="vertical">
+                    <Space orientation="vertical">
                         <Typography.Paragraph>Dashboard URL copied</Typography.Paragraph>
                         <Typography.Paragraph>
                             <Link href={link}>{link}</Link>

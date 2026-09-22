@@ -24,7 +24,7 @@ export default function PropertyForm({prefix}) {
                                 <>
                                     <Space
                                         key={key}
-                                        direction="vertical"
+                                        orientation="vertical"
                                         className="ot-form-list-item"
                                     >
                                         <Form.Item

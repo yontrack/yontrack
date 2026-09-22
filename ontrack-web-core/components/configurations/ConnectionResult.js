@@ -9,7 +9,7 @@ export default function ConnectionResult({connectionResult}) {
                         connectionResult.type === 'ERROR' &&
                         <Alert
                             type="error"
-                            message={connectionResult.message}
+                            title={connectionResult.message}
                             closable
                             style={{
                                 marginTop: 16,
@@ -21,7 +21,7 @@ export default function ConnectionResult({connectionResult}) {
                         connectionResult.type === 'OK' &&
                         <Alert
                             type="success"
-                            message="Connection OK"
+                            title="Connection OK"
                             closable
                             style={{
                                 marginTop: 16,

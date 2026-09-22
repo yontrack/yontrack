@@ -28,7 +28,7 @@ export default function PromotionRunFieldValues({fields, fieldValues}) {
     })
 
     return (
-        <Space direction="vertical" style={{width: '100%'}}>
+        <Space orientation="vertical" style={{width: '100%'}}>
             <Typography.Text strong>Field values</Typography.Text>
             <Descriptions items={items} column={2} size="small" bordered/>
         </Space>

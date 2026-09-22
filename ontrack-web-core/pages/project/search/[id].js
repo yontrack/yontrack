@@ -65,7 +65,7 @@ export default function ProjectBuildSearchPage() {
                 ]}
             >
                 <LoadingContainer loading={loadingProject}>
-                    <Space direction="vertical" className="ot-line">
+                    <Space orientation="vertical" className="ot-line">
                         <ProjectBuildSearchForm
                             project={project}
                             onSubmit={search}

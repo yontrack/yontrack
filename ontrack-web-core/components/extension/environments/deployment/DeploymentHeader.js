@@ -48,7 +48,7 @@ export default function DeploymentHeader({
     const canAct = isAuthorized(deployment.slot ?? {}, 'pipeline', 'create')
 
     return (
-        <Space direction="vertical" size={8} className="ot-line" data-testid="deployment-header">
+        <Space orientation="vertical" size={8} className="ot-line" data-testid="deployment-header">
 
             <Space size={12} wrap>
                 {/*
@@ -87,7 +87,7 @@ export default function DeploymentHeader({
                 <Alert
                     type="error"
                     showIcon
-                    message={deployment.errorMessage}
+                    title={deployment.errorMessage}
                     data-testid="deployment-error"
                 />
             }

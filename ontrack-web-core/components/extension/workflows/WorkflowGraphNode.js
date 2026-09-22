@@ -64,8 +64,10 @@ export default function WorkflowGraphNode({data}) {
                     </>
                 }
                 size="small"
-                bodyStyle={{
-                    overflow: 'hidden'
+                styles={{
+                    body: {
+                        overflow: 'hidden'
+                    },
                 }}
                 extra={
                     <>
@@ -96,7 +98,7 @@ export default function WorkflowGraphNode({data}) {
             >
                 {
                     executor &&
-                    <Space direction="vertical">
+                    <Space orientation="vertical">
                         <Space>
                             <FaCog/>
                             {

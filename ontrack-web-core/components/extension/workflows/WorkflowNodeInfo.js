@@ -5,7 +5,7 @@ import Duration from "@components/common/Duration";
 export default function WorkflowNodeInfo({node}) {
     return (
         <>
-            <Space direction="vertical" className="ot-line">
+            <Space orientation="vertical" className="ot-line">
                 {
                     node.description && <Typography type="secondary">{node.description}</Typography>
                 }

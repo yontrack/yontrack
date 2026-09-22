@@ -55,7 +55,7 @@ export default function BuildTimeline({
     }
 
     return (
-        <Space direction="vertical" size={token.marginXS} className="ot-line">
+        <Space orientation="vertical" size={token.marginXS} className="ot-line">
             <div
                 data-testid="build-timeline"
                 // Visible scrollbar, not the platform's overlay one - see `ot-scroll-x`

@@ -99,7 +99,7 @@ const BuildTimelineCard = forwardRef(function BuildTimelineCard({
                     fontFamily: token.fontFamily,
                 }}
             >
-                <Space direction="vertical" size={token.marginXXS} style={{width: '100%'}}>
+                <Space orientation="vertical" size={token.marginXXS} style={{width: '100%'}}>
                     <Typography.Text strong ellipsis={true}>
                         {version ?? build.name}
                     </Typography.Text>

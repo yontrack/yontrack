@@ -1,5 +1,5 @@
 import "@testing-library/jest-dom"
-import {fireEvent, render, screen, waitFor} from "@testing-library/react"
+import {act, fireEvent, render, screen, waitFor, within} from "@testing-library/react"
 
 // antd's Drawer reads the responsive breakpoints; jsdom ships no `matchMedia`.
 // Same stand-in as `StatePill.test.js` and the other antd component tests.
@@ -66,10 +66,12 @@ const withLevels = (...levels) => {
 
 /** Opens the level dropdown and picks one by name. */
 const pickLevel = async (name) => {
-    fireEvent.mouseDown(screen.getByTestId('mobile-promote-level').querySelector('.ant-select-selector'))
+    fireEvent.mouseDown(within(screen.getByTestId('mobile-promote-level')).getByRole('combobox'))
     const option = await screen.findByTitle(name)
     fireEvent.click(option)
     await waitFor(() => expect(screen.getByTestId('mobile-promote-level')).toHaveTextContent(name))
+    // `Form.useWatch`, which draws the level's own fields, reports on the next macro task.
+    await act(() => new Promise(resolve => setTimeout(resolve, 0)))
 }
 
 const submit = () => fireEvent.click(screen.getByTestId('mobile-promote-submit'))
@@ -91,7 +93,7 @@ describe('the mobile promote sheet', () => {
 
     it('offers the levels of the build\'s own branch', async () => {
         openSheet()
-        fireEvent.mouseDown(screen.getByTestId('mobile-promote-level').querySelector('.ant-select-selector'))
+        fireEvent.mouseDown(within(screen.getByTestId('mobile-promote-level')).getByRole('combobox'))
         expect(await screen.findByTitle('BRONZE')).toBeInTheDocument()
         expect(await screen.findByTitle('SILVER')).toBeInTheDocument()
     })

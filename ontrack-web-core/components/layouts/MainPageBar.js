@@ -15,7 +15,7 @@ export default function MainPageBar({breadcrumbs, title, commands, description})
 
     return (
         <>
-            <Space direction="vertical" className="ot-line" size={0} data-testid="main-page-bar">
+            <Space orientation="vertical" className="ot-line" size={0} data-testid="main-page-bar">
                 <div style={{
                     display: 'flex',
                     justifyContent: 'space-between',

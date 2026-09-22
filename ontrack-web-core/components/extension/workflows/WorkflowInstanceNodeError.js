@@ -13,7 +13,7 @@ export default function WorkflowInstanceNodeError({node, executorId}) {
         <Alert
             type="error"
             data-testid="workflow-node-error"
-            message={
+            title={
                 <Space size="small">
                     <FaTimesCircle color="red"/>
                     <Typography.Text strong>{node.id}</Typography.Text>

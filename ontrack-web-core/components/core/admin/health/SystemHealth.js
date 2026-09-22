@@ -6,7 +6,7 @@ import Connectors from "@components/core/admin/health/Connectors";
 export default function SystemHealth({systemHealth}) {
     return (
         <>
-            <Space className="ot-line" direction="vertical">
+            <Space className="ot-line" orientation="vertical">
                 {
                     systemHealth.health &&
                     <PageSection title="Health components" padding={true}>

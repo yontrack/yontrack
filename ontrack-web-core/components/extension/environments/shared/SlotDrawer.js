@@ -31,11 +31,11 @@ export default function SlotDrawer({slotId, open, onClose, onDeploy}) {
         <Drawer
             open={open}
             onClose={onClose}
-            width={520}
+            size={520}
             title={<SlotDrawerTitle slotId={slotId} open={open}/>}
             data-testid="slot-drawer"
             // Every opening asks the server again, and a closed drawer costs nothing.
-            destroyOnClose
+            destroyOnHidden
         >
             {
                 /*

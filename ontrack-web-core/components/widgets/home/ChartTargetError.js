@@ -14,7 +14,7 @@ export default function ChartTargetError({error}) {
             <Alert
                 type="error"
                 showIcon
-                message="The chart target could not be loaded."
+                title="The chart target could not be loaded."
                 description={error}
             />
         </PaddedContent>

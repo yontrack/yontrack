@@ -50,7 +50,7 @@ export default function Display({
 
     return (
         <div data-testid="av-post-processing-gitlab">
-            <Space direction="vertical">
+            <Space orientation="vertical">
                 <Typography.Text code>gitlab</Typography.Text>
                 <Descriptions
                     items={items}

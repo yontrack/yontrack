@@ -9,7 +9,7 @@ export default function ChangeLogBuild({id, title, loading, build}) {
     return (
         <>
             <GridCell id={id} title={title} loading={loading} padding={true}>
-                <Space direction="vertical">
+                <Space orientation="vertical">
                     <Space>
                         <BranchLink branch={build.branch}/>
                         <Typography.Text>/</Typography.Text>

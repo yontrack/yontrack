@@ -5,7 +5,7 @@ export default function PrCreatingData({data}) {
     const error = data.error
     return (
         <>
-            <Space direction="vertical">
+            <Space orientation="vertical">
                 <Typography.Text>{message}</Typography.Text>
                 {
                     error &&

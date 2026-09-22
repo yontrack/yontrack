@@ -18,7 +18,7 @@ export default function PromotionLevel({
                             <PromotionLevelLink promotionLevel={promotionLevel}/>
                         }
                         content={
-                            <Space direction="vertical">
+                            <Space orientation="vertical">
                                 {
                                     displayDescription &&
                                     <AnnotatedDescription entity={promotionLevel}/>

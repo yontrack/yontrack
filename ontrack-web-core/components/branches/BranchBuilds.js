@@ -75,7 +75,7 @@ export default function BranchBuilds({
 
     return (
         <>
-            <Space className="ot-line" direction="vertical" size={8}>
+            <Space className="ot-line" orientation="vertical" size={8}>
                 <Table
                     className={
                         vsfContext.inlineEdition ? "ot-validation-stamp-filter-edition" : undefined
@@ -159,7 +159,7 @@ export default function BranchBuilds({
                         align="left"
                         fixed="left"
                         title={
-                            <Space>
+                            <Space className="ot-branch-builds-toolbar">
                                 {/* Build filter */}
                                 <BuildFilterDropdown
                                     branch={branch}

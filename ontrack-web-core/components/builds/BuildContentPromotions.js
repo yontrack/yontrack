@@ -90,11 +90,11 @@ export default function BuildContentPromotions({build}) {
 
         if (plRuns.length > 0) {
             return plRuns.map(run => ({
-                label: <Space className={`promotion-run-pl-${run.promotionLevel.id}`}>
+                title: <Space className={`promotion-run-pl-${run.promotionLevel.id}`}>
                     {/* Information about the promotion */}
                     <Popover content={
                         <div data-testid={`build-promotion-run-popover-${run.id}`}>
-                            <Space direction="vertical">
+                            <Space orientation="vertical">
                                 <Typography.Text>Promoted by {run.creation?.user}</Typography.Text>
                                 <TimestampText value={run.creation?.time}/>
                                 <AnnotatedDescription entity={run}/>
@@ -139,7 +139,7 @@ export default function BuildContentPromotions({build}) {
                             /> : undefined
                     }
                 </Space>,
-                children: <Space>
+                content: <Space>
                     <Popover title={promotionLevel.name}
                              content={<AnnotatedDescription entity={promotionLevel}/>}>
                         <Link href={promotionLevelUri(promotionLevel)}>
@@ -152,7 +152,7 @@ export default function BuildContentPromotions({build}) {
                         href={promotionRunUri(run)}
                     />
                 </Space>,
-                dot: <PromotionLevel
+                icon: <PromotionLevel
                     promotionLevel={promotionLevel}
                     size={16}
                     displayTooltip={false}
@@ -160,19 +160,19 @@ export default function BuildContentPromotions({build}) {
             }))
         } else {
             return [{
-                label: isAuthorized(buildData, 'build', 'promote') ?
+                title: isAuthorized(buildData, 'build', 'promote') ?
                     <BuildPromoteAction
                         build={build}
                         promotionLevel={promotionLevel}
                         onPromotion={reload}
                     /> : undefined,
-                children: <Popover title={promotionLevel.name}
+                content: <Popover title={promotionLevel.name}
                                    content={<AnnotatedDescription entity={promotionLevel}/>}>
                     <Link href={promotionLevelUri(promotionLevel)}>
                         <Typography.Text type="secondary">{promotionLevel.name}</Typography.Text>
                     </Link>
                 </Popover>,
-                dot: <PromotionLevel
+                icon: <PromotionLevel
                     promotionLevel={promotionLevel}
                     size={16}
                     displayTooltip={false}
@@ -185,7 +185,7 @@ export default function BuildContentPromotions({build}) {
         <>
             <GridCell id="promotions" title="Promotions" loading={loading} padding={true}>
                 <Timeline
-                    mode="right"
+                    mode="end"
                     reverse={true}
                     items={items}
                 />

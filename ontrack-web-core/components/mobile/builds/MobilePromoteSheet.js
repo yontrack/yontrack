@@ -72,15 +72,15 @@ export default function MobilePromoteSheet({build, open, onClose, onPromoted}) {
              * the scroller, which keeps the title in place while the form
              * scrolls under it.
              */
-            height="auto"
-            styles={{wrapper: {maxHeight: '85vh'}, content: {maxHeight: '85vh'}}}
+            size="auto"
+            styles={{wrapper: {maxHeight: '85vh'}, section: {maxHeight: '85vh'}}}
             title="Promote build"
             open={open}
             onClose={onClose}
             // Every opening starts from a blank form. The alternative is a sheet
             // remembering the level, the description and the fields of a
             // promotion the user decided against.
-            destroyOnClose
+            destroyOnHidden
         >
             <MobilePromoteForm build={build} onClose={onClose} onPromoted={onPromoted}/>
         </Drawer>
@@ -218,7 +218,7 @@ function MobilePromoteForm({build, onClose, onPromoted}) {
                 <Alert
                     type="error"
                     showIcon
-                    message="Could not load the promotion levels."
+                    title="Could not load the promotion levels."
                     description={query.error}
                     style={{marginBottom: 16}}
                 />
@@ -300,7 +300,7 @@ function MobilePromoteForm({build, onClose, onPromoted}) {
                             getPopupContainer={trigger => trigger.parentElement}
                         />
                     </Form.Item> :
-                    <Space direction="vertical" size={0} style={{marginBottom: 16}}>
+                    <Space orientation="vertical" size={0} style={{marginBottom: 16}}>
                         <Typography.Text type="secondary" className="ot-mobile-caption">
                             Promoted now
                         </Typography.Text>
@@ -326,13 +326,13 @@ function MobilePromoteForm({build, onClose, onPromoted}) {
                 <Alert
                     type="error"
                     showIcon
-                    message={error}
+                    title={error}
                     data-testid="mobile-promote-error"
                     style={{marginBottom: 16}}
                 />
             }
 
-            <Space direction="vertical" size="small" style={{width: '100%'}}>
+            <Space orientation="vertical" size="small" style={{width: '100%'}}>
                 <Button
                     block
                     type="primary"

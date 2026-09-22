@@ -21,11 +21,13 @@ export default function WorkflowInstanceGraphNode({data}) {
                         border: 'solid 2px var(--ot-graph-node-border-selected)'
                     } : {}
                 }
-                bodyStyle={{
-                    overflow: 'hidden'
+                styles={{
+                    body: {
+                        overflow: 'hidden'
+                    },
                 }}
             >
-                <Space direction="vertical">
+                <Space orientation="vertical">
                     <Space>
                         <FaTag/>
                         <Typography.Text strong>{workflowNode.id}</Typography.Text>

@@ -1,5 +1,6 @@
 import React, {createContext, useContext, useEffect, useRef, useState} from "react";
-import {Dropdown, Space, Tooltip, Typography} from "antd";
+import {Button, Dropdown, Space, Tooltip, Typography} from "antd";
+import {EllipsisOutlined} from "@ant-design/icons";
 import {FaSync} from "react-icons/fa";
 import SelectableMenuItem from "@components/common/SelectableMenuItem";
 
@@ -124,28 +125,25 @@ export function AutoRefreshButton({size = undefined}) {
     }
 
     return (
-        <Dropdown.Button
+        <Space.Compact
             size={size}
-            menu={menuProps}
-            onClick={onButtonClick}
             className={autoRefresh.autoRefreshEnabled ? "ot-auto-refresh ot-auto-refresh-enabled" : "ot-auto-refresh"}
-            buttonsRender={([leftButton, rightButton]) => [
-                <Tooltip title={
-                    autoRefresh.autoRefreshEnabled ? "Auto refresh is enabled. Click to disable." : "No auto refresh. Click to enable it."
-                } key="leftButton">
-                    {leftButton}
-                </Tooltip>,
-                <Tooltip title={
-                    "Intervals between each refresh."
-                } key="rightButton">
-                    {rightButton}
-                </Tooltip>,
-            ]}
         >
-            <Space>
-                <FaSync/>
-                <Typography.Text>Auto refresh</Typography.Text>
-            </Space>
-        </Dropdown.Button>
+            <Tooltip title={
+                autoRefresh.autoRefreshEnabled ? "Auto refresh is enabled. Click to disable." : "No auto refresh. Click to enable it."
+            }>
+                <Button onClick={onButtonClick}>
+                    <Space>
+                        <FaSync/>
+                        <Typography.Text>Auto refresh</Typography.Text>
+                    </Space>
+                </Button>
+            </Tooltip>
+            <Dropdown menu={menuProps}>
+                <Tooltip title="Intervals between each refresh.">
+                    <Button icon={<EllipsisOutlined/>} aria-label="Refresh interval"/>
+                </Tooltip>
+            </Dropdown>
+        </Space.Compact>
     )
 }

@@ -61,11 +61,11 @@ export default function AutoVersioningAuditEntryLink({uuid}) {
                             {
                                 audit?.mostRecentState &&
                                 <>
-                                    <Divider type="vertical"/>
+                                    <Divider orientation="vertical"/>
                                     <AutoVersioningAuditEntryPR
                                         entry={audit}
                                     />
-                                    <Divider type="vertical"/>
+                                    <Divider orientation="vertical"/>
                                     <AutoVersioningAuditEntryState
                                         status={audit.mostRecentState}
                                     />

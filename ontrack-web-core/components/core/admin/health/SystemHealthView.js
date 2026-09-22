@@ -58,7 +58,7 @@ export default function SystemHealthView() {
                     <CloseCommand key="close" href={homeUri()}/>
                 ]}
             >
-                <Space direction="vertical" className="ot-line">
+                <Space orientation="vertical" className="ot-line">
                     <LoadingContainer loading={loading}>
                         {
                             systemHealth &&

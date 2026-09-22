@@ -7,7 +7,7 @@ import QueueDispatchResult from "@components/extension/queue/QueueDispatchResult
 export default function Info({data}) {
     return (
         <>
-            <Space direction="vertical">
+            <Space orientation="vertical">
                 {
                     data.map(it => <QueueDispatchResult key={it.id} result={it}/>)
                 }

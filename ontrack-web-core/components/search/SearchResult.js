@@ -9,7 +9,7 @@ export default function SearchResult({result, showType = true, onSelect}) {
             <Space>
                 {
                     showType &&
-                    <Space direction="vertical" size={8}>
+                    <Space orientation="vertical" size={8}>
                         <SearchResultType type={result.type}/>
                         <SearchResultAccuracy accuracy={result.accuracy}/>
                     </Space>

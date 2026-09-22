@@ -3,7 +3,7 @@ import {Form, Input, Space, Typography} from "antd";
 export default function MailNotificationChannelConfig({to, cc, subject}) {
     return (
         <>
-            <Space direction="vertical">
+            <Space orientation="vertical">
                 <Space>
                     To:
                     <Typography.Text code>{to}</Typography.Text>

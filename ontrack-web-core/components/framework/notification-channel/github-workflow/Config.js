@@ -36,7 +36,7 @@ export default function GitHubWorkflowNotificationChannelConfig({
     return (
         <>
             <LoadingContainer loading={loading}>
-                <Space direction="vertical">
+                <Space orientation="vertical">
                     <Space size={4}>
                         <Typography.Text>Triggering workflow at</Typography.Text>
                         {

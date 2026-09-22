@@ -101,9 +101,9 @@ export default function ValidationsLastPromotionBuildWidget({title, project, bra
                     Validations for build <BuildLink build={build}/> promoted
                     to <PromotionLevelLink
                     promotionLevel={promotionLevel}/>
-                    <Divider type="vertical"/>
+                    <Divider orientation="vertical"/>
                     <BranchLink branch={build.branch}/>
-                    <Divider type="vertical"/>
+                    <Divider orientation="vertical"/>
                     <ProjectLink project={build.branch.project}/>
                 </>
             )

@@ -79,7 +79,7 @@ export default function AutoVersioningAuditView() {
             title="Columns"
             trigger="click"
             content={
-                <Space direction="vertical">
+                <Space orientation="vertical">
                     <Button size="small" disabled={allVisible} onClick={showAllColumns}>
                         Show all
                     </Button>
@@ -101,7 +101,7 @@ export default function AutoVersioningAuditView() {
 
     return (
         <>
-            <Space className="ot-line" direction="vertical">
+            <Space className="ot-line" orientation="vertical">
                 <StandardTable
                     id="auto-versioning-audit-table"
                     rowKey={entry => entry.order.uuid}

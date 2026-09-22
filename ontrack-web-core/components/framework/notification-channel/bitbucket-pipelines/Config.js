@@ -13,7 +13,7 @@ export default function BitbucketPipelinesNotificationChannelConfig({
                                                                         timeoutSeconds,
                                                                     }) {
     return (
-        <Space direction="vertical">
+        <Space orientation="vertical">
             <Space size={4} wrap>
                 <Typography.Text>Triggering</Typography.Text>
                 {

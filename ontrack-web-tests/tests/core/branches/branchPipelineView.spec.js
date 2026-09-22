@@ -334,9 +334,11 @@ test('the promote button names no level, and the dialog picks the lowest unreach
     // has not reached, and the field it lands in is editable
     await promote.click()
     await expect(page.getByText("Promotion level to promote to")).toBeVisible()
-    // Scoped to the dialog: the page may grow another Select, and a promotion level with a CHOICE
-    // field would put a second one inside this very dialog
-    await expect(page.locator('.ant-modal .ant-select-selection-item')).toContainText(gold.name)
+    // Scoped to the dialog and to the level's own field: the page may grow another Select, and a
+    // promotion level with a CHOICE field would put a second one inside this very dialog
+    await expect(
+        page.getByTestId('promotion-run-create-dialog').getByTestId('promotionLevel')
+    ).toContainText(gold.name)
 })
 
 test('the pipeline view says it is experimental and invites feedback', async ({page, ontrack}) => {

@@ -43,9 +43,10 @@ export class BranchValidationStampsPage {
     async deleteValidationStamp({name}) {
         const listItem = this.getListItem(name)
         await listItem.getByRole('button', {name: "Delete"}).click()
-        // Scope the confirmation to the dialog to avoid matching list item Delete buttons
+        // Scope the confirmation to the dialog to avoid matching list item Delete buttons. The visible
+        // title: antd 6 renders it twice, as the dialog's label and as its heading
         const dialog = this.page.getByRole('dialog')
-        await expect(dialog.getByText(`Delete "${name}"?`, {exact: true})).toBeVisible()
+        await expect(dialog.getByText(`Delete "${name}"?`, {exact: true}).filter({visible: true})).toBeVisible()
         await dialog.getByRole('button', {name: "Delete"}).click()
         await expect(dialog).not.toBeVisible()
     }

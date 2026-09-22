@@ -8,7 +8,7 @@ import BuildPromotions from "@components/links/BuildPromotions";
 export default function BuildNodePopoverContent({build}) {
     return (
         <>
-            <Space direction="vertical">
+            <Space orientation="vertical">
                 <Typography.Text>
                     {build && <ProjectLink project={build.branch.project} shorten={true}/>}
                 </Typography.Text>

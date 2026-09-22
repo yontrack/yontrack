@@ -41,17 +41,17 @@ export default function MobileDeploymentInputSheet({deployment, ruleConfigId, op
     return (
         <Drawer
             placement="bottom"
-            height="auto"
+            size="auto"
             // Capped in both halves - the wrapper's overflow is visible, so a
             // capped wrapper around uncapped content hangs out of the bottom of
             // it exactly as if there were no cap. See `MobilePromoteSheet`.
-            styles={{wrapper: {maxHeight: '85vh'}, content: {maxHeight: '85vh'}}}
+            styles={{wrapper: {maxHeight: '85vh'}, section: {maxHeight: '85vh'}}}
             title="Deployment input"
             open={open}
             onClose={onClose}
             // A half-typed approval message the user decided against must not
             // come back the next time the sheet is opened.
-            destroyOnClose
+            destroyOnHidden
         >
             <MobileDeploymentInputForm
                 deployment={deployment}
@@ -156,13 +156,13 @@ function MobileDeploymentInputForm({deployment, ruleConfigId, onClose, onSaved})
                 <Alert
                     type="error"
                     showIcon
-                    message={error}
+                    title={error}
                     data-testid="mobile-deployment-input-error"
                     style={{marginBottom: 16}}
                 />
             }
 
-            <Space direction="vertical" size="small" style={{width: '100%'}}>
+            <Space orientation="vertical" size="small" style={{width: '100%'}}>
                 <Button
                     block
                     type="primary"

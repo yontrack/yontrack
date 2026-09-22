@@ -20,7 +20,7 @@ export default function WebhookExchangesView({name}) {
                     <CloseCommand key="webhooks" href={webhookListUri()}/>,
                 ]}
             >
-                <Space direction="vertical" className="ot-line">
+                <Space orientation="vertical" className="ot-line">
                     <Typography.Paragraph>
                         List of deliveries for the <strong>{name}</strong> webhook.
                     </Typography.Paragraph>

@@ -13,7 +13,7 @@ export default function DeliveryMapEmpty() {
             image={Empty.PRESENTED_IMAGE_SIMPLE}
             data-testid="delivery-map-empty"
             description={
-                <Space direction="vertical">
+                <Space orientation="vertical">
                     <Typography.Text data-testid="delivery-map-empty-message">
                         Nothing on the delivery map yet
                     </Typography.Text>

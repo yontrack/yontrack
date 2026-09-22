@@ -8,7 +8,7 @@ export default function PreviousPromotionConditionForm({id, ...values}) {
                 <Form.Item>
                     <Alert
                         type="warning"
-                        message="These settings are global and should be used with caution. Instead, try to define your promotion constraints using code at each branch level."
+                        title="These settings are global and should be used with caution. Instead, try to define your promotion constraints using code at each branch level."
                     />
                 </Form.Item>
                 <Form.Item

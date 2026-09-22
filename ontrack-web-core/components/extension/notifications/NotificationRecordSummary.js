@@ -49,14 +49,14 @@ export default function NotificationRecordSummary({recordId}) {
                     {/* Notification source */}
                     {
                         record.source && <>
-                            <Divider type="vertical"/>
+                            <Divider orientation="vertical"/>
                             <NotificationSourceData source={record.source}/>
                         </>
                     }
                     {/* Event */}
                     {
                         record.event && <>
-                            <Divider type="vertical"/>
+                            <Divider orientation="vertical"/>
                             <EventDetails event={record.event}/>
                         </>
                     }

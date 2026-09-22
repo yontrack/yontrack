@@ -6,8 +6,10 @@ export default function RowTag({children}) {
             style={{
                 height: '100%',
             }}
-            bodyStyle={{
-                padding: 8,
+            styles={{
+                body: {
+                    padding: 8,
+                },
             }}
         >
             {children}

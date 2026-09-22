@@ -144,7 +144,7 @@ export default function SubscriptionView({title, breadcrumbs, entity, name, mana
                 commands={commands}
             >
                 <Skeleton active loading={loading}>
-                    <Space direction="vertical" className="ot-line">
+                    <Space orientation="vertical" className="ot-line">
 
                         <SubscriptionCard
                             entity={entity}

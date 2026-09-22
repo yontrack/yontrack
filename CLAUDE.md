@@ -6,7 +6,7 @@ branches, builds, promotions, and validations across the software delivery lifec
 ## Tech Stack
 
 - **Backend:** Kotlin + Java, Spring Boot 3.5+, Spring GraphQL, Spring Security
-- **Frontend:** React 19, Next.js 16 (Turbopack), Ant Design v5, graphql-request
+- **Frontend:** React 19, Next.js 16 (Turbopack), Ant Design v6, graphql-request
 - **Database:** PostgreSQL with Flyway migrations
 - **Search:** Elasticsearch
 - **Messaging:** RabbitMQ
@@ -857,7 +857,7 @@ export default function Display({
         // ... one item per config field
     ]
     return (
-        <Space direction="vertical">
+        <Space orientation="vertical">
             <Typography.Text code>my-id</Typography.Text>
             <Descriptions items={items} span={12}/>
         </Space>

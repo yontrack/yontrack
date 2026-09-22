@@ -24,7 +24,7 @@ export default function BuildInspectorValidations({build, selectedFilter}) {
 
     return (
         <PageSection id="inspector-validations" title="Validations" padding={true}>
-            <Space direction="vertical" size={token.marginXS} className="ot-line">
+            <Space orientation="vertical" size={token.marginXS} className="ot-line">
                 {
                     validations.length === 0 &&
                     <Empty

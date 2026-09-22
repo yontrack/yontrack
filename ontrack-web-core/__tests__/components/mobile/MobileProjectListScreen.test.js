@@ -1,5 +1,5 @@
 import "@testing-library/jest-dom"
-import {act, fireEvent, render, screen, waitFor} from "@testing-library/react"
+import {act, fireEvent, render, screen, waitFor, within} from "@testing-library/react"
 
 let queryResult = {data: null, loading: false, error: null, finished: true}
 /** The options the screen handed `useQuery` for the *list* query on its last render. */
@@ -69,7 +69,7 @@ const filterBy = async (text) => {
 const pickLabel = async (display) => {
     jest.useRealTimers()
     fireEvent.mouseDown(
-        screen.getByTestId('mobile-projects-labels-filter').querySelector('.ant-select-selector')
+        within(screen.getByTestId('mobile-projects-labels-filter')).getByRole('combobox')
     )
     const options = await screen.findAllByTestId(`label-${display}`)
     fireEvent.click(options[options.length - 1])

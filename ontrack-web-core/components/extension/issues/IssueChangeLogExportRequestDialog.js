@@ -39,11 +39,13 @@ export default function IssueChangeLogExportRequestDialog({issueChangeLogExportR
                                     size="small"
                                     title={`Group ${field.name + 1}`}
                                     key={field.key}
-                                    headStyle={{
-                                        backgroundColor: 'var(--ot-bg-neutral-subtle)',
-                                    }}
-                                    bodyStyle={{
-                                        backgroundColor: 'var(--ot-bg-subtle)',
+                                    styles={{
+                                        header: {
+                                            backgroundColor: 'var(--ot-bg-neutral-subtle)',
+                                        },
+                                        body: {
+                                            backgroundColor: 'var(--ot-bg-subtle)',
+                                        },
                                     }}
                                     extra={
                                         <FaTrash

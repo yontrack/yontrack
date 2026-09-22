@@ -143,7 +143,7 @@ export default function EnvironmentMatrix({
 
     return (
         <>
-            <Space direction="vertical" className="ot-line" size="middle">
+            <Space orientation="vertical" className="ot-line" size="middle">
                 {
                     onFilter &&
                     <EnvironmentMatrixToolbar
@@ -169,7 +169,7 @@ export default function EnvironmentMatrix({
                         data-testid="matrix-empty-no-environment"
                         image={Empty.PRESENTED_IMAGE_SIMPLE}
                         description={
-                            <Space direction="vertical">
+                            <Space orientation="vertical">
                                 <Typography.Text>
                                     No environment has been created yet. Environments and their
                                     deployment slots describe where your builds run, and are usually
@@ -193,7 +193,7 @@ export default function EnvironmentMatrix({
                         data-testid="matrix-empty-favourites"
                         image={Empty.PRESENTED_IMAGE_SIMPLE}
                         description={
-                            <Space direction="vertical">
+                            <Space orientation="vertical">
                                 <Typography.Text>
                                     None of your favourite projects has a deployment slot.
                                 </Typography.Text>

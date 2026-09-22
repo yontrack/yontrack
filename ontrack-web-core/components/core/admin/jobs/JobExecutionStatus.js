@@ -69,7 +69,7 @@ export default function JobExecutionStatus() {
             {
                 !jobExecutionStatus && <Alert
                     type="info"
-                    message={
+                    title={
                         <Space>
                             <Spin size="small"/>
                             Loading the job execution status
@@ -83,7 +83,7 @@ export default function JobExecutionStatus() {
                         jobExecutionStatus.paused && <Alert
                             showIcon
                             type="warning"
-                            message="Execution of all jobs is paused. They can be launched manually."
+                            title="Execution of all jobs is paused. They can be launched manually."
                             action={
                                 <Popover
                                     title="Resume execution of all jobs"
@@ -100,7 +100,7 @@ export default function JobExecutionStatus() {
                         !jobExecutionStatus.paused && <Alert
                             showIcon
                             type="success"
-                            message="Jobs are running normally."
+                            title="Jobs are running normally."
                             action={
                                 <Popover
                                     title="Pause execution of all jobs"

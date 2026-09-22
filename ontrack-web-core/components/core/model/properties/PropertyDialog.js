@@ -132,8 +132,8 @@ export default function PropertyDialog({dialog}) {
                         </Form.Item>
                         {
                             !dialog.selectedProperty.editable && <>
-                                <Space direction="vertical" className="ot-line">
-                                    <Alert type="info" message="Non editable. Read only."/>
+                                <Space orientation="vertical" className="ot-line">
+                                    <Alert type="info" title="Non editable. Read only."/>
                                     {
                                         !dialog.selectedProperty.value && <Empty description="No value"/>
                                     }

@@ -129,7 +129,7 @@ export default function MobileAccountScreen() {
               the only destructive control.
             */}
             <MobileSection title="This device" testId="mobile-account-device">
-                <Space direction="vertical" size={4} style={{width: '100%'}}>
+                <Space orientation="vertical" size={4} style={{width: '100%'}}>
                     {/*
                       `DESKTOP_HOME`, exactly as `switchToMobileUI` always lands
                       on `MOBILE_HOME`: by the time the user is here, the screen
@@ -174,7 +174,7 @@ export default function MobileAccountScreen() {
                  * a support thread, not something anyone opened this screen for.
                  */
                 version &&
-                <Space direction="vertical" size={0} style={{width: '100%'}}>
+                <Space orientation="vertical" size={0} style={{width: '100%'}}>
                     <Typography.Text type="secondary" data-testid="mobile-account-version">
                         Yontrack {version}
                     </Typography.Text>

@@ -64,7 +64,7 @@ export default function Display({
 
     return (
         <div data-testid="av-post-processing-bitbucket-cloud">
-            <Space direction="vertical">
+            <Space orientation="vertical">
                 <Typography.Text code>bitbucket-cloud</Typography.Text>
                 <Descriptions
                     items={items}

@@ -41,7 +41,7 @@ export default function MobileBuildActions({build, onPromotion, onDeployment}) {
     if (!canPromote && !canDeploy) return null
 
     return (
-        <Space direction="vertical" size="small" style={{width: '100%'}} data-testid="mobile-build-actions">
+        <Space orientation="vertical" size="small" style={{width: '100%'}} data-testid="mobile-build-actions">
             <Space.Compact block>
                 {
                     canPromote &&

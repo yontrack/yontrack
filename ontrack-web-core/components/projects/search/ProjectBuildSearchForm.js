@@ -60,7 +60,7 @@ export default function ProjectBuildSearchForm({project, loading, onSubmit}) {
                     onFinish={onSubmit}
                     disabled={loading}
                 >
-                    <Space direction="vertical" className="ot-line">
+                    <Space orientation="vertical" className="ot-line">
                         {/* Common fields */}
                         <Space>
                             {/* Branch name */}

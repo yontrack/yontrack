@@ -45,7 +45,7 @@ export default function BranchNode({data}) {
                 }}
                 data-testid={`ot-branch-node-${branch.project.name}`}
             >
-                <Space direction="vertical" className="ot-line">
+                <Space orientation="vertical" className="ot-line">
                     <Typography.Text>
                         {branch && <ProjectLink project={branch.project} shorten={true}/>}
                     </Typography.Text>

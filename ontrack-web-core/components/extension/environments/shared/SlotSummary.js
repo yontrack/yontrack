@@ -173,25 +173,25 @@ function SlotSummaryBody({
     )
 
     if (query.error) {
-        return <Alert type="error" showIcon message="Could not load the slot." description={query.error}
+        return <Alert type="error" showIcon title="Could not load the slot." description={query.error}
                       data-testid={`${testId}-error`}/>
     }
 
     if (!query.finished) return <Skeleton active paragraph={{rows: 8}}/>
 
     if (!slot) {
-        return <Alert type="warning" showIcon message="No such slot." data-testid={`${testId}-missing`}/>
+        return <Alert type="warning" showIcon title="No such slot." data-testid={`${testId}-missing`}/>
     }
 
     const deployed = slot.lastDeployedPipeline
     const deployedBuild = deployed?.build
 
     return (
-        <Space direction="vertical" size={16} className="ot-line" data-testid={`${testId}-${slotId}`}>
+        <Space orientation="vertical" size={16} className="ot-line" data-testid={`${testId}-${slotId}`}>
 
             <Freshness refreshedAt={refreshedAt} refresh={refresh} testId={`${testId}-freshness`}/>
 
-            {error && <Alert type="error" showIcon message={error} data-testid={`${testId}-action-error`}/>}
+            {error && <Alert type="error" showIcon title={error} data-testid={`${testId}-action-error`}/>}
 
             {/* 1 - Now */}
             <section data-testid={`${testId}-now`}>

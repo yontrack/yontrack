@@ -214,7 +214,7 @@ export default function MobileWorkflowInstanceScreen({id}) {
                     <Alert
                         type="warning"
                         showIcon
-                        message="This workflow run could not be found."
+                        title="This workflow run could not be found."
                         data-testid="mobile-workflow-instance-missing"
                     />
                 }
@@ -289,7 +289,7 @@ export default function MobileWorkflowInstanceScreen({id}) {
                                                 <Alert
                                                     type="error"
                                                     showIcon
-                                                    message={node.execution.error}
+                                                    title={node.execution.error}
                                                     data-testid={`mobile-workflow-error-${node.id}`}
                                                 />
                                             }

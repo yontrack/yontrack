@@ -128,7 +128,7 @@ export default function FormDialog({
                     onFinish={onSubmit}
                     onValuesChange={onValuesChange}
                 >
-                    <Space direction="vertical" className="ot-line">
+                    <Space orientation="vertical" className="ot-line">
                         {
                             header &&
                             <div style={{width: '100%'}}>

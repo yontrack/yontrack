@@ -85,7 +85,7 @@ export default function PredefinedValidationStampsTable({reloadState}) {
                     render={(_, record) =>
                         <>
                             {
-                                record.dataType && <Space direction="vertical">
+                                record.dataType && <Space orientation="vertical">
                                     <Typography.Text strong>{record.dataType.descriptor.displayName}</Typography.Text>
                                     <ValidationDataType dataType={record.dataType}/>
                                 </Space>

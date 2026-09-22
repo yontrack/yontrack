@@ -104,7 +104,7 @@ export default function Display({
 
     return (
         <>
-            <Space direction="vertical">
+            <Space orientation="vertical">
                 <Typography.Text code>my-id</Typography.Text>
                 <Descriptions items={items} span={12}/>
             </Space>

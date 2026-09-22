@@ -64,7 +64,7 @@ export default function WorkflowInstanceCard({instance}) {
                 </Link>
             }
         >
-            <Space direction="vertical" className="ot-line">
+            <Space orientation="vertical" className="ot-line">
                 <WorkflowInstanceNodesProgress
                     nodes={nodes}
                     nodesExecutions={nodesExecutions}

@@ -26,7 +26,7 @@ export default function ConfirmCommand({
     const onAction = () => {
         confirm({
             title: confirmTitle,
-            content: <Space direction="vertical">
+            content: <Space orientation="vertical">
                 {confirmText}
                 <FormErrors errors={errors}/>
             </Space>,

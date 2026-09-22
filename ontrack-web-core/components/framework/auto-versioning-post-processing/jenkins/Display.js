@@ -57,7 +57,7 @@ export default function Display({
 
     return (
         <>
-            <Space direction="vertical">
+            <Space orientation="vertical">
                 <Typography.Text code>jenkins</Typography.Text>
                 <Descriptions
                     items={items}

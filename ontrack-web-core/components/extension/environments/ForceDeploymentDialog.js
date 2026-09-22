@@ -41,9 +41,9 @@ export default function ForceDeploymentDialog({dialog}) {
                 <Alert
                     type="error"
                     showIcon
-                    message="Forcing the deployment"
+                    title="Forcing the deployment"
                     description={
-                        <Space direction="vertical">
+                        <Space orientation="vertical">
                             <Typography.Paragraph>
                                 You are about to force this deployment to be marked as completed, regardless of its
                                 status in Ontrack or in reality. Are you sure to want to carry on?

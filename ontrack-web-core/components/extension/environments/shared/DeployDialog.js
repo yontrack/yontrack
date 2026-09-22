@@ -94,7 +94,7 @@ export default function DeployDialog({dialog}) {
             // Every opening asks the server again. Eligibility is a fact about this build *now* - a
             // promotion made a minute ago changes it - and a dialog remembering the previous answer
             // would offer an environment the build has since left, or hide one it has since reached.
-            destroyOnClose
+            destroyOnHidden
         >
             {fromBuild && <DeployFromBuild dialog={dialog} build={context.build} onlySlot={onlySlot}/>}
             {fromSlot && <DeployToSlot dialog={dialog} slot={context.slot}/>}
@@ -212,7 +212,7 @@ function DeployChoices({dialog, query, choices, buildOf, emptyText, label, testI
         return <Alert
             type="error"
             showIcon
-            message="Could not load the environments."
+            title="Could not load the environments."
             description={query.error}
             data-testid="deploy-dialog-error"
         />
@@ -227,10 +227,10 @@ function DeployChoices({dialog, query, choices, buildOf, emptyText, label, testI
     }
 
     return (
-        <Space direction="vertical" size={12} className="ot-line">
+        <Space orientation="vertical" size={12} className="ot-line">
             {
                 error &&
-                <Alert type="error" showIcon message={error} data-testid="deploy-dialog-error"/>
+                <Alert type="error" showIcon title={error} data-testid="deploy-dialog-error"/>
             }
             {
                 choices.map(choice => (

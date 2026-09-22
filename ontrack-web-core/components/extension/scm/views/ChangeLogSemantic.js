@@ -140,7 +140,7 @@ export default function ChangeLogSemantic({id, from, to, options, onOptionChange
         >
             {
                 error &&
-                <Alert type="error" showIcon message="The semantic change log could not be rendered."/>
+                <Alert type="error" showIcon title="The semantic change log could not be rendered."/>
             }
             {
                 !error && !loading && !semantic &&

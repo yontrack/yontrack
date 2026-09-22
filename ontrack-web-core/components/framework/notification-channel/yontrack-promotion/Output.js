@@ -31,7 +31,7 @@ export default function OntrackValidationNotificationChannelOutput({runId}) {
 
     return (
         <>
-            <Space direction="vertical">
+            <Space orientation="vertical">
                 Promotion created.
                 <LoadingInline loading={loading}>
                     {

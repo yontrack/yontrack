@@ -261,13 +261,14 @@ describe('the mobile branch screen', () => {
         /**
          * Clears it again.
          *
-         * The clear affordance acts on `mousedown`, not on `click` - it has to,
-         * or the selector would take focus and reopen the dropdown under the
-         * user's finger.
+         * The clear affordance is a button of its own, named for a screen reader,
+         * and acts on `click` so that it works from the keyboard too.
          */
         const anyPromotion = async () => {
             await act(async () => {
-                fireEvent.mouseDown(document.querySelector('.ant-select-clear'))
+                fireEvent.click(
+                    within(screen.getByTestId('mobile-builds-promotion')).getByRole('button', {name: 'Clear'})
+                )
             })
         }
 

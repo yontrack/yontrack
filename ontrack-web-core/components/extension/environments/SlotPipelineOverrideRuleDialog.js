@@ -42,7 +42,7 @@ export default function SlotPipelineOverrideRuleDialog({dialog}) {
                 <Form.Item>
                     <Alert
                         type="warning"
-                        message="By overriding the rule, you may bypass some controls. This action will be logged."
+                        title="By overriding the rule, you may bypass some controls. This action will be logged."
                         showIcon={true}
                     />
                 </Form.Item>

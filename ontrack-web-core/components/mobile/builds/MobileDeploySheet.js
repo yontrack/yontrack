@@ -51,8 +51,8 @@ export default function MobileDeploySheet({build, open, onClose, onStarted}) {
             // As tall as it needs to be and never taller than the phone, capped
             // in both halves - see `MobilePromoteSheet` for why the wrapper
             // alone is not enough.
-            height="auto"
-            styles={{wrapper: {maxHeight: '85vh'}, content: {maxHeight: '85vh'}}}
+            size="auto"
+            styles={{wrapper: {maxHeight: '85vh'}, section: {maxHeight: '85vh'}}}
             title="Deploy build"
             open={open}
             onClose={onClose}
@@ -60,7 +60,7 @@ export default function MobileDeploySheet({build, open, onClose, onStarted}) {
             // this build *now* - a promotion made a minute ago changes it - and a
             // sheet remembering the previous answer would offer an environment
             // the build has since left, or hide one it has since reached.
-            destroyOnClose
+            destroyOnHidden
         >
             <MobileDeployList build={build} onClose={onClose} onStarted={onStarted}/>
         </Drawer>
@@ -168,7 +168,7 @@ function MobileDeployList({build, onClose, onStarted}) {
             <Alert
                 type="error"
                 showIcon
-                message="Could not load the environments."
+                title="Could not load the environments."
                 description={query.error}
                 data-testid="mobile-deploy-error"
             />
@@ -197,7 +197,7 @@ function MobileDeployList({build, onClose, onStarted}) {
                 <Alert
                     type="error"
                     showIcon
-                    message={error}
+                    title={error}
                     data-testid="mobile-deploy-error"
                     style={{marginBottom: 16}}
                 />

@@ -107,7 +107,7 @@ export default function GitChangeLogCommits({id, loading, commits, diffLink}) {
                                     <Popover
                                         title="Links from this build/commit"
                                         content={
-                                            <Space direction="vertical">
+                                            <Space orientation="vertical">
                                                 {
                                                     commit.build.usingQualified.pageItems.map(link =>
                                                         <Link key={`${link.build.id}-${link.qualifier}`}

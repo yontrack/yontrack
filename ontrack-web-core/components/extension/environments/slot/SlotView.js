@@ -123,7 +123,7 @@ export default function SlotView({id}) {
             >
                 {
                     error &&
-                    <Alert type="error" showIcon message="Could not load the slot."
+                    <Alert type="error" showIcon title="Could not load the slot."
                            description={error} data-testid="slot-load-error"/>
                 }
                 {
@@ -132,11 +132,11 @@ export default function SlotView({id}) {
                 }
                 {
                     !error && finished && !slot &&
-                    <Alert type="warning" showIcon message="No such slot." data-testid="slot-missing"/>
+                    <Alert type="warning" showIcon title="No such slot." data-testid="slot-missing"/>
                 }
                 {
                     slot &&
-                    <Space direction="vertical" size={16} className="ot-line" data-testid={`slot-${slot.id}`}>
+                    <Space orientation="vertical" size={16} className="ot-line" data-testid={`slot-${slot.id}`}>
                         <Card size="small">
                             {/*
                               * The drawer's own component, minus "Recent": the Deployments tab below

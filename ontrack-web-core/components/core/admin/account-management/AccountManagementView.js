@@ -44,7 +44,7 @@ export default function AccountManagementView() {
                     <CloseCommand key="close" href={homeUri()}/>,
                 ]}
             >
-                <Space direction="vertical" className="ot-line">
+                <Space orientation="vertical" className="ot-line">
                     <Form layout="inline" onFinish={onSearch}>
                         <Form.Item
                             key="search"

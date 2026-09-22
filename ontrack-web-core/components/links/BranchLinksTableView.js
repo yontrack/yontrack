@@ -119,10 +119,10 @@ export default function BranchLinksTableView({id}) {
                             {
                                 key: 'consumer',
                                 title: 'Consumer',
-                                render: (_, link) => <Space direction="vertical">
+                                render: (_, link) => <Space orientation="vertical">
                                     <Space size="small">
                                         <ProjectLink project={link.sourceBuild.branch.project}/>
-                                        <Divider type="vertical"/>
+                                        <Divider orientation="vertical"/>
                                         <BranchLink branch={link.sourceBuild.branch}/>
                                     </Space>
                                     <BuildLink build={link.sourceBuild}/>
@@ -132,14 +132,14 @@ export default function BranchLinksTableView({id}) {
                             {
                                 key: 'dependency',
                                 title: 'Dependency',
-                                render: (_, link) => <Space direction="vertical">
+                                render: (_, link) => <Space orientation="vertical">
                                     <Space size="small">
                                         <ProjectLink project={link.targetBuild.branch.project}/>
                                         {
                                             link.qualifier &&
                                             <Typography.Text>[{link.qualifier}]</Typography.Text>
                                         }
-                                        <Divider type="vertical"/>
+                                        <Divider orientation="vertical"/>
                                         <BranchLink branch={link.targetBuild.branch}/>
                                     </Space>
                                     <Space size="small">
@@ -164,7 +164,7 @@ export default function BranchLinksTableView({id}) {
                                 render: (_, link) => <>
                                     {
                                         link.latestBuild && !link.latestOk &&
-                                        <Space direction="vertical">
+                                        <Space orientation="vertical">
                                             <Space size="small">
                                                 <FaCaretRight/>
                                                 <BuildLink build={link.latestBuild}/>

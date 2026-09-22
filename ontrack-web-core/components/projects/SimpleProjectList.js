@@ -7,7 +7,7 @@ export default function SimpleProjectList({projects, emptyText, before, after}) 
         <>
             {
                 projects && projects.length > 0 &&
-                <Space direction="horizontal" size={16} wrap>
+                <Space orientation="horizontal" size={16} wrap>
                     {
                         before
                     }

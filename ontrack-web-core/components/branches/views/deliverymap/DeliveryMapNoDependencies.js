@@ -14,7 +14,7 @@ export default function DeliveryMapNoDependencies() {
             type="info"
             showIcon
             data-testid="delivery-map-no-dependencies"
-            message={
+            title={
                 <Typography.Text>
                     Nothing joins these checkpoints yet
                 </Typography.Text>

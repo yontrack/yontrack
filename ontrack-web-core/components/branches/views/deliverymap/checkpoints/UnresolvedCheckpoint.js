@@ -31,7 +31,7 @@ export default function UnresolvedCheckpoint({checkpoint}) {
     const {text, tooltip} = unresolvedWording(reference)
 
     return (
-        <Space direction="vertical" size={0}>
+        <Space orientation="vertical" size={0}>
             <Space size={4}>
                 <Typography.Text type="warning"><FaUnlink/></Typography.Text>
                 {/* Quoted as code: it is a name copied out of a configuration, not an entity of

@@ -10,7 +10,7 @@ export default function JenkinsPipelineLibrariesIndicatorsForm({id, ...values}) 
                     {(fields, {add, remove}) => (
                         <>
                             {fields.map(({key, name, ...restField}) => (
-                                <Space direction="vertical" key={key} className="ot-form-list-item ot-line">
+                                <Space orientation="vertical" key={key} className="ot-form-list-item ot-line">
                                     <Row>
                                         <Col span={12}>
                                             <Form.Item

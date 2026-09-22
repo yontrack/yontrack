@@ -123,7 +123,7 @@ export default function JobsView() {
                     <CloseCommand key="close" href={homeUri()}/>
                 ]}
             >
-                <Space direction="vertical" className="ot-line">
+                <Space orientation="vertical" className="ot-line">
                     <JobExecutionStatus/>
                     <JobCategoriesContextProvider>
                         <AutoRefreshContextProvider onRefresh={refresh}>
@@ -223,7 +223,7 @@ export default function JobsView() {
                                     {
                                         key: 'description',
                                         title: 'Description',
-                                        render: (_, job) => <Space direction="vertical">
+                                        render: (_, job) => <Space orientation="vertical">
                                             <Typography.Text
                                                 code>{job.jobKey.type.category.key}/{job.jobKey.type.key}/{job.jobKey.id}</Typography.Text>
                                             <Typography.Text type="secondary">{job.description}</Typography.Text>

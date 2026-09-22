@@ -40,7 +40,7 @@ export default function SlotCheckpoint({checkpoint}) {
     }
 
     return (
-        <Space direction="vertical" size={0}>
+        <Space orientation="vertical" size={0}>
             {/* The drawer rather than the slot page, as every other surface of the redesign does it:
                 the map is expensive to lay out and a reader clicking a slot came to look at it, not
                 to leave. The drawer carries the way out to the slot page for when they did mean to
@@ -90,7 +90,7 @@ export default function SlotCheckpoint({checkpoint}) {
                         </Space>
                         {
                             otherBranch &&
-                            <Tag color="orange" bordered={false}>{`from ${otherBranch}`}</Tag>
+                            <Tag color="orange" variant="filled">{`from ${otherBranch}`}</Tag>
                         }
                     </>
             }

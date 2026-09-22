@@ -102,7 +102,7 @@ export default function PipelineContentView({branch}) {
     const hasBuilds = builds.length > 0
 
     return (
-        <Space direction="vertical" size={16} className="ot-line">
+        <Space orientation="vertical" size={16} className="ot-line">
             <PipelineToolbar
                 branch={branch}
                 selectedBuildFilter={selectedBuildFilter}

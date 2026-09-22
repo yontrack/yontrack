@@ -208,7 +208,7 @@ export default function WhatsBlocking({
             }
             {
                 !settled && items.length > 0 &&
-                <Space direction="vertical" size={4} className="ot-line">
+                <Space orientation="vertical" size={4} className="ot-line">
                     <Typography.Text type="secondary" data-testid={`${testId}-summary`}>
                         {summary.text}
                     </Typography.Text>
@@ -230,7 +230,7 @@ export default function WhatsBlocking({
                                 {
                                     key: 'passed',
                                     label: `${passed.length} check${passed.length > 1 ? 's' : ''} passed`,
-                                    children: <Space direction="vertical" size={4} className="ot-line">
+                                    children: <Space orientation="vertical" size={4} className="ot-line">
                                         {passed.map(row)}
                                     </Space>,
                                 }

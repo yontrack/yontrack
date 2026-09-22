@@ -64,7 +64,7 @@ export default function GlobalPermissionsView() {
                     <CloseCommand key="close" href={accountManagementUri}/>,
                 ]}
             >
-                <Space direction="vertical" className="ot-line">
+                <Space orientation="vertical" className="ot-line">
                     <TableFormSection>
                         <Form
                             form={form}

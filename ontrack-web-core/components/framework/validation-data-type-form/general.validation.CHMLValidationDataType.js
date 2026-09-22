@@ -4,7 +4,7 @@ import SelectCHMLLevel from "@components/framework/validation-run-data-form/Sele
 export default function CHMLValidationDataType({prefix, ...config}) {
     return (
         <>
-            <Space direction="vertical">
+            <Space orientation="vertical">
                 {/*Failed if number of LEVEL issues is &ge; to COUNT*/}
                 <Space align="baseline">
                     <Typography.Text>Failed if # of</Typography.Text>

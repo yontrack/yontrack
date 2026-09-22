@@ -41,7 +41,7 @@ export default function BuildInspectorPromotions({build, onChange}) {
 
     return (
         <PageSection id="inspector-promotions" title="Promotions" padding={true}>
-            <Space direction="vertical" size={token.marginXS} className="ot-line">
+            <Space orientation="vertical" size={token.marginXS} className="ot-line">
                 {
                     runs.length === 0 &&
                     <Empty

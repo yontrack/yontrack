@@ -13,7 +13,7 @@ export default function AutoVersioningInfo({autoVersioning, branchLink}) {
     const commonStatusText = "Indicates if the auto versioning has caught up with last eligible build or not."
     return (
         <>
-            <Space direction="vertical" className="ot-line">
+            <Space orientation="vertical" className="ot-line">
                 {/* Last eligible build */}
                 {
                     autoVersioning.lastEligibleBuild &&

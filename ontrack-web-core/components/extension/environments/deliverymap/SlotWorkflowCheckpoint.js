@@ -43,7 +43,7 @@ export default function SlotWorkflowCheckpoint({checkpoint}) {
     const {label = trigger, title} = triggers[trigger] ?? {}
 
     return (
-        <Space direction="vertical" size={0}>
+        <Space orientation="vertical" size={0}>
             {/* The same icon as a promotion's workflow: the two are different KINDS of checkpoint,
                 for reasons of layout and ownership, but a reader sees one thing - a workflow */}
             <Space size={4}>
@@ -61,7 +61,7 @@ export default function SlotWorkflowCheckpoint({checkpoint}) {
             </Space>
             {
                 label &&
-                <Tag bordered={false} title={title} data-testid="slot-workflow-trigger">{label}</Tag>
+                <Tag variant="filled" title={title} data-testid="slot-workflow-trigger">{label}</Tag>
             }
             <WorkflowCheckpointRun data={checkpoint.data} nothingText="Not started"/>
         </Space>

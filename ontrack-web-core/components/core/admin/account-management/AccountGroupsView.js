@@ -42,7 +42,7 @@ export default function AccountGroupsView() {
                     <CloseCommand key="close" href={accountManagementUri}/>,
                 ]}
             >
-                <Space direction="vertical" className="ot-line">
+                <Space orientation="vertical" className="ot-line">
                     <Form layout="inline" onFinish={onSearch}>
                         <Form.Item
                             key="name"

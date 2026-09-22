@@ -162,7 +162,7 @@ export default function PromotionLevelView({id}) {
                 id={sectionAutoVersioning}
                 title="Auto-versioning trail"
             >
-                <Space className="ot-line" direction="vertical">
+                <Space className="ot-line" orientation="vertical">
                     <Typography.Text type="secondary" style={{padding: 8, display: "block"}}>
                         Lists all branches which are targets for auto-versioning
                         from this promotion.

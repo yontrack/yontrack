@@ -210,7 +210,7 @@ export default function ProjectView({id}) {
                 breadcrumbs={projectBreadcrumbs(project)}
                 commands={commands}
             >
-                <Space direction="vertical" className="ot-line" size={16}>
+                <Space orientation="vertical" className="ot-line" size={16}>
                     <DisabledProjectBanner project={project}/>
                     {
                         favouriteBranches && favouriteBranches.length > 0 &&
@@ -241,7 +241,7 @@ export default function ProjectView({id}) {
                         }
                         {
                             branches && branches.length > 0 &&
-                            <Space direction="horizontal" size={16} wrap>
+                            <Space orientation="horizontal" size={16} wrap>
                                 {
                                     branches.map(branch => <RowTag key={branch.id}>
                                             <BranchBox branch={branch}/>

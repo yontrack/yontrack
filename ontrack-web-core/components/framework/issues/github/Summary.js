@@ -4,7 +4,7 @@ import {Space, Tag, Typography} from "antd";
 export default function IssueGitHubSummary({rawIssue}) {
     return (
         <>
-            <Space className="ot-line" direction="vertical">
+            <Space className="ot-line" orientation="vertical">
 
                 {
                     rawIssue.bodyHtml &&

@@ -6,7 +6,7 @@ export default function GitHubConfigAppToken({appToken}) {
     return (
         <>
             <Popover content={
-                <Space direction="vertical">
+                <Space orientation="vertical">
                     <Typography.Paragraph>Created at <TimestampText value={appToken.createdAt}/></Typography.Paragraph>
                     <Typography.Paragraph>Valid until <TimestampText
                         value={appToken.validUntil}/></Typography.Paragraph>

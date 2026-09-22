@@ -109,7 +109,7 @@ function DeliveryMapContent({branch}) {
     )
 
     return (
-        <Space direction="vertical" size={16} className="ot-line">
+        <Space orientation="vertical" size={16} className="ot-line">
             {/* The loud half of the experimental marking, as the pipeline view does it: dismissible,
                 and carrying the invitation to give feedback. `info` rather than `warning` - the view
                 is new, not risky, and a yellow band argues against adopting what we are asking
@@ -138,7 +138,7 @@ function DeliveryMapContent({branch}) {
                     everything below is one child of the `LoadingContainer`, which renders no wrapper
                     of its own between them. Without it the toolbar sits flush against whatever
                     follows - the "nothing joins these checkpoints" notice most visibly. */}
-                <Space direction="vertical" size={16} className="ot-line">
+                <Space orientation="vertical" size={16} className="ot-line">
                     {/* Above the empty state as well as above the map: the header is this view's
                         toolbar, and a control which comes and goes with the data is a control the
                         reader cannot count on. A branch with nothing on its map still has a latest
@@ -166,7 +166,7 @@ function DeliveryMapContent({branch}) {
                                 type="error"
                                 showIcon
                                 data-testid="delivery-map-error"
-                                message="The delivery map could not be loaded"
+                                title="The delivery map could not be loaded"
                                 description={error}
                             /> :
                         isMapEmpty(map) ?

@@ -75,7 +75,7 @@ export default function MobileThemeSwitch() {
     })
 
     return (
-        <Space direction="vertical" size={4} style={{width: '100%'}}>
+        <Space orientation="vertical" size={4} style={{width: '100%'}}>
             <Segmented
                 block
                 // `size="large"`: the segments are the tap targets, and antd's

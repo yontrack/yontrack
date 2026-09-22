@@ -66,7 +66,7 @@ export default function SetupView() {
             >
                 {
                     error &&
-                    <Alert type="error" showIcon message="Could not load the environments."
+                    <Alert type="error" showIcon title="Could not load the environments."
                            description={error} data-testid="setup-error"/>
                 }
                 {

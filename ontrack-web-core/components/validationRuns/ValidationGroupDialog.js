@@ -62,7 +62,7 @@ export default function ValidationGroupDialog({dialog}) {
             <Modal
                 open={dialog.open}
                 closable={false}
-                destroyOnClose={true}
+                destroyOnHidden={true}
                 cancelButtonProps={{style: {display: 'none'}}}
                 onOk={onOk}
                 onCancel={onOk}

@@ -35,13 +35,13 @@ export default function MobileDeploymentFinishSheet({deployment, open, running, 
     return (
         <Drawer
             placement="bottom"
-            height="auto"
-            styles={{wrapper: {maxHeight: '85vh'}, content: {maxHeight: '85vh'}}}
+            size="auto"
+            styles={{wrapper: {maxHeight: '85vh'}, section: {maxHeight: '85vh'}}}
             title="Complete the deployment"
             open={open}
             onClose={onClose}
         >
-            <Space direction="vertical" size="middle" style={{width: '100%'}}>
+            <Space orientation="vertical" size="middle" style={{width: '100%'}}>
                 {/*
                   Which environment and which build, because a phone is often two
                   taps away from a different deployment and the sheet is the last
@@ -52,7 +52,7 @@ export default function MobileDeploymentFinishSheet({deployment, open, running, 
                     {`into ${slot ? slotNameWithoutProject(slot) : 'this environment'} as done.`}
                 </Typography.Text>
 
-                <Space direction="vertical" size="small" style={{width: '100%'}}>
+                <Space orientation="vertical" size="small" style={{width: '100%'}}>
                     <Button
                         block
                         type="primary"

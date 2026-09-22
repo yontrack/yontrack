@@ -27,7 +27,7 @@ export default function SearchBoxResults({query, onSelect}) {
     const allFinished = searchResultTypes.length > 0 && Object.keys(results).length === searchResultTypes.length;
 
     return (
-        <Space direction="vertical" style={{width: '100%'}}>
+        <Space orientation="vertical" style={{width: '100%'}}>
             {
                 searchResultTypes.map(type => (
                     <SearchBoxTypeResults

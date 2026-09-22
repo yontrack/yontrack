@@ -4,6 +4,7 @@ import {useEffect, useState} from "react";
 import {useTemplateRenderers} from "@components/extension/issues/SelectTemplateRenderer";
 import {Alert, Button, Dropdown, Input, Modal, Space, Spin} from "antd";
 import {FaCheck, FaCopy, FaDownload, FaTools} from "react-icons/fa";
+import {EllipsisOutlined} from "@ant-design/icons";
 import copy from "copy-to-clipboard";
 import {gql} from "graphql-request";
 import IssueChangeLogExportRequestDialog, {
@@ -204,24 +205,35 @@ export default function ChangeLogIssues({id, from, to}) {
                 loading={loading}
                 extra={
                     <>
-                        <Dropdown.Button
-                            type="primary"
-                            trigger="click"
-                            disabled={loading || exporting}
-                            menu={{items}}
-                            onClick={onExport}
-                        >
-                            <Space>
-                                {exporting ? <Spin size="small"/> : <FaDownload/>}
-                                Export
-                            </Space>
-                        </Dropdown.Button>
+                        <Space.Compact>
+                            <Button
+                                type="primary"
+                                disabled={loading || exporting}
+                                onClick={onExport}
+                            >
+                                <Space>
+                                    {exporting ? <Spin size="small"/> : <FaDownload/>}
+                                    Export
+                                </Space>
+                            </Button>
+                            <Dropdown
+                                trigger={["click"]}
+                                menu={{items}}
+                            >
+                                <Button
+                                    type="primary"
+                                    disabled={loading || exporting}
+                                    icon={<EllipsisOutlined/>}
+                                    aria-label="Export options"
+                                />
+                            </Dropdown>
+                        </Space.Compact>
                     </>
                 }
             >
                 {
                     error &&
-                    <Alert type="error" showIcon message="The issues could not be loaded."/>
+                    <Alert type="error" showIcon title="The issues could not be loaded."/>
                 }
                 {
                     issueServiceId &&

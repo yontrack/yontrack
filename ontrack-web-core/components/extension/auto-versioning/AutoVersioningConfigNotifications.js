@@ -28,7 +28,7 @@ export default function AutoVersioningConfigNotifications({notifications}) {
                         title="Notification"
                         render={(_, notification) => (
                             <>
-                                <Space direction="vertical">
+                                <Space orientation="vertical">
                                     <Typography.Text code>{notification.channel}</Typography.Text>
                                     <NotificationChannelConfig
                                         channel={notification.channel}

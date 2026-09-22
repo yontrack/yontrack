@@ -139,8 +139,8 @@ export default function AutoVersioningAuditEntry({entry}) {
 
     const history = entry.audit.map((item, index) => (
         {
-            children: <AutoVersioningAuditEntryState status={item} id={`audit-state-${index}`}/>,
-            label: <Space>
+            content: <AutoVersioningAuditEntryState status={item} id={`audit-state-${index}`}/>,
+            title: <Space>
                 <TimestampText
                     value={item.creation.time}
                     format="YYYY MMM DD, HH:mm:ss"
@@ -162,7 +162,7 @@ export default function AutoVersioningAuditEntry({entry}) {
     // Trail
     if (entry.promotionRun) {
         history.push({
-            children: <Space>
+            content: <Space>
                 <Popover
                     content="Promotion which led to the auto-versioning"
                 >
@@ -173,7 +173,7 @@ export default function AutoVersioningAuditEntry({entry}) {
                 </Popover>
                 <Link href={'/'}>Promotion</Link>
             </Space>,
-            label: <DefaultPromotionRunLink promotionRun={entry.promotionRun}/>
+            title: <DefaultPromotionRunLink promotionRun={entry.promotionRun}/>
         })
     }
 
@@ -181,13 +181,13 @@ export default function AutoVersioningAuditEntry({entry}) {
         <>
             <Row>
                 <Col span={14}>
-                    <Space direction="vertical" className="ot-line">
+                    <Space orientation="vertical" className="ot-line">
                         <Timeline
                             style={{
                                 paddingTop: '3em',
                             }}
                             items={history}
-                            mode="right"
+                            mode="end"
                         />
                         <Flex justify="center">
                             <Space>

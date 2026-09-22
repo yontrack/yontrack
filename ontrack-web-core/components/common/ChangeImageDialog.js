@@ -116,7 +116,7 @@ export default function ChangeImageDialog({changeImageDialog, renderer}) {
                                                 }}
                                             />
                                         ) :
-                                        <Space direction="vertical">
+                                        <Space orientation="vertical">
                                             {
                                                 loading ? <Spin size="small"/> : <FaPlus/>
                                             }
@@ -125,7 +125,7 @@ export default function ChangeImageDialog({changeImageDialog, renderer}) {
                                 }
                             </Space>
                         </Upload>
-                        <Space direction="vertical">
+                        <Space orientation="vertical">
                             {
                                 fileSize &&
                                 <Typography.Text>File size: {formatSize()}</Typography.Text>

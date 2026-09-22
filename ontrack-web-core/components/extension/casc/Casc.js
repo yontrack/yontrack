@@ -64,7 +64,7 @@ export default function Casc() {
     return (
         <>
             {contextHolder}
-            <Space className="ot-line" direction="vertical">
+            <Space className="ot-line" orientation="vertical">
                 <Card
                     title="Casc locations"
                     extra={

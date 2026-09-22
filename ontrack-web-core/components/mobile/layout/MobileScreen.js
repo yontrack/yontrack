@@ -21,7 +21,7 @@ import {Space, Typography} from "antd"
  */
 export default function MobileScreen({title, subtitle, extra, children}) {
     return (
-        <Space direction="vertical" size="middle" style={{width: '100%'}}>
+        <Space orientation="vertical" size="middle" style={{width: '100%'}}>
             <div className="ot-mobile-screen-head">
                 <div className="ot-mobile-screen-heading">
                     <Typography.Title

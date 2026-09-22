@@ -29,14 +29,14 @@ export default function MobileDeploymentCancelSheet({deployment, open, onClose, 
     return (
         <Drawer
             placement="bottom"
-            height="auto"
-            styles={{wrapper: {maxHeight: '85vh'}, content: {maxHeight: '85vh'}}}
+            size="auto"
+            styles={{wrapper: {maxHeight: '85vh'}, section: {maxHeight: '85vh'}}}
             title="Cancel the deployment"
             open={open}
             onClose={onClose}
             // A reason typed for a deployment the user then decided to keep must
             // not be offered again the next time the sheet comes up.
-            destroyOnClose
+            destroyOnHidden
         >
             {
                 deployment &&
@@ -99,7 +99,7 @@ function MobileDeploymentCancelForm({deployment, onClose, onCancelled}) {
             <Alert
                 type="warning"
                 showIcon
-                message="Cancelling a deployment cannot be undone. The reason is kept with it."
+                title="Cancelling a deployment cannot be undone. The reason is kept with it."
                 style={{marginBottom: 16}}
                 data-testid="mobile-deployment-cancel-warning"
             />
@@ -118,13 +118,13 @@ function MobileDeploymentCancelForm({deployment, onClose, onCancelled}) {
                 <Alert
                     type="error"
                     showIcon
-                    message={error}
+                    title={error}
                     data-testid="mobile-deployment-cancel-error"
                     style={{marginBottom: 16}}
                 />
             }
 
-            <Space direction="vertical" size="small" style={{width: '100%'}}>
+            <Space orientation="vertical" size="small" style={{width: '100%'}}>
                 <Button
                     block
                     type="primary"

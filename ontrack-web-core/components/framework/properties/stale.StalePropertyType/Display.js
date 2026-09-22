@@ -2,7 +2,7 @@ import {Space, Typography} from "antd";
 
 export default function Display({property}) {
     return (
-        <Space direction="vertical">
+        <Space orientation="vertical">
             {/*  Disabling  */}
             {property.value.disablingDuration &&
                 <Typography.Text strong type="warning">

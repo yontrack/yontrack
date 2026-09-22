@@ -16,7 +16,7 @@ export default function RunInfo({info, mode = "complete"}) {
         <>
             <Space size={mode === "complete" ? 4 : 1}>
                 <RunInfoSource info={info} mode={mode}/>
-                {hasSource && hasTime && <Divider type="vertical"/>}
+                {hasSource && hasTime && <Divider orientation="vertical"/>}
                 <RunInfoTime info={info} mode={mode}/>
             </Space>
         </>

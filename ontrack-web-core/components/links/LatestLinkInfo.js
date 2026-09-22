@@ -44,7 +44,7 @@ export default function LatestLinkInfo({sourceBuild, latestOk, targetBuild, last
 
     return (
         <>
-            <Space direction="vertical" className="ot-line">
+            <Space orientation="vertical" className="ot-line">
                 <Popover
                     title={
                         <Space>
@@ -60,7 +60,7 @@ export default function LatestLinkInfo({sourceBuild, latestOk, targetBuild, last
                         />
                     }
                 >
-                    <Space direction="vertical" className="ot-line">
+                    <Space orientation="vertical" className="ot-line">
                         <CheckStatus
                             value={latestOk}
                             text="Using latest build"

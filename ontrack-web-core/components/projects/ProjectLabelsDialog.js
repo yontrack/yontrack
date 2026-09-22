@@ -30,7 +30,7 @@ function LabelCheckboxes({labels, loading, value, onChange}) {
     }
 
     return (
-        <Space direction="vertical" size={8}>
+        <Space orientation="vertical" size={8}>
             {
                 labels.map(label => {
                     const id = Number(label.id)

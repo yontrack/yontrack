@@ -6,7 +6,7 @@ export default function SearchResultList({results}) {
         <>
             {
                 results.length > 0 &&
-                <Space direction="vertical">
+                <Space orientation="vertical">
                     {
                         results.map((result, index) => <SearchResult
                             key={index}

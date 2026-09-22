@@ -29,7 +29,7 @@ export default function ValidationStampPatternCheckpoint({checkpoint}) {
     const {total, passed} = summariseMembers(members)
 
     return (
-        <Space direction="vertical" size={token.marginXXS} style={{width: '100%'}}>
+        <Space orientation="vertical" size={token.marginXXS} style={{width: '100%'}}>
             <Typography.Text code>{checkpoint.name}</Typography.Text>
             <Popover
                 open={expanded}
@@ -38,7 +38,7 @@ export default function ValidationStampPatternCheckpoint({checkpoint}) {
                 placement="right"
                 title={<Typography.Text code>{checkpoint.name}</Typography.Text>}
                 content={
-                    <Space direction="vertical" size={token.marginXXS}>
+                    <Space orientation="vertical" size={token.marginXXS}>
                         {
                             members.map(member =>
                                 <ValidationStampCheckpoint key={member.id} checkpoint={member}/>

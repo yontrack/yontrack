@@ -42,6 +42,7 @@ const NOT_PRODUCTION = {
     'styles': 'CSS only',
     'jest.config.js': 'test configuration',
     'jest.coverage.js': 'test configuration',
+    'jest.setup.js': 'test configuration',
     'next.config.js': 'build configuration',
     '.next': 'Next.js build output',
 }

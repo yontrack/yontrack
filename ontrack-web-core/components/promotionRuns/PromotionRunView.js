@@ -143,7 +143,7 @@ export default function PromotionRunView({id}) {
                 <Skeleton loading={loading} active>
                     {
                         run &&
-                        <Space direction="vertical" className="ot-line">
+                        <Space orientation="vertical" className="ot-line">
                             <PromotionRunSummary run={run}/>
                             <PromotionRunWorkflows promotionRunId={run.id}/>
                             <Collapse

@@ -20,14 +20,14 @@ export default function SCMCommitInfo({scmCommitInfo}) {
                 }
                 padding={true}
             >
-                <Space direction="vertical">
+                <Space orientation="vertical">
                     <Typography.Paragraph>
                         <SafeHTMLComponent htmlContent={scmCommitInfo.scmDecoratedCommit.annotatedMessage}/>
                     </Typography.Paragraph>
                     <Space size="small">
                         <Typography.Text
                             type="secondary">{scmCommitInfo.scmDecoratedCommit.commit.author}</Typography.Text>
-                        <Divider type="vertical"/>
+                        <Divider orientation="vertical"/>
                         <Typography.Text
                             type="secondary">
                             <TimestampText value={scmCommitInfo.scmDecoratedCommit.commit.timestamp}/>

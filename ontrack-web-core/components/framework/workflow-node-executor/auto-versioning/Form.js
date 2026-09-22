@@ -7,7 +7,7 @@ export default function AutoVersioningWorkflowNodeExecutorForm() {
             <Form.Item>
                 <Alert
                     type="warning"
-                    message="Full configuration is only available through code."
+                    title="Full configuration is only available through code."
                 />
             </Form.Item>
             <Form.Item name={['data', 'targetProject']}

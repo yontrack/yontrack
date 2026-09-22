@@ -5,6 +5,7 @@
 This is where we speak about developing the Ontrack UI, from its interaction 
 with the API to its pure client aspects.
 
+* [Ant Design](ant-design.md) - antd 6 props to use, and testing against antd
 * [Entity UI permissions](entity-ui-permissions.md)
 * [Global UI permissions](global-ui-permissions.md)
 * [GraphQL calls](ui-graphql-call.md)

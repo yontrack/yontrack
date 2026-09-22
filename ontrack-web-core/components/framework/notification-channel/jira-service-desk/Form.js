@@ -74,7 +74,7 @@ export default function JiraServiceDeskNotificationChannelForm({prefix}) {
                                 <>
                                     <Space
                                         key={key}
-                                        direction="vertical"
+                                        orientation="vertical"
                                         className="ot-form-list-item"
                                         align="baseline"
                                     >

@@ -32,7 +32,7 @@ export default function UserProfileTokens() {
 
     return (
         <>
-            <Space direction="vertical" className="ot-line">
+            <Space orientation="vertical" className="ot-line">
                 <Form layout="inline" form={generateTokenForm} onFinish={onGenerateToken}>
                     <Form.Item
                         name="name"

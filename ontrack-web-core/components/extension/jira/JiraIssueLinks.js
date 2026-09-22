@@ -10,7 +10,7 @@ export default function JiraIssueLinks({links = []}) {
                 <Popover
                     title="Linked issues"
                     content={
-                        <Space direction="vertical">
+                        <Space orientation="vertical">
                             {
                                 links.map((link, index) => (
                                     <Space key={`link-${index}`}>

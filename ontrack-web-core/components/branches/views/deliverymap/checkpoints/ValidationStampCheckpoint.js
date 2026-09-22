@@ -22,7 +22,7 @@ export default function ValidationStampCheckpoint({checkpoint}) {
     }
 
     return (
-        <Space direction="vertical" size={0}>
+        <Space orientation="vertical" size={0}>
             <ValidationChip
                 validationStamp={validationStamp}
                 statusID={checkpoint.arrival?.status}

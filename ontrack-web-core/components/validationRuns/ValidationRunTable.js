@@ -94,7 +94,7 @@ export default function ValidationRunTable({
             key: 'creation',
             render: (_, run) => <Popover
                 content={
-                    <Space direction="vertical">
+                    <Space orientation="vertical">
                         <Typography.Text>Created by {run.lastStatus.creation.user}</Typography.Text>
                         <AnnotatedDescription entity={run.lastStatus}/>
                     </Space>

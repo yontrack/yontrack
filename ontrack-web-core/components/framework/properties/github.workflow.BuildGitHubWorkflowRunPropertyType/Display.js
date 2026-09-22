@@ -6,7 +6,7 @@ export default function Display({property}) {
 
     return (
         <>
-            <Space direction="vertical">
+            <Space orientation="vertical">
                 {
                     property.value.workflows.map(workflow => (
                         <>

@@ -15,7 +15,7 @@ export default function Connectors({connectors}) {
                             />
                             {
                                 status.status.error &&
-                                <Alert type="error" message={status.status.error}/>
+                                <Alert type="error" title={status.status.error}/>
                             }
                         </List.Item>
                     )

@@ -31,7 +31,7 @@ export default function DeploymentTimeline({deployment}) {
                 color: entry.type === 'STATUS'
                     ? (entry.status === 'CANCELLED' ? 'red' : entry.status === 'DONE' ? 'green' : 'blue')
                     : 'orange',
-                children: (
+                content: (
                     <div data-testid={`deployment-timeline-${entry.key}`}>
                         <div>
                             <Typography.Text>{entry.title}</Typography.Text>

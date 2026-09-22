@@ -1,5 +1,5 @@
 import "@testing-library/jest-dom"
-import {fireEvent, render, screen, waitFor} from "@testing-library/react"
+import {fireEvent, render, screen, waitFor, within} from "@testing-library/react"
 
 // antd's Drawer - the promote sheet - reads the responsive breakpoints, and
 // jsdom ships no `matchMedia`. Same stand-in as the other antd component tests.
@@ -571,7 +571,7 @@ describe('the mobile build screen', () => {
 
             fireEvent.click(screen.getByTestId('mobile-build-promote'))
             const level = await screen.findByTestId('mobile-promote-level')
-            fireEvent.mouseDown(level.querySelector('.ant-select-selector'))
+            fireEvent.mouseDown(within(level).getByRole('combobox'))
             fireEvent.click(await screen.findByTitle('BRONZE'))
             fireEvent.click(screen.getByTestId('mobile-promote-submit'))
 

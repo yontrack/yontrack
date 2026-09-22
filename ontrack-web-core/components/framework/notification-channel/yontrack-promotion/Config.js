@@ -5,7 +5,7 @@ import YesNo from "@components/common/YesNo";
 export default function OntrackValidationNotificationChannelConfig({project, branch, build, promotion, fields = [], waitForPromotion, waitForPromotionTimeout}) {
     return (
         <>
-            <Space direction="vertical">
+            <Space orientation="vertical">
                 <Space>
                     Project:
                     <Typography.Text code>{project}</Typography.Text>

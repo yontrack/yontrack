@@ -109,7 +109,7 @@ export default function LastValidationsForBranchWidget({title, project, branch, 
             setTitle(
                 <>
                     Validations for <BranchLink branch={loadedBranch}/>
-                    <Divider type="vertical"/>
+                    <Divider orientation="vertical"/>
                     <ProjectLink project={loadedBranch.project}/>
                 </>
             )

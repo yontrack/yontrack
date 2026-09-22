@@ -58,7 +58,7 @@ function CheckpointLag({lag}) {
 
     return (
         <Tag
-            bordered={false}
+            variant="filled"
             data-testid="checkpoint-lag"
             title={
                 atHead ?

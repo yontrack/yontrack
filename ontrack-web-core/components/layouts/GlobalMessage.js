@@ -7,7 +7,7 @@ export default function GlobalMessage({type, content}) {
     return (
         <>
             <Alert
-                message={
+                title={
                     <Typography.Text>{content}</Typography.Text>
                 }
                 showIcon

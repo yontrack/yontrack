@@ -389,7 +389,7 @@ export default function MobileDeploymentScreen({id}) {
                     <Alert
                         type="warning"
                         showIcon
-                        message="No such deployment."
+                        title="No such deployment."
                         data-testid="mobile-deployment-missing"
                     />
                 }
@@ -412,7 +412,7 @@ export default function MobileDeploymentScreen({id}) {
                             <Alert
                                 type="error"
                                 showIcon
-                                message={error}
+                                title={error}
                                 data-testid="mobile-deployment-error"
                             />
                         }
@@ -429,7 +429,7 @@ export default function MobileDeploymentScreen({id}) {
                                 title={isRunning ? "Complete" : "Start"}
                                 testId="mobile-deployment-actions"
                             >
-                                <Space direction="vertical" size="middle" style={{width: '100%'}}>
+                                <Space orientation="vertical" size="middle" style={{width: '100%'}}>
                                     <div>
                                         {
                                             candidate && canAct &&

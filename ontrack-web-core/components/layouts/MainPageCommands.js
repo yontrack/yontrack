@@ -4,7 +4,7 @@ import {Fragment} from "react";
 export default function MainPageCommands({commands}) {
     return (
         <Space
-            direction="horizontal"
+            orientation="horizontal"
             wrap
             size={4}>
             {commands && commands.map((command, index) => {

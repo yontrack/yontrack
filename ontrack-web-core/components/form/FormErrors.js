@@ -5,7 +5,7 @@ export default function FormErrors({errors}) {
     return (
         errors
             ? <Space
-                direction="vertical"
+                orientation="vertical"
                 style={{
                     width: '100%',
                 }}>
@@ -14,7 +14,7 @@ export default function FormErrors({errors}) {
                         <Fragment key={`form-error-${index}`}>
                             <Alert
                                 type="error"
-                                message={error}
+                                title={error}
                                 closable
                                 style={{
                                     marginTop: 16,

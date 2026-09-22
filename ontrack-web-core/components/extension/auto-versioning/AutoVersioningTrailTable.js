@@ -34,7 +34,7 @@ export default function AutoVersioningTrailTable({query, variables, queryNode, e
             title: "State",
             render: (_, branchTrail) => (
                 <>
-                    <Space direction="vertical">
+                    <Space orientation="vertical">
                         <CheckStatus
                             value={!branchTrail.rejectionReason}
                             text="Eligible"

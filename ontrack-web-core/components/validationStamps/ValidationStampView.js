@@ -198,7 +198,7 @@ export default function ValidationStampView({id}) {
                     commands={commands}
                     description={
                         validationStamp &&
-                        <Space direction="vertical">
+                        <Space orientation="vertical">
                             {validationStamp?.description}
                             {/* Validation stamp data config */}
                             {

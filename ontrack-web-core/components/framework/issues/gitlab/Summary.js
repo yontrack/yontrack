@@ -12,7 +12,7 @@ import GitLabMilestone from "@components/extension/gitlab/GitLabMilestone";
  */
 export default function IssueGitLabSummary({rawIssue}) {
     return (
-        <Space className="ot-line" direction="vertical">
+        <Space className="ot-line" orientation="vertical">
             <Space wrap>
 
                 State:

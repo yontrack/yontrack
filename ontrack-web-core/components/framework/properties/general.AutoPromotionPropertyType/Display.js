@@ -5,12 +5,12 @@ import PromotionLevel from "@components/promotionLevels/PromotionLevel";
 export default function Display({property}) {
     return (
         <>
-            <Space direction="vertical">
+            <Space orientation="vertical">
                 {
                     property.value.validationStamps.length > 0 &&
                     <>
                         <Typography.Text strong>Validations</Typography.Text>
-                        <Space direction="vertical">
+                        <Space orientation="vertical">
                             {
                                 property.value.validationStamps.map(vs => (
                                     <>
@@ -28,7 +28,7 @@ export default function Display({property}) {
                     property.value.promotionLevels.length > 0 &&
                     <>
                         <Typography.Text strong>Promotions</Typography.Text>
-                        <Space direction="vertical">
+                        <Space orientation="vertical">
                             {
                                 property.value.promotionLevels.map(pl => (
                                     <>

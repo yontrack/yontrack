@@ -78,11 +78,11 @@ export class EnvironmentsPage {
             return environmentId
         }).toBeDefined()
         if (!environmentId) throw new Error(`Environment with name ${name} not found`)
-        await expect(this.page.getByTestId(`matrix-column-${environmentId}`)).toBeVisible()
+        await expect(this.page.getByRole('columnheader').getByTestId(`matrix-column-${environmentId}`)).toBeVisible()
     }
 
     async checkEnvironmentIsNotVisible(environment) {
-        await expect(this.page.getByTestId(`matrix-column-${environment.id}`)).toHaveCount(0)
+        await expect(this.page.getByRole('columnheader').getByTestId(`matrix-column-${environment.id}`)).toHaveCount(0)
     }
 
     async checkSlotIsVisible(slot) {
@@ -109,13 +109,11 @@ export class EnvironmentsPage {
     }
 
     /**
-     * `data-testid` on an Ant Design `Input.Search` lands on the `<input>` itself, not on a wrapper
-     * around it - `Input` forwards the props it does not know straight to the control. So the test
-     * id *is* the box, and looking for a control inside it finds nothing and waits out the whole
-     * timeout.
+     * `data-testid` on an antd 6 `Input.Search` lands on its `Space.Compact` wrapper, not on the
+     * `<input>`: the text goes into the searchbox inside it.
      */
     async searchProject(text) {
-        const search = this.page.getByTestId('matrix-search-project')
+        const search = this.page.getByTestId('matrix-search-project').getByRole('searchbox')
         await search.fill(text)
         await search.press('Enter')
     }

@@ -50,7 +50,7 @@ export default function SlotDeploymentsTab({slot, reloadCount = 0}) {
     })
 
     return (
-        <Space direction="vertical" size={16} className="ot-line">
+        <Space orientation="vertical" size={16} className="ot-line">
 
             <Space wrap data-testid="slot-deployments-filter">
                 <Select
@@ -68,9 +68,8 @@ export default function SlotDeploymentsTab({slot, reloadCount = 0}) {
                     ]}
                 />
                 {/*
-                  * `data-testid` on an Ant Design `Input` lands on the `<input>` itself - `Input`
-                  * forwards what it does not know straight to the control - so the test id *is* the
-                  * box and there is nothing to look for inside it.
+                  * `data-testid` on an antd 6 `Input.Search` lands on its `Space.Compact` wrapper,
+                  * not on the `<input>`: a test types into the searchbox inside it.
                   */}
                 <Input.Search
                     data-testid="slot-deployments-build"

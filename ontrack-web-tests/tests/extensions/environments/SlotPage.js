@@ -177,9 +177,9 @@ export class SlotPage {
     /**
      * The Deployments tab's filters, all three handled by the server.
      *
-     * `data-testid` on an Ant Design `Input` lands on the `<input>` itself, so the test id *is* the
-     * box; on a `Select` it lands on a wrapper, so the option is clicked inside it. Getting that
-     * backwards costs the whole timeout, twice over with retries.
+     * `data-testid` on an antd 6 `Input.Search` lands on its wrapper, as on a `Select`: the text
+     * is typed into the searchbox inside it, and the option is clicked inside the `Select`. Getting
+     * that backwards costs the whole timeout, twice over with retries.
      */
     async filterDeploymentsByStatus(label) {
         await this.selectTab("Deployments")
@@ -189,14 +189,14 @@ export class SlotPage {
 
     async filterDeploymentsByBuild(name) {
         await this.selectTab("Deployments")
-        const box = this.page.getByTestId('slot-deployments-build')
+        const box = this.page.getByTestId('slot-deployments-build').getByRole('searchbox')
         await box.fill(name)
         await box.press('Enter')
     }
 
     async filterDeploymentsByUser(name) {
         await this.selectTab("Deployments")
-        const box = this.page.getByTestId('slot-deployments-user')
+        const box = this.page.getByTestId('slot-deployments-user').getByRole('searchbox')
         await box.fill(name)
         await box.press('Enter')
     }

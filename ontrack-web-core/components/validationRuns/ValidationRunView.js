@@ -129,7 +129,7 @@ export default function ValidationRunView({id}) {
                 id={tableRunStatuses}
                 title="Statuses"
             >
-                <Space direction="vertical">
+                <Space orientation="vertical">
                     {
                         isAuthorized(run, 'validation_run', 'status_change') &&
                         <ValidationRunStatusChange
@@ -151,7 +151,7 @@ export default function ValidationRunView({id}) {
                 title="Data"
                 padding={true}
             >
-                <Space direction="vertical">
+                <Space orientation="vertical">
                     {
                         run.validationStamp && run.validationStamp.dataType &&
                         <InfoBox>
@@ -209,7 +209,7 @@ export default function ValidationRunView({id}) {
                     breadcrumbs={downToBuildBreadcrumbs(run)}
                 >
                     <LoadingContainer loading={loading}>
-                        <Space direction="vertical" className="ot-line">
+                        <Space orientation="vertical" className="ot-line">
                             <AnnotatedDescription entity={run}/>
                             <StoredGridLayout
                                 id="page-validation-run-layout"

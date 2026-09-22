@@ -13,7 +13,7 @@ import CheckpointArrival from "@components/branches/views/deliverymap/checkpoint
  */
 export default function UnknownCheckpoint({checkpoint}) {
     return (
-        <Space direction="vertical" size={0}>
+        <Space orientation="vertical" size={0}>
             <Typography.Text strong>{checkpoint.name}</Typography.Text>
             <CheckpointArrival arrival={checkpoint.arrival}/>
         </Space>

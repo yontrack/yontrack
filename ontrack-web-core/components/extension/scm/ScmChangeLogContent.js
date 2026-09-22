@@ -136,7 +136,7 @@ export default function ScmChangeLogContent({changeLog, loading, error}) {
                 {
                     error && <Alert
                         type="error"
-                        message="This change log cannot be displayed."
+                        title="This change log cannot be displayed."
                         description={error}
                     />
                 }

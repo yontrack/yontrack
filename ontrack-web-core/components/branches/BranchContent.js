@@ -21,7 +21,7 @@ export default function BranchContent({branch, viewKey}) {
 
     return (
         <>
-            <Space direction="vertical" className="ot-line">
+            <Space orientation="vertical" className="ot-line">
                 <DisabledBranchBanner branch={branch}/>
                 <ValidationStampFilterContextProvider branch={branch}>
                     <ContentView branch={branch}/>

@@ -102,7 +102,7 @@ export default function StandardTable({
     return (
         <>
             <AutoRefreshContextProvider onRefresh={localReload}>
-                <Space direction="vertical" className="ot-line" size={0}>
+                <Space orientation="vertical" className="ot-line" size={0}>
                     {
                         (filterForm.length > 0 || autoRefresh) &&
                         <FilterForm

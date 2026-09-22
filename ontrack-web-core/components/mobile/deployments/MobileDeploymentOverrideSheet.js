@@ -34,14 +34,14 @@ export default function MobileDeploymentOverrideSheet({deployment, rule, open, o
     return (
         <Drawer
             placement="bottom"
-            height="auto"
-            styles={{wrapper: {maxHeight: '85vh'}, content: {maxHeight: '85vh'}}}
+            size="auto"
+            styles={{wrapper: {maxHeight: '85vh'}, section: {maxHeight: '85vh'}}}
             title="Override the rule"
             open={open}
             onClose={onClose}
             // A justification typed for a rule the user then decided not to
             // override must not be offered again for a different rule.
-            destroyOnClose
+            destroyOnHidden
         >
             {
                 rule &&
@@ -114,7 +114,7 @@ function MobileDeploymentOverrideForm({deployment, rule, onClose, onOverridden})
             <Alert
                 type="warning"
                 showIcon
-                message="Overriding this rule may bypass some controls. The override is recorded against your name."
+                title="Overriding this rule may bypass some controls. The override is recorded against your name."
                 style={{marginBottom: 16}}
                 data-testid="mobile-deployment-override-warning"
             />
@@ -138,13 +138,13 @@ function MobileDeploymentOverrideForm({deployment, rule, onClose, onOverridden})
                 <Alert
                     type="error"
                     showIcon
-                    message={error}
+                    title={error}
                     data-testid="mobile-deployment-override-error"
                     style={{marginBottom: 16}}
                 />
             }
 
-            <Space direction="vertical" size="small" style={{width: '100%'}}>
+            <Space orientation="vertical" size="small" style={{width: '100%'}}>
                 <Button
                     block
                     type="primary"

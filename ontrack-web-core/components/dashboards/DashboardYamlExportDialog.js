@@ -43,7 +43,7 @@ export default function DashboardYamlExportDialog({dialog}) {
                 }
                 width={800}
             >
-                <Space direction="vertical" style={{width: '100%'}}>
+                <Space orientation="vertical" style={{width: '100%'}}>
                     <Typography.Text type="secondary">
                         Paste this YAML into your <Typography.Text code>dashboards.yml</Typography.Text> file
                         and call the <Typography.Text code>applyDashboards</Typography.Text> GraphQL mutation

@@ -24,7 +24,7 @@ export default function PromotionRunStep({run, onChange}) {
             <Popover
                 content={
                     <div data-testid={`promotion-run-popover-${run.id}`}>
-                        <Space direction="vertical">
+                        <Space orientation="vertical">
                             <PromotionLevelLink promotionLevel={run.promotionLevel}/>
                             <Typography.Text>Promoted by {run.creation.user}</Typography.Text>
                             <TimestampText value={run.creation.time}/>
