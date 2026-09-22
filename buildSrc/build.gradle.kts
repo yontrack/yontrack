@@ -66,4 +66,8 @@ dependencies {
 
 tasks.named<Test>("test") {
     useJUnitPlatform()
+    // KeycloakRealmsTest reads the realms: an edit to one of them must re-run the tests
+    inputs.dir("../compose/keycloak/import")
+        .withPropertyName("keycloakRealms")
+        .withPathSensitivity(PathSensitivity.RELATIVE)
 }

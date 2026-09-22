@@ -52,6 +52,13 @@ Keycloak port -- a token is only valid if the issuer the backend expects is
 the issuer Keycloak stamps -- and `NEXTAUTH_URL` and `NEXTAUTH_ACCOUNT_URL`
 likewise. All four interpolate the same variable as the port publication.
 
+**The Keycloak realms cannot interpolate at all**, so every realm under
+`compose/keycloak/import/` lists the UI callback of every slot literally --
+3000, 3100, 3200 and 3300 -- with `"+"` as web origins. A realm missing one
+fails every login from that slot on "Invalid parameter: redirect_uri", which
+is how `uiLdapTest` and `uiOidcTest` first failed from linked worktrees.
+`KeycloakRealmsTest` in `buildSrc` checks every realm against `SLOT_MAX`.
+
 **The UI URL in notification payloads is not affected.** Several acceptance
 tests assert on `http://localhost:3000/...` links inside notifications. Those
 come from `ontrack.config.ui.url`, which the compose files never set, so they

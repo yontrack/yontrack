@@ -133,10 +133,13 @@
       "publicClient": false,
       "baseUrl": "http://localhost:3000",
       "redirectUris": [
-        "http://localhost:3000/api/auth/callback/oidc"
+        "http://localhost:3000/api/auth/callback/oidc",
+        "http://localhost:3100/api/auth/callback/oidc",
+        "http://localhost:3200/api/auth/callback/oidc",
+        "http://localhost:3300/api/auth/callback/oidc"
       ],
       "webOrigins": [
-        "http://localhost:3000"
+        "+"
       ],
       "directAccessGrantsEnabled": true,
       "standardFlowEnabled": true,
