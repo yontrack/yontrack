@@ -32,8 +32,13 @@ const selectTheme = async (page, label) => {
 }
 
 const closeUserMenu = async (page) => {
-    await page.keyboard.press('Escape')
-    await expect(themeSwitch(page)).toBeHidden()
+    // antd 6 closes only the topmost layer on Escape, and the switch's own tooltip is one while the
+    // pointer rests on it: move the pointer away, and press again for as long as a layer is left
+    await page.mouse.move(0, 0)
+    await expect(async () => {
+        await page.keyboard.press('Escape')
+        await expect(themeSwitch(page)).toBeHidden({timeout: 1000})
+    }).toPass()
 }
 
 test.beforeEach(async ({ontrack}) => resetThemeMode(ontrack))
