@@ -92,6 +92,16 @@ describe('mobileEquivalent', () => {
         expect(mobileEquivalent('/extension/environments/slot/7')).toBeNull()
     })
 
+    it('leaves the findings pages desktop-only', () => {
+        // #1864: no findings in the mobile UI this cycle. The findings page of a
+        // project reaches the interstitial, under a name a user can read.
+        expect(mobileEquivalent('/extension/findings/project/12')).toBeNull()
+        expect(isRedirectExempt('/extension/findings/project/12')).toBe(false)
+        expect(describeDesktopRoute('/extension/findings/project/12')).toEqual("a project's security findings")
+        expect(mobileEquivalent('/extension/findings/finding/42')).toBeNull()
+        expect(describeDesktopRoute('/extension/findings/finding/42')).toEqual('a security finding')
+    })
+
     it('leaves the rest of the workflows pages to the interstitial', () => {
         // Only the instance page has a mobile screen. The audit page and the
         // definitions do not, and they have to keep reaching the interstitial

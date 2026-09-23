@@ -37,6 +37,7 @@ import {useRefresh} from "@components/common/RefreshUtils";
 import ProjectEditCommand from "@components/projects/ProjectEditCommand";
 import ProjectLabelsCommand from "@components/projects/ProjectLabelsCommand";
 import LabelChip from "@components/labels/LabelChip";
+import ProjectSecuritySection from "@components/extension/findings/project/ProjectSecuritySection";
 
 export default function ProjectView({id}) {
 
@@ -251,6 +252,10 @@ export default function ProjectView({id}) {
                             </Space>
                         }
                     </PageSection>
+                    {
+                        project.id &&
+                        <ProjectSecuritySection project={project}/>
+                    }
                 </Space>
             </MainPage>
         </>

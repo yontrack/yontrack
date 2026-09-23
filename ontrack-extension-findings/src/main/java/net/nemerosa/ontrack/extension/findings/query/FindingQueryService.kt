@@ -41,6 +41,19 @@ interface FindingQueryService {
     ): PaginatedList<Finding>
 
     /**
+     * Summary of the findings of a project: its open findings by severity, and their exposure
+     * per branch.
+     *
+     * @param project Project
+     * @param date Day against which the expiry of the acceptances is evaluated
+     * @return Summary, `null` for a user who cannot see the findings of the project
+     */
+    fun getProjectFindingsSummary(
+        project: Project,
+        date: LocalDate = Time.now.toLocalDate(),
+    ): FindingsSummary?
+
+    /**
      * Findings having a given external ID, across all the projects, by project name.
      */
     fun getFindingsByExternalId(externalId: String): List<Finding>

@@ -2,8 +2,10 @@ package net.nemerosa.ontrack.extension.findings.graphql
 
 import graphql.schema.GraphQLArgument
 import graphql.schema.GraphQLFieldDefinition
+import graphql.schema.GraphQLTypeReference
 import net.nemerosa.ontrack.extension.findings.model.Finding
 import net.nemerosa.ontrack.extension.findings.query.FindingQueryService
+import net.nemerosa.ontrack.extension.findings.query.FindingsSummary
 import net.nemerosa.ontrack.graphql.schema.GQLProjectEntityFieldContributor
 import net.nemerosa.ontrack.graphql.schema.GQLTypeCache
 import net.nemerosa.ontrack.graphql.support.pagination.GQLPaginatedListFactory
@@ -13,7 +15,8 @@ import net.nemerosa.ontrack.model.structure.ProjectEntityType
 import org.springframework.stereotype.Component
 
 /**
- * `Project.findings(filter)`: the security findings of a project, paginated.
+ * `Project.findings(filter)`: the security findings of a project, paginated, and
+ * `Project.findingsSummary`: their summary, for the Security section of the project page.
  */
 @Component
 class GQLProjectFindingsFieldContributor(
@@ -44,7 +47,19 @@ class GQLProjectFindingsFieldContributor(
                     val filter = gqlInputFindingFilter.convert(env.getArgument<Any>(ARG_FILTER))
                     findingQueryService.getProjectFindings(project, filter, offset, size)
                 }
-            )
+            ),
+            GraphQLFieldDefinition.newFieldDefinition()
+                .name("findingsSummary")
+                .description(
+                    "Summary of the security findings of the project: its open findings by severity, and their exposure per branch. " +
+                            "Null for a user who is not granted the view of the findings of the project."
+                )
+                .type(GraphQLTypeReference(FindingsSummary::class.java.simpleName))
+                .dataFetcher { env ->
+                    val project: Project = env.getSource()!!
+                    findingQueryService.getProjectFindingsSummary(project)
+                }
+                .build(),
         )
     } else {
         null

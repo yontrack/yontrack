@@ -1,3 +1,5 @@
+import {findingsFilterToQuery} from "@components/extension/findings/findingsModel";
+
 export function homeUri() {
     return `/`
 }
@@ -75,6 +77,15 @@ export function projectLabelUri(label) {
  */
 export function findingUri(finding) {
     return `/extension/findings/finding/${finding.id}`
+}
+
+/**
+ * Findings page of a project, optionally filtered. The filter goes in the query of the URL, with
+ * the criteria of `Project.findings(filter)`: severity, state, branch, scanner and kind.
+ */
+export function projectFindingsUri(project, filter = {}) {
+    const query = new URLSearchParams(findingsFilterToQuery(filter)).toString()
+    return `/extension/findings/project/${project.id}${query ? `?${query}` : ''}`
 }
 
 export function restPromotionLevelImageUri(promotionLevel) {

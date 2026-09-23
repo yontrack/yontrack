@@ -401,6 +401,202 @@ class FindingsGraphQLIT : AbstractQLKTITSupport() {
         }
     }
 
+    @Test
+    fun `Summary of the findings of a project, open by severity and by branch`() {
+        asAdmin {
+            project {
+                val main = branch("main")
+                val release = branch("release-x")
+                val feature = branch("feature-y")
+                val vsMain = main.findingsStamp()
+                val vsRelease = release.findingsStamp()
+                val vsFeature = feature.findingsStamp()
+                main.scan(
+                    vsMain,
+                    entry("CVE-CRITICAL", severity = "CRITICAL"),
+                    entry("CVE-HIGH-1", severity = "HIGH"),
+                    entry("CVE-ACCEPTED", severity = "HIGH", acceptedUntil = today.plusDays(10)),
+                    entry("CVE-FIXED", severity = "MEDIUM"),
+                )
+                // CVE-FIXED is resolved on main
+                main.scan(
+                    vsMain,
+                    entry("CVE-CRITICAL", severity = "CRITICAL"),
+                    entry("CVE-HIGH-1", severity = "HIGH"),
+                    entry("CVE-ACCEPTED", severity = "HIGH", acceptedUntil = today.plusDays(10)),
+                )
+                release.scan(
+                    vsRelease,
+                    entry("CVE-HIGH-1", severity = "HIGH"),
+                    entry("CVE-HIGH-2", severity = "HIGH"),
+                    entry("CVE-LOW", severity = "LOW"),
+                    entry("CVE-UNKNOWN", severity = "UNKNOWN"),
+                )
+                // Everything resolved on the feature branch
+                feature.scan(vsFeature, entry("CVE-FIXED", severity = "MEDIUM"))
+                feature.scan(vsFeature)
+
+                val summary = findingsSummary(this)
+                assertEquals(
+                    mapOf("CRITICAL" to 1, "HIGH" to 2, "MEDIUM" to 0, "LOW" to 1, "UNKNOWN" to 1),
+                    summary.path("open").severityCounts()
+                )
+                assertEquals(
+                    listOf("CRITICAL", "HIGH", "MEDIUM", "LOW", "UNKNOWN"),
+                    summary.path("open").toList().map { it.path("severity").asText() },
+                    "Every severity, the most severe first"
+                )
+                assertEquals(5, summary.path("openCount").asInt())
+                assertEquals(1, summary.path("acceptedCount").asInt())
+                assertEquals(1, summary.path("resolvedCount").asInt())
+                assertEquals(listOf("trivy"), summary.path("scanners").toList().map { it.asText() })
+
+                // Branches, the most exposed first, those with no open finding last
+                val branches = summary.path("branches").toList()
+                assertEquals(
+                    listOf("main", "release-x", "feature-y"),
+                    branches.map { it.path("branch").path("name").asText() }
+                )
+                val (onMain, onRelease, onFeature) = branches
+                assertEquals(
+                    mapOf("CRITICAL" to 1, "HIGH" to 1, "MEDIUM" to 0, "LOW" to 0, "UNKNOWN" to 0),
+                    onMain.path("open").severityCounts()
+                )
+                assertEquals(2, onMain.path("openCount").asInt())
+                assertEquals(
+                    mapOf("CRITICAL" to 0, "HIGH" to 2, "MEDIUM" to 0, "LOW" to 1, "UNKNOWN" to 1),
+                    onRelease.path("open").severityCounts()
+                )
+                assertEquals(4, onRelease.path("openCount").asInt())
+                assertEquals(0, onFeature.path("openCount").asInt())
+
+                // The counts are the ones the filter of the findings gives
+                assertEquals(
+                    summary.path("open").severityCounts().getValue("HIGH"),
+                    projectFindingIds(this, """{state: OPEN, severity: HIGH}""").size
+                )
+                assertEquals(
+                    onRelease.path("open").severityCounts().getValue("HIGH"),
+                    projectFindingIds(this, """{branch: "release-x", state: OPEN, severity: HIGH}""").size
+                )
+            }
+        }
+    }
+
+    @Test
+    fun `Summary of the findings of a project which has none`() {
+        asAdmin {
+            project {
+                val summary = findingsSummary(this)
+                assertEquals(
+                    mapOf("CRITICAL" to 0, "HIGH" to 0, "MEDIUM" to 0, "LOW" to 0, "UNKNOWN" to 0),
+                    summary.path("open").severityCounts()
+                )
+                assertEquals(0, summary.path("openCount").asInt())
+                assertEquals(0, summary.path("acceptedCount").asInt())
+                assertEquals(0, summary.path("resolvedCount").asInt())
+                assertEquals(0, summary.path("branches").size())
+                assertEquals(0, summary.path("scanners").size())
+            }
+        }
+    }
+
+    @Test
+    fun `Summary of the findings of a project with several scanners`() {
+        asAdmin {
+            project {
+                branch {
+                    scan(findingsStamp(), entry("CVE-1"))
+                    scan(findingsStamp(), entry("10038", location = ""), scanner = "zap", kind = "DAST")
+                }
+                assertEquals(
+                    listOf("trivy", "zap"),
+                    findingsSummary(this).path("scanners").toList().map { it.asText() }
+                )
+            }
+        }
+    }
+
+    @Test
+    fun `No summary of the findings for a user without the permission to see them`() {
+        val project = asAdmin {
+            project {
+                branch {
+                    scan(findingsStamp(), entry("CVE-HIDDEN"))
+                }
+            }
+        }
+        asUserWithView(project) {
+            assertTrue(findingsSummary(project).isNull)
+        }
+    }
+
+    @Test
+    fun `Authorization to see the findings of a project`() {
+        val project = asAdmin { project() }
+        asAdmin {
+            assertTrue(findingsViewAuthorization(project))
+        }
+        val account = asAdmin { doCreateAccountWithProjectRole(project, Roles.PROJECT_READ_ONLY) }
+        asFixedAccount(account) {
+            assertTrue(findingsViewAuthorization(project))
+        }
+        // The project view, but not the findings view
+        asUserWithView(project) {
+            assertFalse(findingsViewAuthorization(project))
+        }
+    }
+
+    private fun findingsViewAuthorization(project: Project): Boolean =
+        run(
+            """
+                {
+                    project(id: ${project.id}) {
+                        authorizations {
+                            name
+                            action
+                            authorized
+                        }
+                    }
+                }
+            """
+        ).path("project").path("authorizations")
+            .single { it.path("name").asText() == "findings" && it.path("action").asText() == "view" }
+            .path("authorized").asBoolean()
+
+    private fun findingsSummary(project: Project): JsonNode =
+        run(
+            """
+                {
+                    project(id: ${project.id}) {
+                        findingsSummary {
+                            open {
+                                severity
+                                count
+                            }
+                            openCount
+                            acceptedCount
+                            resolvedCount
+                            scanners
+                            branches {
+                                branch {
+                                    name
+                                }
+                                open {
+                                    severity
+                                    count
+                                }
+                                openCount
+                            }
+                        }
+                    }
+                }
+            """
+        ).path("project").path("findingsSummary")
+
+    private fun JsonNode.severityCounts(): Map<String, Int> =
+        toList().associate { it.path("severity").asText() to it.path("count").asInt() }
+
     private fun projectFindings(
         project: Project,
         filter: String? = null,

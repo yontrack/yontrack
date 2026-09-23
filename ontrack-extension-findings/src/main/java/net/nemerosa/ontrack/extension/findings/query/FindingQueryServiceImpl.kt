@@ -3,6 +3,7 @@ package net.nemerosa.ontrack.extension.findings.query
 import net.nemerosa.ontrack.extension.findings.model.Finding
 import net.nemerosa.ontrack.extension.findings.model.FindingAcceptance
 import net.nemerosa.ontrack.extension.findings.model.FindingExposureState
+import net.nemerosa.ontrack.extension.findings.model.FindingSeverity
 import net.nemerosa.ontrack.extension.findings.model.FindingState
 import net.nemerosa.ontrack.extension.findings.repository.FindingRepository
 import net.nemerosa.ontrack.extension.findings.security.ProjectFindingsView
@@ -67,6 +68,46 @@ class FindingQueryServiceImpl(
         }
 
         return page(findings.sortedWith(findingOrder), offset, size)
+    }
+
+    override fun getProjectFindingsSummary(project: Project, date: LocalDate): FindingsSummary? {
+        if (!canSeeFindings(project.id())) return null
+        val findings = findingRepository.findFindingsByProject(project.id())
+        val states = findingStateService.getFindingStates(project, findings, date)
+        val byId = findings.associateBy { it.id }
+        // Exposure per branch: open on a branch when exposed there for one of its stamps at least,
+        // as the filter on a branch gives it
+        val exposures = if (findings.isEmpty()) {
+            emptyList()
+        } else {
+            findingRepository.findExposuresByFindings(findings.map { it.id })
+        }
+        val branches = exposures.groupBy { it.branchId }
+            .map { (branchId, branchExposures) ->
+                val open = branchExposures.groupBy { it.findingId }
+                    .filterValues { findingExposures ->
+                        FindingExposureState.of(findingExposures.map { it.stateOn(date) }) == FindingExposureState.EXPOSED
+                    }
+                    .keys
+                    .mapNotNull { byId[it] }
+                FindingsBranchSummary(
+                    branch = structureService.getBranch(ID.of(branchId)),
+                    open = severityCounts(open),
+                )
+            }
+            .sortedWith(branchSummaryOrder)
+        return FindingsSummary(
+            open = severityCounts(findings.filter { states[it.id] == FindingState.OPEN }),
+            acceptedCount = findings.count { states[it.id] == FindingState.ACCEPTED },
+            resolvedCount = findings.count { states[it.id] == FindingState.RESOLVED },
+            branches = branches,
+            scanners = findings.map { it.scanner }.distinct().sorted(),
+        )
+    }
+
+    private fun severityCounts(findings: Collection<Finding>): Map<FindingSeverity, Int> {
+        val counts = findings.groupingBy { it.maxSeverity }.eachCount()
+        return FindingSeverity.entries.associateWith { counts[it] ?: 0 }
     }
 
     override fun getFindingsByExternalId(externalId: String): List<Finding> {
@@ -180,6 +221,19 @@ class FindingQueryServiceImpl(
         }
 
     companion object {
+
+        /**
+         * The most exposed branches first: by number of critical findings, then of high ones,
+         * and so on, then by name.
+         */
+        private val branchSummaryOrder: Comparator<FindingsBranchSummary> =
+            Comparator<FindingsBranchSummary> { a, b ->
+                FindingSeverity.entries
+                    .map { severity -> (b.open[severity] ?: 0).compareTo(a.open[severity] ?: 0) }
+                    .firstOrNull { it != 0 }
+                    ?: 0
+            }.thenBy { it.branch.name }
+
         /**
          * The most severe first, then the most recently seen.
          */

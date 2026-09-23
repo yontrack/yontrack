@@ -264,6 +264,9 @@ const DESCRIPTIONS = [
     [/^\/extension\/auto-versioning\//, 'auto-versioning'],
     [/^\/extension\/notifications\//, 'notifications'],
     [/^\/extension\/workflows\//, 'a workflow'],
+    // No findings in the mobile UI in 6.0 (#1864)
+    [/^\/extension\/findings\/project\//, "a project's security findings"],
+    [/^\/extension\/findings\/finding\//, 'a security finding'],
     [/^\/extension\//, 'an extension page'],
     [/^\/core\/admin\//, 'an administration page'],
     [/^\/core\/config\//, 'a configuration page'],
