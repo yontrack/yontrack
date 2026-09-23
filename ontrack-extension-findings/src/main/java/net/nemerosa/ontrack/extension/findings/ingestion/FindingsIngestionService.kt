@@ -24,7 +24,9 @@ interface FindingsIngestionService {
      * [FindingsEvents][net.nemerosa.ontrack.extension.findings.events.FindingsEvents] — in the same
      * transaction, in the order of the transitions.
      *
-     * A report which cannot be read creates nothing.
+     * A report which cannot be read creates nothing, and neither does a report in a native format
+     * posted without the licensed feature for it — see
+     * [FindingsLicense][net.nemerosa.ontrack.extension.findings.license.FindingsLicense].
      *
      * @param build Build to validate
      * @param request What to post

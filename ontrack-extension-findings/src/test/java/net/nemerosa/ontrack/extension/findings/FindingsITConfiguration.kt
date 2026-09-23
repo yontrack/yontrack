@@ -2,8 +2,11 @@ package net.nemerosa.ontrack.extension.findings
 
 import net.nemerosa.ontrack.common.RunProfile
 import net.nemerosa.ontrack.extension.api.support.TestBranchModelMatcherProvider
+import net.nemerosa.ontrack.extension.findings.license.TestLicenseService
+import net.nemerosa.ontrack.extension.license.DevLicenseService
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+import org.springframework.context.annotation.Primary
 import org.springframework.context.annotation.Profile
 
 /**
@@ -18,4 +21,11 @@ class FindingsITConfiguration {
      */
     @Bean
     fun testBranchModelMatcherProvider() = TestBranchModelMatcherProvider()
+
+    /**
+     * Development licence whose features a test can disable, to run without a licensed feature.
+     */
+    @Bean
+    @Primary
+    fun testLicenseService(devLicenseService: DevLicenseService) = TestLicenseService(devLicenseService)
 }

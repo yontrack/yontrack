@@ -304,7 +304,7 @@ class FindingsValidationRunMutationIT : AbstractQLKTITSupport() {
                         assertUserError(
                             node,
                             "validateBuildWithFindings",
-                            message = "Findings report format `cyclonedx` is not supported. Supported formats: findings."
+                            message = "Findings report format `cyclonedx` is not supported. Supported formats: findings, sarif."
                         )
                         assertTrue(structureService.getValidationRunsForBuild(id, 0, 10).isEmpty())
                     }

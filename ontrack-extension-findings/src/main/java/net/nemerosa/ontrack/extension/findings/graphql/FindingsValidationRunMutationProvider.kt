@@ -57,7 +57,7 @@ class FindingsValidationRunMutationProvider(
                 ),
                 requiredStringInputField(
                     "format",
-                    "Format of the report. `findings` is the neutral format of Yontrack."
+                    "Format of the report. `findings` is the neutral format of Yontrack. `sarif` (SARIF 2.1) is a native scanner format, which needs the licensed feature \"Native scanner formats\"."
                 ),
                 optionalRefInputField(
                     "kind",

@@ -1,0 +1,188 @@
+{
+  "$schema": "https://docs.oasis-open.org/sarif/sarif/v2.1.0/os/schemas/sarif-schema-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "invocations": [
+        {
+          "executionSuccessful": true,
+          "toolExecutionNotifications": []
+        }
+      ],
+      "results": [
+        {
+          "fingerprints": {
+            "matchBasedId/v1": "4d2a6c0e3b1f9a7d5c8e2b4f6a1d3c5e7b9f0a2c4e6d8b1a3c5e7f9b0d2a4c6e8f0b1d3a5c7e9f1b3d5a7c9e1f3b5d7a9c1e3f5b7d9"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "app/views.py",
+                  "uriBaseId": "%SRCROOT%"
+                },
+                "region": {
+                  "endColumn": 71,
+                  "endLine": 18,
+                  "snippet": {
+                    "text": "    cursor.execute(\"SELECT * FROM orders WHERE id = '%s'\" % order_id)"
+                  },
+                  "startColumn": 5,
+                  "startLine": 18
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Detected user input used to manually construct a SQL string. This is usually bad practice because manual construction could accidentally result in a SQL injection."
+          },
+          "properties": {},
+          "ruleId": "python.django.security.injection.sql.sql-injection-using-db-cursor-execute.sql-injection-db-cursor-execute"
+        },
+        {
+          "fingerprints": {
+            "matchBasedId/v1": "8b0d2f4a6c8e0b2d4f6a8c0e2b4d6f8a0c2e4b6d8f0a2c4e6b8d0f2a4c6e8b0d2f4a6c8e0b2d4f6a8c0e2b4d6f8a0c2e4b6d8f0a2"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "app/settings.py",
+                  "uriBaseId": "%SRCROOT%"
+                },
+                "region": {
+                  "endColumn": 44,
+                  "endLine": 7,
+                  "snippet": {
+                    "text": "AWS_ACCESS_KEY_ID = \"AKIAIOSFODNN7EXAMPLE\""
+                  },
+                  "startColumn": 1,
+                  "startLine": 7
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "AWS Access Key ID Value detected: AKIAIOSFODNN7EXAMPLE. This is a sensitive credential and should not be hardcoded here."
+          },
+          "properties": {},
+          "ruleId": "generic.secrets.security.detected-aws-access-key-id-value.detected-aws-access-key-id-value"
+        },
+        {
+          "fingerprints": {
+            "matchBasedId/v1": "1c3e5a7c9e1b3d5f7a9c1e3b5d7f9a1c3e5b7d9f1a3c5e7b9d1f3a5c7e9b1d3f5a7c9e1b3d5f7a9c1e3b5d7f9a1c3e5b7d9f1a3c"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "app/templates/order.html",
+                  "uriBaseId": "%SRCROOT%"
+                },
+                "region": {
+                  "endColumn": 37,
+                  "endLine": 12,
+                  "snippet": {
+                    "text": "  <div>{{ order.comment | safe }}</div>"
+                  },
+                  "startColumn": 9,
+                  "startLine": 12
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Detected a segment of a Flask template where autoescaping is explicitly disabled with '| safe' filter."
+          },
+          "properties": {},
+          "ruleId": "python.flask.security.xss.audit.template-unescaped-with-safe.template-unescaped-with-safe",
+          "suppressions": [
+            {
+              "kind": "inSource"
+            }
+          ]
+        }
+      ],
+      "tool": {
+        "driver": {
+          "name": "Semgrep OSS",
+          "rules": [
+            {
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "fullDescription": {
+                "text": "User-controlled data from a request is passed to 'execute()'. This could lead to a SQL injection and therefore protected information could be leaked."
+              },
+              "help": {
+                "markdown": "User-controlled data from a request is passed to 'execute()'...",
+                "text": "User-controlled data from a request is passed to 'execute()'..."
+              },
+              "helpUri": "https://semgrep.dev/r/python.django.security.injection.sql.sql-injection-using-db-cursor-execute.sql-injection-db-cursor-execute",
+              "id": "python.django.security.injection.sql.sql-injection-using-db-cursor-execute.sql-injection-db-cursor-execute",
+              "name": "python.django.security.injection.sql.sql-injection-using-db-cursor-execute.sql-injection-db-cursor-execute",
+              "properties": {
+                "precision": "very-high",
+                "tags": [
+                  "CWE-89: Improper Neutralization of Special Elements used in an SQL Command ('SQL Injection')",
+                  "HIGH CONFIDENCE",
+                  "OWASP-A01:2017 - Injection",
+                  "OWASP-A03:2021 - Injection",
+                  "security"
+                ]
+              },
+              "shortDescription": {
+                "text": "Semgrep Finding: python.django.security.injection.sql.sql-injection-using-db-cursor-execute.sql-injection-db-cursor-execute"
+              }
+            },
+            {
+              "defaultConfiguration": {
+                "level": "warning"
+              },
+              "fullDescription": {
+                "text": "AWS Access Key ID detected. This is a sensitive credential and should not be hardcoded here."
+              },
+              "helpUri": "https://semgrep.dev/r/generic.secrets.security.detected-aws-access-key-id-value.detected-aws-access-key-id-value",
+              "id": "generic.secrets.security.detected-aws-access-key-id-value.detected-aws-access-key-id-value",
+              "name": "generic.secrets.security.detected-aws-access-key-id-value.detected-aws-access-key-id-value",
+              "properties": {
+                "precision": "very-high",
+                "tags": [
+                  "CWE-798: Use of Hard-coded Credentials",
+                  "MEDIUM CONFIDENCE",
+                  "security"
+                ]
+              },
+              "shortDescription": {
+                "text": "Semgrep Finding: generic.secrets.security.detected-aws-access-key-id-value.detected-aws-access-key-id-value"
+              }
+            },
+            {
+              "defaultConfiguration": {
+                "level": "warning"
+              },
+              "fullDescription": {
+                "text": "Detected a segment of a Flask template where autoescaping is explicitly disabled with '| safe' filter."
+              },
+              "helpUri": "https://semgrep.dev/r/python.flask.security.xss.audit.template-unescaped-with-safe.template-unescaped-with-safe",
+              "id": "python.flask.security.xss.audit.template-unescaped-with-safe.template-unescaped-with-safe",
+              "name": "python.flask.security.xss.audit.template-unescaped-with-safe.template-unescaped-with-safe",
+              "properties": {
+                "precision": "very-high",
+                "tags": [
+                  "CWE-79: Improper Neutralization of Input During Web Page Generation ('Cross-site Scripting')",
+                  "LOW CONFIDENCE",
+                  "security"
+                ]
+              },
+              "shortDescription": {
+                "text": "Semgrep Finding: python.flask.security.xss.audit.template-unescaped-with-safe.template-unescaped-with-safe"
+              }
+            }
+          ],
+          "semanticVersion": "1.62.0"
+        }
+      }
+    }
+  ]
+}

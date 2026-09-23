@@ -8,6 +8,7 @@ dependencies {
     api(project(":ontrack-extension-support"))
     api(project(":ontrack-extension-general"))
 
+    implementation(project(":ontrack-extension-license"))
     implementation(project(":ontrack-repository-support"))
     implementation(project(":ontrack-ui-graphql"))
 

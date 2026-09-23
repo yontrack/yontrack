@@ -18,6 +18,14 @@ interface FindingsReportParser {
     val format: String
 
     /**
+     * Whether this format is a native format, the format of a scanner rather than the neutral
+     * format of Yontrack. Every native format is behind the licensed feature
+     * [native scanner formats][net.nemerosa.ontrack.extension.findings.license.FindingsLicensedFeatureProvider.FEATURE_NATIVE_FORMATS].
+     * Declared by each parser, so that a new one cannot forget it.
+     */
+    val nativeFormat: Boolean
+
+    /**
      * Reads a report.
      *
      * @param report Report, as JSON

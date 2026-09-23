@@ -19,6 +19,11 @@ class NeutralFindingsReportParser : FindingsReportParser {
 
     override val format: String = FORMAT
 
+    /**
+     * The neutral format is core, unlicensed.
+     */
+    override val nativeFormat: Boolean = false
+
     override fun parse(report: JsonNode, scanner: String?, kind: FindingKind?): ParsedFindingsReport {
         val reader = Reader()
         val parsed = reader.readReport(report, scanner, kind)

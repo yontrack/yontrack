@@ -2,6 +2,7 @@ package net.nemerosa.ontrack.extension.findings.ingestion
 
 import net.nemerosa.ontrack.common.Time
 import net.nemerosa.ontrack.extension.findings.events.FindingsEvents
+import net.nemerosa.ontrack.extension.findings.license.FindingsLicense
 import net.nemerosa.ontrack.extension.findings.model.Finding
 import net.nemerosa.ontrack.extension.findings.model.FindingObservation
 import net.nemerosa.ontrack.extension.findings.model.FindingResolutionReason
@@ -27,6 +28,7 @@ class FindingsIngestionServiceImpl(
     private val findingRepository: FindingRepository,
     private val findingStateService: FindingStateService,
     private val eventPostService: EventPostService,
+    private val findingsLicense: FindingsLicense,
 ) : FindingsIngestionService {
 
     private val parsers: Map<String, FindingsReportParser> = parsers.associateBy { it.format }
@@ -37,6 +39,10 @@ class FindingsIngestionServiceImpl(
         // Reading the report before creating anything
         val parser = parsers[request.format]
             ?: throw FindingsReportUnsupportedFormatException(request.format, formats)
+        // A native format needs the licence, checked before anything is read or written
+        if (parser.nativeFormat) {
+            findingsLicense.checkNativeFormat(parser.format)
+        }
         val report = parser.parse(request.report, request.scanner, request.kind)
         checkSizes(request.format, report)
         // Validation run with the counts of the findings
