@@ -94,6 +94,31 @@ describe('the mobile deploy sheet', () => {
         expect(screen.getByTestId('mobile-deploy-slot-slot-1')).not.toHaveTextContent('[')
     })
 
+    it('warns that an eligible slot cannot take the build yet, and still lets it start (#1851)', () => {
+        withSlots({
+            ...eligible(slot('slot-2', 'production')),
+            deployable: false,
+            nonDeployableRules: [{rule: rule('r1', 'promotion', {promotion: 'BRONZE'}), reason: 'Build not promoted'}],
+            pipelineOnlyRules: [],
+        })
+        openSheet()
+        expect(screen.getByTestId('mobile-deploy-not-deployable-slot-2'))
+            .toHaveTextContent('Not deployable yet: Build not promoted')
+        expect(screen.getByTestId('mobile-deploy-start-slot-2')).toBeEnabled()
+    })
+
+    it('does not warn about a manual approval, which is given once started', () => {
+        withSlots({
+            ...eligible(slot('slot-2', 'production')),
+            deployable: true,
+            nonDeployableRules: [],
+            pipelineOnlyRules: [rule('r2', 'manual', {})],
+        })
+        openSheet()
+        expect(screen.queryByTestId('mobile-deploy-not-deployable-slot-2')).not.toBeInTheDocument()
+        expect(screen.getByTestId('mobile-deploy-note-slot-2')).toHaveTextContent('Needs approval once started')
+    })
+
     it('shows an ineligible slot rather than hiding it', () => {
         // Hiding it leaves a user wondering where an environment went, which is
         // exactly the failure this list exists to avoid.

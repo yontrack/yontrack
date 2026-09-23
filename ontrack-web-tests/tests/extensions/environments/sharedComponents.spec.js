@@ -98,6 +98,34 @@ test('the dialog lists a slot which refuses the build, with the rule that refuse
     await dialog.cancel()
 })
 
+test('the dialog warns that an unpromoted build is not deployable yet, and still starts it (#1851)', async ({page, ontrack}) => {
+    const {project, slot} = await createSlot(ontrack)
+    await ontrack.environments.addPromotionRule({slot, promotion: "BRONZE"})
+
+    // The branch has the level, so the build is eligible; the build is not promoted, so it is not
+    // deployable - a deployment started for it waits as a candidate.
+    const branch = await project.createBranch()
+    await branch.createPromotionLevel("BRONZE")
+    const build = await branch.createBuild()
+
+    await login(page, ontrack)
+    const buildPage = new BuildPage(page, build)
+    await buildPage.goTo()
+
+    const section = await getBuildEnvironmentSection(page, build)
+    const dialog = await section.openDeployDialog()
+
+    await dialog.expectSlotNotDeployableYet(slot, 'Build not promoted')
+
+    await dialog.deployToSlot(slot)
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+
+    await expect.poll(async () => {
+        const pipeline = await ontrack.environments.getCurrentPipeline({slot})
+        return pipeline && `${pipeline.build?.name} ${pipeline.status}`
+    }).toBe(`${build.name} CANDIDATE`)
+})
+
 test('starting a deployment through the dialog, from a slot', async ({page, ontrack}) => {
     const {project, slot} = await createSlot(ontrack)
     const branch = await project.createBranch()

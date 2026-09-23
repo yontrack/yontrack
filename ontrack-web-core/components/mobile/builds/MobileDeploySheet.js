@@ -23,6 +23,12 @@
  * A slot with three rules of which one refuses would otherwise be explained by
  * listing all three, two of which are satisfied.
  *
+ * **An eligible slot the build cannot go to yet says so** (#1851) - "Not
+ * deployable yet: Build not promoted" - with the same wording as the desktop
+ * dialog, and still offers "Deploy here": the deployment is then a candidate
+ * which runs once the rules accept it. A rule decided on the deployment itself
+ * (a manual approval) gets a neutral note rather than a warning.
+ *
  * **The rule is drawn by the desktop's own summary component** - "GOLD promotion
  * is required" - reached through `admissionRuleComponents`, which is where the
  * mobile UI keeps its rule-id lookup and which explains at length why it cannot
@@ -43,6 +49,7 @@ import {callGraphQL, useQuery} from "@components/services/GraphQL"
 import {slotNameWithoutProject} from "@components/extension/environments/SlotName"
 import {MobileAdmissionRuleSummary} from "@components/mobile/deployments/admissionRuleComponents"
 import MobileEmpty from "@components/mobile/layout/MobileEmpty"
+import {notDeployableWarning, pipelineOnlyNote} from "@components/extension/environments/shared/deployDialogModel"
 
 export default function MobileDeploySheet({build, open, onClose, onStarted}) {
     return (
@@ -92,6 +99,22 @@ function MobileDeployList({build, onClose, onStarted}) {
                         name
                         ruleId
                         ruleConfig
+                    }
+                    # Eligible but not deployable yet: the deployment
+                    # would wait as a candidate.
+                    deployable
+                    nonDeployableRules {
+                        rule {
+                            id
+                            name
+                            ruleId
+                        }
+                        reason
+                    }
+                    pipelineOnlyRules {
+                        id
+                        name
+                        ruleId
                     }
                     slot {
                         id
@@ -204,8 +227,11 @@ function MobileDeployList({build, onClose, onStarted}) {
             }
             <ul className="ot-mobile-cards" data-testid="mobile-deploy-slots">
                 {
-                    eligibleSlots.map(({eligible, nonEligibleRules, slot}) => (
-                        <li
+                    eligibleSlots.map((entry) => {
+                        const {eligible, nonEligibleRules, slot} = entry
+                        const warning = notDeployableWarning(entry)
+                        const note = pipelineOnlyNote(entry)
+                        return <li
                             key={slot.id}
                             className="ot-mobile-card"
                             data-testid={`mobile-deploy-slot-${slot.id}`}
@@ -228,6 +254,26 @@ function MobileDeployList({build, onClose, onStarted}) {
                                     </Tag>
                                 }
                             </div>
+                            {
+                                warning &&
+                                <Typography.Text
+                                    type="warning"
+                                    className="ot-mobile-caption"
+                                    data-testid={`mobile-deploy-not-deployable-${slot.id}`}
+                                >
+                                    {warning}
+                                </Typography.Text>
+                            }
+                            {
+                                note &&
+                                <Typography.Text
+                                    type="secondary"
+                                    className="ot-mobile-caption"
+                                    data-testid={`mobile-deploy-note-${slot.id}`}
+                                >
+                                    {note}
+                                </Typography.Text>
+                            }
                             {
                                 eligible ?
                                     <Button
@@ -275,7 +321,7 @@ function MobileDeployList({build, onClose, onStarted}) {
                                     </div>
                             }
                         </li>
-                    ))
+                    })
                 }
             </ul>
             <Button

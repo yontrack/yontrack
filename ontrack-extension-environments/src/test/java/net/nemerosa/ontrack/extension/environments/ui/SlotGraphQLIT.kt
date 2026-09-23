@@ -291,11 +291,14 @@ class SlotGraphQLIT : AbstractQLKTITSupport() {
                 )
             )
 
-            run(
+            fun eligibleBuilds(arguments: String) = run(
                 """
                     {
                         slotById(id: "${slot.id}") {
-                            eligibleBuilds {
+                            eligibleBuild$arguments {
+                                id
+                            }
+                            eligibleBuilds$arguments {
                                 pageItems {
                                     id
                                 }
@@ -303,38 +306,95 @@ class SlotGraphQLIT : AbstractQLKTITSupport() {
                         }
                     }
                 """.trimIndent()
-            ) { data ->
-                val builds = data.path("slotById")
-                    .path("eligibleBuilds")
-                    .path("pageItems")
-                assertEquals(
-                    listOf(build2.id(), build1.id()),
-                    builds.values().map {
-                        it.path("id").asInt()
-                    }
-                )
+            ).path("slotById").let { slotData ->
+                slotData.path("eligibleBuild").path("id").asInt() to
+                        slotData.path("eligibleBuilds").path("pageItems").values().map { it.path("id").asInt() }
             }
 
-            run(
-                """
-                    {
-                        slotById(id: "${slot.id}") {
-                            eligibleBuilds(deployable: true) {
-                                pageItems {
+            // By default, only the builds which can be deployed now - the unpromoted build2 is not
+            assertEquals(
+                build1.id() to listOf(build1.id()),
+                eligibleBuilds(""),
+                "Deployable builds by default",
+            )
+            assertEquals(
+                build1.id() to listOf(build1.id()),
+                eligibleBuilds("(deployable: true)"),
+                "Deployable builds",
+            )
+            // Merely eligible builds on demand
+            assertEquals(
+                build2.id() to listOf(build2.id(), build1.id()),
+                eligibleBuilds("(deployable: false)"),
+                "Eligible builds",
+            )
+        }
+    }
+
+    @Test
+    fun `An eligible slot says whether the build can be deployed now, and why not`() {
+        slotTestSupport.withSlot { promotionSlot ->
+            slotTestSupport.withSlot(project = promotionSlot.project) { manualSlot ->
+                val branch = promotionSlot.project.branch()
+                val bronze = branch.promotionLevel("BRONZE")
+                val promotionRule = SlotAdmissionRuleTestFixtures.testPromotionAdmissionRuleConfig(
+                    slot = promotionSlot,
+                    promotion = bronze.name,
+                )
+                slotService.addAdmissionRuleConfig(promotionRule)
+                val manualRule = SlotAdmissionRuleTestFixtures.testManualApprovalRuleConfig(manualSlot)
+                slotService.addAdmissionRuleConfig(manualRule)
+
+                val build = branch.build()
+
+                val index = run(
+                    """{
+                        eligibleSlotsForBuild(buildId: ${build.id}) {
+                            eligible
+                            deployable
+                            nonDeployableRules {
+                                rule {
                                     id
+                                    ruleId
                                 }
+                                reason
+                            }
+                            pipelineOnlyRules {
+                                id
+                                ruleId
+                            }
+                            slot {
+                                id
                             }
                         }
-                    }
-                """.trimIndent()
-            ) { data ->
-                val builds = data.path("slotById")
-                    .path("eligibleBuilds")
-                    .path("pageItems")
+                    }""".trimIndent()
+                ).path("eligibleSlotsForBuild").associateBy { it.path("slot").path("id").asText() }
+
+                // Eligible for the promotion slot, but not promoted yet
+                val promotion = index.getValue(promotionSlot.id)
+                assertEquals(true, promotion.path("eligible").asBoolean())
+                assertEquals(false, promotion.path("deployable").asBoolean())
                 assertEquals(
-                    listOf(build1.id()),
-                    builds.values().map {
-                        it.path("id").asInt()
+                    listOf(Triple(promotionRule.id, "promotion", "Build not promoted")),
+                    promotion.path("nonDeployableRules").values().map {
+                        Triple(
+                            it.path("rule").path("id").asText(),
+                            it.path("rule").path("ruleId").asText(),
+                            it.path("reason").asText(),
+                        )
+                    }
+                )
+                assertEquals(0, promotion.path("pipelineOnlyRules").size())
+
+                // The manual approval is given on the deployment: nothing to warn about
+                val manual = index.getValue(manualSlot.id)
+                assertEquals(true, manual.path("eligible").asBoolean())
+                assertEquals(true, manual.path("deployable").asBoolean())
+                assertEquals(0, manual.path("nonDeployableRules").size())
+                assertEquals(
+                    listOf(manualRule.id to "manual"),
+                    manual.path("pipelineOnlyRules").values().map {
+                        it.path("id").asText() to it.path("ruleId").asText()
                     }
                 )
             }

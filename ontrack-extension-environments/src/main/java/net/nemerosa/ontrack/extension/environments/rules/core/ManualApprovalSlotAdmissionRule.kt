@@ -45,6 +45,15 @@ class ManualApprovalSlotAdmissionRule(
         true
 
     /**
+     * The approval is given on the pipeline: nothing can be said of the build alone.
+     */
+    override fun checkBuildDeployable(
+        build: Build,
+        slot: Slot,
+        config: ManualApprovalSlotAdmissionRuleConfig
+    ): SlotDeploymentCheck? = null
+
+    /**
      * A build is deployable if the user has approved the rule in the pipeline.
      *
      * Only some users or groups are eligible.

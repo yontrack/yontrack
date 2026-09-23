@@ -16,11 +16,26 @@ class GQLTypeEligibleSlot : GQLType {
     override fun createType(cache: GQLTypeCache): GraphQLObjectType =
         GraphQLObjectType.newObject()
             .name(typeName)
-            .description("Association of a slot with its eligibility")
-            .booleanField(EligibleSlot::eligible)
+            .description("Association of a slot with the eligibility and deployability of a build")
+            .booleanField(
+                EligibleSlot::eligible,
+                "Whether the build could go to this slot - a pipeline can be started for it, as a candidate.",
+            )
             .listField(
                 EligibleSlot::nonEligibleRules,
                 "Admission rules of the slot which refuse this build. Empty when the build is eligible.",
+            )
+            .booleanField(
+                EligibleSlot::deployable,
+                "Whether the build is eligible and can be deployed now: it passes every admission rule which can be decided on the build alone. A pipeline started for an eligible but not deployable build waits as a candidate.",
+            )
+            .listField(
+                EligibleSlot::nonDeployableRules,
+                "Admission rules of the slot which prevent this eligible build from being deployed now, with their reasons. Empty when the build is deployable, or not eligible at all.",
+            )
+            .listField(
+                EligibleSlot::pipelineOnlyRules,
+                "Admission rules of the slot which can only be decided once a pipeline exists for the build (like a manual approval). They do not count against deployable.",
             )
             .field(EligibleSlot::slot)
             .build()

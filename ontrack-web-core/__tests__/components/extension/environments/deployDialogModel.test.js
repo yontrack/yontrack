@@ -2,6 +2,8 @@ import {
     buildChoices,
     cancellationWarning,
     cancelledDeployment,
+    notDeployableWarning,
+    pipelineOnlyNote,
     slotChoices,
 } from "@components/extension/environments/shared/deployDialogModel"
 
@@ -76,6 +78,65 @@ describe('choosing a slot, from a build', () => {
     })
 })
 
+describe('an eligible slot the build cannot go to yet (#1851)', () => {
+
+    const promotionRule = {id: 'r1', name: 'bronze', ruleId: 'promotion', ruleConfig: {promotion: 'BRONZE'}}
+    const manualRule = {id: 'r2', name: 'approval', ruleId: 'manual', ruleConfig: {}}
+
+    it('carries the deployability the server gave', () => {
+        const choices = slotChoices([{
+            eligible: true,
+            deployable: false,
+            nonDeployableRules: [{rule: promotionRule, reason: 'Build not promoted'}],
+            pipelineOnlyRules: [],
+            slot: slot('production', 20),
+        }])
+        expect(choices[0].eligible).toBe(true)
+        expect(choices[0].deployable).toBe(false)
+        expect(notDeployableWarning(choices[0])).toBe('Not deployable yet: Build not promoted')
+    })
+
+    it('joins several reasons, and names the rule when the server gives no reason', () => {
+        const choice = slotChoices([{
+            eligible: true,
+            deployable: false,
+            nonDeployableRules: [
+                {rule: promotionRule, reason: 'Build not promoted'},
+                {rule: {id: 'r3', name: 'lastRelease', ruleId: 'branchPattern'}, reason: null},
+            ],
+            slot: slot('production', 20),
+        }])[0]
+        expect(notDeployableWarning(choice)).toBe('Not deployable yet: Build not promoted; lastRelease')
+    })
+
+    it('warns about nothing when the build is deployable', () => {
+        const choice = slotChoices([{eligible: true, deployable: true, slot: slot('staging', 10)}])[0]
+        expect(notDeployableWarning(choice)).toBeNull()
+    })
+
+    it('warns about nothing on an ineligible slot, which explains itself otherwise', () => {
+        const choice = slotChoices([{eligible: false, deployable: false, slot: slot('production', 20)}])[0]
+        expect(notDeployableWarning(choice)).toBeNull()
+    })
+
+    it('only notes a rule decided on the deployment, rather than warning about it', () => {
+        const choice = slotChoices([{
+            eligible: true,
+            deployable: true,
+            nonDeployableRules: [],
+            pipelineOnlyRules: [manualRule],
+            slot: slot('production', 20),
+        }])[0]
+        expect(notDeployableWarning(choice)).toBeNull()
+        expect(pipelineOnlyNote(choice)).toBe('Needs approval once started')
+    })
+
+    it('notes nothing when every rule is decided on the build', () => {
+        const choice = slotChoices([{eligible: true, deployable: true, slot: slot('staging', 10)}])[0]
+        expect(pipelineOnlyNote(choice)).toBeNull()
+    })
+})
+
 describe('choosing a build, from a slot', () => {
 
     const theSlot = slot('production', 20)
@@ -87,6 +148,7 @@ describe('choosing a build, from a slot', () => {
         // rules - see the note on `buildChoices` for why this direction does not explain refusals.
         const choices = buildChoices([build('107'), build('104')], theSlot)
         expect(choices.map(choice => choice.eligible)).toEqual([true, true])
+        expect(choices.map(choice => choice.deployable)).toEqual([true, true])
         expect(choices.map(choice => choice.key)).toEqual(['107', '104'])
     })
 

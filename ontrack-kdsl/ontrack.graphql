@@ -557,6 +557,8 @@ type Build implements Authorizable & ProjectEntity {
   buildBitbucketPipelineRunProperty: Property
   "Link to the GitHub Workflow Run which created this build."
   buildGitHubWorkflowRunProperty: Property
+  "Link to the GitLab CI/CD pipeline which created this build."
+  buildGitLabPipelineRunProperty: Property
   creation: Signature
   "Gets the list of slots where this build is actually deployed"
   currentDeployments(
@@ -580,6 +582,8 @@ type Build implements Authorizable & ProjectEntity {
   information: [EntityInformation!]!
   "Link to a Jenkins Build"
   jenkinsBuildProperty: Property
+  "State of this build in every slot of its project, in environment order"
+  journey: [BuildSlotJourney!]!
   "List of links."
   linkProperty: Property
   "Associates an arbitrary message (and its type) to an entity. Will be displayed as a decorator in the UI."
@@ -785,6 +789,18 @@ type BuildPromotionInfoItem {
   data: BuildPromotionInfoItemData!
   "promotionLevel field"
   promotionLevel: PromotionLevel
+}
+
+"Where one build stands in one slot of its project"
+type BuildSlotJourney {
+  "Admission rules of the slot refusing this build. Empty unless the state is NOT_ELIGIBLE."
+  nonEligibleRules: [SlotAdmissionRuleConfig!]!
+  "pipeline field"
+  pipeline: SlotPipeline
+  "slot field"
+  slot: Slot!
+  "Where the build stands in this slot"
+  state: BuildSlotJourneyState!
 }
 
 "Output type for the bulkUpdatePromotionLevelById mutation."
@@ -1325,6 +1341,22 @@ type DeleteBuildGitCommitPropertyByIdPayload implements Payload {
 
 "Output type for the deleteBuildGitCommitProperty mutation."
 type DeleteBuildGitCommitPropertyPayload implements Payload {
+  "Build updated"
+  build: Build
+  "List of errors"
+  errors: [UserError]
+}
+
+"Output type for the deleteBuildGitLabPipelineRunPropertyById mutation."
+type DeleteBuildGitLabPipelineRunPropertyByIdPayload implements Payload {
+  "Build updated"
+  build: Build
+  "List of errors"
+  errors: [UserError]
+}
+
+"Output type for the deleteBuildGitLabPipelineRunProperty mutation."
+type DeleteBuildGitLabPipelineRunPropertyPayload implements Payload {
   "Build updated"
   build: Build
   "List of errors"
@@ -1940,14 +1972,28 @@ type EditAccountPayload implements Payload {
   errors: [UserError]
 }
 
-"Association of a slot with its eligibility"
+"Association of a slot with the eligibility and deployability of a build"
 type EligibleSlot {
-  "eligible field"
+  "Whether the build is eligible and can be deployed now: it passes every admission rule which can be decided on the build alone. A pipeline started for an eligible but not deployable build waits as a candidate."
+  deployable: Boolean
+  "Whether the build could go to this slot - a pipeline can be started for it, as a candidate."
   eligible: Boolean
+  "Admission rules of the slot which prevent this eligible build from being deployed now, with their reasons. Empty when the build is deployable, or not eligible at all."
+  nonDeployableRules: [EligibleSlotRuleCheck!]!
   "Admission rules of the slot which refuse this build. Empty when the build is eligible."
   nonEligibleRules: [SlotAdmissionRuleConfig!]!
+  "Admission rules of the slot which can only be decided once a pipeline exists for the build (like a manual approval). They do not count against deployable."
+  pipelineOnlyRules: [SlotAdmissionRuleConfig!]!
   "slot field"
   slot: Slot!
+}
+
+"Admission rule of a slot which prevents a build from being deployed now"
+type EligibleSlotRuleCheck {
+  "Why the rule prevents the deployment"
+  reason: String
+  "The admission rule"
+  rule: SlotAdmissionRuleConfig!
 }
 
 "Output type for the enableBranch mutation."
@@ -2021,6 +2067,38 @@ type Environment {
   ): [Slot!]!
   "tags field"
   tags: [String!]!
+}
+
+"One page of the project x environment matrix"
+type EnvironmentMatrix {
+  "Columns of the matrix, by environment order. Only the environments having at least one slot among the rows of this page."
+  environments: [Environment!]!
+  "Does the current user have any favourite project at all? The matrix opens on Favourites, and on All for a user who has never starred anything."
+  hasFavourites: Boolean!
+  "Index of the first project of this page"
+  offset: Int!
+  "Rows of the matrix, by project name"
+  projects: [EnvironmentMatrixProject!]!
+  "Number of projects asked for in this page"
+  size: Int!
+  "Total number of projects matching the filter, before per-project visibility is applied"
+  totalProjects: Int!
+}
+
+"One project of the matrix, with one row per qualifier"
+type EnvironmentMatrixProject {
+  "The project"
+  project: Project!
+  "Rows for this project, the default (empty) qualifier first. A project with only the default qualifier has exactly one row, which is the project's own row."
+  rows: [EnvironmentMatrixRow!]!
+}
+
+"One row of the matrix: a project and a qualifier, across the environments"
+type EnvironmentMatrixRow {
+  "Qualifier of this row, the empty string being the default one"
+  qualifier: String!
+  "Slots of this row, by environment order. Only the slots which exist: an environment with no slot for this project and qualifier is simply absent."
+  slots: [Slot!]!
 }
 
 "EventSubscriptionPayload"
@@ -3534,6 +3612,16 @@ type Mutation {
     "Input for the mutation"
     input: DeleteBuildGitCommitPropertyByIdInput
   ): DeleteBuildGitCommitPropertyByIdPayload
+  "Deletes the gitLab pipeline property on a build identified by name."
+  deleteBuildGitLabPipelineRunProperty(
+    "Input for the mutation"
+    input: DeleteBuildGitLabPipelineRunPropertyInput
+  ): DeleteBuildGitLabPipelineRunPropertyPayload
+  "Deletes the gitLab pipeline property on a build."
+  deleteBuildGitLabPipelineRunPropertyById(
+    "Input for the mutation"
+    input: DeleteBuildGitLabPipelineRunPropertyByIdInput
+  ): DeleteBuildGitLabPipelineRunPropertyByIdPayload
   "Deletes build links from a build, optionally filtered by target project and/or qualifier"
   deleteBuildLinks(
     "Input for the mutation"
@@ -4236,6 +4324,16 @@ type Mutation {
     "Input for the mutation"
     input: SetBuildGitCommitPropertyByIdInput
   ): SetBuildGitCommitPropertyByIdPayload
+  "Set the gitLab pipeline property on a build identified by name."
+  setBuildGitLabPipelineRunProperty(
+    "Input for the mutation"
+    input: SetBuildGitLabPipelineRunPropertyInput
+  ): SetBuildGitLabPipelineRunPropertyPayload
+  "Set the gitLab pipeline property on a build."
+  setBuildGitLabPipelineRunPropertyById(
+    "Input for the mutation"
+    input: SetBuildGitLabPipelineRunPropertyByIdInput
+  ): SetBuildGitLabPipelineRunPropertyByIdPayload
   "Set the message property on a build identified by name."
   setBuildMessageProperty(
     "Input for the mutation"
@@ -5667,6 +5765,15 @@ type Query {
     "Name of the environment"
     name: String!
   ): Environment
+  "Projects x environments, as the Environments home draws them"
+  environmentMatrix(
+    "What narrows the matrix down. Applied before paging."
+    filter: EnvironmentMatrixFilter,
+    "Index of the first project to return"
+    offset: Int,
+    "Number of projects to return (defaults to 20)"
+    size: Int
+  ): EnvironmentMatrix!
   "List of environments"
   environments(
     "Filter on the environments"
@@ -6783,6 +6890,22 @@ type SetBuildGitCommitPropertyPayload implements Payload {
   errors: [UserError]
 }
 
+"Output type for the setBuildGitLabPipelineRunPropertyById mutation."
+type SetBuildGitLabPipelineRunPropertyByIdPayload implements Payload {
+  "Build updated"
+  build: Build
+  "List of errors"
+  errors: [UserError]
+}
+
+"Output type for the setBuildGitLabPipelineRunProperty mutation."
+type SetBuildGitLabPipelineRunPropertyPayload implements Payload {
+  "Build updated"
+  build: Build
+  "List of errors"
+  errors: [UserError]
+}
+
 "Output type for the setBuildMessagePropertyById mutation."
 type SetBuildMessagePropertyByIdPayload implements Payload {
   "Build updated"
@@ -7402,16 +7525,23 @@ type Slot implements Authorizable {
   admissionRules: [SlotAdmissionRuleConfig!]!
   "Authorizations for this context"
   authorizations: [Authorization!]!
+  "Does a slot upstream of this one in the project's slot graph hold a newer build?"
+  behind: Boolean!
+  "Is the in-flight deployment of this slot held up by a failing, non-overridden admission rule or workflow? False when nothing is in flight."
+  blocked: Boolean!
   "Current pipeline in the slot"
   currentPipeline: SlotPipeline
   "description field"
   description: String
-  "Last eligible build for this slot"
-  eligibleBuild: Build
-  "Paginated list of eligible builds"
+  "Last build for this slot. By default, the last build which can be deployed now. With `deployable: false`, the last build which is merely eligible - a pipeline can be started for it, but it waits as a candidate until the admission rules accept it."
+  eligibleBuild(
+    "If true (the default), restricts the list of builds to the ones which can be deployed now. If false, returns all the eligible builds, including the ones which are not deployable yet."
+    deployable: Boolean = true
+  ): Build
+  "Paginated list of builds for this slot, newest first. By default, the builds which can be deployed now. With `deployable: false`, the builds which are merely eligible - a pipeline can be started for them, but it waits as a candidate until the admission rules accept it."
   eligibleBuilds(
-    "If true, restricts the list of builds to the ones which can actually be deployed."
-    deployable: Boolean,
+    "If true (the default), restricts the list of builds to the ones which can be deployed now. If false, returns all the eligible builds, including the ones which are not deployable yet."
+    deployable: Boolean = true,
     "Offset for the page"
     offset: Int = 0,
     "Size of the page"
@@ -7423,18 +7553,29 @@ type Slot implements Authorizable {
   id: ID!
   "Last deployed pipeline in the slot"
   lastDeployedPipeline: SlotPipeline
+  "Eligible builds newer than the one this slot holds, newest first"
+  nextBuilds(
+    "Maximum number of builds to return (defaults to 3)"
+    count: Int
+  ): [Build!]!
   "Paginated list of pipelines"
   pipelines(
     "Name of the branch to get the pipelines for"
     branchName: String,
     "Filtering on a build"
     buildId: Int,
+    "Filtering on the name of a build"
+    buildName: String,
     "Filtering on finished pipelines"
     done: Boolean,
     "Offset for the page"
     offset: Int = 0,
     "Size of the page"
-    size: Int = 20
+    size: Int = 20,
+    "Filtering on an exact status"
+    status: SlotPipelineStatus,
+    "Filtering on a user who acted on the deployment, anywhere in its audit trail"
+    user: String
   ): SlotPipelinePaginated
   "project field"
   project: Project!
@@ -8572,6 +8713,15 @@ enum AutoVersioningPushMode {
   PUSH
 }
 
+"Where a build stands in a slot"
+enum BuildSlotJourneyState {
+  DEPLOYED
+  ELIGIBLE
+  IN_PROGRESS
+  NOT_ELIGIBLE
+  SUPERSEDED
+}
+
 "CHML values"
 enum CHML {
   CRITICAL
@@ -9564,6 +9714,22 @@ input DeleteBuildGitCommitPropertyInput {
   project: String!
 }
 
+"Input type for the deleteBuildGitLabPipelineRunPropertyById mutation."
+input DeleteBuildGitLabPipelineRunPropertyByIdInput {
+  "ID of the build"
+  id: Int!
+}
+
+"Input type for the deleteBuildGitLabPipelineRunProperty mutation."
+input DeleteBuildGitLabPipelineRunPropertyInput {
+  "Branch name"
+  branch: String!
+  "Build name"
+  build: String!
+  "Project name"
+  project: String!
+}
+
 "Input type for the deleteBuildLinks mutation."
 input DeleteBuildLinksInput {
   "ID of the build from which links must be deleted"
@@ -10122,6 +10288,23 @@ input EnableSubscriptionInput {
 }
 
 input EnvironmentFilter {
+  "projects field"
+  projects: [String!]
+  "tags field"
+  tags: [String!]
+}
+
+input EnvironmentMatrixFilter {
+  "activity field"
+  activity: Boolean
+  "environments field"
+  environments: [String!]
+  "favourites field"
+  favourites: Boolean
+  "label field"
+  label: Int
+  "project field"
+  project: String
   "projects field"
   projects: [String!]
   "tags field"
@@ -11006,6 +11189,38 @@ input SetBuildGitCommitPropertyInput {
   commit: String!
   "Project name"
   project: String!
+}
+
+"Input type for the setBuildGitLabPipelineRunPropertyById mutation."
+input SetBuildGitLabPipelineRunPropertyByIdInput {
+  "ID of the build"
+  id: Int!
+  "ID of the pipeline, unique across the GitLab instance"
+  pipelineId: Long!
+  "IID of the pipeline, its number inside the project"
+  pipelineIid: Int!
+  "Path of the GitLab project, subgroups included"
+  projectPath: String!
+  "Link to the pipeline"
+  url: String!
+}
+
+"Input type for the setBuildGitLabPipelineRunProperty mutation."
+input SetBuildGitLabPipelineRunPropertyInput {
+  "Branch name"
+  branch: String!
+  "Build name"
+  build: String!
+  "ID of the pipeline, unique across the GitLab instance"
+  pipelineId: Long!
+  "IID of the pipeline, its number inside the project"
+  pipelineIid: Int!
+  "Project name"
+  project: String!
+  "Path of the GitLab project, subgroups included"
+  projectPath: String!
+  "Link to the pipeline"
+  url: String!
 }
 
 "Input type for the setBuildMessagePropertyById mutation."

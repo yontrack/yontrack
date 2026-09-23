@@ -16,10 +16,13 @@
       "publicClient": false,
       "baseUrl": "http://localhost:3000",
       "redirectUris": [
-        "http://localhost:3000/api/auth/callback/keycloak"
+        "http://localhost:3000/api/auth/callback/keycloak",
+        "http://localhost:3100/api/auth/callback/keycloak",
+        "http://localhost:3200/api/auth/callback/keycloak",
+        "http://localhost:3300/api/auth/callback/keycloak"
       ],
       "webOrigins": [
-        "http://localhost:3000"
+        "+"
       ],
       "directAccessGrantsEnabled": true,
       "standardFlowEnabled": true,

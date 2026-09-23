@@ -2,6 +2,7 @@ package net.nemerosa.ontrack.extension.environments.ui
 
 import graphql.Scalars.GraphQLBoolean
 import graphql.schema.DataFetchingEnvironment
+import graphql.schema.GraphQLArgument
 import graphql.schema.GraphQLObjectType
 import graphql.schema.GraphQLTypeReference
 import net.nemerosa.ontrack.extension.environments.Slot
@@ -52,11 +53,17 @@ class GQLTypeSlot(
             // Last eligible build
             .field {
                 it.name("eligibleBuild")
-                    .description("Last eligible build for this slot")
+                    .description(
+                        "Last build for this slot. By default, the last build which can be deployed now. " +
+                                "With `deployable: false`, the last build which is merely eligible - a pipeline can be started for it, " +
+                                "but it waits as a candidate until the admission rules accept it."
+                    )
+                    .argument(deployableArgument())
                     .type(GraphQLTypeReference(GQLTypeBuild.BUILD))
                     .dataFetcher { env ->
                         val slot: Slot = env.getSource()!!
-                        slotService.getEligibleBuilds(slot, count = 1).pageItems.firstOrNull()
+                        slotService.getEligibleBuilds(slot, count = 1, deployable = env.deployable)
+                            .pageItems.firstOrNull()
                     }
             }
             // Paginated list of eligible builds
@@ -64,17 +71,13 @@ class GQLTypeSlot(
                 paginatedListFactory.createPaginatedField<Slot, Build>(
                     cache = cache,
                     fieldName = "eligibleBuilds",
-                    fieldDescription = "Paginated list of eligible builds",
-                    arguments = listOf(
-                        booleanArgument(
-                            "deployable",
-                            "If true, restricts the list of builds to the ones which can actually be deployed."
-                        )
-                    ),
+                    fieldDescription = "Paginated list of builds for this slot, newest first. By default, the builds which can be deployed now. " +
+                            "With `deployable: false`, the builds which are merely eligible - a pipeline can be started for them, " +
+                            "but it waits as a candidate until the admission rules accept it.",
+                    arguments = listOf(deployableArgument()),
                     itemType = GQLTypeBuild.BUILD,
                     itemPaginatedListProvider = { env, slot, offset, size ->
-                        val deployable: Boolean = env.getArgument("deployable") ?: false
-                        slotService.getEligibleBuilds(slot, offset = offset, count = size, deployable = deployable)
+                        slotService.getEligibleBuilds(slot, offset = offset, count = size, deployable = env.deployable)
                     }
                 )
             )
@@ -210,7 +213,26 @@ class GQLTypeSlot(
         return loader.load(slot).thenApply(extract)
     }
 
+    /**
+     * `deployable` argument of the eligible builds: `true` by default, since a build which is
+     * merely eligible cannot be deployed yet, and listing it as ready is what #1851 was about.
+     */
+    private fun deployableArgument(): GraphQLArgument =
+        GraphQLArgument.newArgument(
+            booleanArgument(
+                ARG_DEPLOYABLE,
+                "If true (the default), restricts the list of builds to the ones which can be deployed now. " +
+                        "If false, returns all the eligible builds, including the ones which are not deployable yet."
+            )
+        )
+            .defaultValueProgrammatic(true)
+            .build()
+
+    private val DataFetchingEnvironment.deployable: Boolean
+        get() = getArgument<Boolean>(ARG_DEPLOYABLE) ?: true
+
     companion object {
+        const val ARG_DEPLOYABLE = "deployable"
         const val ARG_BUILD_NAME = "buildName"
         const val ARG_BRANCH_NAME = "branchName"
         const val ARG_DONE = "done"

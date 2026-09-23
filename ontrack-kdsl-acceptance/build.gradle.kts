@@ -153,12 +153,18 @@ listOf("kdslAcceptanceTest", "kdslLdap", "kdslOidc").forEach { variant ->
     }
 }
 
-val kdslAcceptanceTestComposeUp = tasks.named("kdslAcceptanceTestComposeUp") {
-    if (!isCI) {
-        dependsOn(":ontrack-ui:dockerBuild")
-        dependsOn(":ontrack-web-core:dockerBuild")
+// The images are tagged with the project version, so a local run must build them first -- each
+// variant on its own, since `uiLdapTest` and `uiOidcTest` start their stack without the main one.
+listOf("kdslAcceptanceTest", "kdslLdap", "kdslOidc").forEach { variant ->
+    tasks.named("${variant}ComposeUp") {
+        if (!isCI) {
+            dependsOn(":ontrack-ui:dockerBuild")
+            dependsOn(":ontrack-web-core:dockerBuild")
+        }
     }
 }
+
+val kdslAcceptanceTestComposeUp = tasks.named("kdslAcceptanceTestComposeUp")
 
 // ===================================================================================================================
 // Test coverage of the backend container (#1819)

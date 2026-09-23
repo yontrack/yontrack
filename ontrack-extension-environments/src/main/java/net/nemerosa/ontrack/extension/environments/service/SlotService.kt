@@ -274,7 +274,7 @@ interface SlotService {
 
     /**
      * Gets a list of slots accessible to the given build (having the same project)
-     * and their eligibility status.
+     * and their eligibility & deployability status.
      */
     fun getEligibleSlotsForBuild(build: Build): List<EligibleSlot>
 

@@ -1972,14 +1972,28 @@ type EditAccountPayload implements Payload {
   errors: [UserError]
 }
 
-"Association of a slot with its eligibility"
+"Association of a slot with the eligibility and deployability of a build"
 type EligibleSlot {
-  "eligible field"
+  "Whether the build is eligible and can be deployed now: it passes every admission rule which can be decided on the build alone. A pipeline started for an eligible but not deployable build waits as a candidate."
+  deployable: Boolean
+  "Whether the build could go to this slot - a pipeline can be started for it, as a candidate."
   eligible: Boolean
+  "Admission rules of the slot which prevent this eligible build from being deployed now, with their reasons. Empty when the build is deployable, or not eligible at all."
+  nonDeployableRules: [EligibleSlotRuleCheck!]!
   "Admission rules of the slot which refuse this build. Empty when the build is eligible."
   nonEligibleRules: [SlotAdmissionRuleConfig!]!
+  "Admission rules of the slot which can only be decided once a pipeline exists for the build (like a manual approval). They do not count against deployable."
+  pipelineOnlyRules: [SlotAdmissionRuleConfig!]!
   "slot field"
   slot: Slot!
+}
+
+"Admission rule of a slot which prevents a build from being deployed now"
+type EligibleSlotRuleCheck {
+  "Why the rule prevents the deployment"
+  reason: String
+  "The admission rule"
+  rule: SlotAdmissionRuleConfig!
 }
 
 "Output type for the enableBranch mutation."
@@ -7524,12 +7538,15 @@ type Slot implements Authorizable {
   currentPipeline: SlotPipeline
   "description field"
   description: String
-  "Last eligible build for this slot"
-  eligibleBuild: Build
-  "Paginated list of eligible builds"
+  "Last build for this slot. By default, the last build which can be deployed now. With `deployable: false`, the last build which is merely eligible - a pipeline can be started for it, but it waits as a candidate until the admission rules accept it."
+  eligibleBuild(
+    "If true (the default), restricts the list of builds to the ones which can be deployed now. If false, returns all the eligible builds, including the ones which are not deployable yet."
+    deployable: Boolean = true
+  ): Build
+  "Paginated list of builds for this slot, newest first. By default, the builds which can be deployed now. With `deployable: false`, the builds which are merely eligible - a pipeline can be started for them, but it waits as a candidate until the admission rules accept it."
   eligibleBuilds(
-    "If true, restricts the list of builds to the ones which can actually be deployed."
-    deployable: Boolean,
+    "If true (the default), restricts the list of builds to the ones which can be deployed now. If false, returns all the eligible builds, including the ones which are not deployable yet."
+    deployable: Boolean = true,
     "Offset for the page"
     offset: Int = 0,
     "Size of the page"

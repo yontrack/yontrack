@@ -545,6 +545,15 @@ listing all three, two of which are satisfied.
 (`SlotServiceImpl.eligibleSlot`), because a slot is eligible exactly when nothing refuses:
 computing the two separately would walk the rules twice and let the answers disagree.
 
+**Eligible is not deployable** (#1851). An eligible slot may still not take the build *now* —
+not promoted yet, not deployed upstream yet — and a deployment started for it waits as a
+candidate. `EligibleSlot` says so with `deployable` and `nonDeployableRules` (each rule with its
+reason), and the card shows *"Not deployable yet: Build not promoted"* while keeping *Deploy
+here*. A rule decided on the deployment itself, like a manual approval, is in
+`pipelineOnlyRules` and gets a neutral note — *"Needs approval once started"* — never a warning.
+The wording comes from the desktop dialog's own `deployDialogModel`, so the two UIs say the same
+thing.
+
 The cards are ordered by the environment's own order and then by qualifier, so the list reads
 the way a pipeline runs and two slots of one project in one environment come out stably. A
 badge names the environment **and** the qualifier, through the desktop UI's own
