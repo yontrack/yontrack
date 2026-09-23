@@ -1,6 +1,7 @@
 package net.nemerosa.ontrack.extension.findings.ingestion
 
 import net.nemerosa.ontrack.common.Time
+import net.nemerosa.ontrack.extension.findings.events.FindingsEvents
 import net.nemerosa.ontrack.extension.findings.model.Finding
 import net.nemerosa.ontrack.extension.findings.model.FindingObservation
 import net.nemerosa.ontrack.extension.findings.model.FindingResolutionReason
@@ -12,6 +13,7 @@ import net.nemerosa.ontrack.extension.findings.report.ParsedFindingsReport
 import net.nemerosa.ontrack.extension.findings.repository.FindingRepository
 import net.nemerosa.ontrack.extension.findings.state.FindingStateService
 import net.nemerosa.ontrack.extension.findings.validation.FindingsValidationDataType
+import net.nemerosa.ontrack.model.events.EventPostService
 import net.nemerosa.ontrack.model.structure.*
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -24,6 +26,7 @@ class FindingsIngestionServiceImpl(
     private val runInfoService: RunInfoService,
     private val findingRepository: FindingRepository,
     private val findingStateService: FindingStateService,
+    private val eventPostService: EventPostService,
 ) : FindingsIngestionService {
 
     private val parsers: Map<String, FindingsReportParser> = parsers.associateBy { it.format }
@@ -55,6 +58,10 @@ class FindingsIngestionServiceImpl(
         val written = writeFindings(build.project, report, findings, run)
         // Exposure of the findings on the branch, for the stamp
         val transitions = writeExposure(build.project, run, written)
+        // Events of the transitions, in the same transaction, after the one of the run
+        transitions.forEach { transition ->
+            eventPostService.post(FindingsEvents.event(transition))
+        }
         // OK
         return FindingsIngestionResult(run = run, transitions = transitions)
     }

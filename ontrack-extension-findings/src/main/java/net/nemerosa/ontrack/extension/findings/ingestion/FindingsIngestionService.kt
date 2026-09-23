@@ -19,7 +19,10 @@ interface FindingsIngestionService {
     /**
      * Reads a report and, in one transaction, creates the validation run with the counts of the
      * findings, writes the findings and their observations by this run, and maintains their
-     * exposure on the branch of the build for the stamp of the run.
+     * exposure on the branch of the build for the stamp of the run. Each transition of a finding
+     * on the branch is posted as an event — see
+     * [FindingsEvents][net.nemerosa.ontrack.extension.findings.events.FindingsEvents] — in the same
+     * transaction, in the order of the transitions.
      *
      * A report which cannot be read creates nothing.
      *
