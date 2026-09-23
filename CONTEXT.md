@@ -320,3 +320,25 @@ _Avoid_: saved view, saved search
 **Validation stamp filter**:
 A named selection of which validation stamps to display on a branch.
 _Avoid_: stamp selection, column filter
+
+### Findings
+
+**Finding**:
+One known weakness — a vulnerability, a code issue, a secret, a DAST alert — at
+one location of one project, identified by `(scanner, externalId, location)`.
+_Avoid_: vulnerability (secrets and code issues are not), CVE (one kind of
+external id), issue (the tracker's), alert
+
+**Observation**:
+One sighting of a finding by one scan of one build.
+_Avoid_: occurrence, detection
+
+**Exposure**:
+A finding is exposed on a branch while the latest scan of the same stamp on that
+branch reports it.
+_Avoid_: open (the project-level roll-up), affected
+
+**Acceptance**:
+A decision recorded outside Yontrack, read by it, that a finding is tolerated,
+possibly until an expiry.
+_Avoid_: suppression (the scanner's mechanism), waiver, exception
