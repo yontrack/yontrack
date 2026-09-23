@@ -124,14 +124,14 @@ class TrivyFindingsReportParserTest {
                 ),
                 // No purl: the package name
                 FindingsReportEntry(
-                    externalId = "CVE-2022-42003",
-                    location = "com.fasterxml.jackson.core:jackson-databind",
+                    externalId = "CVE-2024-25710",
+                    location = "org.apache.commons:commons-compress",
                     severity = FindingSeverity.HIGH,
                     rawSeverity = "HIGH (ghsa)",
-                    title = "jackson-databind: deep wrapper array nesting wrt UNWRAP_SINGLE_VALUE_ARRAYS",
-                    url = "https://avd.aquasec.com/nvd/cve-2022-42003",
-                    fixedVersion = "2.12.7.1, 2.13.4.2",
-                    installedVersion = "2.13.4",
+                    title = "commons-compress: Denial of service caused by an infinite loop for a corrupted DUMP file",
+                    url = "https://avd.aquasec.com/nvd/cve-2024-25710",
+                    fixedVersion = "1.26.0",
+                    installedVersion = "1.21",
                 ),
                 // Suppressed by a VEX document
                 FindingsReportEntry(
