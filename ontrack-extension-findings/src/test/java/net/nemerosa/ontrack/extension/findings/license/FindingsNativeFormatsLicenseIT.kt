@@ -125,6 +125,85 @@ class FindingsNativeFormatsLicenseIT : AbstractQLKTITSupport() {
     }
 
     @Test
+    fun `With the feature, a Trivy JSON report is ingested into findings, and no secret is stored`() {
+        asAdmin {
+            project {
+                branch {
+                    val vs = findingsStamp()
+                    build {
+                        val run = assertNoUserError(
+                            validate(vs, format = "trivy", kind = "IMAGE", report = trivySample()),
+                            "validateBuildWithFindings"
+                        ).path("validationRun")
+                        assertEquals(
+                            mapOf(
+                                "levels" to mapOf("CRITICAL" to 1, "HIGH" to 3, "MEDIUM" to 1, "LOW" to 1),
+                                "unknown" to 1,
+                                "accepted" to 2,
+                            ).asJson(),
+                            run.path("data").path("data")
+                        )
+
+                        val findings = findingRepository.findFindingsByProject(project.id())
+                        assertEquals(9, findings.size)
+                        assertTrue(findings.all { it.scanner == "trivy" && it.kind == FindingKind.IMAGE })
+                        // The same CVE in two packages
+                        assertEquals(
+                            setOf("pkg:deb/debian/libssl3", "pkg:deb/debian/openssl"),
+                            findings.filter { it.externalId == "CVE-2023-5363" }.map { it.location }.toSet()
+                        )
+                        val log4j = findings.single { it.externalId == "CVE-2021-44228" }
+                        assertEquals("pkg:maven/org.apache.logging.log4j/log4j-core", log4j.location)
+                        assertEquals(FindingSeverity.CRITICAL, log4j.maxSeverity)
+                        val observations = findingRepository.findObservationsByValidationRun(run.path("id").asInt())
+                        assertEquals(9, observations.size)
+                        val log4jObservation = observations.single { it.findingId == log4j.id }
+                        assertEquals("CRITICAL (ghsa)", log4jObservation.rawSeverity)
+                        assertEquals("2.14.1", log4jObservation.installedVersion)
+                        assertEquals("2.15.0, 2.3.1, 2.12.2", log4jObservation.fixedVersion)
+                        // The suppressed finding is accepted
+                        val zlib = findings.single { it.externalId == "CVE-2023-45853" }
+                        assertEquals(
+                            ".trivyignore.yaml",
+                            observations.single { it.findingId == zlib.id }.acceptance?.source
+                        )
+
+                        // The secret is nowhere
+                        val stored = listOf(findings.asJson(), observations.asJson(), run).joinToString("\n")
+                        assertFalse("AKIAIOSFODNN7EXAMPLE" in stored)
+                        assertFalse("wJalrXUtnFEMI" in stored)
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `Without the feature, a Trivy JSON report is rejected naming the feature, and no run is created`() {
+        asAdmin {
+            project {
+                branch {
+                    val vs = findingsStamp()
+                    build {
+                        testLicenseService.withoutFeature(FEATURE_NATIVE_FORMATS) {
+                            val node = validate(vs, format = "trivy", kind = "IMAGE", report = trivySample())
+                            assertUserError(
+                                node,
+                                "validateBuildWithFindings",
+                                message = "Findings report format `trivy` needs the licensed feature \"Native scanner formats\" " +
+                                        "(extension.findings.native-formats), which the current licence does not allow. " +
+                                        "The neutral format `findings` needs no licence."
+                            )
+                        }
+                        assertTrue(structureService.getValidationRunsForBuild(id, 0, 10).isEmpty())
+                        assertTrue(findingRepository.findFindingsByProject(project.id()).isEmpty())
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
     fun `Without the feature, stored findings stay readable and keep resolving through neutral posts`() {
         asAdmin {
             project {
@@ -166,6 +245,8 @@ class FindingsNativeFormatsLicenseIT : AbstractQLKTITSupport() {
     }
 
     private fun sample(name: String): String = TestUtils.resourceJson("/sarif/$name.sarif").toString()
+
+    private fun trivySample(): String = TestUtils.resourceJson("/trivy/image.json").toString()
 
     private fun Branch.findingsStamp(): ValidationStamp =
         validationStamp(

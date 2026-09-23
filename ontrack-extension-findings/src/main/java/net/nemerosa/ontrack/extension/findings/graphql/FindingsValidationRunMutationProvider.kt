@@ -57,7 +57,7 @@ class FindingsValidationRunMutationProvider(
                 ),
                 requiredStringInputField(
                     "format",
-                    "Format of the report. `findings` is the neutral format of Yontrack. `sarif` (SARIF 2.1) is a native scanner format, which needs the licensed feature \"Native scanner formats\"."
+                    "Format of the report. `findings` is the neutral format of Yontrack. `sarif` (SARIF 2.1) and `trivy` (Trivy JSON, vulnerabilities only) are native scanner formats, which need the licensed feature \"Native scanner formats\"."
                 ),
                 optionalRefInputField(
                     "kind",
