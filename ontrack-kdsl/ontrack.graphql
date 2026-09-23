@@ -2165,6 +2165,113 @@ type FavouriteProjectPayload implements Payload {
   project: Project
 }
 
+"One known weakness (a vulnerability, a code issue, a secret, a DAST alert) at one location of one project, identified by its scanner, its external ID and its location."
+type Finding {
+  "Acceptance recorded by the most recent observation of the finding. Null when this observation carries none, or when all the observations have been purged."
+  acceptance: FindingAcceptance
+  "Exposure of the finding on the branches of its project, resolved or not, one entry per branch and validation stamp, by branch name then stamp name"
+  exposures: [FindingExposure!]!
+  "Identifier given by the scanner, like a CVE or a rule ID"
+  externalId: String!
+  "Time of the first observation"
+  firstSeen: LocalDateTime!
+  "Unique ID of the finding"
+  id: Int!
+  "Kind of scan which reported the finding"
+  kind: FindingKind!
+  "Time of the last observation"
+  lastSeen: LocalDateTime!
+  "Where the finding is, without any version. May be empty."
+  location: String!
+  "Maximum severity across the observations of the finding"
+  maxSeverity: FindingSeverity!
+  "Observations of the finding, the most recent first"
+  observations(
+    "Offset for the page"
+    offset: Int = 0,
+    "Size of the page"
+    size: Int = 20
+  ): FindingObservationPaginated
+  "Project the finding belongs to"
+  project: Project!
+  "Time the finding was resolved in its project, if it is"
+  resolvedAt: LocalDateTime
+  "Name of the scanner which reported the finding"
+  scanner: String!
+  "State of the finding in its project, rolled up from its exposure on the branches which count: the branches matched by the branch model of the project (all of them when it has none), the disabled branches left out. Evaluated when it is read, so that an acceptance past its expiry stops counting."
+  state: FindingState
+  "Short description of the finding"
+  title: String!
+  "Link to more information about the finding"
+  url: String
+}
+
+"Decision recorded outside Yontrack, read by it, that a security finding is tolerated, possibly until an expiry."
+type FindingAcceptance {
+  "Whether the acceptance holds today: it has no expiry, or its expiry is not past. Evaluated when it is read."
+  effective: Boolean!
+  "Last day the acceptance holds, as an ISO date (YYYY-MM-DD), if any"
+  expiresAt: String
+  "Where the decision is recorded, like a suppressions file"
+  source: String
+  "Why the finding is tolerated"
+  statement: String
+}
+
+"A security finding is exposed on a branch while the latest scan of the same stamp on that branch reports it."
+type FindingExposure {
+  "Last day this acceptance holds, as an ISO date (YYYY-MM-DD), if any"
+  acceptanceExpiresAt: String
+  "Whether the latest scan reported the finding under an acceptance holding on the day of the scan"
+  accepted: Boolean!
+  "Branch the finding is exposed on"
+  branch: Branch!
+  "Why the finding was resolved, if it is"
+  resolutionReason: FindingResolutionReason
+  "Time the finding was resolved on this branch for this stamp, if it is"
+  resolvedAt: LocalDateTime
+  "Time the current exposure started"
+  since: LocalDateTime!
+  "State of the exposure today: an acceptance past its expiry stops counting when it is read."
+  state: FindingExposureState!
+  "Validation stamp of the scans"
+  validationStamp: ValidationStamp!
+}
+
+"One sighting of a security finding by one scan of one build."
+type FindingObservation {
+  "Acceptance of the finding at the time of the observation, if any"
+  acceptance: FindingAcceptance
+  "Observed finding"
+  finding: Finding!
+  "Version of the component fixing the finding, if any"
+  fixedVersion: String
+  "Version of the component in which the finding was observed"
+  installedVersion: String
+  "Severity as the scanner gave it, for provenance"
+  rawSeverity: String
+  "Severity asserted by the scanner in this observation"
+  severity: FindingSeverity!
+  "Time of the observation"
+  time: LocalDateTime!
+  "Validation run of the scan"
+  validationRun: ValidationRun!
+}
+
+type FindingObservationPaginated {
+  "Information about the current page"
+  pageInfo: PageInfo
+  "Items in the current page"
+  pageItems: [FindingObservation!]!
+}
+
+type FindingPaginated {
+  "Information about the current page"
+  pageInfo: PageInfo
+  "Items in the current page"
+  pageItems: [Finding!]!
+}
+
 "Output type for the finishSlotPipelineDeployment mutation."
 type FinishSlotPipelineDeploymentPayload implements Payload {
   "List of errors"
@@ -4878,6 +4985,11 @@ type Mutation {
     "Input for the mutation"
     input: ValidateBuildWithCHMLInput
   ): ValidateBuildWithCHMLPayload
+  "Validates a build identified by name with the report of a security scan, creating a validation run with the counts of its findings."
+  validateBuildWithFindings(
+    "Input for the mutation"
+    input: ValidateBuildWithFindingsInput
+  ): ValidateBuildWithFindingsPayload
   "Validates a build identified by name with Metrics data"
   validateBuildWithMetrics(
     "Input for the mutation"
@@ -5133,6 +5245,15 @@ type Project implements Authorizable & ProjectEntity {
   disabled: Boolean!
   "Is this project a favourite of the current user?"
   favourite: Boolean
+  "Security findings of the project, the most severe first, then the most recently seen. Empty for a user who is not granted the view of the findings of the project."
+  findings(
+    "Filter on the findings"
+    filter: FindingFilter,
+    "Offset for the page"
+    offset: Int = 0,
+    "Size of the page"
+    size: Int = 20
+  ): FindingPaginated
   "Associates the project with a GitHub repository"
   gitHubProjectConfigurationProperty: Property
   "Associates the project with a GitLab repository"
@@ -5792,6 +5913,16 @@ type Query {
   ): EventSubscriptionPayloadPaginated
   "List of all event types"
   eventTypes: [EventType!]!
+  "Security finding by ID. Null when it does not exist, or when the user is not granted the view of the findings of its project."
+  finding(
+    "ID of the finding"
+    id: Int!
+  ): Finding
+  "Security findings having the given external ID (a CVE, a rule ID) across all the projects, by project name. Only the projects whose findings the user is granted the view of are searched."
+  findings(
+    "External ID of the findings"
+    externalId: String!
+  ): [Finding!]!
   "Getting data for a chart"
   getChart(
     "Parameters for getting the chart"
@@ -8184,6 +8315,14 @@ type ValidateBuildWithCHMLPayload implements Payload {
   validationRun: ValidationRun
 }
 
+"Output type for the validateBuildWithFindings mutation."
+type ValidateBuildWithFindingsPayload implements Payload {
+  "List of errors"
+  errors: [UserError]
+  "Created validation run"
+  validationRun: ValidationRun
+}
+
 "Output type for the validateBuildWithMetrics mutation."
 type ValidateBuildWithMetricsPayload implements Payload {
   "List of errors"
@@ -8276,6 +8415,8 @@ type ValidationRun implements Authorizable & ProjectEntity {
     type: String
   ): [Decoration!]!
   description: String
+  "Security findings reported by this run, each with its observation by this run (the severity, the installed version, the acceptance), the most severe first. Empty for a run which is not a security scan, and for a user who is not granted the view of the findings of the project."
+  findings: [FindingObservation!]!
   id: ID!
   "List of information components attached to this entity"
   information: [EntityInformation!]!
@@ -8767,6 +8908,44 @@ enum DeliveryMapEdgeKind {
   EMITS
   REQUIRES
   UNLOCKS
+}
+
+"State of the exposure of a security finding on a branch, for the scans of one stamp. EXPOSED: reported by the latest scan without any acceptance holding. ACCEPTED: reported by the latest scan under an acceptance which holds. RESOLVED: no longer reported by the latest scan."
+enum FindingExposureState {
+  ACCEPTED
+  EXPOSED
+  RESOLVED
+}
+
+"Kind of scan which reported a security finding."
+enum FindingKind {
+  CODE
+  DAST
+  DEPENDENCIES
+  IMAGE
+  OTHER
+  SECRETS
+}
+
+"Why a security finding was resolved on a branch. ABSENT: the latest scan of the stamp on the branch does not report it."
+enum FindingResolutionReason {
+  ABSENT
+}
+
+"Severity of a security finding, as asserted by a scanner. UNKNOWN is what a scanner gives when it has no severity to give."
+enum FindingSeverity {
+  CRITICAL
+  HIGH
+  LOW
+  MEDIUM
+  UNKNOWN
+}
+
+"State of a security finding in its project, rolled up from its exposure on the branches which count, or on one branch. OPEN: exposed without any acceptance holding. ACCEPTED: not open, but exposed under an acceptance which holds. RESOLVED: neither open nor accepted."
+enum FindingState {
+  ACCEPTED
+  OPEN
+  RESOLVED
 }
 
 "State a hook request can be in"
@@ -10338,6 +10517,19 @@ input FavouriteBranchInput {
 input FavouriteProjectInput {
   "Project ID"
   id: Int!
+}
+
+input FindingFilter {
+  "Name of a branch the finding has been exposed on, resolved or not. The state then applies to this branch."
+  branch: String
+  "Kind of scan which reported the finding"
+  kind: FindingKind
+  "Name of the scanner which reported the finding"
+  scanner: String
+  "Maximum severity of the finding across its observations"
+  severity: FindingSeverity
+  "State of the finding: in the project, or on the branch when one is given"
+  state: FindingState
 }
 
 "Input type for the finishSlotPipelineDeployment mutation."
@@ -12729,6 +12921,30 @@ input ValidateBuildWithCHMLInput {
   runInfo: RunInfoInput
   "Status of the validation run"
   status: String
+  "Name of the validation stamp"
+  validation: String!
+}
+
+"Input type for the validateBuildWithFindings mutation."
+input ValidateBuildWithFindingsInput {
+  "Name of the branch"
+  branch: String!
+  "Name of the build"
+  build: String!
+  "Description of the validation run"
+  description: String
+  "Format of the report. `findings` is the neutral format of Yontrack. `sarif` (SARIF 2.1) and `trivy` (Trivy JSON, vulnerabilities only) are native scanner formats, which need the licensed feature \"Native scanner formats\"."
+  format: String!
+  "Kind of scan. Takes precedence over the kind given by the report, if any."
+  kind: FindingKind
+  "Name of the project"
+  project: String!
+  "Report of the scan, as JSON"
+  report: JSON!
+  "Optional run info to associated with this validation run"
+  runInfo: RunInfoInput
+  "Name of the scanner. Takes precedence over the scanner given by the report, if any."
+  scanner: String
   "Name of the validation stamp"
   validation: String!
 }

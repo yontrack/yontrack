@@ -1,0 +1,15 @@
+query ValidationRunFindings(
+    $id: Int!,
+) {
+    validationRuns(id: $id) {
+        findings {
+            severity
+            rawSeverity
+            installedVersion
+            fixedVersion
+            finding {
+                ...FindingFragment
+            }
+        }
+    }
+}

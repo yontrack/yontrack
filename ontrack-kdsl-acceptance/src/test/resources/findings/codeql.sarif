@@ -1,0 +1,322 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "CodeQL",
+          "organization": "GitHub",
+          "semanticVersion": "2.16.4",
+          "notifications": [],
+          "rules": []
+        },
+        "extensions": [
+          {
+            "name": "codeql/java-queries",
+            "semanticVersion": "0.8.9+de325133c7a95d84489acdf5a6ced07886ac5c6d",
+            "locations": [
+              {
+                "uri": "file:///opt/hostedtoolcache/CodeQL/2.16.4/x64/codeql/qlpacks/codeql/java-queries/0.8.9/",
+                "description": {
+                  "text": "The QL pack root directory."
+                }
+              }
+            ],
+            "rules": [
+              {
+                "id": "java/sql-injection",
+                "name": "java/sql-injection",
+                "shortDescription": {
+                  "text": "Query built from user-controlled sources"
+                },
+                "fullDescription": {
+                  "text": "Building a SQL or Java Persistence query from user-controlled sources is vulnerable to insertion of malicious code by the user."
+                },
+                "defaultConfiguration": {
+                  "enabled": true,
+                  "level": "error"
+                },
+                "help": {
+                  "text": "# Query built from user-controlled sources\nIf a database query is built from user-provided data...",
+                  "markdown": "# Query built from user-controlled sources\nIf a database query is built from user-provided data..."
+                },
+                "helpUri": "https://codeql.github.com/codeql-query-help/java/java-sql-injection/",
+                "properties": {
+                  "tags": [
+                    "security",
+                    "external/cwe/cwe-089",
+                    "external/cwe/cwe-564"
+                  ],
+                  "description": "Building a SQL or Java Persistence query from user-controlled sources is vulnerable to insertion of malicious code by the user.",
+                  "id": "java/sql-injection",
+                  "kind": "path-problem",
+                  "name": "Query built from user-controlled sources",
+                  "precision": "high",
+                  "problem.severity": "error",
+                  "security-severity": "8.8"
+                }
+              },
+              {
+                "id": "java/log-injection",
+                "name": "java/log-injection",
+                "shortDescription": {
+                  "text": "Log Injection"
+                },
+                "fullDescription": {
+                  "text": "Building log entries from user-controlled data may allow insertion of forged log entries by malicious users."
+                },
+                "defaultConfiguration": {
+                  "enabled": true,
+                  "level": "error"
+                },
+                "properties": {
+                  "tags": [
+                    "security",
+                    "external/cwe/cwe-117"
+                  ],
+                  "kind": "path-problem",
+                  "precision": "medium",
+                  "problem.severity": "error",
+                  "security-severity": "7.8"
+                }
+              },
+              {
+                "id": "java/insecure-cookie",
+                "name": "java/insecure-cookie",
+                "shortDescription": {
+                  "text": "Failure to use secure cookies"
+                },
+                "defaultConfiguration": {
+                  "enabled": true,
+                  "level": "error"
+                },
+                "properties": {
+                  "tags": [
+                    "security",
+                    "external/cwe/cwe-614"
+                  ],
+                  "kind": "problem",
+                  "precision": "high",
+                  "problem.severity": "error",
+                  "security-severity": "5.0"
+                }
+              },
+              {
+                "id": "java/unused-parameter",
+                "name": "java/unused-parameter",
+                "shortDescription": {
+                  "text": "Useless parameter"
+                },
+                "defaultConfiguration": {
+                  "enabled": true,
+                  "level": "note"
+                },
+                "properties": {
+                  "tags": [
+                    "maintainability"
+                  ],
+                  "kind": "problem",
+                  "precision": "very-high",
+                  "problem.severity": "recommendation"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "invocations": [
+        {
+          "toolExecutionNotifications": [],
+          "executionSuccessful": true
+        }
+      ],
+      "artifacts": [
+        {
+          "location": {
+            "uri": "src/main/java/com/example/OrderDao.java",
+            "uriBaseId": "%SRCROOT%",
+            "index": 0
+          }
+        },
+        {
+          "location": {
+            "uri": "src/main/java/com/example/OrderController.java",
+            "uriBaseId": "%SRCROOT%",
+            "index": 1
+          }
+        }
+      ],
+      "results": [
+        {
+          "ruleId": "java/sql-injection",
+          "ruleIndex": 0,
+          "rule": {
+            "id": "java/sql-injection",
+            "index": 0,
+            "toolComponent": {
+              "index": 0
+            }
+          },
+          "message": {
+            "text": "This query depends on a [user-provided value](1)."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/main/java/com/example/OrderDao.java",
+                  "uriBaseId": "%SRCROOT%",
+                  "index": 0
+                },
+                "region": {
+                  "startLine": 42,
+                  "startColumn": 31,
+                  "endColumn": 36
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "primaryLocationLineHash": "2ce7a8e2a1b2c3d4:1",
+            "primaryLocationStartColumnFingerprint": "18"
+          }
+        },
+        {
+          "ruleId": "java/sql-injection",
+          "ruleIndex": 0,
+          "rule": {
+            "id": "java/sql-injection",
+            "index": 0,
+            "toolComponent": {
+              "index": 0
+            }
+          },
+          "message": {
+            "text": "This query depends on a [user-provided value](1)."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/main/java/com/example/OrderDao.java",
+                  "uriBaseId": "%SRCROOT%",
+                  "index": 0
+                },
+                "region": {
+                  "startLine": 87,
+                  "startColumn": 31,
+                  "endColumn": 36
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "primaryLocationLineHash": "9f1e2d3c4b5a6978:1",
+            "primaryLocationStartColumnFingerprint": "18"
+          }
+        },
+        {
+          "ruleId": "java/log-injection",
+          "ruleIndex": 1,
+          "rule": {
+            "id": "java/log-injection",
+            "index": 1,
+            "toolComponent": {
+              "index": 0
+            }
+          },
+          "message": {
+            "text": "This log entry depends on a [user-provided value](1)."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/main/java/com/example/OrderController.java",
+                  "uriBaseId": "%SRCROOT%",
+                  "index": 1
+                },
+                "region": {
+                  "startLine": 25,
+                  "startColumn": 18,
+                  "endColumn": 55
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "java/insecure-cookie",
+          "ruleIndex": 2,
+          "rule": {
+            "id": "java/insecure-cookie",
+            "index": 2,
+            "toolComponent": {
+              "index": 0
+            }
+          },
+          "message": {
+            "text": "Cookie is added to response without the 'secure' flag being set."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/main/java/com/example/OrderController.java",
+                  "uriBaseId": "%SRCROOT%",
+                  "index": 1
+                },
+                "region": {
+                  "startLine": 61,
+                  "startColumn": 9,
+                  "endColumn": 38
+                }
+              }
+            }
+          ],
+          "suppressions": [
+            {
+              "kind": "inSource"
+            }
+          ]
+        },
+        {
+          "ruleId": "java/unused-parameter",
+          "ruleIndex": 3,
+          "rule": {
+            "id": "java/unused-parameter",
+            "index": 3,
+            "toolComponent": {
+              "index": 0
+            }
+          },
+          "message": {
+            "text": "The parameter 'order' is never used."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "index": 1
+                },
+                "region": {
+                  "startLine": 70,
+                  "startColumn": 30,
+                  "endColumn": 41
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "automationDetails": {
+        "id": "/language:java/"
+      },
+      "columnKind": "utf16CodeUnits",
+      "properties": {
+        "semmle.formatSpecifier": "sarif-latest"
+      }
+    }
+  ]
+}

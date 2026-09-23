@@ -1,0 +1,28 @@
+mutation ValidateWithFindings(
+    $project: String!,
+    $branch: String!,
+    $build: String!,
+    $validation: String!,
+    $description: String,
+    $format: String!,
+    $kind: FindingKind,
+    $scanner: String,
+    $report: JSON!,
+) {
+    validateBuildWithFindings(input: {
+        project: $project,
+        branch: $branch,
+        build: $build,
+        validation: $validation,
+        description: $description,
+        format: $format,
+        kind: $kind,
+        scanner: $scanner,
+        report: $report,
+    }) {
+        validationRun {
+            ...ValidationRunFragment
+        }
+        ...PayloadUserErrors
+    }
+}

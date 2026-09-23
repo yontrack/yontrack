@@ -1,0 +1,17 @@
+query ProjectFindings(
+    $projectId: Int!,
+    $filter: FindingFilter,
+    $offset: Int = 0,
+    $size: Int = 20,
+) {
+    project(id: $projectId) {
+        findings(filter: $filter, offset: $offset, size: $size) {
+            pageInfo {
+                totalSize
+            }
+            pageItems {
+                ...FindingFragment
+            }
+        }
+    }
+}

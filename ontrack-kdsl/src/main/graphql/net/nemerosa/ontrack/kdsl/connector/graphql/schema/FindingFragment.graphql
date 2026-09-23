@@ -1,0 +1,29 @@
+fragment FindingFragment on Finding {
+    id
+    scanner
+    externalId
+    location
+    kind
+    title
+    url
+    maxSeverity
+    state
+    resolvedAt
+    acceptance {
+        statement
+        source
+        expiresAt
+        effective
+    }
+    exposures {
+        branch {
+            name
+        }
+        validationStamp {
+            name
+        }
+        state
+        accepted
+        resolvedAt
+    }
+}
