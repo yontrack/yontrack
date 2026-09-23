@@ -1,9 +1,14 @@
 package net.nemerosa.ontrack.extension.findings.ingestion
 
+import net.nemerosa.ontrack.extension.findings.model.Finding
 import net.nemerosa.ontrack.extension.findings.model.FindingKind
+import net.nemerosa.ontrack.extension.findings.model.FindingResolutionReason
+import net.nemerosa.ontrack.extension.findings.model.FindingSeverity
+import net.nemerosa.ontrack.model.structure.Branch
 import net.nemerosa.ontrack.model.structure.Build
 import net.nemerosa.ontrack.model.structure.RunInfoInput
 import net.nemerosa.ontrack.model.structure.ValidationRun
+import net.nemerosa.ontrack.model.structure.ValidationStamp
 import tools.jackson.databind.JsonNode
 
 /**
@@ -13,15 +18,16 @@ interface FindingsIngestionService {
 
     /**
      * Reads a report and, in one transaction, creates the validation run with the counts of the
-     * findings, and writes the findings and their observations by this run.
+     * findings, writes the findings and their observations by this run, and maintains their
+     * exposure on the branch of the build for the stamp of the run.
      *
      * A report which cannot be read creates nothing.
      *
      * @param build Build to validate
      * @param request What to post
-     * @return The created validation run
+     * @return The created validation run and the transitions of the findings on the branch
      */
-    fun ingest(build: Build, request: FindingsIngestionRequest): ValidationRun
+    fun ingest(build: Build, request: FindingsIngestionRequest): FindingsIngestionResult
 
     /**
      * Formats which can be ingested
@@ -48,4 +54,41 @@ data class FindingsIngestionRequest(
     val kind: FindingKind? = null,
     val scanner: String? = null,
     val report: JsonNode,
+)
+
+/**
+ * Outcome of the ingestion of a report.
+ *
+ * @property run Created validation run
+ * @property transitions Transitions of the findings on the branch of the run, caused by this
+ * scan: new exposures, returns after resolution or acceptance, resolutions. In the order of the
+ * report, then the resolutions.
+ */
+data class FindingsIngestionResult(
+    val run: ValidationRun,
+    val transitions: List<FindingTransition>,
+)
+
+/**
+ * Transition of a finding on a branch, caused by a scan.
+ *
+ * @property type Type of transition
+ * @property finding Finding, as it is after the scan
+ * @property branch Branch of the scan
+ * @property validationStamp Stamp of the scan
+ * @property severity Severity of the finding: as observed by this scan for a new exposure, as
+ * last observed by the scans of this stamp for a resolution — the maximum severity of the finding
+ * when those observations were purged
+ * @property reopened For a [new exposure][FindingExposureTransitionType.NEW], whether the finding
+ * was known on the branch before: resolved there, or accepted there
+ * @property resolutionReason For a [resolution][FindingExposureTransitionType.RESOLVED], why
+ */
+data class FindingTransition(
+    val type: FindingExposureTransitionType,
+    val finding: Finding,
+    val branch: Branch,
+    val validationStamp: ValidationStamp,
+    val severity: FindingSeverity,
+    val reopened: Boolean,
+    val resolutionReason: FindingResolutionReason?,
 )

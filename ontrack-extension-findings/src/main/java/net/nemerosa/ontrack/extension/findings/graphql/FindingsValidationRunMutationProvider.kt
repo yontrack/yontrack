@@ -26,8 +26,8 @@ import kotlin.jvm.optionals.getOrNull
  * `validateBuildWithFindings`, the one door for the reports of security scans.
  *
  * In the manner of `validateBuildWithCHML`, but the data is a report: synchronous, the run, the
- * findings and their observations are written in one transaction, and a report which cannot be
- * read fails the mutation, creating nothing.
+ * findings, their observations and their exposure are written in one transaction, and a report
+ * which cannot be read fails the mutation, creating nothing.
  */
 @Component
 class FindingsValidationRunMutationProvider(
@@ -101,7 +101,7 @@ class FindingsValidationRunMutationProvider(
                         scanner = getMutationInputField(env, "scanner"),
                         report = getRequiredMutationInputField<JsonNode>(env, "report"),
                     )
-                )
+                ).run
                 return mapOf("validationRun" to run)
             }
         }

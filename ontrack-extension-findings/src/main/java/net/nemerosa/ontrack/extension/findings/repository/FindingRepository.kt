@@ -3,6 +3,7 @@ package net.nemerosa.ontrack.extension.findings.repository
 import net.nemerosa.ontrack.extension.findings.model.Finding
 import net.nemerosa.ontrack.extension.findings.model.FindingExposure
 import net.nemerosa.ontrack.extension.findings.model.FindingObservation
+import net.nemerosa.ontrack.extension.findings.model.FindingSeverity
 
 /**
  * Storage of the findings, their observations and their exposure.
@@ -31,6 +32,11 @@ interface FindingRepository {
      * Gets a finding by ID.
      */
     fun findFindingById(id: Int): Finding?
+
+    /**
+     * Gets findings by ID.
+     */
+    fun findFindingsByIds(ids: Collection<Int>): List<Finding>
 
     /**
      * Gets a finding by its key in a project.
@@ -69,25 +75,39 @@ interface FindingRepository {
      */
     fun findObservationsByValidationRun(validationRunId: Int): List<FindingObservation>
 
+    /**
+     * Gets the severity of the latest observation of some findings by the runs of a validation
+     * stamp. A finding whose observations were all purged has none.
+     *
+     * @return Severity per finding ID
+     */
+    fun findLatestSeverities(validationStampId: Int, findingIds: Collection<Int>): Map<Int, FindingSeverity>
+
     // Exposure
 
     /**
-     * Inserts exposures, as one JDBC batch.
+     * Saves exposures, as one JDBC batch: a row is created, or replaced when one exists for the
+     * same finding, branch and stamp.
      */
-    fun insertExposures(exposures: List<FindingExposure>)
+    fun saveExposures(exposures: List<FindingExposure>)
 
     /**
-     * Gets the exposure of a finding, on all branches.
+     * Gets the exposure of a finding, on all branches, resolved or not.
      */
     fun findExposuresByFinding(findingId: Int): List<FindingExposure>
 
     /**
-     * Gets the exposure on a branch, for the scans of one validation stamp.
+     * Gets the exposure of some findings, on all branches, resolved or not.
      */
-    fun findExposuresByBranchAndStamp(branchId: Int, validationStampId: Int): List<FindingExposure>
+    fun findExposuresByFindings(findingIds: Collection<Int>): List<FindingExposure>
 
     /**
-     * Removes the exposure of some findings on a branch, for the scans of one validation stamp.
+     * Gets the exposure on a branch, for all its stamps, resolved or not.
      */
-    fun deleteExposures(branchId: Int, validationStampId: Int, findingIds: Collection<Int>)
+    fun findExposuresByBranch(branchId: Int): List<FindingExposure>
+
+    /**
+     * Gets the exposure on a branch, for the scans of one validation stamp, resolved or not.
+     */
+    fun findExposuresByBranchAndStamp(branchId: Int, validationStampId: Int): List<FindingExposure>
 }

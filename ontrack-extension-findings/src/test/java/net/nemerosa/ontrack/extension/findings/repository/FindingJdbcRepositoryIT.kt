@@ -167,39 +167,95 @@ class FindingJdbcRepositoryIT : AbstractDSLTestSupport() {
     }
 
     @Test
-    fun `Exposures are inserted as a batch, read back and deleted`() {
+    fun `Exposures are saved as a batch, read back and replaced`() {
         project {
             val main = branch()
             val release = branch()
             val vsMain = main.validationStamp()
+            val vsMainOther = main.validationStamp()
             val vsRelease = release.validationStamp()
             val f1 = findingRepository.insertFinding(finding(this, externalId = "CVE-20"))
             val f2 = findingRepository.insertFinding(finding(this, externalId = "CVE-21"))
 
             val e1Main = FindingExposure(f1.id, main.id(), vsMain.id(), t0)
-            val e2Main = FindingExposure(f2.id, main.id(), vsMain.id(), t1)
+            val e2Main = FindingExposure(
+                f2.id, main.id(), vsMain.id(), t1,
+                accepted = true,
+                acceptanceExpiresAt = LocalDate.of(2026, 12, 31),
+            )
+            val e1MainOther = FindingExposure(f1.id, main.id(), vsMainOther.id(), t1)
             val e1Release = FindingExposure(f1.id, release.id(), vsRelease.id(), t1)
-            findingRepository.insertExposures(listOf(e1Main, e2Main, e1Release))
+            findingRepository.saveExposures(listOf(e1Main, e2Main, e1MainOther, e1Release))
 
-            assertEquals(setOf(e1Main, e1Release), findingRepository.findExposuresByFinding(f1.id).toSet())
+            assertEquals(setOf(e1Main, e1MainOther, e1Release), findingRepository.findExposuresByFinding(f1.id).toSet())
+            assertEquals(
+                setOf(e1Main, e2Main, e1MainOther, e1Release),
+                findingRepository.findExposuresByFindings(listOf(f1.id, f2.id)).toSet()
+            )
+            assertEquals(emptyList(), findingRepository.findExposuresByFindings(emptyList()))
+            assertEquals(
+                setOf(e1Main, e2Main, e1MainOther),
+                findingRepository.findExposuresByBranch(main.id()).toSet()
+            )
             assertEquals(
                 setOf(e1Main, e2Main),
                 findingRepository.findExposuresByBranchAndStamp(main.id(), vsMain.id()).toSet()
             )
 
-            findingRepository.deleteExposures(main.id(), vsMain.id(), listOf(f1.id))
-            assertEquals(listOf(e2Main), findingRepository.findExposuresByBranchAndStamp(main.id(), vsMain.id()))
-            assertEquals(listOf(e1Release), findingRepository.findExposuresByFinding(f1.id))
-
-            // No-op
-            findingRepository.deleteExposures(main.id(), vsMain.id(), emptyList())
-            assertEquals(listOf(e2Main), findingRepository.findExposuresByBranchAndStamp(main.id(), vsMain.id()))
+            // Resolution replaces the row
+            val e1MainResolved = e1Main.copy(resolvedAt = t1, resolutionReason = FindingResolutionReason.ABSENT)
+            findingRepository.saveExposures(listOf(e1MainResolved))
+            assertEquals(
+                setOf(e1MainResolved, e2Main),
+                findingRepository.findExposuresByBranchAndStamp(main.id(), vsMain.id()).toSet()
+            )
+            assertEquals(setOf(e1MainResolved, e1MainOther, e1Release), findingRepository.findExposuresByFinding(f1.id).toSet())
         }
     }
 
     @Test
-    fun `Inserting no exposure`() {
-        findingRepository.insertExposures(emptyList())
+    fun `Saving no exposure`() {
+        findingRepository.saveExposures(emptyList())
+    }
+
+    @Test
+    fun `Latest severities of findings by the runs of a stamp`() {
+        project {
+            branch {
+                val vs = validationStamp()
+                val other = validationStamp()
+                val run1 = build().validate(vs)
+                val run2 = build().validate(vs)
+                val runOther = build().validate(other)
+                val f1 = findingRepository.insertFinding(finding(project, externalId = "CVE-25"))
+                val f2 = findingRepository.insertFinding(finding(project, externalId = "CVE-26"))
+                val f3 = findingRepository.insertFinding(finding(project, externalId = "CVE-27"))
+                findingRepository.insertObservations(
+                    listOf(
+                        observation(f1, run1, t0).copy(severity = FindingSeverity.HIGH),
+                        observation(f1, run2, t1).copy(severity = FindingSeverity.LOW),
+                        observation(f2, run1, t0).copy(severity = FindingSeverity.MEDIUM),
+                        observation(f3, runOther, t1).copy(severity = FindingSeverity.CRITICAL),
+                    )
+                )
+                assertEquals(
+                    mapOf(f1.id to FindingSeverity.LOW, f2.id to FindingSeverity.MEDIUM),
+                    findingRepository.findLatestSeverities(vs.id(), listOf(f1.id, f2.id, f3.id))
+                )
+                assertEquals(emptyMap(), findingRepository.findLatestSeverities(vs.id(), emptyList()))
+            }
+        }
+    }
+
+    @Test
+    fun `Getting findings by IDs`() {
+        project {
+            val f1 = findingRepository.insertFinding(finding(this, externalId = "CVE-28"))
+            val f2 = findingRepository.insertFinding(finding(this, externalId = "CVE-29"))
+            findingRepository.insertFinding(finding(this, externalId = "CVE-2A"))
+            assertEquals(listOf(f1, f2), findingRepository.findFindingsByIds(listOf(f2.id, f1.id)))
+            assertEquals(emptyList(), findingRepository.findFindingsByIds(emptyList()))
+        }
     }
 
     @Test
@@ -236,7 +292,7 @@ class FindingJdbcRepositoryIT : AbstractDSLTestSupport() {
             val oMain = observation(f, runMain, t0)
             findingRepository.insertObservations(listOf(oMain, observation(f, runFeature, t1)))
             val eMain = FindingExposure(f.id, main.id(), vsMain.id(), t0)
-            findingRepository.insertExposures(
+            findingRepository.saveExposures(
                 listOf(eMain, FindingExposure(f.id, feature.id(), vsFeature.id(), t1))
             )
 
@@ -260,7 +316,7 @@ class FindingJdbcRepositoryIT : AbstractDSLTestSupport() {
                     finding(project, externalId = "CVE-50", lastSeen = t1, maxSeverity = FindingSeverity.HIGH)
                 )
                 findingRepository.insertObservations(runs.map { observation(f, it, t0) })
-                findingRepository.insertExposures(listOf(FindingExposure(f.id, id(), vs.id(), t0)))
+                findingRepository.saveExposures(listOf(FindingExposure(f.id, id(), vs.id(), t0)))
 
                 // Purging all the builds
                 builds.forEach { it.delete() }

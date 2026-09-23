@@ -76,6 +76,16 @@ class FindingJdbcRepository(
             mapOf("id" to id)
         ) { rs, _ -> toFinding(rs) }.firstOrNull()
 
+    override fun findFindingsByIds(ids: Collection<Int>): List<Finding> =
+        if (ids.isEmpty()) {
+            emptyList()
+        } else {
+            namedParameterJdbcTemplate!!.query(
+                "SELECT * FROM FINDINGS WHERE ID IN (:ids) ORDER BY ID",
+                mapOf("ids" to ids)
+            ) { rs, _ -> toFinding(rs) }
+        }
+
     override fun findFindingByKey(projectId: Int, scanner: String, externalId: String, location: String): Finding? =
         namedParameterJdbcTemplate!!.query(
             """
@@ -171,6 +181,24 @@ class FindingJdbcRepository(
             mapOf("validationRunId" to validationRunId)
         ) { rs, _ -> toObservation(rs) }
 
+    override fun findLatestSeverities(validationStampId: Int, findingIds: Collection<Int>): Map<Int, FindingSeverity> =
+        if (findingIds.isEmpty()) {
+            emptyMap()
+        } else {
+            namedParameterJdbcTemplate!!.query(
+                """
+                    SELECT DISTINCT ON (O.FINDING_ID) O.FINDING_ID, O.SEVERITY
+                    FROM FINDING_OBSERVATIONS O
+                    INNER JOIN VALIDATION_RUNS R ON R.ID = O.VALIDATION_RUN_ID
+                    WHERE R.VALIDATIONSTAMPID = :validationStampId
+                    AND O.FINDING_ID IN (:findingIds)
+                    ORDER BY O.FINDING_ID, O.OBSERVED_AT DESC, O.ID DESC
+                """.trimIndent(),
+                mapOf("validationStampId" to validationStampId, "findingIds" to findingIds)
+            ) { rs, _ -> rs.getInt("FINDING_ID") to FindingSeverity.valueOf(rs.getString("SEVERITY")) }
+                .toMap()
+        }
+
     private fun toObservation(rs: ResultSet) = FindingObservation(
         findingId = rs.getInt("FINDING_ID"),
         validationRunId = rs.getInt("VALIDATION_RUN_ID"),
@@ -192,12 +220,23 @@ class FindingJdbcRepository(
 
     // Exposure
 
-    override fun insertExposures(exposures: List<FindingExposure>) {
+    override fun saveExposures(exposures: List<FindingExposure>) {
         if (exposures.isEmpty()) return
         namedParameterJdbcTemplate!!.batchUpdate(
             """
-                INSERT INTO FINDING_EXPOSURES (FINDING_ID, BRANCH_ID, VALIDATION_STAMP_ID, SINCE)
-                VALUES (:findingId, :branchId, :validationStampId, :since)
+                INSERT INTO FINDING_EXPOSURES (
+                    FINDING_ID, BRANCH_ID, VALIDATION_STAMP_ID, SINCE,
+                    ACCEPTED, ACCEPTANCE_EXPIRES_AT, RESOLVED_AT, RESOLUTION_REASON
+                ) VALUES (
+                    :findingId, :branchId, :validationStampId, :since,
+                    :accepted, :acceptanceExpiresAt, :resolvedAt, :resolutionReason
+                )
+                ON CONFLICT (FINDING_ID, BRANCH_ID, VALIDATION_STAMP_ID) DO UPDATE
+                SET SINCE = EXCLUDED.SINCE,
+                    ACCEPTED = EXCLUDED.ACCEPTED,
+                    ACCEPTANCE_EXPIRES_AT = EXCLUDED.ACCEPTANCE_EXPIRES_AT,
+                    RESOLVED_AT = EXCLUDED.RESOLVED_AT,
+                    RESOLUTION_REASON = EXCLUDED.RESOLUTION_REASON
             """.trimIndent(),
             exposures.map { exposure ->
                 MapSqlParameterSource()
@@ -205,6 +244,10 @@ class FindingJdbcRepository(
                     .addValue("branchId", exposure.branchId)
                     .addValue("validationStampId", exposure.validationStampId)
                     .addValue("since", dateTimeForDB(exposure.since))
+                    .addValue("accepted", exposure.accepted)
+                    .addValue("acceptanceExpiresAt", exposure.acceptanceExpiresAt, java.sql.Types.DATE)
+                    .addValue("resolvedAt", dateTimeForDB(exposure.resolvedAt))
+                    .addValue("resolutionReason", exposure.resolutionReason?.name)
             }.toTypedArray()
         )
     }
@@ -213,6 +256,22 @@ class FindingJdbcRepository(
         namedParameterJdbcTemplate!!.query(
             "SELECT * FROM FINDING_EXPOSURES WHERE FINDING_ID = :findingId ORDER BY ID",
             mapOf("findingId" to findingId)
+        ) { rs, _ -> toExposure(rs) }
+
+    override fun findExposuresByFindings(findingIds: Collection<Int>): List<FindingExposure> =
+        if (findingIds.isEmpty()) {
+            emptyList()
+        } else {
+            namedParameterJdbcTemplate!!.query(
+                "SELECT * FROM FINDING_EXPOSURES WHERE FINDING_ID IN (:findingIds) ORDER BY ID",
+                mapOf("findingIds" to findingIds)
+            ) { rs, _ -> toExposure(rs) }
+        }
+
+    override fun findExposuresByBranch(branchId: Int): List<FindingExposure> =
+        namedParameterJdbcTemplate!!.query(
+            "SELECT * FROM FINDING_EXPOSURES WHERE BRANCH_ID = :branchId ORDER BY ID",
+            mapOf("branchId" to branchId)
         ) { rs, _ -> toExposure(rs) }
 
     override fun findExposuresByBranchAndStamp(branchId: Int, validationStampId: Int): List<FindingExposure> =
@@ -226,27 +285,14 @@ class FindingJdbcRepository(
             mapOf("branchId" to branchId, "validationStampId" to validationStampId)
         ) { rs, _ -> toExposure(rs) }
 
-    override fun deleteExposures(branchId: Int, validationStampId: Int, findingIds: Collection<Int>) {
-        if (findingIds.isEmpty()) return
-        namedParameterJdbcTemplate!!.update(
-            """
-                DELETE FROM FINDING_EXPOSURES
-                WHERE BRANCH_ID = :branchId
-                AND VALIDATION_STAMP_ID = :validationStampId
-                AND FINDING_ID IN (:findingIds)
-            """.trimIndent(),
-            mapOf(
-                "branchId" to branchId,
-                "validationStampId" to validationStampId,
-                "findingIds" to findingIds,
-            )
-        )
-    }
-
     private fun toExposure(rs: ResultSet) = FindingExposure(
         findingId = rs.getInt("FINDING_ID"),
         branchId = rs.getInt("BRANCH_ID"),
         validationStampId = rs.getInt("VALIDATION_STAMP_ID"),
         since = rs.readLocalDateTimeNotNull("SINCE"),
+        accepted = rs.getBoolean("ACCEPTED"),
+        acceptanceExpiresAt = rs.getObject("ACCEPTANCE_EXPIRES_AT", LocalDate::class.java),
+        resolvedAt = rs.readLocalDateTime("RESOLVED_AT"),
+        resolutionReason = rs.getString("RESOLUTION_REASON")?.let { FindingResolutionReason.valueOf(it) },
     )
 }
