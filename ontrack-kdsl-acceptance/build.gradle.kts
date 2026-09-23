@@ -296,6 +296,9 @@ tasks.named<Test>("test") {
 val kdslAcceptanceTest = tasks.register<Test>("kdslAcceptanceTest") {
     useJUnitPlatform()
     mustRunAfter("test")
+    // Never restored from the build cache (#1870): the suite tests a running instance, which is
+    // not one of its inputs.
+    outputs.cacheIf("acceptance tests run against a live instance") { false }
     include("**/ACC*.class")
     // Gradle 9 no longer gives a registered Test task the test source set by convention: without
     // these two the task is silently NO-SOURCE.
