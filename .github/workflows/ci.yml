@@ -623,6 +623,7 @@ jobs:
               ontrack-extension-indicators
               ontrack-extension-chart
               ontrack-extension-config
+              ontrack-extension-findings
           - shard: 4
             modules: >-
               ontrack-extension-auto-versioning
