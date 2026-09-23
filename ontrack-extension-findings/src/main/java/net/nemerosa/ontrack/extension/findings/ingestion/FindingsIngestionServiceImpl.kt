@@ -1,8 +1,12 @@
 package net.nemerosa.ontrack.extension.findings.ingestion
 
+import io.micrometer.core.instrument.DistributionSummary
+import io.micrometer.core.instrument.MeterRegistry
+import io.micrometer.core.instrument.Timer
 import net.nemerosa.ontrack.common.Time
 import net.nemerosa.ontrack.extension.findings.events.FindingsEvents
 import net.nemerosa.ontrack.extension.findings.license.FindingsLicense
+import net.nemerosa.ontrack.extension.findings.metrics.FindingsMetrics
 import net.nemerosa.ontrack.extension.findings.model.Finding
 import net.nemerosa.ontrack.extension.findings.model.FindingObservation
 import net.nemerosa.ontrack.extension.findings.model.FindingResolutionReason
@@ -19,6 +23,7 @@ import net.nemerosa.ontrack.model.events.EventPostService
 import net.nemerosa.ontrack.model.structure.*
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import java.time.Duration
 
 @Service
 @Transactional
@@ -31,6 +36,7 @@ class FindingsIngestionServiceImpl(
     private val eventPostService: EventPostService,
     private val findingsLicense: FindingsLicense,
     private val findingSearchIndexer: FindingSearchIndexer,
+    private val meterRegistry: MeterRegistry,
 ) : FindingsIngestionService {
 
     private val parsers: Map<String, FindingsReportParser> = parsers.associateBy { it.format }
@@ -38,6 +44,8 @@ class FindingsIngestionServiceImpl(
     override val formats: Set<String> = this.parsers.keys
 
     override fun ingest(build: Build, request: FindingsIngestionRequest): FindingsIngestionResult {
+        // Only an ingested report is measured, see [measure]
+        val sample = Timer.start(meterRegistry)
         // Reading the report before creating anything
         val parser = parsers[request.format]
             ?: throw FindingsReportUnsupportedFormatException(request.format, formats)
@@ -70,8 +78,40 @@ class FindingsIngestionServiceImpl(
         transitions.forEach { transition ->
             eventPostService.post(FindingsEvents.event(transition))
         }
+        // Measuring an ingested report
+        measure(parser.format, sample, findings.size)
         // OK
         return FindingsIngestionResult(run = run, transitions = transitions)
+    }
+
+    /**
+     * Records the duration and the number of findings of an ingested report.
+     *
+     * A rejected report is not measured: it is fast and says nothing about the cost of the
+     * synchronous door. The format is the one of the parser, never the one of the request, so
+     * that an unknown format cannot create a meter.
+     *
+     * Both meters are histograms, for their percentiles to be computed by the monitoring, the
+     * timer having a bucket at the threshold for moving the parsing to a queue.
+     */
+    private fun measure(format: String, sample: Timer.Sample, findings: Int) {
+        sample.stop(
+            Timer.builder(FindingsMetrics.ingestion)
+                .description("Duration of the ingestion of a report of security scan")
+                .tag(FindingsMetrics.Tags.FORMAT, format)
+                .publishPercentileHistogram()
+                .serviceLevelObjectives(QUEUE_THRESHOLD)
+                .register(meterRegistry)
+        )
+        DistributionSummary.builder(FindingsMetrics.ingestionFindings)
+            .description("Number of findings in an ingested report of security scan")
+            .baseUnit("findings")
+            .tag(FindingsMetrics.Tags.FORMAT, format)
+            .publishPercentileHistogram()
+            .minimumExpectedValue(1.0)
+            .maximumExpectedValue(MAX_EXPECTED_FINDINGS)
+            .register(meterRegistry)
+            .record(findings.toDouble())
     }
 
     /**
@@ -240,6 +280,18 @@ class FindingsIngestionServiceImpl(
     }
 
     companion object {
+        /**
+         * Above this p95 of the ingestion time, the parsing moves to a queue, see
+         * `doc/dev-guide/findings-ingestion.md`
+         */
+        private val QUEUE_THRESHOLD: Duration = Duration.ofSeconds(5)
+
+        /**
+         * Upper bound of the buckets of the number of findings in a report, beyond which
+         * findings are still counted, in the last bucket
+         */
+        private const val MAX_EXPECTED_FINDINGS = 100_000.0
+
         // Sizes of the columns, see the V83 migration
         private const val MAX_SCANNER = 100
         private const val MAX_EXTERNAL_ID = 255

@@ -20,5 +20,6 @@
   * [Next-major branch](major-branch.md) - developing the next major on v6, and what the pipeline does differently there
 * Security
   * [Passive DAST scan](dast.md) - scanning the running demo with OWASP ZAP, reporting SECURITY.DAST
+  * [Findings ingestion performance](findings-ingestion.md) - watching the synchronous door, and when to move parsing to a queue
 * Workflows
   * [Claude Pick Workflow](claude-pick-workflow.md) - Let Claude autonomously pick and implement issues

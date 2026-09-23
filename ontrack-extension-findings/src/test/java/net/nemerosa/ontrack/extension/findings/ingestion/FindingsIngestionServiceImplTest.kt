@@ -1,5 +1,6 @@
 package net.nemerosa.ontrack.extension.findings.ingestion
 
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import io.mockk.Called
 import io.mockk.every
 import io.mockk.mockk
@@ -18,6 +19,7 @@ import net.nemerosa.ontrack.model.structure.RunInfoService
 import net.nemerosa.ontrack.model.structure.StructureService
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
+import kotlin.test.assertTrue
 
 class FindingsIngestionServiceImplTest {
 
@@ -32,6 +34,7 @@ class FindingsIngestionServiceImplTest {
     private val eventPostService = mockk<EventPostService>()
     private val findingsLicense = mockk<FindingsLicense>()
     private val findingSearchIndexer = mockk<FindingSearchIndexer>()
+    private val meterRegistry = SimpleMeterRegistry()
 
     private val service = FindingsIngestionServiceImpl(
         parsers = listOf(nativeParser),
@@ -42,6 +45,7 @@ class FindingsIngestionServiceImplTest {
         eventPostService = eventPostService,
         findingsLicense = findingsLicense,
         findingSearchIndexer = findingSearchIndexer,
+        meterRegistry = meterRegistry,
     )
 
     @Test
@@ -64,5 +68,7 @@ class FindingsIngestionServiceImplTest {
         verify { findingRepository wasNot Called }
         verify { eventPostService wasNot Called }
         verify { findingSearchIndexer wasNot Called }
+        // A rejected report is not measured
+        assertTrue(meterRegistry.meters.isEmpty())
     }
 }
