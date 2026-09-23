@@ -121,6 +121,15 @@ class FindingJdbcRepository(
             mapOf("externalId" to externalId)
         ) { rs, _ -> toFinding(rs) }
 
+    override fun forEachFinding(code: (Finding) -> Unit) {
+        namedParameterJdbcTemplate!!.query(
+            "SELECT * FROM FINDINGS ORDER BY ID",
+            emptyMap<String, Any>()
+        ) { rs ->
+            code(toFinding(rs))
+        }
+    }
+
     private fun toFinding(rs: ResultSet) = Finding(
         id = rs.getInt("ID"),
         projectId = rs.getInt("PROJECT_ID"),

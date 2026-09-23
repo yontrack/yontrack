@@ -12,6 +12,7 @@ import net.nemerosa.ontrack.extension.findings.report.FindingsReportParser
 import net.nemerosa.ontrack.extension.findings.report.FindingsReportUnsupportedFormatException
 import net.nemerosa.ontrack.extension.findings.report.ParsedFindingsReport
 import net.nemerosa.ontrack.extension.findings.repository.FindingRepository
+import net.nemerosa.ontrack.extension.findings.search.FindingSearchIndexer
 import net.nemerosa.ontrack.extension.findings.state.FindingStateService
 import net.nemerosa.ontrack.extension.findings.validation.FindingsValidationDataType
 import net.nemerosa.ontrack.model.events.EventPostService
@@ -29,6 +30,7 @@ class FindingsIngestionServiceImpl(
     private val findingStateService: FindingStateService,
     private val eventPostService: EventPostService,
     private val findingsLicense: FindingsLicense,
+    private val findingSearchIndexer: FindingSearchIndexer,
 ) : FindingsIngestionService {
 
     private val parsers: Map<String, FindingsReportParser> = parsers.associateBy { it.format }
@@ -87,6 +89,7 @@ class FindingsIngestionServiceImpl(
         val time = run.runTime
         val existing = findingRepository.findFindingsByProjectAndScanner(project.id(), report.scanner)
             .associateBy { it.externalId to it.location }
+        val created = mutableListOf<Finding>()
         val written = findings.map { consolidated ->
             val finding = existing[consolidated.externalId to consolidated.location]
                 ?.let { finding ->
@@ -115,9 +118,11 @@ class FindingsIngestionServiceImpl(
                         resolvedAt = null,
                         maxSeverity = consolidated.severity,
                     )
-                )
+                ).also { created += it }
             finding to consolidated
         }
+        // Only a new finding needs indexing: its external ID never changes
+        findingSearchIndexer.indexFindings(created)
         findingRepository.insertObservations(
             written.map { (finding, consolidated) ->
                 FindingObservation(

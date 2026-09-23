@@ -58,6 +58,11 @@ interface FindingRepository {
      */
     fun findFindingsByExternalId(externalId: String): List<Finding>
 
+    /**
+     * Goes through all the findings, of all the projects, by ID.
+     */
+    fun forEachFinding(code: (Finding) -> Unit)
+
     // Observations
 
     /**

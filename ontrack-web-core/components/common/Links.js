@@ -69,6 +69,14 @@ export function projectLabelUri(label) {
     return `/project-labels/${label.id}`
 }
 
+/**
+ * Page of a security finding. The page itself is added by #1865; the search results of the
+ * findings (#1862) already point at it.
+ */
+export function findingUri(finding) {
+    return `/extension/findings/finding/${finding.id}`
+}
+
 export function restPromotionLevelImageUri(promotionLevel) {
     return `/api/protected/images/promotionLevels/${promotionLevel.id}`
 }

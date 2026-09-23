@@ -9,6 +9,7 @@ import net.nemerosa.ontrack.extension.findings.license.FindingsNativeFormatsLice
 import net.nemerosa.ontrack.extension.findings.model.FindingKind
 import net.nemerosa.ontrack.extension.findings.report.FindingsReportParser
 import net.nemerosa.ontrack.extension.findings.repository.FindingRepository
+import net.nemerosa.ontrack.extension.findings.search.FindingSearchIndexer
 import net.nemerosa.ontrack.extension.findings.state.FindingStateService
 import net.nemerosa.ontrack.json.parseAsJson
 import net.nemerosa.ontrack.model.events.EventPostService
@@ -30,6 +31,7 @@ class FindingsIngestionServiceImplTest {
     private val findingStateService = mockk<FindingStateService>()
     private val eventPostService = mockk<EventPostService>()
     private val findingsLicense = mockk<FindingsLicense>()
+    private val findingSearchIndexer = mockk<FindingSearchIndexer>()
 
     private val service = FindingsIngestionServiceImpl(
         parsers = listOf(nativeParser),
@@ -39,6 +41,7 @@ class FindingsIngestionServiceImplTest {
         findingStateService = findingStateService,
         eventPostService = eventPostService,
         findingsLicense = findingsLicense,
+        findingSearchIndexer = findingSearchIndexer,
     )
 
     @Test
@@ -60,5 +63,6 @@ class FindingsIngestionServiceImplTest {
         verify { runInfoService wasNot Called }
         verify { findingRepository wasNot Called }
         verify { eventPostService wasNot Called }
+        verify { findingSearchIndexer wasNot Called }
     }
 }
