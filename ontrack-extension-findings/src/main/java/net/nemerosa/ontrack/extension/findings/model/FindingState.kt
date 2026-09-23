@@ -24,5 +24,19 @@ enum class FindingState {
     /**
      * Neither open nor accepted.
      */
-    RESOLVED,
+    RESOLVED;
+
+    companion object {
+
+        /**
+         * State of a finding from its rolled-up exposure state — see [FindingExposureState.of]:
+         * open when exposed, accepted when accepted, resolved otherwise, including when there
+         * is no exposure at all.
+         */
+        fun of(exposureState: FindingExposureState?): FindingState = when (exposureState) {
+            FindingExposureState.EXPOSED -> OPEN
+            FindingExposureState.ACCEPTED -> ACCEPTED
+            FindingExposureState.RESOLVED, null -> RESOLVED
+        }
+    }
 }

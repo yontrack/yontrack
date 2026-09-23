@@ -39,11 +39,7 @@ class FindingStateServiceImpl(
             val state = FindingExposureState.of(
                 exposures[finding.id]?.map { it.stateOn(date) } ?: emptyList()
             )
-            finding.id to when (state) {
-                FindingExposureState.EXPOSED -> FindingState.OPEN
-                FindingExposureState.ACCEPTED -> FindingState.ACCEPTED
-                FindingExposureState.RESOLVED, null -> FindingState.RESOLVED
-            }
+            finding.id to FindingState.of(state)
         }
     }
 
