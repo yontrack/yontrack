@@ -171,9 +171,27 @@ data class AutoPromotionSpec(
  */
 data class WorkflowSpec(val yaml: String)
 
+/**
+ * @property findings Thresholds of a `security-findings` stamp, whose runs are posted as the
+ * reports of security scans - see [BuildSpec.scans] - rather than with a status: the server
+ * computes the status from the findings. `null` for an ordinary stamp.
+ */
 data class ValidationStampSpec(
     val name: String,
     val description: String,
+    val findings: FindingsThresholdsSpec? = null,
+)
+
+/**
+ * Thresholds of a `security-findings` stamp, which are CHML's: a warning and a failure, each a
+ * count of findings at a level or above. Accepted findings never count, and neither does
+ * [FindingSeverity.UNKNOWN].
+ */
+data class FindingsThresholdsSpec(
+    val warningLevel: FindingSeverity = FindingSeverity.HIGH,
+    val warningValue: Int = 1,
+    val failedLevel: FindingSeverity = FindingSeverity.CRITICAL,
+    val failedValue: Int = 1,
 )
 
 /**
@@ -185,6 +203,9 @@ data class ValidationStampSpec(
  * when the build is created. The last one is the commit the build was built from; the ones
  * before it are the work that went into it, and are what the change log with the previous
  * build shows.
+ * @property scans Security scans of the build, each posted through `validateBuildWithFindings`
+ * as the report of the scan, on a `security-findings` stamp. They take their rungs on the build's
+ * ladder after its [validations], and before its promotions.
  */
 data class BuildSpec(
     val name: String,
@@ -195,6 +216,7 @@ data class BuildSpec(
     val validations: List<ValidationSpec> = emptyList(),
     val links: List<BuildRef> = emptyList(),
     val commits: List<String> = emptyList(),
+    val scans: List<ScanSpec> = emptyList(),
 )
 
 /**
@@ -245,6 +267,100 @@ data class ValidationSpec(
     val validationStamp: String,
     val status: ValidationStatus,
     val description: String = "",
+)
+
+/**
+ * A security scan of a build, posted as a report through the API like any CI would post one.
+ *
+ * The dataset says what the scan found, not how a scanner would write it: [format] picks the
+ * report [FindingsReports] renders from [findings], so the same findings can be sent in the
+ * neutral format or in SARIF.
+ *
+ * @property validationStamp A `security-findings` stamp of the branch
+ * @property format Format of the report
+ * @property kind What was scanned
+ * @property scanner Name of the scanner, as the findings are keyed by it
+ * @property findings What the scan reported. A finding absent from the scan is one it no longer
+ * reports - which is how a finding gets resolved.
+ */
+data class ScanSpec(
+    val validationStamp: String,
+    val format: ScanFormat,
+    val kind: ScanKind,
+    val scanner: String,
+    val findings: List<FindingSpec>,
+    val description: String = "",
+)
+
+/**
+ * Formats of report the dataset renders.
+ */
+enum class ScanFormat {
+    /** The neutral format of Yontrack, which needs no licence. */
+    FINDINGS,
+
+    /**
+     * SARIF 2.1, a native format: the instance needs the licensed feature "Native scanner
+     * formats". SARIF has no field for the expiry of an acceptance.
+     */
+    SARIF,
+}
+
+/**
+ * Kinds of scan, `FindingKind` on the server side.
+ */
+enum class ScanKind {
+    IMAGE,
+    CODE,
+    SECRETS,
+    DAST,
+    DEPENDENCIES,
+    OTHER,
+}
+
+/**
+ * Severities of a finding, `FindingSeverity` on the server side, the most severe first.
+ */
+enum class FindingSeverity {
+    CRITICAL,
+    HIGH,
+    MEDIUM,
+    LOW,
+    UNKNOWN,
+}
+
+/**
+ * One finding as a scan reports it.
+ *
+ * @property externalId Identifier given by the scanner: a CVE, a rule ID. What the search finds.
+ * @property location Where the finding is: a purl for a dependency, a path for code. Never a
+ * version - the one reported goes in [installedVersion].
+ * @property acceptance Decision that the finding is tolerated, as the scanner-side file records it
+ */
+data class FindingSpec(
+    val externalId: String,
+    val location: String,
+    val severity: FindingSeverity,
+    val title: String,
+    val url: String? = null,
+    val installedVersion: String? = null,
+    val fixedVersion: String? = null,
+    val acceptance: AcceptanceSpec? = null,
+)
+
+/**
+ * An acceptance of a finding, recorded outside Yontrack and read by it.
+ *
+ * @property source Where the decision is recorded
+ * @property expiresInDays Days from the reset the acceptance holds for, or `null` for one without
+ * expiry. Relative to the run, like a build's creation time, so that the demo never shows an
+ * acceptance which lapsed only because the dataset got old - and an acceptance cannot be told to
+ * have lapsed from the dataset alone.
+ */
+data class AcceptanceSpec(
+    val statement: String,
+    val source: String,
+    val expiresInDays: Long? = null,
 )
 
 /**

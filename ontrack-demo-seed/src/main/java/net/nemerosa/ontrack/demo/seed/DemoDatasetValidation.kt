@@ -88,6 +88,16 @@ fun DemoDataset.validate() {
             val validationStamps = branch.validationStamps.map { it.name }.toSet()
             branch.promotionLevels.forEach { checkName(it.name, "Promotion level") }
             branch.validationStamps.forEach { checkName(it.name, "Validation stamp") }
+            val findingsStamps = branch.validationStamps.filter { it.findings != null }.map { it.name }.toSet()
+            branch.validationStamps.forEach { stamp ->
+                val thresholds = stamp.findings ?: return@forEach
+                // UNKNOWN is counted and shown, but never trips a threshold: one set at UNKNOWN
+                // would read as a rule and never fire
+                if (FindingSeverity.UNKNOWN in listOf(thresholds.warningLevel, thresholds.failedLevel)) {
+                    problems += "Validation stamp ${stamp.name} of ${project.name}/${branch.name} has " +
+                            "a threshold at UNKNOWN, which never trips."
+                }
+            }
             // The two promotion properties name other entities of the same branch, and a name
             // matching nothing there is a typo rather than a demonstration. The product accepts
             // such a name - it is exactly what the delivery map draws as an unresolved checkpoint,
@@ -196,6 +206,32 @@ fun DemoDataset.validate() {
                         problems += "Build ${build.name} of ${project.name}/${branch.name} " +
                                 "is validated against ${validation.validationStamp}, " +
                                 "which the branch does not declare."
+                    } else if (validation.validationStamp in findingsStamps) {
+                        // The server computes the status of a findings run from its report, and
+                        // refuses one given a status and no report
+                        problems += "Build ${build.name} of ${project.name}/${branch.name} " +
+                                "is validated against ${validation.validationStamp} with a status, " +
+                                "but it is a security-findings stamp: declare a scan instead."
+                    }
+                }
+                build.scans.forEach { scan ->
+                    val where = "The ${scan.validationStamp} scan of build ${build.name} of " +
+                            "${project.name}/${branch.name}"
+                    if (scan.validationStamp !in validationStamps) {
+                        problems += "$where names a validation stamp the branch does not declare."
+                    } else if (scan.validationStamp !in findingsStamps) {
+                        problems += "$where is posted on a stamp which is not a security-findings one."
+                    }
+                    scan.findings.forEach { finding ->
+                        if (finding.externalId.isBlank() || finding.title.isBlank()) {
+                            problems += "$where reports a finding without an external ID or a title."
+                        }
+                        // SARIF has no field for an expiry: the report would silently tell the
+                        // server the acceptance never lapses
+                        if (scan.format == ScanFormat.SARIF && finding.acceptance?.expiresInDays != null) {
+                            problems += "$where is in SARIF, which has no field for the expiry of the " +
+                                    "acceptance of ${finding.externalId}."
+                        }
                     }
                 }
             }

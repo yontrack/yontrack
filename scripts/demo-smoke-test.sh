@@ -33,7 +33,7 @@ trap 'rm -rf "$STUB_ROOT"' EXIT
 mkdir -p "$STUB_ROOT/bin"
 
 # Answers per GraphQL operation, read out of the request body: `info` for the version poll,
-# `projects` for the dataset assertion. Emits the body followed by the status code, which is
+# `findingsSummary` for the findings assertion, `projects` for the dataset assertion. Emits the body followed by the status code, which is
 # the shape `-w '\n%{http_code}'` produces.
 cat > "$STUB_ROOT/bin/curl" <<'STUB'
 #!/usr/bin/env bash
@@ -65,6 +65,7 @@ case "$body" in
     *reloadCasc*) file=reload-casc.json ;;
     *accountGroups*) file=account-groups.json ;;
     *info*) file=info.json ;;
+    *findingsSummary*) file=findings.json ;;
     *projects*) file=projects.json ;;
     *) file=unexpected.json ;;
 esac
@@ -121,6 +122,10 @@ JSON
 
     cat > "$DSM_STUB_DIR/projects.json" <<'JSON'
 {"data":{"projects":[{"name":"petclinic","branches":[{"name":"main","builds":[{"name":"106"}]}]}]}}
+JSON
+
+    cat > "$DSM_STUB_DIR/findings.json" <<'JSON'
+{"data":{"projects":[{"name":"petclinic-billing","findingsSummary":{"openCount":3,"acceptedCount":2}}],"search":{"pageItems":[{"title":"CVE-2024-38816","data":{"project":{"name":"petclinic-billing"},"branches":[{"name":"release-2.3","state":"EXPOSED"}]}}]}}}
 JSON
 
     cat > "$DSM_STUB_DIR/build.json" <<'JSON'
@@ -251,6 +256,66 @@ out="$(dsm_assert_seeded_project 2>&1)"
 assert_contains "$(calls)" "another-project" "dsm_assert_seeded_project asks for the configured project"
 # shellcheck disable=SC2034
 DSM_SEEDED_PROJECT="petclinic"
+
+# --- dsm_assert_findings -----------------------------------------------------
+
+setup_stub
+out="$(dsm_assert_findings 2>&1)"; rc=$?
+assert_eq "0" "$rc" "dsm_assert_findings passes on a seeded demo"
+assert_contains "$out" "3 open, 2 accepted" "dsm_assert_findings says what the Security section shows"
+assert_contains "$out" "exposed on release-2.3" "dsm_assert_findings names where the CVE is exposed"
+assert_contains "$(calls)" "CVE-2024-38816" "dsm_assert_findings searches the demo's CVE"
+
+setup_stub
+echo '{"data":{"projects":[],"search":{"pageItems":[]}}}' > "$DSM_STUB_DIR/findings.json"
+out="$(dsm_assert_findings 2>&1)"; rc=$?
+assert_eq "1" "$rc" "dsm_assert_findings fails when the project is missing"
+assert_contains "$out" "petclinic-billing" "dsm_assert_findings names the project it looked for"
+
+setup_stub
+echo '{"data":{"projects":[{"name":"petclinic-billing","findingsSummary":null}],"search":{"pageItems":[]}}}' \
+    > "$DSM_STUB_DIR/findings.json"
+out="$(dsm_assert_findings 2>&1)"; rc=$?
+assert_eq "1" "$rc" "dsm_assert_findings fails when the findings cannot be read"
+assert_contains "$out" "cannot be read" "dsm_assert_findings says the findings are not readable"
+
+# Scans posted, findings lost: the Security section would be empty
+setup_stub
+echo '{"data":{"projects":[{"name":"petclinic-billing","findingsSummary":{"openCount":0,"acceptedCount":0}}],"search":{"pageItems":[]}}}' \
+    > "$DSM_STUB_DIR/findings.json"
+out="$(dsm_assert_findings 2>&1)"; rc=$?
+assert_eq "1" "$rc" "dsm_assert_findings fails when the project has no finding"
+
+setup_stub
+echo '{"data":{"projects":[{"name":"petclinic-billing","findingsSummary":{"openCount":3,"acceptedCount":2}}],"search":{"pageItems":[]}}}' \
+    > "$DSM_STUB_DIR/findings.json"
+out="$(dsm_assert_findings 2>&1)"; rc=$?
+assert_eq "1" "$rc" "dsm_assert_findings fails when the search does not find the CVE"
+assert_contains "$out" "does not find it" "dsm_assert_findings says the search came back empty"
+
+# The same CVE on another project is not the demo's
+setup_stub
+echo '{"data":{"projects":[{"name":"petclinic-billing","findingsSummary":{"openCount":3,"acceptedCount":2}}],"search":{"pageItems":[{"title":"CVE-2024-38816","data":{"project":{"name":"elsewhere"},"branches":[{"name":"main"}]}}]}}}' \
+    > "$DSM_STUB_DIR/findings.json"
+out="$(dsm_assert_findings 2>&1)"; rc=$?
+assert_eq "1" "$rc" "dsm_assert_findings ignores the CVE found on another project"
+
+setup_stub
+echo '{"data":{"projects":[{"name":"petclinic-billing","findingsSummary":{"openCount":3,"acceptedCount":2}}],"search":{"pageItems":[{"title":"CVE-2024-38816","data":{"project":{"name":"petclinic-billing"},"branches":[]}}]}}}' \
+    > "$DSM_STUB_DIR/findings.json"
+out="$(dsm_assert_findings 2>&1)"; rc=$?
+assert_eq "1" "$rc" "dsm_assert_findings fails when the CVE is exposed nowhere"
+
+setup_stub
+DSM_FINDINGS_PROJECT="another-project"
+DSM_FINDINGS_CVE="CVE-2000-0001"
+out="$(dsm_assert_findings 2>&1)"
+assert_contains "$(calls)" "another-project" "dsm_assert_findings asks for the configured project"
+assert_contains "$(calls)" "CVE-2000-0001" "dsm_assert_findings searches the configured CVE"
+# shellcheck disable=SC2034
+DSM_FINDINGS_PROJECT="petclinic-billing"
+# shellcheck disable=SC2034
+DSM_FINDINGS_CVE="CVE-2024-38816"
 
 # --- dsm_casc_reload ---------------------------------------------------------
 
@@ -440,6 +505,18 @@ assert_not_contains "$(calls)" "accountGroups" "casc: does not check the role wh
 setup_stub
 out="$(dsm_assert 2>&1)"; rc=$?
 assert_eq "0" "$rc" "assert: passes on a seeded demo"
+assert_contains "$(calls)" "findingsSummary" "assert: checks the security findings too"
+
+setup_stub
+echo '{"data":{"projects":[]}}' > "$DSM_STUB_DIR/projects.json"
+out="$(dsm_assert 2>&1)"; rc=$?
+assert_eq "1" "$rc" "assert: fails when the seeded project is missing"
+assert_not_contains "$(calls)" "findingsSummary" "assert: does not look for findings on a demo which was not seeded"
+
+setup_stub
+echo '{"data":{"projects":[],"search":{"pageItems":[]}}}' > "$DSM_STUB_DIR/findings.json"
+out="$(dsm_assert 2>&1)"; rc=$?
+assert_eq "1" "$rc" "assert: fails when the security findings are missing"
 
 setup_stub
 out="$(dsm_main 2>&1)"; rc=$?

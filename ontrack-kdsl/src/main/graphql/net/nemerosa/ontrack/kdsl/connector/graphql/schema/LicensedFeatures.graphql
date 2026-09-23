@@ -1,0 +1,10 @@
+query LicensedFeatures {
+    licenseInfo {
+        license {
+            licensedFeatures {
+                id
+                enabled
+            }
+        }
+    }
+}

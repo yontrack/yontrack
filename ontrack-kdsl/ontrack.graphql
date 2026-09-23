@@ -2272,6 +2272,40 @@ type FindingPaginated {
   pageItems: [Finding!]!
 }
 
+"Number of security findings having a given maximum severity"
+type FindingSeverityCount {
+  "Number of findings"
+  count: Int!
+  "Severity"
+  severity: FindingSeverity!
+}
+
+"Exposure of the security findings of a project on one branch"
+type FindingsBranchSummary {
+  "Branch"
+  branch: Branch!
+  "Findings open on this branch ? exposed there for one of its validation stamps at least ? by maximum severity, every severity present, the most severe first"
+  open: [FindingSeverityCount!]!
+  "Number of findings open on this branch"
+  openCount: Int!
+}
+
+"Summary of the security findings of a project: its open findings by severity, and their exposure per branch. Every count is by maximum severity, as the filter of the findings is."
+type FindingsSummary {
+  "Number of accepted findings of the project"
+  acceptedCount: Int!
+  "Branches a finding has been exposed on, resolved or not, the most exposed first: by number of open critical findings, then of high ones, and so on, then by name"
+  branches: [FindingsBranchSummary!]!
+  "Open findings of the project by maximum severity, every severity present, the most severe first"
+  open: [FindingSeverityCount!]!
+  "Number of open findings of the project"
+  openCount: Int!
+  "Number of resolved findings of the project"
+  resolvedCount: Int!
+  "Names of the scanners which reported the findings of the project, sorted"
+  scanners: [String!]!
+}
+
 "Output type for the finishSlotPipelineDeployment mutation."
 type FinishSlotPipelineDeploymentPayload implements Payload {
   "List of errors"
@@ -5254,6 +5288,8 @@ type Project implements Authorizable & ProjectEntity {
     "Size of the page"
     size: Int = 20
   ): FindingPaginated
+  "Summary of the security findings of the project: its open findings by severity, and their exposure per branch. Null for a user who is not granted the view of the findings of the project."
+  findingsSummary: FindingsSummary
   "Associates the project with a GitHub repository"
   gitHubProjectConfigurationProperty: Property
   "Associates the project with a GitLab repository"
@@ -12931,6 +12967,8 @@ input ValidateBuildWithFindingsInput {
   branch: String!
   "Name of the build"
   build: String!
+  "Time of the scan, the moment of the call when not given. Dates the run, and with it the observations, the exposure and the resolution of the findings."
+  dateTime: LocalDateTime
   "Description of the validation run"
   description: String
   "Format of the report. `findings` is the neutral format of Yontrack. `sarif` (SARIF 2.1) and `trivy` (Trivy JSON, vulnerabilities only) are native scanner formats, which need the licensed feature \"Native scanner formats\"."

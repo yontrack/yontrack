@@ -11,6 +11,7 @@ import net.nemerosa.ontrack.extension.findings.ingestion.FindingsIngestionServic
 import net.nemerosa.ontrack.extension.findings.model.FindingKind
 import net.nemerosa.ontrack.graphql.schema.*
 import net.nemerosa.ontrack.graphql.support.GQLScalarJSON
+import net.nemerosa.ontrack.graphql.support.GQLScalarLocalDateTime
 import net.nemerosa.ontrack.graphql.support.getMutationInputField
 import net.nemerosa.ontrack.graphql.support.getRequiredMutationInputField
 import net.nemerosa.ontrack.graphql.support.toTypeRef
@@ -20,6 +21,7 @@ import net.nemerosa.ontrack.model.structure.StructureService
 import net.nemerosa.ontrack.model.structure.ValidationRun
 import org.springframework.stereotype.Component
 import tools.jackson.databind.JsonNode
+import java.time.LocalDateTime
 import kotlin.jvm.optionals.getOrNull
 
 /**
@@ -69,6 +71,11 @@ class FindingsValidationRunMutationProvider(
                     "Name of the scanner. Takes precedence over the scanner given by the report, if any."
                 ),
                 GraphQLInputObjectField.newInputObjectField()
+                    .name("dateTime")
+                    .description("Time of the scan, the moment of the call when not given. Dates the run, and with it the observations, the exposure and the resolution of the findings.")
+                    .type(GQLScalarLocalDateTime.INSTANCE)
+                    .build(),
+                GraphQLInputObjectField.newInputObjectField()
                     .name("report")
                     .description("Report of the scan, as JSON")
                     .type(GraphQLNonNull(GQLScalarJSON.INSTANCE))
@@ -100,6 +107,7 @@ class FindingsValidationRunMutationProvider(
                         kind = getMutationInputField<Any>(env, "kind")?.let { FindingKind.valueOf(it.toString()) },
                         scanner = getMutationInputField(env, "scanner"),
                         report = getRequiredMutationInputField<JsonNode>(env, "report"),
+                        dateTime = getMutationInputField<LocalDateTime>(env, "dateTime"),
                     )
                 ).run
                 return mapOf("validationRun" to run)

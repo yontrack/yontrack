@@ -19,6 +19,7 @@ import net.nemerosa.ontrack.kdsl.spec.ValidationRun
 import net.nemerosa.ontrack.kdsl.spec.ValidationStamp
 import net.nemerosa.ontrack.kdsl.spec.toValidationRun
 import tools.jackson.databind.JsonNode
+import java.time.LocalDateTime
 
 /**
  * FQCN of the `security-findings` validation data type. The `security-findings` alias is for
@@ -89,6 +90,8 @@ fun Branch.createFindingsValidationStamp(
  * @param kind Kind of scan. Required for the native formats, which cannot tell it.
  * @param scanner Name of the scanner, taking precedence over the one given by the report
  * @param description Description of the validation run
+ * @param dateTime Time of the scan, the moment of the call when null. The observations, the exposure
+ * and the resolution of the findings follow it.
  * @return Created validation run
  */
 fun Build.validateWithFindings(
@@ -98,6 +101,7 @@ fun Build.validateWithFindings(
     kind: FindingKind? = null,
     scanner: String? = null,
     description: String? = null,
+    dateTime: LocalDateTime? = null,
 ): ValidationRun =
     graphqlConnector.mutate(
         ValidateWithFindingsMutation(
@@ -110,6 +114,7 @@ fun Build.validateWithFindings(
             kind = Optional.presentIfNotNull(kind),
             scanner = Optional.presentIfNotNull(scanner),
             report = report,
+            dateTime = Optional.presentIfNotNull(dateTime),
         )
     ) {
         it?.validateBuildWithFindings?.payloadUserErrors?.convert()

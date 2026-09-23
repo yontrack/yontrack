@@ -15,6 +15,7 @@ import net.nemerosa.ontrack.json.parseAsJson
 import net.nemerosa.ontrack.model.security.Roles
 import net.nemerosa.ontrack.model.structure.Branch
 import net.nemerosa.ontrack.model.structure.Build
+import net.nemerosa.ontrack.model.structure.ID
 import net.nemerosa.ontrack.model.structure.ValidationStamp
 import net.nemerosa.ontrack.model.structure.config
 import org.junit.jupiter.api.Test
@@ -22,6 +23,8 @@ import org.springframework.beans.factory.annotation.Autowired
 import tools.jackson.databind.JsonNode
 import tools.jackson.databind.node.NullNode
 import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -253,6 +256,41 @@ class FindingsValidationRunMutationIT : AbstractQLKTITSupport() {
     }
 
     @Test
+    fun `A scan can be dated, and its findings, observations and exposure follow the date of the run`() {
+        asAdmin {
+            project {
+                branch {
+                    val vs = findingsStamp()
+                    val time = LocalDateTime.of(2026, 3, 14, 9, 30)
+                    build {
+                        val run = assertNoUserError(
+                            validate(vs, report(entry("CVE-1", "pkg:maven/org.x/y@1.0", "HIGH")), dateTime = time),
+                            "validateBuildWithFindings"
+                        ).path("validationRun")
+                        assertEquals(time, structureService.getValidationRun(ID.of(run.path("id").asInt())).runTime)
+
+                        val finding = findingRepository.findFindingsByProject(project.id()).single()
+                        assertEquals(time, finding.firstSeen)
+                        assertEquals(time, finding.lastSeen)
+                        assertEquals(time, findingRepository.findObservationsByFinding(finding.id).single().time)
+                        assertEquals(time, findingRepository.findExposuresByFinding(finding.id).single().since)
+                    }
+                    // Resolved at the date of the scan no longer reporting it
+                    build {
+                        assertNoUserError(
+                            validate(vs, report(), dateTime = time.plusDays(2)),
+                            "validateBuildWithFindings"
+                        )
+                        val finding = findingRepository.findFindingsByProject(project.id()).single()
+                        assertEquals(time.plusDays(2), finding.resolvedAt)
+                        assertEquals(time.plusDays(2), findingRepository.findExposuresByFinding(finding.id).single().resolvedAt)
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
     fun `A scan without findings passes`() {
         asAdmin {
             project {
@@ -383,6 +421,7 @@ class FindingsValidationRunMutationIT : AbstractQLKTITSupport() {
         format: String = "findings",
         scanner: String? = null,
         kind: String? = null,
+        dateTime: LocalDateTime? = null,
         onError: ((query: String, variables: Map<String, Any?>) -> Unit)? = null,
     ): JsonNode {
         val query = """
@@ -395,6 +434,7 @@ class FindingsValidationRunMutationIT : AbstractQLKTITSupport() {
                     ${'$'}scanner: String,
                     ${'$'}kind: FindingKind,
                     ${'$'}report: JSON!,
+                    ${'$'}dateTime: LocalDateTime,
                 ) {
                     validateBuildWithFindings(input: {
                         project: ${'$'}project,
@@ -407,6 +447,7 @@ class FindingsValidationRunMutationIT : AbstractQLKTITSupport() {
                         scanner: ${'$'}scanner,
                         kind: ${'$'}kind,
                         report: ${'$'}report,
+                        dateTime: ${'$'}dateTime,
                     }) {
                         validationRun {
                             id
@@ -445,6 +486,7 @@ class FindingsValidationRunMutationIT : AbstractQLKTITSupport() {
                 "scanner" to scanner,
                 "kind" to kind,
                 "report" to report.parseAsJson(),
+                "dateTime" to dateTime?.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME),
             )
         return if (onError != null) {
             onError(query, variables)

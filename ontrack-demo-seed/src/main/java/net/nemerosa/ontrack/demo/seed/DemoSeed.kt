@@ -32,6 +32,15 @@ class DemoSeed(
         if (dataset.projects.any { it.scm != null }) {
             target.checkScmAvailable()
         }
+        // And for the same reason: a SARIF scan needs a licensed feature the instance may not have
+        if (dataset.projects.any { project ->
+                project.branches.any { branch ->
+                    branch.builds.any { build -> build.scans.any { it.format == ScanFormat.SARIF } }
+                }
+            }
+        ) {
+            target.checkNativeFindingsFormats()
+        }
         val now = LocalDateTime.now(clock)
         reset()
         create(dataset, now)
@@ -177,7 +186,7 @@ class DemoSeed(
         spec.scmBranch?.let { branch.configureScmBranch(it) }
         if (spec.favourite) branch.markAsFavourite()
         spec.promotionLevels.forEach { branch.createPromotionLevel(it.name, it.description, it.workflow) }
-        spec.validationStamps.forEach { branch.createValidationStamp(it.name, it.description) }
+        spec.validationStamps.forEach { branch.createValidationStamp(it.name, it.description, it.findings) }
         // A third pass, after both: auto promotion and promotion dependencies name other promotion
         // levels and validation stamps of the same branch, and the property is written with their
         // ids, so all of them have to exist first. Before the builds, so that a build promoted here
@@ -216,7 +225,8 @@ class DemoSeed(
             // validation is what grants the promotions naming it, so a run dated after them -
             // which is what every run was, being stamped at the moment of the reset (#1718) -
             // reads as the stamp having run hours after the promotion it granted.
-            val validationCount = buildSpec.validations.size
+            // A scan is a validation like any other, and takes its rung above the plain ones
+            val validationCount = buildSpec.validations.size + buildSpec.scans.size
             val promotionCount = buildSpec.promotionLevels.size
             val steps = validationCount + promotionCount
             val available = Duration.between(creation, now).coerceAtLeast(Duration.ZERO)
@@ -242,6 +252,13 @@ class DemoSeed(
                     validation.status,
                     validation.description,
                     creation.plus(step.multipliedBy(index + 1L)),
+                )
+            }
+            buildSpec.scans.forEachIndexed { index, scan ->
+                build.scan(
+                    scan = scan,
+                    report = FindingsReports.render(scan, now.toLocalDate()),
+                    at = creation.plus(step.multipliedBy(buildSpec.validations.size + index + 1L)),
                 )
             }
         }

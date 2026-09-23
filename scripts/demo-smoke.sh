@@ -26,9 +26,9 @@
 #            and recreates every project, and a project's permissions go with the project,
 #            so `scan-project` would otherwise have no project at all from the first reset
 #            onwards and the cross-project authorization scan would test nothing.
-#   assert   Checks that the seeded demo dataset is there. Deliberately thin - the heavy
-#            suites already ran for BRONZE, and a fat smoke suite becomes the flaky thing
-#            that blocks releases.
+#   assert   Checks that the seeded demo dataset is there, the security findings included.
+#            Deliberately thin - the heavy suites already ran for BRONZE, and a fat smoke
+#            suite becomes the flaky thing that blocks releases.
 #
 # Environment:
 #   DEMO_URL             demo instance (default: https://demo.dev.yontrack.com)
@@ -37,6 +37,9 @@
 #   DEMO_PROJECT         Yontrack project holding the build (default: yontrack)
 #   DEMO_BRANCH          Yontrack branch holding the build (default: main)
 #   DEMO_SEEDED_PROJECT  seeded project to assert (default: petclinic)
+#   DEMO_FINDINGS_PROJECT  seeded project holding the security findings
+#                        (default: petclinic-billing)
+#   DEMO_FINDINGS_CVE    CVE the search must find exposed on it (default: CVE-2024-38816)
 #   DEMO_CASC_GROUP      Yontrack group the CasC gives a project role to
 #                        (default: DAST Project)
 #   DEMO_CASC_ROLE       project role that group must hold (default: PARTICIPANT)
@@ -64,6 +67,8 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/yontrack-build.sh"
 DSM_URL="${DEMO_URL:-https://demo.dev.yontrack.com}"
 DSM_URL="${DSM_URL%/}"
 DSM_SEEDED_PROJECT="${DEMO_SEEDED_PROJECT:-petclinic}"
+DSM_FINDINGS_PROJECT="${DEMO_FINDINGS_PROJECT:-petclinic-billing}"
+DSM_FINDINGS_CVE="${DEMO_FINDINGS_CVE:-CVE-2024-38816}"
 DSM_CASC_GROUP="${DEMO_CASC_GROUP:-DAST Project}"
 DSM_CASC_ROLE="${DEMO_CASC_ROLE:-PARTICIPANT}"
 DSM_YONTRACK_PROJECT="${DEMO_PROJECT:-yontrack}"
@@ -176,6 +181,65 @@ dsm_assert_seeded_project() {
     [ -z "$build" ] && { dsm_fail "Branch $DSM_SEEDED_PROJECT/$branch has no build."; return 1; }
 
     dsm_log "The seeded project $DSM_SEEDED_PROJECT answers: $branch/$build."
+    return 0
+}
+
+# Checks that the seed left its security findings behind, readable the way the UI reads them.
+#
+# One query for what the project's Security section shows - open and accepted findings, and
+# the branches they are exposed on - and for what the search answers for the demo's CVE. A
+# summary that is null is a project whose findings the token may not see, which on the demo
+# means ProjectFindingsView was taken away from the role, and is a failure like any other.
+#
+# Both counts have to be non-zero: the demo shows an open HIGH and an accepted CRITICAL, and a
+# seed which posted its scans without their findings - a report the server read as empty -
+# would leave a Security section with nothing in it.
+dsm_assert_findings() {
+    local body summary open accepted item exposed
+    body="$(dsm_graphql "query {
+        projects(name: \"$DSM_FINDINGS_PROJECT\") {
+            name
+            findingsSummary {
+                openCount
+                acceptedCount
+            }
+        }
+        search(token: \"$DSM_FINDINGS_CVE\", type: \"finding\") {
+            pageItems { title data }
+        }
+    }")" || return 1
+
+    [ -z "$(echo "$body" | jq -r '.data.projects[0].name // empty')" ] && {
+        dsm_fail "The seeded project $DSM_FINDINGS_PROJECT, holding the security findings, is not on the demo."
+        return 1
+    }
+    summary="$(echo "$body" | jq -c '.data.projects[0].findingsSummary // empty')"
+    [ -z "$summary" ] && {
+        dsm_fail "The security findings of $DSM_FINDINGS_PROJECT cannot be read with this token."
+        return 1
+    }
+    open="$(echo "$summary" | jq -r '.openCount // 0')"
+    accepted="$(echo "$summary" | jq -r '.acceptedCount // 0')"
+    if [ "$open" -eq 0 ] || [ "$accepted" -eq 0 ]; then
+        dsm_fail "$DSM_FINDINGS_PROJECT shows $open open and $accepted accepted findings, expected some of each."
+        return 1
+    fi
+
+    # The search result of the CVE, on the seeded project - exposed on a branch at least, which
+    # is what the result lists and what the demo's CVE is about: fixed on main, open elsewhere
+    item="$(echo "$body" | jq -c --arg cve "$DSM_FINDINGS_CVE" --arg p "$DSM_FINDINGS_PROJECT" \
+        '.data.search.pageItems // [] | map(select(.title == $cve and .data.project.name == $p)) | .[0] // empty')"
+    [ -z "$item" ] && {
+        dsm_fail "Searching $DSM_FINDINGS_CVE does not find it on $DSM_FINDINGS_PROJECT."
+        return 1
+    }
+    exposed="$(echo "$item" | jq -r '.data.branches // [] | map(.name) | join(", ")')"
+    [ -z "$exposed" ] && {
+        dsm_fail "Searching $DSM_FINDINGS_CVE finds it on $DSM_FINDINGS_PROJECT, exposed on no branch."
+        return 1
+    }
+
+    dsm_log "The findings of $DSM_FINDINGS_PROJECT answer: $open open, $accepted accepted; $DSM_FINDINGS_CVE is exposed on $exposed."
     return 0
 }
 
@@ -308,7 +372,8 @@ dsm_casc() {
 dsm_assert() {
     dsm_require_token || return 1
     dsm_log "Asserting the seeded demo at $DSM_URL"
-    dsm_assert_seeded_project
+    dsm_assert_seeded_project || return 1
+    dsm_assert_findings
 }
 
 dsm_main() {

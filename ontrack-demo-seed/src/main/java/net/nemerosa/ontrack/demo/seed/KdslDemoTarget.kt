@@ -23,10 +23,15 @@ import net.nemerosa.ontrack.kdsl.spec.extension.environments.Slot
 import net.nemerosa.ontrack.kdsl.spec.extension.environments.environments
 import net.nemerosa.ontrack.kdsl.spec.extension.environments.workflows.addWorkflow
 import net.nemerosa.ontrack.kdsl.connector.graphql.schema.type.SlotPipelineStatus
+import net.nemerosa.ontrack.kdsl.connector.graphql.schema.type.FindingKind
+import net.nemerosa.ontrack.kdsl.spec.extension.findings.FindingsReportFormat
+import net.nemerosa.ontrack.kdsl.spec.extension.findings.createFindingsValidationStamp
+import net.nemerosa.ontrack.kdsl.spec.extension.findings.validateWithFindings
 import net.nemerosa.ontrack.kdsl.spec.extension.general.AutoPromotionProperty
 import net.nemerosa.ontrack.kdsl.spec.extension.general.autoPromotion
 import net.nemerosa.ontrack.kdsl.spec.extension.general.previousPromotionCondition
 import net.nemerosa.ontrack.kdsl.spec.extension.general.promotionDependencies
+import net.nemerosa.ontrack.kdsl.spec.extension.license.isLicensedFeatureEnabled
 import net.nemerosa.ontrack.kdsl.spec.extension.notifications.NotificationsMgt
 import net.nemerosa.ontrack.kdsl.spec.extension.scm.MockScmRepositoryContext
 import net.nemerosa.ontrack.kdsl.spec.extension.scm.mockScmBranchProperty
@@ -34,6 +39,7 @@ import net.nemerosa.ontrack.kdsl.spec.extension.scm.mockScmBuildCommitProperty
 import net.nemerosa.ontrack.kdsl.spec.extension.scm.mockScmProjectProperty
 import net.nemerosa.ontrack.kdsl.spec.setProperty
 import net.nemerosa.ontrack.yaml.Yaml
+import tools.jackson.databind.JsonNode
 import java.time.LocalDateTime
 
 /**
@@ -116,6 +122,26 @@ class KdslDemoTarget(private val ontrack: Ontrack) : DemoTarget {
         }
     }
 
+    /**
+     * Asks the licence rather than posting a probe: a SARIF scan needs a build to validate, and
+     * the only builds on the instance at this point are the ones the reset is about to delete.
+     */
+    override fun checkNativeFindingsFormats() {
+        val enabled = try {
+            ontrack.isLicensedFeatureEnabled(FEATURE_NATIVE_FORMATS)
+        } catch (ex: Exception) {
+            error(
+                "The dataset posts SARIF scans, and the licence of this instance could not be read " +
+                        "to check it allows them. Nothing was deleted.\n\nThe server said:\n${ex.message}"
+            )
+        }
+        check(enabled) {
+            "The dataset posts SARIF scans, which need the licensed feature \"Native scanner formats\" " +
+                    "($FEATURE_NATIVE_FORMATS), and the licence of this instance does not enable it. " +
+                    "Nothing was deleted."
+        }
+    }
+
     override fun saveDashboard(dashboard: DemoDashboard) {
         ontrack.saveDashboard(
             uuid = dashboard.uuid,
@@ -153,6 +179,11 @@ class KdslDemoTarget(private val ontrack: Ontrack) : DemoTarget {
          * build runs the workflow.
          */
         const val NEW_PROMOTION_RUN_EVENT = "new_promotion_run"
+
+        /**
+         * The licensed feature the native formats of the security scans - SARIF, Trivy JSON - need.
+         */
+        const val FEATURE_NATIVE_FORMATS = "extension.findings.native-formats"
     }
 }
 
@@ -261,8 +292,19 @@ private class KdslDemoBranch(
         }
     }
 
-    override fun createValidationStamp(name: String, description: String) {
-        validationStamps[name] = branch.createValidationStamp(name, description)
+    override fun createValidationStamp(name: String, description: String, findings: FindingsThresholdsSpec?) {
+        validationStamps[name] = if (findings != null) {
+            branch.createFindingsValidationStamp(
+                name = name,
+                description = description,
+                warningLevel = findings.warningLevel.name,
+                warningValue = findings.warningValue,
+                failedLevel = findings.failedLevel.name,
+                failedValue = findings.failedValue,
+            )
+        } else {
+            branch.createValidationStamp(name, description)
+        }
     }
 
     override fun setAutoPromotion(promotionLevel: String, spec: AutoPromotionSpec) {
@@ -306,6 +348,18 @@ private class KdslDemoBuild(val build: Build) : DemoBuild {
 
     override fun validate(validationStamp: String, status: ValidationStatus, description: String, at: LocalDateTime) {
         build.validate(validationStamp, status.name, description, at)
+    }
+
+    override fun scan(scan: ScanSpec, report: JsonNode, at: LocalDateTime) {
+        build.validateWithFindings(
+            validation = scan.validationStamp,
+            format = FindingsReportFormat.valueOf(scan.format.name),
+            report = report,
+            kind = FindingKind.safeValueOf(scan.kind.name),
+            scanner = scan.scanner,
+            description = scan.description.ifBlank { null },
+            dateTime = at,
+        )
     }
 
     override fun linkTo(build: DemoBuild) {

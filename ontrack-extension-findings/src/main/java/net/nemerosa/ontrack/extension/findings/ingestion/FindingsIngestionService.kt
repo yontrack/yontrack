@@ -10,6 +10,7 @@ import net.nemerosa.ontrack.model.structure.RunInfoInput
 import net.nemerosa.ontrack.model.structure.ValidationRun
 import net.nemerosa.ontrack.model.structure.ValidationStamp
 import tools.jackson.databind.JsonNode
+import java.time.LocalDateTime
 
 /**
  * Posting the report of a security scan as a validation run of a build.
@@ -50,6 +51,9 @@ interface FindingsIngestionService {
  * @property kind Kind of scan, taking precedence over the report's
  * @property scanner Name of the scanner, taking precedence over the report's
  * @property report Report
+ * @property dateTime Time of the scan, the moment of the ingestion when `null`. It dates the run,
+ * and the observations, the exposure and the resolution of the findings follow the time of the run —
+ * which is what lets a replayed or seeded history read as the history it stands for.
  */
 data class FindingsIngestionRequest(
     val validation: String,
@@ -59,6 +63,7 @@ data class FindingsIngestionRequest(
     val kind: FindingKind? = null,
     val scanner: String? = null,
     val report: JsonNode,
+    val dateTime: LocalDateTime? = null,
 )
 
 /**

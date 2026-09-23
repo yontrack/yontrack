@@ -36,8 +36,8 @@ own, and this workflow is what provisions it on every deployment.
 | 2 | Poll until the instance reports that version | The whole deployment contract: the version asked for is the version answering |
 | 3 | Reset and seed | The instance's state is a function of the build - see [Demo seed and reset](demo-seed.md) |
 | 4 | Re-apply the CasC | The seed deleted the projects, and their permissions with them - see [Re-applying the CasC](#re-applying-the-casc) below |
-| 5 | Check the seeded dataset over GraphQL | The seed ran and left something behind |
-| 6 | Check the UI signs in and renders | Keycloak's realm, and the UI pod reaching the backend pod |
+| 5 | Check the seeded dataset over GraphQL | The seed ran and left something behind, security findings included |
+| 6 | Check the UI signs in and renders, and shows the security findings | Keycloak's realm, the UI pod reaching the backend pod, and the four views of the findings |
 | 7 | Report `DEMO.SMOKE` | Whatever happened, including "the demo never came up" |
 
 Step 2 is the valuable one. Everything that can go wrong between the merged PR and a serving
@@ -121,6 +121,23 @@ rather than the code, and a fat smoke suite becomes the flaky thing that blocks 
 is left is what only a real deployment can break, and the Playwright leg runs with `retries: 0`
 for the same reason: a demo that only works on the second try is a demo that is broken.
 
+## The security findings
+
+The seed gives `petclinic-billing` its security findings (see
+[Demo seed and reset](demo-seed.md#security-findings-are-scans-not-statuses)), and both legs
+check them, each the way it reads the demo:
+
+- `scripts/demo-smoke.sh assert` reads, in one query, the project's findings summary - some open,
+  some accepted, as the Security section shows them - and the search result of
+  `CVE-2024-38816`, which must be on `petclinic-billing` and exposed on a branch.
+  `DEMO_FINDINGS_PROJECT` and `DEMO_FINDINGS_CVE` override the two.
+- The browser leg's second test walks what a visitor would: the Security section of the project
+  page, its *All findings* link to the findings page, the CVE's link to the finding page - exposed
+  on `release-2.3`, resolved on `main` - and the search of the CVE, back to the finding page.
+
+A seed which posted its scans but lost their findings would pass the first check and leave an
+empty Security section, so the counts are asserted non-zero rather than merely present.
+
 ## Everything goes through `/graphql`
 
 The chart's ingress routes only `/graphql` and `/hook` to the backend; `/` goes to the Next UI.
@@ -192,7 +209,7 @@ See [the channel's documentation](../../ontrack-docs/docs/content/integrations/n
 | `scripts/demo-smoke.sh` | Build resolution, the poll, the CasC reload, the GraphQL assertion |
 | `scripts/demo-smoke-test.sh` | Its tests, against a stubbed `curl` and a stubbed CLI |
 | `scripts/yontrack-build.sh` | Build lookup by version, shared with `scripts/demo-deploy.sh` |
-| `ontrack-web-tests/demo/demo.spec.js` | The browser leg |
+| `ontrack-web-tests/demo/demo.spec.js` | The browser leg: the sign-in, and the security findings |
 | `ontrack-web-tests/playwright.demo.config.js` | Its configuration - a separate `testDir`, so the regular `PLAYWRIGHT` suite does not pick the spec up |
 
 `scripts/demo-smoke-test.sh` is run by hand, like `scripts/demo-deploy-test.sh`:

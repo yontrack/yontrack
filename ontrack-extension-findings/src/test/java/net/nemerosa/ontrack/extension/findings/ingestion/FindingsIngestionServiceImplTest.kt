@@ -46,6 +46,7 @@ class FindingsIngestionServiceImplTest {
         findingsLicense = findingsLicense,
         findingSearchIndexer = findingSearchIndexer,
         meterRegistry = meterRegistry,
+        securityService = mockk(),
     )
 
     @Test

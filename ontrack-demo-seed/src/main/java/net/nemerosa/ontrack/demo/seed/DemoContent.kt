@@ -23,6 +23,21 @@ object DemoContent {
     const val UI = "petclinic-ui"
     const val CHANGELOG = "yontrack"
 
+    /**
+     * The project of the security findings. A project of its own rather than stamps added to
+     * [SERVICE]: the story of a finding needs every build of two branches scanned, and
+     * [SERVICE]'s builds already carry curated readings - the failed build, the auto promotions,
+     * the deployments - which a new stamp on each of them would have to be checked against.
+     */
+    const val SECURITY = "petclinic-billing"
+
+    /**
+     * The release branch of [SECURITY], where the HIGH fixed on [MAIN] is still exposed. Named as
+     * a release branch - the project has no SCM, so no branch model, and every branch counts for
+     * the state of its findings, which is what keeps that HIGH open for the project.
+     */
+    const val SECURITY_RELEASE = "release-2.3"
+
     const val MAIN = "main"
     /**
      * A slash would be rejected: Yontrack entity names allow letters, digits, dots, dashes
@@ -39,6 +54,21 @@ object DemoContent {
     const val UNIT_TESTS = "UNIT.TESTS"
     const val INTEGRATION_TESTS = "INTEGRATION.TESTS"
     const val SECURITY_SCAN = "SECURITY.SCAN"
+
+    /** The `security-findings` stamp of [SECURITY] scanning its dependencies, in the neutral format. */
+    const val SECURITY_DEPENDENCIES = "SECURITY.DEPENDENCIES"
+
+    /** The `security-findings` stamp of [SECURITY] scanning its code, in SARIF. */
+    const val SECURITY_CODE = "SECURITY.CODE"
+
+    /**
+     * The HIGH of the demo: reported by a few builds of [MAIN] then fixed there, and still exposed
+     * on [SECURITY_RELEASE]. The CVE the search finds.
+     */
+    const val CVE_FIXED_ON_MAIN = "CVE-2024-38816"
+
+    /** The CRITICAL of the demo, tolerated under an acceptance which has not expired. */
+    const val CVE_ACCEPTED = "CVE-2022-1471"
 
     /**
      * What [silverAuto] selects its validation stamps by. A constant because the demo is read
@@ -103,6 +133,7 @@ object DemoContent {
             library(),
             service(),
             ui(),
+            security(),
             changelogProject(changelog),
         ),
         environments = environments(),
@@ -671,6 +702,187 @@ object DemoContent {
                             ValidationSpec(UNIT_TESTS, PASSED),
                         ),
                         links = listOf(BuildRef(SERVICE, MAIN, "105")),
+                    ),
+                ),
+            ),
+        ),
+    )
+
+    /**
+     * The two security stamps of [SECURITY], on both of its branches. The thresholds are the
+     * default ones - a warning for a HIGH, a failure for a CRITICAL - so a build reads WARNING
+     * while the HIGH is open, and the accepted CRITICAL, which never counts, fails nothing.
+     */
+    private val securityStamps = listOf(
+        buildStamp,
+        ValidationStampSpec(
+            SECURITY_DEPENDENCIES,
+            "Vulnerabilities of the dependencies, from Trivy.",
+            findings = FindingsThresholdsSpec(),
+        ),
+        ValidationStampSpec(
+            SECURITY_CODE,
+            "Code scanning, from CodeQL.",
+            findings = FindingsThresholdsSpec(),
+        ),
+    )
+
+    private val springWebMvcPath = FindingSpec(
+        externalId = CVE_FIXED_ON_MAIN,
+        location = "pkg:maven/org.springframework/spring-webmvc",
+        severity = FindingSeverity.HIGH,
+        title = "Path traversal vulnerability in functional web frameworks",
+        url = "https://nvd.nist.gov/vuln/detail/$CVE_FIXED_ON_MAIN",
+        installedVersion = "6.1.12",
+        fixedVersion = "6.1.13",
+    )
+
+    /**
+     * Accepted for 90 days from the reset, whenever the reset runs: the demo shows an acceptance
+     * with an expiry which is always ahead of it, rather than one which lapsed because the
+     * dataset got old.
+     */
+    private val snakeYamlConstructor = FindingSpec(
+        externalId = CVE_ACCEPTED,
+        location = "pkg:maven/org.yaml/snakeyaml",
+        severity = FindingSeverity.CRITICAL,
+        title = "SnakeYaml Constructor deserialization remote code execution",
+        url = "https://nvd.nist.gov/vuln/detail/$CVE_ACCEPTED",
+        installedVersion = "1.33",
+        fixedVersion = "2.0",
+        acceptance = AcceptanceSpec(
+            statement = "SnakeYAML only ever parses the configuration files shipped with the " +
+                    "service, never input from a request. Removed with the move to Spring Boot 3.4.",
+            source = ".trivyignore.yaml",
+            expiresInDays = 90,
+        ),
+    )
+
+    private val commonsIoXmlStreamReader = FindingSpec(
+        externalId = "CVE-2024-47554",
+        location = "pkg:maven/commons-io/commons-io",
+        severity = FindingSeverity.MEDIUM,
+        title = "Possible denial of service attack on untrusted input to XmlStreamReader",
+        url = "https://nvd.nist.gov/vuln/detail/CVE-2024-47554",
+        installedVersion = "2.11.0",
+        fixedVersion = "2.14.0",
+    )
+
+    private val insecureCookie = FindingSpec(
+        externalId = "java/insecure-cookie",
+        location = "src/main/java/org/springframework/samples/petclinic/billing/web/InvoiceController.java",
+        severity = FindingSeverity.MEDIUM,
+        title = "Failure to use secure cookies",
+        url = "https://codeql.github.com/codeql-query-help/java/java-insecure-cookie/",
+    )
+
+    /**
+     * Accepted through a SARIF suppression, which has no expiry: the other kind of acceptance.
+     */
+    private val csrfDisabled = FindingSpec(
+        externalId = "java/spring-disabled-csrf-protection",
+        location = "src/main/java/org/springframework/samples/petclinic/billing/config/SecurityConfig.java",
+        severity = FindingSeverity.HIGH,
+        title = "Disabled Spring CSRF protection",
+        url = "https://codeql.github.com/codeql-query-help/java/java-spring-disabled-csrf-protection/",
+        acceptance = AcceptanceSpec(
+            statement = "The billing API is stateless and only accepts bearer tokens: there is no " +
+                    "session for a forged request to ride on.",
+            source = ".github/codeql/suppressions.sarif",
+        ),
+    )
+
+    /**
+     * The two scans of every build of [SECURITY]: its dependencies in the neutral format, whose
+     * acceptances can carry an expiry, and its code in SARIF - the native format the demo shows,
+     * with the dev licence.
+     *
+     * @param highFixed Whether the build carries the fix of [CVE_FIXED_ON_MAIN]
+     */
+    private fun securityScans(highFixed: Boolean) = listOf(
+        ScanSpec(
+            validationStamp = SECURITY_DEPENDENCIES,
+            format = ScanFormat.FINDINGS,
+            kind = ScanKind.DEPENDENCIES,
+            scanner = "trivy",
+            findings = listOfNotNull(
+                snakeYamlConstructor,
+                springWebMvcPath.takeUnless { highFixed },
+                commonsIoXmlStreamReader,
+            ),
+        ),
+        ScanSpec(
+            validationStamp = SECURITY_CODE,
+            format = ScanFormat.SARIF,
+            kind = ScanKind.CODE,
+            scanner = "codeql",
+            findings = listOf(csrfDisabled, insecureCookie),
+        ),
+    )
+
+    private fun securityBuild(
+        name: String,
+        release: String,
+        description: String,
+        creation: BuildCreation,
+        highFixed: Boolean = false,
+    ) = BuildSpec(
+        name = name,
+        release = release,
+        description = description,
+        creation = creation,
+        promotionLevels = listOf(BRONZE),
+        validations = listOf(ValidationSpec(BUILD, PASSED)),
+        scans = securityScans(highFixed),
+    )
+
+    /**
+     * The security findings, on two branches (#1867).
+     *
+     * * [CVE_FIXED_ON_MAIN], a HIGH, is reported by the first three builds of [MAIN], fixed by the
+     *   fourth - which bumps spring-webmvc - and stays exposed on [SECURITY_RELEASE], which never
+     *   got the bump. It is resolved on [MAIN] and open for the project, and it is the CVE the
+     *   search finds.
+     * * [CVE_ACCEPTED], a CRITICAL, is reported everywhere under an acceptance which expires in
+     *   90 days: it counts as accepted, never as open, and fails no build.
+     * * The code scan is posted in SARIF, and carries a HIGH accepted by a suppression - an
+     *   acceptance without expiry, which is all SARIF can say.
+     *
+     * The release branch is declared - and so scanned - FIRST, because its builds are the oldest:
+     * a finding is first seen by the first scan reporting it, whatever the date of a later one,
+     * and the release branch is where [CVE_FIXED_ON_MAIN] was reported first.
+     */
+    private fun security() = ProjectSpec(
+        name = SECURITY,
+        description = "Billing service of the sample application - the demo's security findings.",
+        labels = listOf(LABEL_TEAM_APPS, LABEL_LANGUAGE_JAVA),
+        branches = listOf(
+            BranchSpec(
+                name = SECURITY_RELEASE,
+                description = "Maintenance of the 2.3 line, still on spring-webmvc 6.1.12.",
+                promotionLevels = listOf(bronze),
+                validationStamps = securityStamps,
+                builds = listOf(
+                    securityBuild("305", "2.3.4", "Invoice numbering fix.", DaysAgo(16)),
+                    securityBuild("309", "2.3.5", "Rounding of the VAT amounts.", DaysAgo(5)),
+                ),
+            ),
+            BranchSpec(
+                name = MAIN,
+                description = "Main development branch.",
+                promotionLevels = listOf(bronze),
+                validationStamps = securityStamps,
+                builds = listOf(
+                    securityBuild("310", "2.4.0", "Invoices as PDF.", DaysAgo(13)),
+                    securityBuild("311", "2.4.1", "Payment reminders.", DaysAgo(10)),
+                    securityBuild("312", "2.4.2", "Invoice search by owner.", DaysAgo(7)),
+                    securityBuild(
+                        "313", "2.4.3", "Bump of spring-webmvc to 6.1.13.", DaysAgo(4),
+                        highFixed = true,
+                    ),
+                    securityBuild(
+                        "314", "2.4.4", "Credit notes.", DaysAgo(1),
+                        highFixed = true,
                     ),
                 ),
             ),

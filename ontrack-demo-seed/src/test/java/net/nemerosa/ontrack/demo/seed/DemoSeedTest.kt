@@ -118,6 +118,7 @@ class DemoSeedTest {
                 DemoContent.LIBRARY,
                 DemoContent.SERVICE,
                 DemoContent.UI,
+                DemoContent.SECURITY,
                 DemoContent.CHANGELOG,
             ),
             target.projects().map { it.name },
@@ -224,6 +225,18 @@ class DemoSeedTest {
                     // same window as they are and, on top of that, before the first of them: a
                     // stamp reading as having run after the promotion it granted is what #1718 is.
                     val firstPromotion = build.promotions.minOfOrNull { it.second }
+                    // A scan is a validation, and is bound the same way
+                    build.scans.forEach { scan ->
+                        val stamp = scan.spec.validationStamp
+                        assertTrue(!scan.at.isAfter(now), "Scan $stamp of build ${build.name} is dated in the future")
+                        assertTrue(!scan.at.isBefore(build.creation), "Scan $stamp of build ${build.name} is dated before the build")
+                        if (firstPromotion != null) {
+                            assertTrue(
+                                !scan.at.isAfter(firstPromotion),
+                                "Scan $stamp of build ${build.name} is dated after the first promotion of the build",
+                            )
+                        }
+                    }
                     build.validations.forEach { validation ->
                         assertTrue(
                             !validation.at.isAfter(now),

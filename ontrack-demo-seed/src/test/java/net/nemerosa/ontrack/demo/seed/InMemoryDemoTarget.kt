@@ -1,5 +1,6 @@
 package net.nemerosa.ontrack.demo.seed
 
+import tools.jackson.databind.JsonNode
 import java.security.MessageDigest
 import java.time.LocalDateTime
 
@@ -19,6 +20,11 @@ class InMemoryDemoTarget(
      * check from the dataset alone: an instance that never enabled it.
      */
     private val scmEnabled: Boolean = true,
+    /**
+     * Whether the licence of the instance enables the native formats of the security scans.
+     * `false` models an instance whose licence does not.
+     */
+    private val nativeFindingsFormats: Boolean = true,
 ) : DemoTarget {
 
     private val projects = mutableListOf<InMemoryProject>()
@@ -82,6 +88,10 @@ class InMemoryDemoTarget(
         check(scmEnabled) { "The mock SCM is not enabled on this instance. Nothing was deleted." }
     }
 
+    override fun checkNativeFindingsFormats() {
+        check(nativeFindingsFormats) { "The native scanner formats are not licensed on this instance. Nothing was deleted." }
+    }
+
     override fun dashboards(): List<DemoDashboardHandle> = dashboards.toList()
 
     override fun saveDashboard(dashboard: DemoDashboard) {
@@ -122,13 +132,20 @@ class InMemoryDemoTarget(
                     branch.promotionDependencies[promotionLevel]?.let { add("      depends on $it") }
                     if (promotionLevel in branch.previousPromotionRequired) add("      requires the previous promotion")
                 }
-                branch.validationStamps.forEach { add("    validation stamp $it") }
+                branch.validationStamps.forEach { stamp ->
+                    add("    validation stamp $stamp")
+                    branch.findingsStamps[stamp]?.let { add("      findings $it") }
+                }
                 branch.builds.forEach { build ->
                     add("    build ${build.name} \"${build.description}\" at ${build.creation}")
                     build.releaseVersion?.let { add("      release $it") }
                     build.commitId?.let { add("      built from $it") }
                     build.promotions.forEach { add("      promotion ${it.first} at ${it.second}") }
                     build.validations.forEach { add("      validation ${it.stamp} ${it.status} at ${it.at}") }
+                    build.scans.forEach { scan ->
+                        add("      scan ${scan.spec.validationStamp} ${scan.spec.format} ${scan.spec.kind} ${scan.spec.scanner} at ${scan.at}")
+                        add("        report ${scan.report}")
+                    }
                     build.links.forEach { add("      uses ${it.branch.project.name}/${it.name}") }
                 }
             }
@@ -249,6 +266,8 @@ class InMemoryDemoTarget(
 
         val promotionLevels = mutableListOf<String>()
         val validationStamps = mutableListOf<String>()
+        /** Thresholds of the `security-findings` stamps, by name. */
+        val findingsStamps = mutableMapOf<String, FindingsThresholdsSpec>()
         val builds = mutableListOf<InMemoryBuild>()
         var scmBranch: String? = null
         val autoPromotions = mutableMapOf<String, AutoPromotionSpec>()
@@ -286,10 +305,11 @@ class InMemoryDemoTarget(
             promotionLevels += name
         }
 
-        override fun createValidationStamp(name: String, description: String) {
+        override fun createValidationStamp(name: String, description: String, findings: FindingsThresholdsSpec?) {
             checkName(name, "Validation stamp")
             require(name !in validationStamps) { "Validation stamp $name already exists in ${project.name}/${this.name}" }
             validationStamps += name
+            findings?.let { findingsStamps[name] = it }
         }
 
         override fun setAutoPromotion(promotionLevel: String, spec: AutoPromotionSpec) {
@@ -355,6 +375,7 @@ class InMemoryDemoTarget(
         var commitId: String? = null
         val promotions = mutableListOf<Pair<String, LocalDateTime>>()
         val validations = mutableListOf<InMemoryValidation>()
+        val scans = mutableListOf<InMemoryScan>()
         val links = mutableListOf<InMemoryBuild>()
 
         override fun setRelease(release: String) {
@@ -401,7 +422,23 @@ class InMemoryDemoTarget(
             require(validationStamp in branch.validationStamps) {
                 "No validation stamp $validationStamp on ${branch.project.name}/${branch.name}"
             }
+            // `validateBuildWithFindings` is the only door of a findings stamp: a run with a status
+            // and no report is refused by its data type
+            require(validationStamp !in branch.findingsStamps) {
+                "$validationStamp on ${branch.project.name}/${branch.name} is a security-findings stamp, and takes a report"
+            }
             validations += InMemoryValidation(validationStamp, status, at)
+        }
+
+        override fun scan(scan: ScanSpec, report: JsonNode, at: LocalDateTime) {
+            require(scan.validationStamp in branch.findingsStamps) {
+                "No security-findings stamp ${scan.validationStamp} on ${branch.project.name}/${branch.name}"
+            }
+            // The licence is checked on every post, and nothing is created without it
+            check(scan.format != ScanFormat.SARIF || nativeFindingsFormats) {
+                "Findings report format `sarif` needs the licensed feature \"Native scanner formats\""
+            }
+            scans += InMemoryScan(scan, report, at)
         }
 
         override fun linkTo(build: DemoBuild) {
@@ -552,6 +589,16 @@ class InMemoryDemoTarget(
     data class InMemoryValidation(
         val stamp: String,
         val status: ValidationStatus,
+        val at: LocalDateTime,
+    )
+
+    /**
+     * One security scan posted on a build: what the dataset said, the report the seed rendered
+     * from it, and the time the seed dated it at.
+     */
+    data class InMemoryScan(
+        val spec: ScanSpec,
+        val report: JsonNode,
         val at: LocalDateTime,
     )
 

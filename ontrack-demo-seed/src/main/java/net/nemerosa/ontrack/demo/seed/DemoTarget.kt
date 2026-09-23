@@ -67,6 +67,17 @@ interface DemoTarget {
     fun checkScmAvailable()
 
     /**
+     * Checks the instance takes security scans in the native formats - SARIF - and fails if it
+     * does not.
+     *
+     * Called before the reset, for the same reason as [checkScmAvailable]: the native formats
+     * need the licensed feature "Native scanner formats", which the development licence enables
+     * and a production one may not, and finding that out on the first SARIF scan - after every
+     * project has been deleted - leaves the demo blank.
+     */
+    fun checkNativeFindingsFormats()
+
+    /**
      * Creates or replaces a dashboard. Yontrack rejects a second dashboard with the same
      * name unless the UUID matches, so the seed always names a fixed one.
      */
@@ -143,7 +154,10 @@ interface DemoBranch {
     fun registerCommit(message: String): String
 
     fun createPromotionLevel(name: String, description: String, workflow: WorkflowSpec? = null)
-    fun createValidationStamp(name: String, description: String)
+    /**
+     * @param findings Thresholds of a `security-findings` stamp, `null` for an ordinary one
+     */
+    fun createValidationStamp(name: String, description: String, findings: FindingsThresholdsSpec? = null)
 
     /**
      * Configures what grants [promotionLevel] by itself.
@@ -191,6 +205,16 @@ interface DemoBuild {
      * on a delivery map that puts the stamp *after* the promotion it granted (#1718).
      */
     fun validate(validationStamp: String, status: ValidationStatus, description: String, at: LocalDateTime)
+
+    /**
+     * Posts the report of a security scan on a `security-findings` stamp, dated at [at] for the
+     * same reason as [validate]: the observations, the exposure and the resolution of the findings
+     * all follow the time of the run, and a finding "first seen seconds ago" on a build of last
+     * week is the wrong history.
+     *
+     * @param report The report of the scan, in [ScanSpec.format]
+     */
+    fun scan(scan: ScanSpec, report: JsonNode, at: LocalDateTime)
 
     /**
      * Records that this build uses [build].

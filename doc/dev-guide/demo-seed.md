@@ -65,6 +65,16 @@ which for the demo means an environment variable in its Helm values:
 | **Simulated gate** node executor (`executorId: mock`), which the CANARY promotion workflow is built on | `ontrack.config.extension.workflows.mock.enabled` | `ONTRACK_CONFIG_EXTENSION_WORKFLOWS_MOCK_ENABLED` |
 | **Mock SCM**, which the change log on `petclinic` is read from | `ontrack.config.extension.scm.mock.enabled` | `ONTRACK_CONFIG_EXTENSION_SCM_MOCK_ENABLED` |
 
+A licensed feature is needed as well, for the same reason:
+
+| Feature | Licensed feature | Where it comes from |
+|---------|------------------|---------------------|
+| **Native scanner formats**, which the SARIF code scan of `petclinic-billing` is posted in | `extension.findings.native-formats` | The development licence enables it; a production licence has to include it |
+
+Unlike the two properties, a missing licence is caught before the reset: the seed reads the
+licence of the instance through `licenseInfo` and stops with "Nothing was deleted" when the
+feature is not enabled, as it does when the mock SCM is off.
+
 A third one is optional, and only on a long-lived instance:
 
 | Feature | Property | Helm value |
@@ -166,6 +176,37 @@ promotion to a level the branch does not declare, no link to a build that is nev
 no deployment a slot's admission rules would refuse — **before** the reset deletes anything,
 and reports every problem at once. Destructive by design must not mean blank on failure.
 
+### Security findings are scans, not statuses
+
+`petclinic-billing` carries the security findings (#1867): a HIGH reported by the first builds of
+`main`, fixed there by a dependency bump and still exposed on `release-2.3`; a CRITICAL under an
+acceptance which expires 90 days after the reset; and a code scan in SARIF with a HIGH accepted by a
+suppression. Its two stamps are `security-findings` ones, and a build does not say what status they
+reached: it declares **scans** (`BuildSpec.scans`), each a list of findings, and the server computes
+the status from them, as it does for any CI posting through `validateBuildWithFindings`.
+
+A scan declares its findings, not its report. `FindingsReports` renders the report in the format
+the scan names - the neutral format, or SARIF - so that one finding cannot drift apart between two
+hand-written reports. Two consequences are checked before the reset:
+
+- **SARIF cannot say when an acceptance expires**, so a SARIF scan declaring an expiry is refused
+  rather than sent as an acceptance that never lapses. The expiring CRITICAL is in the neutral
+  format for that reason.
+- **A findings stamp takes no status**: a `ValidationSpec` on one is refused.
+
+An acceptance's expiry is relative to the reset (`AcceptanceSpec.expiresInDays`), like a build's
+creation time, so the demo never shows an acceptance which lapsed only because the dataset got old.
+
+Scans are dated on the build's ladder like validations, above them and below the promotions, which
+is what `validateBuildWithFindings` takes a `dateTime` for: the observations, the exposure and the
+resolution of a finding all follow the time of the run, and a finding "first seen seconds ago" on a
+build of last week is the wrong history. For the same reason the release branch is declared - and
+so scanned - before `main`: its builds are the oldest, and a finding is first seen by the first
+scan *ingested*, whatever the dates of the later ones.
+
+The project has no SCM, so no branch model, and every branch counts for the state of a finding in
+the project. That is what keeps the HIGH open for the project while it is resolved on `main`.
+
 ### A build's history is a ladder, not an instant
 
 A build carries a creation time from the dataset; its validation runs and its promotion runs are
@@ -262,6 +303,7 @@ the server would refuse fails in the unit tests rather than half-way through a r
 | `GitChangelogSource`| Commits since the last release tag.                                    |
 | `DemoSeedConfig`    | Environment variables, and the URL guard.                              |
 | `DemoDatasetValidation` | Rejects a bad dataset before the reset deletes anything.           |
+| `FindingsReports`   | Renders the report of a security scan, in the neutral format or in SARIF. |
 
 The `DemoTarget` seam is what makes the acceptance criterion testable: the unit tests run
 the whole seed twice against an in-memory instance and compare the two states, with no

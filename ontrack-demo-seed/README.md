@@ -24,6 +24,12 @@ the seed — keep it in sync by hand whenever that file changes.
 | Self-hosted changelog                       | `yontrack` / `main`                                                   | One build per commit since the last release, always current, `BRONZE` only                 |
 | Change log between two builds               | `petclinic` / `main`, change log from build `104` to `107`            | Conventional-commit subjects, grouped issues, and the semantic view of the same change log |
 | Project labels                              | Any project page, the project lists, and _Configuration_ → _Labels_   | `team:` and `language:` chips on every project; filtering the project list on one or two of them |
+| Security section and findings page          | `petclinic-billing` project page, _Security_ → _All findings_          | Open findings by severity and per branch, accepted ones, filters on severity, state, branch, scanner and kind |
+| A finding fixed on one branch, open on another | `petclinic-billing`, finding `CVE-2024-38816` (HIGH)               | Resolved on `main` by build `313`, still exposed on `release-2.3`, and open for the project   |
+| Acceptance with an expiry                   | `petclinic-billing`, finding `CVE-2022-1471` (CRITICAL)                | Accepted until 90 days after the reset; counted as accepted, fails no build                    |
+| SARIF scan and a suppression                | `petclinic-billing`, `SECURITY.CODE` runs                              | CodeQL findings posted as SARIF; `java/spring-disabled-csrf-protection` accepted without expiry |
+| Searching a CVE                             | Search box → `CVE-2024-38816`                                          | The finding, its project, and the branch it is exposed on; leads to the finding page           |
+| Findings of a scan                          | Any `SECURITY.DEPENDENCIES` run of `petclinic-billing`                 | The findings that scan reported; WARNING while the HIGH is open, PASSED once it is fixed        |
 
 ## Projects
 
@@ -32,6 +38,7 @@ the seed — keep it in sync by hand whenever that file changes.
 | `common-library`   | `main`                       | `team:platform`, `language:java`         | Bottom of the dependency graph; `petclinic` links to its builds       |
 | `petclinic`        | `main`, `release-1.3`        | `team:apps`, `language:java`             | The main demo project — full pipeline, both promotion ladders, the only one with an SCM |
 | `petclinic-ui`     | `main`                       | `team:apps`, `language:javascript`       | Consumes `petclinic`, so the demo has a dependency graph to walk       |
+| `petclinic-billing` | `release-2.3`, `main`       | `team:apps`, `language:java`             | The security findings: two scans per build, one of them in SARIF       |
 | `yontrack`         | `main`                       | `team:platform`, `language:kotlin`       | Yontrack's own changelog, reseeded from git on every run              |
 
 ## Labels

@@ -12967,6 +12967,8 @@ input ValidateBuildWithFindingsInput {
   branch: String!
   "Name of the build"
   build: String!
+  "Time of the scan, the moment of the call when not given. Dates the run, and with it the observations, the exposure and the resolution of the findings."
+  dateTime: LocalDateTime
   "Description of the validation run"
   description: String
   "Format of the report. `findings` is the neutral format of Yontrack. `sarif` (SARIF 2.1) and `trivy` (Trivy JSON, vulnerabilities only) are native scanner formats, which need the licensed feature \"Native scanner formats\"."

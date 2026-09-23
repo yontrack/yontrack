@@ -20,6 +20,7 @@ import net.nemerosa.ontrack.extension.findings.search.FindingSearchIndexer
 import net.nemerosa.ontrack.extension.findings.state.FindingStateService
 import net.nemerosa.ontrack.extension.findings.validation.FindingsValidationDataType
 import net.nemerosa.ontrack.model.events.EventPostService
+import net.nemerosa.ontrack.model.security.SecurityService
 import net.nemerosa.ontrack.model.structure.*
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -37,6 +38,7 @@ class FindingsIngestionServiceImpl(
     private val findingsLicense: FindingsLicense,
     private val findingSearchIndexer: FindingSearchIndexer,
     private val meterRegistry: MeterRegistry,
+    private val securityService: SecurityService,
 ) : FindingsIngestionService {
 
     private val parsers: Map<String, FindingsReportParser> = parsers.associateBy { it.format }
@@ -65,6 +67,7 @@ class FindingsIngestionServiceImpl(
                 description = request.description,
                 dataTypeId = FindingsValidationDataType::class.java.name,
                 data = FindingsConsolidation.counts(findings),
+                signature = request.dateTime?.let { securityService.currentSignature.withTime(it) },
             )
         )
         if (request.runInfo != null) {
