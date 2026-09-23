@@ -11,6 +11,14 @@ questions. The issue breakdown comes in a following session and will be
 `2026-09-scorecard-issues.md`, under a new `initiative: scorecard` label. The `6.0` milestone
 already exists on GitHub (it holds one unrelated issue, #1734); `6.1` does not.
 
+> **Amended 2026-09-23.** Findings were split out into their own initiative (`initiative:
+> findings`) and their own module (`ontrack-extension-findings`), and specified in full by a
+> second session: [2026-09-findings/README.md](2026-09-findings/README.md). Where the *Findings*
+> section below and that document disagree, that document wins. It also corrected three facts
+> here: there are six security stamps, not five (`SECURITY.DAST.ACTIVE`); 6.0 is built on the
+> `v6` branch, not on `main`; and findings are a product feature for every project, not wiring
+> for Yontrack's own CI.
+
 ## Where we start from
 
 - **Two half-dead reporting modules.** `ontrack-extension-indicators` was born and died of not
@@ -54,8 +62,9 @@ already exists on GitHub (it holds one unrelated issue, #1734); `6.1` does not.
 - **6.x is the release where Yontrack reads its own history**: across projects, over time, and
   honest about where it cannot see. Not "the release where indicators were deleted".
 - **The removal opens 6.x and stands alone.** Deleting `ontrack-extension-indicators` is the first
-  6.x change and does not wait for its replacement; the moment `main` carries it, `main` is
-  `6.0`. Scope, in full: the module; the `indicator(s)` sub-packages of `scm`, `general`,
+  6.x change and does not wait for its replacement. (6.0 is built on the `v6` branch — see
+  `doc/dev-guide/major-branch.md` — so the removal no longer gates anything else, findings
+  included.) Scope, in full: the module; the `indicator(s)` sub-packages of `scm`, `general`,
   `github`, `jenkins` and `sonarqube`, including the Jenkins pipeline-library settings and their
   frontend form; the `ontrack_indicator` metric. A migration purges the rows under the indicator
   categories in `ENTITY_DATA_STORE` and `STORAGE`. **No replacement for the GitHub compliance
@@ -84,9 +93,15 @@ Three words, each to get a `CONTEXT.md` entry with its _Avoid_ list before imple
   _Avoid_: portfolio (the dead module's word), group (accounts), label (the project-labelling
   feature, which is the selection mechanism, not the thing selected).
 
-Module `ontrack-extension-scorecard`, feature name "Delivery scorecard".
+Module `ontrack-extension-scorecard`, feature name "Delivery scorecard". Findings live in their
+own module, `ontrack-extension-findings`, which the scorecard depends on.
 
 ### Findings
+
+> Superseded in detail by [2026-09-findings/README.md](2026-09-findings/README.md): the input
+> formats (neutral, SARIF, Trivy JSON), the licence line, versionless purls, stored exposure,
+> events per branch, the UI and the switch of Yontrack's own CI. The bullets below remain as the
+> model that session started from.
 
 - **A finding** is keyed by `(scanner, externalId, location)` and belongs to a **project**. The
   same CVE on `main` and `release/5.3` is one finding. `location` is an opaque string whose shape
@@ -109,7 +124,7 @@ Module `ontrack-extension-scorecard`, feature name "Delivery scorecard".
   carries the report: per report a `scanner` (free string: trivy, codeql, gitleaks, zap, nuclei)
   and a `kind` (fixed enum `IMAGE | CODE | SECRETS | DAST | DEPENDENCIES | OTHER`), and the
   finding list. Its config is CHML's warning/failed thresholds so `computeStatus` behaves
-  identically. It **replaces** CHML on the five security stamps; `.yontrack/ci.yaml` swaps the
+  identically. It **replaces** CHML on the six security stamps; `.yontrack/ci.yaml` swaps the
   type; the CLI gains `validate … findings --report <file>`; CHML stays for anyone else. One stamp
   may aggregate several scanners, as the DAST passive scan already does. This is the door block 2
   must generalise, not duplicate: the ledger imports a scan as a validation run with data.
@@ -199,6 +214,8 @@ Module `ontrack-extension-scorecard`, feature name "Delivery scorecard".
   authenticated user, with each project's readings filtered by the viewer's project-view right.
 - **Licensing.** Findings, the project scorecard and the delivery charts are core. Estates and
   the estate view are a new licensed feature, "Delivery scorecard", gated the way environments is.
+  Native scanner formats for findings (SARIF, Trivy JSON) are a separate licensed feature, see
+  [2026-09-findings/README.md](2026-09-findings/README.md).
 
 ### UI
 
