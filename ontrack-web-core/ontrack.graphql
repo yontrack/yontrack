@@ -557,6 +557,8 @@ type Build implements Authorizable & ProjectEntity {
   buildBitbucketPipelineRunProperty: Property
   "Link to the GitHub Workflow Run which created this build."
   buildGitHubWorkflowRunProperty: Property
+  "Link to the GitLab CI/CD pipeline which created this build."
+  buildGitLabPipelineRunProperty: Property
   creation: Signature
   "Gets the list of slots where this build is actually deployed"
   currentDeployments(
@@ -1345,6 +1347,22 @@ type DeleteBuildGitCommitPropertyPayload implements Payload {
   errors: [UserError]
 }
 
+"Output type for the deleteBuildGitLabPipelineRunPropertyById mutation."
+type DeleteBuildGitLabPipelineRunPropertyByIdPayload implements Payload {
+  "Build updated"
+  build: Build
+  "List of errors"
+  errors: [UserError]
+}
+
+"Output type for the deleteBuildGitLabPipelineRunProperty mutation."
+type DeleteBuildGitLabPipelineRunPropertyPayload implements Payload {
+  "Build updated"
+  build: Build
+  "List of errors"
+  errors: [UserError]
+}
+
 "Output type for the deleteBuildLinks mutation."
 type DeleteBuildLinksPayload implements Payload {
   "List of errors"
@@ -2037,6 +2055,7 @@ type Environment {
   tags: [String!]!
 }
 
+"One page of the project x environment matrix"
 type EnvironmentMatrix {
   "Columns of the matrix, by environment order. Only the environments having at least one slot among the rows of this page."
   environments: [Environment!]!
@@ -2052,6 +2071,7 @@ type EnvironmentMatrix {
   totalProjects: Int!
 }
 
+"One project of the matrix, with one row per qualifier"
 type EnvironmentMatrixProject {
   "The project"
   project: Project!
@@ -2059,6 +2079,7 @@ type EnvironmentMatrixProject {
   rows: [EnvironmentMatrixRow!]!
 }
 
+"One row of the matrix: a project and a qualifier, across the environments"
 type EnvironmentMatrixRow {
   "Qualifier of this row, the empty string being the default one"
   qualifier: String!
@@ -3577,6 +3598,16 @@ type Mutation {
     "Input for the mutation"
     input: DeleteBuildGitCommitPropertyByIdInput
   ): DeleteBuildGitCommitPropertyByIdPayload
+  "Deletes the gitLab pipeline property on a build identified by name."
+  deleteBuildGitLabPipelineRunProperty(
+    "Input for the mutation"
+    input: DeleteBuildGitLabPipelineRunPropertyInput
+  ): DeleteBuildGitLabPipelineRunPropertyPayload
+  "Deletes the gitLab pipeline property on a build."
+  deleteBuildGitLabPipelineRunPropertyById(
+    "Input for the mutation"
+    input: DeleteBuildGitLabPipelineRunPropertyByIdInput
+  ): DeleteBuildGitLabPipelineRunPropertyByIdPayload
   "Deletes build links from a build, optionally filtered by target project and/or qualifier"
   deleteBuildLinks(
     "Input for the mutation"
@@ -4279,6 +4310,16 @@ type Mutation {
     "Input for the mutation"
     input: SetBuildGitCommitPropertyByIdInput
   ): SetBuildGitCommitPropertyByIdPayload
+  "Set the gitLab pipeline property on a build identified by name."
+  setBuildGitLabPipelineRunProperty(
+    "Input for the mutation"
+    input: SetBuildGitLabPipelineRunPropertyInput
+  ): SetBuildGitLabPipelineRunPropertyPayload
+  "Set the gitLab pipeline property on a build."
+  setBuildGitLabPipelineRunPropertyById(
+    "Input for the mutation"
+    input: SetBuildGitLabPipelineRunPropertyByIdInput
+  ): SetBuildGitLabPipelineRunPropertyByIdPayload
   "Set the message property on a build identified by name."
   setBuildMessageProperty(
     "Input for the mutation"
@@ -4823,6 +4864,11 @@ type Mutation {
     "Input for the mutation"
     input: ValidateBuildWithCHMLInput
   ): ValidateBuildWithCHMLPayload
+  "Validates a build identified by name with the report of a security scan, creating a validation run with the counts of its findings."
+  validateBuildWithFindings(
+    "Input for the mutation"
+    input: ValidateBuildWithFindingsInput
+  ): ValidateBuildWithFindingsPayload
   "Validates a build identified by name with Metrics data"
   validateBuildWithMetrics(
     "Input for the mutation"
@@ -6835,6 +6881,22 @@ type SetBuildGitCommitPropertyPayload implements Payload {
   errors: [UserError]
 }
 
+"Output type for the setBuildGitLabPipelineRunPropertyById mutation."
+type SetBuildGitLabPipelineRunPropertyByIdPayload implements Payload {
+  "Build updated"
+  build: Build
+  "List of errors"
+  errors: [UserError]
+}
+
+"Output type for the setBuildGitLabPipelineRunProperty mutation."
+type SetBuildGitLabPipelineRunPropertyPayload implements Payload {
+  "Build updated"
+  build: Build
+  "List of errors"
+  errors: [UserError]
+}
+
 "Output type for the setBuildMessagePropertyById mutation."
 type SetBuildMessagePropertyByIdPayload implements Payload {
   "Build updated"
@@ -8110,6 +8172,14 @@ type ValidateBuildWithCHMLPayload implements Payload {
   validationRun: ValidationRun
 }
 
+"Output type for the validateBuildWithFindings mutation."
+type ValidateBuildWithFindingsPayload implements Payload {
+  "List of errors"
+  errors: [UserError]
+  "Created validation run"
+  validationRun: ValidationRun
+}
+
 "Output type for the validateBuildWithMetrics mutation."
 type ValidateBuildWithMetricsPayload implements Payload {
   "List of errors"
@@ -8693,6 +8763,16 @@ enum DeliveryMapEdgeKind {
   EMITS
   REQUIRES
   UNLOCKS
+}
+
+"Kind of scan which reported a security finding."
+enum FindingKind {
+  CODE
+  DAST
+  DEPENDENCIES
+  IMAGE
+  OTHER
+  SECRETS
 }
 
 "State a hook request can be in"
@@ -9632,6 +9712,22 @@ input DeleteBuildGitCommitPropertyByIdInput {
 
 "Input type for the deleteBuildGitCommitProperty mutation."
 input DeleteBuildGitCommitPropertyInput {
+  "Branch name"
+  branch: String!
+  "Build name"
+  build: String!
+  "Project name"
+  project: String!
+}
+
+"Input type for the deleteBuildGitLabPipelineRunPropertyById mutation."
+input DeleteBuildGitLabPipelineRunPropertyByIdInput {
+  "ID of the build"
+  id: Int!
+}
+
+"Input type for the deleteBuildGitLabPipelineRunProperty mutation."
+input DeleteBuildGitLabPipelineRunPropertyInput {
   "Branch name"
   branch: String!
   "Build name"
@@ -11099,6 +11195,38 @@ input SetBuildGitCommitPropertyInput {
   commit: String!
   "Project name"
   project: String!
+}
+
+"Input type for the setBuildGitLabPipelineRunPropertyById mutation."
+input SetBuildGitLabPipelineRunPropertyByIdInput {
+  "ID of the build"
+  id: Int!
+  "ID of the pipeline, unique across the GitLab instance"
+  pipelineId: Long!
+  "IID of the pipeline, its number inside the project"
+  pipelineIid: Int!
+  "Path of the GitLab project, subgroups included"
+  projectPath: String!
+  "Link to the pipeline"
+  url: String!
+}
+
+"Input type for the setBuildGitLabPipelineRunProperty mutation."
+input SetBuildGitLabPipelineRunPropertyInput {
+  "Branch name"
+  branch: String!
+  "Build name"
+  build: String!
+  "ID of the pipeline, unique across the GitLab instance"
+  pipelineId: Long!
+  "IID of the pipeline, its number inside the project"
+  pipelineIid: Int!
+  "Project name"
+  project: String!
+  "Path of the GitLab project, subgroups included"
+  projectPath: String!
+  "Link to the pipeline"
+  url: String!
 }
 
 "Input type for the setBuildMessagePropertyById mutation."
@@ -12607,6 +12735,30 @@ input ValidateBuildWithCHMLInput {
   runInfo: RunInfoInput
   "Status of the validation run"
   status: String
+  "Name of the validation stamp"
+  validation: String!
+}
+
+"Input type for the validateBuildWithFindings mutation."
+input ValidateBuildWithFindingsInput {
+  "Name of the branch"
+  branch: String!
+  "Name of the build"
+  build: String!
+  "Description of the validation run"
+  description: String
+  "Format of the report. `findings` is the neutral format of Yontrack."
+  format: String!
+  "Kind of scan. Takes precedence over the kind given by the report, if any."
+  kind: FindingKind
+  "Name of the project"
+  project: String!
+  "Report of the scan, as JSON"
+  report: JSON!
+  "Optional run info to associated with this validation run"
+  runInfo: RunInfoInput
+  "Name of the scanner. Takes precedence over the scanner given by the report, if any."
+  scanner: String
   "Name of the validation stamp"
   validation: String!
 }

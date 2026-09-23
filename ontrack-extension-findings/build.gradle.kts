@@ -6,11 +6,16 @@ description = "Security findings: findings, their observations and their exposur
 
 dependencies {
     api(project(":ontrack-extension-support"))
+    api(project(":ontrack-extension-general"))
 
     implementation(project(":ontrack-repository-support"))
+    implementation(project(":ontrack-ui-graphql"))
 
     testImplementation(testFixtures(project(":ontrack-it-utils")))
     testImplementation(testFixtures(project(":ontrack-model")))
+    testImplementation(testFixtures(project(":ontrack-ui-graphql")))
+    testImplementation(testFixtures(project(":ontrack-extension-config")))
+    testImplementation("com.networknt:json-schema-validator")
 
     testRuntimeOnly(project(":ontrack-service"))
     testRuntimeOnly(project(":ontrack-repository-impl"))

@@ -14,4 +14,10 @@ data class FindingAcceptance(
     val statement: String?,
     val expiresAt: LocalDate?,
     val source: String?,
-)
+) {
+    /**
+     * Whether the acceptance still holds on the given day: it has no expiry, or its expiry is
+     * not past. An expiry is evaluated when it is read, never by a job.
+     */
+    fun isEffectiveOn(date: LocalDate): Boolean = expiresAt == null || !expiresAt.isBefore(date)
+}

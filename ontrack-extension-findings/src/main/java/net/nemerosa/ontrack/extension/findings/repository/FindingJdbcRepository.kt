@@ -99,6 +99,12 @@ class FindingJdbcRepository(
             mapOf("projectId" to projectId)
         ) { rs, _ -> toFinding(rs) }
 
+    override fun findFindingsByProjectAndScanner(projectId: Int, scanner: String): List<Finding> =
+        namedParameterJdbcTemplate!!.query(
+            "SELECT * FROM FINDINGS WHERE PROJECT_ID = :projectId AND SCANNER = :scanner ORDER BY ID",
+            mapOf("projectId" to projectId, "scanner" to scanner)
+        ) { rs, _ -> toFinding(rs) }
+
     override fun findFindingsByExternalId(externalId: String): List<Finding> =
         namedParameterJdbcTemplate!!.query(
             "SELECT * FROM FINDINGS WHERE EXTERNAL_ID = :externalId ORDER BY ID",

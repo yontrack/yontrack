@@ -10,6 +10,7 @@ import {
     TbPercentage,
     TbRubberStamp,
     TbShieldExclamation,
+    TbShieldSearch,
 } from "react-icons/tb"
 
 /**
@@ -54,6 +55,8 @@ export const VALIDATION_DATA_TYPE_GLYPHS = {
     'general.validation.CHMLValidationDataType': TbShieldExclamation,
     'general.validation.ThresholdNumberValidationDataType': TbHash,
     'general.validation.TextValidationDataType': TbFileText,
+    // Security findings: the findings of a scan, counted like CHML - a shield being searched.
+    'findings.validation.FindingsValidationDataType': TbShieldSearch,
     // A version being pushed up.
     'av.validation.AutoVersioningValidationDataType': TbArrowBigUpLine,
 }
