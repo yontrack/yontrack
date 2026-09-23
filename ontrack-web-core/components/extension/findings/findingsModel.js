@@ -100,3 +100,56 @@ export function exposedBranches(exposures = []) {
     })
     return [...byBranch.values()]
 }
+
+/**
+ * The exposure of a finding as the rows of a table, one per branch and stamp, in the order of the
+ * exposures — by branch name then stamp name, as the server gives them. The first row of a branch
+ * spans its other ones (`branchRowSpan`), which span none.
+ *
+ * @param {Array} exposures The `exposures` of a finding, with their `branch` and `validationStamp`
+ * @returns {Array} The exposures, each with a `key` and a `branchRowSpan`
+ */
+export function exposureRows(exposures = []) {
+    const counts = new Map()
+    exposures.forEach(({branch}) => counts.set(branch.id, (counts.get(branch.id) ?? 0) + 1))
+    const seen = new Set()
+    return exposures.map(exposure => {
+        const branchId = exposure.branch.id
+        const first = !seen.has(branchId)
+        seen.add(branchId)
+        return {
+            ...exposure,
+            key: `${branchId}-${exposure.validationStamp.id}`,
+            branchRowSpan: first ? counts.get(branchId) : 0,
+        }
+    })
+}
+
+/**
+ * One line about an acceptance: whether there is one, whether it still holds, and until when.
+ *
+ * @param {object} acceptance `{effective, expiresAt}`, or nothing
+ */
+export function acceptanceSummary(acceptance) {
+    if (!acceptance) {
+        return 'Not accepted'
+    } else if (!acceptance.effective) {
+        return `Acceptance expired on ${acceptance.expiresAt}`
+    } else if (acceptance.expiresAt) {
+        return `Accepted until ${acceptance.expiresAt}`
+    } else {
+        return 'Accepted, without expiry'
+    }
+}
+
+/** Validation data type of the reports of security scans. */
+export const FINDINGS_VALIDATION_DATA_TYPE = 'net.nemerosa.ontrack.extension.findings.validation.FindingsValidationDataType'
+
+/**
+ * Whether a validation run is a security scan: its data is a report of security scan, or, for a
+ * run without data, its stamp takes such reports.
+ */
+export function isFindingsRun(run) {
+    return run?.data?.descriptor?.id === FINDINGS_VALIDATION_DATA_TYPE ||
+        run?.validationStamp?.dataType?.descriptor?.id === FINDINGS_VALIDATION_DATA_TYPE
+}

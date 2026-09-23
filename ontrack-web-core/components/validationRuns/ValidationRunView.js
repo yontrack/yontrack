@@ -26,6 +26,8 @@ import ValidationRunStatusChange from "@components/validationRuns/ValidationRunS
 import {useRefresh} from "@components/common/RefreshUtils";
 import InfoViewDrawer from "@components/common/InfoViewDrawer";
 import {gqlInformationFragment, gqlPropertiesFragment} from "@components/services/fragments";
+import {isFindingsRun} from "@components/extension/findings/findingsModel";
+import ValidationRunFindings from "@components/extension/findings/run/ValidationRunFindings";
 
 export default function ValidationRunView({id}) {
 
@@ -79,6 +81,11 @@ export default function ValidationRunView({id}) {
                                     project {
                                         id
                                         name
+                                        authorizations {
+                                            name
+                                            action
+                                            authorized
+                                        }
                                     }
                                 }
                                 releaseProperty {
@@ -115,11 +122,18 @@ export default function ValidationRunView({id}) {
     const tableRunStatuses = "table-run-statuses"
     const sectionRunData = "section-run-data"
     const sectionRunInfo = "section-run-info"
+    const tableRunFindings = "table-run-findings"
+
+    // The findings of a security scan, for a user granted their view only
+    const showFindings = isFindingsRun(run) &&
+        !!run.build?.branch?.project &&
+        isAuthorized(run.build.branch.project, 'findings', 'view')
 
     const defaultLayout = [
         {i: tableRunStatuses, x: 0, y: 0, w: 6, h: 12},
         {i: sectionRunData, x: 6, y: 0, w: 6, h: 6},
         {i: sectionRunInfo, x: 6, y: 6, w: 6, h: 6},
+        ...(showFindings ? [{i: tableRunFindings, x: 0, y: 12, w: 12, h: 14}] : []),
     ]
 
     const items = [
@@ -184,7 +198,21 @@ export default function ValidationRunView({id}) {
                 }
             </GridCell>
         },
+        ...(showFindings ? [{
+            id: tableRunFindings,
+            content: <GridCell
+                id={tableRunFindings}
+                title="Findings"
+            >
+                <ValidationRunFindings run={run}/>
+            </GridCell>
+        }] : []),
     ]
+
+    // A security scan has a layout of its own, with its findings, so that a layout stored for one
+    // kind of run never lacks the cell of another one. The key remounts the layout when the kind
+    // of the run is known, reading the stored layout of that kind.
+    const layoutId = showFindings ? "page-validation-run-findings-layout" : "page-validation-run-layout"
 
     return (
         <>
@@ -212,7 +240,8 @@ export default function ValidationRunView({id}) {
                         <Space orientation="vertical" className="ot-line">
                             <AnnotatedDescription entity={run}/>
                             <StoredGridLayout
-                                id="page-validation-run-layout"
+                                key={layoutId}
+                                id={layoutId}
                                 defaultLayout={defaultLayout}
                                 items={items}
                                 rowHeight={30}

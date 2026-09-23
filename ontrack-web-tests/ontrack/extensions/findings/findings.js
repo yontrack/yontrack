@@ -63,11 +63,17 @@ export const finding = ({
                             location = "pkg:maven/org.x/y",
                             title,
                             acceptedUntil,
+                            url,
+                            installedVersion,
+                            fixedVersion,
                         }) => ({
     externalId,
     location,
     severity,
     title: title ?? `Title of ${externalId}`,
+    ...(url ? {url} : {}),
+    ...(installedVersion ? {installedVersion} : {}),
+    ...(fixedVersion ? {fixedVersion} : {}),
     ...(acceptedUntil ? {
         acceptance: {
             statement: "Not reachable",
@@ -88,8 +94,20 @@ export const finding = ({
  * @return The created build
  */
 export const scanWithFindings = async (branch, validationStamp, findings, {scanner = "trivy", kind = "IMAGE"} = {}) => {
+    const {build} = await scanWithFindingsRun(branch, validationStamp, findings, {scanner, kind})
+    return build
+}
+
+/**
+ * Validates a build with a report of security scan in the neutral format, creating the build.
+ *
+ * Same as `scanWithFindings`, returning the validation run of the scan too.
+ *
+ * @return `{build, validationRun}`, the run with its `id`
+ */
+export const scanWithFindingsRun = async (branch, validationStamp, findings, {scanner = "trivy", kind = "IMAGE"} = {}) => {
     const build = await branch.createBuild()
-    await graphQLCallMutation(
+    const data = await graphQLCallMutation(
         branch.ontrack.connection,
         'validateBuildWithFindings',
         gql`
@@ -125,5 +143,8 @@ export const scanWithFindings = async (branch, validationStamp, findings, {scann
             report: {scanner, kind, findings},
         }
     )
-    return build
+    return {
+        build,
+        validationRun: data.validateBuildWithFindings.validationRun,
+    }
 }
