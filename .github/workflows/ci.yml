@@ -45,6 +45,13 @@ on:
         description: Collecting test coverage on this branch too
         type: boolean
         default: false
+      # The Gradle state, build cache included, is written from main, release/* and the next-major
+      # branch only (#1870). This forces it on for a run started by hand: a branch changing the
+      # build can then be measured warm, by running it twice.
+      GRADLE_CACHE_WRITE:
+        description: Writing the Gradle cache from this branch too
+        type: boolean
+        default: false
 
 # Keyed on the commit, not the branch. A group of `ci-refs/heads/main` serialised the whole
 # repository -- the workflow merges into main and never pushes the working branch, so every run
@@ -109,9 +116,9 @@ env:
   # wrong fails the coverage job loudly, which is the safe direction.
   KDSL_SHARDS: "2"
   UI_MAIN_SHARDS: "3"
-  # Run-scoped tag used to hand the Docker images from `build` to the jobs that consume them.
-  # Keyed on the run, deliberately not on the attempt: re-running just the failed jobs must
-  # still find the images the original `build` attempt pushed. A re-run of `build` itself
+  # Run-scoped tag used to hand the Docker images from `build` (backend) and `build-ui` to the
+  # jobs that consume them. Keyed on the run, deliberately not on the attempt: re-running just the
+  # failed jobs must still find the images the original attempts pushed. A re-run of either job
   # overwrites the same tag, which is what you want for the same commit.
   GHCR_ONTRACK: ghcr.io/${{ github.repository }}/ontrack
   GHCR_ONTRACK_UI: ghcr.io/${{ github.repository }}/ontrack-ui
@@ -147,6 +154,7 @@ jobs:
       skip_github_it: ${{ steps.params.outputs.skip_github_it }}
       skip_bitbucket_cloud_it: ${{ steps.params.outputs.skip_bitbucket_cloud_it }}
       skip_gitlab_it: ${{ steps.params.outputs.skip_gitlab_it }}
+      gradle_cache_read_only: ${{ steps.params.outputs.gradle_cache_read_only }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -169,8 +177,6 @@ jobs:
           distribution: zulu
           java-version: "21"
 
-      - uses: gradle/actions/setup-gradle@v6
-
       # `inputs` is only populated on workflow_dispatch, so every parameter needs a fallback
       # for `push` and `pull_request`. The booleans arrive as the strings "true"/"false".
       - name: Resolve the parameters
@@ -183,6 +189,7 @@ jobs:
           IN_SKIP_BITBUCKET_CLOUD_IT: ${{ inputs.SKIP_BITBUCKET_CLOUD_IT }}
           IN_SKIP_GITLAB_IT: ${{ inputs.SKIP_GITLAB_IT }}
           IN_COVERAGE: ${{ inputs.COVERAGE }}
+          IN_GRADLE_CACHE_WRITE: ${{ inputs.GRADLE_CACHE_WRITE }}
           ACTOR: ${{ github.actor }}
           REF: ${{ github.ref }}
         run: |
@@ -233,9 +240,31 @@ jobs:
             fi
           fi
 
+          # Which runs write the Gradle state back to the GitHub cache (#1870). setup-gradle's own
+          # default is the default branch only, which left the next-major branch restoring main's
+          # state on every job — another Gradle distribution, another dependency set, all of it
+          # downloaded again each time — and never saving its own. The long-lived branches are
+          # what every later run of that branch restores from, so they write; a working branch
+          # only reads, since an entry it saves is visible to that branch alone and would only
+          # evict the ones that matter from the repository's quota.
+          #
+          # Keyed on the ref and not on `full_run`, for the same reason as coverage above. The
+          # workflow_dispatch input forces it on, which is how a branch is measured warm.
+          gradle_cache_read_only=true
+          if [ "$EVENT_NAME" != "pull_request" ]; then
+            case "$REF" in
+              refs/heads/main|refs/heads/release/*) gradle_cache_read_only=false ;;
+              refs/heads/v[0-9]|refs/heads/v[0-9][0-9]) gradle_cache_read_only=false ;;
+            esac
+            if [ "$EVENT_NAME" = "workflow_dispatch" ] && [ "$IN_GRADLE_CACHE_WRITE" = "true" ]; then
+              gradle_cache_read_only=false
+            fi
+          fi
+
           {
             echo "full_run=$full_run"
             echo "coverage=$coverage"
+            echo "gradle_cache_read_only=$gradle_cache_read_only"
             echo "skip_kdsl_acceptance=$(resolve "$IN_SKIP_KDSL_ACCEPTANCE" false)"
             echo "skip_next_ui_tests=$(resolve "$IN_SKIP_NEXT_UI_TESTS" false)"
             echo "skip_github_it=$(resolve "$IN_SKIP_GITHUB_IT" true)"
@@ -244,6 +273,10 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
           cat "$GITHUB_OUTPUT"
+
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-read-only: ${{ steps.params.outputs.gradle_cache_read_only }}
 
       - name: Compute the version
         id: version
@@ -335,7 +368,10 @@ jobs:
         run: yontrack build set-property release "$VERSION"
 
   # ---------------------------------------------------------------------------------------------
-  # Compile, unit tests, UI unit tests, Docker images.
+  # Compile, unit tests, backend Docker image.
+  #
+  # The frontend is not here: its Jest suite and its image depend on nothing this job produces, so
+  # they run beside it in `build-ui` rather than after it (#1870).
   #
   # Integration tests are deliberately excluded: `build` -> `check` -> `integrationTest` drags in
   # 547 IT classes across 34 modules, which is by far the largest cost on a 4 vCPU runner. They
@@ -387,15 +423,8 @@ jobs:
           java-version: "21"
 
       - uses: gradle/actions/setup-gradle@v6
-
-      # No actions/setup-node: the Gradle node plugin downloads its own Node (24.21.0 for
-      # ontrack-web-core), and a runner-level Node would fight it.
-      - name: Cache the npm downloads
-        uses: actions/cache@v6
         with:
-          path: ~/.npm
-          key: npm-${{ runner.os }}-${{ hashFiles('ontrack-web-core/package-lock.json') }}
-          restore-keys: npm-${{ runner.os }}-
+          cache-read-only: ${{ needs.setup.outputs.gradle_cache_read_only }}
 
       - name: Link to the Yontrack build
         if: env.FULL_RUN == 'true'
@@ -415,19 +444,17 @@ jobs:
           ./gradlew :buildSrc:test --stacktrace --console plain
 
           # Test coverage (#1821). `-Pcoverage` turns the JaCoCo agent on for the `test` tasks
-          # (#1818) and `:ontrack-web-core:testCoverage` runs the Jest suite a second time with
-          # `--coverage` (#1820) — a second task on a second npm script, deliberately, so that an
-          # ordinary run pays for neither. Both are off on every other branch, which is what keeps
-          # a pull request's build exactly what it was.
+          # (#1818). It is off on every other branch, which is what keeps a pull request's build
+          # exactly what it was.
           coverage_args=""
-          coverage_tasks=""
           if [ "${COVERAGE:-false}" = "true" ]; then
             coverage_args="-Pcoverage"
-            coverage_tasks=":ontrack-web-core:testCoverage"
           fi
 
-          # shellcheck disable=SC2086  # deliberate: both are empty or a single word
-          ./gradlew build $coverage_tasks -x integrationTest -x buildDocs $coverage_args \
+          # `-x :ontrack-web-core:test` takes the Jest suite, and the npm install in front of it,
+          # out of this job: `build-ui` runs it (#1870).
+          # shellcheck disable=SC2086  # deliberate: empty or a single word
+          ./gradlew build -x integrationTest -x buildDocs -x :ontrack-web-core:test $coverage_args \
             --stacktrace \
             --parallel \
             --console plain
@@ -435,11 +462,9 @@ jobs:
       # `outcome` is empty only when the step was skipped, so a broken build still records
       # FAILED — which is the case worth seeing in Yontrack.
       #
-      # BUILD and UI_UNIT report the same duration — the job up to this point. Both test sets run
-      # inside the one `./gradlew build`, so neither has a span of its own to report anyway.
-      # Jenkins did the same: `adaptRunInfo()` gave every validation in a stage that stage's
-      # duration. What is left out here is what the job does afterwards: building and pushing the
-      # Docker images, which takes longer than the build itself and which neither stamp is about.
+      # BUILD reports the job up to this point. Jenkins did the same: `adaptRunInfo()` gave every
+      # validation in a stage that stage's duration. What is left out here is what the job does
+      # afterwards: building and pushing the Docker image, which the stamp is not about.
       #
       # `--run-time` goes after the `junit` subcommand: `validateJUnitTestsCmd` redeclares the five
       # run-info flags on itself, so that is where they are read from.
@@ -460,20 +485,6 @@ jobs:
           # shellcheck disable=SC2086  # deliberate: see YONTRACK_RUN_INFO
           yontrack validate --validation BUILD \
             junit --pattern "**/build/test-results/test/*.xml" --fail-when-no-results \
-            $run_time_flag $YONTRACK_RUN_INFO
-
-      - name: Validate UI_UNIT
-        if: ${{ !cancelled() && env.FULL_RUN == 'true' && steps.build.outcome != '' }}
-        env:
-          STARTED: ${{ steps.job_start.outputs.started }}
-        run: |
-          run_time_flag=""
-          if [ -n "${STARTED:-}" ]; then
-            run_time_flag="--run-time $(( $(date +%s) - STARTED ))"
-          fi
-          # shellcheck disable=SC2086  # deliberate: see YONTRACK_RUN_INFO
-          yontrack validate --validation UI_UNIT \
-            junit --pattern "ontrack-web-core/reports/*.xml" --fail-when-no-results \
             $run_time_flag $YONTRACK_RUN_INFO
 
       # Jenkins archived these; without them a unit-test failure is only visible as a class
@@ -508,15 +519,6 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
-      - name: Upload the Jest coverage
-        if: ${{ always() && env.COVERAGE == 'true' }}
-        uses: actions/upload-artifact@v7
-        with:
-          name: coverage-jest
-          path: ontrack-web-core/coverage/**
-          if-no-files-found: ignore
-          retention-days: 7
-
       # A JaCoCo report needs the *exact* class files that were executed, plus the sources. The
       # `integration`, `kdsl` and `ui-tests` runners have their own checkouts and their own — or
       # no — build output, and the report job has neither, so they travel from here.
@@ -540,9 +542,9 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
-      - name: Build the Docker images
+      - name: Build the Docker image
         run: |
-          ./gradlew dockerBuild jibDockerBuild \
+          ./gradlew :ontrack-ui:dockerBuild \
             --stacktrace \
             --parallel \
             --console plain
@@ -558,14 +560,12 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Push the images to GHCR
+      - name: Push the image to GHCR
         if: env.FULL_RUN == 'true'
         run: |
           set -euo pipefail
           docker tag "nemerosa/ontrack:$BASE_VERSION" "$GHCR_ONTRACK:$RUN_TAG"
-          docker tag "nemerosa/ontrack-ui:$BASE_VERSION" "$GHCR_ONTRACK_UI:$RUN_TAG"
           docker push "$GHCR_ONTRACK:$RUN_TAG"
-          docker push "$GHCR_ONTRACK_UI:$RUN_TAG"
 
           # `:run-<id>` is scoped to this run and means nothing once it ends. `:$VERSION` is
           # durable and version-shaped, so one identifier spans CI, the Yontrack build name,
@@ -577,8 +577,143 @@ jobs:
           # itself, and on a feature branch VersionCalculator already appends the branch name and
           # short commit.
           docker tag "nemerosa/ontrack:$BASE_VERSION" "$GHCR_ONTRACK:$VERSION"
-          docker tag "nemerosa/ontrack-ui:$BASE_VERSION" "$GHCR_ONTRACK_UI:$VERSION"
           docker push "$GHCR_ONTRACK:$VERSION"
+
+  # ---------------------------------------------------------------------------------------------
+  # Frontend: Jest suite and the UI Docker image, beside `build` rather than after it (#1870).
+  #
+  # Neither depends on anything the Kotlin build produces, and in series they added the whole of
+  # `next build` - two to four minutes - to the job every test job waits on. The jobs consuming the
+  # images need both `build` and this one.
+  # ---------------------------------------------------------------------------------------------
+
+  build-ui:
+    name: Build UI
+    needs: [setup, yontrack]
+    if: ${{ !cancelled() && needs.setup.result == 'success' && needs.yontrack.result != 'failure' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      VERSION: ${{ needs.setup.outputs.version }}
+      BASE_VERSION: ${{ needs.setup.outputs.base_version }}
+      FULL_RUN: ${{ needs.setup.outputs.full_run }}
+      COVERAGE: ${{ needs.setup.outputs.coverage }}
+    steps:
+      # The run time reported for this job's validations is measured from here. A `run:` step is
+      # the earliest point a workflow can observe: the runner's own "Set up job" precedes every
+      # step and is not visible to any of them. Everything after this — checkout, toolchain setup,
+      # cache restore — is part of what the job costs and is counted.
+      - name: Record the job start
+        id: job_start
+        run: echo "started=$(date +%s)" >> "$GITHUB_OUTPUT"
+
+      # The full history for the same reason as everywhere else: the image is tagged with the
+      # project version, which the versioning plugin computes from the tags.
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      # The JDK is for Gradle itself, which drives the node plugin and the image build.
+      - uses: actions/setup-java@v6
+        with:
+          distribution: zulu
+          java-version: "21"
+
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-read-only: ${{ needs.setup.outputs.gradle_cache_read_only }}
+
+      # No actions/setup-node: the Gradle node plugin downloads its own Node (24.21.0 for
+      # ontrack-web-core), and a runner-level Node would fight it.
+      - name: Cache the npm downloads
+        uses: actions/cache@v6
+        with:
+          path: ~/.npm
+          key: npm-${{ runner.os }}-${{ hashFiles('ontrack-web-core/package-lock.json') }}
+          restore-keys: npm-${{ runner.os }}-
+
+      - name: Link to the Yontrack build
+        if: env.FULL_RUN == 'true'
+        uses: nemerosa/ontrack-github-actions-cli-library/ontrack-cli-workflow-build@v1.0.3
+        with:
+          project: ${{ needs.yontrack.outputs.project }}
+          yontrack-url: ${{ vars.YONTRACK_URL }}
+          yontrack-token: ${{ secrets.YONTRACK_TOKEN }}
+          version: ${{ env.YONTRACK_CLI_VERSION }}
+
+      # The suite runs once. On a coverage run that is `testCoverage` (#1820), the same suite with
+      # `--coverage`, which writes the same JUnit report as `test` does - running `test` as well
+      # would only run it a second time. The image build below then skips `test`, which
+      # `dockerBuild` depends on, for the same reason.
+      - name: UI unit tests
+        id: test
+        run: |
+          set -euo pipefail
+          if [ "${COVERAGE:-false}" = "true" ]; then
+            ./gradlew :ontrack-web-core:testCoverage -Pcoverage --stacktrace --console plain
+          else
+            ./gradlew :ontrack-web-core:test --stacktrace --console plain
+          fi
+
+      # `outcome` is empty only when the step was skipped, so failing tests still record FAILED.
+      #
+      # `--run-time` goes after the `junit` subcommand: `validateJUnitTestsCmd` redeclares the five
+      # run-info flags on itself, so that is where they are read from.
+      - name: Validate UI_UNIT
+        if: ${{ !cancelled() && env.FULL_RUN == 'true' && steps.test.outcome != '' }}
+        env:
+          STARTED: ${{ steps.job_start.outputs.started }}
+        run: |
+          run_time_flag=""
+          if [ -n "${STARTED:-}" ]; then
+            run_time_flag="--run-time $(( $(date +%s) - STARTED ))"
+          fi
+          # shellcheck disable=SC2086  # deliberate: see YONTRACK_RUN_INFO
+          yontrack validate --validation UI_UNIT \
+            junit --pattern "ontrack-web-core/reports/*.xml" --fail-when-no-results \
+            $run_time_flag $YONTRACK_RUN_INFO
+
+      - name: Upload the test reports
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: build-ui-test-reports
+          path: ontrack-web-core/reports/**
+          if-no-files-found: ignore
+          retention-days: 7
+
+      # always(), not !cancelled(): see the coverage uploads of `build`.
+      - name: Upload the Jest coverage
+        if: ${{ always() && env.COVERAGE == 'true' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-jest
+          path: ontrack-web-core/coverage/**
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Build the Docker image
+        run: |
+          ./gradlew :ontrack-web-core:dockerBuild -x :ontrack-web-core:test \
+            --stacktrace \
+            --console plain
+
+      - name: Log in to GHCR
+        if: env.FULL_RUN == 'true'
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # The same two tags as the backend image, for the same reasons: see `build`.
+      - name: Push the image to GHCR
+        if: env.FULL_RUN == 'true'
+        run: |
+          set -euo pipefail
+          docker tag "nemerosa/ontrack-ui:$BASE_VERSION" "$GHCR_ONTRACK_UI:$RUN_TAG"
+          docker push "$GHCR_ONTRACK_UI:$RUN_TAG"
+          docker tag "nemerosa/ontrack-ui:$BASE_VERSION" "$GHCR_ONTRACK_UI:$VERSION"
           docker push "$GHCR_ONTRACK_UI:$VERSION"
 
   # ---------------------------------------------------------------------------------------------
@@ -741,6 +876,8 @@ jobs:
           java-version: "21"
 
       - uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-read-only: ${{ needs.setup.outputs.gradle_cache_read_only }}
 
       # ontrack-docs' documentation ITs shell out to `dot`.
       - name: Install graphviz
@@ -939,10 +1076,11 @@ jobs:
 
   kdsl:
     name: KDSL acceptance tests (shard ${{ matrix.shard }})
-    needs: [setup, build]
+    needs: [setup, build, build-ui]
     if: >-
       ${{ !cancelled()
         && needs.build.result == 'success'
+        && needs.build-ui.result == 'success'
         && needs.setup.outputs.full_run == 'true'
         && needs.setup.outputs.skip_kdsl_acceptance != 'true' }}
     runs-on: ubuntu-latest
@@ -1007,6 +1145,8 @@ jobs:
           java-version: "21"
 
       - uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-read-only: ${{ needs.setup.outputs.gradle_cache_read_only }}
 
       - name: Log in to GHCR
         uses: docker/login-action@v4
@@ -1219,10 +1359,11 @@ jobs:
 
   ui-tests:
     name: UI tests (${{ matrix.label }})
-    needs: [setup, build]
+    needs: [setup, build, build-ui]
     if: >-
       ${{ !cancelled()
         && needs.build.result == 'success'
+        && needs.build-ui.result == 'success'
         && needs.setup.outputs.full_run == 'true'
         && needs.setup.outputs.skip_next_ui_tests != 'true' }}
     runs-on: ubuntu-latest
@@ -1309,6 +1450,8 @@ jobs:
           java-version: "21"
 
       - uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-read-only: ${{ needs.setup.outputs.gradle_cache_read_only }}
 
       - name: Cache the npm downloads
         uses: actions/cache@v6
@@ -1571,7 +1714,7 @@ jobs:
 
   coverage:
     name: Coverage report
-    needs: [setup, yontrack, build, integration, kdsl, ui-tests]
+    needs: [setup, yontrack, build, build-ui, integration, kdsl, ui-tests]
     if: >-
       ${{ !cancelled()
         && needs.setup.outputs.coverage == 'true'
@@ -1783,12 +1926,12 @@ jobs:
   # ---------------------------------------------------------------------------------------------
   # Trivy scan of the two Docker images, reported as CHML counts (#1749).
   #
-  # The run-tagged images `build` pushes: the Jib backend image carries the jars and the UI image
+  # The run-tagged images `build` and `build-ui` push: the Jib backend image carries the jars and the UI image
   # Next's standalone node_modules, so this covers the runtime dependencies of both tiers. It is
   # where the dependency counts in Yontrack come from - Dependabot alerts are not reported.
   #
   # Every full run, on every branch, so that a feature branch bringing in a vulnerable dependency
-  # shows it before it is merged. It needs only `build`, so it runs alongside `integration`, `kdsl`
+  # shows it before it is merged. It needs only the two build jobs, so it runs alongside `integration`, `kdsl`
   # and `ui-tests` and adds no wall-clock time to the run.
   #
   # Findings never fail this job: they only drive the stamps, WARNING from the first HIGH and
@@ -1802,8 +1945,8 @@ jobs:
 
   security-images:
     name: Security scan of the images
-    needs: [setup, yontrack, build]
-    if: ${{ !cancelled() && needs.build.result == 'success' && needs.setup.outputs.full_run == 'true' }}
+    needs: [setup, yontrack, build, build-ui]
+    if: ${{ !cancelled() && needs.build.result == 'success' && needs.build-ui.result == 'success' && needs.setup.outputs.full_run == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     # A job-level block replaces the workflow's, so everything this job needs is restated.
@@ -1992,6 +2135,8 @@ jobs:
           java-version: "21"
 
       - uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-read-only: ${{ needs.setup.outputs.gradle_cache_read_only }}
 
       # python3 and venv are already on ubuntu-latest, which createVenv/installDeps need.
       - name: Install graphviz

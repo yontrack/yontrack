@@ -211,6 +211,11 @@ configure(javaProjects) {
         shouldRunAfter("test")
         minHeapSize = "128m"
         maxHeapSize = "3072m"
+        // Never restored from the build cache (#1870). What these tests check lives outside
+        // their declared inputs -- the database, Elasticsearch, the real GitHub, GitLab and
+        // Bitbucket APIs -- and some of what they produce is not a declared output: the
+        // ontrack-docs ITs write the generated documentation `buildDocs` renders.
+        outputs.cacheIf("integration tests run against live services") { false }
         dependsOn(":integrationTestComposeUp")
         finalizedBy(":integrationTestComposeDown")
 

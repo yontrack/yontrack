@@ -296,6 +296,9 @@ tasks.named<Test>("test") {
 val kdslAcceptanceTest by tasks.registering(Test::class) {
     useJUnitPlatform()
     mustRunAfter("test")
+    // Never restored from the build cache (#1870): the suite tests a running instance, which is
+    // not one of its inputs.
+    outputs.cacheIf("acceptance tests run against a live instance") { false }
     include("**/ACC*.class")
     val testFilter = System.getProperty("test.filter")
     if (testFilter != null) {
