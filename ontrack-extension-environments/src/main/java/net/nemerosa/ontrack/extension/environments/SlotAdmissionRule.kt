@@ -53,6 +53,22 @@ interface SlotAdmissionRule<C: Any, D> {
     )
 
     /**
+     * Checks if this build can be deployed into the slot now, before any pipeline exists for it.
+     *
+     * It is the build-level reading of [isBuildDeployable], and the Kotlin twin of
+     * [fillEligibilityCriteria] with `deployable = true`: a build is listed as deployable exactly
+     * when this check is ok or `null`. It must give the same reason as [isBuildDeployable] would.
+     *
+     * @return The check, or `null` when the rule can only be decided on a pipeline (for example,
+     * a manual approval, which is given on the pipeline itself).
+     */
+    fun checkBuildDeployable(
+        build: Build,
+        slot: Slot,
+        config: C,
+    ): SlotDeploymentCheck?
+
+    /**
      * Checks if this build can be deployable into the slot
      */
     fun isBuildDeployable(

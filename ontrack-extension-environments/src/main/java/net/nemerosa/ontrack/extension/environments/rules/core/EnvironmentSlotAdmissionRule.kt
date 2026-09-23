@@ -71,20 +71,26 @@ class EnvironmentSlotAdmissionRule(
         admissionRuleConfig: SlotAdmissionRuleConfig,
         ruleConfig: EnvironmentSlotAdmissionRuleConfig,
         ruleData: SlotAdmissionRuleTypedData<Any>?
+    ): SlotDeploymentCheck = checkBuildDeployable(pipeline.build, pipeline.slot, ruleConfig)
+
+    override fun checkBuildDeployable(
+        build: Build,
+        slot: Slot,
+        config: EnvironmentSlotAdmissionRuleConfig
     ): SlotDeploymentCheck {
         // Gets the previous slot
-        val previousSlot = findPreviousSlot(pipeline.build, ruleConfig)
-            ?: return SlotDeploymentCheck.nok("""Cannot find previous slot for project = "${pipeline.build.project.name}", environment = ${ruleConfig.environmentName} and qualifier = "${ruleConfig.qualifier}".""")
+        val previousSlot = findPreviousSlot(build, config)
+            ?: return SlotDeploymentCheck.nok("""Cannot find previous slot for project = "${build.project.name}", environment = ${config.environmentName} and qualifier = "${config.qualifier}".""")
         // Gets its last pipeline
         val previousPipeline = slotService.getCurrentPipeline(previousSlot)
-            ?: return SlotDeploymentCheck.nok("""Slot for project = "${pipeline.build.project.name}", environment = ${ruleConfig.environmentName} and qualifier = "${ruleConfig.qualifier}" has no pipeline.""")
+            ?: return SlotDeploymentCheck.nok("""Slot for project = "${build.project.name}", environment = ${config.environmentName} and qualifier = "${config.qualifier}" has no pipeline.""")
         // Checks it's for the same build
-        if (previousPipeline.build.id() != pipeline.build.id()) {
-            return SlotDeploymentCheck.nok("""Pipeline for project = "${pipeline.build.project.name}", environment = ${ruleConfig.environmentName} and qualifier = "${ruleConfig.qualifier}" is for another build.""")
+        if (previousPipeline.build.id() != build.id()) {
+            return SlotDeploymentCheck.nok("""Pipeline for project = "${build.project.name}", environment = ${config.environmentName} and qualifier = "${config.qualifier}" is for another build.""")
         }
         // Checks it's deployed
         if (previousPipeline.status != SlotPipelineStatus.DONE) {
-            return SlotDeploymentCheck.nok("""Build is in a pipeline for project = "${pipeline.build.project.name}", environment = ${ruleConfig.environmentName} and qualifier = "${ruleConfig.qualifier}" but this pipeline has not been deployed.""")
+            return SlotDeploymentCheck.nok("""Build is in a pipeline for project = "${build.project.name}", environment = ${config.environmentName} and qualifier = "${config.qualifier}" but this pipeline has not been deployed.""")
         }
         // OK
         return SlotDeploymentCheck.ok()
@@ -94,8 +100,9 @@ class EnvironmentSlotAdmissionRule(
      * Adding to the criteria the fact that there must exist a slot in the previous environment
      * for the same qualifier & project.
      *
-     * If [deployable] is `true`, we also add the criteria that a pipeline for the build must exist
-     * and be in status deployed.
+     * If [deployable] is `true`, we also add the criteria that the current (latest) pipeline of
+     * this previous slot must be for the build and in status deployed - the same reading as
+     * [checkBuildDeployable].
      */
     override fun fillEligibilityCriteria(
         slot: Slot,
@@ -105,15 +112,23 @@ class EnvironmentSlotAdmissionRule(
         deployable: Boolean,
     ) {
 
-        var joinDeployable = ""
-        var whereDeployable = ""
-        if (deployable) {
-            joinDeployable = """
-                INNER JOIN ENV_SLOT_PIPELINE PP ON PP.SLOT_ID = S.ID AND PP.BUILD_ID = BD.ID
+        val whereDeployable = if (deployable) {
+            """
+                AND EXISTS (
+                    SELECT 1
+                    FROM (
+                        SELECT PP.BUILD_ID, PP.STATUS
+                        FROM ENV_SLOT_PIPELINE PP
+                        WHERE PP.SLOT_ID = S.ID
+                        ORDER BY PP.NUMBER DESC
+                        LIMIT 1
+                    ) CURRENT_PP
+                    WHERE CURRENT_PP.BUILD_ID = BD.ID
+                    AND CURRENT_PP.STATUS = '${SlotPipelineStatus.DONE.name}'
+                )
             """.trimIndent()
-            whereDeployable = """
-                AND PP.STATUS = '${SlotPipelineStatus.DONE.name}'
-            """.trimIndent()
+        } else {
+            ""
         }
 
         queries += """
@@ -121,7 +136,6 @@ class EnvironmentSlotAdmissionRule(
                 SELECT S.ID
                 FROM ENV_SLOTS S
                 INNER JOIN ENVIRONMENTS E ON E.ID = S.ENVIRONMENT_ID
-                $joinDeployable
                 WHERE E.NAME = :environmentName
                 AND S.PROJECT_ID = :projectId
                 AND S.QUALIFIER = :qualifier

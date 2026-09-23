@@ -89,6 +89,37 @@ describe('the deploy dialog, opened from a build', () => {
         expect(screen.getByTestId('deploy-dialog-slot-start-staging')).toBeInTheDocument()
     })
 
+    it('warns that an eligible slot cannot take the build yet, and still lets it start (#1851)', () => {
+        withSlots({
+            eligible: true,
+            nonEligibleRules: [],
+            deployable: false,
+            nonDeployableRules: [{rule: goldRule, reason: 'Build not promoted'}],
+            pipelineOnlyRules: [],
+            slot: slot('production', 20),
+        })
+        openFromBuild()
+        expect(screen.getByTestId('deploy-dialog-slot-not-deployable-production'))
+            .toHaveTextContent('Not deployable yet: Build not promoted')
+        expect(screen.getByTestId('deploy-dialog-slot-start-production')).toBeEnabled()
+        expect(screen.queryByTestId('deploy-dialog-slot-ineligible-production')).not.toBeInTheDocument()
+    })
+
+    it('does not warn about a manual approval, which is given once started', () => {
+        withSlots({
+            eligible: true,
+            nonEligibleRules: [],
+            deployable: true,
+            nonDeployableRules: [],
+            pipelineOnlyRules: [{id: 'r2', name: 'approval', ruleId: 'manual'}],
+            slot: slot('production', 20),
+        })
+        openFromBuild()
+        expect(screen.queryByTestId('deploy-dialog-slot-not-deployable-production')).not.toBeInTheDocument()
+        expect(screen.getByTestId('deploy-dialog-slot-note-production'))
+            .toHaveTextContent('Needs approval once started')
+    })
+
     it('lists an ineligible slot rather than hiding it', () => {
         // A user is never left wondering where an environment went.
         withSlots({eligible: false, nonEligibleRules: [goldRule], slot: slot('production', 20)})

@@ -14,6 +14,8 @@ import {
 import {
     buildChoices,
     cancellationWarning,
+    notDeployableWarning,
+    pipelineOnlyNote,
     slotChoices,
 } from "@components/extension/environments/shared/deployDialogModel"
 import {
@@ -68,6 +70,11 @@ export const useDeployDialog = ({onSuccess} = {}) => {
  *   never been on screen.
  * - **The deploy action is hidden where the user has no right to it**, per slot, like everything
  *   else in the redesign.
+ *
+ * And one it does since #1851: **an eligible slot the build cannot go to yet says so** - *"Not
+ * deployable yet: Build not promoted"* - while still offering the action, because the deployment is
+ * then a candidate which runs once the rules accept it. A rule decided on the deployment itself (a
+ * manual approval) gets a neutral note, not a warning.
  */
 export default function DeployDialog({dialog}) {
 
@@ -233,8 +240,10 @@ function DeployChoices({dialog, query, choices, buildOf, emptyText, label, testI
                 <Alert type="error" showIcon message={error} data-testid="deploy-dialog-error"/>
             }
             {
-                choices.map(choice => (
-                    <div key={choice.key} data-testid={`${testIdPrefix}-${choice.key}`}>
+                choices.map(choice => {
+                    const warning = notDeployableWarning(choice)
+                    const note = pipelineOnlyNote(choice)
+                    return <div key={choice.key} data-testid={`${testIdPrefix}-${choice.key}`}>
                         <Space size={8} wrap>
                             <Typography.Text strong>{label(choice)}</Typography.Text>
                             {
@@ -290,6 +299,22 @@ function DeployChoices({dialog, query, choices, buildOf, emptyText, label, testI
                             </div>
                         }
                         {
+                            warning &&
+                            <div>
+                                <Typography.Text type="warning" data-testid={`${testIdPrefix}-not-deployable-${choice.key}`}>
+                                    {warning}
+                                </Typography.Text>
+                            </div>
+                        }
+                        {
+                            note &&
+                            <div>
+                                <Typography.Text type="secondary" data-testid={`${testIdPrefix}-note-${choice.key}`}>
+                                    {note}
+                                </Typography.Text>
+                            </div>
+                        }
+                        {
                             choice.eligible && choice.cancels &&
                             <div>
                                 <Typography.Text type="warning" data-testid={`${testIdPrefix}-cancels-${choice.key}`}>
@@ -298,7 +323,7 @@ function DeployChoices({dialog, query, choices, buildOf, emptyText, label, testI
                             </div>
                         }
                     </div>
-                ))
+                })
             }
         </Space>
     )

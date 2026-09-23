@@ -40,6 +40,16 @@ export class DeployDialog {
     }
 
     /**
+     * An eligible slot the build cannot go to yet: offered all the same - the deployment waits as a
+     * candidate - but saying why it would wait (#1851).
+     */
+    async expectSlotNotDeployableYet(slot, reason) {
+        await expect(this.page.getByTestId(`deploy-dialog-slot-not-deployable-${slot.id}`))
+            .toContainText(`Not deployable yet: ${reason}`)
+        await expect(this.page.getByTestId(`deploy-dialog-slot-start-${slot.id}`)).toBeEnabled()
+    }
+
+    /**
      * The warning that starting this deployment cancels the slot's active one - which is what
      * `SlotServiceImpl.startPipeline` has always done, silently.
      */

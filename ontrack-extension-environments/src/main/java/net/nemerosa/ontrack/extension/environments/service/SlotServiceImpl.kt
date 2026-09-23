@@ -155,7 +155,7 @@ class SlotServiceImpl(
     }
 
     override fun isBuildEligible(slot: Slot, build: Build): Boolean =
-        eligibleSlot(slot, build).eligible
+        eligibleSlot(slot, build, deployability = false).eligible
 
     /**
      * Whether [build] may enter [slot], **and** the rules which say it may not.
@@ -165,8 +165,12 @@ class SlotServiceImpl(
      * answering the second one separately would mean walking them twice and let the two answers
      * disagree. A slot is eligible exactly when no rule of its own refuses, which is why
      * [EligibleSlot.eligible] is derived from the list here rather than computed beside it.
+     *
+     * With [deployability], an eligible build is also checked against what each rule can decide on
+     * the build alone ([SlotAdmissionRule.checkBuildDeployable]) - the same question the deployable
+     * listing of [getEligibleBuilds] answers in SQL.
      */
-    private fun eligibleSlot(slot: Slot, build: Build): EligibleSlot {
+    private fun eligibleSlot(slot: Slot, build: Build, deployability: Boolean): EligibleSlot {
         securityService.checkSlotAccess<SlotView>(slot)
         // Always checking the project. Not a rule, and so not something to report as one: a slot
         // of another project is not on offer at all rather than on offer and refusing.
@@ -179,12 +183,50 @@ class SlotServiceImpl(
         val nonEligibleRules = configs.filterNot { config ->
             isBuildEligible(slot, config, build)
         }
+        if (nonEligibleRules.isNotEmpty()) {
+            return EligibleSlot(
+                slot = slot,
+                eligible = false,
+                nonEligibleRules = nonEligibleRules,
+            )
+        }
+        if (!deployability) {
+            return EligibleSlot(slot = slot, eligible = true)
+        }
+        // Checking what can be checked on the build alone
+        val checks = configs.map { config ->
+            config to checkBuildDeployable(slot, config, build)
+        }
+        val nonDeployableRules = checks.mapNotNull { (config, check) ->
+            check?.takeIf { !it.ok }?.let {
+                EligibleSlotRuleCheck(rule = config, reason = it.reason)
+            }
+        }
         return EligibleSlot(
             slot = slot,
-            eligible = nonEligibleRules.isEmpty(),
-            nonEligibleRules = nonEligibleRules,
+            eligible = true,
+            deployable = nonDeployableRules.isEmpty(),
+            nonDeployableRules = nonDeployableRules,
+            pipelineOnlyRules = checks.filter { (_, check) -> check == null }.map { (config, _) -> config },
         )
     }
+
+    private fun checkBuildDeployable(
+        slot: Slot,
+        config: SlotAdmissionRuleConfig,
+        build: Build
+    ): SlotDeploymentCheck? {
+        val rule = slotAdmissionRuleRegistry.getRule(config.ruleId)
+        return checkBuildDeployable(slot, rule, config.ruleConfig, build)
+    }
+
+    private fun <C : Any, D> checkBuildDeployable(
+        slot: Slot,
+        rule: SlotAdmissionRule<C, D>,
+        jsonRuleConfig: JsonNode,
+        build: Build
+    ): SlotDeploymentCheck? =
+        rule.checkBuildDeployable(build, slot, rule.parseConfig(jsonRuleConfig))
 
     override fun getEligibleBuilds(
         slot: Slot,
@@ -352,7 +394,7 @@ class SlotServiceImpl(
 
     override fun getEligibleSlotsForBuild(build: Build): List<EligibleSlot> =
         slotRepository.findSlotsByProject(build.project, qualifier = null).map { slot ->
-            eligibleSlot(slot, build)
+            eligibleSlot(slot, build, deployability = true)
         }
 
     override fun findSlotByProjectAndEnvironment(environment: Environment, project: Project, qualifier: String): Slot? =

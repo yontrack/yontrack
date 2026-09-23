@@ -42,7 +42,15 @@ class PromotionSlotAdmissionRule(
         queries += "PL.NAME = :promotionName"
         params["promotionName"] = config.promotion
         if (deployable) {
-            queries += "PR.ID IS NOT NULL"
+            // Promoted to *this* level, not to any level of the branch
+            queries += """
+                EXISTS (
+                    SELECT 1
+                    FROM PROMOTION_RUNS PRD
+                    WHERE PRD.BUILDID = BD.ID
+                    AND PRD.PROMOTIONLEVELID = PL.ID
+                )
+            """
         }
     }
 
@@ -59,14 +67,23 @@ class PromotionSlotAdmissionRule(
         admissionRuleConfig: SlotAdmissionRuleConfig,
         ruleConfig: PromotionSlotAdmissionRuleConfig,
         ruleData: SlotAdmissionRuleTypedData<Any>?
+    ): SlotDeploymentCheck = checkBuildDeployable(pipeline.build, pipeline.slot, ruleConfig)
+
+    /**
+     * Build deployable if it is promoted to the level required by the rule.
+     */
+    override fun checkBuildDeployable(
+        build: Build,
+        slot: Slot,
+        config: PromotionSlotAdmissionRuleConfig
     ): SlotDeploymentCheck {
         val pl = structureService.findPromotionLevelByName(
-            pipeline.build.project.name,
-            pipeline.build.branch.name,
-            ruleConfig.promotion
+            build.project.name,
+            build.branch.name,
+            config.promotion
         ).getOrNull() ?: return SlotDeploymentCheck.nok("Promotion not existing")
         return SlotDeploymentCheck.check(
-            structureService.getLastPromotionRunForBuildAndPromotionLevel(pipeline.build, pl).getOrNull() != null,
+            structureService.getLastPromotionRunForBuildAndPromotionLevel(build, pl).getOrNull() != null,
             "Build promoted",
             "Build not promoted"
         )

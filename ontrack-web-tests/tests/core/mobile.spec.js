@@ -665,6 +665,11 @@ test.describe('the mobile UI on a phone', () => {
         await expect(productionCard).toContainText(/GOLD/)
         await expect(page.getByTestId(`mobile-deploy-start-${productionSlot.id}`)).toHaveCount(0)
 
+        // The approval is given on the deployment itself, so it is no reason to
+        // warn - only a note that it will be asked for (#1851).
+        await expect(page.getByTestId(`mobile-deploy-note-${stagingSlot.id}`)).toContainText('Needs approval once started')
+        await expect(page.getByTestId(`mobile-deploy-not-deployable-${stagingSlot.id}`)).toHaveCount(0)
+
         // Nothing scrolls sideways at 375px, which every mobile surface has to
         // meet. Asserted after the cards are up: the sheet is empty until the
         // slots arrive, and an empty sheet overflows nothing.
@@ -701,6 +706,35 @@ test.describe('the mobile UI on a phone', () => {
         // (#1736). The completion itself is its own journey, below.
         await expect(page.getByTestId('mobile-deployment-run')).toHaveCount(0)
         await expect(page.getByTestId('mobile-deployment-finish')).toBeEnabled()
+    })
+
+    test('a build not promoted yet is deployed from a phone, with a warning', async ({page, ontrack}) => {
+        // #1851: eligible - the branch has the level - but not deployable, since
+        // the build is not promoted. The deployment can still be started, and
+        // waits as a candidate; what it must not be is silent.
+        const project = await ontrack.createProject()
+        const environment = await ontrack.environments.createEnvironment({})
+        const slot = await environment.createSlot({project})
+        await ontrack.environments.addPromotionRule({slot, promotion: 'BRONZE'})
+
+        const branch = await project.createBranch()
+        await branch.createPromotionLevel('BRONZE')
+        const build = await branch.createBuild()
+
+        await page.setViewportSize({width: 375, height: 812})
+        await signInOnPhone(page, ontrack)
+        await page.goto(`${ontrack.connection.ui}/mobile/build/${build.id}`)
+
+        await page.getByTestId('mobile-build-deploy').click()
+
+        await expect(page.getByTestId(`mobile-deploy-not-deployable-${slot.id}`))
+            .toContainText('Not deployable yet: Build not promoted')
+        await expectNoSidewaysScroll(page)
+
+        // Still offered: the candidate becomes runnable once the build is promoted.
+        await page.getByTestId(`mobile-deploy-start-${slot.id}`).click()
+        await expect(page).toHaveURL(/\/mobile\/deployment\/[0-9a-f-]{36}$/)
+        await expect(page.getByTestId('mobile-deployment-run')).toBeDisabled()
     })
 
     test('a blocked deployment is overridden from a phone, with a reason', async ({page, ontrack}) => {

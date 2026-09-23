@@ -38,7 +38,7 @@ the second one is not the one you are looking at.
 | `SelectLabel`, and the `LabelChip` it draws its options with — the project list's label filter is the same control on both UIs (#1806) | Every other label affordance: no chip on a mobile row, no assignment dialog, no label page |
 | Authorization helpers (`isAuthorized`, the `authorizations` field) | `MainLayout`, `MainPage`, `MainPageBar`, `NavBar`, `UserMenu` |
 | Theme tokens (`styles/globals.css`) and the pre-paint theme script | The mobile shell: `MobileLayout`, `MobileHeader`, `MobileBottomNav` |
-| A handful of display primitives — `ValidationChip`, `PromotionLevelImage`, `TimestampText`, `DurationMs`, `EntityIcon`, `CheckIcon`, `SlotPipelineStatusLabel`, `SlotWorkflowTrigger`, `WorkflowInstanceStatus`, `WorkflowInstanceNodeStatus`, and the `workflowNodeDepths` ordering function | The provider stack: `/mobile` is its own App Router root and assembles its own |
+| A handful of display primitives — `ValidationChip`, `PromotionLevelImage`, `TimestampText`, `DurationMs`, `EntityIcon`, `CheckIcon`, `SlotPipelineStatusLabel`, `SlotWorkflowTrigger`, `WorkflowInstanceStatus`, `WorkflowInstanceNodeStatus`, the `workflowNodeDepths` ordering function, and the deploy dialog's `notDeployableWarning` / `pipelineOnlyNote` wording (`deployDialogModel`) | The provider stack: `/mobile` is its own App Router root and assembles its own |
 | The admission rule components under `components/framework/environments-slot-admission-rule/` | `Dynamic` itself — its webpack context belongs to the Pages Router layer, so a `/mobile` screen gets a second React and renders "Error". Mobile screens name their components statically |
 | The next-auth session and the `/api/protected/graphql` proxy | Every screen, and the lists and cards they are built from |
 
@@ -130,7 +130,7 @@ and it is also what makes the check cheap — this is the whole list.
 | Branch | `branch(id:)`, `Branch.builds(filter: StandardBuildFilter, size:)` with `withDisplayName` and `withPromotionLevel`, `Branch.promotionLevels` |
 | Build | `build(id:)` — `displayName`, `description`, `creation`, `branch`, `authorizations`, `promotionRuns(lastPerLevel: true)` with `workflowInstances`, `validations(size:)` with its runs' `lastStatus` |
 | Build and branch | `Build.currentDeployments` and `Build.slotPipelines(status:)` — asked for twice, aliased, for `CANDIDATE` and for `RUNNING` — in a query of their own |
-| Build, deploying | `eligibleSlotsForBuild(buildId:)` — `eligible`, `nonEligibleRules`, `slot`; `startSlotPipeline` |
+| Build, deploying | `eligibleSlotsForBuild(buildId:)` — `eligible`, `nonEligibleRules`, `deployable`, `nonDeployableRules`, `pipelineOnlyRules`, `slot`; `startSlotPipeline` |
 | Deployment | `slotPipelineById(id:)` — `status`, `slot` with its `authorizations` and its `workflows(trigger:)` (three aliases) each with `slotWorkflowInstanceForPipeline(pipelineId:)`, `admissionRules`, `requiredInputs`, `runAction`, `finishAction`, `errorMessage`, `lastChange`; `updatePipelineData`, `overridePipelineRule`, `startSlotPipelineDeployment`, `finishSlotPipelineDeployment`, `cancelSlotPipeline` |
 | Workflow run | `workflowInstance(id:)` — `status`, `finished`, `startTime`, `durationMs`, `triggerData`, `workflow { name nodes }`, `nodesExecutions`; and a narrow second query of the same field while the run is unfinished |
 | Account | `user { account { name fullName email } }` and `info { version { display } }`, both through the shared providers rather than a query of its own |

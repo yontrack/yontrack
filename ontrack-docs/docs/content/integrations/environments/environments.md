@@ -42,11 +42,41 @@ It is the home of one project's deployments into one environment.
   took, and the error if there was one. It can be filtered by status, by build and by user — *user*
   meaning anybody on the deployment's audit trail, not only whoever started it — and the filtering is
   done by the server, so the answers do not depend on how much of the history is on screen.
-* **Eligible builds** lists what could go into the slot next, with *Deploy* on each. The
-  *Show all eligible builds* switch widens the list from the builds the slot's rules already accept
-  to every eligible one, so that "why can I not deploy this?" has somewhere to be asked.
+* **Eligible builds** lists what could go into the slot next, with *Deploy* on each. By default it
+  lists the [deployable](#eligible-and-deployable-builds) builds — the ones the slot's rules already
+  accept. The *Show all eligible builds* switch widens the list to every eligible one, so that "why
+  can I not deploy this?" has somewhere to be asked.
 * **Setup** holds the slot's admission rules and its workflows: adding, editing and deleting them,
   and deleting the slot itself. The whole tab is hidden from a user who may not configure the slot.
+
+## Eligible and deployable builds
+
+Every admission rule of a slot answers two questions about a build:
+
+* **Eligible** — the build *could* go to this slot. A deployment can be started for it, and waits as
+  a **candidate**. For the `promotion` rule, the build's branch has the promotion level.
+* **Deployable** — the build *can go now*: its candidate would run at once. For the `promotion` rule,
+  the build itself is promoted to that level.
+
+A build can be eligible and not yet deployable — not promoted yet, not deployed in the previous
+environment yet, or not on the last branch when the `branchPattern` rule has `lastBranchOnly`.
+Starting a deployment for it is allowed: the candidate becomes runnable once the rules accept it.
+The deploy dialog opened from a build, and its mobile counterpart, say so beside the slot — *Not
+deployable yet: Build not promoted* — and still offer the action.
+
+A `manual` approval is given on the deployment itself, so it can never be satisfied before the
+deployment exists. It is not counted against deployability; the deploy dialog only notes *Needs
+approval once started*.
+
+In the GraphQL API:
+
+* `Slot.eligibleBuilds` and `Slot.eligibleBuild` return the **deployable** builds by default.
+  Pass `deployable: false` to get every eligible build.
+* `eligibleSlotsForBuild` gives, for each slot of the build's project, `eligible` and
+  `nonEligibleRules`, and also `deployable`, `nonDeployableRules` (each with the rule and its
+  reason) and `pipelineOnlyRules` (the rules decided on the deployment only, like `manual`).
+* `startSlotPipeline` creates a candidate for any eligible build. Whether it can run is on the
+  returned pipeline, in `runAction { ok }` and `admissionRules { check { ok reason } }`.
 
 ## The deployment page
 

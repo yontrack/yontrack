@@ -28,7 +28,7 @@ class BranchPatternSlotAdmissionRule(
     override fun parseConfig(jsonRuleConfig: JsonNode) = jsonRuleConfig.parse<BranchPatternSlotAdmissionRuleConfig>()
 
     override fun isBuildEligible(build: Build, slot: Slot, config: BranchPatternSlotAdmissionRuleConfig): Boolean =
-        // TODO Last branch criteria
+        // `lastBranchOnly` is a deployability criteria, see checkBuildDeployable
         isBranchEligible(build.branch.name, config)
 
     /**
@@ -102,31 +102,19 @@ class BranchPatternSlotAdmissionRule(
         admissionRuleConfig: SlotAdmissionRuleConfig,
         ruleConfig: BranchPatternSlotAdmissionRuleConfig,
         ruleData: SlotAdmissionRuleTypedData<Any>?
+    ): SlotDeploymentCheck = checkBuildDeployable(pipeline.build, pipeline.slot, ruleConfig)
+
+    /**
+     * Build deployable if its branch is included by the patterns and, with `lastBranchOnly`, if it
+     * is the last of the included branches - the same last branch as [fillEligibilityCriteria].
+     */
+    override fun checkBuildDeployable(
+        build: Build,
+        slot: Slot,
+        config: BranchPatternSlotAdmissionRuleConfig
     ): SlotDeploymentCheck {
-        val eligibility = isBuildEligible(
-            build = pipeline.build,
-            config = ruleConfig,
-            slot = pipeline.slot,
-        )
-        val check = if (eligibility) {
-            if (ruleConfig.lastBranchOnly) {
-                val ordering = branchOrderingService.getSemVerBranchOrdering(
-                    branchNamePolicy = BranchNamePolicy.NAME_ONLY,
-                )
-                val branches = structureService.filterBranchesForProject(
-                    project = pipeline.slot.project,
-                    filter = BranchFilter(
-                        name = ruleConfig.includes.takeIf { it.isNotEmpty() }?.joinToString("|"),
-                        count = 10, // Arbitrary number
-                    )
-                ).sortedWith(ordering)
-                branches.firstOrNull()?.id == pipeline.build.branch.id
-            } else {
-                true
-            }
-        } else {
-            false
-        }
+        val check = isBuildEligible(build = build, slot = slot, config = config) &&
+                (!config.lastBranchOnly || findLastBranch(slot.project, config)?.id == build.branch.id)
         return SlotDeploymentCheck.check(
             check = check,
             ok = "Build branch is valid",

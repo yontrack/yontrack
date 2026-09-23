@@ -402,7 +402,8 @@ export const gqlDeployDialogBuilds = gql`
         `
 
 /**
- * From a build: every slot of its project, with the rules refusing this build.
+ * From a build: every slot of its project, with the rules refusing this build, and the ones which
+ * would keep its deployment waiting as a candidate.
  */
 export const gqlDeployDialogSlots = gql`
             query DeployDialogSlots($buildId: Int!) {
@@ -413,6 +414,21 @@ export const gqlDeployDialogSlots = gql`
                         name
                         ruleId
                         ruleConfig
+                    }
+                    # Eligible but not deployable yet: the deployment would wait as a candidate
+                    deployable
+                    nonDeployableRules {
+                        rule {
+                            id
+                            name
+                            ruleId
+                        }
+                        reason
+                    }
+                    pipelineOnlyRules {
+                        id
+                        name
+                        ruleId
                     }
                     slot {
                         id
