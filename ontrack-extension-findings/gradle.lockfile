@@ -73,6 +73,7 @@ net.minidev:accessors-smart:2.6.0=testCompileClasspath,testRuntimeClasspath
 net.minidev:json-smart:2.6.0=testCompileClasspath,testRuntimeClasspath
 org.apache.commons:commons-collections4:4.4=runtimeClasspath,testRuntimeClasspath
 org.apache.commons:commons-lang3:3.20.0=runtimeClasspath,testRuntimeClasspath
+org.apache.commons:commons-math3:3.6.1=testRuntimeClasspath
 org.apache.commons:commons-text:1.13.0=runtimeClasspath,testRuntimeClasspath
 org.apache.httpcomponents.client5:httpclient5:5.6.4=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
 org.apache.httpcomponents.core5:httpcore5-h2:5.4.3=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath

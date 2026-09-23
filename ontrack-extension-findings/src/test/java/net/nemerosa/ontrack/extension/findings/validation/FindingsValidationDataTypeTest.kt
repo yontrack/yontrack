@@ -89,6 +89,11 @@ class FindingsValidationDataTypeTest {
     }
 
     @Test
+    fun `CHML is compatible, ThresholdNumber is not`() {
+        assertEquals(setOf(CHMLValidationDataType::class.java.name), dataType.compatibleDataTypes)
+    }
+
+    @Test
     fun `Configuration is the one of CHML`() {
         val json = dataType.configToJson(config)
         assertEquals(config, dataType.configFromJson(json))

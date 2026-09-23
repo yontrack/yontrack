@@ -67,17 +67,15 @@ class ValidationStampMetricsChartProvider(
             ?.takeIf { it is NumericValidationDataType }
             ?: return emptyMetricsChart)
                 as NumericValidationDataType
-        // Collecting all metrics
+        // Collecting all metrics, from the runs of the stamp's type and of the types it is compatible with
         val items = runs.mapNotNull { run ->
             run.data?.let { data ->
-                val runDataType = validationDataTypeService.getValidationDataType<Any, Any>(data.descriptor.id)
-                if (runDataType != null && runDataType.descriptor.id == dataTypeId) {
+                val runDataType = getRunDataType(dataType, data.descriptor.id)
+                runDataType?.let {
                     MetricsChartItemData(
                         timestamp = run.lastStatus.signature.time,
-                        dataType.getNumericMetrics(data.data!!)
+                        it.getNumericMetrics(data.data!!)
                     )
-                } else {
-                    null
                 }
             }
         }
@@ -90,4 +88,23 @@ class ValidationStampMetricsChartProvider(
             period = options.period,
         )
     }
+
+    /**
+     * Gets the type whose metrics a run contributes to the chart of a stamp of type [dataType]:
+     * the stamp's type itself, or a type it declares compatible, or none, the run being then
+     * left out of the chart.
+     */
+    private fun getRunDataType(
+        dataType: NumericValidationDataType<Any, Any>,
+        runDataTypeId: String,
+    ): NumericValidationDataType<Any, Any>? =
+        when (runDataTypeId) {
+            dataType.descriptor.id -> dataType
+            in dataType.compatibleDataTypes ->
+                @Suppress("UNCHECKED_CAST")
+                validationDataTypeService.getValidationDataType<Any, Any>(runDataTypeId)
+                        as? NumericValidationDataType<Any, Any>
+
+            else -> null
+        }
 }

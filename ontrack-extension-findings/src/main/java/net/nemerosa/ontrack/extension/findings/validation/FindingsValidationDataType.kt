@@ -24,7 +24,8 @@ import tools.jackson.databind.JsonNode
  * UNKNOWN findings are counted and shown, but never trip a threshold, since CHML has no such level.
  *
  * The run data holds the counts only, under the keys of CHML plus `unknown` and `accepted`; the
- * findings themselves are in their own tables.
+ * findings themselves are in their own tables. Its metrics are the ones of CHML, which it declares
+ * compatible: a stamp switched from CHML keeps its chart history.
  */
 @Component
 class FindingsValidationDataType(
@@ -81,6 +82,11 @@ class FindingsValidationDataType(
 
     override fun getNumericMetrics(data: FindingsValidationDataTypeData): Map<String, Double> =
         chml.getNumericMetrics(data.asCHML())
+
+    /**
+     * The counts are under the keys of CHML, so a stamp switched from CHML keeps its chart history.
+     */
+    override val compatibleDataTypes: Set<String> = setOf(CHMLValidationDataType::class.java.name)
 }
 
 /**
