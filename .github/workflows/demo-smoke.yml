@@ -203,7 +203,11 @@ jobs:
         id: poll
         env:
           DEMO_TOKEN: ${{ env.TARGET_TOKEN }}
-          DEMO_POLL_TIMEOUT: '600'
+          # 30 minutes. Since rc-350 (2026-09-22) a rollout takes the old pod down before the new
+          # one is ready, and the new one has needed more than 10 minutes to answer: two smokes
+          # failed on a 503 for their whole 600s and the same build then passed first time. The
+          # rest of the job takes ~7 minutes, which still fits in its 45.
+          DEMO_POLL_TIMEOUT: '1800'
         run: scripts/demo-smoke.sh poll
 
       # ------------------------------------------------------------------------------------
