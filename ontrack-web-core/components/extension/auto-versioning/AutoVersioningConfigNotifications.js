@@ -47,7 +47,7 @@ export default function AutoVersioningConfigNotifications({notifications}) {
                         }
                     />
 
-                < /Table>
+                </Table>
             }
         </>
     )
