@@ -132,6 +132,17 @@ Configuration:
     * `level`: CRITICAL / HIGH / MEDIUM / LOW
     * `value`: when the number of issues in this `level` is above this threshold, the validation stamp is failed
 
+### Security findings
+
+The findings of a security scan, sent as a report rather than as counts. Yontrack keeps the
+findings themselves and follows them from build to build — see [Security findings](../../integrations/findings/findings.md).
+
+Value: the number of findings by severity, as for [CHML](#chml), plus the number of `UNKNOWN` and
+of accepted findings.
+
+Configuration: the one of [CHML](#chml). The accepted and `UNKNOWN` findings never trip a
+threshold.
+
 ### Percentage
 
 Value: an integer between 0 and 100.

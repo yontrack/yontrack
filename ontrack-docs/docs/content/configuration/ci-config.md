@@ -349,6 +349,7 @@ the following aliases can be used:
 | `percentage` | [Percentage](../concepts/model/index.md#percentage)           |
 | `number`     | [Number](../concepts/model/index.md#number)                   |
 | `metrics`    | [Metrics](../concepts/model/index.md#metrics)                 |
+| `security-findings` | [Security findings](../integrations/findings/findings.md#the-validation-stamp-type) |
 
 For example, to fail a validation as soon as at least one secret is detected (`okIfGreater: false` means that the
 lower the value, the better):
