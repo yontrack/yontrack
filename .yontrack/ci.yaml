@@ -524,11 +524,15 @@ configuration:
                                 value: "v6"
               - name: demo.dev.yontrack.com
                 admissionRules:
+                  # Anchored, as on the v6 slot: a bare `main` also matches any branch whose name
+                  # contains it, and `lastBranchOnly` then picks the last of those, so a branch like
+                  # `claude-ci-build-performance-main-pipeline` won and no build of `main` could be
+                  # deployed to the demo.
                   - name: "branchPattern"
                     ruleId: "branchPattern"
                     ruleConfig:
                       includes:
-                        - "main"
+                        - "^main$"
                       lastBranchOnly: true
                   - name: "promotion"
                     ruleId: "promotion"
