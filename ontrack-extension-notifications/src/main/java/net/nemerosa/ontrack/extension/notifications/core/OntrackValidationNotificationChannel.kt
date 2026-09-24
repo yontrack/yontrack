@@ -14,6 +14,7 @@ import net.nemerosa.ontrack.model.events.EventTemplatingService
 import net.nemerosa.ontrack.model.exceptions.BranchNotFoundException
 import net.nemerosa.ontrack.model.exceptions.BuildNotFoundException
 import net.nemerosa.ontrack.model.exceptions.ProjectNotFoundException
+import net.nemerosa.ontrack.model.exceptions.ValidationRunStatusNotFoundException
 import net.nemerosa.ontrack.model.security.SecurityService
 import net.nemerosa.ontrack.model.structure.*
 import org.springframework.stereotype.Component
@@ -29,6 +30,7 @@ class OntrackValidationNotificationChannel(
     private val structureService: StructureService,
     private val securityService: SecurityService,
     private val runInfoService: RunInfoService,
+    private val validationRunStatusService: ValidationRunStatusService,
 ) : AbstractNotificationChannel<OntrackValidationNotificationChannelConfig, OntrackValidationNotificationChannelOutput>(
     OntrackValidationNotificationChannelConfig::class
 ) {
@@ -36,6 +38,17 @@ class OntrackValidationNotificationChannel(
     override fun validateParsedConfig(config: OntrackValidationNotificationChannelConfig) {
         if (config.validation.isBlank()) {
             throw EventSubscriptionConfigException("Validation stamp name cannot be blank.")
+        }
+        validateStatus(config.status)
+    }
+
+    internal fun validateStatus(status: String?) {
+        if (!status.isNullOrBlank() && !status.contains("\${")) {
+            try {
+                validationRunStatusService.getValidationRunStatus(status)
+            } catch (e: ValidationRunStatusNotFoundException) {
+                throw EventSubscriptionConfigException("Status [$status] is not a valid validation run status ID.")
+            }
         }
     }
 
@@ -49,6 +62,7 @@ class OntrackValidationNotificationChannel(
             build = patchNullableString(changes, a::build),
             validation = patchString(changes, a::validation),
             runTime = patchNullableString(changes, a::runTime),
+            status = patchNullableString(changes, a::status),
         )
     }
 
@@ -69,12 +83,14 @@ class OntrackValidationNotificationChannel(
         val build = securityService.asAdmin { getTargetBuild(config, event, context) }
         val description = eventTemplatingService.renderEvent(event, context, template)
 
+        val status = resolveStatus(config.status, event, context)
+
         val run = securityService.asAdmin {
             structureService.newValidationRun(
                 build = build,
                 validationRunRequest = ValidationRunRequest(
                     validationStampName = config.validation,
-                    validationRunStatusId = ValidationRunStatusID.STATUS_PASSED,
+                    validationRunStatusId = status,
                     description = description,
                 )
             )
@@ -108,6 +124,15 @@ class OntrackValidationNotificationChannel(
         val rendered = eventTemplatingService.renderEvent(event, context, template = runTime)
         // If not blank and a number
         return rendered.takeIf { it.isNotBlank() }?.toIntOrNull()
+    }
+
+    internal fun resolveStatus(status: String?, event: Event, context: Map<String, Any>): ValidationRunStatusID {
+        val id = if (status.isNullOrBlank()) {
+            ValidationRunStatusID.PASSED
+        } else {
+            eventTemplatingService.renderEvent(event, context, template = status).trim()
+        }
+        return validationRunStatusService.getValidationRunStatus(id)
     }
 
     internal fun getTargetBuild(
