@@ -1,6 +1,6 @@
 import {Space, Typography} from "antd";
 
-export default function OntrackValidationNotificationChannelConfig({project, branch, build, validation}) {
+export default function OntrackValidationNotificationChannelConfig({project, branch, build, validation, status}) {
     return (
         <>
             <Space direction="vertical">
@@ -19,6 +19,10 @@ export default function OntrackValidationNotificationChannelConfig({project, bra
                 <Space>
                     Validation:
                     <Typography.Text code>{validation}</Typography.Text>
+                </Space>
+                <Space>
+                    Status:
+                    <Typography.Text code>{status || 'PASSED'}</Typography.Text>
                 </Space>
             </Space>
         </>

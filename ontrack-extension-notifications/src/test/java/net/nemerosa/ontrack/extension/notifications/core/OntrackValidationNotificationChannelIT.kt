@@ -152,4 +152,79 @@ class OntrackValidationNotificationChannelIT : AbstractNotificationTestSupport()
         }
     }
 
+    @Test
+    fun `Validation status defaults to passed when not configured`() {
+        asAdmin {
+            project {
+                branch {
+                    val vs = validationStamp()
+                    val pl = promotionLevel()
+
+                    eventSubscriptionService.subscribe(
+                        name = uid("p"),
+                        projectEntity = pl,
+                        channel = ontrackValidationNotificationChannel,
+                        channelConfig = OntrackValidationNotificationChannelConfig(
+                            validation = vs.name,
+                        ),
+                        keywords = null,
+                        origin = "test",
+                        contentTemplate = "Validation of ${"$"}{build}",
+                        eventTypes = arrayOf(EventFactory.NEW_PROMOTION_RUN),
+                    )
+
+                    build {
+                        promote(pl)
+
+                        val run = structureService.getValidationRunsForValidationStamp(vs, 0, 10).firstOrNull()
+                        assertNotNull(run) {
+                            assertEquals(
+                                ValidationRunStatusID.STATUS_PASSED,
+                                it.lastStatus.statusID,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `Validation status using a fixed value`() {
+        asAdmin {
+            project {
+                branch {
+                    val vs = validationStamp()
+                    val pl = promotionLevel()
+
+                    eventSubscriptionService.subscribe(
+                        name = uid("p"),
+                        projectEntity = pl,
+                        channel = ontrackValidationNotificationChannel,
+                        channelConfig = OntrackValidationNotificationChannelConfig(
+                            validation = vs.name,
+                            status = "FAILED",
+                        ),
+                        keywords = null,
+                        origin = "test",
+                        contentTemplate = "Validation of ${"$"}{build}",
+                        eventTypes = arrayOf(EventFactory.NEW_PROMOTION_RUN),
+                    )
+
+                    build {
+                        promote(pl)
+
+                        val run = structureService.getValidationRunsForValidationStamp(vs, 0, 10).firstOrNull()
+                        assertNotNull(run) {
+                            assertEquals(
+                                ValidationRunStatusID.STATUS_FAILED,
+                                it.lastStatus.statusID,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
 }

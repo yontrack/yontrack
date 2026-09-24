@@ -13,4 +13,6 @@ data class OntrackValidationNotificationChannelConfig(
     val validation: String,
     @APIDescription("Run time. Can be a template must be rendered as a number of seconds.")
     val runTime: String? = null,
+    @APIDescription("[template] Status of the validation run, must render to a valid validation run status ID (e.g. PASSED, FAILED). Defaults to PASSED.")
+    val status: String? = null,
 )

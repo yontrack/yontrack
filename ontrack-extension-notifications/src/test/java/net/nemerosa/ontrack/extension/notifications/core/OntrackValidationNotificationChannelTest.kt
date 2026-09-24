@@ -2,12 +2,14 @@ package net.nemerosa.ontrack.extension.notifications.core
 
 import io.mockk.every
 import io.mockk.mockk
+import net.nemerosa.ontrack.extension.notifications.subscriptions.EventSubscriptionConfigException
 import net.nemerosa.ontrack.it.MockSecurityService
 import net.nemerosa.ontrack.model.events.Event
 import net.nemerosa.ontrack.model.events.EventTemplatingService
 import net.nemerosa.ontrack.model.exceptions.BranchNotFoundException
 import net.nemerosa.ontrack.model.exceptions.BuildNotFoundException
 import net.nemerosa.ontrack.model.exceptions.ProjectNotFoundException
+import net.nemerosa.ontrack.model.exceptions.ValidationRunStatusNotFoundException
 import net.nemerosa.ontrack.model.structure.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -20,6 +22,7 @@ class OntrackValidationNotificationChannelTest {
     private lateinit var channel: OntrackValidationNotificationChannel
     private lateinit var structureService: StructureService
     private lateinit var eventTemplatingService: EventTemplatingService
+    private lateinit var validationRunStatusService: ValidationRunStatusService
 
     @BeforeEach
     fun before() {
@@ -32,11 +35,23 @@ class OntrackValidationNotificationChannelTest {
             it.invocation.args[2] as? String? ?: error("No template provided")
         }
 
+        validationRunStatusService = mockk()
+        every {
+            validationRunStatusService.getValidationRunStatus(any())
+        } answers {
+            when (val id = it.invocation.args[0] as String) {
+                ValidationRunStatusID.PASSED -> ValidationRunStatusID.STATUS_PASSED
+                ValidationRunStatusID.FAILED -> ValidationRunStatusID.STATUS_FAILED
+                else -> throw ValidationRunStatusNotFoundException(id)
+            }
+        }
+
         channel = OntrackValidationNotificationChannel(
             eventTemplatingService = eventTemplatingService,
             structureService = structureService,
             securityService = MockSecurityService(),
             runInfoService = mockk(),
+            validationRunStatusService = validationRunStatusService,
         )
     }
 
@@ -280,6 +295,86 @@ class OntrackValidationNotificationChannelTest {
                 context = emptyMap(),
             )
         )
+    }
+
+    @Test
+    fun `Resolving the status when not configured defaults to passed`() {
+        val event = mockk<Event>()
+        assertEquals(
+            ValidationRunStatusID.STATUS_PASSED,
+            channel.resolveStatus(status = null, event = event, context = emptyMap()),
+        )
+    }
+
+    @Test
+    fun `Resolving the status when blank defaults to passed`() {
+        val event = mockk<Event>()
+        assertEquals(
+            ValidationRunStatusID.STATUS_PASSED,
+            channel.resolveStatus(status = "", event = event, context = emptyMap()),
+        )
+    }
+
+    @Test
+    fun `Resolving the status from a template`() {
+        val event = mockk<Event>()
+        assertEquals(
+            ValidationRunStatusID.STATUS_FAILED,
+            channel.resolveStatus(status = "FAILED", event = event, context = emptyMap()),
+        )
+    }
+
+    @Test
+    fun `Resolving the status when a configured template renders blank fails`() {
+        val event = mockk<Event>()
+        every {
+            eventTemplatingService.renderEvent(event, emptyMap(), "\${blank}")
+        } returns ""
+        assertFailsWith<ValidationRunStatusNotFoundException> {
+            channel.resolveStatus(status = "\${blank}", event = event, context = emptyMap())
+        }
+    }
+
+    @Test
+    fun `Resolving the status trims whitespace from the rendered template`() {
+        val event = mockk<Event>()
+        every {
+            eventTemplatingService.renderEvent(event, emptyMap(), "\${status}")
+        } returns "  FAILED  "
+        assertEquals(
+            ValidationRunStatusID.STATUS_FAILED,
+            channel.resolveStatus(status = "\${status}", event = event, context = emptyMap()),
+        )
+    }
+
+    @Test
+    fun `Resolving an invalid status fails`() {
+        val event = mockk<Event>()
+        assertFailsWith<ValidationRunStatusNotFoundException> {
+            channel.resolveStatus(status = "NOT_A_STATUS", event = event, context = emptyMap())
+        }
+    }
+
+    @Test
+    fun `Validating the status accepts none`() {
+        channel.validateStatus(null)
+    }
+
+    @Test
+    fun `Validating the status accepts a valid literal`() {
+        channel.validateStatus("FAILED")
+    }
+
+    @Test
+    fun `Validating the status accepts a template without checking it`() {
+        channel.validateStatus("\${STATUS}")
+    }
+
+    @Test
+    fun `Validating the status rejects an invalid literal`() {
+        assertFailsWith<EventSubscriptionConfigException> {
+            channel.validateStatus("NOT_A_STATUS")
+        }
     }
 
 }
