@@ -94,6 +94,7 @@ nav:
           - GitHub Workflows: content/integrations/notifications/github-workflow.md
           - Bitbucket Pipelines: content/integrations/notifications/bitbucket-pipelines.md
           - GitLab pipelines: content/integrations/notifications/gitlab-pipeline.md
+          - Forwarding validations: content/integrations/notifications/ontrack-validation.md
       - Auto-versioning:
           - content/integrations/auto-versioning/auto-versioning.md
           - Jenkins post-processing: content/integrations/auto-versioning/jenkins.md

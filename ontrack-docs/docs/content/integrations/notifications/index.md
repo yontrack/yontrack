@@ -132,6 +132,7 @@ ${promotionRun.changelog?project=dependency}
 
 * [GitHub workflows](github-workflow.md) - triggering a GitHub Actions workflow
 * [Jenkins](jenkins.md) - triggering a Jenkins job
+* [Ontrack validation](ontrack-validation.md) - forwarding a validation, and its status, to another build
 
 ## Notification metrics
 
