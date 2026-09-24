@@ -37,6 +37,13 @@ export default function OntrackValidationNotificationChannelForm({prefix}) {
             >
                 <Input/>
             </Form.Item>
+            <Form.Item
+                name={prefixedFormName(prefix, 'status')}
+                label="Status"
+                extra="[template] Status of the validation run, must render to a valid validation run status ID (e.g. PASSED, FAILED). Defaults to PASSED."
+            >
+                <Input/>
+            </Form.Item>
         </>
     )
 }
