@@ -1,7 +1,6 @@
 # Search on Postgres — issue breakdown
 
-Breakdown of [README.md](README.md) into agent-sized issues. **Not created yet** — the GitHub
-column is filled when they are.
+Breakdown of [README.md](README.md) into agent-sized issues. Created on 2026-09-25.
 
 Every issue carries `initiative: postgres-search`, `type: enhancement`, `status:todo` and
 `ready-for-agent`, milestone `6.0`, and links back to the README section it implements.
@@ -11,26 +10,26 @@ Dependencies are recorded as native GitHub dependencies as well as prose. Base b
 
 | #   | GitHub | Issue                                                               | Repo / base                 | Depends on   |
 |-----|--------|---------------------------------------------------------------------|-----------------------------|--------------|
-| P1  | —      | `CONTEXT.md`: search document, search result type                   | `yontrack` / `v6`           | #1862        |
-| P2  | —      | `SEARCH_DOCUMENTS`, the contract, the Postgres service, the new query; projects | `yontrack` / `v6` | P1       |
-| P3  | —      | Branches and builds on Postgres                                     | `yontrack` / `v6`           | P2           |
-| P4  | —      | Releases, build links and git branches on Postgres                  | `yontrack` / `v6`           | P2           |
-| P5  | —      | SCM commits, issues and catalog on Postgres, incremental commit scan | `yontrack` / `v6`          | P2           |
-| P6  | —      | Findings by external id on Postgres                                 | `yontrack` / `v6`           | P2           |
-| P7  | —      | Remove Elasticsearch search                                         | `yontrack` / `v6`           | P3, P4, P5, P6 |
-| P8  | —      | Elasticsearch out of the dev and KDSL acceptance stacks             | `yontrack` / `v6`           | P7           |
-| P9  | —      | UI: the ⌘K command palette                                          | `yontrack` / `v6`           | P3           |
-| P10 | —      | UI: the `/search` results page                                      | `yontrack` / `v6`           | P3           |
-| P11 | —      | `searchPerfTest`                                                    | `yontrack` / `v6`           | P4, P5       |
-| P12 | —      | Nightly `SEARCH.PERFORMANCE` stamp                                  | `yontrack` / `main` + `v6`  | P11          |
-| P13 | —      | Chart v6: Elasticsearch no longer required                          | `yontrack-chart` / its default | P7        |
+| P1  | [#1876](https://github.com/yontrack/yontrack/issues/1876) | `CONTEXT.md`: search document, search result type                   | `yontrack` / `v6`           | #1862        |
+| P2  | [#1877](https://github.com/yontrack/yontrack/issues/1877) | `SEARCH_DOCUMENTS`, the contract, the Postgres service, the new query; projects | `yontrack` / `v6` | P1       |
+| P3  | [#1878](https://github.com/yontrack/yontrack/issues/1878) | Branches and builds on Postgres                                     | `yontrack` / `v6`           | P2           |
+| P4  | [#1879](https://github.com/yontrack/yontrack/issues/1879) | Releases, build links and git branches on Postgres                  | `yontrack` / `v6`           | P2           |
+| P5  | [#1880](https://github.com/yontrack/yontrack/issues/1880) | SCM commits, issues and catalog on Postgres, incremental commit scan | `yontrack` / `v6`          | P2           |
+| P6  | [#1881](https://github.com/yontrack/yontrack/issues/1881) | Findings by external id on Postgres                                 | `yontrack` / `v6`           | P2           |
+| P7  | [#1882](https://github.com/yontrack/yontrack/issues/1882) | Remove Elasticsearch search                                         | `yontrack` / `v6`           | P3, P4, P5, P6 |
+| P8  | [#1883](https://github.com/yontrack/yontrack/issues/1883) | Elasticsearch out of the dev and KDSL acceptance stacks             | `yontrack` / `v6`           | P7           |
+| P9  | [#1884](https://github.com/yontrack/yontrack/issues/1884) | UI: the ⌘K command palette                                          | `yontrack` / `v6`           | P3           |
+| P10 | [#1885](https://github.com/yontrack/yontrack/issues/1885) | UI: the `/search` results page                                      | `yontrack` / `v6`           | P3           |
+| P11 | [#1886](https://github.com/yontrack/yontrack/issues/1886) | `searchPerfTest`                                                    | `yontrack` / `v6`           | P4, P5       |
+| P12 | [#1887](https://github.com/yontrack/yontrack/issues/1887) | Nightly `SEARCH.PERFORMANCE` stamp                                  | `yontrack` / `main` + `v6`  | P11          |
+| P13 | [yontrack-chart#116](https://github.com/yontrack/yontrack-chart/issues/116) | Chart v6: Elasticsearch no longer required                          | `yontrack-chart` / its default | P7        |
 
 While P2–P6 are in flight, `v6` is always fully searchable: a temporary per-type router sends a
 type to Postgres once its indexer is migrated, to Elasticsearch otherwise. P7 deletes it.
 
 ---
 
-## P1 — `CONTEXT.md`: search document, search result type
+## P1 ([#1876](https://github.com/yontrack/yontrack/issues/1876)) — `CONTEXT.md`: search document, search result type
 
 README *Indexer contract*.
 
@@ -40,7 +39,7 @@ README *Indexer contract*.
 - Done when `CONTEXT.md` carries both.
 - Blocked by #1862; starts after `initiative: findings` is complete.
 
-## P2 — `SEARCH_DOCUMENTS`, the contract, the Postgres service, the new query; projects
+## P2 ([#1877](https://github.com/yontrack/yontrack/issues/1877)) — `SEARCH_DOCUMENTS`, the contract, the Postgres service, the new query; projects
 
 README *Postgres features*, *Storage*, *Indexer contract*, *Indexation*, *Querying*, *API*,
 *Upgrade to 6.0*.
@@ -74,7 +73,7 @@ README *Postgres features*, *Storage*, *Indexer contract*, *Indexation*, *Queryi
   - KDSL: binding for the new query; `ACCDSLSearch` still green through the wrapper.
 - No mobile impact: no UI.
 
-## P3 — Branches and builds on Postgres
+## P3 ([#1878](https://github.com/yontrack/yontrack/issues/1878)) — Branches and builds on Postgres
 
 README *Indexer contract*, *Matching*.
 
@@ -86,7 +85,7 @@ README *Indexer contract*, *Matching*.
   display name path; `ACCDSLSearch` (exact match first, prefix matching) green on Postgres.
 - No mobile impact: no UI.
 
-## P4 — Releases, build links and git branches on Postgres
+## P4 ([#1879](https://github.com/yontrack/yontrack/issues/1879)) — Releases, build links and git branches on Postgres
 
 README *Indexer contract*.
 
@@ -97,7 +96,7 @@ README *Indexer contract*.
 - Tests: IT per type, including deletion on property removal and on link removal.
 - No mobile impact: no UI.
 
-## P5 — SCM commits, issues and catalog on Postgres, incremental commit scan
+## P5 ([#1880](https://github.com/yontrack/yontrack/issues/1880)) — SCM commits, issues and catalog on Postgres, incremental commit scan
 
 README *SCM commits — the largest index*.
 
@@ -111,7 +110,7 @@ README *SCM commits — the largest index*.
   truncation, commit-hash lookup; Playwright `search.spec.js` commit and issue cases green.
 - No mobile impact: no UI.
 
-## P6 — Findings by external id on Postgres
+## P6 ([#1881](https://github.com/yontrack/yontrack/issues/1881)) — Findings by external id on Postgres
 
 README *Scope and order*.
 
@@ -120,7 +119,7 @@ README *Scope and order*.
 - Tests: the #1862 tests, green on Postgres.
 - No mobile impact beyond what #1862 decided.
 
-## P7 — Remove Elasticsearch search
+## P7 ([#1882](https://github.com/yontrack/yontrack/issues/1882)) — Remove Elasticsearch search
 
 README *Elasticsearch after the change*, *API*, *Reconciliation*, *Documentation*.
 
@@ -142,7 +141,7 @@ README *Elasticsearch after the change*, *API*, *Reconciliation*, *Documentation
   `ontrack-extension-elastic` ITs green with metrics enabled.
 - No mobile impact: no UI.
 
-## P8 — Elasticsearch out of the dev and KDSL acceptance stacks
+## P8 ([#1883](https://github.com/yontrack/yontrack/issues/1883)) — Elasticsearch out of the dev and KDSL acceptance stacks
 
 README *Elasticsearch after the change*.
 
@@ -155,7 +154,7 @@ README *Elasticsearch after the change*.
 - Tests: `dev-stack-test.sh`, `KdslStackTest`; a dev-stack `up` from a fresh checkout.
 - No mobile impact: no UI.
 
-## P9 — UI: the ⌘K command palette
+## P9 ([#1884](https://github.com/yontrack/yontrack/issues/1884)) — UI: the ⌘K command palette
 
 README *Command palette*.
 
@@ -177,7 +176,7 @@ README *Command palette*.
   #1723.
 - Demo: no `DemoContent` change, the seeded data already has what to find.
 
-## P10 — UI: the `/search` results page
+## P10 ([#1885](https://github.com/yontrack/yontrack/issues/1885)) — UI: the `/search` results page
 
 README *Results page*, *Highlighting*.
 
@@ -191,7 +190,7 @@ README *Results page*, *Highlighting*.
 - Tests: IT on `highlight`; Playwright on filters, pagination and a shared URL.
 - Mobile impact: none — `/search` stays desktop-only in `mobileRoutes`.
 
-## P11 — `searchPerfTest`
+## P11 ([#1886](https://github.com/yontrack/yontrack/issues/1886)) — `searchPerfTest`
 
 README *searchPerfTest*.
 
@@ -206,7 +205,7 @@ README *searchPerfTest*.
 - Tests: the task itself, run locally.
 - No mobile impact: no UI.
 
-## P12 — Nightly `SEARCH.PERFORMANCE` stamp
+## P12 ([#1887](https://github.com/yontrack/yontrack/issues/1887)) — Nightly `SEARCH.PERFORMANCE` stamp
 
 README *SEARCH.PERFORMANCE stamp*.
 
@@ -222,7 +221,7 @@ README *SEARCH.PERFORMANCE stamp*.
 - Tests: a `workflow_dispatch` run posting onto a `v6` build.
 - No mobile impact: no UI.
 
-## P13 — Chart v6: Elasticsearch no longer required
+## P13 ([yontrack-chart#116](https://github.com/yontrack/yontrack-chart/issues/116)) — Chart v6: Elasticsearch no longer required
 
 In `yontrack/yontrack-chart`, with that repository's labels. README *Elasticsearch after the
 change*.
