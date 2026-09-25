@@ -117,3 +117,19 @@ The resolved slot is recorded in `.yontrack-kdsl/instance.env` and reused by
 the next build, so a stack that is already up is never moved out from under
 itself. That file is also how anything outside Gradle discovers the ports,
 including an agent that wants to open the acceptance instance in a browser.
+
+## Amendment, 2026-09-25: Elasticsearch left the acceptance stacks (#1883)
+
+Search moved to Postgres in 6.0 (ADR 0017), so the three `docker-compose-kdsl*.yml` stacks
+have no Elasticsearch service. Yontrack's container no longer gets `SPRING_ELASTICSEARCH_URIS`
+or the retired `ONTRACK_CONFIG_SEARCH_INDEX_IMMEDIATE`, and `KdslStack` has no
+`BASE_ELASTIC` or `YONTRACK_KDSL_ELASTIC_PORT`. The text above is left as it was decided.
+
+**Still four slots.** The arithmetic argument no longer applies: once Elasticsearch's 9200 is
+gone, a fifth slot's management port would land on nothing. The machine argument alone is enough,
+though, since the stack is still a 2 GB Yontrack plus five containers. The Keycloak realms list
+the UI callback of each slot literally, and `KeycloakRealmsTest` checks them against
+`SLOT_MAX`. So `SLOT_MAX` stays at 3, and the other base ports are unchanged.
+
+The IPv6-probe story above is a record of what happened. The dev stack no longer publishes 9300,
+but the probe fix still holds for every other port.

@@ -64,7 +64,7 @@ Install with the [Helm chart](https://github.com/yontrack/yontrack-chart):
 helm install yontrack oci://registry-1.docker.io/yontrack/yontrack-chart
 ```
 
-This brings up Yontrack, PostgreSQL, Elasticsearch, RabbitMQ, and a Keycloak instance for
+This brings up Yontrack, PostgreSQL, RabbitMQ, and a Keycloak instance for
 authentication (default login `admin` / `admin`). Point it at your own
 [OIDC](https://docs.yontrack.com/yontrack/ref/latest/content/security/oidc.html) or
 [LDAP](https://docs.yontrack.com/yontrack/ref/latest/content/security/ldap.html) provider when

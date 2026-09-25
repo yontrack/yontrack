@@ -82,3 +82,16 @@ implementations are small, and each is unit-tested where it lives. The Gradle
 one is shared by every stack the build drives: `StackSlots` holds the
 arithmetic and each family -- `ItStack`, `KdslStack` -- is a set of base ports
 and a slot ceiling on top of it.
+
+## Amendment, 2026-09-25: the integration stack keeps Elasticsearch (#1883)
+
+Search moved to Postgres in 6.0 (ADR 0017), and Elasticsearch left the development stack
+(ADR 0004) and the KDSL acceptance stacks (ADR 0013). This stack **keeps** it, but only for the
+integration tests of `ontrack-extension-elastic`, the optional metrics export, which is its last
+user. `ItStack` and `spring.elasticsearch.uris` are unchanged. Moving those tests to
+Testcontainers, which would take Elasticsearch out of this stack too, is a separate matter.
+
+Two things above now read differently. A development stack no longer publishes 9200, so this
+stack's Elasticsearch has one less family to step around, although the probing is unchanged. The
+`SearchIndexer` half of the shared-stack argument is also gone, because search indices are rows in
+each test run's own Postgres database. The queue-name half still holds.

@@ -99,8 +99,39 @@ assert_eq "8180" "$(ds_port 8080 1)" "ds_port: backend on slot 1"
 assert_eq "8900" "$(ds_port 8800 1)" "ds_port: management on slot 1"
 assert_eq "8108" "$(ds_port 8008 1)" "ds_port: Keycloak on slot 1"
 assert_eq "5532" "$(ds_port 5432 1)" "ds_port: Postgres on slot 1"
-assert_eq "9300" "$(ds_port 9200 1)" "ds_port: Elasticsearch on slot 1"
+assert_eq "5772" "$(ds_port 5672 1)" "ds_port: RabbitMQ on slot 1"
 assert_eq "15772" "$(ds_port 15672 1)" "ds_port: Rabbit management on slot 1"
+
+# --- DS_BASE_PORTS ---------------------------------------------------------
+
+# Elasticsearch and Kibana left the dev stack (#1883): their ports are neither
+# published nor probed, so a slot is not refused because of them.
+for gone in 9200 5601; do
+    tests_run=$((tests_run + 1))
+    case " $DS_BASE_PORTS " in
+        *" $gone "*)
+            tests_failed=$((tests_failed + 1))
+            echo "FAIL: DS_BASE_PORTS still probes $gone, which the dev stack no longer publishes"
+            ;;
+    esac
+done
+
+assert_eq "3000 8080 8800 8008 5432 5672 15672" "$DS_BASE_PORTS" \
+    "DS_BASE_PORTS lists the services the dev stack always publishes"
+
+# No port of one slot lands on a port of another slot, over the whole range.
+all_ports=""
+for slot in $(seq 0 "$DS_SLOT_MAX"); do
+    for base in $DS_BASE_PORTS; do
+        all_ports="$all_ports $(ds_port "$base" "$slot")"
+    done
+done
+tests_run=$((tests_run + 1))
+collisions="$(printf '%s\n' $all_ports | sort | uniq -d | tr '\n' ' ')"
+if [ -n "$collisions" ]; then
+    tests_failed=$((tests_failed + 1))
+    echo "FAIL: ports collide across slots 0-$DS_SLOT_MAX: $collisions"
+fi
 
 # --- ds_project ------------------------------------------------------------
 

@@ -10,27 +10,6 @@ services:
     ports:
       - "5432:5432"
 
-  elasticsearch:
-    image: docker.elastic.co/elasticsearch/elasticsearch:9.2.0
-    ports:
-      - "9200:9200"
-      - "9300:9300"
-    environment:
-      - "discovery.type=single-node"
-      - bootstrap.memory_lock=true
-      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
-      - "xpack.security.enabled=false"
-    ulimits:
-      memlock:
-        soft: -1
-        hard: -1
-    healthcheck:
-      test: [ "CMD-SHELL", "curl -f http://localhost:9200/_cluster/health?wait_for_status=yellow&timeout=1s || exit 1" ]
-      interval: 10s
-      timeout: 5s
-      retries: 30
-      start_period: 40s
-
   keycloak:
     image: quay.io/keycloak/keycloak:26.2.5
     environment:
@@ -66,8 +45,6 @@ services:
     depends_on:
       postgres:
         condition: service_started
-      elasticsearch:
-        condition: service_started
       rabbitmq:
         condition: service_started
       keycloak:
@@ -86,10 +63,6 @@ services:
 
       # Database
       SPRING_DATASOURCE_URL: "jdbc:postgresql://postgres/ontrack"
-
-      # Elastic search
-      ONTRACK_CONFIG_SEARCH_INDEX_IMMEDIATE: "true"
-      SPRING_ELASTICSEARCH_URIS: "http://elasticsearch:9200"
 
       # RabbitMQ
       SPRING_RABBITMQ_HOST: rabbitmq

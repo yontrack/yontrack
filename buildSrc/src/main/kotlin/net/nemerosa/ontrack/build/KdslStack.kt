@@ -19,18 +19,17 @@ object KdslStack {
 
     /**
      * Four slots, which is fewer than the ten the integration test stack
-     * gets, for two reasons that point the same way.
-     *
-     * The arithmetic: with a `slot * 100` offset, Yontrack's management port
-     * spans 8800-9100 over four slots and Elasticsearch starts at 9200. A
-     * fifth slot would put the management port of one checkout on the
-     * Elasticsearch port of another, and the base ports here are the ones the
-     * tests and `ACCProperties` default to, so they are not free to move.
+     * gets.
      *
      * The machine: an acceptance stack is a full Yontrack with a 2 GB heap,
-     * the Next.js UI, Postgres, Elasticsearch, RabbitMQ, Keycloak and
-     * InfluxDB. Four of those at once is already past what a developer
-     * machine will carry, so the arithmetic is not the binding constraint.
+     * the Next.js UI, Postgres, RabbitMQ, Keycloak and InfluxDB. Four of those
+     * at once is already past what a developer machine will carry.
+     *
+     * The arithmetic used to point the same way: Yontrack's management port
+     * spans 8800-9100 over four slots, and Elasticsearch started at 9200.
+     * Elasticsearch left the acceptance stacks with #1883 (ADR 0017), so that
+     * bound is gone, but the Keycloak realms list the UI callback of every slot
+     * literally (`KeycloakRealmsTest`), and the machine alone keeps it at four.
      */
     const val SLOT_MAX = 3
 
@@ -55,7 +54,6 @@ object KdslStack {
     const val BASE_ONTRACK = 8080
     const val BASE_INFLUXDB = 8086
     const val BASE_ONTRACK_MGMT = 8800
-    const val BASE_ELASTIC = 9200
 
     val BASE_PORTS = listOf(
         BASE_UI,
@@ -69,7 +67,6 @@ object KdslStack {
         BASE_ONTRACK,
         BASE_INFLUXDB,
         BASE_ONTRACK_MGMT,
-        BASE_ELASTIC,
     )
 
     const val INSTANCE_ENV_PATH = ".yontrack-kdsl/instance.env"
@@ -148,7 +145,6 @@ data class KdslStackInstance(
     val ontrackPort: Int = StackSlots.port(KdslStack.BASE_ONTRACK, slot)
     val influxdbPort: Int = StackSlots.port(KdslStack.BASE_INFLUXDB, slot)
     val ontrackManagementPort: Int = StackSlots.port(KdslStack.BASE_ONTRACK_MGMT, slot)
-    val elasticPort: Int = StackSlots.port(KdslStack.BASE_ELASTIC, slot)
 
     val ontrackUrl: String = "http://localhost:$ontrackPort"
     val ontrackManagementUrl: String = "http://localhost:$ontrackManagementPort/manage"
@@ -169,7 +165,6 @@ data class KdslStackInstance(
         "YONTRACK_KDSL_ONTRACK_PORT" to ontrackPort.toString(),
         "YONTRACK_KDSL_INFLUXDB_PORT" to influxdbPort.toString(),
         "YONTRACK_KDSL_ONTRACK_MGMT_PORT" to ontrackManagementPort.toString(),
-        "YONTRACK_KDSL_ELASTIC_PORT" to elasticPort.toString(),
     )
 
     /**

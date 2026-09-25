@@ -24,45 +24,12 @@ services:
       timeout: 5s
       retries: 5
 
-  elasticsearch:
-    image: docker.elastic.co/elasticsearch/elasticsearch:9.2.0
-    ports:
-      - "${YONTRACK_DEV_ELASTIC_PORT:-9200}:9200"
-    environment:
-      - "discovery.type=single-node"
-      - bootstrap.memory_lock=true
-      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
-      - "xpack.security.enabled=false"
-    ulimits:
-      memlock:
-        soft: -1
-        hard: -1
-    # Indices are persisted so that a `down` followed by an `up` leaves the
-    # search index consistent with the database, which is also persisted.
-    volumes:
-      - elasticsearch_data:/usr/share/elasticsearch/data
-    healthcheck:
-      test: [ "CMD-SHELL", "curl -f http://localhost:9200/_cluster/health?wait_for_status=yellow&timeout=1s || exit 1" ]
-      interval: 10s
-      timeout: 5s
-      retries: 30
-      start_period: 40s
-
   influxdb:
     profiles:
       - influxdb
     image: influxdb:1.11.8
     ports:
       - "${YONTRACK_DEV_INFLUXDB_PORT:-8086}:8086"
-
-  kibana:
-    profiles:
-      - kibana
-    image: docker.elastic.co/kibana/kibana:9.2.0
-    ports:
-      - "${YONTRACK_DEV_KIBANA_PORT:-5601}:5601"
-    environment:
-      ELASTICSEARCH_HOSTS: http://elasticsearch:9200
 
   # Keycloak keeps no state between runs: it has no database, so the
   # development realm below is re-imported on every start and edits to it take
@@ -113,4 +80,3 @@ services:
 
 volumes:
   postgres_data:
-  elasticsearch_data:

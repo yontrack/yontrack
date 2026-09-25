@@ -39,7 +39,6 @@ class KdslStackTest {
         assertEquals(8280, instance.ontrackPort)
         assertEquals(8286, instance.influxdbPort)
         assertEquals(9000, instance.ontrackManagementPort)
-        assertEquals(9400, instance.elasticPort)
         assertEquals(6500, instance.jacocoPort)
         assertEquals("http://localhost:9000/manage", instance.ontrackManagementUrl)
     }
@@ -52,6 +51,18 @@ class KdslStackTest {
         assertEquals(6400, KdslStackInstance(slug = "feature-a", slot = 1).jacocoPort)
         assertEquals(6600, KdslStackInstance(slug = "feature-a", slot = 3).jacocoPort)
         assertTrue(KdslStack.BASE_JACOCO in KdslStack.BASE_PORTS, "the agent port must be probed too")
+    }
+
+    @Test
+    fun `Elasticsearch is not part of the acceptance stacks`() {
+        // Search runs in Postgres (ADR 0017), and Elasticsearch left the acceptance stacks with
+        // #1883: its port is neither published nor probed, so it cannot refuse a slot.
+        assertFalse(9200 in KdslStack.BASE_PORTS, "Elasticsearch's 9200 must not be probed")
+        val instance = KdslStackInstance(slug = "feature-a", slot = 1)
+        assertTrue(
+            instance.composeEnvironment.keys.none { it.contains("ELASTIC") },
+            "no compose variable for Elasticsearch: ${instance.composeEnvironment.keys}",
+        )
     }
 
     @Test

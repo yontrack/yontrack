@@ -8,7 +8,8 @@ branches, builds, promotions, and validations across the software delivery lifec
 - **Backend:** Kotlin + Java, Spring Boot 3.5+, Spring GraphQL, Spring Security
 - **Frontend:** React 19, Next.js 16 (Turbopack), Ant Design v6, graphql-request
 - **Database:** PostgreSQL with Flyway migrations
-- **Search:** Elasticsearch
+- **Search:** PostgreSQL (`pg_trgm`, ADR 0017) — Elasticsearch is only an optional target of the
+  metrics export (`ontrack-extension-elastic`), absent from the dev and KDSL stacks
 - **Messaging:** RabbitMQ
 - **Auth:** OIDC/JWT
 - **Build:** Gradle (Kotlin DSL), JDK 25 required

@@ -34,6 +34,14 @@ set -uo pipefail
 DS_SLOT_MIN=1
 DS_SLOT_MAX=9
 
+# The base port of every service an instance always publishes, and therefore
+# probes before claiming a slot: UI, backend, management, Keycloak, Postgres,
+# RabbitMQ and its management console. InfluxDB is behind a Compose profile and
+# is not probed. Elasticsearch and Kibana left the dev stack with #1883: search
+# runs in Postgres (ADR 0017), and only the integration test stack still has an
+# Elasticsearch, for the metrics export's own tests.
+DS_BASE_PORTS="3000 8080 8800 8008 5432 5672 15672"
+
 # Turns a checkout path into a short, filesystem- and Docker-safe name.
 ds_slug() {
     local name
@@ -124,7 +132,7 @@ ds_port_listeners() {
 # Every host port an instance publishes, for the given slot.
 ds_slot_ports() {
     local slot="$1"
-    for base in 3000 8080 8800 8008 5432 9200 5672 15672; do
+    for base in $DS_BASE_PORTS; do
         ds_port "$base" "$slot"
         printf ' '
     done
@@ -182,10 +190,8 @@ ds_resolve_instance() {
     DS_PORT_MGMT="$(ds_port 8800 "$DS_SLOT")"
     DS_PORT_KEYCLOAK="$(ds_port 8008 "$DS_SLOT")"
     DS_PORT_POSTGRES="$(ds_port 5432 "$DS_SLOT")"
-    DS_PORT_ELASTIC="$(ds_port 9200 "$DS_SLOT")"
     DS_PORT_RABBIT="$(ds_port 5672 "$DS_SLOT")"
     DS_PORT_RABBIT_MGMT="$(ds_port 15672 "$DS_SLOT")"
-    DS_PORT_KIBANA="$(ds_port 5601 "$DS_SLOT")"
     DS_PORT_INFLUXDB="$(ds_port 8086 "$DS_SLOT")"
 
     DS_URL_UI="http://localhost:$DS_PORT_UI"
@@ -213,7 +219,6 @@ YONTRACK_DEV_APP_PORT=$DS_PORT_APP
 YONTRACK_DEV_MGMT_PORT=$DS_PORT_MGMT
 YONTRACK_DEV_KEYCLOAK_PORT=$DS_PORT_KEYCLOAK
 YONTRACK_DEV_POSTGRES_PORT=$DS_PORT_POSTGRES
-YONTRACK_DEV_ELASTIC_PORT=$DS_PORT_ELASTIC
 YONTRACK_DEV_RABBIT_PORT=$DS_PORT_RABBIT
 YONTRACK_DEV_UI_URL=$DS_URL_UI
 YONTRACK_DEV_APP_URL=$DS_URL_APP
@@ -226,11 +231,9 @@ EOF
 
 ds_compose() {
     YONTRACK_DEV_POSTGRES_PORT="$DS_PORT_POSTGRES" \
-    YONTRACK_DEV_ELASTIC_PORT="$DS_PORT_ELASTIC" \
     YONTRACK_DEV_RABBIT_PORT="$DS_PORT_RABBIT" \
     YONTRACK_DEV_RABBIT_MGMT_PORT="$DS_PORT_RABBIT_MGMT" \
     YONTRACK_DEV_KEYCLOAK_PORT="$DS_PORT_KEYCLOAK" \
-    YONTRACK_DEV_KIBANA_PORT="$DS_PORT_KIBANA" \
     YONTRACK_DEV_INFLUXDB_PORT="$DS_PORT_INFLUXDB" \
     YONTRACK_DEV_KEYCLOAK_URL="http://localhost:$DS_PORT_KEYCLOAK" \
         docker compose -p "$DS_PROJECT" -f "$DS_COMPOSE_FILE" "$@"
@@ -238,13 +241,15 @@ ds_compose() {
 
 ds_infra_up() {
     ds_step "Middleware (Docker project $DS_PROJECT)"
-    ds_compose up -d --wait --wait-timeout "$DS_READY_TIMEOUT" \
+    # --remove-orphans stops the containers of services that have since left the
+    # compose file, such as the Elasticsearch and Kibana of a stack started
+    # before #1883.
+    ds_compose up -d --wait --wait-timeout "$DS_READY_TIMEOUT" --remove-orphans \
         || ds_fail "the middleware did not become healthy. Inspect it with:
   scripts/dev-stack.sh logs infra"
-    ds_log "Postgres      localhost:$DS_PORT_POSTGRES"
-    ds_log "Elasticsearch localhost:$DS_PORT_ELASTIC"
-    ds_log "RabbitMQ      localhost:$DS_PORT_RABBIT"
-    ds_log "Keycloak      http://localhost:$DS_PORT_KEYCLOAK"
+    ds_log "Postgres localhost:$DS_PORT_POSTGRES"
+    ds_log "RabbitMQ localhost:$DS_PORT_RABBIT"
+    ds_log "Keycloak http://localhost:$DS_PORT_KEYCLOAK"
 }
 
 # ===========================================================================
@@ -356,14 +361,12 @@ ds_backend_up() {
             SERVER_PORT="$DS_PORT_APP" \
             MANAGEMENT_SERVER_PORT="$DS_PORT_MGMT" \
             SPRING_DATASOURCE_URL="jdbc:postgresql://localhost:$DS_PORT_POSTGRES/ontrack" \
-            SPRING_ELASTICSEARCH_URIS="http://localhost:$DS_PORT_ELASTIC" \
             SPRING_RABBITMQ_PORT="$DS_PORT_RABBIT" \
             SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI="$DS_URL_ISSUER" \
             MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info,prometheus,account,graphql,graphqlJson \
             MANAGEMENT_ENDPOINT_ACCOUNT_ACCESS=unrestricted \
             ONTRACK_CONFIG_URL="$DS_URL_UI" \
             ONTRACK_CONFIG_CONFIGURATION_TEST=false \
-            ONTRACK_CONFIG_SEARCH_INDEX_IMMEDIATE=true \
             ONTRACK_CONFIG_TEMPLATING_ERRORS=LOGGING_STACK \
             ONTRACK_EXTENSION_JIRA_CLIENT_TYPE=mock \
             ONTRACK_CONFIG_EXTENSION_SCM_MOCK_PERSISTENT=true \
@@ -451,12 +454,18 @@ ds_cmd_down() {
     ds_step "Stopping '$DS_SLUG' (slot $DS_SLOT)"
     ds_kill_tier "$DS_FRONTEND_PID" "frontend" "$DS_PORT_UI"
     ds_kill_tier "$DS_BACKEND_PID" "backend" "$DS_PORT_APP" "$DS_PORT_MGMT"
+    # --remove-orphans takes down the containers of services that have left the
+    # compose file since the stack was started -- the Elasticsearch of a stack
+    # brought up before #1883, for instance.
     if [ "$clean" -eq 1 ]; then
         ds_log "removing containers and volumes"
-        ds_compose down --volumes
+        ds_compose down --volumes --remove-orphans
+        # Declared no more, so --volumes does not see it: the index volume of a
+        # stack created while the dev stack still had Elasticsearch (#1883).
+        docker volume rm "${DS_PROJECT}_elasticsearch_data" >/dev/null 2>&1 || true
     else
         ds_log "removing containers, keeping volumes"
-        ds_compose down
+        ds_compose down --remove-orphans
     fi
     ds_log "done"
 }

@@ -56,3 +56,23 @@ are behind Compose profiles rather than started by default for that reason.
 The slot and port arithmetic lives in shell functions covered by
 `scripts/dev-stack-test.sh`; the orchestration around them is verified by hand,
 by bringing up two instances at once.
+
+## Amendment, 2026-09-25: Elasticsearch left the stack (#1883)
+
+Search moved to Postgres in 6.0 (ADR 0017,
+`0017-postgres-replaces-elasticsearch-for-search.md`), so the development stack has no
+Elasticsearch and no Kibana any more. The text above is left as it was decided, and the
+following no longer holds:
+
+* An instance's own middleware is Postgres, RabbitMQ and Keycloak. There is no Elasticsearch
+  service, no `elasticsearch_data` volume and no Kibana profile, and `dev-stack.sh` no longer
+  publishes or probes 9200 (the base ports are in `DS_BASE_PORTS`, and `dev-stack-test.sh` checks
+  them). The other ports and the slot scheme are unchanged.
+* The search index lives in the Postgres database, so the volume that kept the index in step
+  with the database is gone: the Postgres volume now does both jobs.
+* The shared-middleware option is still rejected, for the queue names. The index-name half of
+  the argument no longer applies.
+* `up` and `down` pass `--remove-orphans`, so a stack started before this change loses its
+  Elasticsearch container, and `down --clean` also removes its old index volume.
+* An instance now runs three containers, not four. InfluxDB is the only service left behind a
+  Compose profile.

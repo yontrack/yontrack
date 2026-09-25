@@ -58,15 +58,20 @@ offsets every port by `slot * 100`:
 | Management     | 8800   | 8900   |
 | Keycloak       | 8008   | 8108   |
 | Postgres       | 5432   | 5532   |
-| Elasticsearch  | 9200   | 9300   |
 | RabbitMQ       | 5672   | 5772   |
 
 The resolved ports are written to `.yontrack-dev/instance.env` in the checkout,
 along with the logs of each tier. Set `YONTRACK_DEV_NAME` to name an instance
 explicitly instead of deriving the name from the directory.
 
-Two services are off by default and can be opted into with a Compose profile:
-Kibana (`--profile kibana`) and InfluxDB (`--profile influxdb`).
+InfluxDB is off by default and can be opted into with a Compose profile
+(`--profile influxdb`).
+
+The development stack has no Elasticsearch: search runs in Postgres (ADR 0017).
+Elasticsearch is only an optional target of the metrics export, and only the
+integration test stack below still has one, for that export's own tests. A
+stack started before #1883 loses its Elasticsearch container on the next `up`
+or `down`, and `down --clean` removes its index volume too.
 
 > Keycloak has no database: the development realm in
 > `compose/keycloak/import/dev/` is re-imported on every start, so changes to it
@@ -215,7 +220,7 @@ The arithmetic lives in `ItStack` in `buildSrc`, is covered by `ItStackTest`
 
 The task builds the Yontrack and UI images, brings up
 `compose/docker-compose-kdsl.yml` -- a full Yontrack plus its UI, Postgres,
-Elasticsearch, RabbitMQ, Keycloak and InfluxDB -- and tears it down afterwards.
+RabbitMQ, Keycloak and InfluxDB -- and tears it down afterwards.
 
 That stack is an instance of the checkout too. The main working copy takes
 slot 0 and keeps the historical ports; a linked worktree hashes into a slot
@@ -229,7 +234,6 @@ from 1 to 3, which offsets every port by `slot * 100`:
 | Keycloak       | 8008   | 8108   |
 | InfluxDB       | 8086   | 8186   |
 | Postgres       | 5432   | 5532   |
-| Elasticsearch  | 9200   | 9300   |
 | RabbitMQ       | 5672   | 5772   |
 | JaCoCo agent   | 6300   | 6400   |
 
@@ -239,9 +243,10 @@ agent into the backend container (#1819); it is reserved per slot all the
 same, so that an ordinary run and a coverage run in two worktrees cannot
 collide. The released image is never touched.
 
-Four slots rather than the integration stack's ten: the management port's
-range runs into Elasticsearch's beyond that, and an acceptance stack is heavy
-enough that four at once is already more than a laptop will carry.
+Four slots rather than the integration stack's ten: an acceptance stack is
+heavy enough that four at once is already more than a laptop will carry.
+(The management port's range used to run into Elasticsearch's beyond that;
+Elasticsearch left the acceptance stacks with #1883.)
 
 The resolved ports land in `.yontrack-kdsl/instance.env`, and the task passes
 them to the suite as `ontrack.acceptance.*` system properties -- so running
