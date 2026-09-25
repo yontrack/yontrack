@@ -11,27 +11,26 @@ import net.nemerosa.ontrack.extension.general.validation.CHMLLevel
 import net.nemerosa.ontrack.extension.general.validation.CHMLValidationDataTypeConfig
 import net.nemerosa.ontrack.graphql.AbstractQLKTITSupport
 import net.nemerosa.ontrack.json.parseAsJson
+import net.nemerosa.ontrack.model.security.Roles
 import net.nemerosa.ontrack.model.structure.Branch
-import net.nemerosa.ontrack.model.structure.SearchIndexService
+import net.nemerosa.ontrack.model.structure.Project
+import net.nemerosa.ontrack.model.structure.SearchDocumentService
+import net.nemerosa.ontrack.model.structure.SearchService
 import net.nemerosa.ontrack.model.structure.ValidationStamp
 import net.nemerosa.ontrack.model.structure.config
 import net.nemerosa.ontrack.test.TestUtils.uid
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.test.context.TestPropertySource
+import org.springframework.transaction.annotation.Propagation
+import org.springframework.transaction.annotation.Transactional
 import tools.jackson.databind.JsonNode
 import java.time.LocalDate
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
- * Searching the findings by their external ID.
+ * Searching the findings by their external ID, on Postgres.
  */
-@TestPropertySource(
-    properties = [
-        "ontrack.config.search.index.immediate=true"
-    ]
-)
 class FindingSearchIT : AbstractQLKTITSupport() {
 
     @Autowired
@@ -44,10 +43,10 @@ class FindingSearchIT : AbstractQLKTITSupport() {
     private lateinit var findingRepository: FindingRepository
 
     @Autowired
-    private lateinit var findingSearchIndexer: FindingSearchIndexer
+    private lateinit var searchDocumentService: SearchDocumentService
 
     @Autowired
-    private lateinit var searchIndexService: SearchIndexService
+    private lateinit var searchService: SearchService
 
     @Test
     fun `Searching an external ID lists the projects and the branches the finding is exposed on`() {
@@ -124,8 +123,8 @@ class FindingSearchIT : AbstractQLKTITSupport() {
                 }
             }
             val exact = search(cve).map { it.path("title").asText() }
-            assertEquals(cve, exact.first(), "The exact match comes first")
-            assertTrue("$prefix-2" !in exact, "Another external ID is not listed")
+            assertEquals(listOf(cve, "$prefix-12"), exact, "The exact match comes first, then the prefix match")
+            assertTrue("$prefix-2" !in exact, "Another external ID is not listed, however similar")
 
             assertEquals(cve, search(cve.lowercase()).first().path("title").asText())
 
@@ -179,6 +178,101 @@ class FindingSearchIT : AbstractQLKTITSupport() {
     }
 
     @Test
+    fun `The results are filtered by the roles of the user`() {
+        val cve = uid("CVE-")
+        val (one, two) = asAdmin {
+            project { branch { scan(findingsStamp(), entry(cve)) } } to
+                    project { branch { scan(findingsStamp(), entry(cve)) } }
+        }
+        // Creating the accounts needs the administrator
+        asAdmin {
+            withNoGrantViewToAll {
+                one.asAccountWithProjectRole(Roles.PROJECT_READ_ONLY) {
+                    assertEquals(listOf(one.name), search(cve).map { it.path("data").path("project").path("name").asText() })
+                }
+                asGlobalRole(Roles.GLOBAL_READ_ONLY) {
+                    assertEquals(
+                        setOf(one.name, two.name),
+                        search(cve).map { it.path("data").path("project").path("name").asText() }.toSet()
+                    )
+                }
+            }
+            // Seeing all the projects is not seeing their findings
+            withGrantViewToAll {
+                asUser().call {
+                    assertEquals(0, search(cve).size)
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `A later scan updates the branches the finding is exposed on`() {
+        val cve = uid("CVE-")
+        asAdmin {
+            project {
+                lateinit var mainStamp: ValidationStamp
+                val main = branch("main") {
+                    mainStamp = findingsStamp()
+                    scan(mainStamp, entry(cve))
+                }
+                branch("release-1.0") {
+                    val vs = findingsStamp()
+                    scan(vs, entry(cve))
+                    assertEquals(listOf("main", "release-1.0"), branches(cve))
+                    // Fixed on this branch
+                    scan(vs, entry("CVE-OTHER"))
+                }
+                assertEquals(listOf("main"), branches(cve))
+                // Fixed on main as well
+                main.scan(mainStamp, entry("CVE-OTHER"))
+                assertEquals(emptyList(), branches(cve))
+                assertEquals("RESOLVED", search(cve).single().path("data").path("finding").path("state").asText())
+            }
+        }
+    }
+
+    @Test
+    fun `Renaming or deleting a branch rewrites the results of its findings`() {
+        val cve = uid("CVE-")
+        asAdmin {
+            project {
+                val main = branch("main") {
+                    scan(findingsStamp(), entry(cve))
+                }
+                val release = branch("release-1.0") {
+                    scan(findingsStamp(), entry(cve))
+                }
+                assertEquals(listOf("main", "release-1.0"), branches(cve))
+
+                structureService.saveBranch(release.copy(name = "release-1.1"))
+                assertEquals(listOf("main", "release-1.1"), branches(cve))
+
+                structureService.deleteBranch(main.id)
+                assertEquals(listOf("release-1.1"), branches(cve))
+            }
+        }
+    }
+
+    @Test
+    fun `Renaming a project rewrites the results of its findings`() {
+        val cve = uid("CVE-")
+        asAdmin {
+            val project = project {
+                branch { scan(findingsStamp(), entry(cve)) }
+            }
+            val name = uid("P")
+            structureService.saveProject(
+                Project(project.id, name, project.description, project.isDisabled, project.signature)
+            )
+            assertEquals(
+                listOf(name),
+                search(cve).map { it.path("data").path("project").path("name").asText() }
+            )
+        }
+    }
+
+    @Test
     fun `The findings of a deleted project are no longer found`() {
         val cve = uid("CVE-")
         asAdmin {
@@ -193,30 +287,36 @@ class FindingSearchIT : AbstractQLKTITSupport() {
         }
     }
 
+    /**
+     * The rebuild runs in its own transactions: the findings of the test must be committed.
+     */
     @Test
-    fun `Reindexing the findings`() {
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    fun `Rebuilding the findings`() {
         val cve = uid("CVE-")
         asAdmin {
             val project = project {
-                branch {
+                branch("main") {
                     scan(findingsStamp(), entry(cve))
                 }
             }
             val id = findingRepository.findFindingsByProject(project.id()).single().id
-            searchIndexService.deleteSearchIndex(findingSearchIndexer, id.toString())
+            searchDocumentService.delete(FINDING_SEARCH_RESULT_TYPE, id.toString())
             assertEquals(0, search(cve).size)
 
-            searchIndexService.index(findingSearchIndexer)
-            assertEquals(listOf(cve), search(cve).map { it.path("title").asText() })
+            searchService.reindex(FINDING_SEARCH_RESULT_TYPE)
+            val result = search(cve).single()
+            assertEquals(cve, result.path("title").asText())
+            assertEquals(listOf("main"), result.path("data").path("branches").toList().map { it.path("name").asText() })
         }
     }
 
-    private fun search(token: String): List<JsonNode> =
+    private fun search(query: String): List<JsonNode> =
         run(
             """
                 {
-                    search(type: "finding", token: "$token", offset: 0, size: 20) {
-                        pageItems {
+                    search(query: "$query", types: ["$FINDING_SEARCH_RESULT_TYPE"], offset: 0, size: 20) {
+                        items {
                             title
                             description
                             type {
@@ -227,7 +327,13 @@ class FindingSearchIT : AbstractQLKTITSupport() {
                     }
                 }
             """
-        ).path("search").path("pageItems").toList()
+        ).path("search").path("items").toList()
+
+    /**
+     * Names of the branches the single result of a query is exposed on
+     */
+    private fun branches(query: String): List<String> =
+        search(query).single().path("data").path("branches").toList().map { it.path("name").asText() }
 
     private fun Branch.findingsStamp(): ValidationStamp =
         validationStamp(

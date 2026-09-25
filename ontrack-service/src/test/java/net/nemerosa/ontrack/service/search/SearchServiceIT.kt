@@ -4,6 +4,7 @@ import io.micrometer.core.instrument.MeterRegistry
 import net.nemerosa.ontrack.common.Time
 import net.nemerosa.ontrack.it.AbstractDSLTestSupport
 import net.nemerosa.ontrack.it.AsAdminTest
+import net.nemerosa.ontrack.model.security.ProjectEdit
 import net.nemerosa.ontrack.model.security.Roles
 import net.nemerosa.ontrack.model.structure.*
 import net.nemerosa.ontrack.test.TestUtils.uid
@@ -36,6 +37,12 @@ class SearchServiceIT : AbstractDSLTestSupport() {
 
     @Autowired
     private lateinit var beta: TestBetaSearchDocumentIndexer
+
+    @Autowired
+    private lateinit var gamma: TestGammaSearchDocumentIndexer
+
+    @Autowired
+    private lateinit var delta: TestDeltaSearchDocumentIndexer
 
     @Autowired
     private lateinit var meterRegistry: MeterRegistry
@@ -264,6 +271,69 @@ class SearchServiceIT : AbstractDSLTestSupport() {
                 assertEquals(listOf("project-$u"), search(u).items.map { it.key })
             }
         }
+    }
+
+    @Test
+    fun `The documents of a type with a project function are visible only where it is granted`() {
+        val u = token()
+        val granted = project()
+        val notGranted = project()
+        index(
+            gamma.document("granted-$u", "Granted", granted, identifiers = listOf(u)),
+            gamma.document("not-granted-$u", "Not granted", notGranted, identifiers = listOf(u)),
+            alpha.document("alpha-$u", "Alpha", notGranted, identifiers = listOf(u)),
+        )
+        val types = listOf(TestAlphaSearchDocumentIndexer.TYPE, TestGammaSearchDocumentIndexer.TYPE)
+        withNoGrantViewToAll {
+            // Project view on both projects, the function of the type on one only
+            asUser()
+                .withView(granted).withProjectFunction(granted, ProjectEdit::class.java)
+                .withView(notGranted)
+                .call {
+                    val results = search(u, types = types)
+                    assertEquals(listOf("alpha-$u", "granted-$u"), results.items.map { it.key }.sorted())
+                    assertEquals(2, results.total)
+                    assertEquals(
+                        mapOf(TestAlphaSearchDocumentIndexer.TYPE to 1, TestGammaSearchDocumentIndexer.TYPE to 1),
+                        results.facets.associate { it.type.id to it.count }
+                    )
+                }
+            // A project role without the function: the project documents of the other types only
+            notGranted.asAccountWithProjectRole(Roles.PROJECT_READ_ONLY) {
+                assertEquals(listOf("alpha-$u"), search(u, types = types).items.map { it.key })
+            }
+            // A project role with the function
+            granted.asAccountWithProjectRole(Roles.PROJECT_OWNER) {
+                assertEquals(listOf("granted-$u"), search(u, types = types).items.map { it.key })
+            }
+            // A global role with the project view, without the function
+            asGlobalRole(Roles.GLOBAL_READ_ONLY) {
+                assertEquals(listOf("alpha-$u"), search(u, types = types).items.map { it.key })
+            }
+            // A global role with the function
+            asGlobalRole(Roles.GLOBAL_ADMINISTRATOR) {
+                assertEquals(
+                    listOf("alpha-$u", "granted-$u", "not-granted-$u"),
+                    search(u, types = types).items.map { it.key }.sorted()
+                )
+            }
+        }
+    }
+
+    @Test
+    fun `The documents of a type without fuzzy matching are not matched by similarity`() {
+        val project = project()
+        val u = token()
+        val typo = u.dropLast(1) + (if (u.last() == '0') '1' else '0')
+        index(
+            delta.document("delta-exact-$u", "Exact", project, identifiers = listOf(u)),
+            delta.document("delta-similar-$u", typo, project, identifiers = listOf(typo)),
+            alpha.document("alpha-similar-$u", typo, project, identifiers = listOf(typo)),
+        )
+        val results = asAdmin {
+            search(u, types = listOf(TestAlphaSearchDocumentIndexer.TYPE, TestDeltaSearchDocumentIndexer.TYPE))
+        }
+        assertEquals(listOf("delta-exact-$u", "alpha-similar-$u"), results.items.map { it.key })
     }
 
     @Test

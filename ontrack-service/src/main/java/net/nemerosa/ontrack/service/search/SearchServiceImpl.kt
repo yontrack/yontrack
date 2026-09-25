@@ -33,6 +33,12 @@ class SearchServiceImpl(
 
     companion object {
         const val MESSAGE_INDEX_BEING_BUILT = "Search index is being built"
+
+        /**
+         * ID of no project. A project function granted for it is granted independently of the
+         * project, so for all of them.
+         */
+        private const val NO_PROJECT_ID = 0
     }
 
     private val logger: Logger = LoggerFactory.getLogger(SearchServiceImpl::class.java)
@@ -212,7 +218,32 @@ class SearchServiceImpl(
             projectLessTypes = ids.filter { type ->
                 indexers[type]?.globalFunction?.let { securityService.isGlobalFunctionGranted(it) } ?: false
             },
+            restrictedTypes = restrictedTypes(ids, allProjects, projectIds),
+            nonFuzzyTypes = ids.filter { type -> indexers[type]?.fuzzyMatching == false },
         )
+    }
+
+    /**
+     * Types whose indexer declares a [project function][SearchDocumentIndexer.projectFunction], with
+     * the visible projects where this function is granted — unless it is granted in all of them.
+     */
+    private fun restrictedTypes(ids: List<String>, allProjects: Boolean, projectIds: List<Int>): Map<String, List<Int>> {
+        val functions = ids.mapNotNull { type ->
+            indexers[type]?.projectFunction
+                // Granted independently of the project: a global role, or the administrator
+                ?.takeIf { !securityService.isProjectFunctionGranted(NO_PROJECT_ID, it) }
+                ?.let { type to it }
+        }
+        if (functions.isEmpty()) return emptyMap()
+        val visible = if (allProjects) structureService.projectList.map { it.id() } else projectIds
+        return functions.mapNotNull { (type, function) ->
+            val granted = visible.filter { securityService.isProjectFunctionGranted(it, function) }
+            if (granted.size == visible.size) {
+                null
+            } else {
+                type to granted
+            }
+        }.toMap()
     }
 
     @Suppress("UNCHECKED_CAST")

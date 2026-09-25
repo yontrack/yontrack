@@ -104,6 +104,11 @@ Orders of magnitude only, on an idle local database, but the shape is what to re
 - **The search indexing is next.** Only a finding new in the project is indexed, but
   `SearchIndexService.batchSearchIndex` asks Elasticsearch for each document before the bulk
   request, one round trip per finding.
+
+  Since #1881 the findings are searched on Postgres, and a scan rewrites the search document of
+  every finding it reports or resolves, since the document carries the branches the finding is
+  exposed on — in batches, in the transaction of the scan. On the same laptop, the same report
+  then took ~8.7 s to ingest with every finding new, and ~1.5 s with every finding known.
 - The reading of the report and the batched writes are not where the time is.
 
 So when the threshold is crossed, look at what the time is made of before building the queue: a

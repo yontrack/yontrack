@@ -132,7 +132,6 @@ class FindingsIngestionServiceImpl(
         val time = run.runTime
         val existing = findingRepository.findFindingsByProjectAndScanner(project.id(), report.scanner)
             .associateBy { it.externalId to it.location }
-        val created = mutableListOf<Finding>()
         val written = findings.map { consolidated ->
             val finding = existing[consolidated.externalId to consolidated.location]
                 ?.let { finding ->
@@ -161,11 +160,9 @@ class FindingsIngestionServiceImpl(
                         resolvedAt = null,
                         maxSeverity = consolidated.severity,
                     )
-                ).also { created += it }
+                )
             finding to consolidated
         }
-        // Only a new finding needs indexing: its external ID never changes
-        findingSearchIndexer.indexFindings(created)
         findingRepository.insertObservations(
             written.map { (finding, consolidated) ->
                 FindingObservation(
@@ -228,6 +225,8 @@ class FindingsIngestionServiceImpl(
                 finding
             }
         }
+        // Search documents of the findings, which carry their exposure
+        findingSearchIndexer.indexFindings(project, findings.values)
         // Transitions
         val severities = written.associate { (finding, consolidated) -> finding.id to consolidated.severity }
         val lastSeverities = findingRepository.findLatestSeverities(

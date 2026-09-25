@@ -9,10 +9,11 @@ document carries.
 The vocabulary is the one of `CONTEXT.md`: a *search document* is what an indexer writes about one
 findable thing, and a *search result type* is the kind of thing a result is.
 
-> 6.0 is migrating the indexers, one issue at a time, from the Elasticsearch `SearchIndexer` to the
-> contract below. Until the last one is migrated, `SearchService` routes each type to the backend of
-> its indexer: Postgres for a `SearchDocumentIndexer`, Elasticsearch for a `SearchIndexer`. New code
-> uses the Postgres contract only.
+> 6.0 has migrated the indexers, one issue at a time, from the Elasticsearch `SearchIndexer` to the
+> contract below; the findings (#1881) were the last one. Until the Elasticsearch search code is
+> removed (#1882), `SearchService` still routes each type to the backend of its indexer: Postgres
+> for a `SearchDocumentIndexer`, Elasticsearch for a `SearchIndexer`. New code uses the Postgres
+> contract only.
 
 ## The contract
 
@@ -35,6 +36,8 @@ interface SearchDocumentIndexer {
     val searchResultType: SearchResultType
     val indexerName: String get() = searchResultType.name
     val globalFunction: Class<out GlobalFunction>? get() = null
+    val projectFunction: Class<out ProjectFunction>? get() = null
+    val fuzzyMatching: Boolean get() = true
     val documentVersion: Int get() = 1
     val indexerSchedule: Schedule get() = Schedule.NONE
     fun indexAll(processor: (SearchDocument) -> Unit)
@@ -135,6 +138,28 @@ their indexer. An indexer which declares none never shows its project-less docum
 to a project or not, and its documents are visible to the users granted `SCMCatalogAccessFunction`,
 what the SCM catalog itself requires.
 
+### A type protected by a project function
+
+Seeing a project is usually enough to see its documents. A type whose content is protected by a
+project function of its own declares it as `projectFunction`: its documents are then visible only
+in the projects where the user is granted this function, on top of the project view. The security
+findings (`FindingSearchIndexer`, `ontrack-extension-findings`) are the example: their documents
+need `ProjectFindingsView`, which a user seeing every project through the *grant project view to
+all* setting does not have.
+
+The search checks the function once per search, not per document: granted independently of the
+project — a global role, the administrator — it restricts nothing; else the search computes the
+visible projects where it is granted, and filters the documents of the type on them in SQL, so
+that totals and facets stay right. Declare one only when the type needs it: it costs a check per
+visible project for the users who hold the function through their project roles only.
+
+### A type of codes
+
+A document is matched by similarity (the trigram tier) by default, which forgives a typo in a name.
+A type whose identifiers are codes, where a similar code is another thing, turns it off with
+`fuzzyMatching = false`: `CVE-2021-44228` must not find `CVE-2021-44229`. Its documents are still
+matched exactly, by prefix and by their words. The findings are the example.
+
 ### A type indexed from an external source
 
 Some things change outside of Yontrack and of any transaction: the commits of a repository, the
@@ -198,7 +223,7 @@ long. Four tiers, strongest first:
 | Exact     | one identifier is the query                              | 2 characters |
 | Prefix    | the query starts one identifier, or the title            | 2 characters |
 | Full-text | each word of the query starts a word of the title, the identifiers or the text (`simple` configuration: no stemming) | 3 characters |
-| Trigram   | the query is similar to a word of the title or of the identifiers (`pg_trgm`) | 3 characters |
+| Trigram   | the query is similar to a word of the title or of the identifiers (`pg_trgm`), unless the type turns `fuzzyMatching` off | 3 characters |
 
 A result is ranked by its tier, then by the full-text rank or the trigram similarity within the
 tier, then by `updatedAt` (newest first), then by the `order` of its type. **No type outranks
@@ -206,8 +231,8 @@ another**: an exact build name beats a vague project match. Grouping results by 
 presentation only.
 
 Access is filtered in SQL — a user with the global project list sees every project's documents,
-anyone else those of the projects they can see — so totals, facets and pages count only what the
-user can see.
+anyone else those of the projects they can see, and a type with a `projectFunction` only in the
+projects where it is granted — so totals, facets and pages count only what the user can see.
 
 The SQL is in `SearchDocumentJdbcRepository` (`ontrack-repository-impl`), the parsing of the query
 in `ParsedSearchQuery`, the table in migrations `V85__1877_search_documents.sql` and

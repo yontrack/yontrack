@@ -5,6 +5,7 @@ import net.nemerosa.ontrack.model.events.Event
 import net.nemerosa.ontrack.model.events.EventFactory
 import net.nemerosa.ontrack.model.events.EventListener
 import net.nemerosa.ontrack.model.security.GlobalSettings
+import net.nemerosa.ontrack.model.security.ProjectEdit
 import net.nemerosa.ontrack.model.structure.*
 import net.nemerosa.ontrack.json.asJson
 import org.springframework.stereotype.Component
@@ -81,6 +82,31 @@ class TestBetaSearchDocumentIndexer : AbstractTestSearchDocumentIndexer(TYPE, 10
     }
 
     override val globalFunction = GlobalSettings::class.java
+}
+
+/**
+ * Test type whose documents are visible only in the projects where [ProjectEdit] is granted, on top
+ * of the project view.
+ */
+@Component
+class TestGammaSearchDocumentIndexer : AbstractTestSearchDocumentIndexer(TYPE, 1002) {
+    companion object {
+        const val TYPE = "test-gamma"
+    }
+
+    override val projectFunction = ProjectEdit::class.java
+}
+
+/**
+ * Test type whose documents are not matched by similarity.
+ */
+@Component
+class TestDeltaSearchDocumentIndexer : AbstractTestSearchDocumentIndexer(TYPE, 1003) {
+    companion object {
+        const val TYPE = "test-delta"
+    }
+
+    override val fuzzyMatching = false
 }
 
 /**

@@ -1,45 +1,55 @@
 package net.nemerosa.ontrack.extension.findings.search
 
-import co.elastic.clients.elasticsearch._types.query_dsl.Query
-import co.elastic.clients.elasticsearch.indices.CreateIndexRequest
-import co.elastic.clients.util.ObjectBuilder
 import net.nemerosa.ontrack.common.Time
 import net.nemerosa.ontrack.extension.findings.FindingsExtensionFeature
 import net.nemerosa.ontrack.extension.findings.model.Finding
 import net.nemerosa.ontrack.extension.findings.model.FindingExposureState
-import net.nemerosa.ontrack.extension.findings.query.FindingQueryService
 import net.nemerosa.ontrack.extension.findings.repository.FindingRepository
+import net.nemerosa.ontrack.extension.findings.security.ProjectFindingsView
+import net.nemerosa.ontrack.extension.findings.state.FindingStateService
+import net.nemerosa.ontrack.job.Schedule
+import net.nemerosa.ontrack.json.asJson
+import net.nemerosa.ontrack.model.events.Event
+import net.nemerosa.ontrack.model.events.EventFactory
+import net.nemerosa.ontrack.model.events.EventListener
+import net.nemerosa.ontrack.model.security.SecurityService
 import net.nemerosa.ontrack.model.structure.*
-import net.nemerosa.ontrack.model.support.OntrackConfigProperties
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
-import tools.jackson.databind.JsonNode
 
 /**
- * Searching the findings by their external ID — a CVE, a rule ID.
+ * Search documents for the findings, found by their external ID — a CVE, a rule ID.
  *
- * One document per finding, indexed when the finding is first seen. Its external ID never
- * changes, so there is nothing to update afterwards. The findings of a deleted project stay in
- * the index until the next reindexation, but are no longer found: a result is read from the
- * database, and filtered by
- * [ProjectFindingsView][net.nemerosa.ontrack.extension.findings.security.ProjectFindingsView].
+ * One document per finding, in the project of the finding, visible to the users granted
+ * [ProjectFindingsView] on it. Its external ID is its title and its only identifier, and it is
+ * not matched by similarity: a CVE similar to the one looked for is another vulnerability. Its
+ * title is the text, and its last sighting its recency.
+ *
+ * The document carries the branches the finding is exposed on, so it is written again whenever
+ * they may change, in the transaction of the change:
+ *
+ * - by the ingestion of a scan, for the findings it reports or resolves;
+ * - when the project is updated (its name), or when a branch is updated, enabled, disabled or
+ *   deleted, for the findings exposed on it.
+ *
+ * What changes without any event — an acceptance expiring, the branching model of the project
+ * changing, the state of a finding in its project after the deletion of a branch — is caught up
+ * by the reconciliation job, which runs every day.
  */
 @Component
 class FindingSearchIndexer(
     extensionFeature: FindingsExtensionFeature,
     private val findingRepository: FindingRepository,
-    private val findingQueryService: FindingQueryService,
+    private val findingStateService: FindingStateService,
     private val structureService: StructureService,
-    private val searchIndexService: SearchIndexService,
-    private val ontrackConfigProperties: OntrackConfigProperties,
-) : SearchIndexer<FindingSearchItem> {
+    private val securityService: SecurityService,
+    private val searchDocumentService: SearchDocumentService,
+) : SearchDocumentIndexer, EventListener {
 
     private val logger: Logger = LoggerFactory.getLogger(FindingSearchIndexer::class.java)
 
     override val indexerName: String = "Security findings"
-
-    override val indexName: String = FINDING_SEARCH_INDEX
 
     override val searchResultType = SearchResultType(
         feature = extensionFeature.featureDescription,
@@ -49,144 +59,149 @@ class FindingSearchIndexer(
         order = SearchResultType.ORDER_PROPERTIES + 70,
     )
 
-    override fun initIndex(builder: CreateIndexRequest.Builder): CreateIndexRequest.Builder =
-        builder.mappings { mappings ->
-            mappings
-                .keyword(FindingSearchItem::externalId)
-                .id(FindingSearchItem::projectId)
-        }
+    override val projectFunction = ProjectFindingsView::class.java
+
+    override val fuzzyMatching: Boolean = false
 
     /**
-     * An external ID is an identifier: it is matched as a whole, or by its beginning, never by
-     * its parts — `CVE-2021-44228` must not find every other `CVE-2021-…`. The whole match comes
-     * first.
+     * Daily reconciliation, for what changes without an event: the expiry of the acceptances, the
+     * branching model of the project
      */
-    override fun buildQuery(q: Query.Builder, token: String): ObjectBuilder<Query> =
-        q.bool { b ->
-            b
-                .should { s ->
-                    s.term { term ->
-                        term.field(FindingSearchItem::externalId.name)
-                            .value(token)
-                            .caseInsensitive(true)
-                            .boost(EXACT_MATCH_BOOST)
-                    }
-                }
-                .should { s ->
-                    s.prefix { prefix ->
-                        prefix.field(FindingSearchItem::externalId.name)
-                            .value(token)
-                            .caseInsensitive(true)
-                    }
-                }
-        }
+    override val indexerSchedule: Schedule = Schedule.EVERY_DAY
 
-    override fun indexAll(processor: (FindingSearchItem) -> Unit) {
-        findingRepository.forEachFinding { finding ->
-            processor(FindingSearchItem(finding))
+    override fun indexAll(processor: (SearchDocument) -> Unit) {
+        structureService.projectList.forEach { project ->
+            findingRepository.findFindingsByProject(project.id()).chunked(CHUNK).forEach { findings ->
+                documents(project, findings).forEach(processor)
+            }
         }
     }
 
     /**
-     * Indexes findings which have just been created.
+     * Writes the documents of findings of a project, whose content or exposure have just changed.
      *
      * A failure is logged and does not fail the caller: search must never block the ingestion
-     * of a scan. A reindexation of the findings repairs the index.
+     * of a scan. The reconciliation job repairs the documents.
+     *
+     * @param deletedBranchId Branch being deleted, left out of the exposures
      */
-    fun indexFindings(findings: Collection<Finding>) {
+    fun indexFindings(project: Project, findings: Collection<Finding>, deletedBranchId: Int? = null) {
         if (findings.isEmpty()) return
         try {
-            findings.chunked(ontrackConfigProperties.search.index.batch).forEach { batch ->
-                searchIndexService.batchSearchIndex(
-                    indexer = this,
-                    items = batch.map { FindingSearchItem(it) },
-                    mode = BatchIndexMode.UPDATE,
-                )
+            findings.chunked(CHUNK).forEach { chunk ->
+                searchDocumentService.index(documents(project, chunk, deletedBranchId))
             }
         } catch (any: Exception) {
-            logger.error("[search][findings] Cannot index ${findings.size} findings", any)
+            logger.error("[search][findings] Cannot index ${findings.size} findings of ${project.name}", any)
         }
     }
 
-    override fun toSearchResult(id: String, score: Double, source: JsonNode): SearchResult? {
-        val finding = id.toIntOrNull()?.let { findingQueryService.findFindingById(it) }
-            ?: return null
-        val project = structureService.findProjectByID(ID.of(finding.projectId))
-            ?: return null
-        val today = Time.now.toLocalDate()
-        val branches = findingQueryService.getFindingExposures(finding)
-            .groupBy { it.branch.id() }
-            .mapNotNull { (_, exposures) ->
-                val branch = exposures.first().branch
-                FindingExposureState.of(exposures.map { it.exposure.stateOn(today) })
-                    ?.takeIf { it != FindingExposureState.RESOLVED }
-                    ?.let { state ->
-                        FindingSearchResultBranch(id = branch.id(), name = branch.name, state = state)
-                    }
+    override fun onEvent(event: Event) {
+        when (event.eventType) {
+            EventFactory.UPDATE_PROJECT -> {
+                val project = event.getEntity<Project>(ProjectEntityType.PROJECT)
+                indexFindings(project, findingRepository.findFindingsByProject(project.id()))
             }
-            .sortedBy { it.name }
-        return SearchResult(
-            title = finding.externalId,
-            description = finding.title,
-            accuracy = score,
-            type = searchResultType,
-            data = mapOf(
-                SEARCH_RESULT_FINDING to FindingSearchResultFinding(
-                    id = finding.id,
-                    externalId = finding.externalId,
-                    scanner = finding.scanner,
-                    location = finding.location,
-                    kind = finding.kind.name,
-                    title = finding.title,
-                    maxSeverity = finding.maxSeverity.name,
-                    state = findingQueryService.getFindingState(finding, today)?.name,
-                ),
-                SearchResult.SEARCH_RESULT_PROJECT to project,
-                SEARCH_RESULT_BRANCHES to branches,
+
+            EventFactory.UPDATE_BRANCH,
+            EventFactory.ENABLE_BRANCH,
+            EventFactory.DISABLE_BRANCH -> {
+                val branch = event.getEntity<Branch>(ProjectEntityType.BRANCH)
+                onBranchChanged(branch.project, branch.id())
+            }
+
+            // Posted before the deletion: the branch is left out of the documents
+            EventFactory.DELETE_BRANCH -> {
+                val branchId = event.getIntValue("BRANCH_ID")
+                onBranchChanged(event.getEntity(ProjectEntityType.PROJECT), branchId, deletedBranchId = branchId)
+            }
+        }
+    }
+
+    /**
+     * Rewrites the documents of the findings exposed on a branch, resolved or not.
+     */
+    private fun onBranchChanged(project: Project, branchId: Int, deletedBranchId: Int? = null) {
+        val findingIds = findingRepository.findExposuresByBranch(branchId).map { it.findingId }.distinct()
+        if (findingIds.isNotEmpty()) {
+            indexFindings(project, findingRepository.findFindingsByIds(findingIds), deletedBranchId)
+        }
+    }
+
+    /**
+     * Documents of findings of a project, with their exposure, as of today.
+     *
+     * Built as administrator: the documents are what all the users may see, their access being
+     * filtered by the search.
+     *
+     * @param deletedBranchId Branch being deleted, left out of the exposures
+     */
+    private fun documents(
+        project: Project,
+        findings: Collection<Finding>,
+        deletedBranchId: Int? = null,
+    ): List<SearchDocument> = securityService.asAdmin {
+        val today = Time.now.toLocalDate()
+        val branches = structureService.getBranchesForProject(project.id)
+            .filter { it.id() != deletedBranchId }
+            .associateBy { it.id() }
+        val states = findingStateService.getFindingStates(project, findings, today)
+        val exposures = findingRepository.findExposuresByFindings(findings.map { it.id })
+            .groupBy { it.findingId }
+        findings.map { finding ->
+            val exposed = (exposures[finding.id] ?: emptyList())
+                .groupBy { it.branchId }
+                .mapNotNull { (branchId, branchExposures) ->
+                    val branch = branches[branchId] ?: return@mapNotNull null
+                    FindingExposureState.of(branchExposures.map { it.stateOn(today) })
+                        ?.takeIf { it != FindingExposureState.RESOLVED }
+                        ?.let { state ->
+                            FindingSearchResultBranch(id = branch.id(), name = branch.name, state = state)
+                        }
+                }
+                .sortedBy { it.name }
+            SearchDocument(
+                type = FINDING_SEARCH_RESULT_TYPE,
+                key = finding.id.toString(),
+                projectId = project.id(),
+                entity = null,
+                title = finding.externalId,
+                identifiers = listOf(finding.externalId),
+                text = finding.title,
+                data = mapOf(
+                    SEARCH_RESULT_FINDING to FindingSearchResultFinding(
+                        id = finding.id,
+                        externalId = finding.externalId,
+                        scanner = finding.scanner,
+                        location = finding.location,
+                        kind = finding.kind.name,
+                        title = finding.title,
+                        maxSeverity = finding.maxSeverity.name,
+                        state = states[finding.id]?.name,
+                    ),
+                    SearchResult.SEARCH_RESULT_PROJECT to project.searchDocumentData(),
+                    SEARCH_RESULT_BRANCHES to exposed,
+                ).asJson(),
+                updatedAt = finding.lastSeen,
             )
-        )
+        }
     }
 
     companion object {
         const val SEARCH_RESULT_FINDING = "finding"
         const val SEARCH_RESULT_BRANCHES = "branches"
+
+        /**
+         * Number of findings whose documents are built together
+         */
+        private const val CHUNK = 500
     }
 }
-
-/**
- * Index of the findings.
- */
-const val FINDING_SEARCH_INDEX = "findings"
 
 /**
  * Search result type of the findings.
  */
 const val FINDING_SEARCH_RESULT_TYPE = "finding"
-
-/**
- * Indexed finding.
- *
- * @property id ID of the finding
- * @property externalId External ID of the finding
- * @property projectId ID of the project of the finding, not searched
- */
-data class FindingSearchItem(
-    override val id: String,
-    val externalId: String,
-    val projectId: Int,
-) : SearchItem {
-
-    constructor(finding: Finding) : this(
-        id = finding.id.toString(),
-        externalId = finding.externalId,
-        projectId = finding.projectId,
-    )
-
-    override val fields: Map<String, Any?> = mapOf(
-        "externalId" to externalId,
-        "projectId" to projectId,
-    )
-}
 
 /**
  * Finding of a search result, what the result needs to be displayed and linked.

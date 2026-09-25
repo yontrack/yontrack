@@ -192,13 +192,18 @@ class SearchDocumentJdbcRepository(
             .addValue("types", scope.types)
             .addValue("projectIds", scope.projectIds)
             .addValue("projectLessTypes", scope.projectLessTypes)
+            .addValue("nonFuzzyTypes", scope.nonFuzzyTypes)
 
         private val tierConditions: List<Pair<SearchMatchTier, String>> = parsed.tiers.map { tier ->
             tier to when (tier) {
                 SearchMatchTier.EXACT -> "d.IDENTIFIERS LIKE :exact"
                 SearchMatchTier.PREFIX -> "(lower(d.TITLE) LIKE :titlePrefix OR d.IDENTIFIERS LIKE :identifierPrefix)"
                 SearchMatchTier.FULL_TEXT -> "d.TSV @@ to_tsquery('simple', :tsq)"
-                SearchMatchTier.TRIGRAM -> "(:q <% d.TITLE OR :q <% d.IDENTIFIERS)"
+                SearchMatchTier.TRIGRAM -> if (scope.nonFuzzyTypes.isEmpty()) {
+                    "(:q <% d.TITLE OR :q <% d.IDENTIFIERS)"
+                } else {
+                    "(d.TYPE NOT IN (:nonFuzzyTypes) AND (:q <% d.TITLE OR :q <% d.IDENTIFIERS))"
+                }
             }
         }
 
@@ -233,7 +238,18 @@ class SearchDocumentJdbcRepository(
                 scope.projectIds.isEmpty() -> "FALSE"
                 else -> "d.PROJECT_ID IN (:projectIds)"
             }
-            "($projects OR $projectLess)"
+            // Types visible in some of the visible projects only
+            val restrictions = scope.restrictedTypes.entries.withIndex().joinToString("") { (index, entry) ->
+                val (type, projectIds) = entry
+                params.addValue("restrictedType$index", type)
+                if (projectIds.isEmpty()) {
+                    " AND (d.TYPE <> :restrictedType$index OR d.PROJECT_ID IS NULL)"
+                } else {
+                    params.addValue("restrictedProjectIds$index", projectIds)
+                    " AND (d.TYPE <> :restrictedType$index OR d.PROJECT_ID IS NULL OR d.PROJECT_ID IN (:restrictedProjectIds$index))"
+                }
+            }
+            "($projects OR $projectLess)$restrictions"
         }
 
         private val typeOrder = scope.types.withIndex().joinToString(
