@@ -842,9 +842,10 @@ successfully propagated downstream.
 backValidation: auto-versioning-parent
 ```
 
-The validation is created on the branch of the promoted build. It is `PASSED` only when the auto-versioning process
-actually completed and applied the change; any other outcome — missing SCM configuration, timeout, or a target already
-holding the expected version — results in a `FAILED` validation.
+The validation is created on the branch of the promoted build, in both the `PR` and `PUSH` push modes. It is `PASSED`
+only when the auto-versioning process actually completed and applied the change; any other outcome — missing SCM
+configuration, timeout, a change rejected by the version rule, or a target already holding the expected version —
+results in a `FAILED` validation.
 
 ## Auto-versioning checks
 
