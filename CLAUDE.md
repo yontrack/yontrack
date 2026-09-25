@@ -221,6 +221,10 @@ Only a `conclusion` of `success` for the pushed commit earns `status:ready`. If 
 the issue at `status:wip`, report the failure, and fix it before moving on. If the build is still running
 and waiting is impractical, say so explicitly — never apply `status:ready` on an unverified build.
 
+The one exception is a **docs-only push** carrying `[skip ci]` (see *Commit messages* below): it has no
+run to wait for. Once its commit is on the base branch, and the commit before it on that branch had a green
+build, apply `status:ready` straight away and say that CI was skipped by design.
+
 These `status:*` labels are the issue *lifecycle*; they are distinct from the triage labels described in
 `docs/agents/triage-labels.md` and must never be substituted for them.
 
@@ -298,6 +302,17 @@ Follow this order for every non-trivial change:
   Issue *linking* is unaffected either way: `GitHubIssueServiceExtension.extractIssueKeysFromMessage`
   scans the whole message with `while (matcher.find())`, so `#1234` is picked up wherever it sits.
 
+- **Always** end the subject with `[skip ci]` when a commit touches only documentation that CI neither
+  builds nor tests — `CONTEXT.md`, `CLAUDE.md`, `README.md`, `DEVELOPMENT.md`, `docs/` (ADRs, agent
+  docs, grilling sessions) and `doc/dev-guide/`. A full CI run is about 25 minutes spent proving
+  nothing. For example: `#1876 CONTEXT.md: search document and search result type [skip ci]`.
+  - **Never** use it for `ontrack-docs/` — the `docs` job builds the mkdocs site and catches broken
+    links and missing nav entries — nor for any commit that also touches code, build scripts,
+    workflows, or the annotations that generate docs.
+  - GitHub reads the marker on the **head commit of a push** only. When a push carries several
+    commits, it runs CI unless the last one is marked, and it skips CI if the last one is marked,
+    even if an earlier commit is not docs-only. So push a docs-only commit on its own, or on top of
+    commits that were already built.
 - A commit subject that starts with a conventional-commit type is the only kind that appears in a
   semantic change log. Use one on any commit that carries no issue number.
 - The known types are the only ones with a title and an emoji:

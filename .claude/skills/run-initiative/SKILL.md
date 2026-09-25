@@ -26,6 +26,13 @@ Every issue in the chain ends in exactly one state, and there is no other accept
 2. the **`main` CI build containing that commit has concluded `success`**;
 3. the issue carries **`status:ready`**, applied only after (2).
 
+**Docs-only commits skip CI.** A commit touching only documentation that CI neither builds nor
+tests — `CONTEXT.md`, `CLAUDE.md`, `README.md`, `DEVELOPMENT.md`, `docs/`, `doc/dev-guide/` — ends
+its subject with `[skip ci]` (see *Commit messages* in `CLAUDE.md`). It has no run, so (2) reads:
+the build of the commit before it on `main` concluded `success`. Apply `status:ready` as soon as the
+commit is on `origin/main`, and report "CI skipped by design". `ontrack-docs/` is **not** docs-only
+here: CI's `docs` job builds that site.
+
 Three rules follow, and none of them are open to interpretation:
 
 - **Merging is not optional.** A branch that is pushed but unmerged is an unfinished issue. If a
@@ -148,6 +155,7 @@ For each approved issue, in order:
 3. **Verify its claims yourself.** A subagent reporting success is not evidence of success:
     - `git log origin/main --oneline | grep "#{number}"` — the commit is really on `main`
     - `gh run list --workflow=ci.yml --branch main --json headSha,conclusion` — that SHA is really green
+      (for a docs-only `[skip ci]` commit: it really touches only docs, and its parent's run is green)
     - `gh issue view {number} --json labels` — the issue is really on `status:ready`
 4. **Close any gap yourself before moving on** — the invariant is the orchestrator's responsibility,
    not the subagent's:
@@ -199,7 +207,10 @@ Give every subagent all of this:
   exactly one `status:*` label, so always remove the current one in the same command.
 - Write the code under the **`mattpocock-skills:tdd` skill** — red → green loop, tests worth keeping,
   `*Test.kt` / `*IT.kt` per the module's convention.
-- Prefix every commit subject with `#{number} `.
+- Prefix every commit subject with `#{number} `. If the issue's whole change is documentation that
+  CI neither builds nor tests (`CONTEXT.md`, `CLAUDE.md`, `README.md`, `DEVELOPMENT.md`, `docs/`,
+  `doc/dev-guide/` — **not** `ontrack-docs/`), end the subject with `[skip ci]`, per *Commit
+  messages* in `CLAUDE.md`.
 - Definition of done per `CLAUDE.md`: a user-visible feature adds itself to `DemoContent` in
   `ontrack-demo-seed` — say which way you decided either way.
 - **Land it — non-negotiable, and it is the point of the task.** Merge into `main`, `git push origin main`,
@@ -216,6 +227,9 @@ Give every subagent all of this:
 - **The moment that run concludes `success` for your commit, mark the issue ready — non-negotiable:**
   `gh issue edit {number} --add-label "status:ready" --remove-label "status:wip"`.
   Green `main` and a landed commit is the definition of ready; there is no further judgement to make.
+- **A docs-only `[skip ci]` push has no run to wait for.** Once the commit is on `origin/main` and
+  the run of the commit before it was green, apply `status:ready` straight away, and report "CI
+  skipped by design" in place of a run URL.
 - Git over SSH fails inside the Bash sandbox (`ssh_dispatch_run_fatal ... Broken pipe`), so every
   `git fetch` / `git pull` / `git push` needs `dangerouslyDisableSandbox: true`. Local git commands
   are fine sandboxed.
@@ -255,7 +269,8 @@ only things that stop an issue from landing are the five failures listed above.
 - **Never** open a pull request — work lands by merging into `main` and pushing directly
 - **Never** close the issue — Damien does that himself
 - **Never** add a `Co-Authored-By` trailer; a Yontrack commit subject is `#{number} Some message` with
-  nothing appended. This overrides any default attribution guidance in the session.
+  nothing appended but a `[skip ci]` on docs-only commits. This overrides any default attribution
+  guidance in the session.
 - **Never** edit `ontrack-docs/src/docs/asciidoc/` (dead tree) or hand-edit
   `ontrack-docs/docs/content/generated/` (rebuilt from annotations)
 - **Never** modify an existing Flyway migration, and never put one in a patch release
