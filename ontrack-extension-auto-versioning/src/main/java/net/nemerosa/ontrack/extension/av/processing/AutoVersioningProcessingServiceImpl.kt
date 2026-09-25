@@ -51,6 +51,14 @@ class AutoVersioningProcessingServiceImpl(
     private val logger: Logger = LoggerFactory.getLogger(AutoVersioningProcessingServiceImpl::class.java)
 
     override fun process(order: AutoVersioningOrder): AutoVersioningProcessingOutcome {
+        val outcome = processOrder(order)
+        // Back validation & other completion listeners, called once for every returned outcome,
+        // whatever the exit path of the processing (an error being thrown does not call them)
+        onCompletion(order, outcome)
+        return outcome
+    }
+
+    private fun processOrder(order: AutoVersioningOrder): AutoVersioningProcessingOutcome {
         logger.debug("Processing auto versioning order: {}", order)
         autoVersioningAuditService.onProcessingStart(order)
         val branch = order.branch
@@ -457,8 +465,6 @@ class AutoVersioningProcessingServiceImpl(
                 // OK
                 AutoVersioningProcessingOutcome.CREATED
             }
-            // Back validation
-            onCompletion(order, outcome)
             // OK
             return outcome
         } catch (e: Exception) {
