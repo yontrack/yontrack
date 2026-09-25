@@ -6306,17 +6306,23 @@ type Query {
     "Name of the branch of the build to, used to disambiguate its name"
     toBranch: String
   ): SCMChangeLog
-  "Performs a search in Ontrack"
+  "Performs a search across the types of results, ranked together. Only what the user can see is returned and counted."
   search(
-    "Offset for the page"
+    "Index of the first result to return"
     offset: Int = 0,
-    "Size of the page"
+    "When set, returns the best N results of each type in one request, instead of a page: offset and size are then ignored."
+    perType: Int,
+    "Text to look for, at least 2 characters long. Required, unless the deprecated `token` is used."
+    query: String,
+    "Maximum number of results to return"
     size: Int = 20,
     "Query string"
-    token: String!,
+    token: String @deprecated(reason : "Use query. Will be removed in 7.0."),
     "Result type"
-    type: String!
-  ): SearchResultPaginated
+    type: String @deprecated(reason : "Use types. Will be removed in 7.0."),
+    "IDs of the types of results to look into. All of them by default."
+    types: [String!]
+  ): SearchResults!
   "List of types of search results"
   searchResultTypes: [SearchResultType!]!
   "Ontrack settings"
@@ -6861,6 +6867,14 @@ type ScheduleAutoVersioningPayload implements Payload {
   errors: [UserError]
 }
 
+"Number of search results for one type"
+type SearchFacet {
+  "Number of results for this type"
+  count: Int!
+  "Type of result"
+  type: SearchResultType!
+}
+
 "Search result"
 type SearchResult {
   "Score for the search"
@@ -6879,13 +6893,6 @@ type SearchResult {
   uri: String @deprecated(reason : "Will be removed in V5. Use the generic type & data")
 }
 
-type SearchResultPaginated {
-  "Information about the current page"
-  pageInfo: PageInfo
-  "Items in the current page"
-  pageItems: [SearchResult!]!
-}
-
 "Type of search result"
 type SearchResultType {
   "Short help text explaining the format of the token"
@@ -6896,6 +6903,22 @@ type SearchResultType {
   id: String
   "Display name for the search result"
   name: String
+}
+
+"Results of a search"
+type SearchResults {
+  "Number of results per type, for the types having some"
+  facets: [SearchFacet!]!
+  "Results, best first"
+  items: [SearchResult!]!
+  "Message about the search, for example when the search index is being built"
+  message: String
+  "Information about the current page"
+  pageInfo: PageInfo @deprecated(reason : "Use total, and the offset and size arguments. Will be removed in 7.0.")
+  "Items in the current page"
+  pageItems: [SearchResult!]! @deprecated(reason : "Use items. Will be removed in 7.0.")
+  "Total number of results, for what the user can see"
+  total: Int!
 }
 
 type SelectDashboardPayload implements PayloadInterface {

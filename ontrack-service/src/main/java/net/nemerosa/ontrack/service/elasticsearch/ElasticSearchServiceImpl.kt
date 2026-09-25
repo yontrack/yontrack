@@ -12,13 +12,19 @@ import org.springframework.transaction.annotation.Transactional
 
 typealias ESSearchRequestBuilder = co.elastic.clients.elasticsearch.core.SearchRequest.Builder
 
+/**
+ * Search on Elasticsearch, for the types whose indexer has not been migrated yet to a
+ * [SearchDocumentIndexer]. The [SearchService] routes the searches on these types here.
+ *
+ * Removed once every indexer is migrated (#1882).
+ */
 @Service
 @Transactional
 class ElasticSearchServiceImpl(
     private val client: ElasticsearchClient,
     private val searchIndexers: List<SearchIndexer<*>>,
     private val searchIndexService: SearchIndexService
-) : SearchService {
+) {
 
     private val logger: Logger = LoggerFactory.getLogger(ElasticSearchServiceImpl::class.java)
 
@@ -30,29 +36,24 @@ class ElasticSearchServiceImpl(
         searchIndexers.filter { it.searchResultType != null }.associateBy { it.searchResultType!!.id }
     }
 
-    override fun paginatedSearch(request: SearchRequest): SearchResults {
-        val searchIndexer = indexerByResultType[request.type]
+    /**
+     * Search on one type of results.
+     */
+    fun paginatedSearch(type: String, token: String, offset: Int, size: Int): SearchResults {
+        val searchIndexer = indexerByResultType[type]
             ?: return SearchResults.empty
-        return if (searchIndexer is SearchQuery) {
-            searchIndexer.query(
-                token = request.token,
-                offset = request.offset,
-                size = request.size,
+        return rawSearch(
+            token = token,
+            searchIndexer = searchIndexer,
+            offset = offset,
+            size = size,
+        ).run {
+            SearchResults(
+                items = items.mapNotNull { toResult(it) },
+                offset = offset,
+                total = total,
+                message = message,
             )
-        } else {
-            rawSearch(
-                token = request.token,
-                searchIndexer = searchIndexer,
-                offset = request.offset,
-                size = request.size,
-            ).run {
-                SearchResults(
-                    items = items.mapNotNull { toResult(it) },
-                    offset = offset,
-                    total = total,
-                    message = message,
-                )
-            }
         }
     }
 
@@ -130,26 +131,26 @@ class ElasticSearchServiceImpl(
         )
     }
 
-    override val searchResultTypes: List<SearchResultType>
+    val searchResultTypes: List<SearchResultType>
         get() =
             indexers
                 .filter { (_, indexer) -> indexer.enabled }
                 .mapNotNull { (_, indexer) -> indexer.searchResultType }
                 .sortedBy { it.order }
 
-    override fun indexReset(reindex: Boolean, logErrors: Boolean): Ack {
+    fun indexReset(reindex: Boolean, logErrors: Boolean): Ack {
         val ok = indexers.all { (_, indexer) ->
             searchIndexService.resetIndex(indexer = indexer, reindex = reindex, logErrors = logErrors)
         }
         return Ack(ok)
     }
 
-    override fun reindex(resultType: String) {
+    fun reindex(resultType: String) {
         val searchIndexer = indexerByResultType[resultType] ?: return
         searchIndexService.index(searchIndexer)
     }
 
-    override fun indexInit() {
+    fun indexInit() {
         indexers.forEach { (_, indexer) -> searchIndexService.initIndex(indexer) }
     }
 

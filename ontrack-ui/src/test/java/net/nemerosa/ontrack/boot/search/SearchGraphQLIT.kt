@@ -1,7 +1,9 @@
 package net.nemerosa.ontrack.boot.search
 
+import net.nemerosa.ontrack.model.structure.NameDescription
 import net.nemerosa.ontrack.test.TestUtils.uid
 import org.junit.jupiter.api.Test
+import java.util.UUID
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
@@ -114,5 +116,119 @@ class SearchGraphQLIT : AbstractSearchTestSupport() {
             }
         }
     }
+
+
+    @Test
+    fun `Searching across types with total, facets and items`() {
+        val name = token()
+        val project = project(NameDescription.nd(name, "Description of $name"))
+        val data = run("""{
+            search(query: "$name", types: ["project"]) {
+                total
+                message
+                facets {
+                    type { id name }
+                    count
+                }
+                items {
+                    title
+                    description
+                    accuracy
+                    type { id }
+                    data
+                }
+            }
+        }""")
+        val search = data["search"]
+        assertEquals(1, search["total"].asInt())
+        assertTrue(search["message"].isNull)
+        assertEquals(1, search["facets"].size())
+        assertEquals("project", search["facets"][0]["type"]["id"].asText())
+        assertEquals("Project", search["facets"][0]["type"]["name"].asText())
+        assertEquals(1, search["facets"][0]["count"].asInt())
+        val item = search["items"][0]
+        assertEquals(name, item["title"].asText())
+        assertEquals("Description of $name", item["description"].asText())
+        assertEquals("project", item["type"]["id"].asText())
+        assertEquals(project.id(), item["data"]["project"]["id"].asInt())
+        assertEquals(name, item["data"]["project"]["name"].asText())
+    }
+
+    @Test
+    fun `Best results per type, across Postgres and Elasticsearch types`() {
+        val name = token()
+        project(NameDescription.nd(name, "")) {
+            branch(name = name)
+        }
+        index("branches")
+        val data = run("""{
+            search(query: "$name", types: ["project", "branch"], perType: 3) {
+                total
+                facets { type { id } count }
+                items { title type { id } }
+            }
+        }""")
+        val search = data["search"]
+        assertEquals(2, search["total"].asInt())
+        assertEquals(
+            mapOf("project" to 1, "branch" to 1),
+            search["facets"].values().associate { it["type"]["id"].asText() to it["count"].asInt() }
+        )
+        assertEquals(
+            listOf("project", "branch"),
+            search["items"].values().map { it["type"]["id"].asText() }
+        )
+    }
+
+    @Test
+    fun `Paginated search across Postgres and Elasticsearch types`() {
+        val name = token()
+        project(NameDescription.nd(name, "")) {
+            branch(name = name)
+        }
+        index("branches")
+        val query = """query Search(${'$'}offset: Int!) {
+            search(query: "$name", types: ["project", "branch"], offset: ${'$'}offset, size: 1) {
+                total
+                items { type { id } }
+            }
+        }"""
+        val first = run(query, mapOf("offset" to 0))["search"]
+        assertEquals(2, first["total"].asInt())
+        assertEquals(listOf("project"), first["items"].values().map { it["type"]["id"].asText() })
+        val second = run(query, mapOf("offset" to 1))["search"]
+        assertEquals(2, second["total"].asInt())
+        assertEquals(listOf("branch"), second["items"].values().map { it["type"]["id"].asText() })
+    }
+
+    @Test
+    fun `The deprecated search on one type is a wrapper of the new one`() {
+        val name = token()
+        project(NameDescription.nd(name, ""))
+        val data = run("""{
+            search(type: "project", token: "$name") {
+                pageInfo { totalSize currentOffset currentSize }
+                pageItems { title type { id } }
+            }
+        }""")
+        val search = data["search"]
+        assertEquals(1, search["pageInfo"]["totalSize"].asInt())
+        assertEquals(0, search["pageInfo"]["currentOffset"].asInt())
+        assertEquals(1, search["pageInfo"]["currentSize"].asInt())
+        assertEquals(listOf(name), search["pageItems"].values().map { it["title"].asText() })
+    }
+
+    @Test
+    fun `A query is required`() {
+        runWithMatchingError(
+            """{ search(types: ["project"]) { total } }""",
+            errorMessage = "A query is required",
+        )
+    }
+
+    /**
+     * Random name, which no other one is similar to, even by trigram
+     */
+    private fun token() = "p" + UUID.randomUUID().toString().replace("-", "").take(15)
 
 }

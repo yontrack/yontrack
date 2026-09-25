@@ -2,7 +2,6 @@ package net.nemerosa.ontrack.boot.search
 
 import net.nemerosa.ontrack.boot.BRANCH_SEARCH_INDEX
 import net.nemerosa.ontrack.boot.BRANCH_SEARCH_RESULT_TYPE
-import net.nemerosa.ontrack.boot.PROJECT_SEARCH_INDEX
 import net.nemerosa.ontrack.model.structure.Branch
 import net.nemerosa.ontrack.model.structure.SearchRequest
 import net.nemerosa.ontrack.test.TestUtils.uid
@@ -28,8 +27,7 @@ class BranchSearchIT : AbstractSearchTestSupport() {
         }
         // Creates 3 other projects
         repeat(3) { project { branch {} } }
-        // Launching indexation for the projects & branches
-        index("projects")
+        // Launching indexation for the branches
         index("branches")
         // Searches for the candidate project
         val results = asUser { searchService.paginatedSearch(searchRequest(candidate.name)).items }
@@ -51,8 +49,7 @@ class BranchSearchIT : AbstractSearchTestSupport() {
         }
         // Creates 3 other projects
         repeat(3) { project { branch {} } }
-        // Launching indexation for the projects & branches
-        index(PROJECT_SEARCH_INDEX)
+        // Launching indexation for the branches
         index("branches")
         // Searches for the name
         val results = asUser { searchService.paginatedSearch(searchRequest(branch.name)).items }
@@ -68,8 +65,7 @@ class BranchSearchIT : AbstractSearchTestSupport() {
         val branch = project<Branch> {
             branch {}
         }
-        // Launching indexation for the projects
-        index(PROJECT_SEARCH_INDEX)
+        // Launching indexation for the branches
         index(BRANCH_SEARCH_INDEX)
         // Search on project name
         val results = asUser { searchService.paginatedSearch(searchRequest(branch.project.name)).items }
@@ -89,8 +85,7 @@ class BranchSearchIT : AbstractSearchTestSupport() {
                 branch(name = "$prefix-$it")
             }
         }
-        // Launching indexation for the projects
-        index(PROJECT_SEARCH_INDEX)
+        // Launching indexation for the branches
         index(BRANCH_SEARCH_INDEX)
         // Making sure to restrict access rights
         withNoGrantViewToAll {

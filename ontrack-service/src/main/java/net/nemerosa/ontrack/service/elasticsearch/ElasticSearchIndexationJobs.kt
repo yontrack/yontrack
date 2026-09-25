@@ -10,7 +10,6 @@ import net.nemerosa.ontrack.job.orchestrator.JobOrchestratorSupplier
 import net.nemerosa.ontrack.model.structure.SearchIndexService
 import net.nemerosa.ontrack.model.structure.SearchIndexer
 import net.nemerosa.ontrack.model.structure.SearchItem
-import net.nemerosa.ontrack.model.structure.SearchService
 import net.nemerosa.ontrack.service.elasticsearch.ElasticSearchJobs.indexationAllJobKey
 import net.nemerosa.ontrack.service.elasticsearch.ElasticSearchJobs.indexationClearJobKey
 import net.nemerosa.ontrack.service.elasticsearch.ElasticSearchJobs.indexationJobType
@@ -25,7 +24,7 @@ import java.util.concurrent.TimeUnit
 class ElasticSearchIndexationJobs(
     private val applicationContext: ApplicationContext,
     private val elasticSearchService: SearchIndexService,
-    private val searchService: SearchService,
+    private val searchService: ElasticSearchServiceImpl,
     private val jobScheduler: JobScheduler
 ) : JobOrchestratorSupplier {
 

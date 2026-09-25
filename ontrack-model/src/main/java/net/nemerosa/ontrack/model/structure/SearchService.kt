@@ -13,9 +13,26 @@ interface SearchService {
     val searchResultTypes: List<SearchResultType>
 
     /**
-     * Paginated search entry point based on registered search indexers.
+     * Searches across several types of results, ranked together.
+     *
+     * The results are filtered on what the current user can see: the total, the facets and the
+     * pages only count what the user can see.
      */
-    fun paginatedSearch(request: SearchRequest): SearchResults
+    fun search(request: SearchQueryRequest): SearchResults
+
+    /**
+     * Paginated search on one type of results.
+     */
+    @Deprecated("Use search(SearchQueryRequest). Will be removed in 7.0.")
+    fun paginatedSearch(request: SearchRequest): SearchResults =
+        search(
+            SearchQueryRequest(
+                query = request.token,
+                types = listOf(request.type),
+                offset = request.offset,
+                size = request.size,
+            )
+        )
 
     /**
      * Makes sure all search indexes are initialized.

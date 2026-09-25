@@ -8,6 +8,7 @@ package net.nemerosa.ontrack.model.structure
  * @param offset Offset for the results
  * @param size Number of results returned after [offset]
  */
+@Deprecated("Use SearchQueryRequest. Will be removed in 7.0.")
 class SearchRequest @JvmOverloads constructor(
         val token: String,
         val type: String,

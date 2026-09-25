@@ -9,7 +9,6 @@ import kotlinx.coroutines.runBlocking
 import net.nemerosa.ontrack.model.security.SecurityService
 import net.nemerosa.ontrack.model.structure.SearchIndexService
 import net.nemerosa.ontrack.model.structure.SearchIndexStartupReset
-import net.nemerosa.ontrack.model.structure.SearchService
 import net.nemerosa.ontrack.model.support.OntrackConfigProperties
 import net.nemerosa.ontrack.model.support.StartupService
 import net.nemerosa.ontrack.model.support.StorageService
@@ -27,7 +26,7 @@ import org.springframework.stereotype.Component
 @Component
 class ElasticSearchV5Migration(
     private val storageService: StorageService,
-    private val searchService: SearchService,
+    private val searchService: ElasticSearchServiceImpl,
     private val searchIndexService: SearchIndexService,
     private val securityService: SecurityService,
     private val ontrackConfigProperties: OntrackConfigProperties,

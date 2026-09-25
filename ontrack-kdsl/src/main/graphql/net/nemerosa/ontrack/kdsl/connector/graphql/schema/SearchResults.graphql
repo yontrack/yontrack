@@ -1,0 +1,37 @@
+query SearchResults(
+    $query: String!,
+    $types: [String!],
+    $offset: Int!,
+    $size: Int!,
+    $perType: Int,
+) {
+    search(query: $query, types: $types, offset: $offset, size: $size, perType: $perType) {
+        total
+        message
+        facets {
+            type {
+                id
+                name
+                description
+                feature {
+                    id
+                }
+            }
+            count
+        }
+        items {
+            type {
+                id
+                name
+                description
+                feature {
+                    id
+                }
+            }
+            title
+            description
+            accuracy
+            data
+        }
+    }
+}

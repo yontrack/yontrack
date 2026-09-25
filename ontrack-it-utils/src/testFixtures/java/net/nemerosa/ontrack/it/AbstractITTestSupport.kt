@@ -56,7 +56,7 @@ abstract class AbstractITTestSupport {
     protected lateinit var dataSource: DataSource
 
     @Autowired(required = false)
-    private var searchIndexStartupReset: SearchIndexStartupReset? = null
+    private var searchIndexStartupResets: List<SearchIndexStartupReset> = emptyList()
 
     /**
      * On a fresh stack, the search indexes are reset in the background at startup, which would
@@ -64,7 +64,7 @@ abstract class AbstractITTestSupport {
      */
     @BeforeEach
     fun awaitSearchIndexStartupReset() {
-        searchIndexStartupReset?.awaitCompletion()
+        searchIndexStartupResets.forEach { it.awaitCompletion() }
     }
 
     /**

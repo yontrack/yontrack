@@ -6,6 +6,7 @@ import net.nemerosa.ontrack.kdsl.acceptance.tests.support.uid
 import net.nemerosa.ontrack.kdsl.spec.extension.general.release
 import net.nemerosa.ontrack.kdsl.spec.search.search
 import org.junit.jupiter.api.Test
+import java.util.UUID
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.time.Duration.Companion.seconds
@@ -57,6 +58,34 @@ class ACCDSLSearch : AbstractACCDSLTestSupport() {
             }
         }
 
+    }
+
+
+    /**
+     * Random name, which no other project is similar to, even by trigram
+     */
+    private fun token() = "p" + UUID.randomUUID().toString().replace("-", "").take(15)
+
+    @Test
+    fun `Searching for a project across types`() {
+        project(name = token()) {
+            val results = ontrack.search(query = name, types = listOf("project"))
+            assertEquals(1, results.total)
+            assertEquals(listOf(name), results.items.map { it.title })
+            assertEquals("project", results.items.first().type.id)
+            assertEquals(id.toInt(), results.items.first().data?.path("project")?.path("id")?.asInt())
+            assertEquals(listOf("project" to 1), results.facets.map { it.type.id to it.count })
+        }
+    }
+
+    @Test
+    fun `Best results per type, across Postgres and Elasticsearch types`() {
+        project(name = token()) {
+            branch(name) {}
+            val results = ontrack.search(query = name, perType = 1)
+            assertEquals(1, results.items.count { it.type.id == "project" })
+            assertEquals(1, results.facets.first { it.type.id == "project" }.count)
+        }
     }
 
 }

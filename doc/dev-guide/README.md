@@ -8,6 +8,7 @@
 * Components
   * [Model](components/core/README.md) - core model of Ontrack
   * [Properties](components/properties/README.md)
+  * [Search indexers](search-indexer.md) - describing the search documents of a search result type
 * Delivery
   * [Test coverage](coverage.md) - what the COVERAGE.* figures measure, and how to get them locally
   * [Demo seed and reset](demo-seed.md) - resetting the demo environment through the Yontrack API
