@@ -4,7 +4,7 @@ import {useContext} from "react";
 import {UserContext} from "@components/providers/UserProvider";
 import {FaRegUser} from "react-icons/fa";
 import HomeLink from "@components/common/HomeLink";
-import NavBarSearch from "@components/search/NavBarSearch";
+import SearchPaletteButton from "@components/search/palette/SearchPaletteButton";
 import Image from "next/image";
 
 const {Text} = Typography;
@@ -25,9 +25,9 @@ function NavBarText({text}) {
  *
  * The narrow-width rules live in `styles/globals.css` next to `.ot-navbar`,
  * because they need a media query: at phone width the wordmark and the user's
- * name step aside so that the logo, the search box and the avatar fit on one
+ * name step aside so that the logo, the search button and the avatar fit on one
  * 64px line. Everything else here is width-independent - the brand and the
- * avatar never shrink, and the search box is the only thing that gives.
+ * avatar never shrink, and the search button is the only thing that gives.
  */
 export default function NavBar() {
 
@@ -66,9 +66,7 @@ export default function NavBar() {
                     </span>
                 </div>
                 <div className="ot-navbar-actions">
-                    <NavBarSearch
-                        style={{display: 'flex', alignItems: 'center'}}
-                    />
+                    <SearchPaletteButton/>
                     <NavBarText text={user?.fullName ?? user?.email}/>
                     <Avatar icon={<FaRegUser id="user-menu"/>}
                             onClick={openUserMenu}

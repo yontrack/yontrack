@@ -100,11 +100,11 @@ test('a search result lands on the finding page', async ({page, ontrack}) => {
     await login(page, ontrack)
 
     const homePage = new HomePage(page, ontrack)
-    await homePage.search(externalId)
+    const palette = await homePage.search(externalId)
 
-    const result = page.getByRole('link', {name: externalId, exact: true})
-    await expect(result).toBeVisible({timeout: 20_000}) // Waiting a bit longer, in case ES is not ready yet
-    await result.click()
+    const option = palette.option(new RegExp(`^${externalId}, Security finding`))
+    await palette.expectOption(option, externalId)
+    await palette.openWithEnter(option)
 
     const findingPage = new FindingPage(page, ontrack)
     await findingPage.expectOnPage(externalId)

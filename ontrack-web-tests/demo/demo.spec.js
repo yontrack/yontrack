@@ -20,6 +20,7 @@ const {Connection, Credentials} = require("@ontrack/connection")
 const {Ontrack} = require("@ontrack/ontrack")
 const {login} = require("../tests/core/login")
 const {ProjectPage} = require("../tests/core/projects/project")
+const {CommandPalette} = require("../tests/core/search/CommandPalette")
 
 /**
  * Nothing is defaulted. The workflow sets all four, and a default `DEMO_URL` would point a
@@ -96,15 +97,14 @@ test('the demo shows the security findings, from the project to the finding and 
     await expect(page.getByTestId(`finding-exposure-${findingsRelease}-SECURITY.DEPENDENCIES`)).toContainText(/exposed/i)
     await expect(page.getByTestId('finding-exposure-main-SECURITY.DEPENDENCIES')).toContainText(/resolved/i)
 
-    // The search result of the CVE, leading back to the finding page
-    const searchBox = page.getByRole('searchbox')
-    await searchBox.click()
-    await searchBox.fill(findingsCve)
-    await searchBox.press('Enter')
-    const result = page.getByRole('link', {name: findingsCve, exact: true})
-    // Longer than the default, as the search suite does: the index is written as the seed runs
-    await expect(result).toBeVisible({timeout: 20_000})
-    await result.click()
+    // The search result of the CVE in the command palette, leading back to the finding page
+    const palette = new CommandPalette(page)
+    await palette.openByShortcut()
+    await palette.type(findingsCve)
+    // Typed again until it shows, as the search suite does: the index is written as the seed runs
+    const option = palette.option(`${findingsCve}, Security finding, in ${findingsProject}`)
+    await palette.expectOption(option, findingsCve)
+    await palette.openWithEnter(option)
     await expect(page).toHaveURL(/\/extension\/findings\/finding\/\d+$/)
     await expect(page.getByTestId('finding-summary').getByText(findingsCve, {exact: true})).toBeVisible()
 })

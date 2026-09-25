@@ -263,3 +263,38 @@ export function getLocalEnvironmentMatrixFilter() {
 export function setLocalEnvironmentMatrixFilter(filter) {
     localStorage.setItem(environmentMatrixFilter, JSON.stringify(filter))
 }
+
+const recentlyVisited = 'recently-visited'
+
+/**
+ * The entities this browser visited last, the most recent first, as the command palette lists them
+ * before anything is typed (#1884).
+ *
+ * Per browser rather than a server preference: it is a trail of where one reader has just been, not
+ * a choice worth following them from one device to the next.
+ *
+ * Each entry is `{type, id, name, context, href}` - `type` being the id of a search result type, so
+ * that the palette draws it with that type's icon. An entry without a link cannot be opened, and is
+ * left out.
+ *
+ * @returns the entries, or an empty list when there are none or they cannot be read
+ */
+export function getLocalRecentlyVisited() {
+    const json = localStorage.getItem(recentlyVisited)
+    if (json) {
+        try {
+            const parsed = JSON.parse(json)
+            return Array.isArray(parsed) ?
+                parsed.filter(entry => entry && typeof entry === 'object' && entry.type && entry.href) :
+                []
+        } catch (ignored) {
+            return []
+        }
+    } else {
+        return []
+    }
+}
+
+export function setLocalRecentlyVisited(entries) {
+    localStorage.setItem(recentlyVisited, JSON.stringify(entries))
+}

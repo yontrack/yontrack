@@ -671,7 +671,7 @@ button.ot-validation-stamp-filter-edition {
     gap: 8px;
     width: 100%;
     /* A flex item's `min-width: auto` refuses to shrink below its content; this
-       is what lets the search box give way instead of the row overflowing. */
+       is what lets the search button give way instead of the row overflowing. */
     min-width: 0;
 }
 
@@ -689,17 +689,53 @@ button.ot-validation-stamp-filter-edition {
     min-width: 0;
 }
 
-/* The search box is the only thing in the row that gives. A basis rather than a
-   width: antd's `Input.Search` is `width: 100%` and would otherwise eat whatever the
-   row has left, truncating the name beside it even on a 1280px screen. */
-.ot-navbar-actions .ot-search-box {
-    flex: 0 1 260px;
+/* The search button - which opens the command palette (#1884) - is the only thing
+   in the row that gives. It looks like the search box it replaces: a field-wide
+   button, the shortcut at its end. At phone width it shrinks down to its icon. */
+.ot-navbar-actions .ot-search-button {
+    flex: 0 1 220px;
     min-width: 0;
+    justify-content: flex-start;
+    overflow: hidden;
+}
+
+.ot-search-button .ot-search-button-label {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-align: left;
+}
+
+/* A key of the keyboard, as shown by the search button and the palette */
+.ot-kbd {
+    display: inline-block;
+    padding: 0 4px;
+    font-family: inherit;
+    font-size: 0.85em;
+    line-height: 1.5;
+    border: 1px solid currentColor;
+    border-radius: 4px;
+    opacity: 0.75;
+    margin-right: 2px;
+}
+
+/* Present for assistive technologies, out of sight otherwise */
+.ot-visually-hidden {
+    position: absolute !important;
+    width: 1px !important;
+    height: 1px !important;
+    padding: 0 !important;
+    margin: -1px !important;
+    overflow: hidden !important;
+    clip: rect(0, 0, 0, 0) !important;
+    white-space: nowrap !important;
+    border: 0 !important;
 }
 
 /* The name is a single line that truncates, never a block that wraps: wrapping
    it is what grew the row past the header's 64px in the first place. It keeps
-   its width against the search box, and the cap keeps a pathological one from
+   its width against the search button, and the cap keeps a pathological one from
    pushing the avatar out of the row. */
 .ot-navbar-user {
     flex: 0 0 auto;
@@ -716,15 +752,31 @@ button.ot-validation-stamp-filter-edition {
 
 /**
  * Phone width. The wordmark and the user's name step aside so that the logo,
- * the search box and the avatar fit on the header's single 64px line.
+ * the search button and the avatar fit on the header's single 64px line. The
+ * search button keeps its icon only - its accessible name is still "Search…".
  *
  * Hiding rather than shrinking: a 120px wordmark and an ellipsised name eat the
- * width the search box and the avatar need, and neither is load-bearing - the
+ * width the search button and the avatar need, and neither is load-bearing - the
  * logo still links home, and the account is the one the user signed in as.
  */
 @media (max-width: 600px) {
     .ot-navbar-wordmark,
-    .ot-navbar-user {
+    .ot-navbar-user,
+    .ot-search-button .ot-kbd {
         display: none;
+    }
+
+    .ot-navbar-actions .ot-search-button {
+        flex: 0 0 auto;
+    }
+
+    /* Out of sight, not out of the button's accessible name */
+    .ot-search-button .ot-search-button-label {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
     }
 }

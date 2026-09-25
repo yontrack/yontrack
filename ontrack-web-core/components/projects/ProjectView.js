@@ -33,6 +33,7 @@ import ProjectBuildSearchCommand from "@components/projects/ProjectBuildSearchCo
 import ProjectDeleteCommand from "@components/projects/ProjectDeleteCommand";
 import AnnotatedDescription from "@components/common/AnnotatedDescription";
 import {useQuery} from "@components/services/GraphQL";
+import {useRecordVisit, projectVisit} from "@components/search/palette/recentlyVisited";
 import {useRefresh} from "@components/common/RefreshUtils";
 import ProjectEditCommand from "@components/projects/ProjectEditCommand";
 import ProjectLabelsCommand from "@components/projects/ProjectLabelsCommand";
@@ -114,6 +115,9 @@ export default function ProjectView({id}) {
             dataFn: data => data.project,
         }
     )
+
+    // Listed by the command palette before anything is typed
+    useRecordVisit(projectVisit(project))
 
     const [branches, setBranches] = useState([])
     const [favouriteBranches, setFavouriteBranches] = useState([])

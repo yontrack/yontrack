@@ -29,6 +29,7 @@ import BuildDeleteCommand from "@components/builds/BuildDeleteCommand";
 import {isAuthorized} from "@components/common/authorizations";
 import PreviousBuildCommand from "@components/builds/PreviousBuildCommand";
 import NextBuildCommand from "@components/builds/NextBuildCommand";
+import {buildVisit, useRecordVisit} from "@components/search/palette/recentlyVisited";
 
 export default function BuildView({id}) {
 
@@ -39,6 +40,9 @@ export default function BuildView({id}) {
     const [commands, setCommands] = useState([])
 
     const [refreshState, refresh] = useRefresh()
+
+    // Listed by the command palette before anything is typed
+    useRecordVisit(buildVisit(build))
 
     useEffect(() => {
         if (client && id) {

@@ -1,5 +1,6 @@
 import Head from "next/head";
 import {useQuery} from "@components/services/GraphQL";
+import {useRecordVisit, branchVisit} from "@components/search/palette/recentlyVisited";
 import {gql} from "graphql-request";
 import {gqlBranchContentFragment} from "@components/branches/BranchGraphQLFragments";
 import {gqlInformationFragment, gqlPropertiesFragment, gqlUserMenuActionFragment} from "@components/services/fragments";
@@ -64,6 +65,9 @@ export default function BranchView({id}) {
             dataFn: data => data.branch,
         }
     )
+
+    // Listed by the command palette before anything is typed
+    useRecordVisit(branchVisit(branch))
 
     // Selection of the branch content view
     const {views, selectedViewKey, selectBranchContentView} = useBranchContentViewSelection()

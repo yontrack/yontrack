@@ -66,6 +66,7 @@ nav:
           - GitHub: content/start/feeding/github.md
           - GitLab: content/start/feeding/gitlab.md
           - Jenkins: content/start/feeding/jenkins.md
+  - Searching: content/search/index.md
   - Mobile UI: content/mobile/index.md
   - Security:
       - OIDC: content/security/oidc.md

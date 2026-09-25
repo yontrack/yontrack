@@ -1,6 +1,6 @@
 import {expect} from "@playwright/test";
 import {EnvironmentsPage} from "../../extensions/environments/Environments";
-import {SearchPage} from "../search/SearchPage";
+import {CommandPalette} from "../search/CommandPalette";
 
 export class HomePage {
 
@@ -29,16 +29,14 @@ export class HomePage {
         return environmentsPage
     }
 
-    async search(token) {
-        const searchBox = this.page.getByRole('searchbox')
-        await searchBox.click()
-        await searchBox.fill(token)
-        await searchBox.press('Enter')
-
-        const searchPage = new SearchPage(this.page, this.ontrack)
-        await searchPage.expectOnPage()
-
-        return searchPage
+    /**
+     * Opens the command palette from the navigation bar, and types the text into it.
+     */
+    async search(text) {
+        const palette = new CommandPalette(this.page)
+        await palette.openByButton()
+        await palette.type(text)
+        return palette
     }
 
 }
