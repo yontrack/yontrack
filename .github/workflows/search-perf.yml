@@ -1,0 +1,195 @@
+# Nightly search performance (#1887).
+#
+# Runs `./gradlew searchPerfTest` - search on 100k builds and 1M commits, bulk-loaded into the
+# Postgres of the integration test stack - and records its report as the SEARCH.PERFORMANCE stamp
+# on the Yontrack build of the commit it measured: the five figures as `metrics` when the run
+# passed, FAILED with the reason when it did not. The stamp is declared in .yontrack/ci.yaml, and
+# doc/dev-guide/search-perf-test.md (on `v6` until the cutover) is the page for the test itself.
+#
+# Nightly rather than in ci.yml: the test takes minutes and a runner of its own, and what it
+# watches - whether each query shape still uses its index, and how the p95s drift - does not need
+# every commit. Scheduled workflows only ever run from the default branch, which is why this file
+# lives on `main` even though what it measures is on `v6`.
+#
+# Two checkouts, deliberately. The root is this workflow's own commit, for scripts/: the pipeline
+# is `main`'s, like every other workflow's. `measured/` is the code under test, at the commit of
+# the Yontrack build the stamp goes on - which is the head of the branch when it has a build, and
+# otherwise the newest commit that has one (scripts/search-perf-validate.sh says why).
+#
+# Where it reports: the instance, project and branch ci.yml registers the builds in - `yontrack`
+# on vars.YONTRACK_URL (self.dev), branch `v6`. Not onto v6.dev as well: the findings mirror
+# (#1869) exists because self.dev's 5.x cannot take findings, and it takes `metrics` perfectly
+# well. v6.dev holds none of v6's builds and is re-seeded on every deployment.
+name: Search performance
+
+on:
+  schedule:
+    # Nightly, off the hour, and away from security-rescan.yml's 02:41.
+    - cron: "17 3 * * *"
+  # To measure on demand - after a change to the search, or to check this workflow itself.
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Branch to measure. Its Yontrack branch has the same name, with "/" as "-".'
+        required: false
+        default: v6
+        type: string
+
+# One measure at a time: two on one runner pool would not disturb each other, but two posting on
+# the same build would leave the stamp to whichever finished last.
+concurrency:
+  group: search-perf
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  # THE branch measured. `v6` until 6.0 is merged into `main` - search on Postgres is 6.0 work and
+  # `main` has no searchPerfTest - and then `main`: change this default AND the input's above, and
+  # the JDK below if `main`'s differs. Listed in "The cutover" of doc/dev-guide/major-branch.md
+  # on `v6`.
+  SEARCH_PERF_REF: ${{ inputs.ref || 'v6' }}
+  # The JDK of the code measured, not of `main`'s ci.yml: `v6` builds on 25.
+  SEARCH_PERF_JAVA: "25"
+  # Pinned, like ci.yml's: an unpinned CLI lets a Yontrack release turn a green run red.
+  YONTRACK_CLI_VERSION: "5.7.0"
+  # The Yontrack project ci.yml registers its builds in.
+  YONTRACK_PROJECT: yontrack
+  # Where searchPerfTest writes its report, under measured/.
+  SEARCH_PERF_REPORT: measured/ontrack-service/build/reports/search-perf/search-perf.json
+
+jobs:
+  search-perf:
+    name: Search performance
+    # A fork that enabled Actions would otherwise post onto this repository's builds with
+    # credentials it does not have.
+    if: github.repository == 'yontrack/yontrack'
+    runs-on: ubuntu-latest
+    # About 10 minutes of test, and the compilation of the measured branch from a cold cache.
+    timeout-minutes: 90
+    steps:
+      # The run time reported on the validation is measured from here.
+      - name: Record the job start
+        id: job_start
+        run: echo "started=$(date +%s)" >> "$GITHUB_OUTPUT"
+
+      - name: Check out the pipeline
+        uses: actions/checkout@v7
+        with:
+          sparse-checkout: scripts
+
+      # All the history: the build's commit may be a few commits behind the head, and the
+      # versioning plugin reads the tags.
+      - name: Check out the branch measured
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ env.SEARCH_PERF_REF }}
+          path: measured
+          fetch-depth: 0
+
+      # Installed directly rather than through ontrack-github-actions-cli-config, which registers
+      # a build as a side effect. This workflow reports on a build ci.yml registered; it must not
+      # create one.
+      - name: Install the Yontrack CLI
+        env:
+          YONTRACK_URL: ${{ vars.YONTRACK_URL }}
+          YONTRACK_TOKEN: ${{ secrets.YONTRACK_TOKEN }}
+        run: |
+          set -euo pipefail
+          curl -sSfL -o /usr/local/bin/yontrack \
+            "https://github.com/nemerosa/ontrack-cli/releases/download/${YONTRACK_CLI_VERSION}/yontrack-linux-amd64"
+          chmod +x /usr/local/bin/yontrack
+          yontrack version --cli
+          yontrack config create prod "$YONTRACK_URL" --token "$YONTRACK_TOKEN" --override
+
+      # Before the test, not after: with no build to report on there is no point measuring, and
+      # the commit measured has to be the build's.
+      - name: Resolve the Yontrack build
+        id: resolve
+        run: |
+          set -euo pipefail
+          branch="${SEARCH_PERF_REF//\//-}"
+          echo "branch=$branch" >> "$GITHUB_OUTPUT"
+          scripts/search-perf-validate.sh resolve "$YONTRACK_PROJECT" "$branch" measured
+
+      - name: Check out the build's commit
+        env:
+          COMMIT: ${{ steps.resolve.outputs.commit }}
+        run: git -C measured checkout --detach "$COMMIT"
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: zulu
+          java-version: ${{ env.SEARCH_PERF_JAVA }}
+
+      # Read-only: this runs on `main`, so it would otherwise write `v6`'s Gradle state into
+      # `main`'s cache entries, and evict the ones `main`'s CI restores from (#1870).
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-read-only: true
+
+      # Brings the integration test stack up and down by itself.
+      - name: Search performance test
+        id: test
+        working-directory: measured
+        run: ./gradlew searchPerfTest --stacktrace --console plain
+
+      - name: Upload the report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: search-perf-report
+          path: ${{ env.SEARCH_PERF_REPORT }}
+          if-no-files-found: ignore
+          retention-days: 30
+
+      # `!cancelled()` and not `success()`: the test failing is exactly when the stamp must say so.
+      # The script reads the report, not the outcome of the step - see it for what it sends when.
+      # It exits 1 when it posted FAILED, so this step, and the run, are red when the stamp is.
+      - name: Validate SEARCH.PERFORMANCE
+        if: ${{ !cancelled() && steps.resolve.outputs.build != '' }}
+        env:
+          STARTED: ${{ steps.job_start.outputs.started }}
+          BRANCH: ${{ steps.resolve.outputs.branch }}
+          BUILD: ${{ steps.resolve.outputs.build }}
+          COMMIT: ${{ steps.resolve.outputs.commit }}
+          SEARCH_PERF_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -uo pipefail
+          run_time_flag=""
+          if [ -n "${STARTED:-}" ]; then
+            run_time_flag="--run-time $(( $(date +%s) - STARTED ))"
+          fi
+          # Same four run-info flags as ci.yml, with the commit measured as the trigger data.
+          # shellcheck disable=SC2086  # deliberate: the run time is a flag and its value
+          scripts/search-perf-validate.sh validate "$SEARCH_PERF_REPORT" "$YONTRACK_PROJECT" "$BRANCH" "$BUILD" \
+            -- $run_time_flag \
+            --source-type github-workflow \
+            --source-uri "$SEARCH_PERF_RUN_URL" \
+            --trigger-type "$GITHUB_EVENT_NAME" \
+            --trigger-data "$COMMIT"
+
+      - name: Summarise
+        if: ${{ !cancelled() && steps.resolve.outputs.build != '' }}
+        env:
+          VERSION: ${{ steps.resolve.outputs.version }}
+          BRANCH: ${{ steps.resolve.outputs.branch }}
+          COMMIT: ${{ steps.resolve.outputs.commit }}
+        run: |
+          {
+            echo "### Search performance of \`$VERSION\`"
+            echo
+            echo "Build \`$YONTRACK_PROJECT/$BRANCH\` \`$VERSION\`, commit \`$COMMIT\`."
+            echo
+            if [ -f "$SEARCH_PERF_REPORT" ]; then
+              echo "| Metric | Value |"
+              echo "|---|---|"
+              jq -r 'to_entries[] | select(.value | type == "number") | "| `\(.key)` | \(.value) |"' "$SEARCH_PERF_REPORT"
+              echo
+              jq -r '.details.failures // [] | .[] | "- FAILURE: \(.)"' "$SEARCH_PERF_REPORT"
+              jq -r '.details.over_budget // [] | .[] | "- Over budget: `\(.)`"' "$SEARCH_PERF_REPORT"
+            else
+              echo "No report: searchPerfTest did not get as far as measuring."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
