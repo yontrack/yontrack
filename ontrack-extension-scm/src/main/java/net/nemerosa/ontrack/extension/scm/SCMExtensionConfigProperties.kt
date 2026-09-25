@@ -58,10 +58,17 @@ class SCMExtensionConfigProperties {
 
     class SCMSearchConfigProperties {
         @DurationUnit(ChronoUnit.HOURS)
-        @APIDescription("Interval between two indexations, in hours.")
+        @APIDescription(
+            "Interval between two incremental indexations of the SCM commits for the search, in hours. " +
+                    "Each one scans only the commits after the last indexed one of each project; a full " +
+                    "indexation of all the commits runs weekly."
+        )
         var schedule: Duration = Duration.ofHours(1)
 
-        @APIDescription("Enabling auto indexation")
+        @APIDescription(
+            "Enabling the scheduled indexation of the SCM commits for the search, incremental and weekly. " +
+                    "When disabled, the commits are indexed only on demand."
+        )
         var scheduled: Boolean = true
 
         /**

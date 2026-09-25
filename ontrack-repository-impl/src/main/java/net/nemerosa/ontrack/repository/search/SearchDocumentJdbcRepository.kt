@@ -19,12 +19,18 @@ class SearchDocumentJdbcRepository(
     dataSource: DataSource,
 ) : AbstractJdbcRepository(dataSource), SearchDocumentRepository {
 
+    companion object {
+        private const val INSERT = """
+            INSERT INTO SEARCH_DOCUMENTS (TYPE, KEY, PROJECT_ID, ENTITY_TYPE, ENTITY_ID, TITLE, IDENTIFIERS, TEXT, DATA, UPDATED_AT, INDEXED_AT)
+            VALUES (:type, :key, :projectId, :entityType, :entityId, :title, :identifiers, :text, CAST(:data AS JSONB), :updatedAt, :indexedAt)
+        """
+    }
+
     override fun save(documents: List<SearchDocument>, indexedAt: LocalDateTime) {
         if (documents.isEmpty()) return
         namedParameterJdbcTemplate.batchUpdate(
             """
-                INSERT INTO SEARCH_DOCUMENTS (TYPE, KEY, PROJECT_ID, ENTITY_TYPE, ENTITY_ID, TITLE, IDENTIFIERS, TEXT, DATA, UPDATED_AT, INDEXED_AT)
-                VALUES (:type, :key, :projectId, :entityType, :entityId, :title, :identifiers, :text, CAST(:data AS JSONB), :updatedAt, :indexedAt)
+                $INSERT
                 ON CONFLICT (TYPE, KEY) DO UPDATE SET
                     PROJECT_ID = EXCLUDED.PROJECT_ID,
                     ENTITY_TYPE = EXCLUDED.ENTITY_TYPE,
@@ -36,22 +42,36 @@ class SearchDocumentJdbcRepository(
                     UPDATED_AT = EXCLUDED.UPDATED_AT,
                     INDEXED_AT = EXCLUDED.INDEXED_AT
             """,
-            documents.map { document ->
-                MapSqlParameterSource()
-                    .addValue("type", document.type)
-                    .addValue("key", document.key)
-                    .addValue("projectId", document.projectId, Types.INTEGER)
-                    .addValue("entityType", document.entity?.type?.name, Types.VARCHAR)
-                    .addValue("entityId", document.entity?.id, Types.INTEGER)
-                    .addValue("title", document.title)
-                    .addValue("identifiers", SearchDocumentIdentifiers.encode(document.identifiers))
-                    .addValue("text", document.text, Types.VARCHAR)
-                    .addValue("data", writeJson(document.data))
-                    .addValue("updatedAt", document.updatedAt ?: indexedAt)
-                    .addValue("indexedAt", indexedAt)
-            }.toTypedArray()
+            params(documents, indexedAt)
         )
     }
+
+    override fun insertIfAbsent(documents: List<SearchDocument>, indexedAt: LocalDateTime): Int {
+        if (documents.isEmpty()) return 0
+        return namedParameterJdbcTemplate.batchUpdate(
+            """
+                $INSERT
+                ON CONFLICT (TYPE, KEY) DO NOTHING
+            """,
+            params(documents, indexedAt)
+        ).sumOf { count -> count.coerceAtLeast(0) }
+    }
+
+    private fun params(documents: List<SearchDocument>, indexedAt: LocalDateTime) =
+        documents.map { document ->
+            MapSqlParameterSource()
+                .addValue("type", document.type)
+                .addValue("key", document.key)
+                .addValue("projectId", document.projectId, Types.INTEGER)
+                .addValue("entityType", document.entity?.type?.name, Types.VARCHAR)
+                .addValue("entityId", document.entity?.id, Types.INTEGER)
+                .addValue("title", document.title)
+                .addValue("identifiers", SearchDocumentIdentifiers.encode(document.identifiers))
+                .addValue("text", document.text, Types.VARCHAR)
+                .addValue("data", writeJson(document.data))
+                .addValue("updatedAt", document.updatedAt ?: indexedAt)
+                .addValue("indexedAt", indexedAt)
+        }.toTypedArray()
 
     override fun delete(type: String, key: String) {
         namedParameterJdbcTemplate.update(

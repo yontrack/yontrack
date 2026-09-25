@@ -366,6 +366,11 @@ class BitbucketCloudSCMExtension(
                 .getBranchesForCommit(commit)
 
         /**
+         * The commits come from the local clone, which answers "since this commit".
+         */
+        override val commitsSinceSupported: Boolean = true
+
+        /**
          * Commits of the local synced clone, as for GitHub, to spare the API rate limit.
          */
         override fun forAllCommits(project: Project, filter: SCMCommitFilter, code: (commit: SCMCommit) -> Unit) {

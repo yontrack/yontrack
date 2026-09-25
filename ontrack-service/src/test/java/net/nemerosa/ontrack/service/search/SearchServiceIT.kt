@@ -316,6 +316,57 @@ class SearchServiceIT : AbstractDSLTestSupport() {
         assertEquals(0, asAdmin { search(u).total })
     }
 
+    @Test
+    fun `Indexing several documents at once creates or replaces them`() {
+        val u = token()
+        val project = project()
+        index(alpha.document("a-$u", "Old", project, identifiers = listOf(u)))
+        asAdmin {
+            searchDocumentService.index(
+                listOf(
+                    alpha.document("a-$u", "New", project, identifiers = listOf(u)),
+                    alpha.document("b-$u", "Other", project, identifiers = listOf(u)),
+                )
+            )
+        }
+        assertEquals(listOf("New", "Other"), asAdmin { search(u).items.map { it.title }.sorted() })
+    }
+
+    @Test
+    fun `Inserting documents if absent keeps the existing ones as they are`() {
+        val u = token()
+        val project = project()
+        index(alpha.document("existing-$u", "Existing", project, identifiers = listOf(u)))
+        val inserted = asAdmin {
+            searchDocumentService.insertIfAbsent(
+                listOf(
+                    alpha.document("existing-$u", "Replaced", project, identifiers = listOf(u)),
+                    alpha.document("new-$u", "New", project, identifiers = listOf(u)),
+                )
+            )
+        }
+        assertEquals(1, inserted)
+        assertEquals(listOf("Existing", "New"), asAdmin { search(u).items.map { it.title }.sorted() })
+    }
+
+    @Test
+    fun `A failed insertion of documents does not fail the caller and is counted`() {
+        val errors = { meterRegistry.find("ontrack_search_index_errors").tag("type", TestAlphaSearchDocumentIndexer.TYPE).counter()?.count() ?: 0.0 }
+        val before = errors()
+        val u = token()
+        val project = project()
+        val inserted = asAdmin {
+            searchDocumentService.insertIfAbsent(
+                listOf(alpha.document("failing-$u", "Not storable \u0000", project, identifiers = listOf(u)))
+            )
+        }
+        assertEquals(0, inserted)
+        assertEquals(before + 1, errors())
+        // The transaction of the caller goes on
+        index(alpha.document("ok-$u", "OK", project, identifiers = listOf(u)))
+        assertEquals(listOf("ok-$u"), asAdmin { search(u).items.map { it.key } })
+    }
+
     /**
      * The rebuild runs in its own transactions: the documents of the test must be committed.
      */

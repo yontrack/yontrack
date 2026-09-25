@@ -18,6 +18,16 @@ interface SearchDocumentRepository {
     fun save(documents: List<SearchDocument>, indexedAt: LocalDateTime)
 
     /**
+     * Creates the documents which do not exist yet, identified by their type and key. The existing
+     * ones are left untouched, including their time of write.
+     *
+     * @param documents Documents to write
+     * @param indexedAt Time of the write
+     * @return Number of documents created
+     */
+    fun insertIfAbsent(documents: List<SearchDocument>, indexedAt: LocalDateTime): Int
+
+    /**
      * Deletes a document by type and key.
      */
     fun delete(type: String, key: String)

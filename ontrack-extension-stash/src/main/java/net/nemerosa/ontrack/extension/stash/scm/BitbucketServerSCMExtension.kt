@@ -279,6 +279,11 @@ class BitbucketServerSCMExtension(
         override fun getBranchesForCommit(project: Project, commit: String): List<String> =
             client.getBranchesForCommit(repo, commit)
 
+        /**
+         * The commits come from the local clone, which answers "since this commit".
+         */
+        override val commitsSinceSupported: Boolean = true
+
         override fun forAllCommits(
             project: Project,
             filter: SCMCommitFilter,

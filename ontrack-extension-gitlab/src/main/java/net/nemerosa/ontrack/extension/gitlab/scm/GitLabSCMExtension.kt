@@ -467,6 +467,11 @@ class GitLabSCMExtension(
             gitRepositoryClient().getBranchesForCommit(commit)
 
         /**
+         * The commits come from the local clone, which answers "since this commit".
+         */
+        override val commitsSinceSupported: Boolean = true
+
+        /**
          * Commits of the local synced clone, to spare the API rate limit - gitlab.com's announced tier-aware
          * limits drop Free to a 100-request burst per minute, which a full history walk would spend at once.
          */

@@ -42,6 +42,8 @@ interface SearchDocumentIndexer {
 
 interface SearchDocumentService {
     fun index(document: SearchDocument)      // upsert on (type, key)
+    fun index(documents: List<SearchDocument>)           // upsert, in one batch
+    fun insertIfAbsent(documents: List<SearchDocument>): Int  // INSERT … ON CONFLICT DO NOTHING
     fun delete(type: String, key: String)
     fun rebuild(indexer: SearchDocumentIndexer)
 }
@@ -129,6 +131,38 @@ class ProjectSearchProvider(
 
 Documents with a `null` `projectId` are only visible to the users granted the `globalFunction` of
 their indexer. An indexer which declares none never shows its project-less documents.
+`SCMCatalogSearchIndexer` (`ontrack-extension-scm`) is the example: a catalog entry may be linked
+to a project or not, and its documents are visible to the users granted `SCMCatalogAccessFunction`,
+what the SCM catalog itself requires.
+
+### A type indexed from an external source
+
+Some things change outside of Yontrack and of any transaction: the commits of a repository, the
+entries of the SCM catalog. No event says when, so their documents are written by **scheduled
+scans**, and the reconciliation job of the type (`indexerSchedule`) is what keeps them in line.
+
+When a full scan is too expensive to run often — the SCM commits are the largest index —
+scan incrementally in between, as `ScmCommitSearchExtension` does:
+
+- An **incremental scan** (its own job, `ScmCommitSearchJobs`, hourly) remembers the last commit
+  it indexed per project, in the `StorageService`, and scans only the commits after it. It writes
+  with `insertIfAbsent`: a commit never changes, so an existing document is left as it is, and
+  neither a read nor a rewrite is paid for it.
+- A **full scan** is the rebuild of the type, weekly: it rewrites every document, deletes the
+  stale ones (a force push), and catches up on what the incremental scans missed (a failed write,
+  a commit pushed with an older date than the last indexed one). A project whose scan fails in the
+  full scan loses its documents with the stale ones: its marker is dropped, so that its next
+  incremental scan is a full one.
+- A source which cannot list what is new keeps the full scan every time: `insertIfAbsent` makes
+  it cheap on the database side. For the commits, an SCM says so with
+  `SCMChangeLogEnabled.commitsSinceSupported`.
+
+`insertIfAbsent` never refreshes a document, nor its time of write: a document whose content may
+change goes through `index`. The commit documents carry the name of their project, which is
+therefore renamed in them only by the weekly full scan.
+
+The issues found in the commit messages (`ScmIssueSearchExtension`) are written by the same pass,
+with `index`. The rebuild of their own type scans the commits again, for the issues only.
 
 ## What the service guarantees
 
@@ -148,9 +182,11 @@ their indexer. An indexer which declares none never shows its project-less docum
   a type is rebuilt, search answers with what exists so far and the message *"Search index is being
   built"*.
 - **Reconciliation job.** Each indexer gets a job, `search / rebuild / {type}`, manual unless the
-  indexer declares an `indexerSchedule` — which the types indexed outside any transaction (SCM
-  commits, say) do, and so do the types whose deletions cannot all be followed in the transaction
-  (build links, every day).
+  indexer declares an `indexerSchedule` — which the types indexed outside any transaction do (SCM
+  commits every week, the SCM catalog every day), and so do the types whose deletions cannot all
+  be followed in the transaction (build links, every day).
+- **Batches.** `index(documents)` and `insertIfAbsent(documents)` write a batch in one savepoint:
+  a failed batch writes none of its documents, and is counted as one error.
 
 ## How a query is matched and ranked
 

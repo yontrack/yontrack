@@ -124,6 +124,11 @@ class GitHubSCMExtension(
             return client.getBranchLastCommit(repository, branch, retryOnNotFound = false)
         }
 
+        /**
+         * The commits come from the local clone, which answers "since this commit".
+         */
+        override val commitsSinceSupported: Boolean = true
+
         override fun forAllCommits(
             project: Project,
             filter: SCMCommitFilter,

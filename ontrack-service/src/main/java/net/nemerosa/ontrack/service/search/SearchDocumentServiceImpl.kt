@@ -60,6 +60,23 @@ class SearchDocumentServiceImpl(
         }
     }
 
+    override fun index(documents: List<SearchDocument>) {
+        documents.groupBy { it.type }.forEach { (type, typeDocuments) ->
+            write(type, "index ${typeDocuments.size} documents") {
+                searchDocumentRepository.save(typeDocuments, Time.now())
+            }
+        }
+    }
+
+    override fun insertIfAbsent(documents: List<SearchDocument>): Int =
+        documents.groupBy { it.type }.entries.sumOf { (type, typeDocuments) ->
+            var inserted = 0
+            write(type, "insert ${typeDocuments.size} documents") {
+                inserted = searchDocumentRepository.insertIfAbsent(typeDocuments, Time.now())
+            }
+            inserted
+        }
+
     override fun delete(type: String, key: String) {
         write(type, "delete $key") {
             searchDocumentRepository.delete(type, key)

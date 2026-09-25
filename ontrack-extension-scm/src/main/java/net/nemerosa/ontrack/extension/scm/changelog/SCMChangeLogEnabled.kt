@@ -50,6 +50,15 @@ interface SCMChangeLogEnabled : SCM {
     fun getCommit(id: String): SCMCommit?
 
     /**
+     * Whether [forAllCommits] honours [SCMCommitFilter.sinceCommit]: only the commits after this
+     * one are then returned, and all of them when this commit is unknown.
+     *
+     * The search indexation of the commits scans only the commits after the last one it indexed
+     * when this is `true`, and all of them every time otherwise.
+     */
+    val commitsSinceSupported: Boolean get() = false
+
+    /**
      * Looping over all the commits in the repository
      *
      * @param project Project holding the repository

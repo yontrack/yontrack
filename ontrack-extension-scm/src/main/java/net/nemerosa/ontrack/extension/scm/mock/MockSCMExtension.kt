@@ -400,8 +400,11 @@ class MockSCMExtension(
                 branch.commits.any { it.id == commit }
             }.map { it.name }
 
+        /**
+         * All the commits of all the branches, oldest first, as a Git log of all the branches.
+         */
         fun forAllCommits(code: (SCMCommit) -> Unit) {
-            branches.flatMap { it.commits }.forEach(code)
+            branches.flatMap { it.commits }.sortedBy { it.revision }.forEach(code)
         }
 
         private fun save() {
@@ -633,23 +636,21 @@ class MockSCMExtension(
             base: String
         ): SCMCommit = repository(mockScmProjectProperty.name).mergeBranch(head, base)
 
+        override val commitsSinceSupported: Boolean = true
+
+        /**
+         * The commits of the repository, oldest first. Like a Git clone, an unknown
+         * [SCMCommitFilter.sinceCommit] returns all of them.
+         */
         override fun forAllCommits(
             project: Project,
             filter: SCMCommitFilter,
             code: (commit: SCMCommit) -> Unit
         ) {
-            var count = 0
-            var found = filter.sinceCommit == null
-            repository(mockScmProjectProperty.name).forAllCommits { scmCommit ->
-                if (found) {
-                    if (count < filter.count) {
-                        count++
-                        code(scmCommit)
-                    }
-                } else {
-                    found = scmCommit.id == filter.sinceCommit
-                }
-            }
+            val commits = mutableListOf<SCMCommit>()
+            repository(mockScmProjectProperty.name).forAllCommits { commits += it }
+            val since = filter.sinceCommit?.let { sinceCommit -> commits.indexOfFirst { it.id == sinceCommit } } ?: -1
+            commits.drop(since + 1).take(filter.count).forEach(code)
         }
     }
 
