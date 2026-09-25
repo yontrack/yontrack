@@ -9,6 +9,7 @@
   * [Model](components/core/README.md) - core model of Ontrack
   * [Properties](components/properties/README.md)
   * [Search indexers](search-indexer.md) - describing the search documents of a search result type
+  * [Search performance test](search-perf-test.md) - `./gradlew searchPerfTest`: EXPLAIN assertions, p95 latencies and rebuild time on a large dataset
 * Delivery
   * [Test coverage](coverage.md) - what the COVERAGE.* figures measure, and how to get them locally
   * [Demo seed and reset](demo-seed.md) - resetting the demo environment through the Yontrack API

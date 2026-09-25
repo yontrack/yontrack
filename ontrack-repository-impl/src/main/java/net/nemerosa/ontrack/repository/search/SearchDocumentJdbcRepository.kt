@@ -126,33 +126,84 @@ class SearchDocumentJdbcRepository(
         if (scope.types.isEmpty()) {
             return SearchDocumentPage(total = 0, facets = emptyMap(), items = emptyList())
         }
-        val sql = SearchDocumentQuery(parsed, scope)
-        // Facets, and the total out of them
+        val statements = statements(parsed, scope, offset, size, perType, highlight)
         val facets = mutableMapOf<String, Int>()
-        namedParameterJdbcTemplate.query(sql.facets, sql.params) { rs ->
-            facets[rs.getString("TYPE")] = rs.getInt("N")
-        }
-        // Page
-        val items = if (facets.isEmpty()) {
-            emptyList()
-        } else if (perType != null) {
-            namedParameterJdbcTemplate.query(
-                sql.highlighted(sql.perType, highlight),
-                MapSqlParameterSource(sql.params.values).addValue("perType", perType)
-            ) { rs, _ -> toHit(rs, highlight) }
-        } else if (size <= 0) {
-            // Facets only
-            emptyList()
+        val items = if (statements.facets == null) {
+            // Best rows of each type, each one carrying the count of its type: every type with a
+            // candidate has at least one row, so the facets come with them, in one scan
+            statements.rows?.let { rows ->
+                namedParameterJdbcTemplate.query(rows.sql, rows.params) { rs, _ ->
+                    facets[rs.getString("TYPE")] = rs.getInt("N")
+                    toHit(rs, highlight)
+                }
+            } ?: emptyList()
         } else {
-            namedParameterJdbcTemplate.query(
-                sql.highlighted(sql.page, highlight),
-                MapSqlParameterSource(sql.params.values).addValue("offset", offset).addValue("size", size)
-            ) { rs, _ -> toHit(rs, highlight) }
+            // Facets, and the total out of them
+            namedParameterJdbcTemplate.query(statements.facets.sql, statements.facets.params) { rs ->
+                facets[rs.getString("TYPE")] = rs.getInt("N")
+            }
+            // Rows, unless there is no candidate at all
+            if (facets.isEmpty() || statements.rows == null) {
+                emptyList()
+            } else {
+                namedParameterJdbcTemplate.query(statements.rows.sql, statements.rows.params) { rs, _ ->
+                    toHit(rs, highlight)
+                }
+            }
         }
         return SearchDocumentPage(
             total = facets.values.sum(),
             facets = facets,
             items = items,
+        )
+    }
+
+    /**
+     * The statements [search] runs for the same arguments, for the `searchPerfTest`, which
+     * `EXPLAIN`s them. The SQL of the search lives in one place only.
+     *
+     * @return `null` if the query is too short to be searched, or if there is no type to search into
+     */
+    fun searchStatements(
+        query: String,
+        scope: SearchDocumentScope,
+        offset: Int,
+        size: Int,
+        perType: Int?,
+        highlight: Boolean,
+    ): SearchDocumentStatements? {
+        val parsed = ParsedSearchQuery.parse(query) ?: return null
+        if (scope.types.isEmpty()) return null
+        return statements(parsed, scope, offset, size, perType, highlight)
+    }
+
+    private fun statements(
+        parsed: ParsedSearchQuery,
+        scope: SearchDocumentScope,
+        offset: Int,
+        size: Int,
+        perType: Int?,
+        highlight: Boolean,
+    ): SearchDocumentStatements {
+        val sql = SearchDocumentQuery(parsed, scope)
+        val rows = if (perType != null) {
+            SearchDocumentStatement(
+                sql = sql.highlighted(sql.perType, highlight),
+                params = MapSqlParameterSource(sql.params.values).addValue("perType", perType),
+            )
+        } else if (size <= 0) {
+            // Facets only
+            null
+        } else {
+            SearchDocumentStatement(
+                sql = sql.highlighted(sql.page, highlight),
+                params = MapSqlParameterSource(sql.params.values).addValue("offset", offset).addValue("size", size),
+            )
+        }
+        return SearchDocumentStatements(
+            // The best rows of each type carry the facets
+            facets = if (perType != null) null else SearchDocumentStatement(sql = sql.facets, params = sql.params),
+            rows = rows,
         )
     }
 
@@ -310,12 +361,15 @@ class SearchDocumentJdbcRepository(
         """.trimIndent()
 
         /**
-         * Best rows of each type
+         * Best rows of each type, each one with the number `N` of candidates of its type: the
+         * facets, without a second scan of the candidates
          */
         val perType = """
             SELECT c.*, $score AS SCORE
             FROM (
-                SELECT c.*, ROW_NUMBER() OVER (PARTITION BY c.TYPE ORDER BY $ranking) AS RN
+                SELECT c.*,
+                       ROW_NUMBER() OVER (PARTITION BY c.TYPE ORDER BY $ranking) AS RN,
+                       COUNT(*) OVER (PARTITION BY c.TYPE) AS N
                 FROM candidates c
             ) c
             WHERE c.RN <= :perType

@@ -1,0 +1,149 @@
+# Search performance test
+
+*Introduced by [#1886](https://github.com/yontrack/yontrack/issues/1886), P11 of
+`initiative: postgres-search`. The design is the *Performance* section of
+[`docs/grilling/2026-09-postgres-search/README.md`](../../docs/grilling/2026-09-postgres-search/README.md#performance).*
+
+Search runs on Postgres, in one table, `SEARCH_DOCUMENTS`. Whether it stays fast is a matter of
+volume: the integration tests index a few documents, where an instance holds hundreds of
+thousands of builds and a million commits. `searchPerfTest` loads that volume and measures the
+search on it.
+
+```bash
+./gradlew searchPerfTest
+```
+
+It needs what `integrationTest` needs — Docker and JDK 25 — and nothing else: the task brings the
+integration test stack up and down, on this checkout's slot, exactly as `integrationTest` does,
+and passes its ports on the same way. It is **not** part of `check` or `build`: it takes minutes,
+and it is run on its own, nightly by the `SEARCH.PERFORMANCE` workflow (#1887) or by hand.
+
+## What it does
+
+The whole run is `SearchPerf`, in `ontrack-service/src/test/java/.../service/search/perf/`, a plain
+`main` started by a `JavaExec` task, not a JUnit test: it is one measured sequence.
+
+1. **Database.** A database of its own, `ontrack_search_perf`, on the Postgres of the integration
+   test stack — dropped and created again, then migrated by Flyway. The integration tests never
+   see the dataset, and the dataset never sees their data.
+2. **Load.** `SearchPerfDataset` bulk-loads, with `INSERT … SELECT` over `generate_series` — no
+   row goes through the JVM, and every value derives from its ID, so two runs load the same data:
+
+   | | Scale 1 |
+   |---|---|
+   | Projects | 500 |
+   | Branches (and their Git branches) | 5,000 |
+   | Builds | 100,000 |
+   | Build links | 100,000 |
+   | Releases | 10,000 |
+   | Issues | 50,000 |
+   | Commits | 1,000,000 |
+
+   The documents have the `TITLE`, `IDENTIFIERS` and `TEXT` their indexers write; their `DATA`
+   only has the shape and the size of the real one, since no query reads into it. The indexes of
+   the table are dropped for the load and created again from their own definitions, the ones of
+   the migrations. Then `VACUUM ANALYZE`.
+3. **`EXPLAIN` assertions.** For each query shape — the palette (and the palette of a user seeing
+   one project out of ten), the results page and its facets, an exact build name, a full and a
+   short commit hash — each statement the search runs is `EXPLAIN`ed. It must use one of the
+   indexes of its tier, and never scan the whole table. The statements are those of
+   `SearchDocumentJdbcRepository.searchStatements`, the very SQL the search runs.
+4. **Latencies.** After a warm-up, each query of each scenario runs 10 times through
+   `SearchDocumentJdbcRepository.search`:
+
+   | Scenario | Queries | Shape |
+   |---|---|---|
+   | `palette` | 22 prefixes, words, typos, names | all types, 3 best per type |
+   | `palette_restricted` | the same | the same, for a user seeing one project out of ten |
+   | `results` | the same | the second page of the builds, highlighted, plus the facets of all the types |
+   | `exact_build` | 20 build names, of the four styles of the dataset | palette |
+   | `commit_lookup` | 10 full and 10 short commit hashes | palette |
+
+5. **Rebuild.** All the documents are rebuilt through `SearchDocumentServiceImpl.rebuild`: its
+   batches, savepoints, upserts and deletion of stale documents are the real ones. The source is
+   an approximation: the real indexers read the entities through the services, or scan the SCMs,
+   where the test reads the documents back from the table. The time is the time of the writes.
+
+## The report
+
+`ontrack-service/build/reports/search-perf/search-perf.json`:
+
+```json
+{
+  "palette_p95": 361.6,
+  "results_p95": 508.4,
+  "commit_lookup_p95": 49.6,
+  "exact_build_p95": 73.9,
+  "rebuild_seconds": 139.7,
+  "explain": [
+    {
+      "scenario": "palette",
+      "query": "payment",
+      "statement": "palette rows",
+      "expected_indexes": ["search_documents_ix_identifiers_trgm", "..."],
+      "passed": true,
+      "indexes": ["search_documents_ix_identifiers_trgm", "..."]
+    }
+  ],
+  "details": { "...": "..." }
+}
+```
+
+- The five figures at the top are the metrics of the `SEARCH.PERFORMANCE` stamp: p95 latencies in
+  milliseconds, and the rebuild in seconds.
+- `explain` has one entry per statement checked. A failed one also carries its `reason`, its
+  `sql`, its `params` and the `plan`.
+- `details` has the rest: the version of Postgres, the dataset and how long it took to load, the
+  p50, p95 and max of every scenario, the ten slowest queries, the budgets, the ceilings, the
+  figures over budget, the rebuild per type, and the `failures`.
+
+The run fails:
+
+- on a failed `EXPLAIN` assertion — deterministic, the realistic regression;
+- on a p95 past its **ceiling**, 10 times its budget;
+- on an error of the rebuild.
+
+A p95 over its **budget** — palette 150 ms, results page 500 ms, exact build and commit lookup 150 ms
+since they go through the palette — does not fail it. It is listed in `details.over_budget`, and
+the nightly stamp records it: a noisy runner must not turn it red.
+
+## Options
+
+| Gradle property | Default | |
+|---|---|---|
+| `-PsearchPerf.scale=0.1` | `1` | a smaller dataset, for working on the test itself: seconds instead of minutes, stack aside |
+| `-PsearchPerf.rounds=20` | `10` | more samples per query |
+| `-PsearchPerf.reuse=true` | `false` | keeps the dataset of the previous run, when it has the same scale |
+
+When working on it, `-x integrationTestComposeDown` keeps the stack up between two runs. The
+database is then reachable on the Postgres port of `.yontrack-it/instance.env`, as `ontrack` /
+`ontrack`, for an `EXPLAIN ANALYZE` of your own.
+
+## What it found
+
+The first runs, on a laptop (Apple silicon, 12 CPUs, Docker with 12 GB), Postgres 17 with the
+default configuration of its image (`shared_buffers` 128 MB, `work_mem` 4 MB). The whole task took
+5 min 30 s: the stack, 45 s of load (27 s of documents, 17 s of indexes), 1 min of measures and
+2 min 20 s of rebuild, 2 min of which for the commits.
+
+- Every query shape uses its indexes: all the `EXPLAIN` assertions pass.
+- The exact build (p95 74 ms) and the commit lookup (p95 50 ms) are within budget.
+- The palette is not: p95 360 ms for a budget of 150 ms, for a median of 40 ms. The results page
+  is just over its budget, at about 510 ms.
+- The slow queries are the ones made of a **frequent word**. `pay-10` matches every commit of the
+  payment projects, 52,000 documents; `2025.03`, `build-4` or `flaky test` thousands. The search
+  counts all its candidates for the facets and ranks all of them for the best rows of each type:
+  its cost grows with the number of matches, not with the size of the page. On a `work_mem` of
+  4 MB the bitmap of so many rows does not fit and turns lossy, and every row of every page it
+  touches is checked again, trigram similarity included — `pay-10` takes 0.9 s as an
+  administrator, and 2 s for a user seeing a tenth of the projects, whose plan is not parallel.
+- The same frequent-word queries with `SET work_mem = '64MB'` ran three to four times faster
+  (measured by hand with `EXPLAIN ANALYZE`).
+
+One change came out of it: the palette used to scan its candidates twice, once for the facets
+and once for the best rows of each type. Its best rows now carry the count of their type, which
+are the facets, in a single scan (`SearchDocumentJdbcRepository`, #1886). On the first version of
+the dataset, it took the p95 of the palette from 1.5 s to 0.9 s.
+
+Going further is a decision on the design — capping the counts of the facets, or the candidates
+which are ranked — or on the configuration of Postgres, not a missing index.

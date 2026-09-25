@@ -28,7 +28,9 @@ dependencies {
     testImplementation(testFixtures(project(":ontrack-model")))
     testImplementation(testFixtures(project(":ontrack-extension-api")))
 
-    testRuntimeOnly(project(":ontrack-repository-impl"))
+    // The searchPerfTest drives the repository directly
+    testImplementation(project(":ontrack-repository-impl"))
+    testImplementation(project(":ontrack-repository-support"))
     testRuntimeOnly("io.micrometer:micrometer-registry-prometheus")
 
 }

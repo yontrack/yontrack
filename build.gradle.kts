@@ -448,6 +448,52 @@ configure(javaProjects) {
 }
 
 // ===================================================================================================================
+// searchPerfTest (#1886)
+//
+// Search on a large dataset -- 100k builds, 1M commits -- on the Postgres of the integration test
+// stack, in a database of its own: EXPLAIN assertions on each query shape, p95 latencies and the
+// time of a full rebuild, written to a JSON report. Separate from `integrationTest` and hanging off
+// nothing: it takes minutes, and it is run on its own, nightly (#1887) or by hand.
+//
+// A JavaExec rather than a Test task: it is one measured sequence -- load, EXPLAIN, measure,
+// rebuild -- and not a set of independent tests. It reuses the integration test stack and its
+// slot exactly as `integrationTest` does.
+//
+// `doc/dev-guide/search-perf-test.md` is the page.
+// ===================================================================================================================
+
+project(":ontrack-service") {
+    val searchPerfReport = layout.buildDirectory.file("reports/search-perf/search-perf.json")
+    val testSourceSet = the<SourceSetContainer>()["test"]
+    val searchPerfTest = tasks.register<JavaExec>("searchPerfTest") {
+        group = "verification"
+        description = "Search performance test: EXPLAIN assertions, p95 latencies and rebuild time on a large dataset"
+        classpath = testSourceSet.runtimeClasspath
+        mainClass.set("net.nemerosa.ontrack.service.search.perf.SearchPerf")
+        maxHeapSize = "1g"
+        outputs.upToDateWhen { false }
+        outputs.cacheIf("measures a live database") { false }
+        dependsOn(":integrationTestComposeUp")
+        finalizedBy(":integrationTestComposeDown")
+        // Not measured while the integration tests load the same database server
+        mustRunAfter(javaProjects.map { "${it.path}:integrationTest" })
+        // Same instance of the stack as `integrationTest`
+        jvmArgumentProviders.add(CommandLineArgumentProvider {
+            itStack.systemProperties.map { (key, value) -> "-D$key=$value" }
+        })
+        // -PsearchPerf.scale=0.1 for a smaller dataset, -PsearchPerf.rounds=N for more samples,
+        // -PsearchPerf.reuse=true to keep the dataset of the previous run (see the page)
+        listOf("searchPerf.scale", "searchPerf.rounds", "searchPerf.reuse").forEach { name ->
+            providers.gradleProperty(name).orNull?.let { systemProperty(name, it) }
+        }
+        systemProperty("searchPerf.report", searchPerfReport.get().asFile.absolutePath)
+    }
+    rootProject.tasks.named("integrationTestComposeDown") {
+        mustRunAfter(searchPerfTest)
+    }
+}
+
+// ===================================================================================================================
 // The local merge-and-report path (#1823)
 //
 // `./gradlew coverageReport` gives a contributor the reports and the figures the `coverage` job of

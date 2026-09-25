@@ -212,6 +212,10 @@ The arithmetic lives in `ItStack` in `buildSrc`, is covered by `ItStackTest`
 (`./gradlew -p buildSrc test`), and is explained in
 `docs/adr/0012-parallel-integration-test-stacks.md`.
 
+`./gradlew searchPerfTest` runs on the same stack, in a database of its own:
+it loads a large dataset and measures the search on it, and is not part of
+`check`. See `doc/dev-guide/search-perf-test.md`.
+
 ## Running the KDSL acceptance tests
 
 ```bash

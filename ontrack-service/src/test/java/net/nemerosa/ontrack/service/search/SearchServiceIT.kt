@@ -239,6 +239,41 @@ class SearchServiceIT : AbstractDSLTestSupport() {
         val results = asAdmin { search(u, perType = 2) }
         assertEquals(9, results.total)
         assertEquals(listOf("a1-$u", "a2-$u", "b1-$u", "b2-$u"), results.items.map { it.key })
+        // The facets count all the candidates, not only the best rows
+        assertEquals(
+            mapOf(TestAlphaSearchDocumentIndexer.TYPE to 5, TestBetaSearchDocumentIndexer.TYPE to 4),
+            results.facets.associate { it.type.id to it.count }
+        )
+    }
+
+    @Test
+    fun `Best results per type with correct facets for a restricted user`() {
+        val u = token()
+        val visible = project()
+        val hidden = project()
+        index(*(1..3).map { alpha.document("v$it-$u", "V $it", visible, identifiers = listOf(u)) }.toTypedArray())
+        index(*(1..2).map { beta.document("w$it-$u", "W $it", visible, identifiers = listOf(u)) }.toTypedArray())
+        index(*(1..4).map { alpha.document("h$it-$u", "H $it", hidden, identifiers = listOf(u)) }.toTypedArray())
+        withNoGrantViewToAll {
+            visible.asAccountWithProjectRole(Roles.PROJECT_READ_ONLY) {
+                val results = search(u, perType = 1)
+                assertEquals(5, results.total)
+                assertEquals(
+                    mapOf(TestAlphaSearchDocumentIndexer.TYPE to 3, TestBetaSearchDocumentIndexer.TYPE to 2),
+                    results.facets.associate { it.type.id to it.count }
+                )
+                assertEquals(2, results.items.size)
+                assertTrue(results.items.none { it.key.startsWith("h") })
+            }
+        }
+    }
+
+    @Test
+    fun `Best results per type without any candidate`() {
+        val results = asAdmin { search(token(), perType = 3) }
+        assertEquals(0, results.total)
+        assertTrue(results.facets.isEmpty())
+        assertTrue(results.items.isEmpty())
     }
 
     @Test
