@@ -328,7 +328,7 @@ configure(javaProjects) {
     // The former `dependencyManagement { dependencies { ... } }` entries, one constraint each.
     val versionConstraints = listOf(
         "commons-io:commons-io:2.18.0",
-        "org.jsoup:jsoup:1.19.1",
+        "org.jsoup:jsoup:1.23.1",
         "org.apache.commons:commons-math3:3.6.1",
         "org.apache.commons:commons-text:1.13.0",
         "org.jgrapht:jgrapht-core:1.5.2",
