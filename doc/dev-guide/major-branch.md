@@ -11,10 +11,11 @@ by the same `ci.yml`, it goes through the same promotion chain, and it has a dep
 of its own. The only thing it does not do is release: `GOLD` is a human gate, and nobody grants it
 on `v6`.
 
-The only file that differs between `main` and `v6` is `VERSION`. Everything else — the pipeline,
-the environment definition, the versioning rules below — lives on `main` and is inherited by `v6`
-through the regular merges from `main`. That is deliberate, and section
-[Keeping `v6` in step](#keeping-v6-in-step) says why.
+Apart from `VERSION`, the pipeline, the environment definition and the versioning rules below
+live on `main` and are inherited by `v6` through the regular merges from `main`. That is
+deliberate, and section [Keeping `v6` in step](#keeping-v6-in-step) says why. The one exception is
+the security findings mirror, which exists on `v6` alone — see
+[The security findings mirror](#the-security-findings-mirror).
 
 ## Versioning
 
@@ -51,6 +52,7 @@ Same `ci.yml`, same `.yontrack/ci.yaml`, and the branch conditions do the rest.
 | What SILVER means | deployed and verified | deployed and verified |
 | Real GitLab / Bitbucket pipeline tests | yes | **no** |
 | DAST scanned | yes | no — but the CasC reload runs on both |
+| Security findings mirrored onto v6.dev | no | yes — see below |
 | Released by `release.yml` | yes | no — nobody grants GOLD on `v6` |
 
 One of those is worth spelling out. **No third-party pipeline tests:** the real GitLab and Bitbucket
@@ -62,6 +64,24 @@ The DAST row needs no exception in the workflow. `reloadCasc` re-applies whateve
 *instance* carries, not a file sent from the runner, so on `v6` it restores `v6`'s own declaration
 after the seed; and the project-role assertion that follows passes on an instance that declares no
 DAST group at all.
+
+### The security findings mirror
+
+self.dev.yontrack.com, where every branch's CI reports, runs 5.x until 6.0 is released, and so
+cannot take the security findings `v6` is building. `v6`'s CI therefore reports CHML to self.dev
+like every other branch, and **in addition** sends the reports themselves to v6.dev, which runs 6.0
+with the licence for the native formats (#1869):
+
+| Stamp | Workflow | Mirrored as |
+|---|---|---|
+| `SECURITY.IMAGE.BACKEND`, `SECURITY.IMAGE.UI` | `ci.yml` | the Trivy JSON report, accepted vulnerabilities included (`--show-suppressed`) |
+| `SECURITY.CODE` | `codeql.yml` | the open and dismissed CodeQL alerts, in the neutral `findings` format, dismissals as acceptances |
+
+The other three security stamps never run on `v6`. The findings land in the `yontrack-ci` project
+of v6.dev, which the seed's reset spares (`DemoSeed.CI_MIRROR_PROJECT`), with the thresholds of
+`.yontrack/ci.yaml`. The mirror never fails a build: self.dev stays the instance of record.
+Everything is in `scripts/security-findings-mirror.sh`, with `V6_URL` and `V6_TOKEN` as the seed
+uses them.
 
 ## The environment
 
@@ -94,7 +114,7 @@ error until they exist:
 
 | Secret | What it is |
 |---|---|
-| `V6_TOKEN` | API token on the v6 instance — the seed deletes and recreates every project with it |
+| `V6_TOKEN` | API token on the v6 instance — the seed deletes and recreates every project with it, `yontrack-ci` apart, where the findings mirror writes with it too |
 | `V6_USERNAME` | Keycloak user the Playwright sign-in check uses |
 | `V6_PASSWORD` | its password |
 
@@ -103,10 +123,14 @@ Nothing is shared with the demo: two instances, two databases, two Keycloak real
 ## Keeping `v6` in step
 
 `main` keeps moving while `v6` is open, so `v6` takes regular merges from `main`. Two things make
-that cheap, and both are the reason the pipeline changes live on `main`:
+that cheap, and both are the reason pipeline changes land on `main`:
 
-* **One conflicting file.** `VERSION` differs by design — take `v6`'s side, every time. Nothing
-  else should conflict.
+* **Few conflicting spots.** `VERSION` differs by design — take `v6`'s side, every time. The only
+  other ones are those of the findings mirror, the one pipeline change landed on `v6` alone
+  (#1869): `security-findings-mirror.sh`, its steps at the end of `security-images` in `ci.yml`
+  and of `report` in `codeql.yml`, the CLI version of both, `--show-suppressed` in
+  `security-image-scan.sh` and the seed sparing `yontrack-ci`. A merge from `main` touching those
+  conflicts there — keep both sides, and `v6`'s CLI version when `main`'s is older than 5.8.0.
 * **The slots are synchronised, not merged.** `EnvironmentsInjection.defineSlots` uses
   `syncForward` over the slots of the project: a slot the incoming configuration does not mention
   is **deleted**. A `v6` slot declared only on `v6` would therefore be torn down by the next `main`
@@ -119,6 +143,12 @@ that cheap, and both are the reason the pipeline changes live on `main`:
 When 6.0 is ready, `v6` becomes `main`. That is the reverse of
 [Minor cutover](minor-cutover.md) and has not been written down yet — it is one merge, one `VERSION`
 bump, and the retirement of the `v6` environment.
+
+And one thing the merge does not do by itself: **move the security stamps back to self.dev**
+(#1875). The mirror stops with the `v6` branch, but self.dev only runs 6.0 once 6.0.0 is released,
+so the switch cannot happen at the merge. The last step of `security-images` in `ci.yml`, and of
+the `report` job in `codeql.yml`, holds the line: on `main` and `release/*`, a 6.x build warns
+while self.dev still runs 5.x, and fails once it runs 6.x, until #1875 has landed.
 
 ## See also
 

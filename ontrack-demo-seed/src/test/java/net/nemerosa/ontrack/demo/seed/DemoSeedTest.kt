@@ -107,6 +107,35 @@ class DemoSeedTest {
         assertTrue("left-over-env" !in snapshot, "The left-over environment is gone")
     }
 
+    /**
+     * `v6`'s CI mirrors its security findings onto v6.dev, into a project the seed must not
+     * reset: the mirror's history would otherwise last one deployment (#1869).
+     */
+    @Test
+    fun `the reset spares the project of the CI mirror`() {
+        val target = InMemoryDemoTarget()
+        val mirror = target.createProject(DemoSeed.CI_MIRROR_PROJECT, "Security findings of v6's CI.")
+        target.createProject("left-over", "A project a visitor created.")
+
+        seed(target).run(DemoContent.dataset(changelog))
+
+        val projects = target.projects()
+        assertTrue(projects.any { it === mirror }, "The project of the CI mirror is the same one, never recreated")
+        assertTrue(projects.none { it.name == "left-over" }, "Every other project is still reset")
+    }
+
+    @Test
+    fun `a dataset creating the project of the CI mirror is refused before anything is deleted`() {
+        val target = InMemoryDemoTarget()
+        target.createProject("left-over", "A project a visitor created.")
+        val dataset = DemoContent.dataset(changelog).let {
+            it.copy(projects = it.projects + it.projects.first().copy(name = DemoSeed.CI_MIRROR_PROJECT))
+        }
+
+        assertFailsWith<IllegalArgumentException> { seed(target).run(dataset) }
+        assertTrue(target.projects().any { it.name == "left-over" }, "Nothing was deleted")
+    }
+
     @Test
     fun `the curated dataset and the changelog project are both created`() {
         val target = InMemoryDemoTarget()

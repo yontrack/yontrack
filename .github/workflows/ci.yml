@@ -76,8 +76,8 @@ env:
   # here so the version shape does not depend on an implicit runner default.
   CI: "true"
   # Pinned: an unpinned CLI lets a Yontrack release turn a green pipeline red in a repository
-  # nobody touched.
-  YONTRACK_CLI_VERSION: "5.7.0"
+  # nobody touched. 5.8.0 for `validate … findings`, which the findings mirror uses (#1869).
+  YONTRACK_CLI_VERSION: "5.8.0"
   # Run info reported with every validation. The Jenkins shared library computed this silently;
   # the Go CLI is purely declarative and sends `runInfo: null` unless the flags are spelled out,
   # which is how the migration dropped it (#1655) and left a hole in
@@ -2054,6 +2054,51 @@ jobs:
             yontrack validate --validation SECURITY.IMAGE.UI --status FAILED \
               $run_time_flag $YONTRACK_RUN_INFO
           fi
+
+      # The findings mirror (#1869). self.dev runs 5.x and takes CHML only, so on `v6` - and only
+      # there - the Trivy reports themselves also go to v6.dev, which runs 6.0 with the licence for
+      # the native formats. Never fails the job: self.dev is the instance of record, and every
+      # failure of the mirror is a warning. See scripts/security-findings-mirror.sh.
+      - name: Is the findings mirror on?
+        id: mirror
+        if: ${{ !cancelled() }}
+        run: scripts/security-findings-mirror.sh enabled "$GITHUB_REF_NAME"
+
+      - name: Mirror the image findings onto v6.dev
+        if: ${{ !cancelled() && steps.mirror.outputs.enabled == 'true' }}
+        continue-on-error: true
+        env:
+          V6_URL: ${{ vars.V6_URL || 'https://v6.dev.yontrack.com' }}
+          V6_TOKEN: ${{ secrets.V6_TOKEN }}
+          BACKEND_REPORT: ${{ steps.backend.outputs.report-dir }}/trivy.json
+          UI_REPORT: ${{ steps.ui.outputs.report-dir }}/trivy.json
+          BACKEND_OUTCOME: ${{ steps.backend.outcome }}
+          UI_OUTCOME: ${{ steps.ui.outcome }}
+          STARTED: ${{ steps.job_start.outputs.started }}
+        run: |
+          run_time_flag=""
+          if [ -n "${STARTED:-}" ]; then
+            run_time_flag="--run-time $(( $(date +%s) - STARTED ))"
+          fi
+          scripts/security-findings-mirror.sh configure "$V6_URL" "$V6_TOKEN"
+          # A scan that errored has no report worth mirroring - self.dev already has its FAILED.
+          if [ "$BACKEND_OUTCOME" = "success" ]; then
+            # shellcheck disable=SC2086  # deliberate: see YONTRACK_RUN_INFO
+            scripts/security-findings-mirror.sh publish "$YONTRACK_BRANCH_NAME" "$YONTRACK_BUILD_NAME" \
+              SECURITY.IMAGE.BACKEND trivy IMAGE "$BACKEND_REPORT" $run_time_flag $YONTRACK_RUN_INFO
+          fi
+          if [ "$UI_OUTCOME" = "success" ]; then
+            # shellcheck disable=SC2086  # deliberate: see YONTRACK_RUN_INFO
+            scripts/security-findings-mirror.sh publish "$YONTRACK_BRANCH_NAME" "$YONTRACK_BUILD_NAME" \
+              SECURITY.IMAGE.UI trivy IMAGE "$UI_REPORT" $run_time_flag $YONTRACK_RUN_INFO
+          fi
+
+      # Keeps the switch back to self.dev from being forgotten at the 6.0 cutover (#1875): on
+      # `main` and `release/*`, a 6.x build warns while self.dev still runs 5.x, and fails once it
+      # runs 6.x. After the validations, so that the stamps are recorded either way.
+      - name: Check the security findings are not left behind
+        if: ${{ !cancelled() }}
+        run: scripts/security-findings-mirror.sh guard "$GITHUB_REF_NAME" VERSION
 
       - name: Summarise the counts
         if: ${{ !cancelled() }}

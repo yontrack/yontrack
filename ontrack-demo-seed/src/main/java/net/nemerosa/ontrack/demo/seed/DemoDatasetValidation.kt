@@ -57,6 +57,10 @@ fun DemoDataset.validate() {
 
     projects.forEach { project ->
         checkName(project.name, "Project")
+        // The reset spares it, so the seed would find it already there and fail half-way through.
+        if (project.name == DemoSeed.CI_MIRROR_PROJECT) {
+            problems += "Project ${project.name} is the project of the CI mirror, which the demo does not own."
+        }
         // A label naming nothing is a typo here for the same reason a promotion dependency is:
         // the seed would fail half-way through the reset, with the demo already deleted.
         project.labels.forEach { label ->

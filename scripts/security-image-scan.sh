@@ -32,6 +32,10 @@
 #   * CRITICAL, HIGH, MEDIUM and LOW. UNKNOWN is left out: the CHML stamp has no slot for it.
 #   * One entry per (vulnerability, package) as Trivy reports it: the same CVE in two packages
 #     counts twice, since both have to be upgraded.
+#   * Not what the ignore file accepts. The scan keeps those in the report (`--show-suppressed`),
+#     but under `ExperimentalModifiedFindings`, which the count does not read: they are there for
+#     the findings mirror (#1869), which sends them as accepted findings. Nor does the SARIF:
+#     Trivy's SARIF writer reads the vulnerabilities alone, so the Security tab is unchanged.
 #
 # Findings never fail a scan - they only drive the stamp's status. A scanner *error* does:
 # an image that cannot be pulled or a database that cannot be downloaded must not read as an
@@ -100,6 +104,7 @@ sis_scan() {
     trivy image \
         --scanners vuln \
         --ignore-unfixed \
+        --show-suppressed \
         --ignorefile "$ignorefile" \
         --exit-code 0 \
         --no-progress \

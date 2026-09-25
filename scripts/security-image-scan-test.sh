@@ -95,6 +95,33 @@ JSON
 
 echo '{"Results": [' > "$WORK/broken.json"
 
+# What `--show-suppressed` adds: the vulnerabilities the ignore file accepts, under
+# `ExperimentalModifiedFindings` rather than `Vulnerabilities`. They are what the findings mirror
+# sends as accepted findings (#1869), and they must not count.
+cat > "$WORK/suppressed.json" <<'JSON'
+{
+  "SchemaVersion": 2,
+  "Results": [
+    {
+      "Target": "ontrack (ubuntu 24.04)",
+      "Class": "os-pkgs",
+      "Vulnerabilities": [
+        {"VulnerabilityID": "CVE-1", "Severity": "HIGH"}
+      ],
+      "ExperimentalModifiedFindings": [
+        {
+          "Type": "vulnerability",
+          "Status": "ignored",
+          "Statement": "Not reachable",
+          "Source": ".trivyignore.yaml",
+          "Finding": {"VulnerabilityID": "CVE-2", "Severity": "CRITICAL"}
+        }
+      ]
+    }
+  ]
+}
+JSON
+
 # ===========================================================================
 # count
 # ===========================================================================
@@ -123,6 +150,13 @@ low=0" "$out" "count: a missing Results counts as zero"
 out="$(sis_count "$WORK/null-results.json")"; rc=$?
 assert_eq "0" "$rc" "count: succeeds when Results is null"
 assert_contains "$out" "critical=0" "count: a null Results counts as zero"
+
+out="$(sis_count "$WORK/suppressed.json")"; rc=$?
+assert_eq "0" "$rc" "count: succeeds on a report with suppressed findings"
+assert_eq "critical=0
+high=1
+medium=0
+low=0" "$out" "count: a vulnerability the ignore file accepts does not count"
 
 out="$(sis_count "$WORK/broken.json" 2>&1)"; rc=$?
 assert_eq "1" "$rc" "count: a report that is not JSON is an error, not zero findings"
@@ -241,6 +275,7 @@ assert_eq "0" "$rc" "scan: findings do not fail the scan"
 assert_contains "$(calls)" "trivy image" "scan: scans the image"
 assert_contains "$(calls)" "ghcr.io/yontrack/yontrack/ontrack-ui:run-1" "scan: scans the image it was given"
 assert_contains "$(calls)" "--ignore-unfixed" "scan: counts only the vulnerabilities with a fix"
+assert_contains "$(calls)" "--show-suppressed" "scan: keeps the accepted vulnerabilities in the report, for the findings"
 assert_contains "$(calls)" "--format json" "scan: produces the JSON report the counts come from"
 assert_contains "$(calls)" "--scanners vuln" "scan: looks for vulnerabilities only"
 assert_contains "$(calls)" "--exit-code 0" "scan: findings never set the exit code"

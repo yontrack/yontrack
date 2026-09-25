@@ -36,7 +36,7 @@ permissions:
 
 env:
   # Same CLI as ci.yml; see YONTRACK_CLI_VERSION there.
-  YONTRACK_CLI_VERSION: "5.1.1"
+  YONTRACK_CLI_VERSION: "5.8.0"
   # The Yontrack project ci.yml registers its builds in.
   YONTRACK_PROJECT: yontrack
 
@@ -204,3 +204,46 @@ jobs:
             echo
             echo "Build \`$PROJECT/$BRANCH/$BUILD\`: \`${CRITICAL:-?}/${HIGH:-?}/${MEDIUM:-?}/${LOW:-?}\`"
           } >> "$GITHUB_STEP_SUMMARY"
+
+      # The findings mirror (#1869), as in ci.yml's `security-images` job: on `v6` only, the
+      # alerts - open, and dismissed as accepted findings - also go to v6.dev in the neutral
+      # `findings` format. Never fails the job. See scripts/security-findings-mirror.sh.
+      - name: Is the findings mirror on?
+        id: mirror
+        if: ${{ !cancelled() }}
+        run: scripts/security-findings-mirror.sh enabled "$GITHUB_REF_NAME"
+
+      - name: Mirror the code findings onto v6.dev
+        if: >-
+          ${{ !cancelled()
+          && steps.mirror.outputs.enabled == 'true'
+          && steps.build.outputs.found == 'true'
+          && needs.analyze.result == 'success' }}
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          V6_URL: ${{ vars.V6_URL || 'https://v6.dev.yontrack.com' }}
+          V6_TOKEN: ${{ secrets.V6_TOKEN }}
+          BRANCH: ${{ steps.build.outputs.branch }}
+          BUILD: ${{ steps.build.outputs.build }}
+          RUN_INFO: >-
+            --source-type github-workflow
+            --source-uri ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+            --trigger-type ${{ github.event_name }}
+            --trigger-data ${{ github.sha }}
+        run: |
+          report="$RUNNER_TEMP/codeql-findings.json"
+          if ! scripts/security-findings-mirror.sh fetch-code "$GITHUB_REPOSITORY" "$GITHUB_REF" "$report"; then
+            echo "::warning title=Security findings mirror::SECURITY.CODE not mirrored: the alerts could not be fetched."
+            exit 0
+          fi
+          scripts/security-findings-mirror.sh configure "$V6_URL" "$V6_TOKEN"
+          # shellcheck disable=SC2086  # deliberate: run info is a set of flags, not one word
+          scripts/security-findings-mirror.sh publish "$BRANCH" "$BUILD" \
+            SECURITY.CODE findings CODE "$report" $RUN_INFO
+
+      # Keeps the switch back to self.dev from being forgotten at the 6.0 cutover (#1875). See the
+      # same step in ci.yml.
+      - name: Check the security findings are not left behind
+        if: ${{ !cancelled() }}
+        run: scripts/security-findings-mirror.sh guard "$GITHUB_REF_NAME" VERSION

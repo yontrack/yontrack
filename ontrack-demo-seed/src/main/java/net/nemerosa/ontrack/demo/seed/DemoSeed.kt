@@ -10,6 +10,7 @@ import java.time.LocalDateTime
  * The demo's state is a function of the build, not an accumulation: the program deletes
  * every project and every environment, then recreates the dataset from scratch. Destructive
  * by design, and idempotent because of it — running it twice in a row leaves the same demo.
+ * The one exception is [CI_MIRROR_PROJECT], which the demo does not own.
  *
  * Settings are covered by CasC and users live in Keycloak, so projects, environments and
  * the demo dashboard are the only things this has to reset.
@@ -59,7 +60,7 @@ class DemoSeed(
             log("Deleting environment ${environment.name}")
             environment.delete()
         }
-        target.projects().forEach { project ->
+        target.projects().filter { it.name != CI_MIRROR_PROJECT }.forEach { project ->
             log("Deleting project ${project.name}")
             project.delete()
         }
@@ -272,4 +273,13 @@ class DemoSeed(
     private fun slotName(spec: EnvironmentSpec, slotSpec: SlotSpec): String =
         "${spec.name}/${slotSpec.project}" +
                 (slotSpec.qualifier.takeIf { it.isNotBlank() }?.let { " [$it]" } ?: "")
+
+    companion object {
+        /**
+         * Project into which `v6`'s CI mirrors its security findings, on v6.dev (#1869). Left
+         * alone by the reset, or its history would last one deployment. Not `yontrack`, which is
+         * [DemoContent.CHANGELOG]. Goes away at the 6.0 cutover, with the mirror (#1875).
+         */
+        const val CI_MIRROR_PROJECT = "yontrack-ci"
+    }
 }
