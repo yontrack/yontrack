@@ -77,6 +77,7 @@ class SearchServiceImpl(
             offset = request.offset,
             size = request.size,
             perType = request.perType,
+            highlight = request.highlight,
         ) ?: return null
         val typesById = types.associateBy { it.id }
         val rebuilding = searchDocumentService.rebuildingTypes
@@ -146,6 +147,7 @@ class SearchServiceImpl(
         accuracy = hit.score,
         type = type,
         data = hit.data.toObject() as? Map<String, *>,
+        highlight = hit.highlight,
     )
 
     @Transactional(propagation = Propagation.NOT_SUPPORTED)

@@ -30,7 +30,12 @@ constructor(
          */
         @APIDescription("Meta-data associated with the result")
         @get:JsonIgnore
-        val data: Map<String, *>? = null
+        val data: Map<String, *>? = null,
+        /**
+         * Excerpt of the free text where it matches the query, when asked for
+         */
+        @APIDescription("Excerpt of the free text of the result where it matches the query")
+        val highlight: List<SearchHighlightPart>? = null,
 ) {
     companion object {
         const val SEARCH_RESULT_ITEM = "item"

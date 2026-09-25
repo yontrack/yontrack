@@ -14,6 +14,8 @@ import net.nemerosa.ontrack.model.structure.SearchQueryRequest
  * @property titlePrefixPattern `LIKE` pattern matching the start of the lower-cased title
  * @property tsQuery Text for `to_tsquery('simple', ...)`: each word of the query as a quoted
  * prefix, all of them required
+ * @property anyWordTsQuery Text for `to_tsquery('simple', ...)`: each word of the query as a quoted
+ * prefix, any of them - what the free text is highlighted with
  */
 class ParsedSearchQuery private constructor(
     val text: String,
@@ -22,6 +24,7 @@ class ParsedSearchQuery private constructor(
     val identifierPrefixPattern: String,
     val titlePrefixPattern: String,
     val tsQuery: String,
+    val anyWordTsQuery: String,
 ) {
 
     companion object {
@@ -50,15 +53,15 @@ class ParsedSearchQuery private constructor(
                 return null
             }
             val like = escapeLike(text)
+            val tsWords = text.split(" ").map { word -> "'${escapeTsQuery(word)}':*" }
             return ParsedSearchQuery(
                 text = text,
                 tiers = SearchMatchTier.entries.filter { text.length >= it.minLength },
                 exactPattern = "%${SearchDocumentIdentifiers.SEPARATOR}$like${SearchDocumentIdentifiers.SEPARATOR}%",
                 identifierPrefixPattern = "%${SearchDocumentIdentifiers.SEPARATOR}$like%",
                 titlePrefixPattern = "$like%",
-                tsQuery = text.split(" ").joinToString(" & ") { word ->
-                    "'${escapeTsQuery(word)}':*"
-                },
+                tsQuery = tsWords.joinToString(" & "),
+                anyWordTsQuery = tsWords.joinToString(" | "),
             )
         }
 

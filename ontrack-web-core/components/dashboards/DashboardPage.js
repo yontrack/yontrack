@@ -11,7 +11,6 @@ export default function DashboardPage({title}) {
 
     const commands = [
         <NewProjectCommand key="create-project"/>,
-        // <JumpToProject key="project"/>,
         <EnvironmentsCommand key="environments"/>,
         <DashboardCommandMenu key="dashboard"/>,
     ]

@@ -1,7 +1,8 @@
 # Searching
 
 Yontrack searches everything it knows by name or identifier from one place: the **command
-palette**. Open it, type, and pick a result with the keyboard.
+palette**. Open it, type, and pick a result with the keyboard — or go through all the results on
+the [search page](#the-search-page).
 
 ## The command palette
 
@@ -28,7 +29,8 @@ browser: another browser, or another device, has its own.
   — projects, branches, builds, releases, build links, Git branches, commits, issues, SCM
   catalog entries, security findings — grouped by type. Each group says how many results its
   type has in total.
-- The last entry, **See all results**, opens the search page with every result of your text.
+- The last entry, **See all results**, opens the [search page](#the-search-page) with every
+  result of your text.
 
 While the search index is being built — after an upgrade, for example — the palette says so,
 and shows what has been indexed so far.
@@ -47,6 +49,32 @@ and shows what has been indexed so far.
 A click opens an entry too — and a ⌘ or Ctrl click opens it in a new tab.
 
 The palette is not available in the [mobile UI](../mobile/index.md), which has no global search.
+
+## The search page
+
+The search page, `/search`, lists **every result** of a text, best first, 20 per page. It opens
+from the **See all results** entry of the palette.
+
+Each result shows its type, its title linking to its page, where it is — `in` its project — and,
+when its text matches, an **excerpt** of that text around the matching words.
+
+- **Highlighting** — the words you searched for are highlighted in the titles, and in the
+  excerpts of the text: a description, a commit message.
+- **Filters** — above the results, one button per type having results, with its count: *All
+  (42)*, *Build (30)*, *SCM Commit (12)*… Pressing a type shows its results only, the counts
+  of the other types staying there to go to them; *All* shows every type again.
+- **Pages** — below the results, once there are more than 20 of them.
+- **Searching again** — the search field at the top of the page runs another search, keeping
+  the type filter.
+
+The text, the type and the page are all in the address of the page —
+`/search?q=billing&type=build&page=2` — so a page of results can be **bookmarked or shared**,
+and the browser's back and forward buttons move between your searches, filters and pages. The
+person you share it with sees the results their own rights allow.
+
+While the search index is being built, the search page says so, like the palette.
+
+The search page is not available in the [mobile UI](../mobile/index.md) either.
 
 ## How results are matched
 

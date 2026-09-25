@@ -120,6 +120,7 @@ class SearchDocumentJdbcRepository(
         offset: Int,
         size: Int,
         perType: Int?,
+        highlight: Boolean,
     ): SearchDocumentPage? {
         val parsed = ParsedSearchQuery.parse(query) ?: return null
         if (scope.types.isEmpty()) {
@@ -136,14 +137,17 @@ class SearchDocumentJdbcRepository(
             emptyList()
         } else if (perType != null) {
             namedParameterJdbcTemplate.query(
-                sql.perType,
+                sql.highlighted(sql.perType, highlight),
                 MapSqlParameterSource(sql.params.values).addValue("perType", perType)
-            ) { rs, _ -> toHit(rs) }
+            ) { rs, _ -> toHit(rs, highlight) }
+        } else if (size <= 0) {
+            // Facets only
+            emptyList()
         } else {
             namedParameterJdbcTemplate.query(
-                sql.page,
+                sql.highlighted(sql.page, highlight),
                 MapSqlParameterSource(sql.params.values).addValue("offset", offset).addValue("size", size)
-            ) { rs, _ -> toHit(rs) }
+            ) { rs, _ -> toHit(rs, highlight) }
         }
         return SearchDocumentPage(
             total = facets.values.sum(),
@@ -152,7 +156,7 @@ class SearchDocumentJdbcRepository(
         )
     }
 
-    private fun toHit(rs: ResultSet) = SearchDocumentHit(
+    private fun toHit(rs: ResultSet, highlight: Boolean) = SearchDocumentHit(
         type = rs.getString("TYPE"),
         key = rs.getString("KEY"),
         projectId = rs.getInt("PROJECT_ID").takeIf { !rs.wasNull() },
@@ -167,6 +171,11 @@ class SearchDocumentJdbcRepository(
         data = readJson(rs, "DATA"),
         updatedAt = rs.getObject("UPDATED_AT", LocalDateTime::class.java),
         score = rs.getDouble("SCORE"),
+        highlight = if (highlight) {
+            rs.getString("HIGHLIGHT")?.let { SearchHeadline.parse(it) }?.takeIf { it.isNotEmpty() }
+        } else {
+            null
+        },
     )
 
     /**
@@ -189,6 +198,10 @@ class SearchDocumentJdbcRepository(
             .addValue("titlePrefix", parsed.titlePrefixPattern)
             .addValue("identifierPrefix", parsed.identifierPrefixPattern)
             .addValue("tsq", parsed.tsQuery)
+            .addValue("anyTsq", parsed.anyWordTsQuery)
+            .addValue("headlineFrom", SearchHeadline.TRANSLATE_FROM)
+            .addValue("headlineTo", SearchHeadline.TRANSLATE_TO)
+            .addValue("headlineOptions", SearchHeadline.OPTIONS)
             .addValue("types", scope.types)
             .addValue("projectIds", scope.projectIds)
             .addValue("projectLessTypes", scope.projectLessTypes)
@@ -286,16 +299,20 @@ class SearchDocumentJdbcRepository(
             SELECT c.TYPE, COUNT(*) AS N FROM candidates c GROUP BY c.TYPE
         """.trimIndent()
 
+        /**
+         * Rows of a page, best first
+         */
         val page = """
-            $candidates
             SELECT c.*, $score AS SCORE
             FROM candidates c
             ORDER BY $ranking
             OFFSET :offset LIMIT :size
         """.trimIndent()
 
+        /**
+         * Best rows of each type
+         */
         val perType = """
-            $candidates
             SELECT c.*, $score AS SCORE
             FROM (
                 SELECT c.*, ROW_NUMBER() OVER (PARTITION BY c.TYPE ORDER BY $ranking) AS RN
@@ -304,6 +321,32 @@ class SearchDocumentJdbcRepository(
             WHERE c.RN <= :perType
             ORDER BY $ranking
         """.trimIndent()
+
+        /**
+         * Complete query for some [rows][page] of the candidates, with their `HIGHLIGHT` when asked
+         * for.
+         *
+         * `ts_headline` is expensive: it runs in an outer query, on the rows already selected -
+         * never on the other candidates - and only on the free text matching one of the words of
+         * the query.
+         */
+        fun highlighted(rows: String, highlight: Boolean): String =
+            if (highlight) {
+                """
+                    $candidates
+                    SELECT c.*,
+                           CASE WHEN c.TEXT IS NOT NULL AND to_tsvector('simple', c.TEXT) @@ to_tsquery('simple', :anyTsq)
+                                THEN ts_headline('simple', translate(c.TEXT, :headlineFrom, :headlineTo), to_tsquery('simple', :anyTsq), :headlineOptions)
+                           END AS HIGHLIGHT
+                    FROM ($rows) c
+                    ORDER BY $ranking
+                """.trimIndent()
+            } else {
+                """
+                    $candidates
+                    $rows
+                """.trimIndent()
+            }
     }
 
 }

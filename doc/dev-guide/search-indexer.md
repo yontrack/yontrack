@@ -120,8 +120,9 @@ class ProjectSearchProvider(
 - **`identifiers`**: everything the thing answers to *exactly* — name, display name, commit hash
   and short hash, issue key. An exact identifier is the strongest match there is: put the name there
   even when it is also the title. Case does not matter.
-- **`text`**: free text, matched word by word with the lowest weight. Keep it bounded (commit
-  messages are truncated to 2 KB).
+- **`text`**: free text, matched word by word with the lowest weight, and the only field
+  highlighted by the server (see *Highlighting* below). Keep it bounded (commit messages are
+  truncated to 2 KB).
 - **`data`**: everything the `Result` component needs, so that no result costs a read of the
   database. It is returned as the `data` of the `SearchResult`. Render the structure entities with
   `searchDocumentData()` (`SearchDocumentData.kt`, `ontrack-model`), so that every `Result`
@@ -242,12 +243,28 @@ in `ParsedSearchQuery`, the table in migrations `V85__1877_search_documents.sql`
 
 ```graphql
 search(query: String, types: [String!], offset: Int = 0, size: Int = 20, perType: Int): SearchResults!
-# SearchResults { total, facets { type count }, items { title description accuracy type data }, message }
+# SearchResults { total, facets { type count }, items { title description accuracy type data highlight { text match } }, message }
 ```
 
 `perType` returns the best *N* results of each type in one request, instead of a page. The
 `search(token, type, offset, size) { pageInfo pageItems }` form is deprecated, kept until 7.0 as a
 wrapper of this one. In the KDSL: `ontrack.search(query, types, offset, size, perType)`.
+
+### Highlighting
+
+`highlight` is an excerpt of the `text` of a result around the words of the query, as `{text,
+match}` parts — plain text, the matches flagged, never markup. It is `null` when the document has
+no `text`, or when its `text` contains none of the words of the query.
+
+`ts_headline` is expensive, so it is computed **only when the field is selected** — the root
+resolver looks for `items/highlight` in the selection set and passes `highlight = true` down to
+the repository — and then **only on the rows returned**: the page (or the `perType` rows) is
+selected first, and `ts_headline` runs in an outer query over those rows alone. The palette does not
+select it; the results page does. `SearchHeadline` holds the delimiters `ts_headline` is given —
+private-use characters, split on rather than rendered — and the `<` swap which stops its parser
+from dropping what looks like an HTML tag.
+
+The titles are highlighted by the frontend, from the words of the query (`highlightText.js`).
 
 ## Tests
 

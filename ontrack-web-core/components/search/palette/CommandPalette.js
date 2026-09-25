@@ -9,6 +9,7 @@ import {Dynamic} from "@components/common/Dynamic";
 import {getLocalRecentlyVisited} from "@components/storage/local";
 import {MIN_SEARCH_LENGTH, paletteSections, RESULTS_PER_TYPE} from "@components/search/palette/paletteSections";
 import {useIsMacPlatform} from "@components/search/palette/platform";
+import {resultContext} from "@components/search/searchResultContext";
 
 /**
  * Delay between the last key typed and the search.
@@ -52,23 +53,6 @@ function useDebouncedValue(value, delay) {
         return () => clearTimeout(timer)
     }, [value, delay])
     return debounced
-}
-
-/**
- * The project a search result belongs to, when its data says: what tells apart the same commit
- * found in two projects.
- */
-const resultProjectName = (data) =>
-    data?.project?.name ??
-    data?.branch?.project?.name ??
-    data?.build?.branch?.project?.name ??
-    data?.item?.projectName ??
-    null
-
-const resultContext = (result) => {
-    // A project is its own project
-    const project = result.type?.id === 'project' ? null : resultProjectName(result.data)
-    return project ? `in ${project}` : null
 }
 
 const accessibleNameOf = (option) => {

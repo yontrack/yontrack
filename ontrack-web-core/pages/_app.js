@@ -9,7 +9,6 @@ import PreferencesContextProvider from "@components/providers/PreferencesProvide
 import RefDataContextProvider from "@components/providers/RefDataProvider";
 import Head from "next/head";
 import {useRouter} from "next/router";
-import SearchContextProvider from "@components/search/SearchContext";
 import {SessionProvider} from "next-auth/react"
 // Ace editors modes & themes
 import 'ace-builds/src-noconflict/ace';
@@ -44,14 +43,12 @@ export default function App({Component, pageProps}) {
                             <UserContextProvider>
                                 <PreferencesContextProvider>
                                     <RefDataContextProvider>
-                                        <SearchContextProvider>
-                                            <EventsContextProvider>
-                                                <LoadingAggregator>
-                                                    <ThemePreferenceSync/>
-                                                    <Component {...pageProps} />
-                                                </LoadingAggregator>
-                                            </EventsContextProvider>
-                                        </SearchContextProvider>
+                                        <EventsContextProvider>
+                                            <LoadingAggregator>
+                                                <ThemePreferenceSync/>
+                                                <Component {...pageProps} />
+                                            </LoadingAggregator>
+                                        </EventsContextProvider>
                                     </RefDataContextProvider>
                                 </PreferencesContextProvider>
                             </UserContextProvider>

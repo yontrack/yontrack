@@ -91,6 +91,9 @@ class GQLRootQuerySearch(
                 val offset = env.getArgument<Int>(ARG_OFFSET) ?: 0
                 val size = env.getArgument<Int>(ARG_SIZE) ?: SearchQueryRequest.DEFAULT_SIZE
                 val perType = env.getArgument<Int>(ARG_PER_TYPE)
+                // ts_headline is expensive: only when the client asks for the highlight
+                val highlight = env.selectionSet.contains("items/highlight") ||
+                        env.selectionSet.contains("pageItems/highlight")
                 GQLSearchResults(
                     results = searchService.search(
                         SearchQueryRequest(
@@ -99,6 +102,7 @@ class GQLRootQuerySearch(
                             offset = offset,
                             size = size,
                             perType = perType,
+                            highlight = highlight,
                         )
                     ),
                     offset = offset,

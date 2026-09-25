@@ -179,6 +179,7 @@ class SearchDocumentServiceImpl(
         offset: Int,
         size: Int,
         perType: Int?,
-    ): SearchDocumentPage? = searchDocumentRepository.search(query, scope, offset, size, perType)
+        highlight: Boolean = false,
+    ): SearchDocumentPage? = searchDocumentRepository.search(query, scope, offset, size, perType, highlight)
 
 }

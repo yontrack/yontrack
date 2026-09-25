@@ -720,6 +720,17 @@ button.ot-validation-stamp-filter-edition {
     margin-right: 2px;
 }
 
+/*
+ * What matches the query in a search result (#1885). Dark text on a light yellow in both themes:
+ * the contrast of the text holds whatever the background of the page.
+ */
+.ot-search-mark {
+    background: #ffe58f;
+    color: #1f1f1f;
+    padding: 0 1px;
+    border-radius: 2px;
+}
+
 /* Present for assistive technologies, out of sight otherwise */
 .ot-visually-hidden {
     position: absolute !important;

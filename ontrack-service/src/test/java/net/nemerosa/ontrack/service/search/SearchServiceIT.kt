@@ -71,8 +71,16 @@ class SearchServiceIT : AbstractDSLTestSupport() {
         offset: Int = 0,
         size: Int = 20,
         perType: Int? = null,
+        highlight: Boolean = false,
     ) = searchService.search(
-        SearchQueryRequest(query = query, types = types, offset = offset, size = size, perType = perType)
+        SearchQueryRequest(
+            query = query,
+            types = types,
+            offset = offset,
+            size = size,
+            perType = perType,
+            highlight = highlight,
+        )
     )
 
     /**
@@ -231,6 +239,104 @@ class SearchServiceIT : AbstractDSLTestSupport() {
         val results = asAdmin { search(u, perType = 2) }
         assertEquals(9, results.total)
         assertEquals(listOf("a1-$u", "a2-$u", "b1-$u", "b2-$u"), results.items.map { it.key })
+    }
+
+    @Test
+    fun `The free text is highlighted where it matches the query`() {
+        val project = project()
+        val u = token()
+        index(alpha.document("h-$u", "Title", project, text = "Fixes the $u parser crash"))
+        val result = asAdmin { search(u, highlight = true) }.items.single()
+        assertEquals(
+            listOf(
+                SearchHighlightPart("Fixes the ", match = false),
+                SearchHighlightPart(u, match = true),
+                SearchHighlightPart(" parser crash", match = false),
+            ),
+            result.highlight
+        )
+    }
+
+    @Test
+    fun `The highlight keeps the markup of the free text as text`() {
+        val project = project()
+        val u = token()
+        index(alpha.document("h-$u", "Title", project, text = "Fix <b>$u</b> & <script> in the parser"))
+        val result = asAdmin { search(u, highlight = true) }.items.single()
+        val highlight = assertNotNull(result.highlight)
+        // Where the excerpt starts and ends is up to ts_headline, but the markup is kept as text
+        assertTrue(highlight.joinToString("") { it.text }.contains("$u</b> & <script> in the parser"))
+        assertEquals(listOf(u), highlight.filter { it.match }.map { it.text })
+    }
+
+    @Test
+    fun `A long free text is highlighted around its matches only`() {
+        val project = project()
+        val u = token()
+        val filler = (1..200).joinToString(" ") { "word$it" }
+        index(alpha.document("h-$u", "Title", project, text = "$filler $u $filler"))
+        val result = asAdmin { search(u, highlight = true) }.items.single()
+        val highlight = assertNotNull(result.highlight)
+        assertEquals(listOf(u), highlight.filter { it.match }.map { it.text })
+        assertTrue(highlight.sumOf { it.text.length } < filler.length, "Only an excerpt of the text")
+    }
+
+    @Test
+    fun `No highlight for a document without free text`() {
+        val project = project()
+        val u = token()
+        index(alpha.document("h-$u", "Title", project, identifiers = listOf(u)))
+        val result = asAdmin { search(u, highlight = true) }.items.single()
+        assertNull(result.highlight)
+    }
+
+    @Test
+    fun `No highlight when the free text does not match the query`() {
+        val project = project()
+        val u = token()
+        index(alpha.document("h-$u", "Title", project, identifiers = listOf(u), text = "Something else entirely"))
+        val result = asAdmin { search(u, highlight = true) }.items.single()
+        assertNull(result.highlight)
+    }
+
+    @Test
+    fun `No highlight unless asked for`() {
+        val project = project()
+        val u = token()
+        index(alpha.document("h-$u", "Title", project, text = "Fixes the $u parser crash"))
+        val result = asAdmin { search(u) }.items.single()
+        assertNull(result.highlight)
+    }
+
+    @Test
+    fun `The results of a page are highlighted`() {
+        val project = project()
+        val u = token()
+        val now = Time.now()
+        index(*(1..5).map {
+            alpha.document("p$it-$u", "P $it", project, text = "Text $it about $u", updatedAt = now.minusMinutes(it.toLong()))
+        }.toTypedArray())
+        val results = asAdmin { search(u, offset = 2, size = 2, highlight = true) }
+        assertEquals(listOf("p3-$u", "p4-$u"), results.items.map { it.key })
+        assertEquals(
+            listOf("Text 3 about ", "Text 4 about "),
+            results.items.map { item -> item.highlight?.firstOrNull()?.text }
+        )
+    }
+
+    @Test
+    fun `The best results per type are highlighted when asked for`() {
+        val project = project()
+        val u = token()
+        index(
+            alpha.document("a-$u", "A", project, text = "Alpha $u"),
+            beta.document("b-$u", "B", project, text = "Beta $u"),
+        )
+        val results = asAdmin { search(u, perType = 1, highlight = true) }
+        assertEquals(
+            listOf(listOf(u), listOf(u)),
+            results.items.map { item -> item.highlight?.filter { it.match }?.map { it.text } }
+        )
     }
 
     @Test

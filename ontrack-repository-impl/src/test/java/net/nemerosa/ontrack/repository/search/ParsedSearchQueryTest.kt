@@ -59,6 +59,12 @@ class ParsedSearchQueryTest {
     }
 
     @Test
+    fun `Highlighting query is a disjunction of quoted prefixes`() {
+        val parsed = assertNotNull(ParsedSearchQuery.parse("billing Release/4.1"))
+        assertEquals("'billing':* | 'release/4.1':*", parsed.anyWordTsQuery)
+    }
+
+    @Test
     fun `Quotes and backslashes are escaped in the full-text query`() {
         val parsed = assertNotNull(ParsedSearchQuery.parse("it's a\\b"))
         assertEquals("'it''s':* & 'a\\\\b':*", parsed.tsQuery)

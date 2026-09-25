@@ -6875,6 +6875,14 @@ type SearchFacet {
   type: SearchResultType!
 }
 
+"Part of the highlighted free text of a search result. The parts, joined, are an excerpt of the text: plain text, whatever it contains, never markup."
+type SearchHighlightPart {
+  "True if this part matches the query"
+  match: Boolean!
+  "Part of the text"
+  text: String!
+}
+
 "Search result"
 type SearchResult {
   "Score for the search"
@@ -6883,14 +6891,12 @@ type SearchResult {
   data: JSON
   "Description linked to the item being found"
   description: String
-  "Web access point"
-  page: String @deprecated(reason : "Will be removed in V5. Use the generic type & data")
+  "Excerpt of the free text of the result - a description, a commit message - where it matches the query, as a sequence of parts, the matching ones flagged. Computed only when selected, and only for the results returned. Null when the result has no free text, or when its free text does not match any word of the query."
+  highlight: [SearchHighlightPart!]
   "Short title"
   title: String
   "Type of result"
   type: SearchResultType
-  "API access point"
-  uri: String @deprecated(reason : "Will be removed in V5. Use the generic type & data")
 }
 
 "Type of search result"

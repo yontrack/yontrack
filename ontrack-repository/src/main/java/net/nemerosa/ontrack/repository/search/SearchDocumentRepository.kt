@@ -63,6 +63,8 @@ interface SearchDocumentRepository {
      * @param size Maximum number of documents to return
      * @param perType When set, returns the best [perType] documents of each type, ignoring
      * [offset] and [size]
+     * @param highlight `true` to [highlight][SearchDocumentHit.highlight] the free text of the
+     * documents returned - of these only, `ts_headline` being expensive
      * @return `null` if the query is too short to be searched
      */
     fun search(
@@ -71,6 +73,7 @@ interface SearchDocumentRepository {
         offset: Int,
         size: Int,
         perType: Int?,
+        highlight: Boolean = false,
     ): SearchDocumentPage?
 
 }

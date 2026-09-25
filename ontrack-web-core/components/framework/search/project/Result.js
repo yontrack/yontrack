@@ -3,7 +3,7 @@ import ProjectLink from "@components/projects/ProjectLink";
 
 export default function Result({data}) {
     return <SearchResultComponent
-        title={<ProjectLink project={data.project} className="ot-search-result"/>}
+        title={<ProjectLink project={data.project}/>}
         description=""
     />
 }

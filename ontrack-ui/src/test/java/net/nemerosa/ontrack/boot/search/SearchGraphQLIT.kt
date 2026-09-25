@@ -19,8 +19,6 @@ class SearchGraphQLIT : AbstractSearchTestSupport() {
                         pageItems {
                             title
                             description
-                            uri
-                            page
                             accuracy
                             type {
                                 id 
@@ -152,6 +150,37 @@ class SearchGraphQLIT : AbstractSearchTestSupport() {
         assertEquals("project", item["type"]["id"].asText())
         assertEquals(project.id(), item["data"]["project"]["id"].asInt())
         assertEquals(name, item["data"]["project"]["name"].asText())
+    }
+
+    @Test
+    fun `Highlighting the free text of the results`() {
+        val name = token()
+        project(NameDescription.nd(name, "About <b>$name</b> & more"))
+        val data = run("""{
+            search(query: "$name", types: ["project"]) {
+                items {
+                    title
+                    highlight { text match }
+                }
+            }
+        }""")
+        val highlight = data["search"]["items"][0]["highlight"]
+        assertEquals(
+            listOf("About <b>" to false, name to true, "</b> & more" to false),
+            highlight.values().map { it["text"].asText() to it["match"].asBoolean() }
+        )
+    }
+
+    @Test
+    fun `No highlight for a result without free text`() {
+        val name = token()
+        project(NameDescription.nd(name, ""))
+        val data = run("""{
+            search(query: "$name", types: ["project"]) {
+                items { highlight { text match } }
+            }
+        }""")
+        assertTrue(data["search"]["items"][0]["highlight"].isNull)
     }
 
     @Test

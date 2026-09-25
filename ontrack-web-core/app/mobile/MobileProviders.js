@@ -7,10 +7,9 @@
  * `app/(auth)` - it is *not* covered by the stack in `pages/_app.js` and has to
  * assemble its own.
  *
- * It is a shorter stack than the desktop one on purpose. `SearchContextProvider`
- * and `EventsContextProvider` serve desktop surfaces the mobile UI has no
- * counterpart for, and `LoadingAggregator` drives the desktop page bar. What is
- * here is what a mobile screen genuinely needs: the session, the theme, antd's
+ * It is a shorter stack than the desktop one on purpose. `EventsContextProvider`
+ * serves desktop surfaces the mobile UI has no counterpart for, and
+ * `LoadingAggregator` drives the desktop page bar. What is here is what a mobile screen genuinely needs: the session, the theme, antd's
  * message channel, the signed-in user, their preferences and the reference data.
  */
 
