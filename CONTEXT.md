@@ -342,3 +342,23 @@ _Avoid_: open (the project-level roll-up), affected
 A decision recorded outside Yontrack, read by it, that a finding is tolerated,
 possibly until an expiry.
 _Avoid_: suppression (the scanner's mechanism), waiver, exception
+
+### Search
+
+**Search document**:
+What an indexer writes about one findable thing - a project, a build, a commit -
+so that search can match it and show it without reading the thing itself again: a
+title, the identifiers it answers to, optional free text, and what its result needs
+to be rendered and linked. It belongs to exactly one search result type and is
+unique by its key within that type.
+_Avoid_: index entry, ES document. There is one search index for every type, and
+Elasticsearch no longer holds it.
+
+**Search result type**:
+The kind of thing a search result is - project, build, scm-commit, and so on. Each
+type owns how its results are rendered, and whether a user may see one that belongs
+to no project. Types are peers: none outranks another in a search's ranking, and
+grouping by type is a matter of presentation only.
+_Avoid_: search provider, index. A *search provider* is an indexer, which writes
+the documents of a type rather than being one, and a type is a slice of the one
+search index, not an index of its own.
