@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <rect x="4" y="4" width="120" height="120" rx="22" ry="22" fill="#3949AB"/>
+  <circle cx="64" cy="64" r="44" fill="none" stroke="#FFFFFF" stroke-opacity="0.3" stroke-width="8"/>
+  <!-- gauge arc: 75% clockwise from the top -->
+  <path d="M 64 20 A 44 44 0 1 1 20 64" fill="none" stroke="#FFFFFF" stroke-width="8" stroke-linecap="round"/>
+  <!-- magnifying glass -->
+  <circle cx="58" cy="58" r="15" fill="none" stroke="#FFFFFF" stroke-width="7"/>
+  <line x1="69" y1="69" x2="82" y2="82" stroke="#FFFFFF" stroke-width="9" stroke-linecap="round"/>
+</svg>

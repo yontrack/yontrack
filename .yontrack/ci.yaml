@@ -147,6 +147,31 @@ configuration:
           metrics: {}
         COVERAGE.UI_UNIT:
           metrics: {}
+        # Search performance, reported nightly by .github/workflows/search-perf.yml, which runs
+        # `./gradlew searchPerfTest` - 100k builds and 1M commits bulk-loaded into the Postgres of
+        # the integration test stack - and records its report on the build of the commit it
+        # measured (#1887). Search on Postgres is 6.0 work, so until `v6` is merged into `main`
+        # the workflow checks out `v6` and only `v6` builds carry this stamp.
+        #
+        # The five metrics, from the top of the report, and defined in
+        # doc/dev-guide/search-perf-test.md:
+        #
+        #   palette_p95        p95 of the command palette, in ms       (budget 150)
+        #   results_p95        p95 of the /search results page, in ms  (budget 500)
+        #   commit_lookup_p95  p95 of a full or short commit hash, in ms (budget 150)
+        #   exact_build_p95    p95 of an exact build name, in ms       (budget 150)
+        #   rebuild_seconds    a full rebuild of every search document, in seconds
+        #
+        # Recording only, like the COVERAGE stamps: no thresholds, in no promotion, and nothing in
+        # ci.yml waits for it. A p95 over its budget is still PASSED - a shared runner is noisy,
+        # and the description says which figures are over. It is FAILED, with no figure, when the
+        # run itself failed: a failed EXPLAIN assertion (the offending query and why in the
+        # description), a p95 past ten times its budget, a rebuild error, or no report at all.
+        # scripts/search-perf-validate.sh holds that judgement.
+        #
+        # The `metrics` alias, for the reason given above COVERAGE.UNIT.
+        SEARCH.PERFORMANCE:
+          metrics: {}
         # Reported by the `docs` job in ci.yml, which now runs on every full run: the site
         # built and was archived as a run artefact for the release to carry forward (#1668).
         # Distinct from DOCUMENTATION below, which records the S3 publication at release time

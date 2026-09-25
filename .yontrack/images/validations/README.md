@@ -47,3 +47,7 @@ from the UI or with `yontrack validation setup`.
 ## Regenerating them
 
 Whatever produced an image belongs beside it. Do not hand-edit the PNGs.
+
+`SEARCH.PERFORMANCE.png` is rendered from `SEARCH.PERFORMANCE.svg` beside it, at 128×128: the
+`COVERAGE.*` rounded square and ring gauge, in indigo, with a magnifying glass in place of the
+label (#1887).
