@@ -150,6 +150,10 @@ so the switch cannot happen at the merge. The last step of `security-images` in 
 the `report` job in `codeql.yml`, holds the line: on `main` and `release/*`, a 6.x build warns
 while self.dev still runs 5.x, and fails once it runs 6.x, until #1875 has landed.
 
+And one thing the merge does not do by itself either: **point the nightly search performance at
+`main`**. `search-perf.yml` checks out `v6` (#1887); at the merge, switch `SEARCH_PERF_REF` and the
+`ref` input's default to `main`, or the nightly measures a branch that no longer moves.
+
 ## See also
 
 * [Minor cutover](minor-cutover.md) — moving `main` from one minor to the next
