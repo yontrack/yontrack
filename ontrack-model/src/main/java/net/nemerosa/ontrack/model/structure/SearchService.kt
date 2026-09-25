@@ -35,27 +35,22 @@ interface SearchService {
         )
 
     /**
-     * Makes sure all search indexes are initialized.
-     */
-    fun indexInit()
-
-    /**
-     * Resetting all search indexes, optionally restoring them.
-     *
+     * Deletes the search documents of all types, optionally rebuilding them.
      *
      * This method is mostly used for testing but could be used
-     * to reset faulty indexes.
+     * to repair faulty search documents.
      *
-     * @param reindex `true` to relaunch the indexation afterward
+     * @param reindex `true` to rebuild the search documents afterward
      * @param logErrors `true` to log errors only, not raise exceptions
-     * @return OK if indexation was completed successfully
+     * @return OK if the reset was completed successfully
      */
     fun indexReset(reindex: Boolean, logErrors: Boolean): Ack
 
     /**
-     * Launching the indexation for a given result type. Waits until the indexation is completed.
+     * Rebuilds the search documents of a given result type. Waits until the rebuild is completed.
      *
-     * @param resultType Result type to index
+     * @param resultType Result type to rebuild
+     * @throws SearchResultTypeNotFoundException If no indexer serves this type
      */
     fun reindex(resultType: String)
 

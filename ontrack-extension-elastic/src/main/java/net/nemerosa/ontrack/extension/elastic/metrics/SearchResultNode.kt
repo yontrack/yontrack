@@ -1,4 +1,4 @@
-package net.nemerosa.ontrack.model.structure
+package net.nemerosa.ontrack.extension.elastic.metrics
 
 class SearchResultNode(
         val index: String,

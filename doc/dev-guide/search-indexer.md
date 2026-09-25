@@ -9,11 +9,11 @@ document carries.
 The vocabulary is the one of `CONTEXT.md`: a *search document* is what an indexer writes about one
 findable thing, and a *search result type* is the kind of thing a result is.
 
-> 6.0 has migrated the indexers, one issue at a time, from the Elasticsearch `SearchIndexer` to the
-> contract below; the findings (#1881) were the last one. Until the Elasticsearch search code is
-> removed (#1882), `SearchService` still routes each type to the backend of its indexer: Postgres
-> for a `SearchDocumentIndexer`, Elasticsearch for a `SearchIndexer`. New code uses the Postgres
-> contract only.
+> Up to 5.x, search ran on Elasticsearch, behind the `SearchIndexer` extension point. 6.0 replaced
+> it by the contract below and removed the Elasticsearch search (#1882): `SearchIndexer`,
+> `SearchIndexService` and `SearchIndexUtils` are gone, and `elasticsearch-java` is no longer a
+> dependency of `ontrack-model`. Elasticsearch is left to the export of the metrics
+> (`ontrack-extension-elastic`). See ADR 0017 (`docs/adr/0017-postgres-replaces-elasticsearch-for-search.md`).
 
 ## The contract
 
@@ -205,7 +205,7 @@ with `index`. The rebuild of their own type scans the commits again, for the iss
   its own rebuild. **Bump `documentVersion` whenever the shape of the documents changes**, so that
   the existing ones are rebuilt. `ontrack.config.search.index.reset=true` forces all of them. While
   a type is rebuilt, search answers with what exists so far and the message *"Search index is being
-  built"*.
+  built"*. The rebuild of a type is timed in `ontrack_search_index_all{type}`.
 - **Reconciliation job.** Each indexer gets a job, `search / rebuild / {type}`, manual unless the
   indexer declares an `indexerSchedule` — which the types indexed outside any transaction do (SCM
   commits every week, the SCM catalog every day), and so do the types whose deletions cannot all

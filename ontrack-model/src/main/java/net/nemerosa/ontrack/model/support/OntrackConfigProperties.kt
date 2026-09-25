@@ -92,11 +92,9 @@ class OntrackConfigProperties {
             logger.warn("[config] Tests of external configurations are disabled")
         }
         logger.info("[security] Tokens validity: ${security.tokens.validity}")
-        logger.info("[search] Index immediate refresh = ${search.index.immediate}")
         logger.info("[search] Index batch size = ${search.index.batch}")
         logger.info("[search] Index batch logging = ${search.index.logging}")
         logger.info("[search] Index batch tracing = ${search.index.tracing}")
-        logger.info("[search] Index creation error ignoring = ${search.index.ignoreExisting}")
         logger.info("[document] Documents engine = ${documents.engine}")
         logger.info("[templating] Errors = ${templating.errors}")
     }

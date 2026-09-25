@@ -7,9 +7,7 @@ class SearchIT : AbstractSearchTestSupport() {
 
     @Test
     fun `List of result types`() {
-        // Without the test type
-        val types = searchService.searchResultTypes.filter { it.id != TEST_ELASTIC_SEARCH_RESULT_TYPE }
-        val names = types.map { it.name }
+        val names = searchService.searchResultTypes.map { it.name }
         assertEquals(
             listOf(
                 "Project", "Branch", "Build",

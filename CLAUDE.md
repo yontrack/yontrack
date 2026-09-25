@@ -422,7 +422,7 @@ Key extension points:
 - `EventListener` — react to domain events
 - `DecorationExtension` — add visual decorations to entities
 - `EntityInformationExtension` — add info panels in the UI
-- `SearchIndexer` — add custom search capabilities
+- `SearchDocumentIndexer` — add custom search capabilities (see `doc/dev-guide/search-indexer.md`)
 - `ProjectEntityUserMenuItemExtension` — add items to entity action menus
 - `UserMenuItemExtension` — add items to the global user menu
 - `UserMenuGroupExtension` — add groups to the user menu

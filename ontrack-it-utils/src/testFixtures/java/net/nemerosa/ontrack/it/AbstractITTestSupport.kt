@@ -42,7 +42,6 @@ import javax.sql.DataSource
         "spring.rabbitmq.username=ontrack",
         "spring.rabbitmq.password=ontrack",
         "spring.graphql.schema.locations=classpath:graphql/",
-        "ontrack.config.search.index.ignoreExisting=true",
         // The "Simulated gate" workflow node executor and the mock SCM are off by default and are
         // not picked up from application-dev.yml here: these tests boot their own configuration,
         // not the UI application.
@@ -59,8 +58,8 @@ abstract class AbstractITTestSupport {
     private var searchIndexStartupResets: List<SearchIndexStartupReset> = emptyList()
 
     /**
-     * On a fresh stack, the search indexes are reset in the background at startup, which would
-     * delete the documents a test indexes in the meantime.
+     * On a fresh stack, the search documents are rebuilt in the background at startup, which would
+     * interfere with the documents a test indexes in the meantime.
      */
     @BeforeEach
     fun awaitSearchIndexStartupReset() {

@@ -18,7 +18,6 @@ import kotlin.test.assertNotNull
 @TestPropertySource(
         properties = [
             "ontrack.config.key-store=vault",
-            "ontrack.config.search.index.immediate=true"
         ]
 )
 @DirtiesContext

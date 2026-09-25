@@ -8,13 +8,7 @@ import net.nemerosa.ontrack.it.AsAdminTest
 import net.nemerosa.ontrack.model.structure.Build
 import net.nemerosa.ontrack.model.structure.SearchService
 import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.test.context.TestPropertySource
 
-@TestPropertySource(
-    properties = [
-        "ontrack.config.search.index.immediate=true"
-    ]
-)
 @UITest
 @AsAdminTest
 abstract class AbstractSearchTestSupport : AbstractQLKTITSupport() {

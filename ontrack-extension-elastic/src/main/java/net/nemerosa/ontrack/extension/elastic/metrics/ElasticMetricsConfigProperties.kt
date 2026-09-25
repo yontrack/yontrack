@@ -22,7 +22,7 @@ class ElasticMetricsConfigProperties {
         const val ELASTIC_METRICS_PREFIX = "ontrack.extension.elastic.metrics"
     }
 
-    @APIDescription("Is the export of metrics to Elastic enabled?")
+    @APIDescription("Is the export of metrics to Elastic enabled? Elasticsearch is used for nothing else: when disabled, the default, no Elasticsearch client is created and Spring Boot's Elasticsearch auto-configuration and health indicator are left out.")
     var enabled: Boolean = false
 
     @APIDescription("Must we trace the behaviour of the export of the metrics in the logs?")
@@ -33,8 +33,8 @@ class ElasticMetricsConfigProperties {
             Defines where the Elastic metrics should be sent.
             
             Possible values are:
-            * MAIN - When this option is selected, the ES instance used
-            by Ontrack for the regular search will be used.
+            * MAIN - When this option is selected, the ES instance defined
+            by the `spring.elasticsearch.*` properties will be used.
             * CUSTOM -When this option is selected, the ES instance defined
             by the metrics properties will be used.
         """

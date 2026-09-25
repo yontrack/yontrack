@@ -1,6 +1,5 @@
 package net.nemerosa.ontrack.extension.elastic.metrics
 
-import net.nemerosa.ontrack.model.structure.SearchNodeResults
 
 interface ElasticMetricsClient {
 

@@ -79,7 +79,7 @@ class ACCDSLSearch : AbstractACCDSLTestSupport() {
     }
 
     @Test
-    fun `Best results per type, across Postgres and Elasticsearch types`() {
+    fun `Best results per type`() {
         project(name = token()) {
             branch(name) {}
             val results = ontrack.search(query = name, perType = 1)

@@ -14,22 +14,16 @@ class SearchConfigProperties {
 
     class SearchIndexProperties {
 
-        @APIDescription("By default, indexation is ElasticSearch is done after some time after the index has been requested. The flag below forces the index to be refreshed immediately. This SHOULD NOT be used in production but is very useful when testing Ontrack search capabilities")
-        var immediate = false
-
-        @APIDescription("When performing full indexation, the indexation is performed by batch. The parameter below allows to set the size of this batch processing. Note: this is a default batch size. Custom indexers can override it.")
+        @APIDescription("When rebuilding the search documents of a type, they are written by batch. The parameter below sets the size of these batches. Note: this is a default batch size. Some indexers, like the one of the SCM commits, use it for their own batches.")
         var batch = 1000
 
-        @APIDescription("When performing full indexation, the indexation is performed by batch. The parameter below allows to generate additional logging when indexing actions are actually taken.")
+        @APIDescription("When rebuilding the search documents of a type, the parameter below generates additional logging about the progress of the rebuild.")
         var logging = false
 
-        @APIDescription("When performing full indexation, the indexation is performed by batch. The parameter below allows to generate additional deep level logging for all actions on Git issues. Note: if set to `true` this generates a lot of information at DEBUG level.")
+        @APIDescription("When rebuilding the search documents of a type, the parameter below generates additional deep level logging for all actions on SCM commits and issues. Only used when `logging` is `true` as well. Note: if set to `true` this generates a lot of information at DEBUG level.")
         var tracing = false
 
-        @APIDescription("Option to ignore errors when creating indexes. For test only, allowing for concurrent testing.")
-        var ignoreExisting = false
-
-        @APIDescription("Forces a reset of all indexes at startup")
+        @APIDescription("Forces the rebuild of the search documents of all types at startup, in the background.")
         var reset = false
     }
 }

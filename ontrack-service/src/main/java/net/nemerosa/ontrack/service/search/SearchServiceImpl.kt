@@ -7,7 +7,6 @@ import net.nemerosa.ontrack.model.security.SecurityService
 import net.nemerosa.ontrack.model.structure.*
 import net.nemerosa.ontrack.repository.search.SearchDocumentHit
 import net.nemerosa.ontrack.repository.search.SearchDocumentScope
-import net.nemerosa.ontrack.service.elasticsearch.ElasticSearchServiceImpl
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
@@ -15,18 +14,14 @@ import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
 
 /**
- * Search, routed per type while the indexers are migrated from Elasticsearch to Postgres: the
- * types having a [SearchDocumentIndexer] are searched on Postgres, the other ones on
- * Elasticsearch.
- *
- * The router goes once every indexer is migrated (#1882).
+ * Search on the search documents stored in Postgres, as described by the
+ * [indexers][SearchDocumentIndexer] (ADR 0017).
  */
 @Service
 @Transactional(readOnly = true)
 class SearchServiceImpl(
     searchDocumentIndexers: List<SearchDocumentIndexer>,
     private val searchDocumentService: SearchDocumentServiceImpl,
-    private val elasticSearchService: ElasticSearchServiceImpl,
     private val securityService: SecurityService,
     private val structureService: StructureService,
 ) : SearchService {
@@ -44,135 +39,33 @@ class SearchServiceImpl(
     private val logger: Logger = LoggerFactory.getLogger(SearchServiceImpl::class.java)
 
     /**
-     * Indexers migrated to Postgres, per type.
+     * Indexers, per type.
      */
     private val indexers: Map<String, SearchDocumentIndexer> =
         searchDocumentIndexers.associateBy { it.searchResultType.id }
 
     override val searchResultTypes: List<SearchResultType>
-        get() = (indexers.values.map { it.searchResultType } + elasticSearchService.searchResultTypes)
-            .distinctBy { it.id }
-            .sortedBy { it.order }
+        get() = indexers.values.map { it.searchResultType }.sortedBy { it.order }
 
     override fun search(request: SearchQueryRequest): SearchResults {
         // Types to search into, in their display order
         val requested = request.types?.filter { it.isNotBlank() }?.takeIf { it.isNotEmpty() }?.toSet()
         val types = searchResultTypes.filter { requested == null || it.id in requested }
-        val postgresTypes = types.filter { it.id in indexers }
-        val elasticTypes = types.filter { it.id !in indexers }
-
-        // Postgres
-        val postgres = searchPostgres(request, postgresTypes)
-            ?: return SearchResults(
+        return searchDocuments(request, types)
+            ?: SearchResults(
                 items = emptyList(),
                 offset = request.offset,
                 total = 0,
                 message = null,
             )
-
-        // Only Postgres types
-        if (elasticTypes.isEmpty()) {
-            return postgres
-        }
-        // One Elasticsearch type only, with a page: as before the migration
-        if (postgresTypes.isEmpty() && elasticTypes.size == 1 && request.perType == null) {
-            val type = elasticTypes.first()
-            return elasticSearchService.paginatedSearch(
-                type = type.id,
-                token = request.query,
-                offset = request.offset,
-                size = request.size,
-            ).let { results ->
-                SearchResults(
-                    items = results.items,
-                    offset = results.offset,
-                    total = results.total,
-                    message = results.message,
-                    facets = if (results.total > 0) listOf(SearchFacet(type, results.total)) else emptyList(),
-                )
-            }
-        }
-        // Mixed
-        return if (request.perType != null) {
-            mixedPerType(request, request.perType!!, postgres, elasticTypes)
-        } else {
-            mixedPage(request, postgres, elasticTypes)
-        }
     }
 
     /**
-     * Best results of each type: those of Postgres, then those of each Elasticsearch type.
-     */
-    private fun mixedPerType(
-        request: SearchQueryRequest,
-        perType: Int,
-        postgres: SearchResults,
-        elasticTypes: List<SearchResultType>,
-    ): SearchResults {
-        val items = postgres.items.toMutableList()
-        val facets = postgres.facets.toMutableList()
-        var total = postgres.total
-        elasticTypes.forEach { type ->
-            val results = elasticSearchService.paginatedSearch(type.id, request.query, 0, perType)
-            items += results.items
-            total += results.total
-            if (results.total > 0) {
-                facets += SearchFacet(type, results.total)
-            }
-        }
-        return SearchResults(
-            items = items,
-            offset = 0,
-            total = total,
-            message = postgres.message,
-            facets = facets,
-        )
-    }
-
-    /**
-     * Page over the concatenation of the Postgres results, then of the results of each
-     * Elasticsearch type in their display order. Scores of the two backends cannot be compared.
-     */
-    private fun mixedPage(
-        request: SearchQueryRequest,
-        postgres: SearchResults,
-        elasticTypes: List<SearchResultType>,
-    ): SearchResults {
-        val items = postgres.items.toMutableList()
-        val facets = postgres.facets.toMutableList()
-        // Number of results before the current segment
-        var before = postgres.total
-        elasticTypes.forEach { type ->
-            val needed = request.size - items.size
-            val results = elasticSearchService.paginatedSearch(
-                type = type.id,
-                token = request.query,
-                offset = maxOf(0, request.offset - before),
-                size = maxOf(0, needed),
-            )
-            if (request.offset + items.size >= before) {
-                items += results.items.take(maxOf(0, needed))
-            }
-            before += results.total
-            if (results.total > 0) {
-                facets += SearchFacet(type, results.total)
-            }
-        }
-        return SearchResults(
-            items = items,
-            offset = request.offset,
-            total = before,
-            message = postgres.message,
-            facets = facets,
-        )
-    }
-
-    /**
-     * Search on Postgres.
+     * Search on the search documents.
      *
      * @return `null` if the query is too short to be searched
      */
-    private fun searchPostgres(request: SearchQueryRequest, types: List<SearchResultType>): SearchResults? {
+    private fun searchDocuments(request: SearchQueryRequest, types: List<SearchResultType>): SearchResults? {
         if (request.query.trim().length < SearchQueryRequest.MIN_QUERY_LENGTH) {
             return null
         } else if (types.isEmpty()) {
@@ -255,14 +148,9 @@ class SearchServiceImpl(
         data = hit.data.toObject() as? Map<String, *>,
     )
 
-    override fun indexInit() {
-        // The Postgres storage is created by the database migrations
-        elasticSearchService.indexInit()
-    }
-
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     override fun indexReset(reindex: Boolean, logErrors: Boolean): Ack {
-        val postgres = indexers.values.all { indexer ->
+        val ok = indexers.values.all { indexer ->
             try {
                 searchDocumentService.clear(indexer.searchResultType.id)
                 if (reindex) {
@@ -278,18 +166,13 @@ class SearchServiceImpl(
                 }
             }
         }
-        val elastic = elasticSearchService.indexReset(reindex = reindex, logErrors = logErrors)
-        return Ack(postgres && elastic.success)
+        return Ack(ok)
     }
 
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     override fun reindex(resultType: String) {
-        val indexer = indexers[resultType]
-        if (indexer != null) {
-            searchDocumentService.rebuild(indexer)
-        } else {
-            elasticSearchService.reindex(resultType)
-        }
+        val indexer = indexers[resultType] ?: throw SearchResultTypeNotFoundException(resultType)
+        searchDocumentService.rebuild(indexer)
     }
 
 }

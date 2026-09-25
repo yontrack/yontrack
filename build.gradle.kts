@@ -409,9 +409,10 @@ configure(javaProjects) {
         }
     }
 
-    // No Jackson 2 (#1843, ADR 0016). The Elasticsearch client is the last library to bring it, for
-    // its `JacksonJsonpMapper` only: Yontrack gives the client the `Jackson3JsonpMapper`. The rule
-    // removes it wherever the client comes from -- Spring Data Elasticsearch brings it too.
+    // No Jackson 2 (#1843, ADR 0016). The Elasticsearch client, used by the metrics export of
+    // ontrack-extension-elastic only (#1882), is the last library to bring it, for its
+    // `JacksonJsonpMapper` only: Yontrack gives the client the `Jackson3JsonpMapper`. The rule
+    // removes it wherever the client comes from.
     dependencies.components.withModule("co.elastic.clients:elasticsearch-java") {
         allVariants {
             withDependencies {

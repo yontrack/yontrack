@@ -16,8 +16,10 @@ This installs the following services:
 
 * Yontrack itself (backend & frontend)
 * a Postgres 17 database
-* an Elasticsearch 9 single node
 * a RabbitMQ message broker
+
+Yontrack 6 needs no Elasticsearch: search runs in Postgres, with its `pg_trgm` extension (see
+[Search index](../operations/search-index.md)).
 
 The default authentication mechanism, if no other configuration is provided, relies on Keycloak and its own database, and two additional services are installed:
 

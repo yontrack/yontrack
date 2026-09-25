@@ -18,8 +18,6 @@ dependencies {
     implementation("org.apache.commons:commons-lang3")
     implementation("org.jgrapht:jgrapht-core")
     implementation("com.github.ben-manes.caffeine:caffeine")
-    implementation("co.elastic.clients:elasticsearch-java")
-    implementation("org.springframework.boot:spring-boot-elasticsearch")
     implementation("org.flywaydb:flyway-core")
     implementation("org.springframework.boot:spring-boot-flyway")
 

@@ -19,6 +19,7 @@ import java.util.UUID
 import java.util.concurrent.CountDownLatch
 import kotlin.concurrent.thread
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -479,6 +480,13 @@ class SearchServiceIT : AbstractDSLTestSupport() {
             rebuild.join()
         }
         assertNull(asAdmin { search(u) }.message)
+    }
+
+    @Test
+    fun `Rebuilding an unknown type is an error`() {
+        assertFailsWith<SearchResultTypeNotFoundException> {
+            searchService.reindex("unknown-${token()}")
+        }
     }
 
 }

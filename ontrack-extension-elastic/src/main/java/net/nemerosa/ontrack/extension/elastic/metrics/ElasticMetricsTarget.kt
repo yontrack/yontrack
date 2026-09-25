@@ -6,7 +6,7 @@ package net.nemerosa.ontrack.extension.elastic.metrics
 enum class ElasticMetricsTarget {
 
     /**
-     * When this option is selected, the ES instance used by Ontrack for the regular search will be used.
+     * When this option is selected, the ES instance defined by the `spring.elasticsearch.*` properties will be used.
      */
     MAIN,
 

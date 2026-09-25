@@ -79,9 +79,6 @@ management:
     # Disable LDAP health indicator
     ldap:
       enabled: false
-    # Disable the ElasticSearch health indicator by default
-    elasticsearch:
-      enabled: false
 
 # The version information is generated in /config/application.properties by the build
 info:

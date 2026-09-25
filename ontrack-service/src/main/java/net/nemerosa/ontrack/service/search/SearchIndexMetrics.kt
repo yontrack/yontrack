@@ -29,12 +29,12 @@ object SearchIndexMetrics {
     )
     const val indexErrors = "${prefix}_index_errors"
 
-    @APIDescription("Duration of the full rebuild of the search documents of a type.")
+    @APIDescription("Duration of the full rebuild of the search documents of a type. Replaces `ontrack_elasticsearch_index_all` of Yontrack 5.")
     @MetricsMeterDocumentation(
         type = MetricsMeterType.TIMER,
         tags = [
             MetricsMeterTag(METRIC_TYPE, "Search result type being rebuilt"),
         ]
     )
-    const val rebuild = "${prefix}_rebuild"
+    const val rebuild = "${prefix}_index_all"
 }

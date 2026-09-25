@@ -3,16 +3,12 @@ package net.nemerosa.ontrack.boot.search
 import net.nemerosa.ontrack.model.structure.NameDescription
 import net.nemerosa.ontrack.test.TestUtils.uid
 import org.junit.jupiter.api.Test
-import org.springframework.beans.factory.annotation.Autowired
 import java.util.UUID
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class SearchGraphQLIT : AbstractSearchTestSupport() {
-
-    @Autowired
-    private lateinit var testElasticSearchIndexer: TestElasticSearchIndexer
 
     @Test
     fun `Looking for a branch`() {
@@ -156,49 +152,6 @@ class SearchGraphQLIT : AbstractSearchTestSupport() {
         assertEquals("project", item["type"]["id"].asText())
         assertEquals(project.id(), item["data"]["project"]["id"].asInt())
         assertEquals(name, item["data"]["project"]["name"].asText())
-    }
-
-    @Test
-    fun `Best results per type, across Postgres and Elasticsearch types`() {
-        val name = token()
-        project(NameDescription.nd(name, ""))
-        testElasticSearchIndexer.index(name)
-        val data = run("""{
-            search(query: "$name", types: ["project", "$TEST_ELASTIC_SEARCH_RESULT_TYPE"], perType: 3) {
-                total
-                facets { type { id } count }
-                items { title type { id } }
-            }
-        }""")
-        val search = data["search"]
-        assertEquals(2, search["total"].asInt())
-        assertEquals(
-            mapOf("project" to 1, TEST_ELASTIC_SEARCH_RESULT_TYPE to 1),
-            search["facets"].values().associate { it["type"]["id"].asText() to it["count"].asInt() }
-        )
-        assertEquals(
-            listOf("project", TEST_ELASTIC_SEARCH_RESULT_TYPE),
-            search["items"].values().map { it["type"]["id"].asText() }
-        )
-    }
-
-    @Test
-    fun `Paginated search across Postgres and Elasticsearch types`() {
-        val name = token()
-        project(NameDescription.nd(name, ""))
-        testElasticSearchIndexer.index(name)
-        val query = """query Search(${'$'}offset: Int!) {
-            search(query: "$name", types: ["project", "$TEST_ELASTIC_SEARCH_RESULT_TYPE"], offset: ${'$'}offset, size: 1) {
-                total
-                items { type { id } }
-            }
-        }"""
-        val first = run(query, mapOf("offset" to 0))["search"]
-        assertEquals(2, first["total"].asInt())
-        assertEquals(listOf("project"), first["items"].values().map { it["type"]["id"].asText() })
-        val second = run(query, mapOf("offset" to 1))["search"]
-        assertEquals(2, second["total"].asInt())
-        assertEquals(listOf(TEST_ELASTIC_SEARCH_RESULT_TYPE), second["items"].values().map { it["type"]["id"].asText() })
     }
 
     @Test

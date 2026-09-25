@@ -14,9 +14,10 @@ handled by Jackson 3: see [Jackson 3](#jackson-3).
 * **Configuration properties** — no Yontrack or Spring property changes its name. The
   management server behaves as in 5.x: port `8800`, base path `/manage`, only `health`, `info`
   and `prometheus` exposed, the `account` end point off (see [Management port](../operations/management-port.md)).
-* **Elasticsearch 9** — Yontrack now uses the 9.x Elasticsearch client, which talks to
-  Elasticsearch 9. The Compose files ship Elasticsearch 9.2; an installation still on an
-  Elasticsearch 8 server must upgrade it. The `spring.elasticsearch.*` properties are unchanged.
+* **Elasticsearch 9** — the export of the metrics to Elasticsearch, the only use of
+  Elasticsearch left in Yontrack 6 (see [Search on Postgres](#search-on-postgres)), uses the 9.x
+  Elasticsearch client, which talks to Elasticsearch 9: an installation exporting its metrics to
+  an Elasticsearch 8 server must upgrade it. The `spring.elasticsearch.*` properties are unchanged.
 * **Vault key store** — keys stored in Vault by Yontrack 5 are read as they are: their format does
   not change.
 * **Custom JWT `typ`** — `ontrack.config.security.authorization.jwt.typ` still makes the API
@@ -56,7 +57,8 @@ Other breaks:
   `RestTemplateProvider` already does it.
 * **Elasticsearch** — the low-level client bean is a `Rest5Client`
   (`co.elastic.clients.transport.rest5_client.low_level`), no longer an
-  `org.elasticsearch.client.RestClient`.
+  `org.elasticsearch.client.RestClient`; and it exists only when the export of the metrics to
+  Elasticsearch is enabled (see [Search on Postgres](#search-on-postgres)).
 * **Null-safety** — Spring Framework 7 and graphql-java 25 annotate their APIs with JSpecify, and
   Kotlin enforces it:
     * `getForObject<T>()`, `postForObject<T>()` and the other `RestOperations` extensions return
@@ -73,6 +75,52 @@ The KDSL builds its HTTP client with `spring-boot-restclient`; a program which b
 `RestTemplate` alongside it should build it from
 `net.nemerosa.ontrack.kdsl.connector.support.restTemplateBuilder()`, for the reason given
 above.
+
+## Search on Postgres
+
+Yontrack 6 searches in its Postgres database, and no longer needs Elasticsearch. See
+[Search index](../operations/search-index.md) for how it works and how to operate it.
+
+### For deployers
+
+* **Elasticsearch is optional** — it is only used by the export of the metrics
+  (`ontrack.extension.elastic.metrics.enabled=true`), which is disabled by default. Without it,
+  Yontrack creates no Elasticsearch client and has no Elasticsearch health indicator, and the
+  Elasticsearch cluster can be retired, along with the `spring.elasticsearch.*` properties. An
+  export with `target: MAIN` still reads `spring.elasticsearch.*`. When it is enabled, the
+  Elasticsearch health indicator is part of the health of Yontrack: the
+  `management.health.elasticsearch.enabled: false` default of 5.x is gone.
+* **`pg_trgm`** — search needs the `pg_trgm` extension of Postgres. Yontrack creates it at its
+  first start, with `CREATE EXTENSION IF NOT EXISTS pg_trgm`. When the database user of Yontrack
+  cannot create extensions, create it beforehand, once, as a user who can. It ships with
+  Postgres, and the owner of a database can create it on the managed services (RDS, Cloud SQL,
+  Azure), since it is a trusted extension.
+* **A one-off rebuild** — at its first start, Yontrack 6 builds the search documents of every
+  type in the background. Yontrack is usable in the meantime, and a search answers with what
+  exists so far, saying *"Search index is being built"*. On a large installation, the SCM commits
+  take the longest.
+* **Retired settings** — `ontrack.config.search.index.immediate` and
+  `ontrack.config.search.index.ignoreExisting` are gone, and ignored if still set.
+  `ontrack.config.search.index.batch`, `logging`, `tracing` and `reset` keep their meaning.
+* **Jobs and metrics** — the jobs of the `elasticsearch` category are replaced by the
+  `search / rebuild / {type}` jobs of the `search` category, and the `ontrack_elasticsearch_*`
+  metrics by `ontrack_search_*`: `ontrack_elasticsearch_index_all{index}` is now
+  `ontrack_search_index_all{type}`, next to `ontrack_search_index_errors{type}`.
+* The `POST /rest/search/index/type/{type}` and `POST /rest/search/index/reset` endpoints are
+  unchanged, and act on the Postgres search documents. An unknown type now answers with an error.
+
+### For extension authors
+
+`SearchIndexer`, `SearchIndexService`, `SearchIndexUtils` and `SearchItem` are gone, and
+`ontrack-model` no longer exposes `elasticsearch-java`. An extension contributing to the search
+implements `SearchDocumentIndexer` and writes its documents through `SearchDocumentService`; see
+the developer guide, `doc/dev-guide/search-indexer.md`, in the Yontrack repository.
+`SearchService.indexInit()` is gone as well: there is nothing to initialize.
+
+### For API clients
+
+The GraphQL `search(query, types, offset, size, perType)` query replaces
+`search(token, type, offset, size)`, which is deprecated and kept until 7.0.
 
 ## Jackson 3
 

@@ -7,13 +7,7 @@ import net.nemerosa.ontrack.extension.bitbucket.cloud.property.BitbucketCloudPro
 import net.nemerosa.ontrack.graphql.AbstractQLKTITSupport
 import net.nemerosa.ontrack.model.structure.Project
 import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.test.context.TestPropertySource
 
-@TestPropertySource(
-    properties = [
-        "ontrack.config.search.index.ignoreExisting=true"
-    ]
-)
 abstract class AbstractBitbucketCloudTestSupport : AbstractQLKTITSupport() {
 
     @Autowired

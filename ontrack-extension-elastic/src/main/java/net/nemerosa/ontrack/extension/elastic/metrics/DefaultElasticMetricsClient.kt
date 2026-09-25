@@ -14,8 +14,6 @@ import kotlinx.coroutines.channels.Channel
 import net.nemerosa.ontrack.json.asJson
 import net.nemerosa.ontrack.json.toObject
 import net.nemerosa.ontrack.model.metrics.increment
-import net.nemerosa.ontrack.model.structure.SearchNodeResults
-import net.nemerosa.ontrack.model.structure.SearchResultNode
 import net.nemerosa.ontrack.model.support.time
 import org.apache.hc.client5.http.auth.AuthScope
 import org.apache.hc.client5.http.auth.UsernamePasswordCredentials

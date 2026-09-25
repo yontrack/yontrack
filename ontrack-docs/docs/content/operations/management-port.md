@@ -22,7 +22,7 @@ separate **management port**, `8800` by default, under the `/manage` base path.
 
 Every other endpoint answers as if it did not exist.
 
-Health only returns its overall status: the details of each component (database, Elasticsearch,
+Health only returns its overall status: the details of each component (database,
 RabbitMQ, ...) are not shown to anonymous callers, and the management port has no other kind.
 
 !!! note "Changed in 5.5"
