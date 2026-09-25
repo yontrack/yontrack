@@ -72,19 +72,7 @@ class BuildSearchProvider(
             identifiers = listOfNotNull(name, displayName),
             text = description?.takeIf { it.isNotBlank() },
             data = mapOf(
-                SearchResult.SEARCH_RESULT_BUILD to mapOf(
-                    "id" to id(),
-                    "name" to name,
-                    "description" to description,
-                    "branch" to mapOf(
-                        "id" to branch.id(),
-                        "name" to branch.name,
-                        "project" to mapOf(
-                            "id" to project.id(),
-                            "name" to project.name,
-                        ),
-                    ),
-                ),
+                SearchResult.SEARCH_RESULT_BUILD to searchDocumentData(),
                 // Display name of the build, or its name
                 SearchResult.SEARCH_RESULT_BUILD_RELEASE to (displayName ?: name),
             ).asJson(),

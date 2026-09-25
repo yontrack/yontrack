@@ -9,12 +9,7 @@ class ReleasePropertyTypeTest {
 
     private val type = ReleasePropertyType(
             extensionFeature = GeneralExtensionFeature(),
-            searchIndexService = mockk(),
-            releaseSearchExtension = ReleaseSearchExtension(
-                    extensionFeature = GeneralExtensionFeature(),
-                    propertyService = mockk(),
-                    structureService = mockk()
-            ),
+            releaseSearchExtension = mockk(),
             eventFactory = mockk(),
             eventPostService = mockk()
     )

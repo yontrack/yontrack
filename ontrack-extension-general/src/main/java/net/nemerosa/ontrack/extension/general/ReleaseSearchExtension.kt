@@ -1,22 +1,29 @@
 package net.nemerosa.ontrack.extension.general
 
-import co.elastic.clients.elasticsearch._types.query_dsl.Query
-import co.elastic.clients.elasticsearch.indices.CreateIndexRequest
-import co.elastic.clients.util.ObjectBuilder
-import tools.jackson.databind.JsonNode
 import net.nemerosa.ontrack.extension.support.AbstractExtension
-import net.nemerosa.ontrack.json.parseOrNull
+import net.nemerosa.ontrack.json.asJson
+import net.nemerosa.ontrack.model.events.Event
+import net.nemerosa.ontrack.model.events.EventFactory
+import net.nemerosa.ontrack.model.events.EventListener
 import net.nemerosa.ontrack.model.structure.*
 import org.springframework.stereotype.Component
 
+/**
+ * Search documents for the release property of the builds: one document per build having a
+ * release, which is its title and its identifier. The time of the build is its recency.
+ *
+ * The documents are written by the hooks of the [ReleasePropertyType], in the transaction of the
+ * change of property, and rewritten when the build is updated, since they carry its name. The
+ * documents of a deleted build, or of the builds of a deleted branch, are deleted by the search
+ * service.
+ */
 @Component
 class ReleaseSearchExtension(
     extensionFeature: GeneralExtensionFeature,
     private val propertyService: PropertyService,
-    private val structureService: StructureService
-) : AbstractExtension(
-    extensionFeature
-), SearchIndexer<ReleaseSearchItem> {
+    private val structureService: StructureService,
+    private val searchDocumentService: SearchDocumentService,
+) : AbstractExtension(extensionFeature), SearchDocumentIndexer, EventListener {
 
     override val searchResultType = SearchResultType(
         feature = extensionFeature.featureDescription,
@@ -28,96 +35,56 @@ class ReleaseSearchExtension(
 
     override val indexerName: String = "Release property"
 
-    override val indexName: String = RELEASE_SEARCH_INDEX
-
-    override fun initIndex(builder: CreateIndexRequest.Builder): CreateIndexRequest.Builder =
-        builder.run {
-            autoCompleteSettings()
-        }.run {
-            mappings { mappings ->
-                mappings
-                    .id(ReleaseSearchItem::entityId)
-                    .properties(ReleaseSearchItem::entityType.name) { property ->
-                        property.keyword { it.index(false) }
-                    }
-                    .autoCompleteText(ReleaseSearchItem::release)
+    override fun indexAll(processor: (SearchDocument) -> Unit) {
+        propertyService.forEachEntityWithProperty<ReleasePropertyType, ReleaseProperty> { entityId, property ->
+            if (entityId.type == ProjectEntityType.BUILD) {
+                structureService.findBuildByID(ID.of(entityId.id))?.let { build ->
+                    processor(build.asSearchDocument(property))
+                }
             }
         }
+    }
 
-    override fun buildQuery(
-        q: Query.Builder,
-        token: String
-    ): ObjectBuilder<Query> {
-        return q.match { m ->
-            m.field(ReleaseSearchItem::release.name)
-                .query(token)
+    /**
+     * The release of a build has been set or changed.
+     */
+    fun onReleaseChanged(build: Build, property: ReleaseProperty) {
+        searchDocumentService.index(build.asSearchDocument(property))
+    }
+
+    /**
+     * The release of a build has been removed.
+     */
+    fun onReleaseDeleted(build: Build) {
+        searchDocumentService.delete(SEARCH_RESULT_TYPE, build.id.toString())
+    }
+
+    override fun onEvent(event: Event) {
+        if (event.eventType == EventFactory.UPDATE_BUILD) {
+            val build = event.getEntity<Build>(ProjectEntityType.BUILD)
+            propertyService.getPropertyValue(build, ReleasePropertyType::class.java)?.let { property ->
+                onReleaseChanged(build, property)
+            }
         }
     }
 
-    override fun indexAll(processor: (ReleaseSearchItem) -> Unit) {
-        propertyService.forEachEntityWithProperty<ReleasePropertyType, ReleaseProperty> { entityId, property ->
-            processor(
-                ReleaseSearchItem(
-                    release = property.name,
-                    entityType = entityId.type,
-                    entityId = entityId.id
-                )
-            )
-        }
-    }
-
-    override fun toSearchResult(id: String, score: Double, source: JsonNode): SearchResult? {
-        // Parsing
-        val item = source.parseOrNull<ReleaseSearchItem>()
-        // Conversion
-        return item?.let { toSearchResult(it, score) }
-    }
-
-    private fun toSearchResult(item: ReleaseSearchItem, score: Double): SearchResult? {
-        // Loads the entity
-        val entity: ProjectEntity? = item.entityType.getFindEntityFn(structureService).apply(ID.of(item.entityId))
-        // Conversion
-        return entity?.let {
-            SearchResult(
-                title = entity.entityDisplayName,
-                description = "${entity.entityDisplayName} having version/label/release ${item.release}",
-                accuracy = score,
-                type = searchResultType,
-                data = mapOf(
-                    SearchResult.SEARCH_RESULT_BUILD to entity,
-                    SearchResult.SEARCH_RESULT_BUILD_RELEASE to item.release,
-                )
-            )
-        }
-    }
+    private fun Build.asSearchDocument(property: ReleaseProperty) = SearchDocument(
+        type = SEARCH_RESULT_TYPE,
+        key = id.toString(),
+        projectId = project.id(),
+        entity = ProjectEntityID(this),
+        title = property.name,
+        identifiers = listOf(property.name),
+        text = null,
+        data = mapOf(
+            SearchResult.SEARCH_RESULT_BUILD to searchDocumentData(),
+            SearchResult.SEARCH_RESULT_BUILD_RELEASE to property.name,
+        ).asJson(),
+        updatedAt = signature.time,
+    )
 
     companion object {
         const val SEARCH_RESULT_TYPE = "build-release"
     }
 
-}
-
-/**
- * Release property search index
- */
-const val RELEASE_SEARCH_INDEX = "releases"
-
-data class ReleaseSearchItem(
-    val release: String,
-    val entityType: ProjectEntityType,
-    val entityId: Int
-) : SearchItem {
-
-    constructor(entity: ProjectEntity, property: ReleaseProperty) : this(
-        release = property.name,
-        entityType = entity.projectEntityType,
-        entityId = entity.id()
-    )
-
-    override val id: String = "$entityType::$entityId"
-    override val fields: Map<String, Any?> = mapOf(
-        "release" to release,
-        "entityType" to entityType,
-        "entityId" to entityId
-    )
 }

@@ -16,7 +16,6 @@ import java.util.*
 @Component
 class ReleasePropertyType(
     extensionFeature: GeneralExtensionFeature,
-    private val searchIndexService: SearchIndexService,
     private val releaseSearchExtension: ReleaseSearchExtension,
     private val releasePropertyListeners: List<ReleasePropertyListener> = emptyList(),
     private val eventFactory: EventFactory,
@@ -45,7 +44,7 @@ class ReleasePropertyType(
         releasePropertyListeners.forEach { listener ->
             listener.onBuildReleaseLabel(entity as Build, value)
         }
-        searchIndexService.createSearchIndex(releaseSearchExtension, ReleaseSearchItem(entity, value))
+        releaseSearchExtension.onReleaseChanged(entity as Build, value)
         eventPostService.post(
             eventFactory.updateBuildDisplayName(
                 build = entity as Build,
@@ -55,7 +54,7 @@ class ReleasePropertyType(
     }
 
     override fun onPropertyDeleted(entity: ProjectEntity, oldValue: ReleaseProperty) {
-        searchIndexService.deleteSearchIndex(releaseSearchExtension, ReleaseSearchItem(entity, oldValue).documentId)
+        releaseSearchExtension.onReleaseDeleted(entity as Build)
         eventPostService.post(
             eventFactory.updateBuildDisplayName(
                 build = entity as Build,

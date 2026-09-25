@@ -2,7 +2,6 @@ package net.nemerosa.ontrack.extension.git.property
 
 import tools.jackson.databind.JsonNode
 import net.nemerosa.ontrack.extension.git.GitBranchSearchIndexer
-import net.nemerosa.ontrack.extension.git.GitBranchSearchItem
 import net.nemerosa.ontrack.extension.git.GitExtensionFeature
 import net.nemerosa.ontrack.extension.git.model.BuildGitCommitLink
 import net.nemerosa.ontrack.extension.git.model.ConfiguredBuildGitCommitLink
@@ -28,7 +27,6 @@ class GitBranchConfigurationPropertyType(
     extensionFeature: GitExtensionFeature,
     private val buildGitCommitLinkService: BuildGitCommitLinkService,
     private val gitService: GitService,
-    private val searchIndexService: SearchIndexService,
     private val gitBranchSearchIndexer: GitBranchSearchIndexer
 ) : AbstractPropertyType<GitBranchConfigurationProperty>(extensionFeature) {
 
@@ -123,16 +121,14 @@ class GitBranchConfigurationPropertyType(
     override fun onPropertyChanged(entity: ProjectEntity, value: GitBranchConfigurationProperty) {
         if (entity is Branch) {
             gitService.scheduleGitBuildSync(entity, value)
-            gitService.getBranchConfiguration(entity)?.let { branchConfig ->
-                searchIndexService.createSearchIndex(gitBranchSearchIndexer, GitBranchSearchItem(entity, branchConfig))
-            }
+            gitBranchSearchIndexer.onGitBranchChanged(entity, value)
         }
     }
 
     override fun onPropertyDeleted(entity: ProjectEntity, oldValue: GitBranchConfigurationProperty) {
         if (entity is Branch) {
             gitService.unscheduleGitBuildSync(entity, oldValue)
-            searchIndexService.deleteSearchIndex(gitBranchSearchIndexer, entity.id())
+            gitBranchSearchIndexer.onGitBranchDeleted(entity)
         }
     }
 

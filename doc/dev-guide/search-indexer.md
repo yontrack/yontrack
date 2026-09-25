@@ -60,7 +60,10 @@ interface SearchDocumentService {
    reading the `data` of the result.
 
 `ProjectSearchProvider` (`ontrack-ui`) is the reference, and `BranchSearchProvider` and
-`BuildSearchProvider` next to it show a type with a parent and with display names:
+`BuildSearchProvider` next to it show a type with a parent and with display names. For a type
+written from a property type's hooks, see `ReleaseSearchExtension` (`ontrack-extension-general`) or
+`GitBranchSearchIndexer` (`ontrack-extension-git`); for one pointing at two entities,
+`BuildLinkSearchExtension`:
 
 ```kotlin
 @Component
@@ -105,6 +108,9 @@ class ProjectSearchProvider(
   the search service deletes the documents of every type whose entity is that branch or build —
   or, for a branch, one of its builds (`SearchDocumentDeletionListener`). A document describing
   anything else, or pointing at a deleted entity without describing it, is deleted explicitly.
+  A build link, say, describes its source build: the deletion of its target build is handled by
+  its indexer, and that of the target's branch or project — which would need to look at all their
+  builds — by a daily reconciliation (`indexerSchedule`).
 - **`title`**: what is shown. Its prefix matches, and so does a fuzzy match on it.
 - **`identifiers`**: everything the thing answers to *exactly* — name, display name, commit hash
   and short hash, issue key. An exact identifier is the strongest match there is: put the name there
@@ -112,7 +118,10 @@ class ProjectSearchProvider(
 - **`text`**: free text, matched word by word with the lowest weight. Keep it bounded (commit
   messages are truncated to 2 KB).
 - **`data`**: everything the `Result` component needs, so that no result costs a read of the
-  database. It is returned as the `data` of the `SearchResult`.
+  database. It is returned as the `data` of the `SearchResult`. Render the structure entities with
+  `searchDocumentData()` (`SearchDocumentData.kt`, `ontrack-model`), so that every `Result`
+  component receives a project, a branch or a build in the same shape. A document carrying
+  another entity's names is rewritten when that entity is updated.
 - **`updatedAt`**: the recency of the thing (a build's creation, say). Equally relevant results are
   ranked newest first.
 
@@ -140,7 +149,8 @@ their indexer. An indexer which declares none never shows its project-less docum
   built"*.
 - **Reconciliation job.** Each indexer gets a job, `search / rebuild / {type}`, manual unless the
   indexer declares an `indexerSchedule` — which the types indexed outside any transaction (SCM
-  commits, say) do.
+  commits, say) do, and so do the types whose deletions cannot all be followed in the transaction
+  (build links, every day).
 
 ## How a query is matched and ranked
 

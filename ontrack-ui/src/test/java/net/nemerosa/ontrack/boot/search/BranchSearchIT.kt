@@ -85,6 +85,22 @@ class BranchSearchIT : AbstractSearchTestSupport() {
     }
 
     @Test
+    fun `A disabled branch renders as disabled, and as enabled again`() {
+        val name = token()
+        val branch = project(token()).branch(name)
+        fun disabled(): Any? {
+            @Suppress("UNCHECKED_CAST")
+            val data = asUser { search(name).items }.single().data?.get("branch") as Map<String, *>
+            return data["disabled"]
+        }
+        assertEquals(false, disabled())
+        asAdmin { structureService.disableBranch(branch) }
+        assertEquals(true, disabled())
+        asAdmin { structureService.enableBranch(structureService.getBranch(branch.id)) }
+        assertEquals(false, disabled())
+    }
+
+    @Test
     fun `A deleted branch is not searchable any longer, nor are its builds`() {
         val name = token()
         val branch = project(token()).branch(name)

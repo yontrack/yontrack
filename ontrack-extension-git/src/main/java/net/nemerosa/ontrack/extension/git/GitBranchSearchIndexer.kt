@@ -1,26 +1,35 @@
 package net.nemerosa.ontrack.extension.git
 
-import co.elastic.clients.elasticsearch._types.query_dsl.Query
-import co.elastic.clients.elasticsearch._types.query_dsl.TextQueryType
-import co.elastic.clients.elasticsearch.indices.CreateIndexRequest
-import co.elastic.clients.util.ObjectBuilder
-import tools.jackson.databind.JsonNode
-import net.nemerosa.ontrack.common.asMap
-import net.nemerosa.ontrack.extension.git.model.GitBranchConfiguration
-import net.nemerosa.ontrack.extension.git.service.GitService
+import net.nemerosa.ontrack.extension.git.property.GitBranchConfigurationProperty
+import net.nemerosa.ontrack.extension.git.property.GitBranchConfigurationPropertyType
+import net.nemerosa.ontrack.json.asJson
+import net.nemerosa.ontrack.model.events.Event
+import net.nemerosa.ontrack.model.events.EventFactory
+import net.nemerosa.ontrack.model.events.EventListener
 import net.nemerosa.ontrack.model.structure.*
 import org.springframework.stereotype.Component
 
+/**
+ * Search documents for the Git branches of the branches: one document per branch having a Git
+ * branch property, whose Git branch is the title and the identifier. The time of the branch is
+ * its recency.
+ *
+ * The documents are written by the hooks of the [GitBranchConfigurationPropertyType], in the
+ * transaction of the change of property, and rewritten when the branch or its project is
+ * updated, since they carry their names. The documents of a deleted branch are deleted by the
+ * search service.
+ */
 @Component
 class GitBranchSearchIndexer(
     extensionFeature: GitExtensionFeature,
-    private val gitService: GitService,
+    private val propertyService: PropertyService,
     private val structureService: StructureService,
-) : SearchIndexer<GitBranchSearchItem> {
+    private val searchDocumentService: SearchDocumentService,
+) : SearchDocumentIndexer, EventListener {
 
     override val searchResultType = SearchResultType(
         feature = extensionFeature.featureDescription,
-        id = "git-branch",
+        id = SEARCH_RESULT_TYPE,
         name = "Git Branch",
         description = "Git branch associated to an Ontrack branch",
         order = SearchResultType.ORDER_PROPERTIES + 50,
@@ -28,77 +37,69 @@ class GitBranchSearchIndexer(
 
     override val indexerName: String = "Git Branches"
 
-    override val indexName: String = GIT_BRANCH_SEARCH_INDEX
-
-    override fun initIndex(builder: CreateIndexRequest.Builder): CreateIndexRequest.Builder =
-        builder.run {
-            mappings { mappings ->
-                mappings
-                    .id(GitBranchSearchItem::branchId)
-                    .keywordAndText(GitBranchSearchItem::gitBranch)
+    override fun indexAll(processor: (SearchDocument) -> Unit) {
+        propertyService.forEachEntityWithProperty<GitBranchConfigurationPropertyType, GitBranchConfigurationProperty> { entityId, property ->
+            if (entityId.type == ProjectEntityType.BRANCH) {
+                structureService.findBranchByID(ID.of(entityId.id))?.let { branch ->
+                    processor(branch.asSearchDocument(property.branch))
+                }
             }
         }
+    }
 
-    override fun buildQuery(
-        q: Query.Builder,
-        token: String
-    ): ObjectBuilder<Query> {
-        return q.multiMatch { m ->
-            m.query(token)
-                .type(TextQueryType.BestFields)
-                .fields(
-                    GitBranchSearchItem::id to null,
-                    GitBranchSearchItem::gitBranch to 3.0,
-                )
+    /**
+     * The Git branch of a branch has been set or changed.
+     */
+    fun onGitBranchChanged(branch: Branch, property: GitBranchConfigurationProperty) {
+        searchDocumentService.index(branch.asSearchDocument(property.branch))
+    }
+
+    /**
+     * The Git branch of a branch has been removed.
+     */
+    fun onGitBranchDeleted(branch: Branch) {
+        searchDocumentService.delete(SEARCH_RESULT_TYPE, branch.id.toString())
+    }
+
+    override fun onEvent(event: Event) {
+        when (event.eventType) {
+            // The enabling and disabling events carry the branch as it was before the change
+            EventFactory.UPDATE_BRANCH,
+            EventFactory.ENABLE_BRANCH,
+            EventFactory.DISABLE_BRANCH -> structureService.findBranchByID(
+                event.getEntity<Branch>(ProjectEntityType.BRANCH).id
+            )?.let { reindex(it) }
+
+            EventFactory.UPDATE_PROJECT -> {
+                val project = event.getEntity<Project>(ProjectEntityType.PROJECT)
+                structureService.getBranchesForProject(project.id).forEach { reindex(it) }
+            }
         }
     }
 
-    override fun indexAll(processor: (GitBranchSearchItem) -> Unit) {
-        gitService.forEachConfiguredBranch { branch, branchConfig ->
-            processor(
-                GitBranchSearchItem(branch, branchConfig)
-            )
+    private fun reindex(branch: Branch) {
+        propertyService.getPropertyValue(branch, GitBranchConfigurationPropertyType::class.java)?.let { property ->
+            onGitBranchChanged(branch, property)
         }
     }
 
-    override fun toSearchResult(id: String, score: Double, source: JsonNode): SearchResult? {
-        val branchId = id.toIntOrNull(10)
-        val branch = branchId?.let { structureService.findBranchByID(ID.of(branchId)) }
-        val branchConfig = branch?.let { gitService.getBranchConfiguration(branch) }
-        return if (branch != null && branchConfig != null) {
-            SearchResult(
-                title = branch.entityDisplayName,
-                description = "Git branch ${branchConfig.branch}",
-                accuracy = score,
-                type = searchResultType,
-                data = mapOf(
-                    SearchResult.SEARCH_RESULT_BRANCH to branch,
-                    SEARCH_RESULT_GIT_BRANCH to branchConfig.branch,
-                ),
-            )
-        } else null
-    }
+    private fun Branch.asSearchDocument(gitBranch: String) = SearchDocument(
+        type = SEARCH_RESULT_TYPE,
+        key = id.toString(),
+        projectId = project.id(),
+        entity = ProjectEntityID(this),
+        title = gitBranch,
+        identifiers = listOf(gitBranch),
+        text = null,
+        data = mapOf(
+            SearchResult.SEARCH_RESULT_BRANCH to searchDocumentData(),
+            SEARCH_RESULT_GIT_BRANCH to gitBranch,
+        ).asJson(),
+        updatedAt = signature.time,
+    )
 
     companion object {
+        const val SEARCH_RESULT_TYPE = "git-branch"
         const val SEARCH_RESULT_GIT_BRANCH = "gitBranch"
     }
-}
-
-const val GIT_BRANCH_SEARCH_INDEX = "git-branch"
-
-class GitBranchSearchItem(
-    val branchId: Int,
-    val gitBranch: String
-) : SearchItem {
-
-    constructor(branch: Branch, branchConfig: GitBranchConfiguration) : this(
-        branchId = branch.id(),
-        gitBranch = branchConfig.branch
-    )
-
-    override val id: String = branchId.toString()
-
-    override val fields: Map<String, Any?> = asMap(
-        this::gitBranch
-    )
 }

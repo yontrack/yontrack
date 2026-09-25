@@ -48,11 +48,16 @@ class BranchSearchProvider(
     override fun onEvent(event: Event) {
         when (event.eventType) {
             EventFactory.NEW_BRANCH,
-            EventFactory.UPDATE_BRANCH,
+            EventFactory.UPDATE_BRANCH -> {
+                val branch = event.getEntity<Branch>(ProjectEntityType.BRANCH)
+                searchDocumentService.index(branch.asSearchDocument())
+            }
+
+            // These events carry the branch as it was before the change
             EventFactory.ENABLE_BRANCH,
             EventFactory.DISABLE_BRANCH -> {
                 val branch = event.getEntity<Branch>(ProjectEntityType.BRANCH)
-                searchDocumentService.index(branch.asSearchDocument())
+                structureService.findBranchByID(branch.id)?.let { searchDocumentService.index(it.asSearchDocument()) }
             }
 
             EventFactory.UPDATE_PROJECT -> {
@@ -73,16 +78,7 @@ class BranchSearchProvider(
         identifiers = listOf(name),
         text = description?.takeIf { it.isNotBlank() },
         data = mapOf(
-            SearchResult.SEARCH_RESULT_BRANCH to mapOf(
-                "id" to id(),
-                "name" to name,
-                "description" to description,
-                "disabled" to isDisabled,
-                "project" to mapOf(
-                    "id" to project.id(),
-                    "name" to project.name,
-                ),
-            )
+            SearchResult.SEARCH_RESULT_BRANCH to searchDocumentData()
         ).asJson(),
         updatedAt = signature.time,
     )
