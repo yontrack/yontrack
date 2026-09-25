@@ -59,7 +59,8 @@ interface SearchDocumentService {
 4. Add the `framework/search/{type}/Result.js` and `Icon.js` components in `ontrack-web-core`,
    reading the `data` of the result.
 
-`ProjectSearchProvider` (`ontrack-ui`) is the reference:
+`ProjectSearchProvider` (`ontrack-ui`) is the reference, and `BranchSearchProvider` and
+`BuildSearchProvider` next to it show a type with a parent and with display names:
 
 ```kotlin
 @Component
@@ -99,8 +100,11 @@ class ProjectSearchProvider(
   with an existing key replaces it.
 - **`projectId`**: the project the thing belongs to. It decides who sees the document, and the
   document is deleted with its project (`ON DELETE CASCADE`) — a type whose documents all belong to
-  a project needs no deletion code for project deletions. Deleting a branch or a build does not
-  cascade: delete their documents explicitly.
+  a project needs no deletion code for project deletions.
+- **`entity`**: the project entity the document describes. When a branch or a build is deleted,
+  the search service deletes the documents of every type whose entity is that branch or build —
+  or, for a branch, one of its builds (`SearchDocumentDeletionListener`). A document describing
+  anything else, or pointing at a deleted entity without describing it, is deleted explicitly.
 - **`title`**: what is shown. Its prefix matches, and so does a fuzzy match on it.
 - **`identifiers`**: everything the thing answers to *exactly* — name, display name, commit hash
   and short hash, issue key. An exact identifier is the strongest match there is: put the name there
@@ -160,7 +164,8 @@ anyone else those of the projects they can see — so totals, facets and pages c
 user can see.
 
 The SQL is in `SearchDocumentJdbcRepository` (`ontrack-repository-impl`), the parsing of the query
-in `ParsedSearchQuery`, the table in migration `V85__1877_search_documents.sql`.
+in `ParsedSearchQuery`, the table in migrations `V85__1877_search_documents.sql` and
+`V86__1878_search_documents_entity_index.sql`.
 
 ## Querying
 

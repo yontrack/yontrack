@@ -60,6 +60,28 @@ class SearchDocumentJdbcRepository(
         )
     }
 
+    override fun deleteForEntity(entity: ProjectEntityID): Int {
+        val params = params("entityType", entity.type.name).addValue("entityId", entity.id)
+        return when (entity.type) {
+            ProjectEntityType.BRANCH -> namedParameterJdbcTemplate.update(
+                """
+                    DELETE FROM SEARCH_DOCUMENTS
+                    WHERE (ENTITY_TYPE = :entityType AND ENTITY_ID = :entityId)
+                    OR (
+                        ENTITY_TYPE = :buildType
+                        AND ENTITY_ID IN (SELECT B.ID FROM BUILDS B WHERE B.BRANCHID = :entityId)
+                    )
+                """,
+                params.addValue("buildType", ProjectEntityType.BUILD.name)
+            )
+
+            else -> namedParameterJdbcTemplate.update(
+                "DELETE FROM SEARCH_DOCUMENTS WHERE ENTITY_TYPE = :entityType AND ENTITY_ID = :entityId",
+                params
+            )
+        }
+    }
+
     override fun deleteIndexedBefore(type: String, time: LocalDateTime): Int =
         namedParameterJdbcTemplate.update(
             "DELETE FROM SEARCH_DOCUMENTS WHERE TYPE = :type AND INDEXED_AT < :time",

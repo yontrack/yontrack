@@ -5,6 +5,7 @@ import net.nemerosa.ontrack.common.Time
 import net.nemerosa.ontrack.model.metrics.increment
 import net.nemerosa.ontrack.model.metrics.time
 import net.nemerosa.ontrack.model.security.SecurityService
+import net.nemerosa.ontrack.model.structure.ProjectEntityID
 import net.nemerosa.ontrack.model.structure.SearchDocument
 import net.nemerosa.ontrack.model.structure.SearchDocumentIndexer
 import net.nemerosa.ontrack.model.structure.SearchDocumentService
@@ -62,6 +63,19 @@ class SearchDocumentServiceImpl(
     override fun delete(type: String, key: String) {
         write(type, "delete $key") {
             searchDocumentRepository.delete(type, key)
+        }
+    }
+
+    /**
+     * Deletes the documents of every type describing an entity which is being deleted: the
+     * documents of this entity and, for a branch, those of its builds. Only the deletion of a
+     * project cascades to its documents in the database.
+     *
+     * Must be called before the entity is deleted, in the transaction of its deletion.
+     */
+    fun deleteForEntity(entity: ProjectEntityID) {
+        write(entity.type.name.lowercase(), "delete the documents of ${entity.type.name} ${entity.id}") {
+            searchDocumentRepository.deleteForEntity(entity)
         }
     }
 

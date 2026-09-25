@@ -1,5 +1,6 @@
 package net.nemerosa.ontrack.boot.search
 
+import net.nemerosa.ontrack.extension.general.RELEASE_SEARCH_INDEX
 import net.nemerosa.ontrack.model.structure.NameDescription
 import net.nemerosa.ontrack.test.TestUtils.uid
 import org.junit.jupiter.api.Test
@@ -30,7 +31,7 @@ class SearchGraphQLIT : AbstractSearchTestSupport() {
                     }
                 }""")
                 val results = data["search"]["pageItems"]
-                val result = results.find { it["title"].asText() == entityDisplayName }
+                val result = results.find { it["title"].asText() == "${project.name}/$name" }
                 assertNotNull(result, "Branch found") { node ->
                     assertEquals("branch", node["type"]["id"].asText())
                     assertEquals("Branch", node["type"]["name"].asText())
@@ -158,11 +159,11 @@ class SearchGraphQLIT : AbstractSearchTestSupport() {
     fun `Best results per type, across Postgres and Elasticsearch types`() {
         val name = token()
         project(NameDescription.nd(name, "")) {
-            branch(name = name)
+            branch().build().release(name)
         }
-        index("branches")
+        index(RELEASE_SEARCH_INDEX)
         val data = run("""{
-            search(query: "$name", types: ["project", "branch"], perType: 3) {
+            search(query: "$name", types: ["project", "build-release"], perType: 3) {
                 total
                 facets { type { id } count }
                 items { title type { id } }
@@ -171,11 +172,11 @@ class SearchGraphQLIT : AbstractSearchTestSupport() {
         val search = data["search"]
         assertEquals(2, search["total"].asInt())
         assertEquals(
-            mapOf("project" to 1, "branch" to 1),
+            mapOf("project" to 1, "build-release" to 1),
             search["facets"].values().associate { it["type"]["id"].asText() to it["count"].asInt() }
         )
         assertEquals(
-            listOf("project", "branch"),
+            listOf("project", "build-release"),
             search["items"].values().map { it["type"]["id"].asText() }
         )
     }
@@ -184,11 +185,11 @@ class SearchGraphQLIT : AbstractSearchTestSupport() {
     fun `Paginated search across Postgres and Elasticsearch types`() {
         val name = token()
         project(NameDescription.nd(name, "")) {
-            branch(name = name)
+            branch().build().release(name)
         }
-        index("branches")
+        index(RELEASE_SEARCH_INDEX)
         val query = """query Search(${'$'}offset: Int!) {
-            search(query: "$name", types: ["project", "branch"], offset: ${'$'}offset, size: 1) {
+            search(query: "$name", types: ["project", "build-release"], offset: ${'$'}offset, size: 1) {
                 total
                 items { type { id } }
             }
@@ -198,7 +199,7 @@ class SearchGraphQLIT : AbstractSearchTestSupport() {
         assertEquals(listOf("project"), first["items"].values().map { it["type"]["id"].asText() })
         val second = run(query, mapOf("offset" to 1))["search"]
         assertEquals(2, second["total"].asInt())
-        assertEquals(listOf("branch"), second["items"].values().map { it["type"]["id"].asText() })
+        assertEquals(listOf("build-release"), second["items"].values().map { it["type"]["id"].asText() })
     }
 
     @Test

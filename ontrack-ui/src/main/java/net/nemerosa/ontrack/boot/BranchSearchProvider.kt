@@ -1,22 +1,31 @@
 package net.nemerosa.ontrack.boot
 
-import co.elastic.clients.elasticsearch._types.query_dsl.Query
-import co.elastic.clients.elasticsearch._types.query_dsl.TextQueryType
-import co.elastic.clients.elasticsearch.indices.CreateIndexRequest
-import co.elastic.clients.util.ObjectBuilder
-import tools.jackson.databind.JsonNode
 import net.nemerosa.ontrack.extension.support.CoreExtensionFeature
+import net.nemerosa.ontrack.json.asJson
 import net.nemerosa.ontrack.model.events.Event
 import net.nemerosa.ontrack.model.events.EventFactory
 import net.nemerosa.ontrack.model.events.EventListener
 import net.nemerosa.ontrack.model.structure.*
 import org.springframework.stereotype.Component
 
+/**
+ * Search result type
+ */
+const val BRANCH_SEARCH_RESULT_TYPE = "branch"
+
+/**
+ * Search documents for the branches: the name is the identifier, the description the free text,
+ * and the title is `project/branch`, so that a branch is also found on the name of its project.
+ *
+ * The documents are written in the transaction of the branch events, and those of the branches of
+ * a project are rewritten when the project is updated, since they carry its name. The documents
+ * of a deleted branch are deleted by the search service.
+ */
 @Component
 class BranchSearchProvider(
     private val structureService: StructureService,
-    private val searchIndexService: SearchIndexService,
-) : SearchIndexer<BranchSearchItem>, EventListener {
+    private val searchDocumentService: SearchDocumentService,
+) : SearchDocumentIndexer, EventListener {
 
     override val searchResultType = SearchResultType(
         feature = CoreExtensionFeature.INSTANCE.featureDescription,
@@ -28,105 +37,54 @@ class BranchSearchProvider(
 
     override val indexerName: String = "Branches"
 
-    override val indexName: String = BRANCH_SEARCH_INDEX
-
-    override fun initIndex(builder: CreateIndexRequest.Builder): CreateIndexRequest.Builder =
-        builder.run {
-            autoCompleteSettings()
-        }.run {
-            mappings { mappings ->
-                mappings
-                    .autoCompleteText(BranchSearchItem::name)
-                    .autoCompleteText(BranchSearchItem::project)
-                    .text(BranchSearchItem::description)
-            }
-        }
-
-    override fun buildQuery(
-        q: Query.Builder,
-        token: String
-    ): ObjectBuilder<Query> {
-        return q.multiMatch { m ->
-            m.query(token)
-                .type(TextQueryType.BestFields)
-                .fields(
-                    BranchSearchItem::name to 5.0,
-                    BranchSearchItem::project to 3.0,
-                    BranchSearchItem::description to 1.0,
-                )
-        }
-    }
-
-    override fun indexAll(processor: (BranchSearchItem) -> Unit) {
-        structureService.projectList.forEach {
-            structureService.getBranchesForProject(it.id).forEach { branch ->
-                processor(branch.asSearchItem())
+    override fun indexAll(processor: (SearchDocument) -> Unit) {
+        structureService.projectList.forEach { project ->
+            structureService.getBranchesForProject(project.id).forEach { branch ->
+                processor(branch.asSearchDocument())
             }
         }
     }
-
-    override fun toSearchResult(id: String, score: Double, source: JsonNode): SearchResult? =
-        structureService.findBranchByID(ID.of(id.toInt()))?.run {
-            SearchResult(
-                title = entityDisplayName,
-                description = description ?: "",
-                accuracy = score,
-                type = searchResultType,
-                data = mapOf(
-                    SearchResult.SEARCH_RESULT_BRANCH to this
-                )
-            )
-        }
 
     override fun onEvent(event: Event) {
         when (event.eventType) {
-            EventFactory.NEW_BRANCH -> {
+            EventFactory.NEW_BRANCH,
+            EventFactory.UPDATE_BRANCH,
+            EventFactory.ENABLE_BRANCH,
+            EventFactory.DISABLE_BRANCH -> {
                 val branch = event.getEntity<Branch>(ProjectEntityType.BRANCH)
-                searchIndexService.createSearchIndex(this, branch.asSearchItem())
+                searchDocumentService.index(branch.asSearchDocument())
             }
 
-            EventFactory.UPDATE_BRANCH -> {
-                val branch = event.getEntity<Branch>(ProjectEntityType.BRANCH)
-                searchIndexService.updateSearchIndex(this, branch.asSearchItem())
-            }
-
-            EventFactory.DELETE_BRANCH -> {
-                val branchId = event.getIntValue("BRANCH_ID")
-                searchIndexService.deleteSearchIndex(this, branchId)
+            EventFactory.UPDATE_PROJECT -> {
+                val project = event.getEntity<Project>(ProjectEntityType.PROJECT)
+                structureService.getBranchesForProject(project.id).forEach { branch ->
+                    searchDocumentService.index(branch.asSearchDocument())
+                }
             }
         }
     }
 
-    private fun Branch.asSearchItem() = BranchSearchItem(this)
-}
-
-/**
- * Index name for the branches
- */
-const val BRANCH_SEARCH_INDEX = "branches"
-
-/**
- * Search result type
- */
-const val BRANCH_SEARCH_RESULT_TYPE = "branch"
-
-class BranchSearchItem(
-    override val id: String,
-    val name: String,
-    val description: String,
-    val project: String
-) : SearchItem {
-
-    constructor(branch: Branch) : this(
-        id = branch.id.toString(),
-        name = branch.name,
-        description = branch.description ?: "",
-        project = branch.project.name
+    private fun Branch.asSearchDocument() = SearchDocument(
+        type = BRANCH_SEARCH_RESULT_TYPE,
+        key = id.toString(),
+        projectId = project.id(),
+        entity = ProjectEntityID(this),
+        title = "${project.name}/$name",
+        identifiers = listOf(name),
+        text = description?.takeIf { it.isNotBlank() },
+        data = mapOf(
+            SearchResult.SEARCH_RESULT_BRANCH to mapOf(
+                "id" to id(),
+                "name" to name,
+                "description" to description,
+                "disabled" to isDisabled,
+                "project" to mapOf(
+                    "id" to project.id(),
+                    "name" to project.name,
+                ),
+            )
+        ).asJson(),
+        updatedAt = signature.time,
     )
 
-    override val fields: Map<String, Any> = mapOf(
-        "name" to name,
-        "description" to description,
-        "project" to project
-    )
 }

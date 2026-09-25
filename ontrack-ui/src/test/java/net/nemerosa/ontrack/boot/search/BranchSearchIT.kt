@@ -1,110 +1,134 @@
 package net.nemerosa.ontrack.boot.search
 
-import net.nemerosa.ontrack.boot.BRANCH_SEARCH_INDEX
 import net.nemerosa.ontrack.boot.BRANCH_SEARCH_RESULT_TYPE
+import net.nemerosa.ontrack.boot.BUILD_SEARCH_RESULT_TYPE
+import net.nemerosa.ontrack.model.security.Roles
 import net.nemerosa.ontrack.model.structure.Branch
-import net.nemerosa.ontrack.model.structure.SearchRequest
-import net.nemerosa.ontrack.test.TestUtils.uid
+import net.nemerosa.ontrack.model.structure.NameDescription
+import net.nemerosa.ontrack.model.structure.Project
+import net.nemerosa.ontrack.model.structure.SearchQueryRequest
 import org.junit.jupiter.api.Test
+import org.springframework.transaction.annotation.Propagation
+import org.springframework.transaction.annotation.Transactional
+import java.util.UUID
 import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
-import kotlin.test.assertTrue
 
 /**
- * Search indexation for branches
+ * Search documents for the branches, on Postgres.
  */
 class BranchSearchIT : AbstractSearchTestSupport() {
 
-    private fun searchRequest(name: String) = SearchRequest(
-        token = name,
-        type = BRANCH_SEARCH_RESULT_TYPE,
-    )
+    /**
+     * Random name, which no other one is similar to, even by trigram
+     */
+    private fun token() = "b" + UUID.randomUUID().toString().replace("-", "").take(15)
+
+    private fun search(query: String, types: List<String> = listOf(BRANCH_SEARCH_RESULT_TYPE)) =
+        searchService.search(SearchQueryRequest(query = query, types = types, size = 50))
 
     @Test
-    fun `Indexation of branches and looking for branches`() {
-        val candidate = project<Branch> {
-            branch()
-        }
-        // Creates 3 other projects
-        repeat(3) { project { branch {} } }
-        // Launching indexation for the branches
-        index("branches")
-        // Searches for the candidate project
-        val results = asUser { searchService.paginatedSearch(searchRequest(candidate.name)).items }
-        assertEquals(1, results.size)
-        val result = results.first()
-        result.apply {
-            assertEquals(candidate.entityDisplayName, result.title)
-            assertEquals(candidate.description, result.description)
-        }
-    }
-
-    @Test
-    fun `Finding projects and branches`() {
-        // Creates a project
-        val project = project()
-        // Creates a branch with the same name than the project above
-        val branch = project<Branch> {
-            branch(name = project.name)
-        }
-        // Creates 3 other projects
-        repeat(3) { project { branch {} } }
-        // Launching indexation for the branches
-        index("branches")
-        // Searches for the name
-        val results = asUser { searchService.paginatedSearch(searchRequest(branch.name)).items }
+    fun `A created branch is searchable in the transaction of its creation, with what its result renders`() {
+        val name = token()
+        val branch = doCreateBranch(project(token()), NameDescription.nd(name, "Some description"))
+        val results = asUser { search(name).items }
         assertEquals(1, results.size)
         results.first().apply {
-            assertEquals(branch.entityDisplayName, title)
-            assertEquals(branch.description, description)
+            assertEquals("${branch.project.name}/$name", title)
+            assertEquals("Some description", description)
+            assertEquals(BRANCH_SEARCH_RESULT_TYPE, type.id)
+            @Suppress("UNCHECKED_CAST")
+            val data = data?.get("branch") as Map<String, *>
+            assertEquals(branch.id(), data["id"])
+            assertEquals(name, data["name"])
+            assertEquals("Some description", data["description"])
+            assertEquals(false, data["disabled"])
+            @Suppress("UNCHECKED_CAST")
+            val project = data["project"] as Map<String, *>
+            assertEquals(branch.project.id(), project["id"])
+            assertEquals(branch.project.name, project["name"])
         }
     }
 
     @Test
-    fun `Search branch on project name`() {
-        val branch = project<Branch> {
-            branch {}
-        }
-        // Launching indexation for the branches
-        index(BRANCH_SEARCH_INDEX)
-        // Search on project name
-        val results = asUser { searchService.paginatedSearch(searchRequest(branch.project.name)).items }
-        // Branch is found
-        assertNotNull(
-            results.find { it.title == branch.entityDisplayName && it.type.id == BRANCH_SEARCH_RESULT_TYPE },
-            "Branch found"
-        )
+    fun `A branch is found on the name of its project`() {
+        val branch = project(token()).branch(token())
+        val results = asUser { search(branch.project.name).items }
+        assertEquals(listOf("${branch.project.name}/${branch.name}"), results.map { it.title })
     }
 
     @Test
-    fun `Search branches and filter on access rights`() {
-        val prefix = uid("P")
-        // Creates projects and branches
+    fun `A renamed project renames the titles of its branches`() {
+        val newName = token()
+        val branch = project(token()).branch(token())
+        asAdmin {
+            val project = branch.project
+            structureService.saveProject(
+                Project(project.id, newName, project.description, project.isDisabled, project.signature)
+            )
+        }
+        val results = asUser { search(branch.name).items }
+        assertEquals(listOf("$newName/${branch.name}"), results.map { it.title })
+    }
+
+    @Test
+    fun `A renamed branch is searchable by its new name only`() {
+        val oldName = token()
+        val newName = token()
+        val branch = project(token()).branch(oldName)
+        asAdmin {
+            structureService.saveBranch(
+                Branch.of(branch.project, NameDescription.nd(newName, "")).withId(branch.id)
+            )
+        }
+        assertEquals(0, asUser { search(oldName).total })
+        assertEquals(listOf("${branch.project.name}/$newName"), asUser { search(newName).items.map { it.title } })
+    }
+
+    @Test
+    fun `A deleted branch is not searchable any longer, nor are its builds`() {
+        val name = token()
+        val branch = project(token()).branch(name)
+        branch.build("$name-1")
+        branch.build("$name-2")
+        val types = listOf(BRANCH_SEARCH_RESULT_TYPE, BUILD_SEARCH_RESULT_TYPE)
+        assertEquals(3, asUser { search(name, types).total })
+        asAdmin { structureService.deleteBranch(branch.id) }
+        assertEquals(0, asUser { search(name, types).total })
+    }
+
+    @Test
+    fun `Search branches and filter on access rights with correct totals`() {
+        val prefix = token()
         val branches = (0..3).map {
-            project<Branch> {
-                branch(name = "$prefix-$it")
+            project(token()).branch(name = "$prefix-$it")
+        }
+        withNoGrantViewToAll {
+            branches[0].project.asAccountWithProjectRole(Roles.PROJECT_READ_ONLY) {
+                val results = search(prefix)
+                assertEquals(1, results.total)
+                assertEquals(listOf(branches[0].name), results.items.map { it.title.substringAfter("/") })
+            }
+            asGlobalRole(Roles.GLOBAL_READ_ONLY) {
+                assertEquals(4, search(prefix).total)
             }
         }
-        // Launching indexation for the branches
-        index(BRANCH_SEARCH_INDEX)
-        // Making sure to restrict access rights
-        withNoGrantViewToAll {
-            // Performing a search using the prefix and being authorised only for the first branch
-            branches[0].asUserWithView {
-                // Launching the search
-                val results = searchService.paginatedSearch(searchRequest(prefix)).items
-                // Names of branches
-                val foundNames = results.map { it.title }
-                // Checks that authorized branch is found
-                assertTrue(branches[0].entityDisplayName in foundNames, "Authorized branch must be found")
-                // Checks that unauthorized branches are NOT found
-                (1..3).forEach {
-                    assertTrue(
-                        branches[it].entityDisplayName !in foundNames,
-                        "Not authorized branches must be filtered out"
-                    )
-                }
-            }
+    }
+
+    /**
+     * The rebuild runs in its own transactions: the branches must be committed.
+     */
+    @Test
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    fun `Rebuilding the branch documents`() {
+        val prefix = token()
+        val project = project(token()) {
+            (1..3).forEach { branch("$prefix-$it") }
+        }
+        try {
+            searchService.reindex(BRANCH_SEARCH_RESULT_TYPE)
+            assertEquals(3, asUser { search(prefix).total })
+        } finally {
+            asAdmin { structureService.deleteProject(project.id) }
         }
     }
 
