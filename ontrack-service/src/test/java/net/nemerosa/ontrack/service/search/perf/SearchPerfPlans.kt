@@ -20,6 +20,12 @@ object SearchPerfPlans {
      */
     val TIER_INDEXES = setOf(IX_TSV, IX_IDENTIFIERS_TRGM, IX_TITLE_TRGM, IX_TITLE_PREFIX)
 
+    /**
+     * The index only the trigram tier reads, the fallback of the fuzzy types (#1888): the other
+     * tiers read the trigram index of the identifiers too, for their `LIKE`s
+     */
+    val TRIGRAM_INDEXES = setOf(IX_TITLE_TRGM)
+
     private val indexNodeTypes = setOf("Index Scan", "Index Only Scan", "Bitmap Index Scan")
 
     data class PlanNode(

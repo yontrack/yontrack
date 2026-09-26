@@ -7,7 +7,12 @@ import {useQuery} from "@components/services/GraphQL";
 import {UserContext} from "@components/providers/UserProvider";
 import {Dynamic} from "@components/common/Dynamic";
 import {getLocalRecentlyVisited} from "@components/storage/local";
-import {MIN_SEARCH_LENGTH, paletteSections, RESULTS_PER_TYPE} from "@components/search/palette/paletteSections";
+import {
+    countLabel,
+    MIN_SEARCH_LENGTH,
+    paletteSections,
+    RESULTS_PER_TYPE
+} from "@components/search/palette/paletteSections";
 import {useIsMacPlatform} from "@components/search/palette/platform";
 import {resultContext} from "@components/search/searchResultContext";
 
@@ -20,6 +25,7 @@ const SEARCH_QUERY = gql`
     query PaletteSearch($query: String!, $perType: Int!) {
         search(query: $query, perType: $perType) {
             total
+            capped
             message
             facets {
                 type {
@@ -28,6 +34,7 @@ const SEARCH_QUERY = gql`
                     description
                 }
                 count
+                capped
             }
             items {
                 type {
@@ -123,7 +130,7 @@ function SectionHeader({section}) {
             <Space size="small">
                 <Dynamic path={`framework/search/${section.type.id}/Icon`}/>
                 <span>{section.type.name}</span>
-                <Typography.Text type="secondary">({section.count})</Typography.Text>
+                <Typography.Text type="secondary">({countLabel(section.count, section.capped)})</Typography.Text>
             </Space>
         )
     }

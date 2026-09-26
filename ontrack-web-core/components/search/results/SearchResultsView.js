@@ -12,7 +12,7 @@ import ItemList from "@components/common/ItemList";
 import {Dynamic} from "@components/common/Dynamic";
 import {useQuery} from "@components/services/GraphQL";
 import {useRefData} from "@components/providers/RefDataProvider";
-import {MIN_SEARCH_LENGTH} from "@components/search/palette/paletteSections";
+import {countLabel, MIN_SEARCH_LENGTH} from "@components/search/palette/paletteSections";
 import {searchResultHref} from "@components/search/palette/searchResultHref";
 import {resultContext} from "@components/search/searchResultContext";
 import {PAGE_SIZE, searchResultsParams, searchResultsRoute} from "@components/search/results/searchResultsParams";
@@ -30,6 +30,7 @@ const SEARCH_QUERY = gql`
     query SearchResultsPage($query: String!, $types: [String!], $offset: Int!, $size: Int!, $filtered: Boolean!) {
         all: search(query: $query, size: 0) @include(if: $filtered) {
             total
+            capped
             facets {
                 type {
                     id
@@ -37,10 +38,12 @@ const SEARCH_QUERY = gql`
                     description
                 }
                 count
+                capped
             }
         }
         page: search(query: $query, types: $types, offset: $offset, size: $size) {
             total
+            capped
             message
             facets {
                 type {
@@ -49,6 +52,7 @@ const SEARCH_QUERY = gql`
                     description
                 }
                 count
+                capped
             }
             items {
                 type {
@@ -68,7 +72,10 @@ const SEARCH_QUERY = gql`
     }
 `
 
-const plural = (count) => count === 1 ? '1 result' : `${count} results`
+/**
+ * The number of results, followed by a plus when the count of one of the types is capped
+ */
+const plural = (count, capped) => count === 1 && !capped ? '1 result' : `${countLabel(count, capped)} results`
 
 /**
  * One result: the icon of its type, its title - highlighted, linking to its page - its type and
@@ -112,7 +119,7 @@ function SearchResultItem({result, q}) {
  * The filters on the type of results: all of them, then each type having results - and the type
  * of the URL even without any.
  */
-function SearchTypeFilters({total, facets, type, onSelect}) {
+function SearchTypeFilters({total, capped, facets, type, onSelect}) {
     const {searchResultTypes = []} = useRefData()
     const filters = [...facets]
     if (type && !filters.some(facet => facet.type.id === type)) {
@@ -127,7 +134,7 @@ function SearchTypeFilters({total, facets, type, onSelect}) {
                 onClick={() => onSelect(null)}
                 data-testid="search-filter-all"
             >
-                All ({total})
+                All ({countLabel(total, capped)})
             </Button>
             {
                 filters.map(facet => (
@@ -138,7 +145,7 @@ function SearchTypeFilters({total, facets, type, onSelect}) {
                         onClick={() => onSelect(facet.type.id)}
                         data-testid={`search-filter-${facet.type.id}`}
                     >
-                        {facet.type.name} ({facet.count})
+                        {facet.type.name} ({countLabel(facet.count, facet.capped)})
                     </Button>
                 ))
             }
@@ -236,12 +243,13 @@ export default function SearchResultsView() {
                             <Space orientation="vertical" className="ot-line" size="middle">
                                 <SearchTypeFilters
                                     total={facets?.total ?? 0}
+                                    capped={facets?.capped ?? false}
                                     facets={facets?.facets ?? []}
                                     type={type}
                                     onSelect={(selected) => go({type: selected, page: 1})}
                                 />
                                 <Typography.Text type="secondary" role="status" data-testid="search-results-count">
-                                    {results.total === 0 ? 'No results' : plural(results.total)}
+                                    {results.total === 0 ? 'No results' : plural(results.total, results.capped)}
                                 </Typography.Text>
                                 <ItemList
                                     aria-label="Search results"

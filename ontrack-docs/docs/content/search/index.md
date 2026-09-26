@@ -91,7 +91,9 @@ A result matches in one of four ways, the strongest first:
 3. **Full text** — the words you typed are in the text: a word of a commit message, of a
    description.
 4. **Similar** — close enough to what you typed, to forgive a typo. This one starts at 3
-   characters.
+   characters, and applies to a type only when it has **fewer than 20** results of the three
+   stronger kinds: a word with plenty of real matches does not bring in the ones merely similar
+   to it. A type's results and count are then the same on every page, and in the palette.
 
 Results are ranked by how they match, then by how well within the same kind of match. Between
 equally good results, the **most recently updated** comes first — the latest build before an
@@ -100,3 +102,18 @@ comes before a vague project match.
 
 You only ever find what you are allowed to see: results in projects you cannot view are not
 counted, nor listed.
+
+## Counts
+
+Each type counts its results up to **1000**. Past that, its count is shown as **1000+** —
+*Commits (1000+)* in the palette, *Build (1000+)* among the filters of the search page — and the
+totals made of it too: *All (3000+)*, *3000+ results*. The pages of the search page go as far as
+the counted results: 50 pages for a type counting 1000+.
+
+Past 1000 results of a type, the ones ranked are the 1000 which match in the strongest way,
+the **most recently updated** first among those matching the same way. An older result which
+would have ranked higher is then not shown: type more of what you are looking for to narrow the
+search down.
+
+The administrators can change the cap with the `ontrack.config.search.count-cap` setting (see the
+[search index](../operations/search-index.md#settings)).

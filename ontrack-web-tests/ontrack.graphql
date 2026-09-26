@@ -6869,7 +6869,9 @@ type ScheduleAutoVersioningPayload implements Payload {
 
 "Number of search results for one type"
 type SearchFacet {
-  "Number of results for this type"
+  "True when this type has more results than its count, which is then the cap: shown as `1000+`"
+  capped: Boolean!
+  "Number of results for this type, at most the cap of the counts (`ontrack.config.search.count-cap`)"
   count: Int!
   "Type of result"
   type: SearchResultType!
@@ -6913,6 +6915,8 @@ type SearchResultType {
 
 "Results of a search"
 type SearchResults {
+  "True when the count of one of the types is capped: there are more results than the total"
+  capped: Boolean!
   "Number of results per type, for the types having some"
   facets: [SearchFacet!]!
   "Results, best first"
@@ -6923,7 +6927,7 @@ type SearchResults {
   pageInfo: PageInfo @deprecated(reason : "Use total, and the offset and size arguments. Will be removed in 7.0.")
   "Items in the current page"
   pageItems: [SearchResult!]! @deprecated(reason : "Use items. Will be removed in 7.0.")
-  "Total number of results, for what the user can see"
+  "Total number of results, for what the user can see: the sum of the counts of the facets"
   total: Int!
 }
 

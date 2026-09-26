@@ -11,6 +11,7 @@ import net.nemerosa.ontrack.test.TestUtils.uid
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.transaction.PlatformTransactionManager
 import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
@@ -476,6 +477,130 @@ class SearchServiceIT : AbstractDSLTestSupport() {
             search(u, types = listOf(TestAlphaSearchDocumentIndexer.TYPE, TestDeltaSearchDocumentIndexer.TYPE))
         }
         assertEquals(listOf("delta-exact-$u", "alpha-similar-$u"), results.items.map { it.key })
+    }
+
+    /**
+     * Runs [code] with the given cap on the counts
+     */
+    private fun <T> withCountCap(cap: Int, code: () -> T): T {
+        val old = ontrackConfigProperties.search.countCap
+        ontrackConfigProperties.search.countCap = cap
+        return try {
+            code()
+        } finally {
+            ontrackConfigProperties.search.countCap = old
+        }
+    }
+
+    @Test
+    fun `Counts are capped per type`() {
+        val project = project()
+        val u = token()
+        index(*(1..5).map { alpha.document("a$it-$u", "A $it", project, identifiers = listOf("$u-$it")) }.toTypedArray())
+        index(*(1..2).map { beta.document("b$it-$u", "B $it", project, identifiers = listOf("$u-$it")) }.toTypedArray())
+        withCountCap(3) {
+            listOf(
+                asAdmin { search(u, size = 20) },
+                asAdmin { search(u, size = 0) },
+                asAdmin { search(u, perType = 1) },
+            ).forEach { results ->
+                assertEquals(
+                    mapOf(
+                        TestAlphaSearchDocumentIndexer.TYPE to (3 to true),
+                        TestBetaSearchDocumentIndexer.TYPE to (2 to false),
+                    ),
+                    results.facets.associate { it.type.id to (it.count to it.capped) }
+                )
+                assertEquals(5, results.total, "Sum of the capped counts")
+                assertTrue(results.capped, "Capped when one of the types is")
+            }
+            val all = asAdmin { search(u, size = 20) }
+            assertEquals(5, all.items.size, "Only the capped candidates can be shown")
+        }
+    }
+
+    @Test
+    fun `Counts are not capped below the cap`() {
+        val project = project()
+        val u = token()
+        index(*(1..3).map { alpha.document("a$it-$u", "A $it", project, identifiers = listOf("$u-$it")) }.toTypedArray())
+        withCountCap(3) {
+            val results = asAdmin { search(u) }
+            assertEquals(listOf(3 to false), results.facets.map { it.count to it.capped })
+            assertEquals(false, results.capped)
+        }
+    }
+
+    @Test
+    fun `Only the capped candidates are ranked, chosen by tier then recency`() {
+        val project = project()
+        val u = token()
+        val now = Time.now()
+        index(
+            // Strongest tier, oldest
+            alpha.document("prefix-$u", "Prefix", project, identifiers = listOf("$u-x"), updatedAt = now.minusDays(10)),
+            // The most relevant full-text match, but older than the others
+            alpha.document("relevant-$u", "About $u $u", project, updatedAt = now.minusDays(9)),
+            *(1..3).map {
+                alpha.document("recent$it-$u", "Recent $it", project, text = "Mentions $u", updatedAt = now.minusDays(it.toLong()))
+            }.toTypedArray(),
+        )
+        // Without the cap, the most relevant one ranks right after the prefix match
+        assertEquals("relevant-$u", asAdmin { search(u) }.items.map { it.key }[1])
+        withCountCap(3) {
+            val results = asAdmin { search(u) }
+            assertEquals(listOf("prefix-$u", "recent1-$u", "recent2-$u"), results.items.map { it.key })
+        }
+    }
+
+    @Test
+    fun `Trigram is a fallback, for the types with fewer than 20 stronger matches`() {
+        val project = project()
+        val u = token()
+        val typo = u.dropLast(1) + (if (u.last() == '0') '1' else '0')
+        // 20 prefix matches for alpha, and one similar document which is then not a match
+        index(*(1..20).map { alpha.document("a$it-$u", "A $it", project, identifiers = listOf("$u-$it")) }.toTypedArray())
+        index(alpha.document("a-similar-$u", typo, project, identifiers = listOf(typo)))
+        // 19 prefix matches for beta: its similar document is a match
+        index(*(1..19).map { beta.document("b$it-$u", "B $it", project, identifiers = listOf("$u-$it")) }.toTypedArray())
+        index(beta.document("b-similar-$u", typo, project, identifiers = listOf(typo)))
+        val expected = mapOf(TestAlphaSearchDocumentIndexer.TYPE to 20, TestBetaSearchDocumentIndexer.TYPE to 20)
+        // The same on every page, in the facets only and in the best results per type
+        listOf(
+            asAdmin { search(u, size = 50) },
+            asAdmin { search(u, offset = 30, size = 5) },
+            asAdmin { search(u, size = 0) },
+            asAdmin { search(u, perType = 3) },
+        ).forEach { results ->
+            assertEquals(expected, results.facets.associate { it.type.id to it.count })
+        }
+        val keys = asAdmin { search(u, size = 50) }.items.map { it.key }
+        assertTrue("b-similar-$u" in keys, "Beta falls back on similarity")
+        assertTrue("a-similar-$u" !in keys, "Alpha does not")
+        assertEquals("b-similar-$u", keys.last(), "The similar document ranks last")
+    }
+
+    @Test
+    fun `The search sets its own work_mem, for its transaction only`() {
+        val project = project()
+        val u = token()
+        index(alpha.document("a-$u", "A", project, identifiers = listOf(u)))
+        val jdbc = JdbcTemplate(dataSource)
+        val workMem = { jdbc.queryForObject("SELECT current_setting('work_mem')", String::class.java) }
+        val default = workMem()
+        val old = ontrackConfigProperties.search.workMem
+        try {
+            // Not set
+            ontrackConfigProperties.search.workMem = ""
+            asAdmin { search(u) }
+            assertEquals(default, workMem())
+            // Set, until the end of the transaction
+            ontrackConfigProperties.search.workMem = "37MB"
+            asAdmin { search(u) }
+            assertEquals("37MB", workMem())
+        } finally {
+            ontrackConfigProperties.search.workMem = old
+        }
     }
 
     @Test

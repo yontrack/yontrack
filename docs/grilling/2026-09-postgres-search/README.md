@@ -182,7 +182,10 @@ Tiers, strongest first:
 1. **Exact** identifier, case-insensitive.
 2. **Prefix** of an identifier or of the title.
 3. **Full-text** match on `TSV` (`simple`, prefix-enabled `tsquery`).
-4. **Trigram** similarity on identifiers and title.
+4. **Trigram** similarity on identifiers and title — a **fallback, per type** (#1888): it runs
+   for a type only when that type has fewer than **20** matches in tiers 1–3. The threshold is a
+   constant, independent of the page, so a type's matches and count are the same on every page,
+   in the facets and in the palette.
 
 - **Minimum query length: 2** (was 3). At 2 characters only exact and prefix run, on the B-tree;
   trigram starts at 3.
@@ -194,10 +197,22 @@ Tiers, strongest first:
   type's `order`.
 - **No type precedence** in the score: an exact build name beats a vague project match. Grouping
   by type is a presentation concern of the palette only.
+- **Only N candidates per type are ranked** (#1888), N being the count cap below: chosen by tier,
+  then recency. Relevance orders only those N, so an older, more relevant document past N is
+  not shown.
+
+### Counts
+
+**Capped at N per type** (#1888), in the palette and on `/search`: N is
+`ontrack.config.search.count-cap`, 1000 by default. `SearchFacet.capped` says a type has more;
+`SearchResults.total` is the sum of the capped counts, and `SearchResults.capped` is true when any
+facet is. The UI shows "Commits (1000+)", "All (3000+)", "3000+ results"; pagination runs over
+the known total, so a single type ends at page 50.
 
 ### Access
 
-Filtered **in SQL**, so totals, facets and pages are correct:
+Filtered **in SQL**, so totals, facets and pages count only what the user can see — up to the
+cap of the counts (#1888, *Counts* above), past which a count is "1000+" rather than exact:
 
 - A user with global project view sees everything.
 - Anyone else sees `PROJECT_ID IN (:visibleProjects)`.
@@ -278,7 +293,10 @@ palette something to find.
 
 ### Budget
 
-- Palette: **< 150 ms p95**. Results page: **< 500 ms p95**.
+- Palette: **< 150 ms p95**. Results page: **< 500 ms p95**. The same for a user seeing a tenth
+  of the projects (#1888).
+- A search sets its own `work_mem` (`SET LOCAL`, `ontrack.config.search.work-mem`, 64 MB by
+  default): on the Postgres default of 4 MB, the bitmap of a frequent word goes lossy (#1888).
 - Sized for the largest known instance with 3× headroom.
 - Indexing must never slow down creating builds, promotions or validations.
 
@@ -289,8 +307,9 @@ palette something to find.
   links, releases and issues in proportion.
 - **`EXPLAIN` assertions**: each query shape (palette, results page, exact build, commit hash)
   uses its index — deterministic, the realistic regression.
-- **Latency**: p95 per scenario measured and reported, failing only past a generous ceiling so a
-  noisy runner does not turn CI red.
+- **Latency**: p95 per scenario measured and reported against the budget, which is verified
+  locally. The run fails only past a **runner ceiling** per scenario, set from a dispatch run of
+  the nightly on a GitHub runner × 1.5 (#1888), so a noisy runner does not turn CI red.
 - Also measures the full rebuild time of the dataset.
 
 ### `SEARCH.PERFORMANCE` stamp

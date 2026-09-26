@@ -121,26 +121,30 @@ class SearchDocumentJdbcRepository(
         size: Int,
         perType: Int?,
         highlight: Boolean,
+        countCap: Int,
     ): SearchDocumentPage? {
         val parsed = ParsedSearchQuery.parse(query) ?: return null
         if (scope.types.isEmpty()) {
             return SearchDocumentPage(total = 0, facets = emptyMap(), items = emptyList())
         }
-        val statements = statements(parsed, scope, offset, size, perType, highlight)
-        val facets = mutableMapOf<String, Int>()
+        val statements = statements(parsed, scope, offset, size, perType, highlight, countCap)
+        val facets = mutableMapOf<String, SearchDocumentCount>()
+        val facet = { rs: ResultSet ->
+            facets[rs.getString("TYPE")] = SearchDocumentCount(count = rs.getInt("N"), capped = rs.getBoolean("CAPPED"))
+        }
         val items = if (statements.facets == null) {
             // Best rows of each type, each one carrying the count of its type: every type with a
             // candidate has at least one row, so the facets come with them, in one scan
             statements.rows?.let { rows ->
                 namedParameterJdbcTemplate.query(rows.sql, rows.params) { rs, _ ->
-                    facets[rs.getString("TYPE")] = rs.getInt("N")
+                    facet(rs)
                     toHit(rs, highlight)
                 }
             } ?: emptyList()
         } else {
             // Facets, and the total out of them
             namedParameterJdbcTemplate.query(statements.facets.sql, statements.facets.params) { rs ->
-                facets[rs.getString("TYPE")] = rs.getInt("N")
+                facet(rs)
             }
             // Rows, unless there is no candidate at all
             if (facets.isEmpty() || statements.rows == null) {
@@ -152,9 +156,18 @@ class SearchDocumentJdbcRepository(
             }
         }
         return SearchDocumentPage(
-            total = facets.values.sum(),
+            total = facets.values.sumOf { it.count },
             facets = facets,
             items = items,
+        )
+    }
+
+    override fun setLocalWorkMem(workMem: String) {
+        // SET does not take a parameter, set_config does: `true` for the transaction only
+        namedParameterJdbcTemplate.queryForObject(
+            "SELECT set_config('work_mem', :workMem, true)",
+            params("workMem", workMem),
+            String::class.java,
         )
     }
 
@@ -171,10 +184,11 @@ class SearchDocumentJdbcRepository(
         size: Int,
         perType: Int?,
         highlight: Boolean,
+        countCap: Int = SearchDocumentRepository.DEFAULT_COUNT_CAP,
     ): SearchDocumentStatements? {
         val parsed = ParsedSearchQuery.parse(query) ?: return null
         if (scope.types.isEmpty()) return null
-        return statements(parsed, scope, offset, size, perType, highlight)
+        return statements(parsed, scope, offset, size, perType, highlight, countCap)
     }
 
     private fun statements(
@@ -184,11 +198,12 @@ class SearchDocumentJdbcRepository(
         size: Int,
         perType: Int?,
         highlight: Boolean,
+        countCap: Int,
     ): SearchDocumentStatements {
-        val sql = SearchDocumentQuery(parsed, scope)
+        val sql = SearchDocumentQuery(parsed, scope, countCap.coerceAtLeast(1))
         val rows = if (perType != null) {
             SearchDocumentStatement(
-                sql = sql.highlighted(sql.perType, highlight),
+                sql = sql.rows(sql.perType, highlight),
                 params = MapSqlParameterSource(sql.params.values).addValue("perType", perType),
             )
         } else if (size <= 0) {
@@ -196,7 +211,7 @@ class SearchDocumentJdbcRepository(
             null
         } else {
             SearchDocumentStatement(
-                sql = sql.highlighted(sql.page, highlight),
+                sql = sql.rows(sql.page, highlight),
                 params = MapSqlParameterSource(sql.params.values).addValue("offset", offset).addValue("size", size),
             )
         }
@@ -232,16 +247,34 @@ class SearchDocumentJdbcRepository(
     /**
      * SQL of a search.
      *
-     * The candidates are the documents of the scope matching at least one of the tiers of the
-     * query. Each one gets its tier (the strongest it matches) and a relevance within its tier (full-
-     * text rank, trigram similarity). The ranking is: tier, relevance within the tier, recency,
-     * then the display order of the type. There is no precedence of a type over another before
-     * that: an exact build name beats a vague project match.
+     * The matches are the documents of the scope matching at least one of the tiers of the query,
+     * each one with its tier, the strongest it matches:
+     *
+     * - `strong` - the exact, prefix and full-text tiers. A narrow projection (ID, type, tier and
+     *   recency), so that the tens of thousands of matches of a frequent word are cheap to count
+     *   and to sort;
+     * - `weak` - the trigram tier, a fallback: only for the types having fewer than
+     *   [SearchDocumentRepository.SIMILARITY_FALLBACK_THRESHOLD] strong matches, the scan being
+     *   skipped altogether when no type needs it.
+     *
+     * The count of each type is capped. Only the first matches of each type, up to the cap, are
+     * ranked - the candidates: chosen by tier, then recency. Their relevance within their tier
+     * (full-text rank, trigram similarity) is computed for them only. The ranking is: tier,
+     * relevance within the tier, recency, then the display order of the type. There is no
+     * precedence of a type over another before that: an exact build name beats a vague project
+     * match.
+     *
+     * The other columns are read last, for the rows returned only.
      */
     private class SearchDocumentQuery(
         parsed: ParsedSearchQuery,
         scope: SearchDocumentScope,
+        countCap: Int,
     ) {
+
+        private val fuzzyTypes = scope.types.filter { it !in scope.nonFuzzyTypes }
+
+        private val similarity = SearchMatchTier.TRIGRAM in parsed.tiers && fuzzyTypes.isNotEmpty()
 
         val params = MapSqlParameterSource()
             .addValue("q", parsed.text)
@@ -256,40 +289,44 @@ class SearchDocumentJdbcRepository(
             .addValue("types", scope.types)
             .addValue("projectIds", scope.projectIds)
             .addValue("projectLessTypes", scope.projectLessTypes)
-            .addValue("nonFuzzyTypes", scope.nonFuzzyTypes)
+            .addValue("fuzzyTypes", fuzzyTypes)
+            .addValue("fuzzyTypeCount", fuzzyTypes.size)
+            .addValue("fallbackThreshold", SearchDocumentRepository.SIMILARITY_FALLBACK_THRESHOLD)
+            .addValue("countCap", countCap)
 
-        private val tierConditions: List<Pair<SearchMatchTier, String>> = parsed.tiers.map { tier ->
-            tier to when (tier) {
-                SearchMatchTier.EXACT -> "d.IDENTIFIERS LIKE :exact"
-                SearchMatchTier.PREFIX -> "(lower(d.TITLE) LIKE :titlePrefix OR d.IDENTIFIERS LIKE :identifierPrefix)"
-                SearchMatchTier.FULL_TEXT -> "d.TSV @@ to_tsquery('simple', :tsq)"
-                SearchMatchTier.TRIGRAM -> if (scope.nonFuzzyTypes.isEmpty()) {
-                    "(:q <% d.TITLE OR :q <% d.IDENTIFIERS)"
-                } else {
-                    "(d.TYPE NOT IN (:nonFuzzyTypes) AND (:q <% d.TITLE OR :q <% d.IDENTIFIERS))"
+        /**
+         * Conditions of the tiers other than the trigram one
+         */
+        private val strongConditions: List<Pair<SearchMatchTier, String>> =
+            parsed.tiers.filter { it != SearchMatchTier.TRIGRAM }.map { tier ->
+                tier to when (tier) {
+                    SearchMatchTier.EXACT -> "d.IDENTIFIERS LIKE :exact"
+                    SearchMatchTier.PREFIX -> "(lower(d.TITLE) LIKE :titlePrefix OR d.IDENTIFIERS LIKE :identifierPrefix)"
+                    SearchMatchTier.FULL_TEXT -> "d.TSV @@ to_tsquery('simple', :tsq)"
+                    SearchMatchTier.TRIGRAM -> error("Not a strong tier")
                 }
             }
-        }
 
-        private val tier = tierConditions.joinToString(
+        private val strong = strongConditions.joinToString(" OR ", prefix = "(", postfix = ")") { it.second }
+
+        private val strongTier = strongConditions.joinToString(
             prefix = "CASE ",
             separator = " ",
             postfix = " END"
         ) { (tier, condition) ->
-            "WHEN $condition THEN ${tier.ordinal + 1}"
+            "WHEN $condition THEN ${tier.number}"
         }
 
-        private val relevance = tierConditions.joinToString(
-            prefix = "CASE ",
-            separator = " ",
-            postfix = " ELSE 0 END"
-        ) { (tier, condition) ->
-            "WHEN $condition THEN " + when (tier) {
-                SearchMatchTier.EXACT, SearchMatchTier.PREFIX -> "0"
+        /**
+         * Relevance of a candidate `r` within its tier, `d` being its document
+         */
+        private val relevance = parsed.tiers.mapNotNull { tier ->
+            when (tier) {
+                SearchMatchTier.EXACT, SearchMatchTier.PREFIX -> null
                 SearchMatchTier.FULL_TEXT -> "least(ts_rank(d.TSV, to_tsquery('simple', :tsq)), 0.999)"
                 SearchMatchTier.TRIGRAM -> "least(greatest(word_similarity(:q, d.TITLE), word_similarity(:q, d.IDENTIFIERS)), 0.999)"
-            }
-        }
+            }?.let { "WHEN ${tier.number} THEN $it" }
+        }.takeIf { it.isNotEmpty() }?.joinToString(prefix = "CASE r.TIER ", separator = " ", postfix = " ELSE 0 END") ?: "0"
 
         private val access: String = run {
             val projectLess = if (scope.projectLessTypes.isEmpty()) {
@@ -325,15 +362,77 @@ class SearchDocumentJdbcRepository(
             "WHEN :type$index THEN $index"
         }
 
+        /**
+         * All the matches, narrow: `ID`, `TYPE`, `TIER` and `UPDATED_AT`.
+         *
+         * The trigram scan is gated by a condition on the strong matches only, which Postgres
+         * evaluates once, before the scan: when every fuzzy type has enough strong matches, the
+         * trigram indexes are not read at all.
+         */
+        private val matches = if (similarity) {
+            """
+                WITH strong AS MATERIALIZED (
+                    SELECT d.ID, d.TYPE, $strongTier AS TIER, d.UPDATED_AT
+                    FROM SEARCH_DOCUMENTS d
+                    WHERE d.TYPE IN (:types)
+                    AND $access
+                    AND $strong
+                ),
+                saturated AS MATERIALIZED (
+                    SELECT s.TYPE FROM strong s GROUP BY s.TYPE HAVING COUNT(*) >= :fallbackThreshold
+                ),
+                weak AS MATERIALIZED (
+                    SELECT d.ID, d.TYPE, ${SearchMatchTier.TRIGRAM.number} AS TIER, d.UPDATED_AT
+                    FROM SEARCH_DOCUMENTS d
+                    WHERE (SELECT COUNT(*) FROM saturated x WHERE x.TYPE IN (:fuzzyTypes)) < :fuzzyTypeCount
+                    AND d.TYPE IN (:fuzzyTypes)
+                    AND d.TYPE NOT IN (SELECT x.TYPE FROM saturated x)
+                    AND $access
+                    AND (:q <% d.TITLE OR :q <% d.IDENTIFIERS)
+                    AND $strong IS NOT TRUE
+                ),
+                matches AS (
+                    SELECT s.ID, s.TYPE, s.TIER, s.UPDATED_AT FROM strong s
+                    UNION ALL
+                    SELECT w.ID, w.TYPE, w.TIER, w.UPDATED_AT FROM weak w
+                )
+            """.trimIndent()
+        } else {
+            """
+                WITH matches AS MATERIALIZED (
+                    SELECT d.ID, d.TYPE, $strongTier AS TIER, d.UPDATED_AT
+                    FROM SEARCH_DOCUMENTS d
+                    WHERE d.TYPE IN (:types)
+                    AND $access
+                    AND $strong
+                )
+            """.trimIndent()
+        }
+
+        /**
+         * The candidates: the first matches of each type, by tier then recency, up to the cap,
+         * with their relevance and the capped count `N` of their type, `CAPPED` when it is.
+         */
         private val candidates = """
-            WITH candidates AS (
-                SELECT d.ID, d.TYPE, d.KEY, d.PROJECT_ID, d.ENTITY_TYPE, d.ENTITY_ID, d.TITLE, d.TEXT, d.DATA, d.UPDATED_AT,
-                       $tier AS TIER,
+            $matches,
+            numbered AS MATERIALIZED (
+                SELECT m.ID, m.TYPE, m.TIER, m.UPDATED_AT,
+                       ROW_NUMBER() OVER (PARTITION BY m.TYPE ORDER BY m.TIER, m.UPDATED_AT DESC, m.ID) AS RN,
+                       COUNT(*) OVER (PARTITION BY m.TYPE) AS TYPE_COUNT
+                FROM matches m
+            ),
+            ranked AS MATERIALIZED (
+                SELECT n.ID, n.TYPE, n.TIER, n.UPDATED_AT,
+                       LEAST(n.TYPE_COUNT, :countCap) AS N,
+                       n.TYPE_COUNT > :countCap AS CAPPED
+                FROM numbered n
+                WHERE n.RN <= :countCap
+            ),
+            candidates AS (
+                SELECT r.ID, r.TYPE, r.TIER, r.UPDATED_AT, r.N, r.CAPPED,
                        $relevance AS RELEVANCE
-                FROM SEARCH_DOCUMENTS d
-                WHERE d.TYPE IN (:types)
-                AND $access
-                AND (${tierConditions.joinToString(" OR ") { it.second }})
+                FROM ranked r
+                JOIN SEARCH_DOCUMENTS d ON d.ID = r.ID
             )
         """.trimIndent()
 
@@ -345,62 +444,67 @@ class SearchDocumentJdbcRepository(
          */
         private val score = "(${SearchMatchTier.entries.size + 1} - c.TIER + c.RELEVANCE)"
 
+        /**
+         * Capped count of the matches of each type
+         */
         val facets = """
-            $candidates
-            SELECT c.TYPE, COUNT(*) AS N FROM candidates c GROUP BY c.TYPE
+            $matches
+            SELECT m.TYPE, LEAST(COUNT(*), :countCap) AS N, COUNT(*) > :countCap AS CAPPED
+            FROM matches m
+            GROUP BY m.TYPE
         """.trimIndent()
 
         /**
-         * Rows of a page, best first
+         * Candidates of a page, best first
          */
         val page = """
-            SELECT c.*, $score AS SCORE
+            SELECT c.*
             FROM candidates c
             ORDER BY $ranking
             OFFSET :offset LIMIT :size
         """.trimIndent()
 
         /**
-         * Best rows of each type, each one with the number `N` of candidates of its type: the
-         * facets, without a second scan of the candidates
+         * Best candidates of each type. Each one carries the capped count of its type, which are
+         * the facets, without a second scan of the matches.
          */
         val perType = """
-            SELECT c.*, $score AS SCORE
+            SELECT c.*
             FROM (
                 SELECT c.*,
-                       ROW_NUMBER() OVER (PARTITION BY c.TYPE ORDER BY $ranking) AS RN,
-                       COUNT(*) OVER (PARTITION BY c.TYPE) AS N
+                       ROW_NUMBER() OVER (PARTITION BY c.TYPE ORDER BY $ranking) AS TYPE_RN
                 FROM candidates c
             ) c
-            WHERE c.RN <= :perType
-            ORDER BY $ranking
+            WHERE c.TYPE_RN <= :perType
         """.trimIndent()
 
         /**
-         * Complete query for some [rows][page] of the candidates, with their `HIGHLIGHT` when asked
-         * for.
+         * Complete query for some [rows][page] of the candidates: their documents, with their
+         * `HIGHLIGHT` when asked for.
          *
          * `ts_headline` is expensive: it runs in an outer query, on the rows already selected -
          * never on the other candidates - and only on the free text matching one of the words of
          * the query.
          */
-        fun highlighted(rows: String, highlight: Boolean): String =
-            if (highlight) {
+        fun rows(rows: String, highlight: Boolean): String {
+            val highlighted = if (highlight) {
+                """,
+                    CASE WHEN d.TEXT IS NOT NULL AND to_tsvector('simple', d.TEXT) @@ to_tsquery('simple', :anyTsq)
+                         THEN ts_headline('simple', translate(d.TEXT, :headlineFrom, :headlineTo), to_tsquery('simple', :anyTsq), :headlineOptions)
+                    END AS HIGHLIGHT
                 """
-                    $candidates
-                    SELECT c.*,
-                           CASE WHEN c.TEXT IS NOT NULL AND to_tsvector('simple', c.TEXT) @@ to_tsquery('simple', :anyTsq)
-                                THEN ts_headline('simple', translate(c.TEXT, :headlineFrom, :headlineTo), to_tsquery('simple', :anyTsq), :headlineOptions)
-                           END AS HIGHLIGHT
-                    FROM ($rows) c
-                    ORDER BY $ranking
-                """.trimIndent()
             } else {
-                """
-                    $candidates
-                    $rows
-                """.trimIndent()
+                ""
             }
+            return """
+                $candidates
+                SELECT d.ID, d.TYPE, d.KEY, d.PROJECT_ID, d.ENTITY_TYPE, d.ENTITY_ID, d.TITLE, d.TEXT, d.DATA, d.UPDATED_AT,
+                       c.N, c.CAPPED, $score AS SCORE$highlighted
+                FROM ($rows) c
+                JOIN SEARCH_DOCUMENTS d ON d.ID = c.ID
+                ORDER BY $ranking
+            """.trimIndent()
+        }
     }
 
 }

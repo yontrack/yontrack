@@ -1,5 +1,6 @@
 package net.nemerosa.ontrack.graphql.schema
 
+import graphql.Scalars.GraphQLBoolean
 import graphql.Scalars.GraphQLInt
 import graphql.Scalars.GraphQLString
 import graphql.schema.GraphQLFieldDefinition
@@ -50,9 +51,17 @@ class GQLTypeSearchResults(
             .field(
                 GraphQLFieldDefinition.newFieldDefinition()
                     .name("total")
-                    .description("Total number of results, for what the user can see")
+                    .description("Total number of results, for what the user can see: the sum of the counts of the facets")
                     .type(GraphQLNonNull(GraphQLInt))
                     .dataFetcher { env -> env.getSource<GQLSearchResults>()!!.results.total }
+                    .build()
+            )
+            .field(
+                GraphQLFieldDefinition.newFieldDefinition()
+                    .name("capped")
+                    .description("True when the count of one of the types is capped: there are more results than the total")
+                    .type(GraphQLNonNull(GraphQLBoolean))
+                    .dataFetcher { env -> env.getSource<GQLSearchResults>()!!.results.capped }
                     .build()
             )
             .field(

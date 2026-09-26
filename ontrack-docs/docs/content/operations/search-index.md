@@ -96,6 +96,8 @@ See the [list of metrics](../generated/metrics/index.md) for all of them.
 | `ontrack.config.search.index.logging`    | `false` | Logs the progress of the rebuilds.                                          |
 | `ontrack.config.search.index.tracing`    | `false` | With `logging`, logs every SCM commit and issue being indexed, at the `DEBUG` level. Very verbose. |
 | `ontrack.config.search.index.reset`      | `false` | Rebuilds the documents of all the types at every startup.                   |
+| `ontrack.config.search.count-cap`        | `1000`  | Maximum number of results counted, and ranked, for each type. Past it, the count of the type is shown as `1000+`, and only its most recently updated matches of the strongest kinds are ranked. See [Search](../search/index.md#counts). |
+| `ontrack.config.search.work-mem`         | `64MB`  | `work_mem` of the Postgres transaction of a search, set with `SET LOCAL`: it ends with the transaction, and no other connection is affected. With the Postgres default of 4 MB, a search on a frequent word is several times slower. Empty to keep the setting of the database. |
 
 The settings `ontrack.config.search.index.immediate` and
 `ontrack.config.search.index.ignoreExisting` of Yontrack 5 are gone: they only made sense for

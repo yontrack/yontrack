@@ -95,6 +95,8 @@ class OntrackConfigProperties {
         logger.info("[search] Index batch size = ${search.index.batch}")
         logger.info("[search] Index batch logging = ${search.index.logging}")
         logger.info("[search] Index batch tracing = ${search.index.tracing}")
+        logger.info("[search] Count cap = ${search.countCap}")
+        logger.info("[search] work_mem = ${search.workMem.ifBlank { "(database default)" }}")
         logger.info("[document] Documents engine = ${documents.engine}")
         logger.info("[templating] Errors = ${templating.errors}")
     }

@@ -331,6 +331,30 @@ describe('typing', () => {
         expect(mockPush).toHaveBeenCalledWith('/project/1')
     })
 
+    it('shows a capped count as the cap followed by a plus', async () => {
+        searchAnswer = {
+            search: {
+                total: 1002,
+                capped: true,
+                message: null,
+                facets: [
+                    {type: {id: 'project', name: 'Project'}, count: 1000, capped: true},
+                    {type: {id: 'branch', name: 'Branch'}, count: 2, capped: false},
+                ],
+                items: [
+                    result('project', 'Project', 'ontrack', {project: {id: 1, name: 'ontrack'}}),
+                    result('branch', 'Branch', 'ontrack/main', {branch: {id: 10, name: 'main', project: {id: 1, name: 'ontrack'}}}),
+                ],
+            }
+        }
+        openPalette()
+        await type('ontrack')
+
+        expect(screen.getByRole('group', {name: 'Project (1000+)'})).toBeInTheDocument()
+        expect(screen.getByText('(1000+)')).toBeInTheDocument()
+        expect(screen.getByRole('group', {name: 'Branch (2)'})).toBeInTheDocument()
+    })
+
     it('opens each kind of result at its page', async () => {
         searchAnswer = {
             search: {

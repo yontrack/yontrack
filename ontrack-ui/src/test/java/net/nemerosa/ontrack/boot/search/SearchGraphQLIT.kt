@@ -123,10 +123,12 @@ class SearchGraphQLIT : AbstractSearchTestSupport() {
         val data = run("""{
             search(query: "$name", types: ["project"]) {
                 total
+                capped
                 message
                 facets {
                     type { id name }
                     count
+                    capped
                 }
                 items {
                     title
@@ -144,12 +146,39 @@ class SearchGraphQLIT : AbstractSearchTestSupport() {
         assertEquals("project", search["facets"][0]["type"]["id"].asText())
         assertEquals("Project", search["facets"][0]["type"]["name"].asText())
         assertEquals(1, search["facets"][0]["count"].asInt())
+        assertEquals(false, search["facets"][0]["capped"].asBoolean())
+        assertEquals(false, search["capped"].asBoolean())
         val item = search["items"][0]
         assertEquals(name, item["title"].asText())
         assertEquals("Description of $name", item["description"].asText())
         assertEquals("project", item["type"]["id"].asText())
         assertEquals(project.id(), item["data"]["project"]["id"].asInt())
         assertEquals(name, item["data"]["project"]["name"].asText())
+    }
+
+    @Test
+    fun `Capped counts`() {
+        val name = token()
+        project(NameDescription.nd("$name-1", ""))
+        project(NameDescription.nd("$name-2", ""))
+        val old = ontrackConfigProperties.search.countCap
+        ontrackConfigProperties.search.countCap = 1
+        val data = try {
+            run("""{
+                search(query: "$name", types: ["project"]) {
+                    total
+                    capped
+                    facets { count capped }
+                }
+            }""")
+        } finally {
+            ontrackConfigProperties.search.countCap = old
+        }
+        val search = data["search"]
+        assertEquals(1, search["total"].asInt())
+        assertEquals(true, search["capped"].asBoolean())
+        assertEquals(1, search["facets"][0]["count"].asInt())
+        assertEquals(true, search["facets"][0]["capped"].asBoolean())
     }
 
     @Test

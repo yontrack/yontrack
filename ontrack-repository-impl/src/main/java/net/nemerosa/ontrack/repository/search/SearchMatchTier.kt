@@ -26,4 +26,10 @@ enum class SearchMatchTier(val minLength: Int) {
      * The query is similar to a word of the title or of the identifiers (typos, substrings).
      */
     TRIGRAM(ParsedSearchQuery.TRIGRAM_MIN_LENGTH),
+    ;
+
+    /**
+     * Number of the tier in the SQL, from 1 for the strongest
+     */
+    val number: Int get() = ordinal + 1
 }

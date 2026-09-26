@@ -171,7 +171,18 @@ class SearchDocumentServiceImpl(
     }
 
     /**
-     * Searches for documents.
+     * Runs a search in a read-only transaction - the one of the caller when there is one - so that
+     * the `work_mem` set for it ends with it.
+     */
+    private val readOnly = TransactionTemplate(platformTransactionManager).apply {
+        propagationBehavior = TransactionDefinition.PROPAGATION_REQUIRED
+        isReadOnly = true
+    }
+
+    /**
+     * Searches for documents, with the [cap of the counts][net.nemerosa.ontrack.model.support.SearchConfigProperties.countCap]
+     * and the [work_mem][net.nemerosa.ontrack.model.support.SearchConfigProperties.workMem] of the
+     * configuration.
      */
     fun search(
         query: String,
@@ -180,6 +191,12 @@ class SearchDocumentServiceImpl(
         size: Int,
         perType: Int?,
         highlight: Boolean = false,
-    ): SearchDocumentPage? = searchDocumentRepository.search(query, scope, offset, size, perType, highlight)
+    ): SearchDocumentPage? = readOnly.execute {
+        val config = ontrackConfigProperties.search
+        if (config.workMem.isNotBlank()) {
+            searchDocumentRepository.setLocalWorkMem(config.workMem.trim())
+        }
+        searchDocumentRepository.search(query, scope, offset, size, perType, highlight, config.countCap)
+    }
 
 }

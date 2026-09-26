@@ -89,7 +89,7 @@ class SearchServiceImpl(
             total = page.total,
             message = if (types.any { it.id in rebuilding }) MESSAGE_INDEX_BEING_BUILT else null,
             facets = types.mapNotNull { type ->
-                page.facets[type.id]?.let { count -> SearchFacet(type, count) }
+                page.facets[type.id]?.let { facet -> SearchFacet(type, facet.count, facet.capped) }
             },
         )
     }

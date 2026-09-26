@@ -49,12 +49,15 @@ The whole run is `SearchPerf`, in `ontrack-service/src/test/java/.../service/sea
    indexes of its tier, and never scan the whole table. The statements are those of
    `SearchDocumentJdbcRepository.searchStatements`, the very SQL the search runs.
 4. **Latencies.** After a warm-up, each query of each scenario runs 10 times through
+   `SearchDocumentServiceImpl.search` — as the service runs it: in a read-only transaction, with
+   its `SET LOCAL work_mem` and its cap of the counts (#1888), through
    `SearchDocumentJdbcRepository.search`:
 
    | Scenario | Queries | Shape |
    |---|---|---|
    | `palette` | 22 prefixes, words, typos, names | all types, 3 best per type |
    | `palette_restricted` | the same | the same, for a user seeing one project out of ten |
+   | `results_restricted` | the same | the results page, for a user seeing one project out of ten |
    | `results` | the same | the second page of the builds, highlighted, plus the facets of all the types |
    | `exact_build` | 20 build names, of the four styles of the dataset | palette |
    | `commit_lookup` | 10 full and 10 short commit hashes | palette |
@@ -100,7 +103,11 @@ The whole run is `SearchPerf`, in `ontrack-service/src/test/java/.../service/sea
 The run fails:
 
 - on a failed `EXPLAIN` assertion — deterministic, the realistic regression;
-- on a p95 past its **ceiling**, 10 times its budget;
+- on a p95 past its **ceiling** — one per scenario (`CEILINGS` in `SearchPerf`): palette,
+  results, restricted palette, restricted results, exact build, commit. The ceilings are for the
+  GitHub runner the nightly runs on, slower than the machine of the budget: each one is set from
+  the p95 of a `workflow_dispatch` run of `search-perf.yml`, × 1.5 (#1888). Until that run, they
+  are still 10 times the budget;
 - on an error of the rebuild.
 
 A p95 over its **budget** — palette 150 ms, results page 500 ms, exact build and commit lookup 150 ms
@@ -176,3 +183,38 @@ the dataset, it took the p95 of the palette from 1.5 s to 0.9 s.
 
 Going further is a decision on the design — capping the counts of the facets, or the candidates
 which are ranked — or on the configuration of Postgres, not a missing index.
+
+## The latency budget (#1888)
+
+#1888 changed the design, not the indexes:
+
+- **Counts are capped** at `ontrack.config.search.count-cap` (1000) per type, `capped` in the
+  GraphQL API, "1000+" in the UI.
+- **Only the capped candidates are ranked**: the first 1000 of each type, by tier then recency.
+  The matches are selected narrow — ID, type, tier, recency — and relevance (`ts_rank`,
+  similarity) is computed for the candidates only; the other columns are read for the rows
+  returned only.
+- **Trigram is a fallback** for the types with fewer than 20 matches in the other tiers. Its scan
+  is gated by a one-time condition, so that it is skipped when no type needs it.
+- **Search sets its own `work_mem`**, `SET LOCAL`, from `ontrack.config.search.work-mem` (64 MB).
+
+New `EXPLAIN` assertions cover the capped count and the capped ranking (on `pay-10`), the
+trigram fallback (on typos, expecting the trigram index of the title) and the restricted scope.
+
+The first run after the change, on the same laptop:
+
+| p95 (ms) | Before | After | Budget |
+|---|---|---|---|
+| Palette | 398 | 366 | 150 |
+| Results page | 565 | 269 | 500 |
+| Restricted palette | 131 | 72 | 150 |
+| Restricted results | — | 127 | 500 |
+| Exact build | 66 | 73 | 150 |
+| Commit lookup | 54 | 52 | 150 |
+
+The results page and both restricted scenarios are within budget; **the palette is not yet**.
+Its slowest queries are still frequent words — `pay-10` (p50 490 ms), `fix`, `payment`, `cache`,
+`timeout` — whose matches are all read from the heap before the 1000 most recent can be chosen:
+the cap bounds the ranking, not the scan. Going further needs an `EXPLAIN ANALYZE` of these
+queries; a lead is to read the most recent matches of each type in order, rather than all of them.
+

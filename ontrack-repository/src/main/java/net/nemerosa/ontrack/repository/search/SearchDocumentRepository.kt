@@ -57,6 +57,10 @@ interface SearchDocumentRepository {
     /**
      * Searches for documents.
      *
+     * For each type, at most [countCap] matching documents are counted and ranked: the strongest
+     * tiers first, then the most recently updated. The trigram tier is a fallback: it runs for a
+     * type only when it has fewer than [SIMILARITY_FALLBACK_THRESHOLD] matches in the other tiers.
+     *
      * @param query Text to look for
      * @param scope Types and access
      * @param offset Index of the first document to return
@@ -65,6 +69,7 @@ interface SearchDocumentRepository {
      * [offset] and [size]
      * @param highlight `true` to [highlight][SearchDocumentHit.highlight] the free text of the
      * documents returned - of these only, `ts_headline` being expensive
+     * @param countCap Maximum number of documents counted, and ranked, for each type
      * @return `null` if the query is too short to be searched
      */
     fun search(
@@ -74,6 +79,27 @@ interface SearchDocumentRepository {
         size: Int,
         perType: Int?,
         highlight: Boolean = false,
+        countCap: Int = DEFAULT_COUNT_CAP,
     ): SearchDocumentPage?
+
+    /**
+     * Sets the `work_mem` of Postgres until the end of the current transaction (`SET LOCAL`).
+     * Outside of a transaction, it has no effect.
+     */
+    fun setLocalWorkMem(workMem: String)
+
+    companion object {
+        /**
+         * Default of the cap of the counts
+         */
+        const val DEFAULT_COUNT_CAP = 1000
+
+        /**
+         * A type falls back on the trigram tier when it has fewer matches than this in the other
+         * tiers. A constant, independent of the page: the matches and the count of a type are the
+         * same on every page, in the facets and in the best results per type.
+         */
+        const val SIMILARITY_FALLBACK_THRESHOLD = 20
+    }
 
 }

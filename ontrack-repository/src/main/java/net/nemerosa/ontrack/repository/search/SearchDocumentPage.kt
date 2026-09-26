@@ -8,14 +8,25 @@ import java.time.LocalDateTime
 /**
  * Documents found by a search.
  *
- * @property total Total number of matching documents
+ * @property total Total number of matching documents, the sum of the capped counts of the [facets]
  * @property facets Number of matching documents per type, for the types having at least one
  * @property items Documents of the page, best first
  */
 data class SearchDocumentPage(
     val total: Int,
-    val facets: Map<String, Int>,
+    val facets: Map<String, SearchDocumentCount>,
     val items: List<SearchDocumentHit>,
+)
+
+/**
+ * Number of documents of a type matching a search.
+ *
+ * @property count Number of matching documents, at most the cap of the counts
+ * @property capped `true` when there are more matching documents than the cap
+ */
+data class SearchDocumentCount(
+    val count: Int,
+    val capped: Boolean,
 )
 
 /**

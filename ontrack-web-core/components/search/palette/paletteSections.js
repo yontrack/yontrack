@@ -11,6 +11,12 @@ export const MIN_SEARCH_LENGTH = 2
 export const RESULTS_PER_TYPE = 3
 
 /**
+ * A count of results, followed by a plus when it is capped: the server counts the results of a type
+ * up to a cap only - 1000 by default - and says when there are more.
+ */
+export const countLabel = (count, capped) => capped ? `${count}+` : `${count}`
+
+/**
  * The user menu items matching a text, in the order of the menu.
  *
  * The menu the user already has is the one filtered: it reflects their rights. Every word of the text
@@ -32,7 +38,7 @@ export function matchingMenuItems(menuGroups = [], text) {
 
 /**
  * The search results grouped by type, the types in the order of their best result, each with the
- * number of results the server counts for it.
+ * number of results the server counts for it, and whether this count is capped.
  */
 export function groupSearchResults(search) {
     const groups = []
@@ -43,7 +49,7 @@ export function groupSearchResults(search) {
         let group = byType[typeId]
         if (!group) {
             const facet = search.facets?.find(it => it.type?.id === typeId)
-            group = {type: result.type, count: facet?.count, results: []}
+            group = {type: result.type, count: facet?.count, capped: facet?.capped ?? false, results: []}
             byType[typeId] = group
             groups.push(group)
         }
@@ -108,9 +114,10 @@ export function paletteSections({text, recent = [], menuGroups = [], search = nu
             sections.push({
                 key: `type-${group.type.id}`,
                 kind: 'type',
-                title: `${group.type.name} (${group.count})`,
+                title: `${group.type.name} (${countLabel(group.count, group.capped)})`,
                 type: group.type,
                 count: group.count,
+                capped: group.capped,
                 options: group.results.map((result, index) => ({
                     key: `result-${group.type.id}-${index}`,
                     kind: 'result',

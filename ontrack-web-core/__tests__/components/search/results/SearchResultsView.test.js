@@ -96,9 +96,9 @@ const branch = (projectName, name, id = 10) => ({
     highlight: null,
 })
 
-const answer = ({total, facets, items = [], message = null, all = null}) => ({
+const answer = ({total, capped = false, facets, items = [], message = null, all = null}) => ({
     all,
-    page: {total, message, facets, items},
+    page: {total, capped, message, facets, items},
 })
 
 const renderView = (query) => {
@@ -318,6 +318,59 @@ describe('filtering on a type', () => {
         })
         renderView({q: 'billing', type: 'build'})
         expect(screen.getByRole('button', {name: 'Build (0)'})).toHaveAttribute('aria-pressed', 'true')
+    })
+
+})
+
+describe('capped counts', () => {
+
+    const BUILD_CAPPED = {type: BUILD, count: 1000, capped: true}
+    const facets = [
+        {type: PROJECT, count: 1000, capped: true},
+        {type: BRANCH, count: 1000, capped: true},
+        BUILD_CAPPED,
+    ]
+    const builds = Array.from({length: 20}, (_, i) => ({...project(`build-${i}`, i), type: BUILD}))
+
+    const filters = () => within(screen.getByRole('group', {name: 'Filter by type'})).getAllByRole('button')
+
+    it('asks whether the counts are capped', () => {
+        renderView({q: 'billing', type: 'build'})
+        expect(searchQuery.match(/capped/g)).toHaveLength(4)
+    })
+
+    it('shows a capped count as the cap followed by a plus', () => {
+        searchAnswer = answer({total: 3000, capped: true, facets, items: [project('billing')]})
+        renderView({q: 'billing'})
+        expect(filters().map(it => it.textContent)).toEqual(['All (3000+)', 'Project (1000+)', 'Branch (1000+)', 'Build (1000+)'])
+        expect(screen.getByRole('status')).toHaveTextContent('3000+ results')
+    })
+
+    it('keeps the capped counts of all the types while filtering', () => {
+        searchAnswer = answer({
+            all: {total: 3000, capped: true, facets},
+            total: 1000,
+            capped: true,
+            facets: [BUILD_CAPPED],
+            items: builds,
+        })
+        renderView({q: 'billing', type: 'build'})
+        expect(filters().map(it => it.textContent)).toEqual(['All (3000+)', 'Project (1000+)', 'Branch (1000+)', 'Build (1000+)'])
+        expect(screen.getByRole('status')).toHaveTextContent('1000+ results')
+    })
+
+    it('paginates over the capped count, a single type ending at page 50', () => {
+        searchAnswer = answer({
+            all: {total: 3000, capped: true, facets},
+            total: 1000,
+            capped: true,
+            facets: [BUILD_CAPPED],
+            items: builds,
+        })
+        renderView({q: 'billing', type: 'build', page: '50'})
+        const pages = screen.getByRole('navigation', {name: 'Pages of results'})
+        expect(within(pages).getByText('50')).toHaveAttribute('aria-current', 'page')
+        expect(within(pages).queryByText('51')).not.toBeInTheDocument()
     })
 
 })
