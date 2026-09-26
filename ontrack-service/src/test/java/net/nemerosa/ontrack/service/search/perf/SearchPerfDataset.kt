@@ -189,15 +189,17 @@ class SearchPerfDataset(
             log("Loading $projects projects, $branches branches, $builds builds")
             loadStructure(jdbc)
         }
-        // Indexes of the documents, but for their keys
+        // Indexes of the documents, but for their keys. The table is partitioned (#1888): the
+        // indexes of the parent are dropped and created again with those of its partitions - a
+        // definition read back as `ON ONLY` would create the one of the parent only.
         val indexes = jdbc.queryForList(
             """
                 SELECT indexname, indexdef FROM pg_indexes
                 WHERE schemaname = current_schema() AND tablename = 'search_documents'
-                AND indexname NOT IN ('search_documents_pkey', 'search_documents_uq_type_key')
+                AND indexname NOT IN ('search_documents_pk', 'search_documents_uq_type_key')
                 ORDER BY indexname
             """
-        ).map { it["indexname"] as String to it["indexdef"] as String }
+        ).map { it["indexname"] as String to (it["indexdef"] as String).replace(" ON ONLY ", " ON ") }
         indexes.forEach { (name, _) -> jdbc.execute("DROP INDEX $name") }
         val documents = timed {
             log("Loading the search documents ($commits commits)")

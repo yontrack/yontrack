@@ -172,7 +172,8 @@ class SearchDocumentServiceImpl(
 
     /**
      * Runs a search in a read-only transaction - the one of the caller when there is one - so that
-     * the `work_mem` set for it ends with it.
+     * the settings of the search (`work_mem`, see [SearchDocumentRepository.prepareSearchTransaction])
+     * end with it.
      */
     private val readOnly = TransactionTemplate(platformTransactionManager).apply {
         propagationBehavior = TransactionDefinition.PROPAGATION_REQUIRED
@@ -193,9 +194,7 @@ class SearchDocumentServiceImpl(
         highlight: Boolean = false,
     ): SearchDocumentPage? = readOnly.execute {
         val config = ontrackConfigProperties.search
-        if (config.workMem.isNotBlank()) {
-            searchDocumentRepository.setLocalWorkMem(config.workMem.trim())
-        }
+        searchDocumentRepository.prepareSearchTransaction(config.workMem)
         searchDocumentRepository.search(query, scope, offset, size, perType, highlight, config.countCap)
     }
 

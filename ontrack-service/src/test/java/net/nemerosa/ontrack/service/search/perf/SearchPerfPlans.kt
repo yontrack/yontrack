@@ -69,16 +69,30 @@ object SearchPerfPlans {
 
     /**
      * Checks that a plan uses at least one of the [expected] indexes, and that it never scans the
-     * whole search documents table.
+     * whole search documents table, nor one of its partitions.
+     *
+     * @param parents Parent of each partition of the table, and of each index of a partition: the
+     * table is partitioned by type (#1888), and a plan names the partitions and their indexes
+     * @param small Partitions too small for a sequential scan to be a regression: Postgres rightly
+     * reads the few hundred projects of their partition without an index
      */
-    fun check(plan: String, expected: Set<String>): PlanCheck {
+    fun check(
+        plan: String,
+        expected: Set<String>,
+        parents: Map<String, String> = emptyMap(),
+        small: Set<String> = emptySet(),
+    ): PlanCheck {
         val nodes = nodes(plan)
         val indexes = nodes
             .filter { it.nodeType in indexNodeTypes }
             .mapNotNull { it.indexName }
+            .map { parents[it] ?: it }
             .distinct()
         val reason = when {
-            nodes.any { it.nodeType == "Seq Scan" && it.relationName == TABLE } ->
+            nodes.any { node ->
+                node.nodeType == "Seq Scan" && node.relationName !in small &&
+                        node.relationName?.let { name -> parents[name] ?: name } == TABLE
+            } ->
                 "sequential scan of $TABLE"
 
             indexes.none { it in expected } ->

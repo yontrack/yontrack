@@ -121,6 +121,8 @@ the nightly stamp records it: a noisy runner must not turn it red.
 | `-PsearchPerf.scale=0.1` | `1` | a smaller dataset, for working on the test itself: seconds instead of minutes, stack aside |
 | `-PsearchPerf.rounds=20` | `10` | more samples per query |
 | `-PsearchPerf.reuse=true` | `false` | keeps the dataset of the previous run, when it has the same scale |
+| `-PsearchPerf.analyze=pay-10,fix` | | only prints the `EXPLAIN (ANALYZE, BUFFERS)` of the statements of the palette and of the results page, as an administrator and as the restricted user, for these queries — no assertion, no measure. With `reuse`, a minute per try |
+| `-PsearchPerf.rebuild=false` | `true` | skips the rebuild, for working on the queries: the report then has no `rebuild_seconds`, which the nightly stamp requires |
 
 When working on it, `-x integrationTestComposeDown` keeps the stack up between two runs. The
 database is then reachable on the Postgres port of `.yontrack-it/instance.env`, as `ontrack` /
@@ -186,35 +188,48 @@ which are ranked — or on the configuration of Postgres, not a missing index.
 
 ## The latency budget (#1888)
 
-#1888 changed the design, not the indexes:
+#1888 brought the palette and the results page within budget, for the administrator and for a
+user seeing a tenth of the projects. The `EXPLAIN` assertions had all passed before: every query
+used its indexes. What was slow was how much each query read.
 
 - **Counts are capped** at `ontrack.config.search.count-cap` (1000) per type, `capped` in the
   GraphQL API, "1000+" in the UI.
 - **Only the capped candidates are ranked**: the first 1000 of each type, by tier then recency.
-  The matches are selected narrow — ID, type, tier, recency — and relevance (`ts_rank`,
-  similarity) is computed for the candidates only; the other columns are read for the rows
-  returned only.
-- **Trigram is a fallback** for the types with fewer than 20 matches in the other tiers. Its scan
-  is gated by a one-time condition, so that it is skipped when no type needs it.
-- **Search sets its own `work_mem`**, `SET LOCAL`, from `ontrack.config.search.work-mem` (64 MB).
+  Relevance (`ts_rank`, similarity) is computed for them only, and the other columns are read for
+  the rows returned only.
+- **Each type is read on its own, in the order of the ranking, up to the cap**: for each tier,
+  `ORDER BY UPDATED_AT DESC, ID LIMIT cap + 1`. For a frequent word, Postgres reads the full-text
+  matches in the order of the recency index `(TYPE, UPDATED_AT DESC, ID)` and stops at 1001; for a
+  rare one, through the full-text index. The exact, prefix and trigram tiers are always read
+  through their own index: they order on an expression the recency index cannot serve, since a wrong
+  guess of their frequency would read the whole type.
+- **The table is partitioned by type** (V87, `PARTITION BY HASH (TYPE)`, 16 partitions). Reading
+  each type on its own, on one table, searched the full-text and trigram indexes once per type,
+  each time through the entries of all the types: `pay-10` spent 60 ms in the full-text index,
+  ten times. Each partition has indexes of its own.
+- **Trigram is a fallback** for the types with fewer than 20 matches in the other tiers, gated by a
+  one-time condition: the scan does not happen for a type which has enough.
+- **Search sets up its transaction**: `SET LOCAL work_mem` from `ontrack.config.search.work-mem`
+  (64 MB), `plan_cache_mode = force_custom_plan` — whether a tier reads in recency order depends
+  on the frequency of the word, which a generic plan does not know — and `jit = off`, which cost
+  25 ms of compilation on queries of tens of milliseconds.
 
-New `EXPLAIN` assertions cover the capped count and the capped ranking (on `pay-10`), the
-trigram fallback (on typos, expecting the trigram index of the title) and the restricted scope.
+On the partitioned table, a sequential scan of a partition of fewer than 10,000 documents is not
+an `EXPLAIN` failure: Postgres rightly reads the 500 projects without an index.
 
-The first run after the change, on the same laptop:
+`-PsearchPerf.analyze=pay-10,fix` prints the `EXPLAIN (ANALYZE, BUFFERS)` of each statement: that
+is how the figures below were found. The same laptop, before and after:
 
-| p95 (ms) | Before | After | Budget |
-|---|---|---|---|
-| Palette | 398 | 366 | 150 |
-| Results page | 565 | 269 | 500 |
-| Restricted palette | 131 | 72 | 150 |
-| Restricted results | — | 127 | 500 |
-| Exact build | 66 | 73 | 150 |
-| Commit lookup | 54 | 52 | 150 |
+| p95 (ms) | Before | Capped | Partitioned | Budget |
+|---|---|---|---|---|
+| Palette | 398 | 366 | 106 | 150 |
+| Results page | 565 | 269 | 121 | 500 |
+| Restricted palette | 131 | 72 | 107 | 150 |
+| Restricted results | — | 127 | 140 | 500 |
+| Exact build | 66 | 73 | 58 | 150 |
+| Commit lookup | 54 | 52 | 98 | 150 |
 
-The results page and both restricted scenarios are within budget; **the palette is not yet**.
-Its slowest queries are still frequent words — `pay-10` (p50 490 ms), `fix`, `payment`, `cache`,
-`timeout` — whose matches are all read from the heap before the 1000 most recent can be chosen:
-the cap bounds the ranking, not the scan. Going further needs an `EXPLAIN ANALYZE` of these
-queries; a lead is to read the most recent matches of each type in order, rather than all of them.
-
+*Capped* is the first step alone (one table, all matches read, the cap on the ranking only). The
+slowest query left is `pay-10` for the restricted user, about 300 ms: Postgres expects a tenth of
+its 50,000 commits to be in the projects of the user, finds them all there, and reads them through
+the full-text index rather than in recency order. It is one query of 22, below the p95.

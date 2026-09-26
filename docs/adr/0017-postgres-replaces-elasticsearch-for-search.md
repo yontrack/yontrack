@@ -21,6 +21,12 @@ would not have covered them anyway. An indexer only *describes* documents: the S
 in the search service, and a result is rendered from the document's `DATA`, with no database read
 per hit. Access is filtered in SQL, so totals, facets and pages count only what the user can see.
 
+One table, partitioned by type (#1888, V87): hash partitions on `TYPE`, so that each type has
+indexes of its own. A search reads each type on its own, in the order of its ranking, and stops at
+the cap of the counts — which, on one unpartitioned table, meant searching every full-text and
+trigram index once per type, through the entries of all the types. It is still one table for the
+indexers and for the query.
+
 ## In the entity's transaction, inside a savepoint
 
 A document is written in the same transaction as the change it describes, by the synchronous

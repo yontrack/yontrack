@@ -105,6 +105,11 @@ Columns (indicative — the issue settles the DDL):
 Indexes: GIN on `TSV`; GIN `gin_trgm_ops` on `IDENTIFIERS` and `TITLE`; B-tree `text_pattern_ops`
 on `lower(TITLE)` for prefixes; B-tree on `(TYPE, PROJECT_ID)`.
 
+**Partitioned by type** (#1888, V87): `PARTITION BY HASH (TYPE)`, 16 partitions, the primary key
+`(TYPE, ID)`, and a B-tree on `(TYPE, UPDATED_AT DESC, ID)`. Each type is read on its own, in the
+order of its ranking, up to the count cap: a frequent word never has all its matches read, and
+each type's reads go through indexes of its own.
+
 ## Indexer contract
 
 `SearchIndexer` is replaced by a contract with **no Elasticsearch type**, and `elasticsearch-java`

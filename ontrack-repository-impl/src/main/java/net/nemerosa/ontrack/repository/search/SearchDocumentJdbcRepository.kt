@@ -162,13 +162,23 @@ class SearchDocumentJdbcRepository(
         )
     }
 
-    override fun setLocalWorkMem(workMem: String) {
+    override fun prepareSearchTransaction(workMem: String?) {
         // SET does not take a parameter, set_config does: `true` for the transaction only
-        namedParameterJdbcTemplate.queryForObject(
-            "SELECT set_config('work_mem', :workMem, true)",
-            params("workMem", workMem),
-            String::class.java,
+        val settings = listOfNotNull(
+            workMem?.takeIf { it.isNotBlank() }?.let { "work_mem" to it.trim() },
+            // Planned with the values of the query: whether a tier reads its most recent matches
+            // in order, or all of them through its index, depends on how frequent the word is
+            "plan_cache_mode" to "force_custom_plan",
+            // A search takes milliseconds: compiling it would cost more than it saves
+            "jit" to "off",
         )
+        settings.forEach { (name, value) ->
+            namedParameterJdbcTemplate.queryForObject(
+                "SELECT set_config(:name, :value, true)",
+                params("name", name).addValue("value", value),
+                String::class.java,
+            )
+        }
     }
 
     /**
@@ -248,19 +258,15 @@ class SearchDocumentJdbcRepository(
      * SQL of a search.
      *
      * The matches are the documents of the scope matching at least one of the tiers of the query,
-     * each one with its tier, the strongest it matches:
+     * each one with its tier, the strongest it matches. Each type is read on its own, in the
+     * order of the ranking of the candidates - tier, then recency - and only up to the cap of the
+     * counts, plus one to know whether it is capped: a frequent word never has all its matches
+     * read (#1888). The trigram tier is a fallback, for the types having fewer than
+     * [SearchDocumentRepository.SIMILARITY_FALLBACK_THRESHOLD] matches in the other tiers.
      *
-     * - `strong` - the exact, prefix and full-text tiers. A narrow projection (ID, type, tier and
-     *   recency), so that the tens of thousands of matches of a frequent word are cheap to count
-     *   and to sort;
-     * - `weak` - the trigram tier, a fallback: only for the types having fewer than
-     *   [SearchDocumentRepository.SIMILARITY_FALLBACK_THRESHOLD] strong matches, the scan being
-     *   skipped altogether when no type needs it.
-     *
-     * The count of each type is capped. Only the first matches of each type, up to the cap, are
-     * ranked - the candidates: chosen by tier, then recency. Their relevance within their tier
-     * (full-text rank, trigram similarity) is computed for them only. The ranking is: tier,
-     * relevance within the tier, recency, then the display order of the type. There is no
+     * The first matches of each type, up to the cap, are the candidates. Their relevance within
+     * their tier (full-text rank, trigram similarity) is computed for them only. The ranking is:
+     * tier, relevance within the tier, recency, then the display order of the type. There is no
      * precedence of a type over another before that: an exact build name beats a vague project
      * match.
      *
@@ -271,6 +277,18 @@ class SearchDocumentJdbcRepository(
         scope: SearchDocumentScope,
         countCap: Int,
     ) {
+
+        companion object {
+            /**
+             * Most recently updated first, in the order of `SEARCH_DOCUMENTS_IX_TYPE_RECENCY`
+             */
+            private const val RECENCY = "d.UPDATED_AT DESC, d.ID"
+
+            /**
+             * The same order, on an expression which the recency index cannot serve
+             */
+            private const val SORTED_RECENCY = "(d.UPDATED_AT + INTERVAL '0 second') DESC, d.ID"
+        }
 
         private val fuzzyTypes = scope.types.filter { it !in scope.nonFuzzyTypes }
 
@@ -289,10 +307,9 @@ class SearchDocumentJdbcRepository(
             .addValue("types", scope.types)
             .addValue("projectIds", scope.projectIds)
             .addValue("projectLessTypes", scope.projectLessTypes)
-            .addValue("fuzzyTypes", fuzzyTypes)
-            .addValue("fuzzyTypeCount", fuzzyTypes.size)
             .addValue("fallbackThreshold", SearchDocumentRepository.SIMILARITY_FALLBACK_THRESHOLD)
             .addValue("countCap", countCap)
+            .addValue("capPlusOne", countCap + 1)
 
         /**
          * Conditions of the tiers other than the trigram one
@@ -308,14 +325,6 @@ class SearchDocumentJdbcRepository(
             }
 
         private val strong = strongConditions.joinToString(" OR ", prefix = "(", postfix = ")") { it.second }
-
-        private val strongTier = strongConditions.joinToString(
-            prefix = "CASE ",
-            separator = " ",
-            postfix = " END"
-        ) { (tier, condition) ->
-            "WHEN $condition THEN ${tier.number}"
-        }
 
         /**
          * Relevance of a candidate `r` within its tier, `d` being its document
@@ -363,48 +372,86 @@ class SearchDocumentJdbcRepository(
         }
 
         /**
-         * All the matches, narrow: `ID`, `TYPE`, `TIER` and `UPDATED_AT`.
+         * The matches of one type, narrow - `ID`, `TYPE`, `TIER` and `UPDATED_AT` - read in the
+         * order of the ranking of the candidates: tier, then recency.
          *
-         * The trigram scan is gated by a condition on the strong matches only, which Postgres
-         * evaluates once, before the scan: when every fuzzy type has enough strong matches, the
-         * trigram indexes are not read at all.
+         * `s<n>` - the strong matches of the type: for each strong tier, its [countCap] + 1 most
+         * recent matches, then the first [countCap] + 1 of them. Each tier reads at most
+         * [countCap] + 1 documents, however frequent the word: Postgres reads the full-text
+         * matches in the order of the recency index (`SEARCH_DOCUMENTS_IX_TYPE_RECENCY`) when
+         * they are many, and through the index of the tier when they are few. `TYPE = :type`
+         * restricts every read to the partition of the type (V87).
+         *
+         * `w<n>` - the trigram matches of a fuzzy type, a fallback: the scan is gated by a
+         * condition on the strong matches of the type only, which Postgres evaluates once,
+         * before the scan - it does not happen when the type has enough strong matches.
          */
-        private val matches = if (similarity) {
-            """
-                WITH strong AS MATERIALIZED (
-                    SELECT d.ID, d.TYPE, $strongTier AS TIER, d.UPDATED_AT
-                    FROM SEARCH_DOCUMENTS d
-                    WHERE d.TYPE IN (:types)
-                    AND $access
-                    AND $strong
-                ),
-                saturated AS MATERIALIZED (
-                    SELECT s.TYPE FROM strong s GROUP BY s.TYPE HAVING COUNT(*) >= :fallbackThreshold
-                ),
-                weak AS MATERIALIZED (
-                    SELECT d.ID, d.TYPE, ${SearchMatchTier.TRIGRAM.number} AS TIER, d.UPDATED_AT
-                    FROM SEARCH_DOCUMENTS d
-                    WHERE (SELECT COUNT(*) FROM saturated x WHERE x.TYPE IN (:fuzzyTypes)) < :fuzzyTypeCount
-                    AND d.TYPE IN (:fuzzyTypes)
-                    AND d.TYPE NOT IN (SELECT x.TYPE FROM saturated x)
-                    AND $access
-                    AND (:q <% d.TITLE OR :q <% d.IDENTIFIERS)
-                    AND $strong IS NOT TRUE
-                ),
-                matches AS (
-                    SELECT s.ID, s.TYPE, s.TIER, s.UPDATED_AT FROM strong s
-                    UNION ALL
-                    SELECT w.ID, w.TYPE, w.TIER, w.UPDATED_AT FROM weak w
+        private fun typeMatches(index: Int, type: String): List<String> {
+            params.addValue("type$index", type)
+            val tiers = strongConditions.mapIndexed { i, (tier, condition) ->
+                val stronger = strongConditions.take(i).joinToString(" OR ", prefix = " AND (", postfix = ") IS NOT TRUE") { it.second }
+                // Only the full-text tier may have so many matches that reading them in the
+                // order of the recency index is cheaper. The other ones are ordered on an
+                // expression which this index cannot serve: they are always read through their
+                // own index - a wrong guess of their frequency would otherwise read the whole type.
+                val recency = if (tier == SearchMatchTier.FULL_TEXT) RECENCY else SORTED_RECENCY
+                """
+                    (
+                        SELECT d.ID, d.TYPE, ${tier.number} AS TIER, d.UPDATED_AT
+                        FROM SEARCH_DOCUMENTS d
+                        WHERE d.TYPE = :type$index
+                        AND $access
+                        AND $condition${if (i > 0) stronger else ""}
+                        ORDER BY $recency
+                        LIMIT :capPlusOne
+                    )
+                """.trimIndent()
+            }
+            val strongMatches = """
+                s$index AS MATERIALIZED (
+                    SELECT x.ID, x.TYPE, x.TIER, x.UPDATED_AT
+                    FROM (
+                        ${tiers.joinToString("\nUNION ALL\n")}
+                    ) x
+                    ORDER BY x.TIER, x.UPDATED_AT DESC, x.ID
+                    LIMIT :capPlusOne
                 )
             """.trimIndent()
-        } else {
+            return if (similarity && type in fuzzyTypes) {
+                listOf(
+                    strongMatches,
+                    """
+                        w$index AS MATERIALIZED (
+                            SELECT d.ID, d.TYPE, ${SearchMatchTier.TRIGRAM.number} AS TIER, d.UPDATED_AT
+                            FROM SEARCH_DOCUMENTS d
+                            WHERE (SELECT COUNT(*) FROM s$index) < :fallbackThreshold
+                            AND d.TYPE = :type$index
+                            AND $access
+                            AND (:q <% d.TITLE OR :q <% d.IDENTIFIERS)
+                            AND $strong IS NOT TRUE
+                            ORDER BY $SORTED_RECENCY
+                            LIMIT :capPlusOne
+                        )
+                    """.trimIndent(),
+                )
+            } else {
+                listOf(strongMatches)
+            }
+        }
+
+        /**
+         * All the matches, each type read on its own, up to its cap (see [typeMatches])
+         */
+        private val matches: String = run {
+            val perType = scope.types.mapIndexed { index, type -> index to typeMatches(index, type) }
+            val ctes = perType.flatMap { it.second }
+            val union = perType.flatMap { (index, typeCtes) ->
+                typeCtes.indices.map { i -> if (i == 0) "s$index" else "w$index" }
+            }.joinToString("\nUNION ALL\n") { cte -> "SELECT m.ID, m.TYPE, m.TIER, m.UPDATED_AT FROM $cte m" }
             """
-                WITH matches AS MATERIALIZED (
-                    SELECT d.ID, d.TYPE, $strongTier AS TIER, d.UPDATED_AT
-                    FROM SEARCH_DOCUMENTS d
-                    WHERE d.TYPE IN (:types)
-                    AND $access
-                    AND $strong
+                WITH ${ctes.joinToString(",\n")},
+                matches AS (
+                    $union
                 )
             """.trimIndent()
         }
@@ -432,7 +479,7 @@ class SearchDocumentJdbcRepository(
                 SELECT r.ID, r.TYPE, r.TIER, r.UPDATED_AT, r.N, r.CAPPED,
                        $relevance AS RELEVANCE
                 FROM ranked r
-                JOIN SEARCH_DOCUMENTS d ON d.ID = r.ID
+                JOIN SEARCH_DOCUMENTS d ON d.TYPE = r.TYPE AND d.ID = r.ID
             )
         """.trimIndent()
 
@@ -501,7 +548,7 @@ class SearchDocumentJdbcRepository(
                 SELECT d.ID, d.TYPE, d.KEY, d.PROJECT_ID, d.ENTITY_TYPE, d.ENTITY_ID, d.TITLE, d.TEXT, d.DATA, d.UPDATED_AT,
                        c.N, c.CAPPED, $score AS SCORE$highlighted
                 FROM ($rows) c
-                JOIN SEARCH_DOCUMENTS d ON d.ID = c.ID
+                JOIN SEARCH_DOCUMENTS d ON d.TYPE = c.TYPE AND d.ID = c.ID
                 ORDER BY $ranking
             """.trimIndent()
         }

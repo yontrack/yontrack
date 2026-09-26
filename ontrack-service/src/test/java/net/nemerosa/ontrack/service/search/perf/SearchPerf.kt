@@ -98,6 +98,11 @@ object SearchPerf {
     )
 
     /**
+     * A partition with fewer rows than this may be read without an index
+     */
+    private const val SMALL_PARTITION = 10_000
+
+    /**
      * A word matching tens of thousands of documents: every commit of the payment projects
      */
     private const val FREQUENT_WORD = "pay-10"
@@ -163,6 +168,13 @@ object SearchPerf {
             restrictedProjectIds = (1..dataset.projects step 10).toList(),
         )
 
+        // Plans of some queries only, for working on them
+        if (config.analyze.isNotEmpty()) {
+            details["analyze"] = analyze(searcher, scenarios, config.analyze)
+            dataSource.destroy()
+            return
+        }
+
         // EXPLAIN assertions
         val explain = explain(searcher, scenarios)
         explain.filter { it["passed"] == false }.forEach { entry ->
@@ -202,18 +214,21 @@ object SearchPerf {
         details["over_budget"] = p95s.filter { (key, p95) -> p95 > BUDGETS.getValue(key) }.keys.toList()
 
         // Rebuild
-        val rebuild = rebuild(dataSource, url)
-        if (rebuild.errors > 0) {
-            failures += "Rebuild: ${rebuild.errors} batches could not be written"
-        }
-        details["rebuild"] = linkedMapOf(
-            "documents" to rebuild.documents,
-            "errors" to rebuild.errors,
-            "per_type_seconds" to rebuild.perType.mapValues { it.value.round() },
-        )
-
         report.putAll(p95s.mapValues { it.value.round() })
-        report["rebuild_seconds"] = rebuild.seconds.round()
+        if (config.rebuild) {
+            val rebuild = rebuild(dataSource, url)
+            if (rebuild.errors > 0) {
+                failures += "Rebuild: ${rebuild.errors} batches could not be written"
+            }
+            details["rebuild"] = linkedMapOf(
+                "documents" to rebuild.documents,
+                "errors" to rebuild.errors,
+                "per_type_seconds" to rebuild.perType.mapValues { it.value.round() },
+            )
+            report["rebuild_seconds"] = rebuild.seconds.round()
+        } else {
+            log("Rebuild skipped")
+        }
         report["explain"] = explain
         dataSource.destroy()
     }
@@ -351,9 +366,7 @@ object SearchPerf {
          * Runs some code in a transaction with the `work_mem` of the search, as the service does
          */
         fun <T> inSearchTransaction(code: () -> T): T = transaction.execute {
-            if (config.workMem.isNotBlank()) {
-                repository.setLocalWorkMem(config.workMem)
-            }
+            repository.prepareSearchTransaction(config.workMem)
             code()
         }!!
     }
@@ -421,6 +434,27 @@ object SearchPerf {
     private fun explain(searcher: Searcher, scenarios: Scenarios): List<Map<String, Any?>> {
         log("EXPLAIN")
         val repository = searcher.repository
+        // Partitions of the search documents, and of their indexes, by their parents
+        val parents = repository.namedParameterJdbcTemplate.jdbcOperations.queryForList(
+            """
+                SELECT c.relname AS child, p.relname AS parent
+                FROM pg_inherits i
+                JOIN pg_class c ON c.oid = i.inhrelid
+                JOIN pg_class p ON p.oid = i.inhparent
+                WHERE p.relname LIKE 'search_documents%'
+            """
+        ).associate { it["child"] as String to it["parent"] as String }
+        // Partitions small enough to be read without an index
+        val small = repository.namedParameterJdbcTemplate.jdbcOperations.queryForList(
+            """
+                SELECT c.relname
+                FROM pg_inherits i
+                JOIN pg_class c ON c.oid = i.inhrelid
+                JOIN pg_class p ON p.oid = i.inhparent
+                WHERE p.relname = 'search_documents' AND c.reltuples < $SMALL_PARTITION
+            """,
+            String::class.java,
+        ).filterNotNull().toSet()
         val entries = mutableListOf<Map<String, Any?>>()
         fun check(scenario: String, search: Search, query: String, expected: Set<String>) {
             val statements = repository.searchStatements(
@@ -436,7 +470,7 @@ object SearchPerf {
                             String::class.java,
                         )
                     } ?: error("No plan")
-                    val check = SearchPerfPlans.check(plan, expected)
+                    val check = SearchPerfPlans.check(plan, expected, parents, small)
                     log("  ${if (check.passed) "PASS" else "FAIL"} $scenario '$query' ${search.statement} $name: ${check.indexes}${check.reason?.let { " — $it" } ?: ""}")
                     entries += linkedMapOf<String, Any?>(
                         "scenario" to scenario,
@@ -481,6 +515,44 @@ object SearchPerf {
             check("commit_lookup", palette(scenarios.admin), commit, setOf(IX_IDENTIFIERS_TRGM))
         }
         return entries
+    }
+
+    /**
+     * `EXPLAIN (ANALYZE, BUFFERS)` of each statement of the palette and of the results page, for
+     * the administrator and for the restricted user, printed and returned
+     */
+    private fun analyze(searcher: Searcher, scenarios: Scenarios, queries: List<String>): List<Map<String, Any?>> {
+        val repository = searcher.repository
+        val searches = listOf(
+            "palette" to palette(scenarios.admin),
+            "palette_restricted" to palette(scenarios.restricted),
+        ) + results(scenarios.admin).map { "results" to it } +
+                results(scenarios.restricted).map { "results_restricted" to it }
+        return queries.flatMap { query ->
+            searches.flatMap { (scenario, search) ->
+                val statements = repository.searchStatements(
+                    query, search.scope, search.offset, search.size, search.perType, search.highlight,
+                    countCap = searcher.config.countCap,
+                ) ?: error("No statement for '$query'")
+                listOfNotNull(statements.facets?.let { "facets" to it }, statements.rows?.let { "rows" to it })
+                    .map { (name, statement) ->
+                        val plan = searcher.inSearchTransaction {
+                            repository.namedParameterJdbcTemplate.queryForList(
+                                "EXPLAIN (ANALYZE, BUFFERS) ${statement.sql}",
+                                statement.params,
+                                String::class.java,
+                            )
+                        }.joinToString("\n")
+                        log("ANALYZE $scenario '$query' ${search.statement} $name\n$plan")
+                        linkedMapOf(
+                            "scenario" to scenario,
+                            "query" to query,
+                            "statement" to "${search.statement} $name",
+                            "plan" to plan,
+                        )
+                    }
+            }
+        }
     }
 
     // ---------------------------------------------------------------------------------------------
@@ -677,6 +749,9 @@ object SearchPerf {
         val scale: Double = System.getProperty("searchPerf.scale", "1").toDouble()
         val rounds: Int = System.getProperty("searchPerf.rounds", "10").toInt()
         val reuse: Boolean = System.getProperty("searchPerf.reuse", "false").toBoolean()
+        val rebuild: Boolean = System.getProperty("searchPerf.rebuild", "true").toBoolean()
+        val analyze: List<String> = System.getProperty("searchPerf.analyze", "")
+            .split(",").map { it.trim() }.filter { it.isNotEmpty() }
         val report: String = System.getProperty("searchPerf.report", "build/reports/search-perf/search-perf.json")
     }
 }

@@ -118,4 +118,65 @@ class SearchPerfPlansTest {
         val check = SearchPerfPlans.check(plan, SearchPerfPlans.TIER_INDEXES)
         assertTrue(check.passed, check.reason)
     }
+
+    /**
+     * Partitions of the table (#1888), and their indexes, named after their parents
+     */
+    private val parents = mapOf(
+        "search_documents_p07" to "search_documents",
+        "search_documents_p07_tsv_idx" to "search_documents_ix_tsv",
+        "search_documents_p07_type_updated_at_id_idx" to "search_documents_ix_type_recency",
+    )
+
+    @Test
+    fun `a plan on a partition uses the indexes of its parent`() {
+        val plan = plan(
+            """
+            {
+              "Node Type": "Bitmap Heap Scan",
+              "Relation Name": "search_documents_p07",
+              "Plans": [
+                {"Node Type": "Bitmap Index Scan", "Index Name": "search_documents_p07_tsv_idx"}
+              ]
+            }
+            """
+        )
+        val check = SearchPerfPlans.check(plan, SearchPerfPlans.TIER_INDEXES, parents)
+        assertTrue(check.passed, check.reason)
+        assertEquals(listOf("search_documents_ix_tsv"), check.indexes)
+    }
+
+    @Test
+    fun `a sequential scan of a partition of the table fails`() {
+        val plan = plan(
+            """
+            {"Node Type": "Seq Scan", "Relation Name": "search_documents_p07"}
+            """
+        )
+        val check = SearchPerfPlans.check(plan, SearchPerfPlans.TIER_INDEXES, parents)
+        assertFalse(check.passed)
+        assertEquals("sequential scan of search_documents", check.reason)
+    }
+
+    @Test
+    fun `a sequential scan of a small partition is not a failure`() {
+        val plan = plan(
+            """
+            {
+              "Node Type": "Append",
+              "Plans": [
+                {"Node Type": "Seq Scan", "Relation Name": "search_documents_p09"},
+                {"Node Type": "Bitmap Index Scan", "Index Name": "search_documents_p07_tsv_idx"}
+              ]
+            }
+            """
+        )
+        val check = SearchPerfPlans.check(
+            plan, SearchPerfPlans.TIER_INDEXES,
+            parents + ("search_documents_p09" to "search_documents"),
+            small = setOf("search_documents_p09"),
+        )
+        assertTrue(check.passed, check.reason)
+    }
 }
+

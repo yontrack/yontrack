@@ -83,10 +83,12 @@ interface SearchDocumentRepository {
     ): SearchDocumentPage?
 
     /**
-     * Sets the `work_mem` of Postgres until the end of the current transaction (`SET LOCAL`).
-     * Outside of a transaction, it has no effect.
+     * Sets up the current transaction for a search, until its end (`SET LOCAL`): its `work_mem`
+     * when given, custom plans and no JIT. Outside of a transaction, it has no effect.
+     *
+     * @param workMem `work_mem` of the transaction, `null` or blank to keep the one of the database
      */
-    fun setLocalWorkMem(workMem: String)
+    fun prepareSearchTransaction(workMem: String?)
 
     companion object {
         /**
