@@ -11,6 +11,7 @@ import Link from "next/link";
 import {PromotionLevelImage} from "@components/promotionLevels/PromotionLevelImage";
 import React from "react";
 import PromotionRunFieldValues from "@components/promotionRuns/PromotionRunFieldValues";
+import {PromotionRunAutoPromotionConditions} from "@components/promotionLevels/AutoPromotionConditions";
 
 /**
  * Representation of a promotion run to place in a list of steps.
@@ -36,6 +37,7 @@ export default function PromotionRunStep({run, onChange}) {
                                     fieldValues={run.fieldValues}
                                 />
                             }
+                            <PromotionRunAutoPromotionConditions promotionRunId={run.id}/>
                             <EntityNotificationsBadge
                                 entityType="PROMOTION_RUN"
                                 entityId={run.id}

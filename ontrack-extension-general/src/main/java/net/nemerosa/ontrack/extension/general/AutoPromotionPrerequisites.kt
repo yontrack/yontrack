@@ -38,16 +38,18 @@ class AutoPromotionPrerequisites(
         branchValidationStamps: List<ValidationStamp>,
         excludedPromotionRunId: Int? = null,
     ): Boolean {
+        // Keeps only the stamps & levels selected by the auto promotion property
+        val effective = AutoPromotionEffectivePrerequisites.of(
+            property = property,
+            branchValidationStamps = branchValidationStamps,
+            branchPromotionLevels = branchPromotionLevels,
+        )
         // Checks the status of each required validation stamp
-        val allVSPassed = branchValidationStamps
-            // Keeps only the ones selected by the auto promotion property
-            .filter { vs -> property.contains(vs) }
+        val allVSPassed = effective.validationStamps
             // They must all pass - note that `isValidationRunPassed` looks at the *last* run only
             .all { vs -> validationRunService.isValidationRunPassed(build, vs) }
         // Checks that all the required promotions are granted
-        val allPLPassed = branchPromotionLevels
-            // Keeps only the ones selected by the auto promotion property
-            .filter { pl -> property.contains(pl) }
+        val allPLPassed = effective.promotionLevels
             // They must all be granted
             .all { pl -> isPromoted(build, pl, excludedPromotionRunId) }
         return allVSPassed && allPLPassed

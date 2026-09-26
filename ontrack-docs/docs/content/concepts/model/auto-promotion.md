@@ -25,6 +25,20 @@ The list of validation stamps can be defined by:
 
 The list of promotion levels which must be granted is set independently of the list of validations.
 
+## Seeing the conditions
+
+A promotion level with an auto promotion carries a ⚡ next to its name. Hovering it lists the conditions: the validation stamps actually required on the branch — the ones named explicitly, plus the ones matching `include` and not `exclude` — the required promotions, and the regular expressions when they are set.
+
+Hovering a promotion of a build, in the branch builds view or on the build page, shows the same conditions under **Auto promotion conditions**, with their state for that build:
+
+* the status of the last run of each required validation, linking to that run, or **Not run**
+* each required promotion, linking to its last run on the build, or **Not granted**
+* a summary line, for example `2/3 validations passed · 1/1 promotions granted`
+
+These are the _current_ conditions and statuses. The auto promotion property is not versioned, so they explain why the build is — or is not — promoted today, not what triggered a promotion in the past. They are shown for manually granted promotions too.
+
+The GraphQL API exposes them as the `autoPromotionConditions` field of `PromotionLevel` and of `PromotionRun`.
+
 ## Revoking a promotion
 
 By default, a promotion which has been granted stays granted, even if the validations which triggered it later fail.

@@ -7,7 +7,7 @@ export default function Decorations({entity}) {
             {
                 entity.decorations && <Space size={4}>
                     {
-                        entity.decorations.map(decoration => <Decoration key={decoration.decorationType} decoration={decoration}/>)
+                        entity.decorations.map(decoration => <Decoration key={decoration.decorationType} decoration={decoration} entity={entity}/>)
                     }
                 </Space>
             }
