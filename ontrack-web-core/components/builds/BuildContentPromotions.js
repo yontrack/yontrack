@@ -15,6 +15,7 @@ import {promotionLevelUri, promotionRunUri} from "@components/common/Links";
 import Link from "next/link";
 import TimestampText from "@components/common/TimestampText";
 import PromotionRunFieldValues from "@components/promotionRuns/PromotionRunFieldValues";
+import {PromotionRunAutoPromotionConditions} from "@components/promotionLevels/AutoPromotionConditions";
 
 const query = `
     query BuildPromotions($buildId: Int!) {
@@ -105,6 +106,7 @@ export default function BuildContentPromotions({build}) {
                                         fieldValues={run.fieldValues}
                                     />
                                 }
+                                <PromotionRunAutoPromotionConditions promotionRunId={run.id}/>
                             </Space>
                         </div>
                     }>

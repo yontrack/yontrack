@@ -133,6 +133,52 @@ type AuthorizedProject {
   role: ProjectRole!
 }
 
+"Current conditions of the auto promotion of a promotion level, and their current state for a given build."
+type AutoPromotionBuildConditions {
+  "Is the promotion revoked when one of its prerequisites is no longer valid?"
+  autoRevoke: Boolean
+  "Regular expression excluding validation stamps by name - empty when not set"
+  exclude: String!
+  "Regular expression including validation stamps by name - empty when not set"
+  include: String!
+  "State of each required promotion level for the build, in branch order"
+  promotionLevels: [AutoPromotionPromotionLevelCondition!]!
+  "State of each required validation stamp for the build, in branch order"
+  validationStamps: [AutoPromotionValidationStampCondition!]!
+}
+
+"Current conditions of the auto promotion of a promotion level: the validation stamps and promotion levels it requires, as they are resolved on the branch today."
+type AutoPromotionConditions {
+  "Is the promotion revoked when one of its prerequisites is no longer valid?"
+  autoRevoke: Boolean
+  "Regular expression excluding validation stamps by name - empty when not set"
+  exclude: String!
+  "Regular expression including validation stamps by name - empty when not set"
+  include: String!
+  "Promotion levels required for the promotion, in branch order"
+  promotionLevels: [PromotionLevel!]!
+  "Validation stamps required for the promotion, in branch order: the ones named explicitly, plus the ones of the branch matching the include expression and not the exclude one."
+  validationStamps: [ValidationStamp!]!
+}
+
+"State of a promotion level required by an auto promotion, for a build"
+type AutoPromotionPromotionLevelCondition {
+  "Required promotion level"
+  promotionLevel: PromotionLevel!
+  "Latest run of the promotion level for the build - null when it is not granted"
+  promotionRun: PromotionRun
+}
+
+"State of a validation stamp required by an auto promotion, for a build"
+type AutoPromotionValidationStampCondition {
+  "Latest run of the validation stamp for the build - null when it never ran"
+  lastRun: ValidationRun
+  "Does the latest run count as passed for the auto promotion?"
+  passed: Boolean
+  "Required validation stamp"
+  validationStamp: ValidationStamp!
+}
+
 "Audit entry for an auto versioning processing order."
 type AutoVersioningAuditEntry {
   "History of the different states"
@@ -5414,6 +5460,8 @@ type PromotionLevel implements Authorizable & ProjectEntity {
   annotatedDescription: String
   "Authorizations for this context"
   authorizations: [Authorization!]!
+  "Current conditions of the auto promotion of this promotion level - null when it has no auto promotion"
+  autoPromotionConditions: AutoPromotionConditions
   "Allows a promotion level to be granted on a build as soon as a list of validation stamps and/or other promotions has been passed"
   autoPromotionProperty: Property
   "List of branches targeted for auto-versioning based on this promotion level"
@@ -5519,6 +5567,8 @@ type PromotionRun implements Authorizable & ProjectEntity {
   annotatedDescription: String
   "Authorizations for this context"
   authorizations: [Authorization!]!
+  "Current conditions of the auto promotion of this run's promotion level, with their current state for this run's build - null when the promotion level has no auto promotion"
+  autoPromotionConditions: AutoPromotionBuildConditions
   "List of branches targeted for auto-versioning based on this promotion run or with their reason for rejection"
   autoVersioningTrail: AutoVersioningTrail @deprecated(reason : "Will be removed in V6. Use autoVersioningTrailPaginated instead.")
   "List of branches targeted for auto-versioning based on this promotion run or with their reason for rejection"
