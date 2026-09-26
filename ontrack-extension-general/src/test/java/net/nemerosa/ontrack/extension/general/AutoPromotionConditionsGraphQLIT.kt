@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.extension.general
 
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 import net.nemerosa.ontrack.graphql.AbstractQLKTITSupport
 import net.nemerosa.ontrack.it.AsAdminTest
 import net.nemerosa.ontrack.model.structure.PromotionLevel
@@ -58,14 +58,14 @@ class AutoPromotionConditionsGraphQLIT : AbstractQLKTITSupport() {
             """
         ).path("promotionRuns").path(0).path("autoPromotionConditions")
 
-    private fun JsonNode.names(field: String, path: String? = null) =
-        path(field).map { item -> (if (path != null) item.path(path) else item).path("name").asText() }
+    private fun JsonNode.names(field: String, path: String? = null): List<String> =
+        path(field).toList().map { item -> (if (path != null) item.path(path) else item).path("name").asString() }
 
     private fun JsonNode.stamp(name: String): JsonNode =
-        path("validationStamps").first { it.path("validationStamp").path("name").asText() == name }
+        path("validationStamps").first { it.path("validationStamp").path("name").asString() == name }
 
     private fun JsonNode.level(name: String): JsonNode =
-        path("promotionLevels").first { it.path("promotionLevel").path("name").asText() == name }
+        path("promotionLevels").first { it.path("promotionLevel").path("name").asString() == name }
 
     @Test
     fun `No property gives no conditions`() {
@@ -118,8 +118,8 @@ class AutoPromotionConditionsGraphQLIT : AbstractQLKTITSupport() {
                     )
                 )
                 val conditions = levelConditions(silver)
-                assertEquals(".*TESTS", conditions.path("include").asText())
-                assertEquals("SLOW.*", conditions.path("exclude").asText())
+                assertEquals(".*TESTS", conditions.path("include").asString())
+                assertEquals("SLOW.*", conditions.path("exclude").asString())
                 assertEquals(true, conditions.path("autoRevoke").asBoolean())
                 assertEquals(
                     listOf("BUILD", "UNIT.TESTS", "INTEGRATION.TESTS"),
@@ -163,8 +163,8 @@ class AutoPromotionConditionsGraphQLIT : AbstractQLKTITSupport() {
                     val silverRun = promote(silver)
 
                     val conditions = runConditions(silverRun)
-                    assertEquals(".*TESTS", conditions.path("include").asText())
-                    assertEquals("SLOW.*", conditions.path("exclude").asText())
+                    assertEquals(".*TESTS", conditions.path("include").asString())
+                    assertEquals("SLOW.*", conditions.path("exclude").asString())
                     assertEquals(false, conditions.path("autoRevoke").asBoolean())
 
                     assertEquals(

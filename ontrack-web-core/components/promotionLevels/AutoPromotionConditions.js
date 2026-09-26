@@ -23,14 +23,14 @@ export default function AutoPromotionConditions({conditions, withBuild = false})
     const validationStamps = conditions.validationStamps ?? []
     const promotionLevels = conditions.promotionLevels ?? []
     return (
-        <Space direction="vertical" data-testid="auto-promotion-conditions" style={{maxWidth: '32em'}}>
+        <Space orientation="vertical" data-testid="auto-promotion-conditions" style={{maxWidth: '32em'}}>
             {
                 withBuild && <AutoPromotionSummary validationStamps={validationStamps} promotionLevels={promotionLevels}/>
             }
             {
                 validationStamps.length > 0 && <>
                     <Typography.Text strong>Validations</Typography.Text>
-                    <Space direction="vertical" size={4}>
+                    <Space orientation="vertical" size={4}>
                         {
                             validationStamps.map(item => withBuild ?
                                 <ValidationStampCondition key={item.validationStamp.id} condition={item}/> :
@@ -43,7 +43,7 @@ export default function AutoPromotionConditions({conditions, withBuild = false})
             {
                 promotionLevels.length > 0 && <>
                     <Typography.Text strong>Promotions</Typography.Text>
-                    <Space direction="vertical" size={4}>
+                    <Space orientation="vertical" size={4}>
                         {
                             promotionLevels.map(item => withBuild ?
                                 <PromotionLevelCondition key={item.promotionLevel.id} condition={item}/> :
@@ -241,7 +241,7 @@ export function PromotionRunAutoPromotionConditions({promotionRunId}) {
         return <Spin size="small"/>
     }
     return conditions ?
-        <Space direction="vertical" data-testid={`promotion-run-auto-promotion-conditions-${promotionRunId}`}>
+        <Space orientation="vertical" data-testid={`promotion-run-auto-promotion-conditions-${promotionRunId}`}>
             <Typography.Text strong>Auto promotion conditions</Typography.Text>
             <AutoPromotionConditions conditions={conditions} withBuild={true}/>
         </Space> :
