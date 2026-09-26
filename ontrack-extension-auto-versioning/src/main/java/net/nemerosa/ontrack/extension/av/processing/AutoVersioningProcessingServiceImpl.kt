@@ -223,27 +223,36 @@ class AutoVersioningProcessingServiceImpl(
 
                 // Post-processing
                 if (!order.postProcessing.isNullOrBlank()) {
-                    // Gets the post processor
-                    val postProcessing = postProcessingRegistry.getPostProcessingById<Any>(order.postProcessing)
-                    // If processing cannot be found, we consider this an error
-                    if (postProcessing == null) {
-                        throw PostProcessingNotFoundException(order.postProcessing)
-                    }
-                    // Launching the post-processing
-                    else {
-                        logger.debug("Processing auto versioning order launching post processing: {}", order)
-                        autoVersioningAuditService.onPostProcessingStart(order, upgradeBranch)
-                        measureAndLaunchPostProcessing(
-                            postProcessing,
+                    try {
+                        // Gets the post processor
+                        val postProcessing = postProcessingRegistry.getPostProcessingById<Any>(order.postProcessing)
+                        // If processing cannot be found, we consider this an error
+                        if (postProcessing == null) {
+                            throw PostProcessingNotFoundException(order.postProcessing)
+                        }
+                        // Launching the post-processing
+                        else {
+                            logger.debug("Processing auto versioning order launching post processing: {}", order)
+                            autoVersioningAuditService.onPostProcessingStart(order, upgradeBranch)
+                            measureAndLaunchPostProcessing(
+                                postProcessing,
+                                order,
+                                repositoryURI,
+                                repository,
+                                upgradeBranch,
+                                scm,
+                                avRenderer,
+                            )
+                            logger.debug("Processing auto versioning order end of post processing: {}", order)
+                            autoVersioningAuditService.onPostProcessingEnd(order, upgradeBranch)
+                        }
+                    } catch (e: Exception) {
+                        autoVersioningEventService.sendError(
                             order,
-                            repositoryURI,
-                            repository,
-                            upgradeBranch,
-                            scm,
-                            avRenderer,
+                            e.message?.takeIf { it.isNotBlank() } ?: "Issue while processing the change",
+                            e
                         )
-                        logger.debug("Processing auto versioning order end of post processing: {}", order)
-                        autoVersioningAuditService.onPostProcessingEnd(order, upgradeBranch)
+                        throw e
                     }
                 }
 
