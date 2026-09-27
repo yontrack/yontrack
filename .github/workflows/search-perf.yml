@@ -2,7 +2,7 @@
 #
 # Runs `./gradlew searchPerfTest` - search on 100k builds and 1M commits, bulk-loaded into the
 # Postgres of the integration test stack - and records its report as the SEARCH.PERFORMANCE stamp
-# on the Yontrack build of the commit it measured: the five figures as `metrics` when the run
+# on the Yontrack build of the commit it measured: the seven figures as `metrics` when the run
 # passed, FAILED with the reason when it did not. The stamp is declared in .yontrack/ci.yaml, and
 # doc/dev-guide/search-perf-test.md (on `v6` until the cutover) is the page for the test itself.
 #

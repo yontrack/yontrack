@@ -71,6 +71,8 @@ write_report() {
   "results_p95": 508.4,
   "commit_lookup_p95": 49.6,
   "exact_build_p95": 73.9,
+  "palette_restricted_p95": 71.9,
+  "results_restricted_p95": 127.1,
   "rebuild_seconds": 139.7,
   "explain": [
     {"scenario": "palette", "query": "payment", "statement": "palette rows",
@@ -81,7 +83,8 @@ write_report() {
      "indexes": ["search_documents_ix_identifiers"]}
   ],
   "details": {
-    "budgets": {"palette_p95": 150.0, "results_p95": 500.0, "exact_build_p95": 150.0, "commit_lookup_p95": 150.0},
+    "budgets": {"palette_p95": 150.0, "results_p95": 500.0, "exact_build_p95": 150.0, "commit_lookup_p95": 150.0,
+                "palette_restricted_p95": 150.0, "results_restricted_p95": 500.0},
     "over_budget": [],
     "failures": []
   }
@@ -100,8 +103,8 @@ assert_eq "1" "$(grep -c . <<< "$calls")" "one call"
 assert_contains "$calls" "validate --project yontrack --branch v6 --build 20260925231746-413 --validation SEARCH.PERFORMANCE" \
     "on the resolved build, spelled out: nothing in this workflow exports YONTRACK_BUILD_NAME"
 assert_contains "$calls" \
-    "metrics --metric palette_p95=361.6 --metric results_p95=508.4 --metric commit_lookup_p95=49.6 --metric exact_build_p95=73.9 --metric rebuild_seconds=139.7" \
-    "the five figures, in the order of the report"
+    "metrics --metric palette_p95=361.6 --metric results_p95=508.4 --metric commit_lookup_p95=49.6 --metric exact_build_p95=73.9 --metric palette_restricted_p95=71.9 --metric results_restricted_p95=127.1 --metric rebuild_seconds=139.7" \
+    "the seven figures, the restricted user's included (#1888)"
 assert_not_contains "$calls" "--status" "no status: metrics falls back to PASSED"
 assert_contains "$calls" "--metric rebuild_seconds=139.7 --run-time 600 --source-type github-workflow" \
     "the pass-through arguments come last, after the metrics subcommand"
@@ -185,6 +188,12 @@ run_validate "$REPORT"
 assert_eq "1" "$script_status" "a report missing a figure fails"
 assert_contains "$calls" "--status FAILED --description The searchPerfTest report has no figure for: exact_build_p95 rebuild_seconds." \
     "naming the missing figures"
+
+write_report 'del(.palette_restricted_p95) | del(.results_restricted_p95)'
+run_validate "$REPORT"
+assert_eq "1" "$script_status" "a report without the restricted figures fails too"
+assert_contains "$calls" "has no figure for: palette_restricted_p95 results_restricted_p95." \
+    "naming them"
 assert_not_contains "$calls" "--metric" "and sends none: a partial set reads as a smaller measure"
 
 # ===============================================================================================
