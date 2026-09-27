@@ -1,10 +1,10 @@
 ---
 name: release-milestone
-description: Mark every status:ready issue of a GitHub milestone as released — swap status:ready for status:released, comment "Available in <version>", close the issue. Presents the list for approval first. Use when asked to release, close out, or mark as released the issues of a milestone.
+description: Mark every status:ready issue of a GitHub milestone as released — swap status:ready for status:released, comment "Available in <version>", and close any that are still open (ready issues are normally closed already). Presents the list for approval first. Use when asked to release, close out, or mark as released the issues of a milestone.
 user-invocable: true
 ---
 
-# /release-milestone — Close Out a Milestone's Ready Issues
+# /release-milestone — Release a Milestone's Ready Issues
 
 Arguments passed: `$ARGUMENTS`
 
@@ -17,6 +17,11 @@ If either is missing, ask for it. Do not derive the version from the milestone: 
 in a `.0` or in a patch.
 
 All commands target `yontrack/yontrack`.
+
+A `status:ready` issue is normally **closed** already: the workflow in `CLAUDE.md` closes an issue
+when it is marked ready, and the label and the milestone are what keep it findable until the
+release. Issues marked ready before that rule, or left open because they had no milestone yet, are
+still open — this skill closes those too.
 
 ---
 
@@ -32,18 +37,18 @@ If the milestone is not in the list, stop and say so. Check that `version` start
 ## Step 2 — List the issues
 
 ```bash
-gh issue list -R yontrack/yontrack --milestone "<milestone>" --label status:ready --state open --limit 500 \
-  --json number,title,labels \
-  --jq '.[] | "#\(.number)\t\(.title)\t\([.labels[].name]|join(", "))"'
+gh issue list -R yontrack/yontrack --milestone "<milestone>" --label status:ready --state all --limit 500 \
+  --json number,title,state,labels \
+  --jq '.[] | "#\(.number)\t\(.title)\t\(.state)\t\([.labels[].name]|join(", "))"'
 ```
 
 If the list is empty, say so and stop.
 
 ## Step 3 — Approval gate
 
-Show the list as a table (key, title, labels) with the count, and state what will happen to each
-issue. **Wait for an explicit yes.** Closing issues and posting comments are outward-facing, so no
-approval, no action.
+Show the list as a table (key, title, state, labels) with the count, and state what will happen to
+each issue — relabel and comment for all, close as well for the ones still open. **Wait for an
+explicit yes.** Closing issues and posting comments are outward-facing, so no approval, no action.
 
 ## Step 4 — Release each approved issue
 
@@ -52,13 +57,15 @@ Only the issues shown in Step 3:
 ```bash
 for n in <numbers>; do
   if gh issue edit $n -R yontrack/yontrack --add-label status:released --remove-label status:ready >/dev/null \
-    && gh issue close $n -R yontrack/yontrack --comment "Available in <version>" >/dev/null; then
+    && gh issue comment $n -R yontrack/yontrack --body "Available in <version>" >/dev/null \
+    && { [ "$(gh issue view $n -R yontrack/yontrack --json state --jq .state)" = CLOSED ] \
+         || gh issue close $n -R yontrack/yontrack --reason completed >/dev/null; }; then
     echo "OK #$n"; else echo "FAIL #$n"; fi
 done
 ```
 
 The label is `status:released`. There is no `status:release`, and `gh` rejects a label that doesn't
-exist. The `&&` keeps a failed relabel from closing the issue anyway.
+exist. The `&&` keeps a failed relabel from commenting or closing anyway.
 
 On any `FAIL`, report the issue numbers and the error. Don't retry blindly.
 
@@ -70,7 +77,7 @@ silently**. Show them as a new table and go back to Step 3 for them.
 
 ## Step 6 — Report
 
-Say how many issues were released and closed, list any failures, and confirm the Step 5 query came
+Say how many issues were released, how many of them were still open and got closed, list any failures, and confirm the Step 5 query came
 back empty.
 
 ---

@@ -23,5 +23,6 @@ Edit the right-hand column to match whatever vocabulary you actually use.
   and must not be substituted for the labels above — the two vocabularies coexist.
 - Two of those lifecycle labels are driven by the agent workflow (see *Issue status labels* in `CLAUDE.md`):
   `status:wip` when work starts on an issue, and `status:ready` once the change is merged into `main` **and**
-  the CI build on `main` is green. Only one `status:*` label is set at a time — remove the previous one when
-  applying the next.
+  the CI build on `main` is green. The issue is **closed** at `status:ready` (when it has a milestone), and
+  `/release-milestone` later swaps `status:ready` for `status:released`. Only one `status:*` label is set at a
+  time — remove the previous one when applying the next.

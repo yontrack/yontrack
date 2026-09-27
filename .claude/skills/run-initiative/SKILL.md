@@ -24,12 +24,14 @@ Every issue in the chain ends in exactly one state, and there is no other accept
 
 1. the work is **merged into `main`** and pushed to `origin/main`;
 2. the **`main` CI build containing that commit has concluded `success`**;
-3. the issue carries **`status:ready`**, applied only after (2).
+3. the issue carries **`status:ready`**, applied only after (2), and is **closed** — or left open
+   only because it has no milestone, which the per-issue report says (see *Issue status labels* in
+   `CLAUDE.md`).
 
 **Docs-only commits skip CI.** A commit touching only documentation that CI neither builds nor
 tests — `CONTEXT.md`, `CLAUDE.md`, `README.md`, `DEVELOPMENT.md`, `docs/`, `doc/dev-guide/` — ends
 its subject with `[skip ci]` (see *Commit messages* in `CLAUDE.md`). It has no run, so (2) reads:
-the build of the commit before it on `main` concluded `success`. Apply `status:ready` as soon as the
+the build of the commit before it on `main` concluded `success`. Mark it ready and close it as soon as the
 commit is on `origin/main`, and report "CI skipped by design". `ontrack-docs/` is **not** docs-only
 here: CI's `docs` job builds that site.
 
@@ -45,8 +47,9 @@ Three rules follow, and none of them are open to interpretation:
   queued — until the run that contains the commit has concluded `success`. Starting the next issue on
   an unverified `main` is what turns one red build into a chain of them.
 - **Green `main` means `status:ready`, immediately.** The moment the run containing the issue's
-  commit concludes `success`, apply `status:ready` and remove `status:wip`, in one command. Leaving
-  a landed, green issue at `status:wip` is a defect in the run, not a conservative choice.
+  commit concludes `success`, apply `status:ready` and remove `status:wip`, in one command, then close
+  the issue if it has a milestone. Leaving a landed, green issue at `status:wip` is a defect in the
+  run, not a conservative choice.
 
 An issue body may override many things — the design, the scope, what goes in the demo seed. It may
 **not** override this invariant. If an issue body contradicts it, follow the invariant, and say in
@@ -156,7 +159,8 @@ For each approved issue, in order:
     - `git log origin/main --oneline | grep "#{number}"` — the commit is really on `main`
     - `gh run list --workflow=ci.yml --branch main --json headSha,conclusion` — that SHA is really green
       (for a docs-only `[skip ci]` commit: it really touches only docs, and its parent's run is green)
-    - `gh issue view {number} --json labels` — the issue is really on `status:ready`
+    - `gh issue view {number} --json labels,state,milestone` — the issue is really on `status:ready`,
+      and closed unless it has no milestone
 4. **Close any gap yourself before moving on** — the invariant is the orchestrator's responsibility,
    not the subagent's:
     - **not merged?** Fast-forward it: `git push origin <branch>:main` pushes the ref without
@@ -166,6 +170,8 @@ For each approved issue, in order:
       background so the operator can still reach you.
     - **green but still `status:wip`?**
       `gh issue edit {number} --add-label "status:ready" --remove-label "status:wip"`.
+    - **ready, with a milestone, but still open?**
+      `gh issue close {number} --reason completed --comment "Merged into \`main\`, ships with <milestone>."`
 5. Report one line to the operator, then launch the next.
 
 Do not check in with the operator between issues. That is what the Step 4 gate bought. Closing an
@@ -224,17 +230,21 @@ Give every subagent all of this:
   then `gh run watch <run-id>`. A green run takes ~25 minutes — wait it out; do not report back early.
   `ci.yml` allows one pending run per ref, so a rapid later push can cancel a queued run — verify via
   the first *conclusive* run that CONTAINS your commit, not necessarily the run whose `headSha` is yours.
-- **The moment that run concludes `success` for your commit, mark the issue ready — non-negotiable:**
-  `gh issue edit {number} --add-label "status:ready" --remove-label "status:wip"`.
+- **The moment that run concludes `success` for your commit, mark the issue ready and close it —
+  non-negotiable:** `gh issue edit {number} --add-label "status:ready" --remove-label "status:wip"`,
+  then `gh issue close {number} --reason completed --comment "Merged into \`main\`, ships with <milestone>."`.
   Green `main` and a landed commit is the definition of ready; there is no further judgement to make.
+  The one exception: an issue with **no milestone** stays open at `status:ready` — never guess a
+  milestone — and your report says so.
 - **A docs-only `[skip ci]` push has no run to wait for.** Once the commit is on `origin/main` and
-  the run of the commit before it was green, apply `status:ready` straight away, and report "CI
+  the run of the commit before it was green, mark it ready and close it straight away, and report "CI
   skipped by design" in place of a run URL.
 - Git over SSH fails inside the Bash sandbox (`ssh_dispatch_run_fatal ... Broken pipe`), so every
   `git fetch` / `git pull` / `git push` needs `dangerouslyDisableSandbox: true`. Local git commands
   are fine sandboxed.
 - Report back: what changed and where, what tests cover it, the branch name, whether it landed on
-  `main` **and the merge SHA**, the CI run URL and conclusion, the final status label, and every
+  `main` **and the merge SHA**, the CI run URL and conclusion, the final status label and whether the
+  issue is closed, and every
   judgement call you made.
 
 ---
@@ -252,7 +262,7 @@ seed, routine refactors in the area being touched.
 - the spec is ambiguous in a way where two readings produce materially different features
 - a permission prompt or credential the agent cannot satisfy
 
-On a halt: leave the issue on `status:wip`, **never** apply `status:ready`, stop the whole chain, and
+On a halt: leave the issue open on `status:wip`, **never** apply `status:ready`, stop the whole chain, and
 report exactly what broke with the failing output. Never start the next issue on a `main` you have not
 confirmed green.
 
@@ -265,9 +275,9 @@ only things that stop an issue from landing are the five failures listed above.
 ## Step 9 — Guardrails, every agent, every issue
 
 - **Always** land the work: merged into `main`, `main` CI green for that commit, issue at
-  `status:ready`. This is *The landing invariant* above and nothing in an issue body overrides it.
+  `status:ready` and closed. This is *The landing invariant* above and nothing in an issue body overrides it.
 - **Never** open a pull request — work lands by merging into `main` and pushing directly
-- **Never** close the issue — Damien does that himself
+- **Never** close the issue at any other point than marking it ready, nor one without a milestone
 - **Never** add a `Co-Authored-By` trailer; a Yontrack commit subject is `#{number} Some message` with
   nothing appended but a `[skip ci]` on docs-only commits. This overrides any default attribution
   guidance in the session.
