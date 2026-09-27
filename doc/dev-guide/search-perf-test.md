@@ -105,9 +105,9 @@ The run fails:
 - on a failed `EXPLAIN` assertion — deterministic, the realistic regression;
 - on a p95 past its **ceiling** — one per scenario (`CEILINGS` in `SearchPerf`): palette,
   results, restricted palette, restricted results, exact build, commit. The ceilings are for the
-  GitHub runner the nightly runs on, slower than the machine of the budget: each one is set from
-  the p95 of a `workflow_dispatch` run of `search-perf.yml`, × 1.5 (#1888). Until that run, they
-  are still 10 times the budget;
+  GitHub runner the nightly runs on, slower than the machine of the budget: each one is the p95
+  of a `workflow_dispatch` run of `search-perf.yml`, × 1.5 (#1888). After a change which moves
+  the figures, dispatch a run and set them again the same way (see the table below);
 - on an error of the rebuild.
 
 A p95 over its **budget** — palette 150 ms, results page 500 ms, exact build and commit lookup 150 ms
@@ -228,6 +228,21 @@ is how the figures below were found. The same laptop, before and after:
 | Restricted results | — | 127 | 140 | 500 |
 | Exact build | 66 | 73 | 58 | 150 |
 | Commit lookup | 54 | 52 | 98 | 150 |
+
+On the GitHub runner (`ubuntu-latest`, Postgres defaults), the dispatch run the ceilings come
+from — [36300940963](https://github.com/yontrack/yontrack/actions/runs/36300940963), on `e3c6b85c31`:
+
+| p95 (ms) | Runner before | Runner after | Ceiling (× 1.5) |
+|---|---|---|---|
+| Palette | 727 | 217 | 326 |
+| Results page | 894 | 236 | 354 |
+| Restricted palette | — | 167 | 251 |
+| Restricted results | — | 230 | 346 |
+| Exact build | 136 | 99 | 149 |
+| Commit lookup | 84 | 162 | 244 |
+
+The budget is the design target, verified locally; the runner is held to its ceilings. The full
+rebuild takes 281 s on the runner (241 s before partitioning), 236 s of which for the commits.
 
 *Capped* is the first step alone (one table, all matches read, the cap on the ranking only). The
 slowest query left is `pay-10` for the restricted user, about 300 ms: Postgres expects a tenth of

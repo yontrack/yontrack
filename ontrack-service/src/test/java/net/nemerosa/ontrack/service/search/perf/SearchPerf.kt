@@ -70,15 +70,16 @@ object SearchPerf {
      * Ceilings of the p95 latencies, in milliseconds: a p95 past its ceiling fails the run, and
      * the nightly `SEARCH.PERFORMANCE` stamp. The nightly runs on a GitHub runner, slower than
      * the machine of the budget: each ceiling is the p95 of a `workflow_dispatch` run of
-     * `search-perf.yml`, times 1.5 (#1888).
+     * `search-perf.yml`, times 1.5 (#1888) - run 36300940963, on e3c6b85c31. Set them again the
+     * same way after a change which moves the figures.
      */
     private val CEILINGS = mapOf(
-        "palette_p95" to 1500.0,
-        "results_p95" to 5000.0,
-        "palette_restricted_p95" to 1500.0,
-        "results_restricted_p95" to 5000.0,
-        "exact_build_p95" to 1500.0,
-        "commit_lookup_p95" to 1500.0,
+        "palette_p95" to 326.0, // 217.3
+        "results_p95" to 354.0, // 235.8
+        "palette_restricted_p95" to 251.0, // 167.0
+        "results_restricted_p95" to 346.0, // 230.2
+        "exact_build_p95" to 149.0, // 99.2
+        "commit_lookup_p95" to 244.0, // 162.3
     )
 
     private const val PALETTE_SIZE = 20
