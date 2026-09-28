@@ -42,8 +42,9 @@ interface AutoVersioningAuditService {
      * The [order] was just created. It's the first event in the story of this auto versioning order.
      *
      * @param order Auto versioning order
+     * @param data Data to attach to the `CREATED` state, like the order it retries or reschedules
      */
-    fun onCreated(order: AutoVersioningOrder): AutoVersioningAuditEntry
+    fun onCreated(order: AutoVersioningOrder, data: Map<String, String> = emptyMap()): AutoVersioningAuditEntry
 
     /**
      * The [order] was created with a future schedule and is now waiting for its time.
@@ -73,8 +74,9 @@ interface AutoVersioningAuditService {
      *
      * @param order Auto versioning order being processed
      * @param error The error on processing
+     * @param data Additional data to attach to the `ERROR` state, like its automatic retry
      */
-    fun onError(order: AutoVersioningOrder, error: Throwable)
+    fun onError(order: AutoVersioningOrder, error: Throwable, vararg data: Pair<String, String>)
 
     /**
      * The processing of this [order] has started.

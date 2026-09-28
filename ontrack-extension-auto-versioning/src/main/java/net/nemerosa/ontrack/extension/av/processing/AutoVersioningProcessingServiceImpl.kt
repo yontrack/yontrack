@@ -13,6 +13,10 @@ import net.nemerosa.ontrack.extension.av.postprocessing.PostProcessingInfo
 import net.nemerosa.ontrack.extension.av.postprocessing.PostProcessingNotFoundException
 import net.nemerosa.ontrack.extension.av.postprocessing.PostProcessingRegistry
 import net.nemerosa.ontrack.extension.av.properties.FilePropertyType
+import net.nemerosa.ontrack.extension.av.retry.AutoVersioningDeferredErrorException
+import net.nemerosa.ontrack.extension.av.retry.AutoVersioningRetryService
+import net.nemerosa.ontrack.extension.av.retry.autoVersioningErrorMessage
+import net.nemerosa.ontrack.extension.av.retry.isAutoVersioningRetryable
 import net.nemerosa.ontrack.extension.av.versionrules.AutoVersioningVersionRule
 import net.nemerosa.ontrack.extension.av.versionrules.AutoVersioningVersionRuleContext
 import net.nemerosa.ontrack.extension.av.versionrules.AutoVersioningVersionRuleRegistry
@@ -46,19 +50,37 @@ class AutoVersioningProcessingServiceImpl(
     private val versionSourceFactory: VersionSourceFactory,
     private val structureService: StructureService,
     private val autoVersioningVersionRuleRegistry: AutoVersioningVersionRuleRegistry,
+    private val autoVersioningRetryService: AutoVersioningRetryService,
 ) : AutoVersioningProcessingService {
 
     private val logger: Logger = LoggerFactory.getLogger(AutoVersioningProcessingServiceImpl::class.java)
 
-    override fun process(order: AutoVersioningOrder): AutoVersioningProcessingOutcome {
-        val outcome = processOrder(order)
+    /**
+     * Notifies an error, mentioning the automatic retries which preceded it.
+     *
+     * When the caller handles the [automatic retries][automaticRetries] and the failure is transient,
+     * the notification is deferred to the caller, which sends it only if the order is not retried.
+     *
+     * @throws AutoVersioningDeferredErrorException When the notification is deferred
+     */
+    private fun sendError(order: AutoVersioningOrder, message: String, error: Exception, automaticRetries: Boolean) {
+        if (automaticRetries && error.isAutoVersioningRetryable()) {
+            throw AutoVersioningDeferredErrorException(message, error)
+        } else {
+            val attempt = autoVersioningRetryService.getRetryAttempt(order)
+            autoVersioningEventService.sendError(order, autoVersioningErrorMessage(message, attempt), error)
+        }
+    }
+
+    override fun process(order: AutoVersioningOrder, automaticRetries: Boolean): AutoVersioningProcessingOutcome {
+        val outcome = processOrder(order, automaticRetries)
         // Back validation & other completion listeners, called once for every returned outcome,
         // whatever the exit path of the processing (an error being thrown does not call them)
         onCompletion(order, outcome)
         return outcome
     }
 
-    private fun processOrder(order: AutoVersioningOrder): AutoVersioningProcessingOutcome {
+    private fun processOrder(order: AutoVersioningOrder, automaticRetries: Boolean): AutoVersioningProcessingOutcome {
         logger.debug("Processing auto versioning order: {}", order)
         autoVersioningAuditService.onProcessingStart(order)
         val branch = order.branch
@@ -105,7 +127,7 @@ class AutoVersioningProcessingServiceImpl(
                     // Creating the branch
                     scm.createBranch(scmBranch, upgradeBranch)
                 } catch (e: Exception) {
-                    autoVersioningEventService.sendError(order, "Failed to create branch $upgradeBranch", e)
+                    sendError(order, "Failed to create branch $upgradeBranch", e, automaticRetries)
                     throw e
                 }
             }
@@ -180,10 +202,11 @@ class AutoVersioningProcessingServiceImpl(
                 autoVersioningEventService.sendRejected(order, e.reason)
                 return AutoVersioningProcessingOutcome.REJECTED
             } catch (e: Exception) {
-                autoVersioningEventService.sendError(
+                sendError(
                     order,
                     e.message?.takeIf { it.isNotBlank() } ?: "Issue while processing the change",
-                    e
+                    e,
+                    automaticRetries,
                 )
                 throw e
             }
@@ -207,10 +230,11 @@ class AutoVersioningProcessingServiceImpl(
                         )
                     }
                 } catch (e: Exception) {
-                    autoVersioningEventService.sendError(
+                    sendError(
                         order,
                         e.message?.takeIf { it.isNotBlank() } ?: "Issue while uploading the change",
-                        e
+                        e,
+                        automaticRetries,
                     )
                     throw e
                 }
@@ -247,18 +271,19 @@ class AutoVersioningProcessingServiceImpl(
                             autoVersioningAuditService.onPostProcessingEnd(order, upgradeBranch)
                         }
                     } catch (e: Exception) {
-                        autoVersioningEventService.sendError(
+                        sendError(
                             order,
                             e.message?.takeIf { it.isNotBlank() } ?: "Issue while processing the change",
-                            e
+                            e,
+                            automaticRetries,
                         )
                         throw e
                     }
                 }
 
                 return when (order.pushMode) {
-                    AutoVersioningPushMode.PR -> prPush(order, upgradeBranch, avRenderer, scm, scmBranch)
-                    AutoVersioningPushMode.PUSH -> directPush(order, upgradeBranch, scm, scmBranch)
+                    AutoVersioningPushMode.PR -> prPush(order, upgradeBranch, avRenderer, scm, scmBranch, automaticRetries)
+                    AutoVersioningPushMode.PUSH -> directPush(order, upgradeBranch, scm, scmBranch, automaticRetries)
                 }
 
             } else {
@@ -329,6 +354,7 @@ class AutoVersioningProcessingServiceImpl(
         upgradeBranch: String,
         scm: SCM,
         scmBranch: String,
+        automaticRetries: Boolean,
     ): AutoVersioningProcessingOutcome =
         try {
             logger.debug("Processing auto-versioning order direct push: {}", order)
@@ -358,7 +384,7 @@ class AutoVersioningProcessingServiceImpl(
             // OK
             AutoVersioningProcessingOutcome.CREATED
         } catch (e: Exception) {
-            autoVersioningEventService.sendError(order, "Failed to directly push", e)
+            sendError(order, "Failed to directly push", e, automaticRetries)
             throw e
         }
 
@@ -384,6 +410,7 @@ class AutoVersioningProcessingServiceImpl(
         avRenderer: AutoVersioningTemplateRenderer,
         scm: SCM,
         scmBranch: String,
+        automaticRetries: Boolean,
     ): AutoVersioningProcessingOutcome {
         try {
             logger.debug("Processing auto versioning order creating PR: {}", order)
@@ -477,7 +504,7 @@ class AutoVersioningProcessingServiceImpl(
             // OK
             return outcome
         } catch (e: Exception) {
-            autoVersioningEventService.sendError(order, "Failed to create PR", e)
+            sendError(order, "Failed to create PR", e, automaticRetries)
             throw e
         }
     }

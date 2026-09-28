@@ -64,13 +64,13 @@ class AutoVersioningAuditStoreImpl(
         return throttledEntries.size
     }
 
-    override fun create(order: AutoVersioningOrder): AutoVersioningAuditEntry {
+    override fun create(order: AutoVersioningOrder, data: Map<String, String>): AutoVersioningAuditEntry {
         val signature = signature()
 
         val initialState = AutoVersioningAuditEntryState(
             signature = signature,
             state = AutoVersioningAuditState.CREATED,
-            data = emptyMap()
+            data = data,
         )
 
         val entry = AutoVersioningAuditEntry(
@@ -241,6 +241,28 @@ class AutoVersioningAuditStoreImpl(
         ) { rs, _ ->
             rs.toEntry()
         }.firstOrNull()
+    }
+
+    override fun findUUIDsByCreationData(targetBranch: Branch, key: String, value: String): List<String> {
+        val pattern = listOf(
+            mapOf(
+                "state" to AutoVersioningAuditState.CREATED.name,
+                "data" to mapOf(key to value),
+            )
+        )
+        return namedParameterJdbcTemplate!!.queryForList(
+            """
+                SELECT UUID FROM AV_AUDIT
+                WHERE BRANCH_ID = :branchId
+                AND STATES @> CAST(:pattern AS JSONB)
+                ORDER BY TIMESTAMP ASC
+            """,
+            mapOf(
+                "branchId" to targetBranch.id(),
+                "pattern" to writeJson(pattern),
+            ),
+            String::class.java
+        )
     }
 
     override fun findAllBefore(

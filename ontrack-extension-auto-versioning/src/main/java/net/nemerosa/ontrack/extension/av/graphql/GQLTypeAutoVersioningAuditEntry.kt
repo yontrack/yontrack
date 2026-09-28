@@ -5,6 +5,7 @@ import graphql.schema.GraphQLObjectType
 import graphql.schema.GraphQLTypeReference
 import net.nemerosa.ontrack.extension.av.audit.AutoVersioningAuditEntry
 import net.nemerosa.ontrack.extension.av.audit.AutoVersioningAuditEntryService
+import net.nemerosa.ontrack.extension.av.retry.AutoVersioningRetryService
 import net.nemerosa.ontrack.extension.scm.service.SCMPullRequest
 import net.nemerosa.ontrack.graphql.schema.GQLType
 import net.nemerosa.ontrack.graphql.schema.GQLTypeCache
@@ -20,6 +21,8 @@ class GQLTypeAutoVersioningAuditEntry(
     private val gqlTypeAutoVersioningAuditEntryState: GQLTypeAutoVersioningAuditEntryState,
     private val structureService: StructureService,
     private val autoVersioningAuditEntryService: AutoVersioningAuditEntryService,
+    private val gqlTypeAutoVersioningAuditEntryLineage: GQLTypeAutoVersioningAuditEntryLineage,
+    private val autoVersioningRetryService: AutoVersioningRetryService,
 ) : GQLType {
 
     override fun getTypeName(): String = AutoVersioningAuditEntry::class.java.simpleName
@@ -77,6 +80,16 @@ class GQLTypeAutoVersioningAuditEntry(
                         promotionRunId?.let {
                             structureService.findPromotionRunByID(ID.of(it))
                         }
+                    }
+            }
+            // Automatic retries & manual reschedules
+            .field {
+                it.name("lineage")
+                    .description("Automatic retries & manual reschedules this entry is part of")
+                    .type(gqlTypeAutoVersioningAuditEntryLineage.typeRef.toNotNull())
+                    .dataFetcher { env ->
+                        val entry: AutoVersioningAuditEntry = env.getSource()!!
+                        autoVersioningRetryService.getLineage(entry)
                     }
             }
             // OK

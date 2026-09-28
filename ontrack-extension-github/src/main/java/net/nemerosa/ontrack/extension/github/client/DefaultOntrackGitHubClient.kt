@@ -27,7 +27,6 @@ import org.springframework.web.client.HttpClientErrorException
 import org.springframework.web.client.RestClientResponseException
 import org.springframework.web.client.RestTemplate
 import org.springframework.web.client.getForObject
-import java.net.URLEncoder
 import java.time.Duration
 import java.time.LocalDateTime
 import java.util.*
@@ -48,6 +47,8 @@ class DefaultOntrackGitHubClient(
 ) : OntrackGitHubClient {
 
     private val logger: Logger = LoggerFactory.getLogger(OntrackGitHubClient::class.java)
+
+    private val workflowLauncher = GitHubWorkflowLauncher()
 
     override fun getRateLimit(): GitHubRateLimit? =
         try {
@@ -878,30 +879,16 @@ class DefaultOntrackGitHubClient(
     ): WorkflowRun {
         // Getting a client
         val client = createGitHubRestTemplate()
-        // Generating a unique ID to find the launched workflow back
-        val id = UUID.randomUUID().toString()
-        client.postForLocation(
-            "/repos/$repository/actions/workflows/$workflow/dispatches",
-            mapOf(
-                "ref" to branch,
-                "inputs" to (inputs + mapOf("id" to id)),
-            ),
+        // Dispatching & looking for the launched workflow run
+        return workflowLauncher.launch(
+            client = client,
+            repository = repository,
+            workflow = workflow,
+            branch = branch,
+            inputs = inputs,
+            retries = retries,
+            retriesDelaySeconds = retriesDelaySeconds,
         )
-        // Looking for the launched workflow run
-        return runBlocking {
-            untilTimeout(
-                name = "Getting workflow run for $repository/$workflow/$branch",
-                retryCount = retries,
-                retryDelay = Duration.ofSeconds(retriesDelaySeconds.toLong()),
-            ) {
-                // Gets the list of runs
-                val runs = getWorkflowRuns(client, repository, branch)
-                // Checks the artifacts for each run
-                runs.find { run ->
-                    hasWorkflowId(client, repository, run.id, id)
-                }
-            }
-        }
     }
 
     override fun getWorkflowRun(repository: String, runId: Long): WorkflowRun {
@@ -1033,41 +1020,6 @@ class DefaultOntrackGitHubClient(
         name = path("name").asText(),
         email = path("email").asText(),
         date = path("date").asText().let { parseLocalDateTime(it) }
-    )
-
-    private fun getWorkflowRuns(
-        client: RestTemplate,
-        repository: String,
-        branch: String,
-    ): List<WorkflowRun> {
-        val encodedBranch = URLEncoder.encode(branch, Charsets.UTF_8)
-        return client.getForObject<JsonNode>("/repos/$repository/actions/runs?event=workflow_dispatch&branch=$encodedBranch")
-            .path("workflow_runs")
-            .map {
-                it.parse()
-            }
-    }
-
-    private fun hasWorkflowId(
-        client: RestTemplate,
-        repository: String,
-        runId: Long,
-        id: String,
-    ): Boolean {
-        val expectedName = "inputs-$id.properties"
-        val artifacts = client.getForObject<JsonNode>("/repos/$repository/actions/runs/$runId/artifacts")
-            .path("artifacts")
-            .map {
-                it.parse<Artifact>()
-            }
-        return artifacts.any {
-            it.name == expectedName
-        }
-    }
-
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    private data class Artifact(
-        val name: String,
     )
 
     private fun JsonNode.getUserField(field: String): GitHubUser? =

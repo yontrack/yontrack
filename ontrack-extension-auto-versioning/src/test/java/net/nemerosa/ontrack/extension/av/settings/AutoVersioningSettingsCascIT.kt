@@ -42,6 +42,14 @@ class AutoVersioningSettingsCascIT : AbstractCascTestSupport() {
                     "enabled": {
                       "description": "The \"Auto versioning on promotion\" feature is enabled only if this flag is set to `true`.",
                       "type": "boolean"
+                    },
+                    "retryDelayMinutes": {
+                      "description": "Delay (in minutes) before an automatic retry is scheduled. The retry actually starts on the next run of the auto-versioning scheduler.",
+                      "type": "integer"
+                    },
+                    "retryMaxCount": {
+                      "description": "Maximum number of times an order failing on a transient error (like GitHub being momentarily unavailable) is rescheduled automatically. `0` disables the automatic retries.",
+                      "type": "integer"
                     }
                   },
                   "required": [],
@@ -71,6 +79,8 @@ class AutoVersioningSettingsCascIT : AbstractCascTestSupport() {
                 assertEquals(Duration.ofDays(14), settings.auditRetentionDuration)
                 assertEquals(Duration.ofDays(90), settings.auditCleanupDuration)
                 assertEquals(true, settings.buildLinks)
+                assertEquals(0, settings.retryMaxCount, "Automatic retries are disabled by default")
+                assertEquals(5, settings.retryDelayMinutes)
             }
         }
     }
@@ -89,6 +99,8 @@ class AutoVersioningSettingsCascIT : AbstractCascTestSupport() {
                                     auditRetentionDuration: 30d
                                     auditCleanupDuration: 120d
                                     buildLinks: false
+                                    retryMaxCount: 3
+                                    retryDelayMinutes: 10
                 """.trimIndent()
                 )
                 val settings = cachedSettingsService.getCachedSettings(AutoVersioningSettings::class.java)
@@ -96,6 +108,8 @@ class AutoVersioningSettingsCascIT : AbstractCascTestSupport() {
                 assertEquals(Duration.ofDays(30), settings.auditRetentionDuration)
                 assertEquals(Duration.ofDays(120), settings.auditCleanupDuration)
                 assertEquals(false, settings.buildLinks)
+                assertEquals(3, settings.retryMaxCount)
+                assertEquals(10, settings.retryDelayMinutes)
             }
         }
     }

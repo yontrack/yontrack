@@ -5,6 +5,7 @@ import net.nemerosa.ontrack.extension.av.audit.AutoVersioningAuditQueryService
 import net.nemerosa.ontrack.extension.av.audit.AutoVersioningAuditService
 import net.nemerosa.ontrack.extension.av.metrics.AutoVersioningMetricsService
 import net.nemerosa.ontrack.extension.av.processing.AutoVersioningProcessingService
+import net.nemerosa.ontrack.extension.av.retry.AutoVersioningRetryService
 import net.nemerosa.ontrack.extension.queue.QueueAckMode
 import net.nemerosa.ontrack.extension.queue.QueueMetadata
 import net.nemerosa.ontrack.extension.queue.QueueProcessor
@@ -22,6 +23,7 @@ class AutoVersioningQueueProcessor(
     private val securityService: SecurityService,
     private val autoVersioningAuditService: AutoVersioningAuditService,
     private val autoVersioningProcessingService: AutoVersioningProcessingService,
+    private val autoVersioningRetryService: AutoVersioningRetryService,
 ) : QueueProcessor<AutoVersioningQueuePayload> {
 
     private val logger: Logger = LoggerFactory.getLogger(AutoVersioningQueueProcessor::class.java)
@@ -62,12 +64,14 @@ class AutoVersioningQueueProcessor(
             autoVersioningAuditService.onReceived(order, queue ?: "n/a")
             try {
                 val outcome = metrics.processingTiming(order, queue) {
-                    autoVersioningProcessingService.process(order)
+                    // Transient failures are retried by the queue
+                    autoVersioningProcessingService.process(order, automaticRetries = true)
                 }
                 logger.info("Processing order [{}] completed.", payload.order.uuid)
                 metrics.onProcessingCompleted(order, outcome)
             } catch (any: Throwable) {
-                autoVersioningAuditService.onError(order, any)
+                // Records the error, and either schedules an automatic retry or notifies the error
+                autoVersioningRetryService.onError(order, any)
                 metrics.onProcessingError()
             }
         }

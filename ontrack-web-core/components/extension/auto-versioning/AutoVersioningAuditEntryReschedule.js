@@ -1,4 +1,4 @@
-import {Button, Popconfirm, Typography} from "antd";
+import {Button, Popconfirm, Space, Typography} from "antd";
 import {FaRedo} from "react-icons/fa";
 import {useMutation} from "@components/services/GraphQL";
 import {gql} from "graphql-request";
@@ -33,11 +33,27 @@ export default function AutoVersioningAuditEntryReschedule({entry}) {
         await mutate({uuid: entry.order.uuid})
     }
 
+    const retryMaxCount = entry.lineage?.configuredRetryMaxCount ?? 0
+    const description = (
+        <Space direction="vertical" data-testid="av-reschedule-confirmation">
+            <Typography.Text>This creates a new auto-versioning order.</Typography.Text>
+            {
+                retryMaxCount > 0 ?
+                    <Typography.Text>
+                        Its automatic retry count starts again from 0 (max {retryMaxCount}).
+                    </Typography.Text> :
+                    <Typography.Text>
+                        Automatic retries are disabled: it will not be retried automatically if it fails.
+                    </Typography.Text>
+            }
+        </Space>
+    )
+
     return (
         <>
             <Popconfirm
                 title="Reschedule auto-versioning"
-                description="Are you sure to reschedule this auto-versioning request?"
+                description={description}
                 okText="Yes"
                 cancelText="No"
                 onConfirm={reschedule}

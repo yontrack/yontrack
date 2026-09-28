@@ -274,6 +274,8 @@ interface OntrackGitHubClient {
     /**
      * Launching a workflow run and getting its ID.
      *
+     * The call starting the workflow is retried on transient errors (502, 503, 504 & I/O errors).
+     *
      * @param repository Repository name, like `nemerosa/ontrack`
      * @param workflow Name of the workflow, like `my-workflow.yml`
      * @param branch Branch where to launch the workflow
@@ -281,6 +283,8 @@ interface OntrackGitHubClient {
      * @param retries The number of times we check for successful scheduling
      * @param retriesDelaySeconds The time (in seconds) between two checks for successful scheduling
      * @return Launched workflow
+     * @throws GitHubWorkflowDispatchException If starting the workflow still fails on transient errors after its retries
+     * @throws GitHubWorkflowRunNotFoundException If the run of the started workflow cannot be found in time
      */
     fun launchWorkflowRun(
         repository: String,

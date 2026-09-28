@@ -36,7 +36,17 @@ class AutoVersioningSettingsProvider(
             AutoVersioningSettings::class.java,
             AutoVersioningSettings::buildLinks.name,
             AutoVersioningSettings.DEFAULT_BUILD_LINKS
-        )
+        ),
+        retryMaxCount = settingsRepository.getInt(
+            AutoVersioningSettings::class.java,
+            AutoVersioningSettings::retryMaxCount.name,
+            AutoVersioningSettings.DEFAULT_RETRY_MAX_COUNT
+        ),
+        retryDelayMinutes = settingsRepository.getInt(
+            AutoVersioningSettings::class.java,
+            AutoVersioningSettings::retryDelayMinutes.name,
+            AutoVersioningSettings.DEFAULT_RETRY_DELAY_MINUTES
+        ),
     )
 
     override fun getSettingsClass(): Class<AutoVersioningSettings> = AutoVersioningSettings::class.java

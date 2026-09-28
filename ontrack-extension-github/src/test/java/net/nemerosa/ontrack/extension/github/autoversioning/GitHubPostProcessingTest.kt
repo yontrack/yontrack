@@ -7,7 +7,10 @@ import net.nemerosa.ontrack.common.BaseException
 import net.nemerosa.ontrack.extension.av.dispatcher.AutoVersioningOrder
 import net.nemerosa.ontrack.extension.av.postprocessing.PostProcessingFailureException
 import net.nemerosa.ontrack.extension.av.processing.AutoVersioningTemplateRenderer
+import net.nemerosa.ontrack.extension.av.retry.AutoVersioningRetryableException
+import net.nemerosa.ontrack.extension.github.client.GitHubWorkflowDispatchException
 import net.nemerosa.ontrack.extension.github.client.GitHubWorkflowRunFailedException
+import net.nemerosa.ontrack.extension.github.client.GitHubWorkflowRunNotFoundException
 import net.nemerosa.ontrack.extension.github.client.OntrackGitHubClient
 import net.nemerosa.ontrack.extension.github.client.OntrackGitHubClientFactory
 import net.nemerosa.ontrack.extension.github.client.WorkflowRun
@@ -21,6 +24,7 @@ import org.springframework.http.HttpStatus
 import org.springframework.web.client.HttpServerErrorException
 import java.util.concurrent.TimeoutException
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertSame
 
@@ -168,6 +172,7 @@ class GitHubPostProcessingTest {
 
         assertEquals(RUN_URL, ex.link)
         assertSame(timeout, ex.cause)
+        assertFalse(ex is AutoVersioningRetryableException, "Waiting too long for a run to complete is not retried")
     }
 
     @Test
@@ -197,6 +202,45 @@ class GitHubPostProcessingTest {
 
         assertSame(launchError, ex)
         verify(exactly = 0) { client.waitUntilWorkflowRun(any(), any(), any(), any()) }
+    }
+
+    @Test
+    fun `A dispatch still failing after its retries is a transient failure, eligible for an automatic retry`() {
+        val client = mockk<OntrackGitHubClient>()
+        val dispatchError = GitHubWorkflowDispatchException(
+            repository = "repository",
+            workflow = "workflow.yml",
+            attempts = 3,
+            cause = HttpServerErrorException(HttpStatus.SERVICE_UNAVAILABLE),
+        )
+        every { client.launchWorkflowRun(any(), any(), any(), any(), any(), any()) } throws dispatchError
+
+        val ex = assertThrows<GitHubPostProcessingTransientException> {
+            runPostProcessing(client)
+        }
+
+        assertIs<AutoVersioningRetryableException>(ex)
+        assertSame(dispatchError, ex.cause)
+        verify(exactly = 0) { client.waitUntilWorkflowRun(any(), any(), any(), any()) }
+    }
+
+    @Test
+    fun `A launched workflow run not found in time is a transient failure, eligible for an automatic retry`() {
+        val client = mockk<OntrackGitHubClient>()
+        val notFound = GitHubWorkflowRunNotFoundException(
+            repository = "repository",
+            workflow = "workflow.yml",
+            branch = "main",
+            cause = TimeoutException("Could not get result in time"),
+        )
+        every { client.launchWorkflowRun(any(), any(), any(), any(), any(), any()) } throws notFound
+
+        val ex = assertThrows<GitHubPostProcessingTransientException> {
+            runPostProcessing(client)
+        }
+
+        assertIs<AutoVersioningRetryableException>(ex)
+        assertSame(notFound, ex.cause)
     }
 
     @Test

@@ -1,5 +1,6 @@
 package net.nemerosa.ontrack.extension.av.dispatcher
 
+import net.nemerosa.ontrack.extension.av.audit.AutoVersioningAuditEntryStateDataKeys
 import net.nemerosa.ontrack.extension.av.audit.AutoVersioningAuditEntryUUIDNotFoundException
 import net.nemerosa.ontrack.extension.av.audit.AutoVersioningAuditService
 import net.nemerosa.ontrack.extension.av.audit.AutoVersioningAuditStore
@@ -68,12 +69,12 @@ class AutoVersioningDispatcherImpl(
         dispatchOrder(order)
     }
 
-    private fun dispatchOrder(order: AutoVersioningOrder) {
+    private fun dispatchOrder(order: AutoVersioningOrder, data: Map<String, String> = emptyMap()) {
         // Throttling
         autoVersioningAuditService.throttling(order)
 
         // Starting the audit
-        val entry = autoVersioningAuditService.onCreated(order)
+        val entry = autoVersioningAuditService.onCreated(order, data)
 
         // Triggering the scheduler immediately when no schedule is planned
         if (entry.order.schedule == null) {
@@ -84,7 +85,9 @@ class AutoVersioningDispatcherImpl(
     }
 
     /**
-     * Reschedule an entry, without any schedule
+     * Reschedule an entry, without any schedule.
+     *
+     * The new order is not an automatic retry and starts with a full budget of automatic retries.
      */
     override fun reschedule(branch: Branch, uuid: String): AutoVersioningOrder {
         // Getting the entry to reschedule
@@ -97,8 +100,11 @@ class AutoVersioningDispatcherImpl(
             schedule = null,
         )
 
-        // Dispatching the order
-        dispatchOrder(order)
+        // Dispatching the order, keeping track of the entry it reschedules
+        dispatchOrder(
+            order,
+            mapOf(AutoVersioningAuditEntryStateDataKeys.RESCHEDULED_FROM to uuid),
+        )
 
         // OK
         return order

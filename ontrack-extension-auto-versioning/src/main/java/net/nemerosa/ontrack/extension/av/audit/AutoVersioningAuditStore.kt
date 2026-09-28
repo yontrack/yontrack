@@ -30,9 +30,10 @@ interface AutoVersioningAuditStore {
      * Creates a new entry
      *
      * @param order Audit entry to create
+     * @param data Data to attach to the initial `CREATED` state
      * @return The created audit entry
      */
-    fun create(order: AutoVersioningOrder): AutoVersioningAuditEntry
+    fun create(order: AutoVersioningOrder, data: Map<String, String> = emptyMap()): AutoVersioningAuditEntry
 
     /**
      * Adds a new state to an auto versioning process.
@@ -48,6 +49,12 @@ interface AutoVersioningAuditStore {
     )
 
     fun findByUUID(targetBranch: Branch, uuid: String): AutoVersioningAuditEntry?
+
+    /**
+     * Gets the UUIDs of the entries of the [targetBranch] whose `CREATED` state carries the given
+     * [key] and [value] in its data, oldest first.
+     */
+    fun findUUIDsByCreationData(targetBranch: Branch, key: String, value: String): List<String>
 
     /**
      * Counts the number of auto versioning audit entries which are in the given [state]

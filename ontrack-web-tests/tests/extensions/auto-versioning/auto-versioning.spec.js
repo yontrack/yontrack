@@ -46,6 +46,14 @@ test('rescheduling an auto-versioning order', async ({page, ontrack}) => {
 
     // We expect the entry to be aborted (after some time)
     await rescheduledDetailsPage.waitState('Aborted')
+
+    // The new entry links back to the one it reschedules...
+    await rescheduledDetailsPage.expectRescheduledFrom(entry.order.uuid)
+
+    // ... and the rescheduled entry links forward to it
+    const originalDetailsPage = new AutoVersioningAuditDetailsPage(page, ontrack, entry.order.uuid)
+    await originalDetailsPage.goTo()
+    await originalDetailsPage.expectRescheduledAs(rescheduledEntry.order.uuid)
 })
 
 test('seeing the status of the PR linked to the auto-versioning order', async ({page, ontrack}) => {

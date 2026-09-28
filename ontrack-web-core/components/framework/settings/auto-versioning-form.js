@@ -1,5 +1,5 @@
 import SettingsForm from "@components/core/admin/settings/SettingsForm";
-import {Form, Switch} from "antd";
+import {Form, InputNumber, Switch} from "antd";
 import DurationPicker from "@components/common/DurationPicker";
 
 export default function AutoVersioningForm({id, ...values}) {
@@ -33,6 +33,20 @@ export default function AutoVersioningForm({id, ...values}) {
                     extra="Check to enable the creation of build links on auto-versioning."
                 >
                     <Switch/>
+                </Form.Item>
+                <Form.Item
+                    name="retryMaxCount"
+                    label="Automatic retries"
+                    extra="Maximum number of times an order failing on a transient error (like GitHub being momentarily unavailable) is rescheduled automatically. 0 disables the automatic retries."
+                >
+                    <InputNumber min={0} max={10}/>
+                </Form.Item>
+                <Form.Item
+                    name="retryDelayMinutes"
+                    label="Automatic retry delay"
+                    extra="Delay (in minutes) before an automatic retry is scheduled. The retry actually starts on the next run of the auto-versioning scheduler."
+                >
+                    <InputNumber min={1} max={1440}/>
                 </Form.Item>
             </SettingsForm>
         </>

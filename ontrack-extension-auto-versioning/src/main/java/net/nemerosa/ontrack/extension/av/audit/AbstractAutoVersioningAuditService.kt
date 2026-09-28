@@ -16,8 +16,8 @@ abstract class AbstractAutoVersioningAuditService(
         return store.throttling(order)
     }
 
-    override fun onCreated(order: AutoVersioningOrder) =
-        store.create(order)
+    override fun onCreated(order: AutoVersioningOrder, data: Map<String, String>) =
+        store.create(order, data)
 
     override fun onPendingSchedule(order: AutoVersioningOrder) {
         store.addState(
@@ -53,7 +53,7 @@ abstract class AbstractAutoVersioningAuditService(
         )
     }
 
-    override fun onError(order: AutoVersioningOrder, error: Throwable) {
+    override fun onError(order: AutoVersioningOrder, error: Throwable, vararg data: Pair<String, String>) {
         val stack = reducedStackTrace(error)
         store.addState(
             targetBranch = order.branch,
@@ -63,7 +63,8 @@ abstract class AbstractAutoVersioningAuditService(
             upgradeBranch = null,
             state = AutoVersioningAuditState.ERROR,
             "message" to (error.message ?: error::class.java.name),
-            "error" to stack
+            "error" to stack,
+            *data,
         )
     }
 
