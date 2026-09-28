@@ -54,6 +54,10 @@ Deleting a label asks for confirmation first, and the confirmation says how many
 because deleting a label removes it from all of them. There is no undo: the label has to be created
 again, and assigned again.
 
+Deleting a label which selects the projects of an [estate](../../scorecard/estates.md) is refused,
+with a message naming the estates: dropping one of an estate's required labels would silently widen
+it. Take the label out of the estates first.
+
 The **Labels** entry is only offered to the holders of the `LabelManagement` function, and creating,
 editing and deleting a label is refused to anybody else - see [Permissions](#permissions) below.
 

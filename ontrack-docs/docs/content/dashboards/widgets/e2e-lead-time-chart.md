@@ -14,8 +14,8 @@ Measures end-to-end lead time from a source project's promotion to a target proj
 | `targetProject` | string | Target project name. |
 | `targetBranch` | string | Target branch name. |
 | `targetPromotionLevel` | string | Target promotion level. |
-| `interval` | string | Bucket size for the chart (e.g. `"1d"`, `"1w"`). |
-| `period` | string | Time window to display (e.g. `"1M"`, `"3m"`). |
+| `interval` | string | Time window to display, back from now: a number and a unit, `d`, `w`, `m` (months) or `y` (e.g. `"3m"`, the default). |
+| `period` | string | Bucket size for the chart, with the same units (e.g. `"1w"`, the default, or `"1d"`). |
 
 ## When a promotion level is missing
 

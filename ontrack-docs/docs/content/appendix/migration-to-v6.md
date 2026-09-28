@@ -179,3 +179,119 @@ Yontrack 6 is built for and runs on **JDK 25**, an LTS release. Yontrack 5 ran o
 
 An extension must be compiled with a JDK 25 toolchain, since it compiles against Yontrack
 classes which target JDK 25.
+
+## Indicators removed
+
+The indicators — project indicators, their categories, types, views and portfolios, the GitHub
+compliance checks, and the indicators computed from Jenkins pipeline files and libraries and from
+SonarQube — are removed, with no replacement. For numbers about how projects deliver, see the
+[delivery scorecard](../scorecard/scorecard.md), which Yontrack computes from its own data.
+
+### For deployers
+
+* **Data** — at its first start, Yontrack 6 deletes the stored indicator values, categories, types,
+  views, portfolios and computed state, and the Jenkins pipeline-library indicator settings.
+* **Roles** — `PROJECT_INDICATOR_MANAGER` and `GLOBAL_INDICATOR_MANAGER` are gone, and their grants
+  are deleted.
+* **Metrics** — `ontrack_indicator` (exported) and `ontrack_indicators_computing_ms` are gone.
+* **Configuration as code** — the `ontrack.config.settings.jenkins-pipeline-library-indicator` key
+  is ignored with a warning: see [Unknown and removed keys](../configuration/casc.md#unknown-and-removed-keys).
+
+### For API clients
+
+The indicator queries and mutations of the GraphQL API are gone, among them `indicatorCategories`,
+`indicatorTypes`, `indicatorPortfolios`, `indicatorViewList`, `indicatorsManagement`,
+`configurableIndicators` and `Project.projectIndicators`.
+
+### For extension authors
+
+The `ontrack-extension-indicators` module is gone: an extension contributing indicators must drop
+them.
+
+## Delivery metrics and the delivery scorecard
+
+Yontrack 6 introduces the [delivery scorecard](../scorecard/scorecard.md): lead time, frequency,
+success rate, time to restore, test pass rate and test flakiness, read every day for every project
+and kept as daily snapshots, and read together, against targets, in licensed
+[estates](../scorecard/estates.md). The delivery-metrics extension of Yontrack 5 is removed, and
+its promotion-level charts now run on the samples of the scorecard.
+
+### For deployers
+
+**The promotion-level charts are kept** — their names, their `getChart` path, their
+[dashboard widgets](../dashboards/widgets/promotion-charts.md) and their options are unchanged, and
+so is the [end-to-end lead time](../dashboards/widgets/e2e-lead-time-chart.md) chart. Three of
+them change what they measure:
+
+* **Time to restore starts earlier.** An outage now starts at the **first** unpromoted build after
+  a promoted one, not at the last. For B1 promoted, B2, B3 and B4 not promoted, and B5 promoted,
+  the time to restore goes from the creation of B2 to the promotion of B5, where it used to go from
+  the creation of B4. **The numbers grow for any outage longer than one broken build**; an outage of
+  a single build reads as before.
+* **Lead time** is counted in the period of the build's first promotion at the level, and once per
+  build, where it was counted in the period of the build's creation, once per promotion run.
+* **Success rate** leaves out the builds in flight at the end of the charted interval — created
+  within its median lead time before its end — which had not had the time to be promoted.
+
+**The `ontrack_dm_*` metrics are removed**, all seven of them, with no transition release. The
+readings take over, exported as the [`ontrack_reading`](../scorecard/scorecard.md#metrics-export)
+metric:
+
+| Yontrack 5 metric                          | Yontrack 6                                                  |
+|--------------------------------------------|-------------------------------------------------------------|
+| `ontrack_dm_promotion_lead_time`           | `ontrack_reading`, `reading=delivery.leadTime`              |
+| `ontrack_dm_promotion_success_rate`        | `ontrack_reading`, `reading=delivery.successRate`           |
+| `ontrack_dm_promotion_ttr`                 | `ontrack_reading`, `reading=delivery.mttr`                  |
+| `ontrack_dm_time_since_promotion`          | No replacement                                              |
+| `ontrack_dm_relative_time_since_promotion` | No replacement                                              |
+| `ontrack_dm_time_since_passed_validation`  | No replacement                                              |
+| `ontrack_dm_time_since_validation`         | No replacement                                              |
+
+The mapping is not one to one, and dashboards built on the old metrics need rebuilding rather than
+renaming:
+
+* The `ontrack_dm_promotion_*` metrics gave one point per build, tagged by source and target
+  project, branch and promotion level. `ontrack_reading` gives **one point per project, reading and
+  set, per day**: the median for a duration, in seconds, the percentage for a success rate.
+* The promotion level is no longer a tag: a reading is read up to its set's marker — with no
+  estate, the last promotion level of each branch. Filter on `estate=-` for the readings of each
+  project on its own, or on an estate's name for the estate's marker.
+* The time-to-restore reading has the new start above.
+* The time-since-event metrics have no replacement.
+
+**Removed configuration:**
+
+* the *E2E Promotion Metrics Export* settings — deleted at the first start of Yontrack 6 — and
+  their `ontrack.config.settings.e2e-promotion-metrics` CasC key, which is ignored with a warning:
+  see [Unknown and removed keys](../configuration/casc.md#unknown-and-removed-keys);
+* the `ontrack.extension.delivery-metrics.tse.enabled` and
+  `ontrack.extension.delivery-metrics.tse.interval` configuration properties, no longer read;
+* the jobs of the `delivery-metrics` category.
+
+**New:** the *Delivery scorecard* [settings](../scorecard/scorecard.md#settings), the daily jobs of
+the *Delivery scorecard* category, and the `ontrack_readings_computation` and
+`ontrack_readings_errors` metrics.
+
+## Failed and backdated deployments
+
+A slot deployment can now [fail](../integrations/environments/environments.md#failed-deployments),
+and be [recorded after the fact](../integrations/environments/environments.md#backdating-deployments).
+
+### For API clients
+
+* **`FAILED` status** — a slot pipeline has a new, final status, `FAILED`, beside `DONE` and
+  `CANCELLED`. A client reading the status of a deployment must expect it. It is reached through
+  the new `failSlotPipeline` mutation, and sends the new `slot-pipeline-failed` event.
+* **`dateTime`** — `startSlotPipeline`, `startSlotPipelineDeployment`,
+  `finishSlotPipelineDeployment`, `failSlotPipeline` and `cancelSlotPipeline` take an optional
+  `dateTime`. Without it, nothing changes.
+* **License errors** — calling a licensed query, field or mutation without the license — of the
+  environments, for example — now fails with a `FORBIDDEN` error naming the feature, such as
+  *Feature not allowed by the license: extension.environments*, where it failed with an
+  `INTERNAL_ERROR` and no message.
+
+### For KDSL users
+
+`SlotPipeline.fail(message, dateTime)` and `SlotPipeline.cancel(reason, dateTime)` are new, and
+`Build.startPipeline`, `SlotPipeline.startDeploying` and `SlotPipeline.finishDeployment` take an
+optional `dateTime`.

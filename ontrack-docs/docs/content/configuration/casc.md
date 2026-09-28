@@ -125,6 +125,35 @@ This downloads a `ontrack-casc-schema.json` file.
 
 You can use it to validate your CasC YAML files. See the [appendixes](../appendix/json-schemas.md) to learn more about using JSON schemas for edition and validation.
 
+## Delivery scorecard and estates
+
+The settings of the [delivery scorecard](../scorecard/scorecard.md#settings) are under
+`ontrack.config.settings.delivery-scorecard`, and its [estates](../scorecard/estates.md) under
+`ontrack.config.estates`:
+
+```yaml
+ontrack:
+  config:
+    settings:
+      delivery-scorecard:
+        windowDays: 90
+    estates:
+      - name: Products
+        labels:
+          - portfolio:product
+        marker:
+          kind: PROMOTION
+          levelName: GOLD
+        readings:
+          - key: delivery.leadTime
+            target: 86400
+```
+
+The `estates` list is **authoritative**: an estate it does not name is deleted, with its
+snapshots. Without the *Delivery scorecard* license, it is ignored with a warning, and does not
+stop Yontrack from starting. See [Configuration as code](../scorecard/estates.md#configuration-as-code)
+in the estates page for every field.
+
 ## Unknown and removed keys
 
 A CasC key which Yontrack does not know stops the CasC run with the error

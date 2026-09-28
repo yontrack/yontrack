@@ -20,7 +20,8 @@ projects. At least such a role should be defined.
 A **CREATOR** can create any project and can, on all projects, configure them,
 create branches, create promotion levels and
 validation stamps. This role should be attributed to service users in charge
-of automating the definition of projects and branches.
+of automating the definition of projects and branches. A creator also manages the
+[estates](../scorecard/estates.md) of the delivery scorecard.
 
 An **AUTOMATION** user can do the same things than a _CREATOR_ but can, on all
 projects, additionally edit promotion levels and validation stamps, create

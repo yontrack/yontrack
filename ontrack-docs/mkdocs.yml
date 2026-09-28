@@ -106,6 +106,9 @@ nav:
       - Workflows: content/integrations/workflows/workflows.md
       - Environments: content/integrations/environments/environments.md
       - Security findings: content/integrations/findings/findings.md
+  - Delivery scorecard:
+      - content/scorecard/scorecard.md
+      - Estates: content/scorecard/estates.md
   - Dashboards:
       - Overview: content/dashboards/index.md
       - Dashboards as Code: content/dashboards/dashboards-as-code.md

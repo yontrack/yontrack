@@ -1,0 +1,299 @@
+# Delivery scorecard
+
+The **delivery scorecard** of a project answers "how is this project delivering?" with a handful of
+numbers Yontrack takes from its own data — its builds, promotions, deployments and test
+validations. Nothing is entered by hand.
+
+!!! note
+
+    The scorecard of a project on its own is available to everyone. Reading projects together in
+    [estates](estates.md), with targets, is under license — see [License](#license).
+
+## The model
+
+**Reading**
+:   One measurement of one project at one moment — its lead time, say — for one [set](#sets). A
+    reading says what it came to, over which window, and which branches it read.
+
+**Scorecard**
+:   The readings of one project: what its project page shows.
+
+**Set**
+:   Every project is read on its own, in the **no-estate set**, shown as the *Project* column. A
+    project which belongs to [estates](estates.md) is read again for each of them, against the
+    estate's marker, windows and targets.
+
+**Marker**
+:   The event a delivery reading measures up to: a promotion granted, or an environment reached.
+
+**Window**
+:   The period a reading is taken over: the last 90 days by default, back from the time it is
+    computed. See [Settings](#settings).
+
+**Scope**
+:   The branches a project is read on: its non-disabled branches matched by its branch model, or
+    every non-disabled branch when the project has no branch model — a project with no SCM. A
+    reading records its branches and which of the two cases applied.
+
+### Basis
+
+Every reading has a **basis**, which says what its value rests on:
+
+| Basis       | Meaning                                                                                  |
+|-------------|------------------------------------------------------------------------------------------|
+| `MEASURED`  | Measured from Yontrack's own data.                                                       |
+| `UNKNOWN`   | Yontrack cannot see what the reading needs. There is no value, and an [unknown reason](#unknown-readings) says why. |
+| `ESTIMATED` | Reserved for imported history. Yontrack 6 never produces it.                             |
+
+### Sets
+
+The **no-estate set** exists for every non-disabled project. It is read up to each branch's **last
+promotion level** — the last one in the order of the branch's promotion levels. Branches without
+any promotion level are not read, and the samples of all the branches read are pooled together.
+The no-estate set has no target: it is shown, never judged.
+
+An estate adds a set of readings to each project it selects, with its own marker, windows and
+targets. A project's no-estate readings are the same whether or not it belongs to an estate. See
+[Estates](estates.md).
+
+## The readings
+
+Six readings make the catalogue. The four **delivery** readings are read up to the marker; the
+two **quality** readings read the test validations of the branches in scope, whatever the marker.
+
+| Reading       | Key                     | Unit                    | Better when |
+|---------------|-------------------------|-------------------------|-------------|
+| Lead time     | `delivery.leadTime`     | Duration (median)       | lower       |
+| Frequency     | `delivery.frequency`    | Per week                | higher      |
+| Success rate  | `delivery.successRate`  | Percentage, 0 to 100    | higher      |
+| Time to restore | `delivery.mttr`       | Duration (median)       | lower       |
+| Test pass rate | `quality.testPassRate` | Percentage, 0 to 100    | higher      |
+| Test flakiness | `quality.testFlakiness` | Percentage, 0 to 100   | lower       |
+
+Through the API, durations are given in **seconds**. A duration reading keeps the median as its
+value; its 90th percentile, mean, minimum, maximum and sample count are in its details. There is no
+minimum number of samples: the count is always shown beside the value.
+
+### Up to a promotion
+
+When the marker is a promotion level — always the case with no estate — on each branch read:
+
+**Lead time**
+:   From the creation of a build to its **first** promotion run at the level. A build counts in the
+    window where it was first promoted.
+
+**Frequency**
+:   The promotion runs at the level in the window, every one of them, per week. The raw count is in
+    the details.
+
+**Success rate**
+:   The share of the builds created in the window which were promoted at the level, leaving out the
+    builds **in flight**: those created within the window's median lead time before its end. They
+    have not had the time a build usually takes to be promoted, so their not being promoted says
+    nothing yet. The details give the number of builds counted, promoted, and left out as in
+    flight.
+
+**Time to restore**
+:   How long the path to the level stays broken. An outage starts with the **first** unpromoted
+    build following a promoted one, and ends with the next promotion on that branch. For B1
+    promoted, then B2, B3 and B4 not promoted, then B5 promoted, the outage goes from the creation
+    of B2 to the promotion of B5. An outage counts in the window where it was restored.
+    Unpromoted builds before the first promotion of a branch are not an outage — nothing was
+    promoted yet to be restored — and an outage started by a build in flight is not a failure yet.
+    The details also give the outages still going on at the end of the window.
+
+### Up to an environment
+
+When an [estate](estates.md) names an environment as its marker — or defaults to one — the
+delivery readings read the deployments of the project's slot in that environment:
+
+**Lead time**
+:   From the creation of a build to the end of its **first** `DONE` deployment in the slot. A
+    redeployment of the same build does not reset it.
+
+**Frequency**
+:   The `DONE` deployments in the window, per week, counted at their end. A redeployment counts.
+
+**Success rate**
+:   `DONE` over `DONE` plus [`FAILED`](../integrations/environments/environments.md#failed-deployments)
+    deployments in the window. A `CANCELLED` deployment is left out entirely.
+
+**Time to restore**
+:   From a `FAILED` deployment to the next `DONE` one in the same slot; consecutive failures make
+    one outage, from the first of them. It is the time to restore the **deployment path**, not an
+    incident's time to restore, which Yontrack cannot see.
+
+Only the slot with the marker's qualifier is read — the default slot, unless the estate names a
+qualifier. Qualifiers are never pooled: a build deployed to a canary and then to the main slot
+would be counted twice.
+
+### Test readings
+
+A **test stamp** is a validation stamp whose data type is
+[Test summary](../concepts/model/index.md#test-summary) (`tests`). The test readings look at the
+builds created in the window, on the branches in scope, which have at least one run on a test
+stamp:
+
+**Test pass rate**
+:   The share of these builds whose **latest** run passed, on every test stamp they were run on.
+
+**Test flakiness**
+:   The share of these builds where some test stamp has a `FAILED` run followed — immediately or
+    not — by a `PASSED` one.
+
+### Unknown readings
+
+A reading Yontrack cannot take is `UNKNOWN`, with one of these reasons:
+
+| Reason          | Meaning                                                                                     |
+|-----------------|---------------------------------------------------------------------------------------------|
+| `NO_MARKER`     | No marker to read up to: no branch in scope has the promotion level, or the project has no slot in the marker environment with that qualifier, or that environment does not exist. |
+| `NO_SAMPLES`    | Nothing to measure in the window: nothing reached the marker, no build was run on a test stamp, or — for the time to restore — an outage is still going on and none was restored. |
+| `NO_FAILURE`    | Time to restore only: nothing failed in the window, so there was nothing to restore. Shown as *No failure in window*, a neutral state rather than an unknown one. A time to restore never reads 0. |
+| `NO_TEST_STAMP` | Test readings only: no test stamp on the branches in scope.                                 |
+| `NOT_LICENSED`  | Delivery readings up to an environment, when the license does not include the environments. |
+
+## Computing the readings
+
+The readings are computed once a day, by default at 02:00 in the time zone of the server, and
+**kept as daily snapshots**, which is what gives each reading its history. Computing again on the
+same day replaces that day's snapshot. Snapshots older than the retention — 730 days by default —
+are deleted by the daily computation.
+
+* The no-estate set of every non-disabled project is computed by the job *Delivery scorecard /
+  Readings computation / no-estate*; each estate has its own job, for the projects it selects.
+* A project whose computation fails gets no snapshot that day: the failure is logged, and counted
+  by the `ontrack_readings_errors` [metric](../generated/metrics/index.md). The scorecard keeps
+  showing the last snapshot, with its date.
+* **Recompute**, on the project page, computes the readings of the project again, in every set it
+  is in, replacing the day's snapshots. It needs the right to configure the project, and it is
+  queued as a job rather than run on the spot.
+
+### Settings
+
+The *Delivery scorecard* settings, in _System > Settings_, hold:
+
+| Setting    | Default       | Meaning                                                               |
+|------------|---------------|-----------------------------------------------------------------------|
+| Window     | 90 days       | Number of days a reading is taken over. An estate may override it per reading. |
+| Retention  | 730 days      | Number of days the daily snapshots are kept.                          |
+| Schedule   | `0 0 2 * * *` | Cron schedule of the daily computation, in the time zone of the server. |
+
+As [code](../configuration/casc.md):
+
+```yaml
+ontrack:
+  config:
+    settings:
+      delivery-scorecard:
+        windowDays: 90
+        retentionDays: 730
+        cron: "0 0 2 * * *"
+```
+
+## On the project page
+
+The project page has a **Scorecard** section: one row per reading, and one column per set —
+*Project*, then one per estate the project belongs to. Each cell gives the value and its sample
+count, and, in an estate with a target for the reading, whether it is *Met* or *Missed*. An
+unknown reading reads *Unknown*, with its reason on hover. The section says when the readings were
+last computed, carries the *Recompute* command, and links to the scorecard page of the project.
+
+The **scorecard page** of the project answers "why is this number what it is?". It has one part
+per set and a card per reading, with:
+
+* the value, and a sparkline of its daily snapshots over the last 90 days, the target drawn as a
+  dashed line and the unknown days left as gaps — a trend needs several days of snapshots;
+* the window, the branches read and whether they come from the branch model or are all of them;
+* the marker used, for the delivery readings;
+* the target, and what explains the value: the sample count, the 90th percentile, mean, minimum
+  and maximum of a duration, the builds promoted out of those counted and the builds left out as in
+  flight, the outages still open, the deployments done and failed, the builds passed or flaky, the
+  test stamps read.
+
+The scorecard is on the desktop UI only: the [mobile UI](../mobile/index.md) does not show it.
+
+## Promotion-level charts
+
+The [promotion charts](../dashboards/widgets/promotion-charts.md) of a promotion level — lead time,
+frequency, success rate and time to restore — are computed from the same samples as the readings,
+with that level as marker and its branch as scope: a chart over a reading's window holds the
+reading's samples.
+
+## License
+
+The scorecard of a project on its own — the no-estate set — is not licensed.
+
+The [estates](estates.md), and the readings of the projects in them, need the **Delivery
+scorecard** feature (`extension.scorecard`) of the license. Without it, the estates are not
+computed and their columns are not shown; their stored snapshots are kept, and come back with the
+license.
+
+A delivery reading up to an environment also needs the **Environments** feature
+(`extension.environments`); without it, it reads `UNKNOWN (NOT_LICENSED)`.
+
+## API
+
+In GraphQL, `Project.scorecard` gives the sets of the project — the no-estate set first, named
+`Project` — each with the latest snapshot of its readings:
+
+```graphql
+{
+  project(id: 1) {
+    scorecard {
+      sets {
+        name
+        estate { name }
+        readings {
+          key
+          value
+          basis
+          unknownReason
+          windowStart
+          windowEnd
+          computedAt
+          target
+          targetMet
+          details
+          history(days: 30) { day value basis }
+        }
+      }
+    }
+  }
+}
+```
+
+`recomputeProjectScorecard(input: {projectId: 1})` queues the recompute of a project.
+
+In the KDSL:
+
+```kotlin
+val scorecard = project.scorecard()
+val leadTime = scorecard.noEstate.reading(ReadingKeys.DELIVERY_LEAD_TIME)?.value
+// Recomputes and waits for the readings of the day
+project.recomputeScorecardAndWait()
+```
+
+## Metrics export
+
+Each time readings are computed — by the daily job or a recompute — every reading is exported to
+the metrics backends (InfluxDB, Elastic) as the `ontrack_reading` metric:
+
+| Tag       | Value                                                     |
+|-----------|-----------------------------------------------------------|
+| `estate`  | Name of the estate, `-` for the no-estate set             |
+| `project` | Name of the project                                       |
+| `reading` | Key of the reading, like `delivery.leadTime`              |
+| `basis`   | `MEASURED`, `ESTIMATED` or `UNKNOWN`                      |
+
+Its field `value` is in the unit of the reading — seconds, per week, 0 to 100 — and absent for an
+unknown reading. Its timestamp is the time the reading was computed. A computation which fails
+exports nothing.
+
+The *Re-export of all metrics* job replays every stored snapshot, one point per day, within the
+retention. The readings can also be replayed on their own, by launching the job *Re-export of the
+readings of the delivery scorecard* (a restoration job, key `scorecard-readings-restoration`).
+Without the Delivery scorecard license, the estates' snapshots are skipped.
+
+Yontrack 6 replaced the `ontrack_dm_*` metrics of Yontrack 5 by `ontrack_reading`: see
+[Migration to V6](../appendix/migration-to-v6.md#delivery-metrics-and-the-delivery-scorecard).

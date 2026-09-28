@@ -84,9 +84,10 @@ Clicking a deployment — from the matrix cell's drawer, from a slot, or from a 
 one deployment. It answers three questions, in three places:
 
 * The **header** names the build, its branch and its top promotion, says when the deployment started
-  and who started it, and draws where it has got to: Candidate → Running → Deployed, or → Cancelled.
-  Beside the bar is the **one** action that would move it — *Start the deployment* on a candidate,
-  *Finish the deployment* on a running one — with *Cancel* as a secondary action. The action is
+  and who started it, and draws where it has got to: Candidate → Running → Deployed, or → Cancelled,
+  or → Failed. Beside the bar is the **one** action that would move it — *Start the deployment* on a
+  candidate, *Finish the deployment* on a running one — with *Cancel* as a secondary action, and
+  *Mark as failed* on a running one (see [Failed deployments](#failed-deployments)). The action is
   disabled while something is blocking, and is not shown at all to a user without the right, or on a
   deployment which is over.
 * **What's blocking** lists the checks of the phase the deployment is *in*, failing ones first, with
@@ -99,6 +100,86 @@ one deployment. It answers three questions, in three places:
 
 The page refreshes itself every 30 seconds and says when it last did. *Force deployment* and
 *Delete deployment* remain header commands, and are hidden from a user without the right.
+
+## Failed deployments
+
+A deployment goes through `CANDIDATE` and `RUNNING`, and ends as one of:
+
+| Status      | Meaning                                                                                   |
+|-------------|-------------------------------------------------------------------------------------------|
+| `DONE`      | The build is deployed: it is now what the slot runs.                                      |
+| `FAILED`    | The deployment ran and did not make it.                                                   |
+| `CANCELLED` | The deployment was stopped — by hand, or because a more recent deployment replaced it.   |
+
+A **failed** deployment is not a cancelled one: it was attempted, and its failure is a fact worth
+keeping — the [delivery scorecard](../../scorecard/scorecard.md#up-to-an-environment) counts it in
+the success rate and the time to restore of the slot, where a cancelled deployment is left out.
+
+* Only a `RUNNING` deployment can be marked as failed; a candidate which never started is cancelled
+  instead. It needs the same right as finishing a deployment, and takes an optional message saying
+  why it failed.
+* `FAILED` is final: a failed deployment cannot be finished, even by forcing it, nor cancelled.
+  Deploying the build again means starting a new deployment.
+* A failure does not change what the slot runs: the last `DONE` deployment stays the deployed one.
+* On the deployment page, *Mark as failed* sits beside *Finish the deployment*, and the timeline
+  shows the failure with its message. The matrix, the slot drawer and the slot page show the
+  *Failed* status. The [mobile UI](../../mobile/index.md) shows it too, without offering to mark a
+  deployment as failed: a failure is reported by the CI which ran the deployment.
+* Marking a deployment as failed sends the `slot-pipeline-failed` event, and runs the slot
+  workflows whose trigger is `FAILED` (*On deployment failed*).
+
+From CI, or any automation, through GraphQL:
+
+```graphql
+mutation {
+  failSlotPipeline(input: {pipelineId: "...", message: "Helm upgrade timed out"}) {
+    failStatus { ok }
+    errors { message }
+  }
+}
+```
+
+or with the KDSL, `pipeline.fail(message = "Helm upgrade timed out")`.
+
+## Backdating deployments
+
+A deployment can be recorded after the fact — when importing a deployment history, for example,
+or when the CI reports late. The GraphQL mutations moving a deployment accept an optional
+`dateTime`, which is then used instead of the current time:
+
+| Mutation                        | `dateTime` is                                           |
+|---------------------------------|---------------------------------------------------------|
+| `startSlotPipeline`             | the start of the deployment                             |
+| `startSlotPipelineDeployment`   | the time it started running                             |
+| `finishSlotPipelineDeployment`  | its end, as `DONE`                                      |
+| `failSlotPipeline`              | its end, as `FAILED`                                    |
+| `cancelSlotPipeline`            | its end, as `CANCELLED`                                 |
+
+The time is stored on the deployment — its start and end — and in its history. It must be:
+
+* not in the future;
+* not before the creation of the build;
+* not before the previous change of the deployment;
+* for a start, not before the start of the slot's latest deployment.
+
+A time breaking one of these rules is refused, and nothing changes. So, a slot's history is
+recorded in order: deployment by deployment, oldest first.
+
+Starting a deployment cancels the slot's deployment still in progress, if any, and that
+cancellation takes the start time of the new deployment. Without a `dateTime`, nothing is checked
+and the current time is used, as before.
+
+Backdating needs no other right than the action's own. The events are sent, and the slot workflows
+run, as for any other deployment — at the time they are recorded, not at the backdated one.
+
+In the KDSL:
+
+```kotlin
+build.startPipeline(slot, dateTime = start)
+    .startDeploying(dateTime = start.plusMinutes(1))
+    .finishDeployment(dateTime = start.plusMinutes(10))
+// or .fail(message = "...", dateTime = ...), or .cancel(reason = "...", dateTime = ...)
+```
 
 ## Setup
 

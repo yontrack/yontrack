@@ -96,6 +96,10 @@ Everything else, and on purpose. Notably:
   bypasses controls somebody configured and is recorded against your name, so it stays on
   the desktop UI — along with overriding the blocking workflow itself, stopping a running
   workflow, and deleting a deployment.
+- **Marking a deployment as failed.** A failed deployment reads *Failed* on a phone, but
+  reporting the failure is the job of the CI which ran it.
+- **The [delivery scorecard](../scorecard/scorecard.md)** and its
+  [estates](../scorecard/estates.md).
 - **Editing anything** — names, descriptions, properties, links.
 
 This list is not a backlog. The mobile UI exists precisely because the desktop UI is not
