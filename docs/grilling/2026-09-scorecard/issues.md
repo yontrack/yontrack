@@ -1,47 +1,48 @@
 # Delivery scorecard — issue breakdown
 
-Breakdown of [README.md](README.md) into agent-sized issues. Not created on GitHub yet.
+Breakdown of [README.md](README.md) into agent-sized issues. Created on 2026-09-28.
 
 Every issue carries `initiative: scorecard` (a new label), `type: enhancement`, `status:todo` and
 `ready-for-agent`, and links back to the README section it implements. Dependencies are recorded
-as native GitHub dependencies as well as prose. Base branch is `v6` for every issue, except S5
-(`yontrack-cli` / `main`).
+as native GitHub dependencies as well as prose. Base branch is `v6` for the 6.0 issues, except S5
+(`yontrack-cli` / `main`), and `main` for the 6.1 issues — once 6.0 has become `main`, after the
+6.0 release (`doc/dev-guide/major-branch.md`).
 
 ## 6.0 — milestone `6.0`
 
-| #   | Issue                                                                      | Repo / base             | Depends on     |
-|-----|----------------------------------------------------------------------------|-------------------------|----------------|
-| S1  | `CONTEXT.md`: reading, scorecard, estate, marker                           | `yontrack` / `v6`       | —              |
-| S2  | Remove `ontrack-extension-indicators`; CasC removed-key tolerance          | `yontrack` / `v6`       | —              |
-| S3  | Slot pipeline `FAILED` status                                              | `yontrack` / `v6`       | —              |
-| S4  | Backdated slot pipelines                                                   | `yontrack` / `v6`       | S3             |
-| S5  | CLI: `slot pipeline fail` and `--date`                                     | `yontrack-cli` / `main` | S3, S4         |
-| S6  | Scorecard module, readings table, engine, job; lead time and frequency     | `yontrack` / `v6`       | S1             |
-| S7  | Success rate and MTTR under the promotion marker                           | `yontrack` / `v6`       | S6             |
-| S8  | Test pass rate and flakiness                                               | `yontrack` / `v6`       | S6             |
-| S9  | Charts onto the engine; remove `ontrack-extension-delivery-metrics`        | `yontrack` / `v6`       | S2, S7         |
-| S10 | Estates: entity, licence, security, GraphQL, CasC, per-estate jobs         | `yontrack` / `v6`       | S6             |
-| S11 | Environment-marker readings                                                | `yontrack` / `v6`       | S3, S10        |
-| S12 | KDSL: estates and readings, acceptance tests                               | `yontrack` / `v6`       | S10, S11       |
-| S13 | `ontrack_reading` export and re-export job                                 | `yontrack` / `v6`       | S6             |
-| S14 | UI: project Scorecard section and project scorecard page                   | `yontrack` / `v6`       | S7, S8         |
-| S15 | UI: estates admin page                                                     | `yontrack` / `v6`       | S10            |
-| S16 | Demo seed: two estates, backdated deployments, test runs                   | `yontrack` / `v6`       | S4, S11, S14   |
-| S17 | User documentation and 6.0 migration notes                                 | `yontrack` / `v6`       | S9, S11, S13   |
+| #   | GitHub | Issue                                                                      | Repo / base             | Depends on     |
+|-----|--------|----------------------------------------------------------------------------|-------------------------|----------------|
+| S1  | [#1892](https://github.com/yontrack/yontrack/issues/1892) | `CONTEXT.md`: reading, scorecard, estate, marker                           | `yontrack` / `v6`       | —              |
+| S2  | [#1893](https://github.com/yontrack/yontrack/issues/1893) | Remove `ontrack-extension-indicators`; CasC removed-key tolerance          | `yontrack` / `v6`       | —              |
+| S3  | [#1894](https://github.com/yontrack/yontrack/issues/1894) | Slot pipeline `FAILED` status                                              | `yontrack` / `v6`       | —              |
+| S4  | [#1895](https://github.com/yontrack/yontrack/issues/1895) | Backdated slot pipelines                                                   | `yontrack` / `v6`       | S3             |
+| S5  | [yontrack-cli#82](https://github.com/yontrack/yontrack-cli/issues/82) | CLI: `slot pipeline fail` and `--date`                                     | `yontrack-cli` / `main` | S3, S4         |
+| S6  | [#1896](https://github.com/yontrack/yontrack/issues/1896) | Scorecard module, readings table, engine, job; lead time and frequency     | `yontrack` / `v6`       | S1             |
+| S7  | [#1897](https://github.com/yontrack/yontrack/issues/1897) | Success rate and MTTR under the promotion marker                           | `yontrack` / `v6`       | S6             |
+| S8  | [#1898](https://github.com/yontrack/yontrack/issues/1898) | Test pass rate and flakiness                                               | `yontrack` / `v6`       | S6             |
+| S9  | [#1899](https://github.com/yontrack/yontrack/issues/1899) | Charts onto the engine; remove `ontrack-extension-delivery-metrics`        | `yontrack` / `v6`       | S2, S7         |
+| S10 | [#1900](https://github.com/yontrack/yontrack/issues/1900) | Estates: entity, licence, security, GraphQL, CasC, per-estate jobs         | `yontrack` / `v6`       | S6             |
+| S11 | [#1901](https://github.com/yontrack/yontrack/issues/1901) | Environment-marker readings                                                | `yontrack` / `v6`       | S3, S10        |
+| S12 | [#1902](https://github.com/yontrack/yontrack/issues/1902) | KDSL: estates and readings, acceptance tests                               | `yontrack` / `v6`       | S10, S11       |
+| S13 | [#1903](https://github.com/yontrack/yontrack/issues/1903) | `ontrack_reading` export and re-export job                                 | `yontrack` / `v6`       | S6             |
+| S14 | [#1904](https://github.com/yontrack/yontrack/issues/1904) | UI: project Scorecard section and project scorecard page                   | `yontrack` / `v6`       | S7, S8         |
+| S15 | [#1905](https://github.com/yontrack/yontrack/issues/1905) | UI: estates admin page                                                     | `yontrack` / `v6`       | S10            |
+| S16 | [#1906](https://github.com/yontrack/yontrack/issues/1906) | Demo seed: two estates, backdated deployments, test runs                   | `yontrack` / `v6`       | S4, S11, S14   |
+| S17 | [#1907](https://github.com/yontrack/yontrack/issues/1907) | User documentation and 6.0 migration notes                                 | `yontrack` / `v6`       | S9, S11, S13   |
 
 ## 6.1 — milestone `6.1`
 
-| #   | Issue                                                                      | Repo / base             | Depends on     |
-|-----|----------------------------------------------------------------------------|-------------------------|----------------|
-| S18 | Estate security fields and `security.maturity`                             | `yontrack` / `v6`       | S10            |
-| S19 | `security.remediationTime` and `security.overdue`                          | `yontrack` / `v6`       | S18            |
-| S20 | Estate view                                                                | `yontrack` / `v6`       | S14, S15       |
-| S21 | Findings fan-out on the estate view                                        | `yontrack` / `v6`       | S20            |
-| S22 | Demo seed and documentation for 6.1                                        | `yontrack` / `v6`       | S19, S21       |
+| #   | GitHub | Issue                                                                      | Repo / base             | Depends on     |
+|-----|--------|----------------------------------------------------------------------------|-------------------------|----------------|
+| S18 | [#1908](https://github.com/yontrack/yontrack/issues/1908) | Estate security fields and `security.maturity`                             | `yontrack` / `main`     | S10            |
+| S19 | [#1909](https://github.com/yontrack/yontrack/issues/1909) | `security.remediationTime` and `security.overdue`                          | `yontrack` / `main`     | S18            |
+| S20 | [#1910](https://github.com/yontrack/yontrack/issues/1910) | Estate view                                                                | `yontrack` / `main`     | S14, S15       |
+| S21 | [#1911](https://github.com/yontrack/yontrack/issues/1911) | Findings fan-out on the estate view                                        | `yontrack` / `main`     | S20            |
+| S22 | [#1912](https://github.com/yontrack/yontrack/issues/1912) | Demo seed and documentation for 6.1                                        | `yontrack` / `main`     | S19, S21       |
 
 ---
 
-## S1 — `CONTEXT.md`: reading, scorecard, estate, marker
+## S1 ([#1892](https://github.com/yontrack/yontrack/issues/1892)) — `CONTEXT.md`: reading, scorecard, estate, marker
 
 The four entries of README *Vocabulary*, each with its _Avoid_ list, before any code names them.
 Docs-only, `[skip ci]`.
@@ -49,7 +50,7 @@ Docs-only, `[skip ci]`.
 - Done when `CONTEXT.md` carries the four entries, and "indicator" appears only in an _Avoid_ list.
 - No mobile impact, no demo: vocabulary only.
 
-## S2 — Remove `ontrack-extension-indicators`; CasC removed-key tolerance
+## S2 ([#1893](https://github.com/yontrack/yontrack/issues/1893)) — Remove `ontrack-extension-indicators`; CasC removed-key tolerance
 
 README *Removals*.
 
@@ -74,7 +75,7 @@ README *Removals*.
   untouched); build compiles without the module.
 - No mobile impact: nothing indicator-related exists in `/mobile`. No demo: a removal.
 
-## S3 — Slot pipeline `FAILED` status
+## S3 ([#1894](https://github.com/yontrack/yontrack/issues/1894)) — Slot pipeline `FAILED` status
 
 README *Slot `FAILED`*.
 
@@ -90,7 +91,7 @@ README *Slot `FAILED`*.
   workflow trigger IT, KDSL acceptance, UI test for the command.
 - Demo: covered by S16.
 
-## S4 — Backdated slot pipelines
+## S4 ([#1895](https://github.com/yontrack/yontrack/issues/1895)) — Backdated slot pipelines
 
 README *Backdated deployments*.
 
@@ -104,13 +105,13 @@ README *Backdated deployments*.
 - Tests: IT per constraint, auto-cancel time, events still fired.
 - No mobile impact: API only. Demo: used by S16.
 
-## S5 — CLI: `slot pipeline fail` and `--date` (`yontrack-cli`)
+## S5 ([yontrack-cli#82](https://github.com/yontrack/yontrack-cli/issues/82)) — CLI: `slot pipeline fail` and `--date` (`yontrack-cli`)
 
 - `yontrack slot pipeline fail` calling `failSlotPipeline`; `--date` on the pipeline commands.
 - Tests in the CLI's style (`fakeYontrack_test.go`).
 - No mobile impact, no demo.
 
-## S6 — Scorecard module, readings table, engine, job; lead time and frequency
+## S6 ([#1896](https://github.com/yontrack/yontrack/issues/1896)) — Scorecard module, readings table, engine, job; lead time and frequency
 
 README *The engine*, *Storage*, *The job*, *Settings*, *The promotion marker with no estate*,
 *API*, and the first two catalogue rows.
@@ -134,7 +135,7 @@ README *The engine*, *Storage*, *The job*, *Settings*, *The promotion marker wit
   isolation; GraphQL IT.
 - No mobile impact: no UI. Demo: S16.
 
-## S7 — Success rate and MTTR under the promotion marker
+## S7 ([#1897](https://github.com/yontrack/yontrack/issues/1897)) — Success rate and MTTR under the promotion marker
 
 README catalogue rows `delivery.successRate` and `delivery.mttr`.
 
@@ -144,7 +145,7 @@ README catalogue rows `delivery.successRate` and `delivery.mttr`.
 - Tests: unit tests including the B1…B5 example of README *Charts*; in-flight edge cases.
 - No mobile impact, no UI. Demo: S16.
 
-## S8 — Test pass rate and flakiness
+## S8 ([#1898](https://github.com/yontrack/yontrack/issues/1898)) — Test pass rate and flakiness
 
 README catalogue rows `quality.testPassRate` and `quality.testFlakiness`.
 
@@ -154,7 +155,7 @@ README catalogue rows `quality.testPassRate` and `quality.testFlakiness`.
 - Tests: unit tests on runs; IT with several runs per build and stamp.
 - No mobile impact, no UI. Demo: S16.
 
-## S9 — Charts onto the engine; remove `ontrack-extension-delivery-metrics`
+## S9 ([#1899](https://github.com/yontrack/yontrack/issues/1899)) — Charts onto the engine; remove `ontrack-extension-delivery-metrics`
 
 README *Charts*, *Removals*.
 
@@ -171,7 +172,7 @@ README *Charts*, *Removals*.
 - No mobile impact: the mobile UI shows no charts. Demo: the existing `home/PromotionFrequencyChart`
   widget in `DemoContent` keeps working.
 
-## S10 — Estates: entity, licence, security, GraphQL, CasC, per-estate jobs
+## S10 ([#1900](https://github.com/yontrack/yontrack/issues/1900)) — Estates: entity, licence, security, GraphQL, CasC, per-estate jobs
 
 README *Estates*.
 
@@ -190,7 +191,7 @@ README *Estates*.
   `Roles.*`, CasC IT.
 - No mobile impact: no mobile scorecard in 6.x. Demo: S16.
 
-## S11 — Environment-marker readings
+## S11 ([#1901](https://github.com/yontrack/yontrack/issues/1901)) — Environment-marker readings
 
 README catalogue (environment column), *Estates* (qualifier).
 
@@ -200,13 +201,13 @@ README catalogue (environment column), *Estates* (qualifier).
 - Tests: IT on backdated pipelines (S4), including `CANCELLED` excluded.
 - No mobile impact, no UI. Demo: S16.
 
-## S12 — KDSL: estates and readings, acceptance tests
+## S12 ([#1902](https://github.com/yontrack/yontrack/issues/1902)) — KDSL: estates and readings, acceptance tests
 
 - KDSL bindings to manage estates and read a project's scorecard; acceptance tests for both
   markers.
 - No mobile impact, no demo.
 
-## S13 — `ontrack_reading` export and re-export job
+## S13 ([#1903](https://github.com/yontrack/yontrack/issues/1903)) — `ontrack_reading` export and re-export job
 
 README *Export*.
 
@@ -216,7 +217,7 @@ README *Export*.
 - Tests: IT with a capturing `MetricsExportExtension`.
 - No mobile impact, no demo.
 
-## S14 — UI: project Scorecard section and project scorecard page
+## S14 ([#1904](https://github.com/yontrack/yontrack/issues/1904)) — UI: project Scorecard section and project scorecard page
 
 README *UI*.
 
@@ -229,14 +230,14 @@ README *UI*.
   is added.
 - Demo: S16.
 
-## S15 — UI: estates admin page
+## S15 ([#1905](https://github.com/yontrack/yontrack/issues/1905)) — UI: estates admin page
 
 - User-menu item in the configurations group, gated on `EstateManagement`; list, create, edit,
   delete, recompute; label picker; marker choice; windows and targets per reading.
 - Tests: UI test.
 - No mobile impact: admin is desktop-only. Demo: S16.
 
-## S16 — Demo seed: two estates, backdated deployments, test runs
+## S16 ([#1906](https://github.com/yontrack/yontrack/issues/1906)) — Demo seed: two estates, backdated deployments, test runs
 
 README *Demo*; `doc/dev-guide/demo-seed.md`.
 
@@ -249,7 +250,7 @@ README *Demo*; `doc/dev-guide/demo-seed.md`.
 - `DemoSeedTest` still passes (nothing dated after the reset, idempotent).
 - No mobile impact beyond S3's display.
 
-## S17 — User documentation and 6.0 migration notes
+## S17 ([#1907](https://github.com/yontrack/yontrack/issues/1907)) — User documentation and 6.0 migration notes
 
 README *Documentation*.
 
@@ -259,7 +260,7 @@ README *Documentation*.
   start change, removed CasC keys.
 - Verified with `./gradlew :ontrack-docs:buildDocs`. Not `[skip ci]`.
 
-## S18 — Estate security fields and `security.maturity` (6.1)
+## S18 ([#1908](https://github.com/yontrack/yontrack/issues/1908)) — Estate security fields and `security.maturity` (6.1)
 
 README *6.1*.
 
@@ -270,7 +271,7 @@ README *6.1*.
 - Tests: unit tests per rung, IT with findings.
 - No mobile impact. Demo: S22.
 
-## S19 — `security.remediationTime` and `security.overdue` (6.1)
+## S19 ([#1909](https://github.com/yontrack/yontrack/issues/1909)) — `security.remediationTime` and `security.overdue` (6.1)
 
 - Median first observation → project-level resolution for CRITICAL+HIGH resolved in the window;
   overdue count against the estate targets; `NO_TARGET` for the no-estate set; accepted count in
@@ -278,20 +279,20 @@ README *6.1*.
 - Tests: IT on findings with backdated observations, a version bump that is not a remediation.
 - No mobile impact. Demo: S22.
 
-## S20 — Estate view (6.1)
+## S20 ([#1910](https://github.com/yontrack/yontrack/issues/1910)) — Estate view (6.1)
 
 - "Scorecards" user-menu item (licensed); estate page with projects × readings, target colours,
   unknown distinct, roll-up row, sort, links to the project scorecard page.
 - Measured-only toggle hidden while no `ESTIMATED` reading exists.
 - **No mobile impact, because the estate view is desktop-only in 6.x.** Demo: S22.
 
-## S21 — Findings fan-out on the estate view (6.1)
+## S21 ([#1911](https://github.com/yontrack/yontrack/issues/1911)) — Findings fan-out on the estate view (6.1)
 
 - Tab: one finding → projects exposed, branches, since when, through the findings cross-project
   query; filtered by project view.
 - No mobile impact. Demo: S22.
 
-## S22 — Demo seed and documentation for 6.1
+## S22 ([#1912](https://github.com/yontrack/yontrack/issues/1912)) — Demo seed and documentation for 6.1
 
 - The demo estates gain expected kinds and targets; the findings demo project lights up the
   security readings and the fan-out.

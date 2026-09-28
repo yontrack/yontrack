@@ -64,7 +64,7 @@ The issue breakdown is [issues.md](issues.md), under a new `initiative: scorecar
   export, the demo, the docs.
 - **6.1** (milestone `6.1`): the security readings, the estate security fields, the estate view and
   its findings fan-out. Written now so that the 6.0 table and engine are checked to carry them.
-- Every issue targets `v6`.
+- 6.0 issues target `v6`; 6.1 issues target `main`, once 6.0 has become `main`.
 
 ### Vocabulary
 
