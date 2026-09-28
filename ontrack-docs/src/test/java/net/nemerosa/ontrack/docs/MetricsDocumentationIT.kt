@@ -62,6 +62,12 @@ class MetricsDocumentationIT : AbstractDocGenIT() {
                             s.definition("* `${tag.name}` - ${tag.description}")
                         }
                     }
+                    if (it.fields.isNotEmpty()) {
+                        s.definition("Fields:")
+                        it.fields.forEach { field ->
+                            s.definition("* `${field.name}` - ${field.description}")
+                        }
+                    }
                 }
             }
 

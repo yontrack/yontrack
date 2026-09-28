@@ -86,6 +86,38 @@ class ReadingJdbcRepository(
                 .addValue("since", java.sql.Date.valueOf(since), Types.DATE)
         ) { rs, _ -> toReading(rs) }
 
+    override fun forEachPage(estates: Boolean, pageSize: Int, code: (List<Reading>) -> Unit) {
+        // Keyset pagination on the ID: the pages hold no connection while they are processed
+        var after = 0
+        while (true) {
+            val ids = mutableListOf<Int>()
+            val page = namedParameterJdbcTemplate!!.query(
+                """
+                    SELECT *
+                    FROM SCORECARD_READINGS
+                    WHERE ID > :after
+                    ${if (estates) "" else "AND ESTATE_ID IS NULL"}
+                    ORDER BY ID
+                    LIMIT :size
+                """.trimIndent(),
+                MapSqlParameterSource()
+                    .addValue("after", after)
+                    .addValue("size", pageSize)
+            ) { rs, _ ->
+                ids += rs.getInt("ID")
+                toReading(rs)
+            }
+            if (page.isEmpty()) {
+                return
+            }
+            code(page)
+            if (page.size < pageSize) {
+                return
+            }
+            after = ids.last()
+        }
+    }
+
     override fun deleteBefore(day: LocalDate): Int =
         namedParameterJdbcTemplate!!.update(
             "DELETE FROM SCORECARD_READINGS WHERE DAY < :day",

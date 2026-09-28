@@ -26,6 +26,15 @@ interface ReadingRepository {
     fun findHistory(estateId: Int?, projectId: Int, key: String, since: LocalDate): List<Reading>
 
     /**
+     * Reads every snapshot, page by page, in no meaningful order.
+     *
+     * @param estates `false` to read only the snapshots of the no-estate set
+     * @param pageSize Maximum number of snapshots in a page
+     * @param code Called for each page, never empty
+     */
+    fun forEachPage(estates: Boolean, pageSize: Int, code: (List<Reading>) -> Unit)
+
+    /**
      * Deletes the snapshots of a day before [day] (excluded).
      *
      * @return Number of deleted snapshots
