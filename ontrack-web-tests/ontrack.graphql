@@ -4056,6 +4056,11 @@ type Mutation {
   purgeHookRecordings: PurgeHookRecordingsPayload
   "Purging all records for Queue messages"
   purgeQueueRecordings: PurgeQueueRecordingsPayload
+  "Queues the recompute of the readings of a project, in every set it is in, overwriting the snapshots of the day. Needs the right to configure the project."
+  recomputeProjectScorecard(
+    "Input for the mutation"
+    input: RecomputeProjectScorecardInput
+  ): RecomputeProjectScorecardPayload
   "Reload the configuration from the CasC files"
   reloadCasc: ReloadCascPayload
   "Renames an existing subscription"
@@ -5107,6 +5112,8 @@ type Project implements Authorizable & ProjectEntity {
     "Key of the issue"
     issueKey: String!
   ): SCMIssueInfo
+  "Delivery scorecard of the project: its readings in every set it is in, with their daily history"
+  scorecard: Scorecard!
   "Graph of environment slots for a project"
   slotGraph(
     "Qualifier for the slots"
@@ -6134,6 +6141,39 @@ type RateLimit {
   used: Int
 }
 
+"One measurement of one project at one moment, taken by Yontrack from its own data, for one set. Durations are in seconds, frequencies per week."
+type Reading {
+  "What the value rests on"
+  basis: ReadingBasis!
+  "When the reading was computed"
+  computedAt: LocalDateTime!
+  "Day of the snapshot, as an ISO date (YYYY-MM-DD)"
+  day: String!
+  "What explains the value: the sample count (count), the other statistics of a duration (p90, mean, min, max), the kind of marker (markerKind), the marker (marker) and the branches read (scope)."
+  details: JSON
+  "Daily snapshots of this reading over the last days, oldest first, this one included"
+  history(
+    "Number of days back from today"
+    days: Int = 90
+  ): [Reading!]!
+  "Key of the reading, like delivery.leadTime"
+  key: String!
+  "Why the reading is unknown, null when it is not"
+  unknownReason: ReadingUnknownReason
+  "Value of the reading, null when it is unknown. The median for a duration."
+  value: Float
+  "End of the window the reading was taken over"
+  windowEnd: LocalDateTime!
+  "Start of the window the reading was taken over"
+  windowStart: LocalDateTime!
+}
+
+"Output type for the recomputeProjectScorecard mutation."
+type RecomputeProjectScorecardPayload implements Payload {
+  "List of errors"
+  errors: [UserError]
+}
+
 "Output type for the reloadCasc mutation."
 type ReloadCascPayload implements Payload {
   "List of errors"
@@ -6475,6 +6515,20 @@ type Schedule {
 type ScheduleAutoVersioningPayload implements Payload {
   "List of errors"
   errors: [UserError]
+}
+
+"The readings of one project, in every set it is in"
+type Scorecard {
+  "Sets the project is in: the set with no estate first, always present"
+  sets: [ScorecardSet!]!
+}
+
+"The readings of a project in one set: with no estate, or for one estate it belongs to"
+type ScorecardSet {
+  "Name of the set: Project for the set with no estate"
+  name: String!
+  "Latest snapshot of each reading of the set, in the catalogue order. Empty until the readings are computed."
+  readings: [Reading!]!
 }
 
 "Number of search results for one type"
@@ -8744,6 +8798,19 @@ enum QueueRecordState {
   STARTED
 }
 
+"What the value of a reading rests on: MEASURED from Yontrack's own data, ESTIMATED (never produced in 6.x) or UNKNOWN, with a reason."
+enum ReadingBasis {
+  ESTIMATED
+  MEASURED
+  UNKNOWN
+}
+
+"Why a reading is unknown: NO_MARKER (no promotion level on the branches in scope), NO_SAMPLES (nothing reached the marker in the window)."
+enum ReadingUnknownReason {
+  NO_MARKER
+  NO_SAMPLES
+}
+
 "Status of a pull request"
 enum SCMPullRequestStatus {
   DECLINED
@@ -10670,6 +10737,12 @@ input QueueRecordingFilterInput {
   text: String
   "Filtering on the username"
   username: String
+}
+
+"Input type for the recomputeProjectScorecard mutation."
+input RecomputeProjectScorecardInput {
+  "ID of the project"
+  projectId: Int!
 }
 
 "Input type for the renameSubscription mutation."

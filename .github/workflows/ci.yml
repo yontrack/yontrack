@@ -758,6 +758,7 @@ jobs:
               ontrack-extension-chart
               ontrack-extension-config
               ontrack-extension-findings
+              ontrack-extension-scorecard
           - shard: 4
             modules: >-
               ontrack-extension-auto-versioning

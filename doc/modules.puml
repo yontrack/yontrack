@@ -46,6 +46,12 @@
 [extension-general] --> [ui-graphql]
 [extension-general] --> [extension-casc]
 
+[extension-scorecard] --> [extension-support] #blue;line.bold
+[extension-scorecard] --> [extension-chart] #blue;line.bold
+[extension-scorecard] --> [ui-graphql]
+[extension-scorecard] --> [extension-casc]
+[extension-scorecard] --> [repository-support]
+
 [extension-jenkins] --> [extension-scm]
 [extension-jenkins] --> [extension-auto-versioning]
 [extension-jenkins] --> [extension-casc]
