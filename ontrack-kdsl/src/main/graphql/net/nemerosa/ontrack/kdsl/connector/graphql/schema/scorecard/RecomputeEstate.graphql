@@ -1,0 +1,5 @@
+mutation RecomputeEstate($id: Int!) {
+    recomputeEstate(input: {id: $id}) {
+        ...PayloadUserErrors
+    }
+}

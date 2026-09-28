@@ -1,0 +1,5 @@
+mutation DeleteEstate($id: Int!) {
+    deleteEstate(input: {id: $id}) {
+        ...PayloadUserErrors
+    }
+}

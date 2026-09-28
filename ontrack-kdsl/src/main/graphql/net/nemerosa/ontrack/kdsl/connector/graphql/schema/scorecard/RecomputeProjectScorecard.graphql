@@ -1,0 +1,5 @@
+mutation RecomputeProjectScorecard($projectId: Int!) {
+    recomputeProjectScorecard(input: {projectId: $projectId}) {
+        ...PayloadUserErrors
+    }
+}

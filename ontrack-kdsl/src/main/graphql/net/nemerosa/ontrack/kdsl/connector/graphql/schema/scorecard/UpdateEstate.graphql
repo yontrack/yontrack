@@ -1,0 +1,22 @@
+mutation UpdateEstate(
+    $id: Int!,
+    $name: String!,
+    $description: String,
+    $labels: [String!]!,
+    $marker: EstateMarkerInput,
+    $readings: [EstateReadingConfigInput!],
+) {
+    updateEstate(input: {
+        id: $id,
+        name: $name,
+        description: $description,
+        labels: $labels,
+        marker: $marker,
+        readings: $readings,
+    }) {
+        ...PayloadUserErrors
+        estate {
+            ...EstateFragment
+        }
+    }
+}

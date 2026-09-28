@@ -1,0 +1,7 @@
+query EstateProjects($name: String!) {
+    estate(name: $name) {
+        projects {
+            ...ProjectFragment
+        }
+    }
+}

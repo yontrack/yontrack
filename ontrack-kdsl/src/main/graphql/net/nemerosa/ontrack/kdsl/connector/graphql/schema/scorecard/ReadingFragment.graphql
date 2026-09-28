@@ -1,0 +1,14 @@
+fragment ReadingFragment on Reading {
+    key
+    day
+    computedAt
+    windowStart
+    windowEnd
+    value
+    basis
+    unknownReason
+    details
+    direction
+    target
+    targetMet
+}

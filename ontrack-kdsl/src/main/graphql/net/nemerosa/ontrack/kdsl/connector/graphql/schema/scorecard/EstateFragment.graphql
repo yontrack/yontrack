@@ -1,0 +1,20 @@
+fragment EstateFragment on Estate {
+    id
+    name
+    description
+    labels {
+        ...LabelFragment
+    }
+    marker {
+        kind
+        levelName
+        environment
+        qualifier
+    }
+    readingConfigs {
+        key
+        windowDays
+        target
+        direction
+    }
+}

@@ -1,0 +1,20 @@
+mutation CreateEstate(
+    $name: String!,
+    $description: String,
+    $labels: [String!]!,
+    $marker: EstateMarkerInput,
+    $readings: [EstateReadingConfigInput!],
+) {
+    createEstate(input: {
+        name: $name,
+        description: $description,
+        labels: $labels,
+        marker: $marker,
+        readings: $readings,
+    }) {
+        ...PayloadUserErrors
+        estate {
+            ...EstateFragment
+        }
+    }
+}

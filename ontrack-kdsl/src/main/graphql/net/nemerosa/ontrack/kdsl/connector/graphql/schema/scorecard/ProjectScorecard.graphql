@@ -1,0 +1,22 @@
+query ProjectScorecard(
+    $projectId: Int!,
+    $withHistory: Boolean!,
+    $historyDays: Int!,
+) {
+    project(id: $projectId) {
+        scorecard {
+            sets {
+                name
+                estate {
+                    name
+                }
+                readings {
+                    ...ReadingFragment
+                    history(days: $historyDays) @include(if: $withHistory) {
+                        ...ReadingFragment
+                    }
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,5 @@
+query EstateByName($name: String!) {
+    estate(name: $name) {
+        ...EstateFragment
+    }
+}
