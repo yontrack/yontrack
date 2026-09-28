@@ -15,7 +15,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
 /**
- * `delivery.leadTime` and `delivery.frequency` under the promotion marker of the no-estate set,
+ * The delivery readings under the promotion marker of the no-estate set,
  * computed by the engine on backdated builds and promotions.
  */
 class DeliveryReadingsIT : AbstractDSLTestSupport() {
@@ -90,6 +90,63 @@ class DeliveryReadingsIT : AbstractDSLTestSupport() {
     }
 
     @Test
+    fun `Success rate and time to restore pooled across the branches, up to their last level`() {
+        asAdmin {
+            project {
+                branch("main") {
+                    promotionLevel("SILVER")
+                    val gold = promotionLevel("GOLD")
+                    // Promoted in 1 day
+                    build().apply {
+                        updateBuildSignature(time = now.minusDays(30))
+                        promote(gold, time = now.minusDays(29))
+                    }
+                    // Outage: from the first unpromoted build...
+                    build().updateBuildSignature(time = now.minusDays(20))
+                    build().updateBuildSignature(time = now.minusDays(15))
+                    // ... to the next promotion, in 2 days
+                    build().apply {
+                        updateBuildSignature(time = now.minusDays(10))
+                        promote(gold, time = now.minusDays(8))
+                    }
+                    // In flight (created within the median lead time of 2 days)
+                    build().updateBuildSignature(time = now.minusDays(1))
+                }
+                branch("release") {
+                    val platinum = promotionLevel("PLATINUM")
+                    // Promoted in 3 days
+                    build().apply {
+                        updateBuildSignature(time = now.minusDays(25))
+                        promote(platinum, time = now.minusDays(22))
+                    }
+                    // Not promoted, not in flight: an outage still going on
+                    build().updateBuildSignature(time = now.minusDays(5))
+                }
+
+                val readings = readings()
+
+                val successRate = readings.getValue(ReadingKeys.DELIVERY_SUCCESS_RATE)
+                assertEquals(ReadingBasis.MEASURED, successRate.basis)
+                assertEquals(50.0, successRate.value)
+                assertEquals(6, successRate.details.path("count").asInt())
+                assertEquals(3, successRate.details.path("promoted").asInt())
+                assertEquals(2 * 86400.0, successRate.details.path("inFlight").path("leadTime").asDouble())
+                assertEquals(1, successRate.details.path("inFlight").path("excluded").asInt())
+                assertEquals("PROMOTION", successRate.details.path("markerKind").asText())
+                assertEquals("GOLD", successRate.details.path("marker").path("levels").path("main").asText())
+
+                val mttr = readings.getValue(ReadingKeys.DELIVERY_MTTR)
+                assertEquals(ReadingBasis.MEASURED, mttr.basis)
+                assertEquals(12 * 86400.0, mttr.value)
+                assertEquals(1, mttr.details.path("count").asInt())
+                assertEquals(1, mttr.details.path("open").asInt())
+                assertEquals(1, mttr.details.path("inFlight").path("excluded").asInt())
+                assertEquals("PROMOTION", mttr.details.path("markerKind").asText())
+            }
+        }
+    }
+
+    @Test
     fun `No promotion level gives NO_MARKER`() {
         asAdmin {
             project {
@@ -97,7 +154,7 @@ class DeliveryReadingsIT : AbstractDSLTestSupport() {
                     build()
                 }
                 val readings = readings()
-                listOf(ReadingKeys.DELIVERY_LEAD_TIME, ReadingKeys.DELIVERY_FREQUENCY).forEach { key ->
+                ReadingKeys.ORDER.forEach { key ->
                     val reading = readings.getValue(key)
                     assertEquals(ReadingBasis.UNKNOWN, reading.basis)
                     assertEquals(ReadingUnknownReason.NO_MARKER, reading.unknownReason)
@@ -120,12 +177,21 @@ class DeliveryReadingsIT : AbstractDSLTestSupport() {
                     }
                 }
                 val readings = readings()
-                listOf(ReadingKeys.DELIVERY_LEAD_TIME, ReadingKeys.DELIVERY_FREQUENCY).forEach { key ->
+                listOf(
+                    ReadingKeys.DELIVERY_LEAD_TIME,
+                    ReadingKeys.DELIVERY_FREQUENCY,
+                    ReadingKeys.DELIVERY_SUCCESS_RATE,
+                ).forEach { key ->
                     val reading = readings.getValue(key)
                     assertEquals(ReadingBasis.UNKNOWN, reading.basis)
                     assertEquals(ReadingUnknownReason.NO_SAMPLES, reading.unknownReason)
                     assertEquals(0, reading.details.path("count").asInt())
                 }
+                // Nothing to restore
+                val mttr = readings.getValue(ReadingKeys.DELIVERY_MTTR)
+                assertEquals(ReadingBasis.UNKNOWN, mttr.basis)
+                assertEquals(ReadingUnknownReason.NO_FAILURE, mttr.unknownReason)
+                assertNull(mttr.value)
             }
         }
     }

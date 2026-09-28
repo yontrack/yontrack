@@ -13,4 +13,10 @@ enum class ReadingUnknownReason {
      * Nothing reached the marker in the window.
      */
     NO_SAMPLES,
+
+    /**
+     * Time to restore with no failure in the window: nothing to restore. Rendered neutral rather
+     * than as an unknown — a time to restore never reads 0.
+     */
+    NO_FAILURE,
 }

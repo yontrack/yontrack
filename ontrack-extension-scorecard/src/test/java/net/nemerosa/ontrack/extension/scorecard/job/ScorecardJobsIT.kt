@@ -73,7 +73,13 @@ class ScorecardJobsIT : AbstractDSLTestSupport() {
                 // Readings of the project
                 val readings = readingRepository.findLatestByProject(ok.id()).filter { it.day == today }
                 assertEquals(
-                    listOf(ReadingKeys.DELIVERY_FREQUENCY, ReadingKeys.DELIVERY_LEAD_TIME, FailingReadingComputer.KEY),
+                    listOf(
+                        ReadingKeys.DELIVERY_FREQUENCY,
+                        ReadingKeys.DELIVERY_LEAD_TIME,
+                        ReadingKeys.DELIVERY_MTTR,
+                        ReadingKeys.DELIVERY_SUCCESS_RATE,
+                        FailingReadingComputer.KEY,
+                    ),
                     readings.map { it.key }.sorted()
                 )
                 assertTrue(readings.all { it.estateId == null })

@@ -24,4 +24,20 @@ interface PromotionSamples {
      * Promotions: every promotion run at the levels whose creation is in the interval.
      */
     fun promotions(levels: Collection<PromotionLevel>, interval: Interval): List<EventSample>
+
+    /**
+     * Builds: every build created in the interval on the branches of the levels, with its first
+     * promotion run at the level of its branch if it has one before the end of the interval.
+     *
+     * The success rate is read on these builds, once the builds [in flight][InFlight] are left out.
+     */
+    fun builds(levels: Collection<PromotionLevel>, interval: Interval): List<BuildSample>
+
+    /**
+     * Outages of the branches of the levels, as [Outages.of] reads them at the end of the interval:
+     * those restored in the interval, and those still going on at its end.
+     *
+     * The builds before the start of the interval are read too, since an outage may start before it.
+     */
+    fun outages(levels: Collection<PromotionLevel>, interval: Interval): List<OutageSample>
 }

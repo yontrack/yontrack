@@ -8,5 +8,5 @@ import org.springframework.stereotype.Component
 class GQLEnumReadingUnknownReason : AbstractGQLEnum<ReadingUnknownReason>(
     ReadingUnknownReason::class,
     ReadingUnknownReason.entries.toTypedArray(),
-    "Why a reading is unknown: NO_MARKER (no promotion level on the branches in scope), NO_SAMPLES (nothing reached the marker in the window)."
+    "Why a reading is unknown: NO_MARKER (no promotion level on the branches in scope), NO_SAMPLES (nothing reached the marker in the window), NO_FAILURE (time to restore with no failure in the window)."
 )

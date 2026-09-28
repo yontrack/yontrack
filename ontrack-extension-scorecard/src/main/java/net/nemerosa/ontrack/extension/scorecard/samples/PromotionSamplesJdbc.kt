@@ -58,6 +58,51 @@ class PromotionSamplesJdbc(
             }
         }
 
+    override fun builds(levels: Collection<PromotionLevel>, interval: Interval): List<BuildSample> =
+        buildSamples(levels, interval, fromStart = true)
+
+    override fun outages(levels: Collection<PromotionLevel>, interval: Interval): List<OutageSample> =
+        Outages.of(buildSamples(levels, interval, fromStart = false), interval)
+
+    /**
+     * Builds of the branches of the levels created before the end of the interval, and after its
+     * start if [fromStart] is set, with their first promotion at the level before its end.
+     */
+    private fun buildSamples(
+        levels: Collection<PromotionLevel>,
+        interval: Interval,
+        fromStart: Boolean,
+    ): List<BuildSample> =
+        if (levels.isEmpty()) {
+            emptyList()
+        } else {
+            val startCondition = if (fromStart) "AND B.CREATION >= :start" else ""
+            namedParameterJdbcTemplate!!.query(
+                """
+                    SELECT B.ID, B.BRANCHID, B.CREATION, MIN(PR.CREATION) AS FIRST_PROMOTION
+                    FROM BUILDS B
+                    INNER JOIN PROMOTION_LEVELS PL ON PL.BRANCHID = B.BRANCHID
+                    LEFT JOIN PROMOTION_RUNS PR
+                        ON PR.BUILDID = B.ID
+                        AND PR.PROMOTIONLEVELID = PL.ID
+                        AND PR.CREATION < :end
+                    WHERE PL.ID IN (:levels)
+                    AND B.CREATION < :end
+                    $startCondition
+                    GROUP BY B.ID, B.BRANCHID, B.CREATION
+                    ORDER BY B.CREATION, B.ID
+                """.trimIndent(),
+                params(levels, interval)
+            ) { rs, _ ->
+                BuildSample(
+                    branchId = rs.getInt("BRANCHID"),
+                    buildId = rs.getInt("ID"),
+                    creation = Time.fromStorage(rs.getString("CREATION"))!!,
+                    promotion = Time.fromStorage(rs.getString("FIRST_PROMOTION")),
+                )
+            }
+        }
+
     private fun params(levels: Collection<PromotionLevel>, interval: Interval) = mapOf(
         "levels" to levels.map { it.id() },
         "start" to Time.store(interval.start),
