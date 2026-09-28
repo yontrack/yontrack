@@ -68,11 +68,13 @@ function AutoPromotionSummary({validationStamps, promotionLevels}) {
     const parts = []
     if (validationStamps.length > 0) {
         const passed = validationStamps.filter(it => it.passed).length
-        parts.push(`${passed}/${validationStamps.length} validations passed`)
+        const noun = validationStamps.length === 1 ? 'validation' : 'validations'
+        parts.push(`${passed}/${validationStamps.length} ${noun} passed`)
     }
     if (promotionLevels.length > 0) {
         const granted = promotionLevels.filter(it => it.promotionRun).length
-        parts.push(`${granted}/${promotionLevels.length} promotions granted`)
+        const noun = promotionLevels.length === 1 ? 'promotion' : 'promotions'
+        parts.push(`${granted}/${promotionLevels.length} ${noun} granted`)
     }
     return parts.length > 0 ?
         <Typography.Text data-testid="auto-promotion-summary">{parts.join(' · ')}</Typography.Text> :
