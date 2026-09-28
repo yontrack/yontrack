@@ -1,0 +1,10 @@
+ontrack:
+  config:
+    settings:
+      e2e-promotion-metrics:
+        enabled: true
+        branches: "develop|main|master|release-.*|maintenance-.*"
+        pastDays: 14
+        restorationDays: 730
+      job-history:
+        retention: 45d

@@ -774,7 +774,6 @@ jobs:
               ontrack-extension-hook
               ontrack-extension-tfc
               ontrack-extension-elastic
-              ontrack-extension-delivery-metrics
               ontrack-extension-gitlab
               ontrack-extension-vault
               ontrack-extension-recordings

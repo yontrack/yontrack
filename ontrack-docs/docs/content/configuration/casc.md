@@ -139,9 +139,10 @@ CasC key ontrack/config/settings/jenkins-pipeline-library-indicator is ignored: 
 
 Remove such a key from your CasC files at your convenience. The keys removed in 6.x are:
 
-| Key                                                         | Removed in | Why                        |
-|-------------------------------------------------------------|------------|----------------------------|
-| `ontrack.config.settings.jenkins-pipeline-library-indicator` | 6.0        | The indicators are removed |
+| Key                                                          | Removed in | Why                                                       |
+|--------------------------------------------------------------|------------|-----------------------------------------------------------|
+| `ontrack.config.settings.jenkins-pipeline-library-indicator` | 6.0        | The indicators are removed                                |
+| `ontrack.config.settings.e2e-promotion-metrics`              | 6.0        | The export of the end-to-end promotion metrics is removed |
 
 A removed key is not part of the [CasC schema](#casc-schema): a CasC file still carrying one
 does not validate against it.
