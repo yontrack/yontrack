@@ -3,15 +3,26 @@ package net.nemerosa.ontrack.extension.github.autoversioning
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
+import net.nemerosa.ontrack.common.BaseException
 import net.nemerosa.ontrack.extension.av.dispatcher.AutoVersioningOrder
+import net.nemerosa.ontrack.extension.av.postprocessing.PostProcessingFailureException
 import net.nemerosa.ontrack.extension.av.processing.AutoVersioningTemplateRenderer
+import net.nemerosa.ontrack.extension.github.client.GitHubWorkflowRunFailedException
 import net.nemerosa.ontrack.extension.github.client.OntrackGitHubClient
 import net.nemerosa.ontrack.extension.github.client.OntrackGitHubClientFactory
+import net.nemerosa.ontrack.extension.github.client.WorkflowRun
 import net.nemerosa.ontrack.extension.github.model.GitHubEngineConfiguration
 import net.nemerosa.ontrack.extension.github.service.GitHubConfigurationService
 import net.nemerosa.ontrack.model.events.PlainEventRenderer
 import net.nemerosa.ontrack.model.settings.CachedSettingsService
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertThrows
+import org.springframework.http.HttpStatus
+import org.springframework.web.client.HttpServerErrorException
+import java.util.concurrent.TimeoutException
+import kotlin.test.assertEquals
+import kotlin.test.assertIs
+import kotlin.test.assertSame
 
 class GitHubPostProcessingTest {
 
@@ -125,6 +136,140 @@ class GitHubPostProcessingTest {
             )
         }
 
+    }
+
+    @Test
+    fun `A workflow run completing without success is a post-processing failure carrying the run link`() {
+        val client = mockk<OntrackGitHubClient>()
+        every { client.launchWorkflowRun(any(), any(), any(), any(), any(), any()) } returns launchedRun()
+        val failure = GitHubWorkflowRunFailedException("repository", RUN_ID)
+        every { client.waitUntilWorkflowRun("repository", RUN_ID, any(), any()) } throws failure
+
+        val ex = assertThrows<GitHubPostProcessingFailureException> {
+            runPostProcessing(client)
+        }
+
+        assertIs<PostProcessingFailureException>(ex)
+        assertIs<BaseException>(ex)
+        assertEquals(RUN_URL, ex.link)
+        assertSame(failure, ex.cause)
+    }
+
+    @Test
+    fun `A timeout while waiting for the workflow run is a post-processing failure carrying the run link`() {
+        val client = mockk<OntrackGitHubClient>()
+        every { client.launchWorkflowRun(any(), any(), any(), any(), any(), any()) } returns launchedRun()
+        val timeout = TimeoutException("Waiting for workflow run repository/$RUN_ID - Could not get result in time")
+        every { client.waitUntilWorkflowRun("repository", RUN_ID, any(), any()) } throws timeout
+
+        val ex = assertThrows<GitHubPostProcessingFailureException> {
+            runPostProcessing(client)
+        }
+
+        assertEquals(RUN_URL, ex.link)
+        assertSame(timeout, ex.cause)
+    }
+
+    @Test
+    fun `An HTTP error while waiting for the workflow run is a post-processing failure carrying the run link`() {
+        val client = mockk<OntrackGitHubClient>()
+        every { client.launchWorkflowRun(any(), any(), any(), any(), any(), any()) } returns launchedRun()
+        val httpError = HttpServerErrorException(HttpStatus.BAD_GATEWAY)
+        every { client.waitUntilWorkflowRun("repository", RUN_ID, any(), any()) } throws httpError
+
+        val ex = assertThrows<GitHubPostProcessingFailureException> {
+            runPostProcessing(client)
+        }
+
+        assertEquals(RUN_URL, ex.link)
+        assertSame(httpError, ex.cause)
+    }
+
+    @Test
+    fun `A failure to launch the workflow run is propagated unchanged`() {
+        val client = mockk<OntrackGitHubClient>()
+        val launchError = HttpServerErrorException(HttpStatus.BAD_GATEWAY)
+        every { client.launchWorkflowRun(any(), any(), any(), any(), any(), any()) } throws launchError
+
+        val ex = assertThrows<HttpServerErrorException> {
+            runPostProcessing(client)
+        }
+
+        assertSame(launchError, ex)
+        verify(exactly = 0) { client.waitUntilWorkflowRun(any(), any(), any(), any()) }
+    }
+
+    @Test
+    fun `A missing GitHub configuration is propagated unchanged`() {
+        val client = mockk<OntrackGitHubClient>()
+
+        assertThrows<GitHubPostProcessingConfigException> {
+            runPostProcessing(client, ghConfigFound = false)
+        }
+
+        verify(exactly = 0) { client.launchWorkflowRun(any(), any(), any(), any(), any(), any()) }
+    }
+
+    private fun launchedRun() = WorkflowRun(
+        id = RUN_ID,
+        headBranch = "main",
+        status = "queued",
+        conclusion = null,
+    )
+
+    private fun runPostProcessing(
+        client: OntrackGitHubClient,
+        ghConfigFound: Boolean = true,
+    ) {
+        val ontrackGitHubClientFactory = mockk<OntrackGitHubClientFactory>()
+        every { ontrackGitHubClientFactory.create(any()) } returns client
+
+        val cachedSettingsService = mockk<CachedSettingsService>()
+        every { cachedSettingsService.getCachedSettings(GitHubPostProcessingSettings::class.java) } returns GitHubPostProcessingSettings(
+            config = "my-config",
+            repository = "repository",
+            workflow = "workflow.yml",
+            branch = "main",
+        )
+
+        val gitHubConfig = mockk<GitHubEngineConfiguration>()
+        every { gitHubConfig.url } returns "https://github.com"
+        val gitHubConfigurationService = mockk<GitHubConfigurationService>()
+        every { gitHubConfigurationService.findConfiguration("my-config") } returns gitHubConfig.takeIf { ghConfigFound }
+
+        val processing = GitHubPostProcessing(
+            extensionFeature = mockk(),
+            cachedSettingsService = cachedSettingsService,
+            gitHubConfigurationService = gitHubConfigurationService,
+            ontrackGitHubClientFactory = ontrackGitHubClientFactory,
+        )
+
+        val order = mockk<AutoVersioningOrder>()
+        every { order.targetVersion } returns "1.0.0"
+
+        val avTemplateRenderer = mockk<AutoVersioningTemplateRenderer>()
+        every { avTemplateRenderer.render(any(), PlainEventRenderer.INSTANCE) } answers { firstArg() }
+
+        processing.postProcessing(
+            config = GitHubPostProcessingConfig(
+                dockerImage = "docker/image",
+                dockerCommand = "command.sh",
+                commitMessage = "Post processing",
+                config = null,
+                workflow = null,
+            ),
+            autoVersioningOrder = order,
+            repositoryURI = "uri://repository",
+            repository = "repository",
+            upgradeBranch = "av/upgrade",
+            scm = mockk(),
+            avTemplateRenderer = avTemplateRenderer,
+        ) {}
+    }
+
+    companion object {
+        private const val RUN_ID = 12345L
+        private const val RUN_URL = "https://github.com/repository/actions/runs/12345"
     }
 
 }

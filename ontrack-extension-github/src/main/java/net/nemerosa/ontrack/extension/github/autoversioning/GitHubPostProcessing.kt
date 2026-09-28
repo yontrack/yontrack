@@ -135,10 +135,15 @@ class GitHubPostProcessing(
             )
         )
         // Waiting until the workflow run completes
-        client.waitUntilWorkflowRun(
-            repository = repository,
-            runId = runId,
-        )
+        // Any failure from now on has a run to link to
+        try {
+            client.waitUntilWorkflowRun(
+                repository = repository,
+                runId = runId,
+            )
+        } catch (any: Exception) {
+            throw GitHubPostProcessingFailureException(runUrl = url, cause = any)
+        }
     }
 
 }
