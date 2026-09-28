@@ -343,6 +343,37 @@ A decision recorded outside Yontrack, read by it, that a finding is tolerated,
 possibly until an expiry.
 _Avoid_: suppression (the scanner's mechanism), waiver, exception
 
+### Scorecard
+
+**Reading**:
+One measurement of one project at one moment, taken by Yontrack from its own data,
+for one set: the project's own set with no estate, or the set of one estate it
+belongs to. It is never entered by hand, and it says which branches it read as
+well as what it came to.
+_Avoid_: indicator, metric, gauge, score. *Indicator* is the module removed in
+6.0, *metric* is what an export carries, and a *score* would be a judgement a
+reading does not make on its own.
+
+**Scorecard**:
+The readings of one project, and what the project page shows of it. A project's
+scorecard holds its no-estate readings, which it always has, plus one set per
+estate it belongs to.
+_Avoid_: dashboard. *Dashboard* is already Yontrack's home page of widgets.
+
+**Estate**:
+A group of projects selected by labels, every one of them required, and read
+together, with the marker and the targets its projects are read against. A
+project belongs to an estate by carrying its labels, never by being added to it.
+_Avoid_: portfolio, group, label. *Group* is already taken by security, and a
+*label* is what selects an estate's projects, not the estate itself.
+
+**Marker**:
+The event a delivery reading measures up to: an environment reached, or a
+promotion granted. A project read with no estate is read up to each branch's
+last promotion level; an estate may name another marker.
+_Avoid_: target, release, deployment. A *target* is the threshold an estate judges
+a reading against, and a *deployment* is only one kind of marker.
+
 ### Search
 
 **Search document**:
