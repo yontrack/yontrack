@@ -27,6 +27,17 @@ object ReadingKeys {
     const val DELIVERY_MTTR = "delivery.mttr"
 
     /**
+     * Share of the builds with a test run whose latest run passed on every test stamp. Percentage, 0 to 100.
+     */
+    const val QUALITY_TEST_PASS_RATE = "quality.testPassRate"
+
+    /**
+     * Share of the builds with a test run where a test stamp has a `FAILED` run followed by a `PASSED` run.
+     * Percentage, 0 to 100.
+     */
+    const val QUALITY_TEST_FLAKINESS = "quality.testFlakiness"
+
+    /**
      * Catalogue order
      */
     val ORDER: List<String> = listOf(
@@ -34,6 +45,8 @@ object ReadingKeys {
         DELIVERY_FREQUENCY,
         DELIVERY_SUCCESS_RATE,
         DELIVERY_MTTR,
+        QUALITY_TEST_PASS_RATE,
+        QUALITY_TEST_FLAKINESS,
     )
 
     /**

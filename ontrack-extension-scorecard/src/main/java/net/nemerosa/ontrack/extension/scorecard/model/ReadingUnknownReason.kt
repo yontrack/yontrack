@@ -19,4 +19,10 @@ enum class ReadingUnknownReason {
      * than as an unknown — a time to restore never reads 0.
      */
     NO_FAILURE,
+
+    /**
+     * Test reading with no test stamp — no validation stamp with the test summary data type — on the
+     * branches in scope.
+     */
+    NO_TEST_STAMP,
 }

@@ -75,3 +75,36 @@ data class OutageSample(
     val timeToRestore: DurationSample?
         get() = restored?.let { DurationSample(branchId = branchId, start = start, end = it) }
 }
+
+/**
+ * A test stamp: a validation stamp whose data type is the test summary.
+ *
+ * @property id ID of the validation stamp
+ * @property branchId Branch of the validation stamp
+ * @property name Name of the validation stamp
+ */
+data class TestStamp(
+    val id: Int,
+    val branchId: Int,
+    val name: String,
+)
+
+/**
+ * A validation run on a [test stamp][TestStamp].
+ *
+ * @property branchId Branch of the build
+ * @property buildId Build the run was made on
+ * @property stampId Test stamp the run was made on
+ * @property runId ID of the run, which orders the runs of a build on a stamp: the highest is the latest
+ * @property status Status the run was created with — what the tests reported, whatever the triage
+ * of the run changed afterwards
+ * @property time Time the run was created
+ */
+data class TestRunSample(
+    val branchId: Int,
+    val buildId: Int,
+    val stampId: Int,
+    val runId: Int,
+    val status: String,
+    val time: LocalDateTime,
+)

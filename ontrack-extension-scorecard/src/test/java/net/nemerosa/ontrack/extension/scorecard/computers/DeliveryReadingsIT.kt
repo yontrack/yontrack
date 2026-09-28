@@ -147,14 +147,14 @@ class DeliveryReadingsIT : AbstractDSLTestSupport() {
     }
 
     @Test
-    fun `No promotion level gives NO_MARKER`() {
+    fun `No promotion level gives NO_MARKER to the delivery readings`() {
         asAdmin {
             project {
                 branch("main") {
                     build()
                 }
                 val readings = readings()
-                ReadingKeys.ORDER.forEach { key ->
+                ReadingKeys.ORDER.filter { it.startsWith("delivery.") }.forEach { key ->
                     val reading = readings.getValue(key)
                     assertEquals(ReadingBasis.UNKNOWN, reading.basis)
                     assertEquals(ReadingUnknownReason.NO_MARKER, reading.unknownReason)

@@ -78,6 +78,8 @@ class ScorecardJobsIT : AbstractDSLTestSupport() {
                         ReadingKeys.DELIVERY_LEAD_TIME,
                         ReadingKeys.DELIVERY_MTTR,
                         ReadingKeys.DELIVERY_SUCCESS_RATE,
+                        ReadingKeys.QUALITY_TEST_FLAKINESS,
+                        ReadingKeys.QUALITY_TEST_PASS_RATE,
                         FailingReadingComputer.KEY,
                     ),
                     readings.map { it.key }.sorted()
