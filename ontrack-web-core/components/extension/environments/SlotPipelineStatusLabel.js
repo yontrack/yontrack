@@ -6,6 +6,7 @@ export const slotPipelineStatusLabels = {
     RUNNING: "Running",
     CANCELLED: "Cancelled",
     DONE: "Deployed",
+    FAILED: "Failed",
 }
 
 export default function SlotPipelineStatusLabel({status, showText = true}) {

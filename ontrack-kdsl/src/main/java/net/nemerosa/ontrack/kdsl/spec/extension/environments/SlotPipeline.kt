@@ -1,8 +1,10 @@
 package net.nemerosa.ontrack.kdsl.spec.extension.environments
 
+import com.apollographql.apollo.api.Optional
 import net.nemerosa.ontrack.json.asJson
 import net.nemerosa.ontrack.kdsl.connector.Connector
 import net.nemerosa.ontrack.kdsl.connector.graphql.convert
+import net.nemerosa.ontrack.kdsl.connector.graphql.schema.FailPipelineMutation
 import net.nemerosa.ontrack.kdsl.connector.graphql.schema.FinishDeploymentPipelineMutation
 import net.nemerosa.ontrack.kdsl.connector.graphql.schema.PipelineRequiredInputsQuery
 import net.nemerosa.ontrack.kdsl.connector.graphql.schema.StartDeployingPipelineMutation
@@ -40,6 +42,26 @@ class SlotPipeline(
                 id
             )
         ) { it?.finishSlotPipelineDeployment?.payloadUserErrors?.convert() }
+        return this
+    }
+
+    /**
+     * Marks this running pipeline as failed.
+     *
+     * @param message Optional message recorded in the pipeline's history
+     * @throws IllegalStateException If the pipeline could not be marked as failed, typically because
+     * it is not running
+     */
+    fun fail(message: String? = null): SlotPipeline {
+        val status = graphqlConnector.mutate(
+            FailPipelineMutation(
+                id,
+                Optional.presentIfNotNull(message),
+            )
+        ) { it?.failSlotPipeline?.payloadUserErrors?.convert() }
+            ?.failSlotPipeline?.failStatus
+            ?: error("Cannot get the fail status")
+        if (status.ok != true) error("Pipeline could not be marked as failed: ${status.message}")
         return this
     }
 

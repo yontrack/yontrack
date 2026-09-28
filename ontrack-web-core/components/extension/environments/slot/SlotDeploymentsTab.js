@@ -65,6 +65,7 @@ export default function SlotDeploymentsTab({slot, reloadCount = 0}) {
                         {value: 'RUNNING', label: "Running"},
                         {value: 'DONE', label: "Deployed"},
                         {value: 'CANCELLED', label: "Cancelled"},
+                        {value: 'FAILED', label: "Failed"},
                     ]}
                 />
                 {/*

@@ -5,6 +5,7 @@ export const slotWorkflowTriggers = {
     CANDIDATE: "On candidate",
     RUNNING: "On running",
     DONE: "On deployment done",
+    FAILED: "On deployment failed",
 }
 
 export default function SlotWorkflowTrigger({trigger}) {

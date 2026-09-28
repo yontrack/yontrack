@@ -40,7 +40,7 @@ const pipeline = (number, status, aBuild, {end = null} = {}) => ({
     id: `p-${number}`,
     number,
     status,
-    finished: status === 'DONE' || status === 'CANCELLED',
+    finished: status === 'DONE' || status === 'CANCELLED' || status === 'FAILED',
     start: '2026-09-01T10:00:00Z',
     end,
     build: aBuild,
@@ -94,6 +94,22 @@ describe('the slot cell', () => {
             currentPipeline: pipeline(3, 'DONE', build('107'), {end: '2026-09-01T10:00:00Z'}),
         })}/>)
         expect(screen.queryByTestId('slot-cell-slot-1-in-flight')).not.toBeInTheDocument()
+    })
+
+    it('says the most recent deployment failed, beneath the build still deployed', () => {
+        // The failure did not change what runs there: 89 is still the deployed build
+        render(<SlotCell slot={slot({
+            lastDeployedPipeline: pipeline(2, 'DONE', build('89'), {end: '2026-09-01T10:00:00Z'}),
+            currentPipeline: pipeline(3, 'FAILED', build('107'), {end: '2026-09-01T11:00:00Z'}),
+        })}/>)
+        expect(screen.getByTestId('slot-cell-slot-1-deployed')).toHaveTextContent('89')
+        expect(screen.getByTestId('slot-cell-slot-1-failed')).toHaveTextContent('✕ 107 failed')
+        expect(screen.queryByTestId('slot-cell-slot-1-in-flight')).not.toBeInTheDocument()
+    })
+
+    it('shows no failure once a newer deployment has started', () => {
+        render(<SlotCell slot={slot({currentPipeline: pipeline(4, 'CANDIDATE', build('108'))})}/>)
+        expect(screen.queryByTestId('slot-cell-slot-1-failed')).not.toBeInTheDocument()
     })
 
     it('marks a blocked slot', () => {

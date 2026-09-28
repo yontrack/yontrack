@@ -115,6 +115,7 @@ const deployment = ({
                     candidateWorkflows: workflows.filter(it => it.trigger === 'CANDIDATE'),
                     runningWorkflows: workflows.filter(it => it.trigger === 'RUNNING'),
                     doneWorkflows: workflows.filter(it => it.trigger === 'DONE'),
+                    failedWorkflows: workflows.filter(it => it.trigger === 'FAILED'),
                 },
                 admissionRules: rules,
                 requiredInputs: requiredInputs.map(id => ({
@@ -427,6 +428,21 @@ describe('the mobile deployment screen', () => {
             const settled = screen.getByTestId('mobile-deployment-settled')
             expect(settled).toHaveTextContent(/cancelled/i)
             expect(settled).toHaveTextContent('CI died, nobody is coming.')
+        })
+
+        it('says a failed deployment failed, with its message, and offers nothing', () => {
+            // Display only: a failure is reported by the CI which ran the deployment, not decided
+            // on a phone - and "finished" would be a lie about it.
+            deployment({status: 'FAILED', lastChange: {message: 'Helm upgrade timed out'}})
+            render(<MobileDeploymentScreen id="pipeline-1"/>)
+            const settled = screen.getByTestId('mobile-deployment-settled')
+            expect(settled).toHaveTextContent(/failed/i)
+            expect(settled).not.toHaveTextContent(/finished/i)
+            expect(settled).toHaveTextContent('Helm upgrade timed out')
+            expect(screen.getByTestId('mobile-deployment-status')).toHaveTextContent('Failed')
+            expect(screen.queryByTestId('mobile-deployment-run')).not.toBeInTheDocument()
+            expect(screen.queryByTestId('mobile-deployment-finish')).not.toBeInTheDocument()
+            expect(screen.queryByTestId('mobile-deployment-cancel')).not.toBeInTheDocument()
         })
 
         it('no longer points at the desktop version, because there is nothing left to go there for', () => {

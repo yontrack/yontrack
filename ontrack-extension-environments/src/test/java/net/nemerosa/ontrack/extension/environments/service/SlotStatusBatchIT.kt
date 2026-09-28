@@ -121,6 +121,22 @@ class SlotStatusBatchIT : AbstractDSLTestSupport() {
     }
 
     @Test
+    fun `A failed deployment is neither in flight nor blocking, and leaves the deployed build in place`() {
+        slotTestSupport.withSlot { slot ->
+            val deployed = slotTestSupport.createRunAndFinishDeployment(slot = slot)
+            val failing = slotTestSupport.createPipeline(slot = slot)
+            assertTrue(slotService.runDeployment(failing.id, dryRun = false).ok)
+            assertTrue(slotService.failPipeline(failing.id).ok)
+
+            val status = slotStatusService.getSlotStatuses(listOf(slot)).getValue(slot.id)
+            assertEquals(slotStatusService.isBlocked(slot), status.blocked)
+            assertTrue(!status.blocked, "A failed deployment blocks nothing")
+            assertEquals(failing.id, status.currentPipeline?.id, "The failure is the slot's most recent deployment")
+            assertEquals(deployed.id, status.lastDeployedPipeline?.id, "The slot still runs what it ran")
+        }
+    }
+
+    @Test
     fun `An empty batch is an empty answer`() {
         assertEquals(emptyMap(), slotStatusService.getSlotStatuses(emptyList()))
     }

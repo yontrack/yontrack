@@ -2149,6 +2149,14 @@ type ExtensionFeatureDescription {
   version: String
 }
 
+"Output type for the failSlotPipeline mutation."
+type FailSlotPipelinePayload implements Payload {
+  "List of errors"
+  errors: [UserError]
+  "Status of the action"
+  failStatus: SlotDeploymentActionStatus
+}
+
 "Output type for the favouriteBranch mutation."
 type FavouriteBranchPayload implements Payload {
   "Updated branch"
@@ -3899,6 +3907,11 @@ type Mutation {
     "Input for the mutation"
     input: EnableSubscriptionInput
   ): EnableSubscriptionPayload
+  "Marks a running pipeline as failed"
+  failSlotPipeline(
+    "Input for the mutation"
+    input: FailSlotPipelineInput
+  ): FailSlotPipelinePayload
   "Marks a branch as favourite"
   favouriteBranch(
     "Input for the mutation"
@@ -8752,6 +8765,7 @@ enum SlotPipelineStatus {
   CANCELLED
   CANDIDATE
   DONE
+  FAILED
   RUNNING
 }
 
@@ -10164,6 +10178,14 @@ input EventSubscriptionFilter {
   origin: String
   "Scope of the search (if true, includes the entity and the levels above."
   recursive: Boolean
+}
+
+"Input type for the failSlotPipeline mutation."
+input FailSlotPipelineInput {
+  "Optional message recorded in the pipeline's history"
+  message: String
+  "ID of the running pipeline to mark as failed"
+  pipelineId: String!
 }
 
 "Input type for the favouriteBranch mutation."

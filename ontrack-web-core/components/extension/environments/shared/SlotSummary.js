@@ -21,7 +21,10 @@ import {
     gqlSlotDrawerDeployment,
     gqlSlotDrawerFinish,
     gqlSlotDrawerRun,
+    gqlSlotFail,
 } from "@components/extension/environments/shared/environmentsSharedGraphQL"
+import FailDeploymentButton from "@components/extension/environments/shared/FailDeploymentButton"
+import SlotPipelineStatusLabel from "@components/extension/environments/SlotPipelineStatusLabel"
 
 /**
  * **Now / In flight / Next / Recent** - the body of the slot drawer, and the header block of the
@@ -36,7 +39,9 @@ import {
  *
  * 1. **Now** - what is deployed. The question the matrix was opened to answer, in full.
  * 2. **In flight** - what is trying to replace it, how far it got, what is blocking it, and the one
- *    action that would move it. Absent when nothing is in flight, rather than drawn empty.
+ *    action that would move it - plus "Mark as failed" on a running one. Absent when nothing is in
+ *    flight, rather than drawn empty. When the most recent deployment *failed*, a line under Now
+ *    says so instead: the failure did not change what is deployed.
  * 3. **Next** - up to three eligible builds newer than the one here, each with Deploy.
  * 4. **Recent** - the last five deployments, so "was this normal?" has an answer. The slot page
  *    turns this off: its Deployments tab is the full history, and five rows of it above the tab
@@ -165,6 +170,13 @@ function SlotSummaryBody({
         'finishStatus',
     )
 
+    const fail = (message) => act(
+        gqlSlotFail,
+        'failSlotPipeline',
+        'failStatus',
+        {message},
+    )
+
     const cancel = () => act(
         gqlSlotCancel,
         'cancelSlotPipeline',
@@ -228,6 +240,25 @@ function SlotSummaryBody({
                         </div>
                 }
             </section>
+
+            {
+                /*
+                 * The slot's most recent deployment failed. Said under Now because it is about what
+                 * is deployed: it did not change it, and a reader should not have to open Recent to
+                 * learn that the last attempt to replace it went wrong.
+                 */
+                current?.status === 'FAILED' &&
+                <section data-testid={`${testId}-failed`}>
+                    <Space size={8} wrap>
+                        <SlotPipelineStatusLabel status="FAILED"/>
+                        <Link href={slotPipelineUri(current.id)}>#{current.number}</Link>
+                        <Typography.Text>{buildLabel(current.build)}</Typography.Text>
+                        <Typography.Text type="secondary">
+                            <TimestampText value={current.end ?? current.start} relative={true}/>
+                        </Typography.Text>
+                    </Space>
+                </section>
+            }
 
             {/* 2 - In flight */}
             {
@@ -293,6 +324,10 @@ function SlotSummaryBody({
                                 >
                                     Finish the deployment
                                 </Button>
+                            }
+                            {
+                                inFlight.status === 'RUNNING' &&
+                                <FailDeploymentButton acting={acting} onFail={fail} testId={`${testId}-fail`}/>
                             }
                             <Button
                                 danger
@@ -366,7 +401,7 @@ function SlotSummaryBody({
                                     <Space size={8} wrap>
                                         <Link href={slotPipelineUri(pipeline.id)}>#{pipeline.number}</Link>
                                         <Typography.Text>{buildLabel(pipeline.build)}</Typography.Text>
-                                        <Typography.Text type="secondary">{pipeline.status}</Typography.Text>
+                                        <SlotPipelineStatusLabel status={pipeline.status}/>
                                         <Typography.Text type="secondary">
                                             {compactAge(pipeline.end ?? pipeline.start)}
                                         </Typography.Text>

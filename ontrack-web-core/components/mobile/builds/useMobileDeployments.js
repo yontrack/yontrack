@@ -98,7 +98,12 @@ export const deploymentName = (pipeline) =>
  * @param {string|number} id The build's id.
  * @param {number} [refresh] Bumped by a caller which has just changed something
  *   - started a deployment, say - to ask the server again.
- * @returns {{deployments: Array, unsettled: Array, unavailable: boolean}}
+ * **`FAILED` ones too, apart** (#1894). They are not in progress, and they are
+ * not where the build *is* - a failure does not change what a slot runs - so
+ * they are a third list, `failed`, minus the slots the build has since been
+ * deployed to.
+ *
+ * @returns {{deployments: Array, unsettled: Array, failed: Array, unavailable: boolean}}
  *   `unavailable` means the instance has no environments feature - not that the
  *   build is deployed nowhere, which is a different and sayable thing.
  */
@@ -127,6 +132,13 @@ export function useMobileBuildDeployments(id, refresh = 0) {
                         start
                         status
                     }
+                    # Deployments of this build which failed (#1894). Display
+                    # only: a phone cannot fail a deployment.
+                    failedPipelines: slotPipelines(status: FAILED, sortedByEnvironment: true) {
+                        ${DEPLOYMENT_FIELDS}
+                        start
+                        status
+                    }
                 }
             }
         `,
@@ -137,9 +149,18 @@ export function useMobileBuildDeployments(id, refresh = 0) {
         ...(build?.candidatePipelines ?? []),
         ...(build?.runningPipelines ?? []),
     ].sort((a, b) => (b.slot?.environment?.order ?? 0) - (a.slot?.environment?.order ?? 0))
+    const deployments = build?.currentDeployments ?? []
+    /*
+     * A failure in a slot where the build has since been deployed is not news:
+     * the build is there now, and the Deployments section already says so.
+     */
+    const deployedSlotIds = new Set(deployments.map(pipeline => pipeline.slot?.id))
+    const failed = (build?.failedPipelines ?? [])
+        .filter(pipeline => !deployedSlotIds.has(pipeline.slot?.id))
     return {
-        deployments: build?.currentDeployments ?? [],
+        deployments,
         unsettled,
+        failed,
         unavailable: Boolean(query.error),
     }
 }

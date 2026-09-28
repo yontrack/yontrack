@@ -257,8 +257,10 @@ _Avoid_: deployment target, environment slot, deployment config
 
 **Slot pipeline**:
 One build's passage through one slot — the record of a single deployment,
-numbered within its slot and moving from candidate through running to done or
-cancelled. A slot has many pipelines over time; each names exactly one build.
+numbered within its slot and moving from candidate through running to done,
+failed or cancelled. *Failed* is reachable from running only and does not change
+what the slot runs: the last done pipeline stays the deployed one. A slot has
+many pipelines over time; each names exactly one build.
 _Avoid_: deployment, release pipeline, and above all the bare *pipeline*, which
 already means the branch's promotion pipeline in *pipeline view*
 

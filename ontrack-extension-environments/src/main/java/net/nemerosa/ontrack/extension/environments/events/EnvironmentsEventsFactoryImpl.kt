@@ -81,6 +81,11 @@ class EnvironmentsEventsFactoryImpl(
             .withPipeline(pipeline)
             .build()
 
+    override fun pipelineFailed(pipeline: SlotPipeline): Event =
+        Event.of(EnvironmentsEvents.PIPELINE_FAILED)
+            .withPipeline(pipeline)
+            .build()
+
     override fun pipelineStatusOverridden(pipeline: SlotPipeline): Event =
         Event.of(EnvironmentsEvents.PIPELINE_STATUS_OVERRIDDEN)
             .withPipeline(pipeline)
@@ -107,6 +112,7 @@ class EnvironmentsEventsFactoryImpl(
         eventFactory.register(EnvironmentsEvents.PIPELINE_DEPLOYING)
         eventFactory.register(EnvironmentsEvents.PIPELINE_DEPLOYED)
         eventFactory.register(EnvironmentsEvents.PIPELINE_CANCELLED)
+        eventFactory.register(EnvironmentsEvents.PIPELINE_FAILED)
         eventFactory.register(EnvironmentsEvents.PIPELINE_STATUS_OVERRIDDEN)
         eventFactory.register(EnvironmentsEvents.PIPELINE_STATUS_CHANGED)
     }

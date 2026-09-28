@@ -178,6 +178,26 @@ export class PipelinePage {
         await expect(this.page.getByTestId('deployment-actions')).not.toBeVisible()
     }
 
+    locatorFailAction() {
+        return this.page.getByTestId('deployment-fail')
+    }
+
+    /**
+     * "Mark as failed", beside Finish on a running deployment - with an optional message, which the
+     * dialog asks for before the deployment is failed for good.
+     */
+    async fail({message = null} = {}) {
+        await this.locatorFailAction().click()
+        const dialogMessage = this.page.getByTestId('deployment-fail-message')
+        await expect(dialogMessage).toBeVisible()
+        if (message) {
+            await dialogMessage.fill(message)
+        }
+        await this.page.getByTestId('deployment-fail-confirm').click()
+        // A failed deployment offers nothing at all, like a finished one
+        await expect(this.page.getByTestId('deployment-actions')).not.toBeVisible()
+    }
+
     async checkCancelAction({visible = true}) {
         await expect(this.page.getByTestId('deployment-cancel')).toBeVisible({visible})
     }

@@ -143,6 +143,9 @@ export default function MobileDeploymentScreen({id}) {
                         doneWorkflows: workflows(trigger: DONE) {
                             ...MobileSlotWorkflow
                         }
+                        failedWorkflows: workflows(trigger: FAILED) {
+                            ...MobileSlotWorkflow
+                        }
                     }
                     # Every rule and its verdict, which is what makes this screen
                     # a decision rather than a button.
@@ -194,7 +197,8 @@ export default function MobileDeploymentScreen({id}) {
                     # gates CANDIDATE to RUNNING only.
                     errorMessage
                     # What a cancellation was for, read back exactly as the
-                    # desktop reads it beside a CANCELLED pipeline.
+                    # desktop reads it beside a CANCELLED pipeline - and why a
+                    # FAILED one failed.
                     lastChange {
                         message
                     }
@@ -243,6 +247,10 @@ export default function MobileDeploymentScreen({id}) {
      * | RUNNING   | Complete + Cancel               |
      * | DONE      | nothing; the caption says what happened |
      * | CANCELLED | nothing; the caption says what happened, and why |
+     * | FAILED    | nothing; the caption says it failed, and why     |
+     *
+     * FAILED is display only (#1894): a failed deployment is reported by the CI
+     * which ran it, not decided on a phone, so there is no "Mark as failed" here.
      *
      * Cancel is offered on CANDIDATE as well as on RUNNING, which the issue title
      * does not ask for: a candidate nobody will ever approve is the more common
@@ -649,13 +657,17 @@ export default function MobileDeploymentScreen({id}) {
                                 {
                                     deployment.status === 'CANCELLED'
                                         ? "This deployment was cancelled."
-                                        : "This deployment is finished."
+                                        : deployment.status === 'FAILED'
+                                            ? "This deployment failed."
+                                            : "This deployment is finished."
                                 }
                                 {
                                     // The reason it was cancelled for, beside it as
                                     // the desktop shows it. Mandatory on the way in,
                                     // so a cancellation made here always has one.
-                                    deployment.status === 'CANCELLED' && deployment.lastChange?.message &&
+                                    // A failure's message says why it failed.
+                                    (deployment.status === 'CANCELLED' || deployment.status === 'FAILED') &&
+                                    deployment.lastChange?.message &&
                                     ` ${deployment.lastChange.message}`
                                 }
                             </Typography.Text>

@@ -123,6 +123,15 @@ object EnvironmentsEvents {
         context = eventPipelineContext
     )
 
+    val PIPELINE_FAILED: EventType = SimpleEventType(
+        id = "slot-pipeline-failed",
+        template = """
+            Pipeline ${'$'}{#.pipeline} has failed.
+        """.trimIndent(),
+        description = "When a running slot pipeline is marked as failed",
+        context = eventPipelineContext
+    )
+
     val PIPELINE_STATUS_CHANGED: EventType = SimpleEventType(
         id = "slot-pipeline-status-changed",
         template = """

@@ -15,6 +15,15 @@ enum class SlotPipelineStatus(
     ),
     DONE(
         finished = true
+    ),
+
+    /**
+     * A deployment which was started and did not make it. Terminal, and reachable from [RUNNING]
+     * only - a candidate which never started is cancelled, not failed. It does not change what the
+     * slot runs: the last [DONE] pipeline stays the deployed one.
+     */
+    FAILED(
+        finished = true
     );
 
     companion object {

@@ -123,6 +123,7 @@ const build = ({
                    deployments = [],
                    candidates = [],
                    running = [],
+                   failed = [],
                    validations = [],
                    authorizations = [],
                } = {}) => setResult({
@@ -139,6 +140,7 @@ const build = ({
             currentDeployments: deployments,
             candidatePipelines: candidates,
             runningPipelines: running,
+            failedPipelines: failed,
             validations,
         },
     },
@@ -537,6 +539,31 @@ describe('the mobile build screen', () => {
                     .querySelectorAll('[data-testid^="mobile-build-unsettled-"]')
             ).map(row => row.getAttribute('data-testid'))
             expect(rows).toEqual(['mobile-build-unsettled-pipeline-2', 'mobile-build-unsettled-pipeline-1'])
+        })
+
+        it('lists a failed deployment, labelled as failed, with a way into it', () => {
+            build({failed: [unsettled('pipeline-3', 'production', {status: 'FAILED'})]})
+            render(<MobileBuildScreen id="100"/>)
+            const row = screen.getByTestId('mobile-build-failed-pipeline-3')
+            expect(row).toHaveTextContent('production')
+            expect(row).toHaveTextContent('Failed')
+            expect(row.querySelector('a').getAttribute('href')).toEqual('/mobile/deployment/pipeline-3')
+            // Not in progress: it is over
+            expect(screen.queryByTestId('mobile-build-unsettled')).not.toBeInTheDocument()
+        })
+
+        it('drops a failure in a slot where the build has since been deployed', () => {
+            // The build is in production now; its earlier failed attempt there is not news
+            build({
+                deployments: [{
+                    id: 'pipeline-4',
+                    end: '2024-03-03T09:00:00Z',
+                    slot: {id: 'slot-pipeline-3', qualifier: '', environment: {id: 'production', name: 'production', order: 100}},
+                }],
+                failed: [unsettled('pipeline-3', 'production', {status: 'FAILED'})],
+            })
+            render(<MobileBuildScreen id="100"/>)
+            expect(screen.queryByTestId('mobile-build-failed')).not.toBeInTheDocument()
         })
 
         it('is absent rather than empty when nothing is in progress', () => {

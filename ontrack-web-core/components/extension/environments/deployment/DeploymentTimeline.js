@@ -29,7 +29,7 @@ export default function DeploymentTimeline({deployment}) {
             items={entries.map(entry => ({
                 key: entry.key,
                 color: entry.type === 'STATUS'
-                    ? (entry.status === 'CANCELLED' ? 'red' : entry.status === 'DONE' ? 'green' : 'blue')
+                    ? (entry.status === 'CANCELLED' || entry.status === 'FAILED' ? 'red' : entry.status === 'DONE' ? 'green' : 'blue')
                     : 'orange',
                 content: (
                     <div data-testid={`deployment-timeline-${entry.key}`}>

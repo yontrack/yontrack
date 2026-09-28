@@ -147,6 +147,18 @@ class EnvironmentsEventsFactoryIT : AbstractDSLTestSupport() {
     }
 
     @Test
+    fun pipelineFailed() {
+        slotTestSupport.withSlotPipeline { pipeline ->
+            val event = environmentsEventsFactory.pipelineFailed(pipeline)
+            val text = render(event)
+            assertEquals(
+                """Pipeline <a href="http://localhost:3000/extension/environments/pipeline/${pipeline.id}">${pipeline.slot.environment.name}/${pipeline.slot.project.name}#1</a> has failed.""",
+                text
+            )
+        }
+    }
+
+    @Test
     fun pipelineStatusOverridden() {
         slotTestSupport.withSlotPipeline { pipeline ->
             asGlobalRole(Roles.GLOBAL_ADMINISTRATOR) {

@@ -1,0 +1,15 @@
+mutation FailPipeline(
+    $pipelineId: String!,
+    $message: String,
+) {
+    failSlotPipeline(input: {
+        pipelineId: $pipelineId,
+        message: $message,
+    }) {
+        ...PayloadUserErrors
+        failStatus {
+            ok
+            message
+        }
+    }
+}

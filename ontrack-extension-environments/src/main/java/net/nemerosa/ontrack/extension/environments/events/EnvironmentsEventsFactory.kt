@@ -19,6 +19,7 @@ interface EnvironmentsEventsFactory {
     fun pipelineDeploying(pipeline: SlotPipeline): Event
     fun pipelineDeployed(pipeline: SlotPipeline): Event
     fun pipelineCancelled(pipeline: SlotPipeline): Event
+    fun pipelineFailed(pipeline: SlotPipeline): Event
     fun pipelineStatusOverridden(pipeline: SlotPipeline): Event
     fun pipelineStatusChanged(pipeline: SlotPipeline): Event
 }

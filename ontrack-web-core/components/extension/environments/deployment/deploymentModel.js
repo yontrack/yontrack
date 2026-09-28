@@ -14,7 +14,7 @@ import {slotPipelineStatusLabels} from "@components/extension/environments/SlotP
 export const PHASES = ['CANDIDATE', 'RUNNING', 'DONE']
 
 /**
- * The horizontal `Steps` bar: Candidate → Running → Deployed, or → Cancelled.
+ * The horizontal `Steps` bar: Candidate → Running → Deployed, or → Cancelled, or → Failed.
  *
  * A cancelled deployment does not get a fourth step. It **replaces** the step it never reached, and
  * that step is marked as an error: the bar says where the deployment stopped, and a cancelled
@@ -41,6 +41,14 @@ export const deploymentSteps = (deployment) => {
         return {items, current: items.length - 1, status: 'error'}
     }
 
+    if (status === 'FAILED') {
+        // A failure is reachable from RUNNING only, so it always replaces the Deployed step, and
+        // like a cancellation it is where the deployment stopped instead of arriving.
+        const failed = {key: 'FAILED', title: slotPipelineStatusLabels.FAILED}
+        const items = [candidate, running, failed]
+        return {items, current: items.length - 1, status: 'error'}
+    }
+
     const items = [candidate, running, done]
     const current = status === 'CANDIDATE' ? 0 : status === 'RUNNING' ? 1 : 2
     return {items, current, status: status === 'DONE' ? 'finish' : 'process'}
@@ -56,7 +64,7 @@ export const statusChange = (deployment, status) =>
  * The phases to draw **below** the current one: the ones this deployment has already been through.
  *
  * A candidate has none - it has not been anywhere yet. A running deployment has its candidate phase
- * behind it. A finished one has all of them, which is why a `DONE` or `CANCELLED` deployment reads
+ * behind it. A finished one has all of them, which is why a `DONE`, `FAILED` or `CANCELLED` deployment reads
  * as a complete record rather than as a screen with its middle missing.
  *
  * A phase with no checks at all is left out rather than drawn empty: "Running phase (0 checks)" is
@@ -80,10 +88,19 @@ export const earlierPhases = (deployment) => {
         if (phase === 'RUNNING') {
             return deployment.status === 'RUNNING' ||
                 deployment.status === 'DONE' ||
+                deployment.status === 'FAILED' ||
                 !!statusChange(deployment, 'RUNNING')
         }
         return deployment.status === 'DONE'
     })
+
+    /*
+     * A failed deployment never reached DONE; its last phase is the FAILED one - the workflows
+     * which ran *because* it failed - in the place the DONE phase would have taken.
+     */
+    if (deployment.status === 'FAILED') {
+        reached.push('FAILED')
+    }
 
     // The phase the deployment is *in* is shown at the top, under "What's blocking", and is not
     // repeated here.
@@ -127,8 +144,11 @@ export const timelineEntries = (deployment) => {
             timestamp: change.timestamp,
             title: timelineTitle(change),
             // The override message is the whole point of an override entry; for a status change it
-            // is the forcing message, which matters for exactly the same reason.
-            message: change.overrideMessage || null,
+            // is the forcing message, which matters for exactly the same reason. A failure carries
+            // its own message - why it failed - and that is what somebody reading it wants to know.
+            message: change.overrideMessage ||
+                (change.type === 'STATUS' && change.status === 'FAILED' ? change.message : null) ||
+                null,
         }))
 }
 
@@ -157,4 +177,4 @@ const defaultTitles = {
  * every phase read-only.
  */
 export const isSettled = (deployment) =>
-    deployment?.status === 'DONE' || deployment?.status === 'CANCELLED'
+    deployment?.status === 'DONE' || deployment?.status === 'CANCELLED' || deployment?.status === 'FAILED'

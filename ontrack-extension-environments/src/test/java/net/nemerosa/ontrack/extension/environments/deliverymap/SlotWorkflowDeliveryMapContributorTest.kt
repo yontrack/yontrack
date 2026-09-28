@@ -106,6 +106,18 @@ class SlotWorkflowDeliveryMapContributorTest {
     }
 
     @Test
+    fun `A failed workflow gates nothing and is emitted by its slot`() {
+        // Like DONE, FAILED runs once the deployment is over and nothing waits for it
+        givenSlotWorkflows(slotWorkflow("sw-1", "Page on-call", SlotPipelineStatus.FAILED))
+
+        val edge = contributor.contribute(branch).edges.single()
+
+        assertEquals(DeliveryMapEdgeKind.EMITS, edge.kind)
+        assertEquals("slot:slot-1", edge.source)
+        assertEquals("slot-workflow:sw-1", edge.target)
+    }
+
+    @Test
     fun `A slot with workflows on several triggers straddles its own column`() {
         givenSlotWorkflows(
             slotWorkflow("sw-1", "Smoke tests", SlotPipelineStatus.CANDIDATE),

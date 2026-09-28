@@ -173,6 +173,26 @@ interface SlotService {
     ): SlotDeploymentActionStatus
 
     /**
+     * Marking a running pipeline as failed.
+     *
+     * `FAILED` is terminal and reachable from `RUNNING` only: a candidate which never started is
+     * cancelled, not failed. It sets the end of the pipeline, fires the `slot-pipeline-failed` event
+     * and the slot workflows registered on the `FAILED` trigger. It does not change what the slot
+     * runs - [getLastDeployedPipeline] still returns the last `DONE` pipeline.
+     *
+     * Needs the same right as finishing a deployment.
+     *
+     * @param pipelineId ID of the pipeline to mark as failed
+     * @param message Optional message, recorded in the pipeline's history
+     * @return OK when the pipeline has been marked as failed, not OK (with a reason) when the
+     * pipeline is not running
+     */
+    fun failPipeline(
+        pipelineId: String,
+        message: String? = null,
+    ): SlotDeploymentActionStatus
+
+    /**
      * Gets the stored states of admission rules for a given pipeline.
      */
     fun getPipelineAdmissionRuleStatuses(pipeline: SlotPipeline): List<SlotPipelineAdmissionRuleStatus>

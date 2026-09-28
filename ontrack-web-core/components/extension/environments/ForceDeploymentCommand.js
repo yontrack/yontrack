@@ -18,6 +18,8 @@ export default function ForceDeploymentCommand({deployment, onForced}) {
             {
                 isAuthorized(deployment.slot, "pipeline", "override") &&
                 deployment.status !== "DONE" &&
+                // A failure is terminal: the server refuses to force it to deployed
+                deployment.status !== "FAILED" &&
                 <>
                     <Command
                         icon={<FaStamp/>}

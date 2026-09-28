@@ -42,7 +42,8 @@ class SlotStatusServiceImpl(
                 slotService.getDeploymentFinishActionProgress(pipeline.id)?.ok == false
             // Nothing in flight
             SlotPipelineStatus.DONE,
-            SlotPipelineStatus.CANCELLED -> false
+            SlotPipelineStatus.CANCELLED,
+            SlotPipelineStatus.FAILED -> false
         }
 
     override fun isBehind(slot: Slot): Boolean {

@@ -227,6 +227,18 @@ export const gqlSlotDrawerFinish = gql`
         `
 
 /**
+ * Marking a running deployment as failed, with an optional message recorded in its history.
+ */
+export const gqlSlotFail = gql`
+            mutation SlotFail($id: String!, $message: String) {
+                failSlotPipeline(input: {pipelineId: $id, message: $message}) {
+                    failStatus { ok message }
+                    errors { message }
+                }
+            }
+        `
+
+/**
  * Moving a candidate into running.
  */
 export const gqlSlotDrawerRun = gql`

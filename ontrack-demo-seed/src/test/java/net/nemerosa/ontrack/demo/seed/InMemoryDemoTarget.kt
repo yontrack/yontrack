@@ -643,7 +643,7 @@ class InMemoryDemoTarget(
          * `SlotPipelineStatus` on the server side, as far as a slot workflow is concerned.
          * `CANCELLED` is a state a pipeline reaches, never a moment a workflow is fired at.
          */
-        private val SLOT_WORKFLOW_TRIGGERS = listOf("CANDIDATE", "RUNNING", "DONE")
+        private val SLOT_WORKFLOW_TRIGGERS = listOf("CANDIDATE", "RUNNING", "DONE", "FAILED")
 
         private fun checkName(name: String, what: String) {
             require(NAME.matches(name)) {

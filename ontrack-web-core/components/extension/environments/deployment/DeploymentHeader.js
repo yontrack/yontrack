@@ -7,6 +7,7 @@ import Freshness from "@components/extension/environments/shared/Freshness"
 import {isAuthorized} from "@components/common/authorizations"
 import {topPromotionRun} from "@components/extension/environments/shared/slotCellModel"
 import {deploymentSteps, isSettled, statusChange} from "@components/extension/environments/deployment/deploymentModel"
+import FailDeploymentButton from "@components/extension/environments/shared/FailDeploymentButton"
 
 /**
  * The top of the deployment page: what is being deployed, where it got to, and the one thing to do
@@ -18,12 +19,17 @@ import {deploymentSteps, isSettled, statusChange} from "@components/extension/en
  * one way forward - Start it, or Finish it - and the bar names it. Cancel is a secondary action
  * beside it because cancelling is not what anybody came to do.
  *
+ * A running deployment has a second way out beside Finish: **Mark as failed**. It is not a second
+ * primary action - it is not what anybody hoped to do - but it is not a cancellation either: the
+ * deployment ran and did not make it, and that is a fact worth keeping.
+ *
  * A finished deployment offers no action at all, which is why the buttons are not merely disabled.
  *
  * @param {Object} deployment The deployment.
  * @param {boolean} acting Whether an action is in flight, so the buttons can say so.
  * @param {function} onStart Move a candidate into running.
  * @param {function} onFinish Complete a running deployment.
+ * @param {function} onFail Mark a running deployment as failed, with an optional message.
  * @param {function} onCancel Cancel whatever is in flight.
  * @param {number} refreshedAt When the page last asked the server.
  * @param {function} refresh Ask it again now.
@@ -33,6 +39,7 @@ export default function DeploymentHeader({
                                              acting,
                                              onStart,
                                              onFinish,
+                                             onFail,
                                              onCancel,
                                              refreshedAt,
                                              refresh,
@@ -137,6 +144,10 @@ export default function DeploymentHeader({
                             >
                                 Finish the deployment
                             </Button>
+                        }
+                        {
+                            deployment.status === 'RUNNING' &&
+                            <FailDeploymentButton acting={acting} onFail={onFail} testId="deployment-fail"/>
                         }
                         <Button
                             danger

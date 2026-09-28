@@ -463,6 +463,11 @@ class SlotServiceImpl(
 
     override fun cancelPipeline(pipeline: SlotPipeline, reason: String) {
         securityService.checkSlotAccess<SlotPipelineCancel>(pipeline.slot)
+        // A failure is terminal: cancelling it would erase the fact that the deployment failed
+        val current = slotPipelineRepository.getPipelineById(pipeline.id)
+        if (current.status == SlotPipelineStatus.FAILED) {
+            throw SlotPipelineFailedTerminalException(current)
+        }
         changePipeline(
             pipeline = pipeline,
             status = SlotPipelineStatus.CANCELLED,
@@ -706,6 +711,10 @@ class SlotServiceImpl(
         if (lastPipeline?.id != pipeline.id) {
             return SlotDeploymentActionStatus.nok("Only the last pipeline can be deployed.")
         }
+        // A failure is terminal, even when forcing
+        if (lastPipeline.status == SlotPipelineStatus.FAILED) {
+            return SlotDeploymentActionStatus.nok("A failed deployment cannot be marked as deployed.")
+        }
         // Checking if pipeline is running
         if (lastPipeline.status != SlotPipelineStatus.RUNNING && !forcing) {
             return SlotDeploymentActionStatus.nok("Pipeline can be deployed only if deployment has been started first.")
@@ -758,6 +767,36 @@ class SlotServiceImpl(
         return SlotDeploymentActionStatus.ok(actualMessage)
     }
 
+    override fun failPipeline(pipelineId: String, message: String?): SlotDeploymentActionStatus {
+        val pipeline = slotPipelineRepository.getPipelineById(pipelineId)
+        // Same right as finishing a deployment
+        securityService.checkSlotAccess<SlotPipelineFinish>(pipeline.slot)
+        // Only a running pipeline can fail
+        if (pipeline.status != SlotPipelineStatus.RUNNING) {
+            return SlotDeploymentActionStatus.nok("Only a running deployment can be marked as failed.")
+        }
+        // Actual message
+        val actualMessage = message?.takeIf { it.isNotBlank() } ?: "Deployment failed"
+        // Marking the pipeline as failed
+        changePipeline(
+            pipeline = pipeline,
+            type = SlotPipelineChangeType.STATUS,
+            status = SlotPipelineStatus.FAILED,
+            message = actualMessage,
+        )
+        // Workflows
+        val event = environmentsEventsFactory.pipelineFailed(pipeline)
+        slotWorkflowService.startWorkflowsForPipeline(
+            pipeline,
+            SlotPipelineStatus.FAILED,
+            event
+        )
+        // Event
+        eventPostService.post(event)
+        // OK
+        return SlotDeploymentActionStatus.ok(actualMessage)
+    }
+
     override fun getPipelineErrorMessage(pipeline: SlotPipeline): String? {
         val checks = mutableListOf<SlotDeploymentCheck>()
         when (pipeline.status) {
@@ -772,6 +811,10 @@ class SlotServiceImpl(
 
             SlotPipelineStatus.DONE -> {
                 checks += slotWorkflowService.getSlotWorkflowChecks(pipeline, SlotPipelineStatus.DONE, null)
+            }
+
+            SlotPipelineStatus.FAILED -> {
+                checks += slotWorkflowService.getSlotWorkflowChecks(pipeline, SlotPipelineStatus.FAILED, null)
             }
 
             SlotPipelineStatus.CANCELLED -> {

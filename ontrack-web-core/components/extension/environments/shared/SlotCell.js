@@ -4,6 +4,7 @@ import {
     buildLabel,
     compactAge,
     deployedBuild,
+    failedLabel,
     inFlightDeployment,
     inFlightLabel,
     slotDisplayName,
@@ -25,6 +26,8 @@ import {
  * 2. **What is in flight**, as an overlay beneath it rather than in its place: "→ 107 candidate"
  *    is what is *trying* to be there, and a reader who takes it for the deployed build has been
  *    misled.
+ *    A deployment which **failed** is drawn the same way, "✕ 107 failed", while it is the slot's
+ *    most recent one: it did not change what runs there.
  * 3. **Blocked** - a red dot, because a held-up deployment is the thing somebody has to act on.
  * 4. **Behind** - a muted badge, because it is a comparison with another slot rather than a fact
  *    about this one, and it must not shout louder than 3.
@@ -47,6 +50,7 @@ export default function SlotCell({slot, onClick, testId}) {
     const promotionRun = topPromotionRun(build)
     const inFlight = inFlightDeployment(slot)
     const overlay = inFlightLabel(slot)
+    const failure = failedLabel(slot)
 
     const id = testId ?? `slot-cell-${slot.id}`
 
@@ -121,6 +125,18 @@ export default function SlotCell({slot, onClick, testId}) {
                     <Typography.Text type="secondary" data-testid={`${id}-in-flight`}>
                         {overlay}
                     </Typography.Text>
+                </div>
+            }
+
+            {/* The most recent deployment failed */}
+            {
+                failure &&
+                <div>
+                    <Tooltip title="The most recent deployment failed. The build above is still the deployed one.">
+                        <Typography.Text type="danger" data-testid={`${id}-failed`}>
+                            {failure}
+                        </Typography.Text>
+                    </Tooltip>
                 </div>
             }
 

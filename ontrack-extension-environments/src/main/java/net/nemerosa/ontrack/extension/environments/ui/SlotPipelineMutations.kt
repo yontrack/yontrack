@@ -64,6 +64,19 @@ class SlotPipelineMutations(
                 message = input.message,
             )
         },
+        simpleMutation(
+            name = "failSlotPipeline",
+            description = "Marks a running pipeline as failed",
+            input = FailSlotPipelineInput::class,
+            outputName = "failStatus",
+            outputDescription = "Status of the action",
+            outputType = SlotDeploymentActionStatus::class,
+        ) { input ->
+            slotService.failPipeline(
+                pipelineId = input.pipelineId,
+                message = input.message,
+            )
+        },
         unitMutation(
             name = "cancelSlotPipeline",
             description = "Cancelling a pipeline",
@@ -134,6 +147,13 @@ data class StartSlotPipelineDeploymentInput(
 data class FinishSlotPipelineDeploymentInput(
     val pipelineId: String,
     val forcing: Boolean = false,
+    val message: String? = null,
+)
+
+data class FailSlotPipelineInput(
+    @APIDescription("ID of the running pipeline to mark as failed")
+    val pipelineId: String,
+    @APIDescription("Optional message recorded in the pipeline's history")
     val message: String? = null,
 )
 

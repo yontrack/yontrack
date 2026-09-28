@@ -33,7 +33,7 @@ export const currentPhaseItems = (deployment) => phaseItems(deployment, currentP
 /**
  * The phase a deployment is *in*, which is not the same thing as its status.
  *
- * A settled deployment - `DONE` or `CANCELLED` - is in no phase at all: nothing is holding it up
+ * A settled deployment - `DONE`, `FAILED` or `CANCELLED` - is in no phase at all: nothing is holding it up
  * any more, and that is the answer the list gives rather than an empty box.
  */
 export const currentPhase = (deployment) => {
@@ -51,7 +51,7 @@ export const currentPhase = (deployment) => {
  * current one and the two cannot disagree about what passed.
  *
  * @param {Object} deployment The deployment.
- * @param {string|null} phase `CANDIDATE`, `RUNNING`, `DONE`, or null for "no phase".
+ * @param {string|null} phase `CANDIDATE`, `RUNNING`, `DONE`, `FAILED`, or null for "no phase".
  * @return {Array} The items of that phase, failing ones first.
  */
 export const phaseItems = (deployment, phase) => {
@@ -91,6 +91,10 @@ export const phaseItems = (deployment, phase) => {
         })
     } else if (phase === 'DONE') {
         (deployment.slot?.doneWorkflows ?? []).forEach(slotWorkflow => {
+            items.push(workflowItem(slotWorkflow))
+        })
+    } else if (phase === 'FAILED') {
+        (deployment.slot?.failedWorkflows ?? []).forEach(slotWorkflow => {
             items.push(workflowItem(slotWorkflow))
         })
     }

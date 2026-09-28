@@ -51,13 +51,14 @@ const deployment = ({
                         candidateWorkflows = [],
                         runningWorkflows = [],
                         doneWorkflows = [],
+                        failedWorkflows = [],
                     } = {}) => ({
     id: 'p-1',
     status,
     changes,
     admissionRules: rules,
     requiredInputs: [],
-    slot: {id: 'slot-1', candidateWorkflows, runningWorkflows, doneWorkflows, authorizations: []},
+    slot: {id: 'slot-1', candidateWorkflows, runningWorkflows, doneWorkflows, failedWorkflows, authorizations: []},
 })
 
 describe('the steps bar', () => {
@@ -83,6 +84,18 @@ describe('the steps bar', () => {
         // it is the step it was cancelled instead of taking.
         const steps = deploymentSteps(deployment({status: 'CANCELLED', changes: [statusChange('CANDIDATE')]}))
         expect(steps.items.map(item => item.key)).toEqual(['CANDIDATE', 'CANCELLED'])
+        expect(steps.status).toBe('error')
+    })
+
+    it('replaces Deployed with Failed on a deployment which failed', () => {
+        // A failure is reachable from RUNNING only, so the bar always shows the running step before
+        // it - and never a Deployed step the deployment did not reach.
+        const steps = deploymentSteps(deployment({
+            status: 'FAILED',
+            changes: [statusChange('CANDIDATE'), statusChange('RUNNING'), statusChange('FAILED')],
+        }))
+        expect(steps.items.map(item => item.key)).toEqual(['CANDIDATE', 'RUNNING', 'FAILED'])
+        expect(steps.current).toBe(2)
         expect(steps.status).toBe('error')
     })
 
@@ -139,6 +152,21 @@ describe('the phases already over', () => {
         expect(phases.map(phase => phase.phase)).toEqual(['CANDIDATE', 'RUNNING', 'DONE'])
     })
 
+    it('are candidate, running and failed for a failed deployment', () => {
+        // The FAILED workflows are the ones which ran because it failed; DONE ones never did.
+        const phases = earlierPhases(deployment({
+            status: 'FAILED',
+            changes: [statusChange('CANDIDATE'), statusChange('RUNNING'), statusChange('FAILED')],
+            rules: [rule('r1')],
+            runningWorkflows: [workflow('w-run')],
+            doneWorkflows: [workflow('w-done')],
+            failedWorkflows: [workflow('w-failed')],
+        }))
+        expect(phases.map(phase => phase.phase)).toEqual(['CANDIDATE', 'RUNNING', 'FAILED'])
+        expect(phases[2].title).toBe('Failed phase')
+        expect(phases[2].items.map(item => item.key)).toEqual(['workflow-w-failed'])
+    })
+
     it('drop the running phase of a deployment cancelled before it started', () => {
         const phases = earlierPhases(deployment({
             status: 'CANCELLED',
@@ -193,6 +221,18 @@ describe('the audit timeline', () => {
         expect(entry.message).toBe('Window checked by phone with the on-call.')
     })
 
+    it('names a failure, and carries the message it was recorded with', () => {
+        // The failure message is the one thing somebody reading the timeline wants to know: why.
+        const [entry] = timelineEntries(deployment({
+            changes: [statusChange('FAILED', {
+                timestamp: '2026-09-18T12:00:00',
+                message: 'Helm upgrade timed out',
+            })],
+        }))
+        expect(entry.title).toBe('Failed')
+        expect(entry.message).toBe('Helm upgrade timed out')
+    })
+
     it('falls back to a name for a change the server recorded with no message', () => {
         const [entry] = timelineEntries(deployment({
             changes: [{
@@ -209,9 +249,10 @@ describe('the audit timeline', () => {
 })
 
 describe('a settled deployment', () => {
-    it('is one which is deployed or cancelled', () => {
+    it('is one which is deployed, cancelled or failed', () => {
         expect(isSettled(deployment({status: 'DONE'}))).toBe(true)
         expect(isSettled(deployment({status: 'CANCELLED'}))).toBe(true)
+        expect(isSettled(deployment({status: 'FAILED'}))).toBe(true)
         expect(isSettled(deployment({status: 'RUNNING'}))).toBe(false)
         expect(isSettled(deployment({status: 'CANDIDATE'}))).toBe(false)
     })

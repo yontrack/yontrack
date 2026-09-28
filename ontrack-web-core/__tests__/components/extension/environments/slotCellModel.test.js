@@ -2,6 +2,8 @@ import {
     buildLabel,
     compactAge,
     deployedBuild,
+    failedDeployment,
+    failedLabel,
     inFlightDeployment,
     inFlightLabel,
     isInFlight,
@@ -35,7 +37,7 @@ const pipeline = (number, status, aBuild, {end} = {}) => ({
     id: `p-${number}`,
     number,
     status,
-    finished: status === 'DONE' || status === 'CANCELLED',
+    finished: status === 'DONE' || status === 'CANCELLED' || status === 'FAILED',
     start: '2026-09-01T10:00:00Z',
     end: end ?? null,
     build: aBuild,
@@ -69,6 +71,35 @@ describe('in flight', () => {
 
     it('says nothing when nothing is in flight', () => {
         expect(inFlightLabel({currentPipeline: pipeline(3, 'DONE', build('107'))})).toBeNull()
+    })
+})
+
+describe('a failed deployment', () => {
+
+    it('is not in flight', () => {
+        expect(isInFlight(pipeline(3, 'FAILED', build('107')))).toBe(false)
+    })
+
+    it('is the slot\'s most recent deployment when that one failed', () => {
+        const slot = {currentPipeline: pipeline(3, 'FAILED', build('107'))}
+        expect(failedDeployment(slot)?.number).toBe(3)
+        expect(failedLabel(slot)).toBe('✕ 107 failed')
+    })
+
+    it('is forgotten once a newer deployment has started', () => {
+        // The failure is history then, and the cell has something more current to say
+        const slot = {currentPipeline: pipeline(4, 'RUNNING', build('108'))}
+        expect(failedDeployment(slot)).toBeNull()
+        expect(failedLabel(slot)).toBeNull()
+    })
+
+    it('does not replace the deployed build', () => {
+        const slot = {
+            lastDeployedPipeline: pipeline(2, 'DONE', build('89')),
+            currentPipeline: pipeline(3, 'FAILED', build('107')),
+        }
+        expect(deployedBuild(slot)?.name).toBe('89')
+        expect(inFlightLabel(slot)).toBeNull()
     })
 })
 

@@ -13,6 +13,7 @@ import {
     gqlSlotDrawerDeployment,
     gqlSlotDrawerFinish,
     gqlSlotDrawerRun,
+    gqlSlotFail,
     gqlSlotDrawerTitle,
     gqlSharedAdmissionRuleData,
 } from "@components/extension/environments/shared/environmentsSharedGraphQL"
@@ -86,6 +87,7 @@ describe('the shared environments documents', () => {
     check('the drawer run mutation', gqlSlotDrawerRun)
     check('the drawer finish mutation', gqlSlotDrawerFinish)
     check('the cancel mutation', gqlSlotCancel)
+    check('the fail mutation', gqlSlotFail)
     check('the deploy dialog slots query', gqlDeployDialogSlots)
     check('the deploy dialog builds query', gqlDeployDialogBuilds)
     check('the deploy dialog start mutation', gqlDeployDialogStart)
@@ -159,6 +161,8 @@ describe('the shared environments documents', () => {
         expect(gqlDeploymentPage).toContain('candidateWorkflows')
         expect(gqlDeploymentPage).toContain('runningWorkflows')
         expect(gqlDeploymentPage).toContain('doneWorkflows')
+        // ...and the FAILED ones, which ran because the deployment failed
+        expect(gqlDeploymentPage).toContain('failedWorkflows: workflows(trigger: FAILED)')
     })
 
     it('asks the deployment for its changes, which are the audit timeline', () => {

@@ -82,6 +82,9 @@ export const gqlDeploymentPage = gql`
                 doneWorkflows: workflows(trigger: DONE) {
                     ...SharedSlotWorkflowData
                 }
+                failedWorkflows: workflows(trigger: FAILED) {
+                    ...SharedSlotWorkflowData
+                }
             }
         }
     }

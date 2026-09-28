@@ -189,6 +189,7 @@ export default function MobileBuildScreen({id}) {
     const {
         deployments,
         unsettled,
+        failed,
         unavailable: deploymentsUnavailable,
     } = useMobileBuildDeployments(id, refresh)
 
@@ -358,6 +359,49 @@ export default function MobileBuildScreen({id}) {
                                                     <TimestampText
                                                         value={pipeline.start}
                                                         prefix="started"
+                                                        relative
+                                                    />
+                                                </span>
+                                            }
+                                        />
+                                    )
+                                }
+                            </MobileSectionList>
+                        }
+
+                        {
+                            /*
+                             * Deployments of this build which failed, and in a
+                             * slot where it has not been deployed since.
+                             * Absent rather than empty, like the section above,
+                             * and display only (#1894): a failure is reported by
+                             * the CI which ran the deployment, not decided on a
+                             * phone. The row is still a way into the deployment
+                             * screen, which says why it failed.
+                             */
+                            failed.length > 0 &&
+                            <MobileSectionList
+                                title="Failed deployments"
+                                testId="mobile-build-failed"
+                                isEmpty={false}
+                            >
+                                {
+                                    failed.map(pipeline =>
+                                        <MobileEntityRow
+                                            key={pipeline.id}
+                                            testId={`mobile-build-failed-${pipeline.id}`}
+                                            href={mobileDeploymentUri(pipeline.id)}
+                                            name={
+                                                <span className="ot-mobile-inline">
+                                                    <FaServer aria-hidden="true"/>
+                                                    {deploymentName(pipeline)}
+                                                </span>
+                                            }
+                                            context={
+                                                <span className="ot-mobile-inline">
+                                                    <SlotPipelineStatusLabel status={pipeline.status}/>
+                                                    <TimestampText
+                                                        value={pipeline.end ?? pipeline.start}
                                                         relative
                                                     />
                                                 </span>

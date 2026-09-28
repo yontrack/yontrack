@@ -60,6 +60,32 @@ test('a cancelled deployment shows Cancelled in place of the step it never reach
     await pipelinePage.expectTimelineEntry('Cancelled')
 })
 
+test('a running deployment can be marked as failed, and the failure is final', async ({page, ontrack}) => {
+    const {slot, project} = await createSlot(ontrack)
+    const {pipeline} = await createPipeline({project, slot})
+
+    await login(page, ontrack)
+    const pipelinePage = new PipelinePage(page, pipeline, ontrack)
+    await pipelinePage.goTo()
+
+    // Not on a candidate: one which never started is cancelled, not failed
+    await expect(pipelinePage.locatorFailAction()).toHaveCount(0)
+
+    await pipelinePage.running()
+    await expect(pipelinePage.locatorFailAction()).toBeVisible()
+
+    await pipelinePage.fail({message: "Smoke tests failed"})
+
+    // Failed replaces Deployed on the bar, which it never reached
+    await pipelinePage.expectStep('FAILED')
+    await pipelinePage.expectStep('DONE', {present: false})
+    // The failure and why, in the audit timeline
+    await pipelinePage.expectTimelineEntry('Failed')
+    await pipelinePage.expectTimelineEntry('Smoke tests failed')
+    // Terminal: not even forcing is offered
+    await pipelinePage.expectCommand('Force deployment', {visible: false})
+})
+
 test('the primary action unblocks when the blocking check is answered', async ({page, ontrack}) => {
     const {project, slot} = await createSlot(ontrack)
     const ruleConfigId = await ontrack.environments.addManualApproval({slot})

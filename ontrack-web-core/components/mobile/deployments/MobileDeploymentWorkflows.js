@@ -7,7 +7,7 @@
  * reason in that workflow's own words - *"Workflow is running"* - with no way to
  * see which workflow, what it is doing, or where it got stuck. This is that way.
  *
- * **All three triggers, always, and not only the ones the current status has
+ * **All the triggers, always, and not only the ones the current status has
  * reached.** A slot workflow is configuration as much as state: `CONTEXT.md` is
  * explicit that it is drawn whether or not it ever ran, and that a `CANDIDATE`
  * workflow which never ran "is not dormant, it is why nothing has ever deployed
@@ -88,7 +88,7 @@ export const gqlMobileSlotWorkflow = gql`
 /**
  * The workflows of a slot, in the order a deployment meets them.
  *
- * @param {object} [slot] The deployment's slot, with its three aliased trigger
+ * @param {object} [slot] The deployment's slot, with its four aliased trigger
  *   lists. Absent until the first answer lands.
  * @returns {Array} One entry per configured workflow, candidate first.
  */
@@ -96,6 +96,7 @@ export const orderedSlotWorkflows = (slot) => [
     ...(slot?.candidateWorkflows ?? []),
     ...(slot?.runningWorkflows ?? []),
     ...(slot?.doneWorkflows ?? []),
+    ...(slot?.failedWorkflows ?? []),
 ]
 
 export default function MobileDeploymentWorkflows({deployment}) {

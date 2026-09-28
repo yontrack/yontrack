@@ -1,5 +1,5 @@
 import "@testing-library/jest-dom"
-import {render, screen} from "@testing-library/react"
+import {fireEvent, render, screen, waitFor} from "@testing-library/react"
 
 Object.defineProperty(window, 'matchMedia', {
     writable: true,
@@ -53,12 +53,13 @@ const deployment = ({
     slot: {id: 'slot-1', authorizations},
 })
 
-const header = (props) => render(
+const header = (props, {onFail = jest.fn()} = {}) => render(
     <DeploymentHeader
         deployment={deployment(props)}
         acting={false}
         onStart={jest.fn()}
         onFinish={jest.fn()}
+        onFail={onFail}
         onCancel={jest.fn()}
         refreshedAt={Date.now()}
         refresh={jest.fn()}
@@ -82,6 +83,41 @@ describe('the deployment header', () => {
         header({status: 'RUNNING'})
         expect(screen.getByTestId('deployment-finish')).toBeInTheDocument()
         expect(screen.queryByTestId('deployment-start')).not.toBeInTheDocument()
+    })
+
+    it('offers Mark as failed beside Finish on a running deployment', () => {
+        header({status: 'RUNNING'})
+        expect(screen.getByTestId('deployment-fail')).toBeInTheDocument()
+    })
+
+    it('keeps Mark as failed available while a workflow blocks Finish', () => {
+        // A deployment whose RUNNING workflow is stuck is exactly one which may have failed
+        header({status: 'RUNNING', finishAction: {ok: false}})
+        expect(screen.getByTestId('deployment-finish')).toBeDisabled()
+        expect(screen.getByTestId('deployment-fail')).toBeEnabled()
+    })
+
+    it('does not offer Mark as failed on a candidate, which is cancelled instead', () => {
+        header({status: 'CANDIDATE'})
+        expect(screen.queryByTestId('deployment-fail')).not.toBeInTheDocument()
+    })
+
+    it('marks the deployment as failed with the message somebody wrote', async () => {
+        const onFail = jest.fn()
+        header({status: 'RUNNING'}, {onFail})
+        fireEvent.click(screen.getByTestId('deployment-fail'))
+        const message = await screen.findByTestId('deployment-fail-message')
+        fireEvent.change(message, {target: {value: 'Smoke tests failed'}})
+        fireEvent.click(screen.getByTestId('deployment-fail-confirm'))
+        await waitFor(() => expect(onFail).toHaveBeenCalledWith('Smoke tests failed'))
+    })
+
+    it('marks the deployment as failed without a message, which is optional', async () => {
+        const onFail = jest.fn()
+        header({status: 'RUNNING'}, {onFail})
+        fireEvent.click(screen.getByTestId('deployment-fail'))
+        fireEvent.click(await screen.findByTestId('deployment-fail-confirm'))
+        await waitFor(() => expect(onFail).toHaveBeenCalledWith(null))
     })
 
     it('disables the action while something is blocking, because it will become available', () => {
@@ -113,6 +149,17 @@ describe('the deployment header', () => {
     it('offers nothing at all on a cancelled one', () => {
         header({status: 'CANCELLED'})
         expect(screen.queryByTestId('deployment-actions')).not.toBeInTheDocument()
+    })
+
+    it('offers nothing at all on a failed one', () => {
+        header({status: 'FAILED'})
+        expect(screen.queryByTestId('deployment-actions')).not.toBeInTheDocument()
+    })
+
+    it('draws Failed in place of Deployed', () => {
+        header({status: 'FAILED', changes: []})
+        expect(screen.getByTestId('deployment-step-FAILED')).toBeInTheDocument()
+        expect(screen.queryByTestId('deployment-step-DONE')).not.toBeInTheDocument()
     })
 
     /*

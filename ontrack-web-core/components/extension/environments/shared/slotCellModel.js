@@ -10,7 +10,7 @@ import dayjs from "dayjs"
  */
 
 /**
- * A slot pipeline is *in flight* while it is neither done nor cancelled.
+ * A slot pipeline is *in flight* while it is neither done, failed nor cancelled.
  *
  * `Slot.currentPipeline` is simply the slot's most recent deployment whatever became of it, so a
  * caller asking "is something happening here?" has to ask this and not merely whether the field is
@@ -120,4 +120,25 @@ export const inFlightLabel = (slot) => {
     const pipeline = inFlightDeployment(slot)
     if (!pipeline) return null
     return `→ ${buildLabel(pipeline.build)} ${pipeline.status?.toLowerCase()}`
+}
+
+/**
+ * The slot's most recent deployment when it **failed**, or `null`.
+ *
+ * A failure does not change what the slot runs - `lastDeployedPipeline` is still the last `DONE` -
+ * so it is drawn beneath the deployed build like the in-flight overlay, never in its place. Only
+ * the most recent deployment counts: once a newer one has started, the failure is history and the
+ * cell has something more current to say.
+ */
+export const failedDeployment = (slot) =>
+    slot?.currentPipeline?.status === 'FAILED' ? slot.currentPipeline : null
+
+/**
+ * The failure line of a cell: "✕ 1.4.0 failed", or `null` when the most recent deployment did not
+ * fail. Named through `buildLabel` for the same reason as the in-flight overlay.
+ */
+export const failedLabel = (slot) => {
+    const pipeline = failedDeployment(slot)
+    if (!pipeline) return null
+    return `✕ ${buildLabel(pipeline.build)} failed`
 }

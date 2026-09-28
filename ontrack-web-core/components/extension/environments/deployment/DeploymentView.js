@@ -16,6 +16,7 @@ import {
     gqlSlotCancel,
     gqlSlotDrawerFinish,
     gqlSlotDrawerRun,
+    gqlSlotFail,
 } from "@components/extension/environments/shared/environmentsSharedGraphQL"
 import {gqlDeploymentPage} from "@components/extension/environments/deployment/deploymentGraphQL"
 import DeploymentHeader from "@components/extension/environments/deployment/DeploymentHeader"
@@ -138,6 +139,7 @@ export default function DeploymentView({id}) {
                                 acting={acting}
                                 onStart={() => act(gqlSlotDrawerRun, 'startSlotPipelineDeployment', 'deploymentStatus')}
                                 onFinish={() => act(gqlSlotDrawerFinish, 'finishSlotPipelineDeployment', 'finishStatus')}
+                                onFail={(message) => act(gqlSlotFail, 'failSlotPipeline', 'failStatus', {message})}
                                 onCancel={() => act(
                                     gqlSlotCancel,
                                     'cancelSlotPipeline',
