@@ -150,11 +150,12 @@ Every change follows this lifecycle, end to end — don't stop after step 2:
    `ontrack-demo-seed` (see *Definition of done* below); say which way you decided either way
 5. **Land on `main`** — merge the branch into `main`, then `git push origin main`
 6. **Delete the local branch** — `git branch -d <branch>` once it is merged
-7. **Wait for the `main` build, then mark the issue ready** — once CI on `main` is green, move the
-   issue to `status:ready` (see *Issue status labels* below)
+7. **Wait for the `main` build, then mark the issue ready and close it** — once CI on `main` is
+   green, move the issue to `status:ready` and close it, provided it has a milestone (see *Issue
+   status labels* below)
 
 - **Never** create a pull request — work lands by merging into `main` and pushing directly
-- **Never** close the GitHub issue — Damien does that after the change lands
+- **Never** close the GitHub issue at any other point — closing belongs to step 7 and nowhere else
 - If the merge is not a clean fast-forward, stop and ask before creating a merge commit or rebasing
 
 ### Definition of done
@@ -175,14 +176,15 @@ UIs share, what the mobile UI reads, and why adding a desktop route is itself a 
 
 ### Issue status labels
 
-Issues carry exactly one `status:*` label at a time. The four the agent workflow drives are:
+Issues carry exactly one `status:*` label at a time. The five the agent workflow drives are:
 
-| Label            | When to apply                                                             |
-|------------------|---------------------------------------------------------------------------|
-| `status:tospec`  | The issue is being specified — a grilling session has started on it        |
-| `status:todo`    | The spec is settled and the issue is ready to be picked up                 |
-| `status:wip`     | Work has started on the issue (right after creating the branch)            |
-| `status:ready`   | The change is merged into `main` **and** the CI build on `main` succeeded   |
+| Label             | When to apply                                                              | Issue  |
+|-------------------|----------------------------------------------------------------------------|--------|
+| `status:tospec`   | The issue is being specified — a grilling session has started on it        | open   |
+| `status:todo`     | The spec is settled and the issue is ready to be picked up                 | open   |
+| `status:wip`      | Work has started on the issue (right after creating the branch)            | open   |
+| `status:ready`    | Merged into `main` **and** the CI build on `main` succeeded — not released | closed |
+| `status:released` | The milestone has shipped — applied by `/release-milestone`, not by hand   | closed |
 
 Apply them with `gh`, always removing the previous status label in the same command:
 
@@ -196,9 +198,24 @@ gh issue edit <number> --add-label "status:todo" --remove-label "status:tospec" 
 # Starting work (check the issue's actual label first)
 gh issue edit <number> --add-label "status:wip" --remove-label "status:todo"
 
-# After the merge lands and CI on main is green
+# After the merge lands and CI on main is green: check the milestone, then mark ready and close
+gh issue view <number> --json milestone --jq '.milestone.title'
 gh issue edit <number> --add-label "status:ready" --remove-label "status:wip"
+gh issue close <number> --reason completed --comment "Merged into \`<base>\`, ships with <milestone>."
 ```
+
+**A ready issue is closed.** Open means there is still work to do; a change waiting for its release
+is not work, and keeping it open buried the real backlog under finished issues. What says it has not
+shipped yet is the `status:ready` label **and the milestone** — `/release-milestone` finds it by
+both, swaps `status:ready` for `status:released` and comments the version it shipped in. So:
+
+- **Check the milestone before closing.** A closed `status:ready` issue with no milestone drops out of
+  every release query and is never marked released. If the issue has none, apply `status:ready`,
+  leave it **open**, and say so — Damien sets the milestone and closes it. Never guess a milestone.
+- Close with the default reason (`completed`), never `not planned`, and name the base branch
+  (`main`, or `v6` for 6.0 work) and the milestone in the comment.
+- A ready issue that turns out not to work is **reopened** and moved back to `status:wip`, in the
+  same step: `gh issue reopen <number>`, then the `status:wip` edit.
 
 `ready-for-agent` is **not** a status label and is not exclusive with them: it says the issue
 is specified well enough to be handed to an agent, and it travels with the issue from
@@ -224,7 +241,7 @@ and waiting is impractical, say so explicitly — never apply `status:ready` on 
 
 The one exception is a **docs-only push** carrying `[skip ci]` (see *Commit messages* below): it has no
 run to wait for. Once its commit is on the base branch, and the commit before it on that branch had a green
-build, apply `status:ready` straight away and say that CI was skipped by design.
+build, mark it ready and close it straight away, and say that CI was skipped by design.
 
 These `status:*` labels are the issue *lifecycle*; they are distinct from the triage labels described in
 `docs/agents/triage-labels.md` and must never be substituted for them.

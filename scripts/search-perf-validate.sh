@@ -48,17 +48,18 @@
 # it in `details.failures`, writes the report and only then exits 1 - so the report is the one
 # source, and the Gradle outcome is not needed:
 #
-#   * no failure: PASSED, the five figures as metrics. `metrics` has no notion of pass or fail
-#     (MetricsValidationDataType.computeStatus returns null, the run falls back to PASSED), so no
-#     `--status` is sent. A p95 over its budget is not a failure - the test only fails past ten
-#     times the budget, so that a noisy runner does not turn it red - and the description says
-#     which ones are over;
+#   * no failure: PASSED, the seven figures as metrics - the p95s of the six scenarios, the
+#     restricted user's included (#1888), and the time of the rebuild. `metrics` has no notion of
+#     pass or fail (MetricsValidationDataType.computeStatus returns null, the run falls back to
+#     PASSED), so no `--status` is sent. A p95 over its budget is not a failure - the test only
+#     fails past the ceiling of its scenario, set for the GitHub runner (#1888), the budget being
+#     verified on a faster machine - and the description says which ones are over;
 #   * a failed EXPLAIN assertion: FAILED, the offending scenario, query, statement and reason in
 #     the description. It comes first because it is the deterministic regression: an index no
 #     longer used;
 #   * any other failure - a p95 past its ceiling, a rebuild error, an exception: FAILED with the
 #     failures, as the test words them, in the description;
-#   * no report, or one without the five figures: FAILED, saying so. The test did not get as far
+#   * no report, or one without the seven figures: FAILED, saying so. The test did not get as far
 #     as measuring - the stack did not come up, the build did not compile.
 #
 # A FAILED stamp carries no figure, as COVERAGE's do not: a failed run's figures are in the
@@ -71,7 +72,7 @@
 
 set -uo pipefail
 
-SP_METRICS=(palette_p95 results_p95 commit_lookup_p95 exact_build_p95 rebuild_seconds)
+SP_METRICS=(palette_p95 results_p95 commit_lookup_p95 exact_build_p95 palette_restricted_p95 results_restricted_p95 rebuild_seconds)
 SP_STAMP=SEARCH.PERFORMANCE
 SP_DESCRIPTION_MAX=500
 
@@ -173,7 +174,7 @@ sp_validate() {
         return 1
     fi
 
-    # All five figures, or none: a partial set would read as a stamp that measured less.
+    # All the figures, or none: a partial set would read as a stamp that measured less.
     local metric value missing=""
     local -a metrics=()
     for metric in "${SP_METRICS[@]}"; do

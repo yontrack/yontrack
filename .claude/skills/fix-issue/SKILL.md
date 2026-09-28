@@ -103,7 +103,7 @@ See *Commit messages* in CLAUDE.md for what that prefix costs in the semantic ch
 
 ---
 
-## Step 6 — Land on `main` and mark the issue ready
+## Step 6 — Land on `main`, mark the issue ready and close it
 
 Follow the workflow lifecycle in `CLAUDE.md`: merge the branch into `main`, push, and delete the local
 branch. Then wait for the CI build on `main` for the pushed commit:
@@ -113,17 +113,23 @@ gh run list --workflow=ci.yml --branch main --limit 1 --json databaseId,headSha,
 gh run watch <run-id>
 ```
 
-Only when that run's `conclusion` is `success` for the commit you pushed, move the issue to ready:
+Only when that run's `conclusion` is `success` for the commit you pushed, move the issue to ready and
+close it — provided it has a milestone:
 
 ```bash
+gh issue view {number} --json milestone --jq '.milestone.title'
 gh issue edit {number} --add-label "status:ready" --remove-label "status:wip"
+gh issue close {number} --reason completed --comment "Merged into \`<base>\`, ships with <milestone>."
 ```
+
+If the issue has no milestone, apply `status:ready` but leave it **open** and say so — Damien sets
+the milestone and closes it. Never guess a milestone. *Issue status labels* in `CLAUDE.md` says why.
 
 If the build fails, leave the issue on `status:wip`, report the failure, and fix it. If the build is
 still running and waiting is impractical, leave `status:wip` and say so — never apply `status:ready`
 on an unverified build.
 
-**Never close the issue** — Damien does that himself.
+**Never close the issue at any other point** — closing belongs to marking it ready, and nowhere else.
 
 ---
 
