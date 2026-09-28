@@ -5,7 +5,8 @@ package net.nemerosa.ontrack.extension.scorecard.model
  */
 enum class ReadingUnknownReason {
     /**
-     * No marker to read up to: no promotion level on the branches in scope.
+     * No marker to read up to: no promotion level on the branches in scope, or no slot of the
+     * project in the marker environment, for the qualifier.
      */
     NO_MARKER,
 
@@ -25,4 +26,9 @@ enum class ReadingUnknownReason {
      * branches in scope.
      */
     NO_TEST_STAMP,
+
+    /**
+     * Delivery reading up to an environment, without the licence of the environments.
+     */
+    NOT_LICENSED,
 }

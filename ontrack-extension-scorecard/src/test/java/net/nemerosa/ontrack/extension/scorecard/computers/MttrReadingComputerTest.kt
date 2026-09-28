@@ -11,6 +11,7 @@ import net.nemerosa.ontrack.extension.scorecard.samples.Outages
 import org.junit.jupiter.api.Test
 import java.time.LocalDateTime
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
 
 class MttrReadingComputerTest {
@@ -111,5 +112,30 @@ class MttrReadingComputerTest {
         assertEquals(1, outcome.details["count"])
         assertEquals(1, outcome.details["open"])
         assertEquals(start, outcome.details["openSince"])
+    }
+
+    @Test
+    fun `With no builds in flight to leave out, the details say nothing about them`() {
+        val start = window.end.minusHours(2)
+        val outcome = MttrReadingComputer.aggregate(
+            listOf(restored(2), OutageSample(1, start, null)),
+            inFlight = null,
+        )
+        assertEquals(ReadingBasis.MEASURED, outcome.basis)
+        assertEquals(2 * 86400.0, outcome.value)
+        // A recent failure is a failure: nothing is in flight
+        assertEquals(1, outcome.details["open"])
+        assertEquals(start, outcome.details["openSince"])
+        assertFalse("inFlight" in outcome.details)
+    }
+
+    @Test
+    fun `With no builds in flight, an outage still going on gives NO_SAMPLES`() {
+        val outcome = MttrReadingComputer.aggregate(
+            listOf(OutageSample(1, window.end.minusHours(2), null)),
+            inFlight = null,
+        )
+        assertEquals(ReadingUnknownReason.NO_SAMPLES, outcome.unknownReason)
+        assertEquals(1, outcome.details["open"])
     }
 }

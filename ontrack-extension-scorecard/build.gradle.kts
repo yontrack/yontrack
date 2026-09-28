@@ -9,6 +9,7 @@ dependencies {
     api(project(":ontrack-extension-chart"))
 
     implementation(project(":ontrack-extension-casc"))
+    implementation(project(":ontrack-extension-environments"))
     implementation(project(":ontrack-extension-general"))
     implementation(project(":ontrack-extension-license"))
     implementation(project(":ontrack-repository-support"))

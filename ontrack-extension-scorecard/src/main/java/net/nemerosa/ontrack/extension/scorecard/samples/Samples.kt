@@ -77,6 +77,23 @@ data class OutageSample(
 }
 
 /**
+ * A deployment which ended in a slot, done or failed. A cancelled deployment is no sample: it
+ * neither reached the environment nor failed to.
+ *
+ * @property branchId Branch of the deployed build
+ * @property number Number of the deployment in its slot, breaking the ties between deployments
+ * ended at the same time
+ * @property end When the deployment was done, or failed
+ * @property failed Whether the deployment failed
+ */
+data class DeploymentSample(
+    val branchId: Int,
+    val number: Int,
+    val end: LocalDateTime,
+    val failed: Boolean,
+)
+
+/**
  * A test stamp: a validation stamp whose data type is the test summary.
  *
  * @property id ID of the validation stamp

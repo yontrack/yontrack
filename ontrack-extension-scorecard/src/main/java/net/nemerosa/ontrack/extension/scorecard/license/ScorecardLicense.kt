@@ -1,5 +1,6 @@
 package net.nemerosa.ontrack.extension.scorecard.license
 
+import net.nemerosa.ontrack.extension.environments.EnvironmentsLicensedFeatureProvider.Companion.FEATURE_ENVIRONMENTS
 import net.nemerosa.ontrack.extension.license.control.LicenseControlService
 import net.nemerosa.ontrack.extension.license.control.LicenseFeatureException
 import net.nemerosa.ontrack.extension.scorecard.license.ScorecardLicensedFeatureProvider.Companion.FEATURE_SCORECARD
@@ -24,6 +25,13 @@ class ScorecardLicense(
      */
     val estatesEnabled: Boolean
         get() = licenseControlService.isFeatureEnabled(FEATURE_SCORECARD)
+
+    /**
+     * Whether the licence allows the environments, without which a delivery reading up to an
+     * environment is unknown (`NOT_LICENSED`). Read on every call, never cached, as for the estates.
+     */
+    val environmentsEnabled: Boolean
+        get() = licenseControlService.isFeatureEnabled(FEATURE_ENVIRONMENTS)
 
     /**
      * Checks that the licence allows the estates.

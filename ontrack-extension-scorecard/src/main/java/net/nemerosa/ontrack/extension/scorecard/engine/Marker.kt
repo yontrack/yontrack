@@ -1,5 +1,6 @@
 package net.nemerosa.ontrack.extension.scorecard.engine
 
+import net.nemerosa.ontrack.extension.environments.Slot
 import net.nemerosa.ontrack.model.structure.PromotionLevel
 
 /**
@@ -53,5 +54,24 @@ data class PromotionMarker(
     override val details: Map<String, Any?>
         get() = mapOf(
             "levels" to levels.associate { it.branch.name to it.name }
+        )
+}
+
+/**
+ * Environment marker: the deployments done in one slot of the project — in the environment, with
+ * one qualifier only, since pooling the qualifiers would count a deployment several times.
+ *
+ * @property slot Slot of the project in the environment, for the qualifier
+ */
+data class EnvironmentMarker(
+    val slot: Slot,
+) : Marker {
+
+    override val kind: MarkerKind = MarkerKind.ENVIRONMENT
+
+    override val details: Map<String, Any?>
+        get() = mapOf(
+            "environment" to slot.environment.name,
+            "qualifier" to slot.qualifier,
         )
 }

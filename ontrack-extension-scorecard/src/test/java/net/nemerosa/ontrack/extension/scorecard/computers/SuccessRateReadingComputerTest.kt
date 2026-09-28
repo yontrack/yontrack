@@ -4,6 +4,7 @@ import net.nemerosa.ontrack.extension.chart.support.Interval
 import net.nemerosa.ontrack.extension.scorecard.model.ReadingBasis
 import net.nemerosa.ontrack.extension.scorecard.model.ReadingUnknownReason
 import net.nemerosa.ontrack.extension.scorecard.samples.BuildSample
+import net.nemerosa.ontrack.extension.scorecard.samples.DeploymentSample
 import net.nemerosa.ontrack.extension.scorecard.samples.DurationSample
 import net.nemerosa.ontrack.extension.scorecard.samples.InFlight
 import org.junit.jupiter.api.Test
@@ -124,5 +125,40 @@ class SuccessRateReadingComputerTest {
         assertEquals(ReadingBasis.UNKNOWN, outcome.basis)
         assertEquals(ReadingUnknownReason.NO_SAMPLES, outcome.unknownReason)
         assertEquals(0, outcome.details["count"])
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // Environment marker
+    // ---------------------------------------------------------------------------------------------
+
+    private fun deployment(day: Long, failed: Boolean) = DeploymentSample(
+        branchId = 1,
+        number = nextId++,
+        end = ref.plusDays(day),
+        failed = failed,
+    )
+
+    @Test
+    fun `Deployments done over deployments done or failed`() {
+        val outcome = SuccessRateReadingComputer.aggregateDeployments(
+            listOf(
+                deployment(1, failed = false),
+                deployment(2, failed = true),
+                deployment(3, failed = false),
+                deployment(4, failed = false),
+            )
+        )
+        assertEquals(ReadingBasis.MEASURED, outcome.basis)
+        assertEquals(75.0, outcome.value)
+        assertEquals(mapOf("count" to 4, "done" to 3, "failed" to 1), outcome.details)
+    }
+
+    @Test
+    fun `No deployment done or failed gives NO_SAMPLES`() {
+        val outcome = SuccessRateReadingComputer.aggregateDeployments(emptyList())
+        assertEquals(ReadingBasis.UNKNOWN, outcome.basis)
+        assertEquals(ReadingUnknownReason.NO_SAMPLES, outcome.unknownReason)
+        assertNull(outcome.value)
+        assertEquals(mapOf("count" to 0, "done" to 0, "failed" to 0), outcome.details)
     }
 }
