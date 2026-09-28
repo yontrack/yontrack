@@ -5,6 +5,7 @@ import net.nemerosa.ontrack.extension.scorecard.engine.ReadingSets
 import net.nemerosa.ontrack.extension.scorecard.job.ScorecardJobs
 import net.nemerosa.ontrack.extension.scorecard.model.Reading
 import net.nemerosa.ontrack.extension.scorecard.model.ReadingKeys
+import net.nemerosa.ontrack.extension.scorecard.storage.EstateRepository
 import net.nemerosa.ontrack.extension.scorecard.storage.ReadingRepository
 import net.nemerosa.ontrack.job.JobScheduler
 import net.nemerosa.ontrack.job.Schedule
@@ -23,6 +24,7 @@ class ScorecardServiceImpl(
     private val readingRepository: ReadingRepository,
     private val scorecardJobs: ScorecardJobs,
     private val jobScheduler: JobScheduler,
+    private val estateRepository: EstateRepository,
 ) : ScorecardService {
 
     override fun getScorecard(project: Project): Scorecard {
@@ -47,6 +49,12 @@ class ScorecardServiceImpl(
             key = reading.key,
             since = Time.now.toLocalDate().minusDays(days.toLong() - 1),
         )
+
+    override fun getTarget(reading: Reading): Double? =
+        reading.estateId
+            ?.let { estateRepository.findById(it) }
+            ?.readingConfig(reading.key)
+            ?.target
 
     override fun recompute(project: Project): CompletableFuture<*>? {
         securityService.checkProjectFunction(project, ProjectConfig::class.java)

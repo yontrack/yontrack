@@ -50,6 +50,23 @@ object ReadingKeys {
     )
 
     /**
+     * Which way each reading of the catalogue is better, and so how a target judges it
+     */
+    private val DIRECTIONS: Map<String, ReadingDirection> = mapOf(
+        DELIVERY_LEAD_TIME to ReadingDirection.LOWER_IS_BETTER,
+        DELIVERY_FREQUENCY to ReadingDirection.HIGHER_IS_BETTER,
+        DELIVERY_SUCCESS_RATE to ReadingDirection.HIGHER_IS_BETTER,
+        DELIVERY_MTTR to ReadingDirection.LOWER_IS_BETTER,
+        QUALITY_TEST_PASS_RATE to ReadingDirection.HIGHER_IS_BETTER,
+        QUALITY_TEST_FLAKINESS to ReadingDirection.LOWER_IS_BETTER,
+    )
+
+    /**
+     * Which way a reading is better, `null` for a key out of the catalogue
+     */
+    fun direction(key: String): ReadingDirection? = DIRECTIONS[key]
+
+    /**
      * Rank of a key in the catalogue, the keys out of the catalogue last
      */
     fun rank(key: String): Int = ORDER.indexOf(key).takeIf { it >= 0 } ?: Int.MAX_VALUE

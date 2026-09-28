@@ -6,7 +6,15 @@ import net.nemerosa.ontrack.model.structure.PromotionLevel
  * Kind of [marker][Marker], recorded in the `markerKind` detail of every reading.
  */
 enum class MarkerKind {
+    /**
+     * A promotion granted
+     */
     PROMOTION,
+
+    /**
+     * An environment reached: a deployment done in a slot of the environment
+     */
+    ENVIRONMENT,
 }
 
 /**

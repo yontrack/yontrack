@@ -4,6 +4,7 @@ import io.micrometer.core.instrument.MeterRegistry
 import net.nemerosa.ontrack.common.Time
 import net.nemerosa.ontrack.extension.chart.support.Interval
 import net.nemerosa.ontrack.extension.scorecard.metrics.ScorecardMetrics
+import net.nemerosa.ontrack.extension.scorecard.model.EstateReadingSet
 import net.nemerosa.ontrack.extension.scorecard.model.NoEstateReadingSet
 import net.nemerosa.ontrack.extension.scorecard.model.Reading
 import net.nemerosa.ontrack.extension.scorecard.model.ReadingKeys
@@ -102,8 +103,11 @@ class ReadingEngine(
         }
     }
 
-    @Suppress("UNUSED_PARAMETER")
+    /**
+     * Window of a reading in a set: the override of the estate, or the one of the settings.
+     */
     private fun windowDays(set: ReadingSet, key: String): Int = when (set) {
-        NoEstateReadingSet -> cachedSettingsService.getCachedSettings(ScorecardSettings::class.java).windowDays
-    }
+        NoEstateReadingSet -> null
+        is EstateReadingSet -> set.estate.readingConfig(key)?.windowDays
+    } ?: cachedSettingsService.getCachedSettings(ScorecardSettings::class.java).windowDays
 }

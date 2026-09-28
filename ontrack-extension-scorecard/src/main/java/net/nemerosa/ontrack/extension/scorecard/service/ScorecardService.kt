@@ -18,6 +18,11 @@ interface ScorecardService {
     fun getHistory(reading: Reading, days: Int): List<Reading>
 
     /**
+     * Target of a reading: the one its estate sets for it, `null` with no estate or no target.
+     */
+    fun getTarget(reading: Reading): Double?
+
+    /**
      * Queues the recompute of the readings of a project, in every set it is in, overwriting
      * the snapshots of the day. Needs the `ProjectConfig` function on the project.
      *

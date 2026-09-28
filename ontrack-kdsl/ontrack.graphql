@@ -1046,6 +1046,14 @@ type CreateEnvironmentPayload implements Payload {
   errors: [UserError]
 }
 
+"Output type for the createEstate mutation."
+type CreateEstatePayload implements Payload {
+  "List of errors"
+  errors: [UserError]
+  "Created estate"
+  estate: Estate
+}
+
 "Output type for the createGitHubConfiguration mutation."
 type CreateGitHubConfigurationPayload implements Payload {
   "Saved configuration"
@@ -1431,6 +1439,12 @@ type DeleteDeploymentPayload implements Payload {
 
 "Output type for the deleteEnvironment mutation."
 type DeleteEnvironmentPayload implements Payload {
+  "List of errors"
+  errors: [UserError]
+}
+
+"Output type for the deleteEstate mutation."
+type DeleteEstatePayload implements Payload {
   "List of errors"
   errors: [UserError]
 }
@@ -2099,6 +2113,48 @@ type EnvironmentMatrixRow {
   qualifier: String!
   "Slots of this row, by environment order. Only the slots which exist: an environment with no slot for this project and qualifier is simply absent."
   slots: [Slot!]!
+}
+
+"A group of projects selected by labels, every one of them required, and read together, with the marker and the targets its projects are read against."
+type Estate {
+  "Description of the estate"
+  description: String
+  "ID of the estate"
+  id: Int!
+  "Labels selecting the projects of the estate, all of them required"
+  labels: [Label!]!
+  "Marker the delivery readings of the estate are read up to. Null for the default marker: the highest-ordered environment where the project owns a slot, else the last promotion level of each branch."
+  marker: EstateMarker
+  "Unique name of the estate"
+  name: String!
+  "Projects the estate selects, the ones carrying all its labels, among the ones the user can see"
+  projects: [Project!]!
+  "Window override and target of the readings which have one, by reading key"
+  readingConfigs: [EstateReadingConfig!]!
+}
+
+"Marker an estate names for its delivery readings"
+type EstateMarker {
+  "For an ENVIRONMENT marker, name of the environment"
+  environment: String
+  "Kind of marker"
+  kind: MarkerKind!
+  "For a PROMOTION marker, name of the promotion level, read on each branch which has one"
+  levelName: String
+  "For an ENVIRONMENT marker, qualifier of the slots read, empty for the default one"
+  qualifier: String
+}
+
+"Window override and target of one reading in an estate"
+type EstateReadingConfig {
+  "Which way the reading is better, and so how the target judges it"
+  direction: ReadingDirection
+  "Key of the reading, like delivery.leadTime"
+  key: String!
+  "Threshold the reading is judged against, in the unit of the reading (seconds for durations, per week for frequencies, 0 to 100 for rates), null for none"
+  target: Float
+  "Number of days the reading is taken over, null for the window of the settings"
+  windowDays: Int
 }
 
 "EventSubscriptionPayload"
@@ -3323,6 +3379,11 @@ type Mutation {
     "Input for the mutation"
     input: CreateEnvironmentInput
   ): CreateEnvironmentPayload
+  "Creates an estate. Its readings are computed by its daily job, or on recompute."
+  createEstate(
+    "Input for the mutation"
+    input: CreateEstateInput
+  ): CreateEstatePayload
   "Creates a new GitHub configuration."
   createGitHubConfiguration(
     "Input for the mutation"
@@ -3565,6 +3626,11 @@ type Mutation {
     "Input for the mutation"
     input: DeleteEnvironmentInput
   ): DeleteEnvironmentPayload
+  "Deletes an estate, with its snapshots"
+  deleteEstate(
+    "Input for the mutation"
+    input: DeleteEstateInput
+  ): DeleteEstatePayload
   "Generic deletion for a property and an entity"
   deleteGenericProperty(
     "Input for the mutation"
@@ -4056,6 +4122,11 @@ type Mutation {
   purgeHookRecordings: PurgeHookRecordingsPayload
   "Purging all records for Queue messages"
   purgeQueueRecordings: PurgeQueueRecordingsPayload
+  "Queues the recompute of the readings of every project of an estate, overwriting the snapshots of the day."
+  recomputeEstate(
+    "Input for the mutation"
+    input: RecomputeEstateInput
+  ): RecomputeEstatePayload
   "Queues the recompute of the readings of a project, in every set it is in, overwriting the snapshots of the day. Needs the right to configure the project."
   recomputeProjectScorecard(
     "Input for the mutation"
@@ -4699,6 +4770,11 @@ type Mutation {
     "Input for the mutation"
     input: UpdateConfigurationInput
   ): UpdateConfigurationPayload
+  "Replaces the definition of an estate. Its snapshots are kept."
+  updateEstate(
+    "Input for the mutation"
+    input: UpdateEstateInput
+  ): UpdateEstatePayload
   "Updates a Jenkins configuration"
   updateJenkinsConfiguration(
     "Input for the mutation"
@@ -5568,6 +5644,13 @@ type Query {
   ): [Environment!]!
   "Returns the number of environments"
   environmentsCount: Int!
+  "Estate by name, null if none. Needs the licensed feature \"Delivery scorecard\"."
+  estate(
+    "Name of the estate"
+    name: String!
+  ): Estate
+  "All the estates, by name. Needs the licensed feature \"Delivery scorecard\"."
+  estates: [Estate!]!
   "List of event subscriptions"
   eventSubscriptions(
     "Filter for the subscriptions"
@@ -6151,6 +6234,8 @@ type Reading {
   day: String!
   "What explains the value: the sample count (count), the other statistics of a duration (p90, mean, min, max), the kind of marker (markerKind), the marker (marker) and the branches read (scope)."
   details: JSON
+  "Which way the reading is better, and so how a target judges it. Null for a reading out of the catalogue."
+  direction: ReadingDirection
   "Daily snapshots of this reading over the last days, oldest first, this one included"
   history(
     "Number of days back from today"
@@ -6158,6 +6243,10 @@ type Reading {
   ): [Reading!]!
   "Key of the reading, like delivery.leadTime"
   key: String!
+  "Target the estate of the set sets for this reading, in the unit of the reading. Null with no estate or no target: the reading is shown, not judged."
+  target: Float
+  "Whether the reading meets its target (true) or misses it (false). Null when it is not judged: no target, or no value."
+  targetMet: Boolean
   "Why the reading is unknown, null when it is not"
   unknownReason: ReadingUnknownReason
   "Value of the reading, null when it is unknown. The median for a duration."
@@ -6166,6 +6255,12 @@ type Reading {
   windowEnd: LocalDateTime!
   "Start of the window the reading was taken over"
   windowStart: LocalDateTime!
+}
+
+"Output type for the recomputeEstate mutation."
+type RecomputeEstatePayload implements Payload {
+  "List of errors"
+  errors: [UserError]
 }
 
 "Output type for the recomputeProjectScorecard mutation."
@@ -6519,12 +6614,14 @@ type ScheduleAutoVersioningPayload implements Payload {
 
 "The readings of one project, in every set it is in"
 type Scorecard {
-  "Sets the project is in: the set with no estate first, always present"
+  "Sets the project is in: the set with no estate first, always present, then the set of each estate the project belongs to, by name, when the licence allows the estates"
   sets: [ScorecardSet!]!
 }
 
 "The readings of a project in one set: with no estate, or for one estate it belongs to"
 type ScorecardSet {
+  "Estate of the set, null for the set with no estate"
+  estate: Estate
   "Name of the set: Project for the set with no estate"
   name: String!
   "Latest snapshot of each reading of the set, in the catalogue order. Empty until the readings are computed."
@@ -7878,6 +7975,14 @@ type UpdateConfigurationPayload implements Payload {
   errors: [UserError]
 }
 
+"Output type for the updateEstate mutation."
+type UpdateEstatePayload implements Payload {
+  "List of errors"
+  errors: [UserError]
+  "Updated estate"
+  estate: Estate
+}
+
 "Output type for the updateJenkinsConfiguration mutation."
 type UpdateJenkinsConfigurationPayload implements Payload {
   "List of errors"
@@ -8732,6 +8837,12 @@ enum LicenseExpiration {
   OK
 }
 
+"Kind of the event a delivery reading measures up to: PROMOTION (a promotion granted) or ENVIRONMENT (a deployment done in an environment)."
+enum MarkerKind {
+  ENVIRONMENT
+  PROMOTION
+}
+
 "List of types of messages"
 enum MessageType {
   ERROR
@@ -8803,6 +8914,12 @@ enum ReadingBasis {
   ESTIMATED
   MEASURED
   UNKNOWN
+}
+
+"Which way a reading is better: LOWER_IS_BETTER (a target is met by a value lower than or equal to it) or HIGHER_IS_BETTER (a target is met by a value higher than or equal to it)."
+enum ReadingDirection {
+  HIGHER_IS_BETTER
+  LOWER_IS_BETTER
 }
 
 "Why a reading is unknown: NO_MARKER (no promotion level on the branches in scope), NO_SAMPLES (nothing reached the marker in the window), NO_FAILURE (time to restore with no failure in the window), NO_TEST_STAMP (no test stamp on the branches in scope)."
@@ -9255,6 +9372,20 @@ input CreateEnvironmentInput {
   order: Int!
   "Tags for the environment"
   tags: [String!]
+}
+
+"Input type for the createEstate mutation."
+input CreateEstateInput {
+  "Description of the estate"
+  description: String
+  "Labels selecting the projects, as category:name or name. At least one; a project must carry all of them."
+  labels: [String!]!
+  "Marker the delivery readings are read up to. Null for the default marker."
+  marker: EstateMarkerInput
+  "Unique name of the estate"
+  name: String!
+  "Window override and target per reading, at most one per reading"
+  readings: [EstateReadingConfigInput!]
 }
 
 "Input type for the createGitHubConfiguration mutation."
@@ -9734,6 +9865,12 @@ input DeleteDeploymentInput {
 input DeleteEnvironmentInput {
   "ID of the environment to delete"
   id: String!
+}
+
+"Input type for the deleteEstate mutation."
+input DeleteEstateInput {
+  "ID of the estate"
+  id: Int!
 }
 
 "Input type for the deleteGenericProperty mutation."
@@ -10232,6 +10369,26 @@ input EnvironmentMatrixFilter {
   projects: [String!]
   "tags field"
   tags: [String!]
+}
+
+input EstateMarkerInput {
+  "For an ENVIRONMENT marker, name of the environment"
+  environment: String
+  "Kind of marker"
+  kind: MarkerKind!
+  "For a PROMOTION marker, name of the promotion level"
+  levelName: String
+  "For an ENVIRONMENT marker, qualifier of the slots read, empty or null for the default one"
+  qualifier: String
+}
+
+input EstateReadingConfigInput {
+  "Key of the reading, like delivery.leadTime"
+  key: String!
+  "Threshold the reading is judged against, in the unit of the reading, null for none"
+  target: Float
+  "Number of days the reading is taken over, null for the window of the settings"
+  windowDays: Int
 }
 
 input EventSubscriptionFilter {
@@ -10739,6 +10896,12 @@ input QueueRecordingFilterInput {
   text: String
   "Filtering on the username"
   username: String
+}
+
+"Input type for the recomputeEstate mutation."
+input RecomputeEstateInput {
+  "ID of the estate"
+  id: Int!
 }
 
 "Input type for the recomputeProjectScorecard mutation."
@@ -12455,6 +12618,22 @@ input UpdateConfigurationInput {
   name: String!
   "type field"
   type: String!
+}
+
+"Input type for the updateEstate mutation."
+input UpdateEstateInput {
+  "Description of the estate"
+  description: String
+  "ID of the estate"
+  id: Int!
+  "Labels selecting the projects, as category:name or name. At least one; a project must carry all of them."
+  labels: [String!]!
+  "Marker the delivery readings are read up to. Null for the default marker."
+  marker: EstateMarkerInput
+  "Unique name of the estate"
+  name: String!
+  "Window override and target per reading, at most one per reading"
+  readings: [EstateReadingConfigInput!]
 }
 
 "Input type for the updateJenkinsConfiguration mutation."

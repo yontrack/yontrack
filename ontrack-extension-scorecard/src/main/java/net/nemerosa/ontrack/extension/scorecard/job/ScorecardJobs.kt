@@ -3,8 +3,12 @@ package net.nemerosa.ontrack.extension.scorecard.job
 import net.nemerosa.ontrack.common.Time
 import net.nemerosa.ontrack.extension.scorecard.engine.ReadingEngine
 import net.nemerosa.ontrack.extension.scorecard.engine.ReadingSets
+import net.nemerosa.ontrack.extension.scorecard.estates.Estate
+import net.nemerosa.ontrack.extension.scorecard.license.ScorecardLicense
+import net.nemerosa.ontrack.extension.scorecard.model.EstateReadingSet
 import net.nemerosa.ontrack.extension.scorecard.model.NoEstateReadingSet
 import net.nemerosa.ontrack.extension.scorecard.settings.ScorecardSettings
+import net.nemerosa.ontrack.extension.scorecard.storage.EstateRepository
 import net.nemerosa.ontrack.extension.scorecard.storage.ReadingRepository
 import net.nemerosa.ontrack.job.*
 import net.nemerosa.ontrack.job.orchestrator.JobOrchestratorSupplier
@@ -19,12 +23,17 @@ import org.springframework.stereotype.Component
 /**
  * The daily computation of the readings.
  *
- * One job for the no-estate set, over every non-disabled project, on the cron of the
- * [settings][ScorecardSettings]. Being supplied to the job orchestrator, a change of the cron is
- * applied at its next run. The job purges the snapshots past the retention once the readings
- * are computed.
+ * One job for the no-estate set, over every non-disabled project, plus one job per estate, over the
+ * non-disabled projects it selects, all on the cron of the [settings][ScorecardSettings]. Being
+ * supplied to the job orchestrator, a change of the cron, a new or a deleted estate are applied at
+ * its next run. The no-estate job purges the snapshots past the retention once the readings are
+ * computed.
  *
- * The recompute jobs of the projects are created on demand, see [recomputeJob].
+ * Without the licence of the delivery scorecard, the estate jobs are not supplied, and an estate
+ * job which runs anyway skips its estate. The snapshots are kept.
+ *
+ * The recompute jobs of the projects and of the estates are created on demand, see [recomputeJob]
+ * and [estateRecomputeJob].
  */
 @Component
 class ScorecardJobs(
@@ -34,6 +43,8 @@ class ScorecardJobs(
     private val readingEngine: ReadingEngine,
     private val readingSets: ReadingSets,
     private val readingRepository: ReadingRepository,
+    private val estateRepository: EstateRepository,
+    private val scorecardLicense: ScorecardLicense,
 ) : JobOrchestratorSupplier {
 
     companion object {
@@ -45,15 +56,34 @@ class ScorecardJobs(
          * Key of the daily job of the no-estate set
          */
         val noEstateJobKey: JobKey = readingsJobType.getKey("no-estate")
+
+        /**
+         * Key of the daily job of an estate
+         */
+        fun estateJobKey(estateId: Int): JobKey = readingsJobType.getKey("estate-$estateId")
+
+        /**
+         * Key of the recompute job of an estate
+         */
+        fun estateRecomputeJobKey(estateId: Int): JobKey = recomputeJobType.getKey("estate-$estateId")
     }
 
     override val jobRegistrations: Collection<JobRegistration>
-        get() = listOf(
-            JobRegistration(
-                job = NoEstateReadingsJob(),
-                schedule = Schedule.cron(cron()),
-            )
-        )
+        get() {
+            val schedule = Schedule.cron(cron())
+            val estates = if (scorecardLicense.estatesEnabled) estateRepository.findAll() else emptyList()
+            return listOf(
+                JobRegistration(
+                    job = NoEstateReadingsJob(),
+                    schedule = schedule,
+                )
+            ) + estates.map { estate ->
+                JobRegistration(
+                    job = EstateReadingsJob(estate.id, estate.name, estateJobKey(estate.id)),
+                    schedule = schedule,
+                )
+            }
+        }
 
     /**
      * Cron of the settings, the default one if it is not valid.
@@ -76,6 +106,29 @@ class ScorecardJobs(
         }
     }
 
+    /**
+     * Computation of the readings of an estate, for every non-disabled project it selects. Skipped
+     * without the licence, or when the estate is gone.
+     */
+    fun computeEstateReadings(estateId: Int, progress: (String) -> Unit = {}) {
+        if (!scorecardLicense.estatesEnabled) {
+            progress("The licence does not allow the estates: estate $estateId skipped")
+            return
+        }
+        securityService.asAdmin {
+            val estate = estateRepository.findById(estateId)
+            if (estate == null) {
+                progress("Estate $estateId not found")
+            } else {
+                val projects = estateRepository.findProjectIds(estate.id)
+                    .mapNotNull { structureService.findProjectByID(ID.of(it)) }
+                    .filter { !it.isDisabled }
+                val errors = readingEngine.computeSet(EstateReadingSet(estate), projects, progress)
+                progress("Readings of ${estate.name} computed for ${projects.size} project(s), $errors failure(s)")
+            }
+        }
+    }
+
     private fun purge(progress: (String) -> Unit) {
         val retentionDays = cachedSettingsService.getCachedSettings(ScorecardSettings::class.java).retentionDays
         val limit = Time.now.toLocalDate().minusDays(retentionDays.toLong())
@@ -88,10 +141,27 @@ class ScorecardJobs(
      */
     fun recomputeJob(project: Project): Job = RecomputeJob(project.id(), project.name)
 
+    /**
+     * Manual job recomputing the readings of an estate, for every non-disabled project it selects.
+     */
+    fun estateRecomputeJob(estate: Estate): Job =
+        EstateReadingsJob(estate.id, estate.name, estateRecomputeJobKey(estate.id))
+
     private inner class NoEstateReadingsJob : Job {
         override fun getKey(): JobKey = noEstateJobKey
         override fun getTask() = JobRun { listener -> computeNoEstateReadings { listener.message(it) } }
         override fun getDescription(): String = "Readings of every project, with no estate"
+        override fun isDisabled(): Boolean = false
+    }
+
+    private inner class EstateReadingsJob(
+        private val estateId: Int,
+        private val estateName: String,
+        private val key: JobKey,
+    ) : Job {
+        override fun getKey(): JobKey = key
+        override fun getTask() = JobRun { listener -> computeEstateReadings(estateId) { listener.message(it) } }
+        override fun getDescription(): String = "Readings of the estate $estateName"
         override fun isDisabled(): Boolean = false
     }
 

@@ -1,5 +1,8 @@
 package net.nemerosa.ontrack.extension.scorecard.engine
 
+import net.nemerosa.ontrack.extension.scorecard.estates.EstateEnvironmentMarker
+import net.nemerosa.ontrack.extension.scorecard.estates.EstatePromotionMarker
+import net.nemerosa.ontrack.extension.scorecard.model.EstateReadingSet
 import net.nemerosa.ontrack.extension.scorecard.model.NoEstateReadingSet
 import net.nemerosa.ontrack.extension.scorecard.model.ReadingSet
 import net.nemerosa.ontrack.model.structure.BranchModelMatcherService
@@ -26,6 +29,35 @@ class ReadingSubjectResolver(
                 markerKind = MarkerKind.PROMOTION,
                 marker = lastPromotionLevels(scope),
             )
+
+            is EstateReadingSet -> when (val marker = set.estate.marker) {
+                // Default marker
+                // TODO #1901 The highest-ordered environment where the project owns a slot, before the promotion rule
+                null -> ReadingSubject(
+                    set = set,
+                    project = project,
+                    scope = scope,
+                    markerKind = MarkerKind.PROMOTION,
+                    marker = lastPromotionLevels(scope),
+                )
+
+                is EstatePromotionMarker -> ReadingSubject(
+                    set = set,
+                    project = project,
+                    scope = scope,
+                    markerKind = MarkerKind.PROMOTION,
+                    marker = namedPromotionLevels(scope, marker.levelName),
+                )
+
+                // TODO #1901 Resolving the slot of the project in the environment, with the qualifier
+                is EstateEnvironmentMarker -> ReadingSubject(
+                    set = set,
+                    project = project,
+                    scope = scope,
+                    markerKind = MarkerKind.ENVIRONMENT,
+                    marker = null,
+                )
+            }
         }
     }
 
@@ -51,6 +83,17 @@ class ReadingSubjectResolver(
     private fun lastPromotionLevels(scope: ReadingScope): PromotionMarker? {
         val levels = scope.branches.mapNotNull { branch ->
             structureService.getPromotionLevelListForBranch(branch.id).lastOrNull()
+        }
+        return levels.takeIf { it.isNotEmpty() }?.let { PromotionMarker(it) }
+    }
+
+    /**
+     * The promotion marker of an estate: the promotion level of the given name on each branch in scope.
+     * A branch without such a level is not read; no branch with it, no marker.
+     */
+    private fun namedPromotionLevels(scope: ReadingScope, levelName: String): PromotionMarker? {
+        val levels = scope.branches.mapNotNull { branch ->
+            structureService.findPromotionLevelByName(branch.project.name, branch.name, levelName).orElse(null)
         }
         return levels.takeIf { it.isNotEmpty() }?.let { PromotionMarker(it) }
     }

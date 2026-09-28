@@ -10,6 +10,7 @@ dependencies {
 
     implementation(project(":ontrack-extension-casc"))
     implementation(project(":ontrack-extension-general"))
+    implementation(project(":ontrack-extension-license"))
     implementation(project(":ontrack-repository-support"))
     implementation(project(":ontrack-ui-graphql"))
     implementation("org.apache.commons:commons-math3")

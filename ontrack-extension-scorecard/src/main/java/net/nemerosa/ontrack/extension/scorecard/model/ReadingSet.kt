@@ -1,5 +1,7 @@
 package net.nemerosa.ontrack.extension.scorecard.model
 
+import net.nemerosa.ontrack.extension.scorecard.estates.Estate
+
 /**
  * A set of readings: the readings of a project with no estate, or for one estate it belongs to.
  *
@@ -32,4 +34,16 @@ data object NoEstateReadingSet : ReadingSet {
     override val estateId: Int? = null
     override val name: String = "Project"
     override val tag: String = "-"
+}
+
+/**
+ * The set of an estate: the readings of the projects the estate selects, read up to its marker,
+ * over its windows, against its targets.
+ */
+data class EstateReadingSet(
+    val estate: Estate,
+) : ReadingSet {
+    override val estateId: Int = estate.id
+    override val name: String = estate.name
+    override val tag: String = estate.name
 }

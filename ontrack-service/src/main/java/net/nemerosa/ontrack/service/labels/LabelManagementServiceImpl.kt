@@ -12,7 +12,8 @@ import org.springframework.transaction.annotation.Transactional
 @Transactional
 class LabelManagementServiceImpl(
         private val labelRepository: LabelRepository,
-        private val securityService: SecurityService
+        private val securityService: SecurityService,
+        private val labelDeletionGuards: List<LabelDeletionGuard>,
 ) : LabelManagementService {
 
     override val labels: List<Label>
@@ -47,7 +48,12 @@ class LabelManagementServiceImpl(
     override fun deleteLabel(labelId: Int): Ack {
         securityService.checkGlobalFunction(LabelManagement::class.java)
         // Checks the label exists
-        getLabel(labelId)
+        val label = getLabel(labelId)
+        // Checks nothing needs it
+        val reasons = labelDeletionGuards.mapNotNull { it.checkLabelDeletion(label) }
+        if (reasons.isNotEmpty()) {
+            throw LabelInUseException(label, reasons)
+        }
         return labelRepository.deleteLabel(labelId)
     }
 
