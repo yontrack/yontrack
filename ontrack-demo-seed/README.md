@@ -30,23 +30,34 @@ the seed — keep it in sync by hand whenever that file changes.
 | SARIF scan and a suppression                | `petclinic-billing`, `SECURITY.CODE` runs                              | CodeQL findings posted as SARIF; `java/spring-disabled-csrf-protection` accepted without expiry |
 | Searching a CVE                             | Search box → `CVE-2024-38816`                                          | The finding, its project, and the branch it is exposed on; leads to the finding page           |
 | Findings of a scan                          | Any `SECURITY.DEPENDENCIES` run of `petclinic-billing`                 | The findings that scan reported; WARNING while the HIGH is open, PASSED once it is fixed        |
+| Delivery scorecard of a project             | `petclinic-visits` project page, _Scorecard_ section; _Details_ for the scorecard page | Six readings in three columns - the project's own, "Demo production", "Demo products" - met, missed, and one reading without a target |
+| One project, two estate columns             | `petclinic-visits` and `petclinic` scorecards                          | Lead time in hours up to GOLD, in days up to production; `petclinic`'s time to restore in production reads "No failure in window" |
+| Estates                                     | User menu → _Configurations_ → _Estates_                               | "Demo products" (up to `GOLD`) and "Demo production" (up to `production`), their targets and projects |
+| A failed deployment, then a done one        | `production` environment, `petclinic-visits` slot, 1.3.0 then 1.3.1    | `FAILED` with its message, restored the next morning; 1.4.1 `CANCELLED`                     |
+| A flaky build                               | `petclinic-visits` / `main`, build `206` (1.2.1), `TESTS` runs         | The same stamp FAILED then PASSED on the same build; the test flakiness reading counts it   |
+| Unknown readings, with their reason         | `petclinic-billing` in "Demo products", `petclinic-ui` in "Demo production" | No `GOLD` level (no marker); never deployed (no samples)                               |
 
 ## Projects
 
 | Project           | Branches                    | Labels                                  | Role                                                                |
 |--------------------|------------------------------|------------------------------------------|----------------------------------------------------------------------|
 | `common-library`   | `main`                       | `team:platform`, `language:java`         | Bottom of the dependency graph; `petclinic` links to its builds       |
-| `petclinic`        | `main`, `release-1.3`        | `team:apps`, `language:java`             | The main demo project — full pipeline, both promotion ladders, the only one with an SCM |
-| `petclinic-ui`     | `main`                       | `team:apps`, `language:javascript`       | Consumes `petclinic`, so the demo has a dependency graph to walk       |
-| `petclinic-billing` | `release-2.3`, `main`       | `team:apps`, `language:java`             | The security findings: two scans per build, one of them in SARIF       |
+| `petclinic`        | `main`, `release-1.3`        | `team:apps`, `language:java`, `portfolio:product`, `runs-in:production` | The main demo project — full pipeline, both promotion ladders, the only one with an SCM |
+| `petclinic-ui`     | `main`                       | `team:apps`, `language:javascript`, `runs-in:production` | Consumes `petclinic`, so the demo has a dependency graph to walk       |
+| `petclinic-billing` | `release-2.3`, `main`       | `team:apps`, `language:java`, `portfolio:product` | The security findings: two scans per build, one of them in SARIF       |
+| `petclinic-visits` | `main`                       | `team:apps`, `language:kotlin`, `portfolio:product`, `runs-in:production` | The delivery scorecard: 90 days of releases, test runs and production deployments |
 | `yontrack`         | `main`                       | `team:platform`, `language:kotlin`       | Yontrack's own changelog, reseeded from git on every run              |
 
 ## Labels
 
 Two categories, `team` and `language`, and every project carries one of each. The two cut the
-demo's four projects in two different ways on purpose: `team:apps` and `language:java` overlap
-on `petclinic` alone, so filtering the project list on both is worth trying and returns
-something other than what either returns by itself.
+demo's projects in two different ways on purpose: `team:apps` and `language:java` overlap
+on `petclinic` and `petclinic-billing` only, so filtering the project list on both is worth trying
+and returns something other than what either returns by itself.
+
+Two more, `portfolio:product` and `runs-in:production`, are what the two estates of the delivery
+scorecard select their projects by: "Demo products" and "Demo production" respectively. They
+overlap on `petclinic` and `petclinic-visits`, whose scorecards therefore have two estate columns.
 
 Labels are global rather than owned by a project, so the reset deletes them all before
 recreating them — the same treatment as environments and dashboards, and for the same reason:

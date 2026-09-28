@@ -148,6 +148,7 @@ class DemoSeedTest {
                 DemoContent.SERVICE,
                 DemoContent.UI,
                 DemoContent.SECURITY,
+                DemoContent.VISITS,
                 DemoContent.CHANGELOG,
             ),
             target.projects().map { it.name },
@@ -266,6 +267,18 @@ class DemoSeedTest {
                             )
                         }
                     }
+                    // A test run too, and the flaky build's retry above all: it is the latest of them
+                    build.testRuns.forEach { run ->
+                        val stamp = run.run.validationStamp
+                        assertTrue(!run.at.isAfter(now), "Test run $stamp of build ${build.name} is dated in the future")
+                        assertTrue(!run.at.isBefore(build.creation), "Test run $stamp of build ${build.name} is dated before the build")
+                        if (firstPromotion != null) {
+                            assertTrue(
+                                !run.at.isAfter(firstPromotion),
+                                "Test run $stamp of build ${build.name} is dated after the first promotion of the build",
+                            )
+                        }
+                    }
                     build.validations.forEach { validation ->
                         assertTrue(
                             !validation.at.isAfter(now),
@@ -284,6 +297,15 @@ class DemoSeedTest {
                         }
                     }
                 }
+            }
+        }
+        // The backdated deployments: the server refuses one in the future, and one before its build
+        target.environments().flatMap { (it as InMemoryDemoTarget.InMemoryEnvironment).slots }.forEach { slot ->
+            slot.deployments.forEach { deployment ->
+                val times = deployment.times ?: return@forEach
+                val where = "The deployment of ${deployment.build.name} on ${slot.environment.name}/${slot.project.name}"
+                assertTrue(!times.end.isAfter(now), "$where ends in the future")
+                assertTrue(!times.start.isBefore(deployment.build.creation), "$where starts before its build")
             }
         }
     }

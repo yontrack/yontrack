@@ -32,6 +32,15 @@ object DemoContent {
     const val SECURITY = "petclinic-billing"
 
     /**
+     * The project of the delivery scorecard: three months of weekly releases, promotions, test runs
+     * and production deployments, where every other project of the demo has three weeks. A project
+     * of its own for the same reason as [SECURITY]: a scorecard reads a HISTORY, and giving
+     * [SERVICE] one would bury its curated builds - the failed build, the canary, the deployments
+     * the delivery map reads - under a dozen more.
+     */
+    const val VISITS = "petclinic-visits"
+
+    /**
      * The release branch of [SECURITY], where the HIGH fixed on [MAIN] is still exposed. Named as
      * a release branch - the project has no SCM, so no branch model, and every branch counts for
      * the state of its findings, which is what keeps that HIGH open for the project.
@@ -54,6 +63,13 @@ object DemoContent {
     const val UNIT_TESTS = "UNIT.TESTS"
     const val INTEGRATION_TESTS = "INTEGRATION.TESTS"
     const val SECURITY_SCAN = "SECURITY.SCAN"
+
+    /**
+     * The `tests` stamp of [VISITS], of the test summary data type: its runs carry the counts of the
+     * tests, and are what the test readings of the scorecard read. Not matched by [TESTS_PATTERN] by
+     * accident only: [VISITS] has no auto promotion at all.
+     */
+    const val TEST_SUMMARY = "TESTS"
 
     /** The `security-findings` stamp of [SECURITY] scanning its dependencies, in the neutral format. */
     const val SECURITY_DEPENDENCIES = "SECURITY.DEPENDENCIES"
@@ -123,6 +139,20 @@ object DemoContent {
     const val LABEL_LANGUAGE_KOTLIN = "language:kotlin"
 
     /**
+     * The labels the two estates of the delivery scorecard select their projects by. A category each,
+     * named for what an estate is - a set of projects someone answers for - rather than for the
+     * estate itself, so that the chips read as facts about a project.
+     */
+    const val LABEL_PORTFOLIO_PRODUCT = "portfolio:product"
+    const val LABEL_RUNS_IN_PRODUCTION = "runs-in:production"
+
+    /** The estate read up to [GOLD]. */
+    const val ESTATE_PRODUCTS = "Demo products"
+
+    /** The estate read up to the deployments in [PRODUCTION]. */
+    const val ESTATE_PRODUCTION = "Demo production"
+
+    /**
      * The whole dataset, curated part and changelog project together.
      *
      * @param changelog Commits since the last release, one build each.
@@ -134,11 +164,13 @@ object DemoContent {
             service(),
             ui(),
             security(),
+            visits(),
             changelogProject(changelog),
         ),
         environments = environments(),
-        deployments = deployments(),
+        deployments = deployments() + visitsDeployments(),
         dashboard = dashboard(),
+        estates = estates(),
     )
 
     /**
@@ -179,6 +211,18 @@ object DemoContent {
             name = "kotlin",
             description = "Written in Kotlin.",
             color = "#7F52FF",
+        ),
+        LabelSpec(
+            category = "portfolio",
+            name = "product",
+            description = "Part of what the customers buy. Selects the projects of the \"$ESTATE_PRODUCTS\" estate.",
+            color = "#13A8A8",
+        ),
+        LabelSpec(
+            category = "runs-in",
+            name = "production",
+            description = "Runs in production. Selects the projects of the \"$ESTATE_PRODUCTION\" estate.",
+            color = "#389E0D",
         ),
     )
 
@@ -432,7 +476,9 @@ object DemoContent {
         // main project, so the home screen shows the project each branch belongs to doing
         // real work - two branches called differently under one project name.
         favourite = true,
-        labels = listOf(LABEL_TEAM_APPS, LABEL_LANGUAGE_JAVA),
+        // In both estates, and the reason they overlap: its scorecard reads it twice, up to GOLD and
+        // up to production, and the two columns do not say the same thing.
+        labels = listOf(LABEL_TEAM_APPS, LABEL_LANGUAGE_JAVA, LABEL_PORTFOLIO_PRODUCT, LABEL_RUNS_IN_PRODUCTION),
         branches = listOf(
             BranchSpec(
                 name = MAIN,
@@ -671,7 +717,9 @@ object DemoContent {
         favourite = true,
         // Same team as the service, another language: the two categories cut the demo's
         // projects in two different ways, which is what makes filtering on both interesting.
-        labels = listOf(LABEL_TEAM_APPS, LABEL_LANGUAGE_JAVASCRIPT),
+        // In production, so in the "Demo production" estate - where nothing has ever reached its slot,
+        // whose rules are broken on purpose, and every reading is unknown for want of a deployment.
+        labels = listOf(LABEL_TEAM_APPS, LABEL_LANGUAGE_JAVASCRIPT, LABEL_RUNS_IN_PRODUCTION),
         branches = listOf(
             BranchSpec(
                 name = MAIN,
@@ -855,7 +903,10 @@ object DemoContent {
     private fun security() = ProjectSpec(
         name = SECURITY,
         description = "Billing service of the sample application - the demo's security findings.",
-        labels = listOf(LABEL_TEAM_APPS, LABEL_LANGUAGE_JAVA),
+        // A product, so in the "Demo products" estate, which is where the security readings of an
+        // estate will read its findings. Up to GOLD, which it does not have: its delivery readings
+        // there are unknown, and say so.
+        labels = listOf(LABEL_TEAM_APPS, LABEL_LANGUAGE_JAVA, LABEL_PORTFOLIO_PRODUCT),
         branches = listOf(
             BranchSpec(
                 name = SECURITY_RELEASE,
@@ -888,6 +939,197 @@ object DemoContent {
             ),
         ),
     )
+
+    private val testSummary = ValidationStampSpec(
+        TEST_SUMMARY,
+        "Unit and integration tests, with their counts.",
+        tests = true,
+    )
+
+    /**
+     * A release of [VISITS]: built, tested, and promoted up the whole ladder unless it says otherwise.
+     *
+     * @param tests The runs of [TEST_SUMMARY], in order
+     */
+    private fun visitsBuild(
+        name: String,
+        release: String,
+        description: String,
+        creation: BuildCreation,
+        tests: List<TestRunSpec>,
+        promotionLevels: List<String> = listOf(BRONZE, SILVER, GOLD),
+    ) = BuildSpec(
+        name = name,
+        release = release,
+        description = description,
+        creation = creation,
+        promotionLevels = promotionLevels,
+        validations = listOf(ValidationSpec(BUILD, PASSED)),
+        tests = tests,
+    )
+
+    private fun passing(passed: Int) = listOf(TestRunSpec(TEST_SUMMARY, passed = passed))
+
+    /**
+     * The delivery scorecard's project: about ninety days of weekly releases, each built, tested,
+     * promoted to GOLD a few hours later and deployed to production the day after (#1906).
+     *
+     * What each of its readings has to show is a build of the list below:
+     *
+     * * **1.1.0** fails its tests and is never promoted: the only break in the GOLD history, and the
+     *   time to restore up to GOLD, until 1.1.1;
+     * * **1.2.1** is the flaky build - its tests fail, then pass on the same build;
+     * * **1.3.0** reaches GOLD but fails its production deployment, which **1.3.1** restores the next
+     *   day: the time to restore in production, and the one failed deployment of the success rate;
+     * * **1.4.1** has its deployment cancelled, which every reading leaves out;
+     * * **1.6.2**, the head, is hours old and still on its way to GOLD - in flight, so the success
+     *   rate leaves it out rather than counting it as a failure.
+     *
+     * Every promotion follows the build by a few hours and every deployment by a day, so the lead
+     * time reads in hours in "Demo products" and in days in "Demo production": one project, two
+     * different answers, which is what the two estate columns are for.
+     */
+    private fun visits() = ProjectSpec(
+        name = VISITS,
+        description = "Visit scheduling service of the sample application - the demo's delivery scorecard.",
+        labels = listOf(LABEL_TEAM_APPS, LABEL_LANGUAGE_KOTLIN, LABEL_PORTFOLIO_PRODUCT, LABEL_RUNS_IN_PRODUCTION),
+        branches = listOf(
+            BranchSpec(
+                name = MAIN,
+                description = "Main development branch.",
+                promotionLevels = listOf(bronze, silver, gold),
+                validationStamps = listOf(buildStamp, testSummary),
+                builds = listOf(
+                    visitsBuild("201", "1.0.0", "First release of the visit scheduler.", DaysAgo(88), passing(380)),
+                    visitsBuild("202", "1.0.1", "Reminder e-mails for upcoming visits.", DaysAgo(81), passing(386)),
+                    visitsBuild(
+                        "203", "1.1.0", "Recurring visits. Three tests fail on the month boundaries.", DaysAgo(74),
+                        tests = listOf(TestRunSpec(TEST_SUMMARY, passed = 389, failed = 3)),
+                        promotionLevels = listOf(BRONZE),
+                    ),
+                    visitsBuild("204", "1.1.1", "Recurring visits across the month boundaries.", DaysAgo(71), passing(395)),
+                    visitsBuild("205", "1.2.0", "Visits listed by vet.", DaysAgo(63), passing(401)),
+                    visitsBuild(
+                        "206", "1.2.1", "Visit calendar export.", DaysAgo(56),
+                        // FLAKY: the same build, the same stamp, failed then passed - a retry, nothing
+                        // changed in between
+                        tests = listOf(
+                            TestRunSpec(TEST_SUMMARY, passed = 406, failed = 1, description = "VisitCalendarIT timed out."),
+                            TestRunSpec(TEST_SUMMARY, passed = 407, description = "Retried."),
+                        ),
+                    ),
+                    visitsBuild("207", "1.3.0", "Online booking.", DaysAgo(49), passing(412)),
+                    visitsBuild(
+                        "208", "1.3.1", "Online booking, hotfix for the time zones.", DaysAgo(48, hour = 16),
+                        passing(414),
+                    ),
+                    visitsBuild("209", "1.4.0", "Waiting list.", DaysAgo(39), passing(420)),
+                    visitsBuild("210", "1.4.1", "Waiting list notifications.", DaysAgo(32), passing(424)),
+                    visitsBuild("211", "1.5.0", "Visit notes.", DaysAgo(25), passing(431)),
+                    visitsBuild("212", "1.5.1", "Attachments on the visit notes.", DaysAgo(18), passing(436)),
+                    visitsBuild("213", "1.6.0", "Vet availability.", DaysAgo(11), passing(440)),
+                    visitsBuild("214", "1.6.1", "Availability shown in the calendar.", DaysAgo(4), passing(446)),
+                    // In flight: younger than the lead time to GOLD, so not a failure yet
+                    visitsBuild(
+                        "215", "1.6.2", "Booking confirmation page.", HoursAgo(3),
+                        passing(449),
+                        promotionLevels = listOf(BRONZE, SILVER),
+                    ),
+                ),
+            ),
+        ),
+    )
+
+    /**
+     * The production history of [VISITS], oldest first as the server requires of one slot: the day
+     * after each GOLD release, in the afternoon.
+     *
+     * 1.3.0 FAILS and 1.3.1 is deployed the next morning, which is the one outage of production; 1.4.1
+     * is cancelled, superseded before it went out. 1.1.0 was never GOLD and is not here - the slot's
+     * rule would refuse it anyway.
+     */
+    private fun visitsDeployments(): List<DeploymentSpec> {
+        fun deployment(
+            build: String,
+            at: BuildCreation,
+            stopAt: DeploymentStop = DeploymentStop.DONE,
+            message: String? = null,
+        ) = DeploymentSpec(
+            environment = PRODUCTION,
+            build = BuildRef(VISITS, MAIN, build),
+            stopAt = stopAt,
+            at = at,
+            message = message,
+        )
+        return listOf(
+            deployment("201", DaysAgo(87, hour = 14)),
+            deployment("202", DaysAgo(80, hour = 14)),
+            deployment("204", DaysAgo(70, hour = 14)),
+            deployment("205", DaysAgo(62, hour = 14)),
+            deployment("206", DaysAgo(55, hour = 14)),
+            deployment(
+                "207", DaysAgo(48, hour = 14), DeploymentStop.FAILED,
+                message = "Smoke tests failed: bookings are refused outside of UTC.",
+            ),
+            deployment("208", DaysAgo(47, hour = 10)),
+            deployment("209", DaysAgo(38, hour = 14)),
+            deployment(
+                "210", DaysAgo(31, hour = 14), DeploymentStop.CANCELLED,
+                message = "Superseded: the waiting list notifications go out with the visit notes.",
+            ),
+            deployment("211", DaysAgo(24, hour = 14)),
+            deployment("212", DaysAgo(17, hour = 14)),
+            deployment("213", DaysAgo(10, hour = 14)),
+            deployment("214", DaysAgo(3, hour = 14)),
+        )
+    }
+
+    /**
+     * The two estates of the delivery scorecard, over projects which overlap: [SERVICE] and [VISITS]
+     * are in both, so their scorecards have two estate columns beside the project's own, and read
+     * differently in each.
+     *
+     * The targets are chosen so that each estate has readings meeting them and readings missing
+     * them, and one reading - the flakiness of the tests - has none, and is shown without a verdict.
+     * Durations in seconds, frequencies per week, rates from 0 to 100, as the API takes them.
+     *
+     * * "Demo products" (up to GOLD): [VISITS] meets its lead time, frequency and success rate, and
+     *   misses its time to restore - three days from 1.1.0 to 1.1.1 - and its test pass rate. [SECURITY]
+     *   is in it and has no GOLD, so its delivery readings are unknown, with the reason.
+     * * "Demo production" (up to the production deployments): [VISITS] meets its lead time, success
+     *   rate and time to restore, and misses the frequency over the estate's own 30-day window;
+     *   [SERVICE] has had no failure there, so its time to restore reads "no failure" rather than a
+     *   verdict; [UI] has never deployed.
+     */
+    private fun estates() = listOf(
+        EstateSpec(
+            name = ESTATE_PRODUCTS,
+            description = "What the customers buy, read up to the GOLD promotion.",
+            labels = listOf(LABEL_PORTFOLIO_PRODUCT),
+            marker = EstateMarkerSpec.Promotion(GOLD),
+            readings = listOf(
+                EstateReadingSpec(ReadingKeys.DELIVERY_LEAD_TIME, target = DAY_SECONDS),
+                EstateReadingSpec(ReadingKeys.DELIVERY_FREQUENCY, target = 0.5),
+                EstateReadingSpec(ReadingKeys.DELIVERY_SUCCESS_RATE, target = 80.0),
+                EstateReadingSpec(ReadingKeys.DELIVERY_MTTR, target = 2 * DAY_SECONDS),
+                EstateReadingSpec(ReadingKeys.QUALITY_TEST_PASS_RATE, target = 95.0),
+            ),
+        ),
+        EstateSpec(
+            name = ESTATE_PRODUCTION,
+            description = "What runs in production, read up to its deployments there.",
+            labels = listOf(LABEL_RUNS_IN_PRODUCTION),
+            marker = EstateMarkerSpec.Environment(PRODUCTION),
+            readings = listOf(
+                EstateReadingSpec(ReadingKeys.DELIVERY_LEAD_TIME, target = 2 * DAY_SECONDS),
+                EstateReadingSpec(ReadingKeys.DELIVERY_FREQUENCY, windowDays = 30, target = 1.0),
+                EstateReadingSpec(ReadingKeys.DELIVERY_SUCCESS_RATE, target = 90.0),
+                EstateReadingSpec(ReadingKeys.DELIVERY_MTTR, target = DAY_SECONDS),
+            ),
+        ),
+    )
+
+    private const val DAY_SECONDS = 86_400.0
 
     /**
      * Yontrack itself, one build per commit since the last release.
@@ -1034,6 +1276,21 @@ object DemoContent {
                             name = "mainOnly",
                             ruleId = SlotAdmissionRules.BRANCH_PATTERN,
                             config = mapOf("includes" to listOf(MAIN)),
+                        ),
+                    ),
+                ),
+                // The production slot of the delivery scorecard's project, on the default qualifier,
+                // which is what an estate read up to production reads. GOLD only, like [SERVICE]'s, and
+                // NO workflow: a workflow fires at the moment of the reset, and a slot whose history is
+                // backdated would then refuse the dated deployments following it.
+                SlotSpec(
+                    project = VISITS,
+                    description = "Visit scheduling in production.",
+                    admissionRules = listOf(
+                        SlotAdmissionRuleSpec(
+                            name = "gold",
+                            ruleId = SlotAdmissionRules.PROMOTION,
+                            config = mapOf("promotion" to GOLD),
                         ),
                     ),
                 ),

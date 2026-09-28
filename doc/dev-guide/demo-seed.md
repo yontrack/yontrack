@@ -8,8 +8,8 @@ The reset goes **through the Yontrack API**, not the database. No Postgres hooks
 churn, and no dependency on ArgoCD sync timing — a Helm pre-upgrade hook would fire on
 *every* sync, so an unrelated values tweak would silently destroy the demo.
 
-Settings stay covered by CasC and users live in Keycloak, so projects, environments, labels
-and dashboards are the only things the seed has to reset. What they have in common is that
+Settings stay covered by CasC and users live in Keycloak, so projects, environments, labels,
+estates and dashboards are the only things the seed has to reset. What they have in common is that
 they outlive a project deletion: a label is global and carried by several projects, so
 deleting every project leaves every label behind.
 
@@ -70,9 +70,11 @@ A licensed feature is needed as well, for the same reason:
 | Feature | Licensed feature | Where it comes from |
 |---------|------------------|---------------------|
 | **Native scanner formats**, which the SARIF code scan of `petclinic-billing` is posted in | `extension.findings.native-formats` | The development licence enables it; a production licence has to include it |
+| **Delivery scorecard**, which the two estates are | `extension.scorecard` | Same |
+| **Environments**, which the "Demo production" estate reads up to | `extension.environments` | Same |
 
 Unlike the two properties, a missing licence is caught before the reset: the seed reads the
-licence of the instance through `licenseInfo` and stops with "Nothing was deleted" when the
+licence of the instance through `licenseInfo` and stops with "Nothing was deleted" when a
 feature is not enabled, as it does when the mock SCM is off.
 
 A third one is optional, and only on a long-lived instance:
@@ -238,6 +240,49 @@ at the demo can tell a deliberate dangling name from a mistake. The exception is
 and marked as such: the `petclinic-ui` production slot exists precisely to show what a broken
 admission rule looks like, and it is the only one.
 
+### The delivery scorecard reads a history
+
+A scorecard reads ninety days, and the rest of the demo has three weeks. `petclinic-visits` is the
+project which has the ninety days: fifteen releases, about one a week, each built, tested on a `tests` stamp,
+promoted to GOLD a few hours later and deployed to production the day after. Its own project rather
+than more builds on `petclinic`, for the reason `petclinic-billing` is one: `petclinic`'s builds are
+curated readings of the delivery map, and a dozen more would bury them.
+
+Two estates read it, over labels declared for them (`DemoDataset.estates`): "Demo products", up to
+GOLD, over `portfolio:product`, and "Demo production", up to the `production` environment, over
+`runs-in:production`. They overlap on `petclinic` and `petclinic-visits`, so both scorecards have two
+estate columns which do not say the same thing - a lead time in hours up to GOLD and in days up to
+production. The targets are set so that each estate has readings meeting them and readings missing
+them, and the flakiness of the tests has none. `DemoContent.estates` lists which reading of which
+project does what, and every one of them is a build or a deployment of the dataset: 1.1.0 failing
+its tests is the time to restore up to GOLD, 1.2.1 is the flaky build, 1.3.0 failing in production
+and 1.3.1 restoring it the next morning are the time to restore in production.
+
+Three things make it work:
+
+- **Everything is dated.** A test run goes through `Build.validateWithData`, the one mutation taking
+  the data of a run *and* a date - the typed `validateBuildByIdWithTests` stamps the run with the
+  moment of the call. A deployment dated with `DeploymentSpec.at` is created, started and ended a
+  quarter of an hour apart through the backdated pipeline mutations; one without is run at the reset,
+  as before.
+- **A slot's deployments are dated in order.** The server refuses a pipeline starting before the
+  latest start of its slot, and a deployment at the reset is the latest start there is: a dated one
+  after it would fail half-way through the reset. `validate` refuses both orders before anything is
+  deleted. The same goes for a workflow on such a slot, which fires at the moment of the reset and
+  can move a pipeline: `petclinic-visits`' slot has none.
+- **The seed ends by computing the scorecards.** The readings are computed by a daily job, so a fresh
+  demo would read "not computed" until the next night. The last step recomputes every project, which
+  covers every set it is in, the estates' included - and waits for each.
+
+The reset deletes the estates **first**: the server refuses to delete a label an estate selects its
+projects by.
+
+Only today is computed. The engine computes the snapshot of the day and nothing before it, so the
+sparklines of the project scorecard page read "Not enough daily snapshots for a trend yet" on a fresh
+demo, and fill in one day at a time on an instance which is not reset daily. Backfilling past days is
+the ledger's question (`docs/grilling/2026-09-scorecard/README.md`, *What this hands to the ledger*),
+not the seed's.
+
 ### Auto promotion has to reproduce the dataset, not add to it
 
 `PromotionLevelSpec.autoPromotion` configures a real server behaviour: the build reaching
@@ -332,6 +377,8 @@ server involved.
   the seed marks is marked for whatever account `YONTRACK_TOKEN` belongs to. If visitors
   browse the demo as a different account from the one that seeds it, their mobile home is
   still empty — and shows the empty state, which at least says what favourites are.
+- **The scorecard has no history.** See [above](#the-delivery-scorecard-reads-a-history): the
+  readings of the day are computed, not the ones before it.
 - **`KdslDemoTarget` has no automated test.** The seed is destructive by definition, so it
   cannot share an instance with the acceptance suite. Changes to it are verified by running
   the program against a throwaway instance — the local dev stack does fine — twice, and

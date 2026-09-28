@@ -4,6 +4,7 @@ import net.nemerosa.ontrack.kdsl.connector.Connector
 import net.nemerosa.ontrack.kdsl.connector.graphql.schema.ValidationRunRunInfoQuery
 import net.nemerosa.ontrack.kdsl.connector.graphql.schema.type.ProjectEntityType
 import net.nemerosa.ontrack.kdsl.connector.graphqlConnector
+import java.time.LocalDateTime
 
 /**
  * Representation of a validation run.
@@ -19,6 +20,10 @@ class ValidationRun(
     val description: String?,
     val data: ValidationRunData?,
     val statuses: List<ValidationRunStatus>,
+    /**
+     * Time of the run - the one given when it was created, when it was backdated.
+     */
+    val time: LocalDateTime? = null,
 ) : ProjectEntity(connector, ProjectEntityType.VALIDATION_RUN, id) {
     val lastStatus: ValidationRunStatus get() = statuses.first()
 

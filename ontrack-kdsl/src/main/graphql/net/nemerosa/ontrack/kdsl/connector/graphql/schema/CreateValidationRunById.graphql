@@ -4,6 +4,8 @@ mutation CreateValidationRunById(
     $validationRunStatus: String,
     $description: String,
     $dateTime: LocalDateTime,
+    $dataTypeId: String,
+    $data: JSON,
 ) {
     createValidationRunById(input: {
         buildId: $buildId,
@@ -11,6 +13,8 @@ mutation CreateValidationRunById(
         validationRunStatus: $validationRunStatus,
         description: $description,
         dateTime: $dateTime,
+        dataTypeId: $dataTypeId,
+        data: $data,
     }) {
         validationRun {
             ...ValidationRunFragment

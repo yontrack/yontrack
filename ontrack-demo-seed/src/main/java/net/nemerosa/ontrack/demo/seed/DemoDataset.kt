@@ -27,6 +27,13 @@ data class DemoDataset(
      */
     val deployments: List<DeploymentSpec> = emptyList(),
     val dashboard: DemoDashboard? = null,
+    /**
+     * Estates of the delivery scorecard. Created last, once every project carries its labels and
+     * every deployment has run, and followed by a recompute of every project's scorecard: a
+     * scorecard is only computed daily, and a demo whose scorecards read "not computed yet" until
+     * the next night shows nothing of it.
+     */
+    val estates: List<EstateSpec> = emptyList(),
 )
 
 /**
@@ -176,10 +183,16 @@ data class WorkflowSpec(val yaml: String)
  * reports of security scans - see [BuildSpec.scans] - rather than with a status: the server
  * computes the status from the findings. `null` for an ordinary stamp.
  */
+/**
+ * @property tests Whether this is a `tests` stamp - of the test summary data type - whose runs are
+ * posted with the counts of the tests, [BuildSpec.tests], rather than with a status: any failed test
+ * makes a failed run. It is what the test readings of the delivery scorecard read.
+ */
 data class ValidationStampSpec(
     val name: String,
     val description: String,
     val findings: FindingsThresholdsSpec? = null,
+    val tests: Boolean = false,
 )
 
 /**
@@ -205,7 +218,10 @@ data class FindingsThresholdsSpec(
  * build shows.
  * @property scans Security scans of the build, each posted through `validateBuildWithFindings`
  * as the report of the scan, on a `security-findings` stamp. They take their rungs on the build's
- * ladder after its [validations], and before its promotions.
+ * ladder after its [validations] and its [tests], and before its promotions.
+ * @property tests Runs of `tests` stamps, in order, each with the counts of its tests. Two runs of
+ * the same stamp, failed then passed, are what a flaky build is. They take their rungs on the
+ * build's ladder after its [validations].
  */
 data class BuildSpec(
     val name: String,
@@ -217,6 +233,19 @@ data class BuildSpec(
     val links: List<BuildRef> = emptyList(),
     val commits: List<String> = emptyList(),
     val scans: List<ScanSpec> = emptyList(),
+    val tests: List<TestRunSpec> = emptyList(),
+)
+
+/**
+ * A run of a `tests` stamp, with the counts of its tests. The server computes its status: failed as
+ * soon as one test failed, passed otherwise.
+ */
+data class TestRunSpec(
+    val validationStamp: String,
+    val passed: Int,
+    val skipped: Int = 0,
+    val failed: Int = 0,
+    val description: String = "",
 )
 
 /**
@@ -421,12 +450,22 @@ data class SlotWorkflowSpec(
  * @property stopAt How far the deployment is taken. [DeploymentStop.DONE] by default, which
  * is what makes a slot show a deployed build rather than one waiting for something to happen
  * to it.
+ * @property at When the deployment starts, relative to the reset like a build's creation - and never
+ * before the creation of its build. `null` for a deployment happening at the reset, which is what the
+ * server stamps it with. The steps which follow the start are dated by the seed, a few minutes apart.
+ *
+ * The server refuses a pipeline starting before the latest start of its slot, so the deployments of
+ * one slot are dated in the order they are declared, and a dated one never follows one at the reset.
+ * @property message Why a [DeploymentStop.FAILED] deployment failed, or why a
+ * [DeploymentStop.CANCELLED] one was cancelled.
  */
 data class DeploymentSpec(
     val environment: String,
     val build: BuildRef,
     val stopAt: DeploymentStop = DeploymentStop.DONE,
     val qualifier: String = "",
+    val at: BuildCreation? = null,
+    val message: String? = null,
 )
 
 /**
@@ -454,6 +493,19 @@ enum class DeploymentStop {
 
     /** Run all the way through, so the slot holds the build. */
     DONE,
+
+    /**
+     * Started, then failed: the deployment ran and did not succeed. Terminal - the slot keeps holding
+     * what it held before, and it is what the scorecard's success rate and time to restore of an
+     * environment read.
+     */
+    FAILED,
+
+    /**
+     * Created, then cancelled before it started: the scorecard leaves it out of every reading, which
+     * is the point of having one. Never started, so like [CANDIDATE] the slot's rules are not asked.
+     */
+    CANCELLED,
 }
 
 /**
@@ -479,4 +531,69 @@ enum class ValidationStatus {
     PASSED,
     FAILED,
     WARNING,
+}
+
+/**
+ * An estate of the delivery scorecard: the projects carrying all of [labels], read up to [marker] and
+ * judged against the targets of [readings].
+ *
+ * @property labels Labels selecting the projects, named by their [LabelSpec.display]. A project must
+ * carry all of them.
+ * @property marker What the delivery readings are read up to, `null` for the default marker.
+ * @property readings Window override and target per reading. A reading absent here is still shown,
+ * over the settings window, and judged against nothing.
+ */
+data class EstateSpec(
+    val name: String,
+    val description: String,
+    val labels: List<String>,
+    val marker: EstateMarkerSpec? = null,
+    val readings: List<EstateReadingSpec> = emptyList(),
+)
+
+/**
+ * The marker of an estate.
+ */
+sealed interface EstateMarkerSpec {
+
+    /** Read up to a promotion level, named. */
+    data class Promotion(val level: String) : EstateMarkerSpec
+
+    /** Read up to the deployments done in an environment, on the slots of one qualifier. */
+    data class Environment(val environment: String, val qualifier: String = "") : EstateMarkerSpec
+}
+
+/**
+ * @property key Key of the reading, one of [ReadingKeys]
+ * @property windowDays Window of the reading in this estate, the settings one when `null`
+ * @property target Target of the reading, in the API units: seconds for a duration, a count per
+ * week for a frequency, 0 to 100 for a rate. Whether it is a minimum or a maximum follows from the
+ * reading.
+ */
+data class EstateReadingSpec(
+    val key: String,
+    val windowDays: Int? = null,
+    val target: Double? = null,
+)
+
+/**
+ * Keys of the readings of the delivery scorecard - `ReadingKeys` on the server side, repeated here
+ * rather than depended on for the same reason as the entity names are.
+ */
+object ReadingKeys {
+    const val DELIVERY_LEAD_TIME = "delivery.leadTime"
+    const val DELIVERY_FREQUENCY = "delivery.frequency"
+    const val DELIVERY_SUCCESS_RATE = "delivery.successRate"
+    const val DELIVERY_MTTR = "delivery.mttr"
+    const val QUALITY_TEST_PASS_RATE = "quality.testPassRate"
+    const val QUALITY_TEST_FLAKINESS = "quality.testFlakiness"
+
+    val ALL = listOf(
+        DELIVERY_LEAD_TIME,
+        DELIVERY_FREQUENCY,
+        DELIVERY_SUCCESS_RATE,
+        DELIVERY_MTTR,
+        QUALITY_TEST_PASS_RATE,
+        QUALITY_TEST_FLAKINESS,
+    )
 }

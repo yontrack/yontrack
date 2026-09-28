@@ -28,6 +28,9 @@ import net.nemerosa.ontrack.kdsl.spec.extension.findings.FindingsReportFormat
 import net.nemerosa.ontrack.kdsl.spec.extension.findings.createFindingsValidationStamp
 import net.nemerosa.ontrack.kdsl.spec.extension.findings.validateWithFindings
 import net.nemerosa.ontrack.kdsl.spec.extension.general.AutoPromotionProperty
+import net.nemerosa.ontrack.kdsl.spec.extension.general.TestSummary
+import net.nemerosa.ontrack.kdsl.spec.extension.general.createTestSummaryValidationStamp
+import net.nemerosa.ontrack.kdsl.spec.extension.general.validateWithTestSummary
 import net.nemerosa.ontrack.kdsl.spec.extension.general.autoPromotion
 import net.nemerosa.ontrack.kdsl.spec.extension.general.previousPromotionCondition
 import net.nemerosa.ontrack.kdsl.spec.extension.general.promotionDependencies
@@ -37,9 +40,15 @@ import net.nemerosa.ontrack.kdsl.spec.extension.scm.MockScmRepositoryContext
 import net.nemerosa.ontrack.kdsl.spec.extension.scm.mockScmBranchProperty
 import net.nemerosa.ontrack.kdsl.spec.extension.scm.mockScmBuildCommitProperty
 import net.nemerosa.ontrack.kdsl.spec.extension.scm.mockScmProjectProperty
+import net.nemerosa.ontrack.kdsl.spec.extension.scorecard.Estate
+import net.nemerosa.ontrack.kdsl.spec.extension.scorecard.EstateMarker
+import net.nemerosa.ontrack.kdsl.spec.extension.scorecard.EstateReadingConfig
+import net.nemerosa.ontrack.kdsl.spec.extension.scorecard.estates
+import net.nemerosa.ontrack.kdsl.spec.extension.scorecard.recomputeScorecardAndWait
 import net.nemerosa.ontrack.kdsl.spec.setProperty
 import net.nemerosa.ontrack.yaml.Yaml
 import tools.jackson.databind.JsonNode
+import java.time.Duration
 import java.time.LocalDateTime
 
 /**
@@ -142,6 +151,61 @@ class KdslDemoTarget(private val ontrack: Ontrack) : DemoTarget {
         }
     }
 
+    /**
+     * Asks the licence, as [checkNativeFindingsFormats] does: both features, because the estates
+     * need the scorecard one and the readings of an estate read up to an environment need the
+     * environments one - without it they all read "not licensed".
+     */
+    override fun checkScorecardLicensed() {
+        listOf(
+            FEATURE_SCORECARD to "Delivery scorecard",
+            FEATURE_ENVIRONMENTS to "Environments",
+        ).forEach { (feature, name) ->
+            val enabled = try {
+                ontrack.isLicensedFeatureEnabled(feature)
+            } catch (ex: Exception) {
+                error(
+                    "The dataset creates estates of the delivery scorecard, and the licence of this " +
+                            "instance could not be read to check it allows them. Nothing was deleted." +
+                            "\n\nThe server said:\n${ex.message}"
+                )
+            }
+            check(enabled) {
+                "The dataset creates estates of the delivery scorecard, which need the licensed feature " +
+                        "\"$name\" ($feature), and the licence of this instance does not enable it. " +
+                        "Nothing was deleted."
+            }
+        }
+    }
+
+    /**
+     * None on an instance whose licence does not allow the estates: the listing itself is refused
+     * there, and the reset must still be able to run against such an instance with a dataset
+     * which declares none.
+     */
+    override fun estates(): List<DemoEstate> =
+        if (ontrack.isLicensedFeatureEnabled(FEATURE_SCORECARD)) {
+            ontrack.estates.list().map(::KdslDemoEstate)
+        } else {
+            emptyList()
+        }
+
+    override fun createEstate(spec: EstateSpec) {
+        ontrack.estates.create(
+            name = spec.name,
+            labels = spec.labels,
+            description = spec.description,
+            marker = when (val marker = spec.marker) {
+                null -> null
+                is EstateMarkerSpec.Promotion -> EstateMarker.Promotion(marker.level)
+                is EstateMarkerSpec.Environment -> EstateMarker.Environment(marker.environment, marker.qualifier)
+            },
+            readings = spec.readings.map {
+                EstateReadingConfig(key = it.key, windowDays = it.windowDays, target = it.target)
+            },
+        )
+    }
+
     override fun saveDashboard(dashboard: DemoDashboard) {
         ontrack.saveDashboard(
             uuid = dashboard.uuid,
@@ -184,7 +248,24 @@ class KdslDemoTarget(private val ontrack: Ontrack) : DemoTarget {
          * The licensed feature the native formats of the security scans - SARIF, Trivy JSON - need.
          */
         const val FEATURE_NATIVE_FORMATS = "extension.findings.native-formats"
+
+        /**
+         * The licensed feature the estates of the delivery scorecard need.
+         */
+        const val FEATURE_SCORECARD = "extension.scorecard"
+
+        /**
+         * The licensed feature the environments need - and the readings of an estate read up to one.
+         */
+        const val FEATURE_ENVIRONMENTS = "extension.environments"
     }
+}
+
+private class KdslDemoEstate(val estate: Estate) : DemoEstate {
+
+    override val name: String get() = estate.name
+
+    override fun delete() = estate.delete()
 }
 
 private class KdslDemoDashboardHandle(
@@ -235,6 +316,10 @@ private class KdslDemoProject(
 
     override fun setLabels(labels: List<DemoLabel>) {
         project.setLabels(labels.map { (it as KdslDemoLabel).label.id })
+    }
+
+    override fun recomputeScorecard() {
+        project.recomputeScorecardAndWait(timeout = Duration.ofMinutes(2))
     }
 }
 
@@ -292,8 +377,15 @@ private class KdslDemoBranch(
         }
     }
 
-    override fun createValidationStamp(name: String, description: String, findings: FindingsThresholdsSpec?) {
-        validationStamps[name] = if (findings != null) {
+    override fun createValidationStamp(
+        name: String,
+        description: String,
+        findings: FindingsThresholdsSpec?,
+        tests: Boolean,
+    ) {
+        validationStamps[name] = if (tests) {
+            branch.createTestSummaryValidationStamp(name = name, description = description)
+        } else if (findings != null) {
             branch.createFindingsValidationStamp(
                 name = name,
                 description = description,
@@ -362,6 +454,17 @@ private class KdslDemoBuild(val build: Build) : DemoBuild {
         )
     }
 
+    override fun validateWithTests(run: TestRunSpec, at: LocalDateTime) {
+        // Through the one mutation taking data AND a date: the typed `validateBuildByIdWithTests`
+        // stamps the run with the moment of the call
+        build.validateWithTestSummary(
+            validation = run.validationStamp,
+            description = run.description,
+            testSummary = TestSummary(passed = run.passed, skipped = run.skipped, failed = run.failed),
+            dateTime = at,
+        )
+    }
+
     override fun linkTo(build: DemoBuild) {
         this.build.linkTo((build as KdslDemoBuild).build)
     }
@@ -395,14 +498,26 @@ private class KdslDemoSlot(val slot: Slot) : DemoSlot {
      * [DeploymentStop.RUNNING], which is the one state in which the deployment can still be
      * completed or cancelled by a person.
      */
-    override fun deploy(build: DemoBuild, stopAt: DeploymentStop) {
-        val pipeline = slot.createPipeline((build as KdslDemoBuild).build)
-        // A candidate is left exactly where it was created: what the slot's rules refuse is the
-        // whole content of that deployment, and starting it would either fail or hide it.
-        if (stopAt == DeploymentStop.CANDIDATE) return
-        pipeline.startDeploying()
-        if (stopAt == DeploymentStop.DONE) {
-            pipeline.finishDeployment()
+    override fun deploy(build: DemoBuild, stopAt: DeploymentStop, times: DeploymentTimes?, message: String?) {
+        // Backdated through the dates the pipeline mutations take, each step at its own time: the
+        // scorecard's readings of an environment are the durations between them
+        val pipeline = slot.createPipeline((build as KdslDemoBuild).build, dateTime = times?.start)
+        when (stopAt) {
+            // A candidate is left exactly where it was created: what the slot's rules refuse is the
+            // whole content of that deployment, and starting it would either fail or hide it.
+            DeploymentStop.CANDIDATE -> Unit
+            // Cancelled before it started, as a person does with a candidate nobody wants any more
+            DeploymentStop.CANCELLED -> pipeline.cancel(
+                reason = message ?: "Cancelled.",
+                dateTime = times?.end,
+            )
+
+            DeploymentStop.RUNNING -> pipeline.startDeploying(dateTime = times?.running)
+            DeploymentStop.DONE -> pipeline.startDeploying(dateTime = times?.running)
+                .finishDeployment(dateTime = times?.end)
+
+            DeploymentStop.FAILED -> pipeline.startDeploying(dateTime = times?.running)
+                .fail(message = message, dateTime = times?.end)
         }
     }
 

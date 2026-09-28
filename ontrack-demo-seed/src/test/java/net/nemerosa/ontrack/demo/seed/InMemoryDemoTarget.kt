@@ -25,6 +25,11 @@ class InMemoryDemoTarget(
      * `false` models an instance whose licence does not.
      */
     private val nativeFindingsFormats: Boolean = true,
+    /**
+     * Whether the licence of the instance enables the estates of the delivery scorecard. `false`
+     * models an instance whose licence does not.
+     */
+    private val scorecardLicensed: Boolean = true,
 ) : DemoTarget {
 
     private val projects = mutableListOf<InMemoryProject>()
@@ -43,11 +48,23 @@ class InMemoryDemoTarget(
      */
     private val labels = mutableListOf<InMemoryLabel>()
 
+    /**
+     * Estates of the delivery scorecard, held by the instance and naming labels by their display.
+     */
+    private val estates = mutableListOf<InMemoryEstate>()
+
+    /**
+     * What was created and computed, in order - the snapshot is a state and says nothing of the
+     * order it was reached in, and the scorecard has to be computed once everything else exists.
+     */
+    val journal = mutableListOf<String>()
+
     override fun projects(): List<DemoProject> = projects.toList()
 
     override fun createProject(name: String, description: String): DemoProject {
         checkName(name, "Project")
         require(projects.none { it.name == name }) { "Project $name already exists" }
+        journal += "project $name"
         return InMemoryProject(name, description).also { projects += it }
     }
 
@@ -81,6 +98,7 @@ class InMemoryDemoTarget(
     ): DemoEnvironment {
         checkName(name, "Environment")
         require(environments.none { it.name == name }) { "Environment $name already exists" }
+        journal += "environment $name"
         return InMemoryEnvironment(name, order, description, tags).also { environments += it }
     }
 
@@ -92,6 +110,25 @@ class InMemoryDemoTarget(
         check(nativeFindingsFormats) { "The native scanner formats are not licensed on this instance. Nothing was deleted." }
     }
 
+    override fun checkScorecardLicensed() {
+        check(scorecardLicensed) { "The delivery scorecard is not licensed on this instance. Nothing was deleted." }
+    }
+
+    /** None when unlicensed, as `KdslDemoTarget` answers: the server refuses the listing there. */
+    override fun estates(): List<DemoEstate> = if (scorecardLicensed) estates.toList() else emptyList()
+
+    override fun createEstate(spec: EstateSpec) {
+        check(scorecardLicensed) { "Feature not allowed by the license: extension.scorecard" }
+        require(spec.name.isNotBlank()) { "The name of an estate is required." }
+        require(estates.none { it.spec.name == spec.name }) { "Estate ${spec.name} already exists" }
+        require(spec.labels.isNotEmpty()) { "An estate needs one label at least, to select its projects." }
+        spec.labels.forEach { display ->
+            require(labels.any { it.display == display }) { "Label $display does not exist." }
+        }
+        estates += InMemoryEstate(spec)
+        journal += "estate ${spec.name}"
+    }
+
     override fun dashboards(): List<DemoDashboardHandle> = dashboards.toList()
 
     override fun saveDashboard(dashboard: DemoDashboard) {
@@ -99,6 +136,7 @@ class InMemoryDemoTarget(
         require(sameName == null || sameName.dashboard.uuid == dashboard.uuid) {
             "Dashboard ${dashboard.name} already exists under another UUID"
         }
+        journal += "dashboard ${dashboard.name}"
         dashboards.removeIf { it.dashboard.uuid == dashboard.uuid }
         dashboards += InMemoryDashboard(dashboard)
     }
@@ -116,6 +154,7 @@ class InMemoryDemoTarget(
             add("project ${project.name} \"${project.description}\"")
             if (project.favourite) add("  favourite")
             if (project.labels.isNotEmpty()) add("  labels ${project.labels.joinToString(", ")}")
+            if (project.scorecardComputed) add("  scorecard computed")
             project.scmRepositoryName?.let { repositoryName ->
                 val repository = scmRepositories.getValue(repositoryName)
                 add("  scm ${repository.name}")
@@ -142,6 +181,9 @@ class InMemoryDemoTarget(
                     build.commitId?.let { add("      built from $it") }
                     build.promotions.forEach { add("      promotion ${it.first} at ${it.second}") }
                     build.validations.forEach { add("      validation ${it.stamp} ${it.status} at ${it.at}") }
+                    build.testRuns.forEach {
+                        add("      tests ${it.run.validationStamp} ${it.run.passed}/${it.run.skipped}/${it.run.failed} ${it.status} at ${it.at}")
+                    }
                     build.scans.forEach { scan ->
                         add("      scan ${scan.spec.validationStamp} ${scan.spec.format} ${scan.spec.kind} ${scan.spec.scanner} at ${scan.at}")
                         add("        report ${scan.report}")
@@ -157,7 +199,17 @@ class InMemoryDemoTarget(
                 slot.admissionRules.forEach { add("    rule ${it.name} ${it.ruleId} ${it.config}") }
                 slot.workflows.forEach { add("    workflow on ${it.trigger}: ${it.yaml.lines().first()}") }
                 slot.deployments.forEach {
-                    add("    ${if (it.stopAt == DeploymentStop.DONE) "deployed" else "deploying"} ${it.build.name}")
+                    val what = when (it.stopAt) {
+                        DeploymentStop.DONE -> "deployed"
+                        DeploymentStop.FAILED -> "failed"
+                        DeploymentStop.CANCELLED -> "cancelled"
+                        else -> "deploying"
+                    }
+                    add(
+                        "    $what ${it.build.name}" +
+                                (it.times?.let { times -> " at ${times.start}..${times.end}" } ?: "") +
+                                (it.message?.let { message -> " \"$message\"" } ?: "")
+                    )
                 }
             }
         }
@@ -166,6 +218,11 @@ class InMemoryDemoTarget(
         scmRepositories.keys
             .filter { name -> projects.none { it.scmRepositoryName == name } }
             .forEach { add("orphan scm $it") }
+        estates.forEach { held ->
+            val estate = held.spec
+            add("estate ${estate.name} \"${estate.description}\" ${estate.labels} ${estate.marker}")
+            estate.readings.forEach { add("  reading ${it.key} window ${it.windowDays} target ${it.target}") }
+        }
         dashboards.forEach { held ->
             val dashboard = held.dashboard
             add("dashboard ${dashboard.name} (${dashboard.uuid})")
@@ -173,11 +230,26 @@ class InMemoryDemoTarget(
         }
     }.joinToString("\n")
 
+    inner class InMemoryEstate(val spec: EstateSpec) : DemoEstate {
+
+        override val name: String get() = spec.name
+
+        override fun delete() {
+            estates -= this
+        }
+    }
+
     inner class InMemoryLabel(val spec: LabelSpec) : DemoLabel {
 
         override val display: String get() = spec.display
 
         override fun delete() {
+            // As `LabelDeletionGuard` does on the server: a label an estate selects its projects by
+            // cannot go, which is what makes the reset delete the estates first
+            val users = estates.filter { display in it.spec.labels }.map { it.name }
+            check(users.isEmpty()) {
+                "Label $display cannot be deleted: it selects the projects of the estate(s) ${users.joinToString(", ")}."
+            }
             labels -= this
             // As the server does, by cascade on PROJECT_LABEL: a deleted label is gone from
             // every project that carried it.
@@ -217,6 +289,15 @@ class InMemoryDemoTarget(
 
         override fun markAsFavourite() {
             favourite = true
+        }
+
+        /** Whether the scorecard of the project was recomputed after it was seeded. */
+        var scorecardComputed: Boolean = false
+            private set
+
+        override fun recomputeScorecard() {
+            scorecardComputed = true
+            journal += "recompute $name"
         }
 
         /**
@@ -268,6 +349,8 @@ class InMemoryDemoTarget(
         val validationStamps = mutableListOf<String>()
         /** Thresholds of the `security-findings` stamps, by name. */
         val findingsStamps = mutableMapOf<String, FindingsThresholdsSpec>()
+        /** The `tests` stamps, of the test summary data type. */
+        val testsStamps = mutableSetOf<String>()
         val builds = mutableListOf<InMemoryBuild>()
         var scmBranch: String? = null
         val autoPromotions = mutableMapOf<String, AutoPromotionSpec>()
@@ -305,11 +388,18 @@ class InMemoryDemoTarget(
             promotionLevels += name
         }
 
-        override fun createValidationStamp(name: String, description: String, findings: FindingsThresholdsSpec?) {
+        override fun createValidationStamp(
+            name: String,
+            description: String,
+            findings: FindingsThresholdsSpec?,
+            tests: Boolean,
+        ) {
             checkName(name, "Validation stamp")
             require(name !in validationStamps) { "Validation stamp $name already exists in ${project.name}/${this.name}" }
+            require(findings == null || !tests) { "A validation stamp has one data type" }
             validationStamps += name
             findings?.let { findingsStamps[name] = it }
+            if (tests) testsStamps += name
         }
 
         override fun setAutoPromotion(promotionLevel: String, spec: AutoPromotionSpec) {
@@ -376,6 +466,7 @@ class InMemoryDemoTarget(
         val promotions = mutableListOf<Pair<String, LocalDateTime>>()
         val validations = mutableListOf<InMemoryValidation>()
         val scans = mutableListOf<InMemoryScan>()
+        val testRuns = mutableListOf<InMemoryTestRun>()
         val links = mutableListOf<InMemoryBuild>()
 
         override fun setRelease(release: String) {
@@ -427,7 +518,23 @@ class InMemoryDemoTarget(
             require(validationStamp !in branch.findingsStamps) {
                 "$validationStamp on ${branch.project.name}/${branch.name} is a security-findings stamp, and takes a report"
             }
+            // The data of a typed stamp is required, and a run with a status only has none
+            require(validationStamp !in branch.testsStamps) {
+                "$validationStamp on ${branch.project.name}/${branch.name} is a tests stamp, and takes the counts of its tests"
+            }
             validations += InMemoryValidation(validationStamp, status, at)
+        }
+
+        override fun validateWithTests(run: TestRunSpec, at: LocalDateTime) {
+            require(run.validationStamp in branch.testsStamps) {
+                "No tests stamp ${run.validationStamp} on ${branch.project.name}/${branch.name}"
+            }
+            require(run.passed >= 0 && run.skipped >= 0 && run.failed >= 0) {
+                "Counts of tests must be >= 0"
+            }
+            // `TestSummaryValidationConfig.computeStatus`, for a stamp with the default configuration
+            val status = if (run.failed > 0) ValidationStatus.FAILED else ValidationStatus.PASSED
+            testRuns += InMemoryTestRun(run, status, at)
         }
 
         override fun scan(scan: ScanSpec, report: JsonNode, at: LocalDateTime) {
@@ -524,18 +631,33 @@ class InMemoryDemoTarget(
          * one mistake it is easy to make is putting them in an order the server refuses,
          * which on a real instance leaves the demo deleted and the slot empty.
          */
-        override fun deploy(build: DemoBuild, stopAt: DeploymentStop) {
+        override fun deploy(build: DemoBuild, stopAt: DeploymentStop, times: DeploymentTimes?, message: String?) {
             build as InMemoryBuild
             require(build.branch.project == project) {
                 "Cannot deploy ${build.branch.project.name} build on the ${project.name} slot"
             }
+            // The server's checks of a backdated pipeline: never before its build, never starting
+            // before the latest start of the slot - and a deployment at the reset is the latest one
+            if (times != null) {
+                require(!times.start.isBefore(build.creation)) {
+                    "The deployment of ${build.name} on ${environment.name}/${project.name} starts before the build was created"
+                }
+                require(!times.running.isBefore(times.start) && !times.end.isBefore(times.running)) {
+                    "The steps of the deployment of ${build.name} on ${environment.name}/${project.name} go back in time"
+                }
+                deployments.lastOrNull()?.let { latest ->
+                    require(latest.times != null && !times.start.isBefore(latest.times.start)) {
+                        "The deployment of ${build.name} on ${environment.name}/${project.name} starts before the latest one of the slot"
+                    }
+                }
+            }
             // A candidate is deliberately allowed to be refused - see [DeploymentStop.CANDIDATE].
             // The checks below ask whether the server would let this deployment START, and a
-            // candidate never does.
-            if (stopAt != DeploymentStop.CANDIDATE) {
+            // candidate never does - nor does one cancelled before it started.
+            if (stopAt != DeploymentStop.CANDIDATE && stopAt != DeploymentStop.CANCELLED) {
                 admissionRules.forEach { rule -> check(rule, build) }
             }
-            deployments += InMemoryDeployment(build, stopAt)
+            deployments += InMemoryDeployment(build, stopAt, times, message)
         }
 
         private fun check(rule: SlotAdmissionRuleSpec, build: InMemoryBuild) {
@@ -580,6 +702,17 @@ class InMemoryDemoTarget(
     data class InMemoryDeployment(
         val build: InMemoryBuild,
         val stopAt: DeploymentStop,
+        val times: DeploymentTimes? = null,
+        val message: String? = null,
+    )
+
+    /**
+     * One run of a `tests` stamp on a build, with the status the server computes from its counts.
+     */
+    data class InMemoryTestRun(
+        val run: TestRunSpec,
+        val status: ValidationStatus,
+        val at: LocalDateTime,
     )
 
     /**

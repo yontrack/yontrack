@@ -12,8 +12,8 @@ import java.time.LocalDateTime
  * by design, and idempotent because of it — running it twice in a row leaves the same demo.
  * The one exception is [CI_MIRROR_PROJECT], which the demo does not own.
  *
- * Settings are covered by CasC and users live in Keycloak, so projects, environments and
- * the demo dashboard are the only things this has to reset.
+ * Settings are covered by CasC and users live in Keycloak, so projects, environments, labels,
+ * estates and the demo dashboard are the only things this has to reset.
  *
  * @param clock Read once per run, so every build creation time in one run shares a
  * reference. Injected so that a test can pin it and compare two runs.
@@ -42,6 +42,10 @@ class DemoSeed(
         ) {
             target.checkNativeFindingsFormats()
         }
+        // And again: an estate needs a licensed feature the instance may not have
+        if (dataset.estates.isNotEmpty()) {
+            target.checkScorecardLicensed()
+        }
         val now = LocalDateTime.now(clock)
         reset()
         create(dataset, now)
@@ -56,6 +60,12 @@ class DemoSeed(
      * reset, and the demo's state is meant to be a function of the build.
      */
     private fun reset() {
+        // First: an estate selects its projects by labels, and the server refuses to delete a label an
+        // estate still names. Deleting an estate deletes its readings, and nothing else.
+        target.estates().forEach { estate ->
+            log("Deleting estate ${estate.name}")
+            estate.delete()
+        }
         target.environments().forEach { environment ->
             log("Deleting environment ${environment.name}")
             environment.delete()
@@ -153,7 +163,12 @@ class DemoSeed(
             val ref = spec.build
             log("Deploying ${ref.build} of ${ref.project}/${ref.branch} to ${spec.environment} (${spec.stopAt})")
             slots.getValue(Triple(spec.environment, ref.project, spec.qualifier))
-                .deploy(builds.resolve(ref), spec.stopAt)
+                .deploy(
+                    build = builds.resolve(ref),
+                    stopAt = spec.stopAt,
+                    times = spec.at?.let { deploymentTimes(it.resolve(now), now) },
+                    message = spec.message,
+                )
         }
 
         // AFTER the deployments, unlike the admission rules. A `CANDIDATE` or `RUNNING` workflow is
@@ -174,6 +189,36 @@ class DemoSeed(
             log("Saving dashboard ${dashboard.name}")
             target.saveDashboard(dashboard)
         }
+
+        // Last but one: an estate reads the projects carrying its labels, and their builds,
+        // promotions, test runs and deployments - all of which exist by now.
+        dataset.estates.forEach { spec ->
+            log("Creating estate ${spec.name}")
+            target.createEstate(spec)
+        }
+
+        // Last: the readings are computed by a daily job, so without this the scorecard of every
+        // project reads "not computed" until the next night. A project's recompute covers every set
+        // it is in, the estates' included.
+        dataset.projects.forEach { spec ->
+            log("Computing the scorecard of ${spec.name}")
+            projects.getValue(spec.name).recomputeScorecard()
+        }
+    }
+
+    /**
+     * The steps of a deployment starting at [start], a quarter of an hour apart - squeezed, like the
+     * ladder of a build, into whatever time there is between [start] and the reset, so that a
+     * deployment of the newest build does not end in the future.
+     */
+    private fun deploymentTimes(start: LocalDateTime, now: LocalDateTime): DeploymentTimes {
+        val available = Duration.between(start, now).coerceAtLeast(Duration.ZERO)
+        val step = minOf(Duration.ofMinutes(15), available.dividedBy(3))
+        return DeploymentTimes(
+            start = start,
+            running = start.plus(step),
+            end = start.plus(step.multipliedBy(2)),
+        )
     }
 
     private fun createBranch(
@@ -187,7 +232,7 @@ class DemoSeed(
         spec.scmBranch?.let { branch.configureScmBranch(it) }
         if (spec.favourite) branch.markAsFavourite()
         spec.promotionLevels.forEach { branch.createPromotionLevel(it.name, it.description, it.workflow) }
-        spec.validationStamps.forEach { branch.createValidationStamp(it.name, it.description, it.findings) }
+        spec.validationStamps.forEach { branch.createValidationStamp(it.name, it.description, it.findings, it.tests) }
         // A third pass, after both: auto promotion and promotion dependencies name other promotion
         // levels and validation stamps of the same branch, and the property is written with their
         // ids, so all of them have to exist first. Before the builds, so that a build promoted here
@@ -226,8 +271,9 @@ class DemoSeed(
             // validation is what grants the promotions naming it, so a run dated after them -
             // which is what every run was, being stamped at the moment of the reset (#1718) -
             // reads as the stamp having run hours after the promotion it granted.
-            // A scan is a validation like any other, and takes its rung above the plain ones
-            val validationCount = buildSpec.validations.size + buildSpec.scans.size
+            // A scan is a validation like any other, and takes its rung above the plain ones - and
+            // above the test runs, which are validations as well
+            val validationCount = buildSpec.validations.size + buildSpec.tests.size + buildSpec.scans.size
             val promotionCount = buildSpec.promotionLevels.size
             val steps = validationCount + promotionCount
             val available = Duration.between(creation, now).coerceAtLeast(Duration.ZERO)
@@ -255,11 +301,22 @@ class DemoSeed(
                     creation.plus(step.multipliedBy(index + 1L)),
                 )
             }
+            // In the order they are declared, each on its own rung: a failed run followed by a passed
+            // one of the same stamp is what makes the build flaky, and the order of the runs is all
+            // the server reads it from
+            buildSpec.tests.forEachIndexed { index, run ->
+                build.validateWithTests(
+                    run = run,
+                    at = creation.plus(step.multipliedBy(buildSpec.validations.size + index + 1L)),
+                )
+            }
             buildSpec.scans.forEachIndexed { index, scan ->
                 build.scan(
                     scan = scan,
                     report = FindingsReports.render(scan, now.toLocalDate()),
-                    at = creation.plus(step.multipliedBy(buildSpec.validations.size + index + 1L)),
+                    at = creation.plus(
+                        step.multipliedBy(buildSpec.validations.size + buildSpec.tests.size + index + 1L)
+                    ),
                 )
             }
         }

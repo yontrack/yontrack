@@ -78,10 +78,34 @@ interface DemoTarget {
     fun checkNativeFindingsFormats()
 
     /**
+     * Checks the instance runs the estates of the delivery scorecard, and the environments the
+     * readings of one of them are read in, and fails if it does not.
+     *
+     * Called before the reset, for the same reason as [checkNativeFindingsFormats]: an estate needs
+     * the licensed feature "Delivery scorecard", and finding that out on the first estate - after
+     * every project has been deleted - leaves the demo without its scorecard.
+     */
+    fun checkScorecardLicensed()
+
+    /**
+     * Every estate of the delivery scorecard on the instance - none when the instance is not
+     * licensed for them. An estate names labels, and the server refuses to delete a label an estate
+     * selects its projects by, so the reset deletes the estates first.
+     */
+    fun estates(): List<DemoEstate>
+
+    fun createEstate(spec: EstateSpec)
+
+    /**
      * Creates or replaces a dashboard. Yontrack rejects a second dashboard with the same
      * name unless the UUID matches, so the seed always names a fixed one.
      */
     fun saveDashboard(dashboard: DemoDashboard)
+}
+
+interface DemoEstate {
+    val name: String
+    fun delete()
 }
 
 interface DemoDashboardHandle {
@@ -128,6 +152,14 @@ interface DemoProject {
      * `setProjectLabels` removes from the project every label the call does not name.
      */
     fun setLabels(labels: List<DemoLabel>)
+
+    /**
+     * Recomputes the delivery scorecard of this project, in every set it is in, and waits for it.
+     *
+     * The readings are otherwise computed by a daily job, so a freshly seeded demo would show every
+     * scorecard as not computed until the next night.
+     */
+    fun recomputeScorecard()
 }
 
 interface DemoBranch {
@@ -156,8 +188,14 @@ interface DemoBranch {
     fun createPromotionLevel(name: String, description: String, workflow: WorkflowSpec? = null)
     /**
      * @param findings Thresholds of a `security-findings` stamp, `null` for an ordinary one
+     * @param tests Whether the stamp is a `tests` one, of the test summary data type
      */
-    fun createValidationStamp(name: String, description: String, findings: FindingsThresholdsSpec? = null)
+    fun createValidationStamp(
+        name: String,
+        description: String,
+        findings: FindingsThresholdsSpec? = null,
+        tests: Boolean = false,
+    )
 
     /**
      * Configures what grants [promotionLevel] by itself.
@@ -217,6 +255,13 @@ interface DemoBuild {
     fun scan(scan: ScanSpec, report: JsonNode, at: LocalDateTime)
 
     /**
+     * Records a run of a `tests` stamp with the counts of its tests, dated at [at] for the same
+     * reason as [validate]: the test readings of the scorecard window the runs by the build, and a
+     * history of runs all stamped at the reset reads as every test having run today.
+     */
+    fun validateWithTests(run: TestRunSpec, at: LocalDateTime)
+
+    /**
      * Records that this build uses [build].
      */
     fun linkTo(build: DemoBuild)
@@ -239,8 +284,11 @@ interface DemoSlot {
      * Runs a deployment of [build] on this slot as far as [stopAt] says - all the way to done
      * so the environment shows something, or only up to running so that there is a deployment
      * a person can still complete or cancel.
+     *
+     * @param times When each step happens, `null` for a deployment happening at the reset
+     * @param message Why a failed deployment failed, or why a cancelled one was cancelled
      */
-    fun deploy(build: DemoBuild, stopAt: DeploymentStop)
+    fun deploy(build: DemoBuild, stopAt: DeploymentStop, times: DeploymentTimes?, message: String?)
 
     /**
      * Configures an admission rule on this slot.
@@ -252,6 +300,16 @@ interface DemoSlot {
      */
     fun addWorkflow(spec: SlotWorkflowSpec)
 }
+
+/**
+ * When the steps of a backdated deployment happen: the pipeline is created at [start], starts
+ * deploying at [running] and ends - done, failed or cancelled - at [end].
+ */
+data class DeploymentTimes(
+    val start: LocalDateTime,
+    val running: LocalDateTime,
+    val end: LocalDateTime,
+)
 
 /**
  * A dashboard to publish on the demo, shared with every user.

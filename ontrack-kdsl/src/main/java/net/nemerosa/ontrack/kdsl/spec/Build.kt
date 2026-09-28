@@ -1,6 +1,7 @@
 package net.nemerosa.ontrack.kdsl.spec
 
 import com.apollographql.apollo.api.Optional
+import net.nemerosa.ontrack.json.asJson
 import net.nemerosa.ontrack.kdsl.connector.Connector
 import net.nemerosa.ontrack.kdsl.connector.graphql.GraphQLMissingDataException
 import net.nemerosa.ontrack.kdsl.connector.graphql.checkData
@@ -13,6 +14,7 @@ import net.nemerosa.ontrack.kdsl.connector.graphql.schema.type.PromotionRunField
 import net.nemerosa.ontrack.kdsl.connector.graphqlConnector
 import net.nemerosa.ontrack.kdsl.connector.support.PaginatedList
 import net.nemerosa.ontrack.kdsl.connector.support.emptyPaginatedList
+import tools.jackson.databind.JsonNode
 import java.time.LocalDateTime
 
 /**
@@ -73,13 +75,58 @@ class Build(
         status: String? = null,
         description: String? = null,
         dateTime: LocalDateTime? = null,
+    ): ValidationRun = createValidationRun(validationStamp, status, description, dateTime)
+
+    /**
+     * Creates a validation run on a build, carrying the data of a validation data type - the counts
+     * of a test summary, a metric - and dated when [dateTime] says.
+     *
+     * The typed mutations of the data types (`validateBuildByIdWithTests`...) take no date, so a run
+     * posted through them is stamped with the moment of the call: this is the one door through
+     * which a seeded or replayed history gets data AND its own time.
+     *
+     * @param validationStamp Name of the validation stamp
+     * @param dataTypeId FQCN of the validation data type, for example
+     * `net.nemerosa.ontrack.extension.general.validation.TestSummaryValidationDataType`
+     * @param data Data of the run, in the form of the data type, turned into JSON
+     * @param status Status of the run. When null, the data type computes it from the data and the
+     * configuration of the stamp.
+     * @param description Description of the run
+     * @param dateTime Time of the run, defaults to the moment of the call when null
+     * @return Validation run
+     */
+    fun validateWithData(
+        validationStamp: String,
+        dataTypeId: String,
+        data: Any,
+        status: String? = null,
+        description: String? = null,
+        dateTime: LocalDateTime? = null,
+    ): ValidationRun = createValidationRun(
+        validationStamp = validationStamp,
+        status = status,
+        description = description,
+        dateTime = dateTime,
+        dataTypeId = dataTypeId,
+        data = data.asJson(),
+    )
+
+    private fun createValidationRun(
+        validationStamp: String,
+        status: String?,
+        description: String?,
+        dateTime: LocalDateTime?,
+        dataTypeId: String? = null,
+        data: JsonNode? = null,
     ): ValidationRun = graphqlConnector.mutate(
         CreateValidationRunByIdMutation(
-            id.toInt(),
-            validationStamp,
-            Optional.presentIfNotNull(status),
-            Optional.presentIfNotNull(description),
-            Optional.presentIfNotNull(dateTime),
+            buildId = id.toInt(),
+            validationStamp = validationStamp,
+            validationRunStatus = Optional.presentIfNotNull(status),
+            description = Optional.presentIfNotNull(description),
+            dateTime = Optional.presentIfNotNull(dateTime),
+            dataTypeId = Optional.presentIfNotNull(dataTypeId),
+            data = Optional.presentIfNotNull(data),
         )
     ) {
         it?.createValidationRunById?.payloadUserErrors?.convert()

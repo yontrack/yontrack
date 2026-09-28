@@ -93,6 +93,11 @@ fun DemoDataset.validate() {
             branch.promotionLevels.forEach { checkName(it.name, "Promotion level") }
             branch.validationStamps.forEach { checkName(it.name, "Validation stamp") }
             val findingsStamps = branch.validationStamps.filter { it.findings != null }.map { it.name }.toSet()
+            val testsStamps = branch.validationStamps.filter { it.tests }.map { it.name }.toSet()
+            (findingsStamps intersect testsStamps).forEach { stamp ->
+                problems += "Validation stamp $stamp of ${project.name}/${branch.name} is both a " +
+                        "security-findings stamp and a tests one; a stamp has one data type."
+            }
             branch.validationStamps.forEach { stamp ->
                 val thresholds = stamp.findings ?: return@forEach
                 // UNKNOWN is counted and shown, but never trips a threshold: one set at UNKNOWN
@@ -216,6 +221,24 @@ fun DemoDataset.validate() {
                         problems += "Build ${build.name} of ${project.name}/${branch.name} " +
                                 "is validated against ${validation.validationStamp} with a status, " +
                                 "but it is a security-findings stamp: declare a scan instead."
+                    } else if (validation.validationStamp in testsStamps) {
+                        // A run with a status and no counts is invisible to the test readings, which
+                        // is the only reason the stamp is a tests one
+                        problems += "Build ${build.name} of ${project.name}/${branch.name} " +
+                                "is validated against ${validation.validationStamp} with a status, " +
+                                "but it is a tests stamp: declare a test run instead."
+                    }
+                }
+                build.tests.forEach { run ->
+                    val where = "The ${run.validationStamp} test run of build ${build.name} of " +
+                            "${project.name}/${branch.name}"
+                    if (run.validationStamp !in validationStamps) {
+                        problems += "$where names a validation stamp the branch does not declare."
+                    } else if (run.validationStamp !in testsStamps) {
+                        problems += "$where is posted on a stamp which is not a tests one."
+                    }
+                    if (run.passed < 0 || run.skipped < 0 || run.failed < 0) {
+                        problems += "$where counts a negative number of tests."
                     }
                 }
                 build.scans.forEach { scan ->
@@ -341,7 +364,7 @@ fun DemoDataset.validate() {
             // refuse the build: being blocked is what the dataset is asking for (#1792). The
             // checks below say "the server would accept this deployment", which is a question
             // about starting one, and nothing starts here.
-            deployment.stopAt == DeploymentStop.CANDIDATE -> Unit
+            deployment.stopAt == DeploymentStop.CANDIDATE || deployment.stopAt == DeploymentStop.CANCELLED -> Unit
 
             else -> {
                 val build = builds.getValue(ref)
@@ -359,6 +382,88 @@ fun DemoDataset.validate() {
                                 "build of ${ref.branch}, and ${ref.build} is one."
                     }
                 }
+            }
+        }
+    }
+
+    // The server refuses a deployment dated before its build, and a pipeline starting before the
+    // latest start of its slot - and a deployment at the reset is the latest start there is. So on
+    // one slot the dated deployments come first, in the order of their dates.
+    deployments.groupBy { Triple(it.environment, it.build.project, it.qualifier) }
+        .forEach { (slot, slotDeployments) ->
+            val (environment, project, qualifier) = slot
+            val where = "the $environment/$project" +
+                    (qualifier.takeIf { it.isNotBlank() }?.let { " [$it]" } ?: "") + " slot"
+            var latest: LocalDateTime? = null
+            var atTheReset = false
+            slotDeployments.forEach { deployment ->
+                val ref = deployment.build
+                val at = deployment.at?.resolve(reference)
+                if (at == null) {
+                    atTheReset = true
+                } else {
+                    if (atTheReset) {
+                        problems += "A deployment of ${ref.build} on $where is dated, and follows a " +
+                                "deployment at the reset: the server refuses a start before the latest one."
+                    }
+                    latest?.takeIf { at < it }?.let {
+                        problems += "A deployment of ${ref.build} on $where is dated before the " +
+                                "deployment declared before it: the server refuses a start before the latest one."
+                    }
+                    latest = at
+                    builds[ref]?.creation?.resolve(reference)?.takeIf { at < it }?.let {
+                        problems += "A deployment of ${ref.build} on $where is dated before the " +
+                                "creation of the build."
+                    }
+                }
+            }
+        }
+
+    // Estates name labels, a marker and readings, all of which the server checks by name
+    val estateNames = mutableSetOf<String>()
+    val environmentNames = environments.map { it.name }.toSet()
+    estates.forEach { estate ->
+        val where = "Estate \"${estate.name}\""
+        if (estate.name.isBlank() || estate.name.length > 100) {
+            problems += "$where needs a name of 1 to 100 characters."
+        }
+        if (!estateNames.add(estate.name)) {
+            problems += "The dataset declares the estate \"${estate.name}\" twice."
+        }
+        if (estate.labels.isEmpty()) {
+            problems += "$where selects its projects by no label at all."
+        }
+        estate.labels.filterNot { it in labelDisplays }.forEach { label ->
+            problems += "$where selects the projects carrying the $label label, which the dataset never creates."
+        }
+        // An estate of no project shows an empty column nowhere, which reads as a defect
+        val selected = projects.filter { project -> project.labels.containsAll(estate.labels) }
+        if (estate.labels.isNotEmpty() && selected.isEmpty()) {
+            problems += "$where selects no project of the dataset."
+        }
+        when (val marker = estate.marker) {
+            null -> Unit
+            is EstateMarkerSpec.Promotion -> if (selected.none { project ->
+                    project.branches.any { branch -> branch.promotionLevels.any { it.name == marker.level } }
+                }) {
+                problems += "$where reads up to ${marker.level}, which none of its projects declares."
+            }
+
+            is EstateMarkerSpec.Environment -> if (marker.environment !in environmentNames) {
+                problems += "$where reads up to the ${marker.environment} environment, which the dataset never creates."
+            }
+        }
+        estate.readings.groupingBy { it.key }.eachCount().forEach { (key, count) ->
+            if (key !in ReadingKeys.ALL) {
+                problems += "$where configures the reading $key, which does not exist."
+            }
+            if (count > 1) {
+                problems += "$where configures the reading $key more than once."
+            }
+        }
+        estate.readings.forEach { reading ->
+            if (reading.windowDays != null && reading.windowDays <= 0) {
+                problems += "$where reads ${reading.key} over a window of ${reading.windowDays} days."
             }
         }
     }
