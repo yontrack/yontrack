@@ -3,7 +3,6 @@ package net.nemerosa.ontrack.extension.jenkins.model
 import tools.jackson.databind.JsonNode
 import io.mockk.every
 import io.mockk.mockk
-import net.nemerosa.ontrack.extension.indicators.IndicatorsExtensionFeature
 import net.nemerosa.ontrack.extension.jenkins.*
 import net.nemerosa.ontrack.extension.scm.SCMExtensionFeature
 import net.nemerosa.ontrack.json.asJson
@@ -33,7 +32,6 @@ class JenkinsJobPropertyTypeTest {
         configurationService = mockk<JenkinsConfigurationService>()
         type = JenkinsJobPropertyType(
             JenkinsExtensionFeature(
-                IndicatorsExtensionFeature(),
                 SCMExtensionFeature()
             ),
             configurationService

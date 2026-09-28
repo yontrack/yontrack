@@ -5,7 +5,6 @@ plugins {
 dependencies {
     api(project(":ontrack-extension-support"))
 
-    implementation(project(":ontrack-extension-indicators"))
     implementation(project(":ontrack-extension-scm"))
     implementation(project(":ontrack-extension-auto-versioning"))
     implementation(project(":ontrack-extension-casc"))

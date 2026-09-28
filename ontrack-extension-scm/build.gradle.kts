@@ -5,7 +5,6 @@ plugins {
 
 dependencies {
     api(project(":ontrack-extension-issues"))
-    api(project(":ontrack-extension-indicators"))
 
     implementation(project(":ontrack-ui-graphql"))
     implementation("org.springframework.boot:spring-boot-starter-webmvc")

@@ -45,9 +45,7 @@
 [extension-general] --> [extension-support] #blue;line.bold
 [extension-general] --> [ui-graphql]
 [extension-general] --> [extension-casc]
-[extension-general] --> [extension-indicators]
 
-[extension-jenkins] --> [extension-indicators]
 [extension-jenkins] --> [extension-scm]
 [extension-jenkins] --> [extension-auto-versioning]
 [extension-jenkins] --> [extension-casc]

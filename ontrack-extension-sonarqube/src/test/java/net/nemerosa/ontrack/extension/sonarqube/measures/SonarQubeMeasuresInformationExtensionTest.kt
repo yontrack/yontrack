@@ -3,7 +3,6 @@ package net.nemerosa.ontrack.extension.sonarqube.measures
 import io.mockk.every
 import io.mockk.mockk
 import net.nemerosa.ontrack.extension.casc.CascExtensionFeature
-import net.nemerosa.ontrack.extension.indicators.IndicatorsExtensionFeature
 import net.nemerosa.ontrack.extension.sonarqube.SonarQubeExtensionFeature
 import net.nemerosa.ontrack.model.structure.BranchFixtures
 import net.nemerosa.ontrack.model.structure.Build
@@ -25,7 +24,6 @@ class SonarQubeMeasuresInformationExtensionTest {
         sonarQubeMeasuresCollectionService = mockk()
         informationExtension = SonarQubeMeasuresInformationExtension(
             extensionFeature = SonarQubeExtensionFeature(
-                IndicatorsExtensionFeature(),
                 CascExtensionFeature()
             ),
             sonarQubeMeasuresCollectionService = sonarQubeMeasuresCollectionService

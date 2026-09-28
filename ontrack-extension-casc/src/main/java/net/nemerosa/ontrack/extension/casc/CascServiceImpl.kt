@@ -4,6 +4,7 @@ import tools.jackson.databind.JsonNode
 import tools.jackson.databind.node.NullNode
 import tools.jackson.databind.node.ObjectNode
 import net.nemerosa.ontrack.extension.casc.context.OntrackContext
+import net.nemerosa.ontrack.extension.casc.removed.CascRemovedKeys
 import net.nemerosa.ontrack.json.asJson
 import net.nemerosa.ontrack.json.merge
 import net.nemerosa.ontrack.model.security.GlobalSettings
@@ -18,6 +19,7 @@ class CascServiceImpl(
     private val ontrackContext: OntrackContext,
     private val securityService: SecurityService,
     private val preprocessors: List<CascPreprocessor>,
+    private val cascRemovedKeys: CascRemovedKeys,
 ) : CascService {
 
     private val mapper = YAMLMapper.builder().configureForJackson2().build()
@@ -53,6 +55,8 @@ class CascServiceImpl(
 
     private fun run(node: JsonNode) {
         securityService.checkGlobalFunction(GlobalSettings::class.java)
+        // Removed keys are ignored, with a warning
+        cascRemovedKeys.prune(node)
         // We want the root to be `ontrack`
         val ontrack = node.path(ROOT)
         if (ontrack.isNull || !ontrack.isObject) {

@@ -63,7 +63,6 @@ dependencies {
     runtimeOnly(project(":ontrack-extension-vault"))
     runtimeOnly(project(":ontrack-extension-influxdb"))
     runtimeOnly(project(":ontrack-extension-sonarqube"))
-    runtimeOnly(project(":ontrack-extension-indicators"))
     runtimeOnly(project(":ontrack-extension-casc"))
     runtimeOnly(project(":ontrack-extension-elastic"))
     runtimeOnly(project(":ontrack-extension-slack"))

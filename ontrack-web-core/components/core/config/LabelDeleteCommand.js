@@ -13,9 +13,6 @@ const {confirm} = Modal
  * Deletion of a label, after a confirmation which says how many projects carry
  * it - deleting a label removes it from every project it is set on, and the
  * count is the only way to know how much is being undone.
- *
- * Indicator portfolios pointing at the label are deliberately not mentioned:
- * they degrade gracefully, simply listing no project.
  */
 export default function LabelDeleteCommand({label, onChange}) {
 

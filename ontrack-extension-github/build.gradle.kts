@@ -12,7 +12,6 @@ dependencies {
     implementation(project(":ontrack-extension-scm"))
     implementation(project(":ontrack-extension-general"))
     implementation(project(":ontrack-extension-casc"))
-    implementation(project(":ontrack-extension-indicators"))
     implementation(project(":ontrack-extension-auto-versioning"))
     implementation(project(":ontrack-extension-config"))
     implementation(project(":ontrack-extension-notifications"))

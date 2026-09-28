@@ -755,7 +755,6 @@ jobs:
             modules: >-
               ontrack-extension-general
               ontrack-extension-environments
-              ontrack-extension-indicators
               ontrack-extension-chart
               ontrack-extension-config
               ontrack-extension-findings

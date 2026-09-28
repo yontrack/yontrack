@@ -3,7 +3,6 @@ package net.nemerosa.ontrack.extension.sonarqube.property
 import io.mockk.every
 import io.mockk.mockk
 import net.nemerosa.ontrack.extension.casc.CascExtensionFeature
-import net.nemerosa.ontrack.extension.indicators.IndicatorsExtensionFeature
 import net.nemerosa.ontrack.extension.sonarqube.SonarQubeExtensionFeature
 import net.nemerosa.ontrack.extension.sonarqube.configuration.SonarQubeConfiguration
 import net.nemerosa.ontrack.extension.sonarqube.configuration.SonarQubeConfigurationService
@@ -23,7 +22,7 @@ class SonarQubePropertyTypeTest {
     )
 
     private val type = SonarQubePropertyType(
-        SonarQubeExtensionFeature(IndicatorsExtensionFeature(), CascExtensionFeature()),
+        SonarQubeExtensionFeature(CascExtensionFeature()),
         configurationService
     )
 

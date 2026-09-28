@@ -133,6 +133,52 @@ type AuthorizedProject {
   role: ProjectRole!
 }
 
+"Current conditions of the auto promotion of a promotion level, and their current state for a given build."
+type AutoPromotionBuildConditions {
+  "Is the promotion revoked when one of its prerequisites is no longer valid?"
+  autoRevoke: Boolean
+  "Regular expression excluding validation stamps by name - empty when not set"
+  exclude: String!
+  "Regular expression including validation stamps by name - empty when not set"
+  include: String!
+  "State of each required promotion level for the build, in branch order"
+  promotionLevels: [AutoPromotionPromotionLevelCondition!]!
+  "State of each required validation stamp for the build, in branch order"
+  validationStamps: [AutoPromotionValidationStampCondition!]!
+}
+
+"Current conditions of the auto promotion of a promotion level: the validation stamps and promotion levels it requires, as they are resolved on the branch today."
+type AutoPromotionConditions {
+  "Is the promotion revoked when one of its prerequisites is no longer valid?"
+  autoRevoke: Boolean
+  "Regular expression excluding validation stamps by name - empty when not set"
+  exclude: String!
+  "Regular expression including validation stamps by name - empty when not set"
+  include: String!
+  "Promotion levels required for the promotion, in branch order"
+  promotionLevels: [PromotionLevel!]!
+  "Validation stamps required for the promotion, in branch order: the ones named explicitly, plus the ones of the branch matching the include expression and not the exclude one."
+  validationStamps: [ValidationStamp!]!
+}
+
+"State of a promotion level required by an auto promotion, for a build"
+type AutoPromotionPromotionLevelCondition {
+  "Required promotion level"
+  promotionLevel: PromotionLevel!
+  "Latest run of the promotion level for the build - null when it is not granted"
+  promotionRun: PromotionRun
+}
+
+"State of a validation stamp required by an auto promotion, for a build"
+type AutoPromotionValidationStampCondition {
+  "Latest run of the validation stamp for the build - null when it never ran"
+  lastRun: ValidationRun
+  "Does the latest run count as passed for the auto promotion?"
+  passed: Boolean
+  "Required validation stamp"
+  validationStamp: ValidationStamp!
+}
+
 "Audit entry for an auto versioning processing order."
 type AutoVersioningAuditEntry {
   "History of the different states"
@@ -879,52 +925,6 @@ type CleanupAutoVersioningAuditEntriesPayload implements Payload {
 type CollectedConnectorStatus {
   status: ConnectorStatus!
   time: String!
-}
-
-"Definition of an attribute for a configurable indicator"
-type ConfigurableIndicatorAttribute {
-  "Identifier for this attribute, used for storage"
-  key: String!
-  "Display name for this attribute"
-  name: String!
-  "True is the attribute is required"
-  required: Boolean
-  "Type of the value"
-  type: ConfigurableIndicatorAttributeType!
-}
-
-"Value for a state"
-type ConfigurableIndicatorAttributeValue {
-  "Attribute definition"
-  definition: ConfigurableIndicatorAttribute!
-  "Attribute key"
-  key: String!
-  "Attribute value"
-  value: String
-}
-
-"Stored state for a configurable indicator"
-type ConfigurableIndicatorState {
-  "Is this indicator enabled?"
-  enabled: Boolean
-  "Link to a description for this indicator"
-  link: String
-  "List of attribute values for this indicator"
-  values: [ConfigurableIndicatorAttributeValue!]!
-}
-
-"Configurable indicator and its state"
-type ConfigurableIndicatorTypeState {
-  "List of attributes for this type"
-  attributes: [ConfigurableIndicatorAttribute!]!
-  "Associated category"
-  category: IndicatorComputedCategory!
-  "Indicator type ID"
-  id: String
-  "Indicator type name"
-  name: String
-  "Saved stated for this configurable indicator"
-  state: ConfigurableIndicatorState
 }
 
 "Generic configuration"
@@ -2669,264 +2669,6 @@ type HookResponse {
   infoLink: HookInfoLink
   "Type of response"
   type: HookResponseType!
-}
-
-"Aggregator of indicator categories"
-type IndicatorCategories {
-  "List of indicator categories"
-  categories(
-    "ID of the indicator category"
-    id: String
-  ): [IndicatorCategory!]!
-}
-
-"Indicator category"
-type IndicatorCategory {
-  "Indicator category deprecation reason if any"
-  deprecated: String
-  "Indicator category ID"
-  id: String
-  "Indicator category name"
-  name: String
-  "Reporting the indicators for the types in this category"
-  report(
-    "Reports only projects where the indicator is filled in"
-    filledOnly: Boolean,
-    "Reports on the projects matching this label"
-    label: String,
-    "Reports on the projects belonging to this portfolio"
-    portfolio: String,
-    "Reports on the project matching this ID"
-    projectId: Int,
-    "Reports on the project matching this name"
-    projectName: String
-  ): IndicatorCategoryReport!
-  "Source for this category"
-  source: IndicatorSource
-  "List of indicator types belonging to this category."
-  types: [ProjectIndicatorType!]!
-}
-
-"Report of indicators for a category"
-type IndicatorCategoryReport {
-  "Report of indicators per project"
-  projectReport(
-    "Rate must be worse or equal."
-    rate: String
-  ): [IndicatorCategoryReportProject!]!
-  "Report of indicators per type"
-  typeReport: [IndicatorCategoryReportType!]!
-}
-
-"Report of indicators for one project"
-type IndicatorCategoryReportProject {
-  "Indicators for one projects and types in this category"
-  indicators: [ProjectIndicator!]!
-  "Associated project"
-  project: Project
-}
-
-"Report of indicators for one type"
-type IndicatorCategoryReportType {
-  "Indicators for one projects and types in this category"
-  projectIndicators: [IndicatorCategoryReportTypeEntry!]!
-  "Associated type"
-  type: ProjectIndicatorType
-}
-
-"Indicator for one project and one type"
-type IndicatorCategoryReportTypeEntry {
-  "Indicator for one project and one type"
-  indicator: ProjectIndicator!
-  "Associated project"
-  project: Project
-}
-
-"Association of a category and statistics over several items"
-type IndicatorCategoryStats {
-  "Associated indicator category"
-  category: IndicatorCategory
-  "previousStats field"
-  previousStats: IndicatorPreviousStats
-  "Statistics"
-  stats: IndicatorStats
-}
-
-"Computed indicator category"
-type IndicatorComputedCategory {
-  "Indicator category ID"
-  id: String
-  "Indicator category name"
-  name: String
-}
-
-"Grouping indicators for a group of projects identified by labels."
-type IndicatorPortfolio {
-  "Indicator categories being shown for this portfolio"
-  categories: [IndicatorCategory!]!
-  "Stats per category"
-  categoryStats(
-    "Number of seconds (> 0) to get indicator trends from."
-    duration: Int
-  ): [IndicatorCategoryStats!]! @deprecated(reason : "Use viewStats with viewId = null. This field will be removed in V5.")
-  "ID of the portfolio"
-  id: String
-  "Label for this portfolio"
-  label: Label
-  "Name of the portfolio"
-  name: String
-  "List of projects associated with this portfolio"
-  projects: [Project!]!
-  "Indicators stats for a given view for this portfolio"
-  viewStats(
-    "Number of seconds (> 0) to get indicator trends from."
-    duration: Int,
-    "ID of the indicator view, set to null to use the portfolio default configuration"
-    id: String
-  ): [IndicatorCategoryStats!]
-}
-
-"Indicator stats from the past"
-type IndicatorPreviousStats {
-  "avgTrend field"
-  avgTrend: String
-  "Time (in seconds) since the indicator values were computed or entered."
-  durationSeconds: Int
-  "maxTrend field"
-  maxTrend: String
-  "minTrend field"
-  minTrend: String
-  "stats field"
-  stats: IndicatorStats!
-}
-
-"Indicator source"
-type IndicatorSource {
-  "Indicator source name"
-  name: String!
-  "Indicator source provider"
-  provider: IndicatorSourceProviderDescription
-}
-
-"Indicator source provider description"
-type IndicatorSourceProviderDescription {
-  "Indicator source provider ID"
-  id: String
-  "Indicator source provider name"
-  name: String
-}
-
-"Aggregation of ratings over several items."
-type IndicatorStats {
-  "Average value (undefined if no stat available)"
-  avg: Int
-  "Rating for the min value"
-  avgRating: String
-  "Number of items having an actual usable value for stat computation"
-  count: Int
-  "Maximal value (undefined if no stat available)"
-  max: Int
-  "Number of items having the maximum value"
-  maxCount: Int
-  "Rating for the min value"
-  maxRating: String
-  "Minimal value (undefined if no stat available)"
-  min: Int
-  "Number of items having the minimum value"
-  minCount: Int
-  "Rating for the min value"
-  minRating: String
-  "Total number of items used for this stat"
-  total: Int
-}
-
-"Association of a type and statistics over several items"
-type IndicatorTypeStats {
-  "Statistics"
-  stats: IndicatorStats
-  "Associated indicator type"
-  type: ProjectIndicatorType
-}
-
-"Aggregator of indicator types"
-type IndicatorTypes {
-  "List of indicator types"
-  types(
-    "ID of the indicator category"
-    category: String,
-    "ID of the indicator type"
-    id: String
-  ): [ProjectIndicatorType!]!
-}
-
-"Indicator value type"
-type IndicatorValueType {
-  "Extension feature"
-  feature: ExtensionFeatureDescription
-  "FQCN of the value type"
-  id: String
-  "Display name of the value type"
-  name: String!
-}
-
-"List of categories to display for a portfolio or a list of portfolios."
-type IndicatorView {
-  "Selected categories for this view"
-  categories: [IndicatorCategory!]!
-  "Unique ID for this view"
-  id: String!
-  "Name of the view"
-  name: String!
-  "List of indicator stats per project for all categories in this view"
-  reports(
-    "Number of seconds (> 0) to get indicator trends from."
-    duration: Int,
-    "Reports only projects where the indicator is filled in"
-    filledOnly: Boolean,
-    "Reports on the projects matching this label"
-    label: String,
-    "Reports on the projects belonging to this portfolio"
-    portfolio: String,
-    "Reports on the project matching this ID"
-    projectId: Int,
-    "Reports on the project matching this name"
-    projectName: String,
-    "Rate must be worse or equal."
-    rate: String
-  ): [IndicatorViewProjectReport!]!
-}
-
-"List of indicator views and management links."
-type IndicatorViewList {
-  "List of indicator views"
-  views(
-    "ID of the view to put in the list"
-    id: String,
-    "Name of the view to put in the list"
-    name: String
-  ): [IndicatorView!]!
-}
-
-"View report line for a project"
-type IndicatorViewProjectReport {
-  "Associated project"
-  project: Project!
-  "List of stats per category in the view"
-  viewStats: [IndicatorCategoryStats!]!
-}
-
-"Management of indicators"
-type IndicatorsManagement {
-  "Management of the indicators categories"
-  categories: Boolean
-  "Management of the configurable indicators"
-  configuration: Boolean
-  "Access to the indicator portfolios"
-  portfolios: Boolean
-  "Management of the indicators types"
-  types: Boolean
-  "Management of the indicators views"
-  views: Boolean
 }
 
 "Application information"
@@ -5299,8 +5041,6 @@ type Project implements Authorizable & ProjectEntity {
   "URL to the HTML page of the Git repository associated with this project"
   gitRepositoryHtmlURL: String
   id: ID!
-  "List of indicator portfolios associated with this project, through its labels."
-  indicatorPortfolios: [IndicatorPortfolio!]!
   "List of information components attached to this entity"
   information: [EntityInformation!]!
   "Link to a Jenkins Job"
@@ -5323,8 +5063,6 @@ type Project implements Authorizable & ProjectEntity {
   name: String
   "Makes a promotion conditional based on the fact that a previous promotion has been granted."
   previousPromotionConditionProperty: Property
-  "List of project indicators"
-  projectIndicators: ProjectIndicators
   "Authorisations for the project"
   projectRoles(
     "Filter by role name"
@@ -5399,19 +5137,6 @@ type ProjectAuthorization {
   name: String
 }
 
-"Association of an indicator category and a list of associated indicators."
-type ProjectCategoryIndicators {
-  "Indicator category"
-  category: IndicatorCategory
-  "Indicator stats for this project and category"
-  categoryStats(
-    "Number of seconds (> 0) to get indicator trends from."
-    duration: Int
-  ): IndicatorCategoryStats
-  "List of indicators"
-  indicators: [ProjectIndicator!]!
-}
-
 type ProjectEntityID {
   "Project entity ID"
   id: ID
@@ -5438,118 +5163,6 @@ type ProjectEntityInformation {
   type: ProjectEntityType!
 }
 
-"Project indicator"
-type ProjectIndicator {
-  "Comment with links."
-  annotatedComment: String
-  "Comment for the indicator"
-  comment: String
-  "Compliance for the indicator"
-  compliance: Int
-  "Time elapsed (in seconds) since the indicator value was set."
-  durationSecondsSince: Int
-  "History of this indicator"
-  history(
-    "Offset for the page"
-    offset: Int = 0,
-    "Size of the page"
-    size: Int = 20
-  ): ProjectIndicatorHistoryItemPaginated
-  "Previous value for this indicator"
-  previousValue: ProjectIndicator
-  "Associated project"
-  project: Project
-  "Rating for this indicator"
-  rating: String
-  "Signature for the indicator"
-  signature: Signature
-  "Trend since the previous value (if any)"
-  trendSincePrevious: String
-  "Type of indicator"
-  type: ProjectIndicatorType
-  "Value for the indicator"
-  value: JSON
-}
-
-"Project indicator"
-type ProjectIndicatorHistoryItem {
-  "Comment with links."
-  annotatedComment: String
-  "Comment for the indicator"
-  comment: String
-  "Compliance for the indicator"
-  compliance: Int
-  "Time elapsed (in seconds) since the indicator value was set."
-  durationSecondsSince: Int
-  "Rating for this indicator"
-  rating: String
-  "Signature for the indicator"
-  signature: Signature
-  "Type of indicator"
-  type: ProjectIndicatorType
-  "Value for the indicator"
-  value: JSON
-}
-
-type ProjectIndicatorHistoryItemPaginated {
-  "Information about the current page"
-  pageInfo: PageInfo
-  "Items in the current page"
-  pageItems: [ProjectIndicatorHistoryItem!]!
-}
-
-"Type of indicator"
-type ProjectIndicatorType {
-  "Associated category"
-  category: IndicatorCategory
-  "Flag which indicates if the associated project indicators are computed or not"
-  computed: Boolean
-  "Indicator type deprecation reason if any"
-  deprecated: String
-  "Unique ID for the type"
-  id: String
-  "List of indicators for this type"
-  indicators(
-    "Reports only projects where the indicator is filled in"
-    filledOnly: Boolean,
-    "Reports on the projects matching this label"
-    label: String,
-    "Reports on the projects belonging to this portfolio"
-    portfolio: String,
-    "Reports on the project matching this ID"
-    projectId: Int,
-    "Reports on the project matching this name"
-    projectName: String,
-    "Rate must be worse or equal."
-    rate: String
-  ): [ProjectIndicator!]!
-  "Link to the definition of the indicator"
-  link: String
-  "Name for the indicator type"
-  name: String
-  "Source for this type"
-  source: IndicatorSource
-  "Configuration for the value type"
-  valueConfig: JSON
-  "Value type"
-  valueType: IndicatorValueType
-}
-
-"List of indicators for a project"
-type ProjectIndicators {
-  "List of indicator categories"
-  categories: [ProjectCategoryIndicators!]!
-  "List of indicators"
-  indicators(
-    "Restriction on the indicator category"
-    category: String,
-    "Restriction on the indicator type"
-    type: String
-  ): [ProjectIndicator!]!
-  "Associated project"
-  project: Project
-}
-
 type ProjectPaginated {
   "Information about the current page"
   pageInfo: PageInfo
@@ -5571,6 +5184,8 @@ type PromotionLevel implements Authorizable & ProjectEntity {
   annotatedDescription: String
   "Authorizations for this context"
   authorizations: [Authorization!]!
+  "Current conditions of the auto promotion of this promotion level - null when it has no auto promotion"
+  autoPromotionConditions: AutoPromotionConditions
   "Allows a promotion level to be granted on a build as soon as a list of validation stamps and/or other promotions has been passed"
   autoPromotionProperty: Property
   "List of branches targeted for auto-versioning based on this promotion level"
@@ -5676,6 +5291,8 @@ type PromotionRun implements Authorizable & ProjectEntity {
   annotatedDescription: String
   "Authorizations for this context"
   authorizations: [Authorization!]!
+  "Current conditions of the auto promotion of this run's promotion level, with their current state for this run's build - null when the promotion level has no auto promotion"
+  autoPromotionConditions: AutoPromotionBuildConditions
   "List of branches targeted for auto-versioning based on this promotion run or with their reason for rejection"
   autoVersioningTrail: AutoVersioningTrail @deprecated(reason : "Will be removed in V6. Use autoVersioningTrailPaginated instead.")
   "List of branches targeted for auto-versioning based on this promotion run or with their reason for rejection"
@@ -5872,13 +5489,6 @@ type Query {
   ): [Build!]
   "Configuration as Code"
   casc: CasC!
-  "List of configurable indicators"
-  configurableIndicators(
-    "Filter the indicators on their category ID"
-    category: String,
-    "Filter the indicators on their type ID"
-    type: String
-  ): [ConfigurableIndicatorTypeState!]!
   "Gets a configuration for a given type and name"
   configurationByName(
     "Configuration name"
@@ -6027,19 +5637,6 @@ type Query {
     "Size of the page"
     size: Int = 20
   ): HookRecordingPaginated
-  "List of indicator categories"
-  indicatorCategories: IndicatorCategories
-  "List of indicator portfolios"
-  indicatorPortfolios(
-    "ID of the indicator portfolio"
-    id: String
-  ): [IndicatorPortfolio!]!
-  "List of indicator types"
-  indicatorTypes: IndicatorTypes
-  "List of indicator views."
-  indicatorViewList: IndicatorViewList
-  "List of available commands for the management of the indicators"
-  indicatorsManagement: IndicatorsManagement! @deprecated(reason : "Will be removed in 4.6")
   "Gets information about the application"
   info: Info
   "List of issue services"
@@ -8945,13 +8542,6 @@ enum ChangeLogTemplatingCommitsOption {
   ALWAYS
   NONE
   OPTIONAL
-}
-
-"List of supported attribute types for configurable indicators"
-enum ConfigurableIndicatorAttributeType {
-  INT
-  REGEX
-  REQUIRED
 }
 
 "Type of result returned when checking a configuration"

@@ -1,0 +1,11 @@
+ontrack:
+  config:
+    settings:
+      jenkins-pipeline-library-indicator:
+        - library: pipeline-library
+          required: true
+          lastSupported: "2.0.0"
+          lastDeprecated: "1.5.0"
+          lastUnsupported: "1.0.0"
+      job-history:
+        retention: 45d

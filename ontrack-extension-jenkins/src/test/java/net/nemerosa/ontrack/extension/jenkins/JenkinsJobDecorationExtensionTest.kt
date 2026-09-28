@@ -2,7 +2,6 @@ package net.nemerosa.ontrack.extension.jenkins
 
 import io.mockk.every
 import io.mockk.mockk
-import net.nemerosa.ontrack.extension.indicators.IndicatorsExtensionFeature
 import net.nemerosa.ontrack.extension.jenkins.client.JenkinsClient
 import net.nemerosa.ontrack.extension.jenkins.client.JenkinsClientFactory
 import net.nemerosa.ontrack.extension.jenkins.client.JenkinsJob
@@ -31,7 +30,6 @@ class JenkinsJobDecorationExtensionTest {
         jenkinsClientFactory = mockk()
         extension = JenkinsJobDecorationExtension(
             JenkinsExtensionFeature(
-                IndicatorsExtensionFeature(),
                 SCMExtensionFeature()
             ),
             propertyService,
@@ -56,7 +54,6 @@ class JenkinsJobDecorationExtensionTest {
         jenkinsJobProperty = Property.of(
             JenkinsJobPropertyType(
                 JenkinsExtensionFeature(
-                    IndicatorsExtensionFeature(),
                     SCMExtensionFeature()
                 ),
                 mockk()

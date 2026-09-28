@@ -125,4 +125,25 @@ This downloads a `ontrack-casc-schema.json` file.
 
 You can use it to validate your CasC YAML files. See the [appendixes](../appendix/json-schemas.md) to learn more about using JSON schemas for edition and validation.
 
+## Unknown and removed keys
+
+A CasC key which Yontrack does not know stops the CasC run with the error
+`No CasC context is defined for <path>` - at startup, this prevents Yontrack from starting.
+
+Keys which Yontrack used to support and has removed are the exception: they are ignored, and
+Yontrack logs a warning naming the key and the version it was removed in, for example:
+
+```
+CasC key ontrack/config/settings/jenkins-pipeline-library-indicator is ignored: it was removed in 6.0.
+```
+
+Remove such a key from your CasC files at your convenience. The keys removed in 6.x are:
+
+| Key                                                         | Removed in | Why                        |
+|-------------------------------------------------------------|------------|----------------------------|
+| `ontrack.config.settings.jenkins-pipeline-library-indicator` | 6.0        | The indicators are removed |
+
+A removed key is not part of the [CasC schema](#casc-schema): a CasC file still carrying one
+does not validate against it.
+
 [//]: # (TODO Using the API)
