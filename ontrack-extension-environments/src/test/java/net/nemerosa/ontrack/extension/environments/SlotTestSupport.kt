@@ -10,6 +10,7 @@ import net.nemerosa.ontrack.model.structure.Project
 import net.nemerosa.ontrack.test.TestUtils.uid
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.stereotype.Component
+import java.time.LocalDateTime
 import kotlin.jvm.optionals.getOrNull
 import kotlin.test.assertTrue
 
@@ -86,10 +87,15 @@ class SlotTestSupport : AbstractDSLTestSupport() {
             runAndFinishDeployment(this)
         }
 
-    fun runAndFinishDeployment(pipeline: SlotPipeline) {
-        val status = slotService.runDeployment(pipeline.id, dryRun = false)
+    /**
+     * Runs and finishes the deployment of a pipeline.
+     *
+     * @param dateTime When not null, both the run and the finish are backdated to this time
+     */
+    fun runAndFinishDeployment(pipeline: SlotPipeline, dateTime: LocalDateTime? = null) {
+        val status = slotService.runDeployment(pipeline.id, dryRun = false, dateTime = dateTime)
         assertTrue(status.ok, "Pipeline deploying")
-        val result = slotService.finishDeployment(pipeline.id)
+        val result = slotService.finishDeployment(pipeline.id, dateTime = dateTime)
         assertTrue(result.ok, "Pipeline deployed")
     }
 

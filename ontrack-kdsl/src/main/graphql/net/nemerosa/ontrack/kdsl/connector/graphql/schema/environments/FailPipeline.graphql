@@ -1,10 +1,12 @@
 mutation FailPipeline(
     $pipelineId: String!,
     $message: String,
+    $dateTime: LocalDateTime,
 ) {
     failSlotPipeline(input: {
         pipelineId: $pipelineId,
         message: $message,
+        dateTime: $dateTime,
     }) {
         ...PayloadUserErrors
         failStatus {

@@ -1,9 +1,11 @@
 mutation FinishDeploymentPipeline(
     $pipelineId: String!,
+    $dateTime: LocalDateTime,
 ) {
     finishSlotPipelineDeployment(input: {
         pipelineId: $pipelineId,
         forcing: false,
+        dateTime: $dateTime,
     }) {
         ...PayloadUserErrors
     }

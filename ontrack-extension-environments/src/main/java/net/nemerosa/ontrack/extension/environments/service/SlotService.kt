@@ -5,7 +5,32 @@ import net.nemerosa.ontrack.extension.environments.*
 import net.nemerosa.ontrack.model.pagination.PaginatedList
 import net.nemerosa.ontrack.model.structure.Build
 import net.nemerosa.ontrack.model.structure.Project
+import java.time.LocalDateTime
 
+/**
+ * Management of slots and of their pipelines.
+ *
+ * ## Backdated pipelines
+ *
+ * Every action on a pipeline - starting it, running its deployment, finishing it, failing it,
+ * cancelling it - takes an optional `dateTime`, which is then the time stored on the pipeline (its
+ * start or its end) and on the change recorded in its history. Without it, the action happens now.
+ *
+ * A given `dateTime` must keep the history a history, or the action is refused with a
+ * [SlotPipelineDateTimeException] (a user error):
+ *
+ * * it is not in the future;
+ * * it is not before the creation of the pipeline's build;
+ * * it is not before the pipeline's previous change;
+ * * the start of a pipeline is not before the start of the slot's latest pipeline, whatever became
+ *   of it.
+ *
+ * Starting a pipeline cancels the active pipeline of the slot at the new pipeline's start, and this
+ * cancellation is bound by the same constraints.
+ *
+ * Events and workflows are fired as for any action: backdating needs no other right than the
+ * action's own.
+ */
 interface SlotService {
 
     /**
@@ -76,6 +101,8 @@ interface SlotService {
      * @param forceDone If true, creates the pipeline and puts it directly in DONE status
      * @param forceDoneMessage Associated message for the forcing (if null, a default message will be generated)
      * @param skipWorkflows Option to skip the workflows on DONE
+     * @param dateTime When not null, backdates the start of the pipeline - and its whole deployment
+     * when forcing it to DONE. See [SlotService] for the constraints.
      */
     fun startPipeline(
         slot: Slot,
@@ -83,6 +110,7 @@ interface SlotService {
         forceDone: Boolean = false,
         forceDoneMessage: String? = null,
         skipWorkflows: Boolean = false,
+        dateTime: LocalDateTime? = null,
     ): SlotPipeline
 
     /**
@@ -110,8 +138,10 @@ interface SlotService {
 
     /**
      * Cancelling a pipeline
+     *
+     * @param dateTime When not null, backdates the action: see [SlotService] for the constraints
      */
-    fun cancelPipeline(pipeline: SlotPipeline, reason: String)
+    fun cancelPipeline(pipeline: SlotPipeline, reason: String, dateTime: LocalDateTime? = null)
 
     /**
      * Getting a pipeline by ID
@@ -138,12 +168,14 @@ interface SlotService {
      *
      * @param force If true, no workflow linked to this deployment is launched
      * and no rule is controlled
+     * @param dateTime When not null, backdates the action: see [SlotService] for the constraints
      */
     fun runDeployment(
         pipelineId: String,
         dryRun: Boolean = false,
         skipWorkflowId: String? = null,
         force: Boolean = false,
+        dateTime: LocalDateTime? = null,
     ): SlotDeploymentActionStatus
 
     /**
@@ -163,6 +195,8 @@ interface SlotService {
 
     /**
      * Marking a pipeline as being deployed
+     *
+     * @param dateTime When not null, backdates the action: see [SlotService] for the constraints
      */
     fun finishDeployment(
         pipelineId: String,
@@ -170,6 +204,7 @@ interface SlotService {
         forcing: Boolean = false,
         message: String? = null,
         skipWorkflows: Boolean = false,
+        dateTime: LocalDateTime? = null,
     ): SlotDeploymentActionStatus
 
     /**
@@ -184,12 +219,14 @@ interface SlotService {
      *
      * @param pipelineId ID of the pipeline to mark as failed
      * @param message Optional message, recorded in the pipeline's history
+     * @param dateTime When not null, backdates the action: see [SlotService] for the constraints
      * @return OK when the pipeline has been marked as failed, not OK (with a reason) when the
      * pipeline is not running
      */
     fun failPipeline(
         pipelineId: String,
         message: String? = null,
+        dateTime: LocalDateTime? = null,
     ): SlotDeploymentActionStatus
 
     /**

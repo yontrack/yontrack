@@ -9016,6 +9016,8 @@ input CIEnv {
 
 "Input type for the cancelSlotPipeline mutation."
 input CancelSlotPipelineInput {
+  "Date/time of the action, to backdate it. Defaults to now. Not in the future, not before the creation of the build, not before the previous change of the pipeline."
+  dateTime: LocalDateTime
   "pipelineId field"
   pipelineId: String!
   "reason field"
@@ -10182,6 +10184,8 @@ input EventSubscriptionFilter {
 
 "Input type for the failSlotPipeline mutation."
 input FailSlotPipelineInput {
+  "Date/time of the action, to backdate it. Defaults to now. Not in the future, not before the creation of the build, not before the previous change of the pipeline."
+  dateTime: LocalDateTime
   "Optional message recorded in the pipeline's history"
   message: String
   "ID of the running pipeline to mark as failed"
@@ -10215,6 +10219,8 @@ input FindingFilter {
 
 "Input type for the finishSlotPipelineDeployment mutation."
 input FinishSlotPipelineDeploymentInput {
+  "Date/time of the action, to backdate it. Defaults to now. Not in the future, not before the creation of the build, not before the previous change of the pipeline."
+  dateTime: LocalDateTime
   "forcing field"
   forcing: Boolean!
   "message field"
@@ -12106,6 +12112,8 @@ input StandardBuildFilter {
 
 "Input type for the startSlotPipelineDeployment mutation."
 input StartSlotPipelineDeploymentInput {
+  "Date/time of the action, to backdate it. Defaults to now. Not in the future, not before the creation of the build, not before the previous change of the pipeline."
+  dateTime: LocalDateTime
   "pipelineId field"
   pipelineId: String!
 }
@@ -12114,6 +12122,8 @@ input StartSlotPipelineDeploymentInput {
 input StartSlotPipelineInput {
   "buildId field"
   buildId: Int!
+  "Start of the pipeline - and of its whole deployment when forcing it to done. Defaults to now. Not in the future, not before the creation of the build, not before the start of the slot's latest pipeline."
+  dateTime: LocalDateTime
   "forceDone field"
   forceDone: Boolean
   "forceDoneMessage field"

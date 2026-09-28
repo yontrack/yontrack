@@ -11,6 +11,7 @@ import net.nemerosa.ontrack.graphql.support.TypedMutationProvider
 import net.nemerosa.ontrack.model.structure.ID
 import net.nemerosa.ontrack.model.structure.StructureService
 import org.springframework.stereotype.Component
+import java.time.LocalDateTime
 
 @Component
 class SlotPipelineMutations(
@@ -35,6 +36,7 @@ class SlotPipelineMutations(
                 forceDone = input.forceDone ?: false,
                 forceDoneMessage = input.forceDoneMessage,
                 skipWorkflows = input.skipWorkflows ?: false,
+                dateTime = input.dateTime,
             )
         },
         simpleMutation(
@@ -48,6 +50,7 @@ class SlotPipelineMutations(
             slotService.runDeployment(
                 pipelineId = input.pipelineId,
                 dryRun = false,
+                dateTime = input.dateTime,
             )
         },
         simpleMutation(
@@ -62,6 +65,7 @@ class SlotPipelineMutations(
                 pipelineId = input.pipelineId,
                 forcing = input.forcing,
                 message = input.message,
+                dateTime = input.dateTime,
             )
         },
         simpleMutation(
@@ -75,6 +79,7 @@ class SlotPipelineMutations(
             slotService.failPipeline(
                 pipelineId = input.pipelineId,
                 message = input.message,
+                dateTime = input.dateTime,
             )
         },
         unitMutation(
@@ -84,7 +89,7 @@ class SlotPipelineMutations(
         ) { input ->
             val pipeline = slotService.findPipelineById(input.pipelineId)
             pipeline?.let {
-                slotService.cancelPipeline(pipeline, input.reason)
+                slotService.cancelPipeline(pipeline, input.reason, dateTime = input.dateTime)
             }
         },
         unitMutation(
@@ -138,16 +143,22 @@ data class StartSlotPipelineInput(
     val forceDoneMessage: String? = null,
     @APIDescription("Option to skip the workflows on DONE when forcing the deployment")
     val skipWorkflows: Boolean? = false,
+    @APIDescription("Start of the pipeline - and of its whole deployment when forcing it to done. Defaults to now. Not in the future, not before the creation of the build, not before the start of the slot's latest pipeline.")
+    val dateTime: LocalDateTime? = null,
 )
 
 data class StartSlotPipelineDeploymentInput(
     val pipelineId: String,
+    @APIDescription(DATE_TIME_DESCRIPTION)
+    val dateTime: LocalDateTime? = null,
 )
 
 data class FinishSlotPipelineDeploymentInput(
     val pipelineId: String,
     val forcing: Boolean = false,
     val message: String? = null,
+    @APIDescription(DATE_TIME_DESCRIPTION)
+    val dateTime: LocalDateTime? = null,
 )
 
 data class FailSlotPipelineInput(
@@ -155,12 +166,22 @@ data class FailSlotPipelineInput(
     val pipelineId: String,
     @APIDescription("Optional message recorded in the pipeline's history")
     val message: String? = null,
+    @APIDescription(DATE_TIME_DESCRIPTION)
+    val dateTime: LocalDateTime? = null,
 )
 
 data class CancelSlotPipelineInput(
     val pipelineId: String,
     val reason: String,
+    @APIDescription(DATE_TIME_DESCRIPTION)
+    val dateTime: LocalDateTime? = null,
 )
+
+/**
+ * Description of the `dateTime` field of the inputs of the actions on an existing pipeline.
+ */
+private const val DATE_TIME_DESCRIPTION =
+    "Date/time of the action, to backdate it. Defaults to now. Not in the future, not before the creation of the build, not before the previous change of the pipeline."
 
 data class UpdatePipelineDataInput(
     val pipelineId: String,

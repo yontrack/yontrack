@@ -9,6 +9,8 @@ fun SlotPipelineFragment.toPipeline(connected: Connected) = SlotPipeline(
     id = id,
     number = number!!,
     status = status,
+    start = start,
+    end = end,
     slot = slot.slotFragment.toSlot(connected),
     build = build.buildFragment.toBuild(connected),
 )

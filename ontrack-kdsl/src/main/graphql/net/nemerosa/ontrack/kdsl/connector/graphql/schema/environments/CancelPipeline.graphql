@@ -1,14 +1,13 @@
-mutation StartDeployingPipeline(
+mutation CancelPipeline(
     $pipelineId: String!,
+    $reason: String!,
     $dateTime: LocalDateTime,
 ) {
-    startSlotPipelineDeployment(input: {
+    cancelSlotPipeline(input: {
         pipelineId: $pipelineId,
+        reason: $reason,
         dateTime: $dateTime,
     }) {
         ...PayloadUserErrors
-        deploymentStatus {
-            ok
-        }
     }
 }

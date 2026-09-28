@@ -17,6 +17,7 @@ import net.nemerosa.ontrack.model.structure.Build
 import net.nemerosa.ontrack.model.structure.Project
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import java.time.LocalDateTime
 
 @Service
 @Transactional
@@ -324,18 +325,24 @@ class SlotServiceImpl(
         forceDone: Boolean,
         forceDoneMessage: String?,
         skipWorkflows: Boolean,
+        dateTime: LocalDateTime?,
     ): SlotPipeline {
         securityService.checkSlotAccess<SlotPipelineCreate>(slot)
         // Build must be eligible
         if (!isBuildEligible(slot, build)) {
             throw SlotPipelineBuildNotEligibleException(slot, build)
         }
-        // Cancelling all current pipelines
+        // Backdating
+        val time = dateTime?.let { Time.truncate(it) }
+        if (time != null) {
+            checkStartDateTime(slot, build, time)
+        }
+        // Cancelling all current pipelines, at the start of the new one
         slotPipelineRepository.forAllActivePipelines(slot) { pipeline ->
-            cancelPipeline(pipeline, "Cancelled by more recent pipeline.")
+            cancelPipeline(pipeline, "Cancelled by more recent pipeline.", dateTime = time)
         }
         // Creating the new pipeline
-        val pipeline = SlotPipeline(slot = slot, build = build)
+        val pipeline = SlotPipeline(slot = slot, build = build, start = time ?: Time.now)
         // Saving the pipeline
         slotPipelineRepository.savePipeline(pipeline)
         // Saving the initial change
@@ -368,6 +375,7 @@ class SlotServiceImpl(
                 pipelineId = pipeline.id,
                 dryRun = false,
                 force = true,
+                dateTime = time,
             )
             // Forcing the deployment in DONE state
             val message = forceDoneMessage
@@ -378,6 +386,7 @@ class SlotServiceImpl(
                 forcing = true,
                 message = message,
                 skipWorkflows = skipWorkflows,
+                dateTime = time,
             )
         }
         // OK
@@ -461,18 +470,20 @@ class SlotServiceImpl(
         )
     }
 
-    override fun cancelPipeline(pipeline: SlotPipeline, reason: String) {
+    override fun cancelPipeline(pipeline: SlotPipeline, reason: String, dateTime: LocalDateTime?) {
         securityService.checkSlotAccess<SlotPipelineCancel>(pipeline.slot)
         // A failure is terminal: cancelling it would erase the fact that the deployment failed
         val current = slotPipelineRepository.getPipelineById(pipeline.id)
         if (current.status == SlotPipelineStatus.FAILED) {
             throw SlotPipelineFailedTerminalException(current)
         }
+        val time = checkDateTime(current, dateTime)
         changePipeline(
             pipeline = pipeline,
             status = SlotPipelineStatus.CANCELLED,
             type = SlotPipelineChangeType.STATUS,
             message = reason,
+            time = time,
         )
         eventPostService.post(environmentsEventsFactory.pipelineCancelled(pipeline))
     }
@@ -483,9 +494,10 @@ class SlotServiceImpl(
         status: SlotPipelineStatus,
         message: String,
         override: SlotAdmissionRuleOverride? = null,
+        time: LocalDateTime? = null,
     ) {
         val user = securityService.currentSignature.user.name
-        val timestamp = Time.now
+        val timestamp = time ?: Time.now
         slotPipelineChangeRepository.save(
             SlotPipelineChange(
                 pipeline = pipeline,
@@ -543,6 +555,7 @@ class SlotServiceImpl(
         dryRun: Boolean,
         skipWorkflowId: String?,
         force: Boolean,
+        dateTime: LocalDateTime?,
     ): SlotDeploymentActionStatus {
         val pipeline = slotPipelineRepository.getPipelineById(pipelineId)
         securityService.checkSlotAccess<SlotPipelineStart>(pipeline.slot)
@@ -581,6 +594,9 @@ class SlotServiceImpl(
 
         }
 
+        // Backdating
+        val time = checkDateTime(pipeline, dateTime)
+
         // Actual start
         if (!dryRun) {
             // Marks this pipeline as running
@@ -589,6 +605,7 @@ class SlotServiceImpl(
                 type = SlotPipelineChangeType.STATUS,
                 status = SlotPipelineStatus.RUNNING,
                 message = "Deployment running",
+                time = time,
             )
             // Event linked to the pipeline running
             val event = environmentsEventsFactory.pipelineDeploying(pipeline)
@@ -703,6 +720,7 @@ class SlotServiceImpl(
         forcing: Boolean,
         message: String?,
         skipWorkflows: Boolean,
+        dateTime: LocalDateTime?,
     ): SlotDeploymentActionStatus {
         val pipeline = slotPipelineRepository.getPipelineById(pipelineId)
         securityService.checkSlotAccess<SlotPipelineFinish>(pipeline.slot)
@@ -734,6 +752,8 @@ class SlotServiceImpl(
                 return SlotDeploymentActionStatus.nok("Some workflows prevent the deployment to complete")
             }
         }
+        // Backdating
+        val time = checkDateTime(pipeline, dateTime)
         // Actual message
         val actualMessage = message ?: "Deployment finished"
         // Marking the pipeline as deployed
@@ -745,12 +765,13 @@ class SlotServiceImpl(
             override = if (forcing) {
                 SlotAdmissionRuleOverride(
                     user = securityService.currentSignature.user.name,
-                    timestamp = Time.now,
+                    timestamp = time ?: Time.now,
                     message = message ?: "Deployment was marked done manually."
                 )
             } else {
                 null
             },
+            time = time,
         )
         // Workflows
         val event = environmentsEventsFactory.pipelineDeployed(pipeline)
@@ -767,7 +788,7 @@ class SlotServiceImpl(
         return SlotDeploymentActionStatus.ok(actualMessage)
     }
 
-    override fun failPipeline(pipelineId: String, message: String?): SlotDeploymentActionStatus {
+    override fun failPipeline(pipelineId: String, message: String?, dateTime: LocalDateTime?): SlotDeploymentActionStatus {
         val pipeline = slotPipelineRepository.getPipelineById(pipelineId)
         // Same right as finishing a deployment
         securityService.checkSlotAccess<SlotPipelineFinish>(pipeline.slot)
@@ -775,6 +796,8 @@ class SlotServiceImpl(
         if (pipeline.status != SlotPipelineStatus.RUNNING) {
             return SlotDeploymentActionStatus.nok("Only a running deployment can be marked as failed.")
         }
+        // Backdating
+        val time = checkDateTime(pipeline, dateTime)
         // Actual message
         val actualMessage = message?.takeIf { it.isNotBlank() } ?: "Deployment failed"
         // Marking the pipeline as failed
@@ -783,6 +806,7 @@ class SlotServiceImpl(
             type = SlotPipelineChangeType.STATUS,
             status = SlotPipelineStatus.FAILED,
             message = actualMessage,
+            time = time,
         )
         // Workflows
         val event = environmentsEventsFactory.pipelineFailed(pipeline)
@@ -832,6 +856,49 @@ class SlotServiceImpl(
     override fun getCurrentPipeline(slot: Slot): SlotPipeline? {
         securityService.checkSlotAccess<SlotView>(slot)
         return findPipelines(slot).pageItems.firstOrNull()
+    }
+
+    /**
+     * Checks a backdated start against the constraints listed on [SlotService].
+     *
+     * The active pipelines of the slot are cancelled at [time], and so the cancellation constraint
+     * is checked for them here as well, before anything is changed.
+     */
+    private fun checkStartDateTime(slot: Slot, build: Build, time: LocalDateTime) {
+        checkDateTime(build, time)
+        // Not before the start of the latest pipeline of the slot, whatever its status
+        val latest = slotPipelineRepository.findPipelines(slot, offset = 0, size = 1, buildId = null)
+            .pageItems.firstOrNull()
+        if (latest != null && time < latest.start) {
+            throw SlotPipelineDateTimeException.beforeLatestPipelineStart(time, slot, latest)
+        }
+        // The active pipelines are cancelled at this time
+        slotPipelineRepository.forAllActivePipelines(slot) { active ->
+            checkDateTime(active, time)
+        }
+    }
+
+    /**
+     * Checks an optional backdating [dateTime] for an action on an existing [pipeline].
+     *
+     * @return The time to use for the action, null for now
+     */
+    private fun checkDateTime(pipeline: SlotPipeline, dateTime: LocalDateTime?): LocalDateTime? =
+        dateTime?.let { Time.truncate(it) }?.apply {
+            checkDateTime(pipeline.build, this)
+            val previous = slotPipelineChangeRepository.findByPipeline(pipeline).maxOfOrNull { it.timestamp }
+            if (previous != null && this < previous) {
+                throw SlotPipelineDateTimeException.beforePreviousChange(this, pipeline, previous)
+            }
+        }
+
+    private fun checkDateTime(build: Build, time: LocalDateTime) {
+        if (time > Time.now) {
+            throw SlotPipelineDateTimeException.inTheFuture(time)
+        }
+        if (time < build.signature.time) {
+            throw SlotPipelineDateTimeException.beforeBuildCreation(time, build)
+        }
     }
 
     override fun getPipelineAdmissionRuleStatuses(pipeline: SlotPipeline): List<SlotPipelineAdmissionRuleStatus> {

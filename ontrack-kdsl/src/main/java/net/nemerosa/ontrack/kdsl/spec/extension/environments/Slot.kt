@@ -1,5 +1,6 @@
 package net.nemerosa.ontrack.kdsl.spec.extension.environments
 
+import com.apollographql.apollo.api.Optional
 import tools.jackson.databind.JsonNode
 import net.nemerosa.ontrack.kdsl.connector.Connector
 import net.nemerosa.ontrack.kdsl.connector.graphql.convert
@@ -9,6 +10,7 @@ import net.nemerosa.ontrack.kdsl.connector.graphqlConnector
 import net.nemerosa.ontrack.kdsl.spec.Build
 import net.nemerosa.ontrack.kdsl.spec.Project
 import net.nemerosa.ontrack.kdsl.spec.Resource
+import java.time.LocalDateTime
 
 class Slot(
     connector: Connector,
@@ -19,11 +21,20 @@ class Slot(
     val description: String = "",
 ) : Resource(connector) {
 
-    fun createPipeline(build: Build): SlotPipeline {
+    /**
+     * Starts a pipeline for a build in this slot, cancelling the slot's active pipeline.
+     *
+     * @param build Build to deploy
+     * @param dateTime Start of the pipeline, to backdate it. Defaults to now. Not in the future, not
+     * before the creation of the build, not before the start of the slot's latest pipeline. The
+     * active pipeline is cancelled at this time.
+     */
+    fun createPipeline(build: Build, dateTime: LocalDateTime? = null): SlotPipeline {
         val pipeline = graphqlConnector.mutate(
             CreatePipelineMutation(
                 id,
                 build.id.toInt(),
+                Optional.presentIfNotNull(dateTime),
             )
         ) { it?.startSlotPipeline?.payloadUserErrors?.convert() }
             ?.startSlotPipeline?.pipeline
@@ -35,6 +46,8 @@ class Slot(
             slot = this,
             build = build,
             status = pipeline.status,
+            start = pipeline.start,
+            end = pipeline.end,
         )
     }
 

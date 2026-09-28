@@ -1,16 +1,20 @@
 mutation CreatePipeline(
     $slotId: String!,
     $buildId: Int!,
+    $dateTime: LocalDateTime,
 ) {
     startSlotPipeline(input: {
         slotId: $slotId,
         buildId: $buildId,
+        dateTime: $dateTime,
     }) {
         ...PayloadUserErrors
         pipeline {
             id
             number
             status
+            start
+            end
         }
     }
 }
