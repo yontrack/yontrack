@@ -220,3 +220,38 @@ export const deleteEstate = async (ontrack, estate) => {
         {id: Number(estate.id)}
     )
 }
+
+/**
+ * Estate by name, `null` if none, with its definition.
+ */
+export const findEstate = async (ontrack, name) => {
+    const data = await graphQLCall(
+        ontrack.connection,
+        gql`
+            query Estate($name: String!) {
+                estate(name: $name) {
+                    id
+                    name
+                    description
+                    labels {
+                        category
+                        name
+                    }
+                    marker {
+                        kind
+                        levelName
+                        environment
+                        qualifier
+                    }
+                    readingConfigs {
+                        key
+                        windowDays
+                        target
+                    }
+                }
+            }
+        `,
+        {name}
+    )
+    return data.estate
+}

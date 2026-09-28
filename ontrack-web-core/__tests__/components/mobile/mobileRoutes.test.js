@@ -110,6 +110,14 @@ describe('mobileEquivalent', () => {
         expect(describeDesktopRoute('/extension/scorecard/project/12')).toEqual("a project's scorecard")
     })
 
+    it('leaves the estates admin page desktop-only', () => {
+        // #1905: no estates in the mobile UI in 6.x. The admin page reaches the
+        // interstitial, under a name a user can read.
+        expect(mobileEquivalent('/extension/scorecard/estates')).toBeNull()
+        expect(isRedirectExempt('/extension/scorecard/estates')).toBe(false)
+        expect(describeDesktopRoute('/extension/scorecard/estates')).toEqual('the estates')
+    })
+
     it('leaves the rest of the workflows pages to the interstitial', () => {
         // Only the instance page has a mobile screen. The audit page and the
         // definitions do not, and they have to keep reaching the interstitial

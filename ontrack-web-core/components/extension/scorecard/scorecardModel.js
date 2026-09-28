@@ -6,25 +6,37 @@
  * Units, as the API gives them: durations in seconds, frequencies per week, rates in percent (0 to 100).
  */
 
-const DURATION = 'duration'
-const PER_WEEK = 'perWeek'
-const PERCENT = 'percent'
+export const DURATION = 'duration'
+export const PER_WEEK = 'perWeek'
+export const PERCENT = 'percent'
+
+const LOWER_IS_BETTER = 'LOWER_IS_BETTER'
+const HIGHER_IS_BETTER = 'HIGHER_IS_BETTER'
 
 /**
- * The readings of the catalogue, in its order, with their name and unit.
+ * The readings of the catalogue, in its order, with their name, unit, and the way they are better
+ * (the direction a target judges them in, fixed by the reading).
  */
 export const READINGS = [
-    {key: 'delivery.leadTime', name: 'Lead time', unit: DURATION, marker: true},
-    {key: 'delivery.frequency', name: 'Frequency', unit: PER_WEEK, marker: true},
-    {key: 'delivery.successRate', name: 'Success rate', unit: PERCENT, marker: true},
-    {key: 'delivery.mttr', name: 'Time to restore', unit: DURATION, marker: true},
-    {key: 'quality.testPassRate', name: 'Test pass rate', unit: PERCENT, marker: false},
-    {key: 'quality.testFlakiness', name: 'Test flakiness', unit: PERCENT, marker: false},
+    {key: 'delivery.leadTime', name: 'Lead time', unit: DURATION, marker: true, direction: LOWER_IS_BETTER},
+    {key: 'delivery.frequency', name: 'Frequency', unit: PER_WEEK, marker: true, direction: HIGHER_IS_BETTER},
+    {key: 'delivery.successRate', name: 'Success rate', unit: PERCENT, marker: true, direction: HIGHER_IS_BETTER},
+    {key: 'delivery.mttr', name: 'Time to restore', unit: DURATION, marker: true, direction: LOWER_IS_BETTER},
+    {key: 'quality.testPassRate', name: 'Test pass rate', unit: PERCENT, marker: false, direction: HIGHER_IS_BETTER},
+    {key: 'quality.testFlakiness', name: 'Test flakiness', unit: PERCENT, marker: false, direction: LOWER_IS_BETTER},
 ]
 
 const readingOf = (key) => READINGS.find(it => it.key === key)
 
-const rankOf = (key) => {
+/**
+ * Unit of a reading — `DURATION`, `PER_WEEK` or `PERCENT` — `null` out of the catalogue.
+ */
+export const readingUnit = (key) => readingOf(key)?.unit ?? null
+
+/**
+ * Position of a reading in the catalogue, the readings out of it last.
+ */
+export const readingRank = (key) => {
     const index = READINGS.findIndex(it => it.key === key)
     return index >= 0 ? index : READINGS.length
 }
@@ -128,6 +140,16 @@ const DIRECTION_SYMBOLS = {
 }
 
 /**
+ * Symbol of a direction, `≤` when lower is better, `≥` when higher is; empty when unknown.
+ */
+export const directionSymbol = (direction) => DIRECTION_SYMBOLS[direction] ?? ''
+
+/**
+ * Symbol of the direction of a reading of the catalogue, by its key.
+ */
+export const readingDirectionSymbol = (key) => directionSymbol(readingOf(key)?.direction)
+
+/**
  * The target of a reading with its direction, `≤ 1d`, `≥ 90%`; `null` with no target.
  */
 export const targetText = (reading) => {
@@ -156,7 +178,7 @@ export const sampleCountText = (count) => {
 export const scorecardRows = (scorecard) => {
     const sets = scorecard?.sets ?? []
     const keys = [...new Set(sets.flatMap(set => set.readings.map(it => it.key)))]
-    keys.sort((a, b) => rankOf(a) - rankOf(b) || a.localeCompare(b))
+    keys.sort((a, b) => readingRank(a) - readingRank(b) || a.localeCompare(b))
     return keys.map(key => ({
         key,
         readings: Object.fromEntries(

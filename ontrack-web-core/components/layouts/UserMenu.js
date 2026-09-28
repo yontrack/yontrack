@@ -17,6 +17,7 @@ import {
     FaInfo,
     FaJenkins,
     FaJira,
+    FaLayerGroup,
     FaList,
     FaMagic,
     FaMailBulk,
@@ -105,6 +106,7 @@ export default function UserMenu({userMenu}) {
         'extension/hook/hook-records': <FaReceipt/>,
         'extension/tfc/configurations': <TFCIcon/>,
         'extension/github/ingestion/hook-payloads': <FaGithub/>,
+        'extension/scorecard/estates': <FaLayerGroup/>,
     }
 
     useEffect(() => {

@@ -19,24 +19,21 @@ const gqlRecomputeProjectScorecard = gql`
 `
 
 /**
- * Recompute of the scorecard of a project.
+ * A recompute, queued as a job, never run inline: once `request` has queued it, the readings are
+ * reloaded (`refresh`) every two seconds until one computed after the latest one known (`latest`)
+ * shows up, for a minute at most.
  *
- * The recompute is queued as a job, never run inline: once queued, the scorecard is reloaded
- * (`refresh`) every two seconds until a reading computed after the latest one known shows up, for a
- * minute at most.
- *
- * @param projectId ID of the project
- * @param scorecard Scorecard as currently loaded
- * @param refresh Reloads the scorecard
+ * @param latest Time of the latest computation known, as the API gives it, `null` for none
+ * @param refresh Reloads the readings, and so `latest`
+ * @param request Queues the recompute; resolves to the message of its error, `null` for none
  * @return `{recompute, polling, error}`
  */
-export const useScorecardRecompute = ({projectId, scorecard, refresh}) => {
+export const useRecomputePolling = ({latest, refresh, request}) => {
 
     // Latest computation known when the recompute was queued, and the reloads done since
     const [pending, setPending] = useState(null)
     const [error, setError] = useState(null)
 
-    const latest = latestComputedAt(scorecard)
     const done = !!pending && isComputedAfter(latest, pending.baseline)
     const polling = !!pending && !done && pending.polls < MAX_POLLS
 
@@ -55,10 +52,9 @@ export const useScorecardRecompute = ({projectId, scorecard, refresh}) => {
     const recompute = async () => {
         setError(null)
         try {
-            const data = await callGraphQL({query: gqlRecomputeProjectScorecard, variables: {projectId: Number(projectId)}})
-            const errors = data?.recomputeProjectScorecard?.errors ?? []
-            if (errors.length > 0) {
-                setError(errors[0].message)
+            const message = await request()
+            if (message) {
+                setError(message)
             } else {
                 setPending({baseline: latest, polls: 0})
             }
@@ -69,6 +65,24 @@ export const useScorecardRecompute = ({projectId, scorecard, refresh}) => {
 
     return {recompute, polling, error}
 }
+
+/**
+ * Recompute of the scorecard of a project, polled until its new readings show up.
+ *
+ * @param projectId ID of the project
+ * @param scorecard Scorecard as currently loaded
+ * @param refresh Reloads the scorecard
+ * @return `{recompute, polling, error}`
+ */
+export const useScorecardRecompute = ({projectId, scorecard, refresh}) =>
+    useRecomputePolling({
+        latest: latestComputedAt(scorecard),
+        refresh,
+        request: async () => {
+            const data = await callGraphQL({query: gqlRecomputeProjectScorecard, variables: {projectId: Number(projectId)}})
+            return data?.recomputeProjectScorecard?.errors?.[0]?.message ?? null
+        },
+    })
 
 /**
  * The "Recompute" command of a scorecard, spinning while the new readings are awaited.

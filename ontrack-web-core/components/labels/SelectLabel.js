@@ -11,7 +11,7 @@ import {gqlLabelFragment} from "@components/labels/LabelGraphQLFragments";
  * With `multiple`, the value is an array of display strings, which is what the label filter of a
  * project list sends to `paginatedProjects(labels:)`; without it, the value is one display string.
  */
-export default function SelectLabel({value, onChange, multiple = false, placeholder, style}) {
+export default function SelectLabel({id, value, onChange, multiple = false, placeholder, style}) {
 
     const {data, loading} = useQuery(
         gql`
@@ -36,6 +36,8 @@ export default function SelectLabel({value, onChange, multiple = false, placehol
     return (
         <>
             <Select
+                // Given by a Form.Item, so that its label names the select
+                id={id}
                 mode={multiple ? "multiple" : undefined}
                 value={value}
                 onChange={onChange}
