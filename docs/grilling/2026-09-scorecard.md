@@ -19,6 +19,15 @@ already exists on GitHub (it holds one unrelated issue, #1734); `6.1` does not.
 > `v6` branch, not on `main`; and findings are a product feature for every project, not wiring
 > for Yontrack's own CI.
 
+> **Amended 2026-09-28.** The scorecard half was specified in full by a third session:
+> [2026-09-scorecard/README.md](2026-09-scorecard/README.md), with its issue breakdown in
+> [2026-09-scorecard/issues.md](2026-09-scorecard/issues.md) (replacing the
+> `2026-09-scorecard-issues.md` announced below). Where this document and that one disagree, that
+> one wins. Notably: estates are an entity in 6.0 and only the estate view waits for 6.1; readings
+> are daily snapshots, not one row per key; every project also has a no-estate set; slot pipelines
+> gain a `FAILED` status and deployments can be backdated; the promotion-level TTR chart is kept,
+> and `delivery.mttr` under a promotion marker uses it; test stability is two readings.
+
 ## Where we start from
 
 - **Two half-dead reporting modules.** `ontrack-extension-indicators` was born and died of not
