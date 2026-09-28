@@ -88,6 +88,13 @@ export function projectFindingsUri(project, filter = {}) {
     return `/extension/findings/project/${project.id}${query ? `?${query}` : ''}`
 }
 
+/**
+ * Scorecard page of a project: each of its readings with its trend and what explains it.
+ */
+export function projectScorecardUri(project) {
+    return `/extension/scorecard/project/${project.id}`
+}
+
 export function restPromotionLevelImageUri(promotionLevel) {
     return `/api/protected/images/promotionLevels/${promotionLevel.id}`
 }

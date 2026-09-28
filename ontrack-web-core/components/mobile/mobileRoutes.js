@@ -267,6 +267,8 @@ const DESCRIPTIONS = [
     // No findings in the mobile UI in 6.0 (#1864)
     [/^\/extension\/findings\/project\//, "a project's security findings"],
     [/^\/extension\/findings\/finding\//, 'a security finding'],
+    // No scorecard in the mobile UI in 6.x (#1904)
+    [/^\/extension\/scorecard\/project\//, "a project's scorecard"],
     [/^\/extension\//, 'an extension page'],
     [/^\/core\/admin\//, 'an administration page'],
     [/^\/core\/config\//, 'a configuration page'],

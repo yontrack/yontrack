@@ -39,6 +39,7 @@ import ProjectEditCommand from "@components/projects/ProjectEditCommand";
 import ProjectLabelsCommand from "@components/projects/ProjectLabelsCommand";
 import LabelChip from "@components/labels/LabelChip";
 import ProjectSecuritySection from "@components/extension/findings/project/ProjectSecuritySection";
+import ProjectScorecardSection from "@components/extension/scorecard/project/ProjectScorecardSection";
 
 export default function ProjectView({id}) {
 
@@ -256,6 +257,10 @@ export default function ProjectView({id}) {
                             </Space>
                         }
                     </PageSection>
+                    {
+                        project.id &&
+                        <ProjectScorecardSection project={project}/>
+                    }
                     {
                         project.id &&
                         <ProjectSecuritySection project={project}/>

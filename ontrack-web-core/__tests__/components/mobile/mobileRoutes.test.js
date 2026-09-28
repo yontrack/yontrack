@@ -102,6 +102,14 @@ describe('mobileEquivalent', () => {
         expect(describeDesktopRoute('/extension/findings/finding/42')).toEqual('a security finding')
     })
 
+    it('leaves the scorecard page desktop-only', () => {
+        // #1904: no scorecard in the mobile UI in 6.x. The scorecard page of a
+        // project reaches the interstitial, under a name a user can read.
+        expect(mobileEquivalent('/extension/scorecard/project/12')).toBeNull()
+        expect(isRedirectExempt('/extension/scorecard/project/12')).toBe(false)
+        expect(describeDesktopRoute('/extension/scorecard/project/12')).toEqual("a project's scorecard")
+    })
+
     it('leaves the rest of the workflows pages to the interstitial', () => {
         // Only the instance page has a mobile screen. The audit page and the
         // definitions do not, and they have to keep reaching the interstitial
