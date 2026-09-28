@@ -7,6 +7,8 @@ import net.nemerosa.ontrack.extension.av.postprocessing.PostProcessingInfo
 import net.nemerosa.ontrack.extension.av.postprocessing.PostProcessingMissingConfigException
 import net.nemerosa.ontrack.extension.av.processing.AutoVersioningTemplateRenderer
 import net.nemerosa.ontrack.extension.github.GitHubExtensionFeature
+import net.nemerosa.ontrack.extension.github.client.GitHubWorkflowDispatchException
+import net.nemerosa.ontrack.extension.github.client.GitHubWorkflowRunNotFoundException
 import net.nemerosa.ontrack.extension.github.client.OntrackGitHubClientFactory
 import net.nemerosa.ontrack.extension.github.model.GitHubEngineConfiguration
 import net.nemerosa.ontrack.extension.github.service.GitHubConfigurationService
@@ -117,14 +119,21 @@ class GitHubPostProcessing(
             }
         )
         // Launches the workflow run
-        val runId = client.launchWorkflowRun(
-            repository = repository,
-            workflow = workflow,
-            branch = branch,
-            inputs = parameters.toMap(),
-            retries = settings.retries,
-            retriesDelaySeconds = settings.retriesDelaySeconds,
-        ).id
+        // Failures to reach GitHub at this stage are transient & can be retried
+        val runId = try {
+            client.launchWorkflowRun(
+                repository = repository,
+                workflow = workflow,
+                branch = branch,
+                inputs = parameters.toMap(),
+                retries = settings.retries,
+                retriesDelaySeconds = settings.retriesDelaySeconds,
+            ).id
+        } catch (ex: GitHubWorkflowDispatchException) {
+            throw GitHubPostProcessingTransientException(ex)
+        } catch (ex: GitHubWorkflowRunNotFoundException) {
+            throw GitHubPostProcessingTransientException(ex)
+        }
         // Sending back the URL of the workflow run
         val url = "${ghConfig.url}/${repository}/actions/runs/${runId}"
         onPostProcessingInfo(
@@ -135,10 +144,15 @@ class GitHubPostProcessing(
             )
         )
         // Waiting until the workflow run completes
-        client.waitUntilWorkflowRun(
-            repository = repository,
-            runId = runId,
-        )
+        // Any failure from now on has a run to link to
+        try {
+            client.waitUntilWorkflowRun(
+                repository = repository,
+                runId = runId,
+            )
+        } catch (any: Exception) {
+            throw GitHubPostProcessingFailureException(runUrl = url, cause = any)
+        }
     }
 
 }

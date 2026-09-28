@@ -37,7 +37,7 @@ const checkBuildConditions = async (popover, {buildRun}) => {
     const conditions = popover.getByTestId('auto-promotion-conditions')
     await expect(popover.getByText('Auto promotion conditions')).toBeVisible()
     await expect(conditions.getByTestId('auto-promotion-summary'))
-        .toHaveText('1/3 validations passed · 1/1 promotions granted')
+        .toHaveText('1/3 validations passed · 1/1 promotion granted')
     // Ran - linked to its latest run
     await expect(conditions.getByTestId('auto-promotion-vs-link-BUILD'))
         .toHaveAttribute('href', `/validationRun/${buildRun.id}`)

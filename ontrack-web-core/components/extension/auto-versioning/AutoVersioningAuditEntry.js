@@ -15,8 +15,11 @@ import DefaultPromotionRunLink from "@components/promotionRuns/DefaultPromotionR
 import AutoVersioningAdditionalPaths from "@components/extension/auto-versioning/AutoVersioningAdditionalPaths";
 import AutoVersioningAuditEntryReschedule
     from "@components/extension/auto-versioning/AutoVersioningAuditEntryReschedule";
+import {autoVersioningAuditEntryLineageLines} from "@components/extension/auto-versioning/AutoVersioningAuditEntryLineage";
 
 export default function AutoVersioningAuditEntry({entry}) {
+
+    const lineageLines = autoVersioningAuditEntryLineageLines(entry.lineage)
 
     const items = [
         {
@@ -32,6 +35,13 @@ export default function AutoVersioningAuditEntry({entry}) {
                 <AutoVersioningAuditProjectSourceLink name={entry.order.sourceProject}/>
             </Space>,
         },
+        ...(
+            lineageLines.length > 0 ? [{
+                key: 'lineage',
+                label: "Retries",
+                children: <Space direction="vertical">{lineageLines}</Space>,
+            }] : []
+        ),
         {
             key: 'pr',
             label: "Pull request",

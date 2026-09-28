@@ -26,4 +26,14 @@ interface AutoVersioningMetricsService {
     fun onPostProcessingSuccess(order: AutoVersioningOrder, postProcessing: PostProcessing<*>)
     fun onPostProcessingError(order: AutoVersioningOrder, postProcessing: PostProcessing<*>)
 
+    /**
+     * The [order] failed on a transient error and has been rescheduled automatically.
+     */
+    fun onRetryScheduled(order: AutoVersioningOrder)
+
+    /**
+     * The [order] failed after at least one automatic retry, and is not retried any longer.
+     */
+    fun onRetryExhausted(order: AutoVersioningOrder)
+
 }

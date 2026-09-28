@@ -181,6 +181,49 @@ object AutoVersioningMetrics {
         const val time = "ontrack_extension_auto_versioning_post_processing_time"
     }
 
+    object Retry {
+
+        @APIDescription("Number of auto-versioning orders having failed on a transient error and being rescheduled automatically")
+        @MetricsMeterDocumentation(
+            type = MetricsMeterType.COUNT,
+            tags = [
+                MetricsMeterTag(
+                    name = "sourceProject",
+                    description = "Name of the source project"
+                ),
+                MetricsMeterTag(
+                    name = "targetProject",
+                    description = "Name of the target project"
+                ),
+                MetricsMeterTag(
+                    name = "targetBranch",
+                    description = "Name of the target branch"
+                ),
+            ]
+        )
+        const val scheduledCount = "ontrack_extension_auto_versioning_retry_scheduled_count"
+
+        @APIDescription("Number of auto-versioning orders having finally failed after at least one automatic retry")
+        @MetricsMeterDocumentation(
+            type = MetricsMeterType.COUNT,
+            tags = [
+                MetricsMeterTag(
+                    name = "sourceProject",
+                    description = "Name of the source project"
+                ),
+                MetricsMeterTag(
+                    name = "targetProject",
+                    description = "Name of the target project"
+                ),
+                MetricsMeterTag(
+                    name = "targetBranch",
+                    description = "Name of the target branch"
+                ),
+            ]
+        )
+        const val exhaustedCount = "ontrack_extension_auto_versioning_retry_exhausted_count"
+    }
+
     @DocumentationIgnore
     object Tags {
         const val ROUTING_KEY = "routingKey"

@@ -104,6 +104,20 @@ class AutoVersioningMetricsServiceImpl(
         )
     }
 
+    override fun onRetryScheduled(order: AutoVersioningOrder) {
+        meterRegistry.increment(
+            order,
+            AutoVersioningMetrics.Retry.scheduledCount,
+        )
+    }
+
+    override fun onRetryExhausted(order: AutoVersioningOrder) {
+        meterRegistry.increment(
+            order,
+            AutoVersioningMetrics.Retry.exhaustedCount,
+        )
+    }
+
     private fun MeterRegistry.increment(
         order: AutoVersioningOrder,
         metric: String,

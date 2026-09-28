@@ -974,6 +974,59 @@ request_ and schedules it for immediate processing.
     If the target files already contain the expected version, the rescheduled request completes in the
     `PROCESSING_ABORTED` state without creating any pull request.
 
+The new request is linked to the one it reschedules: its detail page shows _Manually rescheduled from_, and the
+original request shows _Manually rescheduled as_.
+
+A manually rescheduled request is not an [automatic retry](#automatic-retries): its count of automatic retries starts
+again from 0, as the confirmation of the _Reschedule_ button reminds you.
+
+## Automatic retries
+
+Some failures are only transient: an external system, like GitHub, is momentarily unavailable, and the very same
+request would succeed a few minutes later. Instead of having to [reschedule](#rescheduling) such requests by hand,
+Yontrack can retry them automatically.
+
+This is disabled by default. To enable it, set the maximum number of _Automatic retries_ in the
+[settings](#general-configuration) to a value greater than `0`.
+
+Only the failures which are known to be transient are retried. Today, these are the failures of the
+[GitHub post-processing](github.md#transient-failures) to launch its workflow:
+
+* the call starting the workflow keeps failing with a `502`, `503` or `504` HTTP error, or cannot connect to GitHub,
+  after three attempts in a row
+* the workflow has been started, but its run cannot be found by Yontrack in time
+
+Any other failure is final: a workflow which runs and fails, a workflow which takes too long to complete, a missing
+file or a wrong configuration are not retried.
+
+When a request fails on a transient error:
+
+* it's recorded in the `ERROR` state, with a link to its retry
+* a _new request_ is created for the same version, and scheduled after the _Automatic retry delay_ (5 minutes by
+  default). It waits in the `PENDING_SCHEDULE` state, like a [scheduled](#scheduling) request, and actually starts on
+  the next run of the scheduling job, which runs every 30 minutes by default.
+* no [error notification](#notifications) is sent
+
+This goes on until the request succeeds or the maximum number of automatic retries is reached. Only then is the
+error notification sent, mentioning how many automatic retries were attempted.
+
+The detail page of each request shows where it stands in the chain, like _Automatic retry 2/3 of_ the previous
+request, and links forward to its own retry if any.
+
+!!! note
+
+    Only the requests processed through the auto-versioning queue are retried automatically. An auto-versioning run
+    by a [workflow](#triggering-from-a-workflow) node fails the node instead, and notifies the error right away.
+
+!!! note
+
+    A pending automatic retry is an ordinary request: a newer request for the same source and target
+    [cancels](#throttling) it. Conversely, a request is not retried automatically if a newer request for the same
+    source and target is already on its way.
+
+The [auto-versioning metrics](../../generated/metrics/net.nemerosa.ontrack.extension.av.metrics.AutoVersioningMetrics.md)
+count the retries being scheduled and the requests failing after all their automatic retries.
+
 ## Restricting auto-versioning at project level
 
 Most of the auto-versioning is configured at branch level. When a branch is configured for the auto-versioning of a
@@ -1299,6 +1352,10 @@ The following settings are available:
   _after_ the audit retention (90 days by default)
 * _Build links on auto-versioning check_ — enables the creation of [build links](#build-links) on auto-versioning
   checks (enabled by default)
+* _Automatic retries_ — maximum number of times a request failing on a transient error is
+  [retried automatically](#automatic-retries) (`0` by default, which disables the automatic retries)
+* _Automatic retry delay_ — delay, in minutes, before an [automatic retry](#automatic-retries) is scheduled (5 minutes
+  by default)
 
 !!! note
 
@@ -1313,6 +1370,8 @@ The following settings are available:
             auditRetentionDuration: 14d
             auditCleanupDuration: 90d
             buildLinks: true
+            retryMaxCount: 3
+            retryDelayMinutes: 5
     ```
 
 ### Queues

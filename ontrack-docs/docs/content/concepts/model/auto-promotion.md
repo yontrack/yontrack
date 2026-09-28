@@ -33,7 +33,7 @@ Hovering a promotion of a build, in the branch builds view or on the build page,
 
 * the status of the last run of each required validation, linking to that run, or **Not run**
 * each required promotion, linking to its last run on the build, or **Not granted**
-* a summary line, for example `2/3 validations passed · 1/1 promotions granted`
+* a summary line, for example `2/3 validations passed · 1/1 promotion granted`
 
 These are the _current_ conditions and statuses. The auto promotion property is not versioned, so they explain why the build is — or is not — promoted today, not what triggered a promotion in the past. They are shown for manually granted promotions too.
 

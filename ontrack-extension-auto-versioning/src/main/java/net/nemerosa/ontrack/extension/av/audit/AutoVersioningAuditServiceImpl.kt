@@ -23,8 +23,8 @@ class AutoVersioningAuditServiceImpl(
     override fun throttling(order: AutoVersioningOrder): Int =
         super.throttling(order)
 
-    override fun onCreated(order: AutoVersioningOrder) =
-        super.onCreated(order)
+    override fun onCreated(order: AutoVersioningOrder, data: Map<String, String>) =
+        super.onCreated(order, data)
 
     override fun onPendingSchedule(order: AutoVersioningOrder) {
         super.onPendingSchedule(order)
@@ -41,8 +41,8 @@ class AutoVersioningAuditServiceImpl(
         super.onReceived(order, queue)
     }
 
-    override fun onError(order: AutoVersioningOrder, error: Throwable) {
-        super.onError(order, error)
+    override fun onError(order: AutoVersioningOrder, error: Throwable, vararg data: Pair<String, String>) {
+        super.onError(order, error, *data)
     }
 
     override fun onProcessingStart(order: AutoVersioningOrder) {

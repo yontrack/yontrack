@@ -23,6 +23,12 @@ data class AutoVersioningSettings(
     @APIDescription("Creation of the build link on auto version check")
     @APILabel("Build links on auto versioning check")
     val buildLinks: Boolean = DEFAULT_BUILD_LINKS,
+    @APIDescription("Maximum number of times an order failing on a transient error (like GitHub being momentarily unavailable) is rescheduled automatically. `0` disables the automatic retries.")
+    @APILabel("Automatic retries")
+    val retryMaxCount: Int = DEFAULT_RETRY_MAX_COUNT,
+    @APIDescription("Delay (in minutes) before an automatic retry is scheduled. The retry actually starts on the next run of the auto-versioning scheduler.")
+    @APILabel("Automatic retry delay")
+    val retryDelayMinutes: Int = DEFAULT_RETRY_DELAY_MINUTES,
 ) {
     companion object {
         /**
@@ -44,5 +50,15 @@ data class AutoVersioningSettings(
          * Default value for [AutoVersioningSettings.buildLinks]
          */
         val DEFAULT_BUILD_LINKS: Boolean = true
+
+        /**
+         * Default value for [AutoVersioningSettings.retryMaxCount]: automatic retries are disabled
+         */
+        const val DEFAULT_RETRY_MAX_COUNT: Int = 0
+
+        /**
+         * Default value for [AutoVersioningSettings.retryDelayMinutes]
+         */
+        const val DEFAULT_RETRY_DELAY_MINUTES: Int = 5
     }
 }

@@ -75,6 +75,17 @@ export default function AutoVersioningAuditEntryView({uuid}) {
                                 promotionRun {
                                     ...PromotionRunContent
                                 }
+                                lineage {
+                                    retryAttempt
+                                    retryMax
+                                    retryOf
+                                    retryOriginal
+                                    retryUuid
+                                    retryAt
+                                    rescheduledFrom
+                                    rescheduledAs
+                                    configuredRetryMaxCount
+                                }
                                 order {
                                     uuid
                                     sourceProject

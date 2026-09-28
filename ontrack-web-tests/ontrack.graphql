@@ -185,6 +185,8 @@ type AutoVersioningAuditEntry {
   audit: [AutoVersioningAuditEntryState!]!
   "Elapsed time between the creation of this process and its last state (in ms)"
   duration: Int
+  "Automatic retries & manual reschedules this entry is part of"
+  lineage: AutoVersioningAuditEntryLineage!
   "Most recent state"
   mostRecentState: AutoVersioningAuditEntryState!
   "Associated auto versioning order"
@@ -201,6 +203,28 @@ type AutoVersioningAuditEntry {
   running: Boolean
   "Actual SCM branch being used"
   upgradeBranch: String
+}
+
+"Retries & reschedules an auto-versioning audit entry is part of"
+type AutoVersioningAuditEntryLineage {
+  "Maximum number of automatic retries currently configured, 0 when disabled"
+  configuredRetryMaxCount: Int!
+  "UUIDs of the entries rescheduling this one manually"
+  rescheduledAs: [String!]!
+  "If this entry was rescheduled manually, UUID of the entry it reschedules"
+  rescheduledFrom: String
+  "If this entry has been retried automatically, time its retry is scheduled at"
+  retryAt: LocalDateTime
+  "If this entry is an automatic retry, its attempt number, starting at 1"
+  retryAttempt: Int
+  "If this entry is an automatic retry, the maximum number of automatic retries when it was created"
+  retryMax: Int
+  "If this entry is an automatic retry, UUID of the entry it retries"
+  retryOf: String
+  "If this entry is an automatic retry, UUID of the first entry of the chain of retries"
+  retryOriginal: String
+  "If this entry has been retried automatically, UUID of its retry"
+  retryUuid: String
 }
 
 type AutoVersioningAuditEntryPaginated {

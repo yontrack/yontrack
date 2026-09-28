@@ -53,8 +53,23 @@ describe('the auto promotion conditions, with a build', () => {
             promotionLevels: [],
         }
         render(<AutoPromotionConditions conditions={conditions} withBuild={true}/>)
-        expect(screen.getByTestId('auto-promotion-summary')).toHaveTextContent('1/1 validations passed')
-        expect(screen.getByTestId('auto-promotion-summary')).not.toHaveTextContent('promotions')
+        expect(screen.getByTestId('auto-promotion-summary')).toHaveTextContent('1/1 validation passed')
+        expect(screen.getByTestId('auto-promotion-summary')).not.toHaveTextContent('promotion')
+    })
+
+    it('uses the singular when there is only one validation or one promotion', () => {
+        const conditions = {
+            ...buildConditions,
+            validationStamps: [
+                {validationStamp: vs(2, 'UNIT.TESTS'), passed: false, lastRun: {id: '11', lastStatus: status('FAILED', 'Failed')}},
+            ],
+            promotionLevels: [
+                {promotionLevel: pl(1, 'BRONZE'), promotionRun: {id: '20'}},
+            ],
+        }
+        render(<AutoPromotionConditions conditions={conditions} withBuild={true}/>)
+        expect(screen.getByTestId('auto-promotion-summary'))
+            .toHaveTextContent(/^0\/1 validation passed · 1\/1 promotion granted$/)
     })
 
     it('links a stamp which ran to its latest run, with its status', () => {

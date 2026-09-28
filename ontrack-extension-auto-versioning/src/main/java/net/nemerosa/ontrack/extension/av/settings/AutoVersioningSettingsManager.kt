@@ -37,6 +37,18 @@ class AutoVersioningSettingsManager(
 
         // Build links
         settingsRepository.setBoolean<AutoVersioningSettings>(settings::buildLinks)
+
+        // Automatic retries
+        settingsRepository.setInt(
+            AutoVersioningSettings::class.java,
+            AutoVersioningSettings::retryMaxCount.name,
+            settings.retryMaxCount
+        )
+        settingsRepository.setInt(
+            AutoVersioningSettings::class.java,
+            AutoVersioningSettings::retryDelayMinutes.name,
+            settings.retryDelayMinutes
+        )
     }
 
     override fun getId(): String = "auto-versioning"

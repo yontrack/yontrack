@@ -23,7 +23,23 @@ export class AutoVersioningAuditDetailsPage {
         const button = this.page.getByRole('button', {name: 'Reschedule'})
         await expect(button).toBeVisible()
         await button.click()
+        // The confirmation states that a new order is created, with its own automatic retries
+        const confirmation = this.page.getByTestId('av-reschedule-confirmation')
+        await expect(confirmation).toContainText("This creates a new auto-versioning order.")
+        await expect(confirmation).toContainText(/retry count starts again from 0|Automatic retries are disabled/)
         await confirmBox(this.page, "Reschedule auto-versioning", {okText: "Yes"})
+    }
+
+    async expectRescheduledFrom(uuid) {
+        const line = this.page.getByTestId('av-lineage-rescheduled-from')
+        await expect(line).toContainText("Manually rescheduled from")
+        await expect(line.getByRole('link', {name: uuid})).toBeVisible()
+    }
+
+    async expectRescheduledAs(uuid) {
+        const line = this.page.getByTestId('av-lineage-rescheduled-as')
+        await expect(line).toContainText("Manually rescheduled as")
+        await expect(line.getByRole('link', {name: uuid})).toBeVisible()
     }
 
     async getState() {

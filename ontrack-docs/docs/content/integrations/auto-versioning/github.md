@@ -52,6 +52,35 @@ postProcessingConfig:
     commitMessage: "Resolving the dependency locks"
 ```
 
+### Transient failures
+
+The call starting the workflow is made up to three times in a row, waiting 2 then 4 seconds, when GitHub answers
+with a `502`, `503` or `504` HTTP error, or when Yontrack cannot connect to GitHub. Any other error, like a `4xx`, is
+not retried, and neither is a read timeout: GitHub has then most likely started the workflow already.
+
+!!! note
+
+    GitHub may answer with an error after having actually accepted the start of the workflow. Retrying the call may
+    then start the workflow twice. Yontrack still identifies the run it has started through a unique ID passed to the
+    workflow, but the other run goes on.
+
+Once started, the workflow run is looked up in the list of runs of the repository, as many times as the _Retries_
+setting says and with its _Retry interval_ between two attempts.
+
+A client error (`4xx`) while looking for the run, like a missing permission, fails the post-processing right away.
+
+If the call still fails after its three attempts, or if the run cannot be found in time, the post-processing fails on
+a _transient_ error: the whole auto-versioning request can then be
+[retried automatically](auto-versioning.md#automatic-retries), if enabled.
+
+!!! warning
+
+    When the run of the workflow cannot be found in time, it may still exist and complete later, pushing to the
+    upgrade branch while the automatic retry recreates it. The delay before an automatic retry makes this unlikely.
+
+A workflow run which completes without success, or which does not complete in time, is a final failure and is never
+retried automatically.
+
 ### Extra parameters
 
 On top of the [inputs Yontrack always sends](#workflow-inputs), arbitrary inputs can be passed to the workflow:
