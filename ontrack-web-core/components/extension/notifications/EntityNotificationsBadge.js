@@ -1,10 +1,11 @@
-import {useGraphQLClient} from "@components/providers/ConnectionContextProvider";
-import {useEffect, useState} from "react";
+import {useQuery} from "@components/services/GraphQL";
 import LoadingInline from "@components/common/LoadingInline";
 import {gql} from "graphql-request";
 import {Badge} from "antd";
 import NotificationBadgeCluster, {mostSevereNotificationBucket} from "@components/primitives/NotificationBadgeCluster";
 import {bucketNotificationTypes} from "@components/extension/notifications/notificationBuckets";
+
+const noCounts = {success: 0, running: 0, error: 0}
 
 /**
  * Fetches an entity's notification records and hands the counts to the badges.
@@ -23,41 +24,35 @@ import {bucketNotificationTypes} from "@components/extension/notifications/notif
  */
 export default function EntityNotificationsBadge({entityType, entityId, href, showText = false, children}) {
 
-    const client = useGraphQLClient()
-    const [loading, setLoading] = useState(true)
-    const [counts, setCounts] = useState({success: 0, running: 0, error: 0})
-
-    useEffect(() => {
-        if (client) {
-            setLoading(true)
-            client.request(
-                gql`
-                    query EntityNotificationsStatuses(
-                        $entityType: ProjectEntityType!,
-                        $entityId: Int!,
-                    ) {
-                        notificationRecords(
-                            eventEntityType: $entityType,
-                            eventEntityId: $entityId,
-                            sourceId: "entity-subscription",
-                        ) {
-                            pageItems {
-                                result {
-                                    type
-                                }
-                            }
+    const {data, loading, finished} = useQuery(
+        gql`
+            query EntityNotificationsStatuses(
+                $entityType: ProjectEntityType!,
+                $entityId: Int!,
+            ) {
+                notificationRecords(
+                    eventEntityType: $entityType,
+                    eventEntityId: $entityId,
+                    sourceId: "entity-subscription",
+                ) {
+                    pageItems {
+                        result {
+                            type
                         }
                     }
-                `,
-                {entityType, entityId: Number(entityId)}
-            ).then(data => {
-                const types = data.notificationRecords?.pageItems?.map(record => record.result.type) ?? []
-                setCounts(bucketNotificationTypes(types))
-            }).finally(() => {
-                setLoading(false)
-            })
+                }
+            }
+        `,
+        {
+            variables: {entityType, entityId: Number(entityId)},
+            deps: [entityType, entityId],
+            initialData: noCounts,
+            dataFn: data => bucketNotificationTypes(
+                data.notificationRecords?.pageItems?.map(record => record.result.type) ?? []
+            ),
         }
-    }, [client, entityType, entityId])
+    )
+    const counts = data ?? noCounts
 
     // On a 22px medal there is only room for one number, so the corner count
     // shows the most severe non-empty bucket. Which bucket that is, and what
@@ -83,7 +78,7 @@ export default function EntityNotificationsBadge({entityType, entityId, href, sh
             {
                 !children &&
                 <LoadingInline
-                    loading={loading}
+                    loading={loading || !finished}
                     text=""
                 >
                     <NotificationBadgeCluster

@@ -1,7 +1,6 @@
 import Link from "next/link";
 import {slotPipelineUri} from "@components/extension/environments/EnvironmentsLinksUtils";
-import {useGraphQLClient} from "@components/providers/ConnectionContextProvider";
-import {useEffect, useState} from "react";
+import {useQuery} from "@components/services/GraphQL";
 import LoadingInline from "@components/common/LoadingInline";
 import {gql} from "graphql-request";
 import {Space} from "antd";
@@ -9,43 +8,36 @@ import SlotPipelineStatusLabel from "@components/extension/environments/SlotPipe
 
 export default function SlotPipelineLink({pipelineId, status, numberOnly = false}) {
 
-    const client = useGraphQLClient()
-    const [loading, setLoading] = useState(true)
-    const [pipeline, setPipeline] = useState()
-    useEffect(() => {
-        if (client && pipelineId) {
-            setLoading(true)
-            client.request(
-                gql`
-                    query PipelineLink($id: String!) {
-                        slotPipelineById(id: $id) {
-                            id
-                            status
-                            number
-                            slot {
-                                project {
-                                    name
-                                }
-                                qualifier
-                                environment {
-                                    name
-                                }
-                            }
+    const {data: pipeline, loading, finished} = useQuery(
+        gql`
+            query PipelineLink($id: String!) {
+                slotPipelineById(id: $id) {
+                    id
+                    status
+                    number
+                    slot {
+                        project {
+                            name
+                        }
+                        qualifier
+                        environment {
+                            name
                         }
                     }
-                `,
-                {id: pipelineId}
-            ).then(data => {
-                setPipeline(data.slotPipelineById)
-            }).finally(() => {
-                setLoading(false)
-            })
+                }
+            }
+        `,
+        {
+            variables: {id: pipelineId},
+            deps: [pipelineId],
+            condition: !!pipelineId,
+            dataFn: data => data.slotPipelineById,
         }
-    }, [client, pipelineId])
+    )
 
     return (
         <>
-            <LoadingInline loading={loading}>
+            <LoadingInline loading={loading || !finished}>
                 {
                     pipeline &&
                     <Space>

@@ -1,5 +1,4 @@
-import {useGraphQLClient} from "@components/providers/ConnectionContextProvider";
-import {useEffect, useState} from "react";
+import {useQuery} from "@components/services/GraphQL";
 import LoadingInline from "@components/common/LoadingInline";
 import {Divider, Space} from "antd";
 import {FaBan, FaMagic} from "react-icons/fa";
@@ -11,34 +10,26 @@ import {gql} from "graphql-request";
 
 export default function AutoVersioningAuditEntryLink({uuid}) {
 
-    const client = useGraphQLClient()
-    const [loading, setLoading] = useState(true)
-    const [audit, setAudit] = useState()
-
-    useEffect(() => {
-        if (client && uuid) {
-            setLoading(true)
-            client.request(
-                gql`
-                    query AutoVersioningAuditEntry($uuid: String!) {
-                        autoVersioningAuditEntries(filter: {uuid: $uuid}) {
-                            pageItems {
-                                mostRecentState {
-                                    state
-                                    data
-                                }
-                            }
+    const {data: audit, loading, finished} = useQuery(
+        gql`
+            query AutoVersioningAuditEntry($uuid: String!) {
+                autoVersioningAuditEntries(filter: {uuid: $uuid}) {
+                    pageItems {
+                        mostRecentState {
+                            state
+                            data
                         }
                     }
-                `,
-                {uuid}
-            ).then(data => {
-                setAudit(data.autoVersioningAuditEntries.pageItems[0])
-            }).finally(() => {
-                setLoading(false)
-            })
+                }
+            }
+        `,
+        {
+            variables: {uuid},
+            deps: [uuid],
+            condition: !!uuid,
+            dataFn: data => data.autoVersioningAuditEntries.pageItems[0],
         }
-    }, [client, uuid])
+    )
 
     return (
         <>
@@ -49,7 +40,7 @@ export default function AutoVersioningAuditEntryLink({uuid}) {
                 </Space>
             }
             {
-                uuid && <LoadingInline loading={loading} text="">
+                uuid && <LoadingInline loading={loading || !finished} text="">
                     {
                         audit && <><Space>
                             <Link href={autoVersioningAuditEntryUri(uuid)}>

@@ -1,5 +1,4 @@
-import {useGraphQLClient} from "@components/providers/ConnectionContextProvider";
-import {useEffect, useState} from "react";
+import {useQuery} from "@components/services/GraphQL";
 import {gql} from "graphql-request";
 import SlotWorkflowDialog, {useSlotWorkflowDialog} from "@components/extension/environments/SlotWorkflowDialog";
 import {Button, Space, Table} from "antd";
@@ -9,6 +8,8 @@ import SlotWorkflowTrigger from "@components/extension/environments/SlotWorkflow
 import SlotWorkflowEditButton from "@components/extension/environments/SlotWorkflowEditButton";
 import SlotWorkflowDeleteButton from "@components/extension/environments/SlotWorkflowDeleteButton";
 import ShowWorkflowButton from "@components/extension/workflows/ShowWorkflowButton";
+
+const noWorkflows = []
 
 /**
  * The workflows of a slot - the second half of the slot page's **Setup** tab.
@@ -20,45 +21,37 @@ import ShowWorkflowButton from "@components/extension/workflows/ShowWorkflowButt
  */
 export default function SlotWorkflowsTable({slot, reloadCount = 0, onChange}) {
 
-    const client = useGraphQLClient()
-
-    const [loading, setLoading] = useState(true)
-    const [workflows, setWorkflows] = useState([])
-
-    useEffect(() => {
-        if (client) {
-            setLoading(true)
-            client.request(
-                gql`
-                    query SlotWorkflows($id: String!) {
-                        slotById(id: $id) {
-                            workflows {
+    const {data, loading, finished} = useQuery(
+        gql`
+            query SlotWorkflows($id: String!) {
+                slotById(id: $id) {
+                    workflows {
+                        id
+                        trigger
+                        workflow {
+                            name
+                            nodes {
                                 id
-                                trigger
-                                workflow {
-                                    name
-                                    nodes {
-                                        id
-                                        executorId
-                                        timeout
-                                        data
-                                        parents {
-                                            id
-                                        }
-                                    }
+                                executorId
+                                timeout
+                                data
+                                parents {
+                                    id
                                 }
                             }
                         }
                     }
-                `,
-                {id: slot.id}
-            ).then(data => {
-                setWorkflows(data.slotById.workflows)
-            }).finally(() => {
-                setLoading(false)
-            })
+                }
+            }
+        `,
+        {
+            variables: {id: slot.id},
+            deps: [slot, reloadCount],
+            initialData: noWorkflows,
+            dataFn: data => data.slotById.workflows,
         }
-    }, [client, slot, reloadCount])
+    )
+    const workflows = data ?? noWorkflows
 
     const dialog = useSlotWorkflowDialog({
         onSuccess: onChange,
@@ -73,7 +66,7 @@ export default function SlotWorkflowsTable({slot, reloadCount = 0, onChange}) {
             <SlotWorkflowDialog dialog={dialog}/>
             <Table
                 dataSource={workflows}
-                loading={loading}
+                loading={loading || !finished}
                 rowKey={slotWorkflow => slotWorkflow.id}
                 pagination={false}
                 size="small"

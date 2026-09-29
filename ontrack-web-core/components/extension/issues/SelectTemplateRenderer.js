@@ -1,30 +1,27 @@
 import {useEffect, useState} from "react";
-import {useGraphQLClient} from "@components/providers/ConnectionContextProvider";
+import {useQuery} from "@components/services/GraphQL";
 import {gql} from "graphql-request";
 import {Select} from "antd";
 
+const noTemplateRenderers = []
+
 export const useTemplateRenderers = () => {
-    const client = useGraphQLClient()
-    const [templateRenderers, setTemplateRenderers] = useState([])
-
-    useEffect(() => {
-        if (client) {
-            client.request(
-                gql`
-                    query TemplatingRenderers {
-                        templatingRenderers {
-                            id
-                            name
-                        }
-                    }
-                `
-            ).then(data => {
-                setTemplateRenderers(data.templatingRenderers)
-            })
+    const {data} = useQuery(
+        gql`
+            query TemplatingRenderers {
+                templatingRenderers {
+                    id
+                    name
+                }
+            }
+        `,
+        {
+            initialData: noTemplateRenderers,
+            dataFn: data => data.templatingRenderers,
         }
-    }, [client]);
+    )
 
-    return templateRenderers
+    return data ?? noTemplateRenderers
 }
 
 export default function SelectTemplateRenderer({value, onChange}) {

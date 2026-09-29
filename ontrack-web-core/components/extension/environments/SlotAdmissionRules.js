@@ -1,28 +1,22 @@
-import {useGraphQLClient} from "@components/providers/ConnectionContextProvider";
-import {useEffect, useState} from "react";
+import {useQuery} from "@components/services/GraphQL";
 import {gql} from "graphql-request";
 
+const noRules = []
+
 export const useSlotAdmissionRules = () => {
-    const client = useGraphQLClient()
-
-    const [rules, setRules] = useState([])
-
-    useEffect(() => {
-        if (client) {
-            client.request(
-                gql`
-                    query SlotAdmissionRules {
-                        slotAdmissionRules {
-                            id
-                            name
-                        }
-                    }
-                `
-            ).then(data => {
-                setRules(data.slotAdmissionRules)
-            })
+    const {data} = useQuery(
+        gql`
+            query SlotAdmissionRules {
+                slotAdmissionRules {
+                    id
+                    name
+                }
+            }
+        `,
+        {
+            initialData: noRules,
+            dataFn: data => data.slotAdmissionRules,
         }
-    }, [client])
-
-    return rules
+    )
+    return data ?? noRules
 }

@@ -1,7 +1,7 @@
 import {UserContext} from "@components/providers/UserProvider";
 import {useContext, useState} from "react";
 import InlineConfirmCommand from "@components/common/InlineConfirmCommand";
-import {useGraphQLClient} from "@components/providers/ConnectionContextProvider";
+import {callGraphQL} from "@components/services/GraphQL";
 import {gql} from "graphql-request";
 import {EventsContext} from "@components/common/EventsContext";
 
@@ -9,14 +9,13 @@ export default function DeleteEnvironmentButton({environment}) {
 
     const eventsContext = useContext(EventsContext)
     const user = useContext(UserContext)
-    const client = useGraphQLClient()
 
     const [loading, setLoading] = useState(false)
 
     const deleteEnvironment = () => {
         setLoading(true)
-        client.request(
-            gql`
+        callGraphQL({
+            query: gql`
                 mutation DeleteEnvironment(
                     $id: String!,
                 ) {
@@ -29,10 +28,10 @@ export default function DeleteEnvironmentButton({environment}) {
                     }
                 }
             `,
-            {
+            variables: {
                 id: environment.id,
-            }
-        ).then(() => {
+            },
+        }).then(() => {
             eventsContext.fireEvent("environment.deleted", {id: environment.id})
         }).finally(() => {
             setLoading(false)

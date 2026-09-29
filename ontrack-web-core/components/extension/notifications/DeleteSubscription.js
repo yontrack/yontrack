@@ -1,13 +1,11 @@
-import {useGraphQLClient} from "@components/providers/ConnectionContextProvider";
+import {callGraphQL} from "@components/services/GraphQL";
 import {gql} from "graphql-request";
 
 export const useDeleteSubscription = () => {
 
-    const client = useGraphQLClient()
-
     const deleteSubscription = async ({entity, name}) => {
-        await client.request(
-            gql`
+        await callGraphQL({
+            query: gql`
                 mutation DeleteSubscription(
                     $id: String!,
                     $projectEntity: ProjectEntityIDInput,
@@ -22,11 +20,11 @@ export const useDeleteSubscription = () => {
                     }
                 }
             `,
-            {
+            variables: {
                 id: name,
                 projectEntity: entity,
-            }
-        )
+            },
+        })
     }
 
     return {

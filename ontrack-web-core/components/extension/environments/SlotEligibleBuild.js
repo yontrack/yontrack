@@ -1,5 +1,4 @@
-import {useGraphQLClient} from "@components/providers/ConnectionContextProvider";
-import {useEffect, useState} from "react";
+import {useQuery} from "@components/services/GraphQL";
 import {gql} from "graphql-request";
 import {Card, Space, Typography} from "antd";
 import BuildLink from "@components/builds/BuildLink";
@@ -9,42 +8,30 @@ import SlotPipelineCreateButton from "@components/extension/environments/SlotPip
 import {gqlSlotPipelineBuildData} from "@components/extension/environments/EnvironmentGraphQL";
 
 export default function SlotEligibleBuild({slot, onStart}) {
-    const client = useGraphQLClient()
-
-    const [loading, setLoading] = useState(false)
-    const [build, setBuild] = useState()
-    const [loadedSlot, setLoadedSlot] = useState()
-
-    useEffect(() => {
-        if (client && slot) {
-            setLoading(true)
-            client.request(
-                gql`
-                    query SlotEligibleBuild($id: String!) {
-                        slotById(id: $id) {
-                            authorizations {
-                                name
-                                action
-                                authorized
-                            }
-                            eligibleBuild {
-                                ...SlotPipelineBuildData
-                            }
-                        }
+    const {data: loadedSlot, loading} = useQuery(
+        gql`
+            query SlotEligibleBuild($id: String!) {
+                slotById(id: $id) {
+                    authorizations {
+                        name
+                        action
+                        authorized
                     }
-                    ${gqlSlotPipelineBuildData}
-                `,
-                {
-                    id: slot.id,
+                    eligibleBuild {
+                        ...SlotPipelineBuildData
+                    }
                 }
-            ).then(data => {
-                setLoadedSlot(data.slotById)
-                setBuild(data.slotById?.eligibleBuild)
-            }).finally(() => {
-                setLoading(false)
-            })
+            }
+            ${gqlSlotPipelineBuildData}
+        `,
+        {
+            variables: {id: slot?.id},
+            deps: [slot],
+            condition: !!slot,
+            dataFn: data => data.slotById,
         }
-    }, [client, slot])
+    )
+    const build = loadedSlot?.eligibleBuild
 
     return (
         <>

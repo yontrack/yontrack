@@ -1,10 +1,12 @@
-import {useGraphQLClient} from "@components/providers/ConnectionContextProvider";
-import {useEffect, useState} from "react";
+import {useQuery} from "@components/services/GraphQL";
 import {gql} from "graphql-request";
 import {Tag, Typography} from "antd";
 import ItemList from "@components/common/ItemList";
 import SubscriptionLink from "@components/extension/notifications/SubscriptionLink";
 import SubscriptionsLink from "@components/extension/notifications/SubscriptionsLink";
+
+const noSubscriptions = []
+const noPageInfo = {}
 
 /**
  * This component displays a list of the subscriptions attached to a given entity.
@@ -17,38 +19,33 @@ import SubscriptionsLink from "@components/extension/notifications/Subscriptions
  */
 export default function EntitySubscriptions({type, id}) {
 
-    const client = useGraphQLClient()
-    const [subscriptions, setSubscriptions] = useState([])
-    const [pageInfo, setPageInfo] = useState({})
-
-    useEffect(() => {
-        if (client) {
-            client.request(
-                gql`
-                    query GetEntitySubscriptions($entity: ProjectEntityIDInput!) {
-                        eventSubscriptions(size: 10, filter: {
-                            entity: $entity,
-                        }) {
-                            pageInfo {
-                                totalSize
-                                nextPage {
-                                    offset
-                                }
-                            }
-                            pageItems {
-                                name
-                                channel
-                            }
+    const {data} = useQuery(
+        gql`
+            query GetEntitySubscriptions($entity: ProjectEntityIDInput!) {
+                eventSubscriptions(size: 10, filter: {
+                    entity: $entity,
+                }) {
+                    pageInfo {
+                        totalSize
+                        nextPage {
+                            offset
                         }
                     }
-                `,
-                {entity: {type, id: Number(id)}}
-            ).then(data => {
-                setSubscriptions(data.eventSubscriptions.pageItems)
-                setPageInfo(data.eventSubscriptions.pageInfo)
-            })
+                    pageItems {
+                        name
+                        channel
+                    }
+                }
+            }
+        `,
+        {
+            variables: {entity: {type, id: Number(id)}},
+            deps: [type, id],
+            dataFn: data => data.eventSubscriptions,
         }
-    }, [client, type, id])
+    )
+    const subscriptions = data?.pageItems ?? noSubscriptions
+    const pageInfo = data?.pageInfo ?? noPageInfo
 
     return (
         <>

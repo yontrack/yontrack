@@ -1,5 +1,4 @@
-import {useEffect, useState} from "react";
-import {useGraphQLClient} from "@components/providers/ConnectionContextProvider";
+import {useQuery} from "@components/services/GraphQL";
 import {gql} from "graphql-request";
 import {gqlNotificationRecordContent} from "@components/extension/notifications/NotificationRecordsGraphQLFragments";
 import LoadingInline from "@components/common/LoadingInline";
@@ -9,37 +8,31 @@ import {FaInfoCircle} from "react-icons/fa";
 import NotificationSourceData from "@components/extension/notifications/NotificationSourceData";
 import EventDetails from "@components/core/model/EventDetails";
 
+const noRecord = {}
+
 export default function NotificationRecordSummary({recordId}) {
 
-    const client = useGraphQLClient()
-    const [record, setRecord] = useState({})
-    const [loading, setLoading] = useState(true)
+    const {data, loading, finished} = useQuery(
+        gql`
+            query NotificationRecord($recordId: String!) {
+                notificationRecord(id: $recordId) {
+                    ...NotificationRecordContent
+                }
+            }
 
-    useEffect(() => {
-        if (client) {
-            setLoading(true)
-            client.request(
-                gql`
-                    query NotificationRecord($recordId: String!) {
-                        notificationRecord(id: $recordId) {
-                            ...NotificationRecordContent
-                        }
-                    }
-
-                    ${gqlNotificationRecordContent}
-                `,
-                {recordId}
-            ).then(data => {
-                setRecord(data.notificationRecord)
-            }).finally(() => {
-                setLoading(false)
-            })
+            ${gqlNotificationRecordContent}
+        `,
+        {
+            variables: {recordId},
+            deps: [recordId],
+            dataFn: data => data.notificationRecord,
         }
-    }, [client, recordId])
+    )
+    const record = data ?? noRecord
 
     return (
         <>
-            <LoadingInline loading={loading}>
+            <LoadingInline loading={loading || !finished}>
                 <Space>
                     {/* Link to the record */}
                     <Link href={`/extension/notifications/recordings/${record.id}`}

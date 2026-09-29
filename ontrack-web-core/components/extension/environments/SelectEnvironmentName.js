@@ -1,39 +1,33 @@
 import {Select} from "antd";
-import {useEffect, useState} from "react";
-import {useGraphQLClient} from "@components/providers/ConnectionContextProvider";
+import {useQuery} from "@components/services/GraphQL";
 import {gql} from "graphql-request";
+
+const noEnvironments = []
 
 export default function SelectEnvironmentName({id = "environment", projects = [], value, onChange}) {
 
-    const client = useGraphQLClient()
-
-    const [environments, setEnvironments] = useState([])
-    const [loading, setLoading] = useState(false)
-
-    useEffect(() => {
-        if (client) {
-            setLoading(true)
-            client.request(
-                gql`
-                    query SelectEnvironments(
-                        $projects: [String!],
-                    ) {
-                        environments(filter: {projects: $projects}) {
-                            name
-                        }
-                    }
-                `,
-                {projects}
-            ).then(data => {
-                setEnvironments(data.environments.map(env => ({
-                    value: env.name,
-                    label: env.name,
-                })))
-            }).finally(() => {
-                setLoading(false)
-            })
+    const {data, loading} = useQuery(
+        gql`
+            query SelectEnvironments(
+                $projects: [String!],
+            ) {
+                environments(filter: {projects: $projects}) {
+                    name
+                }
+            }
+        `,
+        {
+            variables: {projects},
+            // Loaded once, as before: a change of `projects` does not reload the list
+            deps: [],
+            initialData: noEnvironments,
+            dataFn: data => data.environments.map(env => ({
+                value: env.name,
+                label: env.name,
+            })),
         }
-    }, [client])
+    )
+    const environments = data ?? noEnvironments
 
     return (
         <>

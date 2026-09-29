@@ -1,6 +1,6 @@
-import {useGraphQLClient} from "@components/providers/ConnectionContextProvider";
+import {useQuery} from "@components/services/GraphQL";
 import {gql} from "graphql-request";
-import {useEffect, useState} from "react";
+import {useMemo} from "react";
 import {
     branchTitleName,
     projectTitleName,
@@ -93,175 +93,169 @@ export const extractProjectEntityInfo = (type, entity) => {
     }
 }
 
-export const useProjectEntityPageInfo = (type, id, what) => {
-    const client = useGraphQLClient()
-    const [title, setTitle] = useState('')
-    const [breadcrumbs, setBreadcrumbs] = useState([])
-    const [uri, setUri] = useState('')
-    const [entity, setEntity] = useState({})
-    const [entityTypeName, setEntityTypeName] = useState('')
-
-    useEffect(() => {
-        if (client && type && id) {
-            switch (type) {
-                case 'PROJECT': {
-                    client.request(
-                        gql`
-                            query EntityInformation( $id: Int!, ) {
-                                project(id: $id) {
-                                    id
-                                    name
-                                    authorizations {
-                                        name
-                                        action
-                                        authorized
-                                    }
-                                }
-                            }
-                        `, {id: Number(id)}
-                    ).then(data => {
-                        setEntityTypeName("Project")
-                        setTitle(projectTitleName(data.project, what))
-
-                        const breadcrumbs = projectBreadcrumbs()
-                        breadcrumbs.push(
-                            <ProjectLink project={data.project}/>
-                        )
-                        setBreadcrumbs(breadcrumbs)
-
-                        setUri(projectUri(data.project))
-
-                        setEntity(data.project)
-                    })
-                    break
-                }
-                case 'BRANCH': {
-                    client.request(
-                        gql`
-                            query EntityInformation( $id: Int!, ) {
-                                branch(id: $id) {
-                                    id
-                                    name
-                                    project {
-                                        id
-                                        name
-                                    }
-                                    authorizations {
-                                        name
-                                        action
-                                        authorized
-                                    }
-                                }
-                            }
-                        `, {id: Number(id)}
-                    ).then(data => {
-                        setEntityTypeName("Branch")
-                        setTitle(branchTitleName(data.branch, what))
-                        setBreadcrumbs(downToBranchBreadcrumbs(data))
-                        setUri(branchUri(data.branch))
-                        setEntity(data.branch)
-                    })
-                    break
-                }
-                case 'PROMOTION_LEVEL': {
-                    client.request(
-                        gql`
-                            query EntityInformation( $id: Int!, ) {
-                                promotionLevel(id: $id) {
-                                    id
-                                    name
-                                    image
-                                    branch {
-                                        id
-                                        name
-                                        displayName
-                                        project {
-                                            id
-                                            name
-                                        }
-                                    }
-                                    authorizations {
-                                        name
-                                        action
-                                        authorized
-                                    }
-                                }
-                            }
-                        `, {id: Number(id)}
-                    ).then(data => {
-                        setEntityTypeName("Promotion level")
-                        setTitle(promotionLevelTitleName(data.promotionLevel, what))
-
-                        const breadcrumbs = promotionLevelBreadcrumbs(data.promotionLevel)
-                        breadcrumbs.push(
-                            <PromotionLevelViewTitle
-                                key="entity"
-                                promotionLevel={data.promotionLevel}
-                                link={true}
-                            />
-                        )
-                        setBreadcrumbs(breadcrumbs)
-
-                        setUri(promotionLevelUri(data.promotionLevel))
-
-                        setEntity(data.promotionLevel)
-                    })
-                    break
-                }
-                case 'VALIDATION_STAMP': {
-                    client.request(
-                        gql`
-                            query EntityInformation( $id: Int!, ) {
-                                validationStamp(id: $id) {
-                                    id
-                                    name
-                                    image
-                                    branch {
-                                        id
-                                        name
-                                        displayName
-                                        project {
-                                            id
-                                            name
-                                        }
-                                    }
-                                    authorizations {
-                                        name
-                                        action
-                                        authorized
-                                    }
-                                }
-                            }
-                        `, {id: Number(id)}
-                    ).then(data => {
-                        setEntityTypeName("Validation stamp")
-                        setTitle(validationStampTitleName(data.validationStamp, what))
-
-                        const breadcrumbs = validationStampBreadcrumbs(data.validationStamp)
-                        breadcrumbs.push(
-                            <ValidationStampViewTitle
-                                key="entity"
-                                validationStamp={data.validationStamp}
-                                link={true}
-                            />
-                        )
-                        setBreadcrumbs(breadcrumbs)
-
-                        setUri(validationStampUri(data.validationStamp))
-
-                        setEntity(data.validationStamp)
-                    })
-                    break
+/**
+ * For each supported entity type, the field to query and how to turn the entity into the page information.
+ */
+const entityPageInfos = {
+    PROJECT: {
+        field: 'project',
+        query: gql`
+            query EntityInformation( $id: Int!, ) {
+                project(id: $id) {
+                    id
+                    name
+                    authorizations {
+                        name
+                        action
+                        authorized
+                    }
                 }
             }
-        }
-    }, [client, type, id]);
+        `,
+        pageInfo: (project, what) => ({
+            entityTypeName: "Project",
+            title: projectTitleName(project, what),
+            breadcrumbs: [
+                ...projectBreadcrumbs(),
+                <ProjectLink key="entity" project={project}/>,
+            ],
+            uri: projectUri(project),
+        }),
+    },
+    BRANCH: {
+        field: 'branch',
+        query: gql`
+            query EntityInformation( $id: Int!, ) {
+                branch(id: $id) {
+                    id
+                    name
+                    project {
+                        id
+                        name
+                    }
+                    authorizations {
+                        name
+                        action
+                        authorized
+                    }
+                }
+            }
+        `,
+        pageInfo: (branch, what) => ({
+            entityTypeName: "Branch",
+            title: branchTitleName(branch, what),
+            breadcrumbs: downToBranchBreadcrumbs({branch}),
+            uri: branchUri(branch),
+        }),
+    },
+    PROMOTION_LEVEL: {
+        field: 'promotionLevel',
+        query: gql`
+            query EntityInformation( $id: Int!, ) {
+                promotionLevel(id: $id) {
+                    id
+                    name
+                    image
+                    branch {
+                        id
+                        name
+                        displayName
+                        project {
+                            id
+                            name
+                        }
+                    }
+                    authorizations {
+                        name
+                        action
+                        authorized
+                    }
+                }
+            }
+        `,
+        pageInfo: (promotionLevel, what) => ({
+            entityTypeName: "Promotion level",
+            title: promotionLevelTitleName(promotionLevel, what),
+            breadcrumbs: [
+                ...promotionLevelBreadcrumbs(promotionLevel),
+                <PromotionLevelViewTitle
+                    key="entity"
+                    promotionLevel={promotionLevel}
+                    link={true}
+                />,
+            ],
+            uri: promotionLevelUri(promotionLevel),
+        }),
+    },
+    VALIDATION_STAMP: {
+        field: 'validationStamp',
+        query: gql`
+            query EntityInformation( $id: Int!, ) {
+                validationStamp(id: $id) {
+                    id
+                    name
+                    image
+                    branch {
+                        id
+                        name
+                        displayName
+                        project {
+                            id
+                            name
+                        }
+                    }
+                    authorizations {
+                        name
+                        action
+                        authorized
+                    }
+                }
+            }
+        `,
+        pageInfo: (validationStamp, what) => ({
+            entityTypeName: "Validation stamp",
+            title: validationStampTitleName(validationStamp, what),
+            breadcrumbs: [
+                ...validationStampBreadcrumbs(validationStamp),
+                <ValidationStampViewTitle
+                    key="entity"
+                    validationStamp={validationStamp}
+                    link={true}
+                />,
+            ],
+            uri: validationStampUri(validationStamp),
+        }),
+    },
+}
 
-    return {
-        entityTypeName,
-        title,
-        breadcrumbs,
-        uri,
-        entity,
-    }
+const noPageInfo = {
+    entityTypeName: '',
+    title: '',
+    breadcrumbs: [],
+    uri: '',
+    entity: {},
+}
+
+export const useProjectEntityPageInfo = (type, id, what) => {
+    const entityPageInfo = entityPageInfos[type]
+
+    const {data} = useQuery(
+        entityPageInfo?.query,
+        {
+            variables: {id: Number(id)},
+            deps: [type, id],
+            condition: !!(entityPageInfo && id),
+            // The type is kept with the entity: until the entity of a new type is loaded, the
+            // previous one must still be read with its own type
+            dataFn: data => ({type, entity: data[entityPageInfo.field]}),
+        }
+    )
+
+    return useMemo(
+        () => data?.entity ? {
+            ...entityPageInfos[data.type].pageInfo(data.entity, what),
+            entity: data.entity,
+        } : noPageInfo,
+        [data, what]
+    )
 }

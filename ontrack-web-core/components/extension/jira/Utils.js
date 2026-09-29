@@ -1,28 +1,24 @@
-import {useGraphQLClient} from "@components/providers/ConnectionContextProvider";
-import {useEffect, useState} from "react";
+import {useQuery} from "@components/services/GraphQL";
 import {gql} from "graphql-request";
 
 export const useJiraConfigurationUrl = (configName) => {
 
-    const client = useGraphQLClient()
-    const [url, setUrl] = useState('')
-
-    useEffect(() => {
-        if (client && configName) {
-            client.request(
-                gql`
-                    query GetJiraConfiguration($config: String!) {
-                        jiraConfiguration(name: $config) {
-                            url
-                        }
-                    }
-                `,
-                {config: configName}
-            ).then(data => {
-                setUrl(data.jiraConfiguration?.url)
-            })
+    const {data} = useQuery(
+        gql`
+            query GetJiraConfiguration($config: String!) {
+                jiraConfiguration(name: $config) {
+                    url
+                }
+            }
+        `,
+        {
+            variables: {config: configName},
+            deps: [configName],
+            condition: !!configName,
+            initialData: '',
+            dataFn: data => data.jiraConfiguration?.url,
         }
-    }, [client, configName]);
+    )
 
-    return url
+    return data ?? ''
 }

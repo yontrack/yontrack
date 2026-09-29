@@ -1,31 +1,26 @@
-import {useGraphQLClient} from "@components/providers/ConnectionContextProvider";
+import {useQuery} from "@components/services/GraphQL";
 import {gql} from "graphql-request";
-import {useEffect, useState} from "react";
 import {Select} from "antd";
+
+const noStates = []
 
 export default function SelectAutoVersioningAuditState({value, onChange}) {
 
-    const client = useGraphQLClient()
-
-    const [states, setStates] = useState([])
-    useEffect(() => {
-        if (client) {
-            client.request(
-                gql`
-                    query AutoVersioningAuditStates {
-                        autoVersioningAuditStates
-                    }
-                `
-            ).then(data => {
-                setStates(
-                    data.autoVersioningAuditStates.map(id => ({
-                        value: id,
-                        label: id,
-                    }))
-                )
-            })
+    const {data} = useQuery(
+        gql`
+            query AutoVersioningAuditStates {
+                autoVersioningAuditStates
+            }
+        `,
+        {
+            initialData: noStates,
+            dataFn: data => data.autoVersioningAuditStates.map(id => ({
+                value: id,
+                label: id,
+            })),
         }
-    }, [client]);
+    )
+    const states = data ?? noStates
 
     return (
         <>

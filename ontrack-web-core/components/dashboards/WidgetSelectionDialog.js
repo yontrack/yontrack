@@ -1,10 +1,12 @@
 import FormDialog, {useFormDialog} from "@components/form/FormDialog";
-import {useGraphQLClient} from "@components/providers/ConnectionContextProvider";
+import {useQuery} from "@components/services/GraphQL";
 import {gql} from "graphql-request";
-import {useEffect, useState} from "react";
+import {useState} from "react";
 import {Col, Input, Row, Space, Typography} from "antd";
 import SelectableWidget from "@components/dashboards/SelectableWidget";
 import {FaSearch} from "react-icons/fa";
+
+const noWidgets = []
 
 export const useWidgetSelectionDialog = ({onAddWidget}) => {
     return useFormDialog({
@@ -14,28 +16,24 @@ export const useWidgetSelectionDialog = ({onAddWidget}) => {
 
 export default function WidgetSelectionDialog({widgetSelectionDialog}) {
 
-    const client = useGraphQLClient()
-
-    const [availableWidgets, setAvailableWidgets] = useState([])
-    useEffect(() => {
-        if (client) {
-            client.request(
-                gql`
-                    query DashboardWidgets {
-                        dashboardWidgets {
-                            key
-                            name
-                            description
-                            defaultConfig
-                            preferredHeight
-                        }
-                    }
-                `
-            ).then(data => {
-                setAvailableWidgets(data.dashboardWidgets)
-            })
+    const {data} = useQuery(
+        gql`
+            query DashboardWidgets {
+                dashboardWidgets {
+                    key
+                    name
+                    description
+                    defaultConfig
+                    preferredHeight
+                }
+            }
+        `,
+        {
+            initialData: noWidgets,
+            dataFn: data => data.dashboardWidgets,
         }
-    }, [client])
+    )
+    const availableWidgets = data ?? noWidgets
 
     const [token, setToken] = useState('')
 

@@ -1,6 +1,6 @@
 import FormDialog, {useFormDialog} from "@components/form/FormDialog";
 import LoadingContainer from "@components/common/LoadingContainer";
-import {useGraphQLClient} from "@components/providers/ConnectionContextProvider";
+import {callGraphQL} from "@components/services/GraphQL";
 import {useState} from "react";
 import {gql} from "graphql-request";
 import {Space} from "antd";
@@ -8,7 +8,6 @@ import SlotPipelineInput from "@components/extension/environments/SlotPipelineIn
 
 export const useSlotPipelineInputDialog = (ruleConfigId) => {
 
-    const client = useGraphQLClient()
     const [loading, setLoading] = useState(true)
     const [inputs, setInputs] = useState([])
 
@@ -17,8 +16,8 @@ export const useSlotPipelineInputDialog = (ruleConfigId) => {
         inputs,
         init: (form, {pipeline}) => {
             setLoading(true)
-            client.request(
-                gql`
+            callGraphQL({
+                query: gql`
                     query PipelineInput($id: String!) {
                         slotPipelineById(id: $id) {
                             requiredInputs {
@@ -33,8 +32,8 @@ export const useSlotPipelineInputDialog = (ruleConfigId) => {
                         }
                     }
                 `,
-                {id: pipeline.id}
-            ).then(data => {
+                variables: {id: pipeline.id},
+            }).then(data => {
                 let inputs = data.slotPipelineById.requiredInputs;
                 if (ruleConfigId) {
                     inputs = inputs.filter(it => it.config.id === ruleConfigId)

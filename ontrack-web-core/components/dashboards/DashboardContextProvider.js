@@ -1,5 +1,4 @@
 import {createContext, useCallback, useContext, useEffect, useState} from "react";
-import {useGraphQLClient} from "@components/providers/ConnectionContextProvider";
 import {gql} from "graphql-request";
 import {
     deleteDashboardQuery,
@@ -11,7 +10,7 @@ import {
 import {Modal} from "antd";
 import {GridTableContext} from "@components/grid/GridTableContext";
 import {useRouter} from "next/router";
-import {useQuery} from "@components/services/GraphQL";
+import {callGraphQL, useQuery} from "@components/services/GraphQL";
 
 export const DashboardContext = createContext({
     /**
@@ -94,7 +93,6 @@ export const DashboardContext = createContext({
 
 export default function DashboardContextProvider({children}) {
 
-    const client = useGraphQLClient()
     const {clearExpandedId, setExpandable} = useContext(GridTableContext)
 
     // `Modal.useModal()` rather than the static `Modal.confirm`: the static one
@@ -170,10 +168,10 @@ export default function DashboardContextProvider({children}) {
             clearExpandedId()
             setEdition(false)
             setDashboard(value)
-            client.request(
-                selectDashboardQuery,
-                {uuid: value.uuid}
-            )
+            callGraphQL({
+                query: selectDashboardQuery,
+                variables: {uuid: value.uuid},
+            })
         }
     }
 
@@ -187,10 +185,10 @@ export default function DashboardContextProvider({children}) {
                 ...dashboard,
                 userScope: 'SHARED',
             })
-            client.request(
-                shareDashboardQuery,
-                {uuid: dashboard.uuid}
-            )
+            callGraphQL({
+                query: shareDashboardQuery,
+                variables: {uuid: dashboard.uuid},
+            })
         }
     }
 
@@ -202,10 +200,10 @@ export default function DashboardContextProvider({children}) {
                 okText: "Delete",
                 okType: "danger",
                 onOk: () => {
-                    client.request(
-                        deleteDashboardQuery,
-                        {uuid: dashboard.uuid}
-                    )
+                    callGraphQL({
+                        query: deleteDashboardQuery,
+                        variables: {uuid: dashboard.uuid},
+                    })
                     // Selects the default dashboard
                     refresh()
                 }
@@ -256,10 +254,10 @@ export default function DashboardContextProvider({children}) {
                 }
             }
 
-            client.request(
-                saveDashboardQuery,
-                current
-            ).then(() => {
+            callGraphQL({
+                query: saveDashboardQuery,
+                variables: current,
+            }).then(() => {
                 setDashboard(current)
                 // OK
                 setEdition(false)

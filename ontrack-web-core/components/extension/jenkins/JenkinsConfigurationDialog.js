@@ -1,7 +1,7 @@
 import FormDialog, {useFormDialog} from "@components/form/FormDialog";
 import {gql} from "graphql-request";
 import {Button, Form, Input} from "antd";
-import {useGraphQLClient} from "@components/providers/ConnectionContextProvider";
+import {callGraphQL} from "@components/services/GraphQL";
 import {useState} from "react";
 import ConnectionResult from "@components/configurations/ConnectionResult";
 
@@ -56,14 +56,12 @@ export const useJenkinsConfigurationDialog = ({onSuccess}) => {
 
 export default function JenkinsConfigurationDialog({jenkinsConfigurationDialog}) {
 
-    const client = useGraphQLClient()
-
     const [connectionResult, setConnectionResult] = useState()
 
     const onTestConfig = () => {
         setConnectionResult(undefined)
-        client.request(
-            gql`
+        callGraphQL({
+            query: gql`
                 mutation TestJenkinsConfiguration(
                     $name: String!,
                     $url: String!,
@@ -86,8 +84,8 @@ export default function JenkinsConfigurationDialog({jenkinsConfigurationDialog})
                     }
                 }
             `,
-            jenkinsConfigurationDialog.form.getFieldsValue(true)
-        ).then(data => {
+            variables: jenkinsConfigurationDialog.form.getFieldsValue(true),
+        }).then(data => {
             const node = data.testJenkinsConfiguration
             if (node.errors) {
                 const {message} = node.errors[0]

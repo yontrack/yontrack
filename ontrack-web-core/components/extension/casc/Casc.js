@@ -1,10 +1,10 @@
 import CascLocations from "@components/extension/casc/CascLocations";
 import {Button, Card, message, Popconfirm, Space, Typography} from "antd";
 import {FaSync} from "react-icons/fa";
-import {useGraphQLClient} from "@components/providers/ConnectionContextProvider";
+import {callGraphQL, useQuery} from "@components/services/GraphQL";
 import {gql} from "graphql-request";
 import {processGraphQLErrors} from "@components/services/graphql-utils";
-import {useEffect, useState} from "react";
+import {useState} from "react";
 import {useRefresh} from "@components/common/RefreshUtils";
 import LoadingContainer from "@components/common/LoadingContainer";
 import Yaml from "@components/common/Yaml";
@@ -12,14 +12,13 @@ import Yaml from "@components/common/Yaml";
 export default function Casc() {
 
     const [messageApi, contextHolder] = message.useMessage()
-    const client = useGraphQLClient()
 
     const [reloading, setReloading] = useState(false)
     const reloadCasc = async () => {
         setReloading(true)
         try {
-            const data = await client.request(
-                gql`
+            const data = await callGraphQL({
+                query: gql`
                     mutation ReloadCasc {
                         reloadCasc {
                             errors {
@@ -27,8 +26,8 @@ export default function Casc() {
                             }
                         }
                     }
-                `
-            )
+                `,
+            })
 
             if (processGraphQLErrors(data, 'reloadCasc', messageApi)) {
                 reload()
@@ -39,27 +38,23 @@ export default function Casc() {
     }
 
     const [loadState, reload] = useRefresh()
-    const [loading, setLoading] = useState(false)
-    const [cascYaml, setCascYaml] = useState('')
-
-    useEffect(() => {
-        if (client && loadState > 0) {
-            setLoading(true)
-            client.request(
-                gql`
-                    query Casc {
-                        casc {
-                            yaml
-                        }
-                    }
-                `
-            ).then(data => {
-                setCascYaml(data.casc.yaml)
-            }).finally(() => {
-                setLoading(false)
-            })
+    // Only loaded on demand: by the "Load" button, or after a reload of the configuration
+    const {data, loading} = useQuery(
+        gql`
+            query Casc {
+                casc {
+                    yaml
+                }
+            }
+        `,
+        {
+            deps: [loadState],
+            condition: loadState > 0,
+            initialData: '',
+            dataFn: data => data.casc.yaml,
         }
-    }, [client, loadState])
+    )
+    const cascYaml = data ?? ''
 
     return (
         <>
