@@ -14,7 +14,7 @@ class ReleaseValidationPropertyLabelListenerIT : AbstractGeneralExtensionTestSup
                 val vs = validationStamp()
                 setProperty(this, ReleaseValidationPropertyType::class.java, ReleaseValidationProperty(vs.name))
                 build {
-                    releaseProperty = "2.1.0"
+                    releaseProperty(this, "2.1.0")
                     // Checks this build has been validated
                     val run = structureService.getValidationRunsForBuildAndValidationStamp(id, vs.id, 0, 1)
                         .firstOrNull()
@@ -31,7 +31,7 @@ class ReleaseValidationPropertyLabelListenerIT : AbstractGeneralExtensionTestSup
                 val vsName = uid("vs")
                 setProperty(this, ReleaseValidationPropertyType::class.java, ReleaseValidationProperty(vsName))
                 build {
-                    releaseProperty = "2.1.0"
+                    releaseProperty(this, "2.1.0")
                     // Checks the validation stamp exists now
                     assertNotNull(
                         structureService.findValidationStampByName(project.name, branch.name, vsName).getOrNull(),

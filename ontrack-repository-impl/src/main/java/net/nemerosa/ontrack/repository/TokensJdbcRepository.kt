@@ -3,6 +3,8 @@ package net.nemerosa.ontrack.repository
 import net.nemerosa.ontrack.model.security.Account
 import net.nemerosa.ontrack.model.structure.Token
 import net.nemerosa.ontrack.repository.support.AbstractJdbcRepository
+import net.nemerosa.ontrack.repository.support.readLocalDateTimeNotNull
+import net.nemerosa.ontrack.repository.support.readLocalDateTime
 import org.springframework.stereotype.Repository
 import java.sql.ResultSet
 import java.time.LocalDateTime
@@ -118,9 +120,9 @@ class TokensJdbcRepository(dataSource: DataSource) : AbstractJdbcRepository(data
         return Token(
             name = rs.getString("NAME"),
             value = rs.getString("VALUE"),
-            creation = dateTimeFromDB(rs.getString("CREATION"))!!,
-            validUntil = dateTimeFromDB(rs.getString("VALID_UNTIL")),
-            lastUsed = dateTimeFromDB(rs.getString("LAST_USED")),
+            creation = rs.readLocalDateTimeNotNull("CREATION"),
+            validUntil = rs.readLocalDateTime("VALID_UNTIL"),
+            lastUsed = rs.readLocalDateTime("LAST_USED"),
         )
     }
 }

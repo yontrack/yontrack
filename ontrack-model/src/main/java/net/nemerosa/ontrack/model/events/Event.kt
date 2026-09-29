@@ -127,9 +127,6 @@ class Event(
                 with(name, NameValue(name, value))
             }
 
-        @Deprecated("Use build()", replaceWith = ReplaceWith("build()"))
-        fun get(): Event = build()
-
         fun build(): Event {
             // Creates the event
             val event = Event(

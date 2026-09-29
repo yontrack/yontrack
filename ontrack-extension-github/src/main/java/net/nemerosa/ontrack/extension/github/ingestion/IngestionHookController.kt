@@ -1,6 +1,7 @@
 package net.nemerosa.ontrack.extension.github.ingestion
 
 import io.micrometer.core.instrument.MeterRegistry
+import net.nemerosa.ontrack.common.excludes
 import net.nemerosa.ontrack.extension.github.ingestion.metrics.INGESTION_METRIC_EVENT_TAG
 import net.nemerosa.ontrack.extension.github.ingestion.metrics.IngestionMetrics
 import net.nemerosa.ontrack.extension.github.ingestion.payload.*
@@ -10,7 +11,6 @@ import net.nemerosa.ontrack.extension.github.ingestion.processing.model.Reposito
 import net.nemerosa.ontrack.extension.github.ingestion.queue.IngestionHookQueue
 import net.nemerosa.ontrack.extension.github.ingestion.settings.GitHubIngestionSettings
 import net.nemerosa.ontrack.extension.github.ingestion.settings.GitHubIngestionSettingsMissingTokenException
-import net.nemerosa.ontrack.extension.github.ingestion.support.FilterHelper
 import net.nemerosa.ontrack.json.parse
 import net.nemerosa.ontrack.json.parseAsJson
 import net.nemerosa.ontrack.model.metrics.increment
@@ -91,7 +91,7 @@ class IngestionHookController(
         }
         // Repository-based filter
         if (repository != null) {
-            if (FilterHelper.excludes(
+            if (excludes(
                     repository.name,
                     settings.repositoryIncludes,
                     settings.repositoryExcludes

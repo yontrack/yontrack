@@ -2,6 +2,8 @@ package net.nemerosa.ontrack.extension.scorecard.charts.e2e
 
 import net.nemerosa.ontrack.common.Time
 import net.nemerosa.ontrack.repository.support.AbstractJdbcRepository
+import net.nemerosa.ontrack.repository.support.readLocalDateTimeNotNull
+import net.nemerosa.ontrack.repository.support.readLocalDateTime
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource
 import org.springframework.stereotype.Repository
@@ -123,19 +125,19 @@ class EndToEndPromotionsJdbcHelper(
             project = getString("ref_project"),
             branch = getString("ref_branch"),
             build = getString("ref_build"),
-            buildCreation = dateTimeFromDB(getString("ref_build_creation"))!!,
+            buildCreation = readLocalDateTimeNotNull("ref_build_creation"),
             promotionId = getInt("ref_promotion_id"),
             promotion = getString("ref_promotion"),
-            promotionCreation = dateTimeFromDB(getString("ref_promotion_creation"))
+            promotionCreation = readLocalDateTime("ref_promotion_creation")
         ),
         target = EndToEndPromotionNode(
             project = getString("project"),
             branch = getString("branch"),
             build = getString("build"),
-            buildCreation = dateTimeFromDB(getString("build_creation"))!!,
+            buildCreation = readLocalDateTimeNotNull("build_creation"),
             promotionId = getInt("promotion_id"),
             promotion = getString("promotion"),
-            promotionCreation = dateTimeFromDB(getString("promotion_creation"))
+            promotionCreation = readLocalDateTime("promotion_creation")
         )
     )
 }

@@ -158,12 +158,6 @@ inline fun <reified E : Enum<E>> JsonNode.getEnum(field: String): E? {
 }
 
 /**
- * Gets a field as [Int].
- */
-@Deprecated(message = "Use getIntField", replaceWith = ReplaceWith("getIntField"))
-fun JsonNode.getInt(field: String): Int? = getIntField(field)
-
-/**
  * Gets a field as a JSON node, but returns `null` if this is a null node.
  */
 fun JsonNode.getJsonField(field: String): JsonNode? =

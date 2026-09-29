@@ -4,7 +4,7 @@ import graphql.Scalars.GraphQLString
 import graphql.schema.GraphQLObjectType
 import net.nemerosa.ontrack.graphql.schema.authorizations.GQLInterfaceAuthorizableService
 import net.nemerosa.ontrack.graphql.support.enumField
-import net.nemerosa.ontrack.graphql.support.idField
+import net.nemerosa.ontrack.graphql.support.intIdField
 import net.nemerosa.ontrack.graphql.support.listType
 import net.nemerosa.ontrack.graphql.support.stringField
 import net.nemerosa.ontrack.model.annotations.getPropertyDescription
@@ -24,7 +24,7 @@ class GQLTypeValidationStampFilter(
     override fun createType(cache: GQLTypeCache): GraphQLObjectType = GraphQLObjectType.newObject()
         .name(typeName)
         .description("Validation stamp filter")
-        .idField(ValidationStampFilter::id)
+        .intIdField(ValidationStampFilter::id)
         .stringField(ValidationStampFilter::name)
         .field {
             it.name(getPropertyName(ValidationStampFilter::vsNames))

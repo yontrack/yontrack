@@ -53,13 +53,7 @@ object Time: TimeServer {
     /**
      * Keeps only the 4 first digits of the nano seconds field.
      */
-    @Deprecated("Use store instead and null-proof operators.", replaceWith = ReplaceWith("store"))
     @JvmStatic
-    fun forStorage(time: LocalDateTime?): String? = time?.format(DATE_TIME_STORAGE_FORMAT)
-
-    /**
-     * Keeps only the 4 first digits of the nano seconds field.
-     */
     fun store(time: LocalDateTime): String = time.format(DATE_TIME_STORAGE_FORMAT)
 
     /**

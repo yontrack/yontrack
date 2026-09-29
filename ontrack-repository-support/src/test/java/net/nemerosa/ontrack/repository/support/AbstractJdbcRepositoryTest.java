@@ -1,11 +1,11 @@
 package net.nemerosa.ontrack.repository.support;
 
+import net.nemerosa.ontrack.common.Time;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;
 
 import static net.nemerosa.ontrack.repository.support.AbstractJdbcRepository.dateTimeForDB;
-import static net.nemerosa.ontrack.repository.support.AbstractJdbcRepository.dateTimeFromDB;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
@@ -28,7 +28,7 @@ public class AbstractJdbcRepositoryTest {
         String db = dateTimeForDB(time);
         assertEquals("2014-05-22T22:07:10", db);
         // Back from the database:
-        LocalDateTime back = dateTimeFromDB(db);
+        LocalDateTime back = Time.fromStorage(db);
         assertEquals(time, back);
     }
 

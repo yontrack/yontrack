@@ -432,14 +432,6 @@ abstract class AbstractServiceTestSupport : AbstractITTestSupport() {
         /**
          * Associates a list of project functions for a given project (designated by the [entity][e]) to this account
          */
-        @Deprecated("Use withProjectFunction", ReplaceWith("withProjectFunction(e, fn)"))
-        fun with(e: ProjectEntity, fn: Class<out ProjectFunction>): ConfigurableAccountCall {
-            return with(e.projectId(), fn)
-        }
-
-        /**
-         * Associates a list of project functions for a given project (designated by the [entity][e]) to this account
-         */
         fun withProjectFunction(e: ProjectEntity, fn: Class<out ProjectFunction>): ConfigurableAccountCall {
             return with(e.projectId(), fn)
         }

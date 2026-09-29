@@ -3,6 +3,7 @@ package net.nemerosa.ontrack.extension.environments.storage
 import net.nemerosa.ontrack.common.Time
 import net.nemerosa.ontrack.extension.environments.*
 import net.nemerosa.ontrack.repository.support.AbstractJdbcRepository
+import net.nemerosa.ontrack.repository.support.readLocalDateTimeNotNull
 import org.springframework.stereotype.Repository
 import java.sql.ResultSet
 import javax.sql.DataSource
@@ -85,14 +86,14 @@ class SlotPipelineAdmissionRuleStatusRepository(
         data = readJson(rs, "data")?.let { data ->
             SlotAdmissionRuleData(
                 user = rs.getString("data_user"),
-                timestamp = dateTimeFromDB(rs.getString("data_timestamp"))!!,
+                timestamp = rs.readLocalDateTimeNotNull("data_timestamp"),
                 data = data,
             )
         },
         override = rs.getString("override_user")?.let { user ->
             SlotAdmissionRuleOverride(
                 user = user,
-                timestamp = dateTimeFromDB(rs.getString("override_timestamp"))!!,
+                timestamp = rs.readLocalDateTimeNotNull("override_timestamp"),
                 message = rs.getString("override_message"),
             )
         },

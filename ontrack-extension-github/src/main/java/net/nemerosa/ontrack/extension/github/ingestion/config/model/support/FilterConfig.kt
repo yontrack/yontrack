@@ -2,7 +2,7 @@ package net.nemerosa.ontrack.extension.github.ingestion.config.model.support
 
 import net.nemerosa.ontrack.common.api.APIDescription
 import net.nemerosa.ontrack.common.api.APIName
-import net.nemerosa.ontrack.extension.github.ingestion.support.FilterHelper
+import net.nemerosa.ontrack.common.includes as filterIncludes
 
 /**
  * Filter rule
@@ -18,7 +18,7 @@ data class FilterConfig(
     @APIDescription("Regular expression to exclude the items (empty = no exclusion)")
     val excludes: String = "",
 ) {
-    fun includes(name: String) = FilterHelper.includes(name, includes, excludes)
+    fun includes(name: String) = filterIncludes(name, includes, excludes)
 
     companion object {
         /**

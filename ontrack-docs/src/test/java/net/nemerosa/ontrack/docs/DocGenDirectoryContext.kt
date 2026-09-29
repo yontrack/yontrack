@@ -8,28 +8,6 @@ class DocGenDirectoryContext(
     private val dir: File,
 ) {
 
-    @Deprecated("Use StringBuilder extension in MarkdownUtils.kt")
-    fun writeFields(
-        s: StringBuilder,
-        fields: List<FieldDocumentation>,
-        level: Int = 1,
-    ) {
-        fields
-            .sortedBy { it.name }
-            .forEach { (name, description, type, required, subfields) ->
-                s.append(" ".repeat(4 * (level - 1))).append("*").append(" **").append(name).append("** - ")
-                    .append(type)
-                    .append(" - ")
-                    .append(if (required) "required" else "optional")
-                    .append(" - ")
-                    .append(description?.trimIndent()).append("\n")
-                    .append("\n")
-                if (subfields.isNotEmpty()) {
-                    writeFields(s, subfields, level + 1)
-                }
-            }
-    }
-
     fun writeFile(
         fileName: String,
         code: (s: StringBuilder) -> Unit,
@@ -88,7 +66,7 @@ class DocGenDirectoryContext(
 
             if (fields.isNotEmpty()) {
                 s.h2("Configuration")
-                writeFields(s, fields, 1)
+                s.writeFields(fields, 1)
             }
 
             extendedConfig(s)

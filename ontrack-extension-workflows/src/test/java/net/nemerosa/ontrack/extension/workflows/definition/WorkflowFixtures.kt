@@ -1,6 +1,5 @@
 package net.nemerosa.ontrack.extension.workflows.definition
 
-import tools.jackson.databind.node.StringNode
 import net.nemerosa.ontrack.extension.workflows.registry.WorkflowParser
 
 object WorkflowFixtures {
@@ -20,58 +19,24 @@ object WorkflowFixtures {
               text: End node
     """.trimIndent()
 
-    @Deprecated("Use YAML instead")
-    fun simpleLinearWorkflow(
-        name: String = "Simple linear"
-    ) =
-        Workflow(
-            name = name,
-            nodes = listOf(
-                WorkflowNode(
-                    id = "start",
-                    executorId = "mock",
-                    data = StringNode("Start node"),
-                    parents = emptyList(),
-                ),
-                WorkflowNode(
-                    id = "end",
-                    executorId = "mock",
-                    data = StringNode("End node"),
-                    parents = listOf(
-                        WorkflowParentNode(
-                            id = "start"
-                        )
-                    ),
-                ),
-            )
-        )
-
-    @Deprecated("Use YAML instead")
     fun cyclicWorkflow() =
-        Workflow(
-            name = "Simple cyclic",
-            nodes = listOf(
-                WorkflowNode(
-                    id = "start",
-                    executorId = "mock",
-                    data = StringNode("Start node"),
-                    parents = listOf(
-                        WorkflowParentNode(
-                            id = "end",
-                        )
-                    ),
-                ),
-                WorkflowNode(
-                    id = "end",
-                    executorId = "mock",
-                    data = StringNode("End node"),
-                    parents = listOf(
-                        WorkflowParentNode(
-                            id = "start"
-                        )
-                    ),
-                ),
-            )
+        WorkflowParser.parseYamlWorkflow(
+            """
+                name: Simple cyclic
+                nodes:
+                  - id: start
+                    parents:
+                      - id: end
+                    executorId: mock
+                    data:
+                        text: Start node
+                  - id: end
+                    parents:
+                      - id: start
+                    executorId: mock
+                    data:
+                        text: End node
+            """.trimIndent()
         )
 
     fun twoParallelAndJoin() =

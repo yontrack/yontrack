@@ -44,7 +44,7 @@ class TemplatingRenderableDocumentationIT : AbstractDocGenIT() {
                         s.append("* `${field.name}`: ${field.description}\n\n")
                         field.config?.let {
                             val list = getFieldsDocumentation(it)
-                            directoryContext.writeFields(s, list, level = 2)
+                            s.writeFields(list, level = 2)
                         }
                     }
                 },

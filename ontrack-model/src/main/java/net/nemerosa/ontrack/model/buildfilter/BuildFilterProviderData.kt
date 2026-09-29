@@ -33,19 +33,4 @@ class BuildFilterProviderData<T>(
     fun filterBranchBuildsWithPagination(branch: Branch, offset: Int, size: Int): PaginatedList<Build> {
         return provider.filterBranchBuildsWithPagination(branch, data, offset, size)
     }
-
-    companion object {
-        /**
-         * Builder
-         */
-        @Deprecated(
-            "Use the constructor directly", ReplaceWith(
-                "BuildFilterProviderData(provider, data)",
-            )
-        )
-        @JvmStatic
-        fun <T> of(provider: BuildFilterProvider<T>, data: T): BuildFilterProviderData<T> {
-            return BuildFilterProviderData(provider, data)
-        }
-    }
 }

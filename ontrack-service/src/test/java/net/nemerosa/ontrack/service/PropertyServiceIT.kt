@@ -17,7 +17,7 @@ class PropertyServiceIT : AbstractDSLTestSupport() {
         project {
             assertFalse(propertyService.hasProperty(this, TestSimplePropertyType::class.java), "No property set yet")
             // Setting the property
-            asUser().with(this, ProjectEdit::class.java).call {
+            asUser().withProjectFunction(this, ProjectEdit::class.java).call {
                 propertyService.editProperty(this, TestSimplePropertyType::class.java, TestSimpleProperty("my-value"))
                 assertTrue(propertyService.hasProperty(this, TestSimplePropertyType::class.java), "Property is now set")
             }

@@ -47,7 +47,7 @@ class WorkflowNodeExecutorsDocumentationIT : AbstractDocGenIT() {
                 extendedConfig = { s ->
                     if (outputFieldsDocumentation.isNotEmpty()) {
                         s.append("Output:\n\n")
-                        directoryContext.writeFields(s, outputFieldsDocumentation)
+                        s.writeFields(outputFieldsDocumentation)
                     }
                 },
             )

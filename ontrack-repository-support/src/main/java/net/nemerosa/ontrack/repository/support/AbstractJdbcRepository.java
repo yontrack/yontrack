@@ -135,16 +135,7 @@ public abstract class AbstractJdbcRepository {
 
     public static @Nullable
     String dateTimeForDB(@Nullable LocalDateTime time) {
-        return Time.forStorage(time);
-    }
-
-    /**
-     * @deprecated Use ResultSet.readLocalDateTime or ResultSet.readLocalDateTimeNotNull
-     */
-    @Deprecated
-    protected static @Nullable
-    LocalDateTime dateTimeFromDB(@Nullable String value) {
-        return Time.fromStorage(value);
+        return time != null ? Time.store(time) : null;
     }
 
     public Signature readSignature(ResultSet rs) throws SQLException {
@@ -153,7 +144,7 @@ public abstract class AbstractJdbcRepository {
 
     protected Signature readSignature(ResultSet rs, String creationColumn, String creatorColumn) throws SQLException {
         return Signature.of(
-                dateTimeFromDB(rs.getString(creationColumn)),
+                Time.fromStorage(rs.getString(creationColumn)),
                 rs.getString(creatorColumn)
         );
     }

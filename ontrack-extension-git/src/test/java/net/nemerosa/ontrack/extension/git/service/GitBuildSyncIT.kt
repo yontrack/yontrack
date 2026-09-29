@@ -68,7 +68,7 @@ class GitBuildSyncIT : AbstractServiceTestSupport() {
             val project = branch.project
 
             // Configures the project and the branch
-            asUser().with(project, ProjectEdit::class.java).call {
+            asUser().withProjectFunction(project, ProjectEdit::class.java).call {
                 propertyService.editProperty(
                         project,
                         LocalGitProjectConfigurationPropertyType::class.java,

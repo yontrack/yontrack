@@ -16,6 +16,8 @@ import net.nemerosa.ontrack.model.trigger.TriggerData
 import net.nemerosa.ontrack.model.trigger.TriggerRegistry
 import net.nemerosa.ontrack.model.trigger.getTriggerById
 import net.nemerosa.ontrack.repository.support.AbstractJdbcRepository
+import net.nemerosa.ontrack.repository.support.readLocalDateTimeNotNull
+import net.nemerosa.ontrack.repository.support.readLocalDateTime
 import org.springframework.stereotype.Repository
 import java.sql.ResultSet
 import java.time.LocalDateTime
@@ -263,7 +265,7 @@ class WorkflowInstanceRepository(
     private fun ResultSet.toInstanceRow() = InstanceRow(
         triggerId = getString("TRIGGER_ID"),
         triggerData = readJson(this, "TRIGGER_DATA"),
-        timestamp = dateTimeFromDB(getString("TIMESTAMP"))!!,
+        timestamp = readLocalDateTimeNotNull("TIMESTAMP"),
         workflow = readJson(this, "WORKFLOW"),
         event = readJson(this, "EVENT"),
     )
@@ -271,8 +273,8 @@ class WorkflowInstanceRepository(
     private fun toWorkflowInstanceNode(rsn: ResultSet) = WorkflowInstanceNode(
         id = rsn.getString("NODE_ID"),
         status = WorkflowInstanceNodeStatus.valueOf(rsn.getString("STATUS")),
-        startTime = dateTimeFromDB(rsn.getString("START_TIME")),
-        endTime = dateTimeFromDB(rsn.getString("END_TIME")),
+        startTime = rsn.readLocalDateTime("START_TIME"),
+        endTime = rsn.readLocalDateTime("END_TIME"),
         output = readJson(rsn, "OUTPUT"),
         error = rsn.getString("ERROR"),
     )

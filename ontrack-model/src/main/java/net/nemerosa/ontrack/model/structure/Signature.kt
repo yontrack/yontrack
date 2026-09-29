@@ -16,7 +16,7 @@ data class Signature(
     /**
      * Keeps at most 4 first digits for the nano seconds.
      *
-     * @see [Time.forStorage]
+     * @see [Time.store]
      * @see [Time.fromStorage]
      */
     fun truncate() = Signature(

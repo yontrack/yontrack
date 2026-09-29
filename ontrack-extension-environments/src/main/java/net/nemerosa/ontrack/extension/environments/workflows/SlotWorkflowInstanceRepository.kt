@@ -6,6 +6,8 @@ import net.nemerosa.ontrack.extension.environments.SlotPipeline
 import net.nemerosa.ontrack.extension.environments.storage.SlotPipelineRepository
 import net.nemerosa.ontrack.extension.workflows.repository.WorkflowInstanceRepository
 import net.nemerosa.ontrack.repository.support.AbstractJdbcRepository
+import net.nemerosa.ontrack.repository.support.readLocalDateTimeNotNull
+import net.nemerosa.ontrack.repository.support.readLocalDateTime
 import org.springframework.stereotype.Repository
 import java.sql.ResultSet
 import java.time.LocalDateTime
@@ -70,7 +72,7 @@ class SlotWorkflowInstanceRepository(
         val workflowInstanceId = rs.getString("workflow_instance_id")
         return SlotWorkflowInstance(
             id = rs.getString("id"),
-            start = dateTimeFromDB(rs.getString("start"))!!,
+            start = rs.readLocalDateTimeNotNull("start"),
             pipeline = slotPipelineRepository.getPipelineById(rs.getString("pipeline_id")),
             slotWorkflow = slotWorkflowRepository.getSlotWorkflowById(rs.getString("slot_workflow_id")),
             workflowInstance = workflowInstanceRepository.findWorkflowInstance(workflowInstanceId)
@@ -78,7 +80,7 @@ class SlotWorkflowInstanceRepository(
             override = if (rs.getBoolean("override")) {
                 SlotAdmissionRuleOverride(
                     user = rs.getString("user"),
-                    timestamp = dateTimeFromDB(rs.getString("timestamp")) ?: Time.now,
+                    timestamp = rs.readLocalDateTime("timestamp") ?: Time.now,
                     message = rs.getString("override_message")
                 )
             } else {

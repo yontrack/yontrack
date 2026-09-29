@@ -46,21 +46,6 @@ class AutoVersioningConfigSetup {
     var qualifier: String? = null
     var versionSource: String? = null
 
-    @Deprecated("Use project property directory")
-    fun sourceProject(value: String) {
-        project = value
-    }
-
-    @Deprecated("Use branch property directory")
-    fun sourceBranch(value: String) {
-        branch = value
-    }
-
-    @Deprecated("Use promotion property directory")
-    fun sourcePromotion(value: String) {
-        promotion = value
-    }
-
     operator fun invoke() = AutoVersioningSourceConfig(
         sourceProject = project ?: throw IllegalStateException("Missing source project"),
         sourceBranch = branch,

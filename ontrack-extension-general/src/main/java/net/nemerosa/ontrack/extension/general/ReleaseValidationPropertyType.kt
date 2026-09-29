@@ -36,7 +36,6 @@ class ReleaseValidationPropertyType(
 
     override fun fromStorage(node: JsonNode): ReleaseValidationProperty = node.parse()
 
-    @Deprecated("Will be removed in V5")
     override fun replaceValue(
         value: ReleaseValidationProperty,
         replacementFunction: (String) -> String,

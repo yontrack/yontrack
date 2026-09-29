@@ -3,9 +3,11 @@ package net.nemerosa.ontrack.extension.github.ingestion.processing.config
 import net.nemerosa.ontrack.extension.github.ingestion.config.model.*
 import net.nemerosa.ontrack.extension.github.ingestion.config.parser.ConfigParser
 import net.nemerosa.ontrack.extension.github.ingestion.config.parser.ConfigParsingException
+import net.nemerosa.ontrack.extension.github.ingestion.config.parser.ConfigVersionException
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertIs
 
 class ConfigParserTest {
 
@@ -85,108 +87,69 @@ class ConfigParserTest {
     }
 
     @Test
-    fun `V1 configuration`() {
+    fun `Configuration without a version is read as V2`() {
         test(
             """
-                version: v1
                 jobs:
                     validationPrefix: false
                     mappings:
                         - name: Job name
                           validation: my-job
-                          description: My description
                 steps:
                     mappings:
                         - name: Step name
                           validation: my-validation
-                          validationPrefix: false
-                          description: My description
             """
         ) {
-            assertEquals("v1", it.version)
-
+            assertEquals("v2", it.version)
             assertEquals(false, it.jobs.validationPrefix)
-            assertEquals(1, it.jobs.mappings.size)
-            assertEquals("Job name", it.jobs.mappings.first().name)
-            assertEquals("my-job", it.jobs.mappings.first().validation)
-            assertEquals("My description", it.jobs.mappings.first().description)
-
-            assertEquals(1, it.steps.mappings.size)
-            assertEquals("Step name", it.steps.mappings.first().name)
-            assertEquals("my-validation", it.steps.mappings.first().validation)
-            assertEquals(false, it.steps.mappings.first().validationPrefix)
-            assertEquals("My description", it.steps.mappings.first().description)
-
-            assertEquals(IngestionConfigVSNameNormalization.LEGACY, it.vsNameNormalization)
-        }
-    }
-
-    @Test
-    fun `V1 configuration with default VS name normalization`() {
-        test(
-            """
-                version: v1
-                jobs:
-                    validationPrefix: false
-                    mappings:
-                        - name: Job name
-                          validation: my-job
-                          description: My description
-                steps:
-                    mappings:
-                        - name: Step name
-                          validation: my-validation
-                          validationPrefix: false
-                          description: My description
-                vs-name-normalization: DEFAULT
-            """
-        ) {
-            assertEquals("v1", it.version)
-
-            assertEquals(false, it.jobs.validationPrefix)
-            assertEquals(1, it.jobs.mappings.size)
-            assertEquals("Job name", it.jobs.mappings.first().name)
-            assertEquals("my-job", it.jobs.mappings.first().validation)
-            assertEquals("My description", it.jobs.mappings.first().description)
-
-            assertEquals(1, it.steps.mappings.size)
-            assertEquals("Step name", it.steps.mappings.first().name)
-            assertEquals("my-validation", it.steps.mappings.first().validation)
-            assertEquals(false, it.steps.mappings.first().validationPrefix)
-            assertEquals("My description", it.steps.mappings.first().description)
-
+            assertEquals("my-job", it.jobs.mappings.single().validation)
+            assertEquals("my-validation", it.steps.mappings.single().validation)
             assertEquals(IngestionConfigVSNameNormalization.DEFAULT, it.vsNameNormalization)
         }
     }
 
     @Test
-    fun `V0 configuration`() {
-        test(
-            """
-                jobs:
-                    - name: Job name
-                      validation: my-job
-                      description: My description
-                steps:
-                    - name: Step name
-                      validation: my-validation
-                      validationJobPrefix: false
-                      description: My description
-            """
-        ) {
-            assertEquals("v0", it.version)
+    fun `Empty configuration is the default one`() {
+        test("") {
+            assertEquals(IngestionConfig(), it)
+        }
+    }
 
-            assertEquals(true, it.jobs.validationPrefix)
-            assertEquals(1, it.jobs.mappings.size)
-            assertEquals("Job name", it.jobs.mappings.first().name)
-            assertEquals("my-job", it.jobs.mappings.first().validation)
-            assertEquals("My description", it.jobs.mappings.first().description)
+    @Test
+    fun `V1 configuration is no longer supported`() {
+        val ex = assertFailsWith<ConfigParsingException> {
+            ConfigParser.parseYaml(
+                """
+                    version: v1
+                    jobs:
+                        validationPrefix: false
+                """.trimIndent()
+            )
+        }
+        val cause = assertIs<ConfigVersionException>(ex.cause)
+        assertEquals(
+            "Unsupported version for the ingestion configuration: v1. Use version v2 instead.",
+            cause.message
+        )
+    }
 
-            assertEquals(1, it.steps.mappings.size)
-            assertEquals("Step name", it.steps.mappings.first().name)
-            assertEquals("my-validation", it.steps.mappings.first().validation)
-            assertEquals(false, it.steps.mappings.first().validationPrefix)
-            assertEquals("My description", it.steps.mappings.first().description)
+    @Test
+    fun `V0 configuration is no longer supported`() {
+        assertFailsWith<ConfigParsingException> {
+            ConfigParser.parseYaml(
+                """
+                    jobs:
+                        - name: Job name
+                          validation: my-job
+                          description: My description
+                    steps:
+                        - name: Step name
+                          validation: my-validation
+                          validationJobPrefix: false
+                          description: My description
+                """.trimIndent()
+            )
         }
     }
 

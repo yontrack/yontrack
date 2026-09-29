@@ -54,15 +54,6 @@ val ProjectEntity.nameValues: Map<String, String>
     }
 
 /**
- * Name for an entity
- */
-@Deprecated(
-    "Will be removed in V5. The EntityDisplayNameService must be used instead",
-    replaceWith = ReplaceWith("defaultDisplayName")
-)
-val ProjectEntity.displayName: String get() = defaultDisplayName
-
-/**
  * List of names of this entity
  */
 val ProjectEntityType.names: List<String>

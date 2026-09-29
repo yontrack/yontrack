@@ -34,7 +34,7 @@ class GQLRootQueryEntity(
                 GQLTypeProjectEntityInformation.Data(
                     type = type,
                     id = id,
-                    name = displayName,
+                    name = defaultDisplayName,
                     entityName = entityDisplayName,
                     entity = entity,
                 )

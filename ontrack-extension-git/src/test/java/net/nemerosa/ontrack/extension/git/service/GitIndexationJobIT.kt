@@ -52,7 +52,7 @@ class GitIndexationJobIT : AbstractServiceTestSupport() {
             val project = doCreateProject()
 
             // Configures the project
-            asUser().with(project, ProjectEdit::class.java).call {
+            asUser().withProjectFunction(project, ProjectEdit::class.java).call {
                 propertyService.editProperty(
                         project,
                         LocalGitProjectConfigurationPropertyType::class.java,
@@ -82,7 +82,7 @@ class GitIndexationJobIT : AbstractServiceTestSupport() {
             }
 
             // Updates the configuration
-            asUser().with(project, ProjectEdit::class.java).call {
+            asUser().withProjectFunction(project, ProjectEdit::class.java).call {
                 propertyService.editProperty(
                         project,
                         LocalGitProjectConfigurationPropertyType::class.java,

@@ -62,8 +62,11 @@ fun TypeBuilder.stringListField(
             .type(listType(GraphQLString))
     }
 
-@Deprecated("Prefer using graphQLIDField")
-fun TypeBuilder.idField(property: KProperty<ID>, description: String? = null): GraphQLObjectType.Builder =
+/**
+ * Exposes an [ID] property as an `Int` field, for the types whose `id` has always been an `Int` in
+ * the schema. Any other type uses [idFieldForID], which exposes it as an `ID`.
+ */
+fun TypeBuilder.intIdField(property: KProperty<ID>, description: String? = null): GraphQLObjectType.Builder =
     field {
         it.name(getPropertyName(property))
             .description(getPropertyDescription(property, description))

@@ -332,30 +332,6 @@ public class StructureJdbcRepository extends AbstractJdbcRepository implements S
         );
     }
 
-    @Override
-    public List<Build> getBuildsUsedBy(Build build) {
-        return getNamedParameterJdbcTemplate().query(
-                "SELECT F.* FROM BUILDS F " +
-                        "INNER JOIN BUILD_LINKS BL ON BL.TARGETBUILDID = F.ID " +
-                        "WHERE BL.BUILDID = :buildId " +
-                        "ORDER BY F.ID DESC ",
-                params("buildId", build.id()),
-                (rs, num) -> toBuild(rs, this::getBranch)
-        );
-    }
-
-    @Override
-    public List<Build> getBuildsUsing(Build build) {
-        return getNamedParameterJdbcTemplate().query(
-                "SELECT F.* FROM BUILDS F " +
-                        "INNER JOIN BUILD_LINKS BL ON BL.BUILDID = F.ID " +
-                        "WHERE BL.TARGETBUILDID = :buildId " +
-                        "ORDER BY F.ID DESC ",
-                params("buildId", build.id()),
-                (rs, num) -> toBuild(rs, this::getBranch)
-        );
-    }
-
     protected Build toBuild(ResultSet rs, Function<ID, Branch> branchSupplier) throws SQLException {
         return Build.of(
                 branchSupplier.apply(id(rs, "branchId")),
@@ -1292,8 +1268,8 @@ public class StructureJdbcRepository extends AbstractJdbcRepository implements S
                         "AND VRS.CREATION >= :start AND VRS.CREATION <= :end " +
                         "ORDER BY VR.BUILDID DESC, VR.ID DESC ",
                 params("validationStampId", validationStamp.id())
-                        .addValue("start", Time.forStorage(start))
-                        .addValue("end", Time.forStorage(end)),
+                        .addValue("start", Time.store(start))
+                        .addValue("end", Time.store(end)),
                 (rs, rowNum) -> toValidationRun(
                         rs,
                         this::getBuild,

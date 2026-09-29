@@ -26,7 +26,7 @@ class CopyServiceIT : AbstractServiceTestSupport() {
         val branch = doCreateBranch()
 
         // Sets a property on this branch
-        val ack = asUser().with(branch, ProjectEdit::class.java).call {
+        val ack = asUser().withProjectFunction(branch, ProjectEdit::class.java).call {
             propertyService.editProperty(
                 branch,
                 TestPropertyType::class.java,
@@ -37,7 +37,7 @@ class CopyServiceIT : AbstractServiceTestSupport() {
 
         // Clones the branch
         val clonedBranchName = TestUtils.uid("B")
-        val clonedBranch = asUser().with(branch, ProjectEdit::class.java).call {
+        val clonedBranch = asUser().withProjectFunction(branch, ProjectEdit::class.java).call {
             copyService.cloneBranch(
                 branch,
                 BranchCloneRequest(

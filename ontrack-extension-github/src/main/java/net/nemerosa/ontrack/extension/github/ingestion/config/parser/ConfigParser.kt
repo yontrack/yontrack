@@ -2,7 +2,6 @@ package net.nemerosa.ontrack.extension.github.ingestion.config.parser
 
 import tools.jackson.dataformat.yaml.YAMLFactory
 import net.nemerosa.ontrack.extension.github.ingestion.config.model.IngestionConfig
-import net.nemerosa.ontrack.extension.github.ingestion.config.model.IngestionConfig.Companion.V1_VERSION
 import net.nemerosa.ontrack.extension.github.ingestion.config.model.IngestionConfig.Companion.V2_VERSION
 import net.nemerosa.ontrack.json.getTextField
 import tools.jackson.dataformat.yaml.YAMLWriteFeature
@@ -24,17 +23,18 @@ object ConfigParser {
     fun parseYaml(yaml: String): IngestionConfig =
         try {
             val json = mapper.readTree(yaml)
-            // Gets the version from the JSON
-            val version = json.getTextField(FIELD_VERSION)
-            // Gets the parser from the version
-            val parser: JsonConfigParser = when {
-                version == V1_VERSION -> ConfigV1Parser
-                version == V2_VERSION -> ConfigV2Parser
-                version.isNullOrBlank() -> ConfigOldParser
-                else -> throw ConfigVersionException(version)
+            if (json == null || json.isMissingNode || json.isNull) {
+                // Empty document
+                IngestionConfig()
+            } else {
+                // Only the V2 format is supported, and a document without a version is read as V2
+                val version = json.getTextField(FIELD_VERSION)
+                if (version.isNullOrBlank() || version == V2_VERSION) {
+                    ConfigV2Parser.parse(json)
+                } else {
+                    throw ConfigVersionException(version)
+                }
             }
-            // Parsing
-            parser.parse(json)
         } catch (ex: Exception) {
             throw ConfigParsingException(ex)
         }

@@ -88,24 +88,6 @@ class DefaultConnector(
         restTemplate(headers).delete(path)
     }
 
-    @Deprecated("Use uploadFile with the file content")
-    override fun uploadFile(path: String, headers: Map<String, String>, file: Pair<String, ByteArray>) {
-        val actualHeaders = headers.toMutableMap()
-        actualHeaders["Content-Type"] = MediaType.MULTIPART_FORM_DATA.toString()
-
-        val body: MultiValueMap<String, Any> = LinkedMultiValueMap()
-        val (fileName, fileBytes) = file
-        body.add(fileName, ByteArrayResource(fileBytes))
-
-        val requestEntity: HttpEntity<MultiValueMap<String, Any>> = HttpEntity(body)
-
-        restTemplate(actualHeaders).postForEntity(
-            path,
-            requestEntity,
-            String::class.java
-        )
-    }
-
     override fun uploadFile(path: String, headers: Map<String, String>, file: FileContent) {
         val actualHeaders = headers.toMutableMap()
         actualHeaders["Content-Type"] = MediaType.MULTIPART_FORM_DATA.toString()

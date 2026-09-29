@@ -33,7 +33,6 @@ data class IngestionConfig(
     val vsNameNormalization: IngestionConfigVSNameNormalization = IngestionConfigVSNameNormalization.DEFAULT,
 ) {
     companion object {
-        const val V1_VERSION = "v1"
         const val V2_VERSION = "v2"
     }
 

@@ -48,7 +48,7 @@ class NotificationChannelsDocumentationIT : AbstractDocGenIT() {
                     val output = getFieldsDocumentation(channel::class, section = "output")
                     if (output.isNotEmpty()) {
                         s.h2("Output")
-                        directoryContext.writeFields(s, output)
+                        s.writeFields(output)
                     }
                 },
                 extendedHeader = { s ->

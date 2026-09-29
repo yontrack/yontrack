@@ -119,7 +119,7 @@ class AutoPromotionPropertyIT : AbstractDSLTestSupport() {
                         AutoPromotionProperty(listOf(vs1, vs2), "", "", emptyList())
                 )
                 // Deletes a validation stamp
-                asUser().with(this, ProjectEdit::class.java).with(this, ProjectEdit::class.java).call {
+                asUser().withProjectFunction(this, ProjectEdit::class.java).withProjectFunction(this, ProjectEdit::class.java).call {
                     structureService.deleteValidationStamp(vs1.id)
                 }
                 // Gets the auto promotion configuration
@@ -155,7 +155,7 @@ class AutoPromotionPropertyIT : AbstractDSLTestSupport() {
                 )
                 // Cloning the branch
                 val clonedBranchName = TestUtils.uid("B")
-                val clonedBranch = asUser().with(this, ProjectEdit::class.java).call {
+                val clonedBranch = asUser().withProjectFunction(this, ProjectEdit::class.java).call {
                     copyService.cloneBranch(
                             this,
                             BranchCloneRequest(
@@ -336,7 +336,7 @@ class AutoPromotionPropertyIT : AbstractDSLTestSupport() {
                         AutoPromotionProperty(emptyList(), "", "", listOf(iron, silver))
                 )
                 // Deletes the promotion level depended upon
-                asUser().with(this, ProjectEdit::class.java).with(this, ProjectEdit::class.java).call {
+                asUser().withProjectFunction(this, ProjectEdit::class.java).withProjectFunction(this, ProjectEdit::class.java).call {
                     structureService.deletePromotionLevel(silver.id)
                 }
                 // Gets the auto promotion configuration

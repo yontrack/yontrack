@@ -13,6 +13,10 @@ import org.springframework.beans.factory.annotation.Autowired
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 
+/**
+ * Reads the `.github/ontrack/ingestion.yml` file of the `v1` and `v1-test` branches of the GitHub
+ * test repository, which must be in the `v2` format, with `vs-name-normalization: LEGACY` (#1928).
+ */
 @TestOnGitHub
 @WithGitPullRequestEnabled
 class ConfigLoaderServiceIT : AbstractIngestionTestSupport() {
@@ -30,7 +34,7 @@ class ConfigLoaderServiceIT : AbstractIngestionTestSupport() {
                 assertNotNull(config, "Ingestion configuration was loaded") {
                     assertEquals(
                         IngestionConfig(
-                            version = "v1",
+                            version = "v2",
                             workflows = IngestionConfigWorkflows(
                                 filter = FilterConfig(includes = "build")
                             ),
@@ -54,7 +58,7 @@ class ConfigLoaderServiceIT : AbstractIngestionTestSupport() {
                 assertNotNull(config, "Ingestion configuration was loaded") {
                     assertEquals(
                         IngestionConfig(
-                            version = "v1",
+                            version = "v2",
                             workflows = IngestionConfigWorkflows(
                                 filter = FilterConfig(includes = "build")
                             ),

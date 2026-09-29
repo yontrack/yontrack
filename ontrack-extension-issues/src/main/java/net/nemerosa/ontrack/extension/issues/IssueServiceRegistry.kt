@@ -1,6 +1,5 @@
 package net.nemerosa.ontrack.extension.issues
 
-import net.nemerosa.ontrack.common.asOptional
 import net.nemerosa.ontrack.extension.issues.model.ConfiguredIssueService
 import net.nemerosa.ontrack.extension.issues.model.IssueServiceConfigurationRepresentation
 import java.util.*
@@ -16,13 +15,6 @@ interface IssueServiceRegistry {
      * Gets an issue service by its ID. It may be present or not.
      */
     fun findIssueServiceById(id: String): IssueServiceExtension?
-
-    /**
-     * Gets an issue service by its ID. It may be present or not.
-     */
-    @Deprecated("Use findIssueServiceById", replaceWith = ReplaceWith("findIssueServiceById"))
-    fun getOptionalIssueService(id: String): Optional<IssueServiceExtension> =
-        findIssueServiceById(id).asOptional()
 
     val availableIssueServiceConfigurations: List<IssueServiceConfigurationRepresentation>
 

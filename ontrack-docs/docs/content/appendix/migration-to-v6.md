@@ -296,7 +296,8 @@ optional `dateTime`.
 
 Yontrack 6 removes what Yontrack 5 deprecated. Each item is listed here with what to use instead,
 by the way it is used: the GraphQL API, the REST API, configuration as code, the configuration
-properties and environment variables, templating, the CI configuration, and the KDSL.
+properties and environment variables, templating, the CI configuration, the GitHub ingestion
+configuration, and the KDSL.
 
 The latest 5.5.x release counts every use of these items: see [Upgrade path](#upgrade-path).
 
@@ -414,14 +415,45 @@ they keep their `path`, `regex`, `property`, `propertyRegex` and `propertyType` 
 The configurations Yontrack 5 already stored need no conversion: it always stored them with the
 full names, whatever name they were sent with.
 
+### GitHub ingestion configuration
+
+The GitHub ingestion reads its configuration from the `.github/ontrack/ingestion.yml` file of the
+repository, or from the `setBranchGitHubIngestionConfig` mutation. Yontrack 6 reads only the `v2`
+format of this file:
+
+| Removed                     | Use instead                                         |
+|-----------------------------|-----------------------------------------------------|
+| `version: v1`               | `version: v2`, with `vs-name-normalization: LEGACY` |
+| The unversioned format      | `version: v2`                                       |
+
+* **`v1`** — its fields are the ones of `v2`; only the default of `vs-name-normalization` differs,
+  `LEGACY` in `v1` and `DEFAULT` in `v2`. Set `version: v2` and `vs-name-normalization: LEGACY` to
+  keep the names of the validation stamps the ingestion creates. A `v1` file is rejected: the
+  ingestion of the payload which loads it fails with *Unsupported version for the ingestion
+  configuration: v1. Use version v2 instead.*
+* **The unversioned format** — the original format, before `v1`, had `jobs` and `steps` as lists,
+  and `general`, `jobsFilter`, `stepsFilter`, `validations`, `promotions`, `runs` and `casc` at the
+  top level: `v2` has `jobs.mappings`, `steps.mappings`, `jobs.filter`, `steps.filter`, and
+  `setup.validations`, `setup.promotions`, `setup.project` and `setup.branch`. A file without a
+  `version` is now read as `v2`: one in the unversioned format fails to parse, on the first field
+  `v2` does not know or types differently, and one with only `workflows.filter` or `tagging` reads
+  as it did.
+
+Unlike the other items of this page, 5.5.x does not count the use of these formats: check the
+`ingestion.yml` files of the ingested repositories for a `version` other than `v2`.
+
 ### KDSL
 
 | Removed                                          | Use instead                                           |
 |--------------------------------------------------|-------------------------------------------------------|
 | `NotificationsMgt.subscribe` without a `name`    | `NotificationsMgt.subscribe(name = ..., ...)`         |
+| `Connector.uploadFile` with a `Pair` file        | `Connector.uploadFile` with a `FileContent` file      |
 
 The `name` parameter of `NotificationsMgt.subscribe` no longer has a default: a call without it no
 longer compiles.
+
+`Connector.uploadFile(path, headers, file = name to bytes)` is gone: pass the file as a
+`FileContent(name, content, type)`, which also gives the part its content type.
 
 ## Newly deprecated
 

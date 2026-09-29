@@ -1,7 +1,6 @@
 package net.nemerosa.ontrack.model.events
 
 import net.nemerosa.ontrack.model.structure.ProjectEntity
-import net.nemerosa.ontrack.model.structure.displayName
 import org.springframework.stereotype.Component
 
 @Component

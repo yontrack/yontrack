@@ -43,7 +43,6 @@ class MessagePropertyType(extensionFeature: GeneralExtensionFeature) :
         return node.parse()
     }
 
-    @Deprecated("Will be removed in V5")
     override fun replaceValue(
         value: MessageProperty,
         replacementFunction: (String) -> String

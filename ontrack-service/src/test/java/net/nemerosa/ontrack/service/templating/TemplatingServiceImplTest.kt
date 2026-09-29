@@ -35,7 +35,7 @@ class TemplatingServiceImplTest {
                 config: TemplatingSourceConfig,
                 renderer: EventRenderer
             ): String =
-                "feature/${entity.displayName}"
+                "feature/${entity.defaultDisplayName}"
         }
 
         val listProjectSource = object : AbstractTemplatingSource(

@@ -221,7 +221,7 @@ class StructureServiceNewIT : AbstractDSLTestSupport() {
                 build {
                     validate(vs, ValidationRunStatusID.STATUS_FAILED)
                     // Second validation with comment
-                    val run = asUser().with(this, ValidationRunStatusChange::class.java).call {
+                    val run = asUser().withProjectFunction(this, ValidationRunStatusChange::class.java).call {
                         validate(vs, ValidationRunStatusID.STATUS_INVESTIGATING, "First comment")
                     }
                     val statusId = run.lastStatus.id
@@ -244,7 +244,7 @@ class StructureServiceNewIT : AbstractDSLTestSupport() {
         // Creating a promotion level
         project {
             branch {
-                asUser().with(this, PromotionLevelCreate::class.java).call {
+                asUser().withProjectFunction(this, PromotionLevelCreate::class.java).call {
                     val pl = structureService.newPromotionLevel(
                         PromotionLevel.of(
                             this,
@@ -269,7 +269,7 @@ class StructureServiceNewIT : AbstractDSLTestSupport() {
         // Creating a validation stamp
         project {
             branch {
-                asUser().with(this, ValidationStampCreate::class.java).call {
+                asUser().withProjectFunction(this, ValidationStampCreate::class.java).call {
                     val vs = structureService.newValidationStamp(
                         ValidationStamp.of(
                             this,

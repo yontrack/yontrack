@@ -52,16 +52,6 @@ interface Connector {
     )
 
     /**
-     * Uploading a single file
-     */
-    @Deprecated("Use uploadFile with the file content")
-    fun uploadFile(
-        path: String,
-        headers: Map<String, String> = emptyMap(),
-        file: Pair<String, ByteArray>,
-    )
-
-    /**
      * Uploading a single file using REST
      */
     fun uploadFile(

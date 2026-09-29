@@ -17,7 +17,7 @@ class ProjectLabelManagementServiceIT : AbstractDSLTestSupport() {
         val label = label()
         project {
             // Association
-            asUser().with(this, ProjectLabelManagement::class.java).execute {
+            asUser().withProjectFunction(this, ProjectLabelManagement::class.java).execute {
                 projectLabelManagementService.associateProjectToLabel(this, label)
             }
             // Testing the association
@@ -32,7 +32,7 @@ class ProjectLabelManagementServiceIT : AbstractDSLTestSupport() {
                 )
             }
             // Removing the association
-            asUser().with(this, ProjectLabelManagement::class.java).execute {
+            asUser().withProjectFunction(this, ProjectLabelManagement::class.java).execute {
                 projectLabelManagementService.unassociateProjectToLabel(this, label)
             }
             // Testing the association

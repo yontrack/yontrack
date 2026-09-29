@@ -23,4 +23,11 @@ class FilterHelperTest {
         assertTrue(excludes("ontrack-pro", ".*", ".*"))
         assertTrue(excludes("ontrack-pro", ".*", "ontrack-.*"))
     }
+
+    @Test
+    fun `A blank exclusion excludes nothing`() {
+        assertTrue(includes("", ".*", ""))
+        assertTrue(includes("", ".*", "  "))
+        assertFalse(excludes("", ".*", ""))
+    }
 }

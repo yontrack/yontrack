@@ -15,8 +15,16 @@ import java.util.function.Function;
 import java.util.function.Predicate;
 
 /**
- * @deprecated Use dedicated repositories at entity level
+ * Access to the project entities, all types together.
+ * <p>
+ * Being replaced, one entity type at a time, by the entity repositories ({@link ProjectRepository},
+ * {@link BranchRepository}, {@link PromotionLevelRepository}, {@link PromotionRunRepository},
+ * {@link ValidationStampRepository}, {@link ValidationRunRepository}...). The move is a refactoring of
+ * {@code StructureServiceImpl} of its own, carried over to V7.
+ *
+ * @deprecated Removed in V7. Use the entity repositories instead. See #1928
  */
+@Deprecated
 public interface StructureRepository {
 
     // Projects
@@ -159,24 +167,6 @@ public interface StructureRepository {
     Build getLastBuildForBranch(Branch branch);
 
     Ack deleteBuild(ID buildId);
-
-    /**
-     * Gets the builds used by the given one.
-     *
-     * @param build Source build
-     * @return List of builds used by the given one
-     * @deprecated Use {@link BuildLinkRepository#getQualifiedBuildsUsedBy(Build)} instead.
-     */
-    List<Build> getBuildsUsedBy(Build build);
-
-    /**
-     * Gets the builds which use the given one.
-     *
-     * @param build Source build
-     * @return List of builds which use the given one
-     * @deprecated Use {@link BuildLinkRepository#getQualifiedBuildsUsing(Build)} instead.
-     */
-    List<Build> getBuildsUsing(Build build);
 
     // Promotion levels
 

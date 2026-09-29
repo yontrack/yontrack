@@ -1,4 +1,6 @@
-version: v1
+version: v2
+# Validation stamp names as the v1 format computed them
+vs-name-normalization: LEGACY
 setup:
   validations:
     - name: site

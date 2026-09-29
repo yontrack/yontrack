@@ -28,7 +28,7 @@ class ValidationStampIT : AbstractServiceTestSupport() {
         // Branch
         val branch = doCreateBranch()
         // Creates a validation stamp with an associated percentage data type
-        val vs = asUser().with(branch, ValidationStampCreate::class.java).call {
+        val vs = asUser().withProjectFunction(branch, ValidationStampCreate::class.java).call {
             structureService.newValidationStamp(
                     ValidationStamp.of(
                             branch,
@@ -51,7 +51,7 @@ class ValidationStampIT : AbstractServiceTestSupport() {
         assertEquals(1, vsList.size)
         assertEquals(loadedVs.id, vsList.first().id)
         // Updates it (with a threshold)
-        asUser().with(branch, ValidationStampEdit::class.java).execute {
+        asUser().withProjectFunction(branch, ValidationStampEdit::class.java).execute {
             structureService.saveValidationStamp(
                     loadedVs.withDataType(
                             testNumberValidationDataType.config(60)
@@ -84,7 +84,7 @@ class ValidationStampIT : AbstractServiceTestSupport() {
         // A branch...
         val branch = doCreateBranch()
         // Creation of validation stamp from predefined
-        asUser().with(branch, ValidationStampCreate::class.java).execute {
+        asUser().withProjectFunction(branch, ValidationStampCreate::class.java).execute {
             structureService.newValidationStampFromPredefined(
                     branch,
                     pvs
