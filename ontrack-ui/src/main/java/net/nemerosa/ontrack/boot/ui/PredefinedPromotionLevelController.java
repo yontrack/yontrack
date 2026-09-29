@@ -3,8 +3,6 @@ package net.nemerosa.ontrack.boot.ui;
 import jakarta.validation.Valid;
 import net.nemerosa.ontrack.common.Document;
 import net.nemerosa.ontrack.model.Ack;
-import net.nemerosa.ontrack.model.deprecation.DeprecationService;
-import net.nemerosa.ontrack.model.deprecation.DeprecationSurface;
 import net.nemerosa.ontrack.model.settings.PredefinedPromotionLevelService;
 import net.nemerosa.ontrack.model.structure.ID;
 import net.nemerosa.ontrack.model.structure.NameDescription;
@@ -12,9 +10,7 @@ import net.nemerosa.ontrack.model.structure.PredefinedPromotionLevel;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile;
 
-import java.io.IOException;
 import java.util.Base64;
 import java.util.List;
 
@@ -28,12 +24,10 @@ import java.util.List;
 public class PredefinedPromotionLevelController {
 
     private final PredefinedPromotionLevelService predefinedPromotionLevelService;
-    private final DeprecationService deprecationService;
 
     @Autowired
-    public PredefinedPromotionLevelController(PredefinedPromotionLevelService predefinedPromotionLevelService, DeprecationService deprecationService) {
+    public PredefinedPromotionLevelController(PredefinedPromotionLevelService predefinedPromotionLevelService) {
         this.predefinedPromotionLevelService = predefinedPromotionLevelService;
-        this.deprecationService = deprecationService;
     }
 
     /**
@@ -86,24 +80,6 @@ public class PredefinedPromotionLevelController {
         predefinedPromotionLevelService.setPredefinedPromotionLevelImage(predefinedPromotionLevelId, new Document(
                 "image/png",
                 Base64.getDecoder().decode(imageBase64)
-        ));
-    }
-
-    /**
-     * @deprecated Removed in V6. Use the PUT method instead. See #1922
-     */
-    @PostMapping(value = "predefinedPromotionLevels/{predefinedPromotionLevelId}/image")
-    @ResponseStatus(HttpStatus.ACCEPTED)
-    @Deprecated(forRemoval = true)
-    public void setPromotionLevelImage(@PathVariable ID predefinedPromotionLevelId, @RequestParam MultipartFile file) throws IOException {
-        deprecationService.deprecatedUsage(
-                DeprecationSurface.REST,
-                "POST /rest/admin/predefinedPromotionLevels/{id}/image",
-                "Removed in V6. Use the PUT method instead. See #1922"
-        );
-        predefinedPromotionLevelService.setPredefinedPromotionLevelImage(predefinedPromotionLevelId, new Document(
-                file.getContentType(),
-                file.getBytes()
         ));
     }
 

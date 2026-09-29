@@ -52,7 +52,7 @@ class HookController(
         if (!endpoint.enabled) {
             meterRegistry.hookDisabled(hook)
             hookRecordService.onDisabled(recordId)
-            return hookDisabled(hook)
+            return hookDisabled()
         }
 
         // Checking the access

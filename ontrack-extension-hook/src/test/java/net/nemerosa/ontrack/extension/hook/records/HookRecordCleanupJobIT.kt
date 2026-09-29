@@ -103,7 +103,6 @@ class HookRecordCleanupJobIT : AbstractDSLTestSupport() {
                 } else {
                     HookResponse(
                             type = HookResponseType.PROCESSING,
-                            info = null,
                             infoLink = null,
                     )
                 }

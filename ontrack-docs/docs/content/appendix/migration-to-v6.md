@@ -312,6 +312,7 @@ The latest 5.5.x release counts every use of these items: see [Upgrade path](#up
 | `SearchResult.page`                  | No replacement: build the link from the `type` and `data` of the result      |
 | `SearchResult.uri`                   | No replacement: build the link from the `type` and `data` of the result      |
 | `VersionInfo.date`                   | No replacement: the field was always empty                                   |
+| `HookResponse.info`                  | `HookResponse.infoLink`                                                      |
 
 * **`promotionRuns`** — `promotionRunsPaginated` returns a page, `{ pageInfo pageItems }`, the most
   recent runs first. `promotionRuns(first: N)` becomes `promotionRunsPaginated(size: N)`; the
@@ -321,6 +322,38 @@ The latest 5.5.x release counts every use of these items: see [Upgrade path](#up
   `AutoVersioningTrail` type is gone with it. The paginated field returns only the eligible
   branches by default; pass `filter: {onlyEligible: false}` to get the rejected ones too, with
   their `rejectionReason`, as `autoVersioningTrail` did.
+* **`HookResponse.info`** — the unstructured information returned by a hook is gone, from the
+  hook records and from the answer of the `POST /hook/secured/{hook}` endpoint alike. `infoLink`
+  carries the information structured; a disabled hook answers with the `IGNORED` type, and its
+  record has the `DISABLED` state. The hook records stored by Yontrack 5 are still read, without it.
+
+### REST API
+
+| Removed                                                  | Use instead                                                  |
+|----------------------------------------------------------|--------------------------------------------------------------|
+| `POST /rest/structure/promotionLevels/{id}/image`        | `PUT /rest/structure/promotionLevels/{id}/image`             |
+| `POST /rest/admin/predefinedPromotionLevels/{id}/image`  | `PUT /rest/admin/predefinedPromotionLevels/{id}/image`       |
+
+The `POST` endpoints took the image as a multipart `file`. The `PUT` endpoints take the PNG image
+encoded in Base64, on a single line, as the body of the request, for example:
+
+```bash
+base64 < gold.png | tr -d '\n' | curl -X PUT -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: text/plain" --data-binary @- \
+  "$YONTRACK_URL/rest/structure/promotionLevels/42/image"
+```
+
+The 6.x KDSL sets the image of a predefined promotion level with the `PUT` endpoint. A program
+calling `createPredefinedPromotionLevel` with an `image` must use it: the 5.x KDSL still calls the
+`POST` endpoint.
+
+### Configuration properties
+
+| Removed                                                    | Use instead                                                            |
+|------------------------------------------------------------|------------------------------------------------------------------------|
+| `ontrack.extension.elastic.metrics.api-compatibility-mode` | No replacement: the Elasticsearch 9 client needs no compatibility mode |
+
+The property is ignored if still set.
 
 ### Templating
 

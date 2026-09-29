@@ -1,7 +1,6 @@
 package net.nemerosa.ontrack.kdsl.acceptance.tests.tfc
 
 import com.fasterxml.jackson.annotation.JsonIgnore
-import tools.jackson.databind.JsonNode
 import net.nemerosa.ontrack.json.parse
 import net.nemerosa.ontrack.kdsl.acceptance.tests.queue.QueueDispatchResult
 import kotlin.test.fail
@@ -14,11 +13,6 @@ data class HookResponse(
          * Type of response
          */
         val type: String,
-        /**
-         *
-         */
-        @Deprecated("Prefer using infoLink")
-        val info: JsonNode,
         val infoLink: HookInfoLink?,
 ) {
     @get:JsonIgnore

@@ -13,14 +13,6 @@
 # issue expected to remove them; the grouping is a guide, the test does not read it.
 # Cutover gate (doc/dev-guide/major-branch.md): this file has no entry left.
 
-# #1922 (D6) - REST endpoints and other external items, un-deprecations
-graphql ontrack-extension-hook/src/main/java/net/nemerosa/ontrack/extension/hook/ui/GQLTypeHookResponse.kt#info
-kotlin ontrack-extension-notifications/src/main/java/net/nemerosa/ontrack/extension/notifications/channels/NotificationResultType.kt#TIMEOUT
-kotlin ontrack-kdsl-acceptance/src/test/java/net/nemerosa/ontrack/kdsl/acceptance/tests/tfc/HookResponse.kt#info
-kotlin ontrack-model/src/main/java/net/nemerosa/ontrack/model/structure/Reordering.kt#Reordering
-warning ontrack-ui/src/main/java/net/nemerosa/ontrack/boot/ui/PredefinedPromotionLevelController.java#POST /rest/admin/predefinedPromotionLevels/{id}/image
-warning ontrack-ui/src/main/java/net/nemerosa/ontrack/boot/ui/PromotionLevelController.java#POST /rest/structure/promotionLevels/{id}/image
-
 # #1923 (D7) - deprecated for V7
 kotlin ontrack-extension-github/src/main/java/net/nemerosa/ontrack/extension/github/ui/graphql/GitHubConfigurationsMutations.kt#password
 kotlin ontrack-extension-queue/src/main/java/net/nemerosa/ontrack/extension/queue/QueueConfigProperties.kt#warnIfAsync

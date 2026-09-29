@@ -2717,8 +2717,6 @@ type HookRequest {
 
 "Data returned by a hook."
 type HookResponse {
-  "Additional information (non structured, will typically be rendered as JSON)"
-  info: JSON @deprecated(reason : "Removed in V6. Use infoLink instead. See #1922")
   "Structured additional information"
   infoLink: HookInfoLink
   "Type of response"

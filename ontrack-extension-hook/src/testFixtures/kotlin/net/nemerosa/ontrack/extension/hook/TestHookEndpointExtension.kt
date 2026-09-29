@@ -42,7 +42,6 @@ class TestHookEndpointExtension(
         } else {
             return HookResponse(
                 type = HookResponseType.PROCESSED,
-                info = null,
                 infoLink = testHookInfoLinkExtension.createHookInfoLink(
                     "Processing: ${request.body}"
                 ),

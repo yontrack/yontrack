@@ -64,16 +64,6 @@ class ElasticMetricsConfigProperties {
     )
     var custom = ElasticsearchProperties()
 
-    @Deprecated("Removed in V6. No replacement. See #1922")
-    @APIDescription(
-        """
-            Set to true to enable the API Compatibility mode when accessing a 8.x ES server.
-            
-            See https://www.elastic.co/guide/en/elasticsearch/client/java-rest/7.17/java-rest-high-compatibility.html
-        """
-    )
-    var apiCompatibilityMode: Boolean = false
-
     @APIDescription("Set to false to disable the deletion of the index when performing a re-indexation")
     var allowDrop: Boolean = true
 

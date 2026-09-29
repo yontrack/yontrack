@@ -26,7 +26,6 @@ fun <T> List<QueueDispatchResult>.toHookResponse(
 
     return HookResponse(
             type = type,
-            info = this,
             infoLink = extension.createHookInfoLink(this),
     )
 }

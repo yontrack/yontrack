@@ -7,7 +7,6 @@ import net.nemerosa.ontrack.graphql.schema.GQLTypeCache
 import net.nemerosa.ontrack.graphql.support.enumField
 import net.nemerosa.ontrack.graphql.support.field
 import net.nemerosa.ontrack.graphql.support.getTypeDescription
-import net.nemerosa.ontrack.graphql.support.jsonField
 import org.springframework.stereotype.Component
 
 @Component
@@ -19,7 +18,6 @@ class GQLTypeHookResponse : GQLType {
             .name(typeName)
             .description(getTypeDescription(HookResponse::class))
             .enumField(HookResponse::type)
-            .jsonField(HookResponse::info, deprecation = "Removed in V6. Use infoLink instead. See #1922")
             .field(HookResponse::infoLink)
             .build()
 }

@@ -1,7 +1,9 @@
 package net.nemerosa.ontrack.extension.hook
 
-fun hookDisabled(hook: String) = HookResponse(
+/**
+ * Response of a disabled hook. The hook record says it is disabled.
+ */
+fun hookDisabled() = HookResponse(
         type = HookResponseType.IGNORED,
-        info = "Hook `$hook` is disabled.",
         infoLink = null,
 )

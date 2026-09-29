@@ -47,7 +47,6 @@ class HookGraphQLIT : AbstractQLKTITSupport() {
                                 endTime
                                 response {
                                     type
-                                    info
                                 }
                             }
                         }

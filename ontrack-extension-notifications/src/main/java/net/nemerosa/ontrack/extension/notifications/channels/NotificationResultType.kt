@@ -16,7 +16,10 @@ enum class NotificationResultType(
 
     ERROR(running = false),
 
-    @Deprecated("Timeout was introduced in 4.10.3 but is no longer used. No replacement not deletion is planned at the moment.")
+    /**
+     * Introduced in 4.10.3 and no longer set, but kept: notification results stored with it are
+     * still read.
+     */
     TIMEOUT(running = false),
 
     ASYNC(running = true),

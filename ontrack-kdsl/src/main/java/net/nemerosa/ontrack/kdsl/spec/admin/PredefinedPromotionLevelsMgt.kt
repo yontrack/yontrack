@@ -2,10 +2,10 @@ package net.nemerosa.ontrack.kdsl.spec.admin
 
 import net.nemerosa.ontrack.kdsl.connector.Connected
 import net.nemerosa.ontrack.kdsl.connector.Connector
-import net.nemerosa.ontrack.kdsl.connector.FileContent
 import net.nemerosa.ontrack.kdsl.connector.graphql.schema.PredefinedPromotionLevelByNameQuery
 import net.nemerosa.ontrack.kdsl.connector.graphqlConnector
 import java.net.URL
+import java.util.*
 
 /**
  * Management of the predefined promotion levels
@@ -46,18 +46,22 @@ class PredefinedPromotionLevelsMgt(connector: Connector) : Connected(connector) 
             ).body.asJson().path("id").asInt()
             // Image
             if (image != null) {
-                val imageBytes = image.readBytes()
-                connector.uploadFile(
-                    "/rest/admin/predefinedPromotionLevels/${pplId}/image",
-                    headers = emptyMap(),
-                    file = FileContent(
-                        name = "file",
-                        content = imageBytes,
-                        type = "image/png"
-                    ),
-                )
+                setPredefinedPromotionLevelImage(pplId, image.readBytes())
             }
         }
+    }
+
+    /**
+     * Sets the image of a predefined promotion level.
+     *
+     * @param id ID of the predefined promotion level
+     * @param image PNG content of the image
+     */
+    fun setPredefinedPromotionLevelImage(id: Int, image: ByteArray) {
+        connector.put(
+            "/rest/admin/predefinedPromotionLevels/${id}/image",
+            body = Base64.getEncoder().encodeToString(image),
+        )
     }
 
 }
