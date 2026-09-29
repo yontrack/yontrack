@@ -98,7 +98,7 @@ The issue breakdown is in [issues.md](issues.md), under the `deprecation` label.
     the API is the largest surface, and the one admins cannot audit otherwise;
   - no UI. The metric appears in the generated metrics docs, and an admin can graph it before
     upgrading.
-- **The policy is recorded as ADR 0017** (`docs/adr/0017-deprecation-and-removal-across-majors.md`).
+- **The policy is recorded as ADR 0018** (`docs/adr/0018-deprecation-and-removal-across-majors.md`).
   `CLAUDE.md` carries the short rules and links to it.
 
 ### Upgrade path

@@ -1,7 +1,6 @@
 # Deprecations — issue breakdown
 
-Breakdown of [README.md](README.md) into agent-sized issues. **Not created yet** — the GitHub
-column is filled when they are.
+Breakdown of [README.md](README.md) into agent-sized issues, created as #1916–#1930.
 
 Every issue carries `deprecation`, `status:todo` and `ready-for-agent`, and links back to the
 README section it implements. D0 is on milestone `5.5` and based on `main`; all others are on
@@ -18,21 +17,21 @@ Every removal or deprecation issue also:
 
 | #   | GitHub | Issue                                                                  | Repo / base                      | Depends on |
 |-----|--------|------------------------------------------------------------------------|----------------------------------|------------|
-| D0  | —      | 5.5 readiness: runtime warnings and `Removed in V6` markers            | `yontrack` / `main` → `release/5.5` | —       |
-| D1  | —      | Deprecation policy: ADR 0017, `CLAUDE.md`, `major-branch.md`, marker test | `yontrack` / `v6`             | —          |
-| D2  | —      | *Migration to V6*: restructure and initial content                     | `yontrack` / `v6`                | —          |
-| D3  | —      | Upgrade floor at 5.0, delete the startup migrations present in 5.0.0   | `yontrack` / `v6`                | D2         |
-| D4  | —      | Remove the backend items tagged V6                                     | `yontrack` / `v6`                | D1, D2     |
-| D5  | —      | Remove the deprecated GraphQL fields                                   | `yontrack` / `v6`                | D1, D2     |
-| D6  | —      | Remove the deprecated REST endpoints and other external items          | `yontrack` / `v6`                | D1, D2     |
-| D7  | —      | Deprecate for V7: GitHub password, `ONTRACK_SCM_ISSUES`, kebab-case CasC aliases, `warnIfAsync` | `yontrack` / `v6` | D0, D1, D2 |
-| D8  | —      | Remove pure-Git support                                                | `yontrack` / `v6`                | D4         |
-| D9  | —      | `EntityDataService` → `EntityStore`                                    | `yontrack` / `v6`                | D1         |
-| D10 | —      | Remove the auto-versioning legacy attribute names (#1515)              | `yontrack` / `v6`                | D1, D2     |
-| D11 | —      | Subscription `name` becomes required                                   | `yontrack` / `v6`                | D1, D2     |
-| D12 | —      | Internal backend cleanup                                               | `yontrack` / `v6`                | D1         |
-| D13 | —      | Frontend deprecated helpers and `useGraphQLClient`                     | `yontrack` / `v6`                | D1         |
-| D14 | —      | Delete `ontrack-docs/src/docs`                                         | `yontrack` / `v6`                | —          |
+| D0  | #1916  | 5.5 readiness: runtime warnings and `Removed in V6` markers            | `yontrack` / `main` → `release/5.5` | —       |
+| D1  | #1917  | Deprecation policy: ADR 0018, `CLAUDE.md`, `major-branch.md`, marker test | `yontrack` / `v6`             | —          |
+| D2  | #1918  | *Migration to V6*: restructure and initial content                     | `yontrack` / `v6`                | —          |
+| D3  | #1919  | Upgrade floor at 5.0, delete the startup migrations present in 5.0.0   | `yontrack` / `v6`                | D2         |
+| D4  | #1920  | Remove the backend items tagged V6                                     | `yontrack` / `v6`                | D1, D2     |
+| D5  | #1921  | Remove the deprecated GraphQL fields                                   | `yontrack` / `v6`                | D1, D2     |
+| D6  | #1922  | Remove the deprecated REST endpoints and other external items          | `yontrack` / `v6`                | D1, D2     |
+| D7  | #1923  | Deprecate for V7: GitHub password, `ONTRACK_SCM_ISSUES`, kebab-case CasC aliases, `warnIfAsync` | `yontrack` / `v6` | D0, D1, D2 |
+| D8  | #1924  | Remove pure-Git support                                                | `yontrack` / `v6`                | D4         |
+| D9  | #1925  | `EntityDataService` → `EntityStore`                                    | `yontrack` / `v6`                | D1         |
+| D10 | #1926  | Remove the auto-versioning legacy attribute names (#1515)              | `yontrack` / `v6`                | D1, D2     |
+| D11 | #1927  | Subscription `name` becomes required                                   | `yontrack` / `v6`                | D1, D2     |
+| D12 | #1928  | Internal backend cleanup                                               | `yontrack` / `v6`                | D1         |
+| D13 | #1929  | Frontend deprecated helpers and `useGraphQLClient`                     | `yontrack` / `v6`                | D1         |
+| D14 | #1930  | Delete `ontrack-docs/src/docs`                                         | `yontrack` / `v6`                | —          |
 
 D7 depends on D0 *having reached `v6`* through the main → v6 merge, not only on D0 being merged
 into `main`.
@@ -56,11 +55,11 @@ README *Policy* (runtime warnings), *5.5 readiness patch*.
   `release/5.5`, released as a 5.5 patch.
 - Done when a 5.5 patch warns about each item, and the counter shows up in `/manage/prometheus`.
 
-## D1 — Deprecation policy: ADR 0017, `CLAUDE.md`, `major-branch.md`, marker test
+## D1 — Deprecation policy: ADR 0018, `CLAUDE.md`, `major-branch.md`, marker test
 
 README *Scope*, *Policy*, *Upgrade path* (the rule), *Cutover*.
 
-- `docs/adr/0017-deprecation-and-removal-across-majors.md`: deprecate in N, remove in N+1; the
+- `docs/adr/0018-deprecation-and-removal-across-majors.md`: deprecate in N, remove in N+1; the
   marker format; runtime warnings for external contracts only; the upgrade floor at the previous
   major's `.0`; what data-conversion code the cleanup may delete.
 - `CLAUDE.md`: the short rules — marker format, update the migration page in the same commit,
