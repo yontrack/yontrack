@@ -1,4 +1,5 @@
-import {Popover, Space, Table, Typography} from "antd";
+import {Popover, Space, Typography} from "antd";
+import Table from "@components/common/table/Table";
 import React from "react";
 import ValidationChip from "@components/primitives/ValidationChip";
 import {validationStampUri} from "@components/common/Links";

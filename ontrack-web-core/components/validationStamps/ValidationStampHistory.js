@@ -1,5 +1,6 @@
 import {useEffect, useState} from "react";
-import {Button, Popover, Skeleton, Space, Spin, Table, Typography} from "antd";
+import {Button, Popover, Skeleton, Space, Spin, Typography} from "antd";
+import Table from "@components/common/table/Table";
 import {useQuery} from "@components/services/GraphQL";
 import BuildLink from "@components/builds/BuildLink";
 import Decorations from "@components/framework/decorations/Decorations";

@@ -1,5 +1,6 @@
 import GridCell from "@components/grid/GridCell";
-import {Popover, Space, Table, Typography} from "antd";
+import {Popover, Space, Typography} from "antd";
+import Table from "@components/common/table/Table";
 import Link from "next/link";
 import TimestampText from "@components/common/TimestampText";
 import {buildUri} from "@components/common/Links";

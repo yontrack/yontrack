@@ -7,7 +7,11 @@ import AutoVersioningSchedule from "@components/extension/auto-versioning/AutoVe
 import AutoVersioningPushMode from "@components/extension/auto-versioning/AutoVersioningPushMode";
 import FieldLabel from "@components/extension/auto-versioning/AutoVersioningFieldLabel";
 
-export default function AutoVersioningConfigDetails({source, additionalItems = [], size}) {
+/**
+ * @param inExpandedRow Whether the details are rendered in the expanded row of a table, whose
+ * header the tables of the details must not compete with (#1932)
+ */
+export default function AutoVersioningConfigDetails({source, additionalItems = [], size, inExpandedRow = false}) {
 
     const items = additionalItems
     if (source.versionSource) {
@@ -162,6 +166,7 @@ export default function AutoVersioningConfigDetails({source, additionalItems = [
                                description="List of notification subscriptions to setup for this auto versioning"/>,
             children: <AutoVersioningConfigNotifications
                 notifications={source.notifications}
+                sticky={inExpandedRow ? false : undefined}
             />,
             span: 3,
         },

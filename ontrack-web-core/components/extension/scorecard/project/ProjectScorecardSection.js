@@ -1,6 +1,7 @@
 import {gql} from "graphql-request";
 import Link from "next/link";
-import {Empty, Space, Table, Typography} from "antd";
+import {Empty, Space, Typography} from "antd";
+import Table from "@components/common/table/Table";
 import PageSection from "@components/common/PageSection";
 import TimestampText from "@components/common/TimestampText";
 import {useQuery} from "@components/services/GraphQL";

@@ -6,7 +6,8 @@ import AccountManagementLink, {
     accountManagementUri
 } from "@components/core/admin/account-management/AccountManagementLink";
 import {CloseCommand} from "@components/common/Commands";
-import {Button, Form, Input, Space, Table, Typography} from "antd";
+import {Button, Form, Input, Space, Typography} from "antd";
+import Table from "@components/common/table/Table";
 import {useRefresh} from "@components/common/RefreshUtils";
 import {
     useGroupMappings,

@@ -36,6 +36,9 @@ These rules apply unconditionally. Follow them in every change, without exceptio
   in 6.0, and ESLint rejects their imports
 - **Never** use antd's `List` / `List.Item` — deprecated in antd 6. Use `ItemList` from
   `@components/common/ItemList` (see *Lists* below); ESLint flags the import
+- **Never** import `Table` from `antd` — always use `Table` from `@components/common/table/Table`,
+  which sticks its header by default (#1932). Opt out with `sticky={false}` only for a table nested
+  in another table's expanded row or with `showHeader={false}`; ESLint flags the import
 - **Never** store a value in `useState` + `useEffect` when it's purely derived from props/state —
   compute it directly in the render body instead (e.g. `const items = changeLog ? [...] : []`, not
   `useState([])` filled by a `useEffect`). Beyond being an unnecessary extra render, a value that's
@@ -783,7 +786,8 @@ Pick the component by the shape of the data, never antd's deprecated `List`:
   or `getByTestId`, never antd class names. For drag-to-reorder, render it through react-easy-sort:
   `<ItemList component={SortableList} as="ul" onSortEnd={…}>` with each `ItemList.Item` wrapped
   in a `SortableItem` (see `BranchValidationStampsView`).
-- **`Table`** — the items share columns worth sorting, filtering or comparing side by side.
+- **`Table`** (`@components/common/table/Table`, never antd's own) — the items share columns worth
+  sorting, filtering or comparing side by side. Its header sticks while the table scrolls.
 - **`Row` / `Col`** — a grid of cards, e.g. `<Row gutter={[16, 16]}>` with `<Col xs={24} md={12}>`
   (see `SubscriptionsView`).
 - **`MobileEntityList`** (`@components/mobile/entities/MobileEntityList`) — lists in the `/mobile`

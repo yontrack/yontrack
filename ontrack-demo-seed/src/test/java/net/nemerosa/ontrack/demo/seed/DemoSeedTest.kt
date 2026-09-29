@@ -149,6 +149,7 @@ class DemoSeedTest {
                 DemoContent.UI,
                 DemoContent.SECURITY,
                 DemoContent.VISITS,
+                DemoContent.E2E,
                 DemoContent.CHANGELOG,
             ),
             target.projects().map { it.name },

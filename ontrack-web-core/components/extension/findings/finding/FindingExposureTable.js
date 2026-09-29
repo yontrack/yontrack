@@ -1,5 +1,6 @@
 import Link from "next/link";
-import {Empty, Space, Table, Typography} from "antd";
+import {Empty, Space, Typography} from "antd";
+import Table from "@components/common/table/Table";
 import {branchUri, validationStampUri} from "@components/common/Links";
 import FindingStateTag from "@components/extension/findings/FindingStateTag";
 import TimestampText from "@components/common/TimestampText";

@@ -1,5 +1,6 @@
 import BuildBox from "@components/builds/BuildBox";
-import {Button, Col, Popover, Row, Space, Spin, Table, Typography} from "antd";
+import {Button, Col, Popover, Row, Space, Spin, Typography} from "antd";
+import Table from "@components/common/table/Table";
 import {FaCheckSquare, FaEyeSlash, FaSearch, FaSquare} from "react-icons/fa";
 import RangeSelector from "@components/common/RangeSelector";
 import {useRouter} from "next/router";

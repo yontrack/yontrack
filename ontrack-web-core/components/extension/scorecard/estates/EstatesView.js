@@ -1,6 +1,7 @@
 import {gql} from "graphql-request";
 import Link from "next/link";
-import {Alert, Popover, Space, Table, Typography} from "antd";
+import {Alert, Popover, Space, Typography} from "antd";
+import Table from "@components/common/table/Table";
 import {useQuery} from "@components/services/GraphQL";
 import LabelChip from "@components/labels/LabelChip";
 import {gqlLabelFragment} from "@components/labels/LabelGraphQLFragments";

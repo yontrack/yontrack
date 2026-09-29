@@ -41,6 +41,21 @@ object DemoContent {
     const val VISITS = "petclinic-visits"
 
     /**
+     * The project whose tables are long enough to scroll (#1932): the end-to-end suites of the
+     * sample application, one validation stamp per suite and a nightly build on [MAIN], and a
+     * feature branch per change in flight. A project of its own because it is there for its SIZE -
+     * what a sticky table header needs to be seen at all - and anything that size added to the
+     * curated projects would bury their readings. Trim it here rather than elsewhere.
+     */
+    const val E2E = "petclinic-e2e"
+
+    /** The suite of [E2E] run on every build, so its validation stamp has a long history. */
+    const val E2E_SMOKE = "E2E.SMOKE"
+
+    /** The branch statuses widget listing every branch of [E2E] - fixed, like [DASHBOARD_UUID]. */
+    const val E2E_WIDGET_UUID = "1c1f9c3e-8bfa-4a1f-8a0b-4e2f0b0d1a15"
+
+    /**
      * The release branch of [SECURITY], where the HIGH fixed on [MAIN] is still exposed. Named as
      * a release branch - the project has no SCM, so no branch model, and every branch counts for
      * the state of its findings, which is what keeps that HIGH open for the project.
@@ -165,6 +180,7 @@ object DemoContent {
             ui(),
             security(),
             visits(),
+            e2e(),
             changelogProject(changelog),
         ),
         environments = environments(),
@@ -1131,6 +1147,113 @@ object DemoContent {
 
     private const val DAY_SECONDS = 86_400.0
 
+    // The tables showcase (#1932) -------------------------------------------------------------
+
+    /**
+     * The suites of [E2E], one validation stamp each, [E2E_SMOKE] first. Thirty of them: enough for
+     * the branch matrix to scroll sideways on a wide screen, and for the validations of a build
+     * which ran them all to overflow their section of the build page.
+     */
+    private val e2eSuites = listOf(E2E_SMOKE) + listOf(
+        "OWNERS", "PETS", "VISITS", "VETS", "SPECIALTIES", "BOOKING", "CALENDAR", "AVAILABILITY",
+        "REMINDERS", "NOTIFICATIONS", "BILLING", "INVOICES", "PAYMENTS", "REFUNDS", "PHARMACY",
+        "PRESCRIPTIONS", "VACCINATIONS", "LABS", "NOTES", "ATTACHMENTS", "SEARCH", "LOGIN", "PROFILE",
+        "SETTINGS", "REPORTS", "EXPORTS", "IMPORTS", "INVENTORY", "AUDIT",
+    ).map { "E2E.$it" }
+
+    private val e2eStamps = e2eSuites.map { ValidationStampSpec(it, "End-to-end suite ${it.removePrefix("E2E.").lowercase()}.") }
+
+    /**
+     * The suites the feature branches run, and the branch statuses widget shows: a few, so that the
+     * widget overflows by its rows rather than by its columns.
+     */
+    private val e2eFeatureSuites = e2eSuites.take(4)
+
+    /** The one suite failing on the latest nightly build of [E2E]. */
+    private const val E2E_FAILING_SUITE = "E2E.PAYMENTS"
+
+    /**
+     * The nightly builds of [MAIN], oldest first. Each runs [E2E_SMOKE], which fails twice; the
+     * latest runs every suite, and [E2E_FAILING_SUITE] fails. BRONZE is the smoke suite passing.
+     */
+    private fun e2eNightlyBuilds(): List<BuildSpec> {
+        val count = 30
+        val smokeFailures = setOf(9, 21)
+        return (1..count).map { number ->
+            val smoke = if (number in smokeFailures) FAILED else PASSED
+            val latest = number == count
+            BuildSpec(
+                name = "nightly-%02d".format(number),
+                description = if (latest) "Nightly build, full end-to-end run." else "Nightly build, smoke run.",
+                creation = DaysAgo((count - number + 1).toLong(), hour = 2),
+                promotionLevels = if (smoke == PASSED) listOf(BRONZE) else emptyList(),
+                validations = if (latest) {
+                    e2eSuites.map { suite -> ValidationSpec(suite, if (suite == E2E_FAILING_SUITE) FAILED else PASSED) }
+                } else {
+                    listOf(ValidationSpec(E2E_SMOKE, smoke))
+                },
+            )
+        }
+    }
+
+    /** The changes in flight on [E2E], one branch each. */
+    private val e2eFeatures = listOf(
+        "owner-search", "pet-photos", "visit-notes", "vet-schedule", "online-booking", "calendar-sync",
+        "reminder-sms", "invoice-pdf", "card-payments", "refunds", "prescriptions", "vaccination-plan",
+        "lab-results", "audit-log",
+    )
+
+    /**
+     * A feature branch of [E2E], with the one build it was pushed with. One in five fails one of its
+     * suites and is not promoted, so the widget is not a wall of green.
+     */
+    private fun e2eFeatureBranch(index: Int, feature: String): BranchSpec {
+        val failing = index % 5 == 2
+        return BranchSpec(
+            name = "feature-$feature",
+            description = "Feature branch for $feature.",
+            promotionLevels = listOf(bronze),
+            validationStamps = e2eStamps.take(e2eFeatureSuites.size),
+            builds = listOf(
+                BuildSpec(
+                    name = "1",
+                    description = "First push of $feature.",
+                    creation = DaysAgo((index % 7 + 1).toLong(), hour = 14),
+                    promotionLevels = if (failing) emptyList() else listOf(BRONZE),
+                    validations = e2eFeatureSuites.mapIndexed { suiteIndex, suite ->
+                        ValidationSpec(suite, if (failing && suiteIndex == e2eFeatureSuites.lastIndex) FAILED else PASSED)
+                    },
+                ),
+            ),
+        )
+    }
+
+    /**
+     * The tables showcase (#1932): enough builds, stamps, runs and branches for the tables which show
+     * them to scroll, and their headers to stay in place while they do.
+     *
+     * * the branch matrix of [MAIN] scrolls down once more builds are loaded, and sideways;
+     * * the history of [E2E_SMOKE] scrolls after a few "Load more";
+     * * the validations of the latest build overflow their section of the build page;
+     * * the branch statuses widget of the demo dashboard lists every branch, and overflows.
+     */
+    private fun e2e() = ProjectSpec(
+        name = E2E,
+        description = "End-to-end test suites of the sample application - the demo's long tables.",
+        labels = listOf(LABEL_TEAM_APPS, LABEL_LANGUAGE_JAVASCRIPT),
+        branches = listOf(
+            BranchSpec(
+                name = MAIN,
+                description = "Main development branch, built and tested every night.",
+                promotionLevels = listOf(bronze),
+                validationStamps = e2eStamps,
+                builds = e2eNightlyBuilds(),
+            ),
+        ) + e2eFeatures.mapIndexed { index, feature -> e2eFeatureBranch(index, feature) },
+    )
+
+    // ---------------------------------------------------------------------------------------------
+
     /**
      * Yontrack itself, one build per commit since the last release.
      *
@@ -1505,6 +1628,19 @@ object DemoContent {
                     "period" to "3d",
                 ).asJson(),
                 layout = DemoWidgetLayout(x = 6, y = 50, w = 6, h = 20),
+            ),
+            // Every branch of the tables showcase: more rows than the widget has room for, so it
+            // scrolls with its header in place (#1932).
+            DemoWidget(
+                uuid = E2E_WIDGET_UUID,
+                key = "home/BranchStatuses",
+                config = mapOf(
+                    "title" to "End-to-end suites",
+                    "promotionConfigs" to listOf(mapOf("promotionLevel" to BRONZE)),
+                    "validationConfigs" to e2eFeatureSuites.map { mapOf("validationStamp" to it) },
+                    "branches" to e2e().branches.map { mapOf("project" to E2E, "branch" to it.name) },
+                ).asJson(),
+                layout = DemoWidgetLayout(x = 0, y = 70, w = 12, h = 30),
             ),
         ),
     )

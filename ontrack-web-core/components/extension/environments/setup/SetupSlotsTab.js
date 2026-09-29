@@ -1,6 +1,7 @@
 import {useContext} from "react"
 import Link from "next/link"
-import {Button, Table, Typography} from "antd"
+import {Button, Typography} from "antd"
+import Table from "@components/common/table/Table"
 import {FaPlus} from "react-icons/fa"
 import {UserContext} from "@components/providers/UserProvider"
 import {slotSetupUri} from "@components/extension/environments/EnvironmentsLinksUtils"

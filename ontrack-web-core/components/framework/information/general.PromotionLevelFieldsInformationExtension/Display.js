@@ -1,4 +1,5 @@
-import {Table, Tag, Typography} from "antd";
+import {Tag, Typography} from "antd";
+import Table from "@components/common/table/Table";
 
 export default function Display({info}) {
     const fields = info.data || []

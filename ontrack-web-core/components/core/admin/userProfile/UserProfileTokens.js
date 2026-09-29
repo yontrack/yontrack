@@ -1,4 +1,5 @@
-import {Button, Form, Input, Space, Table, Typography} from "antd";
+import {Button, Form, Input, Space, Typography} from "antd";
+import Table from "@components/common/table/Table";
 import {FaCog} from "react-icons/fa";
 import CheckStatus from "@components/common/CheckStatus";
 import TimestampText, {weekDayFormat} from "@components/common/TimestampText";

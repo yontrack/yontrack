@@ -1,6 +1,7 @@
 import {gql} from "graphql-request";
 import React, {useContext, useEffect} from "react";
-import {Popover, Space, Table} from "antd";
+import {Popover, Space} from "antd";
+import Table from "@components/common/table/Table";
 import PromotionRun from "@components/promotionRuns/PromotionRun";
 import {gqlDecorationFragment} from "@components/services/fragments";
 import {FaBan} from "react-icons/fa";

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import {gql} from "graphql-request";
-import {Empty, Space, Table, Typography} from "antd";
+import {Empty, Space, Typography} from "antd";
+import Table from "@components/common/table/Table";
 import {useQuery} from "@components/services/GraphQL";
 import {findingUri} from "@components/common/Links";
 import FindingSeverityTag from "@components/extension/findings/FindingSeverityTag";

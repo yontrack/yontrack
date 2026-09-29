@@ -1,6 +1,7 @@
 import {useQuery} from "@components/services/GraphQL";
 import {gql} from "graphql-request";
-import {Form, Input, Space, Table, Typography} from "antd";
+import {Form, Input, Space, Typography} from "antd";
+import Table from "@components/common/table/Table";
 import {useRefresh} from "@components/common/RefreshUtils";
 import PredefinedValidationStampImage from "@components/core/config/PredefinedValidationStampImage";
 import ValidationDataType from "@components/framework/validation-data-type/ValidationDataType";

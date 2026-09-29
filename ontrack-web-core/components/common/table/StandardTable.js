@@ -1,4 +1,5 @@
-import {Space, Table} from "antd";
+import {Space} from "antd";
+import Table from "@components/common/table/Table";
 import {useState} from "react";
 import {useQuery} from "@components/services/GraphQL";
 import TablePaginationFooter from "@components/common/table/TablePaginationFooter";

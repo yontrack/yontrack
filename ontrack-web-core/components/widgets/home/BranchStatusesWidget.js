@@ -1,6 +1,7 @@
 import {useQueries} from "@components/services/GraphQL";
 import {gql} from "graphql-request";
-import {Alert, Popover, Space, Table, Typography} from "antd";
+import {Alert, Popover, Space, Typography} from "antd";
+import Table from "@components/common/table/Table";
 import ProjectLink from "@components/projects/ProjectLink";
 import BranchLink from "@components/branches/BranchLink";
 import {useContext, useEffect} from "react";

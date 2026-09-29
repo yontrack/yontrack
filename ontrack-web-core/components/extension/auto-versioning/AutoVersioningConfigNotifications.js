@@ -1,11 +1,16 @@
-import {Space, Table, Typography} from "antd";
+import {Space, Typography} from "antd";
+import Table from "@components/common/table/Table";
 import AutoVersioningConfigNotificationScope
     from "@components/extension/auto-versioning/AutoVersioningConfigNotificationScope";
 import NotificationChannelConfig from "@components/extension/notifications/NotificationChannelConfig";
 
 const {Column} = Table
 
-export default function AutoVersioningConfigNotifications({notifications}) {
+/**
+ * @param notifications Notifications of an auto-versioning configuration
+ * @param sticky Passed to the table - `false` where it is nested in another table's expanded row
+ */
+export default function AutoVersioningConfigNotifications({notifications, sticky}) {
     return (
         <>
             {
@@ -13,6 +18,7 @@ export default function AutoVersioningConfigNotifications({notifications}) {
                 <Table
                     dataSource={notifications}
                     pagination={false}
+                    sticky={sticky}
                 >
 
                     <Column

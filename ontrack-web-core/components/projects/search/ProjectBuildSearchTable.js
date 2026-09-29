@@ -1,4 +1,5 @@
-import {Empty, Space, Table} from "antd";
+import {Empty, Space} from "antd";
+import Table from "@components/common/table/Table";
 import BranchLink from "@components/branches/BranchLink";
 import BuildLink from "@components/builds/BuildLink";
 import PromotionRuns from "@components/promotionRuns/PromotionRuns";

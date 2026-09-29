@@ -1,4 +1,5 @@
-import {Space, Table, Tag, Typography} from "antd"
+import {Space, Tag, Typography} from "antd"
+import Table from "@components/common/table/Table"
 import ProjectLink from "@components/projects/ProjectLink"
 import SlotCell from "@components/extension/environments/shared/SlotCell"
 import EnvironmentImage from "@components/extension/environments/shared/EnvironmentImage"

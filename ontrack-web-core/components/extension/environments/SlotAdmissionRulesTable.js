@@ -1,4 +1,5 @@
-import {Button, Space, Table} from "antd";
+import {Button, Space} from "antd";
+import Table from "@components/common/table/Table";
 import {gql} from "graphql-request";
 import SlotAdmissionRuleConfigDialog, {
     useSlotAdmissionRuleConfigDialog

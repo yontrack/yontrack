@@ -283,6 +283,20 @@ demo, and fill in one day at a time on an instance which is not reset daily. Bac
 the ledger's question (`docs/grilling/2026-09-scorecard/README.md`, *What this hands to the ledger*),
 not the seed's.
 
+### The long tables are a project of their own
+
+A sticky table header (#1932) only shows on a table which overflows what it is shown in, and the
+curated projects are too small for most of theirs to. `petclinic-e2e` is there for its size: thirty
+nightly builds and thirty end-to-end suites on `main`, so its branch matrix scrolls down once more
+builds are loaded and sideways on a wide screen; `E2E.SMOKE` run on every build, so its history
+scrolls; every suite run on the latest build, so the validations of its build page overflow their
+section; and fourteen feature branches, listed with `main` by the "End-to-end suites" widget of the
+demo dashboard, which overflows too.
+
+Its own project for the reason `petclinic-visits` is one: that many builds and stamps on a curated
+project would bury its readings. It sits in its own section of `DemoContent`, to be trimmed there.
+`DemoTablesSeedTest` pins what each table needs.
+
 ### Auto promotion has to reproduce the dataset, not add to it
 
 `PromotionLevelSpec.autoPromotion` configures a real server behaviour: the build reaching

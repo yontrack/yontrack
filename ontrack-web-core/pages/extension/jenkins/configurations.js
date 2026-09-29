@@ -1,4 +1,4 @@
-import {Form, Input, Table} from "antd";
+import {Form, Input} from "antd";
 import Link from "next/link";
 import ConfigurationPage from "@components/configurations/ConfigurationPage";
 

@@ -1,7 +1,8 @@
 import {useQuery} from "@components/services/GraphQL";
 import {gql} from "graphql-request";
 import SlotWorkflowDialog, {useSlotWorkflowDialog} from "@components/extension/environments/SlotWorkflowDialog";
-import {Button, Space, Table} from "antd";
+import {Button, Space} from "antd";
+import Table from "@components/common/table/Table";
 import {isAuthorized} from "@components/common/authorizations";
 import {FaPlus} from "react-icons/fa";
 import SlotWorkflowTrigger from "@components/extension/environments/SlotWorkflowTrigger";

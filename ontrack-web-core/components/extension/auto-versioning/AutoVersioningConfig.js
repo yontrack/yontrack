@@ -1,4 +1,5 @@
-import {Empty, Space, Table, Typography} from "antd";
+import {Empty, Space, Typography} from "antd";
+import Table from "@components/common/table/Table";
 import ProjectLinkByName from "@components/projects/ProjectLinkByName";
 import AutoVersioningApproval from "@components/extension/auto-versioning/AutoVersioningApproval";
 import AutoVersioningConfigDetails from "@components/extension/auto-versioning/AutoVersioningConfigDetails";
@@ -32,7 +33,7 @@ export default function AutoVersioningConfig({branch, config, onDeleteConfig}) {
                     expandable={{
                         expandedRowRender: (source) => (
                             <>
-                                <AutoVersioningConfigDetails source={source}/>
+                                <AutoVersioningConfigDetails source={source} inExpandedRow={true}/>
                             </>
                         )
                     }}

@@ -1,4 +1,5 @@
-import {Table, Typography} from "antd";
+import {Typography} from "antd";
+import Table from "@components/common/table/Table";
 import Link from "next/link";
 import GitHubIssueState from "@components/extension/github/GitHubIssueState";
 import GitHubMilestone from "@components/extension/github/GitHubMilestone";

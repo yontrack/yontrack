@@ -3,7 +3,8 @@ import {title} from "@components/common/Titles";
 import MainPage from "@components/layouts/MainPage";
 import {homeBreadcrumbs} from "@components/common/Breadcrumbs";
 import {CloseCommand} from "@components/common/Commands";
-import {Button, Form, Input, Space, Table} from "antd";
+import {Button, Form, Input, Space} from "antd";
+import Table from "@components/common/table/Table";
 import AccountManagementLink, {
     accountManagementUri
 } from "@components/core/admin/account-management/AccountManagementLink";

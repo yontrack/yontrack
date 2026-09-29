@@ -21,6 +21,7 @@ export default defineConfig([
     {
         // Advisory only: lint does not run in CI.
         // - antd 6 deprecates `List` (#1853)
+        // - `Table` goes through our wrapper, which sticks its header by default (#1932)
         // - the frontend helpers removed in 6.0 (#1929) must not come back
         rules: {
             "no-restricted-imports": ["error", {
@@ -29,6 +30,11 @@ export default defineConfig([
                         name: "antd",
                         importNames: ["List"],
                         message: "antd's List is deprecated - use ItemList from @components/common/ItemList.",
+                    },
+                    {
+                        name: "antd",
+                        importNames: ["Table"],
+                        message: "Use Table from @components/common/table/Table, which sticks its header by default.",
                     },
                     {
                         name: "@components/services/graphql-utils",

@@ -1,5 +1,6 @@
 import {gql} from "graphql-request";
-import {Form, Input, Space, Table, Typography} from "antd";
+import {Form, Input, Space, Typography} from "antd";
+import Table from "@components/common/table/Table";
 import {useState} from "react";
 import {callGraphQL, useQuery} from "@components/services/GraphQL";
 import PredefinedPromotionLevelImage from "@components/core/config/PredefinedPromotionLevelImage";

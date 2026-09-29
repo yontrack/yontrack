@@ -1,5 +1,6 @@
 import {useContext} from "react"
-import {Button, Space, Table, Tag, Typography} from "antd"
+import {Button, Space, Tag, Typography} from "antd"
+import Table from "@components/common/table/Table"
 import {FaPlus} from "react-icons/fa"
 import {UserContext} from "@components/providers/UserProvider"
 import EnvironmentEditableIcon from "@components/extension/environments/EnvironmentEditableIcon"

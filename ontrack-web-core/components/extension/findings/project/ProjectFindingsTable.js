@@ -1,5 +1,6 @@
 import Link from "next/link";
-import {Space, Table, Tag, Typography} from "antd";
+import {Space, Tag, Typography} from "antd";
+import Table from "@components/common/table/Table";
 import {branchUri, findingUri} from "@components/common/Links";
 import FindingSeverityTag from "@components/extension/findings/FindingSeverityTag";
 import FindingStateTag from "@components/extension/findings/FindingStateTag";

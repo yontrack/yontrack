@@ -1,5 +1,5 @@
 import GridCell from "@components/grid/GridCell";
-import {Table} from "antd";
+import Table from "@components/common/table/Table";
 import ProjectLink from "@components/projects/ProjectLink";
 import BuildLink from "@components/builds/BuildLink";
 import ChangeLogSignLink from "@components/extension/scm/ChangeLogSignLink";

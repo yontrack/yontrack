@@ -1,6 +1,7 @@
 import {gql} from "graphql-request";
 import {useQuery} from "@components/services/GraphQL";
-import {Space, Table, Typography} from "antd";
+import {Space, Typography} from "antd";
+import Table from "@components/common/table/Table";
 import Link from "next/link";
 import {FaDownload} from "react-icons/fa";
 

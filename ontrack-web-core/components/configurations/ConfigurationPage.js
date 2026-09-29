@@ -1,6 +1,7 @@
 import StandardPage from "@components/layouts/StandardPage";
 import {useContext, useState} from "react";
-import {message, Space, Table} from "antd";
+import {message, Space} from "antd";
+import Table from "@components/common/table/Table";
 import {callGraphQL, useQuery} from "@components/services/GraphQL";
 import {gql} from "graphql-request";
 import {UserContext} from "@components/providers/UserProvider";
