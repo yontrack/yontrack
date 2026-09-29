@@ -50,6 +50,27 @@ These rules apply unconditionally. Follow them in every change, without exceptio
 ### Property Types
 - **Never** rename a `PropertyType` class after it is deployed — its fully qualified class name (FQCN) is its persistent storage ID
 
+### Deprecations
+
+Deprecated in major N, removed in N+1 — the policy is ADR 0018
+(`docs/adr/0018-deprecation-and-removal-across-majors.md`); read it before deprecating or removing
+anything.
+- **Always** write the marker as `Removed in V7. Use X instead. See #NNNN` (or `No replacement.`),
+  on every surface: Kotlin `@Deprecated("…")`, the Javadoc `@deprecated` tag, GraphQL
+  `.deprecate("…")`, the JSDoc `@deprecated` tag, and the `message` of a runtime warning
+- An **external** item (GraphQL, REST, CasC, `ontrack.*` properties, environment variables, KDSL,
+  templating) also gets a runtime warning through `DeprecationService`, and is named on
+  `ontrack-docs/docs/content/appendix/migration-to-v6.md` **in the same commit** — a GraphQL field
+  or KDSL item as `` `Type.field` ``, a runtime warning by its `item`
+- A removal or deprecation is done when the migration page is updated, its lines are deleted from
+  the marker-test baseline, and the demo seed, the mobile UI and the KDSL acceptance tests have
+  been checked for the item — say which way you decided
+- The marker test (`DeprecationMarkersRepositoryTest`, run by `./gradlew test`) enforces the
+  marker and the migration page. Its baseline,
+  `ontrack-model/src/test/resources/deprecation/markers-baseline.txt`, only shrinks: delete the
+  line of every item you remove, fix or list on the page (the test fails on a stale line), and
+  make every new deprecation conform instead of adding a line
+
 ### Documentation
 - **Never** edit `ontrack-docs/src/docs/asciidoc/` — that tree is dead. No asciidoc plugin remains in the
   build, so nothing there is ever published. User documentation lives in **mkdocs** under

@@ -138,11 +138,48 @@ that cheap, and both are the reason pipeline changes land on `main`:
   true`), slots are not. Whatever the environments block says has to say the same thing on every
   branch that builds.
 
+## Deprecations and removals
+
+The next-major branch is where the previous major's deprecations are removed.
+[ADR 0018](../../docs/adr/0018-deprecation-and-removal-across-majors.md) is the policy; on this
+branch it comes down to:
+
+* **Deprecated in N, removed in N+1.** Every item marked `Removed in V6` goes on `v6`. An item that
+  cannot go is re-marked `Removed in V7` and listed on the migration page as carried over, never
+  kept silently.
+* **New deprecations are for the next major**: `Removed in V7. Use X instead. See #NNNN`, a runtime
+  warning and a line on the migration page for an external item.
+* **The upgrade floor is the last Flyway version of the previous major's `.0`** — `V68` for 6.0.
+  A 6.0 instance starts on any 5.x database and on no older one. So the cleanup may delete the
+  code-based data conversions present in 5.0.0 — startup migrations, readers of legacy stored
+  formats — and keeps those added after 5.0.0 until V7, unless a Flyway migration converts the
+  data instead. Aliases on input only (API, CasC) are not data conversions: they follow the
+  deprecation rule.
+* The marker test, `DeprecationMarkersRepositoryTest` in `ontrack-model`, checks the markers and
+  the migration page on every `./gradlew test`. Its baseline
+  (`ontrack-model/src/test/resources/deprecation/markers-baseline.txt`) lists the items which did
+  not conform when the policy was adopted; each removal deletes its lines, and none is added.
+
 ## The cutover
 
 When 6.0 is ready, `v6` becomes `main`. That is the reverse of
-[Minor cutover](minor-cutover.md) and has not been written down yet — it is one merge, one `VERSION`
-bump, and the retirement of the `v6` environment.
+[Minor cutover](minor-cutover.md) and has not been written down in full yet — it is one merge, one
+`VERSION` bump, and the retirement of the `v6` environment.
+
+Its first item is a gate, checked before anything else: **no `Removed in V6` marker left and an
+empty baseline.**
+
+```bash
+# Prints nothing - the marker test and its fixtures excepted, which name the format itself
+git grep -n "Removed in V6" -- ':!*.md' ':!*.graphql' \
+    ':!ontrack-model/src/test/java/net/nemerosa/ontrack/model/deprecation' \
+    ':!ontrack-model/src/test/resources/deprecation'
+# Prints 0
+grep -v '^#' ontrack-model/src/test/resources/deprecation/markers-baseline.txt | grep -c .
+```
+
+Every V5 deprecation is then either gone or explicitly carried over to V7. The marker test then
+moves one major on — `Removed in V7` and `Removed in V8` — for the next major's branch.
 
 And one thing the merge does not do by itself: **move the security stamps back to self.dev**
 (#1875). The mirror stops with the `v6` branch, but self.dev only runs 6.0 once 6.0.0 is released,
