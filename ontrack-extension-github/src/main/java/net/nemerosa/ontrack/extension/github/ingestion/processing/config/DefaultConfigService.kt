@@ -9,7 +9,9 @@ import net.nemerosa.ontrack.extension.github.ingestion.support.FilterHelper
 import net.nemerosa.ontrack.extension.github.ingestion.support.IngestionModelAccessService
 import net.nemerosa.ontrack.extension.github.model.GitHubEngineConfiguration
 import net.nemerosa.ontrack.model.structure.Branch
-import net.nemerosa.ontrack.model.structure.EntityDataService
+import net.nemerosa.ontrack.model.security.ProjectConfig
+import net.nemerosa.ontrack.model.security.SecurityService
+import net.nemerosa.ontrack.model.structure.EntityStore
 import net.nemerosa.ontrack.model.structure.ProjectEntity
 import net.nemerosa.ontrack.model.structure.PropertyService
 import org.springframework.stereotype.Service
@@ -18,7 +20,8 @@ import org.springframework.transaction.annotation.Transactional
 @Service
 @Transactional
 class DefaultConfigService(
-    private val entityDataService: EntityDataService,
+    private val entityStore: EntityStore,
+    private val securityService: SecurityService,
     private val configLoaderService: ConfigLoaderService,
     private val ingestionModelAccessService: IngestionModelAccessService,
     private val propertyService: PropertyService,
@@ -99,6 +102,7 @@ class DefaultConfigService(
     }
 
     override fun saveConfig(branch: Branch, config: IngestionConfig) {
+        securityService.checkProjectFunction(branch, ProjectConfig::class.java)
         // Storing the configuration
         config.store(branch)
         // Validations
@@ -117,25 +121,33 @@ class DefaultConfigService(
     }
 
     private fun IngestionConfig.store(ontrackBranch: Branch) {
-        entityDataService.store(
+        entityStore.store(
             ontrackBranch,
-            IngestionConfig::class.java.name,
+            STORE,
+            EntityStore.DEFAULT_NAME,
             this,
         )
     }
 
     override fun removeConfig(branch: Branch) {
-        entityDataService.delete(
+        securityService.checkProjectFunction(branch, ProjectConfig::class.java)
+        entityStore.deleteByName(
             branch,
-            IngestionConfig::class.java.name,
+            STORE,
+            EntityStore.DEFAULT_NAME,
         )
     }
 
     override fun findConfig(branch: Branch): IngestionConfig? = load(branch)
 
-    private fun load(ontrackBranch: Branch) = entityDataService.retrieve(
+    private fun load(ontrackBranch: Branch) = entityStore.findByName(
         ontrackBranch,
-        IngestionConfig::class.java.name,
-        IngestionConfig::class.java,
+        STORE,
+        EntityStore.DEFAULT_NAME,
+        IngestionConfig::class,
     )
+
+    companion object {
+        private val STORE: String = IngestionConfig::class.java.name
+    }
 }

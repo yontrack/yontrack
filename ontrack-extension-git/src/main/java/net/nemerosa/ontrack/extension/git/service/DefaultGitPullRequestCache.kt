@@ -7,14 +7,14 @@ import net.nemerosa.ontrack.extension.git.GitConfigProperties
 import net.nemerosa.ontrack.extension.git.model.GitPullRequest
 import net.nemerosa.ontrack.model.metrics.increment
 import net.nemerosa.ontrack.model.structure.Branch
-import net.nemerosa.ontrack.model.structure.EntityDataService
+import net.nemerosa.ontrack.model.structure.EntityStore
 import net.nemerosa.ontrack.model.support.time
 import org.springframework.stereotype.Component
 import java.time.LocalDateTime
 
 @Component
 class DefaultGitPullRequestCache(
-    private val entityDataService: EntityDataService,
+    private val entityStore: EntityStore,
     private val gitConfigProperties: GitConfigProperties,
 ) : GitPullRequestCache, MeterBinder {
 
@@ -23,7 +23,7 @@ class DefaultGitPullRequestCache(
     override fun bindTo(registry: MeterRegistry) {
         this.meterRegistry = registry
         registry.gauge(GitPullRequestCacheMetrics.git_pr_cache_count, this) {
-            entityDataService.countByKey(GitPullRequest::class.java.name).toDouble()
+            entityStore.getCountByStoreForAllEntities(STORE).toDouble()
         }
     }
 
@@ -35,10 +35,11 @@ class DefaultGitPullRequestCache(
                 val now = Time.now()
                 // Gets any existing PR for the branch
                 val pr =
-                    entityDataService.retrieve(
+                    entityStore.findByName(
                         branch,
-                        GitPullRequest::class.java.name,
-                        StoredGitPullRequest::class.java
+                        STORE,
+                        EntityStore.DEFAULT_NAME,
+                        StoredGitPullRequest::class
                     )
                 if (pr != null && pr.expirationTime > now) {
                     meterRegistry.increment(GitPullRequestCacheMetrics.git_pr_cache_hits)
@@ -49,9 +50,10 @@ class DefaultGitPullRequestCache(
                         prProvider()
                     }
                     reloadedPr?.apply {
-                        entityDataService.store(
+                        entityStore.store(
                             branch,
-                            GitPullRequest::class.java.name,
+                            STORE,
+                            EntityStore.DEFAULT_NAME,
                             StoredGitPullRequest(
                                 pr = this,
                                 expirationTime = now + gitConfigProperties.pullRequests.cache.duration
@@ -70,5 +72,9 @@ class DefaultGitPullRequestCache(
         val pr: GitPullRequest,
         val expirationTime: LocalDateTime,
     )
+
+    companion object {
+        private val STORE: String = GitPullRequest::class.java.name
+    }
 
 }

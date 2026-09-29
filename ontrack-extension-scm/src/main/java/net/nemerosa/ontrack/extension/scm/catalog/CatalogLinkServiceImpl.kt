@@ -1,6 +1,7 @@
 package net.nemerosa.ontrack.extension.scm.catalog
 
 import net.nemerosa.ontrack.json.asJson
+import net.nemerosa.ontrack.json.format
 import net.nemerosa.ontrack.model.structure.*
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
@@ -13,7 +14,7 @@ class CatalogLinkServiceImpl(
         private val scmCatalog: SCMCatalog,
         private val scmCatalogProviders: List<SCMCatalogProvider>,
         private val structureService: StructureService,
-        private val entityDataService: EntityDataService
+        private val entityStore: EntityStore,
 ) : CatalogLinkService {
 
     private val logger: Logger = LoggerFactory.getLogger(CatalogLinkService::class.java)
@@ -31,29 +32,29 @@ class CatalogLinkServiceImpl(
         }
         // Cleanup
         projects.forEach { project ->
-            val value = entityDataService.retrieve(project, CatalogLinkService::class.java.name)
+            val value = getLinkedKey(project)
             if (!value.isNullOrBlank() && (value in leftOverKeys || value !in allCatalogKeys)) {
                 logger.debug("Catalog entry $value --> ${project.name} is obsolete.")
-                entityDataService.delete(project, CatalogLinkService::class.java.name)
+                entityStore.deleteByName(project, STORE, EntityStore.DEFAULT_NAME)
             }
         }
     }
 
     override fun getSCMCatalogEntry(project: Project): SCMCatalogEntry? =
-            entityDataService.retrieve(project, CatalogLinkService::class.java.name)
+            getLinkedKey(project)
                     ?.run { scmCatalog.getCatalogEntry(this) }
 
     override fun getLinkedProject(entry: SCMCatalogEntry): Project? =
-            entityDataService.findEntityByValue(ProjectEntityType.PROJECT, CatalogLinkService::class.java.name, entry.key.asJson())?.run {
+            findLinkedProjectId(entry)?.run {
                 assert(type == ProjectEntityType.PROJECT)
                 structureService.getProject(ID.of(id))
             }
 
     override fun isLinked(entry: SCMCatalogEntry): Boolean =
-            entityDataService.findEntityByValue(ProjectEntityType.PROJECT, CatalogLinkService::class.java.name, entry.key.asJson()) != null
+            findLinkedProjectId(entry) != null
 
     override fun isOrphan(project: Project): Boolean =
-            !entityDataService.hasEntityValue(project, CatalogLinkService::class.java.name)
+            getLinkedKey(project) == null
 
     private fun computeCatalogLink(
             entry: SCMCatalogEntry,
@@ -81,11 +82,29 @@ class CatalogLinkServiceImpl(
     }
 
     override fun storeLink(project: Project, entry: SCMCatalogEntry) {
-        entityDataService.store(
+        entityStore.store(
             project,
-            CatalogLinkService::class.java.name,
+            STORE,
+            EntityStore.DEFAULT_NAME,
             entry.key
         )
+    }
+
+    private fun getLinkedKey(project: Project): String? =
+            entityStore.findByName(project, STORE, EntityStore.DEFAULT_NAME, String::class)
+
+    private fun findLinkedProjectId(entry: SCMCatalogEntry): ProjectEntityID? =
+            entityStore.findEntities(
+                    type = ProjectEntityType.PROJECT,
+                    store = STORE,
+                    filter = EntityStoreFilter(
+                            jsonFilter = "DATA = CAST(:key AS JSONB)",
+                            jsonFilterCriterias = mapOf("key" to entry.key.asJson().format()),
+                    ),
+            ).firstOrNull()
+
+    companion object {
+        private val STORE: String = CatalogLinkService::class.java.name
     }
 
 }

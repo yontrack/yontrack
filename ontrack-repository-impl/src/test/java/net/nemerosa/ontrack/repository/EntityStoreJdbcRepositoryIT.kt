@@ -141,6 +141,64 @@ class EntityStoreJdbcRepositoryIT : AbstractRepositoryTestSupport() {
         }
     }
 
+    @Test
+    fun `Counting the records of a store for all entities`() {
+        val store = uid("store_")
+        val branches = (1..3).map { do_create_branch() }
+        branches.forEach { branch ->
+            repeat(2) {
+                record().apply { repository.store(branch, store, this) }
+            }
+        }
+        // Another store is not counted
+        record().apply { repository.store(branches.first(), uid("other_"), this) }
+
+        assertEquals(6, repository.getCountByStoreForAllEntities(store))
+    }
+
+    @Test
+    fun `Finding the entities of a store, the most recent first`() {
+        val store = uid("store_")
+        val b1 = do_create_branch()
+        val b2 = do_create_branch()
+        val b3 = do_create_branch()
+        repository.store(b1, store, record())
+        repository.store(b2, store, record())
+        // Another store
+        repository.store(b3, uid("other_"), record())
+        // Another type of entity
+        repository.store(b3.project, store, record())
+
+        assertEquals(
+            listOf(
+                ProjectEntityID(ProjectEntityType.BRANCH, b2.id()),
+                ProjectEntityID(ProjectEntityType.BRANCH, b1.id()),
+            ),
+            repository.findEntities(ProjectEntityType.BRANCH, store)
+        )
+    }
+
+    @Test
+    fun `Finding the entities of a store using a filter`() {
+        val store = uid("store_")
+        val b1 = do_create_branch()
+        val b2 = do_create_branch()
+        repository.store(b1, store, record(enabled = true))
+        repository.store(b2, store, record(enabled = false))
+
+        assertEquals(
+            listOf(ProjectEntityID(ProjectEntityType.BRANCH, b2.id())),
+            repository.findEntities(
+                ProjectEntityType.BRANCH,
+                store,
+                EntityStoreFilter(
+                    jsonFilter = "DATA @> CAST(:json AS JSONB)",
+                    jsonFilterCriterias = mapOf("json" to """{"enabled":false}"""),
+                )
+            )
+        )
+    }
+
     companion object {
         private const val STORE = "testing_store"
 

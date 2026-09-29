@@ -6,4 +6,11 @@ import net.nemerosa.ontrack.git.model.GitCommit
 class IndexableGitCommit(
         val commit: GitCommit,
         val timestamp: Long = Time.toEpochMillis(commit.commitTime)
-)
+) {
+    companion object {
+        /**
+         * Entity store holding the commit of a build
+         */
+        const val STORE = "git-commit"
+    }
+}

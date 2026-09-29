@@ -4,6 +4,8 @@ import net.nemerosa.ontrack.extension.av.versionrules.AutoVersioningVersionRuleR
 import net.nemerosa.ontrack.extension.av.versionrules.validateVersionRule
 import net.nemerosa.ontrack.extension.notifications.subscriptions.EventSubscription
 import net.nemerosa.ontrack.extension.notifications.subscriptions.EventSubscriptionService
+import net.nemerosa.ontrack.json.asJson
+import net.nemerosa.ontrack.json.format
 import net.nemerosa.ontrack.model.security.ProjectConfig
 import net.nemerosa.ontrack.model.security.SecurityService
 import net.nemerosa.ontrack.model.structure.*
@@ -14,7 +16,7 @@ import org.springframework.transaction.annotation.Transactional
 @Transactional
 class AutoVersioningConfigurationServiceImpl(
     private val securityService: SecurityService,
-    private val entityDataService: EntityDataService,
+    private val entityStore: EntityStore,
     private val regexBranchSource: RegexBranchSource,
     private val structureService: StructureService,
     private val eventSubscriptionService: EventSubscriptionService,
@@ -29,12 +31,12 @@ class AutoVersioningConfigurationServiceImpl(
             securityService.asAdmin {
                 setupNotifications(branch, config)
             }
-            entityDataService.store(branch, STORE, config)
+            entityStore.store(branch, STORE, EntityStore.DEFAULT_NAME, config)
         } else {
             securityService.asAdmin {
                 setupNotifications(branch, null)
             }
-            entityDataService.delete(branch, STORE)
+            entityStore.deleteByName(branch, STORE, EntityStore.DEFAULT_NAME)
         }
     }
 
@@ -71,7 +73,7 @@ class AutoVersioningConfigurationServiceImpl(
     }
 
     override fun getAutoVersioning(branch: Branch): AutoVersioningConfig? =
-        entityDataService.retrieve(branch, STORE, AutoVersioningConfig::class.java)?.postDeserialize()
+        entityStore.findByName(branch, STORE, EntityStore.DEFAULT_NAME, AutoVersioningConfig::class)?.postDeserialize()
 
     override fun getAutoVersioningBetween(parent: Branch, dependency: Branch): AutoVersioningSourceConfig? {
         // Gets the AV config of the parent branch
@@ -92,11 +94,17 @@ class AutoVersioningConfigurationServiceImpl(
     }
 
     override fun getBranchesConfiguredFor(project: String, promotion: String): List<Branch> =
-        entityDataService.findEntities(
+        entityStore.findEntities(
             type = ProjectEntityType.BRANCH,
-            key = STORE,
-            jsonQuery = """JSON_VALUE::jsonb->'configurations' @> '[{"sourceProject":"$project","sourcePromotion":"$promotion"}]'::jsonb""",
-            jsonQueryParameters = emptyMap(),
+            store = STORE,
+            filter = EntityStoreFilter(
+                jsonFilter = "DATA->'configurations' @> CAST(:sources AS JSONB)",
+                jsonFilterCriterias = mapOf(
+                    "sources" to listOf(
+                        mapOf("sourceProject" to project, "sourcePromotion" to promotion)
+                    ).asJson().format(),
+                ),
+            ),
         ).map {
             structureService.getBranch(ID.of(it.id))
         }

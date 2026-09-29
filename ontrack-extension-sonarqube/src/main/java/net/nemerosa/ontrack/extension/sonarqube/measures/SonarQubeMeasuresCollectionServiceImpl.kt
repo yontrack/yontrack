@@ -19,7 +19,7 @@ import org.springframework.transaction.annotation.Transactional
 @Transactional
 class SonarQubeMeasuresCollectionServiceImpl(
     private val clientFactory: SonarQubeClientFactory,
-    private val entityDataService: EntityDataService,
+    private val entityStore: EntityStore,
     private val buildDisplayNameService: BuildDisplayNameService,
     private val branchDisplayNameService: BranchDisplayNameService,
     private val metricsExportService: MetricsExportService,
@@ -200,9 +200,10 @@ class SonarQubeMeasuresCollectionServiceImpl(
             }
             // Storage of metrics for build
             securityService.asAdmin {
-                entityDataService.store(
+                entityStore.store(
                     build,
-                    SonarQubeMeasures::class.java.name,
+                    STORE,
+                    EntityStore.DEFAULT_NAME,
                     SonarQubeMeasures(safeMeasures)
                 )
             }
@@ -222,9 +223,14 @@ class SonarQubeMeasuresCollectionServiceImpl(
         }
     }
 
-    override fun getMeasures(build: Build): SonarQubeMeasures? = entityDataService.retrieve(
+    override fun getMeasures(build: Build): SonarQubeMeasures? = entityStore.findByName(
         build,
-        SonarQubeMeasures::class.java.name,
-        SonarQubeMeasures::class.java
+        STORE,
+        EntityStore.DEFAULT_NAME,
+        SonarQubeMeasures::class
     )
+
+    companion object {
+        private val STORE: String = SonarQubeMeasures::class.java.name
+    }
 }

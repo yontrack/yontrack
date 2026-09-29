@@ -4,7 +4,6 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
 import net.nemerosa.ontrack.extension.scm.catalog.CatalogFixtures.entry
-import net.nemerosa.ontrack.json.asJson
 import net.nemerosa.ontrack.model.structure.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -19,7 +18,7 @@ class CatalogLinkServiceTest {
     private lateinit var scmCatalog: SCMCatalog
     private lateinit var scmCatalogProvider: SCMCatalogProvider
     private lateinit var structureService: StructureService
-    private lateinit var entityDataService: EntityDataService
+    private lateinit var entityStore: EntityStore
 
     private val project = Project(ID.of(1), "PRJ", "Project", false, Signature.of("test"))
 
@@ -31,12 +30,14 @@ class CatalogLinkServiceTest {
         every { scmCatalogProvider.id } returns "test"
 
         structureService = mockk(relaxed = true)
-        entityDataService = mockk(relaxed = true)
+        entityStore = mockk(relaxed = true)
+        // No link by default (a relaxed mock cannot guess the generic type)
+        every { entityStore.findByName(any(), STORE, EntityStore.DEFAULT_NAME, String::class) } returns null
         catalogLinkService = CatalogLinkServiceImpl(
             scmCatalog,
             listOf(scmCatalogProvider),
             structureService,
-            entityDataService
+            entityStore
         )
     }
 
@@ -53,9 +54,10 @@ class CatalogLinkServiceTest {
         catalogLinkService.computeCatalogLinks()
         // Checks that link is stored
         verify {
-            entityDataService.store(
+            entityStore.store(
                 project,
-                CatalogLinkService::class.java.name,
+                STORE,
+                EntityStore.DEFAULT_NAME,
                 entry.key
             )
         }
@@ -74,9 +76,10 @@ class CatalogLinkServiceTest {
         catalogLinkService.computeCatalogLinks()
         // Checks that link is NOT stored
         verify(exactly = 0) {
-            entityDataService.store(
+            entityStore.store(
                 project,
-                CatalogLinkService::class.java.name,
+                STORE,
+                EntityStore.DEFAULT_NAME,
                 any<String>()
             )
         }
@@ -95,9 +98,10 @@ class CatalogLinkServiceTest {
         catalogLinkService.computeCatalogLinks()
         // Checks that link is NOT stored
         verify(exactly = 0) {
-            entityDataService.store(
+            entityStore.store(
                 project,
-                CatalogLinkService::class.java.name,
+                STORE,
+                EntityStore.DEFAULT_NAME,
                 any<String>()
             )
         }
@@ -113,14 +117,15 @@ class CatalogLinkServiceTest {
         // Matching
         every { scmCatalogProvider.matches(entry, project) } returns false
         // Existing key
-        every { entityDataService.retrieve(project, CatalogLinkService::class.java.name) } returns entry.key
+        every { entityStore.findByName(project, STORE, EntityStore.DEFAULT_NAME, String::class) } returns entry.key
         // Collection of links
         catalogLinkService.computeCatalogLinks()
         // Asserts the link is deleted
         verify {
-            entityDataService.delete(
+            entityStore.deleteByName(
                 project,
-                CatalogLinkService::class.java.name,
+                STORE,
+                EntityStore.DEFAULT_NAME,
             )
         }
     }
@@ -135,14 +140,15 @@ class CatalogLinkServiceTest {
         // Matching
         every { scmCatalogProvider.matches(entry, project) } returns false
         // Existing key
-        every { entityDataService.retrieve(project, CatalogLinkService::class.java.name) } returns "unknown-key"
+        every { entityStore.findByName(project, STORE, EntityStore.DEFAULT_NAME, String::class) } returns "unknown-key"
         // Collection of links
         catalogLinkService.computeCatalogLinks()
         // Asserts the link is deleted
         verify {
-            entityDataService.delete(
+            entityStore.deleteByName(
                 project,
-                CatalogLinkService::class.java.name,
+                STORE,
+                EntityStore.DEFAULT_NAME,
             )
         }
     }
@@ -150,7 +156,7 @@ class CatalogLinkServiceTest {
     @Test
     fun `Getting a catalog entry from a project`() {
         val entry = entry()
-        every { entityDataService.retrieve(project, CatalogLinkService::class.java.name) } returns entry.key
+        every { entityStore.findByName(project, STORE, EntityStore.DEFAULT_NAME, String::class) } returns entry.key
         every { scmCatalog.getCatalogEntry(entry.key) } returns entry
         val loaded = catalogLinkService.getSCMCatalogEntry(project)
         assertEquals(entry, loaded)
@@ -159,7 +165,7 @@ class CatalogLinkServiceTest {
     @Test
     fun `Catalog entry not found for a project`() {
         val entry = entry()
-        every { entityDataService.retrieve(project, CatalogLinkService::class.java.name) } returns entry.key
+        every { entityStore.findByName(project, STORE, EntityStore.DEFAULT_NAME, String::class) } returns entry.key
         every { scmCatalog.getCatalogEntry(entry.key) } returns null
         val loaded = catalogLinkService.getSCMCatalogEntry(project)
         assertNull(loaded)
@@ -169,12 +175,15 @@ class CatalogLinkServiceTest {
     fun `Getting linked project from an entry`() {
         val entry = entry()
         every {
-            entityDataService.findEntityByValue(
+            entityStore.findEntities(
                 ProjectEntityType.PROJECT,
-                CatalogLinkService::class.java.name,
-                entry.key.asJson()
+                STORE,
+                EntityStoreFilter(
+                    jsonFilter = "DATA = CAST(:key AS JSONB)",
+                    jsonFilterCriterias = mapOf("key" to "\"${entry.key}\""),
+                )
             )
-        } returns ProjectEntityID(ProjectEntityType.PROJECT, project.id())
+        } returns listOf(ProjectEntityID(ProjectEntityType.PROJECT, project.id()))
         every { structureService.getProject(project.id) } returns project
         val loaded = catalogLinkService.getLinkedProject(entry)
         assertEquals(project, loaded)
@@ -184,12 +193,15 @@ class CatalogLinkServiceTest {
     fun `Getting linked flag from an entry`() {
         val entry = entry()
         every {
-            entityDataService.findEntityByValue(
+            entityStore.findEntities(
                 ProjectEntityType.PROJECT,
-                CatalogLinkService::class.java.name,
-                entry.key.asJson()
+                STORE,
+                EntityStoreFilter(
+                    jsonFilter = "DATA = CAST(:key AS JSONB)",
+                    jsonFilterCriterias = mapOf("key" to "\"${entry.key}\""),
+                )
             )
-        } returns ProjectEntityID(ProjectEntityType.PROJECT, project.id())
+        } returns listOf(ProjectEntityID(ProjectEntityType.PROJECT, project.id()))
         val linked = catalogLinkService.isLinked(entry)
         assertEquals(true, linked)
     }
@@ -199,22 +211,26 @@ class CatalogLinkServiceTest {
         val entry = entry()
         every { structureService.projectList } returns listOf(project)
         every {
-            entityDataService.findEntityByValue(
+            entityStore.findEntities(
                 ProjectEntityType.PROJECT,
-                CatalogLinkService::class.java.name,
+                STORE,
                 any()
             )
-        } returns null
+        } returns emptyList()
         val loaded = catalogLinkService.getLinkedProject(entry)
         assertNull(loaded)
     }
 
     @Test
     fun `Orphan project`() {
-        every { entityDataService.hasEntityValue(project, CatalogLinkService::class.java.name) } returns false
+        every { entityStore.findByName(project, STORE, EntityStore.DEFAULT_NAME, String::class) } returns null
         assertTrue(catalogLinkService.isOrphan(project))
-        every { entityDataService.hasEntityValue(project, CatalogLinkService::class.java.name) } returns true
+        every { entityStore.findByName(project, STORE, EntityStore.DEFAULT_NAME, String::class) } returns "some-key"
         assertFalse(catalogLinkService.isOrphan(project))
+    }
+
+    companion object {
+        private val STORE: String = CatalogLinkService::class.java.name
     }
 
 }

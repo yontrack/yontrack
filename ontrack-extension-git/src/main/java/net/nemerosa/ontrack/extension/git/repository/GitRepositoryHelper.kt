@@ -9,7 +9,7 @@ interface GitRepositoryHelper {
     fun findBranchWithProjectAndGitBranch(project: Project, gitBranch: String): Int?
 
     /**
-     * Using the `ENTITY_DATA` table to get the earliest build after a commit.
+     * Using the `ENTITY_STORE` table to get the earliest build after a commit.
      */
     fun getEarliestBuildAfterCommit(
             branch: Branch,

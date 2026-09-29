@@ -1,6 +1,5 @@
 package net.nemerosa.ontrack.model.structure
 
-import tools.jackson.databind.JsonNode
 import kotlin.reflect.KClass
 
 /**
@@ -60,6 +59,28 @@ interface EntityStore {
 
     fun deleteByStoreForAllEntities(store: String)
 
-    fun migrateFromEntityDataStore(category: String, migration: (name: String, data: JsonNode) -> Pair<String, JsonNode>)
+    /**
+     * Number of records in a store, for all entities
+     */
+    fun getCountByStoreForAllEntities(store: String): Int
+
+    /**
+     * Entities of the given [type] having at least one record in the [store] which matches the
+     * [filter], the most recently stored first.
+     */
+    fun findEntities(
+        type: ProjectEntityType,
+        store: String,
+        filter: EntityStoreFilter = EntityStoreFilter(),
+    ): List<ProjectEntityID>
+
+    companion object {
+        /**
+         * Name of the record in a store which holds only one record per entity.
+         *
+         * The data of the former `EntityDataService` was moved into such stores (#1925).
+         */
+        const val DEFAULT_NAME = "default"
+    }
 
 }

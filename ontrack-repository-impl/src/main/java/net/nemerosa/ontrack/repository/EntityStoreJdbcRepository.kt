@@ -1,10 +1,11 @@
 package net.nemerosa.ontrack.repository
 
-import tools.jackson.databind.JsonNode
 import net.nemerosa.ontrack.json.parseInto
 import net.nemerosa.ontrack.model.structure.EntityStore
 import net.nemerosa.ontrack.model.structure.EntityStoreFilter
 import net.nemerosa.ontrack.model.structure.ProjectEntity
+import net.nemerosa.ontrack.model.structure.ProjectEntityID
+import net.nemerosa.ontrack.model.structure.ProjectEntityType
 import net.nemerosa.ontrack.repository.support.AbstractJdbcRepository
 import org.springframework.stereotype.Repository
 import java.sql.ResultSet
@@ -198,51 +199,43 @@ class EntityStoreJdbcRepository(dataSource: DataSource) : AbstractJdbcRepository
         criteria.append(criteriaList.joinToString(" AND ") { "($it)" })
     }
 
-    override fun migrateFromEntityDataStore(
-        category: String,
-        migration: (name: String, data: JsonNode) -> Pair<String, JsonNode>
-    ) {
-        namedParameterJdbcTemplate!!.query(
-            """
-                SELECT *
-                FROM ENTITY_DATA_STORE
-                WHERE CATEGORY = :category
-                ORDER BY ID
-            """,
-            mapOf(
-                "category" to category,
-            )
-        ) { rs: ResultSet, _: Int ->
-            val name = rs.getString("name")
-            val data = readJson(rs, "json")
-            val (newName, newData) = migration(name, data)
-            namedParameterJdbcTemplate!!.update(
-                """
-                    INSERT INTO ENTITY_STORE(PROJECT, BRANCH, PROMOTION_LEVEL, VALIDATION_STAMP, BUILD, PROMOTION_RUN, VALIDATION_RUN, STORE, NAME, DATA)
-                    VALUES(:project, :branch, :promotion_level, :validation_stamp, :build, :promotion_run, :validation_run, :store, :name, CAST(:data AS JSONB))
-                """,
-                mapOf(
-                    "project" to rs.getInt("project").takeIf { it != 0 },
-                    "branch" to rs.getInt("branch").takeIf { it != 0 },
-                    "promotion_level" to rs.getInt("promotion_level").takeIf { it != 0 },
-                    "validation_stamp" to rs.getInt("validation_stamp").takeIf { it != 0 },
-                    "build" to rs.getInt("build").takeIf { it != 0 },
-                    "promotion_run" to rs.getInt("promotion_run").takeIf { it != 0 },
-                    "validation_run" to rs.getInt("validation_run").takeIf { it != 0 },
-                    "store" to category,
-                    "name" to newName,
-                    "data" to writeJson(newData),
-                )
-            )
-        }
-        namedParameterJdbcTemplate!!.update(
-            """
-                DELETE FROM ENTITY_DATA_STORE
-                WHERE CATEGORY = :category
-            """,
-            mapOf(
-                "category" to category,
-            )
+    override fun getCountByStoreForAllEntities(store: String): Int =
+        namedParameterJdbcTemplate!!.queryForObject(
+            "SELECT COUNT(ID) FROM ENTITY_STORE WHERE STORE = :store",
+            mapOf("store" to store),
+            Int::class.java
+        ) ?: 0
+
+    override fun findEntities(
+        type: ProjectEntityType,
+        store: String,
+        filter: EntityStoreFilter,
+    ): List<ProjectEntityID> {
+        val criteriaList = mutableListOf(
+            "${type.name} IS NOT NULL",
+            "STORE = :store",
         )
+        val params = mutableMapOf<String, Any?>("store" to store)
+        val jsonFilter = filter.jsonFilter
+        if (!jsonFilter.isNullOrBlank()) {
+            criteriaList += jsonFilter
+            filter.jsonFilterCriterias?.forEach { (name, value) ->
+                params[name] = value
+            }
+        }
+        val criteria = criteriaList.joinToString(" AND ") { "($it)" }
+        @Suppress("SqlSourceToSinkFlow")
+        return namedParameterJdbcTemplate!!.query(
+            """
+                SELECT ${type.name}
+                FROM ENTITY_STORE ${filter.jsonContext ?: ""}
+                WHERE $criteria
+                GROUP BY ${type.name}
+                ORDER BY MAX(ID) DESC
+            """,
+            params
+        ) { rs: ResultSet, _: Int ->
+            ProjectEntityID(type, rs.getInt(type.name))
+        }
     }
 }

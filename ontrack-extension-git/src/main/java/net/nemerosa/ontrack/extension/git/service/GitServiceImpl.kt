@@ -47,7 +47,7 @@ class GitServiceImpl(
     private val buildGitCommitLinkService: BuildGitCommitLinkService,
     private val gitConfigurators: Collection<GitConfigurator>,
     private val gitRepositoryHelper: GitRepositoryHelper,
-    private val entityDataService: EntityDataService,
+    private val entityStore: EntityStore,
     private val gitConfigProperties: GitConfigProperties,
     private val gitPullRequestCache: DefaultGitPullRequestCache,
     private val gitNoRemoteCounter: GitNoRemoteCounter,
@@ -560,16 +560,18 @@ class GitServiceImpl(
     }
 
     override fun getCommitForBuild(build: Build): IndexableGitCommit? =
-        entityDataService.retrieve(
+        entityStore.findByName(
             build,
-            "git-commit",
-            IndexableGitCommit::class.java
+            IndexableGitCommit.STORE,
+            EntityStore.DEFAULT_NAME,
+            IndexableGitCommit::class
         )
 
     override fun setCommitForBuild(build: Build, commit: IndexableGitCommit) {
-        entityDataService.store(
+        entityStore.store(
             build,
-            "git-commit",
+            IndexableGitCommit.STORE,
+            EntityStore.DEFAULT_NAME,
             commit
         )
     }

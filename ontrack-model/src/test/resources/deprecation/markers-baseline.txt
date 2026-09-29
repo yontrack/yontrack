@@ -13,9 +13,6 @@
 # issue expected to remove them; the grouping is a guide, the test does not read it.
 # Cutover gate (doc/dev-guide/major-branch.md): this file has no entry left.
 
-# #1925 (D9) - EntityDataService
-kotlin ontrack-model/src/main/java/net/nemerosa/ontrack/model/structure/EntityDataService.kt#EntityDataService
-
 # #1929 (D13) - frontend helpers
 frontend ontrack-web-core/components/common/StateUtils.js#useReloadState
 frontend ontrack-web-core/components/entities/ProjectEntityPageInfo.js#closeUri
