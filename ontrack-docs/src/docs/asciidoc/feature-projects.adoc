@@ -1,8 +1,0 @@
-[[projects]]
-=== Managing projects
-
-//include::usage-home-page.adoc[]
-//
-//include::usage-project-favorites.adoc[]
-//
-//include::usage-labels.adoc[]

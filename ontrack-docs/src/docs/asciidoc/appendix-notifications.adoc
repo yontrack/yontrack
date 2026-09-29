@@ -1,6 +1,0 @@
-[[appendix-notifications]]
-=== Notifications
-
-Find below the list of all notification backends and their configurations.
-
-include::notifications/index.adoc[]

@@ -1,6 +1,0 @@
-[[appendix-events]]
-=== Event types
-
-Find below the list of all events and their context.
-
-include::events/index.adoc[]

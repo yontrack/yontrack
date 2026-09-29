@@ -72,10 +72,8 @@ anything.
   make every new deprecation conform instead of adding a line
 
 ### Documentation
-- **Never** edit `ontrack-docs/src/docs/asciidoc/` — that tree is dead. No asciidoc plugin remains in the
-  build, so nothing there is ever published. User documentation lives in **mkdocs** under
-  `ontrack-docs/docs/content/`, and a new page must be added to the `nav:` in `ontrack-docs/mkdocs.yml`
-  or it will not be reachable.
+- User documentation lives in **mkdocs** under `ontrack-docs/docs/content/`, and a new page must be
+  added to the `nav:` in `ontrack-docs/mkdocs.yml` or it will not be reachable.
 - **Never** hand-edit `ontrack-docs/docs/content/generated/` — it is gitignored and rebuilt by the
   `ontrack-docs` integration tests from `@APIDescription` and the event/metric/property declarations.
   To change generated docs, change the annotations, then run `./gradlew :ontrack-docs:integrationTest`.

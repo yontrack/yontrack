@@ -1,6 +1,0 @@
-[[operations]]
-== Operations
-
-include::operations-metrics.adoc[]
-
-include::operations-logging.adoc[]

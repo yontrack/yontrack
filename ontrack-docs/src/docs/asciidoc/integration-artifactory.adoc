@@ -1,4 +1,0 @@
-[[integration-artifactory]]
-=== Artifactory integration
-
-// TODO

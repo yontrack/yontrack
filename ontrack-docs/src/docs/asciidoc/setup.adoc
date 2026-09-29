@@ -1,6 +1,0 @@
-[[setup]]
-== Setup
-
-While Ontrack can be configured using the UI, it's recommended to use the <<casc,Configuration as Code (CasC)>> feature.
-
-include::casc.adoc[]

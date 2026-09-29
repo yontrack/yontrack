@@ -1,6 +1,0 @@
-[[appendix-workflow-node-executors]]
-=== Workflow nodes executors
-
-Find below the list of all workflow node executors and their configurations.
-
-include::workflow-node-executors/index.adoc[]

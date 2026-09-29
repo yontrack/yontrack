@@ -24,7 +24,7 @@ This is a **single-context** repo:
 └── ontrack-*/                         ← Gradle modules
 ```
 
-Note: the repo also has a `doc/` directory (singular) holding the human-facing dev guide and Asciidoc sources.
+Note: the repo also has a `doc/` directory (singular) holding the human-facing dev guide.
 That is unrelated — domain docs and ADRs live under `docs/` (plural).
 
 ## Use the glossary's vocabulary

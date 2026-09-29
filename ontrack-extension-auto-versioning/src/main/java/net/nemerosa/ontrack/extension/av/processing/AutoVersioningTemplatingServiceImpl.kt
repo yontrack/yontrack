@@ -48,9 +48,10 @@ class AutoVersioningTemplatingServiceImpl(
         }
 
         /**
-         * When adding new entries, please also update the documentation at
+         * When adding new entries, please also update the table of templating entries in the
+         * "PR title and body" section of
          *
-         * ontrack-docs/src/docs/asciidoc/templating/contexts/auto-versioning-context.adoc
+         * ontrack-docs/docs/content/integrations/auto-versioning/auto-versioning.md
          */
 
         val context: Map<String, Any> by lazy {

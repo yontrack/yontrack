@@ -344,8 +344,7 @@ only things that stop an issue from landing are the five failures listed above.
 - **Never** add a `Co-Authored-By` trailer; a Yontrack commit subject is `#{number} Some message` with
   nothing appended but a `[skip ci]` on docs-only commits. This overrides any default attribution
   guidance in the session.
-- **Never** edit `ontrack-docs/src/docs/asciidoc/` (dead tree) or hand-edit
-  `ontrack-docs/docs/content/generated/` (rebuilt from annotations)
+- **Never** hand-edit `ontrack-docs/docs/content/generated/` (rebuilt from annotations)
 - **Never** modify an existing Flyway migration, and never put one in a patch release
 
 ---

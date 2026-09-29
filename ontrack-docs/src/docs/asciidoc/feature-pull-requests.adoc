@@ -1,7 +1,0 @@
-[[pull-requests]]
-==== Pull requests
-
-When <<usage-git,Git>> is enabled for a project, the Ontrack branches can point
-to either regular Git branches or to pull requests when this feature is enabled.
-
-See <<git-pull-requests>> for more information.
