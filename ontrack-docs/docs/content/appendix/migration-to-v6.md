@@ -300,6 +300,28 @@ properties and environment variables, templating, the CI configuration, and the 
 
 The latest 5.5.x release counts every use of these items: see [Upgrade path](#upgrade-path).
 
+### GraphQL API
+
+| Removed                              | Use instead                                                                  |
+|--------------------------------------|------------------------------------------------------------------------------|
+| `Account.name`                       | `Account.email`                                                              |
+| `PromotionLevel.promotionRuns`       | `PromotionLevel.promotionRunsPaginated`, its `size` argument for `first`     |
+| `PromotionLevel.autoVersioningTrail` | `PromotionLevel.autoVersioningTrailPaginated`                                |
+| `PromotionRun.autoVersioningTrail`   | `PromotionRun.autoVersioningTrailPaginated`                                  |
+| `AutoVersioningOrder.targetPaths`    | `AutoVersioningOrder.targetPath`                                             |
+| `SearchResult.page`                  | No replacement: build the link from the `type` and `data` of the result      |
+| `SearchResult.uri`                   | No replacement: build the link from the `type` and `data` of the result      |
+| `VersionInfo.date`                   | No replacement: the field was always empty                                   |
+
+* **`promotionRuns`** — `promotionRunsPaginated` returns a page, `{ pageInfo pageItems }`, the most
+  recent runs first. `promotionRuns(first: N)` becomes `promotionRunsPaginated(size: N)`; the
+  `last` argument has no equivalent.
+* **`autoVersioningTrail`** — the trail is now a page of branches, `{ pageInfo pageItems }`, where
+  `autoVersioningTrail` returned an `AutoVersioningTrail` object and its `branches`: the
+  `AutoVersioningTrail` type is gone with it. The paginated field returns only the eligible
+  branches by default; pass `filter: {onlyEligible: false}` to get the rejected ones too, with
+  their `rejectionReason`, as `autoVersioningTrail` did.
+
 ### Templating
 
 | Removed                                                        | Use instead                                                  |

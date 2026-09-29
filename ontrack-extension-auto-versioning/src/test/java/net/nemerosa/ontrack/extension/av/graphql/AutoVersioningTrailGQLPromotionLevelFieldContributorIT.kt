@@ -21,8 +21,8 @@ class AutoVersioningTrailGQLPromotionLevelFieldContributorIT : AbstractAutoVersi
                 """
                     {
                         promotionLevel(id: ${pl.id}) {
-                            autoVersioningTrail {
-                                branches {
+                            autoVersioningTrailPaginated(filter: {onlyEligible: false}) {
+                                pageItems {
                                     branch {
                                         id
                                     }
@@ -39,8 +39,8 @@ class AutoVersioningTrailGQLPromotionLevelFieldContributorIT : AbstractAutoVersi
                 assertEquals(
                     mapOf(
                         "promotionLevel" to mapOf(
-                            "autoVersioningTrail" to mapOf(
-                                "branches" to listOf(
+                            "autoVersioningTrailPaginated" to mapOf(
+                                "pageItems" to listOf(
                                     mapOf(
                                         "branch" to mapOf(
                                             "id" to app2.id().toString(),
@@ -77,8 +77,8 @@ class AutoVersioningTrailGQLPromotionLevelFieldContributorIT : AbstractAutoVersi
                 """
                         {
                             promotionLevel(id: ${pl.id}) {
-                                autoVersioningTrail {
-                                    branches {
+                                autoVersioningTrailPaginated(filter: {onlyEligible: false}) {
+                                    pageItems {
                                         branch {
                                             id
                                         }
@@ -97,8 +97,8 @@ class AutoVersioningTrailGQLPromotionLevelFieldContributorIT : AbstractAutoVersi
                 assertEquals(
                     mapOf(
                         "promotionLevel" to mapOf(
-                            "autoVersioningTrail" to mapOf(
-                                "branches" to listOf(
+                            "autoVersioningTrailPaginated" to mapOf(
+                                "pageItems" to listOf(
                                     mapOf(
                                         "branch" to mapOf(
                                             "id" to app2.id().toString(),

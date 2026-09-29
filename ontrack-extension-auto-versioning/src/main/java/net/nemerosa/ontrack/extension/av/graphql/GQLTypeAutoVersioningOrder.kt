@@ -33,16 +33,6 @@ class GQLTypeAutoVersioningOrder(
                     .type(GraphQLTypeReference(GQLTypeBranch.BRANCH))
             }
             .stringField(AutoVersioningOrder::targetPath, "Target path(s) for the processing order")
-            .field {
-                it.name("targetPaths")
-                    .description("Target path(s) for the processing order")
-                    .deprecate("Removed in V6. Use targetPath instead. See #1921")
-                    .type(GraphQLString)
-                    .dataFetcher { env ->
-                        val order = env.getSource<AutoVersioningOrder>()!!
-                        order.defaultPath.paths
-                    }
-            }
             .stringField(
                 AutoVersioningOrder::targetRegex,
                 "Regex used to identify the line to update in the target files"

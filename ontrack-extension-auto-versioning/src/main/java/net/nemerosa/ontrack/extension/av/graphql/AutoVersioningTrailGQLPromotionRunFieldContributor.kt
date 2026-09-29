@@ -15,7 +15,6 @@ import org.springframework.stereotype.Component
 @Component
 class AutoVersioningTrailGQLPromotionRunFieldContributor(
     private val autoVersioningTrackingService: AutoVersioningTrackingService,
-    private val gqlTypeAutoVersioningTrail: GQLTypeAutoVersioningTrail,
     private val paginatedListFactory: GQLPaginatedListFactory,
     private val gqlInputAutoVersioningTrailFilter: GQLInputAutoVersioningTrailFilter,
 ) : GQLProjectEntityFieldContributor {
@@ -24,16 +23,6 @@ class AutoVersioningTrailGQLPromotionRunFieldContributor(
         projectEntityType: ProjectEntityType,
     ): List<GraphQLFieldDefinition>? = if (projectEntityType == ProjectEntityType.PROMOTION_RUN) {
         listOf(
-            GraphQLFieldDefinition.newFieldDefinition()
-                .name("autoVersioningTrail")
-                .description("List of branches targeted for auto-versioning based on this promotion run or with their reason for rejection")
-                .deprecate("Removed in V6. Use autoVersioningTrailPaginated instead. See #1921")
-                .type(gqlTypeAutoVersioningTrail.typeRef)
-                .dataFetcher { env ->
-                    val run: PromotionRun = env.getSource()!!
-                    autoVersioningTrackingService.getTrail(run)
-                }
-                .build(),
             paginatedListFactory.createPaginatedField<PromotionRun, AutoVersioningBranchTrail>(
                 cache = GQLTypeCache(),
                 fieldName = "autoVersioningTrailPaginated",

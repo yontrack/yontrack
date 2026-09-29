@@ -2,7 +2,6 @@ package net.nemerosa.ontrack.graphql.schema
 
 import graphql.schema.GraphQLFieldDefinition
 import graphql.schema.GraphQLObjectType
-import net.nemerosa.ontrack.graphql.support.GQLScalarLocalDateTime
 import net.nemerosa.ontrack.graphql.support.stringField
 import net.nemerosa.ontrack.model.structure.Info
 import net.nemerosa.ontrack.model.structure.InfoService
@@ -53,12 +52,6 @@ class GQLTypeVersionInfo : GQLType {
     override fun createType(cache: GQLTypeCache): GraphQLObjectType = GraphQLObjectType.newObject()
         .name(typeName)
         .description("Version information")
-        .field {
-            it.name("date")
-                .deprecate("Removed in V6. No replacement. See #1921")
-                .description("Creation date")
-                .type(GQLScalarLocalDateTime.INSTANCE)
-        }
         .stringField(VersionInfo::display, "Display version")
         .stringField(VersionInfo::full, "Full version")
         .stringField(VersionInfo::branch, "Git branch")

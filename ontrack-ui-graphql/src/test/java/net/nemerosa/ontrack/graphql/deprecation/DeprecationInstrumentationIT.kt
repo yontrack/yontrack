@@ -20,11 +20,11 @@ class DeprecationInstrumentationIT : AbstractQLKTITSupport() {
 
     @Test
     fun `Querying a deprecated field through the GraphQL API is counted`() {
-        val before = count("Account.name")
+        val before = count("SearchResults.pageItems")
         asAdmin {
-            run("""{ user { account { name email } } }""")
-            run("""{ user { account { email } } }""")
+            run("""{ search(query: "deprecated-usage") { pageItems { title } } }""")
+            run("""{ search(query: "deprecated-usage") { items { title } } }""")
         }
-        assertEquals(1.0, count("Account.name") - before)
+        assertEquals(1.0, count("SearchResults.pageItems") - before)
     }
 }

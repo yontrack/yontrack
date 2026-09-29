@@ -1,7 +1,13 @@
-query PromotionRunAutoVersioningTrail($id: Int!) {
+query PromotionRunAutoVersioningTrail($id: Int!, $offset: Int!, $size: Int!) {
     promotionRuns(id: $id) {
-        autoVersioningTrail {
-            branches {
+        autoVersioningTrailPaginated(offset: $offset, size: $size, filter: {onlyEligible: false}) {
+            pageInfo {
+                nextPage {
+                    offset
+                    size
+                }
+            }
+            pageItems {
                 id
                 branch {
                     ...BranchFragment

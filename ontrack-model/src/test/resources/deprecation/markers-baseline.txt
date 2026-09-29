@@ -13,14 +13,6 @@
 # issue expected to remove them; the grouping is a guide, the test does not read it.
 # Cutover gate (doc/dev-guide/major-branch.md): this file has no entry left.
 
-# #1921 (D5) - deprecated GraphQL fields
-graphql ontrack-extension-auto-versioning/src/main/java/net/nemerosa/ontrack/extension/av/graphql/AutoVersioningTrailGQLPromotionLevelFieldContributor.kt#autoVersioningTrail
-graphql ontrack-extension-auto-versioning/src/main/java/net/nemerosa/ontrack/extension/av/graphql/AutoVersioningTrailGQLPromotionRunFieldContributor.kt#autoVersioningTrail
-graphql ontrack-extension-auto-versioning/src/main/java/net/nemerosa/ontrack/extension/av/graphql/GQLTypeAutoVersioningOrder.kt#targetPaths
-graphql ontrack-ui-graphql/src/main/java/net/nemerosa/ontrack/graphql/schema/GQLRootQueryInfo.kt#date
-graphql ontrack-ui-graphql/src/main/java/net/nemerosa/ontrack/graphql/schema/GQLTypeAccount.kt#name
-graphql ontrack-ui-graphql/src/main/java/net/nemerosa/ontrack/graphql/schema/GQLTypePromotionLevel.kt#promotionRuns
-
 # #1922 (D6) - REST endpoints and other external items, un-deprecations
 graphql ontrack-extension-hook/src/main/java/net/nemerosa/ontrack/extension/hook/ui/GQLTypeHookResponse.kt#info
 kotlin ontrack-extension-notifications/src/main/java/net/nemerosa/ontrack/extension/notifications/channels/NotificationResultType.kt#TIMEOUT

@@ -81,8 +81,6 @@ type Account {
   "List of groups the account belongs to"
   groups: [AccountGroup!]!
   id: ID!
-  "Unique name for the account"
-  name: String! @deprecated(reason : "Removed in V6. Use email instead. See #1921")
   "Security role (admin or none)"
   role: String
   "List of authentication tokens linked to this account."
@@ -331,8 +329,6 @@ type AutoVersioningOrder {
   sourcePromotion: String
   "Target path(s) for the processing order"
   targetPath: String!
-  "Target path(s) for the processing order"
-  targetPaths: String @deprecated(reason : "Removed in V6. Use targetPath instead. See #1921")
   "Property in the target file"
   targetProperty: String
   "Regex used in property value to identify the version"
@@ -431,12 +427,6 @@ type AutoVersioningSourceConfigPath {
   regex: String
   "Source of the version for the build. By default, uses the build label is the source project is configured so, or the build name itself. This allows the customization of this behavior."
   versionSource: String
-}
-
-"Describes the history of an auto-versioning decision process"
-type AutoVersioningTrail {
-  "Trails per branch"
-  branches: [AutoVersioningBranchTrail!]!
 }
 
 type Branch implements Authorizable & ProjectEntity {
@@ -5308,8 +5298,6 @@ type PromotionLevel implements Authorizable & ProjectEntity {
   autoPromotionProperty: Property
   "List of branches targeted for auto-versioning based on this promotion level"
   autoVersioningTargets: [AutoVersioningConfiguredBranch!]!
-  "List of branches targeted for auto-versioning based on this promotion level or with their reason for rejection"
-  autoVersioningTrail: AutoVersioningTrail @deprecated(reason : "Removed in V6. Use autoVersioningTrailPaginated instead. See #1921")
   "List of branches targeted for auto-versioning based on this promotion or with their reason for rejection"
   autoVersioningTrailPaginated(
     filter: AutoVersioningTrailFilter,
@@ -5349,13 +5337,6 @@ type PromotionLevel implements Authorizable & ProjectEntity {
   promotedBuildCount: Int!
   "List of promotions a promotion depends on before being applied."
   promotionDependenciesProperty: Property
-  "List of runs for this promotion"
-  promotionRuns(
-    "Number of items to return from the beginning of the list"
-    first: Int,
-    "Number of items to return from the end of the list"
-    last: Int
-  ): [PromotionRun!]! @deprecated(reason : "Removed in V6. Use promotionRunsPaginated instead. See #1921")
   "Paginated list of promotion runs"
   promotionRunsPaginated(
     "Keeps only runs after this data / time"
@@ -5411,8 +5392,6 @@ type PromotionRun implements Authorizable & ProjectEntity {
   authorizations: [Authorization!]!
   "Current conditions of the auto promotion of this run's promotion level, with their current state for this run's build - null when the promotion level has no auto promotion"
   autoPromotionConditions: AutoPromotionBuildConditions
-  "List of branches targeted for auto-versioning based on this promotion run or with their reason for rejection"
-  autoVersioningTrail: AutoVersioningTrail @deprecated(reason : "Removed in V6. Use autoVersioningTrailPaginated instead. See #1921")
   "List of branches targeted for auto-versioning based on this promotion run or with their reason for rejection"
   autoVersioningTrailPaginated(
     filter: AutoVersioningTrailFilter,
@@ -8443,8 +8422,6 @@ type VersionInfo {
   branch: String!
   "Git commit"
   commit: String!
-  "Creation date"
-  date: LocalDateTime @deprecated(reason : "Removed in V6. No replacement. See #1921")
   "Display version"
   display: String!
   "Full version"

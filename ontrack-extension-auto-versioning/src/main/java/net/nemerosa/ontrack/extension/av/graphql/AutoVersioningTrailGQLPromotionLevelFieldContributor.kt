@@ -3,7 +3,6 @@ package net.nemerosa.ontrack.extension.av.graphql
 import graphql.schema.GraphQLArgument
 import graphql.schema.GraphQLFieldDefinition
 import net.nemerosa.ontrack.extension.av.graphql.AutoVersioningTrailGQLPromotionRunFieldContributor.Companion.ARG_FILTER
-import net.nemerosa.ontrack.extension.av.listener.AutoVersioningPromotionListenerService
 import net.nemerosa.ontrack.extension.av.tracking.AutoVersioningBranchTrail
 import net.nemerosa.ontrack.extension.av.tracking.AutoVersioningTrackingService
 import net.nemerosa.ontrack.graphql.schema.GQLProjectEntityFieldContributor
@@ -16,9 +15,7 @@ import org.springframework.stereotype.Component
 
 @Component
 class AutoVersioningTrailGQLPromotionLevelFieldContributor(
-    private val autoVersioningPromotionListenerService: AutoVersioningPromotionListenerService,
     private val autoVersioningTrackingService: AutoVersioningTrackingService,
-    private val gqlTypeAutoVersioningTrail: GQLTypeAutoVersioningTrail,
     private val paginatedListFactory: GQLPaginatedListFactory,
     private val gqlInputAutoVersioningTrailFilter: GQLInputAutoVersioningTrailFilter,
 ) : GQLProjectEntityFieldContributor {
@@ -27,18 +24,6 @@ class AutoVersioningTrailGQLPromotionLevelFieldContributor(
         projectEntityType: ProjectEntityType,
     ): List<GraphQLFieldDefinition>? = if (projectEntityType == ProjectEntityType.PROMOTION_LEVEL) {
         listOf(
-            GraphQLFieldDefinition.newFieldDefinition()
-                .name("autoVersioningTrail")
-                .description("List of branches targeted for auto-versioning based on this promotion level or with their reason for rejection")
-                .deprecate("Removed in V6. Use autoVersioningTrailPaginated instead. See #1921")
-                .type(gqlTypeAutoVersioningTrail.typeRef)
-                .dataFetcher { env ->
-                    val pl: PromotionLevel = env.getSource()!!
-                    val tracking = autoVersioningTrackingService.startInMemoryTrail()
-                    autoVersioningPromotionListenerService.getConfiguredBranches(pl, tracking)
-                    tracking.trail
-                }
-                .build(),
             paginatedListFactory.createPaginatedField<PromotionLevel, AutoVersioningBranchTrail>(
                 cache = GQLTypeCache(),
                 fieldName = "autoVersioningTrailPaginated",

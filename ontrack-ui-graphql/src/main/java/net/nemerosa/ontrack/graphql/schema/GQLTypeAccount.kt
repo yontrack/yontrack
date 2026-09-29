@@ -1,13 +1,11 @@
 package net.nemerosa.ontrack.graphql.schema
 
-import graphql.Scalars.GraphQLString
 import graphql.schema.DataFetcher
 import graphql.schema.GraphQLObjectType
 import graphql.schema.GraphQLTypeReference
 import net.nemerosa.ontrack.graphql.support.idField
 import net.nemerosa.ontrack.graphql.support.listType
 import net.nemerosa.ontrack.graphql.support.stringField
-import net.nemerosa.ontrack.graphql.support.toNotNull
 import net.nemerosa.ontrack.model.security.*
 import net.nemerosa.ontrack.model.structure.TokensService
 import org.springframework.stereotype.Component
@@ -29,16 +27,6 @@ class GQLTypeAccount(
         return GraphQLObjectType.newObject()
             .name(ACCOUNT)
             .field(idField())
-            .field {
-                it.name("name")
-                    .description("Unique name for the account")
-                    .deprecate("Removed in V6. Use email instead. See #1921")
-                    .type(GraphQLString.toNotNull())
-                    .dataFetcher { env ->
-                        val account: Account = env.getSource()!!
-                        account.email
-                    }
-            }
             .stringField(Account::fullName, "Full name of the account")
             .stringField(Account::email, "Email of the account")
             .stringField(Account::role.name, "Security role (admin or none)")

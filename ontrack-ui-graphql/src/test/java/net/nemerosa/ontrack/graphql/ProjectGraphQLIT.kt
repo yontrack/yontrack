@@ -286,9 +286,11 @@ class ProjectGraphQLIT : AbstractQLKTITSupport() {
                         branches (name: "$name") {
                             promotionLevels {
                                 name
-                                promotionRuns {
-                                    build {
-                                        name
+                                promotionRunsPaginated {
+                                    pageItems {
+                                        build {
+                                            name
+                                        }
                                     }
                                 }
                             }
@@ -301,7 +303,7 @@ class ProjectGraphQLIT : AbstractQLKTITSupport() {
                         data.path("projects").first()
                             .path("branches").first()
                             .path("promotionLevels").first()
-                            .path("promotionRuns").values().map {
+                            .path("promotionRunsPaginated").path("pageItems").values().map {
                                 it.path("build").path("name").asText()
                             }
                     )
@@ -448,9 +450,11 @@ class ProjectGraphQLIT : AbstractQLKTITSupport() {
                         branches (name: "$name") {
                             promotionLevels {
                                 name
-                                promotionRuns(first: 5) {
-                                    build {
-                                        name
+                                promotionRunsPaginated(size: 5) {
+                                    pageItems {
+                                        build {
+                                            name
+                                        }
                                     }
                                 }
                             }
@@ -463,49 +467,7 @@ class ProjectGraphQLIT : AbstractQLKTITSupport() {
                         data.path("projects").first()
                             .path("branches").first()
                             .path("promotionLevels").first()
-                            .path("promotionRuns").values().map {
-                                it.path("build").path("name").asText()
-                            }
-                    )
-                }
-            }
-        }
-    }
-
-    @Test
-    fun `Last promotion runs for a promotion level`() {
-        project {
-            branch {
-                val pl = promotionLevel()
-                (1..20).forEach {
-                    build("$it") {
-                        if (it % 2 == 0) {
-                            promote(pl)
-                        }
-                    }
-                }
-                run(
-                    """{
-                    projects (id: ${project.id}) {
-                        branches (name: "$name") {
-                            promotionLevels {
-                                name
-                                promotionRuns(last: 3) {
-                                    build {
-                                        name
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }"""
-                ) { data ->
-                    assertEquals(
-                        listOf("6", "4", "2"),
-                        data.path("projects").first()
-                            .path("branches").first()
-                            .path("promotionLevels").first()
-                            .path("promotionRuns").values().map {
+                            .path("promotionRunsPaginated").path("pageItems").values().map {
                                 it.path("build").path("name").asText()
                             }
                     )
@@ -1218,9 +1180,11 @@ class ProjectGraphQLIT : AbstractQLKTITSupport() {
             |      branches {
             |          promotionLevels {
             |              name
-            |              promotionRuns(first: 1) {
-            |                build {
-            |                  name
+            |              promotionRunsPaginated(size: 1) {
+            |                pageItems {
+            |                  build {
+            |                    name
+            |                  }
             |                }
             |              }
             |          }
@@ -1232,7 +1196,7 @@ class ProjectGraphQLIT : AbstractQLKTITSupport() {
         // Checks that the build associated with the promotion is the last one
         val plNode = data["projects"][0]["branches"][0]["promotionLevels"][0]
         assertEquals(pl.name, plNode["name"].asText())
-        val runNodes = plNode["promotionRuns"]
+        val runNodes = plNode["promotionRunsPaginated"]["pageItems"]
         assertEquals(1, runNodes.size())
         val build = runNodes[0]["build"]
         assertEquals(build2.name, build["name"].asText())

@@ -60,15 +60,6 @@ class GQLTypePromotionLevel(
                         .description("Reference to branch")
                         .type(GraphQLTypeReference(GQLTypeBranch.BRANCH))
             }
-            // Promotion runs
-            .field {
-                it.name("promotionRuns")
-                        .deprecate("Removed in V6. Use promotionRunsPaginated instead. See #1921")
-                        .description("List of runs for this promotion")
-                        .type(listType(promotionRun.typeRef))
-                        .arguments(listArguments())
-                        .dataFetcher(promotionLevelPromotionRunsFetcher())
-            }
             // Number of builds which reached this promotion level
             .field {
                 it.name("promotedBuildCount")
@@ -160,15 +151,6 @@ class GQLTypePromotionLevel(
                 .mapTo(mutableSetOf()) { run -> run.build.id() }
                 .size
         }
-
-    private fun promotionLevelPromotionRunsFetcher(): DataFetcher<List<PromotionRun>> =
-            DataFetcher { environment: DataFetchingEnvironment ->
-                val promotionLevel = environment.getSource<PromotionLevel>()!!
-                // Gets all the promotion runs
-                val promotionRuns = structureService.getPromotionRunsForPromotionLevel(promotionLevel.id)
-                // Filters according to the arguments
-                stdListArgumentsFilter(promotionRuns, environment)
-            }
 
     override fun getSignature(entity: PromotionLevel): Signature? {
         return entity.signature

@@ -6,7 +6,6 @@ import net.nemerosa.ontrack.extension.av.AutoVersioningTestSupport
 import net.nemerosa.ontrack.extension.av.config.AutoVersioningConfig
 import net.nemerosa.ontrack.extension.queue.QueueNoAsync
 import net.nemerosa.ontrack.it.AsAdminTest
-import net.nemerosa.ontrack.json.asJson
 import net.nemerosa.ontrack.json.isNullOrNullNode
 import net.nemerosa.ontrack.model.structure.PromotionRun
 import net.nemerosa.ontrack.test.TestUtils.uid
@@ -26,59 +25,13 @@ class AutoVersioningTrailGQLPromotionRunFieldContributorIT : AbstractAutoVersion
     fun `Getting the auto-versioning trail for a promotion run`() {
         withPromotionLevelTargets { pl, app1, app2 ->
             val run = pl.run()
-            run(
-                """
-                        {
-                            promotionRuns(id: ${run.id}) {
-                                autoVersioningTrail {
-                                    branches {
-                                        branch {
-                                            id
-                                        }
-                                        configuration {
-                                            targetPath
-                                        }
-                                        rejectionReason
-                                    }
-                                }
-                            }
-                        }
-                    """, mapOf(
-
-                )
-            ) { data ->
-                assertEquals(
-                    mapOf(
-                        "promotionRuns" to listOf(
-                            mapOf(
-                                "autoVersioningTrail" to mapOf(
-                                    "branches" to listOf(
-                                        mapOf(
-                                            "branch" to mapOf(
-                                                "id" to app2.id().toString(),
-                                            ),
-                                            "configuration" to mapOf(
-                                                "targetPath" to "app2.properties"
-                                            ),
-                                            "rejectionReason" to null,
-                                        ),
-                                        mapOf(
-                                            "branch" to mapOf(
-                                                "id" to app1.id().toString(),
-                                            ),
-                                            "configuration" to mapOf(
-                                                "targetPath" to "app1.properties"
-                                            ),
-                                            "rejectionReason" to null,
-                                        ),
-                                    )
-                                )
-                            )
-                        )
-                    ).asJson(),
-                    data
-                )
-            }
+            assertEquals(
+                setOf(
+                    Triple(app1.id(), "app1.properties", null),
+                    Triple(app2.id(), "app2.properties", null),
+                ),
+                allBranchTrails(run)
+            )
         }
     }
 
@@ -91,8 +44,8 @@ class AutoVersioningTrailGQLPromotionRunFieldContributorIT : AbstractAutoVersion
                 """
                         {
                             promotionRuns(id: ${run.id}) {
-                                autoVersioningTrail {
-                                    branches {
+                                autoVersioningTrailPaginated(filter: {onlyEligible: false}) {
+                                    pageItems {
                                         branch {
                                             id
                                         }
@@ -110,12 +63,10 @@ class AutoVersioningTrailGQLPromotionRunFieldContributorIT : AbstractAutoVersion
                                 }
                             }
                         }
-                    """, mapOf(
-
-                )
+                    """
             ) { data ->
                 val branches = data.path("promotionRuns").path(0)
-                    .path("autoVersioningTrail").path("branches")
+                    .path("autoVersioningTrailPaginated").path("pageItems")
                 assertNotNull(branches.find { it.path("rejectionReason").isNull }) { branch ->
                     assertEquals(app1.id(), branch.path("branch").path("id").asInt())
                     val orderId = branch.path("orderId").asText()
@@ -131,60 +82,51 @@ class AutoVersioningTrailGQLPromotionRunFieldContributorIT : AbstractAutoVersion
         withPromotionLevelTargets { pl, app1, app2 ->
             structureService.disableBranch(app2)
             val run = pl.run()
-            run(
-                """
-                        {
-                            promotionRuns(id: ${run.id}) {
-                                autoVersioningTrail {
-                                    branches {
-                                        branch {
-                                            id
-                                        }
-                                        configuration {
-                                            targetPath
-                                        }
-                                        rejectionReason
-                                    }
+            assertEquals(
+                setOf(
+                    Triple(app1.id(), "app1.properties", null),
+                    Triple(app2.id(), "app2.properties", "Branch is disabled"),
+                ),
+                allBranchTrails(run)
+            )
+        }
+    }
+
+    /**
+     * All the branch trails of a run, eligible or not, as (branch ID, target path, rejection reason).
+     *
+     * A set, because the stored trail of a run keeps no order between its branches.
+     */
+    private fun allBranchTrails(promotionRun: PromotionRun): Set<Triple<Int, String, String?>> {
+        val data = run(
+            """
+                {
+                    promotionRuns(id: ${promotionRun.id}) {
+                        autoVersioningTrailPaginated(filter: {onlyEligible: false}) {
+                            pageItems {
+                                branch {
+                                    id
                                 }
+                                configuration {
+                                    targetPath
+                                }
+                                rejectionReason
                             }
                         }
-                    """, mapOf(
-
-                )
-            ) { data ->
-                assertEquals(
-                    mapOf(
-                        "promotionRuns" to listOf(
-                            mapOf(
-                                "autoVersioningTrail" to mapOf(
-                                    "branches" to listOf(
-                                        mapOf(
-                                            "branch" to mapOf(
-                                                "id" to app2.id().toString(),
-                                            ),
-                                            "configuration" to mapOf(
-                                                "targetPath" to "app2.properties"
-                                            ),
-                                            "rejectionReason" to "Branch is disabled",
-                                        ),
-                                        mapOf(
-                                            "branch" to mapOf(
-                                                "id" to app1.id().toString(),
-                                            ),
-                                            "configuration" to mapOf(
-                                                "targetPath" to "app1.properties"
-                                            ),
-                                            "rejectionReason" to null,
-                                        ),
-                                    )
-                                )
-                            )
-                        )
-                    ).asJson(),
-                    data
+                    }
+                }
+            """
+        )
+        return data.path("promotionRuns").path(0)
+            .path("autoVersioningTrailPaginated").path("pageItems")
+            .values().map { item ->
+                Triple(
+                    item.path("branch").path("id").asInt(),
+                    item.path("configuration").path("targetPath").asText(),
+                    item.path("rejectionReason").takeIf { !it.isNullOrNullNode() }?.asText(),
                 )
             }
-        }
+            .toSet()
     }
 
     @Test
