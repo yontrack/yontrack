@@ -57,6 +57,24 @@ describe('Table', () => {
         expect(holder).toHaveStyle({top: '12px'})
     })
 
+    // antd lays a sticky table out with fixed column widths, splitting the width evenly between
+    // the columns; the wrapper keeps the columns sized by their content, as without sticking.
+    it('keeps the columns sized by their content when sticking its header', () => {
+        const {container} = render(<Table columns={columns} dataSource={dataSource} pagination={false}
+                                          sticky={{offsetHeader: 0}}/>)
+        container.querySelectorAll('table').forEach(table => {
+            expect(table).toHaveStyle({tableLayout: 'auto'})
+        })
+    })
+
+    it('lets the caller choose the table layout', () => {
+        const {container} = render(<Table columns={columns} dataSource={dataSource} pagination={false}
+                                          sticky={{offsetHeader: 0}} tableLayout="fixed"/>)
+        container.querySelectorAll('table').forEach(table => {
+            expect(table).toHaveStyle({tableLayout: 'fixed'})
+        })
+    })
+
     it('accepts columns declared as Table.Column children', () => {
         render(
             <Table dataSource={dataSource} pagination={false}>

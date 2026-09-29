@@ -8,7 +8,7 @@ import BuildFilterDropdown from "@components/branches/filters/builds/BuildFilter
 import ValidationStampFilterDropdown from "@components/branches/filters/validationStamps/ValidationStampFilterDropdown";
 import ValidationStampHeader from "@components/branches/ValidationStampHeader";
 import ValidationRunCell from "@components/branches/ValidationRunCell";
-import {useContext} from "react";
+import {useContext, useEffect, useState} from "react";
 import ValidationGroups from "@components/validationRuns/ValidationGroups";
 import {ValidationStampFilterContext} from "@components/branches/filters/validationStamps/ValidationStampFilterContext";
 import {gql} from "graphql-request";
@@ -72,12 +72,45 @@ export default function BranchBuilds({
         }
     }
 
+    // The toolbar is the title of the first column, spanning the three leading ones. A sticky
+    // header is a table of its own, whose columns take their widths from the body (#1932), and
+    // the body knows nothing of a header cell spanning three of its columns: a toolbar wider than
+    // them would push the whole header out of line with the rows. The build column makes room for
+    // it instead, with a spacer as its title - which only the hidden row antd measures the columns
+    // from renders, its header cell being spanned over - as wide as the toolbar needs beyond the
+    // two columns around it.
+    // The measured copy of a title loses its ref, so only the real toolbar is observed.
+    const [container, setContainer] = useState(null)
+    const [toolbar, setToolbar] = useState(null)
+    const [spacerWidth, setSpacerWidth] = useState(0)
+    useEffect(() => {
+        if (container && toolbar) {
+            const width = element => element.getBoundingClientRect().width
+            // The first row of builds, past antd's hidden measure row
+            const cells = container.querySelector('tbody tr:not([aria-hidden])')?.cells
+            // No build, no row to line up with - only antd's placeholder, spanning every column
+            if (!cells || cells.length < 3) {
+                setSpacerWidth(0)
+                return
+            }
+            const around = [cells[0], cells[2]]
+            const observer = new ResizeObserver(() => setSpacerWidth(Math.max(0, Math.ceil(
+                width(toolbar) - around.reduce((total, cell) => total + width(cell), 0)
+            ))))
+            observer.observe(toolbar)
+            around.forEach(cell => observer.observe(cell))
+            return () => observer.disconnect()
+        }
+        // Whatever re-renders the rows or the columns: the cells observed may be new ones
+    }, [container, toolbar, builds, validationStamps, vsfContext])
+
     // Preferences for the display (filters, options...)
 
     return (
         <>
-            <Space className="ot-line" orientation="vertical" size={8}>
+            <Space ref={setContainer} className="ot-line" orientation="vertical" size={8}>
                 <Table
+                    data-testid="branch-builds"
                     className={
                         vsfContext.inlineEdition ? "ot-validation-stamp-filter-edition" : undefined
                     }
@@ -160,7 +193,7 @@ export default function BranchBuilds({
                         align="left"
                         fixed="left"
                         title={
-                            <Space className="ot-branch-builds-toolbar">
+                            <Space ref={setToolbar} className="ot-branch-builds-toolbar">
                                 {/* Build filter */}
                                 <BuildFilterDropdown
                                     branch={branch}
@@ -215,6 +248,7 @@ export default function BranchBuilds({
                         key="build"
                         fixed="left"
                         colSpan={0} // Header managed by the "header" column
+                        title={<div style={{width: spacerWidth}}/>}
                         render={(_, build) =>
                             <BuildBox build={build} displayDecorations={true}>
                                 <EntityNotificationsBadge

@@ -12,7 +12,7 @@ import {Table as AntdTable} from "antd";
  * This constant is the one switch for the whole UI: turning it off stops every table from
  * sticking, and keeps the wrapper.
  */
-export const DEFAULT_STICKY = false
+export const DEFAULT_STICKY = {offsetHeader: 0}
 
 /**
  * antd's `Table`, whose header sticks by default.
@@ -21,9 +21,13 @@ export const DEFAULT_STICKY = false
  *
  * @param sticky `false` to opt out, or antd's own `sticky` options (see https://ant.design/components/table).
  * Defaults to {@link DEFAULT_STICKY}.
+ * @param tableLayout Defaults to `auto`: antd lays a sticky table out with fixed column widths, which
+ * splits the width evenly between the columns and wraps whatever does not fit, where every table
+ * of the UI sized its columns by their content before its header stuck. A table whose columns use
+ * `ellipsis` needs `fixed`.
  */
-export default function Table({sticky = DEFAULT_STICKY, ...props}) {
-    return <AntdTable sticky={sticky} {...props}/>
+export default function Table({sticky = DEFAULT_STICKY, tableLayout = 'auto', ...props}) {
+    return <AntdTable sticky={sticky} tableLayout={tableLayout} {...props}/>
 }
 
 Table.Column = AntdTable.Column

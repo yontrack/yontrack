@@ -443,7 +443,8 @@ button.ot-validation-stamp-filter-edition {
 /* The toolbar is the title of the first column, spanning the three leading ones. antd 6's table
    measures each column's width from a hidden row holding that column's title alone, colSpan
    ignored, so the toolbar would widen the narrow range selector column to its own width and
-   leave it mostly blank (#1852). The real header still lays it out across its three columns. */
+   leave it mostly blank (#1852). The real header still lays it out across its three columns, and
+   the build column makes room for it in the measure row (#1932, see `BranchBuilds`). */
 .ant-table-measure-row .ot-branch-builds-toolbar {
     display: none;
 }

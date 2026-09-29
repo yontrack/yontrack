@@ -8,7 +8,8 @@ export class Table {
     }
 
     async findRow(predicate) {
-        const rowsLocator = await this.table.locator('tr').all()
+        // Past antd's hidden measure row, which a sticky header brings along (#1932)
+        const rowsLocator = await this.table.locator('tr:not([aria-hidden])').all()
         const rows = rowsLocator.slice(1)
         for (let row of rows) {
             if (await predicate(row)) {

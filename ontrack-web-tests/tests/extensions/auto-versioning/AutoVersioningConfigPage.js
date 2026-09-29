@@ -10,7 +10,9 @@ export class AutoVersioningConfigPage {
     }
 
     async expectOnPage() {
-        await expect(this.page.getByText("targetPath")).toBeVisible()
+        // A column header, not any text: a sticky table repeats its column titles in the hidden
+        // row antd measures the columns from (#1932)
+        await expect(this.page.getByRole('columnheader', {name: 'targetPath'})).toBeVisible()
     }
 
     async displayConfig(projectName) {

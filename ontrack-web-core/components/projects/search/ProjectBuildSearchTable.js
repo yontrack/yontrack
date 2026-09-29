@@ -50,9 +50,6 @@ export default function ProjectBuildSearchTable({
                 dataSource={builds}
                 loading={loading}
                 pagination={false}
-                sticky={{
-                    offsetHeader: 64,
-                }}
                 locale={{
                     emptyText: <>
                         <Empty
