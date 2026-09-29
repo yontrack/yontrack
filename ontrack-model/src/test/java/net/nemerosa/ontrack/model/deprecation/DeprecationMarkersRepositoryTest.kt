@@ -2,6 +2,7 @@ package net.nemerosa.ontrack.model.deprecation
 
 import org.junit.jupiter.api.Test
 import java.io.File
+import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlin.test.fail
 
@@ -29,6 +30,22 @@ class DeprecationMarkersRepositoryTest {
         if (!report.isOk) {
             fail(report.message())
         }
+    }
+
+    /**
+     * Every removal or deprecation issue adds its items to one of these sections, so the page keeps
+     * them, in this order, as its only top-level sections.
+     */
+    @Test
+    fun `The migration page has its four sections`() {
+        val page = File(root, DeprecationMarkers.MIGRATION_PAGE).readText()
+        val sections = Regex("^## (.+)$", RegexOption.MULTILINE).findAll(page).map { it.groupValues[1].trim() }.toList()
+        assertEquals(
+            listOf("Upgrade path", "Breaking changes", "Removed", "Newly deprecated"),
+            sections,
+            "Top-level sections of ${DeprecationMarkers.MIGRATION_PAGE}",
+        )
+        assertTrue(page.startsWith("# Migration to V6\n"), "Title of ${DeprecationMarkers.MIGRATION_PAGE}")
     }
 
 }

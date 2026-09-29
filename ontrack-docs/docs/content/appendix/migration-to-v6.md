@@ -1,23 +1,69 @@
 # Migration to V6
 
-Yontrack 6 is a major release. This page lists what changes for the people who **deploy**
-Yontrack and for the people who **write extensions** or use the **KDSL** client. Each 6.0 change
-adds its own section.
+Yontrack 6 is a major release. This page lists everything a Yontrack 5 installation must know to
+upgrade, for the people who **deploy** Yontrack, the clients of its **API** (GraphQL and REST), the
+users of the **KDSL** client, and those who configure it **as code** (CasC):
 
-## Spring Boot 4
+* [Upgrade path](#upgrade-path) — which versions upgrade to 6.0, and how to prepare;
+* [Breaking changes](#breaking-changes) — the platform changes and the features removed;
+* [Removed](#removed) — the items Yontrack 5 deprecated, and their replacement;
+* [Newly deprecated](#newly-deprecated) — the items Yontrack 6 deprecates, and which Yontrack 7
+  removes.
+
+## Upgrade path
+
+* **From any 5.x release** — Yontrack 6.0 upgrades an installation running any 5.x release. Its
+  database migrations run at its first start, whichever 5.x version it starts from.
+* **From 4.x** — upgrade to a 5.x release first, and start it once, before upgrading to 6.0: see
+  [Migration from V4](migration-from-v4.md).
+* **Check the deprecated items before upgrading** — the latest 5.5.x release counts every use of an
+  item Yontrack 6 removes, in the `ontrack_deprecated_usage_total` metric, tagged by `surface` and
+  `item`, and logs a `WARN` the first time each one is used. Upgrade to it, let it run through the
+  usual activity of the installation — the CI pipelines, the CasC, the API clients — then list what
+  is still used:
+
+    ```
+    sum by (surface, item) (ontrack_deprecated_usage_total)
+    ```
+
+    Every item it lists must be migrated before the upgrade: [Removed](#removed) gives the
+    replacement of each one, and [Usage of deprecated features](../operations/metrics.md#usage-of-deprecated-features)
+    how the metric works.
+
+* **Check the [breaking changes](#breaking-changes)** — among them, JDK 25 to run the JAR, the
+  `pg_trgm` extension of Postgres, and the removed features.
+
+## Breaking changes
+
+### Java 25
+
+Yontrack 6 is built for and runs on **JDK 25**, an LTS release. Yontrack 5 ran on JDK 21.
+
+#### For deployers
+
+* **Docker image** — the `nemerosa/ontrack` image now runs on `azul/zulu-openjdk-alpine:25`.
+  Nothing changes for an installation that runs the image.
+* **Running the JAR yourself** — the minimum runtime is now JDK 25: the classes are compiled for
+  it, and an older JVM refuses to load them.
+* **Runtime warnings** — JDK 25 warns about libraries (Netty, Kotlin coroutines, …) which still
+  use `sun.misc.Unsafe` memory access or restricted native methods. These warnings are expected
+  and harmless.
+
+### Spring Boot 4
 
 Yontrack 6 runs on Spring Boot 4.1, Spring Framework 7, Spring Security 7 and Kotlin 2.3. JSON is
 handled by Jackson 3: see [Jackson 3](#jackson-3).
 
-### For deployers
+#### For deployers
 
 * **Configuration properties** — no Yontrack or Spring property changes its name. The
   management server behaves as in 5.x: port `8800`, base path `/manage`, only `health`, `info`
   and `prometheus` exposed, the `account` end point off (see [Management port](../operations/management-port.md)).
 * **Elasticsearch 9** — the export of the metrics to Elasticsearch, the only use of
-  Elasticsearch left in Yontrack 6 (see [Search on Postgres](#search-on-postgres)), uses the 9.x
-  Elasticsearch client, which talks to Elasticsearch 9: an installation exporting its metrics to
-  an Elasticsearch 8 server must upgrade it. The `spring.elasticsearch.*` properties are unchanged.
+  Elasticsearch left in Yontrack 6 (see [Elasticsearch search](#elasticsearch-search-removed)),
+  uses the 9.x Elasticsearch client, which talks to Elasticsearch 9: an installation exporting its
+  metrics to an Elasticsearch 8 server must upgrade it. The `spring.elasticsearch.*` properties
+  are unchanged.
 * **Vault key store** — keys stored in Vault by Yontrack 5 are read as they are: their format does
   not change.
 * **Custom JWT `typ`** — `ontrack.config.security.authorization.jwt.typ` still makes the API
@@ -25,63 +71,74 @@ handled by Jackson 3: see [Jackson 3](#jackson-3).
   contacts the identity provider while starting up: the provider is reached on the first
   authenticated call, as it is without the setting.
 
-### For extension authors
+#### For KDSL users
 
-Spring Boot 4 splits its auto-configuration into one module per technology, and several classes
-moved with it:
-
-| Before (Spring Boot 3)                                                  | Now (Spring Boot 4)                                                             |
-|-------------------------------------------------------------------------|---------------------------------------------------------------------------------|
-| `org.springframework.boot.web.client.RestTemplateBuilder`              | `org.springframework.boot.restclient.RestTemplateBuilder`                       |
-| `org.springframework.boot.actuate.health.Health` / `HealthIndicator`   | `org.springframework.boot.health.contributor.Health` / `HealthIndicator`        |
-| `org.springframework.boot.actuate.health.HealthEndpoint`               | `org.springframework.boot.health.actuate.endpoint.HealthEndpoint`               |
-| `org.springframework.boot.actuate.health.HealthComponent`              | `org.springframework.boot.health.actuate.endpoint.HealthDescriptor`             |
-| `org.springframework.boot.autoconfigure.graphql.*`                     | `org.springframework.boot.graphql.autoconfigure.*`                              |
-| `org.springframework.boot.autoconfigure.flyway.*`                      | `org.springframework.boot.flyway.autoconfigure.*`                               |
-| `org.springframework.boot.autoconfigure.elasticsearch.ElasticsearchProperties` | `org.springframework.boot.elasticsearch.autoconfigure.ElasticsearchProperties` |
-| `org.springframework.boot.web.context.WebServerApplicationContext`     | `org.springframework.boot.web.server.context.WebServerApplicationContext`       |
-
-`ontrack-extension-support` exposes `spring-boot-restclient` and `spring-boot-health` as API
-dependencies, so an extension gets both through it. The starters were renamed as well:
-`spring-boot-starter-web` is `spring-boot-starter-webmvc`, `spring-boot-starter-aop` is
-`spring-boot-starter-aspectj`, and `spring-boot-starter-oauth2-resource-server` is
-`spring-boot-starter-security-oauth2-resource-server`.
-
-Other breaks:
-
-* **REST clients** — build them from `restTemplateBuilder()`, or give them
-  `clientMessageConverters()`, both in `net.nemerosa.ontrack.extension.support.client`, rather
-  than from `RestTemplateBuilder()` or `RestTemplate()`. Their JSON mapper behaves as the one of
-  the 5.x clients — unknown properties ignored, properties written in their declaration order —
-  where the default one of Spring Framework 7 has the Jackson 3 defaults.
-  `RestTemplateProvider` already does it.
-* **Elasticsearch** — the low-level client bean is a `Rest5Client`
-  (`co.elastic.clients.transport.rest5_client.low_level`), no longer an
-  `org.elasticsearch.client.RestClient`; and it exists only when the export of the metrics to
-  Elasticsearch is enabled (see [Search on Postgres](#search-on-postgres)).
-* **Null-safety** — Spring Framework 7 and graphql-java 25 annotate their APIs with JSpecify, and
-  Kotlin enforces it:
-    * `getForObject<T>()`, `postForObject<T>()` and the other `RestOperations` extensions return
-      `T?` and take a non-null `T`: write `getForObject<Foo>(...)!!` where `getForObject<Foo>(...)`
-      used to be enough, and `getForObject<Foo>(...)` where it was `getForObject<Foo?>(...)`;
-    * `JdbcTemplate.queryForList(sql, String::class.java)` returns a `List<String?>`;
-    * `DataFetchingEnvironment.getArgument<T>()` and `getSource<T>()` require a non-null `T`;
-    * `RestTemplateBuilder.basicAuthentication(...)` takes non-null credentials.
-* **Tests** — the JUnit Jupiter tests run on JUnit 6, and the JUnit 4 ones on its vintage engine.
-
-### For KDSL users
-
-The KDSL builds its HTTP client with `spring-boot-restclient`; a program which built its own
+The KDSL builds its HTTP client with `spring-boot-restclient`. A program which built its own
 `RestTemplate` alongside it should build it from
-`net.nemerosa.ontrack.kdsl.connector.support.restTemplateBuilder()`, for the reason given
-above.
+`net.nemerosa.ontrack.kdsl.connector.support.restTemplateBuilder()`: its JSON mapper then behaves as
+the one of the 5.x clients — unknown properties ignored, properties written in their declaration
+order — where the default one of Spring Framework 7 has the Jackson 3 defaults.
 
-## Search on Postgres
+### Jackson 3
+
+Yontrack 6 reads and writes JSON with Jackson 3 (`tools.jackson`) instead of Jackson 2
+(`com.fasterxml.jackson`). The JSON it stores does not change.
+
+#### For deployers
+
+Nothing: the data stored by Yontrack 5 is read as it is.
+
+#### For REST API clients
+
+The dates in the answers of the REST API (`/rest/...`) are written as the rest of Yontrack writes
+them — as a UTC timestamp string, `"2025-11-04T09:12:30.123400Z"` — where Yontrack 5 wrote them as
+an array of numbers, `[2025,11,4,9,12,30,123400000]`. The GraphQL API does not change.
+
+#### For KDSL users
+
+`JsonNode` in the KDSL API is now `tools.jackson.databind.JsonNode`. The
+[Jackson 3 migration guide](https://github.com/FasterXML/jackson/blob/main/jackson3/MIGRATING_TO_JACKSON_3.md)
+lists the classes and methods it renamed. Two changes compile and still break:
+
+* **`JsonNode.map`** — in Kotlin, `node.map { ... }` now calls the new `JsonNode.map(Function)`
+  member, which maps the node itself, instead of iterating over its elements. Write
+  `node.values().map { ... }`.
+* **Strict accessors** — `stringValue()` (formerly `textValue()`) and `intValue()` throw on a node of
+  another type, and `asText()` throws on an object or an array; `asText()` of a JSON `null` is `""`,
+  no longer `"null"`.
+
+### Indicators removed
+
+The indicators — project indicators, their categories, types, views and portfolios, the GitHub
+compliance checks, and the indicators computed from Jenkins pipeline files and libraries and from
+SonarQube — are removed, with no replacement. For numbers about how projects deliver, see the
+[delivery scorecard](../scorecard/scorecard.md), which Yontrack computes from its own data.
+
+#### For deployers
+
+* **Data** — at its first start, Yontrack 6 deletes the stored indicator values, categories, types,
+  views, portfolios and computed state, and the Jenkins pipeline-library indicator settings.
+* **Roles** — `PROJECT_INDICATOR_MANAGER` and `GLOBAL_INDICATOR_MANAGER` are gone, and their grants
+  are deleted.
+* **Metrics** — `ontrack_indicator` (exported) and `ontrack_indicators_computing_ms` are gone.
+
+#### For CasC users
+
+The `ontrack.config.settings.jenkins-pipeline-library-indicator` key is ignored with a warning: see
+[Unknown and removed keys](../configuration/casc.md#unknown-and-removed-keys).
+
+#### For API clients
+
+The indicator queries and mutations of the GraphQL API are gone, among them `indicatorCategories`,
+`indicatorTypes`, `indicatorPortfolios`, `indicatorViewList`, `indicatorsManagement`,
+`configurableIndicators` and `Project.projectIndicators`.
+
+### Elasticsearch search removed
 
 Yontrack 6 searches in its Postgres database, and no longer needs Elasticsearch. See
 [Search index](../operations/search-index.md) for how it works and how to operate it.
 
-### For deployers
+#### For deployers
 
 * **Elasticsearch is optional** — it is only used by the export of the metrics
   (`ontrack.extension.elastic.metrics.enabled=true`), which is disabled by default. Without it,
@@ -106,109 +163,29 @@ Yontrack 6 searches in its Postgres database, and no longer needs Elasticsearch.
   `search / rebuild / {type}` jobs of the `search` category, and the `ontrack_elasticsearch_*`
   metrics by `ontrack_search_*`: `ontrack_elasticsearch_index_all{index}` is now
   `ontrack_search_index_all{type}`, next to `ontrack_search_index_errors{type}`.
+
+#### For API clients
+
 * The `POST /rest/search/index/type/{type}` and `POST /rest/search/index/reset` endpoints are
   unchanged, and act on the Postgres search documents. An unknown type now answers with an error.
+* The GraphQL `search(query, types, offset, size, perType)` query replaces the
+  `search(token, type, offset, size)` form, which is deprecated: see
+  [Newly deprecated](#newly-deprecated).
 
-### For extension authors
+### Pure-Git support removed
 
-`SearchIndexer`, `SearchIndexService`, `SearchIndexUtils` and `SearchItem` are gone, and
-`ontrack-model` no longer exposes `elasticsearch-java`. An extension contributing to the search
-implements `SearchDocumentIndexer` and writes its documents through `SearchDocumentService`; see
-the developer guide, `doc/dev-guide/search-indexer.md`, in the Yontrack repository.
-`SearchService.indexInit()` is gone as well: there is nothing to initialize.
+A project can no longer be associated with a plain Git repository through the *Git configuration*
+property. Yontrack 6 reads the code of a project from GitHub, GitLab or Bitbucket Cloud only.
 
-### For API clients
+#### For deployers
 
-The GraphQL `search(query, types, offset, size, perType)` query replaces
-`search(token, type, offset, size)`, which is deprecated and kept until 7.0.
+Before upgrading, move every project still using the *Git configuration* property to its
+[GitHub](../start/configuration/github.md), [GitLab](../start/configuration/gitlab.md) or
+[Bitbucket Cloud](../start/configuration/bitbucket-cloud.md) configuration. Yontrack 5.5 counts
+each project read through it in `ontrack_deprecated_usage_total`, with `surface=property` and
+`item=net.nemerosa.ontrack.extension.git.property.GitProjectConfigurationPropertyType`.
 
-## Jackson 3
-
-Yontrack 6 reads and writes JSON with Jackson 3 (`tools.jackson`) instead of Jackson 2
-(`com.fasterxml.jackson`). The JSON it stores does not change.
-
-### For deployers
-
-Nothing: the data stored by Yontrack 5 is read as it is.
-
-### For REST API clients
-
-The dates in the answers of the REST API (`/rest/...`) are written as the rest of Yontrack writes
-them — as a UTC timestamp string, `"2025-11-04T09:12:30.123400Z"` — where Yontrack 5 wrote them as
-an array of numbers, `[2025,11,4,9,12,30,123400000]`. The GraphQL API does not change.
-
-### For extension authors
-
-Replace `com.fasterxml.jackson` by `tools.jackson` in the imports, except for the annotations,
-which Jackson 3 keeps in `com.fasterxml.jackson.annotation`. `JacksonException` replaces
-`JsonProcessingException` and is unchecked; several classes and methods were renamed
-(`JsonSerializer` → `ValueSerializer`, `TextNode` → `StringNode`, `fields()` → `properties()`, …).
-The [Jackson 3 migration guide](https://github.com/FasterXML/jackson/blob/main/jackson3/MIGRATING_TO_JACKSON_3.md)
-lists them. Build a mapper with `ObjectMapperFactory.create()`, or `builder()` to add to it, rather
-than with Jackson's own defaults, and REST clients with `restTemplateBuilder()` or
-`clientMessageConverters()` (see above).
-`ObjectMapperFactory.create(viewClass)` is gone: write with `create().writerWithView(viewClass)`. Two
-changes compile and still break:
-
-* **`JsonNode.map`** — in Kotlin, `node.map { ... }` now calls the new `JsonNode.map(Function)`
-  member, which maps the node itself, instead of iterating over its elements. Write
-  `node.values().map { ... }`.
-* **Strict accessors** — `stringValue()` (formerly `textValue()`) and `intValue()` throw on a node of
-  another type, and `asText()` throws on an object or an array; `asText()` of a JSON `null` is `""`,
-  no longer `"null"`.
-
-### For KDSL users
-
-`JsonNode` in the KDSL API is now `tools.jackson.databind.JsonNode`.
-
-## Java 25
-
-Yontrack 6 is built for and runs on **JDK 25**, an LTS release. Yontrack 5 ran on JDK 21.
-
-### For deployers
-
-* **Docker image** — the `nemerosa/ontrack` image now runs on `azul/zulu-openjdk-alpine:25`.
-  Nothing changes for an installation that runs the image.
-* **Running the JAR yourself** — the minimum runtime is now JDK 25: the classes are compiled for
-  it, and an older JVM refuses to load them.
-* **Runtime warnings** — JDK 25 warns about libraries (Netty, Kotlin coroutines, …) which still
-  use `sun.misc.Unsafe` memory access or restricted native methods. These warnings are expected
-  and harmless.
-
-### For extension authors
-
-An extension must be compiled with a JDK 25 toolchain, since it compiles against Yontrack
-classes which target JDK 25.
-
-## Indicators removed
-
-The indicators — project indicators, their categories, types, views and portfolios, the GitHub
-compliance checks, and the indicators computed from Jenkins pipeline files and libraries and from
-SonarQube — are removed, with no replacement. For numbers about how projects deliver, see the
-[delivery scorecard](../scorecard/scorecard.md), which Yontrack computes from its own data.
-
-### For deployers
-
-* **Data** — at its first start, Yontrack 6 deletes the stored indicator values, categories, types,
-  views, portfolios and computed state, and the Jenkins pipeline-library indicator settings.
-* **Roles** — `PROJECT_INDICATOR_MANAGER` and `GLOBAL_INDICATOR_MANAGER` are gone, and their grants
-  are deleted.
-* **Metrics** — `ontrack_indicator` (exported) and `ontrack_indicators_computing_ms` are gone.
-* **Configuration as code** — the `ontrack.config.settings.jenkins-pipeline-library-indicator` key
-  is ignored with a warning: see [Unknown and removed keys](../configuration/casc.md#unknown-and-removed-keys).
-
-### For API clients
-
-The indicator queries and mutations of the GraphQL API are gone, among them `indicatorCategories`,
-`indicatorTypes`, `indicatorPortfolios`, `indicatorViewList`, `indicatorsManagement`,
-`configurableIndicators` and `Project.projectIndicators`.
-
-### For extension authors
-
-The `ontrack-extension-indicators` module is gone: an extension contributing indicators must drop
-them.
-
-## Delivery metrics and the delivery scorecard
+### Delivery metrics and the delivery scorecard
 
 Yontrack 6 introduces the [delivery scorecard](../scorecard/scorecard.md): lead time, frequency,
 success rate, time to restore, test pass rate and test flakiness, read every day for every project
@@ -216,7 +193,7 @@ and kept as daily snapshots, and read together, against targets, in licensed
 [estates](../scorecard/estates.md). The delivery-metrics extension of Yontrack 5 is removed, and
 its promotion-level charts now run on the samples of the scorecard.
 
-### For deployers
+#### For deployers
 
 **The promotion-level charts are kept** — their names, their `getChart` path, their
 [dashboard widgets](../dashboards/widgets/promotion-charts.md) and their options are unchanged, and
@@ -261,9 +238,7 @@ renaming:
 
 **Removed configuration:**
 
-* the *E2E Promotion Metrics Export* settings — deleted at the first start of Yontrack 6 — and
-  their `ontrack.config.settings.e2e-promotion-metrics` CasC key, which is ignored with a warning:
-  see [Unknown and removed keys](../configuration/casc.md#unknown-and-removed-keys);
+* the *E2E Promotion Metrics Export* settings — deleted at the first start of Yontrack 6;
 * the `ontrack.extension.delivery-metrics.tse.enabled` and
   `ontrack.extension.delivery-metrics.tse.interval` configuration properties, no longer read;
 * the jobs of the `delivery-metrics` category.
@@ -272,12 +247,18 @@ renaming:
 the *Delivery scorecard* category, and the `ontrack_readings_computation` and
 `ontrack_readings_errors` metrics.
 
-## Failed and backdated deployments
+#### For CasC users
+
+The `ontrack.config.settings.e2e-promotion-metrics` key, which configured the *E2E Promotion
+Metrics Export* settings, is ignored with a warning: see
+[Unknown and removed keys](../configuration/casc.md#unknown-and-removed-keys).
+
+### Failed and backdated deployments
 
 A slot deployment can now [fail](../integrations/environments/environments.md#failed-deployments),
 and be [recorded after the fact](../integrations/environments/environments.md#backdating-deployments).
 
-### For API clients
+#### For API clients
 
 * **`FAILED` status** — a slot pipeline has a new, final status, `FAILED`, beside `DONE` and
   `CANCELLED`. A client reading the status of a deployment must expect it. It is reached through
@@ -290,8 +271,31 @@ and be [recorded after the fact](../integrations/environments/environments.md#ba
   *Feature not allowed by the license: extension.environments*, where it failed with an
   `INTERNAL_ERROR` and no message.
 
-### For KDSL users
+#### For KDSL users
 
 `SlotPipeline.fail(message, dateTime)` and `SlotPipeline.cancel(reason, dateTime)` are new, and
 `Build.startPipeline`, `SlotPipeline.startDeploying` and `SlotPipeline.finishDeployment` take an
 optional `dateTime`.
+
+## Removed
+
+Yontrack 6 removes what Yontrack 5 deprecated. Each item is listed here with what to use instead,
+by the way it is used: the GraphQL API, the REST API, configuration as code, the configuration
+properties and environment variables, templating, the CI configuration, and the KDSL.
+
+The latest 5.5.x release counts every use of these items: see [Upgrade path](#upgrade-path).
+
+## Newly deprecated
+
+Yontrack 6 deprecates the items below. They still work in every 6.x release, and are removed in
+Yontrack 7. Each use of one of them is counted in `ontrack_deprecated_usage_total`, and logged as a
+`WARN` the first time: see [Usage of deprecated features](../operations/metrics.md#usage-of-deprecated-features).
+
+### GraphQL API
+
+| Deprecated                                             | Use instead                                                   |
+|--------------------------------------------------------|---------------------------------------------------------------|
+| The `Query.search(token)` argument                     | `query`                                                       |
+| The `Query.search(type)` argument                      | `types`, a list of types                                      |
+| The `SearchResults.pageInfo` field                     | `total`, with the `offset` and `size` arguments of `search`   |
+| The `SearchResults.pageItems` field                    | `items`                                                       |
