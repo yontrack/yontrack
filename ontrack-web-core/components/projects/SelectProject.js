@@ -1,7 +1,7 @@
 import {useState} from "react";
 import {Select} from "antd";
 import {gql} from "graphql-request";
-import {useGraphQLClient} from "@components/providers/ConnectionContextProvider";
+import {callGraphQL} from "@components/services/GraphQL";
 
 export default function SelectProject({
                                           id,
@@ -11,8 +11,6 @@ export default function SelectProject({
                                           multiple = false,
                                           width = '16em',
                                       }) {
-
-    const client = useGraphQLClient()
 
     const [projects, setProjects] = useState([])
     const [searching, setSearching] = useState(false)
@@ -25,16 +23,17 @@ export default function SelectProject({
         if (token && token.length > 2) {
             if (!searching) {
                 setSearching(true)
-                client.request(
-                    gql`
+                callGraphQL({
+                    query: gql`
                         query SearchProjects($token: String!) {
                             projects(pattern: $token) {
                                 id
                                 name
                             }
                         }
-                    `, {token}
-                ).then(data => {
+                    `,
+                    variables: {token},
+                }).then(data => {
                     setProjects(data.projects)
                 }).finally(() => {
                     setSearching(false)

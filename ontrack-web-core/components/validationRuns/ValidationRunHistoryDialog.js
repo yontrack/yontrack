@@ -1,4 +1,4 @@
-import {useEffect, useState} from "react";
+import {useState} from "react";
 import {Modal, Space, Typography} from "antd";
 import {gql} from "graphql-request";
 import LoadingContainer from "@components/common/LoadingContainer";
@@ -10,7 +10,7 @@ import ValidationRunStatus from "@components/validationRuns/ValidationRunStatus"
 import Rows from "@components/common/Rows";
 import ValidationDataType from "@components/framework/validation-data-type/ValidationDataType";
 import InfoBox from "@components/common/InfoBox";
-import {useGraphQLClient} from "@components/providers/ConnectionContextProvider";
+import {useQuery} from "@components/services/GraphQL";
 import {gqlValidationRunContent} from "@components/validationRuns/ValidationRunGraphQLFragments";
 import ValidationRun from "@components/validationRuns/ValidationRun";
 
@@ -37,96 +37,107 @@ export function useValidationRunHistoryDialog() {
 
 export default function ValidationRunHistoryDialog({dialog, onChange}) {
 
-    const client = useGraphQLClient()
-
-    const [loading, setLoading] = useState(true)
-    const [build, setBuild] = useState()
-    const [validationStamp, setValidationStamp] = useState()
-    const [pageInfo, setPageInfo] = useState()
-    const [runs, setRuns] = useState([])
     const [runsReload, setRunsReload] = useState(0)
 
-    useEffect(() => {
-        if (client && dialog.open && dialog.run?.id) {
-            setLoading(true)
-            client.request(
-                gql`
-                    query GetValidationRun($runId: Int!) {
-                        validationRuns(id: $runId) {
-                            build {
-                                id
-                                releaseProperty {
-                                    value
-                                }
-                            }
-                            validationStamp {
-                                name
-                            }
+    // The run gives the build and the validation stamp whose runs are listed
+    const {data: target, loading: targetLoading, finished: targetFinished} = useQuery(
+        gql`
+            query GetValidationRun($runId: Int!) {
+                validationRuns(id: $runId) {
+                    build {
+                        id
+                        releaseProperty {
+                            value
                         }
                     }
-                `,
-                {runId: Number(dialog.run.id)}
-            ).then(data => {
-                const buildId = data.validationRuns[0].build.id
-                const validationStampName = data.validationRuns[0].validationStamp.name
-                return client.request(
-                    gql`
-                        query GetValidationHistory(
-                            $buildId: Int!,
-                            $validationStampName: String!,
-                            $offset: Int!,
-                            $size: Int!,
-                        ) {
-                            build(id: $buildId) {
-                                id
-                                name
-                                validations(validationStamp: $validationStampName) {
-                                    validationStamp {
+                    validationStamp {
+                        name
+                    }
+                }
+            }
+        `,
+        {
+            variables: {runId: dialog.run?.id ? Number(dialog.run.id) : undefined},
+            deps: [dialog.open, dialog.run, runsReload],
+            condition: !!(dialog.open && dialog.run?.id),
+            dataFn: data => ({
+                buildId: data.validationRuns[0].build.id,
+                validationStampName: data.validationRuns[0].validationStamp.name,
+            }),
+        }
+    )
+
+    const {data: history, loading: historyLoading, error: historyError} = useQuery(
+        gql`
+            query GetValidationHistory(
+                $buildId: Int!,
+                $validationStampName: String!,
+                $offset: Int!,
+                $size: Int!,
+            ) {
+                build(id: $buildId) {
+                    id
+                    name
+                    validations(validationStamp: $validationStampName) {
+                        validationStamp {
+                            id
+                            name
+                            image
+                            dataType {
+                                descriptor {
+                                    id
+                                    feature {
                                         id
-                                        name
-                                        image
-                                        dataType {
-                                            descriptor {
-                                                id
-                                                feature {
-                                                    id
-                                                }
-                                            }
-                                            config
-                                        }
-                                        validationRunsPaginated(buildId: $buildId, offset: $offset, size: $size) {
-                                            pageInfo {
-                                                nextPage {
-                                                    offset
-                                                    size
-                                                }
-                                            }
-                                            pageItems {
-                                                ...ValidationRunContent
-                                            }
-                                        }
                                     }
                                 }
+                                config
+                            }
+                            validationRunsPaginated(buildId: $buildId, offset: $offset, size: $size) {
+                                pageInfo {
+                                    nextPage {
+                                        offset
+                                        size
+                                    }
+                                }
+                                pageItems {
+                                    ...ValidationRunContent
+                                }
                             }
                         }
-                        ${gqlValidationRunContent}
-                    `, {
-                        buildId: Number(buildId),
-                        validationStampName,
-                        offset: 0,
-                        size: 10,
                     }
-                )
-            }).then(data => {
-                setBuild(data.build)
-                setValidationStamp(data.build.validations[0].validationStamp)
-                setPageInfo(data.build.validations[0].validationStamp.validationRunsPaginated.pageInfo)
-                setRuns(data.build.validations[0].validationStamp.validationRunsPaginated.pageItems)
-            }).finally(() => {
-                setLoading(false)
-            })
+                }
+            }
+            ${gqlValidationRunContent}
+        `,
+        {
+            variables: {
+                buildId: target ? Number(target.buildId) : undefined,
+                validationStampName: target?.validationStampName,
+                offset: 0,
+                size: 10,
+            },
+            deps: [target],
+            condition: !!target,
+            dataFn: data => ({
+                target,
+                build: data.build,
+                validationStamp: data.build.validations[0].validationStamp,
+                runs: data.build.validations[0].validationStamp.validationRunsPaginated.pageItems,
+            }),
         }
-    }, [client, dialog.open, dialog.run, runsReload]);
+    )
+
+    // Loading until the history of the current target has been loaded (or has failed to)
+    const loading = !targetFinished || targetLoading || historyLoading ||
+        (!!target && !historyError && history?.target !== target)
+
+    const build = history?.build
+    const validationStamp = history?.validationStamp
+
+    // A run changed in the dialog is applied locally, on top of the history it was changed in,
+    // until the next history replaces it
+    const [changedRuns, setChangedRuns] = useState({source: null, runs: []})
+    const runs = (history && changedRuns.source === history) ? changedRuns.runs : (history?.runs ?? [])
 
     const onOk = async () => {
         dialog.close()
@@ -140,16 +151,19 @@ export default function ValidationRunHistoryDialog({dialog, onChange}) {
     }
 
     const onRunChanged = (run) => {
-        setRuns(runs => runs.map(oldRun => {
-            if (oldRun.id === run.id) {
-                return {
-                    ...oldRun,
-                    ...run,
+        setChangedRuns({
+            source: history,
+            runs: runs.map(oldRun => {
+                if (oldRun.id === run.id) {
+                    return {
+                        ...oldRun,
+                        ...run,
+                    }
+                } else {
+                    return oldRun
                 }
-            } else {
-                return oldRun
-            }
-        }))
+            }),
+        })
     }
 
     return (

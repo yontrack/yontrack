@@ -1,6 +1,6 @@
 import LoadingContainer from "@components/common/LoadingContainer";
-import {useContext, useEffect, useState} from "react";
-import {useGraphQLClient} from "@components/providers/ConnectionContextProvider";
+import {useContext, useEffect} from "react";
+import {useQuery} from "@components/services/GraphQL";
 import {gql} from "graphql-request";
 import {gqlValidationRunTableContent} from "@components/validationRuns/ValidationRunGraphQLFragments";
 import ValidationRunTable from "@components/validationRuns/ValidationRunTable";
@@ -12,84 +12,65 @@ import Link from "next/link";
 import {branchUri} from "@components/common/Links";
 import {FaExternalLinkAlt} from "react-icons/fa";
 
+const NO_RUNS = []
+
 export default function LastValidationsForBranchWidget({title, project, branch, validations, displayPromotions}) {
 
-    const client = useGraphQLClient()
-    const [loading, setLoading] = useState(false)
-
-    const [loadedBranch, setLoadedBranch] = useState()
-    const [runs, setRuns] = useState([])
-
-    useEffect(() => {
-        if (client && project && branch && validations && validations.length > 0) {
-
-            const loadData = async () => {
-                setLoading(true)
-                try {
-                    const data = await client.request(
-                        gql`
-                            ${gqlValidationRunTableContent}
-                            query LastValidationsForBranchWidget(
-                                $project: String!,
-                                $branch: String!,
-                                $validations: [String!]!,
-                                $displayPromotions: Boolean!,
-                            ) {
-                                branch: branchByName(project: $project, name: $branch) {
+    const {data: loadedBranch, loading} = useQuery(
+        gql`
+            ${gqlValidationRunTableContent}
+            query LastValidationsForBranchWidget(
+                $project: String!,
+                $branch: String!,
+                $validations: [String!]!,
+                $displayPromotions: Boolean!,
+            ) {
+                branch: branchByName(project: $project, name: $branch) {
+                    id
+                    name
+                    displayName
+                    project {
+                        id
+                        name
+                    }
+                    validationStatuses(names: $validations) {
+                        ...ValidationRunTableContent
+                        build {
+                            id
+                            name
+                            releaseProperty {
+                                value
+                            }
+                            promotionRuns(lastPerLevel: true) @include(if: $displayPromotions) {
+                                id
+                                creation {
+                                    time
+                                }
+                                promotionLevel {
                                     id
                                     name
-                                    displayName
-                                    project {
-                                        id
-                                        name
-                                    }
-                                    validationStatuses(names: $validations) {
-                                        ...ValidationRunTableContent
-                                        build {
-                                            id
-                                            name
-                                            releaseProperty {
-                                                value
-                                            }
-                                            promotionRuns(lastPerLevel: true) @include(if: $displayPromotions) {
-                                                id
-                                                creation {
-                                                    time
-                                                }
-                                                promotionLevel {
-                                                    id
-                                                    name
-                                                    image
-                                                }
-                                            }
-                                        }
-                                    }
+                                    image
                                 }
                             }
-                        `,
-                        {
-                            project,
-                            branch,
-                            validations,
-                            displayPromotions: displayPromotions === true,
                         }
-                    )
-                    setLoadedBranch(data.branch)
-                    if (data.branch) {
-                        setRuns(data.branch.validationStatuses)
                     }
-                } finally {
-                    setLoading(false)
                 }
             }
-
-            // noinspection JSIgnoredPromiseFromCall
-            loadData()
-
-            // setLoading(true)
+        `,
+        {
+            variables: {
+                project,
+                branch,
+                validations,
+                displayPromotions: displayPromotions === true,
+            },
+            deps: [project, branch],
+            condition: !!(project && branch && validations && validations.length > 0),
+            dataFn: data => data.branch,
         }
-    }, [client, project, branch])
-    //
+    )
+    const runs = loadedBranch?.validationStatuses ?? NO_RUNS
+
     const {setTitle} = useContext(DashboardWidgetCellContext)
     useEffect(() => {
         if (title) {

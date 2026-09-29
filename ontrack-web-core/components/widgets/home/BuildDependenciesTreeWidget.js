@@ -1,56 +1,51 @@
 import {gql} from "graphql-request";
-import {useContext, useEffect, useState} from "react";
+import {useContext, useEffect} from "react";
 import {Empty} from "antd";
-import {useGraphQLClient} from "@components/providers/ConnectionContextProvider";
+import {useQuery} from "@components/services/GraphQL";
 import {DashboardWidgetCellContext} from "@components/dashboards/DashboardWidgetCellContextProvider";
 import BuildLinksTree from "@components/links/BuildLinksTree";
 
 export default function BuildDependenciesTreeWidget({title, project, branch, promotionLevel}) {
-
-    const client = useGraphQLClient()
-    const [build, setBuild] = useState(undefined)
-    const [loading, setLoading] = useState(true)
 
     const {setTitle} = useContext(DashboardWidgetCellContext)
     useEffect(() => {
         setTitle(title || "Build dependencies")
     }, [title])
 
-    useEffect(() => {
-        if (client && project && branch && promotionLevel) {
-            setLoading(true)
-            client.request(
-                gql`
-                    query BuildDependenciesTreeWidgetLatestBuild(
-                        $project: String!,
-                        $branch: String!,
-                        $promotionLevel: String!,
-                    ) {
-                        branches(project: $project, token: $branch) {
-                            promotionStatuses(names: [$promotionLevel]) {
-                                build {
-                                    id
-                                    name
-                                }
-                            }
+    const {data: build, loading, finished, error} = useQuery(
+        gql`
+            query BuildDependenciesTreeWidgetLatestBuild(
+                $project: String!,
+                $branch: String!,
+                $promotionLevel: String!,
+            ) {
+                branches(project: $project, token: $branch) {
+                    promotionStatuses(names: [$promotionLevel]) {
+                        build {
+                            id
+                            name
                         }
                     }
-                `,
-                {project, branch, promotionLevel}
-            ).then(data => {
+                }
+            }
+        `,
+        {
+            variables: {project, branch, promotionLevel},
+            deps: [project, branch, promotionLevel],
+            condition: !!(project && branch && promotionLevel),
+            dataFn: data => {
                 const run = data?.branches?.[0]?.promotionStatuses?.[0]
-                setBuild(run?.build ?? null)
-            }).finally(() => {
-                setLoading(false)
-            })
+                return run?.build ?? null
+            },
         }
-    }, [client, project, branch, promotionLevel])
+    )
 
     if (!project || !branch || !promotionLevel) {
         return <Empty description="No promotion level configured"/>
     }
 
-    if (!loading && build === null) {
+    // A failed request is not a missing build
+    if (finished && !loading && !error && build === null) {
         return <Empty description={`No build promoted yet for ${promotionLevel}`}/>
     }
 

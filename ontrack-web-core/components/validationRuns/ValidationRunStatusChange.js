@@ -5,7 +5,7 @@ import SelectValidationRunStatus from "@components/validationRuns/SelectValidati
 import Rows from "@components/common/Rows";
 import {useState} from "react";
 import {gql} from "graphql-request";
-import {useGraphQLClient} from "@components/providers/ConnectionContextProvider";
+import {callGraphQL} from "@components/services/GraphQL";
 
 /**
  * @param run Validation run to update
@@ -13,15 +13,13 @@ import {useGraphQLClient} from "@components/providers/ConnectionContextProvider"
  */
 export default function ValidationRunStatusChange({run, onStatusChanged}) {
 
-    const client = useGraphQLClient()
-
     const [nextStatusId, setNextStatusId] = useState('')
     const [description, setDescription] = useState('')
 
     const changeStatus = async () => {
         if (nextStatusId) {
-            await client.request(
-                gql`
+            await callGraphQL({
+                query: gql`
                     mutation ChangeValidationRunStatus(
                         $runId: Int!,
                         $statusId: String!,
@@ -37,12 +35,13 @@ export default function ValidationRunStatusChange({run, onStatusChanged}) {
                             }
                         }
                     }
-                `, {
+                `,
+                variables: {
                     runId: Number(run.id),
                     statusId: nextStatusId,
                     description,
-                }
-            )
+                },
+            })
             if (onStatusChanged) {
                 onStatusChanged(run.id)
             }

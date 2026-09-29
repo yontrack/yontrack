@@ -1,74 +1,55 @@
 import {gql} from "graphql-request";
-import React, {useContext, useEffect, useState} from "react";
+import React, {useContext, useEffect} from "react";
 import {DashboardWidgetCellContext} from "@components/dashboards/DashboardWidgetCellContextProvider";
-import {useGraphQLClient} from "@components/providers/ConnectionContextProvider";
+import {useQueries} from "@components/services/GraphQL";
 import PaddedContent from "@components/common/PaddedContent";
 import SimpleProjectList from "@components/projects/SimpleProjectList";
 import {Skeleton} from "antd";
 import {gqlDecorationFragment} from "@components/services/fragments";
 import {gqlLabelFragment} from "@components/labels/LabelGraphQLFragments";
 
-export default function ProjectListWidget({projectNames}) {
+const gqlProjectByName = gql`
+    query GetProjectByName($name: String!) {
+        projects(name: $name) {
+            id
+            name
+            favourite
+            labels {
+                ...labelFragment
+            }
+            decorations {
+                ...decorationContent
+            }
+        }
+    }
 
-    const client = useGraphQLClient()
-    const [loading, setLoading] = useState(true)
-    const [projects, setProjects] = useState([])
+    ${gqlDecorationFragment}
+    ${gqlLabelFragment}
+`
+
+export default function ProjectListWidget({projectNames}) {
 
     const {setTitle} = useContext(DashboardWidgetCellContext)
     useEffect(() => { setTitle("Project list") }, [])
 
-    const fetchProject = async (name) => {
-        const data = await client.request(
-            gql`
-                query GetProjectByName($name: String!) {
-                    projects(name: $name) {
-                        id
-                        name
-                        favourite
-                        labels {
-                            ...labelFragment
-                        }
-                        decorations {
-                            ...decorationContent
-                        }
-                    }
-                }
-
-                ${gqlDecorationFragment}
-                ${gqlLabelFragment}
-            `,
-            {name}
-        )
-        const projects = data.projects
-        if (projects.length > 0) {
-            return projects[0]
-        } else {
-            return null
+    const hasProjects = !!projectNames && projectNames.length > 0
+    const {data: results, loading, finished} = useQueries(
+        (projectNames ?? []).map(name => ({
+            query: gqlProjectByName,
+            variables: {name},
+        })),
+        {
+            deps: [projectNames],
+            condition: hasProjects,
         }
-    }
-
-    useEffect(() => {
-        if (client) {
-
-            const fetchProjects = async () => {
-                setLoading(true)
-                try {
-                    const projectPromises = projectNames.map(name => fetchProject(name))
-                    const projectsData = await Promise.all(projectPromises)
-                    setProjects(projectsData.filter(it => it !== null))
-                } finally {
-                    setLoading(false)
-                }
-            }
-
-            // noinspection JSIgnoredPromiseFromCall
-            fetchProjects()
-        }
-    }, [client, projectNames]);
+    )
+    const projects = hasProjects ?
+        results.map(data => data.projects.length > 0 ? data.projects[0] : null).filter(it => it !== null) :
+        []
 
     return (
         <PaddedContent>
-            <Skeleton loading={loading} active>
+            <Skeleton loading={hasProjects && (loading || !finished)} active>
                 <SimpleProjectList
                     projects={projects}
                     emptyText={

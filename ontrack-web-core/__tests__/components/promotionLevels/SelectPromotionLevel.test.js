@@ -47,4 +47,23 @@ describe('SelectPromotionLevel', () => {
         expect(screen.queryByText("Error")).toBeNull()
     })
 
+    it('drops the error of a previous branch once there is no branch any longer', async () => {
+        global.fetch = jest.fn().mockResolvedValue({
+            ok: false,
+            status: 500,
+            json: async () => ({
+                error: {response: {errors: [{message: "Branch not found"}]}},
+            }),
+        })
+
+        const {rerender} = render(<SelectPromotionLevel branch={branch}/>)
+        await waitFor(() => expect(screen.queryByText("Error")).not.toBeNull())
+
+        rerender(<SelectPromotionLevel branch={undefined}/>)
+
+        await waitFor(() => expect(screen.queryByRole('combobox')).not.toBeNull())
+        expect(screen.queryByText("Error")).toBeNull()
+        expect(global.fetch).toHaveBeenCalledTimes(1)
+    })
+
 })

@@ -1,5 +1,4 @@
-import {useGraphQLClient} from "@components/providers/ConnectionContextProvider";
-import {useEffect, useState} from "react";
+import {useQuery} from "@components/services/GraphQL";
 import {gql} from "graphql-request";
 import Head from "next/head";
 import {buildKnownName, pageTitle, validationStampTitleName} from "@components/common/Titles";
@@ -29,95 +28,88 @@ import {gqlInformationFragment, gqlPropertiesFragment} from "@components/service
 import {isFindingsRun} from "@components/extension/findings/findingsModel";
 import ValidationRunFindings from "@components/extension/findings/run/ValidationRunFindings";
 
+const EMPTY_RUN = {}
+
 export default function ValidationRunView({id}) {
-
-    const client = useGraphQLClient()
-
-    const [loading, setLoading] = useState(true)
-    const [run, setRun] = useState({})
-    const [commands, setCommands] = useState([])
 
     const [refreshState, refresh] = useRefresh()
 
-    useEffect(() => {
-        if (client && id) {
-            setLoading(true)
-            client.request(
-                gql`
-                    query GetValidationRun($id: Int!) {
-                        validationRuns(id: $id) {
-                            ...ValidationRunContent
-                            properties {
-                                ...propertiesFragment
-                            }
-                            information {
-                                ...informationFragment
-                            }
-                            validationStamp {
+    const {data, loading, finished} = useQuery(
+        gql`
+            query GetValidationRun($id: Int!) {
+                validationRuns(id: $id) {
+                    ...ValidationRunContent
+                    properties {
+                        ...propertiesFragment
+                    }
+                    information {
+                        ...informationFragment
+                    }
+                    validationStamp {
+                        id
+                        name
+                        image
+                        branch {
+                            id
+                            name
+                            project {
                                 id
                                 name
-                                image
-                                branch {
-                                    id
-                                    name
-                                    project {
-                                        id
-                                        name
-                                    }
-                                }
-                                dataType {
-                                    descriptor {
-                                        id
-                                    }
-                                    config
-                                }
                             }
-                            build {
+                        }
+                        dataType {
+                            descriptor {
+                                id
+                            }
+                            config
+                        }
+                    }
+                    build {
+                        id
+                        name
+                        branch {
+                            id
+                            name
+                            project {
                                 id
                                 name
-                                branch {
-                                    id
+                                authorizations {
                                     name
-                                    project {
-                                        id
-                                        name
-                                        authorizations {
-                                            name
-                                            action
-                                            authorized
-                                        }
-                                    }
-                                }
-                                releaseProperty {
-                                    value
+                                    action
+                                    authorized
                                 }
                             }
                         }
+                        releaseProperty {
+                            value
+                        }
                     }
-                    ${gqlValidationRunContent}
-                    ${gqlPropertiesFragment}
-                    ${gqlInformationFragment}
-                `,
-                {id}
-            ).then(data => {
-                const run = data.validationRuns[0]
-                setRun(run)
-                setCommands([
-                    <InfoViewDrawer
-                        key="details"
-                        id="validation-run-info"
-                        entityType="VALIDATION_RUN"
-                        entityName="validation run"
-                        entity={run}
-                    />,
-                    <StoredGridLayoutResetCommand key="reset"/>,
-                    <CloseCommand key="close" href={buildUri(run.build)}/>,
-                ])
-            }).finally(() => {
-                setLoading(false)
-            })
+                }
+            }
+            ${gqlValidationRunContent}
+            ${gqlPropertiesFragment}
+            ${gqlInformationFragment}
+        `,
+        {
+            variables: {id},
+            deps: [id, refreshState],
+            condition: !!id,
+            dataFn: data => data.validationRuns[0],
         }
-    }, [client, id, refreshState])
+    )
+    const run = data ?? EMPTY_RUN
+
+    const commands = data ? [
+        <InfoViewDrawer
+            key="details"
+            id="validation-run-info"
+            entityType="VALIDATION_RUN"
+            entityName="validation run"
+            entity={run}
+        />,
+        <StoredGridLayoutResetCommand key="reset"/>,
+        <CloseCommand key="close" href={buildUri(run.build)}/>,
+    ] : []
 
     const tableRunStatuses = "table-run-statuses"
     const sectionRunData = "section-run-data"
@@ -236,7 +228,7 @@ export default function ValidationRunView({id}) {
                     commands={commands}
                     breadcrumbs={downToBuildBreadcrumbs(run)}
                 >
-                    <LoadingContainer loading={loading}>
+                    <LoadingContainer loading={loading || !finished}>
                         <Space orientation="vertical" className="ot-line">
                             <AnnotatedDescription entity={run}/>
                             <StoredGridLayout

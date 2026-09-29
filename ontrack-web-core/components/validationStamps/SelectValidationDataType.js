@@ -1,34 +1,23 @@
-import {useEffect, useState} from "react";
-import {useGraphQLClient} from "@components/providers/ConnectionContextProvider";
+import {useQuery} from "@components/services/GraphQL";
 import {gql} from "graphql-request";
 import {Select} from "antd";
 
 export default function SelectValidationDataType({value, onChange, onValidationDataTypeSelected, allowClear = false}) {
 
-    const client = useGraphQLClient()
-
-    const [loading, setLoading] = useState(true)
-    const [types, setTypes] = useState([])
-
-    useEffect(() => {
-        if (client) {
-            setLoading(true)
-            client.request(
-                gql`
-                    query GetValidationTypes {
-                        validationDataTypes {
-                            value: id
-                            label: displayName
-                        }
-                    }
-                `
-            ).then(data => {
-                setTypes(data.validationDataTypes)
-            }).finally(() => {
-                setLoading(false)
-            })
+    const {data: types, loading, finished} = useQuery(
+        gql`
+            query GetValidationTypes {
+                validationDataTypes {
+                    value: id
+                    label: displayName
+                }
+            }
+        `,
+        {
+            initialData: [],
+            dataFn: data => data.validationDataTypes,
         }
-    }, [client])
+    )
 
     const onLocalChange = (value) => {
         if (onChange) onChange(value)
@@ -40,8 +29,8 @@ export default function SelectValidationDataType({value, onChange, onValidationD
     return (
         <>
             <Select
-                options={types}
-                loading={loading}
+                options={types ?? []}
+                loading={loading || !finished}
                 value={value}
                 onChange={onLocalChange}
                 allowClear={allowClear}

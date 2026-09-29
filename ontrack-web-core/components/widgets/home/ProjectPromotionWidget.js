@@ -1,53 +1,47 @@
 import {gql} from "graphql-request";
-import React, {useContext, useEffect, useState} from "react";
+import React, {useContext, useEffect} from "react";
 import {Popover, Space, Table} from "antd";
 import PromotionRun from "@components/promotionRuns/PromotionRun";
 import {gqlDecorationFragment} from "@components/services/fragments";
 import {FaBan} from "react-icons/fa";
 import {DashboardWidgetCellContext} from "@components/dashboards/DashboardWidgetCellContextProvider";
-import {useGraphQLClient} from "@components/providers/ConnectionContextProvider";
+import {useQuery} from "@components/services/GraphQL";
 import BuildLink from "@components/builds/BuildLink";
 import PromotionRuns from "@components/promotionRuns/PromotionRuns";
 import BuildDeploymentChips from "@components/extension/environments/journey/BuildDeploymentChips";
 
 const {Column} = Table;
 
+const NO_ITEMS = []
+
 export default function ProjectPromotionWidget({project, promotions, depth, label}) {
 
-    const client = useGraphQLClient()
-    const [runs, setRuns] = useState([])
-    const [projects, setProjects] = useState([])
-
-    useEffect(() => {
-        if (client && project) {
-            client.request(
-                gql`
-                    query GetProjectPromotions(
-                        $project: String!,
-                        $promotions: [String!]!,
-                        $depth: Int = 0,
-                        $label: String = null,
-                    ) {
-                        projects(name: $project) {
-                            lastBuildsWithPromotions(promotions: $promotions) {
-                                key: id
-                                ...promotionRunContent
-                                build {
-                                    ...buildContent
-                                    usingQualified(
-                                        size: 10,
-                                        depth: $depth,
-                                        label: $label,
-                                    ) {
-                                        pageItems {
-                                            qualifier
-                                            build {
-                                                ...buildContent
-                                                branch {
-                                                    project {
-                                                        name
-                                                    }
-                                                }
+    const {data} = useQuery(
+        gql`
+            query GetProjectPromotions(
+                $project: String!,
+                $promotions: [String!]!,
+                $depth: Int = 0,
+                $label: String = null,
+            ) {
+                projects(name: $project) {
+                    lastBuildsWithPromotions(promotions: $promotions) {
+                        key: id
+                        ...promotionRunContent
+                        build {
+                            ...buildContent
+                            usingQualified(
+                                size: 10,
+                                depth: $depth,
+                                label: $label,
+                            ) {
+                                pageItems {
+                                    qualifier
+                                    build {
+                                        ...buildContent
+                                        branch {
+                                            project {
+                                                name
                                             }
                                         }
                                     }
@@ -55,46 +49,51 @@ export default function ProjectPromotionWidget({project, promotions, depth, labe
                             }
                         }
                     }
+                }
+            }
 
-                    fragment buildContent on Build {
-                        id
-                        name
-                        creation {
-                            time
-                            user
-                        }
-                        releaseProperty {
-                            value
-                        }
-                        decorations {
-                            ...decorationContent
-                        }
-                        promotionRuns(lastPerLevel: true) {
-                            ...promotionRunContent
-                        }
-                    }
+            fragment buildContent on Build {
+                id
+                name
+                creation {
+                    time
+                    user
+                }
+                releaseProperty {
+                    value
+                }
+                decorations {
+                    ...decorationContent
+                }
+                promotionRuns(lastPerLevel: true) {
+                    ...promotionRunContent
+                }
+            }
 
-                    fragment promotionRunContent on PromotionRun {
-                        id
-                        creation {
-                            time
-                            user
-                        }
-                        description
-                        annotatedDescription
-                        promotionLevel {
-                            id
-                            name
-                            description
-                            annotatedDescription
-                            image
-                        }
-                    }
+            fragment promotionRunContent on PromotionRun {
+                id
+                creation {
+                    time
+                    user
+                }
+                description
+                annotatedDescription
+                promotionLevel {
+                    id
+                    name
+                    description
+                    annotatedDescription
+                    image
+                }
+            }
 
-                    ${gqlDecorationFragment}
-                `,
-                {project, promotions, depth, label}
-            ).then(data => {
+            ${gqlDecorationFragment}
+        `,
+        {
+            variables: {project, promotions, depth, label},
+            deps: [project, promotions, depth, label],
+            condition: !!project,
+            dataFn: data => {
                 const projectList = []
                 data.projects[0].lastBuildsWithPromotions.forEach(run => {
                     run.build.usingQualified.pageItems.forEach(dependency => {
@@ -108,11 +107,15 @@ export default function ProjectPromotionWidget({project, promotions, depth, labe
                         }
                     })
                 })
-                setProjects(projectList.sort())
-                setRuns(data.projects[0].lastBuildsWithPromotions);
-            })
+                return {
+                    projects: projectList.sort(),
+                    runs: data.projects[0].lastBuildsWithPromotions,
+                }
+            },
         }
-    }, [client, project, promotions, depth, label]);
+    )
+    const runs = data?.runs ?? NO_ITEMS
+    const projects = data?.projects ?? NO_ITEMS
 
     const {setTitle} = useContext(DashboardWidgetCellContext)
     useEffect(() => {

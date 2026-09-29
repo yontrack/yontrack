@@ -5,11 +5,9 @@ import ValidationRunStatus from "@components/validationRuns/ValidationRunStatus"
 import AnnotatedDescription from "@components/common/AnnotatedDescription";
 import {isAuthorized} from "@components/common/authorizations";
 import {gql} from "graphql-request";
-import {useGraphQLClient} from "@components/providers/ConnectionContextProvider";
+import {callGraphQL} from "@components/services/GraphQL";
 
 export default function ValidationRunStatusList({run, onRunChanged}) {
-
-    const client = useGraphQLClient()
 
     const replaceStatusCommentInRun = (vrsId, description, annotatedDescription) => {
         const newRun = {
@@ -30,8 +28,8 @@ export default function ValidationRunStatusList({run, onRunChanged}) {
     }
 
     const editStatusComment = async (vrs, text) => {
-        const data = await client.request(
-            gql`
+        const data = await callGraphQL({
+            query: gql`
                 mutation ChangeStatusComment(
                     $validationRunStatusId: Int!,
                     $comment: String!,
@@ -53,11 +51,11 @@ export default function ValidationRunStatusList({run, onRunChanged}) {
                     }
                 }
             `,
-            {
+            variables: {
                 validationRunStatusId: Number(vrs.id),
                 comment: text,
-            }
-        )
+            },
+        })
         // Gets the text of the changed status
         const newVrs = data.changeValidationRunStatusComment.validationRun
             .validationRunStatuses

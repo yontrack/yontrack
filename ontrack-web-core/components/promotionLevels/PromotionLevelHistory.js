@@ -1,5 +1,5 @@
-import {useEffect, useState} from "react";
-import {useGraphQLClient} from "@components/providers/ConnectionContextProvider";
+import {useState} from "react";
+import {useQuery} from "@components/services/GraphQL";
 import {gql} from "graphql-request";
 import LoadingContainer from "@components/common/LoadingContainer";
 import {Button, DatePicker, Input, Popover, Space, Spin, Table, Typography} from "antd";
@@ -19,7 +19,6 @@ const {Column} = Table
 
 export default function PromotionLevelHistory({promotionLevel}) {
 
-    const client = useGraphQLClient()
     const router = useRouter()
 
     const [pagination, setPagination] = useState({
@@ -43,96 +42,98 @@ export default function PromotionLevelHistory({promotionLevel}) {
         })
     }
 
-    const [loading, setLoading] = useState(false)
-    const [promotions, setPromotions] = useState([])
-    const [pageInfo, setPageInfo] = useState()
-    const [scmChangeLogEnabled, setScmChangeLogEnabled] = useState('')
-
-    useEffect(() => {
-        if (client && promotionLevel) {
-            setLoading(true)
-            client.request(
-                gql`
-                    query GetPromotionLevelHistory(
-                        $id: Int!,
-                        $offset: Int!,
-                        $size: Int!,
-                        $name: String,
-                        $version: String,
-                        $afterDate: LocalDateTime,
-                        $beforeDate: LocalDateTime,
+    const {data: page, loading} = useQuery(
+        gql`
+            query GetPromotionLevelHistory(
+                $id: Int!,
+                $offset: Int!,
+                $size: Int!,
+                $name: String,
+                $version: String,
+                $afterDate: LocalDateTime,
+                $beforeDate: LocalDateTime,
+            ) {
+                promotionLevel(id: $id) {
+                    branch {
+                        scmBranchInfo {
+                            changeLogs
+                        }
+                    }
+                    promotionRuns: promotionRunsPaginated(
+                        offset: $offset,
+                        size: $size,
+                        name: $name,
+                        version: $version,
+                        afterDate: $afterDate,
+                        beforeDate: $beforeDate,
                     ) {
-                        promotionLevel(id: $id) {
-                            branch {
-                                scmBranchInfo {
-                                    changeLogs
+                        pageInfo {
+                            nextPage {
+                                offset
+                                size
+                            }
+                        }
+                        pageItems {
+                            id
+                            description
+                            annotatedDescription
+                            build {
+                                id
+                                name
+                                displayName
+                                releaseProperty {
+                                    value
+                                }
+                                decorations {
+                                    decorationType
+                                    error
+                                    data
+                                    feature {
+                                        id
+                                    }
                                 }
                             }
-                            promotionRuns: promotionRunsPaginated(
-                                offset: $offset,
-                                size: $size,
-                                name: $name,
-                                version: $version,
-                                afterDate: $afterDate,
-                                beforeDate: $beforeDate,
-                            ) {
-                                pageInfo {
-                                    nextPage {
-                                        offset
-                                        size
-                                    }
-                                }
-                                pageItems {
-                                    id
-                                    description
-                                    annotatedDescription
-                                    build {
-                                        id
-                                        name
-                                        displayName
-                                        releaseProperty {
-                                            value
-                                        }
-                                        decorations {
-                                            decorationType
-                                            error
-                                            data
-                                            feature {
-                                                id
-                                            }
-                                        }
-                                    }
-                                    creation {
-                                        user
-                                        time
-                                    }
-                                }
+                            creation {
+                                user
+                                time
                             }
                         }
                     }
-                `,
-                {
-                    id: Number(promotionLevel.id),
-                    offset: pagination.offset,
-                    size: pagination.size,
-                    name: filter.name,
-                    version: filter.version,
-                    afterDate: filter.afterDate,
-                    beforeDate: filter.beforeDate,
                 }
-            ).then(data => {
-                setScmChangeLogEnabled(data.promotionLevel.branch.scmBranchInfo?.changeLogs)
-                setPageInfo(data.promotionLevel.promotionRuns.pageInfo)
-                if (pagination.offset > 0) {
-                    setPromotions([...promotions, ...data.promotionLevel.promotionRuns.pageItems])
-                } else {
-                    setPromotions(data.promotionLevel.promotionRuns.pageItems)
-                }
-            }).finally(() => {
-                setLoading(false)
-            })
+            }
+        `,
+        {
+            variables: {
+                id: promotionLevel ? Number(promotionLevel.id) : undefined,
+                offset: pagination.offset,
+                size: pagination.size,
+                name: filter.name,
+                version: filter.version,
+                afterDate: filter.afterDate,
+                beforeDate: filter.beforeDate,
+            },
+            deps: [promotionLevel, pagination, filter],
+            condition: !!promotionLevel,
+            dataFn: data => ({
+                promotionLevel: data.promotionLevel,
+                offset: pagination.offset,
+            }),
         }
-    }, [client, promotionLevel, pagination, filter]);
+    )
+
+    // A page beyond the first one is appended to the promotion runs already loaded. This is state
+    // kept from one page to the next, adjusted while rendering.
+    const [loaded, setLoaded] = useState({page: null, promotions: []})
+    if (page && page !== loaded.page) {
+        const newItems = page.promotionLevel?.promotionRuns?.pageItems ?? []
+        setLoaded({
+            page,
+            promotions: page.offset > 0 ? [...loaded.promotions, ...newItems] : newItems,
+        })
+    }
+    const promotions = loaded.promotions
+    const pageInfo = loaded.page?.promotionLevel?.promotionRuns?.pageInfo
+    const scmChangeLogEnabled = loaded.page ? loaded.page.promotionLevel?.branch?.scmBranchInfo?.changeLogs : ''
 
     const onLoadMore = () => {
         if (pageInfo.nextPage) {
@@ -158,6 +159,7 @@ export default function PromotionLevelHistory({promotionLevel}) {
             <LoadingContainer loading={loading && pagination.offset === 0} tip="Loading history...">
                 <Table
                     dataSource={promotions}
+                    rowKey="id"
                     pagination={false}
                     footer={() => (
                         <>

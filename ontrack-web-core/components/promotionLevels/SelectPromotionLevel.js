@@ -1,10 +1,8 @@
 import {Select, Space, Typography} from "antd";
-import {useEffect, useState} from "react";
 import {gql} from "graphql-request";
-import {useGraphQLClient} from "@components/providers/ConnectionContextProvider";
 import {PromotionLevelImage} from "@components/promotionLevels/PromotionLevelImage";
 import InlineError from "@components/common/InlineError";
-import {genericGraphQLErrorMessage} from "@components/services/GraphQL";
+import {useQuery} from "@components/services/GraphQL";
 
 export default function SelectPromotionLevel({
                                                  branch,
@@ -18,52 +16,39 @@ export default function SelectPromotionLevel({
                                                  id,
                                              }) {
 
-    const client = useGraphQLClient()
-
-    const [options, setOptions] = useState([])
-    const [error, setError] = useState()
-
-    useEffect(() => {
-        if (branch && client) {
-            client.request(
-                gql`
-                    query GetPromotionLevels($branchId: Int!) {
-                        branches(id: $branchId) {
-                            promotionLevels {
-                                id
-                                name
-                                image
-                                description
-                                annotatedDescription
-                            }
-                        }
+    const {data: promotionLevels, error} = useQuery(
+        gql`
+            query GetPromotionLevels($branchId: Int!) {
+                branches(id: $branchId) {
+                    promotionLevels {
+                        id
+                        name
+                        image
+                        description
+                        annotatedDescription
                     }
-                `,
-                {branchId: Number(branch.id)}
-            ).then(data => {
-                setError(undefined)
-                setOptions(data.branches[0].promotionLevels.map(pl => {
-                    return {
-                        value: useName ? pl.name : pl.id,
-                        label: <Space>
-                            <PromotionLevelImage promotionLevel={pl}/>
-                            <Typography.Text>{pl.name}</Typography.Text>
-                        </Space>
-                    }
-                }))
-            }).catch(ex => {
-                // Without this, the rejection was swallowed and the dropdown just stayed empty,
-                // indistinguishable from a branch with no promotion levels.
-                setError(ex.message || genericGraphQLErrorMessage)
-                setOptions([])
-            })
-        } else {
-            // nothing to load from: drop any error left over from a previous branch
-            setError(undefined)
+                }
+            }
+        `,
+        {
+            variables: {branchId: branch ? Number(branch.id) : undefined},
+            deps: [branch?.id],
+            condition: !!branch,
+            dataFn: data => data.branches[0].promotionLevels,
         }
-    }, [client, branch]);
+    )
 
-    if (error) {
+    const options = (promotionLevels ?? []).map(pl => ({
+        value: useName ? pl.name : pl.id,
+        label: <Space>
+            <PromotionLevelImage promotionLevel={pl}/>
+            <Typography.Text>{pl.name}</Typography.Text>
+        </Space>
+    }))
+
+    // Without this, a failed lookup was indistinguishable from a branch with no promotion levels.
+    // With no branch, there is nothing to load from: an error left over from a previous branch is dropped.
+    if (branch && error) {
         return <InlineError message={error}/>
     }
 

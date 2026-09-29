@@ -1,6 +1,5 @@
 import {useRouter} from "next/router";
-import {useGraphQLClient} from "@components/providers/ConnectionContextProvider";
-import {useEffect, useState} from "react";
+import {useQuery} from "@components/services/GraphQL";
 import {gql} from "graphql-request";
 import StandardPage from "@components/layouts/StandardPage";
 import AutoVersioningAuditView from "@components/extension/auto-versioning/AutoVersioningAuditView";
@@ -14,37 +13,28 @@ export default function AutoVersioningAuditProjectTargetPage() {
     const router = useRouter()
     const {id} = router.query
 
-    const client = useGraphQLClient()
-
-    const [project, setProject] = useState()
-    const [breadcrumbs, setBreadcrumbs] = useState([])
-    const [commands, setCommands] = useState([])
-    useEffect(() => {
-        if (client && id) {
-            client.request(
-                gql`
-                    query GetProject(
-                        $id: Int!,
-                    ) {
-                        projects(id: $id) {
-                            id
-                            name
-                        }
-                    }
-                `,
-                {id: Number(id)}
-            ).then(data => {
-                const project = data.projects[0];
-                setProject(project)
-                setBreadcrumbs(
-                    downToProjectBreadcrumbs({project})
-                )
-                setCommands([
-                    <CloseCommand key="close" href={projectUri(project)}/>,
-                ])
-            })
+    const {data: project} = useQuery(
+        gql`
+            query GetProject(
+                $id: Int!,
+            ) {
+                projects(id: $id) {
+                    id
+                    name
+                }
+            }
+        `,
+        {
+            variables: {id: Number(id)},
+            deps: [id],
+            condition: !!id,
+            dataFn: data => data.projects[0],
         }
-    }, [client, id]);
+    )
+    const breadcrumbs = project ? downToProjectBreadcrumbs({project}) : []
+    const commands = project ? [
+        <CloseCommand key="close" href={projectUri(project)}/>,
+    ] : []
 
     return (
         <>

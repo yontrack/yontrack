@@ -1,6 +1,6 @@
 import {gql} from "graphql-request";
-import {useGraphQLClient} from "@components/providers/ConnectionContextProvider";
-import {useContext, useEffect, useState} from "react";
+import {useQuery} from "@components/services/GraphQL";
+import {useContext, useEffect} from "react";
 import LoadingContainer from "@components/common/LoadingContainer";
 import {gqlValidationRunTableContent} from "@components/validationRuns/ValidationRunGraphQLFragments";
 import ValidationRunTable from "@components/validationRuns/ValidationRunTable";
@@ -11,85 +11,78 @@ import BranchLink from "@components/branches/BranchLink";
 import {Divider} from "antd";
 import ProjectLink from "@components/projects/ProjectLink";
 
+const NO_RUNS = []
+
 export default function ValidationsLastPromotionBuildWidget({title, project, branch, promotion, validations}) {
 
-    const client = useGraphQLClient()
-    const [loading, setLoading] = useState(false)
-
-    const [promotionLevel, setPromotionLevel] = useState()
-    const [build, setBuild] = useState()
-    const [runs, setRuns] = useState([])
-
-    useEffect(() => {
-        if (client && project && branch && promotion) {
-            setLoading(true)
-            client.request(
-                gql`
-                    ${gqlValidationRunTableContent}
-                    query ValidationsLastPromotionBuild(
-                        $project: String!,
-                        $branch: String!,
-                        $promotion: String!,
-                        $validations: [String!],
-                    ) {
-                        promotionLevelByName(project: $project, branch: $branch, name: $promotion) {
-                            id
-                            name
-                            image
-                            promotionRunsPaginated(size: 1) {
-                                pageItems {
-                                    build {
+    const {data, loading} = useQuery(
+        gql`
+            ${gqlValidationRunTableContent}
+            query ValidationsLastPromotionBuild(
+                $project: String!,
+                $branch: String!,
+                $promotion: String!,
+                $validations: [String!],
+            ) {
+                promotionLevelByName(project: $project, branch: $branch, name: $promotion) {
+                    id
+                    name
+                    image
+                    promotionRunsPaginated(size: 1) {
+                        pageItems {
+                            build {
+                                id
+                                name
+                                branch {
+                                    id
+                                    name
+                                    displayName
+                                    project {
                                         id
                                         name
-                                        branch {
-                                            id
-                                            name
-                                            displayName
-                                            project {
-                                                id
-                                                name
-                                            }
-                                        }
-                                        releaseProperty {
-                                            value
-                                        }
-                                        validations(validationStamps: $validations) {
-                                            validationRuns {
-                                                ...ValidationRunTableContent
-                                            }
-                                        }
+                                    }
+                                }
+                                releaseProperty {
+                                    value
+                                }
+                                validations(validationStamps: $validations) {
+                                    validationRuns {
+                                        ...ValidationRunTableContent
                                     }
                                 }
                             }
                         }
                     }
-                `,
-                {
-                    project,
-                    branch,
-                    promotion,
-                    validations,
                 }
-            ).then(data => {
+            }
+        `,
+        {
+            variables: {
+                project,
+                branch,
+                promotion,
+                validations,
+            },
+            deps: [project, branch, promotion],
+            condition: !!(project && branch && promotion),
+            dataFn: data => {
                 const pl = data.promotionLevelByName
-                if (pl) {
-                    setPromotionLevel(pl)
-                    const promotionRuns = pl.promotionRunsPaginated.pageItems
-                    if (promotionRuns.length > 0) {
-                        const build = promotionRuns[0].build
-                        setBuild(build)
-                        const runs = []
-                        build.validations.forEach(validation => {
-                            runs.push(...validation.validationRuns)
-                        })
-                        setRuns(runs)
-                    }
+                const build = pl?.promotionRunsPaginated?.pageItems?.[0]?.build
+                const runs = []
+                build?.validations?.forEach(validation => {
+                    runs.push(...validation.validationRuns)
+                })
+                return {
+                    promotionLevel: pl,
+                    build,
+                    runs,
                 }
-            }).finally(() => {
-                setLoading(false)
-            })
+            },
         }
-    }, [client, project, branch, promotion])
+    )
+    const promotionLevel = data?.promotionLevel
+    const build = data?.build
+    const runs = data?.runs ?? NO_RUNS
 
     const {setTitle} = useContext(DashboardWidgetCellContext)
     useEffect(() => {

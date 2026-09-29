@@ -1,5 +1,5 @@
 import FormDialog, {useFormDialog} from "@components/form/FormDialog";
-import {useGraphQLClient} from "@components/providers/ConnectionContextProvider";
+import {callGraphQL} from "@components/services/GraphQL";
 import {gqlPromotionLevelByIdQuery, gqlPromotionLevelFragment} from "@components/services/fragments";
 import {gql} from "graphql-request";
 import {EventsContext} from "@components/common/EventsContext";
@@ -28,13 +28,12 @@ const SET_FIELDS_MUTATION = gql`
 
 export const usePromotionLevelUpdateDialog = () => {
 
-    const client = useGraphQLClient()
     const eventsContext = useContext(EventsContext)
     const pendingFieldsRef = useRef(null)
 
     return useFormDialog({
         init: (form, {id}) => {
-            client.request(gqlPromotionLevelByIdQuery, {id}).then(data => data.promotionLevel).then(pl => {
+            callGraphQL({query: gqlPromotionLevelByIdQuery, variables: {id}}).then(data => data.promotionLevel).then(pl => {
                 form.setFieldsValue({
                     ...pl,
                     fields: (pl.fields || []).map(f => ({
@@ -90,7 +89,7 @@ export const usePromotionLevelUpdateDialog = () => {
         userNode: 'updatePromotionLevelById',
         onSuccess: async (updatePromotionLevelById) => {
             if (pendingFieldsRef.current) {
-                await client.request(SET_FIELDS_MUTATION, pendingFieldsRef.current)
+                await callGraphQL({query: SET_FIELDS_MUTATION, variables: pendingFieldsRef.current})
                 pendingFieldsRef.current = null
             }
             eventsContext.fireEvent("promotionLevel.updated", {...updatePromotionLevelById.promotionLevel})

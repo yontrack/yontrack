@@ -1,14 +1,11 @@
 import {Space, Typography} from "antd";
 import SelectProject from "@components/projects/SelectProject";
 import SelectBranch from "@components/branches/SelectBranch";
-import {useEffect, useState} from "react";
-import {useGraphQLClient} from "@components/providers/ConnectionContextProvider";
+import {useQuery} from "@components/services/GraphQL";
 import {gql} from "graphql-request";
 import SelectPromotionLevel from "@components/promotionLevels/SelectPromotionLevel";
 
 export default function SelectProjectBranchPromotionLevel({value, onChange}) {
-
-    const client = useGraphQLClient()
 
     const setProjectName = (name) => {
         onChange({
@@ -35,28 +32,24 @@ export default function SelectProjectBranchPromotionLevel({value, onChange}) {
         }
     }
 
-    const [branch, setBranch] = useState()
-    useEffect(() => {
-        if (client && value?.project && value?.branch) {
-            client.request(
-                gql`
-                    query BranchByName($project: String!, $branch: String!) {
-                        branches(project: $project, name: $branch) {
-                            id
-                            name
-                        }
-                    }
-                `,
-                value
-            ).then(data => {
-                if (data.branches) {
-                    setBranch(data.branches[0])
+    const hasBranch = !!(value?.project && value?.branch)
+    const {data: loadedBranch} = useQuery(
+        gql`
+            query BranchByName($project: String!, $branch: String!) {
+                branches(project: $project, name: $branch) {
+                    id
+                    name
                 }
-            })
-        } else {
-            setBranch(null)
+            }
+        `,
+        {
+            variables: {project: value?.project, branch: value?.branch},
+            deps: [value?.project, value?.branch],
+            condition: hasBranch,
+            dataFn: data => data.branches?.[0],
         }
-    }, [client, value?.project, value?.branch]);
+    )
+    const branch = hasBranch ? loadedBranch : null
 
     return (
         <>

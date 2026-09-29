@@ -1,44 +1,35 @@
-import {useEffect, useState} from "react";
 import {Space, Typography} from "antd";
 import {gql} from "graphql-request";
 import {restPredefinedValidationStampImageUri} from "@components/common/Links";
-import {useGraphQLClient} from "@components/providers/ConnectionContextProvider";
+import {useQuery} from "@components/services/GraphQL";
 import ProxyImage from "@components/common/ProxyImage";
 
 export default function PredefinedValidationStampImageByName({name, displayName = true, size = 24}) {
 
-    const client = useGraphQLClient()
-
-    const [image, setImage] = useState('')
-
-    useEffect(() => {
-        if (client) {
-            client.request(
-                gql`
-                    query PredefinedValidationStamp($name: String!) {
-                        predefinedValidationStampByName(name: $name) {
-                            id
-                            isImage
-                        }
-                    }
-                `, {name}
-            ).then(data => {
-                const pvs = data.predefinedValidationStampByName
-                if (pvs && pvs.isImage) {
-                    setImage(
-                        <ProxyImage
-                            restUri={restPredefinedValidationStampImageUri(pvs)}
-                            alt={`Predefined validation stamp ${name}`}
-                            width={size}
-                            height={size}
-                        />
-                    )
-                } else {
-                    setImage('')
+    const {data: pvs} = useQuery(
+        gql`
+            query PredefinedValidationStamp($name: String!) {
+                predefinedValidationStampByName(name: $name) {
+                    id
+                    isImage
                 }
-            })
+            }
+        `,
+        {
+            variables: {name},
+            deps: [name],
+            dataFn: data => data.predefinedValidationStampByName,
         }
-    }, [client, name])
+    )
+
+    const image = pvs && pvs.isImage ?
+        <ProxyImage
+            restUri={restPredefinedValidationStampImageUri(pvs)}
+            alt={`Predefined validation stamp ${name}`}
+            width={size}
+            height={size}
+        /> :
+        ''
 
     return (
         <Space size={8}>

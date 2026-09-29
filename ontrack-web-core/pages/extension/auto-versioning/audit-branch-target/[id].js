@@ -1,6 +1,5 @@
 import {useRouter} from "next/router";
-import {useGraphQLClient} from "@components/providers/ConnectionContextProvider";
-import {useEffect, useState} from "react";
+import {useQuery} from "@components/services/GraphQL";
 import {gql} from "graphql-request";
 import {gqlBranchContentFragment} from "@components/branches/BranchGraphQLFragments";
 import StandardPage from "@components/layouts/StandardPage";
@@ -15,38 +14,29 @@ export default function AutoVersioningAuditBranchTargetPage() {
     const router = useRouter()
     const {id} = router.query
 
-    const client = useGraphQLClient()
+    const {data: branch} = useQuery(
+        gql`
+            query GetBranch(
+                $id: Int!,
+            ) {
+                branch(id: $id) {
+                    ...BranchContent
+                }
+            }
 
-    const [branch, setBranch] = useState()
-    const [breadcrumbs, setBreadcrumbs] = useState([])
-    const [commands, setCommands] = useState([])
-    useEffect(() => {
-        if (client && id) {
-            client.request(
-                gql`
-                    query GetBranch(
-                        $id: Int!,
-                    ) {
-                        branch(id: $id) {
-                            ...BranchContent
-                        }
-                    }
-
-                    ${gqlBranchContentFragment}
-                `,
-                {id: Number(id)}
-            ).then(data => {
-                const branch = data.branch;
-                setBranch(branch)
-                setBreadcrumbs(
-                    downToBranchBreadcrumbs({branch})
-                )
-                setCommands([
-                    <CloseCommand key="close" href={branchUri(branch)}/>,
-                ])
-            })
+            ${gqlBranchContentFragment}
+        `,
+        {
+            variables: {id: Number(id)},
+            deps: [id],
+            condition: !!id,
+            dataFn: data => data.branch,
         }
-    }, [client, id]);
+    )
+    const breadcrumbs = branch ? downToBranchBreadcrumbs({branch}) : []
+    const commands = branch ? [
+        <CloseCommand key="close" href={branchUri(branch)}/>,
+    ] : []
 
     return (
         <>
