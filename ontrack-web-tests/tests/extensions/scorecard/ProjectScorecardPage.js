@@ -30,6 +30,13 @@ export class ProjectScorecardPage {
     }
 
     /**
+     * What a set is — its marker, its labels — at the top of its section.
+     */
+    setExplanation(name) {
+        return this.page.getByTestId(`scorecard-set-explanation-${name}`)
+    }
+
+    /**
      * Card of one reading of a set.
      */
     reading(set, key) {

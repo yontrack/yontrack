@@ -194,14 +194,30 @@ ontrack:
 ## On the project page
 
 The project page has a **Scorecard** section: one row per reading, and one column per set —
-*Project*, then one per estate the project belongs to. Each cell gives the value and its sample
-count, and, in an estate with a target for the reading, whether it is *Met* or *Missed*. An
-unknown reading reads *Unknown*, with its reason on hover. The section says when the readings were
-last computed, carries the *Recompute* command, and links to the scorecard page of the project.
+*Project*, then *Estate: name* for each estate the project belongs to. Each cell gives the value
+and its sample count, and, in an estate with a target for the reading, whether it is *Met* or
+*Missed*. An unknown reading reads *Unknown*, with its reason on hover. The section says when the
+readings were last computed, carries the *Recompute* command, and links to the scorecard page of
+the project.
+
+The section explains itself:
+
+* the ⓘ next to a column says what the set is — the project on its own, or the estate with its
+  description, its marker and the labels which put the project in it;
+* the ⓘ next to a reading says what it measures — up to a promotion, up to an environment, or
+  both when the columns read it up to both;
+* when the project is in an estate, a line under the table says that there is one column per
+  estate, and that *Met* and *Missed* compare against that estate's target.
+
+The ⓘ opens on hover and on keyboard focus.
+
+![The Scorecard section, with the ⓘ of an estate column open](scorecard-section.png)
 
 The **scorecard page** of the project answers "why is this number what it is?". It has one part
-per set and a card per reading, with:
+per set, which says what the set is — its description, its marker and, for an estate, its labels —
+and a card per reading, with:
 
+* what the reading measures, up to the marker it was read up to;
 * the value, and a sparkline of its daily snapshots over the last 90 days, the target drawn as a
   dashed line and the unknown days left as gaps — a trend needs several days of snapshots;
 * the window, the branches read and whether they come from the branch model or are all of them;
@@ -210,6 +226,8 @@ per set and a card per reading, with:
   and maximum of a duration, the builds promoted out of those counted and the builds left out as in
   flight, the outages still open, the deployments done and failed, the builds passed or flaky, the
   test stamps read.
+
+![An estate on the scorecard page of a project](scorecard-page.png)
 
 The scorecard is on the desktop UI only: the [mobile UI](../mobile/index.md) does not show it.
 

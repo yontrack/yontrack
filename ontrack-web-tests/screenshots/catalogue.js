@@ -47,6 +47,10 @@ const SECURITY_SCAN = 'SECURITY.SCAN'
  * account that saved it, so a visitor lands on the built-in dashboard and would otherwise be
  * photographed looking at it.
  */
+/** `DemoContent.VISITS`, the demo's delivery scorecard, and one of its estates. */
+const SCORECARD_PROJECT = 'petclinic-visits'
+const ESTATE_PRODUCTION = 'Demo production'
+
 const DASHBOARD_UUID = '1c1f9c3e-8bfa-4a1f-8a0b-4e2f0b0d1a01'
 
 /**
@@ -133,6 +137,19 @@ const catalogue = [
         ready: async (page) => {
             // The rendering itself, not the panel: the cell is visible while still loading.
             await expect(page.getByTestId('semantic-content')).toContainText('Features')
+        },
+    },
+    {
+        slug: 'scorecard',
+        description: 'The delivery scorecard of a project: its readings, on its own and in each of its estates',
+        // The project page, addressed by name: the scorecard page is addressed by the project's
+        // id, which the seed does not fix.
+        path: `/display/project/${SCORECARD_PROJECT}`,
+        element: '[data-testid="project-scorecard"]',
+        ready: async (page) => {
+            // A value of an estate column: the seed computes the readings, and the estate columns
+            // come last, from the same query as the rest.
+            await expect(page.getByTestId(`scorecard-${ESTATE_PRODUCTION}-delivery.leadTime-value`)).toBeVisible()
         },
     },
     {

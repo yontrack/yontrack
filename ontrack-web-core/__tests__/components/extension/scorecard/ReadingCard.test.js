@@ -104,4 +104,19 @@ describe('A reading on the scorecard page', () => {
         expect(within(details()).getByText('None')).toBeInTheDocument()
         expect(screen.getByTestId('card-reading-unknown')).toHaveTextContent('Unknown')
     })
+
+    it('says what the reading measures, up to its marker', () => {
+        render(<ReadingCard reading={leadTime} testId="card"/>)
+        expect(screen.getByTestId('card-description')).toHaveTextContent(/first promotion at the marker level/)
+    })
+
+    it('says what the reading measures, up to an environment', () => {
+        render(<ReadingCard reading={{...leadTime, details: {...leadTime.details, markerKind: 'ENVIRONMENT'}}} testId="card"/>)
+        expect(screen.getByTestId('card-description')).toHaveTextContent(/first successful deployment/)
+    })
+
+    it('has no description for a reading out of the catalogue', () => {
+        render(<ReadingCard reading={{...leadTime, key: 'some.other'}} testId="card"/>)
+        expect(screen.queryByTestId('card-description')).not.toBeInTheDocument()
+    })
 })

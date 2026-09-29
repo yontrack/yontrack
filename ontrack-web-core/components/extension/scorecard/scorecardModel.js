@@ -16,14 +16,40 @@ const HIGHER_IS_BETTER = 'HIGHER_IS_BETTER'
 /**
  * The readings of the catalogue, in its order, with their name, unit, and the way they are better
  * (the direction a target judges them in, fixed by the reading).
+ *
+ * `description` says what the reading measures — up to a promotion for a delivery reading — and
+ * `environmentDescription` what a delivery reading measures up to an environment. The wording
+ * follows the user guide of the scorecard (`ontrack-docs/docs/content/scorecard/scorecard.md`).
  */
 export const READINGS = [
-    {key: 'delivery.leadTime', name: 'Lead time', unit: DURATION, marker: true, direction: LOWER_IS_BETTER},
-    {key: 'delivery.frequency', name: 'Frequency', unit: PER_WEEK, marker: true, direction: HIGHER_IS_BETTER},
-    {key: 'delivery.successRate', name: 'Success rate', unit: PERCENT, marker: true, direction: HIGHER_IS_BETTER},
-    {key: 'delivery.mttr', name: 'Time to restore', unit: DURATION, marker: true, direction: LOWER_IS_BETTER},
-    {key: 'quality.testPassRate', name: 'Test pass rate', unit: PERCENT, marker: false, direction: HIGHER_IS_BETTER},
-    {key: 'quality.testFlakiness', name: 'Test flakiness', unit: PERCENT, marker: false, direction: LOWER_IS_BETTER},
+    {
+        key: 'delivery.leadTime', name: 'Lead time', unit: DURATION, marker: true, direction: LOWER_IS_BETTER,
+        description: 'Median time from the creation of a build to its first promotion at the marker level.',
+        environmentDescription: 'Median time from the creation of a build to the end of its first successful deployment.',
+    },
+    {
+        key: 'delivery.frequency', name: 'Frequency', unit: PER_WEEK, marker: true, direction: HIGHER_IS_BETTER,
+        description: 'Promotions at the marker level, per week.',
+        environmentDescription: 'Successful deployments per week, redeployments included.',
+    },
+    {
+        key: 'delivery.successRate', name: 'Success rate', unit: PERCENT, marker: true, direction: HIGHER_IS_BETTER,
+        description: 'Share of the builds created in the window which were promoted at the marker level, leaving out the builds still in flight.',
+        environmentDescription: 'Successful deployments out of the successful and failed ones; the cancelled ones are left out.',
+    },
+    {
+        key: 'delivery.mttr', name: 'Time to restore', unit: DURATION, marker: true, direction: LOWER_IS_BETTER,
+        description: 'Median time the path to the marker level stays broken: from the first unpromoted build to the next promotion.',
+        environmentDescription: 'Median time from a failed deployment to the next successful one in the same slot.',
+    },
+    {
+        key: 'quality.testPassRate', name: 'Test pass rate', unit: PERCENT, marker: false, direction: HIGHER_IS_BETTER,
+        description: 'Share of the builds created in the window whose latest run passed, on every test stamp they were run on.',
+    },
+    {
+        key: 'quality.testFlakiness', name: 'Test flakiness', unit: PERCENT, marker: false, direction: LOWER_IS_BETTER,
+        description: 'Share of the builds created in the window where a test stamp failed, then passed.',
+    },
 ]
 
 const readingOf = (key) => READINGS.find(it => it.key === key)
@@ -45,6 +71,61 @@ export const readingRank = (key) => {
  * Name of a reading, its key for a reading out of the catalogue.
  */
 export const readingName = (key) => readingOf(key)?.name ?? key
+
+const MARKER_KINDS = ['PROMOTION', 'ENVIRONMENT']
+
+/**
+ * What a reading measures, in words, up to a marker of the given kind (`PROMOTION` when not
+ * given); `null` out of the catalogue.
+ */
+export const readingDescription = (key, markerKind) => {
+    const reading = readingOf(key)
+    if (!reading) return null
+    return (markerKind === 'ENVIRONMENT' && reading.environmentDescription) || reading.description
+}
+
+/**
+ * The kinds of marker some readings were read up to, from their details, promotion first.
+ */
+export const readingMarkerKinds = (readings) => {
+    const kinds = new Set((readings ?? []).map(it => it?.details?.markerKind).filter(it => it))
+    return MARKER_KINDS.filter(it => kinds.has(it))
+}
+
+const MARKER_KIND_LABELS = {
+    PROMOTION: 'Up to a promotion',
+    ENVIRONMENT: 'Up to an environment',
+}
+
+/**
+ * What a reading measures, as a list of `{label, text}`, for the readings of several sets read up
+ * to the given kinds of marker: one description with no label when only one applies, one per kind
+ * of marker, labelled, when a delivery reading is read up to both.
+ */
+export const readingDescriptions = (key, markerKinds) => {
+    const reading = readingOf(key)
+    if (!reading) return []
+    const kinds = markerKinds ?? []
+    if (reading.environmentDescription && kinds.length > 1) {
+        return kinds.map(kind => ({label: MARKER_KIND_LABELS[kind], text: readingDescription(key, kind)}))
+    }
+    return [{label: null, text: readingDescription(key, kinds[0])}]
+}
+
+/**
+ * Title of a set of readings: `Project` for the no-estate set, `Estate: <name>` for an estate.
+ */
+export const setTitle = (set) => set.estate ? `Estate: ${set.estate.name}` : 'Project'
+
+/**
+ * What the no-estate set is, in words.
+ */
+export const NO_ESTATE_SET_TEXT = 'This project read on its own: each branch up to its last promotion level. Never judged against a target.'
+
+/**
+ * The marker of the no-estate set, in words.
+ */
+export const NO_ESTATE_MARKER_TEXT = 'Last promotion level of each branch'
 
 /**
  * Whether a reading is read up to the marker. The test readings read the branches in scope and

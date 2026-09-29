@@ -4,6 +4,7 @@ import ReadingValue from "@components/extension/scorecard/ReadingValue";
 import ReadingSparkline from "@components/extension/scorecard/ReadingSparkline";
 import {
     markerText,
+    readingDescription,
     readingDetailItems,
     readingName,
     readingUsesMarker,
@@ -15,13 +16,14 @@ import {
 const timestampFormat = "YYYY MMM DD, HH:mm"
 
 /**
- * One reading of the scorecard page: its value and trend, and what explains it — the window, the
- * branches which fed it, the marker it was read up to, the target, and its details.
+ * One reading of the scorecard page: what it measures, its value and trend, and what explains it —
+ * the window, the branches which fed it, the marker it was read up to, the target, and its details.
  */
 export default function ReadingCard({reading, testId}) {
 
     const days = windowDays(reading)
     const target = targetText(reading)
+    const description = readingDescription(reading.key, reading.details?.markerKind)
 
     const items = [
         {
@@ -69,6 +71,12 @@ export default function ReadingCard({reading, testId}) {
             style={{height: '100%'}}
         >
             <Space orientation="vertical" size={12} style={{width: '100%'}}>
+                {
+                    description &&
+                    <Typography.Text type="secondary" data-testid={testId ? `${testId}-description` : undefined}>
+                        {description}
+                    </Typography.Text>
+                }
                 <ReadingValue reading={reading} testId={testId ? `${testId}-reading` : undefined}/>
                 <ReadingSparkline reading={reading}/>
                 <Descriptions

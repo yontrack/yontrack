@@ -74,13 +74,24 @@ test('project page Scorecard section recomputes the readings and shows them', as
     await expect(section.getByTestId('scorecard-Project-delivery.mttr-no-failure')).toHaveText('No failure in window')
     await expect(section.getByTestId('scorecard-Project-delivery.mttr-unknown')).toHaveCount(0)
 
+    // The column and the readings explain themselves
+    await section.getByRole('button', {name: 'About the Project column'}).hover()
+    await expect(page.getByTestId('scorecard-set-info-Project')).toContainText('This project read on its own')
+    await section.getByRole('button', {name: 'About Lead time'}).hover()
+    await expect(page.getByTestId('scorecard-reading-info-delivery.leadTime')).toContainText('first promotion at the marker level')
+    // No estate, no legend for the estate columns
+    await expect(section.getByTestId('scorecard-legend')).toHaveCount(0)
+
     // The details of each number are on the scorecard page
     await section.getByRole('link', {name: 'Details'}).click()
     const scorecardPage = new ProjectScorecardPage(page, project)
     await scorecardPage.expectOnPage()
 
+    await expect(scorecardPage.setExplanation('Project')).toContainText('Marker: Last promotion level of each branch')
+
     const leadTime = scorecardPage.reading('Project', 'delivery.leadTime')
     await expect(leadTime).toBeVisible()
+    await expect(leadTime.getByTestId('reading-Project-delivery.leadTime-description')).toContainText('first promotion at the marker level')
     await expect(leadTime.getByTestId('reading-Project-delivery.leadTime-details')).toContainText('90 days')
     await expect(leadTime.getByTestId('reading-Project-delivery.leadTime-details')).toContainText('main (all branches, no branch model)')
     await expect(leadTime.getByTestId('reading-Project-delivery.leadTime-details')).toContainText('Promotion: GOLD on main')
@@ -138,7 +149,14 @@ test('project page Scorecard section judges the readings of an estate against it
 
         const section = page.getByTestId('project-scorecard')
         await expect(section.getByRole('columnheader', {name: 'Project'})).toBeVisible()
-        await expect(section.getByRole('columnheader', {name: estate.name})).toBeVisible()
+        await expect(section.getByRole('columnheader', {name: `Estate: ${estate.name}`})).toBeVisible()
+        await expect(section.getByTestId('scorecard-legend')).toContainText('One column per estate')
+
+        // The estate column says what reads the project in it
+        await section.getByRole('button', {name: `About the Estate: ${estate.name} column`}).hover()
+        const estateInfo = page.getByTestId(`scorecard-set-info-${estate.name}`)
+        await expect(estateInfo).toContainText('Marker: Promotion: GOLD')
+        await expect(estateInfo.getByTestId(`label-${label.category}:${label.name}`)).toBeVisible()
 
         await expect(section.getByTestId(`scorecard-${estate.name}-delivery.leadTime`)).toContainText('Met ≤ 1d')
         await expect(section.getByTestId(`scorecard-${estate.name}-delivery.frequency`)).toContainText('Missed ≥ 5 / week')
@@ -153,6 +171,8 @@ test('project page Scorecard section judges the readings of an estate against it
         const scorecardPage = new ProjectScorecardPage(page, project)
         await scorecardPage.expectOnPage()
         await expect(scorecardPage.set(estate.name)).toBeVisible()
+        await expect(scorecardPage.setExplanation(estate.name)).toContainText('Marker: Promotion: GOLD')
+        await expect(scorecardPage.setExplanation(estate.name).getByTestId(`label-${label.category}:${label.name}`)).toBeVisible()
         await expect(scorecardPage.reading(estate.name, 'delivery.leadTime')
             .getByTestId(`reading-${estate.name}-delivery.leadTime-details`)).toContainText('≤ 1d')
     } finally {

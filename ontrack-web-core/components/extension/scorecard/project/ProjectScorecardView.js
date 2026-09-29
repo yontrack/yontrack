@@ -11,12 +11,14 @@ import {useQuery} from "@components/services/GraphQL";
 import {useRefresh} from "@components/common/RefreshUtils";
 import {isAuthorized} from "@components/common/authorizations";
 import {gqlProjectContentFragment} from "@components/projects/ProjectGraphQLFragments";
-import {scorecardRows} from "@components/extension/scorecard/scorecardModel";
+import {scorecardRows, setTitle} from "@components/extension/scorecard/scorecardModel";
+import SetExplanation from "@components/extension/scorecard/SetExplanation";
 import {ScorecardRecomputeButton, useScorecardRecompute} from "@components/extension/scorecard/ScorecardRecompute";
 import ReadingCard from "@components/extension/scorecard/project/ReadingCard";
 
 const HISTORY_DAYS = 90
 
+// `labelFragment`, used by the labels of the estates, comes with `ProjectContent`
 export const gqlProjectScorecard = gql`
     query ProjectScorecard($id: Int!, $days: Int!) {
         project(id: $id) {
@@ -32,6 +34,15 @@ export const gqlProjectScorecard = gql`
                     estate {
                         name
                         description
+                        labels {
+                            ...labelFragment
+                        }
+                        marker {
+                            kind
+                            levelName
+                            environment
+                            qualifier
+                        }
                     }
                     readings {
                         key
@@ -57,14 +68,6 @@ export const gqlProjectScorecard = gql`
     }
     ${gqlProjectContentFragment}
 `
-
-/**
- * What the set is read against, in words.
- */
-const setDescription = (set) =>
-    set.estate ?
-        (set.estate.description || `Read against the marker and the targets of the estate ${set.estate.name}.`) :
-        'Read with no estate: each branch up to its last promotion level, and never judged against a target.'
 
 /**
  * The scorecard page of a project: per set, each reading with the trend of its daily snapshots,
@@ -140,11 +143,11 @@ export default function ProjectScorecardView({id}) {
                             <PageSection
                                 key={set.name}
                                 id={`scorecard-set-${set.name}`}
-                                title={set.estate ? `Estate ${set.name}` : 'Project'}
+                                title={setTitle(set)}
                                 padding={true}
                             >
                                 <Space orientation="vertical" size={16} style={{width: '100%'}}>
-                                    <Typography.Text type="secondary">{setDescription(set)}</Typography.Text>
+                                    <SetExplanation set={set} testId={`scorecard-set-explanation-${set.name}`}/>
                                     {
                                         set.readings.length === 0 ?
                                             <Typography.Text type="secondary">

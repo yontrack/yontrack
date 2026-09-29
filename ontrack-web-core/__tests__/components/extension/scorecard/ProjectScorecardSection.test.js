@@ -1,5 +1,5 @@
 import "@testing-library/jest-dom"
-import {act, fireEvent, render, screen, within} from "@testing-library/react"
+import {act, fireEvent, render, screen, waitFor, within} from "@testing-library/react"
 import ProjectScorecardSection from "@components/extension/scorecard/project/ProjectScorecardSection"
 
 // antd's Table asks for the media queries of its responsive columns, which jsdom does not answer
@@ -46,17 +46,22 @@ const scorecard = {
             name: 'Project',
             estate: null,
             readings: [
-                reading({key: 'delivery.leadTime', value: 7200, details: {count: 12}}),
-                reading({key: 'delivery.frequency', value: 3.5, direction: 'HIGHER_IS_BETTER', details: {count: 45}}),
+                reading({key: 'delivery.leadTime', value: 7200, details: {count: 12, markerKind: 'PROMOTION'}}),
+                reading({key: 'delivery.frequency', value: 3.5, direction: 'HIGHER_IS_BETTER', details: {count: 45, markerKind: 'PROMOTION'}}),
                 reading({key: 'delivery.mttr', basis: 'UNKNOWN', unknownReason: 'NO_FAILURE', details: {count: 0, open: 0}}),
                 reading({key: 'quality.testPassRate', basis: 'UNKNOWN', unknownReason: 'NO_TEST_STAMP', direction: 'HIGHER_IS_BETTER', details: {testStamps: []}}),
             ],
         },
         {
             name: 'Demo products',
-            estate: {name: 'Demo products'},
+            estate: {
+                name: 'Demo products',
+                description: 'The products we ship',
+                labels: [{id: 1, category: 'portfolio', name: 'product', color: '#00AA00', foregroundColor: '#FFFFFF'}],
+                marker: {kind: 'ENVIRONMENT', environment: 'production', qualifier: ''},
+            },
             readings: [
-                reading({key: 'delivery.leadTime', value: 7200, target: 86400, targetMet: true, details: {count: 12}}),
+                reading({key: 'delivery.leadTime', value: 7200, target: 86400, targetMet: true, details: {count: 12, markerKind: 'ENVIRONMENT'}}),
                 reading({key: 'delivery.frequency', value: 3.5, direction: 'HIGHER_IS_BETTER', target: 5, targetMet: false, details: {count: 45}}),
             ],
         },
@@ -95,8 +100,8 @@ describe('Scorecard section of the project page', () => {
     it('has a column for the project and one per estate, and a row per reading', () => {
         renderSection()
         const table = screen.getByTestId('scorecard-table')
-        expect(within(table).getByRole('columnheader', {name: 'Project'})).toBeInTheDocument()
-        expect(within(table).getByRole('columnheader', {name: 'Demo products'})).toBeInTheDocument()
+        expect(within(table).getByRole('columnheader', {name: /^Project/})).toBeInTheDocument()
+        expect(within(table).getByRole('columnheader', {name: /^Estate: Demo products/})).toBeInTheDocument()
         const rows = table.querySelectorAll('tbody tr.ant-table-row')
         expect(rows).toHaveLength(4)
         expect(rows[0]).toHaveTextContent('Lead time')
@@ -180,5 +185,53 @@ describe('Scorecard section of the project page', () => {
         })
         expect(screen.getByText('Not allowed')).toBeInTheDocument()
         expect(screen.getByTestId('scorecard-recompute')).toHaveTextContent('Recompute')
+    })
+    it('explains the no-estate column', async () => {
+        renderSection()
+        fireEvent.mouseEnter(screen.getByRole('button', {name: 'About the Project column'}))
+        expect(await screen.findByText(/This project read on its own/)).toBeInTheDocument()
+    })
+
+    it('explains an estate column: its description, its marker, and the labels selecting the project', async () => {
+        renderSection()
+        fireEvent.mouseEnter(screen.getByRole('button', {name: 'About the Estate: Demo products column'}))
+        const info = await screen.findByTestId('scorecard-set-info-Demo products')
+        expect(info).toHaveTextContent('The products we ship')
+        expect(info).toHaveTextContent('Environment: production')
+        expect(within(info).getByTestId('label-portfolio:product')).toBeInTheDocument()
+    })
+
+    it('opens an explanation on focus, for the keyboard', async () => {
+        renderSection()
+        fireEvent.focus(screen.getByRole('button', {name: 'About the Project column'}))
+        expect(await screen.findByText(/This project read on its own/)).toBeInTheDocument()
+    })
+
+    it('explains a reading, up to each kind of marker its sets are read up to', async () => {
+        renderSection()
+        fireEvent.mouseEnter(screen.getByRole('button', {name: 'About Lead time'}))
+        const info = await screen.findByTestId('scorecard-reading-info-delivery.leadTime')
+        expect(info).toHaveTextContent('Up to a promotion')
+        expect(info).toHaveTextContent(/first promotion at the marker level/)
+        expect(info).toHaveTextContent('Up to an environment')
+        expect(info).toHaveTextContent(/first successful deployment/)
+    })
+
+    it('explains a reading read up to one kind of marker only once', async () => {
+        renderSection()
+        fireEvent.mouseEnter(screen.getByRole('button', {name: 'About Frequency'}))
+        const info = await screen.findByTestId('scorecard-reading-info-delivery.frequency')
+        await waitFor(() => expect(info).toHaveTextContent(/Promotions at the marker level/))
+        expect(info).not.toHaveTextContent('Up to')
+    })
+
+    it('says what the estate columns are', () => {
+        renderSection()
+        expect(screen.getByTestId('scorecard-legend')).toHaveTextContent(/One column per estate/)
+    })
+
+    it('has no legend with no estate column', () => {
+        renderSection({data: {sets: [scorecard.sets[0]]}})
+        expect(screen.queryByTestId('scorecard-legend')).not.toBeInTheDocument()
     })
 })

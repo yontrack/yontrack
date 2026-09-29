@@ -3,6 +3,7 @@ import {
     durationSeconds,
     estateFormValues,
     estateInput,
+    estateMarkerDescription,
     estateMarkerText,
     estateReadingConfigTexts,
     latestEstateComputedAt,
@@ -215,6 +216,17 @@ describe('estateMarkerText', () => {
     it('names an environment marker, with its qualifier if any', () => {
         expect(estateMarkerText({kind: 'ENVIRONMENT', environment: 'production', qualifier: ''})).toBe('Environment: production')
         expect(estateMarkerText({kind: 'ENVIRONMENT', environment: 'production', qualifier: 'eu'})).toBe('Environment: production [eu]')
+    })
+})
+
+describe('estateMarkerDescription', () => {
+    it('explains the default marker', () => {
+        expect(estateMarkerDescription(null)).toBe('Default: the highest-ordered environment where the project has a slot, else the last promotion level of each branch')
+    })
+
+    it('names any other marker', () => {
+        expect(estateMarkerDescription({kind: 'PROMOTION', levelName: 'GOLD'})).toBe('Promotion: GOLD')
+        expect(estateMarkerDescription({kind: 'ENVIRONMENT', environment: 'production', qualifier: 'eu'})).toBe('Environment: production [eu]')
     })
 })
 

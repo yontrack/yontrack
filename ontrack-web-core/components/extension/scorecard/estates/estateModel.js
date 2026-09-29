@@ -141,6 +141,14 @@ export const estateMarkerText = (marker) => {
 }
 
 /**
+ * The marker of an estate, explained: what the default marker reads up to, the name of any other.
+ */
+export const estateMarkerDescription = (marker) =>
+    marker ?
+        estateMarkerText(marker) :
+        'Default: the highest-ordered environment where the project has a slot, else the last promotion level of each branch'
+
+/**
  * The configured readings of an estate, in the catalogue order, each with its name and its target
  * and window in words: `≤ 1d, over 30 days`.
  */

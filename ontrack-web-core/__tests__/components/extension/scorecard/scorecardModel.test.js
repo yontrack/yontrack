@@ -3,9 +3,14 @@ import {
     formatReadingValue,
     isComputedAfter,
     latestComputedAt,
+    READINGS,
+    readingDescription,
+    readingDescriptions,
     readingDetailItems,
     readingJudgement,
+    readingMarkerKinds,
     readingName,
+    setTitle,
     readingUsesMarker,
     sampleCount,
     sampleCountText,
@@ -94,6 +99,90 @@ describe('readingName', () => {
         expect(readingName('quality.testPassRate')).toEqual('Test pass rate')
         expect(readingName('quality.testFlakiness')).toEqual('Test flakiness')
         expect(readingName('some.other')).toEqual('some.other')
+    })
+})
+
+describe('readingDescription', () => {
+
+    it('describes every reading of the catalogue', () => {
+        READINGS.forEach(({key}) => {
+            expect(readingDescription(key)).toEqual(expect.any(String))
+            expect(readingDescription(key, 'ENVIRONMENT')).toEqual(expect.any(String))
+        })
+    })
+
+    it('describes a delivery reading up to a promotion by default', () => {
+        expect(readingDescription('delivery.leadTime')).toMatch(/first promotion/)
+        expect(readingDescription('delivery.leadTime', 'PROMOTION')).toMatch(/first promotion/)
+        expect(readingDescription('delivery.leadTime', null)).toMatch(/first promotion/)
+    })
+
+    it('describes a delivery reading up to an environment', () => {
+        READINGS.filter(it => it.marker).forEach(({key}) => {
+            expect(readingDescription(key, 'ENVIRONMENT')).not.toEqual(readingDescription(key, 'PROMOTION'))
+        })
+        expect(readingDescription('delivery.leadTime', 'ENVIRONMENT')).toMatch(/deployment/)
+    })
+
+    it('describes a test reading the same way whatever the marker', () => {
+        expect(readingDescription('quality.testPassRate', 'ENVIRONMENT')).toEqual(readingDescription('quality.testPassRate', 'PROMOTION'))
+        expect(readingDescription('quality.testFlakiness', 'ENVIRONMENT')).toEqual(readingDescription('quality.testFlakiness', 'PROMOTION'))
+    })
+
+    it('has no description for a reading out of the catalogue', () => {
+        expect(readingDescription('some.other')).toBeNull()
+        expect(readingDescription('some.other', 'ENVIRONMENT')).toBeNull()
+    })
+})
+
+describe('readingMarkerKinds', () => {
+
+    it('gives the marker kinds the readings were read up to, promotion first', () => {
+        expect(readingMarkerKinds([
+            reading({details: {markerKind: 'ENVIRONMENT'}}),
+            reading({details: {markerKind: 'PROMOTION'}}),
+            reading({details: {markerKind: 'ENVIRONMENT'}}),
+        ])).toEqual(['PROMOTION', 'ENVIRONMENT'])
+    })
+
+    it('ignores the readings which do not say', () => {
+        expect(readingMarkerKinds([reading({details: {}}), reading({details: null}), undefined])).toEqual([])
+    })
+})
+
+describe('readingDescriptions', () => {
+
+    it('gives the one description which applies', () => {
+        expect(readingDescriptions('delivery.leadTime', ['ENVIRONMENT'])).toEqual([
+            {label: null, text: readingDescription('delivery.leadTime', 'ENVIRONMENT')},
+        ])
+        expect(readingDescriptions('delivery.leadTime', [])).toEqual([
+            {label: null, text: readingDescription('delivery.leadTime', 'PROMOTION')},
+        ])
+    })
+
+    it('gives both descriptions of a delivery reading read up to both kinds of marker', () => {
+        expect(readingDescriptions('delivery.leadTime', ['PROMOTION', 'ENVIRONMENT'])).toEqual([
+            {label: 'Up to a promotion', text: readingDescription('delivery.leadTime', 'PROMOTION')},
+            {label: 'Up to an environment', text: readingDescription('delivery.leadTime', 'ENVIRONMENT')},
+        ])
+    })
+
+    it('gives one description of a test reading, whatever the markers', () => {
+        expect(readingDescriptions('quality.testPassRate', ['PROMOTION', 'ENVIRONMENT'])).toEqual([
+            {label: null, text: readingDescription('quality.testPassRate')},
+        ])
+    })
+
+    it('has nothing to say of a reading out of the catalogue', () => {
+        expect(readingDescriptions('some.other', ['PROMOTION'])).toEqual([])
+    })
+})
+
+describe('setTitle', () => {
+    it('names the no-estate set Project, and an estate set after its estate', () => {
+        expect(setTitle({name: 'Project', estate: null})).toEqual('Project')
+        expect(setTitle({name: 'Demo products', estate: {name: 'Demo products'}})).toEqual('Estate: Demo products')
     })
 })
 
