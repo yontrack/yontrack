@@ -40,6 +40,8 @@ val deprecationMarkersTest = tasks.register<Test>("deprecationMarkersTest") {
             include("ontrack-docs/docs/content/appendix/migration-to-v6.md")
             exclude("**/build/**", "**/node_modules/**", "**/.*/**", "**/src/test/resources/**")
             exclude("ontrack-web-core/coverage/**", "ontrack-web-core/out/**")
+            // The outputs of :ontrack-docs:buildDocs - Gradle refuses an input tree overlapping them
+            exclude("ontrack-docs/site/**", "ontrack-docs/.venv/**")
         }
     ).withPathSensitivity(PathSensitivity.RELATIVE).withPropertyName("repositorySources")
 }

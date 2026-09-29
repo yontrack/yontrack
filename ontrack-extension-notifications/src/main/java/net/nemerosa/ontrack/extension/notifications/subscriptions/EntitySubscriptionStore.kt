@@ -1,11 +1,8 @@
 package net.nemerosa.ontrack.extension.notifications.subscriptions
 
-import tools.jackson.databind.node.ObjectNode
 import net.nemerosa.ontrack.extension.notifications.channels.NotificationChannelRegistry
 import net.nemerosa.ontrack.extension.notifications.channels.getChannel
 import net.nemerosa.ontrack.json.format
-import net.nemerosa.ontrack.json.getRequiredTextField
-import net.nemerosa.ontrack.json.getTextField
 import net.nemerosa.ontrack.model.events.Event
 import net.nemerosa.ontrack.model.structure.*
 import org.springframework.stereotype.Component
@@ -123,26 +120,6 @@ class EntitySubscriptionStore(
             filter = filter,
             code = code,
         )
-    }
-
-    /**
-     * Moves all records from entity_data_store to entity_store
-     * and generates names.
-     */
-    fun migrateSubscriptionNames() {
-        entityStore.migrateFromEntityDataStore(
-            category = ENTITY_STORE,
-        ) { _, data ->
-            val generatedName = EventSubscription.computeName(
-                events = data.path("events").values().map { it.asText() },
-                keywords = data.getTextField("keywords"),
-                channel = data.getRequiredTextField("channel"),
-                channelConfig = data.path("channelConfig"),
-                contentTemplate = data.getTextField("contentTemplate"),
-            )
-            (data as ObjectNode).put("name", generatedName)
-            generatedName to data
-        }
     }
 
     fun clearAll() {

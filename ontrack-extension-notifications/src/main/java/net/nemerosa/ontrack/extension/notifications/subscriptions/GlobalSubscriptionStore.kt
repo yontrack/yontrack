@@ -1,11 +1,8 @@
 package net.nemerosa.ontrack.extension.notifications.subscriptions
 
-import tools.jackson.databind.node.ObjectNode
 import net.nemerosa.ontrack.extension.notifications.channels.NotificationChannelRegistry
 import net.nemerosa.ontrack.extension.notifications.channels.getChannel
 import net.nemerosa.ontrack.json.format
-import net.nemerosa.ontrack.json.getRequiredTextField
-import net.nemerosa.ontrack.json.getTextField
 import net.nemerosa.ontrack.model.support.StorageService
 import org.springframework.stereotype.Component
 
@@ -107,38 +104,6 @@ class GlobalSubscriptionStore(
             queryVariables = queryVariables,
         ) { _, record ->
             code(record)
-        }
-    }
-
-    /**
-     * Migration of all existing subscriptions to have a name
-     */
-    internal fun migrateSubscriptionNames() {
-        // Getting the whole store in memory
-        val store = storageService.getData(GLOBAL_STORE)
-        // Deleting the whole store
-        storageService.clear(GLOBAL_STORE)
-        // Converting each entry
-        val entries = store.values.associate { record ->
-            val name = record.path("name").asText()
-            if (name.isNullOrBlank()) {
-                val generatedName = EventSubscription.computeName(
-                    events = record.path("events").values().map { it.asText() },
-                    keywords = record.getTextField("keywords"),
-                    channel = record.getRequiredTextField("channel"),
-                    channelConfig = record.path("channelConfig"),
-                    contentTemplate = record.getTextField("contentTemplate"),
-                )
-                (record as ObjectNode).put("name", generatedName)
-                generatedName to record
-            } else {
-                // Name already filled in, skipping
-                name to record
-            }
-        }
-        // Saving the entries back
-        entries.forEach { (name, record) ->
-            storageService.store(GLOBAL_STORE, name, record)
         }
     }
 

@@ -15,7 +15,10 @@ users of the **KDSL** client, and those who configure it **as code** (CasC):
 * **From any 5.x release** — Yontrack 6.0 upgrades an installation running any 5.x release. Its
   database migrations run at its first start, whichever 5.x version it starts from.
 * **From 4.x** — upgrade to a 5.x release first, and start it once, before upgrading to 6.0: see
-  [Migration from V4](migration-from-v4.md).
+  [Migration from V4](migration-from-v4.md). Yontrack 6 checks it at startup, before it migrates
+  anything: on a database which has never been started by a 5.x release, it stops with a message
+  telling to *upgrade to any 5.x release first*, and leaves the database as it is. A new
+  installation, on an empty database, starts normally.
 * **Check the deprecated items before upgrading** — the latest 5.5.x release counts every use of an
   item Yontrack 6 removes, in the `ontrack_deprecated_usage_total` metric, tagged by `surface` and
   `item`, and logs a `WARN` the first time each one is used. Upgrade to it, let it run through the

@@ -154,7 +154,9 @@ branch it comes down to:
   code-based data conversions present in 5.0.0 — startup migrations, readers of legacy stored
   formats — and keeps those added after 5.0.0 until V7, unless a Flyway migration converts the
   data instead. Aliases on input only (API, CasC) are not data conversions: they follow the
-  deprecation rule.
+  deprecation rule. The floor is enforced at startup, before Flyway runs, by `UpgradeFloor` in
+  `ontrack-service` (`UpgradeFloorIT`): the next major raises its `FLOOR` to the last Flyway
+  version of this one's `.0`.
 * The marker test, `DeprecationMarkersRepositoryTest` in `ontrack-model`, checks the markers and
   the migration page on every `./gradlew test`. Its baseline
   (`ontrack-model/src/test/resources/deprecation/markers-baseline.txt`) lists the items which did

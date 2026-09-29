@@ -14,8 +14,9 @@ import org.springframework.stereotype.Component
  * `token` field.
  *
  * Configurations live as encrypted JSON in the `CONFIGURATIONS` table, not in columns, so this is not a
- * Flyway migration but a [StartupService] rewriting the stored JSON - exactly as
- * `GitHubConfigurationTokenMigration` does.
+ * Flyway migration but a [StartupService] rewriting the stored JSON through [ConfigurationRepository.migrate].
+ *
+ * Added in 5.5.0, after the 6.0 upgrade floor (5.0.0): kept until V7 (ADR 0018, *The upgrade floor*).
  *
  * `password` already held a personal access token in practice: the client passed it straight through as the
  * PAT and the configuration page already called it "Token". So the value is **moved as it stands** - still

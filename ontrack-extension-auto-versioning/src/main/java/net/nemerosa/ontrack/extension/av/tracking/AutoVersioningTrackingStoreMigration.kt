@@ -12,6 +12,8 @@ import javax.sql.DataSource
 
 /**
  * Migration of the auto-versioning tracking into a table.
+ *
+ * Added in 5.0.23, after the 6.0 upgrade floor (5.0.0): kept until V7 (ADR 0018, *The upgrade floor*).
  */
 @Component
 class AutoVersioningTrackingStoreMigration(
