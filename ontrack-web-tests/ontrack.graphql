@@ -2183,8 +2183,6 @@ type EventSubscriptionPayload {
   disabled: Boolean
   "List of events types to subscribe to"
   events: [String!]!
-  "Name of the subscription"
-  id: String @deprecated(reason : "Removed in V6. Use name instead. See #1927")
   "Optional space-separated list of tokens to look for in the events"
   keywords: String
   "Unique name for this subscription"
@@ -12390,8 +12388,8 @@ input SubscribeBranchToEventsInput {
   events: [String!]!
   "Optional space-separated list of tokens to look for in the events"
   keywords: String
-  "Unique name of the subscription in its scope. Omitting it is deprecated: it is required in V6."
-  name: String
+  "Unique name of the subscription in its scope"
+  name: String!
   "Project name"
   project: String!
 }
@@ -12412,8 +12410,8 @@ input SubscribeBuildToEventsInput {
   events: [String!]!
   "Optional space-separated list of tokens to look for in the events"
   keywords: String
-  "Unique name of the subscription in its scope. Omitting it is deprecated: it is required in V6."
-  name: String
+  "Unique name of the subscription in its scope"
+  name: String!
   "Project name"
   project: String!
 }
@@ -12430,8 +12428,8 @@ input SubscribeProjectToEventsInput {
   events: [String!]!
   "Optional space-separated list of tokens to look for in the events"
   keywords: String
-  "Unique name of the subscription in its scope. Omitting it is deprecated: it is required in V6."
-  name: String
+  "Unique name of the subscription in its scope"
+  name: String!
   "Project name"
   project: String!
 }
@@ -12450,8 +12448,8 @@ input SubscribePromotionLevelToEventsInput {
   events: [String!]!
   "Optional space-separated list of tokens to look for in the events"
   keywords: String
-  "Unique name of the subscription in its scope. Omitting it is deprecated: it is required in V6."
-  name: String
+  "Unique name of the subscription in its scope"
+  name: String!
   "Project name"
   project: String!
   "Promotion name"
@@ -12474,8 +12472,8 @@ input SubscribePromotionRunToEventsInput {
   events: [String!]!
   "Optional space-separated list of tokens to look for in the events"
   keywords: String
-  "Unique name of the subscription in its scope. Omitting it is deprecated: it is required in V6."
-  name: String
+  "Unique name of the subscription in its scope"
+  name: String!
   "Project name"
   project: String!
   "Promotion name"
@@ -12494,8 +12492,8 @@ input SubscribeToEventsInput {
   events: [String!]!
   "Optional space-separated list of tokens to look for in the events"
   keywords: String
-  "Unique name of the subscription in its scope. Omitting it is deprecated: it is required in V6."
-  name: String
+  "Unique name of the subscription in its scope"
+  name: String!
   "Target project entity (null for global events)"
   projectEntity: ProjectEntityIDInput
 }
@@ -12516,8 +12514,8 @@ input SubscribeValidationRunToEventsInput {
   events: [String!]!
   "Optional space-separated list of tokens to look for in the events"
   keywords: String
-  "Unique name of the subscription in its scope. Omitting it is deprecated: it is required in V6."
-  name: String
+  "Unique name of the subscription in its scope"
+  name: String!
   "Project name"
   project: String!
   "Run name"
@@ -12540,8 +12538,8 @@ input SubscribeValidationStampToEventsInput {
   events: [String!]!
   "Optional space-separated list of tokens to look for in the events"
   keywords: String
-  "Unique name of the subscription in its scope. Omitting it is deprecated: it is required in V6."
-  name: String
+  "Unique name of the subscription in its scope"
+  name: String!
   "Project name"
   project: String!
   "Validation name"

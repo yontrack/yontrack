@@ -1,6 +1,6 @@
 package net.nemerosa.ontrack.extension.notifications.subscriptions
 
-import io.micrometer.core.instrument.MeterRegistry
+import graphql.ErrorType
 import net.nemerosa.ontrack.extension.notifications.AbstractNotificationTestSupport
 import net.nemerosa.ontrack.extension.notifications.mock.MockNotificationChannelConfig
 import net.nemerosa.ontrack.it.AsAdminTest
@@ -8,33 +8,21 @@ import net.nemerosa.ontrack.json.asJson
 import net.nemerosa.ontrack.json.getRequiredBooleanField
 import net.nemerosa.ontrack.json.getRequiredJsonField
 import net.nemerosa.ontrack.json.getRequiredTextField
-import net.nemerosa.ontrack.model.deprecation.DeprecationMetrics
 import net.nemerosa.ontrack.model.events.EventFactory
 import net.nemerosa.ontrack.model.structure.toProjectEntityID
 import net.nemerosa.ontrack.test.TestUtils.uid
 import org.junit.jupiter.api.Test
-import org.springframework.beans.factory.annotation.Autowired
 import kotlin.test.*
 
 @AsAdminTest
 class EventSubscriptionMutationsIT : AbstractNotificationTestSupport() {
 
-    @Autowired
-    private lateinit var meterRegistry: MeterRegistry
-
-    private fun namelessSubscriptions(): Double =
-        meterRegistry.find(DeprecationMetrics.usage)
-            .tag("surface", "graphql")
-            .tag("item", "subscription without name")
-            .counter()?.count() ?: 0.0
-
     @Test
-    fun `A subscription without a name is reported as deprecated`() {
+    fun `A subscription without a name is rejected by the entity mutation`() {
         asAdmin {
             project {
                 branch {
-                    val before = namelessSubscriptions()
-                    run(
+                    runWithError(
                         """
                         mutation {
                             subscribeBranchToEvents(input: {
@@ -53,37 +41,54 @@ class EventSubscriptionMutationsIT : AbstractNotificationTestSupport() {
                                 }
                             }
                         }
-                    """
-                    ) { data ->
-                        checkGraphQLUserErrors(data, "subscribeBranchToEvents")
-                    }
-                    assertEquals(1.0, namelessSubscriptions() - before)
-                    run(
-                        """
-                        mutation {
-                            subscribeBranchToEvents(input: {
-                                project: "${project.name}",
-                                branch: "$name",
-                                name: "named",
-                                channel: "mock",
-                                channelConfig: {
-                                    target: "#test"
-                                },
-                                events: [
-                                    "new_promotion_run"
-                                ],
-                            }) {
-                                errors {
-                                    message
-                                }
-                            }
-                        }
-                    """
-                    ) { data ->
-                        checkGraphQLUserErrors(data, "subscribeBranchToEvents")
-                    }
-                    assertEquals(1.0, namelessSubscriptions() - before)
+                    """,
+                        errorClassification = ErrorType.ValidationError,
+                    )
+                    assertTrue(
+                        eventSubscriptionService.filterSubscriptions(
+                            EventSubscriptionFilter(entity = toProjectEntityID())
+                        ).pageItems.isEmpty(),
+                        "No subscription has been created"
+                    )
                 }
+            }
+        }
+    }
+
+    @Test
+    fun `A subscription without a name is rejected by the generic mutation`() {
+        asAdmin {
+            project {
+                runWithError(
+                    """
+                    mutation {
+                        subscribeToEvents(input: {
+                            projectEntity: {
+                                type: PROJECT,
+                                id: $id
+                            },
+                            channel: "mock",
+                            channelConfig: {
+                                target: "#test"
+                            },
+                            events: [
+                                "new_promotion_run"
+                            ],
+                        }) {
+                            errors {
+                                message
+                            }
+                        }
+                    }
+                """,
+                    errorClassification = ErrorType.ValidationError,
+                )
+                assertTrue(
+                    eventSubscriptionService.filterSubscriptions(
+                        EventSubscriptionFilter(entity = toProjectEntityID())
+                    ).pageItems.isEmpty(),
+                    "No subscription has been created"
+                )
             }
         }
     }
@@ -159,7 +164,6 @@ class EventSubscriptionMutationsIT : AbstractNotificationTestSupport() {
                                     message
                                 }
                                 subscription {
-                                    id
                                     name
                                 }
                             }
@@ -167,70 +171,8 @@ class EventSubscriptionMutationsIT : AbstractNotificationTestSupport() {
                     """
                     ) { data ->
                         checkGraphQLUserErrors(data, "subscribeBranchToEvents") { payload ->
-                            val id = payload.getRequiredJsonField("subscription").getRequiredTextField("id")
                             val name = payload.getRequiredJsonField("subscription").getRequiredTextField("name")
-                            assertEquals(name, id)
-                            val subscription: EventSubscription =
-                                eventSubscriptionService.getSubscriptionByName(this, name)
-                            assertEquals(
-                                setOf(
-                                    "new_promotion_run"
-                                ),
-                                subscription.events
-                            )
-                            assertEquals(this, subscription.projectEntity)
-                            assertEquals("GOLD", subscription.keywords)
-                            assertEquals(
-                                "mock",
-                                subscription.channel
-                            )
-                            assertEquals(
-                                mapOf("target" to "#test").asJson(),
-                                subscription.channelConfig
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    @Test
-    fun `Subscription name is not required yet and can be omitted`() {
-        asAdmin {
-            project {
-                branch {
-                    run(
-                        """
-                        mutation {
-                            subscribeBranchToEvents(input: {
-                                project: "${project.name}",
-                                branch: "$name",
-                                channel: "mock",
-                                channelConfig: {
-                                    target: "#test"
-                                },
-                                events: [
-                                    "new_promotion_run"
-                                ],
-                                keywords: "GOLD",
-                            }) {
-                                errors {
-                                    message
-                                    exception
-                                }
-                                subscription {
-                                    id
-                                    name
-                                }
-                            }
-                        }
-                    """
-                    ) { data ->
-                        checkGraphQLUserErrors(data, "subscribeBranchToEvents") { payload ->
-                            val id = payload.getRequiredJsonField("subscription").getRequiredTextField("id")
-                            val name = payload.getRequiredJsonField("subscription").getRequiredTextField("name")
-                            assertEquals(name, id)
+                            assertEquals("test", name)
                             val subscription: EventSubscription =
                                 eventSubscriptionService.getSubscriptionByName(this, name)
                             assertEquals(
@@ -530,7 +472,6 @@ class EventSubscriptionMutationsIT : AbstractNotificationTestSupport() {
                                 message
                             }
                             subscription {
-                                id
                                 name
                                 disabled
                             }
@@ -539,7 +480,6 @@ class EventSubscriptionMutationsIT : AbstractNotificationTestSupport() {
                 """
                 ) { data ->
                     checkGraphQLUserErrors(data, "enableSubscription") { payload ->
-                        assertEquals("test", payload.path("subscription").getRequiredTextField("id"))
                         assertEquals("test", payload.path("subscription").getRequiredTextField("name"))
                         assertEquals(false, payload.path("subscription").getRequiredBooleanField("disabled"))
                         assertNotNull(eventSubscriptionService.findSubscriptionByName(this, "test")) {

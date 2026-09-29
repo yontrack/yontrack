@@ -48,7 +48,8 @@ class JenkinsNotificationCascIT : AbstractCascTestSupport() {
                                         branch: $name
                                         promotion: ${pl.name}
                                       subscriptions:
-                                        - channel: jenkins
+                                        - name: test
+                                          channel: jenkins
                                           channel-config:
                                             config: ${config.name}
                                             job: path/to/pipeline

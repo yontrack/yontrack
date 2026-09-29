@@ -21,6 +21,7 @@ test('displaying the configuration of a Jenkins notification', async ({page, ont
     // 3. Creating a subscription for this project calling a Jenkins job on new branches
     const jobName = generate("pipeline/")
     await project.subscribe({
+        name: "Jenkins on new branches",
         events: ["new_branch"],
         channel: "jenkins",
         channelConfig: {

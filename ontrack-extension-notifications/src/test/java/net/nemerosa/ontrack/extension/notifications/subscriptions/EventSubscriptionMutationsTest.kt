@@ -1,12 +1,14 @@
 package net.nemerosa.ontrack.extension.notifications.subscriptions
 
 import graphql.schema.*
+import net.nemerosa.ontrack.graphql.schema.GQLTypeCache
 import net.nemerosa.ontrack.graphql.support.GraphQLBeanConverter
 import net.nemerosa.ontrack.model.structure.ProjectEntityID
 import net.nemerosa.ontrack.test.assertIs
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 
 internal class EventSubscriptionMutationsTest {
 
@@ -31,6 +33,27 @@ internal class EventSubscriptionMutationsTest {
 
         assertNotNull(dictionary.find { it is GraphQLInputObjectType && it.name == "ProjectEntityIDInput" },
             "ProjectEntityIDInput input type has been created")
+    }
+
+    @Test
+    fun `SubscribeToEventsInput name is required`() {
+        val type = GraphQLBeanConverter.asInputType(SubscribeToEventsInput::class, mutableSetOf())
+        assertIs<GraphQLInputObjectType>(type) { objectType ->
+            assertNotNull(objectType.getField("name")) { nameField ->
+                assertIs<GraphQLNonNull>(nameField.type) { nameNotNull ->
+                    assertIs<GraphQLScalarType>(nameNotNull.wrappedType) { nameType ->
+                        assertEquals("String", nameType.name)
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `EventSubscriptionPayload has no id field`() {
+        val type = GQLTypeEventSubscriptionPayload().createType(GQLTypeCache())
+        assertNull(type.getFieldDefinition("id"), "The id field is removed in V6")
+        assertNotNull(type.getFieldDefinition("name"), "The name field identifies the subscription")
     }
 
     @Test

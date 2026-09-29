@@ -72,6 +72,7 @@ class ACCJiraNotificationsWorkflow : AbstractACCDSLWorkflowsTestSupport() {
                 """.trimIndent()
 
                 pl.subscribe(
+                    name = "Workflow",
                     channel = "workflow",
                     channelConfig = mapOf(
                         "workflow" to WorkflowTestSupport.yamlWorkflowToJson(workflow)

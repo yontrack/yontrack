@@ -6,8 +6,6 @@ import graphql.schema.*
 import net.nemerosa.ontrack.common.api.APIDescription
 import net.nemerosa.ontrack.graphql.schema.*
 import net.nemerosa.ontrack.graphql.support.*
-import net.nemerosa.ontrack.model.deprecation.DeprecationService
-import net.nemerosa.ontrack.model.deprecation.DeprecationSurface
 import net.nemerosa.ontrack.model.structure.*
 import org.springframework.stereotype.Component
 
@@ -15,7 +13,6 @@ import org.springframework.stereotype.Component
 class EventSubscriptionMutations(
     private val eventSubscriptionService: EventSubscriptionService,
     private val structureService: StructureService,
-    private val deprecationService: DeprecationService,
 ) : TypedMutationProvider() {
 
     override val mutations: List<Mutation>
@@ -61,12 +58,7 @@ class EventSubscriptionMutations(
                 val entity: ProjectEntity = type.loadByNames(structureService, names)
                     ?: throw EntityNotFoundByNameException(type, names)
                 // Extracting the fields
-
-                // Creates the payload
-                val name = getMutationInputField<String>(env, SubscribeToEventsInput::name.name)
-                if (name == null) {
-                    deprecationService.namelessSubscription(DeprecationSurface.GRAPHQL)
-                }
+                val name = getRequiredMutationInputField<String>(env, SubscribeToEventsInput::name.name)
                 val channel = getRequiredMutationInputField<String>(env, SubscribeToEventsInput::channel.name)
                 val channelConfig =
                     getRequiredMutationInputField<JsonNode>(env, SubscribeToEventsInput::channelConfig.name)
@@ -75,13 +67,7 @@ class EventSubscriptionMutations(
                 val contentTemplate = getMutationInputField<String?>(env, SubscribeToEventsInput::contentTemplate.name)
                 val payload = createEventSubscriptionPayload(
                     projectEntity = entity,
-                    name = name ?: EventSubscription.computeName(
-                        events = events,
-                        keywords = keywords,
-                        channel = channel,
-                        channelConfig = channelConfig,
-                        contentTemplate = contentTemplate,
-                    ),
+                    name = name,
                     channel = channel,
                     channelConfig = channelConfig,
                     events = events,
@@ -107,18 +93,9 @@ class EventSubscriptionMutations(
                 val projectEntity = input.projectEntity?.run {
                     type.getEntityFn(structureService).apply(ID.of(id))
                 }
-                if (input.name == null) {
-                    deprecationService.namelessSubscription(DeprecationSurface.GRAPHQL)
-                }
                 createEventSubscriptionPayload(
                     projectEntity = projectEntity,
-                    name = input.name ?: EventSubscription.computeName(
-                        events = input.events,
-                        keywords = input.keywords,
-                        channel = input.channel,
-                        channelConfig = input.channelConfig,
-                        contentTemplate = input.contentTemplate,
-                    ),
+                    name = input.name,
                     channel = input.channel,
                     channelConfig = input.channelConfig,
                     events = input.events,
@@ -312,8 +289,8 @@ data class SubscribeToEventsInput(
     @APIDescription("Target project entity (null for global events)")
     @TypeRef(embedded = true, suffix = "Input")
     val projectEntity: ProjectEntityID?,
-    @APIDescription("Unique name of the subscription in its scope. Omitting it is deprecated: it is required in V6.")
-    val name: String? = null,
+    @APIDescription("Unique name of the subscription in its scope")
+    val name: String,
     @APIDescription("Channel to send this event to")
     val channel: String,
     @APIDescription("Channel configuration")

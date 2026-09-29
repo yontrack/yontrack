@@ -5,8 +5,8 @@ import tools.jackson.databind.JsonNode
 import net.nemerosa.ontrack.common.api.APIDescription
 
 data class SubscriptionsCascContextData(
-    @APIDescription("Name of the subscription. Omitting it is deprecated: it is required in V6.")
-    val name: String?,
+    @APIDescription("Unique name of the subscription in its scope")
+    val name: String,
     @APIDescription("List of events to listen to")
     val events: List<String>,
     @APIDescription("Keywords to filter the events")
@@ -22,7 +22,7 @@ data class SubscriptionsCascContextData(
     val contentTemplate: String?,
 ) {
     fun normalized() = SubscriptionsCascContextData(
-        name = actualName(),
+        name = name,
         events = events.sorted(),
         keywords = keywords,
         channel = channel,
@@ -30,15 +30,4 @@ data class SubscriptionsCascContextData(
         disabled = disabled ?: false,
         contentTemplate = contentTemplate,
     )
-
-    fun actualName(): String = name ?: computeName()
-
-    fun computeName(): String =
-        EventSubscription.computeName(
-            events = events,
-            keywords = keywords,
-            channel = channel,
-            channelConfig = channelConfig,
-            contentTemplate = contentTemplate,
-        )
 }

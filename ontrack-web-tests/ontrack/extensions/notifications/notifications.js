@@ -8,7 +8,7 @@ export const registerNotificationExtensions = (projectEntity) => {
             'subscribeToEvents',
             gql`
                 mutation CreateSubscription(
-                    $name: String,
+                    $name: String!,
                     $entityType: ProjectEntityType!,
                     $entityId: Int!,
                     $events: [String!]!,

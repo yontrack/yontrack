@@ -100,14 +100,15 @@ class EntitySubscriptionsCascContextIT : AbstractNotificationTestSupport() {
                               "type": "string"
                             },
                             "name": {
-                              "description": "Name of the subscription. Omitting it is deprecated: it is required in V6.",
+                              "description": "Unique name of the subscription in its scope",
                               "type": "string"
                             }
                           },
                           "required": [
                             "channel",
                             "channelConfig",
-                            "events"
+                            "events",
+                            "name"
                           ],
                           "additionalProperties": false,
                           "type": "object"
@@ -196,7 +197,8 @@ class EntitySubscriptionsCascContextIT : AbstractNotificationTestSupport() {
                                         project: $name
                                         build: 1
                                       subscriptions:
-                                        - events:
+                                        - name: test
+                                          events:
                                             - new_promotion_run
                                           keywords: ""
                                           channel: mock
@@ -301,10 +303,12 @@ class EntitySubscriptionsCascContextIT : AbstractNotificationTestSupport() {
     }
 
     @Test
-    fun `Generated names for backward compatibility`() {
+    fun `An entity subscription without a name is rejected`() {
         val target = uid("t")
         project {
-            val cascYaml = """
+            assertFailsWith<IllegalStateException> {
+                casc(
+                    """
                     ontrack:
                         extensions:
                             notifications:
@@ -312,80 +316,21 @@ class EntitySubscriptionsCascContextIT : AbstractNotificationTestSupport() {
                                     - entity:
                                         project: $name
                                       subscriptions:
-                                        - name: test
-                                          events:
-                                            - new_promotion_run
-                                          keywords: "SILVER"
-                                          channel: mock
-                                          channel-config:
-                                            target: "$target-silver"
                                         - events:
                                             - new_promotion_run
                                           keywords: "GOLD"
                                           channel: mock
                                           channel-config:
-                                            target: "$target-gold"
-                """
-            // First generation
-            casc(
-                cascYaml
-            )
-            // Computing the actual name of the unnamed subscription
-            val generatedName = EventSubscription.computeName(
-                events = listOf("new_promotion_run"),
-                keywords = "GOLD",
-                channel = "mock",
-                channelConfig = mapOf("target" to "$target-gold").asJson(),
-                contentTemplate = null,
-            )
-
-            // Rendering
-            fun checkRendering() {
-                val json = entitySubscriptionsCascContext.render()
-                assertEquals(
-                    listOf(
-                        mapOf(
-                            "entity" to mapOf(
-                                "project" to project.name,
-                                "branch" to null,
-                                "promotion" to null,
-                                "validation" to null,
-                            ),
-                            "subscriptions" to listOf(
-                                mapOf(
-                                    "name" to "test",
-                                    "events" to listOf("new_promotion_run"),
-                                    "keywords" to "SILVER",
-                                    "channel" to "mock",
-                                    "channelConfig" to mapOf(
-                                        "target" to "$target-silver"
-                                    ),
-                                    "disabled" to false,
-                                    "contentTemplate" to null,
-                                ),
-                                mapOf(
-                                    "name" to generatedName,
-                                    "events" to listOf("new_promotion_run"),
-                                    "keywords" to "GOLD",
-                                    "channel" to "mock",
-                                    "channelConfig" to mapOf(
-                                        "target" to "$target-gold"
-                                    ),
-                                    "disabled" to false,
-                                    "contentTemplate" to null,
-                                ),
-                            )
-                        )
-                    ).asJson(),
-                    json
+                                            target: "$target"
+                    """
                 )
             }
-            checkRendering()
-            // Second generation, still unnamed
-            casc(
-                cascYaml
+            assertTrue(
+                eventSubscriptionService.filterSubscriptions(
+                    EventSubscriptionFilter(entity = toProjectEntityID())
+                ).pageItems.isEmpty(),
+                "No subscription has been created"
             )
-            checkRendering()
         }
     }
 

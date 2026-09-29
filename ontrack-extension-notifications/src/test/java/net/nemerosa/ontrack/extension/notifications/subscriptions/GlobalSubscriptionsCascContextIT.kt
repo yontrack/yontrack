@@ -8,6 +8,7 @@ import net.nemerosa.ontrack.test.TestUtils.uid
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 
 class GlobalSubscriptionsCascContextIT : AbstractCascTestSupport() {
 
@@ -58,14 +59,15 @@ class GlobalSubscriptionsCascContextIT : AbstractCascTestSupport() {
                         "type": "string"
                       },
                       "name": {
-                        "description": "Name of the subscription. Omitting it is deprecated: it is required in V6.",
+                        "description": "Unique name of the subscription in its scope",
                         "type": "string"
                       }
                     },
                     "required": [
                       "channel",
                       "channelConfig",
-                      "events"
+                      "events",
+                      "name"
                     ],
                     "additionalProperties": false,
                     "type": "object"
@@ -76,6 +78,35 @@ class GlobalSubscriptionsCascContextIT : AbstractCascTestSupport() {
             """.trimIndent().parseAsJson(),
             type.asJson()
         )
+    }
+
+    @Test
+    fun `A global subscription without a name is rejected`() {
+        val target = uid("t")
+        assertFailsWith<IllegalStateException> {
+            casc(
+                """
+                ontrack:
+                    extensions:
+                        notifications:
+                            global-subscriptions:
+                                - events:
+                                    - new_promotion_run
+                                  channel: mock
+                                  channel-config:
+                                    target: "#$target"
+                """.trimIndent()
+            )
+        }
+        asAdmin {
+            val subscriptions = eventSubscriptionService.filterSubscriptions(
+                EventSubscriptionFilter(
+                    channel = "mock",
+                    channelConfig = "#$target"
+                )
+            )
+            assertEquals(0, subscriptions.pageItems.size, "No subscription has been created")
+        }
     }
 
     @Test

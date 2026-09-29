@@ -1,5 +1,5 @@
 mutation SubscribeToEntityEvents(
-    $name: String,
+    $name: String!,
     $entityType: ProjectEntityType!,
     $entityId: Int!,
     $channel: String!,

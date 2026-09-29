@@ -313,6 +313,7 @@ The latest 5.5.x release counts every use of these items: see [Upgrade path](#up
 | `SearchResult.uri`                   | No replacement: build the link from the `type` and `data` of the result      |
 | `VersionInfo.date`                   | No replacement: the field was always empty                                   |
 | `HookResponse.info`                  | `HookResponse.infoLink`                                                      |
+| `EventSubscriptionPayload.id`        | `EventSubscriptionPayload.name`                                              |
 
 * **`promotionRuns`** — `promotionRunsPaginated` returns a page, `{ pageInfo pageItems }`, the most
   recent runs first. `promotionRuns(first: N)` becomes `promotionRunsPaginated(size: N)`; the
@@ -326,6 +327,12 @@ The latest 5.5.x release counts every use of these items: see [Upgrade path](#up
   hook records and from the answer of the `POST /hook/secured/{hook}` endpoint alike. `infoLink`
   carries the information structured; a disabled hook answers with the `IGNORED` type, and its
   record has the `DISABLED` state. The hook records stored by Yontrack 5 are still read, without it.
+* **Subscriptions without a name** — the `name` of `SubscribeToEventsInput`, and of the
+  `subscribe<Entity>ToEvents` mutations (`subscribeProjectToEvents`, `subscribeBranchToEvents`, …),
+  is now required. A subscription created without one is rejected with a validation error, where
+  Yontrack 5 named it with a hash of its content. Counted by 5.5.x as
+  `subscription without name`, with `surface="graphql"`. The subscriptions Yontrack 5 already
+  stored keep their names.
 
 ### REST API
 
@@ -346,6 +353,22 @@ base64 < gold.png | tr -d '\n' | curl -X PUT -H "Authorization: Bearer $TOKEN" \
 The 6.x KDSL sets the image of a predefined promotion level with the `PUT` endpoint. A program
 calling `createPredefinedPromotionLevel` with an `image` must use it: the 5.x KDSL still calls the
 `POST` endpoint.
+
+### Configuration as code
+
+| Removed                                                  | Use instead                    |
+|----------------------------------------------------------|--------------------------------|
+| A subscription without a `name`, `global-subscriptions`  | A `name`, unique in its scope  |
+| A subscription without a `name`, `entity-subscriptions`  | A `name`, unique in its entity |
+
+Under `ontrack.extensions.notifications`, every entry of `global-subscriptions`, and every entry of
+the `subscriptions` of an `entity-subscriptions` item, must have a `name`. A configuration with an
+unnamed subscription fails to apply, where Yontrack 5 named it with a hash of its content. Counted
+by 5.5.x as `subscription without name`, with `surface="casc"`. To keep a subscription Yontrack 5
+created from an unnamed entry, give the entry the name Yontrack 5 generated for it, as the
+*Subscriptions* page or the rendered CasC shows it. Under another name, a new subscription is
+created: `entity-subscriptions` deletes the old one, `global-subscriptions` keeps it until it is
+deleted by hand.
 
 ### Configuration properties
 
@@ -390,6 +413,15 @@ they keep their `path`, `regex`, `property`, `propertyRegex` and `propertyType` 
 
 The configurations Yontrack 5 already stored need no conversion: it always stored them with the
 full names, whatever name they were sent with.
+
+### KDSL
+
+| Removed                                          | Use instead                                           |
+|--------------------------------------------------|-------------------------------------------------------|
+| `NotificationsMgt.subscribe` without a `name`    | `NotificationsMgt.subscribe(name = ..., ...)`         |
+
+The `name` parameter of `NotificationsMgt.subscribe` no longer has a default: a call without it no
+longer compiles.
 
 ## Newly deprecated
 

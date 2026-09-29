@@ -44,6 +44,7 @@ To create a subscription, select the _New subscription_ command and enter the fi
 
 ![New subscription](subscription-new.png)
 
+* name - name of the subscription, required and unique for the entity (or among the global subscriptions)
 * events - list of [events](../../generated/events/index.md) to listen to
 * keywords - space-separated list of words which will be used to restrict the events being listened to
 * channel - destination for the notification.
@@ -58,7 +59,8 @@ The management of the global subscriptions is exactly the same as for the [local
 
 !!! note
 
-    Global subscriptions can be configured using [CasC](../../configuration/casc.md). For example:
+    Global subscriptions can be configured using [CasC](../../configuration/casc.md), each with its
+    required `name`. For example:
     
     ```yaml
     ontrack:

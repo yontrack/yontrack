@@ -10,8 +10,6 @@ import net.nemerosa.ontrack.json.JsonParseException
 import net.nemerosa.ontrack.json.asJson
 import net.nemerosa.ontrack.json.parse
 import net.nemerosa.ontrack.model.annotations.APIIgnore
-import net.nemerosa.ontrack.model.deprecation.DeprecationService
-import net.nemerosa.ontrack.model.deprecation.DeprecationSurface
 import net.nemerosa.ontrack.model.exceptions.InputException
 import net.nemerosa.ontrack.model.json.schema.JsonArrayType
 import net.nemerosa.ontrack.model.json.schema.JsonType
@@ -31,7 +29,6 @@ class EntitySubscriptionsCascContext(
     private val eventSubscriptionService: EventSubscriptionService,
     private val storageService: StorageService,
     private val structureService: StructureService,
-    private val deprecationService: DeprecationService,
 ) : AbstractCascContext(), NotificationsSubCascContext {
 
     private val logger: Logger = LoggerFactory.getLogger(EntitySubscriptionsCascContext::class.java)
@@ -48,11 +45,7 @@ class EntitySubscriptionsCascContext(
     override fun run(node: JsonNode, paths: List<String>) {
         val items = node.mapIndexed { index, child ->
             try {
-                child.parse<EntitySubscriptionCascContextData>().also { data ->
-                    if (data.subscriptions.any { it.name == null }) {
-                        deprecationService.namelessSubscription(DeprecationSurface.CASC)
-                    }
-                }.normalized()
+                child.parse<EntitySubscriptionCascContextData>().normalized()
             } catch (ex: JsonParseException) {
                 throw IllegalStateException(
                     "Cannot parse into ${EntitySubscriptionCascContextData::class.qualifiedName}: ${path(paths + index.toString())}",
@@ -153,7 +146,7 @@ class EntitySubscriptionsCascContext(
             to = entitySubscriptions
         ) {
             equality { a, b ->
-                a.actualName() == b.actualName()
+                a.name == b.name
             }
             onCreation { item ->
                 subscribe(entity, item)
@@ -163,9 +156,7 @@ class EntitySubscriptionsCascContext(
                 subscribe(entity, item)
             }
             onDeletion { cached ->
-                if (cached.name != null) {
-                    eventSubscriptionService.deleteSubscriptionByName(entity, cached.name)
-                }
+                eventSubscriptionService.deleteSubscriptionByName(entity, cached.name)
             }
         }
     }
@@ -190,7 +181,7 @@ class EntitySubscriptionsCascContext(
         eventSubscriptionService.subscribe(
             EventSubscription(
                 projectEntity = entity,
-                name = subscription.actualName(),
+                name = subscription.name,
                 events = subscription.events.toSet(),
                 keywords = subscription.keywords,
                 channel = subscription.channel,

@@ -2,10 +2,7 @@ package net.nemerosa.ontrack.extension.notifications.subscriptions
 
 import tools.jackson.databind.JsonNode
 import net.nemerosa.ontrack.common.api.APIDescription
-import net.nemerosa.ontrack.json.asJson
-import net.nemerosa.ontrack.json.format
 import net.nemerosa.ontrack.model.structure.ProjectEntity
-import org.apache.commons.codec.digest.DigestUtils
 
 /**
  * Subscription to an event.
@@ -50,22 +47,4 @@ data class EventSubscription(
         contentTemplate = contentTemplate,
     )
 
-    companion object {
-        fun computeName(
-            events: List<String>,
-            keywords: String?,
-            channel: String,
-            channelConfig: JsonNode,
-            contentTemplate: String?
-        ): String =
-            mapOf(
-                "events" to events.sorted(),
-                "keywords" to keywords,
-                "channel" to channel,
-                "channelConfig" to channelConfig,
-                "contentTemplate" to contentTemplate,
-            ).asJson().format().let {
-                DigestUtils.md5Hex(it)
-            }
-    }
 }
