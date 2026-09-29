@@ -1,43 +1,32 @@
-import {useEffect, useState} from "react";
-import {useGraphQLClient} from "@components/providers/ConnectionContextProvider";
+import {useQuery} from "@components/services/GraphQL";
 import {gql} from "graphql-request";
 import {Select, Space, Tag, Typography} from "antd";
 
 export default function SelectNotificationChannel({value, onChange, onSelectedNotificationChannel, style, allowClear}) {
 
-    const client = useGraphQLClient()
-
-    const [loading, setLoading] = useState(true)
-    const [options, setOptions] = useState([])
-
-    useEffect(() => {
-        if (client) {
-            setLoading(true)
-            client.request(
-                gql`
-                    query GetNotificationChannels {
-                        notificationChannels {
-                            type
-                            enabled
-                        }
-                    }
-                `
-            ).then(data => {
-                const channels = data.notificationChannels
-                setOptions(channels.map((channel, index) => ({
-                    value: channel.type,
-                    label: <Space>
-                        <Tag>{channel.type}</Tag>
-                        {
-                            !channel.enabled && <Typography.Text type="secondary">(disabled)</Typography.Text>
-                        }
-                    </Space>
-                })))
-            }).finally(() => {
-                setLoading(false)
-            })
+    const {data: channels, loading, finished} = useQuery(
+        gql`
+            query GetNotificationChannels {
+                notificationChannels {
+                    type
+                    enabled
+                }
+            }
+        `,
+        {
+            dataFn: data => data.notificationChannels,
         }
-    }, [client])
+    )
+
+    const options = (channels ?? []).map((channel) => ({
+        value: channel.type,
+        label: <Space>
+            <Tag>{channel.type}</Tag>
+            {
+                !channel.enabled && <Typography.Text type="secondary">(disabled)</Typography.Text>
+            }
+        </Space>
+    }))
 
     const onLocalChange = (value) => {
         if (onChange) onChange(value)
@@ -50,7 +39,7 @@ export default function SelectNotificationChannel({value, onChange, onSelectedNo
         <>
             <Select
                 options={options}
-                loading={loading}
+                loading={loading || !finished}
                 value={value}
                 onChange={onLocalChange}
                 style={style}

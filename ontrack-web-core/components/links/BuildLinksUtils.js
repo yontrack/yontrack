@@ -115,7 +115,7 @@ export const buildQueryDownstreamOnly = `
         ${gqlBuildNodeInfo}
     `
 
-function buildDownstreamTreeData(build, qualifier, pathKey = `${build.id}`) {
+export function buildDownstreamTreeData(build, qualifier, pathKey = `${build.id}`) {
     return {
         key: pathKey,
         title: build.name,
@@ -125,9 +125,4 @@ function buildDownstreamTreeData(build, qualifier, pathKey = `${build.id}`) {
             buildDownstreamTreeData(link.build, link.qualifier, `${pathKey}:${index}`)
         ) : []
     }
-}
-
-export async function collectDownstreamNodesAsTreeData(client, build) {
-    const data = await client.request(buildQueryDownstreamOnly, {buildId: Number(build.id)})
-    return buildDownstreamTreeData(data.build)
 }

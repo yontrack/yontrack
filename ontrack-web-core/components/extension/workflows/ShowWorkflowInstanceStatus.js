@@ -1,39 +1,30 @@
-import {useGraphQLClient} from "@components/providers/ConnectionContextProvider";
-import {useEffect, useState} from "react";
+import {useQuery} from "@components/services/GraphQL";
 import LoadingInline from "@components/common/LoadingInline";
 import {gql} from "graphql-request";
 import WorkflowInstanceStatus from "@components/extension/workflows/WorkflowInstanceStatus";
 
 export default function ShowWorkflowInstanceStatus({instanceId}) {
 
-    const client = useGraphQLClient()
-    const [loading, setLoading] = useState(true)
-    const [status, setStatus] = useState('')
-
-    useEffect(() => {
-        if (client) {
-            setLoading(true)
-            client.request(
-                gql`
-                    query GetWorkflowInstanceStatus($instanceId: String!) {
-                        workflowInstance(id: $instanceId) {
-                            status
-                        }
-                    }
-                `,
-                {instanceId}
-            ).then(data => {
-                setStatus(data.workflowInstance?.status)
-            }).finally(() => {
-                setLoading(false)
-            })
+    const {data: status, loading, finished} = useQuery(
+        gql`
+            query GetWorkflowInstanceStatus($instanceId: String!) {
+                workflowInstance(id: $instanceId) {
+                    status
+                }
+            }
+        `,
+        {
+            variables: {instanceId},
+            deps: [instanceId],
+            initialData: '',
+            dataFn: data => data.workflowInstance?.status,
         }
-    }, [client, instanceId])
+    )
 
     return (
         <>
-            <LoadingInline loading={loading} text="">
-                <WorkflowInstanceStatus status={status}/>
+            <LoadingInline loading={loading || !finished} text="">
+                <WorkflowInstanceStatus status={status ?? ''}/>
             </LoadingInline>
         </>
     )

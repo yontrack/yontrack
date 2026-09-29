@@ -1,29 +1,23 @@
-import {useEffect, useState} from "react";
-import {useGraphQLClient} from "@components/providers/ConnectionContextProvider";
+import {useQuery} from "@components/services/GraphQL";
 import {gql} from "graphql-request";
 import GlobalMessage from "@components/layouts/GlobalMessage";
 
 export default function MainGlobalMessages() {
 
-    const client = useGraphQLClient()
-    const [messages, setMessages] = useState([])
-
-    useEffect(() => {
-        if (client) {
-            client.request(
-                gql`
-                    query GlobalMessages {
-                        globalMessages {
-                            type
-                            content
-                        }
-                    }
-                `
-            ).then(data => {
-                setMessages(data.globalMessages)
-            })
+    const {data: messages} = useQuery(
+        gql`
+            query GlobalMessages {
+                globalMessages {
+                    type
+                    content
+                }
+            }
+        `,
+        {
+            initialData: [],
+            dataFn: data => data.globalMessages,
         }
-    }, [client]);
+    )
 
     return (
         <>

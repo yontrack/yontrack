@@ -3,7 +3,7 @@ import {useState} from "react";
 import WorkflowGraph from "@components/extension/workflows/WorkflowGraph";
 import {useReactFlow} from "reactflow";
 import FormErrors from "@components/form/FormErrors";
-import {useGraphQLClient} from "@components/providers/ConnectionContextProvider";
+import {callGraphQL} from "@components/services/GraphQL";
 import {gql} from "graphql-request";
 import {getGraphQLErrors} from "@components/services/graphql-utils";
 import WorkflowDownloadJSONSchema from "@components/extension/workflows/WorkflowDownloadJSONSchema";
@@ -38,8 +38,6 @@ export const useEditWorkflowDialog = ({onSuccess}) => {
 }
 
 export default function EditWorkflowDialog({dialog}) {
-
-    const client = useGraphQLClient()
 
     const [loading, setLoading] = useState(false)
     const [formErrors, setFormErrors] = useState([])
@@ -103,8 +101,8 @@ export default function EditWorkflowDialog({dialog}) {
             // Converts the graph into a workflow definition
             const workflow = convertGraphToWorkflow(nodes, edges)
             // Checks the workflow (name, cycle, etc.)
-            const data = await client.request(
-                gql`
+            const data = await callGraphQL({
+                query: gql`
                     mutation ValidateWorkflow($workflow: JSON!) {
                         validateJsonWorkflow(input: {workflow: $workflow}) {
                             errors {
@@ -116,8 +114,8 @@ export default function EditWorkflowDialog({dialog}) {
                         }
                     }
                 `,
-                {workflow}
-            )
+                variables: {workflow},
+            })
             // Error management
             const userNode = data.validateJsonWorkflow
             let errors = getGraphQLErrors(data, 'validateJsonWorkflow')

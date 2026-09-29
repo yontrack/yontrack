@@ -1,6 +1,6 @@
 import {Button, message, Popconfirm, Space} from "antd";
 import {FaTrash} from "react-icons/fa";
-import {useGraphQLClient} from "@components/providers/ConnectionContextProvider";
+import {callGraphQL} from "@components/services/GraphQL";
 import {useState} from "react";
 import {gql} from "graphql-request";
 import {processGraphQLErrors} from "@components/services/graphql-utils";
@@ -9,13 +9,12 @@ export default function QueuePurgeButton({onDone}) {
 
     const [messageApi, contextHolder] = message.useMessage()
 
-    const client = useGraphQLClient()
     const [loading, setLoading] = useState(false)
     const purge = async () => {
         setLoading(true)
         try {
-            const data = await client.request(
-                gql`
+            const data = await callGraphQL({
+                query: gql`
                     mutation QueuePurgeRecords {
                         purgeQueueRecordings {
                             errors {
@@ -23,8 +22,8 @@ export default function QueuePurgeButton({onDone}) {
                             }
                         }
                     }
-                `
-            )
+                `,
+            })
             if (processGraphQLErrors(data, 'purgeQueueRecordings', messageApi) && onDone) {
                 onDone()
             }

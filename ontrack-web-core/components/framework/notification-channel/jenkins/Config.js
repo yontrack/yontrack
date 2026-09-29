@@ -1,6 +1,5 @@
 import {Space, Typography} from "antd";
-import {useGraphQLClient} from "@components/providers/ConnectionContextProvider";
-import {useEffect, useState} from "react";
+import {useQuery} from "@components/services/GraphQL";
 import {gql} from "graphql-request";
 import Link from "next/link";
 import {FaArrowRight} from "react-icons/fa";
@@ -8,25 +7,22 @@ import Duration from "@components/common/Duration";
 
 export default function JenkinsNotificationChannelConfig({config, job, parameters, callMode, timeout}) {
 
-    const client = useGraphQLClient()
-    const [url, setUrl] = useState('')
-
-    useEffect(() => {
-        if (client && config) {
-            client.request(
-                gql`
-                    query GetJenkinsConfiguration($config: String!) {
-                        jenkinsConfiguration(name: $config) {
-                            url
-                        }
-                    }
-                `,
-                {config}
-            ).then(data => {
-                setUrl(data.jenkinsConfiguration?.url)
-            })
+    const {data: url} = useQuery(
+        gql`
+            query GetJenkinsConfiguration($config: String!) {
+                jenkinsConfiguration(name: $config) {
+                    url
+                }
+            }
+        `,
+        {
+            variables: {config},
+            deps: [config],
+            condition: !!config,
+            initialData: '',
+            dataFn: data => data.jenkinsConfiguration?.url,
         }
-    }, [client, config]);
+    )
 
     return (
         <>

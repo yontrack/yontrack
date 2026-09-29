@@ -1,19 +1,18 @@
 import {message, Spin, Typography} from "antd";
 import {useState} from "react";
 import {FaPencilAlt} from "react-icons/fa";
-import {useGraphQLClient} from "@components/providers/ConnectionContextProvider";
+import {callGraphQL} from "@components/services/GraphQL";
 import {gql} from "graphql-request";
 import {getGraphQLErrors} from "@components/services/graphql-utils";
 
 export default function SubscriptionName({subscription, text, entity, managePermission, onRenamed}) {
 
-    const client = useGraphQLClient()
     const [messageApi, contextHolder] = message.useMessage()
     const [changing, setChanging] = useState(false)
 
     const onChange = async (value) => {
-        const data = await client.request(
-            gql`
+        const data = await callGraphQL({
+            query: gql`
                 mutation RenameSubscription(
                     $projectEntity: ProjectEntityIDInput,
                     $name: String!,
@@ -30,12 +29,12 @@ export default function SubscriptionName({subscription, text, entity, managePerm
                     }
                 }
             `,
-            {
+            variables: {
                 projectEntity: entity,
                 name: subscription.name,
                 newName: value,
-            }
-        )
+            },
+        })
         const errors = getGraphQLErrors(data, 'renameSubscription')
         if (errors.length > 0) {
             messageApi.error(errors[0])

@@ -5,8 +5,7 @@
  *
  * **A bottom sheet, not the desktop dialog.** `BuildStartDeploymentDialog` is a
  * modal built around a `Select` of slots, with the chosen slot's details and its
- * current pipeline underneath; it also still reads the server through the
- * deprecated `useGraphQLClient`. Both halves of the boundary in
+ * current pipeline underneath. Both halves of the boundary in
  * `doc/dev-guide/ui/mobile-ui.md` apply: the layout is the mobile UI's own, and
  * the read and the write go through `@components/services/GraphQL`.
  *

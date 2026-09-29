@@ -11,15 +11,13 @@ import {useCallback, useContext, useEffect, useMemo, useState} from "react";
 import BranchNode from "@components/links/BranchNode";
 import BranchLinkNode from "@components/links/BranchLinkNode";
 import {autoLayout} from "@components/links/GraphUtils";
-import {useGraphQLClient} from "@components/providers/ConnectionContextProvider";
+import {useQuery} from "@components/services/GraphQL";
 import {Skeleton} from "antd";
 import {AutoRefreshContext} from "@components/common/AutoRefresh";
 import {edgeStyle} from "@components/links/LinksGraphConstants";
 import {branchQuery} from "@components/links/BranchDependenciesFragments";
 
 function BranchLinksFlow({branch, loadPullRequests, loadPullRequestsCount}) {
-
-    const client = useGraphQLClient()
 
     const [nodes, setNodes] = useState([])
     const [edges, setEdges] = useState([])
@@ -218,48 +216,50 @@ function BranchLinksFlow({branch, loadPullRequests, loadPullRequestsCount}) {
     }
 
     const {autoRefreshCount} = useContext(AutoRefreshContext)
-    const [loading, setLoading] = useState(true)
 
-    useEffect(() => {
-        if (client && branch && branch.id) {
-            setLoading(true)
-            client.request(
-                branchQuery({downstream: true, upstream: true}),
-                {
-                    branchId: Number(branch.id),
-                    loadPullRequests,
-                }
-            ).then(data => {
-
-                setLayoutDone(false)
-
-                // Root branch
-                const rootBranch = data.branch
-
-                // Nodes & edges to build
-                const nodes = []
-                const edges = []
-
-                // Cache for the nodes & edges
-                const nodesCache = {}
-                const edgesCache = {}
-
-                // Root node
-                const rootNode = branchToNode(rootBranch)
-                rootNode.data.selected = true
-                nodes.push(rootNode)
-                nodesCache[rootNode.id] = rootNode
-
-                collectDownstreamNodes(rootNode, nodes, edges, nodesCache, edgesCache)
-                collectUpstreamNodes(rootNode, nodes, edges, nodesCache, edgesCache)
-
-                setNodes(nodes)
-                setEdges(edges)
-            }).finally(() => {
-                setLoading(false)
-            })
+    const {data, loading, finished} = useQuery(
+        branchQuery({downstream: true, upstream: true}),
+        {
+            variables: {
+                branchId: Number(branch?.id),
+                loadPullRequests,
+            },
+            deps: [branch, autoRefreshCount, loadPullRequestsCount],
+            condition: !!(branch && branch.id),
         }
-    }, [client, branch, autoRefreshCount, loadPullRequestsCount]);
+    )
+
+    // The nodes & edges are then owned by React Flow, which changes them (selection, layout, etc.)
+    useEffect(() => {
+        if (data) {
+
+            setLayoutDone(false)
+
+            // Root branch
+            const rootBranch = data.branch
+
+            // Nodes & edges to build
+            const nodes = []
+            const edges = []
+
+            // Cache for the nodes & edges
+            const nodesCache = {}
+            const edgesCache = {}
+
+            // Root node
+            const rootNode = branchToNode(rootBranch)
+            rootNode.data.selected = true
+            nodes.push(rootNode)
+            nodesCache[rootNode.id] = rootNode
+
+            collectDownstreamNodes(rootNode, nodes, edges, nodesCache, edgesCache)
+            collectUpstreamNodes(rootNode, nodes, edges, nodesCache, edgesCache)
+
+            setNodes(nodes)
+            setEdges(edges)
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [data]);
 
     const onNodesChange = useCallback(
         (changes) => setNodes((nds) => applyNodeChanges(changes, nds)),
@@ -333,7 +333,7 @@ function BranchLinksFlow({branch, loadPullRequests, loadPullRequestsCount}) {
     return (
         <>
             <div style={{height: '800px'}}>
-                <Skeleton active loading={loading || !branch}>
+                <Skeleton active loading={loading || !finished || !branch}>
                     <ReactFlow
                         nodes={nodes}
                         edges={edges}

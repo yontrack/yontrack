@@ -1,35 +1,23 @@
 import {Skeleton, Space, Tree} from "antd";
-import {useEffect, useState} from "react";
-import {useGraphQLClient} from "@components/providers/ConnectionContextProvider";
-import {collectDownstreamNodesAsTreeData} from "@components/links/BuildLinksUtils";
+import {useQuery} from "@components/services/GraphQL";
+import {buildDownstreamTreeData, buildQueryDownstreamOnly} from "@components/links/BuildLinksUtils";
 import BuildLinksTreeNode from "@components/links/BuildLinksTreeNode";
 import CloseableAlert from "@components/common/CloseableAlert";
 
+const NO_TREE_DATA = []
+
 export default function BuildLinksTree({build, changeDependencyLinksMode}) {
 
-    const client = useGraphQLClient()
-
-    const [loading, setLoading] = useState(true)
-    const [treeData, setTreeData] = useState([])
-
-    useEffect(() => {
-        if (client && build) {
-
-            const loadTreeData = async () => {
-                setLoading(true)
-                try {
-                    const treeNodes = await collectDownstreamNodesAsTreeData(client, build)
-                    setTreeData([treeNodes])
-                } finally {
-                    setLoading(false)
-                }
-            }
-
-            // noinspection JSIgnoredPromiseFromCall
-            loadTreeData()
-
+    const {data: treeData, loading, finished} = useQuery(
+        buildQueryDownstreamOnly,
+        {
+            variables: {buildId: Number(build?.id)},
+            deps: [build],
+            condition: !!build,
+            initialData: NO_TREE_DATA,
+            dataFn: data => [buildDownstreamTreeData(data.build)],
         }
-    }, [client, build])
+    )
 
     function switchToGraphView() {
         if (changeDependencyLinksMode) changeDependencyLinksMode('graph')
@@ -37,7 +25,7 @@ export default function BuildLinksTree({build, changeDependencyLinksMode}) {
 
     return (
         <>
-            <Skeleton active loading={loading}>
+            <Skeleton active loading={loading || !finished}>
                 <Space orientation="vertical" className="ot-line">
                     <CloseableAlert
                         id="tree-view-alert"
@@ -52,7 +40,7 @@ export default function BuildLinksTree({build, changeDependencyLinksMode}) {
                     <Tree
                         showIcon={true}
                         defaultExpandAll={true}
-                        treeData={treeData}
+                        treeData={treeData ?? NO_TREE_DATA}
                         blockNode={true}
                         titleRender={node => (
                             <>

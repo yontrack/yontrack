@@ -4,7 +4,7 @@ import PropertyAddButton from "@components/core/model/properties/PropertyAddButt
 import PropertyIcon from "@components/framework/properties/PropertyIcon";
 import PropertyComponent from "@components/framework/properties/PropertyComponent";
 import {useEffect, useState} from "react";
-import {useGraphQLClient} from "@components/providers/ConnectionContextProvider";
+import {useQuery} from "@components/services/GraphQL";
 import {gql} from "graphql-request";
 import {useEventForRefresh} from "@components/common/EventsContext";
 import PropertyTitle from "@components/framework/properties/PropertyTitle";
@@ -13,40 +13,46 @@ import {getExtensionShortName} from "@components/common/ExtensionUtils";
 
 export default function PropertiesSection({entityType, entityId, onPropertiesLoaded}) {
 
-    const client = useGraphQLClient()
     const [propertyList, setPropertyList] = useState([])
 
     const refreshCount = useEventForRefresh("entity.properties.changed")
 
-    useEffect(() => {
-
-        const fetchPropertyList = async () => {
-            const data = await client.request(
-                gql`
-                    query EntityProperties(
-                        $type: ProjectEntityType!,
-                        $id: Int!,
-                    ) {
-                        entity(type: $type, id: $id) {
-                            properties {
-                                editable
-                                type {
-                                    typeName
-                                    name
-                                    description
-                                }
-                                value
-                            }
+    const {data: loadedProperties} = useQuery(
+        gql`
+            query EntityProperties(
+                $type: ProjectEntityType!,
+                $id: Int!,
+            ) {
+                entity(type: $type, id: $id) {
+                    properties {
+                        editable
+                        type {
+                            typeName
+                            name
+                            description
                         }
+                        value
                     }
-                `,
-                {
-                    type: entityType,
-                    id: Number(entityId),
                 }
-            )
+            }
+        `,
+        {
+            variables: {
+                type: entityType,
+                id: Number(entityId),
+            },
+            deps: [entityType, entityId, refreshCount],
+            dataFn: data => data.entity.properties,
+        }
+    )
 
-            const initialProperties = data.entity.properties
+    // The client values of the properties are prepared asynchronously, by dynamically loaded
+    // functions, so this stays a side effect of the loading
+    useEffect(() => {
+        let active = true
+
+        const prepareProperties = async () => {
+            const initialProperties = [...loadedProperties]
                 .sort((a, b) => a.type.name.localeCompare(b.type.name))
 
             const transformedProperties = await Promise.all(
@@ -68,17 +74,22 @@ export default function PropertiesSection({entityType, entityId, onPropertiesLoa
                 })
             )
 
-            setPropertyList(transformedProperties)
-            if (onPropertiesLoaded) {
-                onPropertiesLoaded(transformedProperties)
+            if (active) {
+                setPropertyList(transformedProperties)
+                if (onPropertiesLoaded) {
+                    onPropertiesLoaded(transformedProperties)
+                }
             }
         }
 
-        if (client) {
+        if (loadedProperties) {
             // noinspection JSIgnoredPromiseFromCall
-            fetchPropertyList()
+            prepareProperties()
         }
-    }, [client, entityType, entityId, refreshCount])
+        return () => {
+            active = false
+        }
+    }, [loadedProperties])
 
     const canAdd = propertyList.some(it => it.editable)
 

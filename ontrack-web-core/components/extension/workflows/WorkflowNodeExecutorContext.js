@@ -1,8 +1,10 @@
 import {createContext, useContext, useEffect, useState} from "react";
-import {useGraphQLClient} from "@components/providers/ConnectionContextProvider";
+import {useQuery} from "@components/services/GraphQL";
 import {gql} from "graphql-request";
 
 export const WorkflowNodeExecutorContext = createContext([])
+
+const NO_EXECUTORS = []
 
 export const useWorkflowNodeExecutor = (executorId, dependencies = []) => {
     const [executor, setExecutor] = useState({})
@@ -17,25 +19,21 @@ export const useWorkflowNodeExecutor = (executorId, dependencies = []) => {
 
 export default function WorkflowNodeExecutorContextProvider({children}) {
 
-    const client = useGraphQLClient()
-    const [executors, setExecutors] = useState([])
-
-    useEffect(() => {
-        if (client) {
-            client.request(
-                gql`
-                    query WorkflowNodeExecutors {
-                        workflowNodeExecutors(enabled: true) {
-                            id
-                            displayName
-                        }
-                    }
-                `
-            ).then(data => {
-                setExecutors(data.workflowNodeExecutors)
-            })
+    const {data} = useQuery(
+        gql`
+            query WorkflowNodeExecutors {
+                workflowNodeExecutors(enabled: true) {
+                    id
+                    displayName
+                }
+            }
+        `,
+        {
+            initialData: NO_EXECUTORS,
+            dataFn: data => data.workflowNodeExecutors,
         }
-    }, [client]);
+    )
+    const executors = data ?? NO_EXECUTORS
 
     return (
         <>

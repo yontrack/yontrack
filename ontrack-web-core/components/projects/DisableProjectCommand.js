@@ -1,21 +1,20 @@
 import {Command} from "@components/common/Commands";
 import {FaBell, FaBellSlash} from "react-icons/fa";
-import {useGraphQLClient} from "@components/providers/ConnectionContextProvider";
+import {callGraphQL} from "@components/services/GraphQL";
 import {useContext, useState} from "react";
 import {EventsContext} from "@components/common/EventsContext";
 import {gql} from "graphql-request";
 
 export default function DisableProjectCommand({project}) {
 
-    const client = useGraphQLClient()
     const eventsContext = useContext(EventsContext)
     const [loading, setLoading] = useState(false)
 
     const disableProject = async () => {
         setLoading(true)
         try {
-            await client.request(
-                gql`
+            await callGraphQL({
+                query: gql`
                     mutation DisableProject($id: Int!) {
                         disableProject(input: {id: $id}) {
                             errors {
@@ -24,8 +23,8 @@ export default function DisableProjectCommand({project}) {
                         }
                     }
                 `,
-                {id: Number(project.id)}
-            )
+                variables: {id: Number(project.id)},
+            })
             eventsContext.fireEvent("project.updated", {id: project.id})
         } finally {
             setLoading(false)
@@ -35,8 +34,8 @@ export default function DisableProjectCommand({project}) {
     const enableProject = async () => {
         setLoading(true)
         try {
-            await client.request(
-                gql`
+            await callGraphQL({
+                query: gql`
                     mutation EnableProject($id: Int!) {
                         enableProject(input: {id: $id}) {
                             errors {
@@ -45,8 +44,8 @@ export default function DisableProjectCommand({project}) {
                         }
                     }
                 `,
-                {id: Number(project.id)}
-            )
+                variables: {id: Number(project.id)},
+            })
             eventsContext.fireEvent("project.updated", {id: project.id})
         } finally {
             setLoading(false)

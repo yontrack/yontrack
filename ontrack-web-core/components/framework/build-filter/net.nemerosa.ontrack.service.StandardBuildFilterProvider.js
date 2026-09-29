@@ -2,31 +2,28 @@ import {Col, DatePicker, Form, Input, Row, Select, Tabs, Typography} from "antd"
 import SelectPromotionLevel from "@components/promotionLevels/SelectPromotionLevel";
 import SelectValidationStamp from "@components/validationStamps/SelectValidationStamp";
 import SelectValidationRunStatus from "@components/validationRuns/SelectValidationRunStatus";
-import {useEffect, useState} from "react";
 import {gql} from "graphql-request";
-import {useGraphQLClient} from "@components/providers/ConnectionContextProvider";
+import {useQuery} from "@components/services/GraphQL";
+
+const NO_PROPERTIES = []
 
 export default function StandardBuildFilterProvider({branch, buildFilterForm}) {
 
-    const client = useGraphQLClient()
-
-    const [properties, setProperties] = useState([])
-    useEffect(() => {
-        if (client) {
-            client.request(
-                gql`
-                    query GetBranchProperties {
-                        properties(projectEntityType: BUILD) {
-                            value: typeName
-                            label: name
-                        }
-                    }
-                `
-            ).then(data => {
-                setProperties(data.properties)
-            })
+    const {data} = useQuery(
+        gql`
+            query GetBranchProperties {
+                properties(projectEntityType: BUILD) {
+                    value: typeName
+                    label: name
+                }
+            }
+        `,
+        {
+            initialData: NO_PROPERTIES,
+            dataFn: data => data.properties,
         }
-    }, [client]);
+    )
+    const properties = data ?? NO_PROPERTIES
 
     const tabs = [
         {

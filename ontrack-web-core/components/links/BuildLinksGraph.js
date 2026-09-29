@@ -3,15 +3,13 @@ import {useCallback, useEffect, useMemo, useState} from "react";
 import BuildNode from "@components/links/BuildNode";
 import BuildGroupNode from "@components/links/BuildGroupNode";
 import {autoLayout} from "@components/links/GraphUtils";
-import {useGraphQLClient} from "@components/providers/ConnectionContextProvider";
+import {useQuery} from "@components/services/GraphQL";
 import {Skeleton} from "antd";
 import {buildQuery} from "@components/links/BuildLinksUtils";
 import {edgeStyle} from "@components/links/LinksGraphConstants";
 
 
 function BuildLinksFlow({build}) {
-
-    const client = useGraphQLClient()
 
     const [nodes, setNodes] = useState([])
     const [edges, setEdges] = useState([])
@@ -165,60 +163,60 @@ function BuildLinksFlow({build}) {
         return nodeId
     }
 
-    const [loading, setLoading] = useState(true)
+    const {data, loading, finished} = useQuery(
+        buildQuery,
+        {
+            variables: {buildId: Number(build.id)},
+            deps: [build],
+        }
+    )
 
+    // The nodes & edges are then owned by React Flow, which changes them (layout, etc.)
     useEffect(() => {
-        if (client) {
-            setLoading(true)
-            client.request(
-                buildQuery,
-                {buildId: Number(build.id)}
-            ).then(data => {
-                // Nodes & edges to build
-                const nodes = []
-                const edges = []
+        if (data) {
+            // Nodes & edges to build
+            const nodes = []
+            const edges = []
 
-                // Cache for the nodes & edges
-                const nodesCache = {}
-                const edgesCache = {}
+            // Cache for the nodes & edges
+            const nodesCache = {}
+            const edgesCache = {}
 
-                // Building all downstream nodes recursively
-                const rootNodeId = collectDownstreamNodes(
-                    data.build,
-                    nodes,
-                    edges,
-                    nodesCache,
-                    edgesCache,
-                )
+            // Building all downstream nodes recursively
+            const rootNodeId = collectDownstreamNodes(
+                data.build,
+                nodes,
+                edges,
+                nodesCache,
+                edgesCache,
+            )
 
-                // Selecting the root node
-                nodesCache[rootNodeId].data.selected = true
+            // Selecting the root node
+            nodesCache[rootNodeId].data.selected = true
 
-                // Building all upstream nodes recursively
-                collectUpstreamNodes(
-                    rootNodeId,
-                    data.build,
-                    nodes,
-                    edges,
-                    nodesCache,
-                    edgesCache,
-                )
+            // Building all upstream nodes recursively
+            collectUpstreamNodes(
+                rootNodeId,
+                data.build,
+                nodes,
+                edges,
+                nodesCache,
+                edgesCache,
+            )
 
-                // Layout for the graph
+            // Layout for the graph
 
-                autoLayout({
-                    nodes,
-                    edges,
-                    nodeWidth: 300,
-                    nodeHeight: (node) => node.type === 'group' ? 400 : 60,
-                    setNodes,
-                    setEdges,
-                })
-            }).finally(() => {
-                setLoading(false)
+            autoLayout({
+                nodes,
+                edges,
+                nodeWidth: 300,
+                nodeHeight: (node) => node.type === 'group' ? 400 : 60,
+                setNodes,
+                setEdges,
             })
         }
-    }, [client, build])
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [data])
 
     const onNodesChange = useCallback(
         (changes) => setNodes((nds) => applyNodeChanges(changes, nds)),
@@ -228,7 +226,7 @@ function BuildLinksFlow({build}) {
     return (
         <>
             <div style={{height: '800px'}}>
-                <Skeleton active loading={loading}>
+                <Skeleton active loading={loading || !finished}>
                     <ReactFlow
                         nodes={nodes}
                         edges={edges}

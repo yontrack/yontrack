@@ -2,9 +2,8 @@ import Head from "next/head";
 import {pageTitle} from "@components/common/Titles";
 import MainPage from "@components/layouts/MainPage";
 import SubscriptionCard from "@components/extension/notifications/SubscriptionCard";
-import {useEffect, useState} from "react";
 import {Popconfirm, Skeleton, Space, Table, Typography} from "antd";
-import {useGraphQLClient} from "@components/providers/ConnectionContextProvider";
+import {useQuery} from "@components/services/GraphQL";
 import {gql} from "graphql-request";
 import NotificationRecordDetails from "@components/extension/notifications/NotificationRecordDetails";
 import Timestamp from "@components/common/Timestamp";
@@ -17,9 +16,10 @@ import {useRouter} from "next/router";
 
 const {Column} = Table
 
+const EMPTY_RECORDINGS = []
+
 export default function SubscriptionView({title, breadcrumbs, entity, name, managePermission, onRenamed}) {
 
-    const client = useGraphQLClient()
     const router = useRouter()
 
     const {deleteSubscription} = useDeleteSubscription()
@@ -29,109 +29,101 @@ export default function SubscriptionView({title, breadcrumbs, entity, name, mana
     }
 
 
-    const [loading, setLoading] = useState(true)
-    const [subscription, setSubscription] = useState()
-    const [recordings, setRecordings] = useState([])
-    const [commands, setCommands] = useState([])
-
-    useEffect(() => {
-        if (client) {
-
-            const loadSubscription = async () => {
-                setLoading(true)
-                try {
-                    const data = await client.request(
-                        gql`
-                            query GetEntitySubscription(
-                                $entity: ProjectEntityIDInput,
-                                $name: String!,
-                            ) {
-                                eventSubscriptions(size: 1, filter: {entity: $entity, name: $name}) {
-                                    pageItems {
-                                        name
-                                        channel
-                                        channelConfig
-                                        keywords
-                                        events
-                                        disabled
-                                        contentTemplate
-                                    }
-                                }
-                            }
-                        `,
-                        {
-                            entity: {type: entity.type, id: Number(entity.id)},
-                            name,
-                        }
-                    )
-                    setSubscription(data.eventSubscriptions.pageItems[0])
-
-                    const dataRecordings = await client.request(
-                        gql`
-                            query GetSubscriptionRecordings(
-                                $sourceId: String,
-                                $sourceData: JSON,
-                            ) {
-                                notificationRecords(sourceId: $sourceId, sourceData: $sourceData) {
-                                    pageItems {
-                                        key: id
-                                        source {
-                                            id
-                                            data
-                                        }
-                                        channel
-                                        channelConfig
-                                        event
-                                        result {
-                                            type
-                                            message
-                                            output
-                                        }
-                                        timestamp
-                                    }
-                                }
-                            }
-                        `,
-                        {
-                            sourceId: entity ? 'entity-subscription' : 'global-subscription',
-                            sourceData: entity ? {
-                                entityType: entity.type,
-                                entityId: Number(entity.id),
-                                subscriptionName: name,
-                            } : {
-                                subscriptionName: name,
-                            }
-                        }
-                    )
-                    setRecordings(dataRecordings.notificationRecords.pageItems)
-                    const commands = []
-                    if (managePermission) {
-                        commands.push(
-                            <Popconfirm
-                                key="delete"
-                                title="Do you really want to delete this subscription?"
-                                onConfirm={onDeleteSubscription}
-                            >
-                                <div>
-                                    <Command
-                                        text="Delete subscription"
-                                        icon={<FaTrash/>}
-                                    />
-                                </div>
-                            </Popconfirm>
-                        )
+    const {data: subscription, loading: loadingSubscription, finished: finishedSubscription} = useQuery(
+        gql`
+            query GetEntitySubscription(
+                $entity: ProjectEntityIDInput,
+                $name: String!,
+            ) {
+                eventSubscriptions(size: 1, filter: {entity: $entity, name: $name}) {
+                    pageItems {
+                        name
+                        channel
+                        channelConfig
+                        keywords
+                        events
+                        disabled
+                        contentTemplate
                     }
-                    commands.push(<CloseCommand key="close" href={subscriptionsLink(entity)}/>)
-                    setCommands(commands)
-                } finally {
-                    setLoading(false)
                 }
             }
-
-            // noinspection JSIgnoredPromiseFromCall
-            loadSubscription()
+        `,
+        {
+            variables: {
+                entity: {type: entity.type, id: Number(entity.id)},
+                name,
+            },
+            deps: [entity, name],
+            initialData: undefined,
+            dataFn: data => data.eventSubscriptions.pageItems[0],
         }
-    }, [client, entity, name])
+    )
+
+    const {data: recordings, loading: loadingRecordings, finished: finishedRecordings} = useQuery(
+        gql`
+            query GetSubscriptionRecordings(
+                $sourceId: String,
+                $sourceData: JSON,
+            ) {
+                notificationRecords(sourceId: $sourceId, sourceData: $sourceData) {
+                    pageItems {
+                        key: id
+                        source {
+                            id
+                            data
+                        }
+                        channel
+                        channelConfig
+                        event
+                        result {
+                            type
+                            message
+                            output
+                        }
+                        timestamp
+                    }
+                }
+            }
+        `,
+        {
+            variables: {
+                sourceId: entity ? 'entity-subscription' : 'global-subscription',
+                sourceData: entity ? {
+                    entityType: entity.type,
+                    entityId: Number(entity.id),
+                    subscriptionName: name,
+                } : {
+                    subscriptionName: name,
+                }
+            },
+            deps: [entity, name],
+            initialData: EMPTY_RECORDINGS,
+            dataFn: data => data.notificationRecords.pageItems,
+        }
+    )
+
+    const loading = loadingSubscription || loadingRecordings || !finishedSubscription || !finishedRecordings
+
+    const commands = []
+    if (subscription && finishedRecordings && recordings) {
+        if (managePermission) {
+            commands.push(
+                <Popconfirm
+                    key="delete"
+                    title="Do you really want to delete this subscription?"
+                    onConfirm={onDeleteSubscription}
+                >
+                    <div>
+                        <Command
+                            text="Delete subscription"
+                            icon={<FaTrash/>}
+                        />
+                    </div>
+                </Popconfirm>
+            )
+        }
+        commands.push(<CloseCommand key="close" href={subscriptionsLink(entity)}/>)
+    }
 
     return (
         <>
@@ -157,7 +149,7 @@ export default function SubscriptionView({title, breadcrumbs, entity, name, mana
                         <Typography.Title level={5} type="secondary">Recordings</Typography.Title>
 
                         <Table
-                            dataSource={recordings}
+                            dataSource={recordings ?? EMPTY_RECORDINGS}
                             pagination={false}
                             expandable={{
                                 expandedRowRender: (record) => (

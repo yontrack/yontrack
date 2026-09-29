@@ -2,7 +2,7 @@ import Head from "next/head";
 import {useEffect, useMemo, useState} from "react";
 import MainPage from "@components/layouts/MainPage";
 import {Col, Empty, Row, Skeleton} from "antd";
-import {useGraphQLClient} from "@components/providers/ConnectionContextProvider";
+import {useQuery} from "@components/services/GraphQL";
 import {gql} from "graphql-request";
 import {FaPlus} from "react-icons/fa";
 import {pageTitle} from "@components/common/Titles";
@@ -10,6 +10,8 @@ import {CloseCommand, Command} from "@components/common/Commands";
 import SubscriptionDialog, {useSubscriptionDialog} from "@components/extension/notifications/SubscriptionDialog";
 import SubscriptionCard from "@components/extension/notifications/SubscriptionCard";
 import {useSubscriptionActions} from "@components/extension/notifications/SubscriptionActions";
+
+const EMPTY_ITEMS = []
 
 export default function SubscriptionsView({
                                               title,
@@ -20,66 +22,58 @@ export default function SubscriptionsView({
                                               additionalFilter = {}
                                           }) {
 
-    const client = useGraphQLClient()
-
-    const [loading, setLoading] = useState(true)
-
     const filter = useMemo(() => ({
         ...additionalFilter,
     }), [additionalFilter])
 
-    const [items, setItems] = useState([])
     const [refresh, setRefresh] = useState(0)
 
     const reload = () => {
         setRefresh(it => it + 1)
     }
 
-    useEffect(() => {
-        if (client) {
-            setLoading(true)
-            client.request(
-                gql`
-                    query Subscriptions(
-                        $offset: Int!,
-                        $size: Int!,
-                        $filter: EventSubscriptionFilter!,
-                    ) {
-                        eventSubscriptions(
-                            offset: $offset,
-                            size: $size,
-                            filter: $filter,
-                        ) {
-                            pageInfo {
-                                nextPage {
-                                    offset
-                                    size
-                                }
-                            }
-                            pageItems {
-                                name
-                                channel
-                                channelConfig
-                                disabled
-                                events
-                                keywords
-                                contentTemplate
-                            }
+    const {data, loading, finished} = useQuery(
+        gql`
+            query Subscriptions(
+                $offset: Int!,
+                $size: Int!,
+                $filter: EventSubscriptionFilter!,
+            ) {
+                eventSubscriptions(
+                    offset: $offset,
+                    size: $size,
+                    filter: $filter,
+                ) {
+                    pageInfo {
+                        nextPage {
+                            offset
+                            size
                         }
                     }
-                `,
-                {
-                    offset: 0,
-                    size: 100,
-                    filter,
+                    pageItems {
+                        name
+                        channel
+                        channelConfig
+                        disabled
+                        events
+                        keywords
+                        contentTemplate
+                    }
                 }
-            ).then(data => {
-                setItems(data.eventSubscriptions.pageItems)
-            }).finally(() => {
-                setLoading(false)
-            })
+            }
+        `,
+        {
+            variables: {
+                offset: 0,
+                size: 100,
+                filter,
+            },
+            deps: [filter, refresh],
+            initialData: EMPTY_ITEMS,
+            dataFn: data => data.eventSubscriptions.pageItems,
         }
-    }, [client, filter, refresh]);
+    )
+    const items = data ?? EMPTY_ITEMS
 
     const {getActions} = useSubscriptionActions(
         additionalFilter.entity,
@@ -122,7 +116,7 @@ export default function SubscriptionsView({
                 breadcrumbs={breadcrumbs}
                 commands={commands}
             >
-                <Skeleton active loading={loading}>
+                <Skeleton active loading={loading || !finished}>
                     {
                         items.length === 0 &&
                         <Empty image={Empty.PRESENTED_IMAGE_SIMPLE}/>

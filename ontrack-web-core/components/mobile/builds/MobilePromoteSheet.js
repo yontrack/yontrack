@@ -4,8 +4,7 @@
  * Promoting a build, from a phone.
  *
  * **A bottom sheet, not the desktop dialog.** `BuildPromoteDialog` is a modal
- * with a labelled column beside every control, and it still reads the server
- * through the deprecated `useGraphQLClient`. Both halves of the boundary in
+ * with a labelled column beside every control. Both halves of the boundary in
  * `doc/dev-guide/ui/mobile-ui.md` apply: the layout is the mobile UI's own, and
  * the read and the write go through `@components/services/GraphQL`.
  *

@@ -2,11 +2,9 @@ import {useContext, useEffect, useState} from "react";
 import {EventsContext} from "@components/common/EventsContext";
 import {gql} from "graphql-request";
 import Favourite from "@components/common/Favourite";
-import {useGraphQLClient} from "@components/providers/ConnectionContextProvider";
+import {callGraphQL} from "@components/services/GraphQL";
 
 export default function ProjectFavourite({project}) {
-
-    const client = useGraphQLClient()
 
     const eventsContext = useContext(EventsContext)
     const [favourite, setFavourite] = useState(project.favourite)
@@ -17,8 +15,8 @@ export default function ProjectFavourite({project}) {
 
     const toggleFavourite = async () => {
         if (favourite) {
-            return client.request(
-                gql`
+            return callGraphQL({
+                query: gql`
                     mutation UnsetFavourite(
                         $projectId: Int!,
                     ) {
@@ -30,14 +28,15 @@ export default function ProjectFavourite({project}) {
                             }
                         }
                     }
-                `, {projectId: Number(project.id)}
-            ).then(() => {
+                `,
+                variables: {projectId: Number(project.id)},
+            }).then(() => {
                 setFavourite(false)
                 eventsContext.fireEvent("project.favourite", {id: project.id, value: false})
             })
         } else {
-            return client.request(
-                gql`
+            return callGraphQL({
+                query: gql`
                     mutation SetFavourite(
                         $projectId: Int!,
                     ) {
@@ -49,8 +48,9 @@ export default function ProjectFavourite({project}) {
                             }
                         }
                     }
-                `, {projectId: Number(project.id)}
-            ).then(() => {
+                `,
+                variables: {projectId: Number(project.id)},
+            }).then(() => {
                 setFavourite(true)
                 eventsContext.fireEvent("project.favourite", {id: project.id, value: true})
             })

@@ -1,4 +1,4 @@
-import {useEffect, useState} from "react";
+import {useState} from "react";
 import {CloseCommand} from "@components/common/Commands";
 import {buildUri} from "@components/common/Links";
 import Head from "next/head";
@@ -6,7 +6,7 @@ import {subBuildTitle} from "@components/common/Titles";
 import MainPage from "@components/layouts/MainPage";
 import {downToBuildBreadcrumbs} from "@components/common/Breadcrumbs";
 import {gql} from "graphql-request";
-import {useGraphQLClient} from "@components/providers/ConnectionContextProvider";
+import {useQuery} from "@components/services/GraphQL";
 import {Skeleton} from "antd";
 import {getLocallySelectedDependencyLinksMode, setLocallySelectedDependencyLinksMode} from "@components/storage/local";
 import {FaProjectDiagram, FaStream} from "react-icons/fa";
@@ -14,59 +14,53 @@ import DependencyLinksModeButton from "@components/links/DependencyLinksModeButt
 import BuildLinksGraph from "@components/links/BuildLinksGraph";
 import BuildLinksTree from "@components/links/BuildLinksTree";
 
+const NO_BUILD = {branch: {project: ''}}
+
 export default function BuildLinksView({id}) {
 
-    const client = useGraphQLClient()
-
-    const [loading, setLoading] = useState(true)
-    const [build, setBuild] = useState({branch: {project: ''}})
-    const [commands, setCommands] = useState([])
-
-    const [dependencyLinksMode, setDependencyLinksMode] = useState('')
+    const [selectedDependencyLinksMode, setDependencyLinksMode] = useState('')
 
     const changeDependencyLinksMode = (mode) => {
         setDependencyLinksMode(mode)
         setLocallySelectedDependencyLinksMode(mode)
     }
 
-    useEffect(() => {
-        if (id && client) {
-            setLoading(true)
-            client.request(
-                gql`
-                    query GetBuild($id: Int!) {
-                        build(id: $id) {
+    const {data: loadedBuild, loading, finished} = useQuery(
+        gql`
+            query GetBuild($id: Int!) {
+                build(id: $id) {
+                    id
+                    name
+                    branch {
+                        id
+                        name
+                        project {
                             id
                             name
-                            branch {
-                                id
-                                name
-                                project {
-                                    id
-                                    name
-                                }
-                            }
-                            releaseProperty {
-                                value
-                            }
                         }
                     }
-                `,
-                {id: Number(id)}
-            ).then(data => {
-                const build = data.build
-                setBuild(build)
-
-                setCommands([
-                    <CloseCommand key="close" href={buildUri(build)}/>,
-                ])
-
-                setDependencyLinksMode(getLocallySelectedDependencyLinksMode() ?? 'graph')
-            }).finally(() => {
-                setLoading(false)
-            })
+                    releaseProperty {
+                        value
+                    }
+                }
+            }
+        `,
+        {
+            variables: {id: Number(id)},
+            deps: [id],
+            condition: !!id,
+            dataFn: data => data.build,
         }
-    }, [id, client])
+    )
+    const build = loadedBuild ?? NO_BUILD
+
+    const commands = loadedBuild ? [
+        <CloseCommand key="close" href={buildUri(loadedBuild)}/>,
+    ] : []
+
+    // Until chosen on this page, the mode is the one stored locally, once the build is loaded
+    const dependencyLinksMode = selectedDependencyLinksMode ||
+        (loadedBuild ? (getLocallySelectedDependencyLinksMode() ?? 'graph') : '')
 
     return (
         <>
@@ -94,7 +88,7 @@ export default function BuildLinksView({id}) {
                     action={changeDependencyLinksMode}
                     title="Displays the dependencies as a tree"
                 />
-                <Skeleton active loading={loading}>
+                <Skeleton active loading={loading || !finished}>
                     {
                         dependencyLinksMode === 'graph' && <BuildLinksGraph build={build}/>
                     }
