@@ -5,7 +5,7 @@ import tools.jackson.databind.JsonNode
 import net.nemerosa.ontrack.common.api.APIDescription
 
 data class SubscriptionsCascContextData(
-    @APIDescription("Name of the subscription. Will be required in V5.")
+    @APIDescription("Name of the subscription. Omitting it is deprecated: it is required in V6.")
     val name: String?,
     @APIDescription("List of events to listen to")
     val events: List<String>,

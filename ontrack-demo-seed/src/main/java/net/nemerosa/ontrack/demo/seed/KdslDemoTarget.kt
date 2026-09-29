@@ -369,6 +369,7 @@ private class KdslDemoBranch(
         promotionLevels[name] = promotionLevel
         workflow?.let {
             NotificationsMgt(promotionLevel.connector).subscribe(
+                name = "workflow",
                 channel = "workflow",
                 channelConfig = mapOf("workflow" to Yaml().read(it.yaml).first()),
                 events = listOf(KdslDemoTarget.NEW_PROMOTION_RUN_EVENT),

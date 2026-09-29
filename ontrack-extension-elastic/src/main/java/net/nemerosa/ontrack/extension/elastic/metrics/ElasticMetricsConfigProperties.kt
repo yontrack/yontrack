@@ -64,7 +64,7 @@ class ElasticMetricsConfigProperties {
     )
     var custom = ElasticsearchProperties()
 
-    @Deprecated("Ontrack is now used the Java ES client and the compatibility mode is always enabled")
+    @Deprecated("Removed in V6. No replacement. See #1922")
     @APIDescription(
         """
             Set to true to enable the API Compatibility mode when accessing a 8.x ES server.

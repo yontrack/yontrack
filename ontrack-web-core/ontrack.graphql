@@ -82,7 +82,7 @@ type Account {
   groups: [AccountGroup!]!
   id: ID!
   "Unique name for the account"
-  name: String! @deprecated(reason : "Will be removed in V6. Use email instead. Replaced by email.")
+  name: String! @deprecated(reason : "Removed in V6. Use email instead. See #1921")
   "Security role (admin or none)"
   role: String
   "List of authentication tokens linked to this account."
@@ -332,7 +332,7 @@ type AutoVersioningOrder {
   "Target path(s) for the processing order"
   targetPath: String!
   "Target path(s) for the processing order"
-  targetPaths: String @deprecated(reason : "Deprecated, use `targetPath`")
+  targetPaths: String @deprecated(reason : "Removed in V6. Use targetPath instead. See #1921")
   "Property in the target file"
   targetProperty: String
   "Regex used in property value to identify the version"
@@ -2194,7 +2194,7 @@ type EventSubscriptionPayload {
   "List of events types to subscribe to"
   events: [String!]!
   "Name of the subscription"
-  id: String @deprecated(reason : "Will be removed in V5. Use `name` instead.")
+  id: String @deprecated(reason : "Removed in V6. Use name instead. See #1927")
   "Optional space-separated list of tokens to look for in the events"
   keywords: String
   "Unique name for this subscription"
@@ -2752,7 +2752,7 @@ type HookRequest {
 "Data returned by a hook."
 type HookResponse {
   "Additional information (non structured, will typically be rendered as JSON)"
-  info: JSON
+  info: JSON @deprecated(reason : "Removed in V6. Use infoLink instead. See #1922")
   "Structured additional information"
   infoLink: HookInfoLink
   "Type of response"
@@ -5311,7 +5311,7 @@ type PromotionLevel implements Authorizable & ProjectEntity {
   "List of branches targeted for auto-versioning based on this promotion level"
   autoVersioningTargets: [AutoVersioningConfiguredBranch!]!
   "List of branches targeted for auto-versioning based on this promotion level or with their reason for rejection"
-  autoVersioningTrail: AutoVersioningTrail @deprecated(reason : "Will be removed in V6. Use autoVersioningTrailPaginated instead.")
+  autoVersioningTrail: AutoVersioningTrail @deprecated(reason : "Removed in V6. Use autoVersioningTrailPaginated instead. See #1921")
   "List of branches targeted for auto-versioning based on this promotion or with their reason for rejection"
   autoVersioningTrailPaginated(
     filter: AutoVersioningTrailFilter,
@@ -5357,7 +5357,7 @@ type PromotionLevel implements Authorizable & ProjectEntity {
     first: Int,
     "Number of items to return from the end of the list"
     last: Int
-  ): [PromotionRun!]! @deprecated(reason : "Use the paginated promotion runs with the `promotionRunsPaginated` field.")
+  ): [PromotionRun!]! @deprecated(reason : "Removed in V6. Use promotionRunsPaginated instead. See #1921")
   "Paginated list of promotion runs"
   promotionRunsPaginated(
     "Keeps only runs after this data / time"
@@ -5414,7 +5414,7 @@ type PromotionRun implements Authorizable & ProjectEntity {
   "Current conditions of the auto promotion of this run's promotion level, with their current state for this run's build - null when the promotion level has no auto promotion"
   autoPromotionConditions: AutoPromotionBuildConditions
   "List of branches targeted for auto-versioning based on this promotion run or with their reason for rejection"
-  autoVersioningTrail: AutoVersioningTrail @deprecated(reason : "Will be removed in V6. Use autoVersioningTrailPaginated instead.")
+  autoVersioningTrail: AutoVersioningTrail @deprecated(reason : "Removed in V6. Use autoVersioningTrailPaginated instead. See #1921")
   "List of branches targeted for auto-versioning based on this promotion run or with their reason for rejection"
   autoVersioningTrailPaginated(
     filter: AutoVersioningTrailFilter,
@@ -8446,7 +8446,7 @@ type VersionInfo {
   "Git commit"
   commit: String!
   "Creation date"
-  date: LocalDateTime @deprecated(reason : "Date field will be removed in V5")
+  date: LocalDateTime @deprecated(reason : "Removed in V6. No replacement. See #1921")
   "Display version"
   display: String!
   "Full version"
@@ -12417,7 +12417,7 @@ input SubscribeBranchToEventsInput {
   events: [String!]!
   "Optional space-separated list of tokens to look for in the events"
   keywords: String
-  "Unique name of the channel in its scope (null for backward compatibility, will be required in V5)"
+  "Unique name of the subscription in its scope. Omitting it is deprecated: it is required in V6."
   name: String
   "Project name"
   project: String!
@@ -12439,7 +12439,7 @@ input SubscribeBuildToEventsInput {
   events: [String!]!
   "Optional space-separated list of tokens to look for in the events"
   keywords: String
-  "Unique name of the channel in its scope (null for backward compatibility, will be required in V5)"
+  "Unique name of the subscription in its scope. Omitting it is deprecated: it is required in V6."
   name: String
   "Project name"
   project: String!
@@ -12457,7 +12457,7 @@ input SubscribeProjectToEventsInput {
   events: [String!]!
   "Optional space-separated list of tokens to look for in the events"
   keywords: String
-  "Unique name of the channel in its scope (null for backward compatibility, will be required in V5)"
+  "Unique name of the subscription in its scope. Omitting it is deprecated: it is required in V6."
   name: String
   "Project name"
   project: String!
@@ -12477,7 +12477,7 @@ input SubscribePromotionLevelToEventsInput {
   events: [String!]!
   "Optional space-separated list of tokens to look for in the events"
   keywords: String
-  "Unique name of the channel in its scope (null for backward compatibility, will be required in V5)"
+  "Unique name of the subscription in its scope. Omitting it is deprecated: it is required in V6."
   name: String
   "Project name"
   project: String!
@@ -12501,7 +12501,7 @@ input SubscribePromotionRunToEventsInput {
   events: [String!]!
   "Optional space-separated list of tokens to look for in the events"
   keywords: String
-  "Unique name of the channel in its scope (null for backward compatibility, will be required in V5)"
+  "Unique name of the subscription in its scope. Omitting it is deprecated: it is required in V6."
   name: String
   "Project name"
   project: String!
@@ -12521,7 +12521,7 @@ input SubscribeToEventsInput {
   events: [String!]!
   "Optional space-separated list of tokens to look for in the events"
   keywords: String
-  "Unique name of the channel in its scope (null for backward compatibility, will be required in V5)"
+  "Unique name of the subscription in its scope. Omitting it is deprecated: it is required in V6."
   name: String
   "Target project entity (null for global events)"
   projectEntity: ProjectEntityIDInput
@@ -12543,7 +12543,7 @@ input SubscribeValidationRunToEventsInput {
   events: [String!]!
   "Optional space-separated list of tokens to look for in the events"
   keywords: String
-  "Unique name of the channel in its scope (null for backward compatibility, will be required in V5)"
+  "Unique name of the subscription in its scope. Omitting it is deprecated: it is required in V6."
   name: String
   "Project name"
   project: String!
@@ -12567,7 +12567,7 @@ input SubscribeValidationStampToEventsInput {
   events: [String!]!
   "Optional space-separated list of tokens to look for in the events"
   keywords: String
-  "Unique name of the channel in its scope (null for backward compatibility, will be required in V5)"
+  "Unique name of the subscription in its scope. Omitting it is deprecated: it is required in V6."
   name: String
   "Project name"
   project: String!

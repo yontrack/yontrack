@@ -36,7 +36,7 @@ class GQLTypeAutoVersioningOrder(
             .field {
                 it.name("targetPaths")
                     .description("Target path(s) for the processing order")
-                    .deprecate("Deprecated, use `targetPath`")
+                    .deprecate("Removed in V6. Use targetPath instead. See #1921")
                     .type(GraphQLString)
                     .dataFetcher { env ->
                         val order = env.getSource<AutoVersioningOrder>()!!

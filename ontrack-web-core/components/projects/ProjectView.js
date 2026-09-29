@@ -90,11 +90,13 @@ export default function ProjectView({id}) {
                             id
                             name
                             image
-                            promotionRuns(first: 1) {
-                                build {
-                                    id
-                                    name
-                                    displayName
+                            promotionRunsPaginated(size: 1) {
+                                pageItems {
+                                    build {
+                                        id
+                                        name
+                                        displayName
+                                    }
                                 }
                             }
                         }

@@ -58,7 +58,7 @@ class GlobalSubscriptionsCascContextIT : AbstractCascTestSupport() {
                         "type": "string"
                       },
                       "name": {
-                        "description": "Name of the subscription. Will be required in V5.",
+                        "description": "Name of the subscription. Omitting it is deprecated: it is required in V6.",
                         "type": "string"
                       }
                     },

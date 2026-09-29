@@ -6,6 +6,8 @@ import graphql.schema.*
 import net.nemerosa.ontrack.common.api.APIDescription
 import net.nemerosa.ontrack.graphql.schema.*
 import net.nemerosa.ontrack.graphql.support.*
+import net.nemerosa.ontrack.model.deprecation.DeprecationService
+import net.nemerosa.ontrack.model.deprecation.DeprecationSurface
 import net.nemerosa.ontrack.model.structure.*
 import org.springframework.stereotype.Component
 
@@ -13,6 +15,7 @@ import org.springframework.stereotype.Component
 class EventSubscriptionMutations(
     private val eventSubscriptionService: EventSubscriptionService,
     private val structureService: StructureService,
+    private val deprecationService: DeprecationService,
 ) : TypedMutationProvider() {
 
     override val mutations: List<Mutation>
@@ -61,6 +64,9 @@ class EventSubscriptionMutations(
 
                 // Creates the payload
                 val name = getMutationInputField<String>(env, SubscribeToEventsInput::name.name)
+                if (name == null) {
+                    deprecationService.namelessSubscription(DeprecationSurface.GRAPHQL)
+                }
                 val channel = getRequiredMutationInputField<String>(env, SubscribeToEventsInput::channel.name)
                 val channelConfig =
                     getRequiredMutationInputField<JsonNode>(env, SubscribeToEventsInput::channelConfig.name)
@@ -100,6 +106,9 @@ class EventSubscriptionMutations(
             ) { input ->
                 val projectEntity = input.projectEntity?.run {
                     type.getEntityFn(structureService).apply(ID.of(id))
+                }
+                if (input.name == null) {
+                    deprecationService.namelessSubscription(DeprecationSurface.GRAPHQL)
                 }
                 createEventSubscriptionPayload(
                     projectEntity = projectEntity,
@@ -303,7 +312,7 @@ data class SubscribeToEventsInput(
     @APIDescription("Target project entity (null for global events)")
     @TypeRef(embedded = true, suffix = "Input")
     val projectEntity: ProjectEntityID?,
-    @APIDescription("Unique name of the channel in its scope (null for backward compatibility, will be required in V5)")
+    @APIDescription("Unique name of the subscription in its scope. Omitting it is deprecated: it is required in V6.")
     val name: String? = null,
     @APIDescription("Channel to send this event to")
     val channel: String,

@@ -39,7 +39,6 @@ export default function UserContextProvider({children}) {
             query UserContext {
                 user {
                     account {
-                        name
                         fullName
                         email
                     }
@@ -73,7 +72,7 @@ export default function UserContextProvider({children}) {
     useEffect(() => {
         if (data && profile && finished) {
             const tmpUser = {
-                name: data?.user?.account?.name,
+                name: data?.user?.account?.email,
                 fullName: data?.user?.account?.fullName,
                 email: data?.user?.account?.email,
             }

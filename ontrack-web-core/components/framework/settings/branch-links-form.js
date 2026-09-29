@@ -1,6 +1,7 @@
 import SettingsForm from "@components/core/admin/settings/SettingsForm";
 import {Alert, Form, InputNumber} from "antd";
 
+/** @deprecated Removed in V6. No replacement. See #1922 */
 export default function BranchLinksForm({id, ...values}) {
     return (
         <>
@@ -8,7 +9,7 @@ export default function BranchLinksForm({id, ...values}) {
                 <Form.Item>
                     <Alert
                         type="warning"
-                        title="Settings valid only for legacy (V4) branch graph. Will be removed in V5."
+                        title="Settings valid only for legacy (V4) branch graph. Removed in V6."
                     />
                 </Form.Item>
                 <Form.Item

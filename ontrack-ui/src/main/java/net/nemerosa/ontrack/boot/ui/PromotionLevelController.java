@@ -4,6 +4,8 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import net.nemerosa.ontrack.common.Document;
 import net.nemerosa.ontrack.model.Ack;
+import net.nemerosa.ontrack.model.deprecation.DeprecationService;
+import net.nemerosa.ontrack.model.deprecation.DeprecationSurface;
 import net.nemerosa.ontrack.model.structure.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -22,10 +24,12 @@ import static net.nemerosa.ontrack.ui.support.UIUtils.setupDefaultImageCache;
 public class PromotionLevelController {
 
     private final StructureService structureService;
+    private final DeprecationService deprecationService;
 
     @Autowired
-    public PromotionLevelController(StructureService structureService) {
+    public PromotionLevelController(StructureService structureService, DeprecationService deprecationService) {
         this.structureService = structureService;
+        this.deprecationService = deprecationService;
     }
 
     // Promotion levels
@@ -97,12 +101,17 @@ public class PromotionLevelController {
     }
 
     /**
-     * @deprecated Use the PUT method
+     * @deprecated Removed in V6. Use the PUT method instead. See #1922
      */
     @RequestMapping(value = "promotionLevels/{promotionLevelId}/image", method = RequestMethod.POST)
     @ResponseStatus(HttpStatus.ACCEPTED)
     @Deprecated(forRemoval = true)
     public void setPromotionLevelImage(@PathVariable ID promotionLevelId, @RequestParam MultipartFile file) throws IOException {
+        deprecationService.deprecatedUsage(
+                DeprecationSurface.REST,
+                "POST /rest/structure/promotionLevels/{id}/image",
+                "Removed in V6. Use the PUT method instead. See #1922"
+        );
         structureService.setPromotionLevelImage(promotionLevelId, new Document(
                 file.getContentType(),
                 file.getBytes()
