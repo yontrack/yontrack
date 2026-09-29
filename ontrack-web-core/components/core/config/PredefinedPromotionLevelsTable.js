@@ -1,11 +1,11 @@
 import {gql} from "graphql-request";
 import {Form, Input, Space, Table, Typography} from "antd";
 import {useState} from "react";
-import {useQuery} from "@components/services/useQuery";
+import {callGraphQL, useQuery} from "@components/services/GraphQL";
 import PredefinedPromotionLevelImage from "@components/core/config/PredefinedPromotionLevelImage";
 import FilterForm from "@components/common/table/FilterForm";
 import PredefinedPromotionLevelUpdateCommand from "@components/core/config/PredefinedPromotionLevelUpdateCommand";
-import {useReloadState} from "@components/common/StateUtils";
+import {useRefresh} from "@components/common/RefreshUtils";
 import PredefinedPromotionLevelChangeImageCommand
     from "@components/core/config/PredefinedPromotionLevelChangeImageCommand";
 import PredefinedPromotionLevelDeleteCommand from "@components/core/config/PredefinedPromotionLevelDeleteCommand";
@@ -13,17 +13,15 @@ import {DndContext, PointerSensor, useSensor, useSensors} from "@dnd-kit/core";
 import {arrayMove, SortableContext, verticalListSortingStrategy} from "@dnd-kit/sortable";
 import {restrictToVerticalAxis} from "@dnd-kit/modifiers";
 import {DnDRow} from "@components/common/table/DndRow";
-import {useGraphQLClient} from "@components/providers/ConnectionContextProvider";
 
 export default function PredefinedPromotionLevelsTable({reloadState}) {
 
-    const client = useGraphQLClient()
-    const [changed, onChange] = useReloadState()
+    const [changed, onChange] = useRefresh()
 
     const [filterFormData, setFilterFormData] = useState({
         name: ''
     })
-    const {data, setData, loading} = useQuery(
+    const {data: queriedData, loading, finished} = useQuery(
         gql`
             query PredefinedPromotionLevels($name: String = null) {
                 predefinedPromotionLevels(name: $name) {
@@ -41,6 +39,11 @@ export default function PredefinedPromotionLevelsTable({reloadState}) {
         }
     )
 
+    // A reordering is applied locally, on top of the query result it was made against,
+    // until the next query result replaces it
+    const [reordered, setReordered] = useState({source: null, data: null})
+    const data = reordered.source === queriedData ? reordered.data : queriedData
+
     const sensors = useSensors(
         useSensor(PointerSensor, {
             activationConstraint: {
@@ -54,8 +57,8 @@ export default function PredefinedPromotionLevelsTable({reloadState}) {
 
     const reorder = (activeId, overId) => {
         setReordering(true)
-        client.request(
-            gql`
+        callGraphQL({
+            query: gql`
                 mutation ReorderPredefinedPromotionLevels(
                     $activeId: Int!,
                     $overId: Int!,
@@ -70,20 +73,24 @@ export default function PredefinedPromotionLevelsTable({reloadState}) {
                     }
                 }
             `,
-            {
+            variables: {
                 activeId,
                 overId,
-            }
-        ).then(() => {
+            },
+        }).then(() => {
             // onChange() not reloading
             // only locally:
-            setData(data => {
+            setReordered(previous => {
+                const data = previous.source === queriedData ? previous.data : queriedData
                 const entries = data.predefinedPromotionLevels
                 const activeIndex = entries.findIndex((i) => i.id === activeId)
                 const overIndex = entries.findIndex((i) => i.id === overId)
                 return {
-                    ...data,
-                    predefinedPromotionLevels: arrayMove(entries, activeIndex, overIndex),
+                    source: queriedData,
+                    data: {
+                        ...data,
+                        predefinedPromotionLevels: arrayMove(entries, activeIndex, overIndex),
+                    },
                 }
             })
         }).finally(() => {
@@ -117,7 +124,7 @@ export default function PredefinedPromotionLevelsTable({reloadState}) {
                     strategy={verticalListSortingStrategy}
                 >
                     <Table
-                        loading={loading}
+                        loading={loading || !finished}
                         dataSource={data?.predefinedPromotionLevels}
                         pagination={false}
                         components={{

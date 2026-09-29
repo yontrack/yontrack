@@ -1,11 +1,11 @@
 import {Select, Space, Typography} from "antd";
 import {gql} from "graphql-request";
-import {useQuery} from "@components/services/useQuery";
+import {useQuery} from "@components/services/GraphQL";
 import InlineError from "@components/common/InlineError";
 
 export default function SelectIssueService({id, value, onChange, self}) {
 
-    const {data: options, loading, error} = useQuery(
+    const {data: options, loading, finished, error} = useQuery(
         gql`
             query GetIssueServicesConfigurations {
                 issueServiceConfigurations {
@@ -48,7 +48,7 @@ export default function SelectIssueService({id, value, onChange, self}) {
             <Select
                 id={id}
                 options={options}
-                loading={loading}
+                loading={loading || !finished}
                 value={value}
                 onChange={onChange}
                 allowClear={true}

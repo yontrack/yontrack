@@ -1,9 +1,9 @@
-import {useQuery} from "@components/services/useQuery";
+import {useQuery} from "@components/services/GraphQL";
 import {gql} from "graphql-request";
 import LoadingInline from "@components/common/LoadingInline";
 
 export default function ProjectCount() {
-    const {data: count, loading} = useQuery(
+    const {data: count, loading, finished} = useQuery(
         gql`
             query ProjectCount {
                 entityCounts {
@@ -16,5 +16,5 @@ export default function ProjectCount() {
             dataFn: data => data.entityCounts.projects,
         }
     )
-    return <LoadingInline loading={loading}>{count}</LoadingInline>
+    return <LoadingInline loading={loading || !finished}>{count}</LoadingInline>
 }

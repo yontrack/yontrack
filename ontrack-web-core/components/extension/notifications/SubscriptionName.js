@@ -3,7 +3,7 @@ import {useState} from "react";
 import {FaPencilAlt} from "react-icons/fa";
 import {useGraphQLClient} from "@components/providers/ConnectionContextProvider";
 import {gql} from "graphql-request";
-import {getUserErrors} from "@components/services/graphql-utils";
+import {getGraphQLErrors} from "@components/services/graphql-utils";
 
 export default function SubscriptionName({subscription, text, entity, managePermission, onRenamed}) {
 
@@ -36,8 +36,8 @@ export default function SubscriptionName({subscription, text, entity, managePerm
                 newName: value,
             }
         )
-        const errors = getUserErrors(data.renameSubscription)
-        if (errors) {
+        const errors = getGraphQLErrors(data, 'renameSubscription')
+        if (errors.length > 0) {
             messageApi.error(errors[0])
         } else if (onRenamed) {
             onRenamed(value)

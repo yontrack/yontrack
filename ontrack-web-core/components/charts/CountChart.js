@@ -1,9 +1,16 @@
-import {useGraphQLClient} from "@components/providers/ConnectionContextProvider";
-import {useEffect, useState} from "react";
+import {useState} from "react";
+import {useQuery} from "@components/services/GraphQL";
 import {Bar, CartesianGrid, ComposedChart, Legend, Tooltip, XAxis, YAxis} from "recharts";
 import ChartContainer from "@components/charts/ChartContainer";
 import {chartAxisProps, chartGridProps, chartLegendProps, chartTooltipProps} from "@components/charts/chartTheme";
 import {brand} from "@components/common/brand/Colors";
+
+const noChart = {
+    chart: {
+        categories: []
+    },
+    dataPoints: [],
+}
 
 export default function CountChart({
                                        query,
@@ -13,40 +20,32 @@ export default function CountChart({
                                        domain,
                                    }) {
 
-    const client = useGraphQLClient()
-
-    const [chart, setChart] = useState({
-        categories: []
+    const {data: chartData} = useQuery(query, {
+        variables,
+        deps: [query, variables],
+        initialData: noChart,
+        dataFn: data => {
+            const chart = data.getChart
+            /**
+             *
+             * categories: [],
+             * dates: [],
+             * data: {
+             *     value: [],
+             * }
+             */
+            return {
+                chart,
+                dataPoints: chart.dates.map((date, index) => {
+                    return {
+                        date,
+                        value: chart.data[index],
+                    }
+                }),
+            }
+        },
     })
-    const [dataPoints, setDataPoints] = useState([])
-
-    useEffect(() => {
-        if (client) {
-            client.request(
-                query,
-                variables
-            ).then(data => {
-                const chart = data.getChart
-                /**
-                 *
-                 * categories: [],
-                 * dates: [],
-                 * data: {
-                 *     value: [],
-                 * }
-                 */
-                setChart(chart)
-                setDataPoints(
-                    chart.dates.map((date, index) => {
-                        return {
-                            date,
-                            value: chart.data[index],
-                        }
-                    })
-                )
-            })
-        }
-    }, [client, query, variables]);
+    const {dataPoints} = chartData ?? noChart
 
     const [inactiveSeries, setInactiveSeries] = useState([])
 

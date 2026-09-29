@@ -20,10 +20,6 @@ jest.mock("../../../../components/services/GraphQL", () => ({
     useQuery: () => ({data: null, loading: false, error: null, finished: true}),
 }))
 
-jest.mock("../../../../components/providers/ConnectionContextProvider", () => ({
-    useGraphQLClient: () => ({request: jest.fn()}),
-}))
-
 import {UserContext} from "@components/providers/UserProvider"
 import EnvironmentsSetupCommand from "@components/extension/environments/EnvironmentsSetupCommand"
 import DeleteEnvironmentButton from "@components/extension/environments/DeleteEnvironmentButton"

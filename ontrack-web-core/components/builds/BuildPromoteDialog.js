@@ -3,8 +3,7 @@ import {DatePicker, Form, Input} from "antd";
 import SelectPromotionLevel from "@components/promotionLevels/SelectPromotionLevel";
 import dayjs from "dayjs";
 import {gql} from "graphql-request";
-import {useEffect, useState} from "react";
-import {useGraphQLClient} from "@components/providers/ConnectionContextProvider";
+import {useQuery} from "@components/services/GraphQL";
 import {
     gqlPromotionLevelFieldSet,
     orderedPromotionLevelFields,
@@ -62,41 +61,40 @@ export function useBuildPromoteDialog(config) {
 }
 
 export default function BuildPromoteDialog({buildPromoteDialog}) {
-    const client = useGraphQLClient()
-    const [promotionLevelFields, setPromotionLevelFields] = useState({})
-
     const form = buildPromoteDialog.form
     const selectedPromotion = Form.useWatch('promotionLevel', form)
     const branch = buildPromoteDialog?.context?.build?.branch
 
-    useEffect(() => {
-        if (client && branch) {
-            client.request(
-                gql`
-                    query GetBranchPromotionLevelFields($branchId: Int!) {
-                        branches(id: $branchId) {
-                            promotionLevels {
-                                name
-                                fields {
-                                    ...PromotionLevelFieldSet
-                                }
-                            }
+    const {data: promotionLevelFields} = useQuery(
+        gql`
+            query GetBranchPromotionLevelFields($branchId: Int!) {
+                branches(id: $branchId) {
+                    promotionLevels {
+                        name
+                        fields {
+                            ...PromotionLevelFieldSet
                         }
                     }
-                    ${gqlPromotionLevelFieldSet}
-                `,
-                {branchId: Number(branch.id)}
-            ).then(data => {
+                }
+            }
+            ${gqlPromotionLevelFieldSet}
+        `,
+        {
+            variables: {branchId: Number(branch?.id)},
+            deps: [branch],
+            condition: !!branch,
+            initialData: {},
+            dataFn: data => {
                 const map = {}
                 for (const pl of data.branches[0].promotionLevels) {
                     map[pl.name] = pl.fields
                 }
-                setPromotionLevelFields(map)
-            })
+                return map
+            },
         }
-    }, [client, branch])
+    )
 
-    const currentFields = orderedPromotionLevelFields(selectedPromotion && promotionLevelFields[selectedPromotion])
+    const currentFields = orderedPromotionLevelFields(selectedPromotion && promotionLevelFields?.[selectedPromotion])
 
     return (
         <>

@@ -1,9 +1,9 @@
-import {useQuery} from "@components/services/useQuery";
+import {useQuery} from "@components/services/GraphQL";
 import {gql} from "graphql-request";
 
 export const useTriggers = () => {
 
-    const {data, loading} = useQuery(
+    const {data, loading, finished} = useQuery(
         gql`
             query TriggerList {
                 triggerList {
@@ -19,6 +19,6 @@ export const useTriggers = () => {
 
     return {
         data,
-        loading,
+        loading: loading || !finished,
     }
 }

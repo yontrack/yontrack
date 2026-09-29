@@ -1,4 +1,4 @@
-import {useGraphQLClient} from "@components/providers/ConnectionContextProvider";
+import {callGraphQL} from "@components/services/GraphQL";
 import {useContext, useState} from "react";
 import {EventsContext} from "@components/common/EventsContext";
 import {gql} from "graphql-request";
@@ -7,15 +7,14 @@ import {FaBell, FaBellSlash} from "react-icons/fa";
 
 export default function DisableBranchCommand({branch}) {
 
-    const client = useGraphQLClient()
     const eventsContext = useContext(EventsContext)
     const [loading, setLoading] = useState(false)
 
     const disableBranch = async () => {
         setLoading(true)
         try {
-            await client.request(
-                gql`
+            await callGraphQL({
+                query: gql`
                     mutation DisableBranch($id: Int!) {
                         disableBranch(input: {id: $id}) {
                             errors {
@@ -24,8 +23,8 @@ export default function DisableBranchCommand({branch}) {
                         }
                     }
                 `,
-                {id: Number(branch.id)}
-            )
+                variables: {id: Number(branch.id)},
+            })
             eventsContext.fireEvent("branch.updated", {id: Number(branch.id)})
         } finally {
             setLoading(false)
@@ -35,8 +34,8 @@ export default function DisableBranchCommand({branch}) {
     const enableBranch = async () => {
         setLoading(true)
         try {
-            await client.request(
-                gql`
+            await callGraphQL({
+                query: gql`
                     mutation EnableBranch($id: Int!) {
                         enableBranch(input: {id: $id}) {
                             errors {
@@ -45,8 +44,8 @@ export default function DisableBranchCommand({branch}) {
                         }
                     }
                 `,
-                {id: Number(branch.id)}
-            )
+                variables: {id: Number(branch.id)},
+            })
             eventsContext.fireEvent("branch.updated", {id: Number(branch.id)})
         } finally {
             setLoading(false)

@@ -1,9 +1,9 @@
-import {useQuery} from "@components/services/useQuery";
+import {useQuery} from "@components/services/GraphQL";
 import {gql} from "graphql-request";
 import {Select} from "antd";
 
 export default function SelectWebhookAuthenticator({id, value, onChange, onSelectedWebhookAuthenticator}) {
-    const {loading, data: options} = useQuery(
+    const {loading, finished, data: options} = useQuery(
         gql`
             query SelectWebhookAuthenticator {
                 webhookAuthenticators {
@@ -28,7 +28,7 @@ export default function SelectWebhookAuthenticator({id, value, onChange, onSelec
             <Select
                 id={id}
                 options={options}
-                loading={loading}
+                loading={loading || !finished}
                 value={value}
                 onChange={onLocalChange}
                 allowClear={true}

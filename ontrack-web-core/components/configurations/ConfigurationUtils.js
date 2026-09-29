@@ -1,4 +1,5 @@
 import {gql} from "graphql-request";
+import {callGraphQL} from "@components/services/GraphQL";
 
 export const prepareConfigValues = (values, configurationType) => {
     // The configuration mutations expect three fields:
@@ -15,9 +16,9 @@ export const prepareConfigValues = (values, configurationType) => {
     return input
 }
 
-export function testConfig(client, config, configurationType) {
-    return client.request(
-        gql`
+export function testConfig(config, configurationType) {
+    return callGraphQL({
+        query: gql`
             mutation TestConfiguration(
                 $type: String!,
                 $name: String!,
@@ -38,8 +39,8 @@ export function testConfig(client, config, configurationType) {
                 }
             }
         `,
-        prepareConfigValues(config, configurationType)
-    ).then(data => {
+        variables: prepareConfigValues(config, configurationType),
+    }).then(data => {
         let connectionResult = undefined
         const node = data.testConfiguration
         if (node.errors) {

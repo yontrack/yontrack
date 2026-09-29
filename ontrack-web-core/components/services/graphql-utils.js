@@ -1,17 +1,4 @@
 /**
- * Checking for user errors under a node
- *
- * @deprecated This method collects only the user errors and ignores the GraphQL ones. Use getGraphQLErrors instead.
- */
-export const getUserErrors = (node) => {
-    if (node.errors && node.errors.length > 0) {
-        return node.errors.map(error => error.message);
-    } else {
-        return null;
-    }
-}
-
-/**
  * Collects the list of errors from a returned GraphQL call.
  * @param data Raw JSON data returned by the GraphQL call.
  * @param userNodeName Name of the node containing the user data; this function will look for `errors` underneath.

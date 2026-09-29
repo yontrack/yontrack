@@ -1,4 +1,4 @@
-import {useQuery} from "@components/services/useQuery";
+import {useQuery} from "@components/services/GraphQL";
 import {gql} from "graphql-request";
 import {Space} from "antd";
 import LoadingInline from "@components/common/LoadingInline";
@@ -7,7 +7,7 @@ import ValidationStampImage from "@components/validationStamps/ValidationStampIm
 
 export default function OntrackValidationNotificationChannelOutput({runId}) {
 
-    const {data: run, loading} = useQuery(
+    const {data: run, loading, finished} = useQuery(
         gql`
             query ValidationRun($runId: Int!) {
                 validationRuns(id: $runId) {
@@ -31,7 +31,7 @@ export default function OntrackValidationNotificationChannelOutput({runId}) {
         <>
             <Space orientation="vertical">
                 Validation created.
-                <LoadingInline loading={loading}>
+                <LoadingInline loading={loading || !finished}>
                     {
                         run &&
                         <ValidationRunLink

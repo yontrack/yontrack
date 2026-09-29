@@ -1,5 +1,5 @@
-import {useGraphQLClient} from "@components/providers/ConnectionContextProvider";
-import {useContext, useEffect, useState} from "react";
+import {useContext, useState} from "react";
+import {callGraphQL, useQuery} from "@components/services/GraphQL";
 import Head from "next/head";
 import {subBranchTitle} from "@components/common/Titles";
 import {downToBranchBreadcrumbs} from "@components/common/Breadcrumbs";
@@ -18,82 +18,79 @@ import SortableList, {SortableItem, SortableKnob} from "react-easy-sort";
 import EntitySubscriptions from "@components/extension/notifications/EntitySubscriptions";
 import ItemList from "@components/common/ItemList";
 
+const noBranch = {project: {}}
+
 export default function BranchPromotionLevelsView({id}) {
 
-    const client = useGraphQLClient()
-
-    const [loading, setLoading] = useState(true)
-    const [branch, setBranch] = useState({project: {}})
-    const [commands, setCommands] = useState([])
+    const [reordering, setReordering] = useState(false)
 
     const eventsContext = useContext(EventsContext)
     const refreshCreationCount = useEventForRefresh("promotionLevel.created")
     const refreshReorderCount = useEventForRefresh("promotionLevel.reordered")
 
-    useEffect(() => {
-        if (client && id) {
-            setLoading(true)
-            client.request(
-                gql`
-                    query BranchPromotionLevels($id: Int!) {
-                        branch(id: $id) {
-                            id
-                            name
-                            project {
-                                id
-                                name
+    const {data: queriedBranch, loading, finished} = useQuery(
+        gql`
+            query BranchPromotionLevels($id: Int!) {
+                branch(id: $id) {
+                    id
+                    name
+                    project {
+                        id
+                        name
+                    }
+                    authorizations {
+                        name
+                        action
+                        authorized
+                    }
+                    promotionLevels {
+                        id
+                        name
+                        description
+                        image
+                        properties {
+                            type {
+                                typeName
                             }
-                            authorizations {
-                                name
-                                action
-                                authorized
-                            }
-                            promotionLevels {
-                                id
-                                name
-                                description
-                                image
-                                properties {
-                                    type {
-                                        typeName
-                                    }
-                                    value
-                                }
-                                decorations {
-                                    ...decorationContent
-                                }
-                            }
+                            value
+                        }
+                        decorations {
+                            ...decorationContent
                         }
                     }
-
-                    ${gqlDecorationFragment}
-                `,
-                {id: Number(id)}
-            ).then(data => {
-                setBranch(data.branch)
-
-                const commands = []
-                if (isAuthorized(data.branch, 'promotion_level', 'create')) {
-                    commands.push(
-                        <PromotionLevelCreateCommand key="create" branch={data.branch}/>
-                    )
                 }
-                commands.push(
-                    <CloseCommand key="close" href={branchUri(data.branch)}/>
-                )
-                setCommands(commands)
-            }).finally(() => {
-                setLoading(false)
-            })
+            }
+
+            ${gqlDecorationFragment}
+        `,
+        {
+            variables: {id: Number(id)},
+            deps: [id, refreshCreationCount, refreshReorderCount],
+            condition: !!id,
+            initialData: noBranch,
+            dataFn: data => data.branch,
         }
-    }, [client, id, refreshCreationCount, refreshReorderCount]);
+    )
+    const branch = queriedBranch ?? noBranch
+
+    const commands = []
+    if (branch.id) {
+        if (isAuthorized(branch, 'promotion_level', 'create')) {
+            commands.push(
+                <PromotionLevelCreateCommand key="create" branch={branch}/>
+            )
+        }
+        commands.push(
+            <CloseCommand key="close" href={branchUri(branch)}/>
+        )
+    }
 
     const onSortEnd = (oldIndex, newIndex) => {
-        setLoading(true)
+        setReordering(true)
         const oldName = branch.promotionLevels[oldIndex].name
         const newName = branch.promotionLevels[newIndex].name
-        client.request(
-            gql`
+        callGraphQL({
+            query: gql`
                 mutation ReorderPromotionLevels(
                     $branchId: Int!,
                     $oldName: String!,
@@ -110,15 +107,15 @@ export default function BranchPromotionLevelsView({id}) {
                     }
                 }
             `,
-            {
+            variables: {
                 branchId: Number(branch.id),
                 oldName,
                 newName,
-            }
-        ).then(() => {
+            },
+        }).then(() => {
             eventsContext.fireEvent("promotionLevel.reordered")
         }).finally(() => {
-            setLoading(false)
+            setReordering(false)
         })
     }
 
@@ -127,7 +124,7 @@ export default function BranchPromotionLevelsView({id}) {
             <Head>
                 {subBranchTitle(branch, "Promotion levels")}
             </Head>
-            <Skeleton loading={loading} active>
+            <Skeleton loading={loading || !finished || reordering} active>
                 <MainPage
                     title="Promotion levels"
                     breadcrumbs={downToBranchBreadcrumbs({branch})}

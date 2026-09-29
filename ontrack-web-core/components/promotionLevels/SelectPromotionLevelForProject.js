@@ -1,7 +1,7 @@
 import {Select} from "antd";
 import {useState} from "react";
 import {gql} from "graphql-request";
-import {useQuery} from "@components/services/useQuery";
+import {useQuery} from "@components/services/GraphQL";
 
 export default function SelectPromotionLevelForProject({
                                                            id,
@@ -15,7 +15,7 @@ export default function SelectPromotionLevelForProject({
 
     const [token, setToken] = useState('')
 
-    const {data, setData, loading} = useQuery(
+    const {data: queriedOptions, loading, finished} = useQuery(
         gql`
             query ProjectPromotionLevelNames($id: Int!, $token: String!) {
                 project(id: $id) {
@@ -37,16 +37,20 @@ export default function SelectPromotionLevelForProject({
         }
     )
 
+    // Clearing empties the options until the next query result replaces them
+    const [clearedOptions, setClearedOptions] = useState(null)
+    const data = queriedOptions === clearedOptions ? [] : (queriedOptions ?? [])
+
     const handleSearch = (token) => {
         if (token && token.length > 2) {
             setToken(token)
         } else {
-            setData([])
+            setClearedOptions(queriedOptions)
         }
     }
 
     const handleClear = () => {
-        setData([])
+        setClearedOptions(queriedOptions)
         if (onChange) onChange(null)
     }
 
@@ -56,7 +60,7 @@ export default function SelectPromotionLevelForProject({
                 id={id}
                 data-testid={id}
                 showSearch={true}
-                loading={loading}
+                loading={loading || !finished}
                 value={value}
                 placeholder={placeholder}
                 defaultActiveFirstOption={true}

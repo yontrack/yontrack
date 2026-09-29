@@ -1,5 +1,5 @@
-import {createContext, useEffect, useState} from "react";
-import {useGraphQLClient} from "@components/providers/ConnectionContextProvider";
+import {createContext, useState} from "react";
+import {useQuery} from "@components/services/GraphQL";
 import {gql} from "graphql-request";
 
 export const JobCategoriesContext = createContext({
@@ -11,33 +11,29 @@ export const JobCategoriesContext = createContext({
 
 export default function JobCategoriesContextProvider({children}) {
 
-    const client = useGraphQLClient()
-    const [categories, setCategories] = useState([])
     const [selectedCategory, setSelectedCategory] = useState('')
 
-    useEffect(() => {
-        if (client) {
-            client.request(
-                gql`
-                    query JobCategories {
-                        jobCategories {
-                            key
-                            name
-                            types {
-                                key
-                                name
-                            }
-                        }
+    const {data: categories} = useQuery(
+        gql`
+            query JobCategories {
+                jobCategories {
+                    key
+                    name
+                    types {
+                        key
+                        name
                     }
-                `
-            ).then(data => {
-                setCategories(data.jobCategories)
-            })
+                }
+            }
+        `,
+        {
+            initialData: [],
+            dataFn: data => data.jobCategories,
         }
-    }, [client]);
+    )
 
     const context = {
-        categories,
+        categories: categories ?? [],
         selectedCategory,
         setSelectedCategory,
     }

@@ -1,11 +1,11 @@
-import {useQuery} from "@components/services/useQuery";
+import {useQuery} from "@components/services/GraphQL";
 import {gql} from "graphql-request";
 import LoadingContainer from "@components/common/LoadingContainer";
 import ItemList from "@components/common/ItemList";
 
 export default function CascLocations() {
 
-    const {data, loading} = useQuery(
+    const {data, loading, finished} = useQuery(
         gql`
             query CasC {
                 casc {
@@ -17,7 +17,7 @@ export default function CascLocations() {
 
     return (
         <>
-            <LoadingContainer loading={loading}>
+            <LoadingContainer loading={loading || !finished}>
                 {
                     data &&
                     <ItemList>

@@ -1,35 +1,29 @@
 import {Dynamic} from "@components/common/Dynamic";
-import {useEffect, useState} from "react";
-import {useGraphQLClient} from "@components/providers/ConnectionContextProvider";
+import {useQuery} from "@components/services/GraphQL";
 import {gql} from "graphql-request";
 import PageSection from "@components/common/PageSection";
 
 export default function SettingsWrapper({entryId}) {
 
-    const client = useGraphQLClient()
-
-    const [entry, setEntry] = useState()
-
-    useEffect(() => {
-        if (client && entryId) {
-            client.request(
-                gql`
-                    query SettingsEntry($id: String!) {
-                        settings {
-                            settingsById(id: $id) {
-                                id
-                                title
-                                values
-                            }
-                        }
+    const {data: entry} = useQuery(
+        gql`
+            query SettingsEntry($id: String!) {
+                settings {
+                    settingsById(id: $id) {
+                        id
+                        title
+                        values
                     }
-                `,
-                {id: entryId}
-            ).then(data => {
-                setEntry(data.settings.settingsById)
-            })
+                }
+            }
+        `,
+        {
+            variables: {id: entryId},
+            deps: [entryId],
+            condition: !!entryId,
+            dataFn: data => data.settings.settingsById,
         }
-    }, [client, entryId])
+    )
 
     return (
         <>

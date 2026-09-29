@@ -1,13 +1,12 @@
 import {Button, Form, Space, Spin} from "antd";
-import {useGraphQLClient} from "@components/providers/ConnectionContextProvider";
+import {callGraphQL} from "@components/services/GraphQL";
 import {gql} from "graphql-request";
 import {useState} from "react";
 import FormErrors from "@components/form/FormErrors";
-import {getUserErrors} from "@components/services/graphql-utils";
+import {getGraphQLErrors} from "@components/services/graphql-utils";
 
 export default function SettingsForm({id, values, debug, onValuesChange, children}) {
 
-    const client = useGraphQLClient()
     const [saving, setSaving] = useState(false)
     const [formErrors, setFormErrors] = useState([]);
     const [form] = Form.useForm()
@@ -15,8 +14,8 @@ export default function SettingsForm({id, values, debug, onValuesChange, childre
     const onFinish = (values) => {
         setFormErrors([])
         setSaving(true)
-        client.request(
-            gql`
+        callGraphQL({
+            query: gql`
                 mutation SaveSettings(
                     $id: String!,
                     $values: JSON!,
@@ -31,10 +30,10 @@ export default function SettingsForm({id, values, debug, onValuesChange, childre
                     }
                 }
             `,
-            {id, values}
-        ).then(data => {
-            const errors = getUserErrors(data.saveSettings)
-            if (errors) {
+            variables: {id, values},
+        }).then(data => {
+            const errors = getGraphQLErrors(data, 'saveSettings')
+            if (errors.length > 0) {
                 setFormErrors(errors)
             }
         }).finally(() => {

@@ -1,7 +1,4 @@
 import {gql} from "graphql-request";
-import {useGraphQLClient} from "@components/providers/ConnectionContextProvider";
-import {useEffect, useState} from "react";
-import {gqlBranchContentFragment} from "@components/branches/BranchGraphQLFragments";
 import {useQuery} from "@components/services/GraphQL";
 
 export const gqlUserMenuActionFragment = gql`
@@ -50,30 +47,6 @@ export const gqlPromotionLevelFragment = gql`
     }
     ${gqlUserMenuActionFragment}
 `
-
-/**
- * @deprecated Use `usePromotionLevelById` instead
- */
-export const getPromotionLevelById = (client, id) => {
-    return client.request(
-        gqlPromotionLevelByIdQuery,
-        {id}
-    ).then(data => data.promotionLevel)
-}
-
-/**
- * @deprecated Use `usePromotionLevelById` instead
- */
-export const usePromotionLevel = (id) => {
-    const client = useGraphQLClient()
-    const [promotionLevel, setPromotionLevel] = useState()
-    useEffect(() => {
-        if (client && id) {
-            getPromotionLevelById(client, id).then(pl => setPromotionLevel(pl))
-        }
-    }, [client, id]);
-    return promotionLevel
-}
 
 export const usePromotionLevelById = ({id, refreshCount = 0}) => {
     const {data: promotionLevel, loading} = useQuery(
@@ -213,30 +186,6 @@ export const gqlValidationStampFragment = gql`
     }
 `
 
-/**
- * @deprecated Use `useValidationStampById` instead
- */
-export const getValidationStampById = (client, id) => {
-    return client.request(
-        gqlValidationStampByIdQuery,
-        {id: Number(id)}
-    ).then(data => data.validationStamp)
-}
-
-/**
- * @deprecated Use `useValidationStampById` instead
- */
-export const useValidationStamp = (id) => {
-    const client = useGraphQLClient()
-    const [validationStamp, setValidationStamp] = useState()
-    useEffect(() => {
-        if (client && id) {
-            getValidationStampById(client, id).then(vs => setValidationStamp(vs))
-        }
-    }, [client, id]);
-    return validationStamp
-}
-
 export const useValidationStampById = ({id, refreshCount = 0, deps = []}) => {
     const {data: validationStamp, loading} = useQuery(
         gqlValidationStampByIdQuery,
@@ -279,27 +228,6 @@ export const gqlInformationFragment = gql`
         title
         data
     }
-`
-
-/**
- * @deprecated Use gqlProjectContentFragment
- */
-export const gqlProjectCommonFragment = gql`
-    fragment projectCommonFragment on Project {
-        id
-        name
-    }
-`
-
-/**
- * @deprecated Use gqlBranchContentFragment
- */
-export const gqlBranchCommonFragment = gql`
-    fragment branchCommonFragment on Branch {
-        ...BranchContent
-    }
-
-    ${gqlBranchContentFragment}
 `
 
 export const gqlValidationStampByIdQuery = gql`

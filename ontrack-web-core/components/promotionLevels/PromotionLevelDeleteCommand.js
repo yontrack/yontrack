@@ -1,14 +1,14 @@
 import {FaTrash} from "react-icons/fa";
 import {Typography} from "antd";
 import {gql} from "graphql-request";
-import {usePromotionLevel} from "@components/services/fragments";
+import {usePromotionLevelById} from "@components/services/fragments";
 import {useRouter} from "next/router";
 import {branchUri} from "@components/common/Links";
 import ConfirmCommand from "@components/common/ConfirmCommand";
 
 export default function PromotionLevelDeleteCommand({id}) {
 
-    const promotionLevel = usePromotionLevel(id)
+    const {promotionLevel} = usePromotionLevelById({id})
 
     const router = useRouter()
 

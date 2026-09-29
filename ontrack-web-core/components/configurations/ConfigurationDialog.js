@@ -4,7 +4,6 @@ import {Fragment, useState} from "react";
 import ConnectionResult from "@components/configurations/ConnectionResult";
 import {gql} from "graphql-request";
 import {prepareConfigValues, testConfig} from "@components/configurations/ConfigurationUtils";
-import {useGraphQLClient} from "@components/providers/ConnectionContextProvider";
 
 export const useConfigurationDialog = ({onSuccess, dialogItems, configurationType}) => {
     return useFormDialog({
@@ -60,12 +59,11 @@ export const useConfigurationDialog = ({onSuccess, dialogItems, configurationTyp
 
 export default function ConfigurationDialog({configurationDialog}) {
 
-    const client = useGraphQLClient()
     const [connectionResult, setConnectionResult] = useState()
 
     const onTestConfig = async () => {
         setConnectionResult(undefined)
-        const connectionResult = await testConfig(client, configurationDialog.form.getFieldsValue(true), configurationDialog.configurationType)
+        const connectionResult = await testConfig(configurationDialog.form.getFieldsValue(true), configurationDialog.configurationType)
         setConnectionResult(connectionResult)
     }
 

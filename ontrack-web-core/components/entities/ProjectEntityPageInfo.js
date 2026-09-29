@@ -261,10 +261,6 @@ export const useProjectEntityPageInfo = (type, id, what) => {
         entityTypeName,
         title,
         breadcrumbs,
-        /**
-         * @deprecated Use `uri` instead
-         */
-        closeUri: uri,
         uri,
         entity,
     }

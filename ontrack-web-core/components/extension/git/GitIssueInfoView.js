@@ -1,4 +1,4 @@
-import {useQuery} from "@components/services/useQuery";
+import {useQuery} from "@components/services/GraphQL";
 import {gql} from "graphql-request";
 import Head from "next/head";
 import {pageTitle} from "@components/common/Titles";
@@ -15,7 +15,14 @@ export default function GitIssueInfoView({projectId, issueKey}) {
 
     const [issueDisplayKey, setIssueDisplayKey] = useState(issueKey)
 
-    const {loading, data} = useQuery(
+    const initialData = {
+        project: {
+            id: projectId,
+            name: ""
+        }
+    }
+
+    const {loading, finished, data: queriedData} = useQuery(
         gql`
             query GitIssueInfo(
                 $projectId: Int!,
@@ -93,12 +100,7 @@ export default function GitIssueInfoView({projectId, issueKey}) {
             }
         `,
         {
-            initialData: {
-                project: {
-                    id: projectId,
-                    name: ""
-                }
-            },
+            initialData,
             variables: {
                 projectId: Number(projectId),
                 issueKey,
@@ -107,12 +109,15 @@ export default function GitIssueInfoView({projectId, issueKey}) {
         }
     )
 
+    // A failed query leaves `null` behind, where the old hook kept the initial data
+    const data = queriedData ?? initialData
+
     useEffect(() => {
-        const displayKey = data.scmIssueInfo?.issue?.displayKey
+        const displayKey = queriedData?.scmIssueInfo?.issue?.displayKey
         if (displayKey) {
             setIssueDisplayKey(displayKey)
         }
-    }, [data])
+    }, [queriedData])
 
     return (
         <>
@@ -126,7 +131,7 @@ export default function GitIssueInfoView({projectId, issueKey}) {
                     <CloseCommand key="close" href={projectUri(data.project)}/>,
                 ]}
             >
-                <LoadingContainer loading={loading}>
+                <LoadingContainer loading={loading || !finished}>
                     {
                         data.project.scmIssueInfo && <SCMIssueInfo scmIssueInfo={data.project.scmIssueInfo}/>
                     }

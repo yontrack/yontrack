@@ -1,4 +1,4 @@
-import {useQuery} from "@components/services/useQuery";
+import {useQuery} from "@components/services/GraphQL";
 import {gql} from "graphql-request";
 import {useContext, useState} from "react";
 import {UserContext} from "@components/providers/UserProvider";
@@ -9,7 +9,10 @@ export const useProjectBuildSearch = ({project}) => {
 
     const user = useContext(UserContext)
 
-    const {data: builds, setData: setBuilds, loading, refetch} = useQuery(
+    // No search is run until the form is submitted
+    const [searchCount, setSearchCount] = useState(0)
+
+    const {data, loading} = useQuery(
         gql`
             query ProjectBuildSearch(
                 $projectName: String!,
@@ -45,7 +48,7 @@ export const useProjectBuildSearch = ({project}) => {
             }
         `,
         {
-            skipInitialFetch: true,
+            condition: searchCount > 0,
             variables: {
                 projectName: project?.name,
                 filter: {
@@ -53,10 +56,22 @@ export const useProjectBuildSearch = ({project}) => {
                     buildExactMatch: true,
                 },
             },
-            deps: [project?.name, values],
+            deps: [project?.name, values, searchCount],
             dataFn: data => data.builds,
         }
     )
+
+    // Builds are marked as selected locally, on top of the search result they were made against,
+    // until the next search result replaces them
+    const [selection, setSelection] = useState({source: null, builds: undefined})
+    const builds = selection.source === data ? selection.builds : (data ?? undefined)
+    const setBuilds = (update) => setSelection(previous => {
+        const current = previous.source === data ? previous.builds : data
+        return {
+            source: data,
+            builds: typeof update === 'function' ? update(current) : update,
+        }
+    })
 
     const search = (values) => {
         const extensions = []
@@ -71,7 +86,7 @@ export const useProjectBuildSearch = ({project}) => {
             ...values,
             extensions,
         })
-        refetch()
+        setSearchCount(count => count + 1)
     }
 
     return {

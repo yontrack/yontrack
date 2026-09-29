@@ -5,7 +5,7 @@ import {useGraphQLClient} from "@components/providers/ConnectionContextProvider"
 import {gql} from "graphql-request";
 import {processGraphQLErrors} from "@components/services/graphql-utils";
 import {useEffect, useState} from "react";
-import {useReloadState} from "@components/common/StateUtils";
+import {useRefresh} from "@components/common/RefreshUtils";
 import LoadingContainer from "@components/common/LoadingContainer";
 import Yaml from "@components/common/Yaml";
 
@@ -38,7 +38,7 @@ export default function Casc() {
         }
     }
 
-    const [loadState, reload] = useReloadState()
+    const [loadState, reload] = useRefresh()
     const [loading, setLoading] = useState(false)
     const [cascYaml, setCascYaml] = useState('')
 

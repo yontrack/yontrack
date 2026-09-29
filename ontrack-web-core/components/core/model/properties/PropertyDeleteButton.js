@@ -1,17 +1,16 @@
 import InlineConfirmCommand from "@components/common/InlineConfirmCommand";
-import {useGraphQLClient} from "@components/providers/ConnectionContextProvider";
+import {callGraphQL} from "@components/services/GraphQL";
 import {useContext} from "react";
 import {EventsContext} from "@components/common/EventsContext";
 import {gql} from "graphql-request";
 
 export default function PropertyDeleteButton({entityType, entityId, property}) {
 
-    const client = useGraphQLClient()
     const eventsContext = useContext(EventsContext)
 
     const deleteProperty = () => {
-        client.request(
-            gql`
+        callGraphQL({
+            query: gql`
                 mutation DeleteProperty(
                     $entityType: ProjectEntityType!,
                     $entityId: Int!,
@@ -28,12 +27,12 @@ export default function PropertyDeleteButton({entityType, entityId, property}) {
                     }
                 }
             `,
-            {
+            variables: {
                 entityType,
                 entityId: Number(entityId),
                 type: property.type.typeName,
-            }
-        ).then(() => {
+            },
+        }).then(() => {
             eventsContext.fireEvent("entity.properties.changed", {entity: {entityType, entityId}})
         })
     }

@@ -1,10 +1,10 @@
-import {useQuery} from "@components/services/useQuery";
+import {useQuery} from "@components/services/GraphQL";
 import {gql} from "graphql-request";
 import PromotionLevel from "@components/promotionLevels/PromotionLevel";
 import LoadingInline from "@components/common/LoadingInline";
 
 export default function PromotionLevelByName({projectName, branchName, name}) {
-    const {data: pl, loading} = useQuery(
+    const {data: pl, loading, finished} = useQuery(
         gql`
             query PromotionLevelByName($projectName: String!, $branchName: String!, $name: String!) {
                 promotionLevelByName(
@@ -30,7 +30,7 @@ export default function PromotionLevelByName({projectName, branchName, name}) {
 
     return (
         <>
-            <LoadingInline loading={loading}>
+            <LoadingInline loading={loading || !finished}>
                 {
                     pl &&
                     <PromotionLevel promotionLevel={pl} displayText={true}/>

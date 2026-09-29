@@ -1,5 +1,4 @@
-import {useGraphQLClient} from "@components/providers/ConnectionContextProvider";
-import {useEffect, useState} from "react";
+import {useQuery} from "@components/services/GraphQL";
 import {gql} from "graphql-request";
 import {FaBan, FaCog, FaCogs, FaPauseCircle, FaSpinner} from "react-icons/fa";
 import {useRefData} from "@components/providers/RefDataProvider";
@@ -13,25 +12,25 @@ const jobStateIcons = {
     INVALID: <FaBan color="red"/>,
 }
 
+const noJobStates = {
+    list: [],
+    index: {},
+}
+
 export const useJobStates = () => {
-    const client = useGraphQLClient()
-    const [states, setStates] = useState({
-        list: [],
-        index: {},
-    })
-    useEffect(() => {
-        if (client) {
-            client.request(
-                gql`
-                    query JobStates {
-                        jobStateInfos {
-                            name
-                            displayName
-                            description
-                        }
-                    }
-                `
-            ).then(data => {
+    const {data: states} = useQuery(
+        gql`
+            query JobStates {
+                jobStateInfos {
+                    name
+                    displayName
+                    description
+                }
+            }
+        `,
+        {
+            initialData: noJobStates,
+            dataFn: data => {
                 const infos = data.jobStateInfos.map(info => ({
                     ...info,
                     icon: jobStateIcons[info.name],
@@ -40,15 +39,15 @@ export const useJobStates = () => {
                 infos.forEach(info => {
                     index[info.name] = info
                 })
-                setStates({
+                return {
                     list: infos,
                     index,
-                })
-            })
+                }
+            },
         }
-    }, [client]);
+    )
 
-    return states
+    return states ?? noJobStates
 }
 
 export default function JobState({value, displayName, tooltip = true}) {

@@ -1,14 +1,14 @@
 import {FaTrash} from "react-icons/fa";
 import {Typography} from "antd";
 import {gql} from "graphql-request";
-import {useValidationStamp} from "@components/services/fragments";
+import {useValidationStampById} from "@components/services/fragments";
 import {useRouter} from "next/router";
 import {branchUri} from "@components/common/Links";
 import ConfirmCommand from "@components/common/ConfirmCommand";
 
 export default function ValidationStampDeleteCommand({id}) {
 
-    const validationStamp = useValidationStamp(id)
+    const {validationStamp} = useValidationStampById({id})
 
     const router = useRouter()
 

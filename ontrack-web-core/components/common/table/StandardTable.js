@@ -1,6 +1,6 @@
 import {Space, Table} from "antd";
-import {useGraphQLClient} from "@components/providers/ConnectionContextProvider";
-import {useEffect, useState} from "react";
+import {useState} from "react";
+import {useQuery} from "@components/services/GraphQL";
 import TablePaginationFooter from "@components/common/table/TablePaginationFooter";
 import FilterForm from "@components/common/table/FilterForm";
 import {useRefresh} from "@components/common/RefreshUtils";
@@ -52,46 +52,42 @@ export default function StandardTable({
 
     const [localReloadCount, localReload] = useRefresh()
 
-    const client = useGraphQLClient()
-
     const [filterFormData, setFilterFormData] = useState(initialFilter ?? {})
-
-    const [loading, setLoading] = useState(true)
-    const [items, setItems] = useState([])
 
     const [pagination, setPagination] = useState({
         offset: 0,
         size: size,
     })
 
-    const [pageInfo, setPageInfo] = useState({})
+    const {data: page, loading, finished} = useQuery(query, {
+        variables: {
+            ...variables,
+            ...filter,
+            ...filterFormData,
+            offset: pagination.offset,
+            size: pagination.size,
+        },
+        deps: [query, pagination, filter, filterFormData, reloadCount, localReloadCount],
+        condition: !!query && variables !== undefined,
+        dataFn: data => ({
+            userNode: typeof queryNode === 'function' ? queryNode(data, filterFormData) : data[queryNode],
+            offset: pagination.offset,
+        }),
+    })
 
-    useEffect(() => {
-        if (client && query && variables !== undefined) {
-            setLoading(true)
-            client.request(
-                query,
-                {
-                    ...variables,
-                    ...filter,
-                    ...filterFormData,
-                    offset: pagination.offset,
-                    size: pagination.size,
-                }
-            ).then(data => {
-                const userNode = typeof queryNode === 'function' ? queryNode(data, filterFormData) : data[queryNode]
-                const newItems = userNode.pageItems;
-                setPageInfo(userNode.pageInfo)
-                if (pagination.offset > 0) {
-                    setItems((entries) => [...entries, ...newItems])
-                } else {
-                    setItems(newItems)
-                }
-            }).finally(() => {
-                setLoading(false)
-            })
-        }
-    }, [client, query, pagination, filter, filterFormData, reloadCount, localReloadCount]);
+    // A page beyond the first one is appended to the items already loaded. This is state kept
+    // from one page to the next, adjusted while rendering so that the table never shows a page
+    // as loaded without its items.
+    const [loaded, setLoaded] = useState({page: null, items: []})
+    if (page && page !== loaded.page) {
+        const newItems = page.userNode.pageItems
+        setLoaded({
+            page,
+            items: page.offset > 0 ? [...loaded.items, ...newItems] : newItems,
+        })
+    }
+    const items = loaded.items
+    const pageInfo = loaded.page?.userNode?.pageInfo ?? {}
 
     const onTableChange = (_, filters) => {
         if (onFilterChange) {
@@ -123,7 +119,7 @@ export default function StandardTable({
                     <Table
                         id={id}
                         data-testid={id}
-                        loading={loading}
+                        loading={loading || !finished}
                         dataSource={items}
                         pagination={false}
                         columns={columns}

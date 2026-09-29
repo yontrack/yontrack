@@ -1,65 +1,52 @@
-import {useGraphQLClient} from "@components/providers/ConnectionContextProvider";
-import {useEffect, useState} from "react";
+import {useState} from "react";
+import {callGraphQL, useQuery} from "@components/services/GraphQL";
 import {gql} from "graphql-request";
 import {Alert, Button, Popover, Space, Spin} from "antd";
 
 export default function JobExecutionStatus() {
 
-    const client = useGraphQLClient()
-
-    const [loading, setLoading] = useState(true)
-    const [jobExecutionStatus, setJobExecutionStatus] = useState()
     const [reloadCount, setReloadCount] = useState(0)
 
-    useEffect(() => {
-        if (client) {
-            setLoading(true)
-            client.request(
-                gql`
-                    query JobExecutionStatus {
-                        jobExecutionStatus {
-                            paused
-                        }
-                    }
-                `
-            ).then(data => {
-                setJobExecutionStatus(data.jobExecutionStatus)
-            }).finally(() => {
-                setLoading(false)
-            })
+    const {data: jobExecutionStatus} = useQuery(
+        gql`
+            query JobExecutionStatus {
+                jobExecutionStatus {
+                    paused
+                }
+            }
+        `,
+        {
+            deps: [reloadCount],
+            dataFn: data => data.jobExecutionStatus,
         }
-    }, [client, reloadCount])
+    )
 
     const pauseAllJobs = () => {
-        setLoading(true)
-        client.request(
-            gql`
+        callGraphQL({
+            query: gql`
                 mutation PauseAllJobs {
                     pauseAllJobs {
                         ok
                         error
                     }
                 }
-            `
-        ).finally(() => {
-            setLoading(false)
+            `,
+        }).finally(() => {
             setReloadCount(previous => previous + 1)
         })
     }
 
     const resumeAllJobs = () => {
-        setLoading(true)
-        client.request(
-            gql`
+        callGraphQL({
+            query: gql`
                 mutation ResumeAllJobs {
                     resumeAllJobs {
                         ok
                         error
                     }
                 }
-            `
-        ).finally(() => {
-            setLoading(false)
+            `,
+        }).finally(() => {
             setReloadCount(previous => previous + 1)
         })
     }

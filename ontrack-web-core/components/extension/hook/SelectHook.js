@@ -1,9 +1,9 @@
-import {useQuery} from "@components/services/useQuery";
+import {useQuery} from "@components/services/GraphQL";
 import {gql} from "graphql-request";
 import {Select} from "antd";
 
 export default function SelectHook({id, value, onChange}) {
-    const {data: options, loading} = useQuery(
+    const {data: options, loading, finished} = useQuery(
         gql`
             query Hooks {
                 hookRecordFilterInfo {
@@ -29,7 +29,7 @@ export default function SelectHook({id, value, onChange}) {
                 allowClear
                 style={{width: '12em'}}
                 options={options}
-                loading={loading}
+                loading={loading || !finished}
             />
         </>
     )

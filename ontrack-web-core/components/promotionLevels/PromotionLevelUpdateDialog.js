@@ -1,6 +1,6 @@
 import FormDialog, {useFormDialog} from "@components/form/FormDialog";
 import {useGraphQLClient} from "@components/providers/ConnectionContextProvider";
-import {getPromotionLevelById, gqlPromotionLevelFragment} from "@components/services/fragments";
+import {gqlPromotionLevelByIdQuery, gqlPromotionLevelFragment} from "@components/services/fragments";
 import {gql} from "graphql-request";
 import {EventsContext} from "@components/common/EventsContext";
 import {useContext, useRef} from "react";
@@ -34,7 +34,7 @@ export const usePromotionLevelUpdateDialog = () => {
 
     return useFormDialog({
         init: (form, {id}) => {
-            getPromotionLevelById(client, id).then(pl => {
+            client.request(gqlPromotionLevelByIdQuery, {id}).then(data => data.promotionLevel).then(pl => {
                 form.setFieldsValue({
                     ...pl,
                     fields: (pl.fields || []).map(f => ({

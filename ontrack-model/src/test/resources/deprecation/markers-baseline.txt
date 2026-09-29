@@ -14,17 +14,7 @@
 # Cutover gate (doc/dev-guide/major-branch.md): this file has no entry left.
 
 # #1929 (D13) - frontend helpers
-frontend ontrack-web-core/components/common/StateUtils.js#useReloadState
-frontend ontrack-web-core/components/entities/ProjectEntityPageInfo.js#closeUri
 frontend ontrack-web-core/components/providers/ConnectionContextProvider.js#useGraphQLClient
-frontend ontrack-web-core/components/services/fragments.js#getPromotionLevelById
-frontend ontrack-web-core/components/services/fragments.js#getValidationStampById
-frontend ontrack-web-core/components/services/fragments.js#gqlBranchCommonFragment
-frontend ontrack-web-core/components/services/fragments.js#gqlProjectCommonFragment
-frontend ontrack-web-core/components/services/fragments.js#usePromotionLevel
-frontend ontrack-web-core/components/services/fragments.js#useValidationStamp
-frontend ontrack-web-core/components/services/graphql-utils.js#getUserErrors
-frontend ontrack-web-core/components/services/useQuery.js#useQuery
 
 # Search on Postgres - the deprecated search(...) form, re-marked Removed in V7 by its own initiative
 graphql ontrack-ui-graphql/src/main/java/net/nemerosa/ontrack/graphql/schema/GQLRootQuerySearch.kt#token

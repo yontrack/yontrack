@@ -2,7 +2,7 @@ import {useRouter} from "next/router";
 import {useGraphQLClient} from "@components/providers/ConnectionContextProvider";
 import {useEffect, useState} from "react";
 import {gql} from "graphql-request";
-import {gqlBranchCommonFragment} from "@components/services/fragments";
+import {gqlBranchContentFragment} from "@components/branches/BranchGraphQLFragments";
 import StandardPage from "@components/layouts/StandardPage";
 import AutoVersioningAuditView from "@components/extension/auto-versioning/AutoVersioningAuditView";
 import {downToBranchBreadcrumbs} from "@components/common/Breadcrumbs";
@@ -28,11 +28,11 @@ export default function AutoVersioningAuditBranchTargetPage() {
                         $id: Int!,
                     ) {
                         branch(id: $id) {
-                            ...branchCommonFragment
+                            ...BranchContent
                         }
                     }
 
-                    ${gqlBranchCommonFragment}
+                    ${gqlBranchContentFragment}
                 `,
                 {id: Number(id)}
             ).then(data => {

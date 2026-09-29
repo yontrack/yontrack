@@ -5,15 +5,13 @@ import {gql} from "graphql-request";
 import SelectableMenuItem from "@components/common/SelectableMenuItem";
 import BuildFilterDialog, {useBuildFilterDialog} from "@components/branches/filters/builds/BuildFilterDialog";
 import {isAuthorized} from "@components/common/authorizations";
-import {useGraphQLClient} from "@components/providers/ConnectionContextProvider";
+import {callGraphQL, useQuery} from "@components/services/GraphQL";
 
 export default function BuildFilterDropdown({branch, selectedBuildFilter, onSelectedBuildFilter, onPermalink}) {
 
     const [items, setItems] = useState([])
     const [forms, setForms] = useState([])
     const [resources, setResources] = useState([])
-
-    const client = useGraphQLClient()
 
     const onSelectResourceFilter = (resource) => {
         if (onSelectedBuildFilter) onSelectedBuildFilter(resource)
@@ -54,8 +52,8 @@ export default function BuildFilterDropdown({branch, selectedBuildFilter, onSele
                     setResources([...resources, editedFilterResource])
                 }
                 // Saving the filter
-                client.request(
-                    gql`
+                callGraphQL({
+                    query: gql`
                         mutation SaveBuildFilter(
                             $branchId: Int!,
                             $name: String!,
@@ -74,13 +72,13 @@ export default function BuildFilterDropdown({branch, selectedBuildFilter, onSele
                             }
                         }
                     `,
-                    {
+                    variables: {
                         branchId: Number(branch.id),
                         name: editedFilterResource.name,
                         type: editedFilterResource.type,
                         data: editedFilterResource.data,
-                    }
-                )
+                    },
+                })
             } else {
                 // The filter is not named, this is an anonymous filter, no need to change
                 // the list of resources
@@ -112,8 +110,8 @@ export default function BuildFilterDropdown({branch, selectedBuildFilter, onSele
 
     const onShareFilter = (resource) => {
         return () => {
-            client.request(
-                gql`
+            callGraphQL({
+                query: gql`
                     mutation ShareBuildFilter(
                         $branchId: Int!,
                         $name: String!,
@@ -132,13 +130,13 @@ export default function BuildFilterDropdown({branch, selectedBuildFilter, onSele
                         }
                     }
                 `,
-                {
+                variables: {
                     branchId: Number(branch.id),
                     name: resource.name,
                     type: resource.type,
                     data: resource.data,
-                }
-            ).then(() => {
+                },
+            }).then(() => {
                 setResources(resources.map(it => {
                     if (it.name === resource.name) {
                         return {
@@ -158,8 +156,8 @@ export default function BuildFilterDropdown({branch, selectedBuildFilter, onSele
             // Drop the filter
             onDropFilter()
             // Deleting the filter in the background
-            client.request(
-                gql`
+            callGraphQL({
+                query: gql`
                     mutation DeleteBuildFilter(
                         $branchId: Int!,
                         $name: String!,
@@ -174,11 +172,11 @@ export default function BuildFilterDropdown({branch, selectedBuildFilter, onSele
                         }
                     }
                 `,
-                {
+                variables: {
                     branchId: Number(branch.id),
                     name: resource.name,
-                }
-            ).then(() => {
+                },
+            }).then(() => {
                 // Removes the entry
                 setResources(resources.filter(it => it.name !== resource.name))
             })
@@ -323,36 +321,42 @@ export default function BuildFilterDropdown({branch, selectedBuildFilter, onSele
         setItems(menu)
     }
 
-    useEffect(() => {
-        if (branch && client) {
-            client.request(
-                gql`
-                    query BuildFilters(
-                        $branchId: Int!,
-                    ) {
-                        branches(id: $branchId) {
-                            buildFilterForms {
-                                type
-                                typeName
-                                isPredefined
-                            }
-                            buildFilterResources {
-                                type
-                                name
-                                error
-                                isShared
-                                data
-                            }
-                        }
+    const {data: branchFilters} = useQuery(
+        gql`
+            query BuildFilters(
+                $branchId: Int!,
+            ) {
+                branches(id: $branchId) {
+                    buildFilterForms {
+                        type
+                        typeName
+                        isPredefined
                     }
-                `, {branchId: Number(branch.id)}
-            ).then(data => {
-                const branch = data.branches[0]
-                setForms(branch.buildFilterForms)
-                setResources(branch.buildFilterResources)
-            })
+                    buildFilterResources {
+                        type
+                        name
+                        error
+                        isShared
+                        data
+                    }
+                }
+            }
+        `,
+        {
+            variables: {branchId: Number(branch?.id)},
+            deps: [branch],
+            condition: !!branch,
+            dataFn: data => data.branches[0],
         }
-    }, [branch, client]);
+    )
+
+    // The resources are edited locally afterwards
+    useEffect(() => {
+        if (branchFilters) {
+            setForms(branchFilters.buildFilterForms)
+            setResources(branchFilters.buildFilterResources)
+        }
+    }, [branchFilters]);
 
     useEffect(() => {
         if (forms || resources) {

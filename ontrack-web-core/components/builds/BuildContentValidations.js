@@ -1,21 +1,30 @@
-import React, {useEffect, useState} from "react";
+import React, {useState} from "react";
 import {gql} from "graphql-request";
 import {Button, Space, Typography} from "antd";
 import {FaEraser, FaGavel} from "react-icons/fa";
 import ValidationRunSortingMode from "@components/validationRuns/ValidationRunSortingMode";
 import BuildValidateAction from "@components/builds/BuildValidateAction";
 import {isAuthorized} from "@components/common/authorizations";
-import {useGraphQLClient} from "@components/providers/ConnectionContextProvider";
+import {useQuery} from "@components/services/GraphQL";
 import GridCell from "@components/grid/GridCell";
 import {gqlValidationRunTableContent} from "@components/validationRuns/ValidationRunGraphQLFragments";
 import ValidationRunTable from "@components/validationRuns/ValidationRunTable";
 
+const initialFilters = {
+    statuses: [],
+    validationStamps: [],
+}
+
+const initialPage = {
+    validationRuns: [],
+    pagination: {
+        current: 1,
+        pageSize: 10,
+        total: 0,
+    },
+}
+
 export default function BuildContentValidations({build}) {
-
-    const client = useGraphQLClient()
-
-    const [loading, setLoading] = useState(true)
-    const [validationRuns, setValidationRuns] = useState([])
 
     const [pageRequest, setPageRequest] = useState({
         offset: 0,
@@ -51,12 +60,6 @@ export default function BuildContentValidations({build}) {
         }
     }
 
-    const [pagination, setPagination] = useState({
-        current: 1,
-        pageSize: 10,
-        total: 0,
-    })
-
     const sortingByText = (a, b) => {
         if (a.text < b.text) {
             return -1
@@ -73,102 +76,104 @@ export default function BuildContentValidations({build}) {
         setReloadCount(reloadCount + 1)
     }
 
-    const [statuses, setStatuses] = useState([])
-    const [validationStamps, setValidationStamps] = useState([])
-    useEffect(() => {
-        if (client) {
-            client.request(
-                gql`
-                    query ValidationRunFilters($branchId: Int!) {
-                        validationRunStatusIDList {
-                            value: id
-                            text: name
-                        }
-                        branches(id: $branchId) {
-                            validationStamps {
-                                value: name
-                                text: name
-                            }
-                        }
-                    }
-                `, {branchId: Number(build.branch.id)}
-            ).then(data => {
-                setStatuses(data.validationRunStatusIDList.sort(sortingByText))
-                setValidationStamps(data.branches[0].validationStamps.sort(sortingByText))
-            })
-        }
-    }, [client, build.branch.id]);
-
-    useEffect(() => {
-        if (client) {
-            setLoading(true)
-            client.request(
-                gql`
-                    ${gqlValidationRunTableContent}
-                    query BuildValidations(
-                        $buildId: Int!,
-                        $offset: Int!,
-                        $size: Int!,
-                        $sortingMode: ValidationRunSortingMode!,
-                        $statuses: [String],
-                        $validationStamp: String,
-                    ) {
-                        build(id: $buildId) {
-                            validationRunsPaginated(
-                                sortingMode: $sortingMode,
-                                offset: $offset,
-                                size: $size,
-                                statuses: $statuses,
-                                validationStamp: $validationStamp
-                            ) {
-                                pageInfo {
-                                    pageIndex
-                                    totalSize
-                                    currentSize
-                                    previousPage {
-                                        offset
-                                        size
-                                    }
-                                    nextPage {
-                                        offset
-                                        size
-                                    }
-                                }
-                                pageItems {
-                                    ...ValidationRunTableContent
-                                }
-                            }
-                        }
-                    }
-                `, {
-                    buildId: Number(build.id),
-                    offset: pageRequest.offset,
-                    size: pageRequest.size,
-                    statuses: filteredInfo.status,
-                    validationStamp: filteredInfo.validation ? filteredInfo.validation[0] : null,
-                    sortingMode: sortingMode,
+    const {data: filters} = useQuery(
+        gql`
+            query ValidationRunFilters($branchId: Int!) {
+                validationRunStatusIDList {
+                    value: id
+                    text: name
                 }
-            ).then(data => {
-                setValidationRuns(data.build.validationRunsPaginated.pageItems)
-                const pageInfo = data.build.validationRunsPaginated.pageInfo;
-                setPagination({
-                    ...pagination,
-                    current: pageInfo.pageIndex + 1,
-                    pageSize: pageRequest.size,
-                    total: pageInfo.totalSize,
-                })
-            }).finally(() => {
-                setLoading(false)
-            })
+                branches(id: $branchId) {
+                    validationStamps {
+                        value: name
+                        text: name
+                    }
+                }
+            }
+        `,
+        {
+            variables: {branchId: Number(build.branch.id)},
+            deps: [build.branch.id],
+            initialData: initialFilters,
+            dataFn: data => ({
+                statuses: data.validationRunStatusIDList.sort(sortingByText),
+                validationStamps: data.branches[0].validationStamps.sort(sortingByText),
+            }),
         }
-    }, [client, build, pageRequest, filteredInfo, sortingMode, reloadCount]);
+    )
+    const {statuses, validationStamps} = filters ?? initialFilters
+
+    const {data: page, loading, finished} = useQuery(
+        gql`
+            ${gqlValidationRunTableContent}
+            query BuildValidations(
+                $buildId: Int!,
+                $offset: Int!,
+                $size: Int!,
+                $sortingMode: ValidationRunSortingMode!,
+                $statuses: [String],
+                $validationStamp: String,
+            ) {
+                build(id: $buildId) {
+                    validationRunsPaginated(
+                        sortingMode: $sortingMode,
+                        offset: $offset,
+                        size: $size,
+                        statuses: $statuses,
+                        validationStamp: $validationStamp
+                    ) {
+                        pageInfo {
+                            pageIndex
+                            totalSize
+                            currentSize
+                            previousPage {
+                                offset
+                                size
+                            }
+                            nextPage {
+                                offset
+                                size
+                            }
+                        }
+                        pageItems {
+                            ...ValidationRunTableContent
+                        }
+                    }
+                }
+            }
+        `,
+        {
+            variables: {
+                buildId: Number(build.id),
+                offset: pageRequest.offset,
+                size: pageRequest.size,
+                statuses: filteredInfo.status,
+                validationStamp: filteredInfo.validation ? filteredInfo.validation[0] : null,
+                sortingMode: sortingMode,
+            },
+            deps: [build, pageRequest, filteredInfo, sortingMode, reloadCount],
+            initialData: initialPage,
+            dataFn: data => {
+                const pageInfo = data.build.validationRunsPaginated.pageInfo
+                return {
+                    validationRuns: data.build.validationRunsPaginated.pageItems,
+                    pagination: {
+                        current: pageInfo.pageIndex + 1,
+                        pageSize: pageRequest.size,
+                        total: pageInfo.totalSize,
+                    },
+                }
+            },
+        }
+    )
+    const {validationRuns, pagination} = page ?? initialPage
 
     return (
         <>
             <GridCell id="validations"
                       title="Validations"
                       titleWidth={6}
-                      loading={loading}
+                      loading={loading || !finished}
                       padding={false}
                       extra={
                           <>

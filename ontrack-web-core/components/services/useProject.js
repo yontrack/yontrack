@@ -1,9 +1,9 @@
-import {useQuery} from "@components/services/useQuery";
+import {useQuery} from "@components/services/GraphQL";
 import {gql} from "graphql-request";
 import {gqlProjectContentFragment} from "@components/projects/ProjectGraphQLFragments";
 
 export const useProject = ({id}) => {
-    const {data, loading} = useQuery(
+    const {data, loading, finished} = useQuery(
         gql`
             query Project($id: Int!) {
                 project(id: $id) {
@@ -19,6 +19,6 @@ export const useProject = ({id}) => {
     )
     return {
         project: data,
-        loading,
+        loading: loading || !finished,
     }
 }

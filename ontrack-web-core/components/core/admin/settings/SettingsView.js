@@ -4,50 +4,38 @@ import {homeBreadcrumbs} from "@components/common/Breadcrumbs";
 import {CloseCommand} from "@components/common/Commands";
 import {homeUri} from "@components/common/Links";
 import MainPage from "@components/layouts/MainPage";
-import {useGraphQLClient} from "@components/providers/ConnectionContextProvider";
-import {useEffect, useState} from "react";
+import {useState} from "react";
+import {useQuery} from "@components/services/GraphQL";
 import {gql} from "graphql-request";
 import {Col, Menu, Row, Typography} from "antd";
 import SettingsWrapper from "@components/core/admin/settings/SettingsWrapper";
 
 export default function SettingsView() {
 
-    const client = useGraphQLClient()
-
-    const [settings, setSettings] = useState([])
-
-    useEffect(() => {
-        if (client) {
-            client.request(
-                gql`
-                    query Settings {
-                        settings {
-                            list {
-                                id
-                                title
-                            }
-                        }
+    const {data: settings} = useQuery(
+        gql`
+            query Settings {
+                settings {
+                    list {
+                        id
+                        title
                     }
-                `
-            ).then(data => {
-                setSettings(data.settings.list)
-            })
+                }
+            }
+        `,
+        {
+            initialData: [],
+            dataFn: data => data.settings.list,
         }
-    }, [client]);
-
-    const [items, setItems] = useState([])
-
-    useEffect(() => {
-        setItems(
-            settings.map(entry => ({
-                key: entry.id,
-                label: <Typography.Text>{entry.title}</Typography.Text>,
-                onClick: () => setSelectedSettingsEntry(entry),
-            }))
-        )
-    }, [settings]);
+    )
 
     const [selectedSettingsEntry, setSelectedSettingsEntry] = useState(undefined)
+
+    const items = (settings ?? []).map(entry => ({
+        key: entry.id,
+        label: <Typography.Text>{entry.title}</Typography.Text>,
+        onClick: () => setSelectedSettingsEntry(entry),
+    }))
 
     return (
         <>

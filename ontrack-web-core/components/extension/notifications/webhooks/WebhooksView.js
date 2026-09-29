@@ -6,7 +6,7 @@ import {homeBreadcrumbs} from "@components/common/Breadcrumbs";
 import {CloseCommand} from "@components/common/Commands";
 import {homeUri} from "@components/common/Links";
 import WebhookCreateCommand from "@components/extension/notifications/webhooks/WebhookCreateCommand";
-import {useQuery} from "@components/services/useQuery";
+import {useQuery} from "@components/services/GraphQL";
 import {useRefresh} from "@components/common/RefreshUtils";
 import {Space, Table} from "antd";
 import CheckIcon from "@components/common/CheckIcon";
@@ -20,7 +20,7 @@ import WebhookTestCommand from "@components/extension/notifications/webhooks/Web
 export default function WebhooksView() {
 
     const [refreshCount, refresh] = useRefresh()
-    const {loading, data: webhooks} = useQuery(
+    const {loading, finished, data: webhooks} = useQuery(
         gql`
             query Webhooks {
                 webhooks {
@@ -56,7 +56,7 @@ export default function WebhooksView() {
                 <Table
                     dataSource={webhooks}
                     pagination={false}
-                    loading={loading}
+                    loading={loading || !finished}
                 >
                     <Table.Column
                         key="name"

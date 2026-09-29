@@ -1,7 +1,7 @@
 import FormDialog, {useFormDialog} from "@components/form/FormDialog";
 import {Form, Space, Spin, Typography, Upload} from "antd";
 import {FaPlus} from "react-icons/fa";
-import {useGraphQLClient} from "@components/providers/ConnectionContextProvider";
+import {callGraphQL} from "@components/services/GraphQL";
 import {useEffect, useState} from "react";
 import FormErrors from "@components/form/FormErrors";
 import {formatFileSize, getBase64} from "@components/common/FileUtils";
@@ -12,17 +12,15 @@ export const useChangeImageDialog = ({
                                          imageCallback,
                                      }) => {
 
-    const client = useGraphQLClient()
-
     const [imageContainer, setImageContainer] = useState()
     const [image, setImage] = useState()
 
     return useFormDialog({
         init: (form, {id}) => {
-            client.request(
+            callGraphQL({
                 query,
-                {id}
-            ).then(data => {
+                variables: {id},
+            }).then(data => {
                 setImageContainer(data[queryUserNode])
             })
         },

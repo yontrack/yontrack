@@ -3,7 +3,6 @@ import {buildTitle} from "@components/common/Titles";
 import MainPage from "@components/layouts/MainPage";
 import {buildBreadcrumbs} from "@components/common/Breadcrumbs";
 import LoadingContainer from "@components/common/LoadingContainer";
-import {useEffect, useState} from "react";
 import {gql} from "graphql-request";
 import {CloseCommand, Command} from "@components/common/Commands";
 import {branchUri, buildLinksUri} from "@components/common/Links";
@@ -17,7 +16,7 @@ import BuildContent from "@components/builds/BuildContent";
 import {Space} from "antd";
 import Decorations from "@components/framework/decorations/Decorations";
 import InfoViewDrawer from "@components/common/InfoViewDrawer";
-import {useGraphQLClient} from "@components/providers/ConnectionContextProvider";
+import {useQuery} from "@components/services/GraphQL";
 import StoredGridLayoutResetCommand from "@components/grid/StoredGridLayoutResetCommand";
 import StoredGridLayoutContextProvider from "@components/grid/StoredGridLayoutContext";
 import {FaProjectDiagram} from "react-icons/fa";
@@ -31,132 +30,131 @@ import PreviousBuildCommand from "@components/builds/PreviousBuildCommand";
 import NextBuildCommand from "@components/builds/NextBuildCommand";
 import {buildVisit, useRecordVisit} from "@components/search/palette/recentlyVisited";
 
+const noBuild = {branch: {project: {}}}
+
 export default function BuildView({id}) {
 
-    const client = useGraphQLClient()
-
-    const [loadingBuild, setLoadingBuild] = useState(true)
-    const [build, setBuild] = useState({branch: {project: {}}})
-    const [commands, setCommands] = useState([])
-
     const [refreshState, refresh] = useRefresh()
+
+    const {data: queriedBuild, loading, finished} = useQuery(
+        gql`
+            query GetBuild($id: Int!) {
+                build(id: $id) {
+                    id
+                    name
+                    description
+                    annotatedDescription
+                    creation {
+                        user
+                        time
+                    }
+                    userMenuActions {
+                        ...userMenuActionFragment
+                    }
+                    releaseProperty {
+                        value
+                    }
+                    properties {
+                        ...propertiesFragment
+                    }
+                    information {
+                        ...informationFragment
+                    }
+                    decorations {
+                        ...decorationContent
+                    }
+                    branch {
+                        id
+                        name
+                        project {
+                            id
+                            name
+                        }
+                    }
+                    authorizations {
+                        name
+                        action
+                        authorized
+                    }
+                    previousBuild {
+                        id
+                        name
+                        displayName
+                    }
+                    nextBuild {
+                        id
+                        name
+                        displayName
+                    }
+                }
+            }
+
+            ${gqlDecorationFragment}
+            ${gqlPropertiesFragment}
+            ${gqlInformationFragment}
+            ${gqlUserMenuActionFragment}
+        `,
+        {
+            variables: {id: Number(id)},
+            deps: [id, refreshState],
+            condition: !!id,
+            initialData: noBuild,
+            dataFn: data => data.build,
+        }
+    )
+    const build = queriedBuild ?? noBuild
+    const loadingBuild = loading || !finished
 
     // Listed by the command palette before anything is typed
     useRecordVisit(buildVisit(build))
 
-    useEffect(() => {
-        if (client && id) {
-            setLoadingBuild(true)
-            client.request(
-                gql`
-                    query GetBuild($id: Int!) {
-                        build(id: $id) {
-                            id
-                            name
-                            description
-                            annotatedDescription
-                            creation {
-                                user
-                                time
-                            }
-                            userMenuActions {
-                                ...userMenuActionFragment
-                            }
-                            releaseProperty {
-                                value
-                            }
-                            properties {
-                                ...propertiesFragment
-                            }
-                            information {
-                                ...informationFragment
-                            }
-                            decorations {
-                                ...decorationContent
-                            }
-                            branch {
-                                id
-                                name
-                                project {
-                                    id
-                                    name
-                                }
-                            }
-                            authorizations {
-                                name
-                                action
-                                authorized
-                            }
-                            previousBuild {
-                                id
-                                name
-                                displayName
-                            }
-                            nextBuild {
-                                id
-                                name
-                                displayName
-                            }
-                        }
-                    }
-
-                    ${gqlDecorationFragment}
-                    ${gqlPropertiesFragment}
-                    ${gqlInformationFragment}
-                    ${gqlUserMenuActionFragment}
-                `,
-                {id: Number(id)}
-            ).then(data => {
-                setBuild(data.build)
-                setLoadingBuild(false)
-                const commands = [
-                    <InfoViewDrawer
-                        key="details"
-                        id="build-info"
-                        entityType="BUILD"
-                        entityName="build"
-                        entity={data.build}
-                    />,
-                    <PreviousBuildCommand
-                        key={`previous-${data.build.id}`}
-                        previousBuild={data.build.previousBuild}
-                    />,
-                    <NextBuildCommand
-                        key={`next-${data.build.id}`}
-                        nextBuild={data.build.nextBuild}
-                    />,
-                    <UserMenuActions
-                        key="tools"
-                        actions={data.build.userMenuActions}
-                    />,
-                    <Command
-                        key="links"
-                        icon={<FaProjectDiagram/>}
-                        href={buildLinksUri(data.build)}
-                        text="Links"
-                        title="Displays downstream and upstream dependencies"
-                    />,
-                ]
-                if (isAuthorized(data.build, "build", "edit")) {
-                    commands.push(
-                        <EditBuildCommand
-                            build={data.build}
-                            onSuccess={refresh}
-                            key="edit"
-                        />
-                    )
-                }
-                commands.push(
-                    <StoredGridLayoutResetCommand key="reset"/>,
-                )
-                if (isAuthorized(data.build, "build", "delete")) {
-                    commands.push(<BuildDeleteCommand key="delete" id={data.build.id}/>)
-                }
-                commands.push(<CloseCommand key="close" href={branchUri(data.build.branch)}/>)
-                setCommands(commands)
-            })
+    const commands = []
+    if (build.id) {
+        commands.push(
+            <InfoViewDrawer
+                key="details"
+                id="build-info"
+                entityType="BUILD"
+                entityName="build"
+                entity={build}
+            />,
+            <PreviousBuildCommand
+                key={`previous-${build.id}`}
+                previousBuild={build.previousBuild}
+            />,
+            <NextBuildCommand
+                key={`next-${build.id}`}
+                nextBuild={build.nextBuild}
+            />,
+            <UserMenuActions
+                key="tools"
+                actions={build.userMenuActions}
+            />,
+            <Command
+                key="links"
+                icon={<FaProjectDiagram/>}
+                href={buildLinksUri(build)}
+                text="Links"
+                title="Displays downstream and upstream dependencies"
+            />,
+        )
+        if (isAuthorized(build, "build", "edit")) {
+            commands.push(
+                <EditBuildCommand
+                    build={build}
+                    onSuccess={refresh}
+                    key="edit"
+                />
+            )
         }
-    }, [client, id, refreshState])
+        commands.push(
+            <StoredGridLayoutResetCommand key="reset"/>,
+        )
+        if (isAuthorized(build, "build", "delete")) {
+            commands.push(<BuildDeleteCommand key="delete" id={build.id}/>)
+        }
+        commands.push(<CloseCommand key="close" href={branchUri(build.branch)}/>)
+    }
 
     return (
         <>

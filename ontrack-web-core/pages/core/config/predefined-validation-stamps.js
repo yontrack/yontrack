@@ -1,12 +1,12 @@
 import StandardPage from "@components/layouts/StandardPage";
 import {CloseToHomeCommand} from "@components/common/Commands";
-import {useReloadState} from "@components/common/StateUtils";
+import {useRefresh} from "@components/common/RefreshUtils";
 import PredefinedValidationStampsTable from "@components/core/config/PredefinedValidationStampsTable";
 import PredefinedValidationStampCreateCommand from "@components/core/config/PredefinedValidationStampCreateCommand";
 
 export default function PredefinedValidationStampsPage() {
 
-    const [reloadState, reload] = useReloadState()
+    const [reloadState, reload] = useRefresh()
 
     return (
         <>

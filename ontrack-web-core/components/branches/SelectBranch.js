@@ -1,7 +1,7 @@
 import {useState} from "react";
 import {Select} from "antd";
 import {gql} from "graphql-request";
-import {useGraphQLClient} from "@components/providers/ConnectionContextProvider";
+import {callGraphQL} from "@components/services/GraphQL";
 
 export default function SelectBranch({
                                          project, value, onChange, disabled,
@@ -15,22 +15,21 @@ export default function SelectBranch({
         if (onChange) onChange(newValue)
     }
 
-    const client = useGraphQLClient()
-
     const handleSearch = (token) => {
         if (project && token && token.length > 2) {
             if (!searching) {
                 setSearching(true)
-                client.request(
-                    gql`
+                callGraphQL({
+                    query: gql`
                         query SearchBranches($project: String!, $token: String!) {
                             branches(project: $project, token: $token) {
                                 id
                                 name
                             }
                         }
-                    `, {project, token}
-                ).then(data => {
+                    `,
+                    variables: {project, token},
+                }).then(data => {
                     setBranches(data.branches)
                 }).finally(() => {
                     setSearching(false)

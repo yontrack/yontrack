@@ -1,51 +1,50 @@
-import {useGraphQLClient} from "@components/providers/ConnectionContextProvider";
-import {useEffect, useState} from "react";
+import {useState} from "react";
+import {useQuery} from "@components/services/GraphQL";
 import {formatSeconds} from "@components/common/Duration";
 import {Bar, CartesianGrid, ComposedChart, Legend, Line, Tooltip, XAxis, YAxis} from "recharts";
 import ChartContainer from "@components/charts/ChartContainer";
 import {chartAxisProps, chartGridProps, chartLegendProps, chartTooltipProps} from "@components/charts/chartTheme";
 import {brand} from "@components/common/brand/Colors";
 
+const noChart = {
+    chart: {
+        categories: []
+    },
+    dataPoints: [],
+}
+
 export default function DurationChart({query, variables}) {
 
-    const client = useGraphQLClient()
-
-    const [chart, setChart] = useState({
-        categories: []
+    const {data: chartData} = useQuery(query, {
+        variables,
+        deps: [query, variables],
+        initialData: noChart,
+        dataFn: data => {
+            const chart = data.getChart
+            /**
+             *
+             * categories: [],
+             * dates: [],
+             * data: {
+             *     mean: [],
+             *     percentile90: [],
+             *     maximum: [],
+             * }
+             */
+            return {
+                chart,
+                dataPoints: chart.dates.map((date, index) => {
+                    return {
+                        date,
+                        mean: chart.data.mean[index],
+                        percentile90: chart.data.percentile90[index],
+                        maximum: chart.data.maximum[index],
+                    }
+                }),
+            }
+        },
     })
-    const [dataPoints, setDataPoints] = useState([])
-
-    useEffect(() => {
-        if (client) {
-            client.request(
-                query,
-                variables
-            ).then(data => {
-                const chart = data.getChart
-                /**
-                 *
-                 * categories: [],
-                 * dates: [],
-                 * data: {
-                 *     mean: [],
-                 *     percentile90: [],
-                 *     maximum: [],
-                 * }
-                 */
-                setChart(chart)
-                setDataPoints(
-                    chart.dates.map((date, index) => {
-                        return {
-                            date,
-                            mean: chart.data.mean[index],
-                            percentile90: chart.data.percentile90[index],
-                            maximum: chart.data.maximum[index],
-                        }
-                    })
-                )
-            })
-        }
-    }, [client, query, variables]);
+    const {chart, dataPoints} = chartData ?? noChart
 
     const legendFormatter = (value, entry, index) => {
         return chart.categories[index]

@@ -1,9 +1,9 @@
-import {useQuery} from "@components/services/useQuery";
+import {useQuery} from "@components/services/GraphQL";
 import {gql} from "graphql-request";
 
 export const useWorkflowInstanceStatus = () => {
 
-    const {data, loading} = useQuery(
+    const {data, loading, finished} = useQuery(
         gql`
             query WorkflowInstanceStatusQuery {
                 workflowInstanceStatusList
@@ -17,7 +17,7 @@ export const useWorkflowInstanceStatus = () => {
 
     return {
         data,
-        loading,
+        loading: loading || !finished,
     }
 
 }

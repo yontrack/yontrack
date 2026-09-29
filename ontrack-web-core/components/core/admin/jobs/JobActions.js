@@ -1,21 +1,19 @@
 import {message, Space} from "antd";
 import InlineCommand from "@components/common/InlineCommand";
 import {FaPause, FaPlay, FaRedo, FaStop, FaTrash} from "react-icons/fa";
-import {useGraphQLClient} from "@components/providers/ConnectionContextProvider";
+import {callGraphQL} from "@components/services/GraphQL";
 import {gql} from "graphql-request";
 import {useState} from "react";
 
 export default function JobActions({job, onDone}) {
-
-    const client = useGraphQLClient()
 
     const [messageApi, contextHolder] = message.useMessage()
     const [loading, setLoading] = useState(false)
 
     const jobAction = (mutation, verb) => {
         setLoading(true)
-        client.request(
-            gql`
+        callGraphQL({
+            query: gql`
                 mutation JobAction($id: Int!) {
                     ${mutation}(id: $id) {
                         ok
@@ -23,10 +21,10 @@ export default function JobActions({job, onDone}) {
                     }
                 }
             `,
-            {
+            variables: {
                 id: Number(job.id)
-            }
-        ).then(data => {
+            },
+        }).then(data => {
             const result = data[mutation]
             if (result.ok) {
                 messageApi.success(`Job ${verb} successfully.`)

@@ -1,41 +1,40 @@
-import {useGraphQLClient} from "@components/providers/ConnectionContextProvider";
-import {useEffect, useState} from "react";
+import {useState} from "react";
+import {useQuery} from "@components/services/GraphQL";
 import ChartContainer from "@components/charts/ChartContainer";
 import {chartAxisProps, chartGridProps, chartLegendProps, chartTooltipProps} from "@components/charts/chartTheme";
 import {CartesianGrid, ComposedChart, Legend, Line, Tooltip, XAxis, YAxis} from "recharts";
 
+const noChart = {
+    chart: {
+        categories: []
+    },
+    dataPoints: [],
+}
+
 export default function MetricsChart({query, variables}) {
 
-    const client = useGraphQLClient()
+    const {data: chartData} = useQuery(query, {
+        variables,
+        deps: [query, variables],
+        initialData: noChart,
+        dataFn: data => {
+            const chart = data.getChart
 
-    const [chart, setChart] = useState({
-        categories: []
-    })
-    const [dataPoints, setDataPoints] = useState([])
-
-    useEffect(() => {
-        if (client) {
-            client.request(
-                query,
-                variables
-            ).then(data => {
-                const chart = data.getChart
-
-                setChart(chart)
-                setDataPoints(
-                    chart.dates.map((date, index) => {
-                        const point = {
-                            date
-                        }
-                        chart.metricNames.forEach((metricName) => {
-                            point[metricName] = chart.metricValues[index]?.[metricName]
-                        })
-                        return point
+            return {
+                chart,
+                dataPoints: chart.dates.map((date, index) => {
+                    const point = {
+                        date
+                    }
+                    chart.metricNames.forEach((metricName) => {
+                        point[metricName] = chart.metricValues[index]?.[metricName]
                     })
-                )
-            })
-        }
-    }, [client, query, variables]);
+                    return point
+                }),
+            }
+        },
+    })
+    const {chart, dataPoints} = chartData ?? noChart
 
     const [inactiveSeries, setInactiveSeries] = useState([])
 

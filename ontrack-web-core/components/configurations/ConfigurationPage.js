@@ -1,7 +1,7 @@
 import StandardPage from "@components/layouts/StandardPage";
-import {useContext, useEffect, useState} from "react";
+import {useContext, useState} from "react";
 import {message, Space, Table} from "antd";
-import {useGraphQLClient} from "@components/providers/ConnectionContextProvider";
+import {callGraphQL, useQuery} from "@components/services/GraphQL";
 import {gql} from "graphql-request";
 import {UserContext} from "@components/providers/UserProvider";
 import {Command} from "@components/common/Commands";
@@ -19,39 +19,33 @@ export default function ConfigurationPage({
                                           }) {
 
     const user = useContext(UserContext)
-    const client = useGraphQLClient()
 
     const [refresh, setRefresh] = useState(0)
 
-    const [loading, setLoading] = useState(true)
-    const [configurations, setConfigurations] = useState([])
-
-    useEffect(() => {
-        if (client) {
-            client.request(
-                gql`
-                    query ConfigurationList($configurationType: String!) {
-                        configurations(configurationType: $configurationType) {
-                            name
-                            data
-                            extra
-                        }
-                    }
-                `,
-                {
-                    configurationType,
+    // Only the first load shows as loading, not the reloads
+    const {data: configurations, finished} = useQuery(
+        gql`
+            query ConfigurationList($configurationType: String!) {
+                configurations(configurationType: $configurationType) {
+                    name
+                    data
+                    extra
                 }
-            ).then(data => {
-                setConfigurations(data.configurations.map(it => ({
-                    ...it.data,
-                    name: it.name,
-                    extra: it.extra,
-                })))
-            }).finally(() => {
-                setLoading(false)
-            })
+            }
+        `,
+        {
+            variables: {
+                configurationType,
+            },
+            deps: [configurationType, refresh],
+            initialData: [],
+            dataFn: data => data.configurations.map(it => ({
+                ...it.data,
+                name: it.name,
+                extra: it.extra,
+            })),
         }
-    }, [client, configurationType, refresh]);
+    )
 
     const reload = () => {
         setRefresh(refresh + 1)
@@ -73,7 +67,7 @@ export default function ConfigurationPage({
         return async () => {
             const data = {...config}
             delete data.extra
-            const connectionResult = await testConfig(client, data, configurationType)
+            const connectionResult = await testConfig(data, configurationType)
             if (connectionResult) {
                 if (connectionResult.type === 'OK') {
                     messageApi.success("Connection OK")
@@ -92,8 +86,8 @@ export default function ConfigurationPage({
 
     const onDeleteConfig = (config) => {
         return () => {
-            client.request(
-                gql`
+            callGraphQL({
+                query: gql`
                     mutation DeleteConfiguration($type: String!, $name: String!) {
                         deleteConfiguration(input: {
                             type: $type,
@@ -105,11 +99,11 @@ export default function ConfigurationPage({
                         }
                     }
                 `,
-                {
+                variables: {
                     type: configurationType,
                     name: config.name,
-                }
-            ).then(reload)
+                },
+            }).then(reload)
         }
     }
 
@@ -153,7 +147,7 @@ export default function ConfigurationPage({
                 }
             >
                 <Table
-                    loading={loading}
+                    loading={!finished}
                     dataSource={configurations}
                     columns={[...columns, actionsColumn]}
                     rowKey={(configuration) => `config-${configuration.name}`}

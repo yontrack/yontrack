@@ -1,10 +1,10 @@
-import {useQuery} from "@components/services/useQuery";
+import {useQuery} from "@components/services/GraphQL";
 import {gql} from "graphql-request";
 import {Select} from "antd";
 
 export default function SelectQueueRecordState({value, onChange}) {
 
-    const {data: options, loading} = useQuery(
+    const {data: options, loading, finished} = useQuery(
         gql`
             query QueueStates {
                 queueRecordFilterInfo {
@@ -34,7 +34,7 @@ export default function SelectQueueRecordState({value, onChange}) {
     return (
         <>
             <Select
-                loading={loading}
+                loading={loading || !finished}
                 options={options}
                 value={value}
                 onChange={onChange}

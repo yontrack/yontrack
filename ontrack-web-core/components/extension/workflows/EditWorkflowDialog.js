@@ -5,7 +5,7 @@ import {useReactFlow} from "reactflow";
 import FormErrors from "@components/form/FormErrors";
 import {useGraphQLClient} from "@components/providers/ConnectionContextProvider";
 import {gql} from "graphql-request";
-import {getUserErrors} from "@components/services/graphql-utils";
+import {getGraphQLErrors} from "@components/services/graphql-utils";
 import WorkflowDownloadJSONSchema from "@components/extension/workflows/WorkflowDownloadJSONSchema";
 
 export const useEditWorkflowDialog = ({onSuccess}) => {
@@ -120,8 +120,8 @@ export default function EditWorkflowDialog({dialog}) {
             )
             // Error management
             const userNode = data.validateJsonWorkflow
-            let errors = getUserErrors(userNode)
-            if (!errors) {
+            let errors = getGraphQLErrors(data, 'validateJsonWorkflow')
+            if (errors.length === 0) {
                 errors = userNode.validation.errors
             }
             if (errors && errors.length > 0) {

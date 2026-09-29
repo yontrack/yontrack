@@ -1,7 +1,7 @@
-import {useQuery} from "@components/services/useQuery";
+import {useQuery} from "@components/services/GraphQL";
 import {gql} from "graphql-request";
 import {Form, Input, Space, Table, Typography} from "antd";
-import {useReloadState} from "@components/common/StateUtils";
+import {useRefresh} from "@components/common/RefreshUtils";
 import PredefinedValidationStampImage from "@components/core/config/PredefinedValidationStampImage";
 import ValidationDataType from "@components/framework/validation-data-type/ValidationDataType";
 import FilterForm from "@components/common/table/FilterForm";
@@ -13,13 +13,13 @@ import PredefinedValidationStampChangeImageCommand
 
 export default function PredefinedValidationStampsTable({reloadState}) {
 
-    const [changed, onChange] = useReloadState()
+    const [changed, onChange] = useRefresh()
 
     const [filterFormData, setFilterFormData] = useState({
         name: ''
     })
 
-    const {data, loading} = useQuery(
+    const {data, loading, finished} = useQuery(
         gql`
             query PredefinedValidationStamps($name: String = null) {
                 predefinedValidationStamps(name: $name) {
@@ -59,7 +59,7 @@ export default function PredefinedValidationStampsTable({reloadState}) {
                 ]}
             />
             <Table
-                loading={loading}
+                loading={loading || !finished}
                 dataSource={data?.predefinedValidationStamps}
                 pagination={false}
             >
