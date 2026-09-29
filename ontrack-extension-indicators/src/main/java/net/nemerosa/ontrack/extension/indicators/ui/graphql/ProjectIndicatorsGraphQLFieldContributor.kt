@@ -19,6 +19,7 @@ class ProjectIndicatorsGraphQLFieldContributor(
                     GraphQLFieldDefinition.newFieldDefinition()
                             .name("projectIndicators")
                             .description("List of project indicators")
+                            .deprecate("Removed in V6. No replacement. See #1893")
                             .type(projectIndicators.typeRef)
                             .dataFetcher { env ->
                                 val project: Project = env.getSource()!!

@@ -32,7 +32,7 @@ class GQLTypeAccount(
             .field {
                 it.name("name")
                     .description("Unique name for the account")
-                    .deprecate("Will be removed in V6. Use email instead. Replaced by email.")
+                    .deprecate("Removed in V6. Use email instead. See #1921")
                     .type(GraphQLString.toNotNull())
                     .dataFetcher { env ->
                         val account: Account = env.getSource()!!

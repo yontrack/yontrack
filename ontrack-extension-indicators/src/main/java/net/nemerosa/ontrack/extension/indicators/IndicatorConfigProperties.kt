@@ -14,6 +14,7 @@ import org.springframework.validation.annotation.Validated
 @Validated
 @APIName("Indicators configuration")
 @APIDescription("Configuration of the indicators")
+@Deprecated("Removed in V6. No replacement. See #1893")
 class IndicatorConfigProperties {
 
     /**

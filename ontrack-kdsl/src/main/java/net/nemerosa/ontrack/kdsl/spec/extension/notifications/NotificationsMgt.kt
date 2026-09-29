@@ -20,7 +20,7 @@ class NotificationsMgt(connector: Connector) : Connected(connector) {
     /**
      * Subscribes for notifications.
      *
-     * @param name Subscription name (can be null for backward compatibility, but will be required in V5)
+     * @param name Subscription name (can be null for backward compatibility, but is required in V6)
      * @param channel Channel to send the notifications to
      * @param channelConfig Configuration of the channel
      * @param keywords Space-separated list of keywords to filter the events

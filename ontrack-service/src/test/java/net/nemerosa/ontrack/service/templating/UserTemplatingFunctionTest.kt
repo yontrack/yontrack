@@ -2,6 +2,9 @@ package net.nemerosa.ontrack.service.templating
 
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.verify
+import net.nemerosa.ontrack.model.deprecation.DeprecationService
+import net.nemerosa.ontrack.model.deprecation.DeprecationSurface
 import net.nemerosa.ontrack.model.events.PlainEventRenderer
 import net.nemerosa.ontrack.model.security.Account
 import net.nemerosa.ontrack.model.security.AuthenticatedUser
@@ -16,6 +19,7 @@ class UserTemplatingFunctionTest {
     private lateinit var account: Account
     private lateinit var user: AuthenticatedUser
     private lateinit var securityService: SecurityService
+    private lateinit var deprecationService: DeprecationService
     private lateinit var userTemplatingFunction: UserTemplatingFunction
 
     @BeforeEach
@@ -26,7 +30,8 @@ class UserTemplatingFunctionTest {
         every { user.account } returns account
 
         securityService = mockk()
-        userTemplatingFunction = UserTemplatingFunction(securityService)
+        deprecationService = mockk(relaxed = true)
+        userTemplatingFunction = UserTemplatingFunction(securityService, deprecationService)
     }
 
     @Test
@@ -56,11 +61,11 @@ class UserTemplatingFunctionTest {
                 expressionResolver = { it }
             )
         )
+        verify(exactly = 0) { deprecationService.deprecatedUsage(any(), any(), any()) }
     }
 
     @Test
-    @Deprecated("Will be removed in V6.")
-    fun `Account username field`() {
+    fun `Account username field is reported as deprecated`() {
         every { account.email } returns "test@yontrack.local"
         every { securityService.currentUser } returns user
         assertEquals(
@@ -74,6 +79,13 @@ class UserTemplatingFunctionTest {
                 expressionResolver = { it }
             )
         )
+        verify(exactly = 1) {
+            deprecationService.deprecatedUsage(
+                DeprecationSurface.TEMPLATING,
+                "#.user?field=name",
+                "Removed in V6. Use field=email instead. See #1920"
+            )
+        }
     }
 
     @Test

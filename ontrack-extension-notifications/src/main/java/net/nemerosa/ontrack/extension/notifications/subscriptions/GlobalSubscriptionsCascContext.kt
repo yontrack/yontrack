@@ -6,6 +6,8 @@ import net.nemerosa.ontrack.extension.notifications.casc.NotificationsSubCascCon
 import net.nemerosa.ontrack.json.JsonParseException
 import net.nemerosa.ontrack.json.asJson
 import net.nemerosa.ontrack.json.parse
+import net.nemerosa.ontrack.model.deprecation.DeprecationService
+import net.nemerosa.ontrack.model.deprecation.DeprecationSurface
 import net.nemerosa.ontrack.model.json.schema.JsonArrayType
 import net.nemerosa.ontrack.model.json.schema.JsonType
 import net.nemerosa.ontrack.model.json.schema.JsonTypeBuilder
@@ -15,6 +17,7 @@ import org.springframework.stereotype.Component
 @Component
 class GlobalSubscriptionsCascContext(
     private val eventSubscriptionService: EventSubscriptionService,
+    private val deprecationService: DeprecationService,
 ) : AbstractCascContext(), NotificationsSubCascContext {
 
     override val field: String = "global-subscriptions"
@@ -38,6 +41,9 @@ class GlobalSubscriptionsCascContext(
             }
         }
         items.forEach { subscription ->
+            if (subscription.name == null) {
+                deprecationService.namelessSubscription(DeprecationSurface.CASC)
+            }
             eventSubscriptionService.subscribe(
                 EventSubscription(
                     name = subscription.name ?: subscription.computeName(),

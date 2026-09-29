@@ -70,7 +70,7 @@ class GQLTypeIndicatorPortfolio(
                         it.name("categoryStats")
                                 .description("Stats per category")
                                 .type(listType(indicatorCategoryStats.typeRef))
-                                .deprecate("Use viewStats with viewId = null. This field will be removed in V5.")
+                                .deprecate("Removed in V6. No replacement. See #1893")
                                 .durationArgument()
                                 .dataFetcher { env ->
                                     val duration = env.getDurationArgument()

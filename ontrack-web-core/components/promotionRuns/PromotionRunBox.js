@@ -4,7 +4,7 @@ import PromotionLevelLink from "@components/promotionLevels/PromotionLevelLink";
 import BuildLink from "@components/builds/BuildLink";
 
 export default function PromotionRunBox({promotionLevel}) {
-    const run = promotionLevel.promotionRuns ? promotionLevel.promotionRuns[0] : undefined
+    const run = promotionLevel.promotionRunsPaginated?.pageItems?.[0]
     const build = run?.build
     return (
         <>

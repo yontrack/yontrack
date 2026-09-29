@@ -10,6 +10,8 @@ import net.nemerosa.ontrack.model.json.schema.JsonArrayType
 import net.nemerosa.ontrack.model.json.schema.JsonType
 import net.nemerosa.ontrack.model.json.schema.JsonTypeBuilder
 import net.nemerosa.ontrack.model.json.schema.toType
+import net.nemerosa.ontrack.model.deprecation.DeprecationService
+import net.nemerosa.ontrack.model.deprecation.DeprecationSurface
 import net.nemerosa.ontrack.model.settings.CachedSettingsService
 import net.nemerosa.ontrack.model.settings.SettingsManagerService
 import org.springframework.stereotype.Component
@@ -18,6 +20,7 @@ import org.springframework.stereotype.Component
 class JenkinsPipelineLibraryIndicatorSettingsCasc(
     private val cachedSettingsService: CachedSettingsService,
     private val settingsManagerService: SettingsManagerService,
+    private val deprecationService: DeprecationService,
 ) : AbstractCascContext(), SubSettingsContext {
 
     override val field: String = "jenkins-pipeline-library-indicator"
@@ -30,6 +33,13 @@ class JenkinsPipelineLibraryIndicatorSettingsCasc(
     }
 
     override fun run(node: JsonNode, paths: List<String>) {
+        if (!node.isEmpty) {
+            deprecationService.deprecatedUsage(
+                surface = DeprecationSurface.CASC,
+                item = path(paths),
+                message = "Removed in V6. No replacement. See #1893",
+            )
+        }
         val items = node.mapIndexed { index, child ->
             try {
                 child.parse<JenkinsPipelineLibraryIndicatorLibrarySettings>()

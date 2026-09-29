@@ -18,7 +18,7 @@ import java.util.*
 
 
 @Component
-@Deprecated("Will be removed in V5. Pure Git configuration won't be supported any longer.")
+@Deprecated("Removed in V6. Use GitHub, GitLab or Bitbucket instead. See #1924")
 class GitProjectConfigurationPropertyType(
     extensionFeature: GitExtensionFeature,
     private val configurationService: GitConfigurationService

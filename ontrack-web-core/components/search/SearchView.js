@@ -75,7 +75,6 @@ export default function SearchView() {
                                 description
                                 data
                                 accuracy
-                                page
                             }
                         }
                     }

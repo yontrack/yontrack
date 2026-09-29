@@ -11,6 +11,8 @@ import net.nemerosa.ontrack.extension.scm.service.SCMExtension
 import net.nemerosa.ontrack.extension.scm.service.SCMPath
 import net.nemerosa.ontrack.extension.scm.service.SCMPullRequest
 import net.nemerosa.ontrack.extension.support.AbstractExtension
+import net.nemerosa.ontrack.model.deprecation.DeprecationService
+import net.nemerosa.ontrack.model.deprecation.DeprecationSurface
 import net.nemerosa.ontrack.model.structure.Branch
 import net.nemerosa.ontrack.model.structure.Project
 import net.nemerosa.ontrack.model.structure.PropertyService
@@ -22,9 +24,11 @@ import org.springframework.stereotype.Component
  * WARNING: most of the operations are NOT possible.
  */
 @Component
+@Deprecated("Removed in V6. Use GitHub, GitLab or Bitbucket instead. See #1924")
 class GitSCMExtension(
     extensionFeature: GitExtensionFeature,
     private val propertyService: PropertyService,
+    private val deprecationService: DeprecationService,
 ) : AbstractExtension(extensionFeature), SCMExtension {
 
     override val type: String = "git"
@@ -37,6 +41,11 @@ class GitSCMExtension(
         val property: GitProjectConfigurationProperty? =
             propertyService.getProperty(project, GitProjectConfigurationPropertyType::class.java).value
         return property?.run {
+            deprecationService.deprecatedUsage(
+                surface = DeprecationSurface.PROPERTY,
+                item = GitProjectConfigurationPropertyType::class.java.name,
+                message = "Removed in V6. Use GitHub, GitLab or Bitbucket instead. See #1924",
+            )
             GitSCM(
                 project,
                 // property,
@@ -138,7 +147,7 @@ class GitSCMExtension(
                 """
                     Operation [$operation] not supported by the Git SCM.
                     
-                    The GitSCM will be removed in version 5 on Ontrack.
+                    The Git SCM is removed in V6: move the project to GitHub, GitLab or Bitbucket.
                 """.trimIndent()
             )
 

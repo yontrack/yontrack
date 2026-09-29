@@ -30,7 +30,7 @@ class AutoVersioningTrailGQLPromotionLevelFieldContributor(
             GraphQLFieldDefinition.newFieldDefinition()
                 .name("autoVersioningTrail")
                 .description("List of branches targeted for auto-versioning based on this promotion level or with their reason for rejection")
-                .deprecate("Will be removed in V6. Use autoVersioningTrailPaginated instead.")
+                .deprecate("Removed in V6. Use autoVersioningTrailPaginated instead. See #1921")
                 .type(gqlTypeAutoVersioningTrail.typeRef)
                 .dataFetcher { env ->
                     val pl: PromotionLevel = env.getSource()!!

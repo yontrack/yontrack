@@ -37,10 +37,12 @@ export default function FavouriteProjectsWidget() {
                                     id
                                     name
                                     image
-                                    promotionRuns(first: 1) {
-                                        build {
-                                            id
-                                            name
+                                    promotionRunsPaginated(size: 1) {
+                                        pageItems {
+                                            build {
+                                                id
+                                                name
+                                            }
                                         }
                                     }
                                 }

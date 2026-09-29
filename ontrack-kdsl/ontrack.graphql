@@ -82,7 +82,7 @@ type Account {
   groups: [AccountGroup!]!
   id: ID!
   "Unique name for the account"
-  name: String! @deprecated(reason : "Will be removed in V6. Use email instead. Replaced by email.")
+  name: String! @deprecated(reason : "Removed in V6. Use email instead. See #1921")
   "Security role (admin or none)"
   role: String
   "List of authentication tokens linked to this account."
@@ -133,12 +133,60 @@ type AuthorizedProject {
   role: ProjectRole!
 }
 
+"Current conditions of the auto promotion of a promotion level, and their current state for a given build."
+type AutoPromotionBuildConditions {
+  "Is the promotion revoked when one of its prerequisites is no longer valid?"
+  autoRevoke: Boolean
+  "Regular expression excluding validation stamps by name - empty when not set"
+  exclude: String!
+  "Regular expression including validation stamps by name - empty when not set"
+  include: String!
+  "State of each required promotion level for the build, in branch order"
+  promotionLevels: [AutoPromotionPromotionLevelCondition!]!
+  "State of each required validation stamp for the build, in branch order"
+  validationStamps: [AutoPromotionValidationStampCondition!]!
+}
+
+"Current conditions of the auto promotion of a promotion level: the validation stamps and promotion levels it requires, as they are resolved on the branch today."
+type AutoPromotionConditions {
+  "Is the promotion revoked when one of its prerequisites is no longer valid?"
+  autoRevoke: Boolean
+  "Regular expression excluding validation stamps by name - empty when not set"
+  exclude: String!
+  "Regular expression including validation stamps by name - empty when not set"
+  include: String!
+  "Promotion levels required for the promotion, in branch order"
+  promotionLevels: [PromotionLevel!]!
+  "Validation stamps required for the promotion, in branch order: the ones named explicitly, plus the ones of the branch matching the include expression and not the exclude one."
+  validationStamps: [ValidationStamp!]!
+}
+
+"State of a promotion level required by an auto promotion, for a build"
+type AutoPromotionPromotionLevelCondition {
+  "Required promotion level"
+  promotionLevel: PromotionLevel!
+  "Latest run of the promotion level for the build - null when it is not granted"
+  promotionRun: PromotionRun
+}
+
+"State of a validation stamp required by an auto promotion, for a build"
+type AutoPromotionValidationStampCondition {
+  "Latest run of the validation stamp for the build - null when it never ran"
+  lastRun: ValidationRun
+  "Does the latest run count as passed for the auto promotion?"
+  passed: Boolean
+  "Required validation stamp"
+  validationStamp: ValidationStamp!
+}
+
 "Audit entry for an auto versioning processing order."
 type AutoVersioningAuditEntry {
   "History of the different states"
   audit: [AutoVersioningAuditEntryState!]!
   "Elapsed time between the creation of this process and its last state (in ms)"
   duration: Int
+  "Automatic retries & manual reschedules this entry is part of"
+  lineage: AutoVersioningAuditEntryLineage!
   "Most recent state"
   mostRecentState: AutoVersioningAuditEntryState!
   "Associated auto versioning order"
@@ -155,6 +203,28 @@ type AutoVersioningAuditEntry {
   running: Boolean
   "Actual SCM branch being used"
   upgradeBranch: String
+}
+
+"Retries & reschedules an auto-versioning audit entry is part of"
+type AutoVersioningAuditEntryLineage {
+  "Maximum number of automatic retries currently configured, 0 when disabled"
+  configuredRetryMaxCount: Int!
+  "UUIDs of the entries rescheduling this one manually"
+  rescheduledAs: [String!]!
+  "If this entry was rescheduled manually, UUID of the entry it reschedules"
+  rescheduledFrom: String
+  "If this entry has been retried automatically, time its retry is scheduled at"
+  retryAt: LocalDateTime
+  "If this entry is an automatic retry, its attempt number, starting at 1"
+  retryAttempt: Int
+  "If this entry is an automatic retry, the maximum number of automatic retries when it was created"
+  retryMax: Int
+  "If this entry is an automatic retry, UUID of the entry it retries"
+  retryOf: String
+  "If this entry is an automatic retry, UUID of the first entry of the chain of retries"
+  retryOriginal: String
+  "If this entry has been retried automatically, UUID of its retry"
+  retryUuid: String
 }
 
 type AutoVersioningAuditEntryPaginated {
@@ -262,7 +332,7 @@ type AutoVersioningOrder {
   "Target path(s) for the processing order"
   targetPath: String!
   "Target path(s) for the processing order"
-  targetPaths: String @deprecated(reason : "Deprecated, use `targetPath`")
+  targetPaths: String @deprecated(reason : "Removed in V6. Use targetPath instead. See #1921")
   "Property in the target file"
   targetProperty: String
   "Regex used in property value to identify the version"
@@ -2114,7 +2184,7 @@ type EventSubscriptionPayload {
   "List of events types to subscribe to"
   events: [String!]!
   "Name of the subscription"
-  id: String @deprecated(reason : "Will be removed in V5. Use `name` instead.")
+  id: String @deprecated(reason : "Removed in V6. Use name instead. See #1927")
   "Optional space-separated list of tokens to look for in the events"
   keywords: String
   "Unique name for this subscription"
@@ -2523,7 +2593,7 @@ type HookRequest {
 "Data returned by a hook."
 type HookResponse {
   "Additional information (non structured, will typically be rendered as JSON)"
-  info: JSON
+  info: JSON @deprecated(reason : "Removed in V6. Use infoLink instead. See #1922")
   "Structured additional information"
   infoLink: HookInfoLink
   "Type of response"
@@ -2627,7 +2697,7 @@ type IndicatorPortfolio {
   categoryStats(
     "Number of seconds (> 0) to get indicator trends from."
     duration: Int
-  ): [IndicatorCategoryStats!]! @deprecated(reason : "Use viewStats with viewId = null. This field will be removed in V5.")
+  ): [IndicatorCategoryStats!]! @deprecated(reason : "Removed in V6. No replacement. See #1893")
   "ID of the portfolio"
   id: String
   "Label for this portfolio"
@@ -5143,7 +5213,7 @@ type Project implements Authorizable & ProjectEntity {
   gitRepositoryHtmlURL: String
   id: ID!
   "List of indicator portfolios associated with this project, through its labels."
-  indicatorPortfolios: [IndicatorPortfolio!]!
+  indicatorPortfolios: [IndicatorPortfolio!]! @deprecated(reason : "Removed in V6. No replacement. See #1893")
   "List of information components attached to this entity"
   information: [EntityInformation!]!
   "Link to a Jenkins Job"
@@ -5167,7 +5237,7 @@ type Project implements Authorizable & ProjectEntity {
   "Makes a promotion conditional based on the fact that a previous promotion has been granted."
   previousPromotionConditionProperty: Property
   "List of project indicators"
-  projectIndicators: ProjectIndicators
+  projectIndicators: ProjectIndicators @deprecated(reason : "Removed in V6. No replacement. See #1893")
   "Authorisations for the project"
   projectRoles(
     "Filter by role name"
@@ -5414,12 +5484,14 @@ type PromotionLevel implements Authorizable & ProjectEntity {
   annotatedDescription: String
   "Authorizations for this context"
   authorizations: [Authorization!]!
+  "Current conditions of the auto promotion of this promotion level - null when it has no auto promotion"
+  autoPromotionConditions: AutoPromotionConditions
   "Allows a promotion level to be granted on a build as soon as a list of validation stamps and/or other promotions has been passed"
   autoPromotionProperty: Property
   "List of branches targeted for auto-versioning based on this promotion level"
   autoVersioningTargets: [AutoVersioningConfiguredBranch!]!
   "List of branches targeted for auto-versioning based on this promotion level or with their reason for rejection"
-  autoVersioningTrail: AutoVersioningTrail @deprecated(reason : "Will be removed in V6. Use autoVersioningTrailPaginated instead.")
+  autoVersioningTrail: AutoVersioningTrail @deprecated(reason : "Removed in V6. Use autoVersioningTrailPaginated instead. See #1921")
   "List of branches targeted for auto-versioning based on this promotion or with their reason for rejection"
   autoVersioningTrailPaginated(
     filter: AutoVersioningTrailFilter,
@@ -5465,7 +5537,7 @@ type PromotionLevel implements Authorizable & ProjectEntity {
     first: Int,
     "Number of items to return from the end of the list"
     last: Int
-  ): [PromotionRun!]! @deprecated(reason : "Use the paginated promotion runs with the `promotionRunsPaginated` field.")
+  ): [PromotionRun!]! @deprecated(reason : "Removed in V6. Use promotionRunsPaginated instead. See #1921")
   "Paginated list of promotion runs"
   promotionRunsPaginated(
     "Keeps only runs after this data / time"
@@ -5519,8 +5591,10 @@ type PromotionRun implements Authorizable & ProjectEntity {
   annotatedDescription: String
   "Authorizations for this context"
   authorizations: [Authorization!]!
+  "Current conditions of the auto promotion of this run's promotion level, with their current state for this run's build - null when the promotion level has no auto promotion"
+  autoPromotionConditions: AutoPromotionBuildConditions
   "List of branches targeted for auto-versioning based on this promotion run or with their reason for rejection"
-  autoVersioningTrail: AutoVersioningTrail @deprecated(reason : "Will be removed in V6. Use autoVersioningTrailPaginated instead.")
+  autoVersioningTrail: AutoVersioningTrail @deprecated(reason : "Removed in V6. Use autoVersioningTrailPaginated instead. See #1921")
   "List of branches targeted for auto-versioning based on this promotion run or with their reason for rejection"
   autoVersioningTrailPaginated(
     filter: AutoVersioningTrailFilter,
@@ -5721,7 +5795,7 @@ type Query {
     category: String,
     "Filter the indicators on their type ID"
     type: String
-  ): [ConfigurableIndicatorTypeState!]!
+  ): [ConfigurableIndicatorTypeState!]! @deprecated(reason : "Removed in V6. No replacement. See #1893")
   "Gets a configuration for a given type and name"
   configurationByName(
     "Configuration name"
@@ -5861,18 +5935,18 @@ type Query {
     size: Int = 20
   ): HookRecordingPaginated
   "List of indicator categories"
-  indicatorCategories: IndicatorCategories
+  indicatorCategories: IndicatorCategories @deprecated(reason : "Removed in V6. No replacement. See #1893")
   "List of indicator portfolios"
   indicatorPortfolios(
     "ID of the indicator portfolio"
     id: String
-  ): [IndicatorPortfolio!]!
+  ): [IndicatorPortfolio!]! @deprecated(reason : "Removed in V6. No replacement. See #1893")
   "List of indicator types"
-  indicatorTypes: IndicatorTypes
+  indicatorTypes: IndicatorTypes @deprecated(reason : "Removed in V6. No replacement. See #1893")
   "List of indicator views."
-  indicatorViewList: IndicatorViewList
+  indicatorViewList: IndicatorViewList @deprecated(reason : "Removed in V6. No replacement. See #1893")
   "List of available commands for the management of the indicators"
-  indicatorsManagement: IndicatorsManagement! @deprecated(reason : "Will be removed in 4.6")
+  indicatorsManagement: IndicatorsManagement! @deprecated(reason : "Removed in V6. No replacement. See #1893")
   "Gets information about the application"
   info: Info
   "List of issue services"
@@ -6703,13 +6777,13 @@ type SearchResult {
   "Description linked to the item being found"
   description: String
   "Web access point"
-  page: String @deprecated(reason : "Will be removed in V5. Use the generic type & data")
+  page: String @deprecated(reason : "Removed in V6. No replacement. See #1921")
   "Short title"
   title: String
   "Type of result"
   type: SearchResultType
   "API access point"
-  uri: String @deprecated(reason : "Will be removed in V5. Use the generic type & data")
+  uri: String @deprecated(reason : "Removed in V6. No replacement. See #1921")
 }
 
 type SearchResultPaginated {
@@ -8443,7 +8517,7 @@ type VersionInfo {
   "Git commit"
   commit: String!
   "Creation date"
-  date: LocalDateTime @deprecated(reason : "Date field will be removed in V5")
+  date: LocalDateTime @deprecated(reason : "Removed in V6. No replacement. See #1921")
   "Display version"
   display: String!
   "Full version"
@@ -12271,7 +12345,7 @@ input SubscribeBranchToEventsInput {
   events: [String!]!
   "Optional space-separated list of tokens to look for in the events"
   keywords: String
-  "Unique name of the channel in its scope (null for backward compatibility, will be required in V5)"
+  "Unique name of the subscription in its scope. Omitting it is deprecated: it is required in V6."
   name: String
   "Project name"
   project: String!
@@ -12293,7 +12367,7 @@ input SubscribeBuildToEventsInput {
   events: [String!]!
   "Optional space-separated list of tokens to look for in the events"
   keywords: String
-  "Unique name of the channel in its scope (null for backward compatibility, will be required in V5)"
+  "Unique name of the subscription in its scope. Omitting it is deprecated: it is required in V6."
   name: String
   "Project name"
   project: String!
@@ -12311,7 +12385,7 @@ input SubscribeProjectToEventsInput {
   events: [String!]!
   "Optional space-separated list of tokens to look for in the events"
   keywords: String
-  "Unique name of the channel in its scope (null for backward compatibility, will be required in V5)"
+  "Unique name of the subscription in its scope. Omitting it is deprecated: it is required in V6."
   name: String
   "Project name"
   project: String!
@@ -12331,7 +12405,7 @@ input SubscribePromotionLevelToEventsInput {
   events: [String!]!
   "Optional space-separated list of tokens to look for in the events"
   keywords: String
-  "Unique name of the channel in its scope (null for backward compatibility, will be required in V5)"
+  "Unique name of the subscription in its scope. Omitting it is deprecated: it is required in V6."
   name: String
   "Project name"
   project: String!
@@ -12355,7 +12429,7 @@ input SubscribePromotionRunToEventsInput {
   events: [String!]!
   "Optional space-separated list of tokens to look for in the events"
   keywords: String
-  "Unique name of the channel in its scope (null for backward compatibility, will be required in V5)"
+  "Unique name of the subscription in its scope. Omitting it is deprecated: it is required in V6."
   name: String
   "Project name"
   project: String!
@@ -12375,7 +12449,7 @@ input SubscribeToEventsInput {
   events: [String!]!
   "Optional space-separated list of tokens to look for in the events"
   keywords: String
-  "Unique name of the channel in its scope (null for backward compatibility, will be required in V5)"
+  "Unique name of the subscription in its scope. Omitting it is deprecated: it is required in V6."
   name: String
   "Target project entity (null for global events)"
   projectEntity: ProjectEntityIDInput
@@ -12397,7 +12471,7 @@ input SubscribeValidationRunToEventsInput {
   events: [String!]!
   "Optional space-separated list of tokens to look for in the events"
   keywords: String
-  "Unique name of the channel in its scope (null for backward compatibility, will be required in V5)"
+  "Unique name of the subscription in its scope. Omitting it is deprecated: it is required in V6."
   name: String
   "Project name"
   project: String!
@@ -12421,7 +12495,7 @@ input SubscribeValidationStampToEventsInput {
   events: [String!]!
   "Optional space-separated list of tokens to look for in the events"
   keywords: String
-  "Unique name of the channel in its scope (null for backward compatibility, will be required in V5)"
+  "Unique name of the subscription in its scope. Omitting it is deprecated: it is required in V6."
   name: String
   "Project name"
   project: String!

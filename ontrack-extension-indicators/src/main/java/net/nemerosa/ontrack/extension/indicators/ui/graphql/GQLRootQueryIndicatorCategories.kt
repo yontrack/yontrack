@@ -13,6 +13,7 @@ class GQLRootQueryIndicatorCategories(
             GraphQLFieldDefinition.newFieldDefinition()
                     .name("indicatorCategories")
                     .description("List of indicator categories")
+                    .deprecate("Removed in V6. No replacement. See #1893")
                     .type(indicatorCategories.typeRef)
                     .dataFetcher { IndicatorCategories() }
                     .build()

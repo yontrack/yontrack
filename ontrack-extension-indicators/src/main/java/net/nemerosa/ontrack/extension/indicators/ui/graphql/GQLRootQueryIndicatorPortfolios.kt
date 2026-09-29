@@ -17,6 +17,7 @@ class GQLRootQueryIndicatorPortfolios(
             GraphQLFieldDefinition.newFieldDefinition()
                     .name("indicatorPortfolios")
                     .description("List of indicator portfolios")
+                    .deprecate("Removed in V6. No replacement. See #1893")
                     .type(listType(indicatorPortfolio.typeRef))
                     .argument {
                         it.name(ARG_ID)

@@ -19,7 +19,7 @@ class GQLTypeEventSubscriptionPayload : GQLType {
         .field {
             it.name("id")
                 .description("Name of the subscription")
-                .deprecate("Will be removed in V5. Use `name` instead.")
+                .deprecate("Removed in V6. Use name instead. See #1927")
                 .type(GraphQLString)
                 .dataFetcher { env ->
                     env.getSource<EventSubscriptionPayload>()!!.name

@@ -1,5 +1,6 @@
 package net.nemerosa.ontrack.extension.notifications.subscriptions
 
+import io.micrometer.core.instrument.MeterRegistry
 import net.nemerosa.ontrack.extension.notifications.AbstractNotificationTestSupport
 import net.nemerosa.ontrack.extension.notifications.mock.MockNotificationChannelConfig
 import net.nemerosa.ontrack.it.AsAdminTest
@@ -7,14 +8,85 @@ import net.nemerosa.ontrack.json.asJson
 import net.nemerosa.ontrack.json.getRequiredBooleanField
 import net.nemerosa.ontrack.json.getRequiredJsonField
 import net.nemerosa.ontrack.json.getRequiredTextField
+import net.nemerosa.ontrack.model.deprecation.DeprecationMetrics
 import net.nemerosa.ontrack.model.events.EventFactory
 import net.nemerosa.ontrack.model.structure.toProjectEntityID
 import net.nemerosa.ontrack.test.TestUtils.uid
 import org.junit.jupiter.api.Test
+import org.springframework.beans.factory.annotation.Autowired
 import kotlin.test.*
 
 @AsAdminTest
 class EventSubscriptionMutationsIT : AbstractNotificationTestSupport() {
+
+    @Autowired
+    private lateinit var meterRegistry: MeterRegistry
+
+    private fun namelessSubscriptions(): Double =
+        meterRegistry.find(DeprecationMetrics.usage)
+            .tag("surface", "graphql")
+            .tag("item", "subscription without name")
+            .counter()?.count() ?: 0.0
+
+    @Test
+    fun `A subscription without a name is reported as deprecated`() {
+        asAdmin {
+            project {
+                branch {
+                    val before = namelessSubscriptions()
+                    run(
+                        """
+                        mutation {
+                            subscribeBranchToEvents(input: {
+                                project: "${project.name}",
+                                branch: "$name",
+                                channel: "mock",
+                                channelConfig: {
+                                    target: "#test"
+                                },
+                                events: [
+                                    "new_promotion_run"
+                                ],
+                            }) {
+                                errors {
+                                    message
+                                }
+                            }
+                        }
+                    """
+                    ) { data ->
+                        checkGraphQLUserErrors(data, "subscribeBranchToEvents")
+                    }
+                    assertEquals(1.0, namelessSubscriptions() - before)
+                    run(
+                        """
+                        mutation {
+                            subscribeBranchToEvents(input: {
+                                project: "${project.name}",
+                                branch: "$name",
+                                name: "named",
+                                channel: "mock",
+                                channelConfig: {
+                                    target: "#test"
+                                },
+                                events: [
+                                    "new_promotion_run"
+                                ],
+                            }) {
+                                errors {
+                                    message
+                                }
+                            }
+                        }
+                    """
+                    ) { data ->
+                        checkGraphQLUserErrors(data, "subscribeBranchToEvents")
+                    }
+                    assertEquals(1.0, namelessSubscriptions() - before)
+                }
+            }
+        }
+    }
 
     @Test
     fun `Renaming a subscription for an entity`() {

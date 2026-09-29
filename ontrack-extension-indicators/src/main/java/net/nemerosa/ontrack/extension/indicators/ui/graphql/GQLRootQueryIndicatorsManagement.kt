@@ -15,7 +15,7 @@ import net.nemerosa.ontrack.model.security.SecurityService
 import org.springframework.stereotype.Component
 
 @Component
-@Deprecated("Will be removed in 4.6")
+@Deprecated("Removed in V6. No replacement. See #1893")
 class GQLRootQueryIndicatorsManagement(
     private val gqlIndicatorsManagement: GQLTypeIndicatorsManagement,
     private val securityService: SecurityService,
@@ -24,7 +24,7 @@ class GQLRootQueryIndicatorsManagement(
     override fun getFieldDefinition(): GraphQLFieldDefinition = GraphQLFieldDefinition.newFieldDefinition()
         .name("indicatorsManagement")
         .description("List of available commands for the management of the indicators")
-        .deprecate("Will be removed in 4.6")
+        .deprecate("Removed in V6. No replacement. See #1893")
         .type(gqlIndicatorsManagement.typeRef.toNotNull())
         .dataFetcher { _ ->
             getIndicatorsManagement()
@@ -44,7 +44,7 @@ class GQLRootQueryIndicatorsManagement(
 }
 
 @APIDescription("Management flags for the indicators")
-@Deprecated("Will be removed in 4.6")
+@Deprecated("Removed in V6. No replacement. See #1893")
 class IndicatorsManagement(
     @APIDescription("Access to the indicator portfolios")
     val portfolios: Boolean,
@@ -59,7 +59,7 @@ class IndicatorsManagement(
 )
 
 @Component
-@Deprecated("Will be removed in 4.6")
+@Deprecated("Removed in V6. No replacement. See #1893")
 class GQLTypeIndicatorsManagement : GQLType {
 
     override fun getTypeName(): String = "IndicatorsManagement"

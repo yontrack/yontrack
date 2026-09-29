@@ -16,6 +16,7 @@ class GQLRootQueryConfigurableIndicators(
     override fun getFieldDefinition(): GraphQLFieldDefinition = GraphQLFieldDefinition.newFieldDefinition()
         .name("configurableIndicators")
         .description("List of configurable indicators")
+        .deprecate("Removed in V6. No replacement. See #1893")
         .argument {
             it.name("category")
                 .description("Filter the indicators on their category ID")

@@ -5,7 +5,7 @@ enum class UserTemplatingFunctionField {
     /**
      * Username
      */
-    @Deprecated("Will be removed in V6. Use EMAIL instead. Replaced by the email.")
+    @Deprecated("Removed in V6. Use EMAIL instead. See #1920")
     NAME,
 
     /**

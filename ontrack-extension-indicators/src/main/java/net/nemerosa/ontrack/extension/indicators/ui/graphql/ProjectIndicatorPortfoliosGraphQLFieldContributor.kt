@@ -24,6 +24,7 @@ class ProjectIndicatorPortfoliosGraphQLFieldContributor(
                     GraphQLFieldDefinition.newFieldDefinition()
                             .name("indicatorPortfolios")
                             .description("List of indicator portfolios associated with this project, through its labels.")
+                            .deprecate("Removed in V6. No replacement. See #1893")
                             .type(listType(indicatorPortfolio.typeRef))
                             .dataFetcher { env ->
                                 val project: Project = env.getSource()!!

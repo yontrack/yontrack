@@ -19,7 +19,7 @@ class GQLTypeHookResponse : GQLType {
             .name(typeName)
             .description(getTypeDescription(HookResponse::class))
             .enumField(HookResponse::type)
-            .jsonField(HookResponse::info)
+            .jsonField(HookResponse::info, deprecation = "Removed in V6. Use infoLink instead. See #1922")
             .field(HookResponse::infoLink)
             .build()
 }

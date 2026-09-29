@@ -63,7 +63,7 @@ class GQLTypePromotionLevel(
             // Promotion runs
             .field {
                 it.name("promotionRuns")
-                        .deprecate("Use the paginated promotion runs with the `promotionRunsPaginated` field.")
+                        .deprecate("Removed in V6. Use promotionRunsPaginated instead. See #1921")
                         .description("List of runs for this promotion")
                         .type(listType(promotionRun.typeRef))
                         .arguments(listArguments())

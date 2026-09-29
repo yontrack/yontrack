@@ -31,13 +31,13 @@ class GQLTypeSearchResult(
             }
             .field {
                 it.name("uri")
-                    .deprecate("Will be removed in V5. Use the generic type & data")
+                    .deprecate("Removed in V6. No replacement. See #1921")
                     .description("API access point")
                     .type(GraphQLString)
             }
             .field {
                 it.name("page")
-                    .deprecate("Will be removed in V5. Use the generic type & data")
+                    .deprecate("Removed in V6. No replacement. See #1921")
                     .description("Web access point")
                     .type(GraphQLString)
             }
