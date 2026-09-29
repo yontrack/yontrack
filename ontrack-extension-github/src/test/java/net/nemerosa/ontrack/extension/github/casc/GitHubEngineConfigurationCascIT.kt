@@ -1,9 +1,13 @@
 package net.nemerosa.ontrack.extension.github.casc
 
+import io.micrometer.core.instrument.MeterRegistry
 import net.nemerosa.ontrack.extension.casc.AbstractCascTestSupport
 import net.nemerosa.ontrack.extension.github.service.GitHubConfigurationService
+import net.nemerosa.ontrack.it.deprecatedUsageCount
+import net.nemerosa.ontrack.it.deprecatedUsages
 import net.nemerosa.ontrack.json.asJson
 import net.nemerosa.ontrack.json.parseAsJson
+import net.nemerosa.ontrack.model.deprecation.DeprecationSurface
 import net.nemerosa.ontrack.model.json.schema.JsonTypeBuilder
 import net.nemerosa.ontrack.test.TestUtils
 import org.junit.jupiter.api.Test
@@ -20,6 +24,9 @@ class GitHubEngineConfigurationCascIT : AbstractCascTestSupport() {
 
     @Autowired
     private lateinit var jsonTypeBuilder: JsonTypeBuilder
+
+    @Autowired
+    private lateinit var meterRegistry: MeterRegistry
 
     @Test
     fun `CasC schema type`() {
@@ -85,18 +92,24 @@ class GitHubEngineConfigurationCascIT : AbstractCascTestSupport() {
     @Test
     fun `Defining a GitHub configuration using a user and password`() {
         val name = TestUtils.uid("GH")
-        withDisabledConfigurationTest {
-            casc(
-                """
-                    ontrack:
-                        config:
-                            github:
-                                - name: $name
-                                  user: my-user
-                                  password: my-secret-password
-                """.trimIndent()
-            )
+        val usages = meterRegistry.deprecatedUsages(
+            DeprecationSurface.SETTINGS,
+            "GitHub configuration password authentication"
+        ) {
+            withDisabledConfigurationTest {
+                casc(
+                    """
+                        ontrack:
+                            config:
+                                github:
+                                    - name: $name
+                                      user: my-user
+                                      password: my-secret-password
+                    """.trimIndent()
+                )
+            }
         }
+        assertEquals(1.0, usages, "Password authentication is reported as deprecated")
         // Checks the GitHub configuration has been registered
         asAdmin {
             val configurations = gitHubConfigurationService.configurations
@@ -154,8 +167,8 @@ class GitHubEngineConfigurationCascIT : AbstractCascTestSupport() {
                         config:
                             github:
                                 - name: $name
-                                  app-id: 123456
-                                  app-private-key: |
+                                  appId: 123456
+                                  appPrivateKey: |
                                     -----BEGIN PRIVATE KEY-----
                                     MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQDy6NM0KGZojJnJ
                                     6ssXpmMqoMcXIISbBqTas8+6EQF+wQ2AyJCajbL/jCJf4X0UzYH5SMZUDA2njGnq
@@ -214,8 +227,8 @@ class GitHubEngineConfigurationCascIT : AbstractCascTestSupport() {
                         config:
                             github:
                                 - name: $name
-                                  app-id: 123456
-                                  app-private-key: |
+                                  appId: 123456
+                                  appPrivateKey: |
                                     -----BEGIN PRIVATE KEY-----
                                     MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQDy6NM0KGZojJnJ
                                     6ssXpmMqoMcXIISbBqTas8+6EQF+wQ2AyJCajbL/jCJf4X0UzYH5SMZUDA2njGnq
@@ -244,7 +257,7 @@ class GitHubEngineConfigurationCascIT : AbstractCascTestSupport() {
                                     U2YcYmNPODjCpjUgKuDp2A2Bp/xUtafsR3AWjOjfKxDKSY3HxVsT09l1NNnoKQ6l
                                     vJ+5Pnp+vCydc7gA9CD3YNgE
                                     -----END PRIVATE KEY-----
-                                  app-installation: nemerosa
+                                  appInstallationAccountName: nemerosa
         """.trimIndent()
             )
         }
@@ -262,6 +275,97 @@ class GitHubEngineConfigurationCascIT : AbstractCascTestSupport() {
             assertEquals(TestUtils.resourceString("/test-app.pem").trim(), configuration.appPrivateKey?.trim())
             assertEquals("nemerosa", configuration.appInstallationAccountName)
         }
+    }
+
+    @Test
+    fun `Defining a GitHub configuration using the camel case names reports no deprecated alias`() {
+        val name = TestUtils.uid("GH")
+        val usages = aliasUsages {
+            withDisabledConfigurationTest {
+                casc(
+                    """
+                        ontrack:
+                            config:
+                                github:
+                                    - name: $name
+                                      appId: 123456
+                                      appPrivateKey: |
+${pem()}
+                                      appInstallationAccountName: nemerosa
+                                      autoMergeToken: my-merge-token
+                    """.trimIndent()
+                )
+            }
+        }
+        assertEquals(
+            mapOf(
+                "ontrack.config.github.app-id" to 0.0,
+                "ontrack.config.github.app-private-key" to 0.0,
+                "ontrack.config.github.app-installation" to 0.0,
+                "ontrack.config.github.auto-merge-token" to 0.0,
+            ),
+            usages
+        )
+    }
+
+    @Test
+    fun `Defining a GitHub configuration using the deprecated kebab case aliases`() {
+        val name = TestUtils.uid("GH")
+        val usages = aliasUsages {
+            withDisabledConfigurationTest {
+                casc(
+                    """
+                        ontrack:
+                            config:
+                                github:
+                                    - name: $name
+                                      app-id: 123456
+                                      app-private-key: |
+${pem()}
+                                      app-installation: nemerosa
+                                      auto-merge-token: my-merge-token
+                    """.trimIndent()
+                )
+            }
+        }
+        // The aliases still work
+        asAdmin {
+            val configuration = gitHubConfigurationService.configurations.single()
+            assertEquals(name, configuration.name)
+            assertEquals("123456", configuration.appId)
+            assertEquals(TestUtils.resourceString("/test-app.pem").trim(), configuration.appPrivateKey?.trim())
+            assertEquals("nemerosa", configuration.appInstallationAccountName)
+            assertEquals("my-merge-token", configuration.autoMergeToken)
+        }
+        // ... and are reported as deprecated
+        assertEquals(
+            mapOf(
+                "ontrack.config.github.app-id" to 1.0,
+                "ontrack.config.github.app-private-key" to 1.0,
+                "ontrack.config.github.app-installation" to 1.0,
+                "ontrack.config.github.auto-merge-token" to 1.0,
+            ),
+            usages
+        )
+    }
+
+    /**
+     * Content of the test private key, indented for a YAML block under a configuration entry,
+     * to be inserted at the start of a line of the raw strings above.
+     */
+    private fun pem(): String =
+        TestUtils.resourceString("/test-app.pem").trim().prependIndent(" ".repeat(42))
+
+    private fun aliasUsages(code: () -> Unit): Map<String, Double> {
+        val items = listOf(
+            "ontrack.config.github.app-id",
+            "ontrack.config.github.app-private-key",
+            "ontrack.config.github.app-installation",
+            "ontrack.config.github.auto-merge-token",
+        )
+        val before = items.associateWith { meterRegistry.deprecatedUsageCount(DeprecationSurface.CASC, it) }
+        code()
+        return items.associateWith { meterRegistry.deprecatedUsageCount(DeprecationSurface.CASC, it) - before.getValue(it) }
     }
 
 }

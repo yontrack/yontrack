@@ -50,7 +50,7 @@ class JenkinsNotificationCascIT : AbstractCascTestSupport() {
                                       subscriptions:
                                         - name: test
                                           channel: jenkins
-                                          channel-config:
+                                          channelConfig:
                                             config: ${config.name}
                                             job: path/to/pipeline
                                             parameters:
@@ -116,7 +116,7 @@ class JenkinsNotificationCascIT : AbstractCascTestSupport() {
                                       subscriptions:
                                         - name: test
                                           channel: jenkins
-                                          channel-config:
+                                          channelConfig:
                                             config: ${config.name}
                                             job: path/to/pipeline
                                             parameters:

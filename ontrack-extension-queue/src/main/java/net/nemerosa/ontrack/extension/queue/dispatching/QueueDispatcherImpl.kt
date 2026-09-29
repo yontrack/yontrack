@@ -38,7 +38,7 @@ class QueueDispatcherImpl(
         routingFeedback: (routingKey: String) -> Unit
     ): QueueDispatchResult =
         if (sync(queueProcessor)) {
-            if (queueConfigProperties.general.warnIfAsync) {
+            if (queueConfigProperties.general.warnIfSync) {
                 logger.warn("Processing queuing in synchronous mode.")
             }
             // No metadata in sync mode

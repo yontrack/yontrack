@@ -9,6 +9,8 @@ import net.nemerosa.ontrack.extension.notifications.casc.NotificationsSubCascCon
 import net.nemerosa.ontrack.json.JsonParseException
 import net.nemerosa.ontrack.json.asJson
 import net.nemerosa.ontrack.json.parse
+import net.nemerosa.ontrack.model.deprecation.DeprecationService
+import net.nemerosa.ontrack.model.deprecation.DeprecationSurface
 import net.nemerosa.ontrack.model.annotations.APIIgnore
 import net.nemerosa.ontrack.model.exceptions.InputException
 import net.nemerosa.ontrack.model.json.schema.JsonArrayType
@@ -29,6 +31,7 @@ class EntitySubscriptionsCascContext(
     private val eventSubscriptionService: EventSubscriptionService,
     private val storageService: StorageService,
     private val structureService: StructureService,
+    private val deprecationService: DeprecationService,
 ) : AbstractCascContext(), NotificationsSubCascContext {
 
     private val logger: Logger = LoggerFactory.getLogger(EntitySubscriptionsCascContext::class.java)
@@ -44,6 +47,13 @@ class EntitySubscriptionsCascContext(
 
     override fun run(node: JsonNode, paths: List<String>) {
         val items = node.mapIndexed { index, child ->
+            if (child.path("subscriptions").any { it.has(SubscriptionsCascContextData.CHANNEL_CONFIG_ALIAS) }) {
+                deprecationService.deprecatedUsage(
+                    surface = DeprecationSurface.CASC,
+                    item = "ontrack.extensions.notifications.entity-subscriptions.subscriptions.channel-config",
+                    message = "Removed in V7. Use channelConfig instead. See #1923",
+                )
+            }
             try {
                 child.parse<EntitySubscriptionCascContextData>().normalized()
             } catch (ex: JsonParseException) {

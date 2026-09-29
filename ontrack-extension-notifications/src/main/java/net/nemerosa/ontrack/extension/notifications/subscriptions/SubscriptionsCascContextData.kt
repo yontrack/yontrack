@@ -14,7 +14,7 @@ data class SubscriptionsCascContextData(
     @APIDescription("Channel to send notifications to")
     val channel: String,
     @APIDescription("Configuration of the channel")
-    @JsonAlias("channel-config")
+    @JsonAlias(CHANNEL_CONFIG_ALIAS)
     val channelConfig: JsonNode,
     @APIDescription("Is this channel disabled?")
     val disabled: Boolean? = null,
@@ -30,4 +30,12 @@ data class SubscriptionsCascContextData(
         disabled = disabled ?: false,
         contentTemplate = contentTemplate,
     )
+
+    companion object {
+        /**
+         * Kebab-case alias of [channelConfig], deprecated and removed in V7 (#1923). Its use is
+         * reported by [GlobalSubscriptionsCascContext] and [EntitySubscriptionsCascContext].
+         */
+        const val CHANNEL_CONFIG_ALIAS = "channel-config"
+    }
 }

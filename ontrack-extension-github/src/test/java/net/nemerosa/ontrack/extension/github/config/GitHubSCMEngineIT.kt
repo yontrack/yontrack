@@ -1,5 +1,6 @@
 package net.nemerosa.ontrack.extension.github.config
 
+import io.micrometer.core.instrument.MeterRegistry
 import net.nemerosa.ontrack.extension.config.ConfigTestSupport
 import net.nemerosa.ontrack.extension.config.EnvFixtures
 import net.nemerosa.ontrack.extension.config.model.EnvConstants
@@ -11,6 +12,9 @@ import net.nemerosa.ontrack.extension.github.AbstractGitHubTestSupport
 import net.nemerosa.ontrack.extension.github.property.GitHubProjectConfigurationPropertyType
 import net.nemerosa.ontrack.extension.github.service.GitHubConfigurationService
 import net.nemerosa.ontrack.it.AsAdminTest
+import net.nemerosa.ontrack.it.deprecatedUsages
+import net.nemerosa.ontrack.model.deprecation.DeprecationSurface
+import net.nemerosa.ontrack.model.structure.Project
 import net.nemerosa.ontrack.test.TestUtils.uid
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -26,6 +30,9 @@ class GitHubSCMEngineIT : AbstractGitHubTestSupport() {
 
     @Autowired
     private lateinit var configTestSupport: ConfigTestSupport
+
+    @Autowired
+    private lateinit var meterRegistry: MeterRegistry
 
     @BeforeEach
     fun cleanup() {
@@ -230,19 +237,23 @@ class GitHubSCMEngineIT : AbstractGitHubTestSupport() {
     fun `Configuration of the project with a default issue service identifier from the legacy environment`() {
         gitHubConfiguration()
         withDisabledConfigurationTest {
-            val project = configTestSupport.configureProject(
-                yaml = """
-                    version: v1
-                    configuration: {}
-                """.trimIndent(),
-                ci = null,
-                scm = null,
-                env = EnvFixtures.gitHub(
-                    extraEnv = mapOf(
-                        EnvConstants.YONTRACK_LEGACY_SCM_ISSUES to "jira//JIRA",
-                    )
-                ),
-            )
+            lateinit var project: Project
+            val usages = meterRegistry.deprecatedUsages(DeprecationSurface.ENV, "ONTRACK_SCM_ISSUES") {
+                project = configTestSupport.configureProject(
+                    yaml = """
+                        version: v1
+                        configuration: {}
+                    """.trimIndent(),
+                    ci = null,
+                    scm = null,
+                    env = EnvFixtures.gitHub(
+                        extraEnv = mapOf(
+                            "ONTRACK_SCM_ISSUES" to "jira//JIRA",
+                        )
+                    ),
+                )
+            }
+            assertEquals(1.0, usages, "The legacy environment variable is reported as deprecated")
             assertNotNull(
                 propertyService.getPropertyValue(project, GitHubProjectConfigurationPropertyType::class.java),
                 "GitHub project config has been set"
@@ -260,19 +271,23 @@ class GitHubSCMEngineIT : AbstractGitHubTestSupport() {
     fun `Configuration of the project with a default issue service identifier from the environment`() {
         gitHubConfiguration()
         withDisabledConfigurationTest {
-            val project = configTestSupport.configureProject(
-                yaml = """
-                    version: v1
-                    configuration: {}
-                """.trimIndent(),
-                ci = null,
-                scm = null,
-                env = EnvFixtures.gitHub(
-                    extraEnv = mapOf(
-                        EnvConstants.YONTRACK_CI_SCM_ISSUES to "jira//JIRA",
-                    )
-                ),
-            )
+            lateinit var project: Project
+            val usages = meterRegistry.deprecatedUsages(DeprecationSurface.ENV, "ONTRACK_SCM_ISSUES") {
+                project = configTestSupport.configureProject(
+                    yaml = """
+                        version: v1
+                        configuration: {}
+                    """.trimIndent(),
+                    ci = null,
+                    scm = null,
+                    env = EnvFixtures.gitHub(
+                        extraEnv = mapOf(
+                            EnvConstants.YONTRACK_CI_SCM_ISSUES to "jira//JIRA",
+                        )
+                    ),
+                )
+            }
+            assertEquals(0.0, usages, "The environment variable is not deprecated")
             assertNotNull(
                 propertyService.getPropertyValue(project, GitHubProjectConfigurationPropertyType::class.java),
                 "GitHub project config has been set"

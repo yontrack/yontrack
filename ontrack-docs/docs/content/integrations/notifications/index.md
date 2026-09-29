@@ -72,7 +72,7 @@ The management of the global subscriptions is exactly the same as for the [local
                   - new_promotion_run
                 keywords: "GOLD main"
                 channel: slack
-                channel-config:
+                channelConfig:
                   channel: "#my-channel"
                 contentTemplate: |
                   Promoted to ${promotionLevel}.

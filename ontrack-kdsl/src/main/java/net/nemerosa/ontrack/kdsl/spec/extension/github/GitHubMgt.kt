@@ -20,6 +20,7 @@ class GitHubMgt(connector: Connector) : Connected(connector) {
      * @param config Configuration to save
      * @return Saved configuration, with obfuscated values but for the name & URL.
      */
+    @Suppress("DEPRECATION")
     fun createConfig(config: GitHubConfiguration): GitHubConfiguration = graphqlConnector.mutate(
         mutation = config.run {
             CreateGitHubConfigurationMutation(

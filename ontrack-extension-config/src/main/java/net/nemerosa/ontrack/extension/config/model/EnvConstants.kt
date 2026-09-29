@@ -8,6 +8,7 @@ object EnvConstants {
     /**
      * Issue service identifier legacy environment variable (`serviceId//serviceName`)
      */
+    @Deprecated("Removed in V7. Use YONTRACK_CI_SCM_ISSUES instead. See #1923")
     const val YONTRACK_LEGACY_SCM_ISSUES = "ONTRACK_SCM_ISSUES"
 
     /**

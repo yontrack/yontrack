@@ -13,10 +13,6 @@
 # issue expected to remove them; the grouping is a guide, the test does not read it.
 # Cutover gate (doc/dev-guide/major-branch.md): this file has no entry left.
 
-# #1923 (D7) - deprecated for V7
-kotlin ontrack-extension-github/src/main/java/net/nemerosa/ontrack/extension/github/ui/graphql/GitHubConfigurationsMutations.kt#password
-kotlin ontrack-extension-queue/src/main/java/net/nemerosa/ontrack/extension/queue/QueueConfigProperties.kt#warnIfAsync
-
 # #1925 (D9) - EntityDataService
 kotlin ontrack-model/src/main/java/net/nemerosa/ontrack/model/structure/EntityDataService.kt#EntityDataService
 

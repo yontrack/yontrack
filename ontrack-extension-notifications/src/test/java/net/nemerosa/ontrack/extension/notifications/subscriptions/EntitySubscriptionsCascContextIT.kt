@@ -150,7 +150,7 @@ class EntitySubscriptionsCascContextIT : AbstractNotificationTestSupport() {
                                             - new_promotion_run
                                           keywords: ""
                                           channel: mock
-                                          channel-config:
+                                          channelConfig:
                                             target: "$target"
                 """
             )
@@ -202,7 +202,7 @@ class EntitySubscriptionsCascContextIT : AbstractNotificationTestSupport() {
                                             - new_promotion_run
                                           keywords: ""
                                           channel: mock
-                                          channel-config:
+                                          channelConfig:
                                             target: "$target"
                 """
                 )
@@ -233,7 +233,7 @@ class EntitySubscriptionsCascContextIT : AbstractNotificationTestSupport() {
                                                     - new_promotion_run
                                                   keywords: ""
                                                   channel: mock
-                                                  channel-config:
+                                                  channelConfig:
                                                     target: "$target"
                         """
                     )
@@ -263,7 +263,7 @@ class EntitySubscriptionsCascContextIT : AbstractNotificationTestSupport() {
                                                     - new_promotion_run
                                                   keywords: ""
                                                   channel: mock
-                                                  channel-config:
+                                                  channelConfig:
                                                     target: "$target"
                         """
                     )
@@ -293,7 +293,7 @@ class EntitySubscriptionsCascContextIT : AbstractNotificationTestSupport() {
                                                     - new_promotion_run
                                                   keywords: ""
                                                   channel: mock
-                                                  channel-config:
+                                                  channelConfig:
                                                     target: "$target"
                         """
                     )
@@ -320,7 +320,7 @@ class EntitySubscriptionsCascContextIT : AbstractNotificationTestSupport() {
                                             - new_promotion_run
                                           keywords: "GOLD"
                                           channel: mock
-                                          channel-config:
+                                          channelConfig:
                                             target: "$target"
                     """
                 )
@@ -352,7 +352,7 @@ class EntitySubscriptionsCascContextIT : AbstractNotificationTestSupport() {
                                             - new_promotion_run
                                           keywords: "SILVER"
                                           channel: mock
-                                          channel-config:
+                                          channelConfig:
                                             target: "$target-silver"
                                           contentTemplate: |
                                             This is my template.
@@ -408,14 +408,14 @@ class EntitySubscriptionsCascContextIT : AbstractNotificationTestSupport() {
                                             - new_promotion_run
                                           keywords: "GOLD"
                                           channel: mock
-                                          channel-config:
+                                          channelConfig:
                                             target: "$target"
                                         - name: test-2
                                           events:
                                             - new_promotion_run
                                           keywords: "SILVER"
                                           channel: mock
-                                          channel-config:
+                                          channelConfig:
                                             target: "$target"
                 """
             )
@@ -447,14 +447,14 @@ class EntitySubscriptionsCascContextIT : AbstractNotificationTestSupport() {
                                             - new_promotion_run
                                           keywords: "PLATINUM"
                                           channel: mock
-                                          channel-config:
+                                          channelConfig:
                                             target: "$target"
                                         - name: test-2
                                           events:
                                             - new_promotion_run
                                           keywords: "SILVER"
                                           channel: mock
-                                          channel-config:
+                                          channelConfig:
                                             target: "$target-silver"
                 """
             )
@@ -493,14 +493,14 @@ class EntitySubscriptionsCascContextIT : AbstractNotificationTestSupport() {
                                             - new_promotion_run
                                           keywords: "GOLD"
                                           channel: mock
-                                          channel-config:
+                                          channelConfig:
                                             target: "$target"
                                         - name: test-2
                                           events:
                                             - new_promotion_run
                                           keywords: "SILVER"
                                           channel: mock
-                                          channel-config:
+                                          channelConfig:
                                             target: "$target"
                 """
             )
@@ -562,7 +562,7 @@ class EntitySubscriptionsCascContextIT : AbstractNotificationTestSupport() {
                                                 - new_promotion_run
                                               keywords: ""
                                               channel: mock
-                                              channel-config:
+                                              channelConfig:
                                                 target: "$target"
                     """
                 )
@@ -615,7 +615,7 @@ class EntitySubscriptionsCascContextIT : AbstractNotificationTestSupport() {
                                                 - new_validation_run
                                               keywords: ""
                                               channel: mock
-                                              channel-config:
+                                              channelConfig:
                                                 target: "$target"
                     """
                 )
@@ -667,7 +667,7 @@ class EntitySubscriptionsCascContextIT : AbstractNotificationTestSupport() {
                                                 - new_validation_run
                                               keywords: "failed"
                                               channel: mock
-                                              channel-config:
+                                              channelConfig:
                                                 target: "$target"
                     """
                 )
@@ -725,7 +725,7 @@ class EntitySubscriptionsCascContextIT : AbstractNotificationTestSupport() {
                                         - new_promotion_run
                                       keywords: ""
                                       channel: mock
-                                      channel-config:
+                                      channelConfig:
                                         target: "$target"
             """
         )
@@ -756,7 +756,7 @@ class EntitySubscriptionsCascContextIT : AbstractNotificationTestSupport() {
                                             - new_promotion_run
                                           keywords: ""
                                           channel: mock
-                                          channel-config:
+                                          channelConfig:
                                             target: "$target"
                 """
             )
@@ -810,7 +810,7 @@ class EntitySubscriptionsCascContextIT : AbstractNotificationTestSupport() {
                                                 - new_promotion_run
                                               keywords: ""
                                               channel: mock
-                                              channel-config:
+                                              channelConfig:
                                                 target: "$target"
                     """
                 )
@@ -883,7 +883,7 @@ class EntitySubscriptionsCascContextIT : AbstractNotificationTestSupport() {
                                                 - new_promotion_run
                                               keywords: ""
                                               channel: mock
-                                              channel-config:
+                                              channelConfig:
                                                 target: "$target"
                                               contentTemplate: |
                                                 Change log for ${'$'}{build.release}
@@ -957,7 +957,7 @@ class EntitySubscriptionsCascContextIT : AbstractNotificationTestSupport() {
                                             - new_promotion_run
                                           keywords: ""
                                           channel: mock
-                                          channel-config:
+                                          channelConfig:
                                             target: "$target"
                                     - entity:
                                         project: $name
@@ -967,7 +967,7 @@ class EntitySubscriptionsCascContextIT : AbstractNotificationTestSupport() {
                                             - new_promotion_run
                                           keywords: "GOLD"
                                           channel: mock
-                                          channel-config:
+                                          channelConfig:
                                             target: "$target"
                     """
                 )
@@ -1001,7 +1001,7 @@ class EntitySubscriptionsCascContextIT : AbstractNotificationTestSupport() {
                                             - new_promotion_run
                                           keywords: ""
                                           channel: mock
-                                          channel-config:
+                                          channelConfig:
                                             target: "$target"
                 """
             )
@@ -1030,7 +1030,7 @@ class EntitySubscriptionsCascContextIT : AbstractNotificationTestSupport() {
                                             - new_promotion_run
                                           keywords: ""
                                           channel: mock
-                                          channel-config:
+                                          channelConfig:
                                             target: "$newTarget"
                 """
             )

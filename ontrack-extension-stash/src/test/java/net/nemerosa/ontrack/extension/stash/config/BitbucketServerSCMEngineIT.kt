@@ -260,7 +260,7 @@ class BitbucketServerSCMEngineIT : AbstractDSLTestSupport() {
                 env = BitbucketServerSCMEnvFixtures.bitbucketServerEnv(
                     configuredProjectName,
                     extraEnv = mapOf(
-                        EnvConstants.YONTRACK_LEGACY_SCM_ISSUES to "jira//JIRA",
+                        "ONTRACK_SCM_ISSUES" to "jira//JIRA",
                     )
                 ),
             )

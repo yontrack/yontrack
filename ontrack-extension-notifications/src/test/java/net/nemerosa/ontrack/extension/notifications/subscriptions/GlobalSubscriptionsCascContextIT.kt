@@ -1,5 +1,8 @@
 package net.nemerosa.ontrack.extension.notifications.subscriptions
 
+import io.micrometer.core.instrument.MeterRegistry
+import net.nemerosa.ontrack.it.deprecatedUsages
+import net.nemerosa.ontrack.model.deprecation.DeprecationSurface
 import net.nemerosa.ontrack.extension.casc.AbstractCascTestSupport
 import net.nemerosa.ontrack.json.asJson
 import net.nemerosa.ontrack.json.parseAsJson
@@ -20,6 +23,9 @@ class GlobalSubscriptionsCascContextIT : AbstractCascTestSupport() {
 
     @Autowired
     private lateinit var jsonTypeBuilder: JsonTypeBuilder
+
+    @Autowired
+    private lateinit var meterRegistry: MeterRegistry
 
     @Test
     fun `CasC schema type`() {
@@ -93,7 +99,7 @@ class GlobalSubscriptionsCascContextIT : AbstractCascTestSupport() {
                                 - events:
                                     - new_promotion_run
                                   channel: mock
-                                  channel-config:
+                                  channelConfig:
                                     target: "#$target"
                 """.trimIndent()
             )
@@ -123,7 +129,7 @@ class GlobalSubscriptionsCascContextIT : AbstractCascTestSupport() {
                                 - new_promotion_run
                               keywords: "GOLD main"
                               channel: mock
-                              channel-config:
+                              channelConfig:
                                 target: "#$target"
         """.trimIndent())
         // Check we can find this global subscriptions
@@ -177,7 +183,7 @@ class GlobalSubscriptionsCascContextIT : AbstractCascTestSupport() {
                                 - new_promotion_run
                               keywords: "GOLD main"
                               channel: mock
-                              channel-config:
+                              channelConfig:
                                 target: "#$target"
                               contentTemplate: |
                                 This is a fairly simple template
@@ -223,6 +229,60 @@ class GlobalSubscriptionsCascContextIT : AbstractCascTestSupport() {
                 subscription.contentTemplate
             )
         }
+    }
+
+    private fun cascGlobalSubscription(name: String, target: String, channelConfigField: String) {
+        casc("""
+            ontrack:
+                extensions:
+                    notifications:
+                        global-subscriptions:
+                            - name: $name
+                              events:
+                                - new_promotion_run
+                              channel: mock
+                              $channelConfigField:
+                                target: "#$target"
+        """.trimIndent())
+    }
+
+    private fun globalSubscriptionChannelConfig(target: String) = asAdmin {
+        eventSubscriptionService.filterSubscriptions(
+            EventSubscriptionFilter(
+                channel = "mock",
+                channelConfig = "#$target"
+            )
+        ).pageItems.single().channelConfig
+    }
+
+    @Test
+    fun `Creating a global subscription using the channelConfig field reports no deprecation`() {
+        val target = uid("t")
+        val usages = meterRegistry.deprecatedUsages(
+            DeprecationSurface.CASC,
+            "ontrack.extensions.notifications.global-subscriptions.channel-config"
+        ) {
+            cascGlobalSubscription(uid("g"), target, "channelConfig")
+        }
+        assertEquals(0.0, usages)
+        assertEquals(mapOf("target" to "#$target").asJson(), globalSubscriptionChannelConfig(target))
+    }
+
+    @Test
+    fun `Creating a global subscription using the deprecated channel-config alias`() {
+        val target = uid("t")
+        val usages = meterRegistry.deprecatedUsages(
+            DeprecationSurface.CASC,
+            "ontrack.extensions.notifications.global-subscriptions.channel-config"
+        ) {
+            cascGlobalSubscription(uid("g"), target, "channel-config")
+        }
+        assertEquals(1.0, usages, "The alias is reported as deprecated")
+        assertEquals(
+            mapOf("target" to "#$target").asJson(),
+            globalSubscriptionChannelConfig(target),
+            "The alias still works"
+        )
     }
 
 }

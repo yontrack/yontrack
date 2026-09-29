@@ -3,6 +3,7 @@ package net.nemerosa.ontrack.extension.queue
 import net.nemerosa.ontrack.common.api.APIDescription
 import net.nemerosa.ontrack.common.api.APIName
 import org.springframework.boot.context.properties.ConfigurationProperties
+import org.springframework.boot.context.properties.DeprecatedConfigurationProperty
 import org.springframework.stereotype.Component
 import kotlin.math.abs
 
@@ -33,9 +34,24 @@ class QueueConfigProperties {
      * General properties
      */
     class GeneralProperties : ProcessingProperties() {
-        @APIDescription("Emits a warning if the queues are not asynchronous (careful: the property name is a misnomer and will be renamed at one point into warnIfSync")
-        @Deprecated("The property name is a misnomer and will be renamed at one point into warnIfSync")
-        var warnIfAsync: Boolean = true
+        @APIDescription("Emits a warning if the queues are not asynchronous")
+        var warnIfSync: Boolean = true
+
+        /**
+         * Former, misnamed, name of [warnIfSync], kept as an alias until V7 and reported as deprecated
+         * by [QueueDeprecatedConfigurationProperties].
+         */
+        @APIDescription("Deprecated alias of warnIfSync")
+        @Deprecated("Removed in V7. Use warnIfSync instead. See #1923")
+        @get:DeprecatedConfigurationProperty(
+            replacement = "ontrack.extension.queue.general.warn-if-sync",
+            since = "6.0",
+        )
+        var warnIfAsync: Boolean
+            get() = warnIfSync
+            set(value) {
+                warnIfSync = value
+            }
     }
 
     /**

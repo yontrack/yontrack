@@ -9,6 +9,8 @@ import net.nemerosa.ontrack.extension.casc.context.SubConfigContext
 import net.nemerosa.ontrack.json.JsonParseException
 import net.nemerosa.ontrack.json.asJson
 import net.nemerosa.ontrack.json.parse
+import net.nemerosa.ontrack.model.deprecation.DeprecationService
+import net.nemerosa.ontrack.model.deprecation.DeprecationSurface
 import net.nemerosa.ontrack.model.json.schema.JsonArrayType
 import net.nemerosa.ontrack.model.json.schema.JsonType
 import net.nemerosa.ontrack.model.json.schema.JsonTypeBuilder
@@ -21,6 +23,7 @@ import java.time.Duration
 @Component
 class WebhooksCascConfigContext(
     private val webhookAdminService: WebhookAdminService,
+    private val deprecationService: DeprecationService,
 ) : AbstractCascContext(), SubConfigContext {
 
     private val logger: Logger = LoggerFactory.getLogger(WebhooksCascConfigContext::class.java)
@@ -36,6 +39,13 @@ class WebhooksCascConfigContext(
 
     override fun run(node: JsonNode, paths: List<String>) {
         val items = node.mapIndexed { index, child ->
+            if (child.has(TIMEOUT_SECONDS_ALIAS)) {
+                deprecationService.deprecatedUsage(
+                    surface = DeprecationSurface.CASC,
+                    item = "ontrack.config.webhooks.timeout-seconds",
+                    message = "Removed in V7. Use timeoutSeconds instead. See #1923",
+                )
+            }
             try {
                 child.parse<CascWebhook>()
             } catch (ex: JsonParseException) {
@@ -111,7 +121,7 @@ class WebhooksCascConfigContext(
         @APIDescription("Webhook endpoint")
         val url: String,
         @APIDescription("Webhook execution timeout (in seconds)")
-        @JsonAlias("timeout-seconds")
+        @JsonAlias(TIMEOUT_SECONDS_ALIAS)
         val timeoutSeconds: Int,
         @APIDescription("Webhook authentication")
         val authentication: CascWebhookAuthentication,
@@ -124,5 +134,12 @@ class WebhooksCascConfigContext(
         @APIDescription("Authentication configuration (JSON)")
         val config: JsonNode,
     )
+
+    companion object {
+        /**
+         * Kebab-case alias of [CascWebhook.timeoutSeconds], deprecated and removed in V7 (#1923)
+         */
+        const val TIMEOUT_SECONDS_ALIAS = "timeout-seconds"
+    }
 
 }

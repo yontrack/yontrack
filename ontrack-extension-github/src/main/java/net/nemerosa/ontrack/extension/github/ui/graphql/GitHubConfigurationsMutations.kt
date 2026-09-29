@@ -50,8 +50,8 @@ data class CreateGitHubConfigurationInput(
     val url: String?,
     @APIDescription("User name for authentication")
     val user: String? = null,
-    @APIDescription("Password for authentication")
-    @Deprecated("Prefer using token or GitHub App based authentication")
+    @APIDescription("Password for authentication. Deprecated: use a token or a GitHub App instead.")
+    @Deprecated("Removed in V7. Use a token or a GitHub App instead. See #1923")
     val password: String? = null,
     @APIDescription("Personal Access Token")
     val oauth2Token: String? = null,

@@ -4,8 +4,10 @@ import net.nemerosa.ontrack.extension.github.app.GitHubAppTokenService
 import net.nemerosa.ontrack.extension.github.client.OntrackGitHubClientFactory
 import net.nemerosa.ontrack.extension.github.model.GitHubAuthenticationType
 import net.nemerosa.ontrack.extension.github.model.GitHubEngineConfiguration
+import net.nemerosa.ontrack.extension.github.model.checkGitHubPasswordAuthentication
 import net.nemerosa.ontrack.extension.github.model.getAppInstallationTokenInformation
 import net.nemerosa.ontrack.extension.support.AbstractConfigurationService
+import net.nemerosa.ontrack.model.deprecation.DeprecationService
 import net.nemerosa.ontrack.model.events.EventFactory
 import net.nemerosa.ontrack.model.events.EventPostService
 import net.nemerosa.ontrack.model.security.EncryptionService
@@ -28,6 +30,7 @@ class GitHubConfigurationServiceImpl(
     private val gitHubClientFactory: OntrackGitHubClientFactory,
     ontrackConfigProperties: OntrackConfigProperties,
     private val gitHubAppTokenService: GitHubAppTokenService,
+    private val deprecationService: DeprecationService,
 ) : AbstractConfigurationService<GitHubEngineConfiguration>(
     GitHubEngineConfiguration::class.java,
     configurationRepository,
@@ -44,6 +47,7 @@ class GitHubConfigurationServiceImpl(
 
     override fun checkConfigurationFields(configuration: GitHubEngineConfiguration) {
         configuration.checkFields()
+        deprecationService.checkGitHubPasswordAuthentication(configuration)
     }
 
     override fun getConfigExtraData(config: GitHubEngineConfiguration): Any? {

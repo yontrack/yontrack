@@ -9,6 +9,7 @@ import net.nemerosa.ontrack.extension.config.extensions.CIConfigExtensionNotFoun
 import net.nemerosa.ontrack.extension.config.extensions.ProjectCIConfigExtension
 import net.nemerosa.ontrack.extension.config.license.ConfigurationLicense
 import net.nemerosa.ontrack.extension.config.scm.SCMEngine
+import net.nemerosa.ontrack.model.deprecation.DeprecationService
 import net.nemerosa.ontrack.model.events.PlainEventRenderer
 import net.nemerosa.ontrack.model.security.*
 import net.nemerosa.ontrack.model.structure.*
@@ -31,6 +32,7 @@ class CoreConfigurationServiceImpl(
     private val promotionLevelConfigurators: List<PromotionLevelConfigurator>,
     private val extensionManager: ExtensionManager,
     private val templatingService: TemplatingService,
+    private val deprecationService: DeprecationService,
 ) : CoreConfigurationService {
 
     private val ciExtensions: Map<String, CIConfigExtension<*>> by lazy {
@@ -68,6 +70,7 @@ class CoreConfigurationServiceImpl(
         securityService.checkProjectFunction(project, ProjectConfig::class.java)
 
         // Configuration of the project SCM (using the SCM engine)
+        deprecationService.checkLegacyIssueServiceEnv(configuration, env)
         scmEngine.configureProject(project, configuration, env, projectName, ciEngine)
 
         // Auto-validations & auto-promotions

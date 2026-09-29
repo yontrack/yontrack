@@ -26,6 +26,6 @@ dependencies {
     testFixturesImplementation(testFixtures(project(":ontrack-extension-recordings")))
     testFixturesImplementation(testFixtures(project(":ontrack-extension-api")))
 
-    testRuntimeOnly(project(":ontrack-service"))
+    testImplementation(project(":ontrack-service"))
     testRuntimeOnly(project(":ontrack-repository-impl"))
 }

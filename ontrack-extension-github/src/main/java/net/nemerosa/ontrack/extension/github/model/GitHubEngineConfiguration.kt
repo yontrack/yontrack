@@ -21,6 +21,10 @@ import net.nemerosa.ontrack.model.support.CredentialsConfiguration
  * @property appPrivateKey GitHub App private key
  * @property appInstallationAccountName Account name of the GitHub App installation (used when more than 1 installation for the app)
  * @property autoMergeToken Token for an account used to approve pull requests for auto approval processes
+ *
+ * The kebab-case aliases (`app-id`, `app-private-key`, `app-installation`, `auto-merge-token`) are
+ * deprecated, removed in V7 (#1923): the CasC reports their use, see `GitHubEngineConfigurationContext`.
+ * Authenticating with a [password] is deprecated as well, see `checkGitHubPasswordAuthentication`.
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 @SelfDocumented

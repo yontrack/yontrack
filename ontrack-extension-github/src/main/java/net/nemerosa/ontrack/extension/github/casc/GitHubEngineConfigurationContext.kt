@@ -9,6 +9,8 @@ import net.nemerosa.ontrack.extension.github.service.GitHubConfigurationService
 import net.nemerosa.ontrack.json.JsonParseException
 import net.nemerosa.ontrack.json.asJson
 import net.nemerosa.ontrack.json.parse
+import net.nemerosa.ontrack.model.deprecation.DeprecationService
+import net.nemerosa.ontrack.model.deprecation.DeprecationSurface
 import net.nemerosa.ontrack.model.json.schema.JsonArrayType
 import net.nemerosa.ontrack.model.json.schema.JsonType
 import net.nemerosa.ontrack.model.json.schema.JsonTypeBuilder
@@ -23,6 +25,7 @@ import org.springframework.stereotype.Component
 @Component
 class GitHubEngineConfigurationContext(
     private val gitHubConfigurationService: GitHubConfigurationService,
+    private val deprecationService: DeprecationService,
 ) : AbstractCascContext(), SubConfigContext {
 
     private val logger: Logger = LoggerFactory.getLogger(GitHubEngineConfigurationContext::class.java)
@@ -38,6 +41,7 @@ class GitHubEngineConfigurationContext(
 
     override fun run(node: JsonNode, paths: List<String>) {
         val items = node.mapIndexed { index, child ->
+            checkDeprecatedAliases(child)
             try {
                 child.parse<GitHubEngineConfiguration>()
             } catch (ex: JsonParseException) {
@@ -69,6 +73,40 @@ class GitHubEngineConfigurationContext(
                 logger.info("Deleting GitHub configuration: ${existing.name}")
                 gitHubConfigurationService.deleteConfiguration(existing.name)
             }
+        }
+    }
+
+    /**
+     * The kebab-case aliases of [GitHubEngineConfiguration] still work, and are reported as deprecated.
+     */
+    private fun checkDeprecatedAliases(node: JsonNode) {
+        if (node.has("app-id")) {
+            deprecationService.deprecatedUsage(
+                surface = DeprecationSurface.CASC,
+                item = "ontrack.config.github.app-id",
+                message = "Removed in V7. Use appId instead. See #1923",
+            )
+        }
+        if (node.has("app-private-key")) {
+            deprecationService.deprecatedUsage(
+                surface = DeprecationSurface.CASC,
+                item = "ontrack.config.github.app-private-key",
+                message = "Removed in V7. Use appPrivateKey instead. See #1923",
+            )
+        }
+        if (node.has("app-installation")) {
+            deprecationService.deprecatedUsage(
+                surface = DeprecationSurface.CASC,
+                item = "ontrack.config.github.app-installation",
+                message = "Removed in V7. Use appInstallationAccountName instead. See #1923",
+            )
+        }
+        if (node.has("auto-merge-token")) {
+            deprecationService.deprecatedUsage(
+                surface = DeprecationSurface.CASC,
+                item = "ontrack.config.github.auto-merge-token",
+                message = "Removed in V7. Use autoMergeToken instead. See #1923",
+            )
         }
     }
 

@@ -12,7 +12,7 @@ export default function GitHubConfigAuthenticationType({authenticationType}) {
             }
             {
                 authenticationType === 'PASSWORD' &&
-                <Tooltip title="Username/password authentication. This should be replaced by using a token or a GitHub app.">
+                <Tooltip title="Username/password authentication. Deprecated, removed in Yontrack 7: use a token or a GitHub App instead.">
                     <Space>
                         <FaExclamationTriangle/>
                         Password

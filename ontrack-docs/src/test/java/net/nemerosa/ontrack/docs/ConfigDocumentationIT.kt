@@ -116,7 +116,11 @@ class ConfigDocumentationIT : AbstractDocGenIT() {
                     ?.toString()
                     ?: ""
 
-                writeProperty(s, propertyName, envName, description, defaultValue, deprecatedReason)
+                val memberDeprecatedReason = member.findAnnotation<Deprecated>()?.message
+                    ?.let { "Deprecated: $it" }
+                    ?: deprecatedReason
+
+                writeProperty(s, propertyName, envName, description, defaultValue, memberDeprecatedReason)
             } else {
                 val child = try {
                     member.call(current)

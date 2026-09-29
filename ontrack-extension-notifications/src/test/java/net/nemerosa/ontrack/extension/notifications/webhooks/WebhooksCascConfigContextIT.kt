@@ -1,5 +1,8 @@
 package net.nemerosa.ontrack.extension.notifications.webhooks
 
+import io.micrometer.core.instrument.MeterRegistry
+import net.nemerosa.ontrack.it.deprecatedUsages
+import net.nemerosa.ontrack.model.deprecation.DeprecationSurface
 import net.nemerosa.ontrack.extension.casc.AbstractCascTestSupport
 import net.nemerosa.ontrack.json.asJson
 import net.nemerosa.ontrack.json.parseAsJson
@@ -22,6 +25,9 @@ internal class WebhooksCascConfigContextIT : AbstractCascTestSupport() {
 
     @Autowired
     private lateinit var jsonTypeBuilder: JsonTypeBuilder
+
+    @Autowired
+    private lateinit var meterRegistry: MeterRegistry
 
     @Test
     fun `CasC schema type`() {
@@ -96,7 +102,7 @@ internal class WebhooksCascConfigContextIT : AbstractCascTestSupport() {
                         webhooks:
                             - name: "$name"
                               url: "https://webhook.example.com"
-                              timeout-seconds: 30
+                              timeoutSeconds: 30
                               authentication:
                                 type: basic
                                 config:
@@ -140,7 +146,7 @@ internal class WebhooksCascConfigContextIT : AbstractCascTestSupport() {
                         webhooks:
                             - name: "$name"
                               url: "https://webhook.example.com"
-                              timeout-seconds: 120
+                              timeoutSeconds: 120
                               authentication:
                                 type: basic
                                 config:
@@ -185,7 +191,7 @@ internal class WebhooksCascConfigContextIT : AbstractCascTestSupport() {
                         webhooks:
                             - name: "$newName"
                               url: "https://webhook.example.com"
-                              timeout-seconds: 30
+                              timeoutSeconds: 30
                               authentication:
                                 type: basic
                                 config:
@@ -194,6 +200,50 @@ internal class WebhooksCascConfigContextIT : AbstractCascTestSupport() {
             """.trimIndent())
             assertNotNull(webhookAdminService.findWebhookByName(newName), "New webhook is available")
             assertNull(webhookAdminService.findWebhookByName(oldName), "Old webhook is no longer available")
+        }
+    }
+
+    private fun cascWebhook(name: String, timeoutField: String) {
+        casc("""
+            ontrack:
+                config:
+                    webhooks:
+                        - name: "$name"
+                          url: "https://webhook.example.com"
+                          $timeoutField: 45
+                          authentication:
+                            type: basic
+                            config:
+                                username: my-user
+                                password: my-pass
+        """.trimIndent())
+    }
+
+    @Test
+    fun `Creating a webhook using the timeoutSeconds field reports no deprecation`() {
+        asAdmin {
+            val name = uid("wh")
+            val usages = meterRegistry.deprecatedUsages(DeprecationSurface.CASC, "ontrack.config.webhooks.timeout-seconds") {
+                cascWebhook(name, "timeoutSeconds")
+            }
+            assertEquals(0.0, usages)
+            assertNotNull(webhookAdminService.findWebhookByName(name)) {
+                assertEquals(45L, it.timeout.toSeconds())
+            }
+        }
+    }
+
+    @Test
+    fun `Creating a webhook using the deprecated timeout-seconds alias`() {
+        asAdmin {
+            val name = uid("wh")
+            val usages = meterRegistry.deprecatedUsages(DeprecationSurface.CASC, "ontrack.config.webhooks.timeout-seconds") {
+                cascWebhook(name, "timeout-seconds")
+            }
+            assertEquals(1.0, usages, "The alias is reported as deprecated")
+            assertNotNull(webhookAdminService.findWebhookByName(name), "The alias still works") {
+                assertEquals(45L, it.timeout.toSeconds())
+            }
         }
     }
 

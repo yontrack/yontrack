@@ -437,3 +437,70 @@ Yontrack 7. Each use of one of them is counted in `ontrack_deprecated_usage_tota
 | The `Query.search(type)` argument                      | `types`, a list of types                                      |
 | The `SearchResults.pageInfo` field                     | `total`, with the `offset` and `size` arguments of `search`   |
 | The `SearchResults.pageItems` field                    | `items`                                                       |
+
+### GitHub configurations
+
+| Deprecated                                                           | Use instead                                                          |
+|----------------------------------------------------------------------|----------------------------------------------------------------------|
+| Authenticating a GitHub configuration with a `user` and a `password` | A token, `oauth2Token`, or a GitHub App, `appId` and `appPrivateKey` |
+
+GitHub refuses passwords for its API. A GitHub configuration authenticating with a user and a
+password still works in 6.x, whether it is created in the UI, through the
+`createGitHubConfiguration` mutation — its `password` input field — as code, or with the
+`GitHubConfiguration.password` field of the KDSL. Each time such a configuration is saved or used,
+it is counted as `GitHub configuration password authentication`, with `surface="settings"`.
+The *GitHub configurations* page marks it with a warning in its *Authentication* column.
+
+### Configuration as code
+
+The kebab-case aliases of a few CasC keys are deprecated: use the camel-case names, the only ones
+the [CasC JSON schema](../configuration/casc.md) lists. Each use of an alias is counted with
+`surface="casc"`, under the item given here.
+
+| Deprecated alias                                                                        | Use instead                  |
+|-----------------------------------------------------------------------------------------|------------------------------|
+| `ontrack.config.github.app-id`                                                          | `appId`                      |
+| `ontrack.config.github.app-private-key`                                                 | `appPrivateKey`              |
+| `ontrack.config.github.app-installation`                                                | `appInstallationAccountName` |
+| `ontrack.config.github.auto-merge-token`                                                | `autoMergeToken`             |
+| `ontrack.config.webhooks.timeout-seconds`                                               | `timeoutSeconds`             |
+| `ontrack.extensions.notifications.global-subscriptions.channel-config`                  | `channelConfig`              |
+| `ontrack.extensions.notifications.entity-subscriptions.subscriptions.channel-config`    | `channelConfig`              |
+
+For example, a global subscription:
+
+```yaml
+ontrack:
+  extensions:
+    notifications:
+      global-subscriptions:
+        - name: On Gold
+          events:
+            - new_promotion_run
+          channel: slack
+          channelConfig: # instead of channel-config
+            channel: "#my-channel"
+```
+
+### Configuration properties
+
+| Deprecated                                      | Use instead                                    |
+|-------------------------------------------------|------------------------------------------------|
+| `ontrack.extension.queue.general.warn-if-async` | `ontrack.extension.queue.general.warn-if-sync` |
+
+The property emits a warning when the queues are processed synchronously: its former name said the
+opposite of what it does. The old name, in any of its spellings — `warnIfAsync`, or
+`ONTRACK_EXTENSION_QUEUE_GENERAL_WARNIFASYNC` as an environment variable — still sets the property,
+and is counted once at startup with `surface="config"`. When both are set, the new name wins.
+
+### CI environment
+
+| Deprecated                                              | Use instead              |
+|---------------------------------------------------------|--------------------------|
+| The `ONTRACK_SCM_ISSUES` variable of the CI environment | `YONTRACK_CI_SCM_ISSUES` |
+
+The [CI configuration](../configuration/ci-config.md) reads the issue service of a project —
+`serviceId//serviceName` — from its `issueServiceIdentifier`, else from the
+`YONTRACK_CI_SCM_ISSUES` variable of the CI environment, else from `ONTRACK_SCM_ISSUES`. A project
+whose issue service is taken from `ONTRACK_SCM_ISSUES` is counted as `ONTRACK_SCM_ISSUES`, with
+`surface="env"`.

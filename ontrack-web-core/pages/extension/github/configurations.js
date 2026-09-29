@@ -106,7 +106,7 @@ export default function GitHubConfigurationsPage() {
             key="password"
             name="password"
             label="Password"
-            extra="Password used to connect to GitHub. Prefer using tokens or GitHub Apps."
+            extra="Deprecated, removed in Yontrack 7: use a token or a GitHub App instead."
         >
             <Input.Password/>
         </Form.Item>,
