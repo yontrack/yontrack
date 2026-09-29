@@ -60,6 +60,10 @@ export default defineConfig([
                         group: ["**/common/StateUtils"],
                         message: "useReloadState was removed in 6.0 - use useRefresh from @components/common/RefreshUtils.",
                     },
+                    {
+                        group: ["**/providers/ConnectionContextProvider"],
+                        message: "useGraphQLClient was removed in 6.0 - use useQuery, useMutation or callGraphQL from @components/services/GraphQL.",
+                    },
                 ],
             }],
             "no-restricted-syntax": ["error",

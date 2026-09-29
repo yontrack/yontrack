@@ -13,9 +13,6 @@
 # issue expected to remove them; the grouping is a guide, the test does not read it.
 # Cutover gate (doc/dev-guide/major-branch.md): this file has no entry left.
 
-# #1929 (D13) - frontend helpers
-frontend ontrack-web-core/components/providers/ConnectionContextProvider.js#useGraphQLClient
-
 # Search on Postgres - the deprecated search(...) form, re-marked Removed in V7 by its own initiative
 graphql ontrack-ui-graphql/src/main/java/net/nemerosa/ontrack/graphql/schema/GQLRootQuerySearch.kt#token
 graphql ontrack-ui-graphql/src/main/java/net/nemerosa/ontrack/graphql/schema/GQLRootQuerySearch.kt#type

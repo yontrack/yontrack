@@ -31,11 +31,9 @@ These rules apply unconditionally. Follow them in every change, without exceptio
 
 ### Frontend
 - **Never** access `localStorage` directly — always use the wrapper functions in `@components/storage/local`
-- **Never** introduce a new usage of the deprecated `useGraphQLClient` hook — always use `useQuery`,
-  `useMutation` or `callGraphQL` from `@components/services/GraphQL`. This holds even inside a file
-  that still uses `useGraphQLClient` elsewhere.
-- **Always** import `useQuery` from `@components/services/GraphQL` — the identically named hook in
-  `@components/services/useQuery` is deprecated (it wraps `useGraphQLClient`)
+- **Always** call the GraphQL API with `useQuery`, `useMutation` or `callGraphQL` from
+  `@components/services/GraphQL` (see *GraphQL Calls* below) — the older client hooks were removed
+  in 6.0, and ESLint rejects their imports
 - **Never** use antd's `List` / `List.Item` — deprecated in antd 6. Use `ItemList` from
   `@components/common/ItemList` (see *Lists* below); ESLint flags the import
 - **Never** store a value in `useState` + `useEffect` when it's purely derived from props/state —
@@ -735,17 +733,11 @@ val orderedBranches = branches.sortedWith(ordering)
 
 ### GraphQL Calls
 
-Always use `useQuery` / `useMutation` / `callGraphQL` from `@components/services/GraphQL`.
+Always use `useQuery` / `useMutation` / `callGraphQL` from `@components/services/GraphQL` — it is
+the only GraphQL client left in the frontend, and ESLint rejects the imports of the ones removed in
+6.0. `doc/dev-guide/ui/ui-graphql-call.md` has the details.
 
-The `useGraphQLClient` hook is **deprecated**. Never introduce a new usage of it, even when
-editing a file that still uses it elsewhere. Existing usages are migrated on their own schedule
-with the `/migrate-use-graphql-client` skill — do not migrate a file unless asked to.
-
-Beware of the import path: `@components/services/useQuery` exports a hook of the same name which is
-also deprecated (it wraps `useGraphQLClient`). The one to use is the one in
-`@components/services/GraphQL`.
-
-**Reading data** — `useQuery` replaces the `useState` + `useEffect` + `client.request()` triad:
+**Reading data** — `useQuery` replaces the `useState` + `useEffect` + request triad:
 ```javascript
 import {useQuery} from "@components/services/GraphQL"
 
@@ -768,7 +760,7 @@ const {data, loading, error, finished} = useQuery(
 `useQuery` starts with `loading` false and only flips it inside its effect. When a component must
 never render as "loaded" before the first fetch resolves, use `loading || !finished`.
 
-**Mutations** — `client.request()` inside an async handler becomes either:
+**Mutations** — a mutation run from an async handler uses either:
 ```javascript
 // Simple one-shot mutation:
 const data = await callGraphQL({query: MUTATION, variables})

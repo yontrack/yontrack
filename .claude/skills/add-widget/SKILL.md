@@ -90,7 +90,7 @@ export default function {Name}Widget({
 Key rules:
 - Props mirror the config fields of `{Name}WidgetConfig` (Kotlin field names, camelCase).
 - Call `setTitle(...)` via `DashboardWidgetCellContext` so the cell header shows a meaningful title.
-- For data fetching prefer `useQuery` from `@components/services/GraphQL` (declarative) over manual `useEffect` + `useGraphQLClient`, unless imperative fetching is needed.
+- For data fetching use `useQuery` from `@components/services/GraphQL` (declarative), or `callGraphQL` from the same module when imperative fetching is needed.
 - Wrap content in `<PaddedContent>` (`@components/common/PaddedContent`) when the widget displays a list or table that needs padding.
 
 **Examples:**

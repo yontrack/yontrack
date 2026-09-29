@@ -7,8 +7,8 @@ import {useMutation} from "@components/services/GraphQL";
  *
  * Extracted so that a second host can delete a run without importing the whole
  * `PromotionRunDeleteAction` composition - the icon, the popover and the confirmation - which is the
- * ADR 0003 rule: hosts share the primitive, not the arrangement. It also retires one usage of the
- * deprecated `useGraphQLClient`, which is what the action was built on.
+ * ADR 0003 rule: hosts share the primitive, not the arrangement. It also moved the action off the
+ * imperative GraphQL client it was built on, onto `useMutation`.
  *
  * `onDeletion` runs only when the mutation reports no user error, where the previous implementation
  * ran its callback on any completed request and reloaded a list from which nothing had been removed.
