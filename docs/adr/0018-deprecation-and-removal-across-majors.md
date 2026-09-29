@@ -106,9 +106,14 @@ start; the test cannot tell an added line from an old one, so this rule is the r
 
 ## The upgrade floor
 
-A major accepts an upgrade from any release of the previous major, and from nothing older: 6.0
-starts on any 5.x database and refuses a pre-5.0 one, telling to upgrade to a 5.x release first.
-Flyway replays every migration, so the schema is safe from any 5.x starting point.
+A major supports an upgrade from any release of the previous major, and from nothing older: 6.0
+upgrades any 5.x installation, and a pre-5.0 one goes through a 5.x release first. Flyway replays
+every migration, so the schema is safe from any 5.x starting point.
+
+**The upgrade path is documented, not enforced.** The migration page states it; Yontrack does not
+check it at startup. It never has for a previous major, and a check reading the Flyway history
+before `migrate()` raced with a second instance migrating the same fresh database — it saw a
+partial history and refused it (#1919).
 
 The real upgrade risk is the code-based data conversions, which the cleanup of a major is tempted
 to delete. The rule is: **the floor is the last Flyway version of the previous major's `.0`** —

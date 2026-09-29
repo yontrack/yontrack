@@ -27,10 +27,6 @@ public class StartupStrategy implements FlywayMigrationStrategy {
 
     @Override
     public void migrate(Flyway flyway) {
-        // Refusing a database older than 5.0, before Flyway touches it
-        logger.info("Checking the upgrade floor of the database...");
-        UpgradeFloor.INSTANCE.check(flyway);
-
         // Migrating the database
         logger.info("Migrating the database...");
         flyway.migrate();
