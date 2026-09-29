@@ -288,6 +288,15 @@ properties and environment variables, templating, the CI configuration, and the 
 
 The latest 5.5.x release counts every use of these items: see [Upgrade path](#upgrade-path).
 
+### Templating
+
+| Removed                                                        | Use instead                                                  |
+|----------------------------------------------------------------|--------------------------------------------------------------|
+| The `name` field of the `#.user` function, `#.user?field=name` | `#.user?field=email`, or `#.user`: the email is the default  |
+
+A template still using `#.user?field=name` fails to render, with an error listing the accepted
+fields, `display` and `email`.
+
 ## Newly deprecated
 
 Yontrack 6 deprecates the items below. They still work in every 6.x release, and are removed in

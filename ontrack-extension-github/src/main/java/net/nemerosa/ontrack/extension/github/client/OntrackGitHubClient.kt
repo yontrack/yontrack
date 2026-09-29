@@ -1,7 +1,6 @@
 package net.nemerosa.ontrack.extension.github.client
 
 import tools.jackson.databind.JsonNode
-import net.nemerosa.ontrack.extension.git.model.GitPullRequest
 import net.nemerosa.ontrack.extension.github.model.*
 import org.springframework.web.client.RestTemplate
 
@@ -69,17 +68,6 @@ interface OntrackGitHubClient {
         token: String? = null,
         code: (data: JsonNode) -> T,
     ): T
-
-    /**
-     * Gets a pull request using its ID
-     *
-     * @param repository Repository name, like `nemerosa/ontrack`
-     * @param id         ID of the pull request
-     * @param ignoreError If `true` in case of error, this method returns `null`
-     * @return Details of the pull request or `null` if it does not exist
-     */
-    @Deprecated("Will be removed in V6. Use getPR instead.")
-    fun getPullRequest(repository: String, id: Int, ignoreError: Boolean = false): GitPullRequest?
 
     /**
      * Gets the list of teams for this organization.

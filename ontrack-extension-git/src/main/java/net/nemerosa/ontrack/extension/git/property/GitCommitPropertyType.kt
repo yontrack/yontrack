@@ -2,7 +2,6 @@ package net.nemerosa.ontrack.extension.git.property
 
 import tools.jackson.databind.JsonNode
 import net.nemerosa.ontrack.extension.git.GitExtensionFeature
-import net.nemerosa.ontrack.extension.git.service.GitService
 import net.nemerosa.ontrack.extension.scm.index.SCMBuildCommitIndexService
 import net.nemerosa.ontrack.extension.support.AbstractPropertyType
 import net.nemerosa.ontrack.json.getRequiredTextField
@@ -21,7 +20,6 @@ import java.util.*
 @Component
 class GitCommitPropertyType(
     extensionFeature: GitExtensionFeature,
-    private val gitService: GitService,
     private val scmBuildCommitIndexService: SCMBuildCommitIndexService,
 ) : AbstractPropertyType<GitCommitProperty>(extensionFeature) {
 
@@ -66,7 +64,6 @@ class GitCommitPropertyType(
     override fun onPropertyChanged(entity: ProjectEntity, value: GitCommitProperty) {
         if (entity is Build) {
             scmBuildCommitIndexService.indexBuildCommit(entity, value.commit)
-            gitService.collectIndexableGitCommitForBuild(entity)
         }
     }
 

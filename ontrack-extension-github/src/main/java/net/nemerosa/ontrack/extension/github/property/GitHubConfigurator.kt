@@ -20,7 +20,6 @@ import net.nemerosa.ontrack.model.structure.PropertyService
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
-import java.io.IOException
 
 @Component
 class GitHubConfigurator(
@@ -47,12 +46,21 @@ class GitHubConfigurator(
         if (configuration is GitHubGitConfiguration) {
             val client = ontrackGitHubClientFactory.create(configuration.property.configuration)
             try {
-                client.getPullRequest(
+                client.getPR(
                     repository = configuration.property.repository,
-                    id = id,
-                    ignoreError = true,
-                )
-            } catch (any: IOException) {
+                    pr = id,
+                )?.let { pr ->
+                    GitPullRequest(
+                        id = id,
+                        key = "#$id",
+                        source = pr.head?.ref ?: "",
+                        target = pr.base?.ref ?: "",
+                        title = pr.title ?: "",
+                        status = pr.state,
+                        url = pr.html_url ?: "",
+                    )
+                }
+            } catch (any: Exception) {
                 logger.error("Cannot check PR for a branch", any)
                 null
             }

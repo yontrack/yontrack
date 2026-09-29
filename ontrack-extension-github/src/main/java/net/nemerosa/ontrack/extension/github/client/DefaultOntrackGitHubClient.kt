@@ -8,7 +8,6 @@ import kotlinx.coroutines.runBlocking
 import net.nemerosa.ontrack.common.BaseException
 import net.nemerosa.ontrack.common.runIf
 import net.nemerosa.ontrack.common.untilTimeout
-import net.nemerosa.ontrack.extension.git.model.GitPullRequest
 import net.nemerosa.ontrack.extension.github.app.GitHubAppRateLimitMetricsNames
 import net.nemerosa.ontrack.extension.github.app.GitHubAppTokenService
 import net.nemerosa.ontrack.extension.github.model.*
@@ -406,36 +405,6 @@ class DefaultOntrackGitHubClient(
             }
         } catch (ex: GitHubErrorsException) {
             if (ex.status == 404) {
-                null
-            } else {
-                throw ex
-            }
-        }
-    }
-
-    @Deprecated("Will be removed in V6. Use getPR instead.")
-    override fun getPullRequest(repository: String, id: Int, ignoreError: Boolean): GitPullRequest? {
-        // Getting a client
-        val client = createGitHubRestTemplate()
-        // Gets the repository for this project
-        val (owner, name) = getRepositoryParts(repository)
-        // Getting the PR
-        return try {
-            client("Get PR $repository#$id") {
-                getForObject<JsonNode>("/repos/$owner/$name/pulls/$id")?.run {
-                    GitPullRequest(
-                        id = id,
-                        key = "#$id",
-                        source = path("head").path("ref").asText(),
-                        target = path("base").path("ref").asText(),
-                        title = getRequiredTextField("title"),
-                        status = getRequiredTextField("state"),
-                        url = getRequiredTextField("html_url"),
-                    )
-                }
-            }
-        } catch (ex: GitHubErrorsException) {
-            if (ex.status == 404 || ignoreError) {
                 null
             } else {
                 throw ex

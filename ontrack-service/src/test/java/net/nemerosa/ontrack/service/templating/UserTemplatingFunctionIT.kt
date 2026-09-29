@@ -27,20 +27,4 @@ class UserTemplatingFunctionIT : AbstractDSLTestSupport() {
         }
     }
 
-    @Test
-    @Deprecated("Will be removed in V6.")
-    fun `Current user name (deprecated)`() {
-        asUser {
-            val name = securityService.currentUser?.account?.email
-            assertEquals(
-                "Current user is $name",
-                templatingService.render(
-                    template = "Current user is ${'$'}{#.user?field=name}",
-                    context = emptyMap(),
-                    renderer = PlainEventRenderer.INSTANCE,
-                )
-            )
-        }
-    }
-
 }

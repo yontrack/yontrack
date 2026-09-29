@@ -1,8 +1,10 @@
 package net.nemerosa.ontrack.extension.github.client
 
 import com.fasterxml.jackson.annotation.JsonIgnore
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import net.nemerosa.ontrack.extension.scm.service.SCMPullRequestStatus
 
+@JsonIgnoreProperties(ignoreUnknown = true)
 data class GitHubPR(
     /**
      * Local ID of the PR
@@ -27,7 +29,19 @@ data class GitHubPR(
     /**
      * Link to the PR
      */
-    val html_url: String?
+    val html_url: String?,
+    /**
+     * Title of the PR
+     */
+    val title: String? = null,
+    /**
+     * Source branch of the PR
+     */
+    val head: GitHubPRRef? = null,
+    /**
+     * Target branch of the PR
+     */
+    val base: GitHubPRRef? = null,
 ) {
     @JsonIgnore
     val status: SCMPullRequestStatus = when (state) {
@@ -40,3 +54,13 @@ data class GitHubPR(
         else -> SCMPullRequestStatus.UNKNOWN
     }
 }
+
+/**
+ * Branch end of a PR.
+ *
+ * @property ref Name of the branch
+ */
+@JsonIgnoreProperties(ignoreUnknown = true)
+data class GitHubPRRef(
+    val ref: String,
+)

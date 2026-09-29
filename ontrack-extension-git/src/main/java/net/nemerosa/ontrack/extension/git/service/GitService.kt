@@ -2,7 +2,6 @@ package net.nemerosa.ontrack.extension.git.service
 
 import net.nemerosa.ontrack.extension.git.model.*
 import net.nemerosa.ontrack.extension.git.property.GitBranchConfigurationProperty
-import net.nemerosa.ontrack.extension.scm.service.SCMService
 import net.nemerosa.ontrack.git.GitRepositoryClient
 import net.nemerosa.ontrack.git.model.GitCommit
 import net.nemerosa.ontrack.job.JobCategory
@@ -17,7 +16,7 @@ import java.util.function.BiConsumer
 
 val GIT_JOB_CATEGORY = JobCategory.of("git").withName("Git")
 
-interface GitService : SCMService {
+interface GitService {
 
     /**
      * Gets the Git configurator for a project
@@ -119,6 +118,16 @@ interface GitService : SCMService {
     fun lookupCommit(configuration: GitConfiguration, id: String): GitCommit?
 
     /**
+     * Downloads the file at the given path for a branch
+     *
+     * @param project Project holding the Git configuration
+     * @param scmBranch Name of the Git branch
+     * @param path Path to the file, relative to the repository
+     * @return Content of the file or null if not found
+     */
+    fun download(project: Project, scmBranch: String, path: String): String?
+
+    /**
      * Gets the list of remote branches, as defined under `ref/heads`.
      */
     fun getRemoteBranches(gitConfiguration: GitConfiguration): List<String>
@@ -213,12 +222,6 @@ interface GitService : SCMService {
         overrides: Boolean,
         listener: JobRunListener
     )
-
-    /**
-     * Collects and stores the [IndexableGitCommit]s one build.
-     */
-    @Deprecated("Will be removed in V6. Use the SCMBuildCommitIndexService instead.")
-    fun collectIndexableGitCommitForBuild(build: Build)
 
     /**
      * Loops over the commits of a configuration

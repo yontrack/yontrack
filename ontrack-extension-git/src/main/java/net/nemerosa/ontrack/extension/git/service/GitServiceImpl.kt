@@ -11,7 +11,6 @@ import net.nemerosa.ontrack.extension.git.property.GitBranchConfigurationPropert
 import net.nemerosa.ontrack.extension.git.property.GitBranchConfigurationPropertyType
 import net.nemerosa.ontrack.extension.git.repository.GitRepositoryHelper
 import net.nemerosa.ontrack.extension.git.support.NoGitCommitPropertyException
-import net.nemerosa.ontrack.extension.scm.model.SCMPathInfo
 import net.nemerosa.ontrack.git.GitRepositoryClient
 import net.nemerosa.ontrack.git.GitRepositoryClientFactory
 import net.nemerosa.ontrack.git.exceptions.GitRepositoryNoRemoteException
@@ -32,7 +31,6 @@ import org.springframework.transaction.PlatformTransactionManager
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.transaction.support.TransactionTemplate
 import java.lang.String.format
-import java.util.*
 import java.util.concurrent.Future
 import java.util.function.BiConsumer
 import kotlin.jvm.optionals.getOrNull
@@ -182,19 +180,6 @@ class GitServiceImpl(
     override fun getRemoteBranches(gitConfiguration: GitConfiguration): List<String> {
         val gitClient = gitRepositoryClientFactory.getClient(gitConfiguration.gitRepository, gitConfigService.gitConnectionConfig)
         return gitClient.remoteBranches
-    }
-
-    @Deprecated("Use the version with the branch name")
-    override fun download(branch: Branch, path: String): Optional<String> {
-        securityService.checkProjectFunction(branch, ProjectConfig::class.java)
-        return transactionService.doInTransaction {
-            val branchConfiguration = getRequiredBranchConfiguration(branch)
-            val client = gitRepositoryClientFactory.getClient(
-                branchConfiguration.configuration.gitRepository,
-                gitConfigService.gitConnectionConfig
-            )
-            client.download(branchConfiguration.branch, path).asOptional()
-        }
     }
 
     override fun download(project: Project, scmBranch: String, path: String): String? {
@@ -574,19 +559,6 @@ class GitServiceImpl(
         jobScheduler.unschedule(getGitBranchSyncJobKey(branch))
     }
 
-    @Deprecated("Use getBranchSCMPathInfo")
-    override fun getSCMPathInfo(branch: Branch): Optional<SCMPathInfo> = getBranchSCMPathInfo(branch).asOptional()
-
-    override fun getBranchSCMPathInfo(branch: Branch): SCMPathInfo? =
-        getBranchConfiguration(branch)
-            ?.let {
-                SCMPathInfo(
-                    "git",
-                    it.configuration.remote,
-                    it.branch, null
-                )
-            }
-
     override fun getCommitForBuild(build: Build): IndexableGitCommit? =
         entityDataService.retrieve(
             build,
@@ -634,32 +606,6 @@ class GitServiceImpl(
             }
         }
     }
-
-    @Deprecated("Will be removed in V6. Use the SCMBuildCommitIndexService instead.")
-    override fun collectIndexableGitCommitForBuild(build: Build) {
-        val project = build.project
-        val projectConfiguration = getProjectConfiguration(project)
-        if (projectConfiguration != null) {
-            val client = gitRepositoryClientFactory.getClient(projectConfiguration.gitRepository, gitConfigService.gitConnectionConfig)
-            val branchConfiguration = getBranchConfiguration(build.branch)
-            val buildCommitLink = branchConfiguration?.buildCommitLink
-            if (buildCommitLink != null) {
-                collectIndexableGitCommitForBuild(
-                    build,
-                    client,
-                    buildCommitLink,
-                    true,
-                    JobRunListener.logger(logger)
-                )
-            }
-        }
-    }
-
-    override fun getSCMDefaultBranch(project: Project): String? =
-        getProjectConfiguration(project)?.let { conf ->
-            val client = gitRepositoryClientFactory.getClient(conf.gitRepository, gitConfigService.gitConnectionConfig)
-            client.defaultBranch
-        }
 
     private fun collectIndexableGitCommitForBuild(
         build: Build,

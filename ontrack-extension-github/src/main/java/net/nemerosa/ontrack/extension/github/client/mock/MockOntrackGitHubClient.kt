@@ -2,7 +2,6 @@ package net.nemerosa.ontrack.extension.github.client.mock
 
 import tools.jackson.databind.JsonNode
 import net.nemerosa.ontrack.common.Time
-import net.nemerosa.ontrack.extension.git.model.GitPullRequest
 import net.nemerosa.ontrack.extension.github.client.*
 import net.nemerosa.ontrack.extension.github.model.*
 import org.springframework.web.client.RestTemplate
@@ -47,15 +46,6 @@ class MockOntrackGitHubClient(
         repository: String,
         pr: Int
     ): GitHubPR {
-        TODO("Not yet implemented")
-    }
-
-    @Deprecated("Will be removed in V6. Use getPR instead.")
-    override fun getPullRequest(
-        repository: String,
-        id: Int,
-        ignoreError: Boolean
-    ): GitPullRequest? {
         TODO("Not yet implemented")
     }
 

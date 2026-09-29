@@ -169,16 +169,18 @@ class DefaultOntrackGitHubClientIT {
 
     @Test
     fun `Getting a PR`() {
-        val pr = client.getPullRequest(githubTestEnv.fullRepository, githubTestEnv.pr)
+        val pr = client.getPR(githubTestEnv.fullRepository, githubTestEnv.pr)
         assertNotNull(pr, "PR ${githubTestEnv.fullRepository}#${githubTestEnv.pr} has been found") {
-            assertEquals("#${githubTestEnv.pr}", it.key)
+            assertEquals(githubTestEnv.pr, it.number)
+            assertNotNull(it.head?.ref, "PR source branch")
+            assertNotNull(it.base?.ref, "PR target branch")
         }
     }
 
     @Test
     fun `Getting an unknown PR`() {
         val id = Int.MAX_VALUE / 2
-        val pr = client.getPullRequest(githubTestEnv.fullRepository, id)
+        val pr = client.getPR(githubTestEnv.fullRepository, id)
         assertNull(pr, "Issue ${githubTestEnv.fullRepository}#$id cannot be found found")
     }
 

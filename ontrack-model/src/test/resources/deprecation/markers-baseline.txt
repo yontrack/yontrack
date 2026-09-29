@@ -13,26 +13,6 @@
 # issue expected to remove them; the grouping is a guide, the test does not read it.
 # Cutover gate (doc/dev-guide/major-branch.md): this file has no entry left.
 
-# #1920 (D4) - backend items tagged V6
-java ontrack-model/src/main/java/net/nemerosa/ontrack/model/structure/SyncConfig.java#SyncConfig
-java ontrack-model/src/main/java/net/nemerosa/ontrack/model/structure/SyncPolicy.java#SyncPolicy
-kotlin ontrack-extension-git/src/main/java/net/nemerosa/ontrack/extension/git/service/GitService.kt#collectIndexableGitCommitForBuild
-kotlin ontrack-extension-git/src/main/java/net/nemerosa/ontrack/extension/git/service/GitServiceImpl.kt#collectIndexableGitCommitForBuild
-kotlin ontrack-extension-git/src/main/java/net/nemerosa/ontrack/extension/git/service/GitServiceImpl.kt#download
-kotlin ontrack-extension-git/src/main/java/net/nemerosa/ontrack/extension/git/service/GitServiceImpl.kt#getSCMPathInfo
-kotlin ontrack-extension-github/src/main/java/net/nemerosa/ontrack/extension/github/client/DefaultOntrackGitHubClient.kt#getPullRequest
-kotlin ontrack-extension-github/src/main/java/net/nemerosa/ontrack/extension/github/client/OntrackGitHubClient.kt#getPullRequest
-kotlin ontrack-extension-github/src/main/java/net/nemerosa/ontrack/extension/github/client/mock/MockOntrackGitHubClient.kt#getPullRequest
-kotlin ontrack-extension-scm/src/main/java/net/nemerosa/ontrack/extension/scm/service/SCMService.kt#SCMService
-kotlin ontrack-extension-scm/src/main/java/net/nemerosa/ontrack/extension/scm/service/SCMService.kt#download
-kotlin ontrack-extension-scm/src/main/java/net/nemerosa/ontrack/extension/scm/service/SCMService.kt#getSCMPathInfo
-kotlin ontrack-extension-scm/src/main/java/net/nemerosa/ontrack/extension/scm/service/SCMServiceDetector.kt#SCMServiceDetector
-kotlin ontrack-extension-scm/src/main/java/net/nemerosa/ontrack/extension/scm/service/SCMServiceDetector.kt#getScmService
-kotlin ontrack-extension-scm/src/main/java/net/nemerosa/ontrack/extension/scm/service/SCMServiceProvider.kt#SCMServiceProvider
-kotlin ontrack-extension-scm/src/main/java/net/nemerosa/ontrack/extension/scm/service/SCMServiceProvider.kt#getScmService
-kotlin ontrack-service/src/test/java/net/nemerosa/ontrack/service/templating/UserTemplatingFunctionIT.kt#Current user name (deprecated)
-warning ontrack-service/src/main/java/net/nemerosa/ontrack/service/templating/UserTemplatingFunction.kt##.user?field=name
-
 # #1921 (D5) - deprecated GraphQL fields
 graphql ontrack-extension-auto-versioning/src/main/java/net/nemerosa/ontrack/extension/av/graphql/AutoVersioningTrailGQLPromotionLevelFieldContributor.kt#autoVersioningTrail
 graphql ontrack-extension-auto-versioning/src/main/java/net/nemerosa/ontrack/extension/av/graphql/AutoVersioningTrailGQLPromotionRunFieldContributor.kt#autoVersioningTrail

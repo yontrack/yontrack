@@ -4,7 +4,6 @@ import net.nemerosa.ontrack.extension.git.AbstractGitTestSupport
 import net.nemerosa.ontrack.model.structure.BuildSearchForm
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
 
 class GitCommitPropertyTypeIT : AbstractGitTestSupport() {
 
@@ -93,30 +92,6 @@ class GitCommitPropertyTypeIT : AbstractGitTestSupport() {
                         build,
                         "Found build by commit"
                     )
-                }
-            }
-        }
-    }
-
-    @Test
-    fun onPropertyChanged() {
-        createRepo {
-            commits(1)
-        } and { repo, commits ->
-            project {
-                gitProject(repo)
-                branch {
-                    gitBranch {
-                        commitAsProperty()
-                    }
-                    build("1") {
-                        gitCommitProperty(commits.getValue(1))
-                        // Checks that we can now get a GitCommit for this build
-                        val commit = gitService.getCommitForBuild(this)
-                        assertNotNull(commit) {
-                            assertEquals("Commit 1", it.commit.shortMessage)
-                        }
-                    }
                 }
             }
         }
