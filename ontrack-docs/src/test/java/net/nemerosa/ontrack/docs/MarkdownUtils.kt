@@ -130,7 +130,6 @@ fun StringBuilder.fields(type: KClass<*>, title: String? = "Configuration") {
 fun StringBuilder.writeFields(
     fields: List<FieldDocumentation>,
     level: Int = 1,
-    aliasesDeprecated: Boolean = false,
 ) {
     fields
         .sortedBy { it.name }
@@ -140,7 +139,7 @@ fun StringBuilder.writeFields(
                 .append(" - ")
                 .append(if (required) "required" else "optional")
                 .appendDescription(description)
-                .appendAliases(aliases, aliasesDeprecated)
+                .appendAliases(aliases)
                 .append("\n")
                 .append("\n")
             if (subfields.isNotEmpty()) {
@@ -156,13 +155,9 @@ private fun StringBuilder.appendDescription(description: String?): StringBuilder
         this
     }
 
-private fun StringBuilder.appendAliases(aliases: List<String>, aliasesDeprecated: Boolean): StringBuilder =
+private fun StringBuilder.appendAliases(aliases: List<String>): StringBuilder =
     if (aliases.isNotEmpty()) {
-        append(" (aliases: ${aliases.joinToString(", ") { "`$it`" }}")
-        if (aliasesDeprecated) {
-            append(" - deprecated")
-        }
-        append(")")
+        append(" (aliases: ${aliases.joinToString(", ") { "`$it`" }})")
     } else {
         this
     }

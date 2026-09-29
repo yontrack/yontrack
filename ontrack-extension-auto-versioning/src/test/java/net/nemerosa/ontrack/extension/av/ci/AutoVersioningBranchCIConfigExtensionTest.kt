@@ -1,92 +1,63 @@
 package net.nemerosa.ontrack.extension.av.ci
 
 import io.mockk.mockk
-import io.mockk.verify
 import net.nemerosa.ontrack.extension.av.AutoVersioningExtensionFeature
 import net.nemerosa.ontrack.extension.av.config.AutoVersioningSourceConfig
+import net.nemerosa.ontrack.json.JsonParseException
 import net.nemerosa.ontrack.json.asJson
-import net.nemerosa.ontrack.model.deprecation.DeprecationService
-import net.nemerosa.ontrack.model.deprecation.DeprecationSurface
 import org.junit.jupiter.api.Test
+import kotlin.test.assertContains
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 
 class AutoVersioningBranchCIConfigExtensionTest {
 
+    private fun extension() = AutoVersioningBranchCIConfigExtension(
+        autoVersioningExtensionFeature = mockk<AutoVersioningExtensionFeature>(relaxed = true),
+        autoVersioningConfigurationService = mockk(),
+        branchDisplayNameService = mockk(),
+    )
+
     @Test
-    fun `Legacy attribute names are reported once per name`() {
-        val deprecationService = mockk<DeprecationService>(relaxed = true)
-        val extension = AutoVersioningBranchCIConfigExtension(
-            autoVersioningExtensionFeature = mockk<AutoVersioningExtensionFeature>(relaxed = true),
-            autoVersioningConfigurationService = mockk(),
-            branchDisplayNameService = mockk(),
-            deprecationService = deprecationService,
-        )
+    fun `Legacy attribute names are rejected`() {
         val legacy = mapOf(
             "project" to "my-project",
             "sourceBranch" to "main",
             "sourcePromotion" to "GOLD",
-            "path" to "versions.properties",
+            "targetPath" to "versions.properties",
+            "targetProperty" to "version",
         )
-        val config = extension.parseData(
-            mapOf("configurations" to listOf(legacy, legacy)).asJson()
-        )
-        assertEquals("my-project", config.configurations.first().sourceProject)
-        verify(exactly = 1) {
-            deprecationService.deprecatedUsage(
-                DeprecationSurface.CI_CONFIG,
-                "autoVersioning.configurations.project",
-                "Removed in V6. Use sourceProject instead. See #1926",
+        val ex = assertFailsWith<JsonParseException> {
+            extension().parseData(
+                mapOf("configurations" to listOf(legacy)).asJson()
             )
         }
-        verify(exactly = 1) {
-            deprecationService.deprecatedUsage(
-                DeprecationSurface.CI_CONFIG,
-                "autoVersioning.configurations.path",
-                "Removed in V6. Use targetPath instead. See #1926",
-            )
-        }
-        verify(exactly = 2) { deprecationService.deprecatedUsage(any(), any(), any()) }
+        assertContains(ex.message ?: "", "sourceProject")
     }
 
     @Test
-    fun `Legacy attribute names are reported in a custom configuration`() {
-        val deprecationService = mockk<DeprecationService>(relaxed = true)
-        val extension = AutoVersioningBranchCIConfigExtension(
-            autoVersioningExtensionFeature = mockk<AutoVersioningExtensionFeature>(relaxed = true),
-            autoVersioningConfigurationService = mockk(),
-            branchDisplayNameService = mockk(),
-            deprecationService = deprecationService,
-        )
-        extension.mergeConfig(
-            defaults = AutoVersioningBranchCIConfig(configurations = emptyList()),
-            custom = mapOf(
-                "configurations" to listOf(
-                    mapOf(
-                        "sourceProject" to "my-project",
-                        "sourceBranch" to "main",
-                        "promotion" to "GOLD",
-                        "targetPath" to "versions.properties",
+    fun `Legacy attribute names are rejected in a custom configuration`() {
+        assertFailsWith<JsonParseException> {
+            extension().mergeConfig(
+                defaults = AutoVersioningBranchCIConfig(configurations = emptyList()),
+                custom = mapOf(
+                    "configurations" to listOf(
+                        mapOf(
+                            "sourceProject" to "my-project",
+                            "sourceBranch" to "main",
+                            "promotion" to "GOLD",
+                            "targetPath" to "versions.properties",
+                            "targetProperty" to "version",
+                        )
                     )
-                )
-            ).asJson()
-        )
-        verify(exactly = 1) {
-            deprecationService.deprecatedUsage(
-                DeprecationSurface.CI_CONFIG,
-                "autoVersioning.configurations.promotion",
-                "Removed in V6. Use sourcePromotion instead. See #1926",
+                ).asJson()
             )
         }
     }
 
     @Test
     fun `Merging partial configurations with no branch filter`() {
-        val extension = AutoVersioningBranchCIConfigExtension(
-            autoVersioningExtensionFeature = mockk<AutoVersioningExtensionFeature>(relaxed = true),
-            autoVersioningConfigurationService = mockk(),
-            branchDisplayNameService = mockk(),
-            deprecationService = mockk(relaxed = true),
-        )
+        val extension = extension()
         val config = extension.mergeConfig(
             defaults = AutoVersioningBranchCIConfig(
                 configurations = listOf(
@@ -117,12 +88,7 @@ class AutoVersioningBranchCIConfigExtensionTest {
 
     @Test
     fun `Merging branch filters, branch filters are always the default`() {
-        val extension = AutoVersioningBranchCIConfigExtension(
-            autoVersioningExtensionFeature = mockk<AutoVersioningExtensionFeature>(relaxed = true),
-            autoVersioningConfigurationService = mockk(),
-            branchDisplayNameService = mockk(),
-            deprecationService = mockk(relaxed = true),
-        )
+        val extension = extension()
         val avConfig = AutoVersioningSourceConfig(
             sourceProject = "my-project",
             sourceBranch = "main",
@@ -158,12 +124,7 @@ class AutoVersioningBranchCIConfigExtensionTest {
 
     @Test
     fun `Merging configurations and branch filters, branch filters are always the default`() {
-        val extension = AutoVersioningBranchCIConfigExtension(
-            autoVersioningExtensionFeature = mockk<AutoVersioningExtensionFeature>(relaxed = true),
-            autoVersioningConfigurationService = mockk(),
-            branchDisplayNameService = mockk(),
-            deprecationService = mockk(relaxed = true),
-        )
+        val extension = extension()
         val config = extension.mergeConfig(
             defaults = AutoVersioningBranchCIConfig(
                 branchFilter = AutoVersioningBranchCIConfigBranchFilter(

@@ -15,7 +15,7 @@ class AutoVersioningConfigDocumentationIT : AbstractDocGenIT() {
                 val fields = getFieldsDocumentation(
                     AutoVersioningSourceConfig::class,
                 )
-                s.writeFields(fields, aliasesDeprecated = true)
+                s.writeFields(fields)
             }
         }
     }

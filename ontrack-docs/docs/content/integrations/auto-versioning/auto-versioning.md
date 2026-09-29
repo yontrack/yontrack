@@ -109,12 +109,6 @@ The parameters available for each configuration are listed below.
     A JSON schema for the auto-versioning configuration is available for download in the UI, in the user menu, under
     _User information_ > _Resources_. See [JSON schemas](../../appendix/json-schemas.md) to use it in your editor.
 
-!!! note "Legacy parameter names"
-
-    Some parameters have shorter aliases (`project`, `branch`, `promotion`, `path`, `property`, `propertyType`,
-    `regex`, `propertyRegex`) kept for compatibility with the old Jenkins pipeline library. Prefer the `source*` and
-    `target*` names in new configurations.
-
 ### Viewing the configuration
 
 Once an auto-versioning configuration is set on a branch, it can be checked:
@@ -1235,22 +1229,24 @@ ontrackCliAutoVersioning {
 where `auto-versioning.yaml` is a file in the repository containing for example:
 
 ```yaml
-dependencies:
-  - project: my-library
-    branch: release-1.3
-    promotion: IRON
-    path: gradle.properties
-    property: my-version
+configurations:
+  - sourceProject: my-library
+    sourceBranch: release-1.3
+    sourcePromotion: IRON
+    targetPath: gradle.properties
+    targetProperty: my-version
     postProcessing: jenkins
     postProcessingConfig:
       dockerImage: openjdk:8
       dockerCommand: ./gradlew clean
 ```
 
-!!! warning
+!!! note
 
-    For historical reasons, this YAML file uses `dependencies` as a root instead of `configurations`, and the legacy
-    parameter aliases (`project`, `branch`, `promotion`, `path`, `property`).
+    Older versions of this file use `dependencies` as a root, and short parameter names (`project`, `branch`,
+    `promotion`, `path`, `property`, …) which the pipeline library translates. Use `configurations` and the names
+    of [the configuration](#configuration): Yontrack 6 no longer accepts the short names, see
+    [Migration to V6](../../appendix/migration-to-v6.md#auto-versioning-configuration).
 
 The [auto-versioning check](#auto-versioning-checks) is called using:
 
@@ -1278,8 +1274,9 @@ yontrack branch auto-versioning \
   --yaml .ontrack/auto-versioning.yaml
 ```
 
-`--yaml` defaults to `.ontrack/auto-versioning.yaml`, and the file uses the same `dependencies` root and legacy
-parameter aliases as the [Jenkins](#jenkins-pipeline) one.
+`--yaml` defaults to `.ontrack/auto-versioning.yaml`. The file uses `dependencies` as a root instead of
+`configurations`, and each of its entries the same parameters as a [configuration](#configuration),
+`sourceProject`, `sourceBranch`, and so on.
 
 Running the [auto-versioning check](#auto-versioning-checks) on a build:
 

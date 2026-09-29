@@ -7,13 +7,16 @@ import net.nemerosa.ontrack.extension.config.ConfigTestSupport
 import net.nemerosa.ontrack.extension.config.EnvFixtures
 import net.nemerosa.ontrack.extension.scm.mock.MockSCMTester
 import net.nemerosa.ontrack.graphql.AbstractQLKTITSupport
+import net.nemerosa.ontrack.json.JsonParseException
 import net.nemerosa.ontrack.it.AsAdminTest
 import net.nemerosa.ontrack.test.TestUtils.uid
 import net.nemerosa.ontrack.test.assertIs
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import kotlin.jvm.optionals.getOrNull
+import kotlin.test.assertContains
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.fail
@@ -66,6 +69,33 @@ class AutoVersioningBranchCIConfigExtensionIT : AbstractQLKTITSupport() {
                 assertEquals("my-chart-validator", validationStamp)
             }
         }
+    }
+
+    @Test
+    @AsAdminTest
+    fun `Auto-versioning setup rejects the legacy attribute names`() {
+        val configuredProjectName = uid("cfg-")
+        val ex = assertFailsWith<JsonParseException> {
+            configTestSupport.configureBranch(
+                """
+                    version: v1
+                    configuration:
+                      defaults:
+                        branch:
+                          autoVersioning:
+                            configurations:
+                              - project: my-project
+                                sourceBranch: main
+                                sourcePromotion: GOLD
+                                targetPath: versions.properties
+                                targetProperty: yontrackVersion
+                """.trimIndent(),
+                ci = "generic",
+                scm = "mock",
+                env = EnvFixtures.generic(configuredProjectName)
+            )
+        }
+        assertContains(ex.message ?: "", "sourceProject")
     }
 
     @Test

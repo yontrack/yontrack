@@ -1,9 +1,11 @@
 package net.nemerosa.ontrack.extension.av.config
 
 import net.nemerosa.ontrack.extension.av.AutoVersioningTestFixtures.sourceConfig
+import net.nemerosa.ontrack.json.JsonParseException
 import net.nemerosa.ontrack.json.asJson
 import net.nemerosa.ontrack.json.parse
 import org.junit.jupiter.api.Test
+import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
@@ -209,6 +211,49 @@ class AutoVersioningSourceConfigTest {
             "null postProcessingConfig must be deserialized as null, not a NullNode."
         )
         assertEquals(config, parsed)
+    }
+
+    /**
+     * The 8 legacy attribute names accepted by Yontrack 5 (#1515) are removed in V6 (#1926):
+     * a configuration still using one of them is rejected.
+     */
+    @Test
+    fun `Legacy attribute names are rejected`() {
+        val current = mapOf(
+            "sourceProject" to "p",
+            "sourceBranch" to "main",
+            "sourcePromotion" to "GOLD",
+            "targetPath" to "gradle.properties",
+            "targetProperty" to "version",
+        )
+        listOf(
+            "project",
+            "branch",
+            "promotion",
+            "path",
+            "regex",
+            "property",
+            "propertyRegex",
+            "propertyType",
+        ).forEach { legacy ->
+            val ex = assertFailsWith<JsonParseException>("Legacy name $legacy is rejected") {
+                (current + (legacy to "any")).asJson().parse<AutoVersioningSourceConfig>()
+            }
+            assertContains(ex.message ?: "", "\"$legacy\"", message = "The error names $legacy")
+        }
+    }
+
+    @Test
+    fun `Configuration using only the legacy names is rejected`() {
+        assertFailsWith<JsonParseException> {
+            mapOf(
+                "project" to "p",
+                "branch" to "main",
+                "promotion" to "GOLD",
+                "path" to "gradle.properties",
+                "property" to "version",
+            ).asJson().parse<AutoVersioningSourceConfig>()
+        }
     }
 
 }

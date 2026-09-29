@@ -364,6 +364,33 @@ The property is ignored if still set.
 A template still using `#.user?field=name` fails to render, with an error listing the accepted
 fields, `display` and `email`.
 
+### Auto-versioning configuration
+
+Yontrack 5 accepted short aliases for eight parameters of an
+[auto-versioning configuration](../integrations/auto-versioning/auto-versioning.md#configuration),
+kept for the old Jenkins pipeline library ([#1515](https://github.com/yontrack/yontrack/issues/1515)).
+Yontrack 6 accepts only the full names:
+
+| Removed         | Use instead           | Counted by 5.5.x as (`surface="ci-config"`)   |
+|-----------------|-----------------------|-----------------------------------------------|
+| `project`       | `sourceProject`       | `autoVersioning.configurations.project`       |
+| `branch`        | `sourceBranch`        | `autoVersioning.configurations.branch`        |
+| `promotion`     | `sourcePromotion`     | `autoVersioning.configurations.promotion`     |
+| `path`          | `targetPath`          | `autoVersioning.configurations.path`          |
+| `regex`         | `targetRegex`         | `autoVersioning.configurations.regex`         |
+| `property`      | `targetProperty`      | `autoVersioning.configurations.property`      |
+| `propertyRegex` | `targetPropertyRegex` | `autoVersioning.configurations.propertyRegex` |
+| `propertyType`  | `targetPropertyType`  | `autoVersioning.configurations.propertyType`  |
+
+A configuration still using one of them is rejected: in the `autoVersioning` section of the
+[CI configuration](../configuration/ci-config.md), the whole CI configuration fails to apply, with
+an error naming the field — the missing `sourceProject` for a configuration using `project`, the
+unrecognized `regex` for one using `regex`. The entries of `additionalPaths` are not concerned:
+they keep their `path`, `regex`, `property`, `propertyRegex` and `propertyType` names.
+
+The configurations Yontrack 5 already stored need no conversion: it always stored them with the
+full names, whatever name they were sent with.
+
 ## Newly deprecated
 
 Yontrack 6 deprecates the items below. They still work in every 6.x release, and are removed in
