@@ -1,7 +1,7 @@
 package net.nemerosa.ontrack.extension.git.service
 
 import net.nemerosa.ontrack.extension.git.AbstractGitTestSupport
-import net.nemerosa.ontrack.extension.git.property.GitProjectConfigurationPropertyType
+import net.nemerosa.ontrack.extension.git.mocking.LocalGitProjectConfigurationPropertyType
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -36,8 +36,8 @@ class GitCommitIndexationIT : AbstractGitTestSupport() {
                     // Before setting the Git commit property for the build
                     // we have to simulate the fact that the indexation won't work
                     val projectProperty = asAdmin().call {
-                        val property = propertyService.getProperty(project, GitProjectConfigurationPropertyType::class.java).value
-                        propertyService.deleteProperty(project, GitProjectConfigurationPropertyType::class.java)
+                        val property = propertyService.getProperty(project, LocalGitProjectConfigurationPropertyType::class.java).value
+                        propertyService.deleteProperty(project, LocalGitProjectConfigurationPropertyType::class.java)
                         property
                     }!!
 
@@ -52,7 +52,7 @@ class GitCommitIndexationIT : AbstractGitTestSupport() {
                     asAdmin().execute {
                         propertyService.editProperty(
                                 project,
-                                GitProjectConfigurationPropertyType::class.java,
+                                LocalGitProjectConfigurationPropertyType::class.java,
                                 projectProperty
                         )
                     }

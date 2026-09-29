@@ -39,7 +39,7 @@ class PullRequestStaleBranchCheckIT : AbstractGitTestSupport() {
             commits(1)
         } and { repo, _ ->
             project {
-                prGitProject(repo)
+                prGitProject()
                 withPRDisabled {
                     assertFalse(
                         check.isProjectEligible(this),
@@ -60,7 +60,7 @@ class PullRequestStaleBranchCheckIT : AbstractGitTestSupport() {
             commits(1)
         } and { repo, _ ->
             project {
-                prGitProject(repo)
+                prGitProject()
                 withPRCleanupDisabled {
                     assertFalse(
                         check.isProjectEligible(this),
@@ -81,7 +81,7 @@ class PullRequestStaleBranchCheckIT : AbstractGitTestSupport() {
             commits(1)
         } and { repo, _ ->
             project {
-                prGitProject(repo)
+                prGitProject()
                 branch {
                     assertFalse(
                         check.isBranchEligible(this),
@@ -98,7 +98,7 @@ class PullRequestStaleBranchCheckIT : AbstractGitTestSupport() {
             commits(1)
         } and { repo, _ ->
             project {
-                prGitProject(repo)
+                prGitProject()
                 branch {
                     gitBranch("main")
                     assertFalse(
@@ -116,7 +116,7 @@ class PullRequestStaleBranchCheckIT : AbstractGitTestSupport() {
             commits(1)
         } and { repo, _ ->
             project {
-                prGitProject(repo)
+                prGitProject()
                 branch {
                     gitBranch("PR-1")
                     withPRDisabled {
@@ -140,7 +140,7 @@ class PullRequestStaleBranchCheckIT : AbstractGitTestSupport() {
             commits(1)
         } and { repo, _ ->
             project {
-                prGitProject(repo)
+                prGitProject()
                 branch {
                     gitBranch("PR-1")
                     withPRCleanupDisabled {
@@ -164,7 +164,7 @@ class PullRequestStaleBranchCheckIT : AbstractGitTestSupport() {
             commits(1)
         } and { repo, _ ->
             project {
-                prGitProject(repo)
+                prGitProject()
                 branch {
                     gitMockingConfigurator.registerPullRequest(1)
                     gitBranch("PR-1") {
@@ -187,7 +187,7 @@ class PullRequestStaleBranchCheckIT : AbstractGitTestSupport() {
             commits(1)
         } and { repo, _ ->
             project {
-                prGitProject(repo)
+                prGitProject()
                 branch {
                     gitMockingConfigurator.registerPullRequest(1)
                     gitBranch("PR-1") {
@@ -210,7 +210,7 @@ class PullRequestStaleBranchCheckIT : AbstractGitTestSupport() {
             commits(1)
         } and { repo, _ ->
             project {
-                prGitProject(repo)
+                prGitProject()
                 branch {
                     // gitMockingConfigurator.registerPullRequest(1)
                     gitBranch("PR-1") {
@@ -233,7 +233,7 @@ class PullRequestStaleBranchCheckIT : AbstractGitTestSupport() {
             commits(1)
         } and { repo, _ ->
             project {
-                prGitProject(repo)
+                prGitProject()
                 branch {
                     // gitMockingConfigurator.registerPullRequest(1)
                     gitBranch("PR-1") {
@@ -256,7 +256,7 @@ class PullRequestStaleBranchCheckIT : AbstractGitTestSupport() {
             commits(1)
         } and { repo, _ ->
             project {
-                prGitProject(repo)
+                prGitProject()
                 branch {
                     // gitMockingConfigurator.registerPullRequest(1)
                     gitBranch("PR-1") {
@@ -279,7 +279,7 @@ class PullRequestStaleBranchCheckIT : AbstractGitTestSupport() {
             commits(1)
         } and { repo, _ ->
             project {
-                prGitProject(repo)
+                prGitProject()
                 branch {
                     gitMockingConfigurator.registerPullRequest(1, invalid = true)
                     gitBranch("PR-1") {
@@ -302,7 +302,7 @@ class PullRequestStaleBranchCheckIT : AbstractGitTestSupport() {
             commits(1)
         } and { repo, _ ->
             project {
-                prGitProject(repo)
+                prGitProject()
                 branch {
                     gitMockingConfigurator.registerPullRequest(1, invalid = true)
                     gitBranch("PR-1") {
@@ -325,7 +325,7 @@ class PullRequestStaleBranchCheckIT : AbstractGitTestSupport() {
             commits(1)
         } and { repo, _ ->
             project {
-                prGitProject(repo)
+                prGitProject()
                 branch {
                     gitMockingConfigurator.registerPullRequest(1, invalid = true)
                     gitBranch("PR-1") {

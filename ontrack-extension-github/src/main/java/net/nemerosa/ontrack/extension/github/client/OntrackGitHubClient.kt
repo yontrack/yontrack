@@ -248,6 +248,22 @@ interface OntrackGitHubClient {
     ): List<GitHubCommit>
 
     /**
+     * Checks whether a commit is contained in a branch, that is, whether it is the head of the branch
+     * or one of its ancestors.
+     *
+     * @param repository Repository name, like `nemerosa/ontrack`
+     * @param commit Commit SHA
+     * @param branch Branch name, like `main` (not `refs/heads/main`)
+     * @return `true` if the branch contains the commit, `false` if not, or if the branch or the commit
+     * does not exist
+     */
+    fun isCommitInBranch(
+        repository: String,
+        commit: String,
+        branch: String,
+    ): Boolean
+
+    /**
      * Gets information about a commit
      *
      * @param repository Repository name, like `nemerosa/ontrack`

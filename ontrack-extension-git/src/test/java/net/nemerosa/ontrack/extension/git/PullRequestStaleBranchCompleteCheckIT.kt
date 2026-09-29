@@ -150,7 +150,7 @@ class PullRequestStaleBranchCompleteCheckIT : AbstractGitTestSupport() {
                 commits(1)
             } and { repo, _ ->
                 project {
-                    prGitProject(repo)
+                    prGitProject()
                     // Stale property for project
                     branchConfiguration.configureProject(this)
                     // Branch

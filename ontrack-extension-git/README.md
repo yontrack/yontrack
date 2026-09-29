@@ -3,17 +3,12 @@ Git
 
 ## Git configurations
 
-From an administrative point of view, one can declare:
+This module holds what the Git-based SCMs share: GitHub, GitLab, Bitbucket Cloud and Bitbucket Server. It has no
+configuration of its own: the pure-Git support, which associated a project with a plain Git repository, was removed
+in V6 (#1924).
 
-* `BasicGitConfiguration` - name, remote, user/password, links to the commits/files/etc, link to the issue management, indexation interval
-* `GitHubConfiguration` - GitHub configuration: name, repository name, user/password/token, indexation interval
-
-Both are `GitConfiguration`s.
-
-From a structure point of view, one can associate a project:
-
-* to a basic Git configuration
-* to a GitHub configuration
+Each SCM extension provides a `GitConfigurator`, which reads the `GitConfiguration` of a project out of its own
+project property (e.g. the GitHub configuration: name, repository, credentials, indexation interval).
 
 Then, a branch can be associated to additional information:
 
@@ -34,7 +29,7 @@ Indexation of repositories is based on the list of all the `GitRepository`, by c
 associated `GitConfiguration`.
 
 Grouping the indexations per remote only is not enough because the way to access this repository might be different,
-or the same remote and user are used for some basic and GitHub configurations.
+or the same remote and user are used for configurations of different SCMs.
 
 Therefore, to differentiate two such repositories, we need additionally two other attributes:
 

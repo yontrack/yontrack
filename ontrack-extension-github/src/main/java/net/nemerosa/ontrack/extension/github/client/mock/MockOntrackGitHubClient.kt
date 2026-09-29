@@ -151,6 +151,11 @@ class MockOntrackGitHubClient(
         TODO("Not yet implemented")
     }
 
+    /**
+     * The mock has no commit history: no branch contains any commit.
+     */
+    override fun isCommitInBranch(repository: String, commit: String, branch: String): Boolean = false
+
     override fun getCommit(
         repository: String,
         commit: String

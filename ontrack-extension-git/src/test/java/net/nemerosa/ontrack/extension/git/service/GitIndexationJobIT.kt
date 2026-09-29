@@ -1,8 +1,7 @@
 package net.nemerosa.ontrack.extension.git.service
 
-import net.nemerosa.ontrack.extension.git.model.BasicGitConfiguration
-import net.nemerosa.ontrack.extension.git.property.GitProjectConfigurationProperty
-import net.nemerosa.ontrack.extension.git.property.GitProjectConfigurationPropertyType
+import net.nemerosa.ontrack.extension.git.mocking.LocalGitProjectConfigurationProperty
+import net.nemerosa.ontrack.extension.git.mocking.LocalGitProjectConfigurationPropertyType
 import net.nemerosa.ontrack.extension.issues.mock.TestIssueServiceConfiguration
 import net.nemerosa.ontrack.extension.issues.model.toIdentifier
 import net.nemerosa.ontrack.git.support.GitRepo
@@ -11,7 +10,6 @@ import net.nemerosa.ontrack.it.AsAdminTest
 import net.nemerosa.ontrack.job.JobRunListener
 import net.nemerosa.ontrack.job.JobScheduler
 import net.nemerosa.ontrack.job.orchestrator.JobOrchestrator
-import net.nemerosa.ontrack.model.security.GlobalSettings
 import net.nemerosa.ontrack.model.security.ProjectEdit
 import net.nemerosa.ontrack.test.TestUtils.uid
 import org.junit.jupiter.api.Test
@@ -23,17 +21,14 @@ import kotlin.test.assertNull
 class GitIndexationJobIT : AbstractServiceTestSupport() {
 
     @Autowired
-    private lateinit var gitConfigurationService: GitConfigurationService
-
-    @Autowired
     private lateinit var jobScheduler: JobScheduler
 
     @Autowired
     private lateinit var jobOrchestrator: JobOrchestrator
 
     /**
-     * Regression test for #434. Checks that changing a Git configuration does change the associated indexation job
-     * for a project.
+     * Regression test for #434. Checks that changing the Git configuration of a project does change its
+     * indexation job.
      */
     @Test
     fun `Git configuration change changes the indexation job`() {
@@ -45,16 +40,13 @@ class GitIndexationJobIT : AbstractServiceTestSupport() {
             commit(2, "#2")
             log()
 
-            // Create a Git configuration
+            // Configuration of the local Git repository
             val gitConfigurationName = uid("C")
-            val gitConfiguration = asUser().with(GlobalSettings::class.java).call {
-                gitConfigurationService.newConfiguration(
-                        BasicGitConfiguration.empty()
-                                .withName(gitConfigurationName)
-                                .withIssueServiceConfigurationIdentifier(TestIssueServiceConfiguration.INSTANCE.toIdentifier().format())
-                                .withRemote("file://${dir.absolutePath}")
-                )
-            }
+            val gitConfiguration = LocalGitProjectConfigurationProperty(
+                    name = gitConfigurationName,
+                    remote = "file://${dir.absolutePath}",
+                    issueServiceConfigurationIdentifier = TestIssueServiceConfiguration.INSTANCE.toIdentifier().format(),
+            )
 
             // Creates a project
             val project = doCreateProject()
@@ -63,8 +55,8 @@ class GitIndexationJobIT : AbstractServiceTestSupport() {
             asUser().with(project, ProjectEdit::class.java).call {
                 propertyService.editProperty(
                         project,
-                        GitProjectConfigurationPropertyType::class.java,
-                        GitProjectConfigurationProperty(gitConfiguration)
+                        LocalGitProjectConfigurationPropertyType::class.java,
+                        gitConfiguration
                 )
             }
 
@@ -76,7 +68,7 @@ class GitIndexationJobIT : AbstractServiceTestSupport() {
             // Checks that the indexation job is registered
             var statuses = jobScheduler.jobStatuses
             var status = statuses.find {
-                it.description == "file://${dir.absolutePath} ($gitConfigurationName @ basic)"
+                it.description == "file://${dir.absolutePath} ($gitConfigurationName @ local)"
             }
             assertNotNull(status, "The indexation job must be present")
 
@@ -90,13 +82,11 @@ class GitIndexationJobIT : AbstractServiceTestSupport() {
             }
 
             // Updates the configuration
-            asUser().with(GlobalSettings::class.java).call {
-                gitConfigurationService.updateConfiguration(
-                        gitConfigurationName,
-                        BasicGitConfiguration.empty()
-                                .withName(gitConfigurationName)
-                                .withIssueServiceConfigurationIdentifier(TestIssueServiceConfiguration.INSTANCE.toIdentifier().format())
-                                .withRemote("file://${newRepo.dir.absolutePath}")
+            asUser().with(project, ProjectEdit::class.java).call {
+                propertyService.editProperty(
+                        project,
+                        LocalGitProjectConfigurationPropertyType::class.java,
+                        gitConfiguration.copy(remote = "file://${newRepo.dir.absolutePath}")
                 )
             }
 
@@ -108,12 +98,12 @@ class GitIndexationJobIT : AbstractServiceTestSupport() {
             // Checks that the NEW indexation job is registered
             statuses = jobScheduler.jobStatuses
             status = statuses.find {
-                it.description == "file://${newRepo.dir.absolutePath} (${gitConfigurationName} @ basic)"
+                it.description == "file://${newRepo.dir.absolutePath} (${gitConfigurationName} @ local)"
             }
             assertNotNull(status, "The new indexation job must be present")
             // Checks that the OLD indexation job is gone
             status = statuses.find {
-                it.description == "file://${dir.absolutePath} ($gitConfigurationName @ basic)"
+                it.description == "file://${dir.absolutePath} ($gitConfigurationName @ local)"
             }
             assertNull(status, "The old indexation job must be done")
         }

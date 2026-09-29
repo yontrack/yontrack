@@ -28,7 +28,7 @@ class GitPullRequestGraphQLIT: AbstractGitTestSupport() {
             commits(1)
         } and { repo, _ ->
             project {
-                prGitProject(repo)
+                prGitProject()
                 branch {
                     gitBranch("release/1.0")
                     // Gets the PR for this branch
@@ -60,7 +60,7 @@ class GitPullRequestGraphQLIT: AbstractGitTestSupport() {
         } and { repo, _ ->
             gitMockingConfigurator.registerPullRequest(1)
             project {
-                prGitProject(repo)
+                prGitProject()
                 branch {
                     gitBranch("PR-1")
                     // Gets the PR for this branch
@@ -109,7 +109,7 @@ class GitPullRequestGraphQLIT: AbstractGitTestSupport() {
         } and { repo, _ ->
             gitMockingConfigurator.registerPullRequest(1)
             project {
-                prGitProject(repo)
+                prGitProject()
                 val source = branch("source") {
                     gitBranch("feature/TK-1-feature")
                 }

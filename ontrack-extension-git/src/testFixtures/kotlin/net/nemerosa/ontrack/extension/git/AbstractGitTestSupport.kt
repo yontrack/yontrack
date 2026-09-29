@@ -3,10 +3,12 @@ package net.nemerosa.ontrack.extension.git
 import net.nemerosa.ontrack.extension.git.casc.GitConfigService
 import net.nemerosa.ontrack.extension.git.mocking.GitMockingConfigurationProperty
 import net.nemerosa.ontrack.extension.git.mocking.GitMockingConfigurationPropertyType
-import net.nemerosa.ontrack.extension.git.model.BasicGitConfiguration
+import net.nemerosa.ontrack.extension.git.mocking.LocalGitConfiguration
+import net.nemerosa.ontrack.extension.git.mocking.LocalGitProjectConfigurationProperty
+import net.nemerosa.ontrack.extension.git.mocking.LocalGitProjectConfigurationPropertyType
 import net.nemerosa.ontrack.extension.git.model.ConfiguredBuildGitCommitLink
+import net.nemerosa.ontrack.extension.git.model.gitRepository
 import net.nemerosa.ontrack.extension.git.property.*
-import net.nemerosa.ontrack.extension.git.service.GitConfigurationService
 import net.nemerosa.ontrack.extension.git.service.GitService
 import net.nemerosa.ontrack.extension.git.support.*
 import net.nemerosa.ontrack.extension.issues.mock.TestIssueServiceConfiguration
@@ -19,7 +21,6 @@ import net.nemerosa.ontrack.graphql.AbstractQLKTITSupport
 import net.nemerosa.ontrack.it.AsAdminTest
 import net.nemerosa.ontrack.job.JobRunListener
 import net.nemerosa.ontrack.job.orchestrator.JobOrchestrator
-import net.nemerosa.ontrack.model.security.GlobalSettings
 import net.nemerosa.ontrack.model.structure.*
 import net.nemerosa.ontrack.model.support.NoConfig
 import net.nemerosa.ontrack.test.TestUtils
@@ -46,9 +47,6 @@ abstract class AbstractGitTestSupport : AbstractQLKTITSupport() {
 
     @Autowired
     private lateinit var tagPatternBuildNameGitCommitLink: TagPatternBuildNameGitCommitLink
-
-    @Autowired
-    private lateinit var gitConfigurationService: GitConfigurationService
 
     @Autowired
     private lateinit var gitRepositoryClientFactory: GitRepositoryClientFactory
@@ -118,37 +116,30 @@ abstract class AbstractGitTestSupport : AbstractQLKTITSupport() {
     }
 
     /**
-     * Creates and saves a Git configuration
+     * Creates a configuration for a local Git repository, synchronising its clone if asked to.
      */
-    protected fun createGitConfiguration(repo: GitRepo, sync: Boolean = true): BasicGitConfiguration {
-        val gitConfigurationName = TestUtils.uid("C")
-        val gitConfiguration = asUser().with(GlobalSettings::class.java).call {
-            gitConfigurationService.newConfiguration(
-                BasicGitConfiguration.empty()
-                    .withName(gitConfigurationName)
-                    .withIssueServiceConfigurationIdentifier(
-                        TestIssueServiceConfiguration.INSTANCE.toIdentifier().format()
-                    )
-                    .withRemote("file://${repo.dir.absolutePath}")
-            )
-        }
+    protected fun createGitConfiguration(repo: GitRepo, sync: Boolean = true): LocalGitProjectConfigurationProperty {
+        val property = LocalGitProjectConfigurationProperty(
+            name = TestUtils.uid("C"),
+            remote = "file://${repo.dir.absolutePath}",
+            issueServiceConfigurationIdentifier = TestIssueServiceConfiguration.INSTANCE.toIdentifier().format(),
+        )
         if (sync) {
-            gitRepositoryClientFactory.getClient(gitConfiguration.gitRepository, gitConfigService.gitConnectionConfig).sync { println(it) }
+            val configuration = LocalGitConfiguration(property.name, property.remote, null)
+            gitRepositoryClientFactory.getClient(configuration.gitRepository, gitConfigService.gitConnectionConfig).sync { println(it) }
         }
-        return gitConfiguration
+        return property
     }
 
     /**
-     * Configures a project for Git.
+     * Configures a project for Git, on a local repository.
      */
     protected fun Project.gitProject(repo: GitRepo, sync: Boolean = true) {
-        // Create a Git configuration
-        val gitConfiguration = createGitConfiguration(repo, sync)
         // Configures the project
         setProperty(
             this,
-            GitProjectConfigurationPropertyType::class.java,
-            GitProjectConfigurationProperty(gitConfiguration)
+            LocalGitProjectConfigurationPropertyType::class.java,
+            createGitConfiguration(repo, sync)
         )
         // Makes sure to register the project
         if (sync) {
@@ -161,14 +152,12 @@ abstract class AbstractGitTestSupport : AbstractQLKTITSupport() {
     /**
      * Configures a project for Git, with compatibility with pull requests (mocking)
      */
-    protected fun Project.prGitProject(repo: GitRepo, sync: Boolean = true) {
-        // Create a Git configuration
-        val gitConfiguration = createGitConfiguration(repo, sync)
+    protected fun Project.prGitProject(sync: Boolean = true) {
         // Configures the project
         setProperty(
             this,
             GitMockingConfigurationPropertyType::class.java,
-            GitMockingConfigurationProperty(gitConfiguration, null)
+            GitMockingConfigurationProperty(null)
         )
         // Makes sure to register the project
         if (sync) {

@@ -812,6 +812,35 @@ class DefaultOntrackGitHubClient(
         }.reversed()
     }
 
+    /**
+     * Compares the branch (base) with the commit (head): the branch contains the commit when the
+     * commit is behind it or identical to its head. In both cases, the commit has nothing the branch
+     * has not, so the answer carries no commit and no file.
+     */
+    override fun isCommitInBranch(repository: String, commit: String, branch: String): Boolean {
+        // Getting a client
+        val client = createGitHubRestTemplate()
+        // Gets the repository for this project
+        val (owner, name) = getRepositoryParts(repository)
+        // Call
+        return try {
+            val status = client("Checking if commit $commit is in branch $branch") {
+                getForObject<JsonNode>(
+                    "/repos/$owner/$name/compare/$branch...$commit?per_page=1"
+                )
+            }?.path("status")?.asText()
+            status == "behind" || status == "identical"
+        } catch (ex: GitHubErrorsException) {
+            if (ex.status == 404) {
+                false
+            } else {
+                throw ex
+            }
+        } catch (_: HttpClientErrorException.NotFound) {
+            false
+        }
+    }
+
     override fun getCommit(
         repository: String,
         commit: String

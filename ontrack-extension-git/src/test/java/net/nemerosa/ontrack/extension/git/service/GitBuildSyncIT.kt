@@ -1,12 +1,11 @@
 package net.nemerosa.ontrack.extension.git.service
 
 
-import net.nemerosa.ontrack.extension.git.model.BasicGitConfiguration
+import net.nemerosa.ontrack.extension.git.mocking.LocalGitProjectConfigurationProperty
+import net.nemerosa.ontrack.extension.git.mocking.LocalGitProjectConfigurationPropertyType
 import net.nemerosa.ontrack.extension.git.model.ConfiguredBuildGitCommitLink
 import net.nemerosa.ontrack.extension.git.property.GitBranchConfigurationProperty
 import net.nemerosa.ontrack.extension.git.property.GitBranchConfigurationPropertyType
-import net.nemerosa.ontrack.extension.git.property.GitProjectConfigurationProperty
-import net.nemerosa.ontrack.extension.git.property.GitProjectConfigurationPropertyType
 import net.nemerosa.ontrack.extension.git.support.TagPatternBuildNameGitCommitLink
 import net.nemerosa.ontrack.extension.scm.support.TagPattern
 import net.nemerosa.ontrack.git.support.GitRepo
@@ -14,7 +13,6 @@ import net.nemerosa.ontrack.it.AbstractServiceTestSupport
 import net.nemerosa.ontrack.it.AsAdminTest
 import net.nemerosa.ontrack.job.JobRunListener
 import net.nemerosa.ontrack.job.orchestrator.JobOrchestrator
-import net.nemerosa.ontrack.model.security.GlobalSettings
 import net.nemerosa.ontrack.model.security.ProjectEdit
 import net.nemerosa.ontrack.test.TestUtils.uid
 import org.junit.jupiter.api.Test
@@ -30,8 +28,6 @@ class GitBuildSyncIT : AbstractServiceTestSupport() {
 
     @Autowired
     private lateinit var gitService: GitService
-    @Autowired
-    private lateinit var gitConfigurationService: GitConfigurationService
     @Autowired
     private lateinit var tagPatternBuildNameGitCommitLink: TagPatternBuildNameGitCommitLink
     @Autowired
@@ -60,15 +56,12 @@ class GitBuildSyncIT : AbstractServiceTestSupport() {
 
         } and { _, repo ->
 
-            // Create a Git configuration
-            val gitConfigurationName = uid("C")
-            val gitConfiguration = asUser().with(GlobalSettings::class.java).call {
-                gitConfigurationService.newConfiguration(
-                        BasicGitConfiguration.empty()
-                                .withName(gitConfigurationName)
-                                .withRemote("file://${repo.dir.absolutePath}")
-                )
-            }
+            // Configuration of the local Git repository
+            val gitConfiguration = LocalGitProjectConfigurationProperty(
+                    name = uid("C"),
+                    remote = "file://${repo.dir.absolutePath}",
+                    issueServiceConfigurationIdentifier = null,
+            )
 
             // Creates a project and branch
             val branch = doCreateBranch()
@@ -78,8 +71,8 @@ class GitBuildSyncIT : AbstractServiceTestSupport() {
             asUser().with(project, ProjectEdit::class.java).call {
                 propertyService.editProperty(
                         project,
-                        GitProjectConfigurationPropertyType::class.java,
-                        GitProjectConfigurationProperty(gitConfiguration)
+                        LocalGitProjectConfigurationPropertyType::class.java,
+                        gitConfiguration
                 )
                 // ...  & the branch with a link based on commits
                 propertyService.editProperty(

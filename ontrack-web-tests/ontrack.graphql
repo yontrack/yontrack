@@ -5154,8 +5154,6 @@ type Project implements Authorizable & ProjectEntity {
   gitHubProjectConfigurationProperty: Property
   "Associates the project with a GitLab repository"
   gitLabProjectConfigurationProperty: Property
-  "Associates the project with a Git repository"
-  gitProjectConfigurationProperty: Property
   "URL to the HTML page of the Git repository associated with this project"
   gitRepositoryHtmlURL: String
   id: ID!

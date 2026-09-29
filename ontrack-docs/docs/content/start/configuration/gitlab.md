@@ -113,8 +113,7 @@ The `issueServiceConfigurationIdentifier` of the project property says where a c
   the _GitLab issues_ entry of the UI's issue-service list means.
 * **set to another service** — any other issue service the instance offers, JIRA included. Every GitLab
   project already configured in Yontrack appears there as `configuration:group/project`, so a project whose
-  code and issues do not live together — or a plain Git project, with no GitLab property of its own — can
-  point at the GitLab project that holds its issues.
+  code and issues do not live together can point at the GitLab project that holds its issues.
 
 ### The last commit of an issue
 

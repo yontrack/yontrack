@@ -340,19 +340,25 @@ class GitHubSCMExtension(
             )
 
         /**
-         * As of 2025, Sep 26, there is no API endpoint in GitHub (REST or GraphQL) to
-         * get the list of branches for a commit.
+         * GitHub has no API endpoint (REST or GraphQL) listing the branches which contain a commit,
+         * so each candidate branch is compared with the commit through the API, one call per branch
+         * (see [OntrackGitHubClient.isCommitInBranch]).
          *
-         * We're now using the local Git repository client (file & `git` based) to
-         * get this information.
-         *
-         * In V6, this will need to be converted into something else.
+         * The candidates are the Git branches of the Yontrack branches of the [project], not every
+         * branch of the repository: a caller can only use a branch which Yontrack knows (see
+         * [findBranchFromScmBranchName]), and a repository may hold many more, pull request branches
+         * among them, each costing a call.
          */
-        override fun getBranchesForCommit(project: Project, commit: String): List<String> {
-            val configuration = gitHubConfigurator.getConfiguration(project) ?: return emptyList()
-            val gitRepoClient = gitRepositoryClientFactory.getClient(configuration.gitRepository, gitConfigService.gitConnectionConfig)
-            return gitRepoClient.getBranchesForCommit(commit)
-        }
+        override fun getBranchesForCommit(project: Project, commit: String): List<String> =
+            structureService.getBranchesForProject(project.id)
+                .mapNotNull { branch ->
+                    propertyService.getPropertyValue(branch, GitBranchConfigurationPropertyType::class.java)?.branch
+                }
+                .distinct()
+                .filter { scmBranch ->
+                    client.isCommitInBranch(repository, commit, scmBranch)
+                }
+                .sorted()
 
         override fun mergeBranch(
             head: String,

@@ -15,6 +15,7 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import java.time.Duration
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -218,6 +219,30 @@ class DefaultOntrackGitHubClientIT {
         assertEquals(
             githubTestEnv.changeLog.messages,
             commits.map { it.commit.message }
+        )
+    }
+
+    @Test
+    fun `Checking whether a commit is in a branch`() {
+        val head = client.getBranchLastCommit(
+            repository = githubTestEnv.fullRepository,
+            branch = githubTestEnv.branch,
+        ) ?: error("No last commit for ${githubTestEnv.branch}")
+        assertTrue(
+            client.isCommitInBranch(githubTestEnv.fullRepository, head, githubTestEnv.branch),
+            "The head of a branch is in this branch"
+        )
+        assertTrue(
+            client.isCommitInBranch(githubTestEnv.fullRepository, githubTestEnv.changeLog.from, githubTestEnv.changeLog.to),
+            "An older commit is in the history of a newer one"
+        )
+        assertFalse(
+            client.isCommitInBranch(githubTestEnv.fullRepository, githubTestEnv.changeLog.to, githubTestEnv.changeLog.from),
+            "A newer commit is not in the history of an older one"
+        )
+        assertFalse(
+            client.isCommitInBranch(githubTestEnv.fullRepository, head, uid("missing-")),
+            "No branch, no commit"
         )
     }
 

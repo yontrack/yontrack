@@ -177,15 +177,28 @@ Yontrack 6 searches in its Postgres database, and no longer needs Elasticsearch.
 ### Pure-Git support removed
 
 A project can no longer be associated with a plain Git repository through the *Git configuration*
-property. Yontrack 6 reads the code of a project from GitHub, GitLab or Bitbucket Cloud only.
+property. Yontrack 6 reads the code of a project from GitHub, GitLab or Bitbucket (Cloud or
+Server) only. The Git configurations, which only this property used, go with it.
 
 #### For deployers
 
-Before upgrading, move every project still using the *Git configuration* property to its
-[GitHub](../start/configuration/github.md), [GitLab](../start/configuration/gitlab.md) or
-[Bitbucket Cloud](../start/configuration/bitbucket-cloud.md) configuration. Yontrack 5.5 counts
-each project read through it in `ontrack_deprecated_usage_total`, with `surface=property` and
-`item=net.nemerosa.ontrack.extension.git.property.GitProjectConfigurationPropertyType`.
+* **Before upgrading**, move every project still using the *Git configuration* property to its
+  [GitHub](../start/configuration/github.md), [GitLab](../start/configuration/gitlab.md) or
+  [Bitbucket Cloud](../start/configuration/bitbucket-cloud.md) configuration. Yontrack 5.5 counts
+  each project read through it in `ontrack_deprecated_usage_total`, with `surface=property` and
+  `item=net.nemerosa.ontrack.extension.git.property.GitProjectConfigurationPropertyType`.
+* **Data** — at its first start, Yontrack 6 deletes the *Git configuration* property of every
+  project, and every Git configuration. A project which still had the property is left with no
+  SCM: its Git indexation stops, and its change logs, commit information and branch information
+  are no longer available until it is given a GitHub, GitLab or Bitbucket configuration. Its
+  branches keep their *Git branch* property, and its builds their *Git commit* property.
+* **Connectors** — the connector status no longer lists the `git` connectors.
+
+#### For API clients
+
+The `Project.gitProjectConfigurationProperty` field of the GraphQL API is gone, and the
+`net.nemerosa.ontrack.extension.git.property.GitProjectConfigurationPropertyType` property type
+can no longer be read or set, through the GraphQL API or the REST API.
 
 ### Delivery metrics and the delivery scorecard
 

@@ -28,7 +28,7 @@ class GitPullRequestIT : AbstractGitTestSupport() {
             commits(1)
         } and { repo, _ ->
             project {
-                prGitProject(repo)
+                prGitProject()
                 branch {
                     gitBranch("release/1.0")
                     // Gets the Git configuration for this branch
@@ -46,7 +46,7 @@ class GitPullRequestIT : AbstractGitTestSupport() {
         } and { repo, _ ->
             gitMockingConfigurator.registerPullRequest(1, title = "Useful feature")
             project {
-                prGitProject(repo)
+                prGitProject()
                 branch {
                     gitBranch("PR-1")
                     // Registers this PR in mock service

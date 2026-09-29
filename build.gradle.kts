@@ -355,7 +355,8 @@ configure(javaProjects) {
         "io.mockk:mockk-dsl:$mockkVersion",
         "io.mockk:mockk-dsl-jvm:$mockkVersion",
 
-        // Git repository support TODO Will be removed in V6
+        // Local clones of the Git repositories (ontrack-git). The pure-Git support is gone (#1924), but
+        // GitHub, GitLab and Bitbucket still walk their commits and merge their branches on a clone.
         "org.eclipse.jgit:org.eclipse.jgit:$jgitVersion",
 
         // Transitive libraries pinned past their managed versions to clear the HIGHs of the backend

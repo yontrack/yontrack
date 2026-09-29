@@ -29,7 +29,7 @@ class GitPullRequestInformationExtensionIT : AbstractGitTestSupport() {
             commits(1)
         } and { repo, _ ->
             project {
-                prGitProject(repo)
+                prGitProject()
                 branch {
                     gitBranch("release/1.0")
                     // Gets the PR entity information
@@ -48,7 +48,7 @@ class GitPullRequestInformationExtensionIT : AbstractGitTestSupport() {
             // Registers this PR in mock service
             gitMockingConfigurator.registerPullRequest(1, title = "Useful feature")
             project {
-                prGitProject(repo)
+                prGitProject()
                 branch {
                     gitBranch("PR-1")
                     // Gets the PR entity information
@@ -74,7 +74,7 @@ class GitPullRequestInformationExtensionIT : AbstractGitTestSupport() {
             commits(1)
         } and { repo, _ ->
             project {
-                prGitProject(repo)
+                prGitProject()
                 branch {
                     gitBranch("PR-1")
                     // Gets the PR entity information
