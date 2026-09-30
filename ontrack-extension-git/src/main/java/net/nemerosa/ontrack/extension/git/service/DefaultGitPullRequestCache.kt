@@ -6,9 +6,9 @@ import net.nemerosa.ontrack.common.Time
 import net.nemerosa.ontrack.extension.git.GitConfigProperties
 import net.nemerosa.ontrack.extension.git.model.GitPullRequest
 import net.nemerosa.ontrack.model.metrics.increment
+import net.nemerosa.ontrack.model.metrics.time
 import net.nemerosa.ontrack.model.structure.Branch
 import net.nemerosa.ontrack.model.structure.EntityStore
-import net.nemerosa.ontrack.model.support.time
 import org.springframework.stereotype.Component
 import java.time.LocalDateTime
 
@@ -27,48 +27,52 @@ class DefaultGitPullRequestCache(
         }
     }
 
-    override fun getBranchPullRequest(branch: Branch, prProvider: () -> GitPullRequest?): GitPullRequest? {
-        return if (gitConfigProperties.pullRequests.cache.enabled) {
-            prProvider()
+    override fun getBranchPullRequest(branch: Branch, prProvider: () -> GitPullRequest?): GitPullRequest? =
+        if (gitConfigProperties.pullRequests.cache.enabled) {
+            getCachedBranchPullRequest(branch, prProvider)
         } else {
-            meterRegistry.time(GitPullRequestCacheMetrics.git_pr_cache_time_all) {
-                val now = Time.now()
-                // Gets any existing PR for the branch
-                val pr =
-                    entityStore.findByName(
+            prProvider()
+        }
+
+    private fun getCachedBranchPullRequest(branch: Branch, prProvider: () -> GitPullRequest?): GitPullRequest? =
+        meterRegistry.time(GitPullRequestCacheMetrics.git_pr_cache_time_all) {
+            val now = Time.now()
+            // Gets any existing PR for the branch
+            val pr =
+                entityStore.findByName(
+                    branch,
+                    STORE,
+                    EntityStore.DEFAULT_NAME,
+                    StoredGitPullRequest::class
+                )
+            if (pr != null && pr.expirationTime > now) {
+                meterRegistry.increment(GitPullRequestCacheMetrics.git_pr_cache_hits)
+                pr.pr
+            } else {
+                meterRegistry.increment(GitPullRequestCacheMetrics.git_pr_cache_miss)
+                val reloadedPr = meterRegistry.time(GitPullRequestCacheMetrics.git_pr_cache_time_scm) {
+                    prProvider()
+                }
+                reloadedPr?.apply {
+                    entityStore.store(
                         branch,
                         STORE,
                         EntityStore.DEFAULT_NAME,
-                        StoredGitPullRequest::class
-                    )
-                if (pr != null && pr.expirationTime > now) {
-                    meterRegistry.increment(GitPullRequestCacheMetrics.git_pr_cache_hits)
-                    pr.pr
-                } else {
-                    meterRegistry.increment(GitPullRequestCacheMetrics.git_pr_cache_miss)
-                    val reloadedPr = meterRegistry.time(GitPullRequestCacheMetrics.git_pr_cache_time_scm) {
-                        prProvider()
-                    }
-                    reloadedPr?.apply {
-                        entityStore.store(
-                            branch,
-                            STORE,
-                            EntityStore.DEFAULT_NAME,
-                            StoredGitPullRequest(
-                                pr = this,
-                                expirationTime = now + gitConfigProperties.pullRequests.cache.duration
-                            )
+                        StoredGitPullRequest(
+                            pr = this,
+                            expirationTime = now + gitConfigProperties.pullRequests.cache.duration
                         )
-                    }
+                    )
                 }
             }
         }
-    }
 
     /**
      * Internal storage including registration time.
+     *
+     * Internal (and not private) so that the unit test can build a stored entry.
      */
-    private class StoredGitPullRequest(
+    internal class StoredGitPullRequest(
         val pr: GitPullRequest,
         val expirationTime: LocalDateTime,
     )

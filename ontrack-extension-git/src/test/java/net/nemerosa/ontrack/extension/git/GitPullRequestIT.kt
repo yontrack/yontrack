@@ -65,5 +65,83 @@ class GitPullRequestIT : AbstractGitTestSupport() {
         }
     }
 
+    @Test
+    fun `PR read from the cache once fetched from the SCM`() {
+        createRepo {
+            commits(1)
+        } and { _, _ ->
+            gitMockingConfigurator.registerPullRequest(1, title = "Useful feature")
+            project {
+                prGitProject()
+                branch {
+                    gitBranch("PR-1")
+                    // First call, fetched from the SCM
+                    assertNotNull(gitService.getBranchAsPullRequest(this), "PR fetched from the SCM")
+                    // The PR is gone from the SCM, but still in the cache
+                    gitMockingConfigurator.unregisterPullRequest(1)
+                    val pr = gitService.getBranchAsPullRequest(this)
+                    assertNotNull(pr, "PR read from the cache") {
+                        assertEquals(1, it.id)
+                        assertEquals(true, it.isValid)
+                        assertEquals("#1", it.key)
+                        assertEquals("feature/TK-1-feature", it.source)
+                        assertEquals("release/1.0", it.target)
+                        assertEquals("Useful feature", it.title)
+                        assertEquals("open", it.status)
+                        assertEquals("uri:testing:web:git:pr:1", it.url)
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `Invalid PR read from the cache stays invalid`() {
+        createRepo {
+            commits(1)
+        } and { _, _ ->
+            gitMockingConfigurator.registerPullRequest(1, invalid = true)
+            project {
+                prGitProject()
+                branch {
+                    gitBranch("PR-1")
+                    assertNotNull(gitService.getBranchAsPullRequest(this), "PR fetched from the SCM") {
+                        assertEquals(false, it.isValid)
+                    }
+                    gitMockingConfigurator.unregisterPullRequest(1)
+                    assertNotNull(gitService.getBranchAsPullRequest(this), "PR read from the cache") {
+                        assertEquals(1, it.id)
+                        assertEquals(false, it.isValid)
+                        assertEquals("#1", it.key)
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `PR always fetched from the SCM when the cache is disabled`() {
+        createRepo {
+            commits(1)
+        } and { _, _ ->
+            gitMockingConfigurator.registerPullRequest(1, title = "Useful feature")
+            project {
+                prGitProject()
+                branch {
+                    gitBranch("PR-1")
+                    withPRCacheDisabled {
+                        assertNotNull(gitService.getBranchAsPullRequest(this), "PR fetched from the SCM") {
+                            assertEquals("Useful feature", it.title)
+                        }
+                        // The PR changes in the SCM
+                        gitMockingConfigurator.registerPullRequest(1, title = "Renamed feature")
+                        assertNotNull(gitService.getBranchAsPullRequest(this), "PR fetched again from the SCM") {
+                            assertEquals("Renamed feature", it.title)
+                        }
+                    }
+                }
+            }
+        }
+    }
 
 }

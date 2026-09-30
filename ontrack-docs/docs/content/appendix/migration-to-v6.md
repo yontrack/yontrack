@@ -200,6 +200,33 @@ The `Project.gitProjectConfigurationProperty` field of the GraphQL API is gone, 
 `net.nemerosa.ontrack.extension.git.property.GitProjectConfigurationPropertyType` property type
 can no longer be read or set, through the GraphQL API or the REST API.
 
+### Pull request cache now active
+
+The information Yontrack reads about a pull request — its title, status, source and target — is
+now cached, as the `ontrack.config.extension.git.pull-requests.cache.*` properties always said it
+was. Yontrack 5 had the condition inverted: with the cache enabled, the default, every lookup went
+to the SCM, and disabling the cache turned it on
+([#1934](https://github.com/yontrack/yontrack/issues/1934)).
+
+This only concerns an instance with pull requests enabled
+(`ontrack.config.extension.git.pull-requests.enabled: true`, off by default).
+
+#### For deployers
+
+* **PR information can be up to 6 hours old.** The cache keeps a pull request for
+  `ontrack.config.extension.git.pull-requests.cache.duration` — 6 hours by default — before asking
+  the SCM again, so a pull request renamed, merged or closed in the SCM can show its former state in
+  Yontrack until then.
+* **Fewer calls to the SCM.** Pull request lookups by the branch pages, the PR decorations and the
+  stale-branch cleanup mostly stop reaching GitHub, GitLab or Bitbucket.
+* **The cache metrics move.** `ontrack_extension_git_pr_cache_hits` and
+  `ontrack_extension_git_pr_cache_miss` now count, where they stayed at zero.
+* **To keep the uncached behaviour of Yontrack 5**, set
+  `ontrack.config.extension.git.pull-requests.cache.enabled: false`
+  (`ONTRACK_CONFIG_EXTENSION_GIT_PULLREQUESTS_CACHE_ENABLED=false`). An instance which had set it
+  to `false` to turn the cache off was in fact running with it on, and gets the uncached behaviour
+  it asked for.
+
 ### Delivery metrics and the delivery scorecard
 
 Yontrack 6 introduces the [delivery scorecard](../scorecard/scorecard.md): lead time, frequency,
