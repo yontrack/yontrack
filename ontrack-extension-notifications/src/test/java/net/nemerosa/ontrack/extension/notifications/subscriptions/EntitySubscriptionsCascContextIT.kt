@@ -1,24 +1,28 @@
 package net.nemerosa.ontrack.extension.notifications.subscriptions
 
+import io.micrometer.core.instrument.MeterRegistry
 import net.nemerosa.ontrack.extension.casc.CascService
 import net.nemerosa.ontrack.extension.notifications.AbstractNotificationTestSupport
+import net.nemerosa.ontrack.it.AsAdminTest
+import net.nemerosa.ontrack.it.deprecatedUsages
 import net.nemerosa.ontrack.json.asJson
 import net.nemerosa.ontrack.json.getRequiredTextField
 import net.nemerosa.ontrack.json.parseAsJson
 import net.nemerosa.ontrack.model.json.schema.JsonArrayType
 import net.nemerosa.ontrack.model.json.schema.JsonObjectType
 import net.nemerosa.ontrack.model.json.schema.JsonStringType
+import net.nemerosa.ontrack.model.deprecation.DeprecationSurface
 import net.nemerosa.ontrack.model.json.schema.JsonTypeBuilder
 import net.nemerosa.ontrack.model.structure.NameDescription
+import net.nemerosa.ontrack.model.structure.Project
 import net.nemerosa.ontrack.model.structure.ValidationRunStatusID
 import net.nemerosa.ontrack.model.structure.toProjectEntityID
 import net.nemerosa.ontrack.test.TestUtils.uid
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import kotlin.test.*
 
-@Disabled("FLAKY")
+@AsAdminTest
 class EntitySubscriptionsCascContextIT : AbstractNotificationTestSupport() {
 
     @Autowired
@@ -29,6 +33,9 @@ class EntitySubscriptionsCascContextIT : AbstractNotificationTestSupport() {
 
     @Autowired
     private lateinit var jsonTypeBuilder: JsonTypeBuilder
+
+    @Autowired
+    private lateinit var meterRegistry: MeterRegistry
 
     @Test
     fun `CasC schema type`() {
@@ -1055,6 +1062,66 @@ class EntitySubscriptionsCascContextIT : AbstractNotificationTestSupport() {
         val entityProperties = (itemProperties["entity"] as JsonObjectType).properties
         assertIs<JsonStringType>(entityProperties["project"])
         assertNull(entityProperties["storageKey"])
+    }
+
+    @Test
+    fun `Entity subscription using the channelConfig field reports no deprecation`() {
+        val target = uid("t")
+        project {
+            assertEquals(0.0, cascEntitySubscription(this, target, "channelConfig"))
+            assertEquals(mapOf("target" to target).asJson(), channelConfig(this))
+        }
+    }
+
+    @Test
+    fun `Entity subscription using the deprecated channel-config alias`() {
+        val target = uid("t")
+        project {
+            assertEquals(
+                1.0,
+                cascEntitySubscription(this, target, "channel-config"),
+                "The alias is reported as deprecated"
+            )
+            assertEquals(mapOf("target" to target).asJson(), channelConfig(this), "The alias still works")
+        }
+    }
+
+    /**
+     * Runs the CasC for one subscription on the [project], its channel configuration under the
+     * [channelConfigField] name, and returns how many times the deprecated `channel-config` alias
+     * was reported.
+     */
+    private fun cascEntitySubscription(project: Project, target: String, channelConfigField: String): Double =
+        meterRegistry.deprecatedUsages(
+            DeprecationSurface.CASC,
+            "ontrack.extensions.notifications.entity-subscriptions.subscriptions.channel-config"
+        ) {
+            casc(
+                """
+                    ontrack:
+                        extensions:
+                            notifications:
+                                entity-subscriptions:
+                                    - entity:
+                                        project: ${project.name}
+                                      subscriptions:
+                                        - name: test
+                                          events:
+                                            - new_promotion_run
+                                          channel: mock
+                                          $channelConfigField:
+                                            target: "$target"
+                """.trimIndent()
+            )
+        }
+
+    private fun channelConfig(project: Project) = asAdmin {
+        eventSubscriptionService.filterSubscriptions(
+            EventSubscriptionFilter(
+                entity = project.toProjectEntityID(),
+                origin = "casc",
+            )
+        ).pageItems.single().channelConfig
     }
 
     /**
