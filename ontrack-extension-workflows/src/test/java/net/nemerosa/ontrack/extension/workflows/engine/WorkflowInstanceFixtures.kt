@@ -25,4 +25,42 @@ object WorkflowInstanceFixtures {
             timestamp = timestamp,
         )
     }
+
+    /**
+     * Fan-out: `start` has two children, `fails` and `other`.
+     */
+    fun fanOut(
+        timestamp: LocalDateTime = Time.now(),
+    ): WorkflowInstance {
+        val workflow = WorkflowParser.parseYamlWorkflow(
+            """
+                name: Fan-out
+                nodes:
+                  - id: start
+                    executorId: mock
+                    data:
+                      text: Start node
+                  - id: fails
+                    parents:
+                      - id: start
+                    executorId: mock
+                    data:
+                      text: Failing node
+                      error: true
+                  - id: other
+                    parents:
+                      - id: start
+                    executorId: mock
+                    data:
+                      text: Other node
+            """.trimIndent()
+        )
+        return createInstance(
+            workflow = workflow,
+            event = MockEventType.serializedMockEvent("Some text"),
+            triggerData = TestTrigger().createTriggerData(TestTriggerData()),
+            contexts = emptyMap(),
+            timestamp = timestamp,
+        )
+    }
 }

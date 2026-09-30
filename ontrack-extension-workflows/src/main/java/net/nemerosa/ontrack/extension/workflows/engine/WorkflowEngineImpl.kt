@@ -189,28 +189,33 @@ class WorkflowEngineImpl(
         debug("NODE WAITING", instance, workflowNodeId)
         nodeWaiting(workflowInstanceId, workflowNodeId)
         // Waiting for the parent nodes to be OK
-        val okToStart = if (node.parents.isNotEmpty()) {
+        val cancellation: String? = if (node.parents.isNotEmpty()) {
             debug("NODE WAITING FOR PARENTS", instance, workflowNodeId)
             val parentStatuses = awaitParents(instance, workflowNodeId, node.parents)
             debug("NODE WAITED FOR PARENTS", instance, workflowNodeId)
             // TODO OK to start depending on the conditions
             val parentsOK = parentStatuses.all { it.status == WorkflowInstanceNodeStatus.SUCCESS }
-            // Checking the instance state again
-            if (parentsOK) {
-                !getWorkflowInstanceTx(workflowInstanceId).status.finished
-            } else {
+            if (!parentsOK) {
                 val statusSummary = parentStatuses.joinToString(",") {
                     "${it.parentDef.id}=${it.status}"
                 }
                 debugParent("NODE PARENTS STATUSES: $statusSummary", instance, workflowNodeId)
-                false
+                CANCELLED_PARENTS_NOT_MET
+            }
+            // Checking the instance state again: a sibling may have failed and stopped the
+            // instance while this node was waiting, even though its own parents all succeeded
+            else if (getWorkflowInstanceTx(workflowInstanceId).status.finished) {
+                debug("NODE INSTANCE STOPPED WHILE WAITING", instance, workflowNodeId)
+                CANCELLED_WORKFLOW_STOPPED
+            } else {
+                null
             }
         } else {
             // No parent
-            true
+            null
         }
         // Starting the node execution
-        if (okToStart) {
+        if (cancellation == null) {
             debug("NODE STARTED", instance, workflowNodeId)
             nodeStarted(workflowInstanceId, workflowNodeId)
             // Loading a fresh instance before starting
@@ -218,8 +223,8 @@ class WorkflowEngineImpl(
             // Starts the node execution
             nodeExecution(freshInstance, workflowNodeId)
         } else {
-            debug("NODE PARENT NOT OK", instance, workflowNodeId)
-            nodeCancelled(workflowInstanceId, workflowNodeId, "Parents conditions were not met.")
+            debug("NODE NOT STARTED: $cancellation", instance, workflowNodeId)
+            nodeCancelled(workflowInstanceId, workflowNodeId, cancellation)
         }
     }
 
@@ -478,5 +483,18 @@ class WorkflowEngineImpl(
         transactionHelper.inNewTransaction {
             workflowInstanceRepository.stopInstance(workflowInstanceId)
         }
+    }
+
+    companion object {
+        /**
+         * A parent of the node did not succeed.
+         */
+        private const val CANCELLED_PARENTS_NOT_MET = "Parents conditions were not met."
+
+        /**
+         * The parents of the node all succeeded, but the instance was stopped meanwhile - typically
+         * by a sibling node in error.
+         */
+        private const val CANCELLED_WORKFLOW_STOPPED = "The workflow was stopped before this node could start."
     }
 }
