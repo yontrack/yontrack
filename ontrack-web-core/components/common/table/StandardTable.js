@@ -7,6 +7,10 @@ import FilterForm from "@components/common/table/FilterForm";
 import {useRefresh} from "@components/common/RefreshUtils";
 import {AutoRefreshButton, AutoRefreshContextProvider} from "@components/common/AutoRefresh";
 
+// The filters are dependencies of the query and of the filter form's effect: their defaults must
+// be the same object from one render to the next, or every render would send the query again
+const NO_FILTER = {}
+
 /**
  * Table whose content is fetched using a GraphQL query.
  *
@@ -37,8 +41,8 @@ export default function StandardTable({
                                           expandable = false,
                                           tableSize,
                                           size = 10,
-                                          initialFilter = {},
-                                          filter = {},
+                                          initialFilter = NO_FILTER,
+                                          filter = NO_FILTER,
                                           onFilterChange = (_) => {
                                           },
                                           onFilterFormValuesChanged = (_) => {
@@ -53,7 +57,7 @@ export default function StandardTable({
 
     const [localReloadCount, localReload] = useRefresh()
 
-    const [filterFormData, setFilterFormData] = useState(initialFilter ?? {})
+    const [filterFormData, setFilterFormData] = useState(initialFilter ?? NO_FILTER)
 
     const [pagination, setPagination] = useState({
         offset: 0,

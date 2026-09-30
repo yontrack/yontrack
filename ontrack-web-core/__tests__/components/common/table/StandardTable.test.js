@@ -1,5 +1,5 @@
 import "@testing-library/jest-dom"
-import {fireEvent, render, screen, waitFor} from "@testing-library/react"
+import {act, fireEvent, render, screen, waitFor} from "@testing-library/react"
 import StandardTable from "@components/common/table/StandardTable"
 
 Object.defineProperty(window, 'matchMedia', {
@@ -34,19 +34,21 @@ const pages = {
     },
 }
 
-// Every caller passes a filter: the default one is a new object on each render, which is an
-// effect dependency, and would refetch forever
 const filter = {}
 
 const requestedOffsets = () => global.fetch.mock.calls.map(([, init]) => JSON.parse(init.body).variables.offset)
 
-const table = (reloadCount = 0) => (
+// Lets the pending requests and effects run: a table which refetches on every render would keep
+// calling `fetch` meanwhile
+const settle = () => act(() => new Promise(resolve => setTimeout(resolve, 100)))
+
+const table = (reloadCount = 0, props = {filter}) => (
     <StandardTable
         id="items"
         query={QUERY}
         queryNode="items"
         reloadCount={reloadCount}
-        filter={filter}
+        {...props}
         size={2}
         rowKey="name"
         columns={[{key: "name", title: "Name", dataIndex: "name"}]}
@@ -58,6 +60,9 @@ describe('StandardTable', () => {
     beforeEach(() => {
         global.fetch = jest.fn().mockImplementation(async (_, init) => {
             const {variables} = JSON.parse(init.body)
+            // Answering on a later task, like a real server, keeps a refetch loop from starving
+            // the timers of the test
+            await new Promise(resolve => setTimeout(resolve, 0))
             return {
                 ok: true,
                 status: 200,
@@ -93,6 +98,17 @@ describe('StandardTable', () => {
         await waitFor(() => expect(screen.getByText("two")).toBeInTheDocument())
         expect(screen.getAllByText("one")).toHaveLength(1)
         expect(requestedOffsets()).toEqual([0, 0])
+    })
+
+    it('sends the query once when no filter is given', async () => {
+        // The default filter is an effect dependency: it must be the same object from one
+        // render to the next, or every render would send the query again (#1935)
+        render(table(0, {}))
+
+        await settle()
+
+        expect(requestedOffsets()).toEqual([0])
+        expect(screen.getByText("two")).toBeInTheDocument()
     })
 
 })
