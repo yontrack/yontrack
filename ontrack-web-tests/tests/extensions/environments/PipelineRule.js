@@ -48,6 +48,16 @@ export class PipelineRule {
         await expect(locator.getByTestId(`${this.prefix}-rule-${this.ruleConfigId}-nok`)).toBeVisible()
     }
 
+    /**
+     * A rule still waiting for something - an approval nobody has given yet - rather than one which
+     * refuses: an hourglass, not a red cross (#1937).
+     */
+    async expectToBePending() {
+        const locator = this.locatePipelineRule()
+        await expect(locator.getByTestId(`${this.prefix}-rule-${this.ruleConfigId}-pending`)).toBeVisible()
+        await expect(locator).toContainText('Waiting for approval')
+    }
+
     async expectToBeChecked() {
         const locator = this.locatePipelineRule()
         await expect(locator.getByTestId(`${this.prefix}-rule-${this.ruleConfigId}-ok`)).toBeVisible()

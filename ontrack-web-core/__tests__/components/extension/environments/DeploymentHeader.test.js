@@ -39,13 +39,16 @@ const deployment = ({
                         changes = [],
                         authorizations = [granted('pipeline', 'create')],
                         build = {id: 1, name: '107', displayName: '107', branch: {id: 1, name: 'main'}, promotionRuns: []},
+                        errorMessage = null,
+                        pendingMessage = null,
                     } = {}) => ({
     id: 'p-1',
     number: 3,
     status,
     start: '2026-09-18T10:00:00',
     end: null,
-    errorMessage: null,
+    errorMessage,
+    pendingMessage,
     runAction,
     finishAction,
     changes,
@@ -188,5 +191,24 @@ describe('the deployment header', () => {
         header({status: 'CANCELLED', changes: []})
         expect(screen.getByTestId('deployment-step-CANCELLED')).toBeInTheDocument()
         expect(screen.queryByTestId('deployment-step-DONE')).not.toBeInTheDocument()
+    })
+})
+
+describe('the deployment header, when the deployment is waiting (#1937)', () => {
+
+    it('says a running workflow is running, not that something went wrong', () => {
+        header({status: 'RUNNING', finishAction: {ok: false}, pendingMessage: 'Workflow is running'})
+        const pending = screen.getByTestId('deployment-pending')
+        expect(pending).toHaveTextContent('Workflow is running')
+        expect(pending).toHaveClass('ant-alert-info')
+        expect(screen.queryByTestId('deployment-error')).not.toBeInTheDocument()
+    })
+
+    it('still reports an error as an error', () => {
+        header({status: 'RUNNING', finishAction: {ok: false}, errorMessage: 'Workflow is in error'})
+        const error = screen.getByTestId('deployment-error')
+        expect(error).toHaveTextContent('Workflow is in error')
+        expect(error).toHaveClass('ant-alert-error')
+        expect(screen.queryByTestId('deployment-pending')).not.toBeInTheDocument()
     })
 })

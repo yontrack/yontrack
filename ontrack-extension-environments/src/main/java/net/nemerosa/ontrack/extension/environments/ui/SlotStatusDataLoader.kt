@@ -1,6 +1,7 @@
 package net.nemerosa.ontrack.extension.environments.ui
 
 import net.nemerosa.ontrack.extension.environments.Slot
+import net.nemerosa.ontrack.extension.environments.SlotDeploymentCheckState
 import net.nemerosa.ontrack.extension.environments.service.SlotStatus
 import net.nemerosa.ontrack.extension.environments.service.SlotStatusService
 import org.springframework.graphql.execution.BatchLoaderRegistry
@@ -51,7 +52,7 @@ class SlotStatusDataLoader(
                 slot = slot,
                 currentPipeline = null,
                 lastDeployedPipeline = null,
-                blocked = false,
+                blockingState = SlotDeploymentCheckState.OK,
                 behind = false,
             )
         }

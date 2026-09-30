@@ -167,3 +167,34 @@ describe('the slot cell', () => {
         expect(container).toBeEmptyDOMElement()
     })
 })
+
+describe('a blocked slot cell, pending or failed (#1937)', () => {
+
+    it('marks a slot waiting for a pending check as in progress, not as an error', () => {
+        render(<SlotCell slot={slot({
+            blocked: true,
+            blockingState: 'PENDING',
+            currentPipeline: pipeline(3, 'RUNNING', build('107')),
+        })}/>)
+        const mark = screen.getByTestId('slot-cell-slot-1-blocked')
+        expect(mark.querySelector('.ant-badge-status-processing')).not.toBeNull()
+        expect(mark.querySelector('.ant-badge-status-error')).toBeNull()
+        expect(screen.getByTestId('slot-cell-slot-1')).toHaveAttribute('data-blocking-state', 'PENDING')
+    })
+
+    it('marks a slot held up by a failed check as an error', () => {
+        render(<SlotCell slot={slot({
+            blocked: true,
+            blockingState: 'FAILED',
+            currentPipeline: pipeline(3, 'RUNNING', build('107')),
+        })}/>)
+        const mark = screen.getByTestId('slot-cell-slot-1-blocked')
+        expect(mark.querySelector('.ant-badge-status-error')).not.toBeNull()
+    })
+
+    it('reads a blocked slot without a blocking state as failed', () => {
+        render(<SlotCell slot={slot({blocked: true, currentPipeline: pipeline(3, 'CANDIDATE', build('107'))})}/>)
+        const mark = screen.getByTestId('slot-cell-slot-1-blocked')
+        expect(mark.querySelector('.ant-badge-status-error')).not.toBeNull()
+    })
+})

@@ -712,6 +712,7 @@ class SlotServiceImpl(
             overridden = checks.any { it.overridden },
             successCount = checks.count { it.ok },
             totalCount = checks.size,
+            state = SlotDeploymentCheckState.of(checks),
         )
 
     override fun finishDeployment(
@@ -821,7 +822,10 @@ class SlotServiceImpl(
         return SlotDeploymentActionStatus.ok(actualMessage)
     }
 
-    override fun getPipelineErrorMessage(pipeline: SlotPipeline): String? {
+    /**
+     * The checks of the phase a pipeline is in.
+     */
+    private fun getPipelineCurrentChecks(pipeline: SlotPipeline): List<SlotDeploymentCheck> {
         val checks = mutableListOf<SlotDeploymentCheck>()
         when (pipeline.status) {
             SlotPipelineStatus.CANDIDATE -> {
@@ -845,9 +849,18 @@ class SlotServiceImpl(
                 // No error message
             }
         }
-        return if (checks.any { !it.ok }) {
-            val check = checks.first { !it.ok }
-            check.reason
+        return checks
+    }
+
+    override fun getPipelineErrorMessage(pipeline: SlotPipeline): String? =
+        getPipelineCurrentChecks(pipeline)
+            .firstOrNull { it.state == SlotDeploymentCheckState.FAILED }
+            ?.reason
+
+    override fun getPipelinePendingMessage(pipeline: SlotPipeline): String? {
+        val checks = getPipelineCurrentChecks(pipeline)
+        return if (SlotDeploymentCheckState.of(checks) == SlotDeploymentCheckState.PENDING) {
+            checks.first { it.state == SlotDeploymentCheckState.PENDING }.reason
         } else {
             null
         }

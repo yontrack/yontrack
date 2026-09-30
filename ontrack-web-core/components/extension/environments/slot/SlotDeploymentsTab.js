@@ -1,7 +1,6 @@
 import {useState} from "react"
 import Link from "next/link"
 import {Input, Select, Space, Tooltip, Typography} from "antd"
-import {FaBan, FaExclamationCircle} from "react-icons/fa"
 import StandardTable from "@components/common/table/StandardTable"
 import BuildLink from "@components/builds/BuildLink"
 import PromotionRuns from "@components/promotionRuns/PromotionRuns"
@@ -10,6 +9,7 @@ import SlotPipelineStatusLabel from "@components/extension/environments/SlotPipe
 import {slotPipelineUri} from "@components/extension/environments/EnvironmentsLinksUtils"
 import {formatDuration} from "@components/extension/environments/slot/slotDeploymentsModel"
 import {gqlSlotDeployments} from "@components/extension/environments/slot/slotGraphQL"
+import DeploymentErrorCell from "@components/extension/environments/slot/DeploymentErrorCell"
 
 /**
  * **Deployments** - the slot's full history.
@@ -148,9 +148,7 @@ export default function SlotDeploymentsTab({slot, reloadCount = 0}) {
                     {
                         key: 'error',
                         title: 'Error',
-                        render: (_, item) => item.errorMessage
-                            ? <Tooltip title={item.errorMessage}><FaExclamationCircle color="red"/></Tooltip>
-                            : <Tooltip title="No error"><FaBan color="gray"/></Tooltip>,
+                        render: (_, item) => <DeploymentErrorCell deployment={item}/>,
                     },
                 ]}
             />

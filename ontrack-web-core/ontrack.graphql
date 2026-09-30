@@ -7485,8 +7485,10 @@ type Slot implements Authorizable {
   authorizations: [Authorization!]!
   "Does a slot upstream of this one in the project's slot graph hold a newer build?"
   behind: Boolean!
-  "Is the in-flight deployment of this slot held up by a failing, non-overridden admission rule or workflow? False when nothing is in flight."
+  "Is the in-flight deployment of this slot held up by a failing or pending, non-overridden admission rule or workflow? False when nothing is in flight. See blockingState to tell the two apart."
   blocked: Boolean!
+  "How is the in-flight deployment of this slot held up? OK when it is not blocked, FAILED when one of its checks has failed, PENDING when it is only waiting for something expected to happen - a workflow running, an approval to give."
+  blockingState: SlotDeploymentCheckState!
   "Current pipeline in the slot"
   currentPipeline: SlotPipeline
   "description field"
@@ -7606,6 +7608,8 @@ type SlotDeploymentCheck {
   ok: Boolean
   "reason field"
   reason: String
+  "OK, still pending - it blocks, but is expected to pass, like a running workflow - or failed"
+  state: SlotDeploymentCheckState!
 }
 
 "Graph of slots for a project"
@@ -7638,7 +7642,7 @@ type SlotPipeline {
   changes: [SlotPipelineChange!]!
   "end field"
   end: LocalDateTime
-  "Error message if any"
+  "Reason of the first failed check of the current phase, if any. A pending check - a workflow still running, an approval still to give - is not an error: see pendingMessage."
   errorMessage: String
   "Can this deployment be completed?"
   finishAction: SlotPipelineDeploymentStatusProgress
@@ -7650,6 +7654,8 @@ type SlotPipeline {
   lastChange: SlotPipelineChange
   "number field"
   number: Int
+  "Reason of the first pending check of the current phase - a workflow still running, an approval still to give - when no check has failed."
+  pendingMessage: String
   "List of required inputs for the admission rules"
   requiredInputs: [SlotAdmissionRuleInput!]!
   "Can this deployment be actioned into a running state?"
@@ -8934,6 +8940,13 @@ enum SCMPullRequestStatus {
   UNKNOWN
 }
 
+"State of a deployment check: OK, still pending (it blocks, but is expected to pass), or failed"
+enum SlotDeploymentCheckState {
+  FAILED
+  OK
+  PENDING
+}
+
 "Type of change in a deployment"
 enum SlotPipelineChangeType {
   RULE_DATA
@@ -9398,7 +9411,7 @@ input CreateGitHubConfigurationInput {
   name: String!
   "Personal Access Token"
   oauth2Token: String
-  "Password for authentication"
+  "Password for authentication. Deprecated: use a token or a GitHub App instead."
   password: String
   "GitHub server URL. Null will be replaced by https://github.com"
   url: String

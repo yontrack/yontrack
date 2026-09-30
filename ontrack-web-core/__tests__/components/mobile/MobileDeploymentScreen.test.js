@@ -48,6 +48,7 @@ const refused = (name, action) => ({name, action, authorized: false})
 
 const rule = (id, {
     ok = true,
+    state = undefined,
     canBeOverridden = true,
     overridden = false,
     override = null,
@@ -56,7 +57,7 @@ const rule = (id, {
 } = {}) => ({
     canBeOverridden,
     overridden,
-    check: {ok},
+    check: {ok, state},
     override,
     admissionRuleConfig: {id, name: id, description: null, ruleId, ruleConfig},
 })
@@ -96,6 +97,7 @@ const deployment = ({
                         runAction = {ok: true, successCount: 1, totalCount: 1},
                         finishAction = {ok: true, successCount: 1, totalCount: 1},
                         errorMessage = null,
+                        pendingMessage = null,
                         lastChange = null,
                         authorizations = [granted('pipeline', 'create'), granted('pipeline', 'override')],
                     } = {}) => {
@@ -124,6 +126,7 @@ const deployment = ({
                 runAction,
                 finishAction,
                 errorMessage,
+                pendingMessage,
                 lastChange,
             },
         },
@@ -289,11 +292,11 @@ describe('the mobile deployment screen', () => {
             // rule list of a RUNNING deployment is all green: a "n of m checks
             // passed" caption would point at rules which have nothing to do with
             // why the button is off. `errorMessage` is the failing workflow's
-            // own reason.
+            // own reason, and `pendingMessage` the running one's (#1937).
             deployment({
                 status: 'RUNNING',
                 finishAction: {ok: false},
-                errorMessage: "Workflow is running",
+                pendingMessage: "Workflow is running",
             })
             render(<MobileDeploymentScreen id="pipeline-1"/>)
             expect(screen.getByTestId('mobile-deployment-finish')).toBeDisabled()
@@ -665,7 +668,7 @@ describe('the mobile deployment screen', () => {
             deployment({
                 status: 'RUNNING',
                 finishAction: {ok: false},
-                errorMessage: 'Workflow is running',
+                pendingMessage: 'Workflow is running',
                 workflows: [slotWorkflow('d1', 'DONE', {instance: {status: 'RUNNING', finished: false}})],
             })
             render(<MobileDeploymentScreen id="pipeline-1"/>)
@@ -743,5 +746,38 @@ describe('the mobile deployment screen', () => {
         queryResult = {data: null, loading: false, error: null, finished: false}
         render(<MobileDeploymentScreen id="pipeline-1"/>)
         expect(screen.queryByTestId('mobile-deployment-missing')).not.toBeInTheDocument()
+    })
+})
+
+describe('a check which is only pending (#1937)', () => {
+
+    it('shows a rule waiting for an answer as waiting, not as blocking', () => {
+        deployment({rules: [rule('r1', {ok: false, state: 'PENDING'})], requiredInputs: ['r1']})
+        render(<MobileDeploymentScreen id="pipeline-1"/>)
+        const row = screen.getByTestId('mobile-deployment-rule-r1')
+        expect(row).toHaveTextContent('Waiting for approval')
+        expect(row).not.toHaveTextContent('Blocking')
+        expect(screen.getByTestId('mobile-deployment-rule-r1-pending')).toBeInTheDocument()
+        expect(screen.queryByTestId('mobile-deployment-rule-r1-nok')).not.toBeInTheDocument()
+        expect(screen.getByTestId('mobile-deployment-override-open-r1')).not.toHaveClass('ant-btn-dangerous')
+    })
+
+    it('still shows a failed rule as blocking', () => {
+        deployment({rules: [rule('r1', {ok: false, state: 'FAILED'})]})
+        render(<MobileDeploymentScreen id="pipeline-1"/>)
+        expect(screen.getByTestId('mobile-deployment-rule-r1')).toHaveTextContent('Blocking')
+        expect(screen.getByTestId('mobile-deployment-rule-r1-nok')).toBeInTheDocument()
+        expect(screen.getByTestId('mobile-deployment-override-open-r1')).toHaveClass('ant-btn-dangerous')
+    })
+
+    it('prefers the error to what is pending in the caption', () => {
+        deployment({
+            status: 'RUNNING',
+            finishAction: {ok: false},
+            errorMessage: 'Workflow is in error',
+            pendingMessage: 'Workflow is running',
+        })
+        render(<MobileDeploymentScreen id="pipeline-1"/>)
+        expect(screen.getByTestId('mobile-deployment-finish-blocked')).toHaveTextContent('Workflow is in error')
     })
 })

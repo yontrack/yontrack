@@ -63,6 +63,11 @@ class SlotStatusBatchIT : AbstractDSLTestSupport() {
                             "Batched `blocked` of ${slot.fullName()}"
                         )
                         assertEquals(
+                            slotStatusService.getBlockingState(slot),
+                            status.blockingState,
+                            "Batched `blockingState` of ${slot.fullName()}"
+                        )
+                        assertEquals(
                             slotStatusService.isBehind(slot),
                             status.behind,
                             "Batched `behind` of ${slot.fullName()}"

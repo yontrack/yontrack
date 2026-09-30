@@ -680,9 +680,9 @@ test.describe('the mobile UI on a phone', () => {
         await expect(page).toHaveURL(/\/mobile\/deployment\/[0-9a-f-]{36}$/)
 
         // Which is waiting on the approval, and says so rather than offering a
-        // button that would fail.
+        // button that would fail - as waiting, not as an error (#1937).
         const rule = page.getByTestId(`mobile-deployment-rule-${approvalId}`)
-        await expect(rule).toContainText('Blocking')
+        await expect(rule).toContainText('Waiting for approval')
         await expect(page.getByTestId('mobile-deployment-run')).toBeDisabled()
         await expect(page.getByTestId('mobile-deployment-run-blocked')).toContainText('0 of 1')
 
@@ -763,7 +763,7 @@ test.describe('the mobile UI on a phone', () => {
         await expect(page).toHaveURL(new RegExp(`/mobile/deployment/${pipeline.id}$`))
 
         const rule = page.getByTestId(`mobile-deployment-rule-${approvalId}`)
-        await expect(rule).toContainText('Blocking')
+        await expect(rule).toContainText('Waiting for approval')
 
         // The override, which is refused without a reason.
         await page.getByTestId(`mobile-deployment-override-open-${approvalId}`).click()

@@ -26,6 +26,7 @@ export const gqlDeploymentPage = gql`
             start
             end
             errorMessage
+            pendingMessage
             build {
                 ...SharedBuildData
             }

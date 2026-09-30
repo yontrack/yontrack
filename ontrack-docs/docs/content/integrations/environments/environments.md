@@ -95,6 +95,10 @@ one deployment. It answers three questions, in three places:
   workflow which refuses. Checks which passed are folded behind "N of M checks passed". The phases
   already over are below, collapsed and read-only; a finished deployment has no current phase and
   shows all of them, expanded.
+* A check which is only **pending** — a workflow still running or not started yet, a manual approval
+  nobody has answered — blocks the deployment like a failed one, but is not drawn as an error: it
+  shows a spinner or an hourglass, reads *Running* or *Waiting*, and the header says what the
+  deployment is waiting for in a blue notice rather than a red one. A failed check stays red.
 * The **timeline** down the side is the audit trail, newest first: every status change, every answer
   given to a rule, and every override — with the justification its author wrote.
 

@@ -77,6 +77,7 @@ export const gqlSlotPipelineDataNoBuild = gql`
         status
         finished
         errorMessage
+        pendingMessage
         lastChange {
             message
         }

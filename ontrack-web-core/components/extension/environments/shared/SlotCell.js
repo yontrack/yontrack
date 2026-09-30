@@ -60,6 +60,7 @@ export default function SlotCell({slot, onClick, testId}) {
         <div
             data-testid={id}
             data-blocked={slot.blocked ? 'yes' : 'no'}
+            data-blocking-state={blockingState(slot)}
             data-behind={slot.behind ? 'yes' : 'no'}
             className="ot-slot-cell"
             role={activate ? 'button' : undefined}
@@ -99,10 +100,7 @@ export default function SlotCell({slot, onClick, testId}) {
                              * overlay: a reader scanning the column for red finds it on the same
                              * line whether or not the slot happens to have something in flight.
                              */
-                            slot.blocked &&
-                            <Tooltip title="This deployment is waiting on a failing check.">
-                                <Badge status="error" data-testid={`${id}-blocked`}/>
-                            </Tooltip>
+                            slot.blocked && <BlockedMark slot={slot} id={id}/>
                         }
                     </Space> :
                     <Space size={6}>
@@ -110,10 +108,7 @@ export default function SlotCell({slot, onClick, testId}) {
                             Never deployed
                         </Typography.Text>
                         {
-                            slot.blocked &&
-                            <Tooltip title="This deployment is waiting on a failing check.">
-                                <Badge status="error" data-testid={`${id}-blocked`}/>
-                            </Tooltip>
+                            slot.blocked && <BlockedMark slot={slot} id={id}/>
                         }
                     </Space>
             }
@@ -152,5 +147,30 @@ export default function SlotCell({slot, onClick, testId}) {
                 </div>
             }
         </div>
+    )
+}
+
+/**
+ * How the slot's in-flight deployment is held up: `OK`, `PENDING` or `FAILED` (#1937). A blocked
+ * slot read without its state is taken as failed, which is what `blocked` alone always meant.
+ */
+const blockingState = (slot) => slot.blockingState ?? (slot.blocked ? 'FAILED' : 'OK')
+
+/**
+ * The blocked dot: red when a check has failed, the processing dot when the deployment is only
+ * waiting for something expected to happen - a workflow running, an approval to give (#1937).
+ */
+function BlockedMark({slot, id}) {
+    const pending = blockingState(slot) === 'PENDING'
+    return (
+        <Tooltip
+            title={
+                pending ?
+                    "This deployment is waiting on a check still in progress." :
+                    "This deployment is waiting on a failing check."
+            }
+        >
+            <Badge status={pending ? 'processing' : 'error'} data-testid={`${id}-blocked`}/>
+        </Tooltip>
     )
 }

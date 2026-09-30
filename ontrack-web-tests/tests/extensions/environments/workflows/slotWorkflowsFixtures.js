@@ -34,9 +34,10 @@ export const withSlotWorkflow = async (ontrack, {trigger}) => {
     return {slot, project, slotWorkflow}
 }
 
-export const waitForPipelineWorkflowToBeFinished = async (page, ontrack, pipelineId, slotWorkflow) => {
+export const waitForPipelineWorkflowToBeFinished = async (page, ontrack, pipelineId, slotWorkflow, {timeout = 5000} = {}) => {
     await waitUntilCondition({
         page,
+        timeout,
         condition: async () => {
             const data = await graphQLCall(
                 ontrack.connection,
@@ -65,7 +66,7 @@ export const waitForPipelineWorkflowToBeFinished = async (page, ontrack, pipelin
             // Condition is that the workflow instance is finished to run
             return slotWorkflowInstance?.workflowInstance?.finished
         },
-        message: `Pipeline workflow for ${slotWorkflow.workflow.name} not finished in 5 seconds`
+        message: `Pipeline workflow for ${slotWorkflow.workflow.name} not finished in ${timeout / 1000} seconds`
     })
 }
 

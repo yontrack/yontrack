@@ -1065,4 +1065,130 @@ class SlotPipelineGraphQLIT : AbstractQLKTITSupport() {
         }
     }
 
+
+    private fun pendingAndErrorOf(pipeline: SlotPipeline, code: (pipelineNode: tools.jackson.databind.JsonNode) -> Unit) {
+        run(
+            """
+                {
+                    slotPipelineById(id: "${pipeline.id}") {
+                        status
+                        errorMessage
+                        pendingMessage
+                        slot {
+                            blocked
+                            blockingState
+                        }
+                        admissionRules {
+                            check {
+                                ok
+                                state
+                                reason
+                            }
+                        }
+                        slotWorkflowInstances {
+                            check {
+                                ok
+                                state
+                                reason
+                            }
+                        }
+                    }
+                }
+            """.trimIndent()
+        ) { data ->
+            code(data.path("slotPipelineById"))
+        }
+    }
+
+    @Test
+    fun `A running workflow on a running deployment is pending, not an error`() {
+        slotWorkflowTestSupport.withSlotWorkflow(
+            trigger = SlotPipelineStatus.RUNNING,
+            waitMs = 5_000,
+        ) { slot, _ ->
+            val pipeline = slotTestSupport.createPipeline(slot = slot)
+            val status = slotService.runDeployment(pipeline.id, dryRun = false)
+            assertTrue(status.ok, "Pipeline has started its deployment")
+
+            // While the workflow runs
+            pendingAndErrorOf(pipeline) { node ->
+                assertEquals("RUNNING", node.path("status").asText())
+                assertJsonNull(node.path("errorMessage"), "A running workflow is not an error")
+                assertTrue(
+                    node.path("pendingMessage").asText() in setOf("Workflow has started", "Workflow is running"),
+                    "The running workflow is what the deployment is waiting for"
+                )
+                assertEquals(true, node.path("slot").path("blocked").asBoolean())
+                assertEquals("PENDING", node.path("slot").path("blockingState").asText())
+                val check = node.path("slotWorkflowInstances").single().path("check")
+                assertEquals(false, check.path("ok").asBoolean())
+                assertEquals("PENDING", check.path("state").asText())
+            }
+
+            // Once the workflow is done
+            slotWorkflowTestSupport.waitForSlotWorkflowsToSucceed(pipeline, SlotPipelineStatus.RUNNING)
+            pendingAndErrorOf(pipeline) { node ->
+                assertJsonNull(node.path("errorMessage"))
+                assertJsonNull(node.path("pendingMessage"), "Nothing is pending any longer")
+                assertEquals(false, node.path("slot").path("blocked").asBoolean())
+                assertEquals("OK", node.path("slot").path("blockingState").asText())
+                assertEquals("OK", node.path("slotWorkflowInstances").single().path("check").path("state").asText())
+            }
+        }
+    }
+
+    @Test
+    fun `A workflow in error on a running deployment has failed`() {
+        slotWorkflowTestSupport.withSlotWorkflow(
+            trigger = SlotPipelineStatus.RUNNING,
+            error = true,
+        ) { slot, _ ->
+            val pipeline = slotTestSupport.createPipeline(slot = slot)
+            slotService.runDeployment(pipeline.id, dryRun = false)
+            slotWorkflowTestSupport.waitForSlotWorkflowsToFinish(pipeline, SlotPipelineStatus.RUNNING)
+            pendingAndErrorOf(pipeline) { node ->
+                assertEquals("Workflow is in error", node.path("errorMessage").asText())
+                assertJsonNull(node.path("pendingMessage"))
+                assertEquals(true, node.path("slot").path("blocked").asBoolean())
+                assertEquals("FAILED", node.path("slot").path("blockingState").asText())
+                assertEquals(
+                    "FAILED",
+                    node.path("slotWorkflowInstances").single().path("check").path("state").asText()
+                )
+            }
+        }
+    }
+
+    @Test
+    fun `A candidate waiting for a manual approval is pending, and failed once rejected`() {
+        slotTestSupport.withSlotPipeline { pipeline ->
+            val config = SlotAdmissionRuleTestFixtures.testManualApprovalRuleConfig(pipeline.slot)
+            slotService.addAdmissionRuleConfig(config)
+
+            // Waiting for the approval
+            pendingAndErrorOf(pipeline) { node ->
+                assertEquals("CANDIDATE", node.path("status").asText())
+                assertJsonNull(node.path("errorMessage"), "Waiting for an approval is not an error")
+                assertEquals("No approval", node.path("pendingMessage").asText())
+                assertEquals("PENDING", node.path("slot").path("blockingState").asText())
+                val check = node.path("admissionRules").single().path("check")
+                assertEquals(false, check.path("ok").asBoolean())
+                assertEquals("PENDING", check.path("state").asText())
+            }
+
+            // Rejecting
+            slotService.setupAdmissionRule(
+                pipeline = pipeline,
+                admissionRuleConfig = config,
+                data = ManualApprovalSlotAdmissionRuleData(approval = false, message = "No way").asJson(),
+            )
+            pendingAndErrorOf(pipeline) { node ->
+                assertEquals("Rejected", node.path("errorMessage").asText())
+                assertJsonNull(node.path("pendingMessage"))
+                assertEquals("FAILED", node.path("slot").path("blockingState").asText())
+                assertEquals("FAILED", node.path("admissionRules").single().path("check").path("state").asText())
+            }
+        }
+    }
+
 }

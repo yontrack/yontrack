@@ -6,6 +6,7 @@ import graphql.schema.GraphQLArgument
 import graphql.schema.GraphQLObjectType
 import graphql.schema.GraphQLTypeReference
 import net.nemerosa.ontrack.extension.environments.Slot
+import net.nemerosa.ontrack.extension.environments.SlotDeploymentCheckState
 import net.nemerosa.ontrack.extension.environments.SlotPipeline
 import net.nemerosa.ontrack.extension.environments.SlotPipelineStatus
 import net.nemerosa.ontrack.extension.environments.service.SlotService
@@ -148,11 +149,23 @@ class GQLTypeSlot(
             .field {
                 it.name("blocked")
                     .description(
-                        "Is the in-flight deployment of this slot held up by a failing, " +
-                                "non-overridden admission rule or workflow? False when nothing is in flight."
+                        "Is the in-flight deployment of this slot held up by a failing or pending, " +
+                                "non-overridden admission rule or workflow? False when nothing is in flight. " +
+                                "See blockingState to tell the two apart."
                     )
                     .type(GraphQLBoolean.toNotNull())
                     .dataFetcher { env -> status(env) { it.blocked } }
+            }
+            // Blocking state
+            .field {
+                it.name("blockingState")
+                    .description(
+                        "How is the in-flight deployment of this slot held up? OK when it is not blocked, " +
+                                "FAILED when one of its checks has failed, PENDING when it is only waiting for " +
+                                "something expected to happen - a workflow running, an approval to give."
+                    )
+                    .type(GraphQLTypeReference(SlotDeploymentCheckState::class.java.simpleName).toNotNull())
+                    .dataFetcher { env -> status(env) { it.blockingState } }
             }
             // Behind
             .field {

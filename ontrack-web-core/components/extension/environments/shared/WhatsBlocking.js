@@ -1,6 +1,6 @@
 import {Button, Collapse, Space, Typography} from "antd"
 import {FaCheck, FaExclamationCircle, FaHandPaper} from "react-icons/fa"
-import CheckIcon from "@components/common/CheckIcon"
+import CheckStateIcon from "@components/extension/environments/shared/CheckStateIcon"
 import {isAuthorized} from "@components/common/authorizations"
 import SlotAdmissionRuleSummary from "@components/extension/environments/SlotAdmissionRuleSummary"
 import SlotAdmissionRuleCheck from "@components/extension/environments/SlotAdmissionRuleCheck"
@@ -36,6 +36,10 @@ import {checksSummary, currentPhase, isClear, phaseItems} from "@components/exte
  * - **The labels are the mobile deployment screen's labels** - "N of M checks passed", "Passed",
  *   "Blocking". The two UIs describe the same deployment to the same person on two devices, and
  *   two vocabularies for one state is how they drift apart.
+ * - **A pending check is not an error** (#1937). A workflow still running, or an approval nobody
+ *   has given yet, blocks the deployment as much as a failed check does, but drawing it with a red
+ *   cross, "Blocking" and a danger Override reads as "something went wrong" when nothing has. It
+ *   gets a spinner or an hourglass, "Running" or "Waiting", and a plain Override.
  *
  * @param {Object} deployment The deployment, with its slot's workflows for the current phase.
  * @param {function} onChange Called after any inline fix, so the caller can ask the server again.
@@ -90,7 +94,7 @@ export default function WhatsBlocking({
     const row = (item) => (
         <div key={item.key} className="ot-whats-blocking-row" data-testid={`${testId}-${item.key}`}>
             <Space size={6} wrap>
-                <CheckIcon id={`${testId}-${item.key}`} value={item.ok}/>
+                <CheckStateIcon id={`${testId}-${item.key}`} state={item.state} running={isRunning(item)}/>
                 {
                     item.kind === 'rule' ?
                         <SlotAdmissionRuleSummary
@@ -100,7 +104,7 @@ export default function WhatsBlocking({
                         <WorkflowLabel item={item} testId={testId}/>
                 }
                 <Typography.Text type="secondary">
-                    {item.ok ? 'Passed' : 'Blocking'}
+                    {stateLabel(item)}
                 </Typography.Text>
                 {
                     /* Inline fix: answer a rule waiting on somebody. */
@@ -122,8 +126,8 @@ export default function WhatsBlocking({
                     item.kind === 'rule' && !item.ok && !item.overridden && item.canBeOverridden && canOverride &&
                     <Button
                         size="small"
-                        danger
-                        icon={<FaExclamationCircle/>}
+                        danger={item.state === 'FAILED'}
+                        icon={item.state === 'FAILED' ? <FaExclamationCircle/> : undefined}
                         data-testid={`${testId}-override-${item.rule.admissionRuleConfig.id}`}
                         onClick={() => overrideRuleDialog.start({pipeline: deployment, rule: item.rule})}
                     >
@@ -131,12 +135,12 @@ export default function WhatsBlocking({
                     </Button>
                 }
                 {
-                    /* Inline fix: override a workflow that failed. */
+                    /* Inline fix: override a workflow that failed - or one still running, stuck maybe. */
                     item.kind === 'workflow' && !item.ok && !item.overridden && item.canBeOverridden && canOverride &&
                     <Button
                         size="small"
-                        danger
-                        icon={<FaExclamationCircle/>}
+                        danger={item.state === 'FAILED'}
+                        icon={item.state === 'FAILED' ? <FaExclamationCircle/> : undefined}
                         data-testid={`${testId}-override-${item.slotWorkflow.id}`}
                         onClick={() => overrideWorkflowDialog.start({
                             deployment,
@@ -255,6 +259,32 @@ export default function WhatsBlocking({
             }
         </div>
     )
+}
+
+/**
+ * Whether a pending check is something actually running - a workflow started - rather than
+ * something the deployment is waiting for.
+ */
+const isRunning = (item) => {
+    const status = item.slotWorkflow?.slotWorkflowInstanceForPipeline?.workflowInstance?.status
+    return item.kind === 'workflow' && (status === 'STARTED' || status === 'RUNNING')
+}
+
+/**
+ * The word beside a check.
+ *
+ * A pending rule is a rule waiting for an answer - the manual approval is the only one which
+ * waits - and a pending workflow is either running or waiting to start.
+ */
+const stateLabel = (item) => {
+    if (item.state === 'OK') return 'Passed'
+    if (item.state === 'PENDING') {
+        if (item.kind === 'rule') {
+            return item.rule?.admissionRuleConfig?.ruleId === 'manual' ? 'Waiting for approval' : 'Waiting'
+        }
+        return isRunning(item) ? 'Running' : 'Waiting'
+    }
+    return 'Blocking'
 }
 
 /**

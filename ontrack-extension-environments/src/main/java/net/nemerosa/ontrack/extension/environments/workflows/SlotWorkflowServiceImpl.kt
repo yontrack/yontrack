@@ -230,31 +230,41 @@ class SlotWorkflowServiceImpl(
         val slotWorkflowInstance = findSlotWorkflowInstanceByPipelineAndSlotWorkflow(
             pipeline, slotWorkflow
         )
-        // If present, computing the check
-        return if (slotWorkflowInstance != null) {
-            if (slotWorkflowInstance.override != null) {
+        return slotWorkflowCheck(
+            status = slotWorkflowInstance?.workflowInstance?.status,
+            overridden = slotWorkflowInstance?.override != null,
+        )
+    }
+
+    companion object {
+
+        /**
+         * Check for a slot workflow, from the status of its instance.
+         *
+         * A workflow which has not finished yet - or not even started - is *pending*: it still
+         * blocks the deployment, but it is not a failure.
+         *
+         * @param status Status of the workflow instance, `null` when the workflow has not started
+         * @param overridden Whether the workflow instance was overridden
+         */
+        fun slotWorkflowCheck(status: WorkflowInstanceStatus?, overridden: Boolean): SlotDeploymentCheck =
+            if (overridden) {
                 SlotDeploymentCheck(
                     ok = true,
                     overridden = true,
                     reason = "Workflow was overridden",
                 )
             } else {
-                when (slotWorkflowInstance.workflowInstance.status) {
+                when (status) {
                     WorkflowInstanceStatus.SUCCESS -> SlotDeploymentCheck.ok()
-                    WorkflowInstanceStatus.STARTED -> SlotDeploymentCheck.nok("Workflow has started")
-                    WorkflowInstanceStatus.RUNNING -> SlotDeploymentCheck.nok("Workflow is running")
+                    WorkflowInstanceStatus.STARTED -> SlotDeploymentCheck.pending("Workflow has started")
+                    WorkflowInstanceStatus.RUNNING -> SlotDeploymentCheck.pending("Workflow is running")
                     WorkflowInstanceStatus.STOPPED -> SlotDeploymentCheck.nok("Workflow has been stopped")
                     WorkflowInstanceStatus.ERROR -> SlotDeploymentCheck.nok("Workflow is in error")
+                    // The workflow has not started at all
+                    null -> SlotDeploymentCheck.pending("Workflow has not started")
                 }
             }
-        }
-        // If not present, the workflow has not started at all
-        else {
-            SlotDeploymentCheck(
-                ok = false,
-                overridden = false,
-                reason = "Workflow has not started",
-            )
-        }
     }
+
 }

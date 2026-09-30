@@ -20,9 +20,9 @@ class SlotStatusServiceImpl(
     private val securityService: SecurityService,
 ) : SlotStatusService {
 
-    override fun isBlocked(slot: Slot): Boolean {
-        val pipeline = slotService.getCurrentPipeline(slot) ?: return false
-        return isBlocked(pipeline)
+    override fun getBlockingState(slot: Slot): SlotDeploymentCheckState {
+        val pipeline = slotService.getCurrentPipeline(slot) ?: return SlotDeploymentCheckState.OK
+        return getBlockingState(pipeline)
     }
 
     /**
@@ -32,19 +32,19 @@ class SlotStatusServiceImpl(
      * "blocked" is a property of the deployment and of the phase it is in, not of how it was looked
      * up.
      */
-    private fun isBlocked(pipeline: SlotPipeline): Boolean =
+    private fun getBlockingState(pipeline: SlotPipeline): SlotDeploymentCheckState =
         when (pipeline.status) {
             // Admission rules + CANDIDATE workflows
             SlotPipelineStatus.CANDIDATE ->
-                slotService.getDeploymentRunActionProgress(pipeline.id)?.ok == false
+                slotService.getDeploymentRunActionProgress(pipeline.id)?.state
             // RUNNING workflows
             SlotPipelineStatus.RUNNING ->
-                slotService.getDeploymentFinishActionProgress(pipeline.id)?.ok == false
+                slotService.getDeploymentFinishActionProgress(pipeline.id)?.state
             // Nothing in flight
             SlotPipelineStatus.DONE,
             SlotPipelineStatus.CANCELLED,
-            SlotPipelineStatus.FAILED -> false
-        }
+            SlotPipelineStatus.FAILED -> null
+        } ?: SlotDeploymentCheckState.OK
 
     override fun isBehind(slot: Slot): Boolean {
         val parents = projectSlotGraphService.slotGraph(slot.project, slot.qualifier)
@@ -117,7 +117,7 @@ class SlotStatusServiceImpl(
                 currentPipeline = current,
                 lastDeployedPipeline = deployedPipelines[slot.id],
                 // Only a deployment still on its way can be blocked, so only those are checked.
-                blocked = inFlight != null && isBlocked(inFlight),
+                blockingState = inFlight?.let { getBlockingState(it) } ?: SlotDeploymentCheckState.OK,
                 behind = parents[slot.id].orEmpty().any { parent ->
                     val there = shownBuildIds[parent.id]
                     there != null && there > here

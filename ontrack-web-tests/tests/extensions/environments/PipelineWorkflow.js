@@ -48,6 +48,9 @@ export class PipelineWorkflow {
      * The old page drew the workflow *instance's* status word ("Success", "Not started"); the
      * redesign says Passed or Blocking, in the mobile screen's vocabulary, because "Not started"
      * and "Error" are two ways of saying the same thing to somebody asking why nothing is moving.
+     *
+     * `ok: 'pending'` checks the spinner or hourglass of a workflow still running or waiting to
+     * start (#1937), which is not an error.
      */
     async checkState({name, ok}) {
         const locator = this.locatePipelineWorkflow()
@@ -57,7 +60,7 @@ export class PipelineWorkflow {
             ).toContainText(name)
         }
         if (ok !== undefined) {
-            const suffix = ok ? 'ok' : 'nok'
+            const suffix = ok === 'pending' ? 'pending' : (ok ? 'ok' : 'nok')
             await expect(
                 locator.getByTestId(`${this.prefix}-workflow-${this.slotWorkflowId}-${suffix}`)
             ).toBeVisible()

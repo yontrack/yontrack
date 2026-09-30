@@ -71,7 +71,8 @@ class ManualApprovalSlotAdmissionRule(
                 SlotDeploymentCheck.ok()
             }
         } else {
-            SlotDeploymentCheck.nok("No approval")
+            // Waiting for someone to answer is not a failure
+            SlotDeploymentCheck.pending("No approval")
         }
     }
 

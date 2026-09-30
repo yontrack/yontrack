@@ -2,6 +2,7 @@ package net.nemerosa.ontrack.extension.environments.service
 
 import net.nemerosa.ontrack.extension.environments.BuildSlotJourney
 import net.nemerosa.ontrack.extension.environments.Slot
+import net.nemerosa.ontrack.extension.environments.SlotDeploymentCheckState
 import net.nemerosa.ontrack.extension.environments.SlotPipeline
 import net.nemerosa.ontrack.model.structure.Build
 
@@ -33,7 +34,17 @@ interface SlotStatusService {
      *
      * False when nothing is in flight - a slot with no deployment is idle, not blocked.
      */
-    fun isBlocked(slot: Slot): Boolean
+    fun isBlocked(slot: Slot): Boolean = getBlockingState(slot) != SlotDeploymentCheckState.OK
+
+    /**
+     * How is this slot's in-flight deployment held up?
+     *
+     * [SlotDeploymentCheckState.OK] when it is not blocked (see [isBlocked]),
+     * [SlotDeploymentCheckState.FAILED] when one of the checks of its phase has failed, and
+     * [SlotDeploymentCheckState.PENDING] when it is only waiting for something still expected to
+     * happen - a workflow running, an approval to give.
+     */
+    fun getBlockingState(slot: Slot): SlotDeploymentCheckState
 
     /**
      * Does a slot upstream of this one hold a newer build?
@@ -92,13 +103,18 @@ interface SlotStatusService {
  *   never had one. *Not* necessarily in flight: `finished` says which.
  * @property lastDeployedPipeline The last deployment which actually completed - what the slot is
  *   holding - or null when nothing ever reached it.
- * @property blocked See [SlotStatusService.isBlocked]
+ * @property blockingState See [SlotStatusService.getBlockingState]
  * @property behind See [SlotStatusService.isBehind]
  */
 data class SlotStatus(
     val slot: Slot,
     val currentPipeline: SlotPipeline?,
     val lastDeployedPipeline: SlotPipeline?,
-    val blocked: Boolean,
+    val blockingState: SlotDeploymentCheckState,
     val behind: Boolean,
-)
+) {
+    /**
+     * See [SlotStatusService.isBlocked]
+     */
+    val blocked: Boolean get() = blockingState != SlotDeploymentCheckState.OK
+}

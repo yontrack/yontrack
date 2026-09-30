@@ -312,6 +312,12 @@ and be [recorded after the fact](../integrations/environments/environments.md#ba
   environments, for example — now fails with a `FORBIDDEN` error naming the feature, such as
   *Feature not allowed by the license: extension.environments*, where it failed with an
   `INTERNAL_ERROR` and no message.
+* **Pending checks** — `SlotPipeline.errorMessage` now reports *failed* checks only. A deployment
+  merely waiting — a workflow still running or not started yet, a manual approval not answered —
+  has a null `errorMessage` and says what it waits for in the new `SlotPipeline.pendingMessage`. A
+  client polling `errorMessage` to know whether a deployment is blocked should read
+  `pendingMessage` too, or `Slot.blocked`. `SlotDeploymentCheck.state` (`OK`, `PENDING`, `FAILED`)
+  and `Slot.blockingState` are new and tell the two apart.
 
 #### For KDSL users
 

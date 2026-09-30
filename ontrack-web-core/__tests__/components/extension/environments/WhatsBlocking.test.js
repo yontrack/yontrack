@@ -183,3 +183,79 @@ describe("what's blocking", () => {
         expect(screen.getByTestId('whats-blocking-none')).toBeInTheDocument()
     })
 })
+
+describe("what's blocking, when a check is only pending (#1937)", () => {
+
+    const runningWorkflow = ({status = 'RUNNING', started = true} = {}) => ({
+        id: 'w1',
+        trigger: 'RUNNING',
+        workflow: {name: 'Deploying'},
+        slotWorkflowInstanceForPipeline: started ? {
+            id: 'w1-instance',
+            canBeOverridden: true,
+            overridden: false,
+            check: {ok: false, state: 'PENDING', reason: 'Workflow is running'},
+            override: null,
+            workflowInstance: {id: 'w1-wi', status},
+        } : null,
+    })
+
+    const runningDeployment = (slotWorkflow) => ({
+        ...deployment({status: 'RUNNING'}),
+        slot: {
+            id: 'slot-1',
+            candidateWorkflows: [],
+            runningWorkflows: [slotWorkflow],
+            authorizations: [granted('pipeline', 'create'), granted('pipeline', 'override')],
+        },
+    })
+
+    it('shows a running workflow as running, not as an error', () => {
+        render(<WhatsBlocking deployment={runningDeployment(runningWorkflow())}/>)
+        const row = screen.getByTestId('whats-blocking-workflow-w1')
+        expect(row).toHaveTextContent('Running')
+        expect(row).not.toHaveTextContent('Blocking')
+        expect(screen.getByTestId('whats-blocking-workflow-w1-pending')).toBeInTheDocument()
+        expect(screen.queryByTestId('whats-blocking-workflow-w1-nok')).not.toBeInTheDocument()
+    })
+
+    it('shows a workflow which has not started as waiting', () => {
+        render(<WhatsBlocking deployment={runningDeployment({
+            ...runningWorkflow({started: false}),
+            // No instance, so no check from the server: the model reads it as pending
+        })}/>)
+        const row = screen.getByTestId('whats-blocking-workflow-w1')
+        expect(row).toHaveTextContent('Waiting')
+        expect(screen.getByTestId('whats-blocking-workflow-w1-pending')).toBeInTheDocument()
+    })
+
+    it('offers a plain Override on a running workflow, not a danger one', () => {
+        render(<WhatsBlocking deployment={runningDeployment(runningWorkflow())}/>)
+        const button = screen.getByTestId('whats-blocking-override-w1')
+        expect(button).not.toHaveClass('ant-btn-dangerous')
+    })
+
+    it('keeps a danger Override on a failed workflow', () => {
+        const failed = runningWorkflow({status: 'ERROR'})
+        failed.slotWorkflowInstanceForPipeline.check = {ok: false, state: 'FAILED', reason: 'Workflow is in error'}
+        render(<WhatsBlocking deployment={runningDeployment(failed)}/>)
+        expect(screen.getByTestId('whats-blocking-workflow-w1')).toHaveTextContent('Blocking')
+        expect(screen.getByTestId('whats-blocking-workflow-w1-nok')).toBeInTheDocument()
+        expect(screen.getByTestId('whats-blocking-override-w1')).toHaveClass('ant-btn-dangerous')
+    })
+
+    it('shows a manual approval still waiting for an answer as waiting for approval', () => {
+        const waiting = {...rule('r1', {ok: false}), check: {ok: false, state: 'PENDING', reason: 'No approval'}}
+        render(<WhatsBlocking deployment={deployment({rules: [waiting], requiredInputs: [{config: {id: 'r1'}}]})}/>)
+        const row = screen.getByTestId('whats-blocking-rule-r1')
+        expect(row).toHaveTextContent('Waiting for approval')
+        expect(row).not.toHaveTextContent('Blocking')
+        expect(screen.getByTestId('whats-blocking-rule-r1-pending')).toBeInTheDocument()
+        expect(screen.getByTestId('whats-blocking-override-r1')).not.toHaveClass('ant-btn-dangerous')
+    })
+
+    it('says how many checks are in progress', () => {
+        render(<WhatsBlocking deployment={runningDeployment(runningWorkflow())}/>)
+        expect(screen.getByTestId('whats-blocking-summary')).toHaveTextContent('0 of 1 checks passed · 1 in progress')
+    })
+})

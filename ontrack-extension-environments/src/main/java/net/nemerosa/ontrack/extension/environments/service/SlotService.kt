@@ -235,12 +235,23 @@ interface SlotService {
     fun getPipelineAdmissionRuleStatuses(pipeline: SlotPipeline): List<SlotPipelineAdmissionRuleStatus>
 
     /**
-     * Get any error message associated with a pipeline.
+     * Get any error message associated with a pipeline: the reason of the first check of its
+     * current phase which has *failed*. A check which is only pending is not an error - see
+     * [getPipelinePendingMessage].
      *
      * @param pipeline Pipeline to check
      * @return Error message or null if none
      */
     fun getPipelineErrorMessage(pipeline: SlotPipeline): String?
+
+    /**
+     * What a pipeline is waiting for: the reason of the first *pending* check of its current phase,
+     * when none has failed.
+     *
+     * @param pipeline Pipeline to check
+     * @return Reason of the pending check, or null when nothing is pending or when a check has failed
+     */
+    fun getPipelinePendingMessage(pipeline: SlotPipeline): String?
 
     /**
      * Gets the status (data, override) of a rule for a given pipeline

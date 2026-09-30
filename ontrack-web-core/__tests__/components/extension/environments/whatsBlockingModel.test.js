@@ -2,6 +2,7 @@ import {
     checksSummary,
     currentPhaseItems,
     isClear,
+    phaseItems,
 } from "@components/extension/environments/shared/whatsBlockingModel"
 
 /**
@@ -120,5 +121,89 @@ describe('the summary', () => {
         // The server already folds an override into `check.ok`; the list must not count it twice.
         const items = currentPhaseItems(deployment({rules: [rule('r1', {ok: true, overridden: true})]}))
         expect(isClear(items)).toBe(true)
+    })
+})
+
+describe('pending checks (#1937)', () => {
+
+    const runningWorkflow = (id) => ({
+        id,
+        trigger: 'RUNNING',
+        workflow: {name: id},
+        slotWorkflowInstanceForPipeline: {
+            id: `${id}-instance`,
+            canBeOverridden: true,
+            overridden: false,
+            check: {ok: false, state: 'PENDING', reason: 'Workflow is running'},
+            override: null,
+            workflowInstance: {id: `${id}-wi`, status: 'RUNNING'},
+        },
+    })
+
+    it('carries the state of the check', () => {
+        const items = currentPhaseItems(deployment({status: 'RUNNING', runningWorkflows: [runningWorkflow('w1')]}))
+        expect(items[0].ok).toBe(false)
+        expect(items[0].state).toBe('PENDING')
+    })
+
+    it('reads a check without a state from its verdict', () => {
+        const items = currentPhaseItems(deployment({rules: [rule('passing'), rule('failing', {ok: false})]}))
+        expect(items.map(item => [item.key, item.state])).toEqual([
+            ['rule-failing', 'FAILED'],
+            ['rule-passing', 'OK'],
+        ])
+    })
+
+    it('puts failed checks before pending ones, and pending ones before passed ones', () => {
+        const pendingRule = {...rule('pending', {ok: false}), check: {ok: false, state: 'PENDING', reason: 'No approval'}}
+        const items = currentPhaseItems(deployment({
+            rules: [rule('passing'), pendingRule, rule('failing', {ok: false})],
+        }))
+        expect(items.map(item => item.key)).toEqual(['rule-failing', 'rule-pending', 'rule-passing'])
+    })
+
+    it('says how many checks are still in progress', () => {
+        const items = currentPhaseItems(deployment({status: 'RUNNING', runningWorkflows: [runningWorkflow('w1')]}))
+        expect(checksSummary(items).text).toBe('0 of 1 checks passed · 1 in progress')
+        expect(isClear(items)).toBe(false)
+    })
+
+    it('does not call a workflow which never ran in a phase already over waiting', () => {
+        // A forced deployment left its CANDIDATE workflows unstarted: nothing is waiting for them
+        // any longer, they simply did not pass.
+        const items = phaseItems(
+            deployment({status: 'DONE', candidateWorkflows: [workflow('w1', {started: false})]}),
+            'CANDIDATE',
+        )
+        expect(items[0].state).toBe('FAILED')
+    })
+
+    it('does not call an approval never given in a phase already over waiting', () => {
+        const pendingRule = {...rule('r1', {ok: false}), check: {ok: false, state: 'PENDING', reason: 'No approval'}}
+        const items = phaseItems(deployment({status: 'RUNNING', rules: [pendingRule]}), 'CANDIDATE')
+        expect(items[0].state).toBe('FAILED')
+    })
+
+    it('keeps a not-started workflow of the phase a finished deployment ended in as pending', () => {
+        // DONE workflows run once the deployment is done: that phase is the server's current one,
+        // and the row must agree with the header's pending message.
+        const items = phaseItems(
+            {...deployment({status: 'DONE'}), slot: {id: 'slot-1', doneWorkflows: [workflow('w1', {started: false})]}},
+            'DONE',
+        )
+        expect(items[0].state).toBe('PENDING')
+    })
+
+    it('keeps a workflow still running in a phase already over as pending', () => {
+        const items = phaseItems(
+            deployment({status: 'DONE', runningWorkflows: [runningWorkflow('w1')]}),
+            'RUNNING',
+        )
+        expect(items[0].state).toBe('PENDING')
+    })
+
+    it('says nothing about progress when nothing is pending', () => {
+        const items = currentPhaseItems(deployment({rules: [rule('r1'), rule('r2', {ok: false})]}))
+        expect(checksSummary(items).text).toBe('1 of 2 checks passed')
     })
 })

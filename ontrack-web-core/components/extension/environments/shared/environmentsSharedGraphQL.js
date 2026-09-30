@@ -63,6 +63,7 @@ export const gqlSlotCellData = gql`
         id
         qualifier
         blocked
+        blockingState
         behind
         environment {
             id
@@ -93,6 +94,7 @@ export const gqlSharedAdmissionRuleData = gql`
         overridden
         check {
             ok
+            state
             reason
         }
         override {
@@ -137,6 +139,7 @@ export const gqlSharedSlotWorkflowData = gql`
             overridden
             check {
                 ok
+                state
                 reason
             }
             override {

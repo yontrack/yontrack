@@ -98,12 +98,15 @@ test('the primary action unblocks when the blocking check is answered', async ({
     const pipelinePage = new PipelinePage(page, pipeline, ontrack)
     await pipelinePage.goTo()
 
-    // Blocked: one check, not passing, and the fix is on the row itself.
-    await pipelinePage.expectChecksSummary({passed: 0, total: 1})
+    // Blocked: one check, not passing - still waiting for its answer - and the fix is on the row itself.
+    await pipelinePage.expectChecksSummaryInProgress({passed: 0, total: 1, pending: 1})
     await pipelinePage.checkRunAction({disabled: true})
 
+    // Waiting for an answer, which is not an error (#1937).
     const rule = await pipelinePage.getAdmissionRule(ruleConfigId)
-    await rule.expectToBeUnchecked()
+    await rule.expectToBePending()
+    await pipelinePage.expectPipelinePendingMessage('No approval')
+    await pipelinePage.expectNoPipelineErrorMessage()
     await rule.manualInput({
         actions: async (dialog) => {
             await dialog.getByLabel('Approval', {exact: true}).click()

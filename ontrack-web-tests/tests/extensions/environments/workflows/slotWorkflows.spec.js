@@ -336,3 +336,46 @@ test('a workflow status can be overridden for a pipeline', async ({page, ontrack
     // ...and, since #1792, the override is in the audit timeline with the reason that was given.
     await pipelinePage.expectTimelineEntry("Ignoring the workflow result")
 })
+test('a running workflow on deploying is shown as running, not as an error', async ({page, ontrack}) => {
+    // #1937 - a workflow still running blocks the deployment completion, but nothing went wrong
+    const {slot, project} = await createSlot(ontrack)
+    const slotWorkflow = await addSlotWorkflow({
+        slot,
+        trigger: 'RUNNING',
+        workflowYaml: `
+            name: Deploying
+            nodes:
+              - id: deploy
+                executorId: mock
+                data:
+                    text: Deploying
+                    waitMs: 10000
+        `
+    })
+
+    const {pipeline} = await createPipeline({project, slot})
+    await ontrack.environments.startPipeline({pipeline})
+
+    await login(page, ontrack)
+    const pipelinePage = new PipelinePage(page, pipeline, ontrack)
+    await pipelinePage.goTo()
+
+    // Waiting, not in error
+    await pipelinePage.expectNoPipelineErrorMessage()
+    await pipelinePage.expectPipelinePendingMessage('Workflow')
+    await pipelinePage.expectChecksSummaryInProgress({passed: 0, total: 1, pending: 1})
+    await pipelinePage.checkFinishAction({disabled: true})
+
+    const pipelineWorkflow = await pipelinePage.getWorkflow(slotWorkflow.id)
+    await pipelineWorkflow.checkState({name: 'Deploying', ok: 'pending'})
+    await expect(pipelineWorkflow.locatePipelineWorkflow()).not.toContainText('Blocking')
+    await pipelineWorkflow.checkOverrideWorkflowButton({visible: true})
+    await expect(pipelineWorkflow.locatorOverrideWorkflowButton()).not.toHaveClass(/ant-btn-dangerous/)
+
+    // Once the workflow is done, the deployment can be finished
+    await waitForPipelineWorkflowToBeFinished(page, ontrack, pipeline.id, slotWorkflow, {timeout: 20000})
+    await pipelinePage.goTo()
+    await pipelinePage.expectChecksSummary({passed: 1, total: 1})
+    await pipelinePage.checkFinishAction({disabled: false})
+    await expect(page.getByTestId('deployment-pending')).not.toBeVisible()
+})

@@ -74,7 +74,7 @@ import {mobileBuildUri, mobileProjectUri} from "@components/mobile/mobileRoutes"
 import {slotNameWithoutProject} from "@components/extension/environments/SlotName"
 import {MobileAdmissionRuleSummary} from "@components/mobile/deployments/admissionRuleComponents"
 import SlotPipelineStatusLabel from "@components/extension/environments/SlotPipelineStatusLabel"
-import CheckIcon from "@components/common/CheckIcon"
+import CheckStateIcon from "@components/extension/environments/shared/CheckStateIcon"
 import TimestampText from "@components/common/TimestampText"
 
 export default function MobileDeploymentScreen({id}) {
@@ -154,6 +154,7 @@ export default function MobileDeploymentScreen({id}) {
                         overridden
                         check {
                             ok
+                            state
                         }
                         override {
                             user
@@ -192,10 +193,12 @@ export default function MobileDeploymentScreen({id}) {
                     }
                     # Why the deployment cannot move on, in the failing check's
                     # own words. On a RUNNING deployment that is a slot workflow -
-                    # "Workflow is running", "Workflow has not started",
-                    # "Workflow is in error" - and never an admission rule, which
-                    # gates CANDIDATE to RUNNING only.
+                    # "Workflow is in error", "Workflow has been stopped" - and never
+                    # an admission rule, which gates CANDIDATE to RUNNING only.
                     errorMessage
+                    # What it is only waiting for, when nothing has failed:
+                    # "Workflow is running", "Workflow has not started" (#1937).
+                    pendingMessage
                     # What a cancellation was for, read back exactly as the
                     # desktop reads it beside a CANCELLED pipeline - and why a
                     # FAILED one failed.
@@ -270,7 +273,8 @@ export default function MobileDeploymentScreen({id}) {
      * nothing to do with it - admission rules gate CANDIDATE to RUNNING only - so
      * a "n of m checks passed" caption would point at the wrong thing entirely.
      * `errorMessage` is what is read instead: already state-aware, and the failing
-     * workflow's own reason rather than a pointer to the desktop.
+     * workflow's own reason rather than a pointer to the desktop - or, when nothing
+     * has failed, `pendingMessage`, the reason of the workflow still running (#1937).
      */
     const runBlocked = candidate && !deployment?.runAction?.ok
     const finishBlocked = isRunning && !deployment?.finishAction?.ok
@@ -500,6 +504,7 @@ export default function MobileDeploymentScreen({id}) {
                                             >
                                                 {
                                                     deployment.errorMessage ||
+                                                    deployment.pendingMessage ||
                                                     "This deployment cannot be completed yet."
                                                 }
                                             </Typography.Text>
@@ -556,14 +561,14 @@ export default function MobileDeploymentScreen({id}) {
                                                       survive greyscale, as the
                                                       validation chips do.
                                                     */}
-                                                    <CheckIcon
+                                                    <CheckStateIcon
                                                         id={`mobile-deployment-rule-${config.id}`}
-                                                        value={rule.check?.ok}
+                                                        state={ruleState(rule)}
                                                     />
                                                     <MobileAdmissionRuleSummary rule={config}/>
                                                 </span>
                                                 <span className="ot-mobile-row-context">
-                                                    {rule.check?.ok ? 'Passed' : 'Blocking'}
+                                                    {ruleStateLabel(rule)}
                                                     {
                                                         rule.overridden &&
                                                         ` — overridden${rule.override?.user ? ` by ${rule.override.user}` : ''}`
@@ -618,8 +623,8 @@ export default function MobileDeploymentScreen({id}) {
                                                         !rule.overridden && rule.canBeOverridden &&
                                                         <Button
                                                             size="large"
-                                                            danger
-                                                            icon={<FaExclamationTriangle/>}
+                                                            danger={ruleState(rule) === 'FAILED'}
+                                                            icon={ruleState(rule) === 'FAILED' ? <FaExclamationTriangle/> : undefined}
                                                             title="Override this rule"
                                                             data-testid={`mobile-deployment-override-open-${config.id}`}
                                                             onClick={() => setOverriding(rule)}
@@ -705,4 +710,22 @@ export default function MobileDeploymentScreen({id}) {
             </MobileAsyncContent>
         </MobileScreen>
     )
+}
+
+/**
+ * The state of a rule's check - `OK`, `PENDING` or `FAILED` - read from its verdict when the server
+ * does not say it.
+ */
+const ruleState = (rule) => rule.check?.state ?? (rule.check?.ok ? 'OK' : 'FAILED')
+
+/**
+ * The word beside a rule: a pending rule is one waiting for an answer, not one refusing (#1937).
+ */
+const ruleStateLabel = (rule) => {
+    const state = ruleState(rule)
+    if (state === 'OK') return 'Passed'
+    if (state === 'PENDING') {
+        return rule.admissionRuleConfig?.ruleId === 'manual' ? 'Waiting for approval' : 'Waiting'
+    }
+    return 'Blocking'
 }

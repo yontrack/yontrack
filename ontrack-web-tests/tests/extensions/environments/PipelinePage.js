@@ -133,6 +133,24 @@ export class PipelinePage {
         await expect(this.page.getByTestId('deployment-error')).not.toBeVisible()
     }
 
+    /**
+     * What the deployment is waiting for - a workflow running, an approval to give - which is a
+     * blue notice and not the red error (#1937).
+     */
+    async expectPipelinePendingMessage(message) {
+        const pending = this.page.getByTestId('deployment-pending')
+        await expect(pending).toBeVisible()
+        await expect(pending).toContainText(message)
+    }
+
+    /**
+     * "N of M checks passed · K in progress" - the summary line when some checks are still pending.
+     */
+    async expectChecksSummaryInProgress({passed, total, pending}) {
+        const summary = this.page.getByTestId(`${this.prefix}-summary`)
+        await expect(summary).toHaveText(`${passed} of ${total} checks passed · ${pending} in progress`)
+    }
+
     locatorRunAction() {
         return this.page.getByTestId('deployment-start')
     }

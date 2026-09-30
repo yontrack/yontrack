@@ -1,5 +1,5 @@
 import {Alert, Button, Space, Steps, Typography} from "antd"
-import {FaBan, FaCheck, FaPlay} from "react-icons/fa"
+import {FaBan, FaCheck, FaHourglassHalf, FaPlay, FaSpinner} from "react-icons/fa"
 import BuildLink from "@components/builds/BuildLink"
 import {PromotionLevelImage} from "@components/promotionLevels/PromotionLevelImage"
 import TimestampText from "@components/common/TimestampText"
@@ -96,6 +96,24 @@ export default function DeploymentHeader({
                     showIcon
                     title={deployment.errorMessage}
                     data-testid="deployment-error"
+                />
+            }
+            {
+                /*
+                 * What the deployment is waiting for - a workflow still running, an approval still
+                 * to give. It blocks as much as an error does, and is not one (#1937).
+                 */
+                !deployment.errorMessage && deployment.pendingMessage &&
+                <Alert
+                    type="info"
+                    showIcon
+                    icon={
+                        deployment.status === 'RUNNING' ?
+                            <FaSpinner className="anticon-spin"/> :
+                            <FaHourglassHalf/>
+                    }
+                    title={deployment.pendingMessage}
+                    data-testid="deployment-pending"
                 />
             }
 

@@ -20,9 +20,13 @@
  * Each item is normalised to one shape so the component draws one kind of row:
  *
  * ```
- * {key, kind: 'rule' | 'workflow', ok, overridden, override, canBeOverridden,
+ * {key, kind: 'rule' | 'workflow', ok, state, overridden, override, canBeOverridden,
  *  rule?, slotWorkflow?, needsInput}
  * ```
+ *
+ * `state` is `OK`, `PENDING` or `FAILED` (#1937). A pending check blocks exactly like a failed one -
+ * `ok` is false for both - but it is waiting for something expected to happen, a workflow running
+ * or an approval to give, and is not drawn as an error.
  *
  * @param {Object} deployment The deployment, with `status`, `admissionRules`, `requiredInputs` and
  *   the slot's `candidateWorkflows` / `runningWorkflows`.
@@ -70,6 +74,7 @@ export const phaseItems = (deployment, phase) => {
                 key: `rule-${config?.id}`,
                 kind: 'rule',
                 ok: !!rule.check?.ok,
+                state: checkState(rule.check),
                 reason: rule.check?.reason,
                 overridden: !!rule.overridden,
                 override: rule.override,
@@ -99,9 +104,16 @@ export const phaseItems = (deployment, phase) => {
         })
     }
 
-    // Failing first, then overridden, then passed - the order somebody reading the list needs, not
-    // the order the server happened to return them in.
-    return [...items].sort((a, b) => rank(a) - rank(b))
+    // In a phase already over, nothing is waiting any longer: a workflow which never ran, or an
+    // approval never given, did not pass. Only a workflow still actually running stays pending.
+    // The DONE or FAILED phase of a deployment which ended that way is not over: its workflows run
+    // once it has ended, and the server reports them as what the deployment is waiting for.
+    const over = phase !== currentPhase(deployment) && phase !== deployment.status
+    const settled = over ? items.map(item => settledItem(item)) : items
+
+    // Failing first, then pending, then overridden, then passed - the order somebody reading the list
+    // needs, not the order the server happened to return them in.
+    return [...settled].sort((a, b) => rank(a) - rank(b))
 }
 
 const workflowItem = (slotWorkflow) => {
@@ -110,9 +122,10 @@ const workflowItem = (slotWorkflow) => {
         key: `workflow-${slotWorkflow.id}`,
         kind: 'workflow',
         // A workflow which has not started yet has no verdict, and "no verdict" is not a pass: the
-        // deployment is still waiting on it.
+        // deployment is still waiting on it - which is what the server says of it too.
         ok: !!instance?.check?.ok,
-        reason: instance?.check?.reason,
+        state: instance ? checkState(instance.check) : 'PENDING',
+        reason: instance?.check?.reason ?? 'Workflow has not started',
         overridden: !!instance?.overridden,
         override: instance?.override,
         canBeOverridden: !!instance?.canBeOverridden,
@@ -121,20 +134,37 @@ const workflowItem = (slotWorkflow) => {
     }
 }
 
+const settledItem = (item) => {
+    if (item.state !== 'PENDING') return item
+    const status = item.slotWorkflow?.slotWorkflowInstanceForPipeline?.workflowInstance?.status
+    if (status === 'STARTED' || status === 'RUNNING') return item
+    return {...item, state: 'FAILED'}
+}
+
+/**
+ * The state of a check: the server's when it says it, and otherwise read from its verdict, since
+ * a check which does not pass and does not say it is pending is one that failed.
+ */
+const checkState = (check) => check?.state ?? (check?.ok ? 'OK' : 'FAILED')
+
 const rank = (item) => {
-    if (!item.ok) return 0
-    if (item.overridden) return 1
-    return 2
+    if (item.state === 'FAILED') return 0
+    if (item.state === 'PENDING') return 1
+    if (item.overridden) return 2
+    return 3
 }
 
 /**
  * "N of M checks passed" - the same sentence the mobile deployment screen uses, from the same
- * numbers, so the two UIs do not count differently.
+ * numbers, so the two UIs do not count differently - followed by how many are still in progress,
+ * when some are.
  */
 export const checksSummary = (items) => {
     const total = items.length
     const passed = items.filter(item => item.ok).length
-    return {passed, total, text: `${passed} of ${total} checks passed`}
+    const pending = items.filter(item => item.state === 'PENDING').length
+    const text = `${passed} of ${total} checks passed` + (pending > 0 ? ` · ${pending} in progress` : '')
+    return {passed, pending, total, text}
 }
 
 /**

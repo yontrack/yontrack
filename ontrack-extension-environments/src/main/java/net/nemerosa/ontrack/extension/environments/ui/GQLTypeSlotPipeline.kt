@@ -109,10 +109,21 @@ class GQLTypeSlotPipeline(
             // Error message
             .fieldGetter<SlotPipeline, String>(
                 name = "errorMessage",
-                description = "Error message if any",
+                description = "Reason of the first failed check of the current phase, if any. " +
+                        "A pending check - a workflow still running, an approval still to give - is not an error: " +
+                        "see pendingMessage.",
                 nullable = true,
             ) { pipeline, _ ->
                 slotService.getPipelineErrorMessage(pipeline)
+            }
+            // Pending message
+            .fieldGetter<SlotPipeline, String>(
+                name = "pendingMessage",
+                description = "Reason of the first pending check of the current phase - a workflow still running, " +
+                        "an approval still to give - when no check has failed.",
+                nullable = true,
+            ) { pipeline, _ ->
+                slotService.getPipelinePendingMessage(pipeline)
             }
             // OK
             .build()
