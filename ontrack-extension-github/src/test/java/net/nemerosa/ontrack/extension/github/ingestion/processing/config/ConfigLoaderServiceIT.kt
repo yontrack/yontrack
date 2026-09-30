@@ -30,7 +30,7 @@ class ConfigLoaderServiceIT : AbstractIngestionTestSupport() {
                 assertNotNull(config, "Ingestion configuration was loaded") {
                     assertEquals(
                         IngestionConfig(
-                            version = "v1",
+                            version = "v2",
                             workflows = IngestionConfigWorkflows(
                                 filter = FilterConfig(includes = "build")
                             ),
@@ -54,7 +54,7 @@ class ConfigLoaderServiceIT : AbstractIngestionTestSupport() {
                 assertNotNull(config, "Ingestion configuration was loaded") {
                     assertEquals(
                         IngestionConfig(
-                            version = "v1",
+                            version = "v2",
                             workflows = IngestionConfigWorkflows(
                                 filter = FilterConfig(includes = "build")
                             ),
