@@ -25,6 +25,9 @@ import BranchContent from "@components/branches/BranchContent";
 import {useEventForRefresh} from "@components/common/EventsContext";
 import BranchContentViewSelector from "@components/branches/BranchContentViewSelector";
 import useBranchContentViewSelection from "@components/branches/views/useBranchContentViewSelection";
+import BranchFindingsCommand, {
+    gqlBranchFindingsCommandFragment
+} from "@components/extension/findings/branch/BranchFindingsCommand";
 
 export default function BranchView({id}) {
 
@@ -49,12 +52,14 @@ export default function BranchView({id}) {
                     userMenuActions {
                         ...userMenuActionFragment
                     }
+                    ...BranchFindingsCommand
                 }
             }
             ${gqlBranchContentFragment}
             ${gqlPropertiesFragment}
             ${gqlInformationFragment}
             ${gqlUserMenuActionFragment}
+            ${gqlBranchFindingsCommandFragment}
         `,
         {
             variables: {
@@ -127,6 +132,7 @@ export default function BranchView({id}) {
                     text="Validations"
                     title="Management of the validation stamps for this branch"
                 />,
+                <BranchFindingsCommand key="findings" branch={branch}/>,
                 <UserMenuActions key="userMenuActions" actions={branch.userMenuActions}/>,
                 <JumpToBranch key="branch" projectName={branch.project.name}/>,
                 <Command

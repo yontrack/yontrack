@@ -33,13 +33,44 @@ data class FindingsSummary(
  *
  * @property branch Branch
  * @property open Findings open on this branch, by maximum severity, every severity present
+ * @property counting Whether this branch counts for the state of the findings of the project:
+ * matched by its branch model, and not disabled
  */
 data class FindingsBranchSummary(
     val branch: Branch,
     val open: Map<FindingSeverity, Int>,
+    val counting: Boolean,
 ) {
     /**
      * Number of findings open on this branch
      */
     val openCount: Int get() = open.values.sum()
+}
+
+/**
+ * Summary of the findings of one branch, for the branch page and the dashboards.
+ *
+ * The state of a finding on a branch rolls up its exposure for all the stamps of the branch, as
+ * the filter of the findings on a branch does, so that a count and the list it leads to agree —
+ * whether the branch counts for the project or not.
+ *
+ * @property open Findings open on this branch, by maximum severity, every severity present
+ * @property acceptedCount Number of findings accepted on this branch
+ * @property resolvedCount Number of findings resolved on this branch
+ */
+data class BranchFindingsSummary(
+    val open: Map<FindingSeverity, Int>,
+    val acceptedCount: Int,
+    val resolvedCount: Int,
+) {
+    /**
+     * Number of findings open on this branch
+     */
+    val openCount: Int get() = open.values.sum()
+
+    /**
+     * Whether a finding has ever been exposed on this branch, resolved or not. A scan which
+     * reports nothing leaves no exposure: a branch with clean scans only has none either.
+     */
+    val hasExposures: Boolean get() = openCount + acceptedCount + resolvedCount > 0
 }

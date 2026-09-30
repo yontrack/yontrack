@@ -128,6 +128,7 @@ nav:
           - Validation charts: content/dashboards/widgets/validation-charts.md
           - End-to-end lead time: content/dashboards/widgets/e2e-lead-time-chart.md
           - Project scorecard: content/dashboards/widgets/project-scorecard.md
+          - Findings: content/dashboards/widgets/findings.md
   - Reference:
       - API:
           - GraphQL API: content/api/graphql.md

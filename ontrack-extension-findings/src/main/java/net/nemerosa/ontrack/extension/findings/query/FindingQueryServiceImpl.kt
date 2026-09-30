@@ -82,6 +82,7 @@ class FindingQueryServiceImpl(
         } else {
             findingRepository.findExposuresByFindings(findings.map { it.id })
         }
+        val countingBranches = findingStateService.getCountingBranchIds(project)
         val branches = exposures.groupBy { it.branchId }
             .map { (branchId, branchExposures) ->
                 val open = branchExposures.groupBy { it.findingId }
@@ -93,6 +94,7 @@ class FindingQueryServiceImpl(
                 FindingsBranchSummary(
                     branch = structureService.getBranch(ID.of(branchId)),
                     open = severityCounts(open),
+                    counting = branchId in countingBranches,
                 )
             }
             .sortedWith(branchSummaryOrder)
@@ -102,6 +104,21 @@ class FindingQueryServiceImpl(
             resolvedCount = findings.count { states[it.id] == FindingState.RESOLVED },
             branches = branches,
             scanners = findings.map { it.scanner }.distinct().sorted(),
+        )
+    }
+
+    override fun getBranchFindingsSummary(branch: Branch, date: LocalDate): BranchFindingsSummary? {
+        if (!canSeeFindings(branch.project.id())) return null
+        // State on the branch: its exposure rolled up over its stamps, as the filter on a branch gives it
+        val states = findingRepository.findExposuresByBranch(branch.id())
+            .groupBy { it.findingId }
+            .mapValues { (_, exposures) -> FindingExposureState.of(exposures.map { it.stateOn(date) }) }
+        val exposed = states.filterValues { it == FindingExposureState.EXPOSED }.keys
+        val open = if (exposed.isEmpty()) emptyList() else findingRepository.findFindingsByIds(exposed)
+        return BranchFindingsSummary(
+            open = severityCounts(open),
+            acceptedCount = states.values.count { it == FindingExposureState.ACCEPTED },
+            resolvedCount = states.values.count { it == FindingExposureState.RESOLVED },
         )
     }
 

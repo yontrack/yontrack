@@ -62,6 +62,12 @@ object DemoContent {
      */
     const val SECURITY_RELEASE = "release-2.3"
 
+    /** The findings widget of [SECURITY] on the demo dashboard - fixed, like [DASHBOARD_UUID]. */
+    const val FINDINGS_PROJECT_WIDGET_UUID = "1c1f9c3e-8bfa-4a1f-8a0b-4e2f0b0d1a17"
+
+    /** The findings widget of [SECURITY_RELEASE] on the demo dashboard - fixed, like [DASHBOARD_UUID]. */
+    const val FINDINGS_BRANCH_WIDGET_UUID = "1c1f9c3e-8bfa-4a1f-8a0b-4e2f0b0d1a18"
+
     const val MAIN = "main"
     /**
      * A slash would be rejected: Yontrack entity names allow letters, digits, dots, dashes
@@ -1649,6 +1655,26 @@ object DemoContent {
                 key = "extension/scorecard/ProjectScorecard",
                 config = mapOf("project" to VISITS).asJson(),
                 layout = DemoWidgetLayout(x = 0, y = 100, w = 4, h = 24),
+            ),
+            // The security findings: the project with its branches, and the release branch on its
+            // own, where the HIGH fixed on main is still open.
+            DemoWidget(
+                uuid = FINDINGS_PROJECT_WIDGET_UUID,
+                key = "extension/findings/ProjectFindings",
+                config = mapOf(
+                    "project" to SECURITY,
+                    "showBranches" to true,
+                ).asJson(),
+                layout = DemoWidgetLayout(x = 0, y = 124, w = 6, h = 20),
+            ),
+            DemoWidget(
+                uuid = FINDINGS_BRANCH_WIDGET_UUID,
+                key = "extension/findings/BranchFindings",
+                config = mapOf(
+                    "project" to SECURITY,
+                    "branch" to SECURITY_RELEASE,
+                ).asJson(),
+                layout = DemoWidgetLayout(x = 6, y = 124, w = 6, h = 20),
             ),
         ),
     )

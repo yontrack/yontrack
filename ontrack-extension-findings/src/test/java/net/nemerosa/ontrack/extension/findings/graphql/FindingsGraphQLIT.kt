@@ -532,6 +532,149 @@ class FindingsGraphQLIT : AbstractQLKTITSupport() {
     }
 
     @Test
+    fun `Summary of the findings of a project, telling the branches which count for the project from the others`() {
+        asAdmin {
+            project {
+                val main = branch("main")
+                val disabled = branch("old")
+                val vsMain = main.findingsStamp()
+                val vsDisabled = disabled.findingsStamp()
+                main.scan(vsMain, entry("CVE-1"))
+                disabled.scan(vsDisabled, entry("CVE-2"))
+                structureService.disableBranch(disabled)
+
+                val branches = findingsSummary(this).path("branches").toList()
+                    .associate { it.path("branch").path("name").asText() to it.path("counting").asBoolean() }
+                assertEquals(mapOf("main" to true, "old" to false), branches)
+            }
+        }
+    }
+
+    @Test
+    fun `Summary of the findings of a branch, open by severity, accepted and resolved`() {
+        asAdmin {
+            project {
+                val main = branch("main")
+                val release = branch("release-x")
+                val vsCode = main.findingsStamp()
+                val vsImage = main.findingsStamp()
+                val vsRelease = release.findingsStamp()
+                main.scan(
+                    vsCode,
+                    entry("CVE-CRITICAL", severity = "CRITICAL"),
+                    entry("CVE-ACCEPTED", severity = "HIGH", acceptedUntil = today.plusDays(10)),
+                    entry("CVE-EXPIRED", severity = "MEDIUM", acceptedUntil = today.plusDays(10)),
+                    entry("CVE-FIXED", severity = "LOW"),
+                    entry("CVE-TWO-STAMPS", severity = "HIGH"),
+                )
+                main.scan(
+                    vsCode,
+                    entry("CVE-CRITICAL", severity = "CRITICAL"),
+                    entry("CVE-ACCEPTED", severity = "HIGH", acceptedUntil = today.plusDays(10)),
+                    entry("CVE-EXPIRED", severity = "MEDIUM", acceptedUntil = today.minusDays(1)),
+                )
+                // Resolved for one stamp, still exposed for another one
+                main.scan(vsImage, entry("CVE-TWO-STAMPS", severity = "HIGH"))
+                // Only on the release branch
+                release.scan(vsRelease, entry("CVE-ELSEWHERE", severity = "CRITICAL"))
+
+                val summary = branchFindingsSummary(main)
+                assertEquals(
+                    mapOf("CRITICAL" to 1, "HIGH" to 1, "MEDIUM" to 1, "LOW" to 0, "UNKNOWN" to 0),
+                    summary.path("open").severityCounts()
+                )
+                assertEquals(
+                    listOf("CRITICAL", "HIGH", "MEDIUM", "LOW", "UNKNOWN"),
+                    summary.path("open").toList().map { it.path("severity").asText() },
+                    "Every severity, the most severe first"
+                )
+                assertEquals(3, summary.path("openCount").asInt())
+                assertEquals(1, summary.path("acceptedCount").asInt())
+                assertEquals(1, summary.path("resolvedCount").asInt())
+                assertTrue(summary.path("hasExposures").asBoolean())
+
+                // The counts are the ones the filter of the findings on the branch gives
+                assertEquals(
+                    summary.path("open").severityCounts().getValue("HIGH"),
+                    projectFindingIds(this, """{branch: "main", state: OPEN, severity: HIGH}""").size
+                )
+                assertEquals(
+                    summary.path("resolvedCount").asInt(),
+                    projectFindingIds(this, """{branch: "main", state: RESOLVED}""").size
+                )
+            }
+        }
+    }
+
+    @Test
+    fun `Summary of the findings of a branch which has none`() {
+        asAdmin {
+            project {
+                val main = branch("main")
+                // A clean scan leaves no exposure
+                main.scan(main.findingsStamp())
+                val summary = branchFindingsSummary(main)
+                assertEquals(
+                    mapOf("CRITICAL" to 0, "HIGH" to 0, "MEDIUM" to 0, "LOW" to 0, "UNKNOWN" to 0),
+                    summary.path("open").severityCounts()
+                )
+                assertEquals(0, summary.path("openCount").asInt())
+                assertEquals(0, summary.path("acceptedCount").asInt())
+                assertEquals(0, summary.path("resolvedCount").asInt())
+                assertFalse(summary.path("hasExposures").asBoolean())
+            }
+        }
+    }
+
+    @Test
+    fun `Summary of the findings of a branch whose findings are all resolved`() {
+        asAdmin {
+            project {
+                val main = branch("main")
+                val vs = main.findingsStamp()
+                main.scan(vs, entry("CVE-1"))
+                main.scan(vs)
+                val summary = branchFindingsSummary(main)
+                assertEquals(0, summary.path("openCount").asInt())
+                assertEquals(1, summary.path("resolvedCount").asInt())
+                assertTrue(summary.path("hasExposures").asBoolean())
+            }
+        }
+    }
+
+    @Test
+    fun `Summary of the findings of a disabled branch, which does not count for the project`() {
+        asAdmin {
+            project {
+                val old = branch("old")
+                old.scan(old.findingsStamp(), entry("CVE-1", severity = "CRITICAL"))
+                structureService.disableBranch(old)
+                val summary = branchFindingsSummary(old)
+                assertEquals(1, summary.path("openCount").asInt())
+                assertEquals(0, findingsSummary(this).path("openCount").asInt())
+            }
+        }
+    }
+
+    @Test
+    fun `No summary of the findings of a branch for a user without the permission to see them`() {
+        val branch = asAdmin {
+            project<Branch> {
+                val branch = branch()
+                branch.scan(branch.findingsStamp(), entry("CVE-HIDDEN"))
+                branch
+            }
+        }
+        asUserWithView(branch) {
+            assertTrue(branchFindingsSummary(branch).isNull)
+        }
+        val account = asAdmin { doCreateAccountWithProjectRole(branch.project, Roles.PROJECT_READ_ONLY) }
+        asFixedAccount(account) {
+            assertEquals(1, branchFindingsSummary(branch).path("openCount").asInt())
+        }
+    }
+
+    @Test
     fun `Authorization to see the findings of a project`() {
         val project = asAdmin { project() }
         asAdmin {
@@ -587,12 +730,33 @@ class FindingsGraphQLIT : AbstractQLKTITSupport() {
                                     count
                                 }
                                 openCount
+                                counting
                             }
                         }
                     }
                 }
             """
         ).path("project").path("findingsSummary")
+
+    private fun branchFindingsSummary(branch: Branch): JsonNode =
+        run(
+            """
+                {
+                    branch(id: ${branch.id}) {
+                        findingsSummary {
+                            open {
+                                severity
+                                count
+                            }
+                            openCount
+                            acceptedCount
+                            resolvedCount
+                            hasExposures
+                        }
+                    }
+                }
+            """
+        ).path("branch").path("findingsSummary")
 
     private fun JsonNode.severityCounts(): Map<String, Int> =
         toList().associate { it.path("severity").asText() to it.path("count").asInt() }

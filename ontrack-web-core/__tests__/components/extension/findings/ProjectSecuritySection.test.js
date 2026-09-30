@@ -68,15 +68,15 @@ describe('Security section of the project page', () => {
             .toHaveAttribute('href', '/extension/findings/project/7')
     })
 
-    it('counts the open findings by severity, each count linking to them', () => {
+    it('counts the open findings by severity as severity tags, each count linking to them', () => {
         renderSection()
-        expect(screen.getByTestId('security-open-CRITICAL')).toHaveTextContent('1')
-        expect(screen.getByTestId('security-open-HIGH'))
+        expect(screen.getByTestId('security-open-CRITICAL')).toHaveTextContent('Critical 1')
+        expect(screen.getByTestId('security-open-HIGH')).toHaveTextContent('High 2')
+        expect(screen.getByTestId('security-open-HIGH').closest('a'))
             .toHaveAttribute('href', '/extension/findings/project/7?severity=HIGH&state=OPEN')
-        expect(screen.getByTestId('security-open-HIGH')).toHaveTextContent('2')
         // No link to an empty list
-        expect(screen.getByTestId('security-open-MEDIUM')).toHaveTextContent('0')
-        expect(screen.getByTestId('security-open-MEDIUM')).not.toHaveAttribute('href')
+        expect(screen.getByTestId('security-open-MEDIUM')).toHaveTextContent('Medium 0')
+        expect(screen.getByTestId('security-open-MEDIUM').closest('a')).toBeNull()
         expect(screen.getByTestId('security-accepted'))
             .toHaveAttribute('href', '/extension/findings/project/7?state=ACCEPTED')
         expect(screen.getByTestId('security-resolved'))
@@ -88,7 +88,8 @@ describe('Security section of the project page', () => {
         const table = screen.getByTestId('security-branches')
         expect(within(table).getByRole('link', {name: 'main'}))
             .toHaveAttribute('href', '/extension/findings/project/7?state=OPEN&branch=main')
-        expect(screen.getByTestId('security-branch-release/1.0-HIGH'))
+        expect(screen.getByTestId('security-branch-release/1.0-HIGH')).toHaveTextContent('H 2')
+        expect(screen.getByTestId('security-branch-release/1.0-HIGH').closest('a'))
             .toHaveAttribute('href', '/extension/findings/project/7?severity=HIGH&state=OPEN&branch=release%2F1.0')
         expect(screen.getByTestId('security-branch-release/1.0-total')).toHaveTextContent('3')
         expect(within(table).queryByText('feature')).not.toBeInTheDocument()

@@ -1,12 +1,12 @@
 import {gql} from "graphql-request";
 import Link from "next/link";
 import {Empty, Space, Typography} from "antd";
-import Table from "@components/common/table/Table";
 import PageSection from "@components/common/PageSection";
 import {useQuery} from "@components/services/GraphQL";
 import {projectFindingsUri} from "@components/common/Links";
-import FindingSeverityTag from "@components/extension/findings/FindingSeverityTag";
-import {FINDING_SEVERITIES, severityName} from "@components/extension/findings/findingsModel";
+import FindingsSummaryCounts from "@components/extension/findings/FindingsSummaryCounts";
+import FindingsBranchesTable from "@components/extension/findings/FindingsBranchesTable";
+import {hasReportedFindings} from "@components/extension/findings/findingsModel";
 import {isAuthorized} from "@components/common/authorizations";
 
 export const gqlProjectFindingsSummary = gql`
@@ -37,19 +37,6 @@ export const gqlProjectFindingsSummary = gql`
     }
 `
 
-const countOf = (counts, severity) => counts.find(it => it.severity === severity)?.count ?? 0
-
-/**
- * A count, linking to the findings it counts when there is any.
- */
-function CountLink({project, filter, count, testId, label}) {
-    if (count > 0) {
-        return <Link href={projectFindingsUri(project, filter)} data-testid={testId} aria-label={label}>{count}</Link>
-    } else {
-        return <Typography.Text type="secondary" data-testid={testId} aria-label={label}>0</Typography.Text>
-    }
-}
-
 /**
  * The Security section of the project page: the open findings of the project by severity, and
  * their exposure per branch, each count linking to the findings page filtered on it.
@@ -73,42 +60,7 @@ export default function ProjectSecuritySection({project}) {
     )
 
     const exposedBranches = (summary?.branches ?? []).filter(it => it.openCount > 0)
-    const hasFindings = summary && (summary.openCount + summary.acceptedCount + summary.resolvedCount) > 0
-
-    const columns = [
-        {
-            key: 'branch',
-            title: 'Branch',
-            render: (_, {branch}) =>
-                <Link href={projectFindingsUri(project, {branch: branch.name, state: 'OPEN'})}>{branch.name}</Link>,
-        },
-        ...FINDING_SEVERITIES.map(severity => ({
-            key: severity,
-            title: <FindingSeverityTag severity={severity}/>,
-            align: 'right',
-            render: (_, {branch, open}) =>
-                <CountLink
-                    project={project}
-                    filter={{branch: branch.name, state: 'OPEN', severity}}
-                    count={countOf(open, severity)}
-                    testId={`security-branch-${branch.name}-${severity}`}
-                    label={`${severityName(severity)} findings open on ${branch.name}`}
-                />,
-        })),
-        {
-            key: 'total',
-            title: 'Open',
-            align: 'right',
-            render: (_, {branch, openCount}) =>
-                <CountLink
-                    project={project}
-                    filter={{branch: branch.name, state: 'OPEN'}}
-                    count={openCount}
-                    testId={`security-branch-${branch.name}-total`}
-                    label={`Findings open on ${branch.name}`}
-                />,
-        },
-    ]
+    const hasFindings = hasReportedFindings(summary)
 
     if (!allowed) return null
 
@@ -134,52 +86,18 @@ export default function ProjectSecuritySection({project}) {
             {
                 hasFindings &&
                 <Space orientation="vertical" size={16} style={{width: '100%'}}>
-                    <Space size={24} wrap data-testid="security-open">
-                        <Typography.Text strong>Open findings</Typography.Text>
-                        {
-                            FINDING_SEVERITIES.map(severity =>
-                                <Space key={severity} size={4}>
-                                    <FindingSeverityTag severity={severity}/>
-                                    <CountLink
-                                        project={project}
-                                        filter={{state: 'OPEN', severity}}
-                                        count={countOf(summary.open, severity)}
-                                        testId={`security-open-${severity}`}
-                                        label={`${severityName(severity)} open findings`}
-                                    />
-                                </Space>
-                            )
-                        }
-                        <Space size={4}>
-                            <Typography.Text type="secondary">Accepted</Typography.Text>
-                            <CountLink
-                                project={project}
-                                filter={{state: 'ACCEPTED'}}
-                                count={summary.acceptedCount}
-                                testId="security-accepted"
-                                label="Accepted findings"
-                            />
-                        </Space>
-                        <Space size={4}>
-                            <Typography.Text type="secondary">Resolved</Typography.Text>
-                            <CountLink
-                                project={project}
-                                filter={{state: 'RESOLVED'}}
-                                count={summary.resolvedCount}
-                                testId="security-resolved"
-                                label="Resolved findings"
-                            />
-                        </Space>
-                    </Space>
+                    <FindingsSummaryCounts
+                        project={project}
+                        summary={summary}
+                        testIdPrefix="security"
+                        title="Open findings"
+                    />
                     {
                         exposedBranches.length > 0 ?
-                            <Table
-                                data-testid="security-branches"
-                                size="small"
-                                rowKey={it => it.branch.id}
-                                columns={columns}
-                                dataSource={exposedBranches}
-                                pagination={false}
+                            <FindingsBranchesTable
+                                project={project}
+                                branches={exposedBranches}
+                                testIdPrefix="security"
                             /> :
                             <Typography.Text type="secondary">No finding is open on any branch.</Typography.Text>
                     }

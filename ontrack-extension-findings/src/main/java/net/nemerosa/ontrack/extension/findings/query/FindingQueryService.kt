@@ -54,6 +54,19 @@ interface FindingQueryService {
     ): FindingsSummary?
 
     /**
+     * Summary of the findings of a branch: its open findings by severity, and the number of its
+     * accepted and resolved ones.
+     *
+     * @param branch Branch
+     * @param date Day against which the expiry of the acceptances is evaluated
+     * @return Summary, `null` for a user who cannot see the findings of the project
+     */
+    fun getBranchFindingsSummary(
+        branch: Branch,
+        date: LocalDate = Time.now.toLocalDate(),
+    ): BranchFindingsSummary?
+
+    /**
      * Findings having a given external ID, across all the projects, by project name.
      */
     fun getFindingsByExternalId(externalId: String): List<Finding>

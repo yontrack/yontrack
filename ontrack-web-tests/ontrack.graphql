@@ -492,6 +492,8 @@ type Branch implements Authorizable & ProjectEntity {
   ): [BranchLink!]!
   "Is this branch a favourite of the current user?"
   favourite: Boolean
+  "Summary of the security findings of the branch: its open findings by severity, and the number of its accepted and resolved ones. Null for a user who is not granted the view of the findings of the project."
+  findingsSummary: BranchFindingsSummary
   "Git branch"
   gitBranchConfigurationProperty: Property
   "Registered GitHub ingestion configuration"
@@ -563,6 +565,20 @@ type Branch implements Authorizable & ProjectEntity {
   validationStatuses(names: [String!]!): [ValidationRun!]!
   "Workflows which have been launched by a notification on an event for this entity, most recent first. Resolved by scanning the 100 most recent workflow notification records for this entity, so the list may be truncated on entities which accumulate many of them, like a project or a branch."
   workflowInstances: [WorkflowInstance!]!
+}
+
+"Summary of the security findings of a branch: its open findings by severity, and the number of its accepted and resolved ones. The state of a finding on a branch rolls up its exposure for all the validation stamps of the branch, as the filter of the findings on a branch does. Every count is by maximum severity."
+type BranchFindingsSummary {
+  "Number of findings accepted on this branch"
+  acceptedCount: Int!
+  "Whether a finding has ever been exposed on this branch, resolved or not. A scan which reports nothing leaves no exposure."
+  hasExposures: Boolean!
+  "Findings open on this branch ? exposed there for one of its validation stamps at least ? by maximum severity, every severity present, the most severe first"
+  open: [FindingSeverityCount!]!
+  "Number of findings open on this branch"
+  openCount: Int!
+  "Number of findings resolved on this branch"
+  resolvedCount: Int!
 }
 
 "Information about a branch"
@@ -2360,6 +2376,8 @@ type FindingSeverityCount {
 type FindingsBranchSummary {
   "Branch"
   branch: Branch!
+  "Whether this branch counts for the state of the findings of the project: matched by the branch model of the project, and not disabled"
+  counting: Boolean!
   "Findings open on this branch ? exposed there for one of its validation stamps at least ? by maximum severity, every severity present, the most severe first"
   open: [FindingSeverityCount!]!
   "Number of findings open on this branch"

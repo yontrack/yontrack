@@ -33,7 +33,7 @@ describe('Search result of a finding', () => {
     it('shows the project, the severity, the title and the location', () => {
         render(<Result data={data([])}/>)
         expect(screen.getByRole('link', {name: 'yontrack'})).toHaveAttribute('href', '/project/7')
-        expect(screen.getByText('CRITICAL')).toBeInTheDocument()
+        expect(screen.getByTestId('finding-severity-CRITICAL')).toHaveTextContent('Critical')
         expect(screen.getByText('log4j-core: Remote code execution in Log4j 2.x')).toBeInTheDocument()
         expect(screen.getByText('pkg:maven/org.apache.logging.log4j/log4j-core')).toBeInTheDocument()
     })

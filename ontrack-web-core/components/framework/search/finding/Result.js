@@ -1,9 +1,10 @@
 import SearchResultComponent from "@components/framework/search/SearchResultComponent";
-import {Space, Tag, Typography} from "antd";
+import {Space, Typography} from "antd";
 import Link from "next/link";
 import ProjectLink from "@components/projects/ProjectLink";
 import BranchLink from "@components/branches/BranchLink";
 import {findingUri} from "@components/common/Links";
+import FindingSeverityTag from "@components/extension/findings/FindingSeverityTag";
 
 /**
  * Search result of a finding: its external ID linking to the finding page, its project, and the
@@ -17,7 +18,7 @@ export default function Result({data}) {
                 <Link href={findingUri(finding)}>
                     <Typography.Text code>{finding.externalId}</Typography.Text>
                 </Link>
-                <Tag>{finding.maxSeverity}</Tag>
+                <FindingSeverityTag severity={finding.maxSeverity}/>
                 <ProjectLink project={project}/>
             </Space>
         }

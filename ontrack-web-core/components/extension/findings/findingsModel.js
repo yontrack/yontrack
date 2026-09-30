@@ -64,6 +64,67 @@ export function findingsFilterToQuery(filter = {}) {
 export const severityName = (severity) =>
     severity ? severity.charAt(0) + severity.slice(1).toLowerCase() : ''
 
+/**
+ * The one palette of the severities.
+ *
+ * - `preset`: the antd colour of the light severity tag (`FindingSeverityTag`)
+ * - `background` and `text`: the colours of a solid tag or badge (`FindingSeverityCountTag`), the
+ *   darker shade of the same hue, and a text colour keeping the pair at WCAG AA contrast (4.5:1)
+ *   whatever the theme — dark text on gold, white on the others.
+ */
+const FINDING_SEVERITY_PALETTE = {
+    CRITICAL: {preset: 'red', background: '#cf1322', text: '#ffffff'},
+    HIGH: {preset: 'volcano', background: '#d4380d', text: '#ffffff'},
+    MEDIUM: {preset: 'gold', background: '#faad14', text: '#1f1f1f'},
+    LOW: {preset: 'blue', background: '#0958d9', text: '#ffffff'},
+    UNKNOWN: {preset: 'default', background: '#595959', text: '#ffffff'},
+}
+
+/**
+ * Colours of a severity: `{preset, background, text}`, the ones of the unknown severity for
+ * anything else.
+ */
+export const findingSeverityColor = (severity) =>
+    FINDING_SEVERITY_PALETTE[severity] ?? FINDING_SEVERITY_PALETTE.UNKNOWN
+
+/** Number of findings of a severity, in a list of `{severity, count}`. */
+export const severityCount = (counts, severity) =>
+    (counts ?? []).find(it => it.severity === severity)?.count ?? 0
+
+/**
+ * The most severe severity having an open finding, `null` when none is open.
+ *
+ * @param {Array} open `{severity, count}` per severity
+ */
+export const highestOpenSeverity = (open) =>
+    FINDING_SEVERITIES.find(severity => severityCount(open, severity) > 0) ?? null
+
+/**
+ * Whether a summary of findings — of a project or of a branch — has any finding at all, open,
+ * accepted or resolved.
+ */
+export const hasReportedFindings = (summary) =>
+    !!summary && (summary.openCount + summary.acceptedCount + summary.resolvedCount) > 0
+
+/** "1 finding", "2 findings". */
+export const findingsCountText = (count, qualifier = '') =>
+    `${count} ${qualifier ? `${qualifier} ` : ''}${count === 1 ? 'finding' : 'findings'}`
+
+/**
+ * The open findings spelled out, for a label: `3 open findings: 1 critical, 2 high`.
+ *
+ * @param {Array} open `{severity, count}` per severity
+ */
+export function openFindingsLabel(open) {
+    const total = (open ?? []).reduce((sum, it) => sum + it.count, 0)
+    if (total === 0) return 'No open finding'
+    const details = FINDING_SEVERITIES
+        .filter(severity => severityCount(open, severity) > 0)
+        .map(severity => `${severityCount(open, severity)} ${severity.toLowerCase()}`)
+        .join(', ')
+    return `${findingsCountText(total, 'open')}: ${details}`
+}
+
 /** Human names of the states. */
 export const stateName = (state) =>
     state ? state.charAt(0) + state.slice(1).toLowerCase() : ''

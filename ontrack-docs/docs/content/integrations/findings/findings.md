@@ -521,19 +521,48 @@ In the UI:
 
     ![A finding](findings-finding.png)
 
+* the **Findings** command of a branch page leads to the findings open on this branch. Its badge
+  gives their number, in the colour of the most severe one, and hovering it spells them out —
+  `3 open findings: 1 critical, 2 high`. The command appears once a finding has been reported on the
+  branch; with nothing open, it carries no badge.
+
+    ![Findings command of a branch](findings-branch-command.png)
+
 * the page of a **validation run** lists the findings of this scan.
 * the **search** finds a finding by its external ID: searching `CVE-2021-44228` lists the projects and
   branches where it is exposed or accepted, and leads to the finding page.
 
+Everywhere a number of findings is given by severity, it is a tag in the colour of the severity —
+red for critical, orange for high, gold for medium, blue for low, grey for unknown — which names the
+severity as well: `Critical 3`, or `C 3` where space is short. A severity without any finding is
+shown muted.
+
+### Dashboard widgets
+
+Two [dashboard](../../dashboards/index.md) widgets show the findings on the home page — see
+[their reference](../../dashboards/widgets/findings.md) for their keys and configuration:
+
+| Widget               | Configuration                                  | Shows                                                                                       |
+|----------------------|------------------------------------------------|---------------------------------------------------------------------------------------------|
+| **Project findings** | A project, and whether to show its branches    | The open findings of the project by severity, the accepted and resolved ones and, optionally, the branches with open findings among those which count for the project |
+| **Branch findings**  | A branch                                       | The findings open on the branch by severity, and the ones accepted and resolved on it. A disabled branch, which does not count for the project, still shows its own findings |
+
+![Findings widgets](findings-widgets.png)
+
+Each figure opens the findings page, filtered. A widget tells a user who cannot see the findings of
+the project so, rather than showing zeros, and says when no finding has been reported at all.
+
 !!! note
 
-    The [mobile UI](../../mobile/index.md) does not show findings.
+    The [mobile UI](../../mobile/index.md) does not show findings, nor dashboards.
 
 Through the [GraphQL API](../../api/graphql.md):
 
 * `Project.findings(filter)` lists the findings of a project, paginated, most severe first, with the
   same filters as the findings page
 * `Project.findingsSummary` gives the counts the Security section shows
+* `Branch.findingsSummary` gives the counts of one branch: its open findings by severity, the number
+  of its accepted and resolved ones, and whether a finding has ever been reported on it
 * `ValidationRun.findings` lists the observations of a scan
 * `findings(externalId)` lists the findings with this external ID, across all the projects you can
   see the findings of

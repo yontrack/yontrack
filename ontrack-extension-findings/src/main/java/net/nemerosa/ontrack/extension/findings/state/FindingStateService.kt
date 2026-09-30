@@ -39,4 +39,9 @@ interface FindingStateService {
         findings: Collection<Finding>,
         date: LocalDate = Time.now.toLocalDate(),
     ): Map<Int, FindingState>
+
+    /**
+     * IDs of the branches of a project which count for the state of its findings.
+     */
+    fun getCountingBranchIds(project: Project): Set<Int>
 }

@@ -3,7 +3,7 @@ import {Button, Space, Typography} from "antd";
 import Link from "next/link";
 import {homeUri} from "@components/common/Links";
 
-export function Command({icon, text, href, target, action, title, disabled = false, testId}) {
+export function Command({icon, text, href, target, action, title, ariaLabel, disabled = false, testId}) {
     return <Button
         type="text"
         data-testid={testId}
@@ -11,7 +11,7 @@ export function Command({icon, text, href, target, action, title, disabled = fal
         title={title}
         disabled={disabled}
     >
-        {href && <Link href={href} target={target}>{icon} {text}</Link>}
+        {href && <Link href={href} target={target} aria-label={ariaLabel}>{icon} {text}</Link>}
         {!href && <>
             <Space size={8}>
                 {icon}

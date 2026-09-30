@@ -31,7 +31,7 @@ class FindingStateServiceImpl(
         date: LocalDate,
     ): Map<Int, FindingState> {
         if (findings.isEmpty()) return emptyMap()
-        val branches = countingBranches(project)
+        val branches = getCountingBranchIds(project)
         val exposures = findingRepository.findExposuresByFindings(findings.map { it.id })
             .filter { it.branchId in branches }
             .groupBy { it.findingId }
@@ -43,10 +43,7 @@ class FindingStateServiceImpl(
         }
     }
 
-    /**
-     * IDs of the branches which count for the state of the findings of a project.
-     */
-    private fun countingBranches(project: Project): Set<Int> {
+    override fun getCountingBranchIds(project: Project): Set<Int> {
         val matcher = branchModelMatcherService.getBranchModelMatcher(project)
         return structureService.getBranchesForProject(project.id)
             .filter { !it.isDisabled && (matcher == null || matcher.matches(it)) }

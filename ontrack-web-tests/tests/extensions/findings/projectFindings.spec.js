@@ -67,12 +67,12 @@ test('project page Security section shows the open findings by severity and thei
     await expect(section).toBeVisible()
     await expect(section.getByText('Security', {exact: true})).toBeVisible()
 
-    // Open findings by severity
-    await expect(section.getByTestId('security-open-CRITICAL')).toHaveText('1')
-    await expect(section.getByTestId('security-open-HIGH')).toHaveText('1')
-    await expect(section.getByTestId('security-open-MEDIUM')).toHaveText('1')
-    await expect(section.getByTestId('security-open-LOW')).toHaveText('1')
-    await expect(section.getByTestId('security-open-UNKNOWN')).toHaveText('0')
+    // Open findings by severity, as severity tags naming the severity
+    await expect(section.getByTestId('security-open-CRITICAL')).toHaveText('Critical 1')
+    await expect(section.getByTestId('security-open-HIGH')).toHaveText('High 1')
+    await expect(section.getByTestId('security-open-MEDIUM')).toHaveText('Medium 1')
+    await expect(section.getByTestId('security-open-LOW')).toHaveText('Low 1')
+    await expect(section.getByTestId('security-open-UNKNOWN')).toHaveText('Unknown 0')
     await expect(section.getByTestId('security-accepted')).toHaveText('1')
     await expect(section.getByTestId('security-resolved')).toHaveText('1')
 
@@ -81,7 +81,7 @@ test('project page Security section shows the open findings by severity and thei
     await expect(rows).toHaveCount(2)
     await expect(rows.nth(0)).toContainText('main')
     await expect(rows.nth(1)).toContainText('release')
-    await expect(section.getByTestId('security-branch-main-CRITICAL')).toHaveText('1')
+    await expect(section.getByTestId('security-branch-main-CRITICAL')).toHaveText('C 1')
     await expect(section.getByTestId('security-branch-main-total')).toHaveText('1')
     await expect(section.getByTestId('security-branch-release-total')).toHaveText('3')
 

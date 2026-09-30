@@ -264,6 +264,25 @@ class DemoFindingsSeedTest {
         ),
     )
 
+    @Test
+    fun `the demo dashboard shows the findings of the project, and of the release branch where the HIGH is still open`() {
+        val target = InMemoryDemoTarget()
+        seed(target).run(dataset)
+        val widgets = target.dashboards()
+            .filterIsInstance<InMemoryDemoTarget.InMemoryDashboard>()
+            .single().dashboard.widgets
+
+        val projectWidget = widgets.single { it.uuid == DemoContent.FINDINGS_PROJECT_WIDGET_UUID }
+        assertEquals("extension/findings/ProjectFindings", projectWidget.key)
+        assertEquals(DemoContent.SECURITY, projectWidget.config.path("project").asString())
+        assertTrue(projectWidget.config.path("showBranches").asBoolean())
+
+        val branchWidget = widgets.single { it.uuid == DemoContent.FINDINGS_BRANCH_WIDGET_UUID }
+        assertEquals("extension/findings/BranchFindings", branchWidget.key)
+        assertEquals(DemoContent.SECURITY, branchWidget.config.path("project").asString())
+        assertEquals(DemoContent.SECURITY_RELEASE, branchWidget.config.path("branch").asString())
+    }
+
     private fun InMemoryDemoTarget.buildOf(project: String, branch: String, build: String) =
         (projects().single { it.name == project } as InMemoryDemoTarget.InMemoryProject)
             .branches.single { it.name == branch }

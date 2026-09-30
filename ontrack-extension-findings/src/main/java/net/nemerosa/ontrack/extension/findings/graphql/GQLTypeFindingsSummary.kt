@@ -1,5 +1,6 @@
 package net.nemerosa.ontrack.extension.findings.graphql
 
+import graphql.Scalars.GraphQLBoolean
 import graphql.Scalars.GraphQLInt
 import graphql.Scalars.GraphQLString
 import graphql.schema.GraphQLList
@@ -7,6 +8,7 @@ import graphql.schema.GraphQLNonNull
 import graphql.schema.GraphQLObjectType
 import graphql.schema.GraphQLTypeReference
 import net.nemerosa.ontrack.extension.findings.model.FindingSeverity
+import net.nemerosa.ontrack.extension.findings.query.BranchFindingsSummary
 import net.nemerosa.ontrack.extension.findings.query.FindingsBranchSummary
 import net.nemerosa.ontrack.extension.findings.query.FindingsSummary
 import net.nemerosa.ontrack.graphql.schema.GQLType
@@ -111,6 +113,70 @@ class GQLTypeFindingsBranchSummary : GQLType {
                 it.name(FindingsBranchSummary::openCount.name)
                     .description("Number of findings open on this branch")
                     .type(GraphQLNonNull(GraphQLInt))
+            }
+            .field {
+                it.name(FindingsBranchSummary::counting.name)
+                    .description(
+                        "Whether this branch counts for the state of the findings of the project: " +
+                                "matched by the branch model of the project, and not disabled"
+                    )
+                    .type(GraphQLNonNull(GraphQLBoolean))
+            }
+            .build()
+}
+
+/**
+ * Summary of the findings of one branch.
+ */
+@Component
+class GQLTypeBranchFindingsSummary : GQLType {
+
+    override fun getTypeName(): String = BranchFindingsSummary::class.java.simpleName
+
+    override fun createType(cache: GQLTypeCache): GraphQLObjectType =
+        GraphQLObjectType.newObject()
+            .name(typeName)
+            .description(
+                "Summary of the security findings of a branch: its open findings by severity, and the number of its " +
+                        "accepted and resolved ones. The state of a finding on a branch rolls up its exposure for all " +
+                        "the validation stamps of the branch, as the filter of the findings on a branch does. " +
+                        "Every count is by maximum severity."
+            )
+            .field {
+                it.name(BranchFindingsSummary::open.name)
+                    .description(
+                        "Findings open on this branch — exposed there for one of its validation stamps at least — " +
+                                "by maximum severity, every severity present, the most severe first"
+                    )
+                    .type(GQLTypeFindingsSummary.severityCountListType)
+                    .dataFetcher { env ->
+                        with(GQLTypeFindingsSummary) {
+                            env.getSource<BranchFindingsSummary>()!!.open.toSeverityCounts()
+                        }
+                    }
+            }
+            .field {
+                it.name(BranchFindingsSummary::openCount.name)
+                    .description("Number of findings open on this branch")
+                    .type(GraphQLNonNull(GraphQLInt))
+            }
+            .field {
+                it.name(BranchFindingsSummary::acceptedCount.name)
+                    .description("Number of findings accepted on this branch")
+                    .type(GraphQLNonNull(GraphQLInt))
+            }
+            .field {
+                it.name(BranchFindingsSummary::resolvedCount.name)
+                    .description("Number of findings resolved on this branch")
+                    .type(GraphQLNonNull(GraphQLInt))
+            }
+            .field {
+                it.name(BranchFindingsSummary::hasExposures.name)
+                    .description(
+                        "Whether a finding has ever been exposed on this branch, resolved or not. " +
+                                "A scan which reports nothing leaves no exposure."
+                    )
+                    .type(GraphQLNonNull(GraphQLBoolean))
             }
             .build()
 }

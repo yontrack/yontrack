@@ -2,7 +2,11 @@ import {
     acceptanceSummary,
     exposedBranches,
     exposureRows,
+    FINDING_SEVERITIES,
     FINDINGS_VALIDATION_DATA_TYPE,
+    findingSeverityColor,
+    highestOpenSeverity,
+    openFindingsLabel,
     isFindingsRun,
     findingsFilterFromQuery,
     findingsFilterToQuery,
@@ -158,5 +162,76 @@ describe('isFindingsRun', () => {
         })).toBe(false)
         expect(isFindingsRun({})).toBe(false)
         expect(isFindingsRun(undefined)).toBe(false)
+    })
+})
+
+// WCAG 2.x relative luminance and contrast ratio
+const luminance = (hex) => {
+    const [r, g, b] = [1, 3, 5]
+        .map(i => parseInt(hex.slice(i, i + 2), 16) / 255)
+        .map(c => c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4))
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b
+}
+const contrast = (a, b) => {
+    const [high, low] = [luminance(a), luminance(b)].sort((x, y) => y - x)
+    return (high + 0.05) / (low + 0.05)
+}
+
+describe('findingSeverityColor', () => {
+
+    it('gives the antd preset of each severity, the one of the severity tag', () => {
+        expect(FINDING_SEVERITIES.map(it => findingSeverityColor(it).preset))
+            .toEqual(['red', 'volcano', 'gold', 'blue', 'default'])
+    })
+
+    it('gives four distinct solid colours for the four known severities', () => {
+        const solids = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'].map(it => findingSeverityColor(it).background)
+        expect(new Set(solids).size).toBe(4)
+    })
+
+    it.each(FINDING_SEVERITIES)('keeps the text of a %s solid tag at WCAG AA contrast', (severity) => {
+        const {background, text} = findingSeverityColor(severity)
+        expect(contrast(background, text)).toBeGreaterThanOrEqual(4.5)
+    })
+
+    it('falls back on the unknown severity', () => {
+        expect(findingSeverityColor('WHATEVER')).toEqual(findingSeverityColor('UNKNOWN'))
+        expect(findingSeverityColor(undefined)).toEqual(findingSeverityColor('UNKNOWN'))
+    })
+})
+
+const counts = (critical, high, medium, low, unknown) => [
+    {severity: 'CRITICAL', count: critical},
+    {severity: 'HIGH', count: high},
+    {severity: 'MEDIUM', count: medium},
+    {severity: 'LOW', count: low},
+    {severity: 'UNKNOWN', count: unknown},
+]
+
+describe('highestOpenSeverity', () => {
+
+    it('is the most severe severity having an open finding', () => {
+        expect(highestOpenSeverity(counts(0, 2, 1, 0, 0))).toBe('HIGH')
+        expect(highestOpenSeverity(counts(0, 0, 0, 0, 3))).toBe('UNKNOWN')
+    })
+
+    it('is nothing when no finding is open', () => {
+        expect(highestOpenSeverity(counts(0, 0, 0, 0, 0))).toBeNull()
+        expect(highestOpenSeverity(undefined)).toBeNull()
+    })
+})
+
+describe('openFindingsLabel', () => {
+
+    it('spells out the open findings by severity, the most severe first', () => {
+        expect(openFindingsLabel(counts(1, 2, 0, 0, 0))).toBe('3 open findings: 1 critical, 2 high')
+    })
+
+    it('uses the singular for one finding', () => {
+        expect(openFindingsLabel(counts(0, 0, 0, 1, 0))).toBe('1 open finding: 1 low')
+    })
+
+    it('says when no finding is open', () => {
+        expect(openFindingsLabel(counts(0, 0, 0, 0, 0))).toBe('No open finding')
     })
 })
