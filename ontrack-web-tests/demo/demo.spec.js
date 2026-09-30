@@ -79,9 +79,10 @@ test('the demo shows the security findings, from the project to the finding and 
     await new ProjectPage(page, ontrack, {name: findingsProject}).expectOnPage()
     const section = page.getByTestId('project-security')
     await expect(section).toBeVisible()
-    await expect(section.getByTestId('security-open-HIGH')).toHaveText(/^[1-9]\d*$/)
+    // A severity count tag names its severity: `High 3`, or `H 3` in its short form
+    await expect(section.getByTestId('security-open-HIGH')).toHaveText(/^High [1-9]\d*$/)
     await expect(section.getByTestId('security-accepted')).toHaveText(/^[1-9]\d*$/)
-    await expect(section.getByTestId(`security-branch-${findingsRelease}-HIGH`)).toHaveText(/^[1-9]\d*$/)
+    await expect(section.getByTestId(`security-branch-${findingsRelease}-HIGH`)).toHaveText(/^H [1-9]\d*$/)
 
     // The findings page, through the section's own link
     await section.getByRole('link', {name: 'All findings'}).click()
