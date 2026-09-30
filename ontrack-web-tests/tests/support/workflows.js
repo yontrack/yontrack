@@ -17,6 +17,12 @@ import {waitUntilCondition} from "./timing";
  * That shape is what makes the run worth drawing at all: concurrency, fan-out and ordering are
  * all readable from it, on the desktop's node strip and in the mobile UI's depth-ordered list
  * alike. `failing` makes the `publish` node fail, which is how a spec gets a node error to read.
+ *
+ * A failing `publish` also waits for `test-unit`. A node error stops the whole instance, and a
+ * sibling which has not started by then is cancelled - so
+ * with `publish` and `test-unit` both released by `build` alone, `test-unit` ended in Success or
+ * Stopped depending on which of the two polled its parent first. The join makes the order, and
+ * every node's final state, deterministic.
  */
 export const fanOutWorkflowNodes = ({failing = false} = {}) => ([
     {
@@ -32,7 +38,7 @@ export const fanOutWorkflowNodes = ({failing = false} = {}) => ([
     },
     {
         id: "publish",
-        parents: [{id: "build"}],
+        parents: failing ? [{id: "build"}, {id: "test-unit"}] : [{id: "build"}],
         executorId: "mock",
         data: {text: "Publishing", error: failing},
     },
