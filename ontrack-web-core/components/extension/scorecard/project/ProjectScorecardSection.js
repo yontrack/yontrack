@@ -1,29 +1,30 @@
+import {useState} from "react";
 import {gql} from "graphql-request";
 import Link from "next/link";
-import {Empty, Space, Typography} from "antd";
-import Table from "@components/common/table/Table";
+import {Col, Empty, Row, Space, Typography} from "antd";
 import PageSection from "@components/common/PageSection";
-import TimestampText from "@components/common/TimestampText";
 import {useQuery} from "@components/services/GraphQL";
 import {useRefresh} from "@components/common/RefreshUtils";
 import {projectScorecardUri} from "@components/common/Links";
 import {isAuthorized} from "@components/common/authorizations";
 import {
     latestComputedAt,
-    readingDescriptions,
-    readingMarkerKinds,
-    readingName,
+    orderedSets,
+    resolveSet,
+    SCORECARD_HISTORY_DAYS,
     scorecardRows,
-    setTitle,
+    setParam,
+    sortedReadings,
 } from "@components/extension/scorecard/scorecardModel";
 import {gqlLabelFragment} from "@components/labels/LabelGraphQLFragments";
-import ScorecardInfo from "@components/extension/scorecard/ScorecardInfo";
-import SetExplanation from "@components/extension/scorecard/SetExplanation";
-import ReadingValue from "@components/extension/scorecard/ReadingValue";
+import SetCard from "@components/extension/scorecard/SetCard";
+import ReadingTile from "@components/extension/scorecard/ReadingTile";
+import SecondaryText from "@components/extension/scorecard/SecondaryText";
+import ScorecardLegend from "@components/extension/scorecard/ScorecardLegend";
 import {ScorecardRecomputeButton, useScorecardRecompute} from "@components/extension/scorecard/ScorecardRecompute";
 
 export const gqlProjectScorecardSummary = gql`
-    query ProjectScorecardSummary($id: Int!) {
+    query ProjectScorecardSummary($id: Int!, $days: Int!) {
         project(id: $id) {
             scorecard {
                 sets {
@@ -54,6 +55,10 @@ export const gqlProjectScorecardSummary = gql`
                         direction
                         target
                         targetMet
+                        history(days: $days) {
+                            day
+                            value
+                        }
                     }
                 }
             }
@@ -63,24 +68,23 @@ export const gqlProjectScorecardSummary = gql`
 `
 
 /**
- * The Scorecard section of the project page: a compact table of the readings of the project, one
- * column per set — "Project", with no estate, then "Estate: <name>" per estate the project is in. Each
- * cell gives the value against the target of the estate, an unknown reading distinctly with its
- * reason, and the number of samples. The "Recompute" command needs the right to configure the project.
+ * The Scorecard section of the project page: one card per set - "Project", with no estate, then
+ * one per estate the project is in, by name - each estate with the ring of its targets met, and
+ * under them the readings of the selected set as tiles, with the trend of their last 90 days.
  *
- * An ⓘ on each column says what the set is, and one on each reading what it measures — up to each
- * kind of marker the sets read it up to. A legend says what the estate columns are.
- *
- * The scorecard page of the project says why each number is what it is.
+ * The first estate is selected by default, the Project set for a project in no estate. The selection
+ * is not kept: the "Details" link opens the scorecard page on it. The "Recompute" command needs the
+ * right to configure the project.
  */
 export default function ProjectScorecardSection({project}) {
 
     const [refreshCount, refresh] = useRefresh()
+    const [selected, setSelected] = useState(null)
 
     const {data: scorecard, finished, error} = useQuery(
         gqlProjectScorecardSummary,
         {
-            variables: {id: Number(project.id)},
+            variables: {id: Number(project.id), days: SCORECARD_HISTORY_DAYS},
             deps: [project.id, refreshCount],
             condition: !!project.id,
             dataFn: data => data.project?.scorecard,
@@ -94,65 +98,11 @@ export default function ProjectScorecardSection({project}) {
         refresh,
     })
 
-    const sets = scorecard?.sets ?? []
-    const rows = scorecardRows(scorecard)
+    const sets = orderedSets(scorecard)
+    const computed = scorecardRows(scorecard).length > 0
     const latest = latestComputedAt(scorecard)
-
-    const hasEstates = sets.some(set => set.estate)
-
-    const columns = [
-        {
-            key: 'reading',
-            title: 'Reading',
-            render: (_, {key, readings}) => {
-                const name = readingName(key)
-                const descriptions = readingDescriptions(key, readingMarkerKinds(Object.values(readings)))
-                return (
-                    <Space size={0}>
-                        <Typography.Text>{name}</Typography.Text>
-                        {
-                            descriptions.length > 0 &&
-                            <ScorecardInfo
-                                label={`About ${name}`}
-                                title={name}
-                                testId={`scorecard-reading-info-${key}`}
-                                content={
-                                    <Space orientation="vertical" size={4}>
-                                        {
-                                            descriptions.map(({label, text}) =>
-                                                <Typography.Text key={label ?? 'default'}>
-                                                    {label && <Typography.Text strong>{label}: </Typography.Text>}
-                                                    {text}
-                                                </Typography.Text>
-                                            )
-                                        }
-                                    </Space>
-                                }
-                            />
-                        }
-                    </Space>
-                )
-            },
-        },
-        ...sets.map(set => ({
-            key: set.name,
-            title: <Space size={0}>
-                {setTitle(set)}
-                <ScorecardInfo
-                    label={`About the ${setTitle(set)} column`}
-                    title={setTitle(set)}
-                    testId={`scorecard-set-info-${set.name}`}
-                    content={<SetExplanation set={set}/>}
-                />
-            </Space>,
-            render: (_, {readings}) => {
-                const reading = readings[set.name]
-                return reading ?
-                    <ReadingValue reading={reading} testId={`scorecard-${set.name}-${reading.key}`}/> :
-                    <Typography.Text type="secondary">-</Typography.Text>
-            },
-        })),
-    ]
+    const {set: current} = resolveSet(sets, selected)
+    const readings = sortedReadings(current)
 
     return (
         <PageSection
@@ -165,12 +115,12 @@ export default function ProjectScorecardSection({project}) {
                         canRecompute &&
                         <ScorecardRecomputeButton recompute={recompute} polling={polling} size="small"/>
                     }
-                    <Link href={projectScorecardUri(project)}>Details</Link>
+                    <Link href={projectScorecardUri(project, current ? setParam(current) : undefined)}>Details</Link>
                 </Space>
             }
             padding={true}
         >
-            <Space orientation="vertical" size={8} style={{width: '100%'}}>
+            <Space orientation="vertical" size={16} style={{width: '100%'}}>
                 {
                     error &&
                     <Typography.Text type="danger">{error}</Typography.Text>
@@ -180,36 +130,48 @@ export default function ProjectScorecardSection({project}) {
                     <Typography.Text type="danger">{recomputeError}</Typography.Text>
                 }
                 {
-                    !error && rows.length === 0 &&
+                    !error && !computed &&
                     <Empty
                         image={Empty.PRESENTED_IMAGE_SIMPLE}
                         description="The readings of this project have not been computed yet"
                     />
                 }
                 {
-                    rows.length > 0 &&
+                    computed &&
                     <>
-                        <Table
-                            data-testid="scorecard-table"
-                            size="small"
-                            rowKey="key"
-                            columns={columns}
-                            dataSource={rows}
-                            pagination={false}
-                        />
+                        <Row gutter={[16, 16]} data-testid="scorecard-sets">
+                            {
+                                sets.map(set =>
+                                    <Col key={set.name} xs={24} md={12} lg={8}>
+                                        <SetCard
+                                            set={set}
+                                            selected={set === current}
+                                            onSelect={it => setSelected(setParam(it))}
+                                            testId={`scorecard-set-card-${set.name}`}
+                                        />
+                                    </Col>
+                                )
+                            }
+                        </Row>
+                        <Row gutter={[16, 16]} data-testid="scorecard-tiles">
+                            {
+                                readings.map(reading =>
+                                    <Col key={reading.key} xs={24} md={12} lg={8}>
+                                        <ReadingTile
+                                            reading={reading}
+                                            testId={`scorecard-${current.name}-${reading.key}`}
+                                        />
+                                    </Col>
+                                )
+                            }
+                        </Row>
                         {
-                            hasEstates &&
-                            <Typography.Text type="secondary" style={{fontSize: '85%'}} data-testid="scorecard-legend">
-                                One column per estate the project belongs to through its labels.
-                                Met / Missed compares against that estate&apos;s target.
-                            </Typography.Text>
+                            readings.length === 0 &&
+                            <SecondaryText>
+                                The readings of this set have not been computed yet.
+                            </SecondaryText>
                         }
-                        {
-                            latest &&
-                            <Typography.Text type="secondary" style={{fontSize: '85%'}}>
-                                Computed <TimestampText value={latest} relative={true}/>
-                            </Typography.Text>
-                        }
+                        <ScorecardLegend latest={latest}/>
                     </>
                 }
             </Space>

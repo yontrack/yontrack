@@ -1642,6 +1642,14 @@ object DemoContent {
                 ).asJson(),
                 layout = DemoWidgetLayout(x = 0, y = 70, w = 12, h = 30),
             ),
+            // The scorecard of the project in both estates (#1938), with no set: it opens on its
+            // default one, the first estate by name - "Demo production", before "Demo products".
+            DemoWidget(
+                uuid = "1c1f9c3e-8bfa-4a1f-8a0b-4e2f0b0d1a16",
+                key = "extension/scorecard/ProjectScorecard",
+                config = mapOf("project" to VISITS).asJson(),
+                layout = DemoWidgetLayout(x = 0, y = 100, w = 4, h = 24),
+            ),
         ),
     )
 }

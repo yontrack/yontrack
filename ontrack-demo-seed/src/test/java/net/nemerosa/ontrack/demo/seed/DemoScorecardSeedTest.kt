@@ -36,6 +36,23 @@ class DemoScorecardSeedTest {
         return dataset.projects.filter { it.labels.containsAll(spec.labels) }.map { it.name }.toSet()
     }
 
+    /** The project scorecard widget (#1938) opens on its default set: no set in its configuration. */
+    @Test
+    fun `the demo dashboard has a project scorecard widget on the scorecard project, on its default set`() {
+        val widget = seeded().dashboards()
+            .filterIsInstance<InMemoryDemoTarget.InMemoryDashboard>()
+            .single().dashboard.widgets
+            .single { it.key == "extension/scorecard/ProjectScorecard" }
+
+        assertEquals(DemoContent.VISITS, widget.config.path("project").asString())
+        assertTrue(widget.config.path("set").isMissingNode, "No set: the widget shows the default one")
+        // The default set is the first estate by name
+        assertEquals(setOf(DemoContent.ESTATE_PRODUCTS, DemoContent.ESTATE_PRODUCTION), dataset.estates.filter {
+            DemoContent.VISITS in projectsOf(it.name)
+        }.map { it.name }.toSet())
+        assertTrue(DemoContent.ESTATE_PRODUCTION < DemoContent.ESTATE_PRODUCTS, "The widget opens on ${DemoContent.ESTATE_PRODUCTION}")
+    }
+
     @Test
     fun `the demo has two estates, one read up to GOLD and one up to production`() {
         val target = seeded()

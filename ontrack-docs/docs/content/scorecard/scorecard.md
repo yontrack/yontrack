@@ -19,7 +19,7 @@ validations. Nothing is entered by hand.
 :   The readings of one project: what its project page shows.
 
 **Set**
-:   Every project is read on its own, in the **no-estate set**, shown as the *Project* column. A
+:   Every project is read on its own, in the **no-estate set**, shown as the *Project* set. A
     project which belongs to [estates](estates.md) is read again for each of them, against the
     estate's marker, windows and targets.
 
@@ -193,41 +193,62 @@ ontrack:
 
 ## On the project page
 
-The project page has a **Scorecard** section: one row per reading, and one column per set —
-*Project*, then *Estate: name* for each estate the project belongs to. Each cell gives the value
-and its sample count, and, in an estate with a target for the reading, whether it is *Met* or
-*Missed*. An unknown reading reads *Unknown*, with its reason on hover. The section says when the
-readings were last computed, carries the *Recompute* command, and links to the scorecard page of
-the project.
+The project page has a **Scorecard** section, with one card per set: *Project* first, then one per
+estate the project belongs to, by name.
 
-The section explains itself:
+* An estate's card has a ring with one segment per reading judged against a target — the met ones
+  first, then the missed ones — and the headline *N of M targets met*, with the marker the estate
+  reads up to. This is a count, not a score: the readings are never combined into one number, nor
+  weighted. A reading with a target which cannot be judged — unknown, or with no failure in the
+  window — is left out of the count, and mentioned beside it (*1 not judged*). An estate with no
+  judged reading has no ring.
+* The *Project* card reads *no targets*: the project on its own is never judged.
 
-* the ⓘ next to a column says what the set is — the project on its own, or the estate with its
-  description, its marker and the labels which put the project in it;
-* the ⓘ next to a reading says what it measures — up to a promotion, up to an environment, or
-  both when the columns read it up to both;
-* when the project is in an estate, a line under the table says that there is one column per
-  estate, and that *Met* and *Missed* compare against that estate's target.
+The first estate is selected by default, or *Project* when the project belongs to no estate.
+Under the cards, the readings of the selected set are tiles, each with:
 
-The ⓘ opens on hover and on keyboard focus.
+* its name, and an ⓘ saying what it measures, up to the marker of the set;
+* its judgement, always in words: *Met*, *Missed*, *No target*, *Unknown* — with its reason on
+  hover — or *No failure in window*;
+* its value, and its target (*target ≤ 1d*), or *no target in this set*;
+* a sparkline of its daily snapshots over the last 90 days, the target dashed and the zone where it
+  is met shaded — below the target when lower is better, above it when higher is — with today's
+  point in the colour of the judgement. The unknown days are left as gaps, and a trend needs
+  several days of snapshots.
 
-![The Scorecard section, with the ⓘ of an estate column open](scorecard-section.png)
+*Met* and *Missed* never rest on colour alone: each comes with an icon and a word. The ⓘ next to a
+card says what the set is — the project on its own, or the estate with its description, its
+marker and the labels which put the project in it. The ⓘ opens on hover and on keyboard focus.
 
-The **scorecard page** of the project answers "why is this number what it is?". It has one part
-per set, which says what the set is — its description, its marker and, for an estate, its labels —
-and a card per reading, with:
+The section says when the readings were last computed, carries the *Recompute* command, and its
+*Details* link opens the scorecard page of the project on the selected set. The selection is not
+kept.
+
+![The Scorecard section of a project in two estates](scorecard-section.png)
+
+The **scorecard page** of the project answers "why is this number what it is?". It has the same
+cards at the top, and shows the readings of the selected set only. The selected set is in the URL —
+`?set=project`, or `?set=` and the name of an estate — so that a link lands on it; an unknown set
+falls back on the default one. Under the cards, the page says what the set is — its description,
+its marker and, for an estate, its labels — and gives one large tile per reading, with:
 
 * what the reading measures, up to the marker it was read up to;
-* the value, and a sparkline of its daily snapshots over the last 90 days, the target drawn as a
-  dashed line and the unknown days left as gaps — a trend needs several days of snapshots;
+* its judgement, its value and its target, and a larger chart of the last 90 days;
 * the window, the branches read and whether they come from the branch model or are all of them;
 * the marker used, for the delivery readings;
 * the target, and what explains the value: the sample count, the 90th percentile, mean, minimum
   and maximum of a duration, the builds promoted out of those counted and the builds left out as in
   flight, the outages still open, the deployments done and failed, the builds passed or flaky, the
-  test stamps read.
+  test stamps read;
+* when it was computed.
 
 ![An estate on the scorecard page of a project](scorecard-page.png)
+
+## On a dashboard
+
+The [Project scorecard](../dashboards/widgets/project-scorecard.md) widget shows the scorecard of a
+project on a dashboard: a tab per set, the ring of the targets met in an estate and its judged
+readings, and a link to the scorecard page on the set shown.
 
 The scorecard is on the desktop UI only: the [mobile UI](../mobile/index.md) does not show it.
 
@@ -244,7 +265,7 @@ The scorecard of a project on its own — the no-estate set — is not licensed.
 
 The [estates](estates.md), and the readings of the projects in them, need the **Delivery
 scorecard** feature (`extension.scorecard`) of the license. Without it, the estates are not
-computed and their columns are not shown; their stored snapshots are kept, and come back with the
+computed and their sets are not shown; their stored snapshots are kept, and come back with the
 license.
 
 A delivery reading up to an environment also needs the **Environments** feature

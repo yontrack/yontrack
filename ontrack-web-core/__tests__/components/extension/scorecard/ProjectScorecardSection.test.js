@@ -2,7 +2,7 @@ import "@testing-library/jest-dom"
 import {act, fireEvent, render, screen, waitFor, within} from "@testing-library/react"
 import ProjectScorecardSection from "@components/extension/scorecard/project/ProjectScorecardSection"
 
-// antd's Table asks for the media queries of its responsive columns, which jsdom does not answer
+// antd's grid asks for the media queries of its responsive columns, which jsdom does not answer
 Object.defineProperty(window, 'matchMedia', {
     writable: true,
     value: jest.fn().mockImplementation(query => ({
@@ -65,6 +65,18 @@ const scorecard = {
                 reading({key: 'delivery.frequency', value: 3.5, direction: 'HIGHER_IS_BETTER', target: 5, targetMet: false, details: {count: 45}}),
             ],
         },
+        {
+            name: 'Demo production',
+            estate: {
+                name: 'Demo production',
+                description: null,
+                labels: [],
+                marker: {kind: 'PROMOTION', levelName: 'GOLD'},
+            },
+            readings: [
+                reading({key: 'delivery.leadTime', value: 7200, target: 3600, targetMet: false, details: {count: 12, markerKind: 'PROMOTION'}}),
+            ],
+        },
     ],
 }
 
@@ -90,65 +102,113 @@ afterEach(() => {
 
 describe('Scorecard section of the project page', () => {
 
-    it('is titled Scorecard and links to the scorecard page', () => {
+    it('is titled Scorecard', () => {
         renderSection()
         expect(screen.getByText('Scorecard')).toBeInTheDocument()
-        expect(screen.getByRole('link', {name: 'Details'}))
-            .toHaveAttribute('href', '/extension/scorecard/project/7')
     })
 
-    it('has a column for the project and one per estate, and a row per reading', () => {
+    it('asks for the trend of the last 90 days', () => {
         renderSection()
-        const table = screen.getByTestId('scorecard-table')
-        expect(within(table).getByRole('columnheader', {name: /^Project/})).toBeInTheDocument()
-        expect(within(table).getByRole('columnheader', {name: /^Estate: Demo products/})).toBeInTheDocument()
-        const rows = table.querySelectorAll('tbody tr.ant-table-row')
-        expect(rows).toHaveLength(4)
-        expect(rows[0]).toHaveTextContent('Lead time')
-        expect(rows[1]).toHaveTextContent('Frequency')
-        expect(rows[2]).toHaveTextContent('Time to restore')
-        expect(rows[3]).toHaveTextContent('Test pass rate')
+        expect(mockUseQuery.mock.calls[0][1].variables).toEqual({id: 7, days: 90})
     })
 
-    it('gives the value of a reading with its sample count', () => {
+    it('has no table any more', () => {
         renderSection()
-        expect(screen.getByTestId('scorecard-Project-delivery.leadTime-value')).toHaveTextContent('2h')
-        expect(screen.getByTestId('scorecard-Project-delivery.leadTime-count')).toHaveTextContent('12 samples')
-        expect(screen.getByTestId('scorecard-Project-delivery.frequency-value')).toHaveTextContent('3.5 / week')
+        expect(screen.queryByRole('table')).not.toBeInTheDocument()
     })
 
-    it('judges a reading against the target of its estate, in words', () => {
+    it('has a card for the project, then one per estate, by name', () => {
         renderSection()
-        expect(screen.getByTestId('scorecard-Demo products-delivery.leadTime')).toHaveTextContent('Met ≤ 1d')
-        expect(screen.getByTestId('scorecard-Demo products-delivery.frequency')).toHaveTextContent('Missed ≥ 5 / week')
-        // The set with no estate is never judged
-        expect(screen.getByTestId('scorecard-Project-delivery.leadTime')).not.toHaveTextContent('Met')
+        const cards = [...screen.getByTestId('scorecard-sets').querySelectorAll('[data-selected]')]
+        expect(cards.map(it => it.getAttribute('data-testid'))).toEqual([
+            'scorecard-set-card-Project',
+            'scorecard-set-card-Demo production',
+            'scorecard-set-card-Demo products',
+        ])
+    })
+
+    it('selects the first estate by name by default', () => {
+        renderSection()
+        expect(screen.getByTestId('scorecard-set-card-Demo production')).toHaveAttribute('data-selected', 'true')
+        expect(screen.getByTestId('scorecard-Demo production-delivery.leadTime')).toBeInTheDocument()
+        expect(screen.queryByTestId('scorecard-Project-delivery.leadTime')).not.toBeInTheDocument()
+    })
+
+    it('selects the Project set for a project in no estate', () => {
+        renderSection({data: {sets: [scorecard.sets[0]]}})
+        expect(screen.getByTestId('scorecard-set-card-Project')).toHaveAttribute('data-selected', 'true')
+        expect(screen.getByTestId('scorecard-Project-delivery.leadTime')).toBeInTheDocument()
+    })
+
+    it('shows the readings of the set selected by its card, in the catalogue order', () => {
+        renderSection()
+        fireEvent.click(within(screen.getByTestId('scorecard-set-card-Project')).getByRole('button', {pressed: false}))
+        const tiles = within(screen.getByTestId('scorecard-tiles')).getAllByTestId(/^scorecard-Project-[a-zA-Z.]+$/)
+        expect(tiles.map(it => it.getAttribute('data-testid'))).toEqual([
+            'scorecard-Project-delivery.leadTime',
+            'scorecard-Project-delivery.frequency',
+            'scorecard-Project-delivery.mttr',
+            'scorecard-Project-quality.testPassRate',
+        ])
+    })
+
+    it('draws the ring of the targets met in each estate', () => {
+        renderSection()
+        expect(screen.getByRole('img', {name: '1 of 2 targets met in Demo products'})).toBeInTheDocument()
+        expect(screen.getByRole('img', {name: '0 of 1 target met in Demo production'})).toBeInTheDocument()
+    })
+
+    it('gives the value of a reading and judges it against the target of its estate, in words', () => {
+        renderSection()
+        fireEvent.click(within(screen.getByTestId('scorecard-set-card-Demo products')).getByRole('button', {pressed: false}))
+        expect(screen.getByTestId('scorecard-Demo products-delivery.leadTime-value')).toHaveTextContent('2h')
+        expect(screen.getByTestId('scorecard-Demo products-delivery.leadTime-judgement')).toHaveTextContent('Met')
+        expect(screen.getByTestId('scorecard-Demo products-delivery.leadTime-target')).toHaveTextContent('target ≤ 1d')
+        expect(screen.getByTestId('scorecard-Demo products-delivery.frequency-judgement')).toHaveTextContent('Missed')
+    })
+
+    it('never judges the Project set', () => {
+        renderSection({data: {sets: [scorecard.sets[0]]}})
+        expect(screen.getByTestId('scorecard-Project-delivery.leadTime-judgement')).toHaveTextContent('No target')
+        expect(screen.getByTestId('scorecard-Project-delivery.leadTime-target')).toHaveTextContent('no target in this set')
     })
 
     it('renders an unknown reading distinctly, with its reason', () => {
-        renderSection()
+        renderSection({data: {sets: [scorecard.sets[0]]}})
         const unknown = screen.getByTestId('scorecard-Project-quality.testPassRate-unknown')
         expect(unknown).toHaveTextContent('Unknown')
         expect(unknown).toHaveAttribute('aria-label', expect.stringMatching(/^Unknown: No test stamp/))
     })
 
     it('renders no failure as neutral, never as a value of 0', () => {
-        renderSection()
-        const cell = screen.getByTestId('scorecard-Project-delivery.mttr')
-        expect(cell).toHaveTextContent('No failure in window')
-        expect(cell).not.toHaveTextContent('Unknown')
-        expect(cell).not.toHaveTextContent('0')
+        renderSection({data: {sets: [scorecard.sets[0]]}})
+        const tile = screen.getByTestId('scorecard-Project-delivery.mttr')
+        expect(tile).toHaveTextContent('No failure in window')
+        expect(tile).not.toHaveTextContent('Unknown')
+        expect(screen.getByTestId('scorecard-Project-delivery.mttr-value')).not.toHaveTextContent('0')
     })
 
-    it('leaves a reading a set does not have empty', () => {
+    it('links to the scorecard page on the selected set', () => {
         renderSection()
-        expect(screen.queryByTestId('scorecard-Demo products-delivery.mttr')).not.toBeInTheDocument()
+        expect(screen.getByRole('link', {name: 'Details'}))
+            .toHaveAttribute('href', '/extension/scorecard/project/7?set=Demo%20production')
+        fireEvent.click(within(screen.getByTestId('scorecard-set-card-Project')).getByRole('button', {pressed: false}))
+        expect(screen.getByRole('link', {name: 'Details'}))
+            .toHaveAttribute('href', '/extension/scorecard/project/7?set=project')
+    })
+
+    it('says when the readings were computed, over which window, and what the chart marks are', () => {
+        renderSection()
+        const legend = screen.getByTestId('scorecard-legend')
+        expect(legend).toHaveTextContent(/Computed .* · daily readings over the last 90 days/)
+        expect(legend).toHaveTextContent('target met zone')
+        expect(legend).toHaveTextContent('target')
     })
 
     it('says when the readings have not been computed yet', () => {
         renderSection({data: {sets: [{name: 'Project', estate: null, readings: []}]}})
         expect(screen.getByText('The readings of this project have not been computed yet')).toBeInTheDocument()
-        expect(screen.queryByTestId('scorecard-table')).not.toBeInTheDocument()
+        expect(screen.queryByTestId('scorecard-sets')).not.toBeInTheDocument()
     })
 
     it('offers the recompute only with the right to configure the project', () => {
@@ -186,15 +246,16 @@ describe('Scorecard section of the project page', () => {
         expect(screen.getByText('Not allowed')).toBeInTheDocument()
         expect(screen.getByTestId('scorecard-recompute')).toHaveTextContent('Recompute')
     })
-    it('explains the no-estate column', async () => {
+
+    it('explains the Project set', async () => {
         renderSection()
-        fireEvent.mouseEnter(screen.getByRole('button', {name: 'About the Project column'}))
+        fireEvent.mouseEnter(screen.getByRole('button', {name: 'About the Project set'}))
         expect(await screen.findByText(/This project read on its own/)).toBeInTheDocument()
     })
 
-    it('explains an estate column: its description, its marker, and the labels selecting the project', async () => {
+    it('explains an estate: its description, its marker, and the labels selecting the project', async () => {
         renderSection()
-        fireEvent.mouseEnter(screen.getByRole('button', {name: 'About the Estate: Demo products column'}))
+        fireEvent.mouseEnter(screen.getByRole('button', {name: 'About the Estate: Demo products set'}))
         const info = await screen.findByTestId('scorecard-set-info-Demo products')
         expect(info).toHaveTextContent('The products we ship')
         expect(info).toHaveTextContent('Environment: production')
@@ -203,35 +264,15 @@ describe('Scorecard section of the project page', () => {
 
     it('opens an explanation on focus, for the keyboard', async () => {
         renderSection()
-        fireEvent.focus(screen.getByRole('button', {name: 'About the Project column'}))
+        fireEvent.focus(screen.getByRole('button', {name: 'About the Project set'}))
         expect(await screen.findByText(/This project read on its own/)).toBeInTheDocument()
     })
 
-    it('explains a reading, up to each kind of marker its sets are read up to', async () => {
+    it('explains a reading, up to the marker of its set', async () => {
         renderSection()
+        fireEvent.click(within(screen.getByTestId('scorecard-set-card-Demo products')).getByRole('button', {pressed: false}))
         fireEvent.mouseEnter(screen.getByRole('button', {name: 'About Lead time'}))
         const info = await screen.findByTestId('scorecard-reading-info-delivery.leadTime')
-        expect(info).toHaveTextContent('Up to a promotion')
-        expect(info).toHaveTextContent(/first promotion at the marker level/)
-        expect(info).toHaveTextContent('Up to an environment')
-        expect(info).toHaveTextContent(/first successful deployment/)
-    })
-
-    it('explains a reading read up to one kind of marker only once', async () => {
-        renderSection()
-        fireEvent.mouseEnter(screen.getByRole('button', {name: 'About Frequency'}))
-        const info = await screen.findByTestId('scorecard-reading-info-delivery.frequency')
-        await waitFor(() => expect(info).toHaveTextContent(/Promotions at the marker level/))
-        expect(info).not.toHaveTextContent('Up to')
-    })
-
-    it('says what the estate columns are', () => {
-        renderSection()
-        expect(screen.getByTestId('scorecard-legend')).toHaveTextContent(/One column per estate/)
-    })
-
-    it('has no legend with no estate column', () => {
-        renderSection({data: {sets: [scorecard.sets[0]]}})
-        expect(screen.queryByTestId('scorecard-legend')).not.toBeInTheDocument()
+        await waitFor(() => expect(info).toHaveTextContent(/first successful deployment/))
     })
 })

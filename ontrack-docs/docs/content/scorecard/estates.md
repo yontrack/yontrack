@@ -7,7 +7,7 @@
 An **estate** is a group of projects read together in the [delivery scorecard](scorecard.md): the
 projects are selected by [labels](../concepts/model/project-labels.md), and read against the
 estate's own marker, windows and targets. Every project of an estate gets one more set of readings
-— one more column in its Scorecard section — beside its no-estate readings, which do not change.
+— one more card in its Scorecard section — beside its no-estate readings, which do not change.
 
 A project can belong to several estates, and is then read differently in each: its lead time to
 the `GOLD` promotion in one, its lead time to `production` in another.
@@ -15,7 +15,7 @@ the `GOLD` promotion in one, its lead time to `production` in another.
 ## What an estate is made of
 
 **Name**
-:   Unique. It names the estate's column on the scorecards, and the `estate` tag of the exported
+:   Unique. It names the estate's card on the scorecards, and the `estate` tag of the exported
     [`ontrack_reading`](scorecard.md#metrics-export) metric.
 
 **Description**
@@ -200,7 +200,7 @@ GraphQL schema is the same with or without it; without it:
 
 * the estate queries, fields and mutations fail with a `FORBIDDEN` error, *Feature not allowed by
   the license: extension.scorecard*;
-* the estates are not computed, and their columns are not shown on the scorecards;
+* the estates are not computed, and their cards are not shown on the scorecards;
 * the estates in the configuration as code are ignored;
 * the stored estates and their snapshots are kept, and come back with the license.
 

@@ -412,3 +412,161 @@ export const readingDetailItems = (reading) => {
  */
 export const sparklinePoints = (reading) =>
     (reading.history ?? []).map(({day, value}) => ({day, value: isNumber(value) ? value : null}))
+
+/**
+ * The target count of a set, which is not a score: `met`, the readings meeting their target;
+ * `count`, the readings the API judged (`targetMet` not `null`); `notJudged`, the readings with a
+ * target and no judgement - unknown, or with no failure in the window - left out of the count so
+ * that the UI makes no judgement of its own.
+ */
+export const setTargetCount = (set) => {
+    const judged = judgedReadings(set)
+    return {
+        met: judged.filter(it => it.targetMet === true).length,
+        count: judged.length,
+        notJudged: (set?.readings ?? []).filter(it => isNumber(it.target) && !isJudged(it)).length,
+    }
+}
+
+const isJudged = (reading) => reading.targetMet === true || reading.targetMet === false
+
+/**
+ * The readings of a set the API judged against a target, in their order.
+ */
+export const judgedReadings = (set) => (set?.readings ?? []).filter(isJudged)
+
+/**
+ * The readings of a set in the catalogue order, the readings out of it last.
+ */
+export const sortedReadings = (set) =>
+    [...(set?.readings ?? [])].sort((a, b) => readingRank(a.key) - readingRank(b.key))
+
+/**
+ * Whether a set has a target for any of its readings, judged or not.
+ */
+export const hasTargets = (set) => (set?.readings ?? []).some(it => isNumber(it.target))
+
+/**
+ * Days of daily snapshots the trends of the scorecard cover.
+ */
+export const SCORECARD_HISTORY_DAYS = 90
+
+/**
+ * The headline of a target count - "3 of 4 targets met" - and, as secondary text, the readings with
+ * a target and no judgement - "1 not judged" - `null` when there are none.
+ */
+export const targetHeadline = ({met, count, notJudged}) => ({
+    headline: `${met} of ${count} ${count === 1 ? 'target' : 'targets'} met`,
+    secondary: notJudged > 0 ? `${notJudged} not judged` : null,
+})
+
+/**
+ * Tone of the headline of a target count: `met` when every target is met, `missed` when fewer than
+ * half are, `normal` otherwise.
+ */
+export const headlineTone = ({met, count}) => {
+    if (count > 0 && met === count) return 'met'
+    if (met * 2 < count) return 'missed'
+    return 'normal'
+}
+
+/**
+ * Segments of the ring of a target count, one per judged reading, the met ones first: each one's
+ * `start` and `length` as fractions of the circle, `gap` apart. A single target is a full circle.
+ */
+export const ringSegments = ({met, count}, gap) => {
+    if (count <= 0) return []
+    if (count === 1) return [{met: met === 1, start: 0, length: 1}]
+    const step = 1 / count
+    return Array.from({length: count}, (_, index) => ({
+        met: index < met,
+        start: index * step,
+        length: step - gap,
+    }))
+}
+
+/**
+ * The sets of a scorecard, the Project set first, then the estates by name.
+ */
+export const orderedSets = (scorecard) => {
+    const sets = scorecard?.sets ?? []
+    return [
+        ...sets.filter(set => !set.estate),
+        ...sets.filter(set => set.estate).sort((a, b) => a.estate.name.localeCompare(b.estate.name)),
+    ]
+}
+
+/**
+ * How the Project set is named in a URL or a widget configuration.
+ */
+export const PROJECT_SET_PARAM = 'project'
+
+/**
+ * How a set is named in a URL or a widget configuration: `project`, or the name of its estate.
+ */
+export const setParam = (set) => set.estate ? set.estate.name : PROJECT_SET_PARAM
+
+/**
+ * The set shown by default: the first estate by name, the Project set for a project in no estate.
+ */
+export const defaultSetParam = (sets) => {
+    const estates = (sets ?? []).filter(set => set.estate).map(set => set.estate.name).sort((a, b) => a.localeCompare(b))
+    return estates[0] ?? PROJECT_SET_PARAM
+}
+
+/**
+ * The set named by `param` among `sets`, the default set when none is named, and the default set
+ * too, `unknown`, when the named one is not among them.
+ */
+export const resolveSet = (sets, param) => {
+    const list = sets ?? []
+    const find = (name) => list.find(set => setParam(set) === name) ?? null
+    const fallback = find(defaultSetParam(list)) ?? list[0] ?? null
+    if (!param) return {set: fallback, unknown: false}
+    const set = find(param)
+    return set ? {set, unknown: false} : {set: fallback, unknown: !!fallback}
+}
+
+/**
+ * What an estate reads its delivery readings up to, as a headline: "Up to promotion GOLD".
+ */
+export const estateMarkerHeadline = (marker) => {
+    if (!marker) return 'Up to the default marker'
+    if (marker.kind === 'ENVIRONMENT') {
+        return `Up to environment ${marker.environment}${marker.qualifier ? ` [${marker.qualifier}]` : ''}`
+    }
+    return `Up to promotion ${marker.levelName}`
+}
+
+/**
+ * The target of a reading, as the secondary line of its tile: "target ≤ 1d".
+ */
+export const targetLineText = (reading) => {
+    const target = targetText(reading)
+    return target ? `target ${target}` : 'no target in this set'
+}
+
+/**
+ * Where the zone meeting the target of a reading lies on its sparkline: `below` the target when
+ * lower is better, `above` it when higher is, `null` with no target.
+ */
+export const sparklineZone = (reading) => {
+    if (!isNumber(reading.target)) return null
+    if (reading.direction === LOWER_IS_BETTER) return 'below'
+    if (reading.direction === HIGHER_IS_BETTER) return 'above'
+    return null
+}
+
+/**
+ * The value range of a sparkline: its known values and its target, padded by 15 % of their spread
+ * so that the line never touches an edge and the zone meeting the target never collapses to
+ * nothing - by 1 for a flat line.
+ */
+export const sparklineDomain = (points, target) => {
+    const values = points.map(it => it.value).filter(isNumber)
+    if (isNumber(target)) values.push(target)
+    const lo = Math.min(...values)
+    const hi = Math.max(...values)
+    const pad = (hi - lo) * 0.15 || 1
+    return [lo - pad, hi + pad]
+}

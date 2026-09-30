@@ -89,6 +89,22 @@
     --ot-chart-series-lilac: var(--ot-brand-lilac);
     --ot-chart-series-purple: var(--ot-brand-purple);
     --ot-chart-series-green: var(--ot-brand-green);
+
+    /*
+     * Scorecard: a reading meeting its target, missing it, or not judged. Met and missed differ in
+     * lightness as well as in hue - the met green is dark, the missed orange light - and always come
+     * with an icon and a word, so that they never rest on colour alone. The `-text` values read at
+     * WCAG AA on their `-bg` and on the page.
+     */
+    --ot-scorecard-met: #1f7a4c;
+    --ot-scorecard-met-text: #17693f;
+    --ot-scorecard-met-bg: #e2f2e8;
+    --ot-scorecard-met-zone: #eef7f1;
+    --ot-scorecard-missed: #f5a372;
+    --ot-scorecard-missed-text: #a9380b;
+    --ot-scorecard-missed-bg: #fce9df;
+    --ot-scorecard-neutral-bg: #efebf3;
+    --ot-scorecard-selected-bg: var(--ot-brand-light-gray);
 }
 
 :root[data-theme="dark"] {
@@ -151,6 +167,22 @@
     --ot-chart-series-lilac: var(--ot-brand-lilac);
     --ot-chart-series-purple: #A995C4;
     --ot-chart-series-green: var(--ot-brand-green);
+
+    /*
+     * Scorecard. Same hues as on light. The marks and the texts are lifted to read on a dark
+     * surface; the backgrounds become dark tints of the same hue, since a light tint under a light
+     * text would not read. The lightness order flips with the ground - the met green is now the
+     * lighter mark, the missed orange the darker one - so the two still differ in lightness.
+     */
+    --ot-scorecard-met: #5fd394;
+    --ot-scorecard-met-text: #7ddba4;
+    --ot-scorecard-met-bg: #16301f;
+    --ot-scorecard-met-zone: #14261b;
+    --ot-scorecard-missed: #c9642c;
+    --ot-scorecard-missed-text: #ffa472;
+    --ot-scorecard-missed-bg: #3a2216;
+    --ot-scorecard-neutral-bg: #2d2833;
+    --ot-scorecard-selected-bg: #2a2433;
 }
 
 /**

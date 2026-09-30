@@ -17,3 +17,4 @@ Widgets are the building blocks of dashboards. Each widget displays a specific v
 | [Promotion charts](promotion-charts.md) | `home/PromotionLeadTimeChart` · `home/PromotionFrequencyChart` · `home/PromotionStabilityChart` · `home/PromotionTTRChart` | Delivery metrics charts for promotion levels |
 | [Validation charts](validation-charts.md) | `home/ValidationMetricsChart` · `home/ValidationStabilityChart` | Metrics charts for validation stamps |
 | [End-to-end lead time](e2e-lead-time-chart.md) | `home/E2ELeadTimeChart` | Lead time across two projects |
+| [Project scorecard](project-scorecard.md) | `extension/scorecard/ProjectScorecard` | Targets met by a project in each of its estates, and its readings |

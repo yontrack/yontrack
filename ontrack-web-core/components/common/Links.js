@@ -90,9 +90,12 @@ export function projectFindingsUri(project, filter = {}) {
 
 /**
  * Scorecard page of a project: each of its readings with its trend and what explains it.
+ *
+ * @param project Project, with its `id`
+ * @param set Set to open, `project` or the name of an estate - the default set when not given
  */
-export function projectScorecardUri(project) {
-    return `/extension/scorecard/project/${project.id}`
+export function projectScorecardUri(project, set) {
+    return `/extension/scorecard/project/${project.id}${set ? `?set=${encodeURIComponent(set)}` : ''}`
 }
 
 export function restPromotionLevelImageUri(promotionLevel) {

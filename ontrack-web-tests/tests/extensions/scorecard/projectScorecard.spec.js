@@ -58,15 +58,19 @@ test('project page Scorecard section recomputes the readings and shows them', as
 
     // The recompute is queued, and the section waits for its readings
     await section.getByTestId('scorecard-recompute').click()
-    await expect(section.getByTestId('scorecard-table')).toBeVisible({timeout: 60000})
+    await expect(section.getByTestId('scorecard-sets')).toBeVisible({timeout: 60000})
+    // No table any more
+    await expect(section.getByRole('table')).toHaveCount(0)
 
-    // One column for the project, no estate
-    await expect(section.getByRole('columnheader', {name: 'Project'})).toBeVisible()
+    // One card for the project, no estate: it is selected, and never judged
+    const projectCard = section.getByTestId('scorecard-set-card-Project')
+    await expect(projectCard).toHaveAttribute('data-selected', 'true')
+    await expect(projectCard).toContainText('Readings only, never judged')
 
-    // Measured, with the sample count
+    // Measured
     await expect(section.getByTestId('scorecard-Project-delivery.leadTime-value')).toBeVisible()
-    await expect(section.getByTestId('scorecard-Project-delivery.leadTime-count')).toHaveText('3 samples')
-    await expect(section.getByTestId('scorecard-Project-delivery.frequency-count')).toHaveText('3 samples')
+    await expect(section.getByTestId('scorecard-Project-delivery.leadTime-judgement')).toHaveText('No target')
+    await expect(section.getByTestId('scorecard-Project-delivery.leadTime-target')).toHaveText('no target in this set')
     await expect(section.getByTestId('scorecard-Project-quality.testPassRate-value')).toHaveText('100%')
     await expect(section.getByTestId('scorecard-Project-quality.testFlakiness-value')).toHaveText('33.3%')
 
@@ -74,18 +78,18 @@ test('project page Scorecard section recomputes the readings and shows them', as
     await expect(section.getByTestId('scorecard-Project-delivery.mttr-no-failure')).toHaveText('No failure in window')
     await expect(section.getByTestId('scorecard-Project-delivery.mttr-unknown')).toHaveCount(0)
 
-    // The column and the readings explain themselves
-    await section.getByRole('button', {name: 'About the Project column'}).hover()
+    // The set and the readings explain themselves
+    await section.getByRole('button', {name: 'About the Project set'}).hover()
     await expect(page.getByTestId('scorecard-set-info-Project')).toContainText('This project read on its own')
     await section.getByRole('button', {name: 'About Lead time'}).hover()
     await expect(page.getByTestId('scorecard-reading-info-delivery.leadTime')).toContainText('first promotion at the marker level')
-    // No estate, no legend for the estate columns
-    await expect(section.getByTestId('scorecard-legend')).toHaveCount(0)
+    await expect(section.getByTestId('scorecard-legend')).toContainText('daily readings over the last 90 days')
 
-    // The details of each number are on the scorecard page
+    // The details of each number are on the scorecard page, on the same set
     await section.getByRole('link', {name: 'Details'}).click()
     const scorecardPage = new ProjectScorecardPage(page, project)
     await scorecardPage.expectOnPage()
+    await expect(page).toHaveURL(/\?set=project$/)
 
     await expect(scorecardPage.setExplanation('Project')).toContainText('Marker: Last promotion level of each branch')
 
@@ -95,6 +99,7 @@ test('project page Scorecard section recomputes the readings and shows them', as
     await expect(leadTime.getByTestId('reading-Project-delivery.leadTime-details')).toContainText('90 days')
     await expect(leadTime.getByTestId('reading-Project-delivery.leadTime-details')).toContainText('main (all branches, no branch model)')
     await expect(leadTime.getByTestId('reading-Project-delivery.leadTime-details')).toContainText('Promotion: GOLD on main')
+    await expect(leadTime.getByTestId('reading-Project-delivery.leadTime-details')).toContainText('Samples')
 
     const flakiness = scorecardPage.reading('Project', 'quality.testFlakiness')
     await expect(flakiness.getByTestId('reading-Project-quality.testFlakiness-details')).toContainText('1 of 3')
@@ -148,33 +153,47 @@ test('project page Scorecard section judges the readings of an estate against it
         await projectPage.goTo()
 
         const section = page.getByTestId('project-scorecard')
-        await expect(section.getByRole('columnheader', {name: 'Project'})).toBeVisible()
-        await expect(section.getByRole('columnheader', {name: `Estate: ${estate.name}`})).toBeVisible()
-        await expect(section.getByTestId('scorecard-legend')).toContainText('One column per estate')
+        // The estate is selected by default, with the ring of its targets
+        const estateCard = section.getByTestId(`scorecard-set-card-${estate.name}`)
+        await expect(estateCard).toHaveAttribute('data-selected', 'true')
+        await expect(section.getByTestId('scorecard-set-card-Project')).toHaveAttribute('data-selected', 'false')
+        await expect(estateCard.getByRole('img', {name: `1 of 2 targets met in ${estate.name}`})).toBeVisible()
+        await expect(estateCard).toContainText('Up to promotion GOLD')
 
-        // The estate column says what reads the project in it
-        await section.getByRole('button', {name: `About the Estate: ${estate.name} column`}).hover()
+        // The estate card says what reads the project in it
+        await section.getByRole('button', {name: `About the Estate: ${estate.name} set`}).hover()
         const estateInfo = page.getByTestId(`scorecard-set-info-${estate.name}`)
         await expect(estateInfo).toContainText('Marker: Promotion: GOLD')
         await expect(estateInfo.getByTestId(`label-${label.category}:${label.name}`)).toBeVisible()
 
-        await expect(section.getByTestId(`scorecard-${estate.name}-delivery.leadTime`)).toContainText('Met ≤ 1d')
-        await expect(section.getByTestId(`scorecard-${estate.name}-delivery.frequency`)).toContainText('Missed ≥ 5 / week')
+        await expect(section.getByTestId(`scorecard-${estate.name}-delivery.leadTime-judgement`)).toHaveText('Met')
+        await expect(section.getByTestId(`scorecard-${estate.name}-delivery.leadTime-target`)).toHaveText('target ≤ 1d')
+        await expect(section.getByTestId(`scorecard-${estate.name}-delivery.frequency-judgement`)).toHaveText('Missed')
+        await expect(section.getByTestId(`scorecard-${estate.name}-delivery.frequency-target`)).toHaveText('target ≥ 5 / week')
         // No target, not judged
-        await expect(section.getByTestId(`scorecard-${estate.name}-delivery.successRate`)).not.toContainText('Met')
-        await expect(section.getByTestId(`scorecard-${estate.name}-delivery.successRate`)).not.toContainText('Missed')
-        // The set with no estate is never judged
-        await expect(section.getByTestId('scorecard-Project-delivery.leadTime')).not.toContainText('Met')
+        await expect(section.getByTestId(`scorecard-${estate.name}-delivery.successRate-judgement`)).toHaveText('No target')
 
-        // The estate has its own section on the scorecard page
+        // The set with no estate is never judged
+        await section.getByTestId('scorecard-set-card-Project').locator('button[aria-pressed]').click()
+        await expect(section.getByTestId('scorecard-Project-delivery.leadTime-judgement')).toHaveText('No target')
+
+        // The scorecard page opens on the set the section showed, and selects another in its URL
         await section.getByRole('link', {name: 'Details'}).click()
         const scorecardPage = new ProjectScorecardPage(page, project)
         await scorecardPage.expectOnPage()
+        await expect(scorecardPage.set('Project')).toBeVisible()
+        await scorecardPage.selectSet(estate.name)
+        await expect(page).toHaveURL(new RegExp(`\\?set=${encodeURIComponent(estate.name)}$`))
         await expect(scorecardPage.set(estate.name)).toBeVisible()
+        await expect(scorecardPage.set('Project')).toHaveCount(0)
         await expect(scorecardPage.setExplanation(estate.name)).toContainText('Marker: Promotion: GOLD')
         await expect(scorecardPage.setExplanation(estate.name).getByTestId(`label-${label.category}:${label.name}`)).toBeVisible()
         await expect(scorecardPage.reading(estate.name, 'delivery.leadTime')
             .getByTestId(`reading-${estate.name}-delivery.leadTime-details`)).toContainText('≤ 1d')
+
+        // Straight to a set by its URL
+        await scorecardPage.goTo('project')
+        await expect(scorecardPage.setCard('Project')).toHaveAttribute('data-selected', 'true')
     } finally {
         await deleteEstate(ontrack, estate)
     }

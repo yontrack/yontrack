@@ -1,6 +1,7 @@
 import {parse} from "graphql";
 import {gqlProjectScorecard} from "@components/extension/scorecard/project/ProjectScorecardView";
 import {gqlProjectScorecardSummary} from "@components/extension/scorecard/project/ProjectScorecardSection";
+import {gqlProjectScorecardWidget} from "@components/widgets/extension/scorecard/ProjectScorecardWidget";
 
 /**
  * A fragment declared twice in a document fails the whole query on the server
@@ -16,6 +17,7 @@ describe('Queries of the scorecard', () => {
     it.each([
         ['scorecard page', gqlProjectScorecard],
         ['Scorecard section', gqlProjectScorecardSummary],
+        ['project scorecard widget', gqlProjectScorecardWidget],
     ])('the %s query declares each fragment once', (_, query) => {
         const names = fragmentNames(query)
         expect(names).toEqual([...new Set(names)])
