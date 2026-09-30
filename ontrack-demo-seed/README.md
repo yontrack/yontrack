@@ -20,7 +20,7 @@ the seed — keep it in sync by hand whenever that file changes.
 | Maintenance branch alongside `main`         | `petclinic` / `release-1.3`                                          | Its own promotion ladder and its own (failing) `CANARY` workflow                           |
 | Build dependency graph                      | `petclinic-ui` / `main`, builds `58` and `59`                        | Links down to `petclinic` builds, which link down to `common-library` builds               |
 | Environments and deployments                | `staging` and `production` environments                              | `petclinic` `105` deployed on staging, `104` deployed on production                        |
-| Shared dashboard                            | Dashboard picker → "Yontrack demo"                                    | `BranchStatuses`, `EnvironmentList`, `LastActiveProjects` and `PromotionFrequencyChart` widgets |
+| Shared dashboard                            | Dashboard picker → "Yontrack demo"                                    | Two `BranchStatuses` widgets ("Sample application", "End-to-end suites"), `EnvironmentList`, `LastActiveProjects` and `PromotionFrequencyChart` |
 | Self-hosted changelog                       | `yontrack` / `main`                                                   | One build per commit since the last release, always current, `BRONZE` only                 |
 | Change log between two builds               | `petclinic` / `main`, change log from build `104` to `107`            | Conventional-commit subjects, grouped issues, and the semantic view of the same change log |
 | Project labels                              | Any project page, the project lists, and _Configuration_ → _Labels_   | `team:` and `language:` chips on every project; filtering the project list on one or two of them |
@@ -36,6 +36,11 @@ the seed — keep it in sync by hand whenever that file changes.
 | A failed deployment, then a done one        | `production` environment, `petclinic-visits` slot, 1.3.0 then 1.3.1    | `FAILED` with its message, restored the next morning; 1.4.1 `CANCELLED`                     |
 | A flaky build                               | `petclinic-visits` / `main`, build `206` (1.2.1), `TESTS` runs         | The same stamp FAILED then PASSED on the same build; the test flakiness reading counts it   |
 | Unknown readings, with their reason         | `petclinic-billing` in "Demo products", `petclinic-ui` in "Demo production" | No `GOLD` level (no marker); never deployed (no samples)                               |
+| Sticky header, scrolling with the window    | `petclinic-e2e` / `main`, _Load more..._ once, then scroll down       | The toolbar and the row of stamp icons stay at the top of the window while the builds scroll |
+| Sticky header, scrolling sideways           | `petclinic-e2e` / `main`, scroll the build matrix to the right        | 30 stamp columns; the header follows the body, the build columns stay pinned on the left - on a screen narrower than about 1650px |
+| Sticky header inside a section              | `petclinic-e2e` / `main`, build `nightly-30`, _Validations_ section    | 30 runs, one failed (`E2E.PAYMENTS`); the column headers stay at the top of the section while it scrolls |
+| Sticky header after _Load more_             | `petclinic-e2e` / `main`, stamp `E2E.SMOKE`, _Validation history_      | A run on every build, two failed; _Load more..._ a few times and the section scrolls under its header |
+| Sticky header in a widget                   | Dashboard "Yontrack demo", widget "End-to-end suites"                  | 15 branches of `petclinic-e2e`, more than the widget holds; the `BRONZE` and suite headers stay put |
 
 ## Projects
 
@@ -46,6 +51,7 @@ the seed — keep it in sync by hand whenever that file changes.
 | `petclinic-ui`     | `main`                       | `team:apps`, `language:javascript`, `runs-in:production` | Consumes `petclinic`, so the demo has a dependency graph to walk       |
 | `petclinic-billing` | `release-2.3`, `main`       | `team:apps`, `language:java`, `portfolio:product` | The security findings: two scans per build, one of them in SARIF       |
 | `petclinic-visits` | `main`                       | `team:apps`, `language:kotlin`, `portfolio:product`, `runs-in:production` | The delivery scorecard: 90 days of releases, test runs and production deployments |
+| `petclinic-e2e`    | `main`, 14 `feature-*`       | `team:apps`, `language:javascript`       | The long tables: 30 nightly builds, 30 end-to-end suite stamps, 15 branches - enough for every table showing them to scroll |
 | `yontrack`         | `main`                       | `team:platform`, `language:kotlin`       | Yontrack's own changelog, reseeded from git on every run              |
 
 ## Labels
