@@ -4,6 +4,11 @@ import net.nemerosa.ontrack.model.events.*
 
 object AutoVersioningEvents {
 
+    private val auditValues = arrayOf(
+        eventValue("AUDIT_NAME", "Text of the link to the auto versioning audit entry"),
+        eventValue("AUDIT_LINK", "Link to the auto versioning audit entry"),
+    )
+
     val AUTO_VERSIONING_SUCCESS: EventType = SimpleEventType(
         id = "auto-versioning-success",
         template = $$"""
@@ -12,6 +17,8 @@ object AutoVersioningEvents {
             ${MESSAGE}
             
             Pull request ${#.link?text=PR_NAME&href=PR_LINK}
+
+            ${#.link?text=AUDIT_NAME&href=AUDIT_LINK}
         """.trimIndent(),
         description = "When an auto versioning request succeeds with the creation of a PR (merged or not).",
         context = eventContext(
@@ -25,6 +32,7 @@ object AutoVersioningEvents {
             eventValue("MESSAGE", "Auto versioning message"),
             eventValue("PR_NAME", "Title of the PR having been created"),
             eventValue("PR_LINK", "Link to the PR having been created"),
+            *auditValues,
         ),
     )
 
@@ -36,6 +44,8 @@ object AutoVersioningEvents {
             ${MESSAGE}
             
             Error: ${ERROR}
+
+            ${#.link?text=AUDIT_NAME&href=AUDIT_LINK}
         """.trimIndent(),
         description = "When an auto versioning request fails because of a general error.",
         context = eventContext(
@@ -48,6 +58,7 @@ object AutoVersioningEvents {
             eventValue("VERSION", "Version being set"),
             eventValue("MESSAGE", "Auto versioning message"),
             eventValue("ERROR", "Error message"),
+            *auditValues,
         ),
     )
 
@@ -57,6 +68,8 @@ object AutoVersioningEvents {
             Auto versioning of ${project}/${branch} for dependency ${xProject} version "${VERSION}" has been rejected.
 
             ${MESSAGE}
+
+            ${#.link?text=AUDIT_NAME&href=AUDIT_LINK}
         """.trimIndent(),
         description = "When an auto versioning request is rejected by the version rule of its configuration, typically because the version to set would be older than the version already present in the target files.",
         context = eventContext(
@@ -68,6 +81,7 @@ object AutoVersioningEvents {
             eventXProject("Source project"),
             eventValue("VERSION", "Version having been rejected"),
             eventValue("MESSAGE", "Reason for the rejection"),
+            *auditValues,
         ),
     )
 
@@ -77,6 +91,8 @@ object AutoVersioningEvents {
             Auto versioning post-processing of ${project}/${branch} for dependency ${xProject} version "${VERSION}" has failed.
 
             ${#.link?text=MESSAGE&href=LINK}
+
+            ${#.link?text=AUDIT_NAME&href=AUDIT_LINK}
         """.trimIndent(),
         description = "When an auto versioning request fails because of the post-processing.",
         context = eventContext(
@@ -89,6 +105,7 @@ object AutoVersioningEvents {
             eventValue("VERSION", "Version being set"),
             eventValue("MESSAGE", "Auto versioning message"),
             eventValue("LINK", "Link to the post processing process"),
+            *auditValues,
         ),
     )
 
@@ -100,6 +117,8 @@ object AutoVersioningEvents {
             Timeout while waiting for the PR to be ready to be merged.
             
             Pull request ${#.link?text=PR_NAME&href=PR_LINK}
+
+            ${#.link?text=AUDIT_NAME&href=AUDIT_LINK}
         """.trimIndent(),
         description = "When an auto versioning request fails because the corresponding PR could not be merged in time.",
         context = eventContext(
@@ -112,6 +131,7 @@ object AutoVersioningEvents {
             eventValue("VERSION", "Version being set"),
             eventValue("PR_NAME", "Title of the PR having been created"),
             eventValue("PR_LINK", "Link to the PR having been created"),
+            *auditValues,
         ),
     )
 

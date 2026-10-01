@@ -71,6 +71,8 @@ class ACCAutoVersioningConfigNotifications : AbstractACCAutoVersioningTestSuppor
                                         Cannot find version in "gradle.properties".
     
                                         Error: Cannot find version in "gradle.properties".
+
+                                        Auto-versioning audit
                                     """.trimIndent()
                         }
 
@@ -137,6 +139,8 @@ class ACCAutoVersioningConfigNotifications : AbstractACCAutoVersioningTestSuppor
                                         Auto versioning PR has been created, approved and merged.
                                         
                                         Pull request #1
+
+                                        Auto-versioning audit
                                     """.trimIndent()
                         }
 
