@@ -136,6 +136,7 @@ test('editing the levels of a CHML validation stamp', async ({page, ontrack}) =>
         failedValue: 1,
         warningLevel: "MEDIUM",
         warningValue: 3,
+        warningPassesAutoPromotion: false,
     })
 
     // Reopening the dialog shows the saved values
