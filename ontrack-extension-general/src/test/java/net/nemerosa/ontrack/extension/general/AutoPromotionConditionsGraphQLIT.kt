@@ -6,7 +6,9 @@ import net.nemerosa.ontrack.it.AsAdminTest
 import net.nemerosa.ontrack.model.structure.PromotionLevel
 import net.nemerosa.ontrack.model.structure.PromotionRun
 import net.nemerosa.ontrack.model.structure.ValidationRunStatusID
+import net.nemerosa.ontrack.model.structure.Build
 import org.junit.jupiter.api.Test
+import org.springframework.graphql.execution.ErrorType
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
@@ -57,6 +59,33 @@ class AutoPromotionConditionsGraphQLIT : AbstractQLKTITSupport() {
                 }
             """
         ).path("promotionRuns").path(0).path("autoPromotionConditions")
+
+    private val buildConditionsQuery = """
+        query BuildConditions(${'$'}buildId: Int!, ${'$'}promotionLevelId: Int!) {
+            build(id: ${'$'}buildId) {
+                autoPromotionConditions(promotionLevelId: ${'$'}promotionLevelId) {
+                    include
+                    exclude
+                    autoRevoke
+                    validationStamps {
+                        validationStamp { name }
+                        lastRun { id }
+                        passed
+                    }
+                    promotionLevels {
+                        promotionLevel { name }
+                        promotionRun { id }
+                    }
+                }
+            }
+        }
+    """
+
+    private fun buildConditions(build: Build, pl: PromotionLevel): JsonNode =
+        run(
+            buildConditionsQuery,
+            mapOf("buildId" to build.id(), "promotionLevelId" to pl.id())
+        ).path("build").path("autoPromotionConditions")
 
     private fun JsonNode.names(field: String, path: String? = null) =
         path(field).map { item -> (if (path != null) item.path(path) else item).path("name").asText() }
@@ -214,6 +243,112 @@ class AutoPromotionConditionsGraphQLIT : AbstractQLKTITSupport() {
                         .orElseThrow()
                     val conditions = runConditions(silverRun)
                     assertEquals(latestBronze.id(), conditions.level("BRONZE").path("promotionRun").path("id").asInt())
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `Build conditions are null for a promotion level without property`() {
+        project {
+            branch {
+                val pl = promotionLevel()
+                build {
+                    assertTrue(buildConditions(this, pl).isNull)
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `Build conditions are null for a promotion level with an empty property`() {
+        project {
+            branch {
+                validationStamp()
+                val pl = promotionLevel()
+                pl.autoPromote(AutoPromotionProperty(emptyList(), "", "", emptyList()))
+                build {
+                    assertTrue(buildConditions(this, pl).isNull)
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `Build conditions give the state of each prerequisite of a promotion not granted`() {
+        project {
+            branch {
+                val notRun = validationStamp("BUILD")
+                val failed = validationStamp("UNIT.TESTS")
+                val passed = validationStamp("INTEGRATION.TESTS")
+                val bronze = promotionLevel("BRONZE")
+                val iron = promotionLevel("IRON")
+                val silver = promotionLevel("SILVER")
+                silver.autoPromote(
+                    AutoPromotionProperty(
+                        validationStamps = listOf(notRun),
+                        include = ".*TESTS",
+                        exclude = "",
+                        promotionLevels = listOf(bronze, iron),
+                        autoRevoke = true,
+                    )
+                )
+                build {
+                    val failedRun = validate(failed, ValidationRunStatusID.STATUS_FAILED)
+                    val passedRun = validate(passed)
+                    val bronzeRun = promote(bronze)
+
+                    assertTrue(
+                        structureService.getLastPromotionRunForBuildAndPromotionLevel(this, silver).isEmpty,
+                        "SILVER is not granted"
+                    )
+
+                    val conditions = buildConditions(this, silver)
+                    assertEquals(".*TESTS", conditions.path("include").asText())
+                    assertEquals("", conditions.path("exclude").asText())
+                    assertEquals(true, conditions.path("autoRevoke").asBoolean())
+
+                    assertEquals(
+                        listOf("BUILD", "UNIT.TESTS", "INTEGRATION.TESTS"),
+                        conditions.names("validationStamps", "validationStamp")
+                    )
+                    conditions.stamp("BUILD").let {
+                        assertTrue(it.path("lastRun").isNull, "Not run")
+                        assertEquals(false, it.path("passed").asBoolean())
+                    }
+                    conditions.stamp("UNIT.TESTS").let {
+                        assertEquals(failedRun.id(), it.path("lastRun").path("id").asInt())
+                        assertEquals(false, it.path("passed").asBoolean())
+                    }
+                    conditions.stamp("INTEGRATION.TESTS").let {
+                        assertEquals(passedRun.id(), it.path("lastRun").path("id").asInt())
+                        assertEquals(true, it.path("passed").asBoolean())
+                    }
+
+                    assertEquals(
+                        listOf("BRONZE", "IRON"),
+                        conditions.names("promotionLevels", "promotionLevel")
+                    )
+                    assertEquals(bronzeRun.id(), conditions.level("BRONZE").path("promotionRun").path("id").asInt())
+                    assertTrue(conditions.level("IRON").path("promotionRun").isNull, "Not granted")
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `Build conditions for a promotion level of another branch are an error`() {
+        project {
+            val otherPl = branch().promotionLevel("SILVER").apply {
+                autoPromote(AutoPromotionProperty(emptyList(), ".*", "", emptyList()))
+            }
+            branch {
+                build {
+                    runWithError(
+                        buildConditionsQuery,
+                        mapOf("buildId" to id(), "promotionLevelId" to otherPl.id()),
+                        errorClassification = ErrorType.BAD_REQUEST,
+                    )
                 }
             }
         }

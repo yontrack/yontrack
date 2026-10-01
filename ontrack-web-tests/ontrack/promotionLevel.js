@@ -3,7 +3,7 @@ import {graphQLCall, graphQLCallMutation} from "@ontrack/graphql";
 import {gql} from "graphql-request";
 import {registerNotificationExtensions} from "@ontrack/extensions/notifications/notifications";
 
-export const createPromotionLevel = async (branch, name) => {
+export const createPromotionLevel = async (branch, name, {description = ""} = {}) => {
     const actualName = name ?? generate('pl_')
 
     const data = await graphQLCallMutation(
@@ -13,11 +13,12 @@ export const createPromotionLevel = async (branch, name) => {
             mutation CreatePromotionLevel(
                 $branchId: Int!,
                 $name: String!,
+                $description: String!,
             ) {
                 createPromotionLevelById(input: {
                     branchId: $branchId,
                     name: $name,
-                    description: "",
+                    description: $description,
                 }) {
                     promotionLevel {
                         id
@@ -32,6 +33,7 @@ export const createPromotionLevel = async (branch, name) => {
         {
             branchId: Number(branch.id),
             name: actualName,
+            description,
         }
     )
 

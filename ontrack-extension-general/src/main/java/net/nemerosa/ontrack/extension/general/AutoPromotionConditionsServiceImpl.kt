@@ -21,9 +21,14 @@ class AutoPromotionConditionsServiceImpl(
             )
         }
 
-    override fun getBuildConditions(promotionRun: PromotionRun): AutoPromotionBuildConditions? {
-        val build = promotionRun.build
-        return effectivePropertyOf(promotionRun.promotionLevel)?.let { (property, effective) ->
+    override fun getBuildConditions(promotionRun: PromotionRun): AutoPromotionBuildConditions? =
+        getBuildConditions(promotionRun.build, promotionRun.promotionLevel)
+
+    override fun getBuildConditions(build: Build, promotionLevel: PromotionLevel): AutoPromotionBuildConditions? {
+        if (promotionLevel.branch.id != build.branch.id) {
+            throw AutoPromotionConditionsBranchMismatchException(build, promotionLevel)
+        }
+        return effectivePropertyOf(promotionLevel)?.let { (property, effective) ->
             AutoPromotionBuildConditions(
                 include = property.include,
                 exclude = property.exclude,

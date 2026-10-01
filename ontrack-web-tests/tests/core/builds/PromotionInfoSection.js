@@ -44,4 +44,10 @@ export class PromotionInfoSection {
         await trigger.hover()
     }
 
+    async hoverPromotionLevel(promotionLevel) {
+        const trigger = this.section.getByTestId(`build-promotion-level-trigger-${promotionLevel.id}`)
+        await expect(trigger).toBeVisible()
+        await trigger.hover()
+    }
+
 }

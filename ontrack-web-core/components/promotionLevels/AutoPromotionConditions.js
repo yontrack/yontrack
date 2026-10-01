@@ -14,8 +14,9 @@ import {promotionRunUri, validationRunUri} from "@components/common/Links";
  *
  * - **plain** (`PromotionLevel.autoPromotionConditions`) - the required validation stamps and
  *   promotion levels alone;
- * - **with build** (`withBuild`, `PromotionRun.autoPromotionConditions`) - each of them with its
- *   state for the run's build, a link to the run when there is one, and a summary line.
+ * - **with build** (`withBuild`, `PromotionRun.autoPromotionConditions` or
+ *   `Build.autoPromotionConditions`) - each of them with its state for the build, a link to the run
+ *   when there is one, and a summary line.
  *
  * These are the *current* conditions and states, not a record of what triggered a promotion.
  */
@@ -161,6 +162,27 @@ const patternsFields = `
     autoRevoke
 `
 
+const buildConditionsFields = `
+    ${patternsFields}
+    validationStamps {
+        validationStamp { ${entityFields} }
+        passed
+        lastRun {
+            id
+            lastStatus {
+                statusID {
+                    id
+                    name
+                }
+            }
+        }
+    }
+    promotionLevels {
+        promotionLevel { ${entityFields} }
+        promotionRun { id }
+    }
+`
+
 const plainConditionsFields = `
     ${patternsFields}
     validationStamps { ${entityFields} }
@@ -211,24 +233,7 @@ export function PromotionRunAutoPromotionConditions({promotionRunId}) {
             query PromotionRunAutoPromotionConditions($id: Int!) {
                 promotionRuns(id: $id) {
                     autoPromotionConditions {
-                        ${patternsFields}
-                        validationStamps {
-                            validationStamp { ${entityFields} }
-                            passed
-                            lastRun {
-                                id
-                                lastStatus {
-                                    statusID {
-                                        id
-                                        name
-                                    }
-                                }
-                            }
-                        }
-                        promotionLevels {
-                            promotionLevel { ${entityFields} }
-                            promotionRun { id }
-                        }
+                        ${buildConditionsFields}
                     }
                 }
             }
@@ -242,8 +247,49 @@ export function PromotionRunAutoPromotionConditions({promotionRunId}) {
     if (loading || !finished) {
         return <Spin size="small"/>
     }
+    return <BuildConditionsSection
+        conditions={conditions}
+        testId={`promotion-run-auto-promotion-conditions-${promotionRunId}`}
+    />
+}
+
+/**
+ * Loads and displays the conditions of the auto promotion of a promotion level, with their state for a
+ * build, whether the build is promoted to this level or not, under a "Auto promotion conditions" title.
+ *
+ * Displays nothing when the promotion level has no auto promotion.
+ *
+ * Meant to be mounted lazily (inside a popover): the query runs when the component mounts.
+ */
+export function BuildAutoPromotionConditions({buildId, promotionLevelId}) {
+    const {data: conditions, loading, finished} = useQuery(
+        gql`
+            query BuildAutoPromotionConditions($buildId: Int!, $promotionLevelId: Int!) {
+                build(id: $buildId) {
+                    autoPromotionConditions(promotionLevelId: $promotionLevelId) {
+                        ${buildConditionsFields}
+                    }
+                }
+            }
+        `,
+        {
+            variables: {buildId: Number(buildId), promotionLevelId: Number(promotionLevelId)},
+            deps: [buildId, promotionLevelId],
+            dataFn: data => data.build?.autoPromotionConditions,
+        }
+    )
+    if (loading || !finished) {
+        return <Spin size="small"/>
+    }
+    return <BuildConditionsSection
+        conditions={conditions}
+        testId={`build-auto-promotion-conditions-${promotionLevelId}`}
+    />
+}
+
+function BuildConditionsSection({conditions, testId}) {
     return conditions ?
-        <Space direction="vertical" data-testid={`promotion-run-auto-promotion-conditions-${promotionRunId}`}>
+        <Space direction="vertical" data-testid={testId}>
             <Typography.Text strong>Auto promotion conditions</Typography.Text>
             <AutoPromotionConditions conditions={conditions} withBuild={true}/>
         </Space> :

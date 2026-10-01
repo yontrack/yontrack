@@ -612,6 +612,11 @@ type Build implements Authorizable & ProjectEntity {
   annotatedDescription: String
   "Authorizations for this context"
   authorizations: [Authorization!]!
+  "Current conditions of the auto promotion of a promotion level of this build's branch, with their current state for this build, whether it is promoted to this level or not - null when the promotion level has no auto promotion"
+  autoPromotionConditions(
+    "ID of the promotion level, which must belong to the build's branch"
+    promotionLevelId: Int!
+  ): AutoPromotionBuildConditions
   "Auto versioning information for this build, in regards of a parent branch"
   autoVersioning(
     "ID of the parent branch. Is overridden by the buildId argument, but at least one of each is required."
