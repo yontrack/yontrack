@@ -17,6 +17,7 @@ import net.nemerosa.ontrack.model.support.SettingsRepository
 import net.nemerosa.ontrack.model.tx.DefaultTransactionHelper
 import net.nemerosa.ontrack.model.tx.TransactionHelper
 import net.nemerosa.ontrack.model.tx.TransactionRetry
+import net.nemerosa.ontrack.repository.StructureRepository
 import net.nemerosa.ontrack.test.TestUtils
 import net.nemerosa.ontrack.test.TestUtils.uid
 import net.nemerosa.ontrack.test.email
@@ -55,6 +56,9 @@ abstract class AbstractDSLTestSupport : AbstractServiceTestSupport() {
 
     @Autowired
     protected lateinit var runInfoService: RunInfoService
+
+    @Autowired
+    private lateinit var structureRepository: StructureRepository
 
     /**
      * When working with asynchronous process, having the transaction isolated
@@ -510,6 +514,26 @@ abstract class AbstractDSLTestSupport : AbstractServiceTestSupport() {
                 )
             )
         }
+    }
+
+    /**
+     * Appends statuses to the history of a validation run **without** checking the transitions
+     * between them, for a history the transition tree forbids — a run which passed and was later
+     * marked defective — but which the database can hold all the same.
+     */
+    fun ValidationRun.forceStatusHistory(vararg statuses: ValidationRunStatusID): ValidationRun {
+        statuses.forEach { status ->
+            structureRepository.newValidationRunStatus(
+                this,
+                ValidationRunStatus(
+                    ID.NONE,
+                    Signature.of("test"),
+                    status,
+                    null
+                )
+            )
+        }
+        return structureService.getValidationRun(id)
     }
 
     /**

@@ -1087,7 +1087,7 @@ public class StructureJdbcRepository extends AbstractJdbcRepository implements S
         params.put("limit", count);
 
         if (statuses != null && !statuses.isEmpty()) {
-            sql += "INNER JOIN VALIDATION_RUN_STATUSES VRS ON VRS.ID = (SELECT ID FROM VALIDATION_RUN_STATUSES WHERE VALIDATIONRUNID = VR.ID ORDER BY ID DESC LIMIT 1) ";
+            sql += ValidationRunStatusSql.LAST_STATUS_JOIN;
             criterias += "AND VRS.VALIDATIONRUNSTATUSID IN (:statuses) ";
             params.put("statuses", statuses);
         }
@@ -1135,7 +1135,7 @@ public class StructureJdbcRepository extends AbstractJdbcRepository implements S
         params.put("buildId", build.id());
 
         if (statuses != null && !statuses.isEmpty()) {
-            sql += "INNER JOIN VALIDATION_RUN_STATUSES VRS ON VRS.ID = (SELECT ID FROM VALIDATION_RUN_STATUSES WHERE VALIDATIONRUNID = VR.ID ORDER BY ID DESC LIMIT 1) ";
+            sql += ValidationRunStatusSql.LAST_STATUS_JOIN;
             criterias += "AND VRS.VALIDATIONRUNSTATUSID IN (:statuses) ";
             params.put("statuses", statuses);
         }
@@ -1172,7 +1172,7 @@ public class StructureJdbcRepository extends AbstractJdbcRepository implements S
         params.put("limit", count);
 
         if (statuses != null && !statuses.isEmpty()) {
-            sql += "INNER JOIN VALIDATION_RUN_STATUSES VRS ON VRS.ID = (SELECT ID FROM VALIDATION_RUN_STATUSES WHERE VALIDATIONRUNID = VR.ID ORDER BY ID DESC LIMIT 1) ";
+            sql += ValidationRunStatusSql.LAST_STATUS_JOIN;
             criterias += "AND VRS.VALIDATIONRUNSTATUSID IN (:statuses) ";
             params.put("statuses", statuses);
         }
@@ -1214,10 +1214,10 @@ public class StructureJdbcRepository extends AbstractJdbcRepository implements S
                 "SELECT VR.*, VDR.DATA_TYPE_ID, VDR.DATA " +
                         "FROM VALIDATION_RUNS VR " +
                         "LEFT JOIN VALIDATION_RUN_DATA VDR ON VDR.VALIDATION_RUN = VR.ID " +
-                        "LEFT JOIN VALIDATION_RUN_STATUSES VST ON VST.VALIDATIONRUNID = VR.ID " +
+                        ValidationRunStatusSql.LAST_STATUS_JOIN +
                         "WHERE VR.BUILDID = :buildId " +
                         "AND VR.VALIDATIONSTAMPID = :validationStampId " +
-                        "AND VST.VALIDATIONRUNSTATUSID IN (:statuses) " +
+                        "AND VRS.VALIDATIONRUNSTATUSID IN (:statuses) " +
                         "ORDER BY VR.ID DESC " +
                         "LIMIT :limit OFFSET :offset",
                 params("buildId", build.id()).addValue("validationStampId", validationStamp.id())
@@ -1247,7 +1247,7 @@ public class StructureJdbcRepository extends AbstractJdbcRepository implements S
         params.put("validationStampId", validationStampId.get());
 
         if (statuses != null && !statuses.isEmpty()) {
-            sql += "INNER JOIN VALIDATION_RUN_STATUSES VRS ON VRS.ID = (SELECT ID FROM VALIDATION_RUN_STATUSES WHERE VALIDATIONRUNID = VR.ID ORDER BY ID DESC LIMIT 1) ";
+            sql += ValidationRunStatusSql.LAST_STATUS_JOIN;
             criterias += "AND VRS.VALIDATIONRUNSTATUSID IN (:statuses) ";
             params.put("statuses", statuses);
         }
@@ -1287,7 +1287,7 @@ public class StructureJdbcRepository extends AbstractJdbcRepository implements S
                 "SELECT VR.*, VDR.DATA_TYPE_ID, VDR.DATA " +
                         "FROM VALIDATION_RUNS VR " +
                         "LEFT JOIN VALIDATION_RUN_DATA VDR ON VDR.VALIDATION_RUN = VR.ID " +
-                        "INNER JOIN VALIDATION_RUN_STATUSES VRS ON VRS.ID = (SELECT ID FROM VALIDATION_RUN_STATUSES WHERE VALIDATIONRUNID = VR.ID ORDER BY ID DESC LIMIT 1) " +
+                        ValidationRunStatusSql.LAST_STATUS_JOIN +
                         "WHERE VR.VALIDATIONSTAMPID = :validationStampId " +
                         "AND VRS.CREATION >= :start AND VRS.CREATION <= :end " +
                         "ORDER BY VR.BUILDID DESC, VR.ID DESC ",
@@ -1309,9 +1309,9 @@ public class StructureJdbcRepository extends AbstractJdbcRepository implements S
                 "SELECT VR.*, VDR.DATA_TYPE_ID, VDR.DATA " +
                         "FROM VALIDATION_RUNS VR " +
                         "LEFT JOIN VALIDATION_RUN_DATA VDR ON VDR.VALIDATION_RUN = VR.ID " +
-                        "LEFT JOIN VALIDATION_RUN_STATUSES VST ON VST.VALIDATIONRUNID = VR.ID " +
+                        ValidationRunStatusSql.LAST_STATUS_JOIN +
                         "WHERE VR.VALIDATIONSTAMPID = :validationStampId " +
-                        "AND VST.VALIDATIONRUNSTATUSID IN (:statuses) " +
+                        "AND VRS.VALIDATIONRUNSTATUSID IN (:statuses) " +
                         "ORDER BY VR.BUILDID DESC, VR.ID DESC " +
                         "LIMIT :limit OFFSET :offset",
                 params("validationStampId", validationStamp.id())
@@ -1333,10 +1333,10 @@ public class StructureJdbcRepository extends AbstractJdbcRepository implements S
                 "SELECT VR.*, VDR.DATA_TYPE_ID, VDR.DATA " +
                         "FROM VALIDATION_RUNS VR " +
                         "LEFT JOIN VALIDATION_RUN_DATA VDR ON VDR.VALIDATION_RUN = VR.ID " +
-                        "INNER JOIN VALIDATION_RUN_STATUSES VST ON VST.VALIDATIONRUNID = VR.ID " +
+                        ValidationRunStatusSql.LAST_STATUS_JOIN +
                         "INNER JOIN BUILDS B ON B.ID = VR.BUILDID " +
                         "WHERE B.BRANCHID = :branchId " +
-                        "AND VST.VALIDATIONRUNSTATUSID IN (:statuses) " +
+                        "AND VRS.VALIDATIONRUNSTATUSID IN (:statuses) " +
                         "ORDER BY VR.BUILDID DESC, VR.ID DESC " +
                         "LIMIT :limit OFFSET :offset",
                 params("branchId", branch.id())
@@ -1357,6 +1357,23 @@ public class StructureJdbcRepository extends AbstractJdbcRepository implements S
         return getNamedParameterJdbcTemplate().queryForObject(
                 "SELECT COUNT(ID) FROM VALIDATION_RUNS WHERE VALIDATIONSTAMPID = :validationStampId",
                 params("validationStampId", validationStampId.getValue()),
+                Integer.class
+        );
+    }
+
+    @Override
+    public int getValidationRunsCountForValidationStampAndStatus(ID validationStampId, List<ValidationRunStatusID> statuses) {
+        if (statuses.isEmpty()) {
+            return 0;
+        }
+        return getNamedParameterJdbcTemplate().queryForObject(
+                "SELECT COUNT(VR.ID) " +
+                        "FROM VALIDATION_RUNS VR " +
+                        ValidationRunStatusSql.LAST_STATUS_JOIN +
+                        "WHERE VR.VALIDATIONSTAMPID = :validationStampId " +
+                        "AND VRS.VALIDATIONRUNSTATUSID IN (:statuses)",
+                params("validationStampId", validationStampId.get())
+                        .addValue("statuses", statuses.stream().map(ValidationRunStatusID::getId).collect(Collectors.toList())),
                 Integer.class
         );
     }

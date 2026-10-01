@@ -38,11 +38,9 @@ class DeliveryMapCheckpointFactoryImpl(
     }
 
     override fun validationStamp(validationStamp: ValidationStamp): DeliveryMapCheckpoint {
-        // The latest build with a run of ANY status, and the status of that run. Deliberately not
-        // `getValidationRunsForValidationStampAndStatus`: its SQL joins every status row a run has
-        // ever had, so a run which passed and was later marked defective still matches a PASSED
-        // filter, and matching rows are duplicated into the paging. That defect is real, belongs to
-        // the build filters, and is filed as #1712.
+        // The latest build with a run of ANY status, and the status of that run: the checkpoint
+        // shows where the stamp was last run and how it went, not where it last passed, so it is
+        // deliberately not filtered on statuses.
         // The query orders by build id descending, so one row is all the checkpoint needs.
         val run = structureService.getValidationRunsForValidationStamp(validationStamp, 0, 1).firstOrNull()
         return DeliveryMapCheckpoint(

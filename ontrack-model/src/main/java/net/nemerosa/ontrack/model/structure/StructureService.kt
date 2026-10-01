@@ -560,6 +560,19 @@ interface StructureService {
      */
     fun getValidationRunsCountForValidationStamp(validationStampId: ID): Int
 
+    /**
+     * Gets the number of validation runs for a validation stamp whose last status is one of the
+     * given statuses
+     *
+     * @param validationStampId ID of the validation stamp
+     * @param statuses          Accepted statuses for the last status of the runs
+     * @return Number of matching validation runs
+     */
+    fun getValidationRunsCountForValidationStampAndStatus(
+        validationStampId: ID,
+        statuses: List<ValidationRunStatusID>,
+    ): Int
+
     // Entity searches by name
 
     // TODO Replace by Project?
