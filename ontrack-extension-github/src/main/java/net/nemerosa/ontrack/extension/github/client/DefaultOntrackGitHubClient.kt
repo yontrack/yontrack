@@ -21,8 +21,10 @@ import org.apache.commons.codec.binary.Base64
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import org.springframework.boot.web.client.RestTemplateBuilder
+import org.springframework.boot.web.client.RestTemplateRequestCustomizer
 import org.springframework.http.HttpHeaders
 import org.springframework.http.MediaType
+import org.springframework.http.client.ClientHttpRequest
 import org.springframework.web.client.HttpClientErrorException
 import org.springframework.web.client.RestClientResponseException
 import org.springframework.web.client.RestTemplate
@@ -380,11 +382,15 @@ class DefaultOntrackGitHubClient(
                         defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer ${configuration.oauth2Token}")
                     }
 
+                    // The installation token is read on every request, not once: a template may outlive
+                    // the token (e.g. the lookup of a workflow run) and the token cache renews it hourly
                     GitHubAuthenticationType.APP -> {
-                        defaultHeader(
-                            HttpHeaders.AUTHORIZATION,
-                            "Bearer ${gitHubAppTokenService.getAppInstallationToken(configuration)}"
-                        )
+                        requestCustomizers(RestTemplateRequestCustomizer<ClientHttpRequest> { request ->
+                            request.headers.set(
+                                HttpHeaders.AUTHORIZATION,
+                                "Bearer ${gitHubAppTokenService.getAppInstallationToken(configuration)}"
+                            )
+                        })
                     }
                 }
             }
