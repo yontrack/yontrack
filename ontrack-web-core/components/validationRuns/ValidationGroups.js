@@ -4,7 +4,7 @@ import {useEffect, useState} from "react";
 import {Typography} from "antd";
 import ValidationGroup from "@components/validationRuns/ValidationGroup";
 
-export default function ValidationGroups({build}) {
+export default function ValidationGroups({build, onChange}) {
 
     const {validationRunStatuses} = useRefData()
     const [groupedValidations, setGroupedValidations] = useState([])
@@ -49,7 +49,7 @@ export default function ValidationGroups({build}) {
         <Columns>
             {
                 groupedValidations.map(group =>
-                    <ValidationGroup key={group.statusID.id} group={group}/>
+                    <ValidationGroup key={group.statusID.id} group={group} onChange={onChange}/>
                 )
             }
         </Columns>

@@ -1,5 +1,5 @@
 const {expect} = require("@playwright/test");
-const {ValidationRunHistoryDialog} = require("../validationRuns/ValidationRunHistoryDialog");
+const {ValidationRunQuickTransition} = require("../validationRuns/ValidationRunQuickTransition");
 const {SCMChangeLogPage} = require("../../extensions/scm/scm");
 const {PromotionsPage} = require("../promotionLevels/PromotionsPage");
 const {confirmBox} = require("../../support/confirm");
@@ -98,14 +98,26 @@ class BranchPage {
         return changeLogPage
     }
 
-    async validationRunHistory(run) {
+    validationRunCell(run) {
         const {build, validationStamp} = run
-        const cell = this.page.getByTestId(`${build.id}-${validationStamp.id}`);
+        return this.page.getByTestId(`${build.id}-${validationStamp.id}`)
+    }
+
+    /**
+     * Clicks the status of the run in the builds grid, which opens its quick-transition popover.
+     */
+    async validationRunQuickTransition(run) {
+        const cell = this.validationRunCell(run)
         await expect(cell).toBeVisible()
         await cell.click()
-        const dialog = new ValidationRunHistoryDialog(this.page, run)
-        await dialog.waitFor()
-        return dialog
+        const popover = new ValidationRunQuickTransition(this.page, run)
+        await popover.waitFor()
+        return popover
+    }
+
+    async validationRunHistory(run) {
+        const popover = await this.validationRunQuickTransition(run)
+        return await popover.history()
     }
 
     async newStandardBuildFilter() {

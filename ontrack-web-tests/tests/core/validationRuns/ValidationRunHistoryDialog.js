@@ -26,7 +26,8 @@ export class ValidationRunHistoryDialog {
     }
 
     async checkStatus(expectedStatus, expectedMessage) {
-        await this.page.getByText(expectedStatus, {exact: true})
-        await this.page.getByText(expectedMessage, {exact: true})
+        const dialog = this.page.getByRole('dialog')
+        await expect(dialog.getByText(expectedStatus, {exact: true}).first()).toBeVisible()
+        await expect(dialog.getByText(expectedMessage, {exact: true})).toBeVisible()
     }
 }

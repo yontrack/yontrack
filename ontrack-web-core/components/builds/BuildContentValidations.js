@@ -206,6 +206,7 @@ export default function BuildContentValidations({build}) {
                     validationRuns={validationRuns}
                     pagination={pagination}
                     onChange={onTableChange}
+                    onStatusChanged={reload}
                     filtering={{
                         validationStamps,
                         statuses,
