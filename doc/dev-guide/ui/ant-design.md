@@ -32,9 +32,23 @@ meets:
 ## Lists
 
 `List` / `List.Item` are deprecated in antd 6 and not used: `ItemList` (`components/common/ItemList.js`)
-replaced them (#1853), and ESLint flags the import. `CLAUDE.md` (*Frontend Development Patterns* ›
-*Lists*) says when to use `ItemList`, a `Table`, a `Row` / `Col` grid or, in `/mobile`,
-`MobileEntityList`.
+replaced them (#1853), and ESLint flags the import. Pick the component by the shape of the data:
+
+- **`ItemList`** (`@components/common/ItemList`) — a plain vertical list of items, each with an
+  optional `avatar`, `title`, `description`, `actions` and free `children`. Semantic `ul` > `li`,
+  a divider between items, `size="small"` for a denser one, `emptyText` when there is nothing.
+  Extra props such as `data-testid` land on the `ul` / `li`, so tests use `getByRole('listitem')`
+  or `getByTestId`, never antd class names. For drag-to-reorder, render it through react-easy-sort:
+  `<ItemList component={SortableList} as="ul" onSortEnd={…}>` with each `ItemList.Item` wrapped
+  in a `SortableItem` (see `BranchValidationStampsView`).
+- **`Table`** (`@components/common/table/Table`, never antd's own) — the items share columns worth
+  sorting, filtering or comparing side by side. Its header sticks while the table scrolls (#1932);
+  opt out with `sticky={false}` only for a table nested in another table's expanded row or with
+  `showHeader={false}`. ESLint flags an import of antd's `Table`.
+- **`Row` / `Col`** — a grid of cards, e.g. `<Row gutter={[16, 16]}>` with `<Col xs={24} md={12}>`
+  (see `SubscriptionsView`).
+- **`MobileEntityList`** (`@components/mobile/entities/MobileEntityList`) — lists in the `/mobile`
+  UI, which keeps its own components.
 
 ## Testing against antd
 
