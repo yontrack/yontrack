@@ -733,7 +733,7 @@ configuration:
               contentTemplate: |
                 Yontrack ${build} has been released.
 
-                Release notes: https://github.com/yontrack/yontrack/wiki/Release-${build.release}
+                📝 Release notes: https://github.com/yontrack/yontrack/wiki/Release-${build.release}
 
                 ${promotionRun.changelog?title=true&commitsOption=OPTIONAL}
 
