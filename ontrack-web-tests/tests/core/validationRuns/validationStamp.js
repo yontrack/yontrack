@@ -53,8 +53,11 @@ export class ValidationStampPage extends AbstractImagePage {
      */
     async filterHistoryOnLastStatus(label) {
         const dropdown = await this.openLastStatusFilter()
-        await dropdown.getByRole('combobox').click()
-        await this.page.locator('.ant-select-item-option', {hasText: new RegExp(`^${label}$`)}).click()
+        // The select box, not its search input: once a value is selected, its label covers the input
+        await dropdown.locator('.ant-select-selector').click()
+        await this.page
+            .locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option', {hasText: new RegExp(`^${label}$`)})
+            .click()
         await dropdown.getByRole('button', {name: 'Search'}).click()
     }
 
