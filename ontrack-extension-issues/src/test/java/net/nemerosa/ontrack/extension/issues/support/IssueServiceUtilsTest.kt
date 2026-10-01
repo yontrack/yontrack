@@ -77,4 +77,28 @@ class IssueServiceUtilsTest {
         )
     }
 
+    @Test
+    fun `Hash issue keys - repository paths and URLs are excluded`() {
+        assertEquals(
+            setOf("10"),
+            IssueServiceUtils.extractHashIssueKeys(
+                "owner/repo#1 (group/sub.group/project#2, https://host/page#3 http://host/#4 www.host.com/page#5 #10"
+            )
+        )
+    }
+
+    @Test
+    fun `Hash issue keys - a bare slash is no repository path`() {
+        assertEquals(
+            setOf("12", "13", "14"),
+            IssueServiceUtils.extractHashIssueKeys("#12/#13 Fix in feature/#14")
+        )
+    }
+
+    @Test
+    fun `Hash issue keys - none in a blank message`() {
+        assertTrue(IssueServiceUtils.extractHashIssueKeys("").isEmpty())
+        assertTrue(IssueServiceUtils.extractHashIssueKeys(null).isEmpty())
+    }
+
 }

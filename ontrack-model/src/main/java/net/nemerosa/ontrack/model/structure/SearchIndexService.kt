@@ -1,5 +1,7 @@
 package net.nemerosa.ontrack.model.structure
 
+import co.elastic.clients.elasticsearch._types.query_dsl.Query
+
 /**
  * This service is used to manage the search indexes when they are available.
  */
@@ -26,6 +28,13 @@ interface SearchIndexService {
     fun <T : SearchItem> updateSearchIndex(indexer: SearchIndexer<T>, item: T)
 
     fun <T : SearchItem> deleteSearchIndex(indexer: SearchIndexer<T>, id: String)
+
+    /**
+     * Deletes all the documents of an index matching a query.
+     *
+     * @return Number of deleted documents
+     */
+    fun <T : SearchItem> deleteSearchIndexByQuery(indexer: SearchIndexer<T>, query: Query): Long
 
     fun <T : SearchItem> batchSearchIndex(indexer: SearchIndexer<T>, items: Collection<T>, mode: BatchIndexMode): BatchIndexResults
 

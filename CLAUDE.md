@@ -309,8 +309,12 @@ Follow this order for every non-trivial change:
   is invisible in the change log the SILVER notification renders to support the GOLD decision;
   the `issues=true` section carries the content instead.
 
-  Issue *linking* is unaffected either way: `GitHubIssueServiceExtension.extractIssueKeysFromMessage`
-  scans the whole message with `while (matcher.find())`, so `#1234` is picked up wherever it sits.
+  Issue *linking* is unaffected either way: a change log takes the issues of a commit from its
+  **subject** and its **trailer lines** (`issueReferenceText` in `SCMCommitMessages.kt`), so the
+  leading `#1234` is picked up. The body prose is ignored — a `#1236` mentioned there is not linked;
+  to name another issue, put it in a trailer line (`Refs: #1236`). The trailer keywords are
+  `close(s|d)`, `fix(es|ed)`, `resolve(s|d)`, `ref(s)`, `references`, `related`, `issue(s)` and
+  `jira-ticket`, at the start of a line, with or without a colon.
 
 - **Always** end the subject with `[skip ci]` when a commit touches only documentation that CI neither
   builds nor tests — `CONTEXT.md`, `CLAUDE.md`, `README.md`, `DEVELOPMENT.md`, `docs/` (ADRs, agent

@@ -9,6 +9,7 @@ import net.nemerosa.ontrack.extension.scm.SCMExtensionConfigProperties
 import net.nemerosa.ontrack.extension.scm.SCMExtensionFeature
 import net.nemerosa.ontrack.extension.scm.changelog.SCMChangeLogEnabled
 import net.nemerosa.ontrack.extension.scm.changelog.SCMCommitFilter
+import net.nemerosa.ontrack.extension.scm.changelog.issueReferenceText
 import net.nemerosa.ontrack.extension.scm.changelog.shortCommitMessage
 import net.nemerosa.ontrack.extension.scm.service.SCMDetector
 import net.nemerosa.ontrack.extension.support.AbstractExtension
@@ -122,14 +123,15 @@ class ScmCommitSearchExtension(
                 processor(item)
                 // Indexes the list of issues for this commit
                 if (issueConfig != null) {
-                    val keys = issueConfig.extractIssueKeysFromMessage(commit.message)
+                    // Only the subject and the trailers name the issues of a commit
+                    val keys = issueConfig.extractIssueKeysFromMessage(issueReferenceText(commit.message))
                     projectIssueKeys.addAll(keys)
                 }
             }
-            // Processing of issues
-            if (issueConfig != null && projectIssueKeys.isNotEmpty()) {
+            // Processing of issues, replacing the ones indexed for this project
+            if (issueConfig != null) {
                 logger.debug("[search][indexation][scm-commits] project=${project.name} issues=${projectIssueKeys.size} SCM issues have been found.")
-                scmIssueSearchExtension.processIssueKeys(project, issueConfig, projectIssueKeys)
+                scmIssueSearchExtension.replaceProjectIssueKeys(project, issueConfig, projectIssueKeys)
             }
         }
     }

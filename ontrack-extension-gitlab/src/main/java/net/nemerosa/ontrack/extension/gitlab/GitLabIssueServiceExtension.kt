@@ -11,6 +11,7 @@ import net.nemerosa.ontrack.extension.issues.IssueRepositoryContext
 import net.nemerosa.ontrack.extension.issues.model.Issue
 import net.nemerosa.ontrack.extension.issues.model.IssueServiceConfiguration
 import net.nemerosa.ontrack.extension.issues.support.AbstractIssueServiceExtension
+import net.nemerosa.ontrack.extension.issues.support.IssueServiceUtils
 import net.nemerosa.ontrack.model.structure.PropertyService
 import net.nemerosa.ontrack.model.structure.forEachEntityWithProperty
 import net.nemerosa.ontrack.model.support.MessageAnnotation.Companion.of
@@ -85,20 +86,8 @@ class GitLabIssueServiceExtension(
     override fun extractIssueKeysFromMessage(
         issueServiceConfiguration: IssueServiceConfiguration,
         message: String?
-    ): Set<String> {
-        val result: MutableSet<String> = HashSet()
-        if (!message.isNullOrBlank()) {
-            val matcher = Pattern.compile(GITLAB_ISSUE_PATTERN).matcher(message)
-            while (matcher.find()) {
-                // Gets the issue
-                val issueKey = matcher.group(2)
-                // Adds to the result
-                result.add(issueKey)
-            }
-        }
-        // OK
-        return result
-    }
+    ): Set<String> =
+        IssueServiceUtils.extractHashIssueKeys(message)
 
     override fun getMessageAnnotator(issueServiceConfiguration: IssueServiceConfiguration): MessageAnnotator {
         val configuration = issueServiceConfiguration as GitLabIssueServiceConfiguration

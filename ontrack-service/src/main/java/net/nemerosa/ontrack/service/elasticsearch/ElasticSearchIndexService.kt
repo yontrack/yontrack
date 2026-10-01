@@ -1,7 +1,10 @@
 package net.nemerosa.ontrack.service.elasticsearch
 
 import co.elastic.clients.elasticsearch.ElasticsearchClient
+import co.elastic.clients.elasticsearch._types.Conflicts
 import co.elastic.clients.elasticsearch._types.ElasticsearchException
+import co.elastic.clients.elasticsearch._types.query_dsl.Query
+import co.elastic.clients.elasticsearch.core.DeleteByQueryRequest
 import co.elastic.clients.elasticsearch.core.BulkRequest
 import co.elastic.clients.elasticsearch.core.DeleteRequest
 import co.elastic.clients.elasticsearch.core.GetRequest
@@ -173,6 +176,20 @@ class ElasticSearchIndexService(
         client.delete(deleteRequest)
         // Refreshes the index
         immediateRefreshIfRequested(indexer)
+    }
+
+    override fun <T : SearchItem> deleteSearchIndexByQuery(indexer: SearchIndexer<T>, query: Query): Long {
+        logger.debug("Delete by query in index ${indexer.indexName}")
+        val request = DeleteByQueryRequest.Builder()
+            .index(indexer.indexName)
+            .query(query)
+            // A document changed while being deleted is not worth failing for
+            .conflicts(Conflicts.Proceed)
+            .build()
+        val deleted = client.deleteByQuery(request).deleted() ?: 0L
+        // Refreshes the index
+        immediateRefreshIfRequested(indexer)
+        return deleted
     }
 
     override fun <T : SearchItem> batchSearchIndex(

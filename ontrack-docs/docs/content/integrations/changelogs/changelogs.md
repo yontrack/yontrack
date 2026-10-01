@@ -283,6 +283,49 @@ rendered in a changelog.
 
 The length used on the changelog page and in the search results is not configurable.
 
+## Issues of a commit
+
+The issues of a changelog are the ones its commits **name**. A commit names its issues in two places
+only:
+
+* its **subject** - the first line of its message;
+* its **trailer lines** - any line of the body which *starts*, in any case, with one of the keywords
+  below, with or without a colon. The rest of that line is the value of the trailer.
+
+| Keywords                                  |
+|-------------------------------------------|
+| `close`, `closes`, `closed`               |
+| `fix`, `fixes`, `fixed`                   |
+| `resolve`, `resolves`, `resolved`         |
+| `ref`, `refs`, `references`, `related`    |
+| `issue`, `issues`                         |
+| `jira-ticket`                             |
+
+Every issue key found in the subject or in a trailer value is linked, so a trailer can name several
+issues:
+
+```
+#12 Search owners by phone number
+
+The search used to ignore the phone numbers, see the discussion in #10.
+
+Closes #12, #13
+Refs: ABC-1 ABC-2
+Jira-Ticket: ABC-3
+```
+
+This commit names `#12`, `#13`, `ABC-1`, `ABC-2` and `ABC-3`. The rest of the body is prose, and is
+ignored: `#10` above is mentioned, not worked on, and is not part of the changelog.
+
+The rule is fixed and has no setting. It applies to the issues of a changelog, wherever it is
+rendered - the changelog page, the issue export, [templating](#using-templating), the
+[API](#using-the-api) and notifications - and to the issues the search finds in the commits of a
+project.
+
+For GitHub and GitLab issues, a `#123` is not an issue of the repository when it is part of a
+reference to another repository (`owner/repo#123`), of a URL, or of an HTML entity (`&#39;`), or when
+it is directly followed by a letter or an underscore (`#123abc`).
+
 ## Configuration of changelogs
 
 Besides the [recursivity options](#recursive-changelogs), the two types of changelogs have their own configuration.

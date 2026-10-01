@@ -32,29 +32,67 @@ class ScmIssueSearchExtension(
 
     private val logger: Logger = LoggerFactory.getLogger(ScmIssueSearchExtension::class.java)
 
-    fun processIssueKeys(
+    /**
+     * Replaces the issue keys indexed for a project: the given keys are indexed, and any other key
+     * indexed for this project - one no longer extracted from its commits - is removed.
+     *
+     * @param project Project whose issues are indexed
+     * @param issueConfig Issue service of the project, used to get the display keys
+     * @param projectIssueKeys All the issue keys extracted from the commits of the project
+     */
+    fun replaceProjectIssueKeys(
         project: Project,
         issueConfig: ConfiguredIssueService,
         projectIssueKeys: Set<String>,
     ) {
+        val items = projectIssueKeys.map { key ->
+            ScmIssueSearchItem(project.name, key, issueConfig.getDisplayKey(key))
+        }
+        // Removing the keys which are no longer extracted
+        val deleted = searchIndexService.deleteSearchIndexByQuery(
+            indexer = this,
+            query = staleProjectIssuesQuery(project, items.map { it.documentId }),
+        )
+        if (deleted > 0) {
+            logger.info("[search][indexation][scm-issues] project=${project.name} deleted=$deleted Git issues no longer referenced.")
+        }
         // Batch size
         val batchSize = ontrackConfigProperties.search.index.batch
-        // Split the keys in batches
-        val chunks = projectIssueKeys.chunked(batchSize)
+        // Split the items in batches
+        val chunks = items.chunked(batchSize)
         // For each batch
         chunks.forEach { batch ->
             logger.info("[search][indexation][scm-issues] project=${project.name} batch=${batch.size} Git issues to index.")
             searchIndexService.batchSearchIndex(
                 indexer = this,
-                items = batch.map { key ->
-                    key to issueConfig.getDisplayKey(key)
-                }.map { (key, displayKey) ->
-                    ScmIssueSearchItem(project.name, key, displayKey)
-                },
+                items = batch,
                 mode = BatchIndexMode.KEEP
             )
         }
     }
+
+    /**
+     * Documents of the project whose ID is not one of [documentIds].
+     *
+     * The `projectName` field is not mapped explicitly: it gets the default dynamic mapping, a
+     * text field with a `keyword` sub-field, which is the one to match exactly.
+     */
+    private fun staleProjectIssuesQuery(project: Project, documentIds: List<String>): Query =
+        Query.of { q ->
+            q.bool { b ->
+                b.filter { f ->
+                    f.term { t ->
+                        t.field("${ScmIssueSearchItem::projectName.name}.keyword").value(project.name)
+                    }
+                }
+                if (documentIds.isNotEmpty()) {
+                    b.mustNot { n ->
+                        n.ids { ids -> ids.values(documentIds) }
+                    }
+                }
+                b
+            }
+        }
 
     companion object {
         const val SCM_ISSUE_SEARCH_RESULT_TYPE = "scm-issue"
@@ -91,7 +129,7 @@ class ScmIssueSearchExtension(
     /**
      * No indexation is needed - it's performed by the [ScmCommitSearchExtension].
      *
-     * @see processIssueKeys
+     * @see replaceProjectIssueKeys
      */
     override fun indexAll(processor: (ScmIssueSearchItem) -> Unit) {}
 

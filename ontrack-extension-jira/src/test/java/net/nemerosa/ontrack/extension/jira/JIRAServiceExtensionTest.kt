@@ -101,6 +101,18 @@ class JIRAServiceExtensionTest {
     }
 
     @Test
+    fun `Extract keys separated by a comma only`() {
+        val issues = service.extractIssueKeysFromMessage(
+            jiraConfiguration(),
+            "ABC-1,ABC-2 List of issues"
+        )
+        assertEquals(
+            setOf("ABC-1", "ABC-2"),
+            issues
+        )
+    }
+
+    @Test
     fun `Extract key from message with exclusion list`() {
         val config = jiraConfiguration(
             exclude = listOf("TEST")

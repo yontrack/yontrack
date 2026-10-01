@@ -19,8 +19,8 @@ const val COMMIT_MESSAGE_MAX_LENGTH_DESCRIPTION =
  * Subject of a commit message, as rendered in a change log: the first line of the message,
  * truncated when too long.
  *
- * Note this never touches the message stored in [SCMCommit.message]: issue keys are extracted from
- * the whole message, body included, and the search indexes it in full.
+ * Note this never touches the message stored in [SCMCommit.message]: the search indexes it in full,
+ * and issue keys are extracted from its [issueReferenceText].
  *
  * @param message Full commit message
  * @param maxLength Maximum length of the result, the ellipsis included. `0` or less disables the
@@ -33,4 +33,43 @@ fun shortCommitMessage(message: String, maxLength: Int = COMMIT_MESSAGE_DEFAULT_
     } else {
         subject.take(maxLength - 1).trimEnd() + "…"
     }
+}
+
+/**
+ * Keywords which, at the start of a line of a commit body, make this line a trailer naming issues.
+ */
+private val ISSUE_TRAILER_KEYWORDS = listOf(
+    "close", "closes", "closed",
+    "fix", "fixes", "fixed",
+    "resolve", "resolves", "resolved",
+    "ref", "refs", "references", "related",
+    "issue", "issues",
+    "jira-ticket",
+)
+
+/**
+ * A trailer line: one of the [ISSUE_TRAILER_KEYWORDS], as a whole word, with or without a colon,
+ * followed by its value.
+ */
+private val issueTrailerRegex = Regex(
+    "^(?:${ISSUE_TRAILER_KEYWORDS.joinToString("|") { Regex.escape(it) }})(?:\\s*:|\\s|$)(.*)$",
+    RegexOption.IGNORE_CASE,
+)
+
+/**
+ * Part of a commit message which names its issues: the subject (first line) and the value of each
+ * trailer line of the body (see [ISSUE_TRAILER_KEYWORDS]), one per line. The rest of the body is
+ * prose, and an issue it mentions - historically, or in another repository - is not one the commit
+ * works on.
+ *
+ * @param message Full commit message
+ * @return Text to extract the issue keys from
+ */
+fun issueReferenceText(message: String): String {
+    val lines = message.lines()
+    val subject = lines.firstOrNull() ?: ""
+    val trailerValues = lines.drop(1).mapNotNull { line ->
+        issueTrailerRegex.matchEntire(line)?.groupValues?.get(1)?.trim()?.takeIf { it.isNotEmpty() }
+    }
+    return (listOf(subject) + trailerValues).joinToString("\n")
 }
