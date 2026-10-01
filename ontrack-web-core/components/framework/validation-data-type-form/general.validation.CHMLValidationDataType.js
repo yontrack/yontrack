@@ -1,4 +1,4 @@
-import {Form, Input, InputNumber, Space, Typography} from "antd";
+import {Checkbox, Form, InputNumber, Space, Typography} from "antd";
 import SelectCHMLLevel from "@components/framework/validation-run-data-form/SelectCHMLLevel";
 
 export default function CHMLValidationDataType({prefix, ...config}) {
@@ -39,6 +39,14 @@ export default function CHMLValidationDataType({prefix, ...config}) {
                         <InputNumber min={0} style={{width: '4em'}}/>
                     </Form.Item>
                 </Space>
+                {/*A WARNING run counts as passed for the auto promotion only*/}
+                <Form.Item
+                    name={[prefix, 'warningPassesAutoPromotion']}
+                    initialValue={config?.warningPassesAutoPromotion ?? false}
+                    valuePropName="checked"
+                >
+                    <Checkbox>A warning counts as passed for auto-promotion</Checkbox>
+                </Form.Item>
             </Space>
 
         </>

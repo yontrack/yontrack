@@ -149,6 +149,12 @@ class KdslDemoTarget(private val ontrack: Ontrack) : DemoTarget {
         const val RELEASE_PROPERTY = "net.nemerosa.ontrack.extension.general.ReleasePropertyType"
 
         /**
+         * The CHML validation data type, by its FQCN - `createValidationStampById` does not read the
+         * `chml` alias the CI configuration accepts.
+         */
+        const val CHML_DATA_TYPE = "net.nemerosa.ontrack.extension.general.validation.CHMLValidationDataType"
+
+        /**
          * The event a promotion level's workflow subscription listens to, so that promoting a
          * build runs the workflow.
          */
@@ -262,8 +268,22 @@ private class KdslDemoBranch(
         }
     }
 
-    override fun createValidationStamp(name: String, description: String) {
-        validationStamps[name] = branch.createValidationStamp(name, description)
+    override fun createValidationStamp(name: String, description: String, chml: CHMLSpec?) {
+        validationStamps[name] = branch.createValidationStamp(
+            name = name,
+            description = description,
+            dataType = chml?.let { KdslDemoTarget.CHML_DATA_TYPE },
+            // The form shape, which is what `createValidationStampById` parses
+            dataTypeConfig = chml?.let {
+                mapOf(
+                    "failedLevel" to it.failedLevel.name,
+                    "failedValue" to it.failedValue,
+                    "warningLevel" to it.warningLevel.name,
+                    "warningValue" to it.warningValue,
+                    "warningPassesAutoPromotion" to it.warningPassesAutoPromotion,
+                )
+            },
+        )
     }
 
     override fun setAutoPromotion(promotionLevel: String, spec: AutoPromotionSpec) {

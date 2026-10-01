@@ -46,14 +46,24 @@ class AutoPromotionPrerequisites(
         )
         // Checks the status of each required validation stamp
         val allVSPassed = effective.validationStamps
-            // They must all pass - note that `isValidationRunPassed` looks at the *last* run only
-            .all { vs -> validationRunService.isValidationRunPassed(build, vs) }
+            // They must all pass - note that `isValidationRunPassedForAutoPromotion` looks at the *last* run
+            // only, and lets the stamp's data type accept more than the passed statuses (#1943)
+            .all { vs -> validationRunService.isValidationRunPassedForAutoPromotion(build, vs) }
         // Checks that all the required promotions are granted
         val allPLPassed = effective.promotionLevels
             // They must all be granted
             .all { pl -> isPromoted(build, pl, excludedPromotionRunId) }
         return allVSPassed && allPLPassed
     }
+
+    /**
+     * Checks if the last status of the [validationRun] counts as passed for the auto promotion.
+     *
+     * This is the same rule as the one applied to the required validation stamps by [areSatisfied]: the
+     * listeners use it to decide whether a validation run event is worth (re)checking the promotions.
+     */
+    fun isPassedForAutoPromotion(validationRun: ValidationRun): Boolean =
+        validationRunService.isValidationRunPassedForAutoPromotion(validationRun)
 
     /**
      * Checks if the [build] is promoted to the [promotionLevel], discounting the

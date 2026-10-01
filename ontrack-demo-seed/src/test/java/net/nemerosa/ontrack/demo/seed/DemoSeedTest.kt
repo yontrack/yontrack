@@ -7,6 +7,7 @@ import java.time.ZoneOffset
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -473,7 +474,7 @@ class DemoSeedTest {
                         build.validations.any { it.validationStamp == stamp }
                     }
                     val run = latest?.validations?.last { it.validationStamp == stamp }
-                    if (run != null && !validationStatusPasses(run.status)) {
+                    if (run != null && !validationStatusPasses(run.status, branch.stamp(stamp))) {
                         "${project.name}/${branch.name} ${latest.name} $stamp"
                     } else {
                         null
@@ -501,7 +502,9 @@ class DemoSeedTest {
         DemoContent.dataset(changelog).projects.forEach { project ->
             project.branches.forEach { branch ->
                 val passed = { build: BuildSpec, stamp: String ->
-                    build.validations.any { it.validationStamp == stamp && validationStatusPasses(it.status) }
+                    build.validations.any {
+                        it.validationStamp == stamp && validationStatusPasses(it.status, branch.stamp(stamp))
+                    }
                 }
                 branch.promotionLevels.forEach { promotionLevel ->
                     val autoPromotion = promotionLevel.autoPromotion ?: return@forEach
@@ -524,6 +527,48 @@ class DemoSeedTest {
             }
         }
     }
+
+    /**
+     * #1943 - the demo shows a build which a CHML stamp's WARNING did not hold back: the auto
+     * promotion reads that WARNING as passed, and the build carries the promotion. Pinned because
+     * nothing else in the dataset would notice the stamp losing its opt-in, or the build its warning.
+     */
+    @Test
+    fun `the demo shows a build auto promoted over a WARNING its CHML stamp accepts`() {
+        val shown = DemoContent.dataset(changelog).projects.flatMap { project ->
+            project.branches.flatMap { branch ->
+                branch.promotionLevels.mapNotNull { it.autoPromotion?.let { auto -> it.name to auto } }
+                    .flatMap { (promotionLevel, auto) ->
+                        branch.builds.filter { build ->
+                            promotionLevel in build.promotionLevels &&
+                                    build.validations.any { run ->
+                                        run.status == ValidationStatus.WARNING &&
+                                                autoPromotionSelectsStamp(run.validationStamp, auto) &&
+                                                validationStatusPasses(run.status, branch.stamp(run.validationStamp))
+                                    }
+                        }.map { "${project.name}/${branch.name} ${it.name} $promotionLevel" }
+                    }
+            }
+        }
+        assertTrue(shown.isNotEmpty(), "At least one build of the demo is auto promoted over an accepted WARNING")
+    }
+
+    @Test
+    fun `a WARNING passes the auto promotion only on a CHML stamp which opts in`() {
+        val plain = ValidationStampSpec("SCAN", "")
+        val strict = plain.copy(chml = CHMLSpec(CHML.CRITICAL, 1, CHML.HIGH, 1))
+        val tolerant = plain.copy(chml = strict.chml!!.copy(warningPassesAutoPromotion = true))
+        assertTrue(validationStatusPasses(ValidationStatus.PASSED, plain))
+        assertTrue(validationStatusPasses(ValidationStatus.PASSED, tolerant))
+        assertFalse(validationStatusPasses(ValidationStatus.WARNING, null))
+        assertFalse(validationStatusPasses(ValidationStatus.WARNING, plain))
+        assertFalse(validationStatusPasses(ValidationStatus.WARNING, strict))
+        assertTrue(validationStatusPasses(ValidationStatus.WARNING, tolerant))
+        assertFalse(validationStatusPasses(ValidationStatus.FAILED, tolerant))
+    }
+
+    private fun BranchSpec.stamp(name: String): ValidationStampSpec? =
+        validationStamps.firstOrNull { it.name == name }
 
     @Test
     fun `a promotion depending on a level the branch does not declare is caught before anything is deleted`() {

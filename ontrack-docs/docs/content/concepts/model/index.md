@@ -144,6 +144,8 @@ Configuration:
 * `failedLevel`:
     * `level`: CRITICAL / HIGH / MEDIUM / LOW
     * `value`: when the number of issues in this `level` is above this threshold, the validation stamp is failed
+* `warningPassesAutoPromotion`: optional, `false` by default. When `true`, a run whose last status is `WARNING` counts
+  as passed for the [auto promotion](auto-promotion.md) — and only for it.
 
 ### Percentage
 

@@ -57,6 +57,24 @@ describe('the auto promotion conditions, with a build', () => {
         expect(screen.getByTestId('auto-promotion-summary')).not.toHaveTextContent('promotion')
     })
 
+    it('counts a WARNING run accepted by its CHML stamp as passed, and shows its WARNING status', () => {
+        const conditions = {
+            ...buildConditions,
+            validationStamps: [
+                {validationStamp: vs(1, 'BUILD'), passed: true, lastRun: {id: '10', lastStatus: status('PASSED', 'Passed')}},
+                {validationStamp: vs(4, 'SECURITY'), passed: true, lastRun: {id: '12', lastStatus: status('WARNING', 'Warning')}},
+            ],
+            promotionLevels: [],
+        }
+        render(<AutoPromotionConditions conditions={conditions} withBuild={true}/>)
+        expect(screen.getByTestId('auto-promotion-summary')).toHaveTextContent('2/2 validations passed')
+        // The tolerance stays visible: the row shows the WARNING status, not a plain tick
+        const row = screen.getByTestId('auto-promotion-vs-SECURITY')
+        expect(within(row).getByLabelText('Warning')).toBeInTheDocument()
+        expect(row).toHaveTextContent('Warning')
+        expect(within(row).queryByLabelText('Passed')).toBeNull()
+    })
+
     it('uses the singular when there is only one validation or one promotion', () => {
         const conditions = {
             ...buildConditions,

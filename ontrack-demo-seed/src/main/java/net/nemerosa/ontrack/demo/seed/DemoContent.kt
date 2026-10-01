@@ -297,7 +297,7 @@ object DemoContent {
     /**
      * The full ladder, for the projects that show the whole delivery pipeline.
      *
-     * [UI] keeps the plain [bronze] and [silver], and [LIBRARY] the plain [bronze] and
+     * [UI] keeps [bronzeAuto] and the plain [silver], and [LIBRARY] the plain [bronze] and
      * [silverAfterBronze]: neither declares the stamps [silverAuto] names, nor a GOLD for
      * [goldAfterSilver] to sit above.
      */
@@ -312,6 +312,39 @@ object DemoContent {
      * it reach a server. The promotion story is [SERVICE]'s.
      */
     private val plainPromotions = listOf(bronze, silver, gold)
+
+    /**
+     * The security scan of [UI], as a CHML stamp which lets a warning through to the auto promotion
+     * (#1943): any critical issue fails it, any high one only warns, and a warning still counts as
+     * passed for [bronzeAuto] - and only for it.
+     *
+     * Kept apart from [securityScan], which carries no data type and whose warning on [SERVICE] build
+     * 104 has to keep reading as the warning it is.
+     */
+    private val tolerantSecurityScan = ValidationStampSpec(
+        SECURITY_SCAN,
+        "Dependency and container scan. A warning does not hold BRONZE back.",
+        chml = CHMLSpec(
+            failedLevel = CHML.CRITICAL,
+            failedValue = 1,
+            warningLevel = CHML.HIGH,
+            warningValue = 1,
+            warningPassesAutoPromotion = true,
+        ),
+    )
+
+    /**
+     * BRONZE on [UI]: granted by itself once the build has built and its security scan is not red -
+     * a [tolerantSecurityScan] in WARNING counts as passed, which is what build 59 shows.
+     *
+     * It reproduces the promotions the dataset declares rather than adding any: both builds of [UI]
+     * are BRONZE, with `BUILD` green and the scan PASSED or WARNING.
+     */
+    private val bronzeAuto = bronze.copy(
+        autoPromotion = AutoPromotionSpec(
+            validationStamps = listOf(BUILD, SECURITY_SCAN),
+        ),
+    )
 
     /** The full set of checks, for the same projects. */
     private val fullValidationStamps = listOf(buildStamp, unitTests, integrationTests, securityScan)
@@ -645,8 +678,8 @@ object DemoContent {
             BranchSpec(
                 name = MAIN,
                 description = "Main development branch.",
-                promotionLevels = listOf(bronze, silver),
-                validationStamps = listOf(buildStamp, unitTests),
+                promotionLevels = listOf(bronzeAuto, silver),
+                validationStamps = listOf(buildStamp, unitTests, tolerantSecurityScan),
                 builds = listOf(
                     BuildSpec(
                         name = "58",
@@ -657,6 +690,7 @@ object DemoContent {
                         validations = listOf(
                             ValidationSpec(BUILD, PASSED),
                             ValidationSpec(UNIT_TESTS, PASSED),
+                            ValidationSpec(SECURITY_SCAN, PASSED),
                         ),
                         links = listOf(BuildRef(SERVICE, MAIN, "104")),
                     ),
@@ -669,6 +703,8 @@ object DemoContent {
                         validations = listOf(
                             ValidationSpec(BUILD, PASSED),
                             ValidationSpec(UNIT_TESTS, PASSED),
+                            // Accepted by the stamp: BRONZE is granted all the same
+                            ValidationSpec(SECURITY_SCAN, WARNING, "One high advisory in a transitive dependency."),
                         ),
                         links = listOf(BuildRef(SERVICE, MAIN, "105")),
                     ),

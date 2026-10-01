@@ -34,6 +34,7 @@ class ValidationDataTypeFormConfigGraphQLIT : AbstractQLKTITSupport() {
         "failedValue" to 1,
         "warningLevel" to "HIGH",
         "warningValue" to 2,
+        "warningPassesAutoPromotion" to false,
     ).asJson()
 
     @Test
@@ -65,6 +66,15 @@ class ValidationDataTypeFormConfigGraphQLIT : AbstractQLKTITSupport() {
 
     @Test
     fun `Saving a CHML validation stamp with its form config leaves its config unchanged`() {
+        assertFormConfigRoundTrip(chmlConfig)
+    }
+
+    @Test
+    fun `Saving a CHML validation stamp accepting warnings with its form config leaves its config unchanged`() {
+        assertFormConfigRoundTrip(chmlConfig.copy(warningPassesAutoPromotion = true))
+    }
+
+    private fun assertFormConfigRoundTrip(chmlConfig: CHMLValidationDataTypeConfig) {
         asAdmin {
             project {
                 branch {

@@ -122,7 +122,10 @@ class InMemoryDemoTarget(
                     branch.promotionDependencies[promotionLevel]?.let { add("      depends on $it") }
                     if (promotionLevel in branch.previousPromotionRequired) add("      requires the previous promotion")
                 }
-                branch.validationStamps.forEach { add("    validation stamp $it") }
+                branch.validationStamps.forEach { stamp ->
+                    add("    validation stamp $stamp")
+                    branch.chmlStamps[stamp]?.let { add("      chml $it") }
+                }
                 branch.builds.forEach { build ->
                     add("    build ${build.name} \"${build.description}\" at ${build.creation}")
                     build.releaseVersion?.let { add("      release $it") }
@@ -249,6 +252,7 @@ class InMemoryDemoTarget(
 
         val promotionLevels = mutableListOf<String>()
         val validationStamps = mutableListOf<String>()
+        val chmlStamps = mutableMapOf<String, CHMLSpec>()
         val builds = mutableListOf<InMemoryBuild>()
         var scmBranch: String? = null
         val autoPromotions = mutableMapOf<String, AutoPromotionSpec>()
@@ -286,10 +290,11 @@ class InMemoryDemoTarget(
             promotionLevels += name
         }
 
-        override fun createValidationStamp(name: String, description: String) {
+        override fun createValidationStamp(name: String, description: String, chml: CHMLSpec?) {
             checkName(name, "Validation stamp")
             require(name !in validationStamps) { "Validation stamp $name already exists in ${project.name}/${this.name}" }
             validationStamps += name
+            chml?.let { chmlStamps[name] = it }
         }
 
         override fun setAutoPromotion(promotionLevel: String, spec: AutoPromotionSpec) {

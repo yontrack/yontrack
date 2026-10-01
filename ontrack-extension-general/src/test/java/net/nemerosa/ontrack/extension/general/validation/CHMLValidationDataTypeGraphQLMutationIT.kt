@@ -107,4 +107,41 @@ class CHMLValidationDataTypeGraphQLMutationIT : AbstractQLKTITSupport() {
             }
         }
     }
+    @Test
+    fun `Creation of a CHML validation stamp accepting warnings for the auto promotion`() {
+        asAdmin {
+            project {
+                branch {
+                    run("""
+                        mutation {
+                            setupCHMLValidationStamp(input: {
+                                project: "${project.name}",
+                                branch: "$name",
+                                validation: "test",
+                                warningLevel: {level: HIGH, value: 1},
+                                failedLevel: {level: CRITICAL, value: 1},
+                                warningPassesAutoPromotion: true
+                            }) {
+                                errors {
+                                    message
+                                }
+                            }
+                        }
+                    """).let { data ->
+                        assertNoUserError(data, "setupCHMLValidationStamp")
+                        assertPresent(structureService.findValidationStampByName(project.name, name, "test")) {
+                            assertEquals(
+                                CHMLValidationDataTypeConfig(
+                                    warningLevel = CHMLLevel(CHML.HIGH, 1),
+                                    failedLevel = CHMLLevel(CHML.CRITICAL, 1),
+                                    warningPassesAutoPromotion = true,
+                                ),
+                                it.dataType?.config
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
 }

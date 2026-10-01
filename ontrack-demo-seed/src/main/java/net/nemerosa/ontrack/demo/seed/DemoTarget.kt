@@ -143,7 +143,10 @@ interface DemoBranch {
     fun registerCommit(message: String): String
 
     fun createPromotionLevel(name: String, description: String, workflow: WorkflowSpec? = null)
-    fun createValidationStamp(name: String, description: String)
+    /**
+     * @param chml CHML configuration of the stamp, or null for a stamp without any data type
+     */
+    fun createValidationStamp(name: String, description: String, chml: CHMLSpec? = null)
 
     /**
      * Configures what grants [promotionLevel] by itself.

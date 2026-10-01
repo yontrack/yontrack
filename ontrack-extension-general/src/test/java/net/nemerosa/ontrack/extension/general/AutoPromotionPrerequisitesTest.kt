@@ -47,7 +47,7 @@ class AutoPromotionPrerequisitesTest {
 
     private fun passed(vararg stamps: ValidationStamp) {
         allValidationStamps.forEach { vs ->
-            every { validationRunService.isValidationRunPassed(build, vs) } returns (vs in stamps)
+            every { validationRunService.isValidationRunPassedForAutoPromotion(build, vs) } returns (vs in stamps)
         }
     }
 

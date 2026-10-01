@@ -13,6 +13,7 @@ class ValidationRunServiceImpl(
     private val securityService: SecurityService,
     private val validationRunRepository: ValidationRunRepository,
     private val validationRunStatusService: ValidationRunStatusService,
+    private val validationDataTypeService: ValidationDataTypeService,
 ) : ValidationRunService {
 
     override fun updateValidationRunData(run: ValidationRun, data: ValidationRunData<*>?): ValidationRun {
@@ -20,15 +21,37 @@ class ValidationRunServiceImpl(
         return validationRunRepository.updateValidationRunData(run, data)
     }
 
-    override fun isValidationRunPassed(build: Build, validationStamp: ValidationStamp): Boolean {
-        // Gets the status of the last run, if any
-        val statusId = validationRunRepository.getLastValidationRunStatusId(build, validationStamp)
-            ?: return false
+    override fun isValidationRunPassed(build: Build, validationStamp: ValidationStamp): Boolean =
         // A status is passed when it is flagged as such (PASSED, but also FIXED).
-        // An unknown status is never passed - it must not fail the caller.
+        getLastValidationRunStatus(build, validationStamp)?.isPassed == true
+
+    override fun isValidationRunPassedForAutoPromotion(build: Build, validationStamp: ValidationStamp): Boolean {
+        val status = getLastValidationRunStatus(build, validationStamp) ?: return false
+        return isPassedForAutoPromotion(validationStamp, status)
+    }
+
+    override fun isValidationRunPassedForAutoPromotion(validationRun: ValidationRun): Boolean =
+        isPassedForAutoPromotion(validationRun.validationStamp, validationRun.lastStatus.statusID)
+
+    /**
+     * Status of the last run, if any. An unknown status is returned as `null` - it must not fail the caller.
+     */
+    private fun getLastValidationRunStatus(build: Build, validationStamp: ValidationStamp): ValidationRunStatusID? {
+        val statusId = validationRunRepository.getLastValidationRunStatusId(build, validationStamp)
+            ?: return null
         return validationRunStatusService.getValidationRunStatusList()
             .find { it.id == statusId }
-            ?.isPassed == true
+    }
+
+    /**
+     * Delegates to the data type of the stamp, which reads its current configuration. A stamp without any
+     * data type, or whose data type is no longer available, falls back to the passed flag of the status.
+     */
+    private fun isPassedForAutoPromotion(validationStamp: ValidationStamp, status: ValidationRunStatusID): Boolean {
+        val dataTypeConfig = validationStamp.dataType ?: return status.isPassed
+        val dataType = validationDataTypeService.getValidationDataType<Any?, Any>(dataTypeConfig.descriptor.id)
+            ?: return status.isPassed
+        return dataType.isPassedForAutoPromotion(dataTypeConfig.config, status)
     }
 
 }

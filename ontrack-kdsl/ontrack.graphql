@@ -12131,6 +12131,8 @@ input SetupCHMLValidationStampInput {
   validation: String!
   "Level needed to raise a warning"
   warningLevel: CHMLLevel!
+  "If true, a run in WARNING status counts as passed for the auto promotion. Defaults to false."
+  warningPassesAutoPromotion: Boolean
 }
 
 "Input type for the setupMetricsValidationStamp mutation."

@@ -34,7 +34,8 @@ class CHMLValidationDataType(
                 "failedLevel" to it.failedLevel.level,
                 "failedValue" to it.failedLevel.value,
                 "warningLevel" to it.warningLevel.level,
-                "warningValue" to it.warningLevel.value
+                "warningValue" to it.warningLevel.value,
+                "warningPassesAutoPromotion" to it.warningPassesAutoPromotion,
             ).toJson()
         }
 
@@ -48,7 +49,8 @@ class CHMLValidationDataType(
                 failedLevel = CHMLLevel(
                     node.getRequiredEnum("failedLevel"),
                     node.getIntField("failedValue") ?: 0
-                )
+                ),
+                warningPassesAutoPromotion = node.path("warningPassesAutoPromotion").asBoolean(false),
             )
         }
 
@@ -66,6 +68,9 @@ class CHMLValidationDataType(
                 values = CHML.entries.map { it.name },
             ),
             "failedValue" to JsonIntType("Value for which to raise a failure"),
+            "warningPassesAutoPromotion" to JsonBooleanType(
+                "If true, a run in WARNING status counts as passed for the auto promotion. Defaults to false."
+            ),
         ),
         required = listOf(
             "warningLevel",
@@ -106,6 +111,16 @@ class CHMLValidationDataType(
             return null
         }
     }
+
+    /**
+     * A `WARNING` run counts as passed for the auto promotion when the stamp opts in. Only a last status
+     * of exactly `WARNING` is accepted: a warning which was later moved to another status is not.
+     */
+    override fun isPassedForAutoPromotion(
+        config: CHMLValidationDataTypeConfig?,
+        status: ValidationRunStatusID,
+    ): Boolean =
+        status.isPassed || (config?.warningPassesAutoPromotion == true && status.id == ValidationRunStatusID.WARNING)
 
     override fun validateData(config: CHMLValidationDataTypeConfig?, data: CHMLValidationDataTypeData?) =
         validateNotNull(data) {
@@ -149,9 +164,16 @@ data class CHMLValidationDataTypeData(
     val levels: Map<CHML, Int>,
 )
 
+/**
+ * @property warningLevel Level for which to raise a warning
+ * @property failedLevel Level for which to raise a failure
+ * @property warningPassesAutoPromotion If `true`, a run in `WARNING` status counts as passed for the
+ * auto promotion - and only for it.
+ */
 data class CHMLValidationDataTypeConfig(
     val warningLevel: CHMLLevel,
     val failedLevel: CHMLLevel,
+    val warningPassesAutoPromotion: Boolean = false,
 )
 
 data class CHMLLevel(

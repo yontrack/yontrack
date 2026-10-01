@@ -25,16 +25,21 @@ internal fun autoPromotionSelectsStamp(name: String, spec: AutoPromotionSpec): B
 }
 
 /**
- * Whether a validation of this status counts as passed for an auto promotion.
+ * Whether a validation of this status, on this stamp, counts as passed for an auto promotion.
  *
- * `ValidationRunStatusID.isPassed` on the server side, where `PASSED` and `FIXED` pass and `WARNING`
- * deliberately does not. Read through here rather than compared to `PASSED` at each use: the
- * dataset's [ValidationStatus] is a subset of what Yontrack knows, and the day it gains `FIXED` -
- * which is how it gains any status - a comparison against `PASSED` alone starts answering wrongly
- * about a build the server would have promoted.
+ * `ValidationRunService.isValidationRunPassedForAutoPromotion` on the server side, where `PASSED` and
+ * `FIXED` pass and `WARNING` does not - *unless the stamp opts in*: a CHML stamp carrying
+ * `warningPassesAutoPromotion` lets a `WARNING` through to the auto promotion (#1943). Read through
+ * here rather than compared to `PASSED` at each use: the dataset's [ValidationStatus] is a subset of
+ * what Yontrack knows, and the day it gains `FIXED` - which is how it gains any status - a comparison
+ * against `PASSED` alone starts answering wrongly about a build the server would have promoted.
+ *
+ * @param stamp The stamp the validation ran on, or null when the branch does not declare it - which
+ * [validate] refuses anyway, and which reads as a stamp without any data type
  */
-internal fun validationStatusPasses(status: ValidationStatus): Boolean =
-    status == ValidationStatus.PASSED
+internal fun validationStatusPasses(status: ValidationStatus, stamp: ValidationStampSpec?): Boolean =
+    status == ValidationStatus.PASSED ||
+            (status == ValidationStatus.WARNING && stamp?.chml?.warningPassesAutoPromotion == true)
 
 /**
  * The first promotion a build is missing out of the ones its promotion requires, or null when it is

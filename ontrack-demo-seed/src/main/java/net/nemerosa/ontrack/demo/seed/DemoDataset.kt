@@ -171,10 +171,40 @@ data class AutoPromotionSpec(
  */
 data class WorkflowSpec(val yaml: String)
 
+/**
+ * @property chml CHML thresholds of the stamp, when it carries this data type. The demo's runs only
+ * ever give a status, never CHML counts, so the thresholds are there for what the stamp *says* - its
+ * configuration and, through [CHMLSpec.warningPassesAutoPromotion], how the auto promotion reads it.
+ */
 data class ValidationStampSpec(
     val name: String,
     val description: String,
+    val chml: CHMLSpec? = null,
 )
+
+/**
+ * Configuration of a CHML validation stamp, as `CHMLValidationDataTypeConfig` holds it on the server.
+ *
+ * @property warningPassesAutoPromotion Whether a run in `WARNING` counts as passed for the auto
+ * promotion, and only for it (#1943).
+ */
+data class CHMLSpec(
+    val failedLevel: CHML,
+    val failedValue: Int,
+    val warningLevel: CHML,
+    val warningValue: Int,
+    val warningPassesAutoPromotion: Boolean = false,
+)
+
+/**
+ * CHML severity levels, as `CHML` on the server side.
+ */
+enum class CHML {
+    CRITICAL,
+    HIGH,
+    MEDIUM,
+    LOW,
+}
 
 /**
  * @property name Build name — the opaque run identity, as in a real pipeline.

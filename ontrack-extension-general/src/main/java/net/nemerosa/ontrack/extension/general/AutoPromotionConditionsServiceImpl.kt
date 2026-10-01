@@ -43,7 +43,7 @@ class AutoPromotionConditionsServiceImpl(
                             count = 1,
                         ).firstOrNull(),
                         // Same rule as the auto promotion itself
-                        passed = validationRunService.isValidationRunPassed(build, vs),
+                        passed = validationRunService.isValidationRunPassedForAutoPromotion(build, vs),
                     )
                 },
                 promotionLevels = effective.promotionLevels.map { pl ->
