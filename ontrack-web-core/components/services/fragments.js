@@ -189,6 +189,7 @@ export const gqlValidationStampFragment = gql`
                 displayName
             }
             config
+            formConfig
         }
         authorizations {
             name

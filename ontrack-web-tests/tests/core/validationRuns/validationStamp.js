@@ -18,6 +18,16 @@ export class ValidationStampPage extends AbstractImagePage {
         await expect(this.page.getByText(this.validationStamp.name)).toBeVisible()
     }
 
+    /**
+     * Opens the update dialog of the validation stamp and returns the dialog
+     */
+    async openUpdateDialog() {
+        await this.page.getByRole('button', {name: 'Update validation stamp'}).click()
+        const dialog = this.page.getByRole('dialog')
+        await expect(dialog).toBeVisible()
+        return dialog
+    }
+
     history() {
         return this.page.getByTestId("validation-stamp-history")
     }

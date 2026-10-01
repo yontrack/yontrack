@@ -10,14 +10,14 @@ export default function CHMLValidationDataType({prefix, ...config}) {
                     <Typography.Text>Failed if # of</Typography.Text>
                     <Form.Item
                         name={[prefix, 'failedLevel']}
-                        initialValue={config?.failedLevel?.level}
+                        initialValue={config?.failedLevel}
                     >
                         <SelectCHMLLevel/>
                     </Form.Item>
                     <Typography.Text>issues is &ge;</Typography.Text>
                     <Form.Item
                         name={[prefix, 'failedValue']}
-                        initialValue={config?.failedLevel?.value}
+                        initialValue={config?.failedValue}
                     >
                         <InputNumber min={0} style={{width: '4em'}}/>
                     </Form.Item>
@@ -27,14 +27,14 @@ export default function CHMLValidationDataType({prefix, ...config}) {
                     <Typography.Text>Warning if # of</Typography.Text>
                     <Form.Item
                         name={[prefix, 'warningLevel']}
-                        initialValue={config?.warningLevel?.level}
+                        initialValue={config?.warningLevel}
                     >
                         <SelectCHMLLevel/>
                     </Form.Item>
                     <Typography.Text>issues is &ge;</Typography.Text>
                     <Form.Item
                         name={[prefix, 'warningValue']}
-                        initialValue={config?.warningLevel?.value}
+                        initialValue={config?.warningValue}
                     >
                         <InputNumber min={0} style={{width: '4em'}}/>
                     </Form.Item>

@@ -8,6 +8,7 @@ import {OntrackSettings} from "@ontrack/settings";
 import {AutoVersioningExtension} from "@ontrack/extensions/auto-versioning/AutoVersioningExtension";
 import {SearchMgt} from "@ontrack/search";
 import {labels} from "@ontrack/labels";
+import {createPredefinedValidationStamp} from "@ontrack/predefinedValidationStamp";
 
 /**
  * Ontrack service
@@ -31,6 +32,8 @@ export class Ontrack {
     getBranchById = async (id) => getBranchById(this, id)
 
     getValidationRunById = async (runId) => getValidationRunById(this, runId)
+
+    createPredefinedValidationStamp = async (options) => createPredefinedValidationStamp(this, options)
 
     // Extensions
 

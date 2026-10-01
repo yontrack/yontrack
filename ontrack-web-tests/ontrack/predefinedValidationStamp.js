@@ -3,34 +3,30 @@ import {graphQLCall, graphQLCallMutation} from "@ontrack/graphql";
 import {gql} from "graphql-request";
 
 /**
- * Creates a validation stamp on a branch.
+ * Creates a predefined validation stamp.
  *
- * @param branch Parent branch
- * @param name Name of the validation stamp (generated if not set)
+ * @param ontrack Ontrack connection
+ * @param name Name of the predefined validation stamp (generated if not set)
  * @param dataType FQCN of the validation data type (optional)
  * @param dataTypeConfig Configuration of the data type, in its form (input) shape (optional)
  */
-export const createValidationStamp = async (branch, name, {dataType, dataTypeConfig} = {}) => {
-    const actualName = name ?? generate('vs_')
-
+export const createPredefinedValidationStamp = async (ontrack, {name, dataType, dataTypeConfig} = {}) => {
     const data = await graphQLCallMutation(
-        branch.ontrack.connection,
-        'createValidationStampById',
+        ontrack.connection,
+        'createPredefinedValidationStamp',
         gql`
-            mutation CreateValidationStamp(
-                $branchId: Int!,
+            mutation CreatePredefinedValidationStamp(
                 $name: String!,
                 $dataType: String,
                 $dataTypeConfig: JSON,
             ) {
-                createValidationStampById(input: {
-                    branchId: $branchId,
+                createPredefinedValidationStamp(input: {
                     name: $name,
                     description: "",
                     dataType: $dataType,
                     dataTypeConfig: $dataTypeConfig,
                 }) {
-                    validationStamp {
+                    predefinedValidationStamp {
                         id
                         name
                     }
@@ -41,33 +37,25 @@ export const createValidationStamp = async (branch, name, {dataType, dataTypeCon
             }
         `,
         {
-            branchId: Number(branch.id),
-            name: actualName,
+            name: name ?? generate('pvs_'),
             dataType,
             dataTypeConfig,
         }
     )
-
-    return validationStampInstance(branch, data.createValidationStampById.validationStamp)
-}
-
-
-const validationStampInstance = (branch, data) => {
-    const validationStamp = {
-        ontrack: branch.ontrack,
-        ...data,
-        branch,
+    const pvs = {
+        ontrack,
+        ...data.createPredefinedValidationStamp.predefinedValidationStamp,
     }
 
     /**
-     * Gets the data type of the validation stamp, with its stored and form configurations.
+     * Gets the data type of the predefined validation stamp, with its stored and form configurations.
      */
-    validationStamp.getDataType = async () => {
+    pvs.getDataType = async () => {
         const data = await graphQLCall(
-            validationStamp.ontrack.connection,
+            ontrack.connection,
             gql`
-                query ValidationStampDataType($id: Int!) {
-                    validationStamp(id: $id) {
+                query PredefinedValidationStampDataType($name: String!) {
+                    predefinedValidationStampByName(name: $name) {
                         dataType {
                             descriptor {
                                 id
@@ -78,10 +66,10 @@ const validationStampInstance = (branch, data) => {
                     }
                 }
             `,
-            {id: Number(validationStamp.id)}
+            {name: pvs.name}
         )
-        return data.validationStamp.dataType
+        return data.predefinedValidationStampByName.dataType
     }
 
-    return validationStamp
+    return pvs
 }

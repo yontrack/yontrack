@@ -19,12 +19,13 @@ export const usePredefinedValidationStampUpdateDialog = ({onChange}) => {
                 name: pvs.name,
                 description: pvs.description,
                 dataType: pvs.dataType?.descriptor?.id,
+                config: pvs.dataType?.formConfig,
             })
         },
         prepareValues: (values, {pvs}) => {
             return {
                 ...values,
-                id: pvs.id,
+                id: Number(pvs.id),
                 description: values.description ?? '',
                 dataType: values.dataType,
                 dataTypeConfig: values.config,

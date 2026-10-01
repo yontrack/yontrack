@@ -34,6 +34,7 @@ export default function PredefinedValidationStampsTable({reloadState}) {
                             displayName
                         }
                         config
+                        formConfig
                     }
                 }
             }

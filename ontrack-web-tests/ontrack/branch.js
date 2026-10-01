@@ -77,7 +77,7 @@ const branchInstance = (ontrack, data, project) => {
     }
 
     branch.createPromotionLevel = async (name, options) => createPromotionLevel(branch, name, options)
-    branch.createValidationStamp = async (name) => createValidationStamp(branch, name)
+    branch.createValidationStamp = async (name, options) => createValidationStamp(branch, name, options)
     branch.createBuild = async (name) => createBuild(branch, name)
     branch.disableBranch = async () => disableBranch(branch)
     branch.favourite = async () => favouriteBranch(branch)

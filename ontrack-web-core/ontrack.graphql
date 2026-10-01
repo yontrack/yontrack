@@ -8319,6 +8319,8 @@ type ValidationDataTypeConfig {
   config: JSON
   "Descriptor for the validation data type"
   descriptor: ValidationDataTypeDescriptor
+  "Configuration object, in the shape expected by the edition forms and the mutations"
+  formConfig: JSON
 }
 
 "Descriptor for a validation data type"
