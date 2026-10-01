@@ -717,6 +717,11 @@ configuration:
         branch:
           notificationsConfig:
             notifications:
+            # The wiki link uses `${build.release}`, not `${build}`: the latter renders a link to the
+            # build, and the page is named for the bare version. By RELEASE the property has been
+            # rewritten from `5.3.0-rc-41` to `5.3.0` at GOLD, and the WIKI stamp that RELEASE
+            # requires has checked that `Release-5.3.0` exists - the same URL release.sh puts in
+            # the GitHub release.
             - name: On RELEASE
               promotion: RELEASE
               events:
@@ -727,6 +732,8 @@ configuration:
                 type: 'SUCCESS'
               contentTemplate: |
                 Yontrack ${build} has been released.
+
+                Release notes: https://github.com/yontrack/yontrack/wiki/Release-${build.release}
 
                 ${promotionRun.changelog?title=true&commitsOption=OPTIONAL}
 
