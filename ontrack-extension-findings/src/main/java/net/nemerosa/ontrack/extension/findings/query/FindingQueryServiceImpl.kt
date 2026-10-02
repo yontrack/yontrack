@@ -176,9 +176,14 @@ class FindingQueryServiceImpl(
 
     override fun getFindingExposures(finding: Finding): List<FindingExposureView> {
         if (!canSeeFindings(finding.projectId)) return emptyList()
+        val exposures = findingRepository.findExposuresByFinding(finding.id)
+        if (exposures.isEmpty()) return emptyList()
+        val countingBranches = findingStateService.getCountingBranchIds(
+            structureService.getProject(ID.of(finding.projectId))
+        )
         val branches = mutableMapOf<Int, Branch>()
         val stamps = mutableMapOf<Int, ValidationStamp>()
-        return findingRepository.findExposuresByFinding(finding.id)
+        return exposures
             .map { exposure ->
                 FindingExposureView(
                     exposure = exposure,
@@ -188,6 +193,7 @@ class FindingQueryServiceImpl(
                     validationStamp = stamps.getOrPut(exposure.validationStampId) {
                         structureService.getValidationStamp(ID.of(exposure.validationStampId))
                     },
+                    counts = exposure.branchId in countingBranches,
                 )
             }
             .sortedWith(

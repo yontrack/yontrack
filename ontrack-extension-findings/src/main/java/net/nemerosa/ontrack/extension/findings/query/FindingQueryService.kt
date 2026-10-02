@@ -92,7 +92,8 @@ interface FindingQueryService {
     fun getFindingState(finding: Finding, date: LocalDate = Time.now.toLocalDate()): FindingState?
 
     /**
-     * Exposure of a finding on the branches of its project, resolved or not, by branch then stamp.
+     * Exposure of a finding on the branches of its project, resolved or not, by branch then stamp,
+     * each saying whether its branch counts toward the state of the finding in the project.
      */
     fun getFindingExposures(finding: Finding): List<FindingExposureView>
 
@@ -110,11 +111,15 @@ interface FindingQueryService {
 
 /**
  * Exposure of a finding on a branch, for the scans of one stamp, with the branch and the stamp.
+ *
+ * @property counts Whether the branch counts toward the state of the finding in its project:
+ * matched by the branch model of the project (every branch when it has none), and not disabled
  */
 data class FindingExposureView(
     val exposure: FindingExposure,
     val branch: Branch,
     val validationStamp: ValidationStamp,
+    val counts: Boolean,
 )
 
 /**

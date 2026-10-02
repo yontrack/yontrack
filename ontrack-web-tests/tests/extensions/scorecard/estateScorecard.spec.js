@@ -186,6 +186,13 @@ test('estate view: the fan-out of one finding over the projects of the estate', 
         await expect(estatePage.fanOutBranch(exposed.name, 'main')).toContainText('since')
         await expect(estatePage.fanOutBranch(exposed.name, 'release')).toContainText(`accepted until ${acceptedUntil}`)
 
+        // No SCM, so no branch model: every branch counts toward the state of the project, none
+        // is greyed. A branch outside the branch model is covered by EstateFindingsIT and by the
+        // Jest tests of the fan-out: the mock SCM of this stack gives no branch model.
+        await expect(estatePage.fanOutBranch(exposed.name, 'main')).toHaveAttribute('data-counts', 'true')
+        await expect(estatePage.fanOutBranch(exposed.name, 'release')).toHaveAttribute('data-counts', 'true')
+        await expect(estatePage.fanOutBranches(exposed.name)).not.toContainText('does not count')
+
         // Fixed: no branch left, resolved
         await expect(estatePage.fanOutState(fixed.name)).toHaveText('Resolved')
         await expect(estatePage.fanOutBranches(fixed.name)).toContainText('Resolved')

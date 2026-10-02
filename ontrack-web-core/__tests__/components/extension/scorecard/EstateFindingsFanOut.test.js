@@ -1,5 +1,5 @@
 import "@testing-library/jest-dom"
-import {fireEvent, render, screen, within} from "@testing-library/react"
+import {fireEvent, render, screen, waitFor, within} from "@testing-library/react"
 import EstateFindingsFanOut from "@components/extension/scorecard/estates/EstateFindingsFanOut"
 
 Object.defineProperty(window, 'matchMedia', {
@@ -23,14 +23,17 @@ jest.mock("../../../../components/services/GraphQL", () => ({
     callGraphQL: jest.fn(),
 }))
 
-const main = {id: 10, name: 'main'}
-const release = {id: 11, name: 'release'}
+const main = {id: 10, name: 'main', disabled: false}
+const release = {id: 11, name: 'release', disabled: false}
+const spike = {id: 12, name: 'feature-old-spike', disabled: false}
+const archived = {id: 13, name: 'archived', disabled: true}
 
 const exposure = (branch, props = {}) => ({
     branch,
     validationStamp: {id: 1, name: 'scan'},
     since: '2026-09-10T10:00:00Z',
     state: 'EXPOSED',
+    counts: true,
     accepted: false,
     acceptanceExpiresAt: null,
     resolvedAt: null,
@@ -153,6 +156,69 @@ describe('The findings fan-out of an estate', () => {
             '/extension/findings/finding/2',
             '/extension/findings/finding/1',
         ])
+    })
+
+    describe('with branches which do not count toward the state of the project', () => {
+
+        const outsideFindings = [
+            // Resolved on the branches which count, still exposed on the ones which do not
+            finding(3, {id: 9, name: 'gamma'}, {
+                state: 'RESOLVED',
+                resolvedAt: '2026-09-15T10:00:00Z',
+                // By branch name, as the server gives them
+                exposures: [
+                    exposure(archived, {counts: false}),
+                    exposure(spike, {counts: false}),
+                    exposure(main, {state: 'RESOLVED', resolvedAt: '2026-09-15T10:00:00Z'}),
+                ],
+            }),
+            finding(4, {id: 10, name: 'delta'}, {
+                exposures: [
+                    exposure(archived, {counts: false}),
+                    exposure(spike, {counts: false}),
+                    exposure(release),
+                ],
+            }),
+        ]
+
+        const searchOutside = () => {
+            mockFindings(outsideFindings)
+            render(<EstateFindingsFanOut estate={{name: 'Products'}}/>)
+            search('CVE-2021-44228')
+        }
+
+        it('lists them after the ones which count', () => {
+            searchOutside()
+            const branches = within(screen.getByTestId('estate-fanout-branches-delta'))
+                .getAllByTestId(/^estate-fanout-branch-delta-/)
+            expect(branches.map(it => [it.getAttribute('data-testid'), it.getAttribute('data-counts')])).toEqual([
+                ['estate-fanout-branch-delta-release', 'true'],
+                ['estate-fanout-branch-delta-archived', 'false'],
+                ['estate-fanout-branch-delta-feature-old-spike', 'false'],
+            ])
+        })
+
+        it('says why a branch does not count, to the eye and to a screen reader', async () => {
+            searchOutside()
+            const outside = screen.getByTestId('estate-fanout-branch-gamma-feature-old-spike')
+            expect(outside).toHaveTextContent("Outside the branch model: does not count toward the project's state")
+            expect(screen.getByTestId('estate-fanout-branch-gamma-archived'))
+                .toHaveTextContent("Disabled branch: does not count toward the project's state")
+            expect(screen.getByTestId('estate-fanout-branch-delta-release'))
+                .not.toHaveTextContent('does not count')
+
+            fireEvent.focus(within(outside).getByRole('link', {name: 'feature-old-spike'}))
+            await waitFor(() => expect(screen.getByRole('tooltip'))
+                .toHaveTextContent("Outside the branch model: does not count toward the project's state"))
+        })
+
+        it('leaves the state of the project and the summary as the branches which count make them', () => {
+            searchOutside()
+            expect(screen.getByTestId('estate-fanout-state-gamma')).toHaveTextContent('Resolved')
+            expect(screen.getByTestId('estate-fanout-summary')).toHaveTextContent(
+                '2 projects of this estate report CVE-2021-44228: exposed in 1, accepted in 0, resolved in 1'
+            )
+        })
     })
 
     it('says when no project of the estate reports the external ID', () => {

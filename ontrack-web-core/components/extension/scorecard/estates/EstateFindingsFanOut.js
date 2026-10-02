@@ -1,7 +1,7 @@
 import {useState} from "react";
 import {gql} from "graphql-request";
 import Link from "next/link";
-import {Alert, Empty, Input, Skeleton, Space, Tag, Typography} from "antd";
+import {Alert, Empty, Input, Skeleton, Space, Tag, theme, Tooltip, Typography} from "antd";
 import Table from "@components/common/table/Table";
 import {useQuery} from "@components/services/GraphQL";
 import {branchUri, findingUri, projectUri} from "@components/common/Links";
@@ -39,6 +39,7 @@ export const gqlEstateFindingsFanOut = gql`
                     branch {
                         id
                         name
+                        disabled
                     }
                     validationStamp {
                         id
@@ -46,6 +47,7 @@ export const gqlEstateFindingsFanOut = gql`
                     }
                     since
                     state
+                    counts
                     acceptanceExpiresAt
                 }
             }
@@ -56,8 +58,52 @@ export const gqlEstateFindingsFanOut = gql`
 const DAY_FORMAT = "YYYY MMM DD"
 
 /**
- * The branches a finding is exposed on, each since the start of its exposure, or when the finding
- * was resolved when it is exposed on none.
+ * Why a branch exposing the finding does not count toward the state of the finding in its project.
+ */
+const notCountingReason = (branch) =>
+    branch.disabled ?
+        "Disabled branch: does not count toward the project's state" :
+        "Outside the branch model: does not count toward the project's state"
+
+/**
+ * One branch a finding is exposed on, since the start of its exposure.
+ *
+ * A branch which does not count toward the state of the project is greyed, with a dashed border
+ * rather than by its colour alone, and says why on hover and on keyboard focus — and to a screen
+ * reader, in a text it alone reads.
+ */
+function FanOutBranch({project, branch, state, since, acceptanceExpiresAt, counts}) {
+    const {token} = theme.useToken()
+    const greyed = counts ? undefined : {color: token.colorTextSecondary}
+    const tag =
+        <Tag
+            data-testid={`estate-fanout-branch-${project.name}-${branch.name}`}
+            data-counts={counts ? 'true' : 'false'}
+            style={counts ? undefined : {...greyed, borderStyle: 'dashed', background: 'transparent'}}
+        >
+            <Link href={branchUri(branch)} style={greyed}>{branch.name}</Link>
+            {' '}
+            <TimestampText value={since} prefix="since" format={DAY_FORMAT}/>
+            {
+                state === 'ACCEPTED' &&
+                <>
+                    {' · '}
+                    {acceptanceExpiresAt ? `accepted until ${acceptanceExpiresAt}` : 'accepted without expiry'}
+                </>
+            }
+            {
+                !counts && <span className="ot-visually-hidden">{` (${notCountingReason(branch)})`}</span>
+            }
+        </Tag>
+    return counts ?
+        tag :
+        <Tooltip title={notCountingReason(branch)} trigger={['hover', 'focus']}>{tag}</Tooltip>
+}
+
+/**
+ * The branches a finding is exposed on, each since the start of its exposure — the ones which do
+ * not count toward the state of the project after the ones which count — or when the finding was
+ * resolved when it is exposed on none.
  */
 function FanOutBranches({project, finding, branches}) {
     return (
@@ -66,19 +112,8 @@ function FanOutBranches({project, finding, branches}) {
                 branches.length > 0 ?
                     <Space size={4} wrap>
                         {
-                            branches.map(({branch, state, since, acceptanceExpiresAt}) =>
-                                <Tag key={branch.id} data-testid={`estate-fanout-branch-${project.name}-${branch.name}`}>
-                                    <Link href={branchUri(branch)}>{branch.name}</Link>
-                                    {' '}
-                                    <TimestampText value={since} prefix="since" format={DAY_FORMAT}/>
-                                    {
-                                        state === 'ACCEPTED' &&
-                                        <>
-                                            {' · '}
-                                            {acceptanceExpiresAt ? `accepted until ${acceptanceExpiresAt}` : 'accepted without expiry'}
-                                        </>
-                                    }
-                                </Tag>
+                            branches.map(exposure =>
+                                <FanOutBranch key={exposure.branch.id} project={project} {...exposure}/>
                             )
                         }
                     </Space> :

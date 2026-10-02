@@ -87,6 +87,13 @@ is resolved:
 * **Exposed on**: the branches exposing it, each since the start of its exposure, and *accepted
   until* the expiry of its acceptance — or *accepted without expiry*. A branch where the finding is
   resolved is not listed; a finding resolved in the project reads *Resolved* and its date;
+  a branch which does not count toward the state of the project — outside the branch model of the
+  project, or disabled, see [Project roll-up](../integrations/findings/findings.md#project-roll-up)
+  — is still listed, greyed with a dashed border, after the branches which count, and says why on
+  hover and on keyboard focus: *Outside the branch model: does not count toward the project's
+  state*. The state of the project and the summary are the ones of the branches which count, so
+  that a project may read *Resolved* while it lists such a branch. A project without SCM has no
+  branch model: all its branches count;
 * when it was **first seen**.
 
 ![The findings fan-out of an estate](estate-fanout.png)
@@ -122,8 +129,11 @@ projects:
       maxSeverity
       firstSeen
       resolvedAt
-      exposures { branch { name } since state acceptanceExpiresAt }
+      exposures { branch { name } since state counts acceptanceExpiresAt }
     }
   }
 }
 ```
+
+`counts` says whether the branch of an exposure counts toward the state of the finding in its
+project — the `state` of the finding is rolled up from these branches only.

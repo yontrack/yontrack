@@ -30,14 +30,18 @@ const severityRank = (severity) => {
  * else accepted, since the earliest start of the exposure of its stamps. Branches where the finding
  * is resolved are left out.
  *
- * @param {Array} exposures The `exposures` of a finding: `{branch, since, state, acceptanceExpiresAt}`
- * per branch and stamp
- * @returns {Array} `{branch, state, since, acceptanceExpiresAt}` per branch, in the order of the
- * exposures
+ * Each branch says whether it `counts` toward the state of the finding in the project — matched by
+ * the branch model of the project (every branch when it has none) and not disabled. The branches
+ * which do not count are still listed, after the ones which count.
+ *
+ * @param {Array} exposures The `exposures` of a finding: `{branch, since, state, acceptanceExpiresAt,
+ * counts}` per branch and stamp
+ * @returns {Array} `{branch, state, since, acceptanceExpiresAt, counts}` per branch, the ones which
+ * count first, each group in the order of the exposures
  */
 export function branchExposures(exposures = []) {
     const byBranch = new Map()
-    ;(exposures ?? []).forEach(({branch, since, state, acceptanceExpiresAt}) => {
+    ;(exposures ?? []).forEach(({branch, since, state, acceptanceExpiresAt, counts}) => {
         if (state !== 'EXPOSED' && state !== 'ACCEPTED') return
         const current = byBranch.get(branch.id)
         if (!current) {
@@ -46,6 +50,8 @@ export function branchExposures(exposures = []) {
                 state,
                 since,
                 acceptanceExpiresAt: state === 'ACCEPTED' ? (acceptanceExpiresAt ?? null) : null,
+                // Whether a branch counts depends on the branch only, not on the stamp
+                counts: counts !== false,
             })
         } else {
             if (since && (!current.since || since < current.since)) {
@@ -57,7 +63,8 @@ export function branchExposures(exposures = []) {
             }
         }
     })
-    return [...byBranch.values()]
+    const branches = [...byBranch.values()]
+    return [...branches.filter(it => it.counts), ...branches.filter(it => !it.counts)]
 }
 
 /**

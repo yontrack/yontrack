@@ -1,5 +1,6 @@
 package net.nemerosa.ontrack.extension.scorecard.estates
 
+import net.nemerosa.ontrack.extension.api.support.TestBranchModelMatcherProvider
 import net.nemerosa.ontrack.extension.findings.ingestion.FindingsIngestionRequest
 import net.nemerosa.ontrack.extension.findings.ingestion.FindingsIngestionService
 import net.nemerosa.ontrack.extension.findings.security.ProjectFindingsView
@@ -30,6 +31,9 @@ class EstateFindingsIT : EstatesTestSupport() {
 
     @Autowired
     private lateinit var findingsValidationDataType: FindingsValidationDataType
+
+    @Autowired
+    private lateinit var testBranchModelMatcherProvider: TestBranchModelMatcherProvider
 
     /**
      * Branch with a security stamp, `scan`
@@ -91,6 +95,7 @@ class EstateFindingsIT : EstatesTestSupport() {
                                 branch { name }
                                 since
                                 state
+                                counts
                             }
                         }
                     }
@@ -165,6 +170,53 @@ class EstateFindingsIT : EstatesTestSupport() {
                         .map { it.path("project").path("name").asText() }
                     assertEquals(listOf(visible.name), projects)
                 }
+        }
+    }
+
+    /**
+     * Whether each branch exposing the finding counts toward its state in the project, by branch
+     * name.
+     */
+    private fun countingByBranch(estate: Estate, externalId: String): Map<String, Boolean> =
+        estateFindings(estate.name, externalId).values().single()
+            .path("exposures").values()
+            .associate { it.path("branch").path("name").asText() to it.path("counts").asBoolean() }
+
+    @Test
+    fun `A branch outside the branch model is listed as not counting toward the state of the project`() {
+        val externalId = uid("CVE-")
+        asAdmin {
+            val label = label()
+            project {
+                labels = listOf(label)
+                // Branch model of the test provider: master|release-.*
+                testBranchModelMatcherProvider.projects += name
+                scannedBranch("master").scan(externalId to "pkg:maven/org.x/y")
+                scannedBranch("feature-x").scan(externalId to "pkg:maven/org.x/y")
+            }
+            val estate = estate(label)
+            assertEquals(
+                mapOf("feature-x" to false, "master" to true),
+                countingByBranch(estate, externalId)
+            )
+        }
+    }
+
+    @Test
+    fun `Without a branch model, every branch exposing the finding counts`() {
+        val externalId = uid("CVE-")
+        asAdmin {
+            val label = label()
+            project {
+                labels = listOf(label)
+                scannedBranch("master").scan(externalId to "pkg:maven/org.x/y")
+                scannedBranch("feature-x").scan(externalId to "pkg:maven/org.x/y")
+            }
+            val estate = estate(label)
+            assertEquals(
+                mapOf("feature-x" to true, "master" to true),
+                countingByBranch(estate, externalId)
+            )
         }
     }
 }

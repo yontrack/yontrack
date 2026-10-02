@@ -13,6 +13,7 @@ const exposure = (b, props = {}) => ({
     validationStamp: stamp(1, 'scan'),
     since: '2026-09-10T10:00:00Z',
     state: 'EXPOSED',
+    counts: true,
     accepted: false,
     acceptanceExpiresAt: null,
     resolvedAt: null,
@@ -59,7 +60,7 @@ describe('branchExposures', () => {
             exposure(main, {validationStamp: stamp(1, 'image'), since: '2026-09-12T10:00:00Z'}),
             exposure(main, {validationStamp: stamp(2, 'code'), since: '2026-09-05T10:00:00Z'}),
         ])).toEqual([
-            {branch: main, state: 'EXPOSED', since: '2026-09-05T10:00:00Z', acceptanceExpiresAt: null},
+            {branch: main, state: 'EXPOSED', since: '2026-09-05T10:00:00Z', acceptanceExpiresAt: null, counts: true},
         ])
     })
 
@@ -70,7 +71,7 @@ describe('branchExposures', () => {
             exposure(main, {state: 'RESOLVED', resolvedAt: '2026-09-20T10:00:00Z'}),
             exposure(release, {since: '2026-09-15T10:00:00Z'}),
         ])).toEqual([
-            {branch: release, state: 'EXPOSED', since: '2026-09-15T10:00:00Z', acceptanceExpiresAt: null},
+            {branch: release, state: 'EXPOSED', since: '2026-09-15T10:00:00Z', acceptanceExpiresAt: null, counts: true},
         ])
     })
 
@@ -79,7 +80,7 @@ describe('branchExposures', () => {
         expect(branchExposures([
             exposure(main, {state: 'ACCEPTED', accepted: true, acceptanceExpiresAt: '2026-12-31'}),
         ])).toEqual([
-            {branch: main, state: 'ACCEPTED', since: '2026-09-10T10:00:00Z', acceptanceExpiresAt: '2026-12-31'},
+            {branch: main, state: 'ACCEPTED', since: '2026-09-10T10:00:00Z', acceptanceExpiresAt: '2026-12-31', counts: true},
         ])
     })
 
@@ -89,6 +90,31 @@ describe('branchExposures', () => {
             exposure(main, {validationStamp: stamp(1, 'image'), state: 'ACCEPTED', accepted: true}),
             exposure(main, {validationStamp: stamp(2, 'code'), state: 'EXPOSED'}),
         ])[0].state).toBe('EXPOSED')
+    })
+
+    it('says whether each branch counts toward the state of the finding in the project', () => {
+        const main = branch(10, 'main')
+        const spike = branch(12, 'spike')
+        expect(branchExposures([
+            exposure(main),
+            exposure(spike, {counts: false}),
+        ]).map(it => [it.branch.name, it.counts])).toEqual([
+            ['main', true],
+            ['spike', false],
+        ])
+    })
+
+    it('lists the branches which do not count after the ones which count', () => {
+        const develop = branch(10, 'develop')
+        const featureA = branch(11, 'feature-a')
+        const main = branch(12, 'main')
+        const spike = branch(13, 'spike')
+        expect(branchExposures([
+            exposure(develop, {counts: false}),
+            exposure(featureA, {counts: false}),
+            exposure(main),
+            exposure(spike),
+        ]).map(it => it.branch.name)).toEqual(['main', 'spike', 'develop', 'feature-a'])
     })
 
     it('gives nothing for no exposure', () => {

@@ -2344,6 +2344,8 @@ type FindingExposure {
   accepted: Boolean!
   "Branch the finding is exposed on"
   branch: Branch!
+  "Whether the branch counts toward the state of the finding in its project: matched by the branch model of the project (every branch when it has none, without SCM), and not disabled. A branch which does not count still exposes the finding."
+  counts: Boolean!
   "Why the finding was resolved, if it is"
   resolutionReason: FindingResolutionReason
   "Time the finding was resolved on this branch for this stamp, if it is"

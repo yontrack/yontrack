@@ -55,6 +55,16 @@ class GQLTypeFindingExposure : GQLType {
                     .dataFetcher { env -> env.view.exposure.stateOn(Time.now.toLocalDate()) }
             }
             .field {
+                it.name(FindingExposureView::counts.name)
+                    .description(
+                        "Whether the branch counts toward the state of the finding in its project: " +
+                                "matched by the branch model of the project (every branch when it has none, without SCM), " +
+                                "and not disabled. A branch which does not count still exposes the finding."
+                    )
+                    .type(GraphQLNonNull(GraphQLBoolean))
+                    .dataFetcher { env -> env.view.counts }
+            }
+            .field {
                 it.name(FindingExposure::accepted.name)
                     .description("Whether the latest scan reported the finding under an acceptance holding on the day of the scan")
                     .type(GraphQLNonNull(GraphQLBoolean))
