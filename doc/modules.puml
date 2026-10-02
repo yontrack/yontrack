@@ -52,6 +52,10 @@
 [extension-scorecard] --> [extension-casc]
 [extension-scorecard] --> [repository-support]
 
+[extension-audit-trail] --> [extension-support] #blue;line.bold
+[extension-audit-trail] --> [extension-license]
+[extension-audit-trail] --> [repository-support]
+
 [extension-jenkins] --> [extension-scm]
 [extension-jenkins] --> [extension-auto-versioning]
 [extension-jenkins] --> [extension-casc]

@@ -1,0 +1,82 @@
+{
+  "description": "A trail opened by the creation of its build: seq 1 is build.created, with no previous hash, then a link and a validation run.",
+  "schemaVersion": 1,
+  "entries": [
+    {
+      "envelope": {
+        "schemaVersion": 1,
+        "seq": 1,
+        "type": "build.created",
+        "time": "2026-10-02T08:15:30.000Z",
+        "actor": {
+          "account": "ci-bot",
+          "via": "token",
+          "tokenName": "ci-demo"
+        },
+        "prevHash": null,
+        "payload": {
+          "build": {
+            "id": 1042,
+            "project": "payments",
+            "branch": "release-2.4",
+            "name": "2.4.7"
+          },
+          "claimed": {
+            "time": "2026-10-02T08:15:29.871Z",
+            "user": "ci-bot"
+          }
+        }
+      },
+      "canonical": "{\"actor\":{\"account\":\"ci-bot\",\"tokenName\":\"ci-demo\",\"via\":\"token\"},\"payload\":{\"build\":{\"branch\":\"release-2.4\",\"id\":1042,\"name\":\"2.4.7\",\"project\":\"payments\"},\"claimed\":{\"time\":\"2026-10-02T08:15:29.871Z\",\"user\":\"ci-bot\"}},\"prevHash\":null,\"schemaVersion\":1,\"seq\":1,\"time\":\"2026-10-02T08:15:30.000Z\",\"type\":\"build.created\"}",
+      "hash": "4b320b3f1628780eaf5adbc9153975aa05eeb25fd082f97b111588499a6550a6"
+    },
+    {
+      "envelope": {
+        "schemaVersion": 1,
+        "seq": 2,
+        "type": "link.added",
+        "time": "2026-10-02T08:15:31.250Z",
+        "actor": {
+          "account": "ci-bot",
+          "via": "token",
+          "tokenName": "ci-demo"
+        },
+        "prevHash": "4b320b3f1628780eaf5adbc9153975aa05eeb25fd082f97b111588499a6550a6",
+        "payload": {
+          "target": {
+            "id": 977,
+            "project": "ledger-core",
+            "branch": "main",
+            "name": "1.18.0"
+          },
+          "qualifier": ""
+        }
+      },
+      "canonical": "{\"actor\":{\"account\":\"ci-bot\",\"tokenName\":\"ci-demo\",\"via\":\"token\"},\"payload\":{\"qualifier\":\"\",\"target\":{\"branch\":\"main\",\"id\":977,\"name\":\"1.18.0\",\"project\":\"ledger-core\"}},\"prevHash\":\"4b320b3f1628780eaf5adbc9153975aa05eeb25fd082f97b111588499a6550a6\",\"schemaVersion\":1,\"seq\":2,\"time\":\"2026-10-02T08:15:31.250Z\",\"type\":\"link.added\"}",
+      "hash": "8a78e74944dfb4d80786ff009c402384a693b357769811fecc156ba78eecf7d5"
+    },
+    {
+      "envelope": {
+        "schemaVersion": 1,
+        "seq": 3,
+        "type": "validation.run",
+        "time": "2026-10-02T08:21:04.007Z",
+        "actor": {
+          "account": "ci-bot",
+          "via": "token",
+          "tokenName": "ci-demo"
+        },
+        "prevHash": "8a78e74944dfb4d80786ff009c402384a693b357769811fecc156ba78eecf7d5",
+        "payload": {
+          "validationStamp": "unit-tests",
+          "runId": 55120,
+          "status": "PASSED",
+          "dataType": null,
+          "dataSha256": null
+        }
+      },
+      "canonical": "{\"actor\":{\"account\":\"ci-bot\",\"tokenName\":\"ci-demo\",\"via\":\"token\"},\"payload\":{\"dataSha256\":null,\"dataType\":null,\"runId\":55120,\"status\":\"PASSED\",\"validationStamp\":\"unit-tests\"},\"prevHash\":\"8a78e74944dfb4d80786ff009c402384a693b357769811fecc156ba78eecf7d5\",\"schemaVersion\":1,\"seq\":3,\"time\":\"2026-10-02T08:21:04.007Z\",\"type\":\"validation.run\"}",
+      "hash": "0f08040748d69d3268d35b4fa8f4b36f8d4777a6b0b2f36996639170c64d0bd6"
+    }
+  ]
+}

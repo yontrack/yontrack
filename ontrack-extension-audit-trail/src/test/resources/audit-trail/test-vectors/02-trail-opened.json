@@ -1,0 +1,50 @@
+{
+  "description": "A partial trail: the build predates its trail, which opens with trail.opened, partial, carrying the creation time of the build.",
+  "schemaVersion": 1,
+  "entries": [
+    {
+      "envelope": {
+        "schemaVersion": 1,
+        "seq": 1,
+        "type": "trail.opened",
+        "time": "2026-10-02T09:00:00.123Z",
+        "actor": {
+          "account": "alice",
+          "via": "ui"
+        },
+        "prevHash": null,
+        "payload": {
+          "build": {
+            "id": 1042,
+            "project": "payments",
+            "branch": "release-2.4",
+            "name": "2.4.7"
+          },
+          "buildCreatedAt": "2026-09-30T17:42:08.500Z",
+          "partial": true
+        }
+      },
+      "canonical": "{\"actor\":{\"account\":\"alice\",\"via\":\"ui\"},\"payload\":{\"build\":{\"branch\":\"release-2.4\",\"id\":1042,\"name\":\"2.4.7\",\"project\":\"payments\"},\"buildCreatedAt\":\"2026-09-30T17:42:08.500Z\",\"partial\":true},\"prevHash\":null,\"schemaVersion\":1,\"seq\":1,\"time\":\"2026-10-02T09:00:00.123Z\",\"type\":\"trail.opened\"}",
+      "hash": "27a668764f0cabb7b03da21eac285ac3d364be2c8c6695e463be05e525e455fc"
+    },
+    {
+      "envelope": {
+        "schemaVersion": 1,
+        "seq": 2,
+        "type": "promotion.added",
+        "time": "2026-10-02T09:00:00.123Z",
+        "actor": {
+          "account": "alice",
+          "via": "ui"
+        },
+        "prevHash": "27a668764f0cabb7b03da21eac285ac3d364be2c8c6695e463be05e525e455fc",
+        "payload": {
+          "promotionLevel": "GOLD",
+          "runId": 8812
+        }
+      },
+      "canonical": "{\"actor\":{\"account\":\"alice\",\"via\":\"ui\"},\"payload\":{\"promotionLevel\":\"GOLD\",\"runId\":8812},\"prevHash\":\"27a668764f0cabb7b03da21eac285ac3d364be2c8c6695e463be05e525e455fc\",\"schemaVersion\":1,\"seq\":2,\"time\":\"2026-10-02T09:00:00.123Z\",\"type\":\"promotion.added\"}",
+      "hash": "470a152ba11244c4c11c8145be11d51878963f79739ecc9b112a5254fd35f969"
+    }
+  ]
+}

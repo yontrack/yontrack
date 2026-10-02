@@ -1,0 +1,56 @@
+{
+  "description": "One entry whose payload exercises the canonical form: property names sorted by UTF-16 code units (U+1F600 before U+FB33), escapes, non-ASCII text, integers at the I-JSON limits, nesting, empty containers and literals.",
+  "schemaVersion": 1,
+  "entries": [
+    {
+      "envelope": {
+        "schemaVersion": 1,
+        "seq": 1,
+        "type": "build.updated",
+        "time": "1999-12-31T23:59:59.999Z",
+        "actor": {
+          "account": "Zo\u00eb \u00dcnl\u00fc",
+          "via": "jwt",
+          "jwt": {
+            "iss": "https://idp.example.com/",
+            "sub": "u-123"
+          }
+        },
+        "prevHash": null,
+        "payload": {
+          "\u20ac": "Euro Sign",
+          "\r": "Carriage Return",
+          "\ufb33": "Hebrew Letter Dalet With Dagesh",
+          "1": "One",
+          "\ud83d\ude00": "Emoji: Grinning Face",
+          "\u0080": "Control",
+          "\u00f6": "Latin Small Letter O With Diaeresis",
+          "escapes": "\u20ac$\u000f\nA'B\"\\\\\"/\b\t\f\u0000\u001f\u007f\u2028",
+          "integers": [
+            0,
+            -1,
+            9007199254740991,
+            -9007199254740991
+          ],
+          "literals": [
+            null,
+            true,
+            false
+          ],
+          "nested": {
+            "b": [],
+            "a": {},
+            "A": [
+              {
+                "y": 1,
+                "x": 2
+              }
+            ]
+          }
+        }
+      },
+      "canonical": "{\"actor\":{\"account\":\"Zo\u00eb \u00dcnl\u00fc\",\"jwt\":{\"iss\":\"https://idp.example.com/\",\"sub\":\"u-123\"},\"via\":\"jwt\"},\"payload\":{\"\\r\":\"Carriage Return\",\"1\":\"One\",\"escapes\":\"\u20ac$\\u000f\\nA'B\\\"\\\\\\\\\\\"/\\b\\t\\f\\u0000\\u001f\u007f\u2028\",\"integers\":[0,-1,9007199254740991,-9007199254740991],\"literals\":[null,true,false],\"nested\":{\"A\":[{\"x\":2,\"y\":1}],\"a\":{},\"b\":[]},\"\u0080\":\"Control\",\"\u00f6\":\"Latin Small Letter O With Diaeresis\",\"\u20ac\":\"Euro Sign\",\"\ud83d\ude00\":\"Emoji: Grinning Face\",\"\ufb33\":\"Hebrew Letter Dalet With Dagesh\"},\"prevHash\":null,\"schemaVersion\":1,\"seq\":1,\"time\":\"1999-12-31T23:59:59.999Z\",\"type\":\"build.updated\"}",
+      "hash": "6b3f605accd38c7b30545c0c2ded7a9b0e8b9e187e8aa80c8b7ba3603d1efce8"
+    }
+  ]
+}
