@@ -43,6 +43,17 @@ interface SearchDocumentService {
     fun delete(type: String, key: String)
 
     /**
+     * Deletes the documents of a type belonging to a project, except those whose key is given:
+     * what a type indexed from a full scan of a project uses to drop what the scan no longer finds.
+     *
+     * @param type Type of the documents
+     * @param projectId ID of the project
+     * @param keys Keys of the documents to keep
+     * @return Number of deleted documents, 0 if the deletion failed
+     */
+    fun deleteForProjectExcept(type: String, projectId: Int, keys: Collection<String>): Int
+
+    /**
      * Rebuilds all the documents of an indexer: all the documents it provides are written, and
      * the documents of its type it did not provide are deleted.
      */

@@ -67,3 +67,38 @@ test('changing the chart interval and period reloads the charts', async ({page, 
         ).toBeGreaterThan(0)
     }
 })
+
+test('filtering the validation history on the last status of the runs', async ({page, ontrack}) => {
+    // Provisioning
+    const project = await ontrack.createProject()
+    const branch = await project.createBranch()
+    const validationStamp = await branch.createValidationStamp()
+    const passed1 = await branch.createBuild()
+    await passed1.validate(validationStamp, {status: "PASSED"})
+    const failed = await branch.createBuild()
+    await failed.validate(validationStamp, {status: "FAILED"})
+    const passed2 = await branch.createBuild()
+    await passed2.validate(validationStamp, {status: "PASSED"})
+    // Login
+    await login(page, ontrack)
+    // Navigating to the validation stamp
+    const vsPage = new ValidationStampPage(page, validationStamp)
+    await vsPage.goTo()
+    const rows = vsPage.historyRows()
+    // All the runs are displayed
+    await expect(rows).toHaveCount(3)
+    // Only the runs which are not passed
+    await vsPage.filterHistoryOnLastStatus('Not passed')
+    await expect(rows).toHaveCount(1)
+    await expect(rows.first()).toContainText(failed.name)
+    // Only the passed runs
+    await vsPage.filterHistoryOnLastStatus('Passed')
+    await expect(rows).toHaveCount(2)
+    await expect(rows.nth(0)).toContainText(passed2.name)
+    await expect(rows.nth(1)).toContainText(passed1.name)
+    // All the runs again
+    await vsPage.resetHistoryLastStatusFilter()
+    await expect(rows).toHaveCount(3)
+    // No error along the way
+    await expect(vsPage.history().locator('.ant-alert-error')).toHaveCount(0)
+})

@@ -1,5 +1,6 @@
 package net.nemerosa.ontrack.extension.general
 
+import net.nemerosa.ontrack.model.structure.Build
 import net.nemerosa.ontrack.model.structure.PromotionLevel
 import net.nemerosa.ontrack.model.structure.PromotionRun
 
@@ -21,4 +22,13 @@ interface AutoPromotionConditionsService {
      * build, or `null` when the promotion level has no auto promotion.
      */
     fun getBuildConditions(promotionRun: PromotionRun): AutoPromotionBuildConditions?
+
+    /**
+     * Conditions of the auto promotion of a promotion level, with their state for a build, whether
+     * the build is promoted to this level or not - `null` when the promotion level has no auto promotion.
+     *
+     * @throws AutoPromotionConditionsBranchMismatchException When the promotion level is not on the
+     * build's branch
+     */
+    fun getBuildConditions(build: Build, promotionLevel: PromotionLevel): AutoPromotionBuildConditions?
 }

@@ -1,7 +1,10 @@
 package net.nemerosa.ontrack.graphql
 
+import tools.jackson.databind.JsonNode
 //import net.nemerosa.ontrack.extension.general.validation.*
 import net.nemerosa.ontrack.it.AsAdminTest
+import net.nemerosa.ontrack.model.structure.ValidationRun
+import net.nemerosa.ontrack.model.structure.ValidationRunStatusID
 import net.nemerosa.ontrack.test.TestUtils.uid
 import net.nemerosa.ontrack.test.assertNotPresent
 import net.nemerosa.ontrack.test.assertPresent
@@ -518,6 +521,128 @@ class ValidationStampGraphQLIT : AbstractQLKTITSupport() {
 
         val name = data["validationStamp"]["name"].asText()
         assertEquals(vs.name, name)
+    }
+
+    /**
+     * The `passed` filter, sent as a variable the way the UI sends it, keeps the runs whose
+     * **current** status is passed or not, and the page info counts those runs only (#1712).
+     *
+     * ```
+     * build 1   a1  FAILED -> PASSED     (passed now)
+     * build 2   b2  PASSED -> DEFECTIVE  (not passed now)
+     * build 3   c3  PASSED -> FIXED      (passed now)
+     *           d3  PASSED               (passed now)
+     *           e3  FAILED               (not passed now)
+     * ```
+     */
+    @Test
+    fun `Paginated list of validation runs filtered on their current status`() {
+        project {
+            branch {
+                val vs = validationStamp()
+                lateinit var a1: ValidationRun
+                lateinit var b2: ValidationRun
+                lateinit var c3: ValidationRun
+                lateinit var d3: ValidationRun
+                lateinit var e3: ValidationRun
+                build("1") {
+                    a1 = validate(vs, ValidationRunStatusID.STATUS_FAILED)
+                        .forceStatusHistory(ValidationRunStatusID.STATUS_PASSED)
+                }
+                build("2") {
+                    b2 = validate(vs, ValidationRunStatusID.STATUS_PASSED)
+                        .forceStatusHistory(ValidationRunStatusID.STATUS_DEFECTIVE)
+                }
+                val build3 = build("3") {
+                    c3 = validate(vs, ValidationRunStatusID.STATUS_PASSED)
+                        .forceStatusHistory(ValidationRunStatusID.STATUS_FIXED)
+                    d3 = validate(vs, ValidationRunStatusID.STATUS_PASSED)
+                    e3 = validate(vs, ValidationRunStatusID.STATUS_FAILED)
+                }
+
+                val query = """
+                    query PaginatedValidationRuns(
+                        ${'$'}validationStampId: Int!,
+                        ${'$'}buildId: Int,
+                        ${'$'}passed: Boolean,
+                        ${'$'}offset: Int = 0,
+                        ${'$'}size: Int = 2) {
+                        validationStamp(id: ${'$'}validationStampId) {
+                            validationRunsPaginated(
+                                buildId: ${'$'}buildId,
+                                passed: ${'$'}passed,
+                                offset: ${'$'}offset,
+                                size: ${'$'}size
+                            ) {
+                                pageInfo {
+                                    totalSize
+                                    nextPage {
+                                        offset
+                                        size
+                                    }
+                                }
+                                pageItems {
+                                    id
+                                }
+                            }
+                        }
+                    }
+                """
+
+                fun page(passed: Boolean?, offset: Int = 0, buildId: Int? = null) = run(
+                    query,
+                    mapOf(
+                        "validationStampId" to vs.id(),
+                        "buildId" to buildId,
+                        "passed" to passed,
+                        "offset" to offset,
+                        "size" to 2,
+                    )
+                ).path("validationStamp").path("validationRunsPaginated")
+
+                fun JsonNode.ids() = path("pageItems").values().map { it.path("id").asInt() }
+                fun JsonNode.totalSize() = path("pageInfo").path("totalSize").asInt()
+                fun JsonNode.nextOffset(): Int? =
+                    path("pageInfo").path("nextPage").takeIf { !it.isNull && !it.isMissingNode }?.path("offset")?.asInt()
+
+                // Passed, first page
+                page(passed = true).let {
+                    assertEquals(listOf(d3.id(), c3.id()), it.ids())
+                    assertEquals(3, it.totalSize())
+                    assertEquals(2, it.nextOffset())
+                }
+                // Passed, last page
+                page(passed = true, offset = 2).let {
+                    assertEquals(listOf(a1.id()), it.ids())
+                    assertEquals(3, it.totalSize())
+                    assertEquals(null, it.nextOffset())
+                }
+                // Not passed, one page only
+                page(passed = false).let {
+                    assertEquals(listOf(e3.id(), b2.id()), it.ids())
+                    assertEquals(2, it.totalSize())
+                    assertEquals(null, it.nextOffset())
+                }
+                // No filter
+                page(passed = null).let {
+                    assertEquals(listOf(e3.id(), d3.id()), it.ids())
+                    assertEquals(5, it.totalSize())
+                    assertEquals(2, it.nextOffset())
+                }
+                // For a build, passed
+                page(passed = true, buildId = build3.id()).let {
+                    assertEquals(listOf(d3.id(), c3.id()), it.ids())
+                    assertEquals(2, it.totalSize())
+                    assertEquals(null, it.nextOffset())
+                }
+                // For a build, not passed
+                page(passed = false, buildId = build3.id()).let {
+                    assertEquals(listOf(e3.id()), it.ids())
+                    assertEquals(1, it.totalSize())
+                    assertEquals(null, it.nextOffset())
+                }
+            }
+        }
     }
 
     @Test

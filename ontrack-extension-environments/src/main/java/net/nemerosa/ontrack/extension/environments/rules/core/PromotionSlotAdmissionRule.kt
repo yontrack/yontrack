@@ -2,11 +2,9 @@ package net.nemerosa.ontrack.extension.environments.rules.core
 
 import tools.jackson.databind.JsonNode
 import net.nemerosa.ontrack.extension.environments.*
-import net.nemerosa.ontrack.extension.environments.rules.PromotionRelatedSlotAdmissionRule
 import net.nemerosa.ontrack.json.parse
 import net.nemerosa.ontrack.json.parseOrNull
 import net.nemerosa.ontrack.model.structure.Build
-import net.nemerosa.ontrack.model.structure.PromotionLevel
 import net.nemerosa.ontrack.model.structure.StructureService
 import org.springframework.stereotype.Component
 import kotlin.jvm.optionals.getOrNull
@@ -15,8 +13,7 @@ import kotlin.reflect.KClass
 @Component
 class PromotionSlotAdmissionRule(
     private val structureService: StructureService,
-) : SlotAdmissionRule<PromotionSlotAdmissionRuleConfig, Any>,
-    PromotionRelatedSlotAdmissionRule<PromotionSlotAdmissionRuleConfig, Any> {
+) : SlotAdmissionRule<PromotionSlotAdmissionRuleConfig, Any> {
 
     companion object {
         const val ID = "promotion"
@@ -95,9 +92,4 @@ class PromotionSlotAdmissionRule(
     }
 
     override fun parseData(node: JsonNode): Any = ""
-
-    override fun isForPromotionLevel(
-        ruleConfig: PromotionSlotAdmissionRuleConfig,
-        promotionLevel: PromotionLevel
-    ): Boolean = promotionLevel.name == ruleConfig.promotion
 }

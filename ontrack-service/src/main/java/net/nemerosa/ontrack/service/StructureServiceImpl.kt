@@ -1601,6 +1601,13 @@ class StructureServiceImpl(
         return structureRepository.getValidationRunsCountForValidationStamp(validationStampId)
     }
 
+    override fun getValidationRunsCountForValidationStampAndStatus(
+        validationStampId: ID,
+        statuses: List<ValidationRunStatusID>,
+    ): Int {
+        return structureRepository.getValidationRunsCountForValidationStampAndStatus(validationStampId, statuses)
+    }
+
     override fun findProjectByName(project: String): Optional<Project> {
         return structureRepository.getProjectByName(project)
             .filter { p ->

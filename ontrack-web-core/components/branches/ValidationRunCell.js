@@ -5,9 +5,7 @@ import Timestamp from "@components/common/Timestamp";
 import Duration from "@components/common/Duration";
 import React from "react";
 import ValidationRunStatusNone from "@components/validationRuns/ValidationRunStatusNone";
-import ValidationRunHistoryDialog, {
-    useValidationRunHistoryDialog
-} from "@components/validationRuns/ValidationRunHistoryDialog";
+import ValidationRunQuickTransition from "@components/validationRuns/ValidationRunQuickTransition";
 import {isAuthorized} from "@components/common/authorizations";
 import BuildValidateDialog, {useBuildValidateDialog} from "@components/builds/BuildValidateDialog";
 
@@ -17,12 +15,6 @@ export default function ValidationRunCell({build, validationStamp, onChange}) {
     let run = undefined
     if (validation && validation.validationRuns.length > 0) {
         run = validation.validationRuns[0]
-    }
-
-    const validationRunHistoryDialog = useValidationRunHistoryDialog();
-
-    const displayRunStatuses = () => {
-        validationRunHistoryDialog.start(run)
     }
 
     const buildValidateDialog = useBuildValidateDialog({
@@ -52,13 +44,17 @@ export default function ValidationRunCell({build, validationStamp, onChange}) {
             }
             {/* Last status */}
             {
-                run && <>
-                    <ValidationRunStatus
+                run && <ValidationRunQuickTransition
+                    run={run}
+                    label={`${validationStamp.name} \u2014 ${run.lastStatus.statusID.name}`}
+                    onChange={onChange}
+                >
+                    {({open}) => <ValidationRunStatus
                         id={`${build.id}-${validationStamp.id}`}
-                        onClick={displayRunStatuses}
                         status={run.lastStatus}
                         displayText={false}
-                        tooltip={true}
+                        // The hover summary steps aside while the quick-transition popover is open
+                        tooltip={!open}
                         tooltipContent={
                             <Space orientation="vertical" size={0}>
                                 {/* Description */}
@@ -85,12 +81,8 @@ export default function ValidationRunCell({build, validationStamp, onChange}) {
                                 }
                             </Space>
                         }
-                    />
-                    <ValidationRunHistoryDialog
-                        dialog={validationRunHistoryDialog}
-                        onChange={onChange}
-                    />
-                </>
+                    />}
+                </ValidationRunQuickTransition>
             }
         </>
     )

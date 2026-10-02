@@ -6,11 +6,13 @@ import net.nemerosa.ontrack.extension.scm.service.SCMPullRequest
 import net.nemerosa.ontrack.model.events.Event
 import net.nemerosa.ontrack.model.structure.ID
 import net.nemerosa.ontrack.model.structure.StructureService
+import net.nemerosa.ontrack.ui.controller.UILocations
 import org.springframework.stereotype.Service
 
 @Service
 class AutoVersioningEventsFactoryImpl(
     private val structureService: StructureService,
+    private val uiLocations: UILocations,
 ) : AutoVersioningEventsFactory {
 
     override fun success(
@@ -30,6 +32,7 @@ class AutoVersioningEventsFactoryImpl(
             .with("PR_LINK", pr?.link)
             .with("COMMIT", commit)
             .with("COMMIT_LINK", commitLink)
+            .withAudit(order)
             .build()
 
     override fun error(
@@ -44,6 +47,7 @@ class AutoVersioningEventsFactoryImpl(
             .with("PROMOTION", order.sourcePromotion)
             .with("MESSAGE", close(message))
             .with("LINK", error.link)
+            .withAudit(order)
             .build()
     } else {
         Event.of(AutoVersioningEvents.AUTO_VERSIONING_ERROR)
@@ -53,6 +57,7 @@ class AutoVersioningEventsFactoryImpl(
             .with("PROMOTION", order.sourcePromotion)
             .with("MESSAGE", close(message))
             .with("ERROR", close(error.message ?: error::class.java.name))
+            .withAudit(order)
             .build()
     }
 
@@ -66,6 +71,7 @@ class AutoVersioningEventsFactoryImpl(
             .with("VERSION", order.targetVersion)
             .with("PROMOTION", order.sourcePromotion)
             .with("MESSAGE", close(reason))
+            .withAudit(order)
             .build()
 
     override fun prMergeTimeoutError(
@@ -79,7 +85,12 @@ class AutoVersioningEventsFactoryImpl(
             .with("PROMOTION", order.sourcePromotion)
             .with("PR_NAME", pr.name)
             .with("PR_LINK", pr.link)
+            .withAudit(order)
             .build()
+
+    private fun Event.EventBuilder.withAudit(order: AutoVersioningOrder) =
+        with("AUDIT_NAME", "Auto-versioning audit")
+            .with("AUDIT_LINK", uiLocations.page("/extension/auto-versioning/audit/detail/${order.uuid}"))
 
     private fun Event.EventBuilder.withSourcePromotionRun(order: AutoVersioningOrder) =
         sourcePromotionRun(order)?.let {

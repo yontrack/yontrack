@@ -83,6 +83,14 @@ class SearchDocumentServiceImpl(
         }
     }
 
+    override fun deleteForProjectExcept(type: String, projectId: Int, keys: Collection<String>): Int {
+        var deleted = 0
+        write(type, "delete the documents of project $projectId") {
+            deleted = searchDocumentRepository.deleteForProjectExcept(type, projectId, keys)
+        }
+        return deleted
+    }
+
     /**
      * Deletes the documents of every type describing an entity which is being deleted: the
      * documents of this entity and, for a branch, those of its builds. Only the deletion of a

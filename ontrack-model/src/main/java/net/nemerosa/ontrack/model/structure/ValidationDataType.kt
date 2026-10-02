@@ -75,6 +75,19 @@ interface ValidationDataType<C, T> : Extension {
     fun computeStatus(config: C?, data: T): ValidationRunStatusID?
 
     /**
+     * Checks if a run whose last status is [status] counts as passed for the auto promotion.
+     *
+     * By default, this is the [passed flag][ValidationRunStatusID.isPassed] of the status. A data type
+     * can relax this rule according to its configuration - it is used by the auto promotion only, and
+     * never changes the status itself.
+     *
+     * @param config Configuration of the validation stamp, if any
+     * @param status Last status of the run
+     * @return `true` if the run counts as passed for the auto promotion
+     */
+    fun isPassedForAutoPromotion(config: C?, status: ValidationRunStatusID): Boolean = status.isPassed
+
+    /**
      * Validates some data according to its type and configuration.
      *
      * @param config Configuration associated to the type

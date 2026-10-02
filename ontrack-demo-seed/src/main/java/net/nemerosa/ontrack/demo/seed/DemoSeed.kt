@@ -232,7 +232,7 @@ class DemoSeed(
         spec.scmBranch?.let { branch.configureScmBranch(it) }
         if (spec.favourite) branch.markAsFavourite()
         spec.promotionLevels.forEach { branch.createPromotionLevel(it.name, it.description, it.workflow) }
-        spec.validationStamps.forEach { branch.createValidationStamp(it.name, it.description, it.findings, it.tests) }
+        spec.validationStamps.forEach { branch.createValidationStamp(it.name, it.description, it.findings, it.tests, it.chml) }
         // A third pass, after both: auto promotion and promotion dependencies name other promotion
         // levels and validation stamps of the same branch, and the property is written with their
         // ids, so all of them have to exist first. Before the builds, so that a build promoted here

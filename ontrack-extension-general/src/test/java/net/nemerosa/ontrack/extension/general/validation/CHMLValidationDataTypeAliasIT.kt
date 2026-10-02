@@ -53,6 +53,38 @@ class CHMLValidationDataTypeAliasIT : AbstractDSLTestSupport() {
         assertIs<CHMLValidationDataTypeConfig>(vs.dataType?.config) {
             assertEquals(CHMLLevel(CHML.HIGH, 1), it.warningLevel)
             assertEquals(CHMLLevel(CHML.CRITICAL, 1), it.failedLevel)
+            assertEquals(false, it.warningPassesAutoPromotion)
+        }
+    }
+
+    @Test
+    @AsAdminTest
+    fun `CHML validation data type alias accepting warnings for the auto promotion`() {
+        val branch = configTestSupport.configureBranch(
+            yaml = """
+                version: v1
+                configuration:
+                    defaults:
+                        branch:
+                            validations:
+                                CHML:
+                                    chml:
+                                        warningLevel: HIGH
+                                        warningValue: 1
+                                        failedLevel: CRITICAL
+                                        failedValue: 1
+                                        warningPassesAutoPromotion: true
+            """.trimIndent(),
+            ci = "generic",
+            scm = "mock",
+            env = EnvFixtures.generic(configuredProjectName)
+        )
+
+        val vs = structureService.findValidationStampByName(branch.project.name, branch.name, "CHML").getOrNull()
+            ?: fail("Cannot find CHML validation stamp")
+
+        assertIs<CHMLValidationDataTypeConfig>(vs.dataType?.config) {
+            assertEquals(true, it.warningPassesAutoPromotion)
         }
     }
 

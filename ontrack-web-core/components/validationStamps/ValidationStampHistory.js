@@ -1,5 +1,5 @@
 import {useEffect, useState} from "react";
-import {Button, Popover, Skeleton, Space, Spin, Typography} from "antd";
+import {Alert, Button, Popover, Skeleton, Space, Spin, Typography} from "antd";
 import Table from "@components/common/table/Table";
 import {useQuery} from "@components/services/GraphQL";
 import BuildLink from "@components/builds/BuildLink";
@@ -20,23 +20,25 @@ import RangeSelector from "@components/common/RangeSelector";
 
 const {Column} = Table
 
+const firstPage = {
+    offset: 0,
+    size: 5,
+}
+
 export default function ValidationStampHistory({validationStamp}) {
 
     const router = useRouter()
 
     const [runs, setRuns] = useState([])
 
-    const [pagination, setPagination] = useState({
-        offset: 0,
-        size: 5,
-    })
+    const [pagination, setPagination] = useState(firstPage)
     const [pageInfo, setPageInfo] = useState({})
     const [scmChangeLogEnabled, setScmChangeLogEnabled] = useState('')
     const [filter, setFilter] = useState({
         passed: null,
     })
 
-    const {data: rawData, loading} = useQuery(
+    const {data: rawData, loading, error} = useQuery(
         `
             query GetValidationStampHistory(
                 $id: Int!,
@@ -144,9 +146,13 @@ export default function ValidationStampHistory({validationStamp}) {
     }
 
     const onTableChange = (_, filters) => {
+        // The dropdown selects "true" / "false", the query takes a Boolean
+        const status = filters.status?.[0]
         setFilter({
-            passed: filters.status && filters.status[0],
+            passed: status === 'true' ? true : status === 'false' ? false : null,
         })
+        // A new filter starts a new list, instead of being appended to the loaded one
+        setPagination(firstPage)
     }
 
     const rangeSelection = useRangeSelection()
@@ -163,10 +169,20 @@ export default function ValidationStampHistory({validationStamp}) {
     }
 
     return (
-        <>
+        <div data-testid="validation-stamp-history">
+            {
+                error &&
+                <Alert
+                    type="error"
+                    showIcon
+                    title="Could not load the validation history."
+                    description={error}
+                    style={{marginBottom: 8}}
+                />
+            }
             <Skeleton loading={loading && pagination.offset === 0} active>
                 <Table
-                    dataSource={runs}
+                    dataSource={error ? [] : runs}
                     pagination={false}
                     onChange={onTableChange}
                     footer={() => (
@@ -267,12 +283,12 @@ export default function ValidationStampHistory({validationStamp}) {
                                 clearFilters={clearFilters}
                             >
                                 <SelectValidationRunPassedState
-                                    value={selectedKeys}
-                                    onChange={value => setSelectedKeys([value])}
+                                    value={selectedKeys[0]}
+                                    onChange={value => setSelectedKeys(value ? [value] : [])}
                                 />
                             </TableColumnFilterDropdown>
                         }
-                        filteredValue={filter.passed}
+                        filteredValue={filter.passed === null ? null : [String(filter.passed)]}
                     />
 
                     <Column
@@ -319,6 +335,6 @@ export default function ValidationStampHistory({validationStamp}) {
 
                 </Table>
             </Skeleton>
-        </>
+        </div>
     )
 }

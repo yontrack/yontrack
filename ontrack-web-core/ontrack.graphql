@@ -618,6 +618,11 @@ type Build implements Authorizable & ProjectEntity {
   annotatedDescription: String
   "Authorizations for this context"
   authorizations: [Authorization!]!
+  "Current conditions of the auto promotion of a promotion level of this build's branch, with their current state for this build, whether it is promoted to this level or not - null when the promotion level has no auto promotion"
+  autoPromotionConditions(
+    "ID of the promotion level, which must belong to the build's branch"
+    promotionLevelId: Int!
+  ): AutoPromotionBuildConditions
   "Auto versioning information for this build, in regards of a parent branch"
   autoVersioning(
     "ID of the parent branch. Is overridden by the buildId argument, but at least one of each is required."
@@ -2474,6 +2479,8 @@ type GitHubEngineConfiguration {
   url: String!
   "User used to connect to GitHub. Can be used with a password or an OAuth2 token. Not needed if using only the OAUth2 token or a GitHub App."
   user: String
+  "Whether to pass the id input to the dispatched workflows, to find their run when GitHub does not return it"
+  workflowSendId: Boolean
 }
 
 "Output type for the gitHubIngestionBuildLinksByBuildLabel mutation."
@@ -8238,6 +8245,8 @@ type ValidationDataTypeConfig {
   config: JSON
   "Descriptor for the validation data type"
   descriptor: ValidationDataTypeDescriptor
+  "Configuration object, in the shape expected by the edition forms and the mutations"
+  formConfig: JSON
 }
 
 "Descriptor for a validation data type"
@@ -9435,6 +9444,8 @@ input CreateGitHubConfigurationInput {
   url: String
   "User name for authentication"
   user: String
+  "Whether to pass the id input to the dispatched workflows, to find their run when GitHub does not return it. Defaults to true."
+  workflowSendId: Boolean
 }
 
 "Input type for the createJenkinsConfiguration mutation."
@@ -12199,6 +12210,8 @@ input SetupCHMLValidationStampInput {
   validation: String!
   "Level needed to raise a warning"
   warningLevel: CHMLLevel!
+  "If true, a run in WARNING status counts as passed for the auto promotion. Defaults to false."
+  warningPassesAutoPromotion: Boolean
 }
 
 "Input type for the setupMetricsValidationStamp mutation."

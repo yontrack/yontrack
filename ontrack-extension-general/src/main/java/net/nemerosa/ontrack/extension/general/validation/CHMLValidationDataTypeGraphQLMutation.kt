@@ -30,7 +30,11 @@ class CHMLValidationDataTypeGraphQLMutation(
             CHMLValidationDataTypeConfig::failedLevel.name,
             "Level needed to raise a failure",
             gqlInputCHMLLevel.typeRef
-        )
+        ),
+        optionalBooleanInputField(
+            CHMLValidationDataTypeConfig::warningPassesAutoPromotion.name,
+            "If true, a run in WARNING status counts as passed for the auto promotion. Defaults to false."
+        ),
     )
 
     override fun readInput(input: MutationInput): ValidationDataTypeConfig<CHMLValidationDataTypeConfig> {
@@ -41,8 +45,11 @@ class CHMLValidationDataTypeGraphQLMutation(
         return ValidationDataTypeConfig(
             descriptor = chmlValidationDataType.descriptor,
             config = CHMLValidationDataTypeConfig(
-                warningLevel,
-                failedLevel
+                warningLevel = warningLevel,
+                failedLevel = failedLevel,
+                warningPassesAutoPromotion = input.getInput<Boolean>(
+                    CHMLValidationDataTypeConfig::warningPassesAutoPromotion.name
+                ) ?: false,
             )
         )
     }

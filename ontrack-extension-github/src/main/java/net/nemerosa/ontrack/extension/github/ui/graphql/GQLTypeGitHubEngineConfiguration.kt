@@ -11,6 +11,7 @@ import net.nemerosa.ontrack.graphql.schema.GQLFieldContributor
 import net.nemerosa.ontrack.graphql.schema.GQLType
 import net.nemerosa.ontrack.graphql.schema.GQLTypeCache
 import net.nemerosa.ontrack.graphql.schema.graphQLFieldContributions
+import net.nemerosa.ontrack.graphql.support.booleanField
 import net.nemerosa.ontrack.graphql.support.stringField
 import org.springframework.stereotype.Component
 
@@ -47,6 +48,10 @@ class GQLTypeGitHubEngineConfiguration(
         .stringField(
             GitHubEngineConfiguration::appInstallationAccountName,
             "Name of the account where the GitHub App is installed."
+        )
+        .booleanField(
+            GitHubEngineConfiguration::workflowSendId,
+            "Whether to pass the id input to the dispatched workflows, to find their run when GitHub does not return it"
         )
         .field {
             it.name("rateLimits")

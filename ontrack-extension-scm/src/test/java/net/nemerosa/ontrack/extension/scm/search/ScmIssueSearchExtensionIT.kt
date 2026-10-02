@@ -3,7 +3,10 @@ package net.nemerosa.ontrack.extension.scm.search
 import net.nemerosa.ontrack.extension.scm.mock.MockSCMTester
 import net.nemerosa.ontrack.it.AbstractDSLTestSupport
 import net.nemerosa.ontrack.it.AsAdminTest
+import net.nemerosa.ontrack.json.asJson
 import net.nemerosa.ontrack.model.structure.Project
+import net.nemerosa.ontrack.model.structure.SearchDocument
+import net.nemerosa.ontrack.model.structure.SearchDocumentService
 import net.nemerosa.ontrack.model.structure.SearchQueryRequest
 import net.nemerosa.ontrack.model.structure.SearchResult
 import net.nemerosa.ontrack.model.structure.SearchService
@@ -13,6 +16,8 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 /**
  * Search documents for the issues found in the commit messages, on Postgres. They are written by
@@ -29,6 +34,9 @@ class ScmIssueSearchExtensionIT : AbstractDSLTestSupport() {
 
     @Autowired
     private lateinit var searchService: SearchService
+
+    @Autowired
+    private lateinit var searchDocumentService: SearchDocumentService
 
     private fun searchInProject(query: String, project: Project): List<SearchResult> =
         searchService.search(
@@ -128,6 +136,55 @@ class ScmIssueSearchExtensionIT : AbstractDSLTestSupport() {
                 asAdmin { structureService.deleteProject(project.id) }
             }
         }
+    }
+
+    @Test
+    fun `Issue keys no longer named by the commits are removed by a full scan of the project`() {
+        val subjectIssue = issueKey()
+        val bodyIssue = issueKey()
+        // Another project, which keeps its issues
+        val other = project()
+        indexIssue(other, bodyIssue)
+        mockSCMTester.withMockSCMRepository {
+            project {
+                // An issue which used to be extracted from the body of a commit
+                indexIssue(this, bodyIssue)
+                val build = branch { configureMockSCMBranch() }.build()
+                repositoryIssue(key = subjectIssue, message = "Sample issue")
+                repositoryIssue(key = bodyIssue, message = "Mentioned issue")
+                build.withRepositoryCommit("$subjectIssue Commit 1\n\nFollow-up of $bodyIssue, mentioned in the body only.")
+                // The first scan of a project is a full one
+                asAdmin { scmCommitSearchExtension.indexNewCommits(this) }
+
+                fun keysIn(project: Project, key: String) =
+                    asAdmin { searchInProject(key, project) }.map { it.item["key"] }
+
+                assertTrue(subjectIssue in keysIn(this, subjectIssue), "Issue in the subject is indexed")
+                assertFalse(bodyIssue in keysIn(this, bodyIssue), "Issue mentioned in the body only is removed")
+                assertTrue(bodyIssue in keysIn(other, bodyIssue), "Issues of other projects are kept")
+            }
+        }
+    }
+
+    private fun indexIssue(project: Project, key: String) {
+        searchDocumentService.index(
+            SearchDocument(
+                type = ScmIssueSearchExtension.SCM_ISSUE_SEARCH_RESULT_TYPE,
+                key = ScmIssueSearchExtension.documentKey(project, key),
+                projectId = project.id(),
+                entity = null,
+                title = key,
+                identifiers = listOf(key),
+                text = null,
+                data = mapOf(
+                    SearchResult.SEARCH_RESULT_ITEM to mapOf(
+                        "projectName" to project.name,
+                        "key" to key,
+                        "displayKey" to key,
+                    ),
+                ).asJson(),
+            )
+        )
     }
 
 }

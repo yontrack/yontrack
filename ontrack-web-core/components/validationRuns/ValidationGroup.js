@@ -1,9 +1,7 @@
 import {Popover, Space} from "antd";
 import ValidationRunStatus from "@components/validationRuns/ValidationRunStatus";
 import ValidationGroupDialog, {useValidationGroupDialog} from "@components/validationRuns/ValidationGroupDialog";
-import ValidationRunHistoryDialog, {
-    useValidationRunHistoryDialog
-} from "@components/validationRuns/ValidationRunHistoryDialog";
+import ValidationRunQuickTransition from "@components/validationRuns/ValidationRunQuickTransition";
 import ValidationChip from "@components/primitives/ValidationChip";
 
 /**
@@ -16,18 +14,17 @@ import ValidationChip from "@components/primitives/ValidationChip";
  * A bucket holding several keeps `ValidationRunStatus`: there is no stamp
  * identity to show, only a status and a count, and the status mark's shape is
  * worth more there than a chip's outline would be.
+ *
+ * Clicking the single run's chip opens its quick-transition popover; clicking a
+ * bucket of several opens the list of its runs.
+ *
+ * @param onChange Called when the status of a run has changed
  */
-export default function ValidationGroup({group}) {
+export default function ValidationGroup({group, onChange}) {
 
     const dialog = useValidationGroupDialog()
-    const validationRunHistoryDialog = useValidationRunHistoryDialog()
-
     const onClick = () => {
         dialog.start(group)
-    }
-
-    const showRunHistory = (run) => {
-        validationRunHistoryDialog.start(run)
     }
 
     const single = group.count === 1 ? group.validations[0] : undefined
@@ -46,24 +43,26 @@ export default function ValidationGroup({group}) {
                 }
                 {
                     single &&
-                    <Popover
-                        title={group.statusID.name}
-                        content={group.description}
-                        placement="bottom"
-                    >
-                        <span>
-                            <ValidationChip
-                                id={`validation-group-${group.statusID.id}`}
-                                validationStamp={single.validationStamp}
-                                statusID={group.statusID}
-                                onClick={() => showRunHistory(single.validationRuns[0])}
-                            />
-                        </span>
-                    </Popover>
+                    <ValidationRunQuickTransition run={single.validationRuns[0]} onChange={onChange}>
+                        {({open}) => <Popover
+                            title={group.statusID.name}
+                            content={group.description}
+                            placement="bottom"
+                            // The hover summary steps aside while the quick-transition popover is open
+                            open={open ? false : undefined}
+                        >
+                            <span>
+                                <ValidationChip
+                                    id={`validation-group-${group.statusID.id}`}
+                                    validationStamp={single.validationStamp}
+                                    statusID={group.statusID}
+                                />
+                            </span>
+                        </Popover>}
+                    </ValidationRunQuickTransition>
                 }
             </Space>
-            <ValidationGroupDialog dialog={dialog}/>
-            <ValidationRunHistoryDialog dialog={validationRunHistoryDialog}/>
+            <ValidationGroupDialog dialog={dialog} onChange={onChange}/>
         </>
     )
 }

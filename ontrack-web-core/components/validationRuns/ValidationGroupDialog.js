@@ -52,7 +52,7 @@ export function useValidationGroupDialog() {
     }
 }
 
-export default function ValidationGroupDialog({dialog}) {
+export default function ValidationGroupDialog({dialog, onChange}) {
 
     const onOk = () => {
         dialog.close()
@@ -106,7 +106,8 @@ export default function ValidationGroupDialog({dialog}) {
             </Modal>
             <ValidationRunHistoryDialog
                 dialog={dialog.validationRunHistoryDialog}
-                />
+                onChange={onChange}
+            />
         </>
     )
 }

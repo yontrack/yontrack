@@ -43,6 +43,16 @@ interface SearchDocumentRepository {
     fun deleteForEntity(entity: ProjectEntityID): Int
 
     /**
+     * Deletes the documents of a type belonging to a project, except those whose key is given.
+     *
+     * @param type Type of the documents
+     * @param projectId ID of the project
+     * @param keys Keys of the documents to keep
+     * @return Number of deleted documents
+     */
+    fun deleteForProjectExcept(type: String, projectId: Int, keys: Collection<String>): Int
+
+    /**
      * Deletes the documents of a type written before a given time.
      *
      * @return Number of deleted documents

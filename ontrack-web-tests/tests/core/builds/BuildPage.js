@@ -3,6 +3,7 @@ import {PromotionInfoSection} from "./PromotionInfoSection";
 import {confirmBox} from "../../support/confirm";
 import {BuildLinksSection} from "./BuildLinksSection";
 import {PropertiesSection} from "../properties/PropertiesSection";
+import {ValidationRunQuickTransition} from "../validationRuns/ValidationRunQuickTransition";
 
 const {expect} = require("@playwright/test");
 
@@ -81,6 +82,25 @@ export class BuildPage {
         await button.click()
         await expect(this.page.getByText('Build details')).toBeVisible()
         return new PropertiesSection(this.page)
+    }
+
+    /**
+     * The status of the run in the "Validations" table.
+     */
+    validationRunStatus(run) {
+        return this.page.getByTestId('validations').getByTestId(`validation-run-table-status-${run.id}`)
+    }
+
+    /**
+     * Clicks the status of the run in the "Validations" table, which opens its quick-transition popover.
+     */
+    async validationRunQuickTransition(run) {
+        const status = this.validationRunStatus(run)
+        await expect(status).toBeVisible()
+        await status.click()
+        const popover = new ValidationRunQuickTransition(this.page, run)
+        await popover.waitFor()
+        return popover
     }
 
     async getPromotionInfoSection() {

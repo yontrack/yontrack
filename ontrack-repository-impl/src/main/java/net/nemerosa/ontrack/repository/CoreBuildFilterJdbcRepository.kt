@@ -783,9 +783,10 @@ class CoreBuildFilterJdbcRepository(
     }
 
     private fun findLastBuildWithValidationStamp(validationStampId: Int, status: String?): Int? {
+        // The status is the current one of the run, never one it had in the past
         val sql = StringBuilder(
-            "SELECT VR.BUILDID FROM VALIDATION_RUN_STATUSES VRS\n" +
-                    "INNER JOIN VALIDATION_RUNS VR ON VR.ID = VRS.VALIDATIONRUNID\n" +
+            "SELECT VR.BUILDID FROM VALIDATION_RUNS VR\n" +
+                    ValidationRunStatusSql.LAST_STATUS_JOIN + "\n" +
                     "WHERE VR.VALIDATIONSTAMPID = :validationStampId\n"
         )
         // Parameters

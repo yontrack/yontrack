@@ -126,9 +126,10 @@ class GitHubPostProcessing(
                 workflow = workflow,
                 branch = branch,
                 inputs = parameters.toMap(),
+                sendId = config.sendId ?: ghConfig.workflowSendId,
                 retries = settings.retries,
                 retriesDelaySeconds = settings.retriesDelaySeconds,
-            ).id
+            )
         } catch (ex: GitHubWorkflowDispatchException) {
             throw GitHubPostProcessingTransientException(ex)
         } catch (ex: GitHubWorkflowRunNotFoundException) {

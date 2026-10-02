@@ -12,6 +12,8 @@ Auto promotion is configured by setting the "Auto promotion" property on a promo
 
     A validation counts as passed when the status of its **last** run is `PASSED` or `FIXED` — a validation which failed and was later fixed counts towards the auto promotion.
 
+    A [CHML](index.md#chml) validation stamp can also opt in, with `warningPassesAutoPromotion`, to having a last run in `WARNING` status count as passed. This applies to the auto promotion only — a `WARNING` run still shows as a warning everywhere else — and only to a last status of exactly `WARNING`: a warning later moved to another status, `INVESTIGATING` or `EXPLAINED` for example, does not count. With this option, a `WARNING` run both promotes a build and leaves an [auto revoked](#revoking-a-promotion) promotion standing.
+
 ## Selecting the validations
 
 The list of validation stamps can be defined by:
@@ -35,9 +37,13 @@ Hovering a promotion of a build, in the branch builds view or on the build page,
 * each required promotion, linking to its last run on the build, or **Not granted**
 * a summary line, for example `2/3 validations passed · 1/1 promotion granted`
 
+A `WARNING` run accepted by its CHML validation stamp counts as passed in the summary line, but its row still shows the `WARNING` status, so that the tolerance stays visible.
+
+On the build page, hovering a promotion the build does **not** have yet shows the same conditions, with their state for that build, under the promotion's name marked **Not granted** — the place to look when wondering why a build is not promoted. A promotion level without auto promotion shows its description only.
+
 These are the _current_ conditions and statuses. The auto promotion property is not versioned, so they explain why the build is — or is not — promoted today, not what triggered a promotion in the past. They are shown for manually granted promotions too.
 
-The GraphQL API exposes them as the `autoPromotionConditions` field of `PromotionLevel` and of `PromotionRun`.
+The GraphQL API exposes them as the `autoPromotionConditions` field of `PromotionLevel` and of `PromotionRun`, and as the `autoPromotionConditions(promotionLevelId)` field of `Build`, for any promotion level of the build's branch, granted or not.
 
 ## Revoking a promotion
 

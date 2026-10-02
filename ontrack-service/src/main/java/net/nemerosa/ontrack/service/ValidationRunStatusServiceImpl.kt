@@ -48,8 +48,8 @@ class ValidationRunStatusServiceImpl : ValidationRunStatusService, StartupServic
         register(ValidationRunStatusID.STATUS_EXPLAINED, ValidationRunStatusID.FIXED)
         register(ValidationRunStatusID.STATUS_INVESTIGATING, ValidationRunStatusID.DEFECTIVE, ValidationRunStatusID.EXPLAINED, ValidationRunStatusID.FIXED)
         register(ValidationRunStatusID.STATUS_INTERRUPTED, ValidationRunStatusID.INVESTIGATING, ValidationRunStatusID.FIXED)
-        register(ValidationRunStatusID.STATUS_FAILED, ValidationRunStatusID.INTERRUPTED, ValidationRunStatusID.INVESTIGATING, ValidationRunStatusID.EXPLAINED, ValidationRunStatusID.DEFECTIVE)
-        register(ValidationRunStatusID.STATUS_WARNING, ValidationRunStatusID.INTERRUPTED, ValidationRunStatusID.INVESTIGATING, ValidationRunStatusID.EXPLAINED, ValidationRunStatusID.DEFECTIVE)
+        register(ValidationRunStatusID.STATUS_FAILED, ValidationRunStatusID.INTERRUPTED, ValidationRunStatusID.INVESTIGATING, ValidationRunStatusID.EXPLAINED, ValidationRunStatusID.DEFECTIVE, ValidationRunStatusID.FIXED)
+        register(ValidationRunStatusID.STATUS_WARNING, ValidationRunStatusID.INTERRUPTED, ValidationRunStatusID.INVESTIGATING, ValidationRunStatusID.EXPLAINED, ValidationRunStatusID.DEFECTIVE, ValidationRunStatusID.FIXED)
         // Checks the tree
         for (statusID in statuses.values) {
             for (nextStatus in statusID.followingStatuses) {

@@ -1,4 +1,4 @@
-import {Form, Input, Space, Typography} from "antd";
+import {Form, Input, Space, Switch, Typography} from "antd";
 import Link from "next/link";
 import ConfigurationPage from "@components/configurations/ConfigurationPage";
 import GitHubConfigAuthenticationType from "@components/extension/github/GitHubConfigAuthenticationType";
@@ -149,6 +149,16 @@ export default function GitHubConfigurationsPage() {
             extra="Token for an account used to approve pull requests for auto approval processes."
         >
             <Input.Password/>
+        </Form.Item>,
+        <Form.Item
+            key="workflowSendId"
+            name="workflowSendId"
+            label="Send workflow ID"
+            extra="Default for passing an id input to the dispatched workflows (auto-versioning post-processing, notifications). Needed only when this GitHub does not return the run of a dispatch. A workflow must declare the id input if and only if it is sent."
+            valuePropName="checked"
+            initialValue={true}
+        >
+            <Switch/>
         </Form.Item>,
     ]
 

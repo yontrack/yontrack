@@ -1,5 +1,6 @@
 package net.nemerosa.ontrack.graphql
 
+import tools.jackson.databind.JsonNode
 import tools.jackson.databind.node.StringNode
 import net.nemerosa.ontrack.extension.general.ReleaseProperty
 import net.nemerosa.ontrack.extension.general.ReleasePropertyType
@@ -9,14 +10,17 @@ import net.nemerosa.ontrack.extension.general.validation.TextValidationDataType
 import net.nemerosa.ontrack.it.AsAdminTest
 import net.nemerosa.ontrack.json.isNullOrNullNode
 import net.nemerosa.ontrack.common.Time
+import net.nemerosa.ontrack.model.security.Roles
 import net.nemerosa.ontrack.model.structure.ID
 import net.nemerosa.ontrack.model.structure.NameDescription
+import net.nemerosa.ontrack.model.structure.ValidationRun
 import net.nemerosa.ontrack.model.structure.ValidationRunStatusID
 import net.nemerosa.ontrack.model.structure.config
 import net.nemerosa.ontrack.model.structure.data
 import net.nemerosa.ontrack.test.assertIs
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.graphql.execution.ErrorType
 import java.time.LocalDateTime
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -391,6 +395,125 @@ class ValidationRunGraphQLIT : AbstractQLKTITSupport() {
                         ),
                         descriptions
                     )
+                }
+            }
+        }
+    }
+
+    private fun changeValidationRunStatus(validationRun: ValidationRun, status: String, description: String? = null): JsonNode =
+        run(
+            """
+                mutation ChangeValidationRunStatus(${'$'}id: Int!, ${'$'}status: String!, ${'$'}description: String) {
+                    changeValidationRunStatus(input: {
+                        validationRunId: ${'$'}id,
+                        validationRunStatusId: ${'$'}status,
+                        description: ${'$'}description
+                    }) {
+                        validationRun {
+                            lastStatus {
+                                statusID {
+                                    id
+                                }
+                                description
+                            }
+                        }
+                        errors {
+                            message
+                        }
+                    }
+                }
+            """,
+            mapOf(
+                "id" to validationRun.id(),
+                "status" to status,
+                "description" to description,
+            )
+        )
+
+    private fun lastStatusId(validationRun: ValidationRun): String =
+        asAdmin { structureService.getValidationRun(validationRun.id).lastStatusId }
+
+    @Test
+    fun `Changing a WARNING validation run directly to FIXED`() {
+        project {
+            branch {
+                val vs = validationStamp()
+                build {
+                    val run = validate(vs, ValidationRunStatusID.STATUS_WARNING)
+                    val data = changeValidationRunStatus(run, ValidationRunStatusID.FIXED, "Fixed in one go")
+                    val lastStatus = assertNoUserError(data, "changeValidationRunStatus")["validationRun"]["lastStatus"]
+                    assertEquals(ValidationRunStatusID.FIXED, lastStatus["statusID"]["id"].asText())
+                    assertEquals("Fixed in one go", lastStatus["description"].asText())
+                    assertEquals(ValidationRunStatusID.FIXED, lastStatusId(run))
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `Changing a FAILED validation run directly to FIXED`() {
+        project {
+            branch {
+                val vs = validationStamp()
+                build {
+                    val run = validate(vs, ValidationRunStatusID.STATUS_FAILED)
+                    val data = changeValidationRunStatus(run, ValidationRunStatusID.FIXED)
+                    assertNoUserError(data, "changeValidationRunStatus")
+                    assertEquals(ValidationRunStatusID.FIXED, lastStatusId(run))
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `Changing a WARNING validation run directly to FIXED as a project participant`() {
+        project {
+            branch {
+                val vs = validationStamp()
+                build {
+                    val run = validate(vs, ValidationRunStatusID.STATUS_WARNING)
+                    withGrantViewAndNOParticipationToAll {
+                        asAccountWithProjectRole(Roles.PROJECT_PARTICIPANT) {
+                            assertNoUserError(
+                                changeValidationRunStatus(run, ValidationRunStatusID.FIXED),
+                                "changeValidationRunStatus"
+                            )
+                        }
+                    }
+                    assertEquals(ValidationRunStatusID.FIXED, lastStatusId(run))
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `Changing a WARNING validation run to FIXED is refused without the status change permission`() {
+        project {
+            branch {
+                val vs = validationStamp()
+                build {
+                    val run = validate(vs, ValidationRunStatusID.STATUS_WARNING)
+                    // Participation is granted to all by default, which would grant the status change
+                    withGrantViewAndNOParticipationToAll {
+                        asAccountWithProjectRole(Roles.PROJECT_READ_ONLY) {
+                            runWithError(
+                                """
+                                    mutation {
+                                        changeValidationRunStatus(input: {
+                                            validationRunId: ${run.id()},
+                                            validationRunStatusId: "${ValidationRunStatusID.FIXED}"
+                                        }) {
+                                            errors {
+                                                message
+                                            }
+                                        }
+                                    }
+                                """,
+                                errorClassification = ErrorType.FORBIDDEN
+                            )
+                        }
+                    }
+                    assertEquals(ValidationRunStatusID.WARNING, lastStatusId(run))
                 }
             }
         }

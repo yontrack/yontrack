@@ -332,7 +332,7 @@ export default function BranchBuilds({
                         !vsfContext.inlineEdition && vsfContext.grouping && <Column
                             key="groups"
                             render={(_, build) =>
-                                <ValidationGroups build={build}/>
+                                <ValidationGroups build={build} onChange={onChange}/>
                             }
                         />
                     }

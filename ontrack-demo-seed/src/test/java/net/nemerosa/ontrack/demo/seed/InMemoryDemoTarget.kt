@@ -174,6 +174,7 @@ class InMemoryDemoTarget(
                 branch.validationStamps.forEach { stamp ->
                     add("    validation stamp $stamp")
                     branch.findingsStamps[stamp]?.let { add("      findings $it") }
+                    branch.chmlStamps[stamp]?.let { add("      chml $it") }
                 }
                 branch.builds.forEach { build ->
                     add("    build ${build.name} \"${build.description}\" at ${build.creation}")
@@ -351,6 +352,8 @@ class InMemoryDemoTarget(
         val findingsStamps = mutableMapOf<String, FindingsThresholdsSpec>()
         /** The `tests` stamps, of the test summary data type. */
         val testsStamps = mutableSetOf<String>()
+        /** CHML configuration of the CHML stamps, by name. */
+        val chmlStamps = mutableMapOf<String, CHMLSpec>()
         val builds = mutableListOf<InMemoryBuild>()
         var scmBranch: String? = null
         val autoPromotions = mutableMapOf<String, AutoPromotionSpec>()
@@ -393,13 +396,15 @@ class InMemoryDemoTarget(
             description: String,
             findings: FindingsThresholdsSpec?,
             tests: Boolean,
+            chml: CHMLSpec?,
         ) {
             checkName(name, "Validation stamp")
             require(name !in validationStamps) { "Validation stamp $name already exists in ${project.name}/${this.name}" }
-            require(findings == null || !tests) { "A validation stamp has one data type" }
+            require(listOf(findings != null, tests, chml != null).count { it } <= 1) { "A validation stamp has one data type" }
             validationStamps += name
             findings?.let { findingsStamps[name] = it }
             if (tests) testsStamps += name
+            chml?.let { chmlStamps[name] = it }
         }
 
         override fun setAutoPromotion(promotionLevel: String, spec: AutoPromotionSpec) {

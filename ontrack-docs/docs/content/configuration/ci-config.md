@@ -363,6 +363,21 @@ branch:
           okIfGreater: false
 ```
 
+As another example, a security scan which fails on any critical issue and warns on any high one, but lets a warning
+through to the [auto promotion](../concepts/model/auto-promotion.md):
+
+```yaml
+branch:
+  validations:
+    - SECURITY.SCAN:
+        chml:
+          failedLevel: CRITICAL
+          failedValue: 1
+          warningLevel: HIGH
+          warningValue: 1
+          warningPassesAutoPromotion: true
+```
+
 !!! note
 
     Use the [JSON schema](#json-schema) to see which other types are available.

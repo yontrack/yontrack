@@ -48,6 +48,7 @@ interface SearchDocumentService {
     fun index(documents: List<SearchDocument>)           // upsert, in one batch
     fun insertIfAbsent(documents: List<SearchDocument>): Int  // INSERT … ON CONFLICT DO NOTHING
     fun delete(type: String, key: String)
+    fun deleteForProjectExcept(type: String, projectId: Int, keys: Collection<String>): Int
     fun rebuild(indexer: SearchDocumentIndexer)
 }
 ```
@@ -187,8 +188,10 @@ scan incrementally in between, as `ScmCommitSearchExtension` does:
 change goes through `index`. The commit documents carry the name of their project, which is
 therefore renamed in them only by the weekly full scan.
 
-The issues found in the commit messages (`ScmIssueSearchExtension`) are written by the same pass,
-with `index`. The rebuild of their own type scans the commits again, for the issues only.
+The issues named by the commits (`ScmIssueSearchExtension`) — their subject and trailer lines only,
+see `issueReferenceText` — are written by the same pass, with `index`. A full scan of a project
+replaces its issues: those no longer named are dropped with `deleteForProjectExcept` (#1949). The
+rebuild of their own type scans the commits again, for the issues only.
 
 ## What the service guarantees
 

@@ -30,6 +30,9 @@ data class GitHubWorkflowNotificationChannelConfig(
     @APIDescription("Timeout in seconds")
     @APILabel("Timeout")
     val timeoutSeconds: Int = DEFAULT_TIMEOUT_SECONDS,
+    @APIDescription("If defined, overrides the GitHub configuration for passing the `id` input to the workflow, used to find its run when GitHub does not return it")
+    @APILabel("Send ID")
+    val sendId: Boolean? = null,
 ) {
     companion object {
         const val DEFAULT_TIMEOUT_SECONDS = 30

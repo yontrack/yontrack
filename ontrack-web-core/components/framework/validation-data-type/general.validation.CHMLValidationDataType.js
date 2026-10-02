@@ -1,7 +1,7 @@
 import {Tag} from "antd";
 
-// {"warningLevel":{"level":"HIGH","value":1},"failedLevel":{"level":"CRITICAL","value":1}}
-export default function CHMLValidationDataType({warningLevel, failedLevel}) {
+// {"warningLevel":{"level":"HIGH","value":1},"failedLevel":{"level":"CRITICAL","value":1},"warningPassesAutoPromotion":false}
+export default function CHMLValidationDataType({warningLevel, failedLevel, warningPassesAutoPromotion}) {
     return (
         <>
             {
@@ -14,6 +14,12 @@ export default function CHMLValidationDataType({warningLevel, failedLevel}) {
                 failedLevel &&
                 <Tag>
                     Failed if {failedLevel.level} &ge; {failedLevel.value}
+                </Tag>
+            }
+            {
+                warningPassesAutoPromotion &&
+                <Tag data-testid="chml-warning-passes-auto-promotion">
+                    Warning passes auto-promotion
                 </Tag>
             }
         </>

@@ -104,12 +104,12 @@ class AutoPromotionEventListener(
      * Called when a validation run is created or when the status of an existing run changes.
      *
      * The auto promotions are checked only when the new status is a passed one - `PASSED` but
-     * also `FIXED` (see #1629).
+     * also `FIXED` (see #1629), and `WARNING` on a CHML stamp which opts in (see #1943).
      */
     private fun onValidationRunStatus(event: Event) {
         // Passed validation?
         val validationRun = event.getEntity<ValidationRun>(ProjectEntityType.VALIDATION_RUN)
-        if (validationRun.isPassed) {
+        if (autoPromotionPrerequisites.isPassedForAutoPromotion(validationRun)) {
             processEvent(event)
         }
     }

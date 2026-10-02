@@ -13,6 +13,8 @@ import net.nemerosa.ontrack.test.TestUtils
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 class GitHubEngineConfigurationCascIT : AbstractCascTestSupport() {
 
@@ -72,6 +74,10 @@ class GitHubEngineConfigurationCascIT : AbstractCascTestSupport() {
                       "user": {
                         "description": "user field",
                         "type": "string"
+                      },
+                      "workflowSendId": {
+                        "description": "workflowSendId field",
+                        "type": "boolean"
                       }
                     },
                     "required": [
@@ -123,6 +129,45 @@ class GitHubEngineConfigurationCascIT : AbstractCascTestSupport() {
             assertEquals(null, configuration.appId)
             assertEquals(null, configuration.appPrivateKey)
             assertEquals(null, configuration.appInstallationAccountName)
+        }
+    }
+
+    @Test
+    fun `Sending the workflow ID is enabled by default`() {
+        val name = TestUtils.uid("GH")
+        withDisabledConfigurationTest {
+            casc(
+                """
+                    ontrack:
+                        config:
+                            github:
+                                - name: $name
+                                  token: my-secret-token
+                """.trimIndent()
+            )
+        }
+        asAdmin {
+            assertTrue(gitHubConfigurationService.getConfiguration(name).workflowSendId)
+        }
+    }
+
+    @Test
+    fun `Disabling the sending of the workflow ID`() {
+        val name = TestUtils.uid("GH")
+        withDisabledConfigurationTest {
+            casc(
+                """
+                    ontrack:
+                        config:
+                            github:
+                                - name: $name
+                                  token: my-secret-token
+                                  workflowSendId: false
+                """.trimIndent()
+            )
+        }
+        asAdmin {
+            assertFalse(gitHubConfigurationService.getConfiguration(name).workflowSendId)
         }
     }
 
@@ -293,6 +338,7 @@ class GitHubEngineConfigurationCascIT : AbstractCascTestSupport() {
 ${pem()}
                                       appInstallationAccountName: nemerosa
                                       autoMergeToken: my-merge-token
+                                      workflowSendId: false
                     """.trimIndent()
                 )
             }
@@ -303,6 +349,7 @@ ${pem()}
                 "ontrack.config.github.app-private-key" to 0.0,
                 "ontrack.config.github.app-installation" to 0.0,
                 "ontrack.config.github.auto-merge-token" to 0.0,
+                "ontrack.config.github.workflow-send-id" to 0.0,
             ),
             usages
         )
@@ -324,6 +371,7 @@ ${pem()}
 ${pem()}
                                       app-installation: nemerosa
                                       auto-merge-token: my-merge-token
+                                      workflow-send-id: false
                     """.trimIndent()
                 )
             }
@@ -336,6 +384,7 @@ ${pem()}
             assertEquals(TestUtils.resourceString("/test-app.pem").trim(), configuration.appPrivateKey?.trim())
             assertEquals("nemerosa", configuration.appInstallationAccountName)
             assertEquals("my-merge-token", configuration.autoMergeToken)
+            assertFalse(configuration.workflowSendId)
         }
         // ... and are reported as deprecated
         assertEquals(
@@ -344,6 +393,7 @@ ${pem()}
                 "ontrack.config.github.app-private-key" to 1.0,
                 "ontrack.config.github.app-installation" to 1.0,
                 "ontrack.config.github.auto-merge-token" to 1.0,
+                "ontrack.config.github.workflow-send-id" to 1.0,
             ),
             usages
         )
@@ -362,6 +412,7 @@ ${pem()}
             "ontrack.config.github.app-private-key",
             "ontrack.config.github.app-installation",
             "ontrack.config.github.auto-merge-token",
+            "ontrack.config.github.workflow-send-id",
         )
         val before = items.associateWith { meterRegistry.deprecatedUsageCount(DeprecationSurface.CASC, it) }
         code()

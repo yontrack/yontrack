@@ -102,6 +102,12 @@ class SearchDocumentJdbcRepository(
         }
     }
 
+    override fun deleteForProjectExcept(type: String, projectId: Int, keys: Collection<String>): Int =
+        namedParameterJdbcTemplate.update(
+            "DELETE FROM SEARCH_DOCUMENTS WHERE TYPE = :type AND PROJECT_ID = :projectId AND NOT (KEY = ANY(CAST(:keys AS TEXT[])))",
+            params("type", type).addValue("projectId", projectId).addValue("keys", keys.toTypedArray())
+        )
+
     override fun deleteIndexedBefore(type: String, time: LocalDateTime): Int =
         namedParameterJdbcTemplate.update(
             "DELETE FROM SEARCH_DOCUMENTS WHERE TYPE = :type AND INDEXED_AT < :time",

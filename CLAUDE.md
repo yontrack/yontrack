@@ -178,6 +178,8 @@ Follow this order for every non-trivial change:
   of subject that appears in a semantic change log: `build`, `chore`, `ci`, `docs`, `feat`, `fix`,
   `style`, `refactor`, `perf`, `test`. Anything else becomes a raw section of its own.
 - **Never** write `doc:` — the type is `docs:` (ADR 0019 says why the two cannot be merged).
+- Only the subject and the trailer lines name the issues of a commit — body prose is ignored. To
+  link another issue, add a trailer line such as `Refs: #1236` (ADR 0019 lists the keywords).
 - **Always** end the subject with `[skip ci]` when a commit touches only documentation that CI neither
   builds nor tests — `CONTEXT.md`, `CLAUDE.md`, `.claude/rules/`, `README.md`, `DEVELOPMENT.md`,
   `docs/` (ADRs, agent docs, grilling sessions) and `doc/dev-guide/`. A full CI run is about 25

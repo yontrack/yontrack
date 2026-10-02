@@ -4,6 +4,7 @@ import net.nemerosa.ontrack.extension.issues.model.ConfiguredIssueService
 import net.nemerosa.ontrack.extension.scm.changelog.SCMChangeLogEnabled
 import net.nemerosa.ontrack.extension.scm.changelog.SCMCommit
 import net.nemerosa.ontrack.extension.scm.changelog.SCMCommitFilter
+import net.nemerosa.ontrack.extension.scm.changelog.issueReferenceText
 import net.nemerosa.ontrack.extension.scm.service.SCMDetector
 import net.nemerosa.ontrack.model.structure.Project
 import org.springframework.stereotype.Component
@@ -43,7 +44,8 @@ class ScmCommitSearchScanner(
             lastCommit = commit.id
             code(commit)
             if (issueService != null) {
-                issueKeys += issueService.extractIssueKeysFromMessage(commit.message)
+                // Only the subject and the trailers name the issues of a commit
+                issueKeys += issueService.extractIssueKeysFromMessage(issueReferenceText(commit.message))
             }
         }
         return ScmCommitSearchScan(
@@ -64,7 +66,7 @@ class ScmCommitSearchScanner(
  * @property commits Number of scanned commits
  * @property lastCommit ID of the last scanned commit, the most recent one
  * @property issueService Issue service of the project, if any
- * @property issueKeys Keys of the issues found in the messages of the scanned commits
+ * @property issueKeys Keys of the issues named by the subjects and trailers of the scanned commits
  */
 data class ScmCommitSearchScan(
     val incremental: Boolean,

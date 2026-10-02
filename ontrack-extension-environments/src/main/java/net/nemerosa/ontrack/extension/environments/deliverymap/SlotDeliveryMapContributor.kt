@@ -148,9 +148,8 @@ class SlotDeliveryMapContributor(
      * yields a different edge on every branch, which is why slots belong on a branch view at all.
      *
      * A name matching no promotion level of this branch is drawn as an unresolved checkpoint carrying
-     * that name (#1705). The rule config is read directly rather than through
-     * `PromotionRelatedSlotAdmissionRule.isForPromotionLevel`, which answers yes or no against an
-     * existing promotion level and can never report the name which failed to resolve.
+     * that name (#1705). The rule config is read directly because that checkpoint needs the name the
+     * rule asked for, and only the config carries it.
      *
      * There is no permission ambiguity to worry about here: promotion levels belong to the branch's
      * own project, and the map already refused to be assembled at all without `ProjectView` on it.

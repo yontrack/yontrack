@@ -52,7 +52,7 @@ class AutoPromotionRevocationEventListener(
     override fun onEvent(event: Event) {
         when {
             // (a) the last run of a required validation stamp flips to a non-passed status, and
-            // (b) a *new* run is created for a required stamp with a non-passed status - `isValidationRunPassed`
+            // (b) a *new* run is created for a required stamp with a non-passed status - `isValidationRunPassedForAutoPromotion`
             //     looks at the last run only, so a failing re-run invalidates the prerequisite even though an
             //     earlier passing run still exists
             event.eventType === EventFactory.NEW_VALIDATION_RUN ||
@@ -64,7 +64,8 @@ class AutoPromotionRevocationEventListener(
 
     private fun onValidationRunStatus(event: Event) {
         val validationRun = event.getEntity<ValidationRun>(ProjectEntityType.VALIDATION_RUN)
-        if (!validationRun.isPassed) {
+        // Same rule as the promotion side - a `WARNING` accepted by its stamp does not revoke (#1943)
+        if (!autoPromotionPrerequisites.isPassedForAutoPromotion(validationRun)) {
             val validationStamp = validationRun.validationStamp
             revokeEligiblePromotions(
                 event = event,

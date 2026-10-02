@@ -12,7 +12,12 @@ import RunInfo from "@components/common/RunInfo";
 import ValidationRunData from "@components/framework/validation-run-data/ValidationRunData";
 import BuildLink from "@components/builds/BuildLink";
 import PromotionRuns from "@components/promotionRuns/PromotionRuns";
+import ValidationRunQuickTransition from "@components/validationRuns/ValidationRunQuickTransition";
 
+/**
+ * @param onStatusChanged When set, clicking a run's status opens its quick-transition popover,
+ * and this is called once the status has changed
+ */
 export default function ValidationRunTable({
                                                validationRuns,
                                                pagination = false,
@@ -20,6 +25,7 @@ export default function ValidationRunTable({
                                                filtering,
                                                displayBuild = false,
                                                displayPromotionRuns = false,
+                                               onStatusChanged,
                                            }) {
 
     // Definition of the columns
@@ -80,7 +86,20 @@ export default function ValidationRunTable({
         {
             title: "Status",
             key: 'status',
-            render: (_, run) => <ValidationRunStatus status={run.lastStatus}/>,
+            render: (_, run) => onStatusChanged ?
+                <ValidationRunQuickTransition
+                    run={run}
+                    label={`${run.validationStamp?.name} \u2014 ${run.lastStatus.statusID.name}`}
+                    onChange={onStatusChanged}
+                >
+                    {({open}) => <ValidationRunStatus
+                        id={`validation-run-table-status-${run.id}`}
+                        status={run.lastStatus}
+                        // The hover summary steps aside while the quick-transition popover is open
+                        tooltip={!open}
+                    />}
+                </ValidationRunQuickTransition> :
+                <ValidationRunStatus status={run.lastStatus}/>,
             filters: filtering?.statuses,
             filterSearch: true,
             filteredValue: filtering?.filteredInfo?.status || null,

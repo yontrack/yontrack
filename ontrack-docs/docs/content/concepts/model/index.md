@@ -77,6 +77,19 @@ some data, of the same type as the validation stamp.
 
 ![Validation life-cycle](validation-life-cycle.png)
 
+A run in `WARNING` or `FAILED` can be set to `FIXED` directly. Since `FIXED` counts as passed, this single change
+can make the build eligible for a promotion, including an automatic one.
+
+In the builds grid of a branch page, and in the "Validations" table of a build page, clicking the status of a
+validation run opens a small popover:
+
+* one button per status the run can move to, `FIXED` first when it is one of them — one click applies it;
+* _With comment…_ to pick a status and give it a description;
+* _History…_ to display all the runs of this validation stamp for this build, and their statuses.
+
+The popover reads the current status of the run when it opens. Users who are not allowed to change the status of
+validation runs only see _History…_.
+
 ## Promotions
 
 A promotion level can be granted to a [build](#builds). This is called a _promotion_ or _promotion run_. This can happen several times for a given promotion level and a given build.
@@ -131,6 +144,8 @@ Configuration:
 * `failedLevel`:
     * `level`: CRITICAL / HIGH / MEDIUM / LOW
     * `value`: when the number of issues in this `level` is above this threshold, the validation stamp is failed
+* `warningPassesAutoPromotion`: optional, `false` by default. When `true`, a run whose last status is `WARNING` counts
+  as passed for the [auto promotion](auto-promotion.md) — and only for it.
 
 ### Security findings
 

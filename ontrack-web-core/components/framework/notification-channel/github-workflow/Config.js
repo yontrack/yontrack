@@ -14,7 +14,8 @@ export default function GitHubWorkflowNotificationChannelConfig({
                                                                     reference,
                                                                     inputs,
                                                                     callMode,
-                                                                    timeoutSeconds
+                                                                    timeoutSeconds,
+                                                                    sendId,
                                                                 }) {
 
     const {data: url, loading} = useQuery(
@@ -77,6 +78,14 @@ export default function GitHubWorkflowNotificationChannelConfig({
                     <Space>
                         <Typography.Text>Timeout:</Typography.Text>
                         <Duration seconds={timeoutSeconds} displaySecondsInTooltip={true} defaultText="Default"/>
+                    </Space>
+                    <Space>
+                        <Typography.Text>Send workflow ID:</Typography.Text>
+                        {
+                            sendId === undefined || sendId === null ?
+                                <Typography.Text type="secondary">Default (from the GitHub configuration)</Typography.Text> :
+                                <Typography.Text>{sendId ? "Yes" : "No"}</Typography.Text>
+                        }
                     </Space>
                 </Space>
             </LoadingContainer>

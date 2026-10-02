@@ -350,6 +350,72 @@ class IssueReportingIT : AbstractGitTestSupport() {
         }
     }
 
+    /**
+     * "Open issues" are the issues of the runs which are **currently** not passed (#1712):
+     *
+     * ```
+     * | Build | VS0                                              | VS1                                   |
+     * |-------|--------------------------------------------------|---------------------------------------|
+     * | 1.0   | Failed -> Investigating with #5 -> Fixed (passed) | Failed with #6 -> Defective (no issue) |
+     * ```
+     *
+     * #5 is left out because its run is now fixed; #6 is kept although it is only in a past status
+     * description of a run which is still not passed.
+     */
+    @Test
+    fun `Getting last issues on runs which are currently not passed using the branch`() {
+        createRepo {
+            commits(1)
+        } and { repo, _ ->
+            testIssueServiceExtension.resetIssues()
+            testIssueServiceExtension.register(
+                    TestIssue(5, TestIssueStatus.OPEN, "bug"),
+                    TestIssue(6, TestIssueStatus.OPEN, "bug")
+            )
+            val project = project {
+                gitProject(repo)
+                branch("main") {
+                    gitBranch {
+                        commitAsProperty()
+                    }
+                    val vs0 = validationStamp("VS0")
+                    val vs1 = validationStamp("VS1")
+                    build("1.0") {
+                        validate(vs0, ValidationRunStatusID.STATUS_FAILED)
+                                .validationStatus(ValidationRunStatusID.STATUS_INVESTIGATING, "Issue #5 is being looked at")
+                                .validationStatus(ValidationRunStatusID.STATUS_FIXED, "Fixed")
+                        validate(vs1, ValidationRunStatusID.STATUS_FAILED, description = "Issue #6 is the cause")
+                                .validationStatus(ValidationRunStatusID.STATUS_DEFECTIVE, "Defective")
+                    }
+                }
+            }
+            asUserWithView(project) {
+                val data = run("""{
+                    projects(id: ${project.id}) {
+                        branches(name: "main") {
+                            validationIssues(passed: false) {
+                                validationRuns {
+                                    validationStamp {
+                                        name
+                                    }
+                                }
+                                issue {
+                                    key
+                                }
+                            }
+                        }
+                    }
+                }""")
+                val issues = data["projects"][0]["branches"][0]["validationIssues"]
+                assertEquals(listOf(6), issues.values().map { it["issue"]["key"].asInt() })
+                assertEquals(
+                        listOf("VS1"),
+                        issues[0]["validationRuns"].values().map { it["validationStamp"]["name"].asString() }
+                )
+            }
+        }
+    }
+
     private fun withTestContext(code: (Project) -> Unit) {
         createRepo {
             commits(1)

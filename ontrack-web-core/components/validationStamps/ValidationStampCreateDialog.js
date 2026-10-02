@@ -95,7 +95,7 @@ export default function ValidationStampCreateDialog({dialog}) {
                         <Well>
                             <ValidationDataTypeForm
                                 prefix="dataTypeConfig"
-                                dataType={{descriptor: {id: dialog.dataTypeId}, config: {}}}
+                                dataType={{descriptor: {id: dialog.dataTypeId}}}
                             />
                         </Well>
                     </Form.Item>

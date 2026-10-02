@@ -4,7 +4,6 @@ import tools.jackson.databind.JsonNode
 import net.nemerosa.ontrack.common.api.APIDescription
 import net.nemerosa.ontrack.extension.github.client.OntrackGitHubClient
 import net.nemerosa.ontrack.extension.github.client.OntrackGitHubClientFactory
-import net.nemerosa.ontrack.extension.github.client.WorkflowRun
 import net.nemerosa.ontrack.extension.github.model.GitHubEngineConfiguration
 import net.nemerosa.ontrack.extension.github.service.GitHubConfigurationService
 import net.nemerosa.ontrack.extension.notifications.channels.AbstractNotificationChannel
@@ -148,6 +147,9 @@ class GitHubWorkflowNotificationChannel(
             )
         )
 
+        // Passing the ID input or not
+        val sendId = config.sendId ?: gitHubConfig.workflowSendId
+
         // Running the job
         val (error, runId) = when (config.callMode) {
             GitHubWorkflowNotificationChannelConfigCallMode.ASYNC -> launchAsync(
@@ -157,6 +159,7 @@ class GitHubWorkflowNotificationChannel(
                 workflowId = workflowId,
                 reference = reference,
                 inputs = inputs,
+                sendId = sendId,
             )
 
             GitHubWorkflowNotificationChannelConfigCallMode.SYNC -> launchSync(
@@ -166,10 +169,11 @@ class GitHubWorkflowNotificationChannel(
                 workflowId = workflowId,
                 reference = reference,
                 inputs = inputs,
+                sendId = sendId,
                 timeoutSeconds = config.timeoutSeconds,
-            ) { run ->
+            ) { runId ->
                 output = outputProgressCallback(
-                    output.withWorkflowRunId(run.id)
+                    output.withWorkflowRunId(runId)
                 )
             }
         }
@@ -200,31 +204,33 @@ class GitHubWorkflowNotificationChannel(
         workflowId: String,
         reference: String,
         inputs: List<GitHubWorkflowNotificationChannelConfigInput>,
+        sendId: Boolean,
         timeoutSeconds: Int,
-        runFeedback: (run: WorkflowRun) -> Unit,
+        runFeedback: (runId: Long) -> Unit,
     ): GitHubWorkflowRunResult {
-        // Launching the workflow and getting the run (id)
-        val run = gitHubClient.launchWorkflowRun(
+        // Launching the workflow and getting the run id
+        val runId = gitHubClient.launchWorkflowRun(
             repository = "$owner/$repository",
             workflow = workflowId,
             branch = reference,
             inputs = inputs.associate { it.name to it.value },
+            sendId = sendId,
             retries = 10,
             retriesDelaySeconds = 10,
         )
         // Feedback
-        runFeedback(run)
+        runFeedback(runId)
         // Waiting for the completion of the run
         val waitIntervalSeconds = 10 // seconds
         val waitRetries = timeoutSeconds / waitIntervalSeconds + 1
         gitHubClient.waitUntilWorkflowRun(
             repository = "$owner/$repository",
-            runId = run.id,
+            runId = runId,
             retries = waitRetries,
             retriesDelaySeconds = waitIntervalSeconds,
         )
         // Gets the final result of the workflow run
-        val finalRun = gitHubClient.getWorkflowRun(repository = "$owner/$repository", runId = run.id)
+        val finalRun = gitHubClient.getWorkflowRun(repository = "$owner/$repository", runId = runId)
         val success = finalRun.success
         return if (success != null && success) {
             GitHubWorkflowRunResult(
@@ -245,15 +251,17 @@ class GitHubWorkflowNotificationChannel(
         repository: String,
         workflowId: String,
         reference: String,
-        inputs: List<GitHubWorkflowNotificationChannelConfigInput>
+        inputs: List<GitHubWorkflowNotificationChannelConfigInput>,
+        sendId: Boolean,
     ): GitHubWorkflowRunResult {
-        // Launching the workflow and getting the run (id)
-        val run = try {
+        // Launching the workflow and getting the run id
+        val runId = try {
             gitHubClient.launchWorkflowRun(
                 repository = "$owner/$repository",
                 workflow = workflowId,
                 branch = reference,
                 inputs = inputs.associate { it.name to it.value },
+                sendId = sendId,
                 retries = 10,
                 retriesDelaySeconds = 10,
             )
@@ -266,7 +274,7 @@ class GitHubWorkflowNotificationChannel(
         // OK
         return GitHubWorkflowRunResult(
             error = null,
-            runId = run.id,
+            runId = runId,
         )
     }
 

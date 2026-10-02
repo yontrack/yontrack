@@ -6,6 +6,7 @@ import net.nemerosa.ontrack.extension.scm.service.SCMPullRequest
 import net.nemerosa.ontrack.extension.scm.service.SCMPullRequestStatus
 import net.nemerosa.ontrack.it.AbstractDSLTestSupport
 import net.nemerosa.ontrack.it.AsAdminTest
+import net.nemerosa.ontrack.model.events.Event
 import net.nemerosa.ontrack.model.events.EventTemplatingService
 import net.nemerosa.ontrack.model.events.HtmlNotificationEventRenderer
 import net.nemerosa.ontrack.model.structure.Branch
@@ -37,6 +38,7 @@ internal class AutoVersioningEventsIT : AbstractDSLTestSupport() {
                     link = "https://job.link",
                 )
             )
+            assertAuditValues(event, order)
             val text = eventTemplatingService.renderEvent(
                 event,
                 context = emptyMap(),
@@ -47,6 +49,8 @@ internal class AutoVersioningEventsIT : AbstractDSLTestSupport() {
                     Auto versioning post-processing of <a href="http://localhost:3000/project/${target.project.id}">${target.project.name}</a>/<a href="http://localhost:3000/branch/${target.id}">${target.name}</a> for dependency <a href="http://localhost:3000/project/${run.project.id}">${run.project.name}</a> version "1.1.0" has failed.
 
                     <a href="https://job.link">Post processing error.</a>
+
+                    ${auditLink(order)}
                 """.trimIndent(),
                 text
             )
@@ -66,6 +70,7 @@ internal class AutoVersioningEventsIT : AbstractDSLTestSupport() {
                     status = SCMPullRequestStatus.MERGED,
                 )
             )
+            assertAuditValues(event, order)
             val text = eventTemplatingService.renderEvent(
                 event,
                 context = emptyMap(),
@@ -78,6 +83,8 @@ internal class AutoVersioningEventsIT : AbstractDSLTestSupport() {
                             Created, approved and merged.
                             
                             Pull request <a href="https://scm/pr/42">PR-42</a>
+
+                            ${auditLink(order)}
                         """.trimIndent(),
                 text
             )
@@ -92,6 +99,7 @@ internal class AutoVersioningEventsIT : AbstractDSLTestSupport() {
                 message = "Processing failed.",
                 error = RuntimeException("Processing failed because of this error.")
             )
+            assertAuditValues(event, order)
             val text = eventTemplatingService.renderEvent(
                 event,
                 context = emptyMap(),
@@ -104,6 +112,8 @@ internal class AutoVersioningEventsIT : AbstractDSLTestSupport() {
                             Processing failed.
                             
                             Error: Processing failed because of this error.
+
+                            ${auditLink(order)}
                         """.trimIndent(),
                 text
             )
@@ -122,6 +132,7 @@ internal class AutoVersioningEventsIT : AbstractDSLTestSupport() {
                     status = SCMPullRequestStatus.OPEN,
                 )
             )
+            assertAuditValues(event, order)
             val text = eventTemplatingService.renderEvent(
                 event,
                 context = emptyMap(),
@@ -134,6 +145,8 @@ internal class AutoVersioningEventsIT : AbstractDSLTestSupport() {
                     Timeout while waiting for the PR to be ready to be merged.
                     
                     Pull request <a href="https://scm/pr/42">PR-42</a>
+
+                    ${auditLink(order)}
                 """.trimIndent(),
                 text
             )
@@ -147,6 +160,7 @@ internal class AutoVersioningEventsIT : AbstractDSLTestSupport() {
                 order = order,
                 reason = "Version \"1.1.0\" is older than the version \"2.0.0\" already present in the target file.",
             )
+            assertAuditValues(event, order)
             val text = eventTemplatingService.renderEvent(
                 event,
                 context = emptyMap(),
@@ -157,10 +171,23 @@ internal class AutoVersioningEventsIT : AbstractDSLTestSupport() {
                     Auto versioning of <a href="http://localhost:3000/project/${target.project.id}">${target.project.name}</a>/<a href="http://localhost:3000/branch/${target.id}">${target.name}</a> for dependency <a href="http://localhost:3000/project/${run.project.id}">${run.project.name}</a> version "1.1.0" has been rejected.
 
                     Version "1.1.0" is older than the version "2.0.0" already present in the target file.
+
+                    ${auditLink(order)}
                 """.trimIndent(),
                 text
             )
         }
+    }
+
+    private fun auditUrl(order: AutoVersioningOrder) =
+        "http://localhost:3000/extension/auto-versioning/audit/detail/${order.uuid}"
+
+    private fun auditLink(order: AutoVersioningOrder) =
+        """<a href="${auditUrl(order)}">Auto-versioning audit</a>"""
+
+    private fun assertAuditValues(event: Event, order: AutoVersioningOrder) {
+        assertEquals(auditUrl(order), event.getValue("AUDIT_LINK"))
+        assertEquals("Auto-versioning audit", event.getValue("AUDIT_NAME"))
     }
 
     private fun withOrder(

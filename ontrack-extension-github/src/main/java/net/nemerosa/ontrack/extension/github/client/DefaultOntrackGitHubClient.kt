@@ -20,8 +20,10 @@ import org.apache.commons.codec.binary.Base64
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import net.nemerosa.ontrack.extension.support.client.restTemplateBuilder
+import org.springframework.boot.restclient.RestTemplateRequestCustomizer
 import org.springframework.http.HttpHeaders
 import org.springframework.http.MediaType
+import org.springframework.http.client.ClientHttpRequest
 import org.springframework.web.client.HttpClientErrorException
 import org.springframework.web.client.RestClientResponseException
 import org.springframework.web.client.RestTemplate
@@ -379,11 +381,15 @@ class DefaultOntrackGitHubClient(
                         defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer ${configuration.oauth2Token}")
                     }
 
+                    // The installation token is read on every request, not once: a template may outlive
+                    // the token (e.g. the lookup of a workflow run) and the token cache renews it hourly
                     GitHubAuthenticationType.APP -> {
-                        defaultHeader(
-                            HttpHeaders.AUTHORIZATION,
-                            "Bearer ${gitHubAppTokenService.getAppInstallationToken(configuration)}"
-                        )
+                        requestCustomizers(RestTemplateRequestCustomizer<ClientHttpRequest> { request ->
+                            request.headers.set(
+                                HttpHeaders.AUTHORIZATION,
+                                "Bearer ${gitHubAppTokenService.getAppInstallationToken(configuration)}"
+                            )
+                        })
                     }
                 }
             }
@@ -872,9 +878,10 @@ class DefaultOntrackGitHubClient(
         workflow: String,
         branch: String,
         inputs: Map<String, String>,
+        sendId: Boolean,
         retries: Int,
         retriesDelaySeconds: Int,
-    ): WorkflowRun {
+    ): Long {
         // Getting a client
         val client = createGitHubRestTemplate()
         // Dispatching & looking for the launched workflow run
@@ -884,6 +891,7 @@ class DefaultOntrackGitHubClient(
             workflow = workflow,
             branch = branch,
             inputs = inputs,
+            sendId = sendId,
             retries = retries,
             retriesDelaySeconds = retriesDelaySeconds,
         )

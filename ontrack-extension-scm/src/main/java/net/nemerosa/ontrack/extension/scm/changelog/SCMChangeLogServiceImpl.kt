@@ -127,7 +127,8 @@ class SCMChangeLogServiceImpl(
         val index = mutableMapOf<String, Issue>()
         // For all commits in this commit log
         commits.forEach { commit ->
-            val keys = configuredIssueService.extractIssueKeysFromMessage(commit.message)
+            // Only the subject and the trailers name the issues of a commit
+            val keys = configuredIssueService.extractIssueKeysFromMessage(issueReferenceText(commit.message))
             keys.forEach { key ->
                 val exisingIssue = index[key]
                 if (exisingIssue == null) {

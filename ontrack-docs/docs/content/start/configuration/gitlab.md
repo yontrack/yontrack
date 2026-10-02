@@ -97,13 +97,17 @@ labels and milestone.
 ### Referencing an issue
 
 Only the **`#123`** form is recognised, and it is looked up in the GitLab project the issue service names.
+A commit names its issues in its subject and in its trailer lines (`Closes #123`, `Refs: #124`, …), not in
+the prose of its body: see [the issues of a commit](../../integrations/changelogs/changelogs.md#issues-of-a-commit).
+
 Two things GitLab itself understands are deliberately not parsed:
 
 * **cross-project references** — `group/project#123` needs access to another project and is ambiguous about
-  which one Yontrack should call, so it is not supported;
+  which one Yontrack should call. Such a reference is ignored: it is neither looked up in the project of the
+  issue service, nor anywhere else;
 * **closing keywords** — `Closes #123`, `Fixes #123` and the rest are an instance-wide, administrator-editable
-  pattern in GitLab. Yontrack links the issue either way; it does not try to tell a closing reference from a
-  plain one.
+  pattern in GitLab. Yontrack reads a line starting with one of these keywords as a trailer, and links the
+  issue it names, but it does not try to tell a closing reference from a plain one.
 
 ### Choosing the issue service
 

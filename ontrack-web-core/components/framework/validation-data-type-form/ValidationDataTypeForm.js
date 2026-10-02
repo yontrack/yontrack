@@ -5,6 +5,6 @@ export default function ValidationDataTypeForm({prefix, dataType}) {
 
     return <Dynamic
         path={`framework/validation-data-type-form/${shortTypeName}`}
-        props={{...dataType.config, prefix}}
+        props={{...dataType.formConfig, prefix}}
     />
 }

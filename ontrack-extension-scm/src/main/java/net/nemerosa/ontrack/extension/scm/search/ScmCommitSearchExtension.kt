@@ -193,9 +193,13 @@ class ScmCommitSearchExtension(
         logger.debug(
             "[search][indexation][scm-commits] project=${project.name} incremental=${scan.incremental} commits=${scan.commits} issues=${scan.issueKeys.size}"
         )
-        // Issues found in the messages
-        if (scan.issueService != null && scan.issueKeys.isNotEmpty()) {
-            scmIssueSearchExtension.indexIssues(project, scan.issueService, scan.issueKeys)
+        // Issues found in the messages: a full scan replaces the ones of the project
+        if (scan.issueService != null) {
+            if (!scan.incremental) {
+                scmIssueSearchExtension.replaceProjectIssues(project, scan.issueService, scan.issueKeys)
+            } else if (scan.issueKeys.isNotEmpty()) {
+                scmIssueSearchExtension.indexIssues(project, scan.issueService, scan.issueKeys)
+            }
         }
         // Last indexed commit
         if (scan.lastCommit != null) {

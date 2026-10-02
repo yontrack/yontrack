@@ -654,6 +654,42 @@ class SearchServiceIT : AbstractDSLTestSupport() {
     }
 
     @Test
+    fun `Deleting the documents of a project except some keys`() {
+        val u = token()
+        val project = project()
+        val other = project()
+        index(
+            alpha.document("a1-$u", "A1", project, identifiers = listOf(u)),
+            alpha.document("a2-$u", "A2", project, identifiers = listOf(u)),
+            alpha.document("a3-$u", "A3", other, identifiers = listOf(u)),
+            beta.document("b1-$u", "B1", project, identifiers = listOf(u)),
+        )
+        val deleted = asAdmin {
+            searchDocumentService.deleteForProjectExcept(TestAlphaSearchDocumentIndexer.TYPE, project.id(), listOf("a1-$u"))
+        }
+        assertEquals(1, deleted)
+        assertEquals(
+            setOf("a1-$u", "a3-$u", "b1-$u"),
+            asAdmin { search(u).items.map { it.key }.toSet() }
+        )
+    }
+
+    @Test
+    fun `Deleting the documents of a project except none deletes all of them`() {
+        val u = token()
+        val project = project()
+        index(
+            alpha.document("a1-$u", "A1", project, identifiers = listOf(u)),
+            alpha.document("a2-$u", "A2", project, identifiers = listOf(u)),
+        )
+        val deleted = asAdmin {
+            searchDocumentService.deleteForProjectExcept(TestAlphaSearchDocumentIndexer.TYPE, project.id(), emptyList())
+        }
+        assertEquals(2, deleted)
+        assertEquals(0, asAdmin { search(u).total })
+    }
+
+    @Test
     fun `Indexing several documents at once creates or replaces them`() {
         val u = token()
         val project = project()

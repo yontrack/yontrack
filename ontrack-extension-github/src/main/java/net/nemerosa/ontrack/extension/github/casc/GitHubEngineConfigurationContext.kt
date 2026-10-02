@@ -108,6 +108,13 @@ class GitHubEngineConfigurationContext(
                 message = "Removed in V7. Use autoMergeToken instead. See #1923",
             )
         }
+        if (node.has("workflow-send-id")) {
+            deprecationService.deprecatedUsage(
+                surface = DeprecationSurface.CASC,
+                item = "ontrack.config.github.workflow-send-id",
+                message = "Removed in V7. Use workflowSendId instead. See #1923",
+            )
+        }
     }
 
     override fun render(): JsonNode = gitHubConfigurationService

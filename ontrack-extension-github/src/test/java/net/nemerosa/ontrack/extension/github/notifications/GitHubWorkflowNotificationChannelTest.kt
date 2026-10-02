@@ -2,6 +2,7 @@ package net.nemerosa.ontrack.extension.github.notifications
 
 import io.mockk.Runs
 import io.mockk.every
+import io.mockk.verify
 import io.mockk.just
 import io.mockk.mockk
 import net.nemerosa.ontrack.extension.github.client.OntrackGitHubClient
@@ -72,15 +73,11 @@ class GitHubWorkflowNotificationChannelTest {
                 workflow = WORKFLOW,
                 branch = REFERENCE,
                 inputs = emptyMap(),
+                sendId = true,
                 retries = 10,
                 retriesDelaySeconds = 10,
             )
-        } returns WorkflowRun(
-            id = 100,
-            headBranch = REFERENCE,
-            status = "in_progress",
-            conclusion = null,
-        )
+        } returns 100L
 
         val result = gitHubWorkflowNotificationChannel.publish(
             recordId = "1",
@@ -110,15 +107,11 @@ class GitHubWorkflowNotificationChannelTest {
                 inputs = mapOf(
                     "PROMOTION" to PROMOTION
                 ),
+                sendId = true,
                 retries = 10,
                 retriesDelaySeconds = 10,
             )
-        } returns WorkflowRun(
-            id = 100,
-            headBranch = REFERENCE,
-            status = "in_progress",
-            conclusion = null,
-        )
+        } returns 100L
 
         val result = gitHubWorkflowNotificationChannel.publish(
             recordId = "1",
@@ -132,6 +125,53 @@ class GitHubWorkflowNotificationChannelTest {
     }
 
     @Test
+    fun `Sending the ID defaults to the GitHub configuration`() {
+        useGitHubConfig(workflowSendId = false)
+        every { ontrackGitHubClient.launchWorkflowRun(any(), any(), any(), any(), any(), any(), any()) } returns 100L
+
+        gitHubWorkflowNotificationChannel.publish(
+            recordId = "1",
+            config = newGitHubWorkflowNotificationConfig(),
+            event = newPromotionRunEvent(),
+            context = emptyMap(),
+            template = null,
+        ) { it }
+
+        verify { ontrackGitHubClient.launchWorkflowRun(any(), any(), any(), any(), sendId = false, any(), any()) }
+    }
+
+    @Test
+    fun `Sending the ID in the channel config overrides the GitHub configuration`() {
+        useGitHubConfig(workflowSendId = false)
+        every { ontrackGitHubClient.launchWorkflowRun(any(), any(), any(), any(), any(), any(), any()) } returns 100L
+
+        gitHubWorkflowNotificationChannel.publish(
+            recordId = "1",
+            config = newGitHubWorkflowNotificationConfig(sendId = true),
+            event = newPromotionRunEvent(),
+            context = emptyMap(),
+            template = null,
+        ) { it }
+
+        verify { ontrackGitHubClient.launchWorkflowRun(any(), any(), any(), any(), sendId = true, any(), any()) }
+    }
+
+    @Test
+    fun `Not sending the ID in the channel config overrides the GitHub configuration`() {
+        every { ontrackGitHubClient.launchWorkflowRun(any(), any(), any(), any(), any(), any(), any()) } returns 100L
+
+        gitHubWorkflowNotificationChannel.publish(
+            recordId = "1",
+            config = newGitHubWorkflowNotificationConfig(sendId = false),
+            event = newPromotionRunEvent(),
+            context = emptyMap(),
+            template = null,
+        ) { it }
+
+        verify { ontrackGitHubClient.launchWorkflowRun(any(), any(), any(), any(), sendId = false, any(), any()) }
+    }
+
+    @Test
     fun `Async job not successfully launched`() {
         val config = newGitHubWorkflowNotificationConfig()
         val event = newPromotionRunEvent()
@@ -142,6 +182,7 @@ class GitHubWorkflowNotificationChannelTest {
                 workflow = WORKFLOW,
                 branch = REFERENCE,
                 inputs = emptyMap(),
+                sendId = true,
                 retries = 10,
                 retriesDelaySeconds = 10,
             )
@@ -165,23 +206,17 @@ class GitHubWorkflowNotificationChannelTest {
         )
         val event = newPromotionRunEvent()
 
-        val startedRun = WorkflowRun(
-            id = 100,
-            headBranch = REFERENCE,
-            status = "in_progress",
-            conclusion = null,
-        )
-
         every {
             ontrackGitHubClient.launchWorkflowRun(
                 repository = "$OWNER/$REPOSITORY",
                 workflow = WORKFLOW,
                 branch = REFERENCE,
                 inputs = emptyMap(),
+                sendId = true,
                 retries = 10,
                 retriesDelaySeconds = 10,
             )
-        } returns startedRun
+        } returns 100L
 
         every {
             ontrackGitHubClient.waitUntilWorkflowRun(
@@ -232,23 +267,17 @@ class GitHubWorkflowNotificationChannelTest {
         )
         val event = newPromotionRunEvent()
 
-        val startedRun = WorkflowRun(
-            id = 100,
-            headBranch = REFERENCE,
-            status = "in_progress",
-            conclusion = null,
-        )
-
         every {
             ontrackGitHubClient.launchWorkflowRun(
                 repository = "$OWNER/$REPOSITORY",
                 workflow = WORKFLOW,
                 branch = REFERENCE,
                 inputs = emptyMap(),
+                sendId = true,
                 retries = 10,
                 retriesDelaySeconds = 10,
             )
-        } returns startedRun
+        } returns 100L
 
         every {
             ontrackGitHubClient.waitUntilWorkflowRun(
@@ -295,6 +324,7 @@ class GitHubWorkflowNotificationChannelTest {
     private fun newGitHubWorkflowNotificationConfig(
         callMode: GitHubWorkflowNotificationChannelConfigCallMode = GitHubWorkflowNotificationChannelConfigCallMode.ASYNC,
         inputs: Map<String, String> = emptyMap(),
+        sendId: Boolean? = null,
     ) = GitHubWorkflowNotificationChannelConfig(
         config = gitHubConfigName,
         owner = OWNER,
@@ -305,7 +335,20 @@ class GitHubWorkflowNotificationChannelTest {
             GitHubWorkflowNotificationChannelConfigInput(name, value)
         },
         callMode = callMode,
+        sendId = sendId,
     )
+
+    private fun useGitHubConfig(workflowSendId: Boolean) {
+        gitHubConfig = GitHubEngineConfiguration(
+            name = gitHubConfigName,
+            url = URL,
+            user = "someuser",
+            password = "somepassword",
+            workflowSendId = workflowSendId,
+        )
+        every { gitHubConfigurationService.findConfiguration(gitHubConfigName) } returns gitHubConfig
+        every { ontrackGitHubClientFactory.create(gitHubConfig) } returns ontrackGitHubClient
+    }
 
     private fun newPromotionRunEvent(): Event {
         val project = Project.of(NameDescription.nd("project", "")).withId(ID.of(1))

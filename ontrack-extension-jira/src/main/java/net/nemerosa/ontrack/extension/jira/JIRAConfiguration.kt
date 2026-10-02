@@ -110,7 +110,11 @@ open class JIRAConfiguration(
 
     companion object {
 
-        val ISSUE_PATTERN_REGEX = "(?:[^A-Z0-9]|^)([A-Z][A-Z0-9]+-\\d+)(?:[^0-9]|\$)".toRegex()
+        /**
+         * The delimiters around a key are lookarounds, not consumed, so that two keys separated
+         * by a single character - `ABC-1,ABC-2` - are both found.
+         */
+        val ISSUE_PATTERN_REGEX = "(?<![A-Z0-9])([A-Z][A-Z0-9]+-\\d+)(?![0-9])".toRegex()
 
     }
 }

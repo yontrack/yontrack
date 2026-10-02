@@ -8,9 +8,11 @@ import {expect} from "@playwright/test";
  * SILVER is auto promoted on BUILD, on the stamps matching `.*TESTS`, and on BRONZE.
  *
  * On the build: BUILD passed, UNIT.TESTS failed, INTEGRATION.TESTS never ran, SECURITY.SCAN
- * (not required) passed, BRONZE granted - and SILVER granted by hand.
+ * (not required) passed, BRONZE granted - and SILVER granted by hand, unless `grantSilver` is false.
+ *
+ * GOLD has no auto promotion, and is never granted.
  */
-const setup = async (ontrack) => {
+const setup = async (ontrack, {grantSilver = true} = {}) => {
     const project = await ontrack.createProject()
     const branch = await project.createBranch()
     const buildVs = await branch.createValidationStamp('BUILD')
@@ -19,6 +21,7 @@ const setup = async (ontrack) => {
     const securityScan = await branch.createValidationStamp('SECURITY.SCAN')
     const bronze = await branch.createPromotionLevel('BRONZE')
     const silver = await branch.createPromotionLevel('SILVER')
+    const gold = await branch.createPromotionLevel('GOLD', {description: 'Ready for production'})
     await silver.setAutoPromotionProperty({
         validationStamps: [buildVs],
         include: '.*TESTS',
@@ -29,8 +32,8 @@ const setup = async (ontrack) => {
     await build.validate(unitTests, {status: 'FAILED'})
     await build.validate(securityScan)
     await build.promote(bronze)
-    const silverRun = await build.promote(silver)
-    return {branch, build, silver, silverRun, buildRun}
+    const silverRun = grantSilver ? await build.promote(silver) : null
+    return {branch, build, silver, gold, silverRun, buildRun}
 }
 
 const checkBuildConditions = async (popover, {buildRun}) => {
@@ -72,6 +75,38 @@ test('the promotion run popover of the build page shows the auto promotion condi
     const promotionsSection = await buildPage.getPromotionInfoSection()
     await promotionsSection.hoverPromotionRun(silver)
     await checkBuildConditions(page.getByTestId(`build-promotion-run-popover-${silverRun.id}`), {buildRun})
+})
+
+test('the popover of a promotion not granted on the build page shows the auto promotion conditions', async ({page, ontrack}) => {
+    const {build, silver, buildRun} = await setup(ontrack, {grantSilver: false})
+
+    await login(page, ontrack)
+    const buildPage = new BuildPage(page, build)
+    await buildPage.goTo()
+
+    const promotionsSection = await buildPage.getPromotionInfoSection()
+    await promotionsSection.hoverPromotionLevel(silver)
+    const popover = page.getByTestId(`build-promotion-level-popover-${silver.id}`)
+    await expect(popover).toBeVisible()
+    await expect(page.locator('.ant-popover-title').filter({hasText: 'SILVER'})).toContainText('Not granted')
+    await checkBuildConditions(popover, {buildRun})
+})
+
+test('the popover of a promotion not granted, without auto promotion, shows its description only', async ({page, ontrack}) => {
+    const {build, gold} = await setup(ontrack, {grantSilver: false})
+
+    await login(page, ontrack)
+    const buildPage = new BuildPage(page, build)
+    await buildPage.goTo()
+
+    const promotionsSection = await buildPage.getPromotionInfoSection()
+    await promotionsSection.hoverPromotionLevel(gold)
+    const popover = page.getByTestId(`build-promotion-level-popover-${gold.id}`)
+    await expect(popover).toContainText('Ready for production')
+    await expect(page.locator('.ant-popover-title').filter({hasText: 'GOLD'})).toContainText('Not granted')
+    await expect(popover.getByTestId(`build-auto-promotion-conditions-${gold.id}`)).toHaveCount(0)
+    await expect(popover.getByText('Auto promotion conditions')).toHaveCount(0)
+    await expect(popover.getByText('No auto promotion condition')).toHaveCount(0)
 })
 
 test('the auto promotion decoration of the branch promotion levels shows the conditions', async ({page, ontrack}) => {

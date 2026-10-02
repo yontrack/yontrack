@@ -528,6 +528,7 @@ the [CasC JSON schema](../configuration/casc.md) lists. Each use of an alias is 
 | `ontrack.config.github.app-private-key`                                                 | `appPrivateKey`              |
 | `ontrack.config.github.app-installation`                                                | `appInstallationAccountName` |
 | `ontrack.config.github.auto-merge-token`                                                | `autoMergeToken`             |
+| `ontrack.config.github.workflow-send-id`                                                | `workflowSendId`             |
 | `ontrack.config.webhooks.timeout-seconds`                                               | `timeoutSeconds`             |
 | `ontrack.extensions.notifications.global-subscriptions.channel-config`                  | `channelConfig`              |
 | `ontrack.extensions.notifications.entity-subscriptions.subscriptions.channel-config`    | `channelConfig`              |

@@ -3,6 +3,7 @@ package net.nemerosa.ontrack.graphql.schema
 import graphql.Scalars.GraphQLBoolean
 import graphql.Scalars.GraphQLInt
 import graphql.schema.DataFetcher
+import graphql.schema.DataFetchingEnvironment
 import graphql.schema.GraphQLArgument
 import graphql.schema.GraphQLFieldDefinition.newFieldDefinition
 import graphql.schema.GraphQLObjectType
@@ -78,10 +79,17 @@ class GQLTypeValidationStamp(
                                 itemType = validationRun.typeName,
                                 itemListCounter = { environment, validationStamp ->
                                     val buildId: Int? = environment.getArgument<Int>("buildId")
+                                    val statuses = passedStatuses(environment)
                                     if (buildId != null) {
                                         structureService.getValidationRunsCountForBuildAndValidationStamp(
                                                 ID.of(buildId),
-                                                validationStamp.id
+                                                validationStamp.id,
+                                                statuses?.map { it.id }
+                                        )
+                                    } else if (statuses != null) {
+                                        structureService.getValidationRunsCountForValidationStampAndStatus(
+                                                validationStamp.id,
+                                                statuses
                                         )
                                     } else {
                                         structureService.getValidationRunsCountForValidationStamp(
@@ -91,16 +99,7 @@ class GQLTypeValidationStamp(
                                 },
                                 itemListProvider = { environment, validationStamp, offset, size ->
                                     val buildId: Int? = environment.getArgument<Int>("buildId")
-                                    val passed: Boolean? = environment.getArgument("passed")
-                                    val statuses = if (passed != null) {
-                                        if (passed) {
-                                            validationRunStatusService.validationRunStatusList.filter { it.isPassed }
-                                        } else {
-                                            validationRunStatusService.validationRunStatusList.filter { !it.isPassed }
-                                        }
-                                    } else {
-                                        null
-                                    }
+                                    val statuses = passedStatuses(environment)
                                     if (buildId != null) {
                                         if (statuses != null) {
                                             structureService.getValidationRunsForBuildAndValidationStampAndStatus(
@@ -165,6 +164,15 @@ class GQLTypeValidationStamp(
                 // OK
                 .build()
 
+    }
+
+    /**
+     * Statuses accepted by the `passed` argument of `validationRunsPaginated`, or `null` when the
+     * runs are not filtered. The list and its counter must use the same ones.
+     */
+    private fun passedStatuses(environment: DataFetchingEnvironment): List<ValidationRunStatusID>? {
+        val passed: Boolean = environment.getArgument("passed") ?: return null
+        return validationRunStatusService.validationRunStatusList.filter { it.isPassed == passed }
     }
 
     private fun validationStampValidationRunsFetcher() =

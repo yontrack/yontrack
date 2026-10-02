@@ -1,5 +1,5 @@
 import React, {useState} from "react";
-import {Popover, Space, Timeline, Typography} from "antd";
+import {Popover, Space, Tag, Timeline, Typography} from "antd";
 import dayjs from "dayjs";
 import AnnotatedDescription from "@components/common/AnnotatedDescription";
 import PromotionLevel from "@components/promotionLevels/PromotionLevel";
@@ -15,7 +15,10 @@ import {promotionLevelUri, promotionRunUri} from "@components/common/Links";
 import Link from "next/link";
 import TimestampText from "@components/common/TimestampText";
 import PromotionRunFieldValues from "@components/promotionRuns/PromotionRunFieldValues";
-import {PromotionRunAutoPromotionConditions} from "@components/promotionLevels/AutoPromotionConditions";
+import {
+    BuildAutoPromotionConditions,
+    PromotionRunAutoPromotionConditions
+} from "@components/promotionLevels/AutoPromotionConditions";
 
 const query = `
     query BuildPromotions($buildId: Int!) {
@@ -168,9 +171,33 @@ export default function BuildContentPromotions({build}) {
                         promotionLevel={promotionLevel}
                         onPromotion={reload}
                     /> : undefined,
-                content: <Popover title={promotionLevel.name}
-                                   content={<AnnotatedDescription entity={promotionLevel}/>}>
-                    <Link href={promotionLevelUri(promotionLevel)}>
+                content: <Popover
+                    title={
+                        <Space>
+                            <PromotionLevel
+                                promotionLevel={promotionLevel}
+                                displayText={true}
+                                displayTooltip={false}
+                            />
+                            <Tag>Not granted</Tag>
+                        </Space>
+                    }
+                    content={
+                        <div data-testid={`build-promotion-level-popover-${promotionLevel.id}`}>
+                            <Space orientation="vertical">
+                                <AnnotatedDescription entity={promotionLevel}/>
+                                <BuildAutoPromotionConditions
+                                    buildId={build.id}
+                                    promotionLevelId={promotionLevel.id}
+                                />
+                            </Space>
+                        </div>
+                    }
+                >
+                    <Link
+                        href={promotionLevelUri(promotionLevel)}
+                        data-testid={`build-promotion-level-trigger-${promotionLevel.id}`}
+                    >
                         <Typography.Text type="secondary">{promotionLevel.name}</Typography.Text>
                     </Link>
                 </Popover>,

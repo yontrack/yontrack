@@ -374,6 +374,16 @@ public interface StructureRepository {
      */
     int getValidationRunsCountForValidationStamp(ID validationStampId);
 
+    /**
+     * Gets the number of validation runs for a validation stamp whose <b>last</b> status is one of
+     * the given statuses.
+     *
+     * @param validationStampId ID of the validation stamp
+     * @param statuses          Accepted statuses for the last status of the runs
+     * @return Number of matching validation runs
+     */
+    int getValidationRunsCountForValidationStampAndStatus(ID validationStampId, List<ValidationRunStatusID> statuses);
+
     ValidationRun newValidationRunStatus(ValidationRun validationRun, ValidationRunStatus runStatus);
 
 

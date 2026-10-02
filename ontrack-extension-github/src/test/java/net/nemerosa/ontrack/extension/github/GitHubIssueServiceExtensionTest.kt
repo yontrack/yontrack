@@ -117,4 +117,40 @@ class GitHubIssueServiceExtensionTest {
         assertEquals(14, extension.getIssueId("#14").toLong())
     }
 
+    @Test
+    fun `No key extracted from a reference to another repository`() {
+        val keys = extension.extractIssueKeysFromMessage(
+            configuration,
+            "Same as nemerosa/ontrack-github-integration-test#673 and group/sub.group/project#5, see #12"
+        )
+        assertEquals(setOf("12"), keys)
+    }
+
+    @Test
+    fun `No key extracted from a URL`() {
+        val keys = extension.extractIssueKeysFromMessage(
+            configuration,
+            "See https://example.com/docs/page#12 and http://host/#13 (#14)"
+        )
+        assertEquals(setOf("14"), keys)
+    }
+
+    @Test
+    fun `No key extracted from an HTML entity`() {
+        val keys = extension.extractIssueKeysFromMessage(configuration, "It&#39;s fixed by #12")
+        assertEquals(setOf("12"), keys)
+    }
+
+    @Test
+    fun `No key extracted when followed by a word character`() {
+        val keys = extension.extractIssueKeysFromMessage(configuration, "Colour #12abc and #13_x, but #14.")
+        assertEquals(setOf("14"), keys)
+    }
+
+    @Test
+    fun `Keys extracted from a list`() {
+        val keys = extension.extractIssueKeysFromMessage(configuration, "Closes #12, #13,#14 (#15)")
+        assertEquals(setOf("12", "13", "14", "15"), keys)
+    }
+
 }

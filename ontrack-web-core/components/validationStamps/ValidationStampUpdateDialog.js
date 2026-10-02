@@ -18,7 +18,7 @@ export const useValidationStampUpdateDialog = ({onSuccess}) => {
             return form.setFieldsValue({
                 ...validationStamp,
                 dataType: validationStamp.dataType?.descriptor?.id,
-                config: validationStamp.dataType?.config,
+                config: validationStamp.dataType?.formConfig,
             })
         },
         prepareValues: (values, {validationStamp}) => {

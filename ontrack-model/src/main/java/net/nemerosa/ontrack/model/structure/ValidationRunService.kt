@@ -27,4 +27,21 @@ interface ValidationRunService {
      */
     fun isValidationRunPassed(build: Build, validationStamp: ValidationStamp): Boolean
 
+    /**
+     * Same as [isValidationRunPassed], but for the auto promotion: the [data type][ValidationDataType]
+     * of the [validation stamp][validationStamp] may accept more statuses than the passed ones, according
+     * to its current configuration - see [ValidationDataType.isPassedForAutoPromotion].
+     *
+     * If there was no run at all, the function returns `false`.
+     */
+    fun isValidationRunPassedForAutoPromotion(build: Build, validationStamp: ValidationStamp): Boolean
+
+    /**
+     * Checks if the last status of the given [validation run][validationRun] counts as passed for the
+     * auto promotion, according to the [data type][ValidationDataType] of its validation stamp.
+     *
+     * @see isValidationRunPassedForAutoPromotion
+     */
+    fun isValidationRunPassedForAutoPromotion(validationRun: ValidationRun): Boolean
+
 }
