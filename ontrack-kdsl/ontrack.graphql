@@ -2309,6 +2309,8 @@ type GitHubEngineConfiguration {
   url: String!
   "User used to connect to GitHub. Can be used with a password or an OAuth2 token. Not needed if using only the OAUth2 token or a GitHub App."
   user: String
+  "Whether to pass the id input to the dispatched workflows, to find their run when GitHub does not return it"
+  workflowSendId: Boolean
 }
 
 "Output type for the gitHubIngestionBuildLinksByBuildLabel mutation."
@@ -9430,6 +9432,8 @@ input CreateGitHubConfigurationInput {
   url: String
   "User name for authentication"
   user: String
+  "Whether to pass the id input to the dispatched workflows, to find their run when GitHub does not return it. Defaults to true."
+  workflowSendId: Boolean
 }
 
 "Input type for the createJenkinsConfiguration mutation."

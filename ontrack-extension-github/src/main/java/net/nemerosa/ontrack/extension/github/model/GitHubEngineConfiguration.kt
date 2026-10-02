@@ -41,7 +41,7 @@ open class GitHubEngineConfiguration(
     @JsonAlias("auto-merge-token")
     val autoMergeToken: String? = null,
     @JsonAlias("workflow-send-id")
-    val workflowSendId: Boolean = true,
+    val workflowSendId: Boolean = DEFAULT_WORKFLOW_SEND_ID,
 ) : CredentialsConfiguration<GitHubEngineConfiguration> {
 
     /**
@@ -235,6 +235,11 @@ open class GitHubEngineConfiguration(
          * github.com end point.
          */
         const val GITHUB_COM = "https://github.com"
+
+        /**
+         * Default for [workflowSendId].
+         */
+        const val DEFAULT_WORKFLOW_SEND_ID = true
 
     }
 

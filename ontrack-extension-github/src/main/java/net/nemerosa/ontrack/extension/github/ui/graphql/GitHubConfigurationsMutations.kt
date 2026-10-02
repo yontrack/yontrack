@@ -35,6 +35,7 @@ class GitHubConfigurationsMutations(
                         appPrivateKey = appPrivateKey,
                         appInstallationAccountName = appInstallationAccountName,
                         autoMergeToken = autoMergeToken,
+                        workflowSendId = workflowSendId ?: GitHubEngineConfiguration.DEFAULT_WORKFLOW_SEND_ID,
                     )
                 }
             )
@@ -63,4 +64,6 @@ data class CreateGitHubConfigurationInput(
     val appInstallationAccountName: String? = null,
     @APIDescription("Token for an account used to approve pull requests for auto approval processes")
     val autoMergeToken: String? = null,
+    @APIDescription("Whether to pass the id input to the dispatched workflows, to find their run when GitHub does not return it. Defaults to true.")
+    val workflowSendId: Boolean? = null,
 )
