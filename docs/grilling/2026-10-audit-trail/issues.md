@@ -48,9 +48,9 @@ Milestone `6.0` exists in `yontrack` only; the issues in the other repositories 
 AT15 and AT16 (UI) are *cuttable*: if time runs short, 6.0 ships the trail and the evidence API without them
 (`v6-scope.md` §7). AT18 (demo seed) depends on them and would then show the trail through the API only.
 
-## Human prerequisites
+## Prerequisites outside the breakdown
 
-- A licence carrying `extension.audit-trail` for v6.dev (AT22) and for demo (AT31).
+- [yontrack-license#2](https://github.com/yontrack/yontrack-license/issues/2) makes the licensed feature `extension.audit-trail` available; it blocks AT22 and AT31 (native dependency), which then need a licence carrying it for v6.dev and for demo.
 - AT23 is applied through the bootstrap repository's OpenTofu workflow before AT22.
 
 ---
@@ -310,7 +310,7 @@ Not `[skip ci]`: the `docs` job builds the site.
 
 - v6.dev reads the Spaces credentials through an ExternalSecret from the Vault path of the bootstrap issue, and sets the chart's `auditTrail.storage.*` values to its bucket (virtual-hosted, DO region endpoint). No MinIO.
 - `ontrack.extension.audit-trail.demo-tampering.enabled=true` on v6.dev only.
-- **Prerequisite (Damien):** a licence carrying `extension.audit-trail` for v6.dev.
+- **Prerequisite:** the licensed feature from [yontrack-license#2](https://github.com/yontrack/yontrack-license/issues/2), and a licence carrying `extension.audit-trail` for v6.dev.
 - Done when v6.dev's audit trail status page shows storage OK and the seeded demo shows both projects.
 
 ## AT23 ([yontrack-infra-bootstrap#13](https://github.com/yontrack/yontrack-infra-bootstrap/issues/13)) — Spaces buckets for audit trail evidence (v6 and demo)
@@ -358,5 +358,5 @@ Applied once the demo environment runs 6.0 (it runs `main`, 5.x, until the cutov
 
 - Demo reads its Spaces bucket's credentials (created by the bootstrap issue) through an ExternalSecret and sets `auditTrail.storage.*`.
 - `ontrack.extension.audit-trail.demo-tampering.enabled=true` on demo.
-- **Prerequisite (Damien):** a licence carrying `extension.audit-trail` for demo.
+- **Prerequisite:** the licensed feature from [yontrack-license#2](https://github.com/yontrack/yontrack-license/issues/2), and a licence carrying `extension.audit-trail` for demo.
 - Done when the demo's seed shows `audit-trail-demo` and `audit-trail-tampered` with evidence.
