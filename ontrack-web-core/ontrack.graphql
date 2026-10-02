@@ -114,6 +114,42 @@ type ApplyDashboardsPayload implements PayloadInterface {
   errors: [PayloadUserError]
 }
 
+"Endorsement of an entry by the instance key: the Ed25519 signature of its hash"
+type AuditTrailEndorsement {
+  "Technical ID of the endorsed entry"
+  entryId: Int!
+  "ID of the key which endorsed the entry"
+  keyId: String!
+  "Seq of the endorsed entry"
+  seq: Int!
+  "Signature of the hash of the entry, in base64"
+  signature: String!
+  "Server time of the endorsement: ISO-8601 in UTC with milliseconds"
+  time: String!
+}
+
+"An entry of the trail of a build"
+type AuditTrailEntry {
+  "Who made the change"
+  actor: JSON!
+  "Hash of the entry: SHA-256 of the canonical form of its envelope, in lowercase hex"
+  hash: String!
+  "Technical ID of the entry"
+  id: Int!
+  "What changed"
+  payload: JSON!
+  "Hash of the entry before, null for seq 1"
+  prevHash: String
+  "Schema version of the entry, which selects its hash format"
+  schemaVersion: Int!
+  "Position of the entry in the trail, from 1"
+  seq: Int!
+  "Server time of the entry, as hashed: ISO-8601 in UTC with milliseconds"
+  time: String!
+  "Type of the entry, like build.created or validation.run"
+  type: String!
+}
+
 "Public key of the instance, with which the endorsements of the entries of its trails are verified"
 type AuditTrailKey {
   "Algorithm of the key: Ed25519"
@@ -122,6 +158,38 @@ type AuditTrailKey {
   keyId: String!
   "Public key, in PEM"
   publicKey: String!
+}
+
+"Verification of the trail of a build"
+type AuditTrailVerification {
+  "Positions of the evidence.attached entries whose evidence no longer has the recorded digest - null unless the evidence was verified"
+  alteredEvidence: [Int!]
+  "Whether every hash recomputes from its entry, every entry is chained to the one before it, and the seqs run from 1 without gap"
+  chainIntact: Boolean!
+  "Whether every endorsement is the signature of the hash of its entry by a known public key of the instance"
+  endorsementsValid: Boolean!
+  "Position, from 1, of the first entry failing a check of the chain - the trail is verified up to the one before it. Null when the chain is intact."
+  firstBrokenSeq: Int
+  "Position of the first entry with an invalid endorsement, null when they are all valid"
+  firstInvalidEndorsementSeq: Int
+  "Positions of the evidence.attached entries whose evidence is absent from the storage - null unless the evidence was verified"
+  missingEvidence: [Int!]
+  "Whether the trail opens with trail.opened: its build predates it, and the trail starts at seq 1"
+  partial: Boolean!
+  "Every check which failed, by position"
+  problems: [AuditTrailVerificationProblem!]!
+  "Position of the first entry of the unendorsed tail of the trail - the entries after the last endorsed one, which no endorsement covers. Null when the last entry is endorsed or the trail is empty."
+  unendorsedFromSeq: Int
+}
+
+"A check of the verification of a trail which failed"
+type AuditTrailVerificationProblem {
+  "What failed, for a human"
+  message: String!
+  "Position of the entry, from 1 - its seq, unless the seqs themselves are wrong"
+  seq: Int!
+  "What failed"
+  type: TrailVerificationProblemType!
 }
 
 "A named authorization"
@@ -626,6 +694,8 @@ type BranchLink {
 type Build implements Authorizable & ProjectEntity {
   "Description with links."
   annotatedDescription: String
+  "Trail of the build: its entries, their endorsements and its verification - null when the build has no trail, the licence being off"
+  auditTrail: BuildAuditTrail
   "Authorizations for this context"
   authorizations: [Authorization!]!
   "Current conditions of the auto promotion of a promotion level of this build's branch, with their current state for this build, whether it is promoted to this level or not - null when the promotion level has no auto promotion"
@@ -796,6 +866,19 @@ type Build implements Authorizable & ProjectEntity {
   ): [Validation!]!
   "Workflows which have been launched by a notification on an event for this entity, most recent first. Resolved by scanning the 100 most recent workflow notification records for this entity, so the list may be truncated on entities which accumulate many of them, like a project or a branch."
   workflowInstances: [WorkflowInstance!]!
+}
+
+"Trail of a build: the append-only, hash-chained record of its story"
+type BuildAuditTrail {
+  "Endorsements of the entries, by seq - none for the entries written while the instance key was not provisioned"
+  endorsements: [AuditTrailEndorsement!]!
+  "Entries of the trail, by seq"
+  entries: [AuditTrailEntry!]!
+  "Verification of the trail: its chain, its endorsements and, on demand, its evidence"
+  verification(
+    "Whether to check the evidence the trail references too"
+    includeEvidence: Boolean = false
+  ): AuditTrailVerification!
 }
 
 "Gathering information about the auto versioning around this build"
@@ -9066,6 +9149,18 @@ enum ThemeMode {
   DARK
   LIGHT
   SYSTEM
+}
+
+"Check of the verification of a trail which failed: SEQ, SCHEMA_VERSION, HASH, PREVIOUS_HASH, FIRST_ENTRY and BUILD break its chain; ENDORSEMENT and UNKNOWN_KEY invalidate an endorsement."
+enum TrailVerificationProblemType {
+  BUILD
+  ENDORSEMENT
+  FIRST_ENTRY
+  HASH
+  PREVIOUS_HASH
+  SCHEMA_VERSION
+  SEQ
+  UNKNOWN_KEY
 }
 
 "Defines how validation runs should be sorted"

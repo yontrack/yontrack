@@ -53,4 +53,14 @@ interface TrailService {
      * instance key was not provisioned
      */
     fun getEndorsements(build: Build): List<TrailEndorsement>
+
+    /**
+     * Whether the build has a trail to read: the licence is on — its trail is being written — or
+     * the trail has entries — written before the licence lapsed. A build with no entry while the
+     * licence is off has no trail, and never will until the licence is back.
+     *
+     * @param build Build, which the caller is allowed to see
+     * @return Whether the trail of the build is available
+     */
+    fun isTrailAvailable(build: Build): Boolean
 }

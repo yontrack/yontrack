@@ -64,6 +64,11 @@ class TrailServiceImpl(
         return trailEndorsementRepository.findEndorsements(build.id())
     }
 
+    override fun isTrailAvailable(build: Build): Boolean {
+        securityService.checkProjectFunction(build, ProjectView::class.java)
+        return auditTrailLicense.auditTrailEnabled || trailEntryRepository.findLastEntry(build.id()) != null
+    }
+
     private fun write(
         build: Build,
         last: TrailEntry?,
