@@ -395,3 +395,41 @@ grouping by type is a matter of presentation only.
 _Avoid_: search provider, index. A *search provider* is an indexer, which writes
 the documents of a type rather than being one, and a type is a slice of the one
 search index, not an index of its own.
+
+### Audit trail
+
+**Trail**:
+The append-only, hash-chained record of one build's story — its creation, links,
+validations, evidence, promotions, run info and deployments — written in the same
+transaction as each change, so that the history cannot be rewritten unnoticed. A
+trail belongs to exactly one build and goes with it. *Chain* is only ever an
+adjective for it ("the trail's chain is intact"), never a name for the thing.
+_Avoid_: ledger, log, history, journal. A *ledger* is reserved for the planned
+build import format, a *log* is the application's, and *history* is a generic word
+of the UI.
+
+**Entry**:
+One element of a trail: a typed, canonical payload with the actor and server time
+of the change, numbered within its trail and hashed together with the hash of the
+entry before it.
+_Avoid_: event, fact, record. An *event* is what the notification system posts,
+and an entry is often written because of one but is not it; a *record* is the
+recordings extension's.
+
+**Endorsement**:
+The instance key's Ed25519 signature over one entry's hash, saying that this
+Yontrack instance wrote that entry. Every entry is endorsed while the key is
+available; an entry written without it stays chained but unendorsed.
+_Avoid_: checkpoint, signature (alone). A *checkpoint* is a node of a delivery
+map, and a bare *signature* is `model.structure.Signature`, the time and user name
+every entity carries.
+
+**Evidence**:
+A file attached to a validation run — a scan report, an SBOM, a test summary —
+stored by its content hash and referenced by the trail entry recording its
+attachment. Evidence is immutable: a new upload is a new evidence.
+_Avoid_: attachment, artifact, document. An *artifact* is what a build produces.
+
+*Seal* (the frozen, self-contained package of a trail) and *Instance trail* (the
+trail of changes to the audit feature itself) are reserved for 6.x: do not use
+them for anything else.
