@@ -16,6 +16,7 @@ import {
 import {
     estateMarkerText,
     estateReadingConfigTexts,
+    estateSecurityTexts,
     latestEstateComputedAt,
 } from "@components/extension/scorecard/estates/estateModel";
 
@@ -39,6 +40,12 @@ export const gqlEstates = gql`
                 windowDays
                 target
                 direction
+            }
+            security {
+                expectedKinds
+                freshnessDays
+                criticalTargetDays
+                highTargetDays
             }
             projects {
                 id
@@ -156,6 +163,18 @@ export default function EstatesView({refreshState, refresh, canEdit, dialog}) {
             key: 'readings',
             title: 'Windows and targets',
             render: (_, estate) => <EstateReadings estate={estate}/>,
+        },
+        {
+            key: 'security',
+            title: 'Security scans',
+            render: (_, estate) =>
+                <Space orientation="vertical" size={0} data-testid={`estate-security-${estate.name}`}>
+                    {
+                        estateSecurityTexts(estate.security).map(text =>
+                            <Typography.Text key={text}>{text}</Typography.Text>
+                        )
+                    }
+                </Space>,
         },
         {
             key: 'projects',

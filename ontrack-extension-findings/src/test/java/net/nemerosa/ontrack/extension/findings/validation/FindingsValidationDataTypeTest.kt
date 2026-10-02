@@ -1,6 +1,7 @@
 package net.nemerosa.ontrack.extension.findings.validation
 
 import net.nemerosa.ontrack.extension.findings.FindingsExtensionFeature
+import net.nemerosa.ontrack.extension.findings.model.FindingKind
 import net.nemerosa.ontrack.extension.general.GeneralExtensionFeature
 import net.nemerosa.ontrack.extension.general.validation.CHML
 import net.nemerosa.ontrack.extension.general.validation.CHMLLevel
@@ -72,6 +73,21 @@ class FindingsValidationDataTypeTest {
             json
         )
         assertEquals(data, dataType.fromJson(json))
+    }
+
+    @Test
+    fun `Run data records the kind of the scan, absent from the runs posted before it was recorded`() {
+        val data = data(critical = 1).copy(kind = FindingKind.CODE)
+        val json = dataType.toJson(data)
+        assertEquals("CODE", json.path("kind").asText())
+        assertEquals(data, dataType.fromJson(json))
+        // A run posted before the kind was recorded
+        val legacy = mapOf(
+            "levels" to mapOf("CRITICAL" to 1, "HIGH" to 0, "MEDIUM" to 0, "LOW" to 0),
+            "unknown" to 0,
+            "accepted" to 0,
+        ).asJson()
+        assertNull(dataType.fromJson(legacy).kind)
     }
 
     @Test

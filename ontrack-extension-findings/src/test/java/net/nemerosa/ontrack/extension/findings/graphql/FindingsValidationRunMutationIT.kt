@@ -107,6 +107,7 @@ class FindingsValidationRunMutationIT : AbstractQLKTITSupport() {
                                 "levels" to mapOf("CRITICAL" to 1, "HIGH" to 0, "MEDIUM" to 0, "LOW" to 1),
                                 "unknown" to 1,
                                 "accepted" to 1,
+                                "kind" to "IMAGE",
                             ).asJson(),
                             run.path("data").path("data")
                         )

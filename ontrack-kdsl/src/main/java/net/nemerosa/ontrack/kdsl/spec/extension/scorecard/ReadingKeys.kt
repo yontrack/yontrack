@@ -37,4 +37,9 @@ object ReadingKeys {
      * Share of the builds with a failed test run followed by a passed one, from 0 to 100. Lower is better.
      */
     const val QUALITY_TEST_FLAKINESS = "quality.testFlakiness"
+
+    /**
+     * Rung of the security scans: 0 none, 1 reported, 2 covered, 3 gating. Higher is better.
+     */
+    const val SECURITY_MATURITY = "security.maturity"
 }

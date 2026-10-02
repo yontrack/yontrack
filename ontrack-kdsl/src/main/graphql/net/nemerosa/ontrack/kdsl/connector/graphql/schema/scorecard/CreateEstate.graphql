@@ -4,6 +4,7 @@ mutation CreateEstate(
     $labels: [String!]!,
     $marker: EstateMarkerInput,
     $readings: [EstateReadingConfigInput!],
+    $security: EstateSecurityInput,
 ) {
     createEstate(input: {
         name: $name,
@@ -11,6 +12,7 @@ mutation CreateEstate(
         labels: $labels,
         marker: $marker,
         readings: $readings,
+        security: $security,
     }) {
         ...PayloadUserErrors
         estate {

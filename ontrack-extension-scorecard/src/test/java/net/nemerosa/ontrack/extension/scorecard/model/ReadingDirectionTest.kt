@@ -39,6 +39,7 @@ class ReadingDirectionTest {
                 ReadingKeys.DELIVERY_MTTR to ReadingDirection.LOWER_IS_BETTER,
                 ReadingKeys.QUALITY_TEST_PASS_RATE to ReadingDirection.HIGHER_IS_BETTER,
                 ReadingKeys.QUALITY_TEST_FLAKINESS to ReadingDirection.LOWER_IS_BETTER,
+                ReadingKeys.SECURITY_MATURITY to ReadingDirection.HIGHER_IS_BETTER,
             ),
             ReadingKeys.ORDER.associateWith { ReadingKeys.direction(it) }
         )

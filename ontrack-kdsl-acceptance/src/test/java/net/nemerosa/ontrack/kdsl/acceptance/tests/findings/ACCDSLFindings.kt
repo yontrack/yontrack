@@ -64,6 +64,7 @@ class ACCDSLFindings : AbstractACCDSLTestSupport() {
                         "levels" to mapOf("CRITICAL" to 0, "HIGH" to 1, "MEDIUM" to 1, "LOW" to 0),
                         "unknown" to 0,
                         "accepted" to 1,
+                        "kind" to "DAST",
                     ).asJson(),
                     run.data?.data
                 )

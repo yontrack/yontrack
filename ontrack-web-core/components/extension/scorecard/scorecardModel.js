@@ -3,12 +3,21 @@
  * against a target, and the wording of the `details`. Pure functions, shared by the Scorecard section
  * of the project page and the scorecard page of the project.
  *
- * Units, as the API gives them: durations in seconds, frequencies per week, rates in percent (0 to 100).
+ * Units, as the API gives them: durations in seconds, frequencies per week, rates in percent (0 to 100),
+ * rungs of a ladder from 0 up.
  */
+
+import {kindName} from "@components/extension/findings/findingsModel";
 
 export const DURATION = 'duration'
 export const PER_WEEK = 'perWeek'
 export const PERCENT = 'percent'
+export const RUNG = 'rung'
+
+/**
+ * Names of the rungs of the security maturity, from 0 up.
+ */
+export const SECURITY_MATURITY_RUNGS = ['None', 'Reported', 'Covered', 'Gating']
 
 const LOWER_IS_BETTER = 'LOWER_IS_BETTER'
 const HIGHER_IS_BETTER = 'HIGHER_IS_BETTER'
@@ -49,6 +58,10 @@ export const READINGS = [
     {
         key: 'quality.testFlakiness', name: 'Test flakiness', unit: PERCENT, marker: false, direction: LOWER_IS_BETTER,
         description: 'Share of the builds created in the window where a test stamp failed, then passed.',
+    },
+    {
+        key: 'security.maturity', name: 'Security maturity', unit: RUNG, marker: false, direction: HIGHER_IS_BETTER,
+        description: 'Rung of the security scans of the branches read: 0 none; 1 reported, a scan in the window; 2 covered, every kind the estate expects scanned within its freshness (any scan with no estate); 3 gating, a security stamp required by a promotion, or a scan which failed in the window.',
     },
 ]
 
@@ -181,6 +194,10 @@ export const formatReadingValue = (key, value) => {
             return `${value >= 1 ? round(value, 1) : round(value, 2)} / week`
         case PERCENT:
             return `${round(value, 1)}%`
+        case RUNG: {
+            const name = SECURITY_MATURITY_RUNGS[value]
+            return name ? `${value} · ${name}` : round(value, 2)
+        }
         default:
             return round(value, 2)
     }
@@ -336,6 +353,11 @@ export const scopeText = (details) => {
 const ofCount = (part, count) => `${part} of ${count}`
 
 /**
+ * A number of days, in words: `1 day`, `14 days`.
+ */
+export const daysText = (days) => days === 1 ? '1 day' : `${days} days`
+
+/**
  * The `details` of a reading which explain its value, beyond the marker and the scope, as a list
  * of `{key, label, text}`, or `{key, label, timestamp}` for a moment in time.
  */
@@ -402,6 +424,40 @@ export const readingDetailItems = (reading) => {
             label: 'Test stamps',
             text: details.testStamps.length > 0 ? details.testStamps.join(', ') : 'None',
         })
+    }
+    // Security maturity
+    if (Array.isArray(details.expectedKinds)) {
+        items.push({
+            key: 'expectedKinds',
+            label: 'Expected kinds',
+            text: details.expectedKinds.length > 0 ? details.expectedKinds.map(kindName).join(', ') : 'Any',
+        })
+    }
+    if (isNumber(details.freshnessDays)) {
+        items.push({key: 'freshnessDays', label: 'Freshness', text: daysText(details.freshnessDays)})
+    }
+    if (Array.isArray(details.freshKinds)) {
+        items.push({
+            key: 'freshKinds',
+            label: 'Fresh kinds',
+            text: details.freshKinds.length > 0 ? details.freshKinds.map(kindName).join(', ') : 'None',
+        })
+    }
+    if (Array.isArray(details.missingKinds) && details.missingKinds.length > 0) {
+        items.push({key: 'missingKinds', label: 'Missing kinds', text: details.missingKinds.map(kindName).join(', ')})
+    }
+    if (isNumber(details.failedScans)) {
+        items.push({key: 'failedScans', label: 'Failed scans', text: String(details.failedScans)})
+    }
+    if (Array.isArray(details.requiredStamps)) {
+        items.push({
+            key: 'requiredStamps',
+            label: 'Required by a promotion',
+            text: details.requiredStamps.length > 0 ? details.requiredStamps.join(', ') : 'None',
+        })
+    }
+    if (details.lastScan) {
+        items.push({key: 'lastScan', label: 'Last scan', timestamp: details.lastScan})
     }
     return items
 }

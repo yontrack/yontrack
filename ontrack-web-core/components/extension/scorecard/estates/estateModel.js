@@ -8,7 +8,9 @@
  * or days instead, which is converted here both ways.
  */
 import {labelDisplay} from "@components/labels/LabelChip";
+import {kindName} from "@components/extension/findings/findingsModel";
 import {
+    daysText,
     DURATION,
     formatReadingValue,
     READINGS,
@@ -94,6 +96,10 @@ export const estateFormValues = (estate) => {
                 .filter(({key}) => !READINGS.some(it => it.key === key))
                 .map(config => readingFormValues(config.key, config)),
         ],
+        expectedKinds: estate?.security?.expectedKinds ?? [],
+        freshnessDays: numberOrNull(estate?.security?.freshnessDays),
+        criticalTargetDays: numberOrNull(estate?.security?.criticalTargetDays),
+        highTargetDays: numberOrNull(estate?.security?.highTargetDays),
     }
 }
 
@@ -112,8 +118,8 @@ const markerInput = (values) => {
 
 /**
  * Input of the `createEstate` and `updateEstate` mutations from the values of the form: the marker
- * `null` for the default one, and only the readings having a window or a target, the duration
- * targets in seconds.
+ * `null` for the default one, only the readings having a window or a target, the duration
+ * targets in seconds, and what the estate expects of the security scans.
  */
 export const estateInput = (values) => ({
     name: trimmed(values.name),
@@ -127,7 +133,41 @@ export const estateInput = (values) => ({
             target: readingUnit(key) === DURATION ? durationSeconds(target, targetUnit) : numberOrNull(target),
         }))
         .filter(({windowDays, target}) => windowDays !== null || target !== null),
+    security: {
+        expectedKinds: values.expectedKinds ?? [],
+        freshnessDays: numberOrNull(values.freshnessDays),
+        criticalTargetDays: numberOrNull(values.criticalTargetDays),
+        highTargetDays: numberOrNull(values.highTargetDays),
+    },
 })
+
+/**
+ * What an estate expects of the security scans, in words: the kinds and their freshness, then the
+ * remediation targets, if any.
+ */
+export const estateSecurityTexts = (security) => {
+    const kinds = security?.expectedKinds ?? []
+    const freshness = isNumber(security?.freshnessDays) ? daysText(security.freshnessDays) : null
+    const texts = []
+    if (kinds.length > 0) {
+        texts.push(`${kinds.map(kindName).join(', ')} scans fresher than ${freshness ?? 'the default freshness'}`)
+    } else {
+        texts.push(freshness ? `Any scan fresher than ${freshness}` : 'Any scan, default freshness')
+    }
+    const targets = []
+    if (isNumber(security?.criticalTargetDays)) {
+        targets.push(`CRITICAL fixed within ${daysText(security.criticalTargetDays)}`)
+    }
+    if (isNumber(security?.highTargetDays)) {
+        targets.push(targets.length > 0 ?
+            `HIGH within ${daysText(security.highTargetDays)}` :
+            `HIGH fixed within ${daysText(security.highTargetDays)}`)
+    }
+    if (targets.length > 0) {
+        texts.push(targets.join(', '))
+    }
+    return texts
+}
 
 /**
  * The marker of an estate, in words.

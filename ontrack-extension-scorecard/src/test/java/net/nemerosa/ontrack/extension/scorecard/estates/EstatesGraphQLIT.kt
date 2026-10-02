@@ -189,6 +189,120 @@ class EstatesGraphQLIT : EstatesTestSupport() {
     }
 
     @Test
+    fun `What an estate expects of the security scans is created, read and replaced`() {
+        asAdmin {
+            val a = label()
+            val name = uid("E")
+            val created = assertNoUserError(
+                run(
+                    """
+                        mutation(${'$'}name: String!, ${'$'}labels: [String!]!) {
+                            createEstate(input: {
+                                name: ${'$'}name,
+                                labels: ${'$'}labels,
+                                security: {
+                                    expectedKinds: [CODE, IMAGE, CODE],
+                                    freshnessDays: 14,
+                                    criticalTargetDays: 7,
+                                    highTargetDays: 30,
+                                }
+                            }) {
+                                estate { id $SECURITY_FIELDS }
+                                errors { message }
+                            }
+                        }
+                    """,
+                    mapOf("name" to name, "labels" to listOf(a.getDisplay()))
+                ),
+                "createEstate"
+            ).path("estate")
+            assertEquals(
+                mapOf(
+                    // Once each, in the order of the kinds
+                    "expectedKinds" to listOf("IMAGE", "CODE"),
+                    "freshnessDays" to 14,
+                    "criticalTargetDays" to 7,
+                    "highTargetDays" to 30,
+                ).asJson(),
+                created.path("security")
+            )
+            val id = created.path("id").asInt()
+
+            // Read
+            run("""{ estate(name: "$name") { $SECURITY_FIELDS } }""") { data ->
+                assertEquals(created.path("security"), data.path("estate").path("security"))
+            }
+
+            // Update, the whole definition is replaced: no expectation
+            val updated = assertNoUserError(
+                run(
+                    """
+                        mutation(${'$'}id: Int!, ${'$'}name: String!, ${'$'}labels: [String!]!) {
+                            updateEstate(input: {
+                                id: ${'$'}id,
+                                name: ${'$'}name,
+                                labels: ${'$'}labels,
+                            }) {
+                                estate { $SECURITY_FIELDS }
+                                errors { message }
+                            }
+                        }
+                    """,
+                    mapOf("id" to id, "name" to name, "labels" to listOf(a.getDisplay()))
+                ),
+                "updateEstate"
+            ).path("estate")
+            assertEquals(
+                mapOf(
+                    "expectedKinds" to emptyList<String>(),
+                    "freshnessDays" to null,
+                    "criticalTargetDays" to null,
+                    "highTargetDays" to null,
+                ).asJson(),
+                updated.path("security")
+            )
+            assertEquals(EstateSecurity(), estateService.getById(id).security)
+        }
+    }
+
+    @Test
+    fun `What an estate expects of the security scans is checked before being saved`() {
+        asAdmin {
+            val a = label()
+            fun create(security: String) = run(
+                """
+                    mutation {
+                        createEstate(input: {
+                            name: "${uid("E")}",
+                            labels: ["${a.getDisplay()}"],
+                            security: $security,
+                        }) {
+                            errors { message }
+                        }
+                    }
+                """
+            )
+            assertUserError(
+                create("{freshnessDays: 0}"),
+                "createEstate",
+                "The freshness of the security scans must be one day at least."
+            )
+            assertUserError(
+                create("{criticalTargetDays: -1}"),
+                "createEstate",
+                "The remediation target of the CRITICAL findings must be zero days or more."
+            )
+            assertUserError(
+                create("{highTargetDays: -1}"),
+                "createEstate",
+                "The remediation target of the HIGH findings must be zero days or more."
+            )
+            // Zero days: no open finding is tolerated
+            assertNoUserError(create("{criticalTargetDays: 0, highTargetDays: 0}"), "createEstate")
+        }
+    }
+
+    @Test
     fun `An estate is checked before being saved`() {
         asAdmin {
             val a = label()
@@ -350,6 +464,10 @@ class EstatesGraphQLIT : EstatesTestSupport() {
             labels { id }
             marker { kind levelName environment qualifier }
             readingConfigs { key windowDays target direction }
+        """
+
+        private const val SECURITY_FIELDS = """
+            security { expectedKinds freshnessDays criticalTargetDays highTargetDays }
         """
     }
 }

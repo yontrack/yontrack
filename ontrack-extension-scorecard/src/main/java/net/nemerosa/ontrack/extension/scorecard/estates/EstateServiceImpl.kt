@@ -62,6 +62,7 @@ class EstateServiceImpl(
             labelIds = valid.labelIds,
             marker = valid.marker,
             readingConfigs = valid.readingConfigs,
+            security = valid.security,
         )
         return estateRepository.findById(id) ?: throw EstateNotFoundException(id)
     }
@@ -81,6 +82,7 @@ class EstateServiceImpl(
             labelIds = valid.labelIds,
             marker = valid.marker,
             readingConfigs = valid.readingConfigs,
+            security = valid.security,
         )
         return estateRepository.findById(id) ?: throw EstateNotFoundException(id)
     }
@@ -117,6 +119,7 @@ class EstateServiceImpl(
         val labelIds: List<Int>,
         val marker: EstateMarker?,
         val readingConfigs: List<EstateReadingConfig>,
+        val security: EstateSecurity,
     )
 
     private fun validate(input: EstateInput): ValidEstate {
@@ -177,12 +180,24 @@ class EstateServiceImpl(
             }
             config.takeIf { it.windowDays != null || it.target != null }
         }
+        // Security
+        val security = input.security
+        if (security.freshnessDays != null && security.freshnessDays <= 0) {
+            throw EstateInputException("The freshness of the security scans must be one day at least.")
+        }
+        if (security.criticalTargetDays != null && security.criticalTargetDays < 0) {
+            throw EstateInputException("The remediation target of the CRITICAL findings must be zero days or more.")
+        }
+        if (security.highTargetDays != null && security.highTargetDays < 0) {
+            throw EstateInputException("The remediation target of the HIGH findings must be zero days or more.")
+        }
         return ValidEstate(
             name = name,
             description = description,
             labelIds = labelIds,
             marker = marker,
             readingConfigs = readingConfigs,
+            security = security.copy(expectedKinds = security.expectedKinds.distinct().sorted()),
         )
     }
 

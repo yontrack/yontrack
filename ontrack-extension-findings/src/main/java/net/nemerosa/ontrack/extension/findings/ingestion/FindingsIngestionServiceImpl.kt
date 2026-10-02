@@ -66,7 +66,7 @@ class FindingsIngestionServiceImpl(
                 validationStampName = request.validation,
                 description = request.description,
                 dataTypeId = FindingsValidationDataType::class.java.name,
-                data = FindingsConsolidation.counts(findings),
+                data = FindingsConsolidation.counts(findings).copy(kind = report.kind),
                 signature = request.dateTime?.let { securityService.currentSignature.withTime(it) },
             )
         )

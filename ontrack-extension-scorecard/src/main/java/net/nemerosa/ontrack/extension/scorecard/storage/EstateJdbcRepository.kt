@@ -1,13 +1,16 @@
 package net.nemerosa.ontrack.extension.scorecard.storage
 
+import net.nemerosa.ontrack.extension.findings.model.FindingKind
 import net.nemerosa.ontrack.extension.scorecard.engine.MarkerKind
 import net.nemerosa.ontrack.extension.scorecard.estates.Estate
 import net.nemerosa.ontrack.extension.scorecard.estates.EstateEnvironmentMarker
 import net.nemerosa.ontrack.extension.scorecard.estates.EstateMarker
 import net.nemerosa.ontrack.extension.scorecard.estates.EstatePromotionMarker
 import net.nemerosa.ontrack.extension.scorecard.estates.EstateReadingConfig
+import net.nemerosa.ontrack.extension.scorecard.estates.EstateSecurity
 import net.nemerosa.ontrack.model.labels.Label
 import net.nemerosa.ontrack.repository.support.AbstractJdbcRepository
+import net.nemerosa.ontrack.repository.support.getNullableInt
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource
 import org.springframework.stereotype.Repository
 import org.springframework.transaction.annotation.Transactional
@@ -84,15 +87,19 @@ class EstateJdbcRepository(
         labelIds: List<Int>,
         marker: EstateMarker?,
         readingConfigs: List<EstateReadingConfig>,
+        security: EstateSecurity,
     ): Int {
         val id = dbCreate(
             """
-                INSERT INTO SCORECARD_ESTATES (NAME, DESCRIPTION, MARKER_KIND, MARKER_LEVEL, MARKER_ENVIRONMENT, MARKER_QUALIFIER)
-                VALUES (:name, :description, :markerKind, :markerLevel, :markerEnvironment, :markerQualifier)
+                INSERT INTO SCORECARD_ESTATES (NAME, DESCRIPTION, MARKER_KIND, MARKER_LEVEL, MARKER_ENVIRONMENT, MARKER_QUALIFIER,
+                                               SECURITY_FRESHNESS_DAYS, SECURITY_CRITICAL_TARGET_DAYS, SECURITY_HIGH_TARGET_DAYS)
+                VALUES (:name, :description, :markerKind, :markerLevel, :markerEnvironment, :markerQualifier,
+                        :freshnessDays, :criticalTargetDays, :highTargetDays)
             """.trimIndent(),
-            estateParams(name, description, marker)
+            estateParams(name, description, marker, security)
         )
         saveLabelsAndReadings(id, labelIds, readingConfigs)
+        saveScanKinds(id, security.expectedKinds)
         return id
     }
 
@@ -103,6 +110,7 @@ class EstateJdbcRepository(
         labelIds: List<Int>,
         marker: EstateMarker?,
         readingConfigs: List<EstateReadingConfig>,
+        security: EstateSecurity,
     ) {
         namedParameterJdbcTemplate!!.update(
             """
@@ -112,15 +120,20 @@ class EstateJdbcRepository(
                     MARKER_KIND = :markerKind,
                     MARKER_LEVEL = :markerLevel,
                     MARKER_ENVIRONMENT = :markerEnvironment,
-                    MARKER_QUALIFIER = :markerQualifier
+                    MARKER_QUALIFIER = :markerQualifier,
+                    SECURITY_FRESHNESS_DAYS = :freshnessDays,
+                    SECURITY_CRITICAL_TARGET_DAYS = :criticalTargetDays,
+                    SECURITY_HIGH_TARGET_DAYS = :highTargetDays
                 WHERE ID = :id
             """.trimIndent(),
-            estateParams(name, description, marker).addValue("id", id)
+            estateParams(name, description, marker, security).addValue("id", id)
         )
         val params = MapSqlParameterSource("id", id)
         namedParameterJdbcTemplate!!.update("DELETE FROM SCORECARD_ESTATE_LABELS WHERE ESTATE_ID = :id", params)
         namedParameterJdbcTemplate!!.update("DELETE FROM SCORECARD_ESTATE_READINGS WHERE ESTATE_ID = :id", params)
+        namedParameterJdbcTemplate!!.update("DELETE FROM SCORECARD_ESTATE_SCAN_KINDS WHERE ESTATE_ID = :id", params)
         saveLabelsAndReadings(id, labelIds, readingConfigs)
+        saveScanKinds(id, security.expectedKinds)
     }
 
     override fun delete(id: Int) {
@@ -130,8 +143,11 @@ class EstateJdbcRepository(
         )
     }
 
-    private fun estateParams(name: String, description: String?, marker: EstateMarker?) =
+    private fun estateParams(name: String, description: String?, marker: EstateMarker?, security: EstateSecurity) =
         MapSqlParameterSource()
+            .addValue("freshnessDays", security.freshnessDays, Types.INTEGER)
+            .addValue("criticalTargetDays", security.criticalTargetDays, Types.INTEGER)
+            .addValue("highTargetDays", security.highTargetDays, Types.INTEGER)
             .addValue("name", name)
             .addValue("description", description, Types.VARCHAR)
             .addValue("markerKind", marker?.kind?.name, Types.VARCHAR)
@@ -156,6 +172,15 @@ class EstateJdbcRepository(
                     .addValue("reading", config.key)
                     .addValue("windowDays", config.windowDays, Types.INTEGER)
                     .addValue("target", config.target, Types.DOUBLE)
+            )
+        }
+    }
+
+    private fun saveScanKinds(id: Int, kinds: List<FindingKind>) {
+        kinds.distinct().forEach { kind ->
+            namedParameterJdbcTemplate!!.update(
+                "INSERT INTO SCORECARD_ESTATE_SCAN_KINDS (ESTATE_ID, KIND) VALUES (:id, :kind)",
+                MapSqlParameterSource("id", id).addValue("kind", kind.name)
             )
         }
     }
@@ -205,6 +230,17 @@ class EstateJdbcRepository(
                 target = rs.getDouble("TARGET").takeIf { !rs.wasNull() },
             )
         }.groupBy({ it.first }, { it.second })
+        val scanKinds = namedParameterJdbcTemplate!!.query(
+            """
+                SELECT ESTATE_ID, KIND
+                FROM SCORECARD_ESTATE_SCAN_KINDS
+                WHERE ESTATE_ID IN (:ids)
+            """.trimIndent(),
+            MapSqlParameterSource("ids", ids)
+        ) { rs, _ ->
+            rs.getInt("ESTATE_ID") to FindingKind.entries.find { it.name == rs.getString("KIND") }
+        }.groupBy({ it.first }, { it.second })
+            .mapValues { (_, kinds) -> kinds.filterNotNull().sorted() }
         return estates.map { record ->
             Estate(
                 id = record.id,
@@ -213,6 +249,12 @@ class EstateJdbcRepository(
                 labels = labels[record.id] ?: emptyList(),
                 marker = record.marker,
                 readingConfigs = readingConfigs[record.id] ?: emptyList(),
+                security = EstateSecurity(
+                    expectedKinds = scanKinds[record.id] ?: emptyList(),
+                    freshnessDays = record.freshnessDays,
+                    criticalTargetDays = record.criticalTargetDays,
+                    highTargetDays = record.highTargetDays,
+                ),
             )
         }
     }
@@ -222,6 +264,9 @@ class EstateJdbcRepository(
         val name: String,
         val description: String?,
         val marker: EstateMarker?,
+        val freshnessDays: Int?,
+        val criticalTargetDays: Int?,
+        val highTargetDays: Int?,
     )
 
     private fun toEstateRecord(rs: ResultSet) = EstateRecord(
@@ -239,5 +284,8 @@ class EstateJdbcRepository(
                 qualifier = rs.getString("MARKER_QUALIFIER") ?: "",
             )
         },
+        freshnessDays = rs.getNullableInt("SECURITY_FRESHNESS_DAYS"),
+        criticalTargetDays = rs.getNullableInt("SECURITY_CRITICAL_TARGET_DAYS"),
+        highTargetDays = rs.getNullableInt("SECURITY_HIGH_TARGET_DAYS"),
     )
 }

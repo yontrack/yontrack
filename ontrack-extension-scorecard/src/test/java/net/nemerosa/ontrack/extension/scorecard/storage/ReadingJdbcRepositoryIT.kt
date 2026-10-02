@@ -1,6 +1,7 @@
 package net.nemerosa.ontrack.extension.scorecard.storage
 
 import net.nemerosa.ontrack.common.Time
+import net.nemerosa.ontrack.extension.scorecard.estates.EstateSecurity
 import net.nemerosa.ontrack.extension.scorecard.model.Reading
 import net.nemerosa.ontrack.extension.scorecard.model.ReadingBasis
 import net.nemerosa.ontrack.extension.scorecard.model.ReadingUnknownReason
@@ -147,6 +148,7 @@ class ReadingJdbcRepositoryIT : AbstractDSLTestSupport() {
                     labelIds = emptyList(),
                     marker = null,
                     readingConfigs = emptyList(),
+                    security = EstateSecurity(),
                 )
                 try {
                     readingRepository.save(listOf(reading(value = 1.0), reading(value = 2.0, estateId = estateId)))

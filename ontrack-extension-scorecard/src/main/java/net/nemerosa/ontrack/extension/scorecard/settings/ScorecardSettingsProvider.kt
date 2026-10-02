@@ -24,6 +24,10 @@ class ScorecardSettingsProvider(
             ScorecardSettings::cron,
             ScorecardSettings.DEFAULT_CRON
         ),
+        securityFreshnessDays = settingsRepository.getInt(
+            ScorecardSettings::securityFreshnessDays,
+            ScorecardSettings.DEFAULT_SECURITY_FRESHNESS_DAYS
+        ),
     )
 
     override fun getSettingsClass(): Class<ScorecardSettings> = ScorecardSettings::class.java

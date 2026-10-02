@@ -1,6 +1,8 @@
 package net.nemerosa.ontrack.extension.findings.validation
 
+import com.fasterxml.jackson.annotation.JsonInclude
 import net.nemerosa.ontrack.extension.findings.FindingsExtensionFeature
+import net.nemerosa.ontrack.extension.findings.model.FindingKind
 import net.nemerosa.ontrack.extension.general.validation.CHML
 import net.nemerosa.ontrack.extension.general.validation.CHMLValidationDataType
 import net.nemerosa.ontrack.extension.general.validation.CHMLValidationDataTypeConfig
@@ -96,11 +98,15 @@ class FindingsValidationDataType(
  * @property unknown Findings which are not accepted and whose severity is UNKNOWN
  * @property accepted Findings under an acceptance holding at the time of the scan, whatever their
  * severity. They are neither open nor resolved, and never trip a threshold.
+ * @property kind Kind of the scan, recorded with the counts so that a scan reporting no finding
+ * still says what it covered. Absent from the runs posted before it was recorded.
  */
 data class FindingsValidationDataTypeData(
     val levels: Map<CHML, Int>,
     val unknown: Int = 0,
     val accepted: Int = 0,
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    val kind: FindingKind? = null,
 ) {
     /**
      * The same counts, as CHML data

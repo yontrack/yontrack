@@ -14,6 +14,7 @@ import net.nemerosa.ontrack.model.labels.Label
  * @property labels Labels selecting the projects of the estate, all required, never empty
  * @property marker Marker the delivery readings of the estate are read up to, `null` for the default one
  * @property readingConfigs Window override and target of the readings, for the readings which have one
+ * @property security What the estate expects of the security scans of its projects
  */
 data class Estate(
     val id: Int,
@@ -22,6 +23,7 @@ data class Estate(
     val labels: List<Label>,
     val marker: EstateMarker?,
     val readingConfigs: List<EstateReadingConfig>,
+    val security: EstateSecurity = EstateSecurity(),
 ) {
     /**
      * Configuration of a reading in this estate, `null` if the reading has neither a window nor a target

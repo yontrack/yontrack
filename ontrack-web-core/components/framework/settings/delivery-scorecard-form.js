@@ -29,6 +29,14 @@ export default function DeliveryScorecardForm({id, ...values}) {
                 >
                     <Input/>
                 </Form.Item>
+                <Form.Item
+                    name="securityFreshnessDays"
+                    label="Security scan freshness (days)"
+                    extra="Number of days a security scan stays fresh, for the security maturity of a project read with no estate. An estate sets its own."
+                    rules={[{required: true}]}
+                >
+                    <InputNumber min={1} max={3650}/>
+                </Form.Item>
             </SettingsForm>
         </>
     )

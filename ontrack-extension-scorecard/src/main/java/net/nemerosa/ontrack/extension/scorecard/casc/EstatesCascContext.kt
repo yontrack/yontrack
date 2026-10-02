@@ -4,6 +4,7 @@ import net.nemerosa.ontrack.common.api.APIDescription
 import net.nemerosa.ontrack.common.syncForward
 import net.nemerosa.ontrack.extension.casc.context.AbstractCascContext
 import net.nemerosa.ontrack.extension.casc.context.SubConfigContext
+import net.nemerosa.ontrack.extension.findings.model.FindingKind
 import net.nemerosa.ontrack.extension.scorecard.engine.MarkerKind
 import net.nemerosa.ontrack.extension.scorecard.estates.*
 import net.nemerosa.ontrack.extension.scorecard.license.ScorecardLicense
@@ -102,6 +103,14 @@ class EstatesCascContext(
         readings = readingConfigs.map {
             EstateReadingCasc(key = it.key, windowDays = it.windowDays, target = it.target)
         },
+        security = security.takeIf { it != EstateSecurity() }?.let {
+            EstateSecurityCasc(
+                expectedKinds = it.expectedKinds,
+                freshnessDays = it.freshnessDays,
+                criticalTargetDays = it.criticalTargetDays,
+                highTargetDays = it.highTargetDays,
+            )
+        },
     )
 
     @APIDescription("Estate of the delivery scorecard")
@@ -116,6 +125,8 @@ class EstatesCascContext(
         val marker: EstateMarkerCasc? = null,
         @APIDescription("Window override and target per reading, at most one per reading")
         val readings: List<EstateReadingCasc> = emptyList(),
+        @APIDescription("What the estate expects of the security scans of its projects. Omitted for no expectation.")
+        val security: EstateSecurityCasc? = null,
     ) {
         fun toEstateInput() = EstateInput(
             name = name,
@@ -130,6 +141,14 @@ class EstatesCascContext(
             readingConfigs = readings.map {
                 EstateReadingConfig(key = it.key, windowDays = it.windowDays, target = it.target)
             },
+            security = security?.let {
+                EstateSecurity(
+                    expectedKinds = it.expectedKinds,
+                    freshnessDays = it.freshnessDays,
+                    criticalTargetDays = it.criticalTargetDays,
+                    highTargetDays = it.highTargetDays,
+                )
+            } ?: EstateSecurity(),
         )
     }
 
@@ -153,5 +172,17 @@ class EstatesCascContext(
         val windowDays: Int? = null,
         @APIDescription("Threshold the reading is judged against, in the unit of the reading, omitted for none")
         val target: Double? = null,
+    )
+
+    @APIDescription("What an estate expects of the security scans of its projects")
+    data class EstateSecurityCasc(
+        @APIDescription("Kinds of scan every project must have run, each fresher than the freshness, to be covered: IMAGE, CODE, SECRETS, DAST, DEPENDENCIES or OTHER. Omitted or empty: any fresh scan covers a project.")
+        val expectedKinds: List<FindingKind> = emptyList(),
+        @APIDescription("Number of days a scan stays fresh, omitted for the freshness of the settings")
+        val freshnessDays: Int? = null,
+        @APIDescription("Number of days a CRITICAL finding may stay open, omitted for no target")
+        val criticalTargetDays: Int? = null,
+        @APIDescription("Number of days a HIGH finding may stay open, omitted for no target")
+        val highTargetDays: Int? = null,
     )
 }

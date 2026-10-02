@@ -70,6 +70,7 @@ class FindingsNativeFormatsLicenseIT : AbstractQLKTITSupport() {
                                 "levels" to mapOf("CRITICAL" to 2, "HIGH" to 1, "MEDIUM" to 1, "LOW" to 1),
                                 "unknown" to 0,
                                 "accepted" to 0,
+                                "kind" to "SECRETS",
                             ).asJson(),
                             run.path("data").path("data")
                         )
@@ -140,6 +141,7 @@ class FindingsNativeFormatsLicenseIT : AbstractQLKTITSupport() {
                                 "levels" to mapOf("CRITICAL" to 1, "HIGH" to 3, "MEDIUM" to 1, "LOW" to 1),
                                 "unknown" to 1,
                                 "accepted" to 2,
+                                "kind" to "IMAGE",
                             ).asJson(),
                             run.path("data").path("data")
                         )

@@ -38,6 +38,11 @@ object ReadingKeys {
     const val QUALITY_TEST_FLAKINESS = "quality.testFlakiness"
 
     /**
+     * Rung of the security scans on the ladder: 0 none, 1 reported, 2 covered, 3 gating.
+     */
+    const val SECURITY_MATURITY = "security.maturity"
+
+    /**
      * Catalogue order
      */
     val ORDER: List<String> = listOf(
@@ -47,6 +52,7 @@ object ReadingKeys {
         DELIVERY_MTTR,
         QUALITY_TEST_PASS_RATE,
         QUALITY_TEST_FLAKINESS,
+        SECURITY_MATURITY,
     )
 
     /**
@@ -59,6 +65,7 @@ object ReadingKeys {
         DELIVERY_MTTR to ReadingDirection.LOWER_IS_BETTER,
         QUALITY_TEST_PASS_RATE to ReadingDirection.HIGHER_IS_BETTER,
         QUALITY_TEST_FLAKINESS to ReadingDirection.LOWER_IS_BETTER,
+        SECURITY_MATURITY to ReadingDirection.HIGHER_IS_BETTER,
     )
 
     /**

@@ -80,6 +80,7 @@ class ScorecardJobsIT : AbstractDSLTestSupport() {
                         ReadingKeys.DELIVERY_SUCCESS_RATE,
                         ReadingKeys.QUALITY_TEST_FLAKINESS,
                         ReadingKeys.QUALITY_TEST_PASS_RATE,
+                        ReadingKeys.SECURITY_MATURITY,
                         FailingReadingComputer.KEY,
                     ),
                     readings.map { it.key }.sorted()

@@ -8,6 +8,7 @@ package net.nemerosa.ontrack.extension.scorecard.estates
  * @property labels Labels selecting the projects, as `category:name` or `name`; at least one, all existing
  * @property marker Marker the delivery readings are read up to, `null` for the default one
  * @property readingConfigs Window override and target per reading, at most one per reading
+ * @property security What the estate expects of the security scans of its projects
  */
 data class EstateInput(
     val name: String,
@@ -15,4 +16,5 @@ data class EstateInput(
     val labels: List<String>,
     val marker: EstateMarker? = null,
     val readingConfigs: List<EstateReadingConfig> = emptyList(),
+    val security: EstateSecurity = EstateSecurity(),
 )

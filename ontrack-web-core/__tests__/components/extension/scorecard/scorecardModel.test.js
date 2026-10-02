@@ -81,6 +81,13 @@ describe('formatReadingValue', () => {
         expect(formatReadingValue('quality.testFlakiness', 33.3333)).toEqual('33.3%')
     })
 
+    it('formats a rung of the security maturity with its name', () => {
+        expect(formatReadingValue('security.maturity', 0)).toEqual('0 · None')
+        expect(formatReadingValue('security.maturity', 1)).toEqual('1 · Reported')
+        expect(formatReadingValue('security.maturity', 2)).toEqual('2 · Covered')
+        expect(formatReadingValue('security.maturity', 3)).toEqual('3 · Gating')
+    })
+
     it('formats the value of a reading out of the catalogue as a number', () => {
         expect(formatReadingValue('test.failing', 1.23456)).toEqual('1.23')
     })
@@ -98,6 +105,7 @@ describe('readingName', () => {
         expect(readingName('delivery.mttr')).toEqual('Time to restore')
         expect(readingName('quality.testPassRate')).toEqual('Test pass rate')
         expect(readingName('quality.testFlakiness')).toEqual('Test flakiness')
+        expect(readingName('security.maturity')).toEqual('Security maturity')
         expect(readingName('some.other')).toEqual('some.other')
     })
 })
@@ -122,6 +130,12 @@ describe('readingDescription', () => {
             expect(readingDescription(key, 'ENVIRONMENT')).not.toEqual(readingDescription(key, 'PROMOTION'))
         })
         expect(readingDescription('delivery.leadTime', 'ENVIRONMENT')).toMatch(/deployment/)
+    })
+
+    it('describes the security maturity the same way whatever the marker, without the marker', () => {
+        expect(readingDescription('security.maturity', 'ENVIRONMENT')).toEqual(readingDescription('security.maturity', 'PROMOTION'))
+        expect(readingDescription('security.maturity')).toMatch(/gating/)
+        expect(readingUsesMarker('security.maturity')).toBe(false)
     })
 
     it('describes a test reading the same way whatever the marker', () => {
@@ -480,6 +494,59 @@ describe('readingDetailItems', () => {
             details: {testStamps: []},
         })))).toEqual({
             'Test stamps': 'None',
+        })
+    })
+
+    it('gives what each rung of the security maturity rests on', () => {
+        expect(labels(readingDetailItems(reading({
+            key: 'security.maturity',
+            value: 1,
+            details: {
+                count: 3,
+                reported: true,
+                covered: false,
+                gating: true,
+                expectedKinds: ['IMAGE', 'CODE'],
+                freshnessDays: 14,
+                freshKinds: ['IMAGE'],
+                missingKinds: ['CODE'],
+                failedScans: 1,
+                requiredStamps: ['scan'],
+                lastScan: '2026-09-27T10:00:00',
+            },
+        })))).toEqual({
+            'Samples': '3',
+            'Expected kinds': 'Image, Code',
+            'Freshness': '14 days',
+            'Fresh kinds': 'Image',
+            'Missing kinds': 'Code',
+            'Failed scans': '1',
+            'Required by a promotion': 'scan',
+            'Last scan': '2026-09-27T10:00:00',
+        })
+        expect(labels(readingDetailItems(reading({
+            key: 'security.maturity',
+            value: 0,
+            details: {
+                count: 0,
+                reported: false,
+                covered: false,
+                gating: false,
+                expectedKinds: [],
+                freshnessDays: 1,
+                freshKinds: [],
+                missingKinds: [],
+                failedScans: 0,
+                requiredStamps: [],
+                lastScan: null,
+            },
+        })))).toEqual({
+            'Samples': '0',
+            'Expected kinds': 'Any',
+            'Freshness': '1 day',
+            'Fresh kinds': 'None',
+            'Failed scans': '0',
+            'Required by a promotion': 'None',
         })
     })
 })

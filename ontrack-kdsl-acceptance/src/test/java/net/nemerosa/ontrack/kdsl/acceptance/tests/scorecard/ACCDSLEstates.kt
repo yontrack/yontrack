@@ -3,11 +3,13 @@ package net.nemerosa.ontrack.kdsl.acceptance.tests.scorecard
 import net.nemerosa.ontrack.kdsl.acceptance.tests.AbstractACCDSLTestSupport
 import net.nemerosa.ontrack.kdsl.acceptance.tests.support.uid
 import net.nemerosa.ontrack.kdsl.connector.graphql.GraphQLClientException
+import net.nemerosa.ontrack.kdsl.connector.graphql.schema.type.FindingKind
 import net.nemerosa.ontrack.kdsl.connector.graphql.schema.type.ReadingDirection
 import net.nemerosa.ontrack.kdsl.spec.createLabel
 import net.nemerosa.ontrack.kdsl.spec.extension.license.devLicense
 import net.nemerosa.ontrack.kdsl.spec.extension.scorecard.EstateMarker
 import net.nemerosa.ontrack.kdsl.spec.extension.scorecard.EstateReadingConfig
+import net.nemerosa.ontrack.kdsl.spec.extension.scorecard.EstateSecurity
 import net.nemerosa.ontrack.kdsl.spec.extension.scorecard.ReadingKeys
 import net.nemerosa.ontrack.kdsl.spec.extension.scorecard.estates
 import net.nemerosa.ontrack.kdsl.spec.extension.scorecard.scorecard
@@ -97,6 +99,38 @@ class ACCDSLEstates : AbstractACCDSLTestSupport() {
         }
         assertNull(ontrack.estates.findByName(name))
         assertEquals(listOf("Project"), selected.scorecard().sets.map { it.name })
+    }
+
+    @Test
+    fun `What an estate expects of the security scans`() {
+        val label = ontrack.createLabel(category = uid("estate-"), name = "product")
+        val name = uid("Estate ")
+        val estate = ontrack.estates.create(
+            name = name,
+            labels = listOf(label.display),
+            security = EstateSecurity(
+                expectedKinds = listOf(FindingKind.IMAGE, FindingKind.CODE),
+                freshnessDays = 14,
+                criticalTargetDays = 7,
+                highTargetDays = 30,
+            ),
+        )
+        try {
+            val expected = EstateSecurity(
+                expectedKinds = listOf(FindingKind.IMAGE, FindingKind.CODE),
+                freshnessDays = 14,
+                criticalTargetDays = 7,
+                highTargetDays = 30,
+            )
+            assertEquals(expected, estate.security)
+            assertEquals(expected, ontrack.estates.findByName(name)?.security)
+            // Kept by an update which does not give it
+            assertEquals(expected, estate.update(description = "Products").security)
+            // Replaced
+            assertEquals(EstateSecurity(), estate.update(security = EstateSecurity()).security)
+        } finally {
+            estate.delete()
+        }
     }
 
     @Test

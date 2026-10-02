@@ -1,11 +1,13 @@
 package net.nemerosa.ontrack.extension.scorecard.casc
 
 import net.nemerosa.ontrack.extension.casc.AbstractCascTestSupport
+import net.nemerosa.ontrack.extension.findings.model.FindingKind
 import net.nemerosa.ontrack.extension.license.DevLicenseService
 import net.nemerosa.ontrack.extension.scorecard.estates.EstateEnvironmentMarker
 import net.nemerosa.ontrack.extension.scorecard.estates.EstateInput
 import net.nemerosa.ontrack.extension.scorecard.estates.EstatePromotionMarker
 import net.nemerosa.ontrack.extension.scorecard.estates.EstateReadingConfig
+import net.nemerosa.ontrack.extension.scorecard.estates.EstateSecurity
 import net.nemerosa.ontrack.extension.scorecard.estates.EstateService
 import net.nemerosa.ontrack.extension.scorecard.license.ScorecardLicensedFeatureProvider
 import net.nemerosa.ontrack.test.TestUtils.uid
@@ -102,6 +104,65 @@ class EstatesCascContextIT : AbstractCascTestSupport() {
             assertEquals(listOf(a.id), updated.labels.map { it.id })
             assertTrue(updated.readingConfigs.isEmpty())
             assertNull(estateService.findByName(production.name))
+        }
+    }
+
+    @Test
+    fun `What the estates expect of the security scans, as code`() {
+        asAdmin {
+            val a = label()
+            val name = uid("E")
+            val yaml = """
+                ontrack:
+                    config:
+                        estates:
+                            - name: $name
+                              labels:
+                                - ${a.getDisplay()}
+                              security:
+                                expectedKinds:
+                                  - IMAGE
+                                  - DEPENDENCIES
+                                freshnessDays: 10
+                                criticalTargetDays: 7
+                                highTargetDays: 30
+            """.trimIndent()
+            assertValidYaml(yaml)
+            casc(yaml)
+
+            val estate = estateService.findByName(name)!!
+            assertEquals(
+                EstateSecurity(
+                    expectedKinds = listOf(FindingKind.IMAGE, FindingKind.DEPENDENCIES),
+                    freshnessDays = 10,
+                    criticalTargetDays = 7,
+                    highTargetDays = 30,
+                ),
+                estate.security
+            )
+
+            // Rendering
+            val rendered = estatesCascContext.render().values().single { it.path("name").asText() == name }
+            assertEquals(
+                listOf("IMAGE", "DEPENDENCIES"),
+                rendered.path("security").path("expectedKinds").values().map { it.asText() }
+            )
+            assertEquals(10, rendered.path("security").path("freshnessDays").asInt())
+            assertEquals(7, rendered.path("security").path("criticalTargetDays").asInt())
+            assertEquals(30, rendered.path("security").path("highTargetDays").asInt())
+
+            // Omitted: no expectation
+            casc(
+                """
+                    ontrack:
+                        config:
+                            estates:
+                                - name: $name
+                                  labels:
+                                    - ${a.getDisplay()}
+                """.trimIndent()
+            )
+            assertEquals(EstateSecurity(), estateService.findByName(name)!!.security)
         }
     }
 

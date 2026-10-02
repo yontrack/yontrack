@@ -17,4 +17,10 @@ fragment EstateFragment on Estate {
         target
         direction
     }
+    security {
+        expectedKinds
+        freshnessDays
+        criticalTargetDays
+        highTargetDays
+    }
 }

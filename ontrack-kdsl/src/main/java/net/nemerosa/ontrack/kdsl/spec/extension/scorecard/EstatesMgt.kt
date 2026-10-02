@@ -46,6 +46,7 @@ class EstatesMgt(connector: Connector) : Connected(connector) {
      * @param description Description of the estate
      * @param marker Marker the delivery readings are read up to, `null` for the default one
      * @param readings Window override and target per reading, at most one per reading
+     * @param security What the estate expects of the security scans of its projects
      * @return Created estate
      */
     fun create(
@@ -54,6 +55,7 @@ class EstatesMgt(connector: Connector) : Connected(connector) {
         description: String? = null,
         marker: EstateMarker? = null,
         readings: List<EstateReadingConfig> = emptyList(),
+        security: EstateSecurity = EstateSecurity(),
     ): Estate =
         graphqlConnector.mutate(
             CreateEstateMutation(
@@ -62,6 +64,7 @@ class EstatesMgt(connector: Connector) : Connected(connector) {
                 labels = labels,
                 marker = Optional.presentIfNotNull(marker?.toInput()),
                 readings = Optional.present(readings.map { it.toInput() }),
+                security = Optional.present(security.toInput()),
             )
         ) {
             it?.createEstate?.payloadUserErrors?.convert()

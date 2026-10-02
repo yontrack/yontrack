@@ -12,6 +12,8 @@ import net.nemerosa.ontrack.kdsl.connector.graphql.schema.UpdateEstateMutation
 import net.nemerosa.ontrack.kdsl.connector.graphql.schema.fragment.EstateFragment
 import net.nemerosa.ontrack.kdsl.connector.graphql.schema.type.EstateMarkerInput
 import net.nemerosa.ontrack.kdsl.connector.graphql.schema.type.EstateReadingConfigInput
+import net.nemerosa.ontrack.kdsl.connector.graphql.schema.type.EstateSecurityInput
+import net.nemerosa.ontrack.kdsl.connector.graphql.schema.type.FindingKind
 import net.nemerosa.ontrack.kdsl.connector.graphql.schema.type.MarkerKind
 import net.nemerosa.ontrack.kdsl.connector.graphql.schema.type.ReadingDirection
 import net.nemerosa.ontrack.kdsl.connector.graphqlConnector
@@ -37,6 +39,7 @@ import java.time.Duration
  * highest-ordered environment where the project owns a slot, else the last promotion level of each
  * branch
  * @property readingConfigs Window override and target of the readings which have one
+ * @property security What the estate expects of the security scans of its projects
  */
 class Estate(
     connector: Connector,
@@ -46,6 +49,7 @@ class Estate(
     val labels: List<Label>,
     val marker: EstateMarker?,
     val readingConfigs: List<EstateReadingConfig>,
+    val security: EstateSecurity,
 ) : Resource(connector) {
 
     /**
@@ -74,6 +78,7 @@ class Estate(
      * @param labels Labels selecting the projects, as `category:name` or `name`
      * @param marker Marker of the delivery readings, `null` for the default one
      * @param readings Window override and target per reading, the ones of the estate replaced
+     * @param security What the estate expects of the security scans of its projects
      * @return Updated estate
      */
     fun update(
@@ -82,6 +87,7 @@ class Estate(
         labels: List<String> = this.labels.map { it.display },
         marker: EstateMarker? = this.marker,
         readings: List<EstateReadingConfig> = this.readingConfigs,
+        security: EstateSecurity = this.security,
     ): Estate =
         graphqlConnector.mutate(
             UpdateEstateMutation(
@@ -91,6 +97,7 @@ class Estate(
                 labels = labels,
                 marker = Optional.presentIfNotNull(marker?.toInput()),
                 readings = Optional.present(readings.map { it.toInput() }),
+                security = Optional.present(security.toInput()),
             )
         ) {
             it?.updateEstate?.payloadUserErrors?.convert()
@@ -196,6 +203,29 @@ data class EstateReadingConfig(
     val direction: ReadingDirection? = null,
 )
 
+/**
+ * What an estate expects of the security scans of its projects.
+ *
+ * @property expectedKinds Kinds of scan every project must have run, each fresher than
+ * [freshnessDays], to be covered. None: any fresh scan covers a project.
+ * @property freshnessDays Number of days a scan stays fresh, `null` for the freshness of the settings
+ * @property criticalTargetDays Number of days a CRITICAL finding may stay open, `null` for no target
+ * @property highTargetDays Number of days a HIGH finding may stay open, `null` for no target
+ */
+data class EstateSecurity(
+    val expectedKinds: List<FindingKind> = emptyList(),
+    val freshnessDays: Int? = null,
+    val criticalTargetDays: Int? = null,
+    val highTargetDays: Int? = null,
+)
+
+internal fun EstateSecurity.toInput() = EstateSecurityInput(
+    expectedKinds = Optional.present(expectedKinds),
+    freshnessDays = Optional.presentIfNotNull(freshnessDays),
+    criticalTargetDays = Optional.presentIfNotNull(criticalTargetDays),
+    highTargetDays = Optional.presentIfNotNull(highTargetDays),
+)
+
 internal fun EstateMarker.toInput(): EstateMarkerInput = when (this) {
     is EstateMarker.Promotion -> EstateMarkerInput(
         kind = MarkerKind.PROMOTION,
@@ -240,4 +270,10 @@ internal fun EstateFragment.toEstate(connector: Connector) = Estate(
             direction = it.direction,
         )
     },
+    security = EstateSecurity(
+        expectedKinds = security.expectedKinds,
+        freshnessDays = security.freshnessDays,
+        criticalTargetDays = security.criticalTargetDays,
+        highTargetDays = security.highTargetDays,
+    ),
 )

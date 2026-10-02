@@ -28,12 +28,16 @@ class ScorecardSettingsManager(
         if (settings.retentionDays < 1) {
             throw ScorecardSettingsException("The retention must be one day at least.")
         }
+        if (settings.securityFreshnessDays < 1) {
+            throw ScorecardSettingsException("The security scan freshness must be one day at least.")
+        }
         if (!CronExpression.isValidExpression(settings.cron)) {
             throw ScorecardSettingsException("The schedule is not a valid cron expression: ${settings.cron}")
         }
         settingsRepository.setInt<ScorecardSettings>(settings::windowDays)
         settingsRepository.setInt<ScorecardSettings>(settings::retentionDays)
         settingsRepository.setString<ScorecardSettings>(settings::cron)
+        settingsRepository.setInt<ScorecardSettings>(settings::securityFreshnessDays)
     }
 
     override fun getId(): String = "delivery-scorecard"

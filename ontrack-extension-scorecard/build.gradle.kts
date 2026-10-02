@@ -10,6 +10,7 @@ dependencies {
 
     implementation(project(":ontrack-extension-casc"))
     implementation(project(":ontrack-extension-environments"))
+    implementation(project(":ontrack-extension-findings"))
     implementation(project(":ontrack-extension-general"))
     implementation(project(":ontrack-extension-license"))
     implementation(project(":ontrack-repository-support"))

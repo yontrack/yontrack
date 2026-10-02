@@ -7,6 +7,8 @@ import {
     DURATION,
     PER_WEEK,
     PERCENT,
+    RUNG,
+    SECURITY_MATURITY_RUNGS,
     readingDirectionSymbol,
     readingName,
     readingUnit,
@@ -19,6 +21,7 @@ import {
     MARKER_ENVIRONMENT,
     MARKER_PROMOTION,
 } from "@components/extension/scorecard/estates/estateModel";
+import {FINDING_KINDS, kindName} from "@components/extension/findings/findingsModel";
 
 const estateInputFields = `
     name: $name,
@@ -26,6 +29,7 @@ const estateInputFields = `
     labels: $labels,
     marker: $marker,
     readings: $readings,
+    security: $security,
 `
 
 const createQuery = gql`
@@ -35,6 +39,7 @@ const createQuery = gql`
         $labels: [String!]!,
         $marker: EstateMarkerInput,
         $readings: [EstateReadingConfigInput!],
+        $security: EstateSecurityInput,
     ) {
         createEstate(input: {${estateInputFields}}) {
             estate {
@@ -55,6 +60,7 @@ const updateQuery = gql`
         $labels: [String!]!,
         $marker: EstateMarkerInput,
         $readings: [EstateReadingConfigInput!],
+        $security: EstateSecurityInput,
     ) {
         updateEstate(input: {id: $id, ${estateInputFields}}) {
             estate {
@@ -135,6 +141,19 @@ function ReadingTargetInput({name, readingKey}) {
     const unit = readingUnit(readingKey)
     const label = `Target of ${readingName(readingKey)}`
     const symbol = readingDirectionSymbol(readingKey)
+    if (unit === RUNG) {
+        return (
+            <Form.Item name={[name, 'target']} noStyle>
+                <Select
+                    aria-label={label}
+                    allowClear
+                    placeholder="None"
+                    options={SECURITY_MATURITY_RUNGS.map((rung, value) => ({value, label: `${symbol} ${value} · ${rung}`}))}
+                    style={{width: '15em'}}
+                />
+            </Form.Item>
+        )
+    }
     if (unit === DURATION) {
         return (
             <Space.Compact>
@@ -214,7 +233,8 @@ function EstateReadingsItems({form}) {
 
 /**
  * Creation and edition of an estate: its name, the labels selecting its projects, the marker its
- * delivery readings are read up to, and the window and target of each reading.
+ * delivery readings are read up to, the window and target of each reading, and what it expects of
+ * the security scans of its projects.
  */
 export default function EstateDialog({dialog}) {
 
@@ -315,6 +335,47 @@ export default function EstateDialog({dialog}) {
             >
                 <EstateReadingsItems form={dialog.form}/>
             </Form.Item>
+            <Form.Item
+                name="expectedKinds"
+                label="Expected scans"
+                extra="Kinds of security scan every project must have run, each within the freshness, to be covered. None: any recent scan covers a project."
+            >
+                <Select
+                    mode="multiple"
+                    allowClear
+                    placeholder="Any kind of scan"
+                    options={FINDING_KINDS.map(kind => ({value: kind, label: kindName(kind)}))}
+                />
+            </Form.Item>
+            <Row gutter={8}>
+                <Col span={8}>
+                    <Form.Item
+                        name="freshnessDays"
+                        label="Scan freshness"
+                        extra="Empty for the one of the settings."
+                    >
+                        <InputNumber min={1} precision={0} suffix="days" placeholder="Default" style={{width: '100%'}}/>
+                    </Form.Item>
+                </Col>
+                <Col span={8}>
+                    <Form.Item
+                        name="criticalTargetDays"
+                        label="CRITICAL fixed within"
+                        extra="Empty for no target."
+                    >
+                        <InputNumber min={0} precision={0} suffix="days" placeholder="None" style={{width: '100%'}}/>
+                    </Form.Item>
+                </Col>
+                <Col span={8}>
+                    <Form.Item
+                        name="highTargetDays"
+                        label="HIGH fixed within"
+                        extra="Empty for no target."
+                    >
+                        <InputNumber min={0} precision={0} suffix="days" placeholder="None" style={{width: '100%'}}/>
+                    </Form.Item>
+                </Col>
+            </Row>
         </FormDialog>
     )
 }

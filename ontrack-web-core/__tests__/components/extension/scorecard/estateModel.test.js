@@ -6,6 +6,7 @@ import {
     estateMarkerDescription,
     estateMarkerText,
     estateReadingConfigTexts,
+    estateSecurityTexts,
     latestEstateComputedAt,
 } from "@components/extension/scorecard/estates/estateModel";
 
@@ -77,11 +78,26 @@ describe('estateFormValues', () => {
             'delivery.mttr',
             'quality.testPassRate',
             'quality.testFlakiness',
+            'security.maturity',
         ])
         values.readings.forEach(it => {
             expect(it.windowDays).toBeNull()
             expect(it.target).toBeNull()
         })
+        expect(values.expectedKinds).toEqual([])
+        expect(values.freshnessDays).toBeNull()
+        expect(values.criticalTargetDays).toBeNull()
+        expect(values.highTargetDays).toBeNull()
+    })
+
+    it('gives what an estate expects of the security scans', () => {
+        const values = estateFormValues(estate({
+            security: {expectedKinds: ['IMAGE', 'CODE'], freshnessDays: 14, criticalTargetDays: 7, highTargetDays: 30},
+        }))
+        expect(values.expectedKinds).toEqual(['IMAGE', 'CODE'])
+        expect(values.freshnessDays).toBe(14)
+        expect(values.criticalTargetDays).toBe(7)
+        expect(values.highTargetDays).toBe(30)
     })
 
     it('gives the labels of an estate as display strings', () => {
@@ -144,7 +160,17 @@ describe('estateInput', () => {
             labels: ['type:product'],
             marker: null,
             readings: [],
+            security: {expectedKinds: [], freshnessDays: null, criticalTargetDays: null, highTargetDays: null},
         })
+    })
+
+    it('sends what the estate expects of the security scans', () => {
+        expect(estateInput(values({
+            expectedKinds: ['DAST'],
+            freshnessDays: 10,
+            criticalTargetDays: 0,
+            highTargetDays: undefined,
+        })).security).toEqual({expectedKinds: ['DAST'], freshnessDays: 10, criticalTargetDays: 0, highTargetDays: null})
     })
 
     it('sends no description when it is blank', () => {
@@ -189,7 +215,9 @@ describe('estateInput', () => {
             readingConfigs: [
                 {key: 'delivery.leadTime', windowDays: 30, target: 86400},
                 {key: 'delivery.successRate', windowDays: null, target: 95},
+                {key: 'security.maturity', windowDays: null, target: 2},
             ],
+            security: {expectedKinds: ['IMAGE'], freshnessDays: 7, criticalTargetDays: 7, highTargetDays: null},
         })
         expect(estateInput(estateFormValues(original))).toEqual({
             name: 'Products',
@@ -199,7 +227,9 @@ describe('estateInput', () => {
             readings: [
                 {key: 'delivery.leadTime', windowDays: 30, target: 86400},
                 {key: 'delivery.successRate', windowDays: null, target: 95},
+                {key: 'security.maturity', windowDays: null, target: 2},
             ],
+            security: {expectedKinds: ['IMAGE'], freshnessDays: 7, criticalTargetDays: 7, highTargetDays: null},
         })
     })
 })
@@ -270,5 +300,29 @@ describe('latestEstateComputedAt', () => {
     it('is null when the estate has not been computed', () => {
         expect(latestEstateComputedAt(estate())).toBeNull()
         expect(latestEstateComputedAt(estate({projects: [project([{estate: null, readings: []}])]}))).toBeNull()
+    })
+})
+
+describe('estateSecurityTexts', () => {
+    it('describes what an estate expects of the security scans', () => {
+        expect(estateSecurityTexts({expectedKinds: ['IMAGE', 'CODE'], freshnessDays: 14, criticalTargetDays: 7, highTargetDays: 30}))
+            .toEqual([
+                'Image, Code scans fresher than 14 days',
+                'CRITICAL fixed within 7 days, HIGH within 30 days',
+            ])
+    })
+
+    it('describes the defaults: any scan, the freshness of the settings', () => {
+        expect(estateSecurityTexts({expectedKinds: [], freshnessDays: null, criticalTargetDays: null, highTargetDays: null}))
+            .toEqual(['Any scan, default freshness'])
+        expect(estateSecurityTexts(null)).toEqual(['Any scan, default freshness'])
+    })
+
+    it('describes one remediation target only', () => {
+        expect(estateSecurityTexts({expectedKinds: ['DAST'], freshnessDays: 1, criticalTargetDays: null, highTargetDays: 0}))
+            .toEqual([
+                'DAST scans fresher than 1 day',
+                'HIGH fixed within 0 days',
+            ])
     })
 })

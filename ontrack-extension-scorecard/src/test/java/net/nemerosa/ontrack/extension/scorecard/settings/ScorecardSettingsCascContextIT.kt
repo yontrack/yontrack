@@ -16,6 +16,7 @@ class ScorecardSettingsCascContextIT : AbstractCascTestSupport() {
             assertEquals(90, settings.windowDays)
             assertEquals(730, settings.retentionDays)
             assertEquals("0 0 2 * * *", settings.cron)
+            assertEquals(7, settings.securityFreshnessDays)
         }
     }
 
@@ -32,12 +33,14 @@ class ScorecardSettingsCascContextIT : AbstractCascTestSupport() {
                                     windowDays: 30
                                     retentionDays: 365
                                     cron: "0 30 3 * * *"
+                                    securityFreshnessDays: 14
                 """.trimIndent()
             )
             val settings = cachedSettingsService.getCachedSettings(ScorecardSettings::class.java)
             assertEquals(30, settings.windowDays)
             assertEquals(365, settings.retentionDays)
             assertEquals("0 30 3 * * *", settings.cron)
+            assertEquals(14, settings.securityFreshnessDays)
         }
     }
 
@@ -58,6 +61,18 @@ class ScorecardSettingsCascContextIT : AbstractCascTestSupport() {
             assertEquals(60, settings.windowDays)
             assertEquals(730, settings.retentionDays)
             assertEquals("0 0 2 * * *", settings.cron)
+            assertEquals(7, settings.securityFreshnessDays)
+        }
+    }
+
+    @Test
+    fun `A security scan freshness under one day is rejected`() {
+        withSettings<ScorecardSettings> {
+            asAdmin {
+                assertFailsWith<ScorecardSettingsException> {
+                    settingsManagerService.saveSettings(ScorecardSettings(securityFreshnessDays = 0))
+                }
+            }
         }
     }
 

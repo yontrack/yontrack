@@ -3,6 +3,7 @@ package net.nemerosa.ontrack.extension.scorecard.storage
 import net.nemerosa.ontrack.extension.scorecard.estates.Estate
 import net.nemerosa.ontrack.extension.scorecard.estates.EstateMarker
 import net.nemerosa.ontrack.extension.scorecard.estates.EstateReadingConfig
+import net.nemerosa.ontrack.extension.scorecard.estates.EstateSecurity
 
 /**
  * Storage of the estates. No security, no licence check.
@@ -29,6 +30,7 @@ interface EstateRepository {
         labelIds: List<Int>,
         marker: EstateMarker?,
         readingConfigs: List<EstateReadingConfig>,
+        security: EstateSecurity,
     ): Int
 
     /**
@@ -41,6 +43,7 @@ interface EstateRepository {
         labelIds: List<Int>,
         marker: EstateMarker?,
         readingConfigs: List<EstateReadingConfig>,
+        security: EstateSecurity,
     )
 
     /**

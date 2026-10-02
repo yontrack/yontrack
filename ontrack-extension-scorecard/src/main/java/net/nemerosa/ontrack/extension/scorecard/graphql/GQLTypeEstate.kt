@@ -5,6 +5,7 @@ import graphql.Scalars.GraphQLString
 import graphql.schema.GraphQLNonNull
 import graphql.schema.GraphQLObjectType
 import graphql.schema.GraphQLTypeReference
+import net.nemerosa.ontrack.extension.findings.model.FindingKind
 import net.nemerosa.ontrack.extension.scorecard.engine.MarkerKind
 import net.nemerosa.ontrack.extension.scorecard.estates.*
 import net.nemerosa.ontrack.extension.scorecard.model.ReadingDirection
@@ -63,6 +64,11 @@ class GQLTypeEstate(
                 it.name(Estate::readingConfigs.name)
                     .description("Window override and target of the readings which have one, by reading key")
                     .type(listType(GraphQLTypeReference(EstateReadingConfig::class.java.simpleName)))
+            }
+            .field {
+                it.name(Estate::security.name)
+                    .description("What the estate expects of the security scans of its projects")
+                    .type(GraphQLNonNull(GraphQLTypeReference(EstateSecurity::class.java.simpleName)))
             }
             .field {
                 it.name("projects")
@@ -140,5 +146,28 @@ class GQLTypeEstateReadingConfig : GQLType {
                     .description("Which way the reading is better, and so how the target judges it")
                     .type(GraphQLTypeReference(ReadingDirection::class.java.simpleName))
             }
+            .build()
+}
+
+/**
+ * What an estate expects of the security scans of its projects.
+ */
+@Component
+class GQLTypeEstateSecurity : GQLType {
+
+    override fun getTypeName(): String = EstateSecurity::class.java.simpleName
+
+    override fun createType(cache: GQLTypeCache): GraphQLObjectType =
+        GraphQLObjectType.newObject()
+            .name(typeName)
+            .description("What an estate expects of the security scans of its projects")
+            .field {
+                it.name(EstateSecurity::expectedKinds.name)
+                    .description("Kinds of scan every project must have run, each fresher than the freshness, to be covered. Empty: any fresh scan covers a project.")
+                    .type(listType(GraphQLTypeReference(FindingKind::class.java.simpleName)))
+            }
+            .intField(EstateSecurity::freshnessDays, "Number of days a scan stays fresh, null for the freshness of the settings")
+            .intField(EstateSecurity::criticalTargetDays, "Number of days a CRITICAL finding may stay open, null for no target")
+            .intField(EstateSecurity::highTargetDays, "Number of days a HIGH finding may stay open, null for no target")
             .build()
 }

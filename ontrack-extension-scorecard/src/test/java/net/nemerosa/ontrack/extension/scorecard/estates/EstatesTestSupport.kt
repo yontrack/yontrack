@@ -38,6 +38,7 @@ abstract class EstatesTestSupport : AbstractQLKTITSupport() {
         name: String = uid("E"),
         marker: EstateMarker? = null,
         readingConfigs: List<EstateReadingConfig> = emptyList(),
+        security: EstateSecurity = EstateSecurity(),
     ): Estate = asAdmin {
         estateService.create(
             EstateInput(
@@ -46,6 +47,7 @@ abstract class EstatesTestSupport : AbstractQLKTITSupport() {
                 labels = labels.map { it.getDisplay() },
                 marker = marker,
                 readingConfigs = readingConfigs,
+                security = security,
             )
         )
     }

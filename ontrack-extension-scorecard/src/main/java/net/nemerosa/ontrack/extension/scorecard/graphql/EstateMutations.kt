@@ -1,6 +1,7 @@
 package net.nemerosa.ontrack.extension.scorecard.graphql
 
 import net.nemerosa.ontrack.common.api.APIDescription
+import net.nemerosa.ontrack.extension.findings.model.FindingKind
 import net.nemerosa.ontrack.extension.scorecard.engine.MarkerKind
 import net.nemerosa.ontrack.extension.scorecard.estates.*
 import net.nemerosa.ontrack.graphql.schema.Mutation
@@ -45,6 +46,7 @@ class EstateMutations(
                     labels = input.labels,
                     marker = input.marker?.toEstateMarker(),
                     readingConfigs = input.readings?.map { it.toEstateReadingConfig() } ?: emptyList(),
+                    security = input.security?.toEstateSecurity() ?: EstateSecurity(),
                 )
             )
         },
@@ -80,6 +82,9 @@ data class CreateEstateInput(
     @APIDescription("Window override and target per reading, at most one per reading")
     @ListRef(embedded = true)
     val readings: List<EstateReadingConfigInput>?,
+    @APIDescription("What the estate expects of the security scans of its projects. Null for no expectation.")
+    @TypeRef(embedded = true)
+    val security: EstateSecurityInput?,
 ) {
     fun toEstateInput() = EstateInput(
         name = name,
@@ -87,6 +92,7 @@ data class CreateEstateInput(
         labels = labels,
         marker = marker?.toEstateMarker(),
         readingConfigs = readings?.map { it.toEstateReadingConfig() } ?: emptyList(),
+        security = security?.toEstateSecurity() ?: EstateSecurity(),
     )
 }
 
@@ -107,7 +113,30 @@ data class UpdateEstateInput(
     @APIDescription("Window override and target per reading, at most one per reading")
     @ListRef(embedded = true)
     val readings: List<EstateReadingConfigInput>?,
+    @APIDescription("What the estate expects of the security scans of its projects. Null for no expectation.")
+    @TypeRef(embedded = true)
+    val security: EstateSecurityInput?,
 )
+
+@APIDescription("What an estate expects of the security scans of its projects")
+data class EstateSecurityInput(
+    @APIDescription("Kinds of scan every project must have run, each fresher than the freshness, to be covered. Null or empty: any fresh scan covers a project.")
+    @ListRef
+    val expectedKinds: List<FindingKind>?,
+    @APIDescription("Number of days a scan stays fresh, null for the freshness of the settings")
+    val freshnessDays: Int?,
+    @APIDescription("Number of days a CRITICAL finding may stay open, null for no target")
+    val criticalTargetDays: Int?,
+    @APIDescription("Number of days a HIGH finding may stay open, null for no target")
+    val highTargetDays: Int?,
+) {
+    fun toEstateSecurity() = EstateSecurity(
+        expectedKinds = expectedKinds ?: emptyList(),
+        freshnessDays = freshnessDays,
+        criticalTargetDays = criticalTargetDays,
+        highTargetDays = highTargetDays,
+    )
+}
 
 @APIDescription("Marker of an estate")
 data class EstateMarkerInput(
