@@ -81,6 +81,8 @@ class ScorecardJobsIT : AbstractDSLTestSupport() {
                         ReadingKeys.QUALITY_TEST_FLAKINESS,
                         ReadingKeys.QUALITY_TEST_PASS_RATE,
                         ReadingKeys.SECURITY_MATURITY,
+                        ReadingKeys.SECURITY_OVERDUE,
+                        ReadingKeys.SECURITY_REMEDIATION_TIME,
                         FailingReadingComputer.KEY,
                     ),
                     readings.map { it.key }.sorted()

@@ -4,7 +4,7 @@
  * of the project page and the scorecard page of the project.
  *
  * Units, as the API gives them: durations in seconds, frequencies per week, rates in percent (0 to 100),
- * rungs of a ladder from 0 up.
+ * rungs of a ladder from 0 up, counts.
  */
 
 import {kindName} from "@components/extension/findings/findingsModel";
@@ -13,6 +13,7 @@ export const DURATION = 'duration'
 export const PER_WEEK = 'perWeek'
 export const PERCENT = 'percent'
 export const RUNG = 'rung'
+export const COUNT = 'count'
 
 /**
  * Names of the rungs of the security maturity, from 0 up.
@@ -62,6 +63,14 @@ export const READINGS = [
     {
         key: 'security.maturity', name: 'Security maturity', unit: RUNG, marker: false, direction: HIGHER_IS_BETTER,
         description: 'Rung of the security scans of the branches read: 0 none; 1 reported, a scan in the window; 2 covered, every kind the estate expects scanned within its freshness (any scan with no estate); 3 gating, a security stamp required by a promotion, or a scan which failed in the window.',
+    },
+    {
+        key: 'security.remediationTime', name: 'Remediation time', unit: DURATION, marker: false, direction: LOWER_IS_BETTER,
+        description: 'Median time from the first observation of a CRITICAL or HIGH finding to its resolution in the project, for the findings resolved in the window. A version bump which leaves the finding in place does not resolve it.',
+    },
+    {
+        key: 'security.overdue', name: 'Overdue findings', unit: COUNT, marker: false, direction: LOWER_IS_BETTER,
+        description: 'Open CRITICAL findings older than the CRITICAL remediation target of the estate, plus open HIGH findings older than its HIGH target. Unknown with no target.',
     },
 ]
 
@@ -198,6 +207,8 @@ export const formatReadingValue = (key, value) => {
             const name = SECURITY_MATURITY_RUNGS[value]
             return name ? `${value} · ${name}` : round(value, 2)
         }
+        case COUNT:
+            return String(Math.round(value))
         default:
             return round(value, 2)
     }
@@ -209,12 +220,23 @@ const UNKNOWN_REASONS = {
     NO_FAILURE: 'No failure in window',
     NO_TEST_STAMP: 'No test stamp: no validation stamp with test summary data on the branches read',
     NOT_LICENSED: 'The environment marker needs the environments, which the licence does not allow',
+    NO_TARGET: 'No remediation target: no estate, or an estate with neither a CRITICAL nor a HIGH target',
 }
 
 /**
- * Why a reading is unknown, in words.
+ * Reasons said in the terms of one reading, by reading key.
  */
-export const unknownReasonText = (reason) => UNKNOWN_REASONS[reason] ?? reason
+const READING_UNKNOWN_REASONS = {
+    'security.remediationTime': {
+        NO_SAMPLES: 'No CRITICAL or HIGH finding resolved in the window',
+    },
+}
+
+/**
+ * Why a reading is unknown, in words - in the terms of the reading when its `key` is given.
+ */
+export const unknownReasonText = (reason, key) =>
+    READING_UNKNOWN_REASONS[key]?.[reason] ?? UNKNOWN_REASONS[reason] ?? reason
 
 /**
  * How a reading is to be shown:
@@ -358,6 +380,15 @@ const ofCount = (part, count) => `${part} of ${count}`
 export const daysText = (days) => days === 1 ? '1 day' : `${days} days`
 
 /**
+ * The open findings of one severity against their remediation target: `2 overdue of 3 open, target
+ * 7 days`, or `3 open, no target`.
+ */
+const overdueText = (overdue, open, targetDays) =>
+    isNumber(targetDays) ?
+        `${overdue ?? 0} overdue of ${open} open, target ${daysText(targetDays)}` :
+        `${open} open, no target`
+
+/**
  * The `details` of a reading which explain its value, beyond the marker and the scope, as a list
  * of `{key, label, text}`, or `{key, label, timestamp}` for a moment in time.
  */
@@ -458,6 +489,28 @@ export const readingDetailItems = (reading) => {
     }
     if (details.lastScan) {
         items.push({key: 'lastScan', label: 'Last scan', timestamp: details.lastScan})
+    }
+    // Overdue findings, by severity, against their target
+    if (isNumber(details.openCritical)) {
+        items.push({
+            key: 'critical',
+            label: 'CRITICAL',
+            text: overdueText(details.overdueCritical, details.openCritical, details.criticalTargetDays),
+        })
+    }
+    if (isNumber(details.openHigh)) {
+        items.push({
+            key: 'high',
+            label: 'HIGH',
+            text: overdueText(details.overdueHigh, details.openHigh, details.highTargetDays),
+        })
+    }
+    if (details.overdueSince) {
+        items.push({key: 'overdueSince', label: 'Overdue since', timestamp: details.overdueSince})
+    }
+    // Remediation readings: the accepted findings, neither open nor resolved
+    if (isNumber(details.accepted)) {
+        items.push({key: 'accepted', label: 'Accepted', text: String(details.accepted)})
     }
     return items
 }

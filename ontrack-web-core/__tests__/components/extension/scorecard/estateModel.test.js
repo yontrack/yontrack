@@ -79,6 +79,8 @@ describe('estateFormValues', () => {
             'quality.testPassRate',
             'quality.testFlakiness',
             'security.maturity',
+            'security.remediationTime',
+            'security.overdue',
         ])
         values.readings.forEach(it => {
             expect(it.windowDays).toBeNull()

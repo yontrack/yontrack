@@ -2,7 +2,10 @@ package net.nemerosa.ontrack.extension.scorecard.samples
 
 import net.nemerosa.ontrack.extension.chart.support.Interval
 import net.nemerosa.ontrack.extension.findings.model.FindingKind
+import net.nemerosa.ontrack.extension.findings.model.FindingSeverity
+import net.nemerosa.ontrack.extension.findings.model.FindingState
 import net.nemerosa.ontrack.model.structure.Branch
+import net.nemerosa.ontrack.model.structure.Project
 import java.time.LocalDateTime
 
 /**
@@ -24,6 +27,66 @@ interface SecuritySamples {
      * excluded, ordered by time.
      */
     fun scans(branches: Collection<Branch>, interval: Interval): List<SecurityRunSample>
+
+    /**
+     * CRITICAL and HIGH findings of a project — by maximum severity — which matter to its
+     * remediation over the interval: the ones resolved at project level from the start of the
+     * interval, and the ones not resolved, with their state at the end of the interval on the
+     * branches in scope. Ordered by ID.
+     *
+     * The findings of a project belong to the project, not to a branch: a finding is resolved at
+     * project level once no branch which counts for the project exposes it any more. Its location
+     * is versionless, so that bumping a package to a version which is still vulnerable does not
+     * resolve it.
+     *
+     * @param project Project of the findings
+     * @param branches Branches in scope, which give the state of the findings not resolved
+     * @param interval Window of the reading. The state is evaluated on the day of its end, for the
+     * expiry of the acceptances.
+     */
+    fun remediationFindings(
+        project: Project,
+        branches: Collection<Branch>,
+        interval: Interval,
+    ): List<SecurityFindingSample>
+}
+
+/**
+ * A CRITICAL or HIGH finding, for the remediation readings.
+ *
+ * @property findingId ID of the finding
+ * @property severity Maximum severity of the finding across its observations
+ * @property firstSeen Time of its first observation
+ * @property resolvedAt Time it was resolved at project level, `null` while it is not
+ * @property state State of the finding at the end of the window: `RESOLVED` when it has a
+ * resolution time, else rolled up from its exposure on the branches in scope — `OPEN`, `ACCEPTED`,
+ * or `RESOLVED` when no branch in scope exposes it
+ */
+data class SecurityFindingSample(
+    val findingId: Int,
+    val severity: FindingSeverity,
+    val firstSeen: LocalDateTime,
+    val resolvedAt: LocalDateTime?,
+    val state: FindingState,
+)
+
+/**
+ * Remediation targets of a set: how many days a finding of each severity may stay open, `null`
+ * for no target. The no-estate set has none.
+ *
+ * @property criticalDays Number of days a CRITICAL finding may stay open
+ * @property highDays Number of days a HIGH finding may stay open
+ */
+data class SecurityTargets(
+    val criticalDays: Int?,
+    val highDays: Int?,
+) {
+    companion object {
+        /**
+         * No target at all, as for the no-estate set
+         */
+        val NONE = SecurityTargets(criticalDays = null, highDays = null)
+    }
 }
 
 /**

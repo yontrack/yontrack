@@ -55,12 +55,12 @@ export function JudgementTag({reading, testId}) {
             </Tag>
         case 'UNKNOWN':
             return <span {...props}>
-                <Tooltip title={unknownReasonText(reading.unknownReason)}>
+                <Tooltip title={unknownReasonText(reading.unknownReason, reading.key)}>
                     <Tag
                         variant="filled"
                         icon={<FaQuestionCircle aria-hidden="true"/>}
                         tabIndex={0}
-                        aria-label={`Unknown: ${unknownReasonText(reading.unknownReason)}`}
+                        aria-label={`Unknown: ${unknownReasonText(reading.unknownReason, reading.key)}`}
                         data-testid={sub('unknown')}
                         style={NEUTRAL_TAG}
                     >

@@ -86,6 +86,10 @@ class ACCDSLScorecard : AbstractACCDSLTestSupport() {
                 assertMeasured(ReadingKeys.DELIVERY_MTTR, 44.hours, count = 1) // 2 creation -> 3 GOLD
                 assertUnknown(ReadingKeys.QUALITY_TEST_PASS_RATE, ReadingUnknownReason.NO_TEST_STAMP)
                 assertUnknown(ReadingKeys.QUALITY_TEST_FLAKINESS, ReadingUnknownReason.NO_TEST_STAMP)
+                // No finding at all
+                assertUnknown(ReadingKeys.SECURITY_REMEDIATION_TIME, ReadingUnknownReason.NO_SAMPLES)
+                // No remediation target with no estate
+                assertUnknown(ReadingKeys.SECURITY_OVERDUE, ReadingUnknownReason.NO_TARGET)
                 readings.forEach {
                     assertNull(it.target)
                     assertNull(it.targetMet)

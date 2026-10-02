@@ -88,6 +88,15 @@ describe('formatReadingValue', () => {
         expect(formatReadingValue('security.maturity', 3)).toEqual('3 · Gating')
     })
 
+    it('formats a remediation time as a duration', () => {
+        expect(formatReadingValue('security.remediationTime', 2 * 86400)).toEqual('2d')
+    })
+
+    it('formats a number of overdue findings as a whole number', () => {
+        expect(formatReadingValue('security.overdue', 0)).toEqual('0')
+        expect(formatReadingValue('security.overdue', 3)).toEqual('3')
+    })
+
     it('formats the value of a reading out of the catalogue as a number', () => {
         expect(formatReadingValue('test.failing', 1.23456)).toEqual('1.23')
     })
@@ -106,6 +115,8 @@ describe('readingName', () => {
         expect(readingName('quality.testPassRate')).toEqual('Test pass rate')
         expect(readingName('quality.testFlakiness')).toEqual('Test flakiness')
         expect(readingName('security.maturity')).toEqual('Security maturity')
+        expect(readingName('security.remediationTime')).toEqual('Remediation time')
+        expect(readingName('security.overdue')).toEqual('Overdue findings')
         expect(readingName('some.other')).toEqual('some.other')
     })
 })
@@ -136,6 +147,13 @@ describe('readingDescription', () => {
         expect(readingDescription('security.maturity', 'ENVIRONMENT')).toEqual(readingDescription('security.maturity', 'PROMOTION'))
         expect(readingDescription('security.maturity')).toMatch(/gating/)
         expect(readingUsesMarker('security.maturity')).toBe(false)
+    })
+
+    it('describes the remediation readings without the marker', () => {
+        expect(readingDescription('security.remediationTime')).toMatch(/first observation/)
+        expect(readingDescription('security.overdue')).toMatch(/target/)
+        expect(readingUsesMarker('security.remediationTime')).toBe(false)
+        expect(readingUsesMarker('security.overdue')).toBe(false)
     })
 
     it('describes a test reading the same way whatever the marker', () => {
@@ -217,7 +235,14 @@ describe('unknownReasonText', () => {
         expect(unknownReasonText('NO_FAILURE')).toEqual('No failure in window')
         expect(unknownReasonText('NO_TEST_STAMP')).toMatch(/test stamp/i)
         expect(unknownReasonText('NOT_LICENSED')).toMatch(/licen/i)
+        expect(unknownReasonText('NO_TARGET')).toMatch(/no remediation target/i)
         expect(unknownReasonText('SOMETHING_NEW')).toEqual('SOMETHING_NEW')
+    })
+
+    it('explains a reason in the terms of its reading', () => {
+        expect(unknownReasonText('NO_SAMPLES', 'security.remediationTime')).toMatch(/no CRITICAL or HIGH finding resolved/i)
+        expect(unknownReasonText('NO_SAMPLES', 'delivery.leadTime')).toMatch(/nothing reached the marker/i)
+        expect(unknownReasonText('NO_TARGET', 'security.overdue')).toMatch(/no remediation target/i)
     })
 })
 
@@ -547,6 +572,71 @@ describe('readingDetailItems', () => {
             'Fresh kinds': 'None',
             'Failed scans': '0',
             'Required by a promotion': 'None',
+        })
+    })
+})
+
+describe('readingDetailItems of the remediation readings', () => {
+
+    const labels = (items) => Object.fromEntries(items.map(it => [it.label, it.text ?? it.timestamp]))
+
+    it('gives the statistics of the remediation time and the accepted findings', () => {
+        expect(labels(readingDetailItems(reading({
+            key: 'security.remediationTime',
+            value: 2 * 86400,
+            details: {count: 3, p90: 5 * 86400, mean: 3 * 86400, min: 86400, max: 6 * 86400, accepted: 2},
+        })))).toEqual({
+            'Samples': '3',
+            '90th percentile': '5d',
+            'Mean': '3d',
+            'Min': '1d',
+            'Max': '6d',
+            'Accepted': '2',
+        })
+    })
+
+    it('gives the overdue findings by severity, against their target', () => {
+        expect(labels(readingDetailItems(reading({
+            key: 'security.overdue',
+            value: 2,
+            details: {
+                overdueCritical: 2,
+                overdueHigh: null,
+                openCritical: 3,
+                openHigh: 1,
+                criticalTargetDays: 7,
+                highTargetDays: null,
+                overdueSince: '2026-08-01T10:00:00',
+                accepted: 1,
+            },
+        })))).toEqual({
+            'CRITICAL': '2 overdue of 3 open, target 7 days',
+            'HIGH': '1 open, no target',
+            'Overdue since': '2026-08-01T10:00:00',
+            'Accepted': '1',
+        })
+    })
+
+    it('gives the open findings with no target at all', () => {
+        expect(labels(readingDetailItems(reading({
+            key: 'security.overdue',
+            value: null,
+            basis: 'UNKNOWN',
+            unknownReason: 'NO_TARGET',
+            details: {
+                overdueCritical: null,
+                overdueHigh: null,
+                openCritical: 0,
+                openHigh: 4,
+                criticalTargetDays: null,
+                highTargetDays: null,
+                overdueSince: null,
+                accepted: 0,
+            },
+        })))).toEqual({
+            'CRITICAL': '0 open, no target',
+            'HIGH': '4 open, no target',
+            'Accepted': '0',
         })
     })
 })

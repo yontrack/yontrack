@@ -11,7 +11,8 @@ enum class ReadingUnknownReason {
     NO_MARKER,
 
     /**
-     * Nothing reached the marker in the window.
+     * Nothing to measure in the window: nothing reached the marker, or — for the remediation time — no
+     * CRITICAL or HIGH finding was resolved.
      */
     NO_SAMPLES,
 
@@ -31,4 +32,10 @@ enum class ReadingUnknownReason {
      * Delivery reading up to an environment, without the licence of the environments.
      */
     NOT_LICENSED,
+
+    /**
+     * Security reading judged against the remediation targets of an estate, with no such target: no
+     * estate, or an estate with neither a CRITICAL nor a HIGH target.
+     */
+    NO_TARGET,
 }

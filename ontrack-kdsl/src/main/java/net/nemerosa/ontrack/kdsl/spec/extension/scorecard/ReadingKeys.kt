@@ -42,4 +42,15 @@ object ReadingKeys {
      * Rung of the security scans: 0 none, 1 reported, 2 covered, 3 gating. Higher is better.
      */
     const val SECURITY_MATURITY = "security.maturity"
+
+    /**
+     * Median time from the first observation of a CRITICAL or HIGH finding to its resolution in the
+     * project, in seconds, for the findings resolved in the window. Lower is better.
+     */
+    const val SECURITY_REMEDIATION_TIME = "security.remediationTime"
+
+    /**
+     * Open CRITICAL and HIGH findings older than the remediation targets of the estate. Lower is better.
+     */
+    const val SECURITY_OVERDUE = "security.overdue"
 }

@@ -43,6 +43,18 @@ object ReadingKeys {
     const val SECURITY_MATURITY = "security.maturity"
 
     /**
+     * First observation to project-level resolution of the CRITICAL and HIGH findings resolved in the
+     * window. Median, in seconds.
+     */
+    const val SECURITY_REMEDIATION_TIME = "security.remediationTime"
+
+    /**
+     * Open CRITICAL findings older than the CRITICAL target of the estate, plus open HIGH findings older
+     * than its HIGH target. A count.
+     */
+    const val SECURITY_OVERDUE = "security.overdue"
+
+    /**
      * Catalogue order
      */
     val ORDER: List<String> = listOf(
@@ -53,6 +65,8 @@ object ReadingKeys {
         QUALITY_TEST_PASS_RATE,
         QUALITY_TEST_FLAKINESS,
         SECURITY_MATURITY,
+        SECURITY_REMEDIATION_TIME,
+        SECURITY_OVERDUE,
     )
 
     /**
@@ -66,6 +80,8 @@ object ReadingKeys {
         QUALITY_TEST_PASS_RATE to ReadingDirection.HIGHER_IS_BETTER,
         QUALITY_TEST_FLAKINESS to ReadingDirection.LOWER_IS_BETTER,
         SECURITY_MATURITY to ReadingDirection.HIGHER_IS_BETTER,
+        SECURITY_REMEDIATION_TIME to ReadingDirection.LOWER_IS_BETTER,
+        SECURITY_OVERDUE to ReadingDirection.LOWER_IS_BETTER,
     )
 
     /**
