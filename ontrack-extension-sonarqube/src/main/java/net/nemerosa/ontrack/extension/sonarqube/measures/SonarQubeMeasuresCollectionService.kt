@@ -40,3 +40,8 @@ interface SonarQubeMeasuresCollectionService {
     fun getMeasures(build: Build): SonarQubeMeasures?
 
 }
+
+/**
+ * Reason of the system acting as administrator to collect SonarQube measures.
+ */
+const val SONARQUBE_SYSTEM_REASON = "sonarqube"

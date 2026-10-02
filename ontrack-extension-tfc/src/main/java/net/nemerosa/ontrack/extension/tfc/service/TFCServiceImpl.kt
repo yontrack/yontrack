@@ -28,7 +28,7 @@ class TFCServiceImpl(
     ) {
         // Getting the actual parameters
         val actualParams = expandParams(params, workspaceId, runUrl)
-        securityService.asAdmin {
+        securityService.asAdmin("tfc") {
             // Looking for the build
             val build = findBuild(actualParams) ?: return@asAdmin
             // Forcing the creation of the validation stamp if not existing

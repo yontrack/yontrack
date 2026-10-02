@@ -40,7 +40,7 @@ class SonarQubeMeasuresJobSupplier(
                                 SONARQUBE_COLLECTION_JOB.getKey(project.name)
 
                         override fun getTask() = JobRun { listener ->
-                            securityService.asAdmin {
+                            securityService.asAdmin(SONARQUBE_SYSTEM_REASON) {
                                 sonarQubeMeasuresCollectionService.collect(project) { msg ->
                                     listener.message(msg)
                                 }

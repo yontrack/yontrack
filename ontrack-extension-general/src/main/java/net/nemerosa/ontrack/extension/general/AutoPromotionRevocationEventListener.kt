@@ -13,6 +13,11 @@ import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
 
 /**
+ * Reason of the system acting as administrator to revoke an automatic promotion.
+ */
+private const val AUTO_PROMOTION_REVOCATION = "auto-promotion-revocation"
+
+/**
  * Revokes an auto promotion as soon as one of its prerequisites - a required validation stamp or a
  * required promotion - is no longer valid, for the promotion levels which have opted in through
  * [AutoPromotionProperty.autoRevoke].
@@ -100,7 +105,7 @@ class AutoPromotionRevocationEventListener(
         val build = event.getEntity<Build>(ProjectEntityType.BUILD)
         // `deletePromotionRun` requires `PromotionRunDelete`, which the user who flipped a validation to
         // FAILED will typically not hold.
-        securityService.asAdmin {
+        securityService.asAdmin(AUTO_PROMOTION_REVOCATION) {
             val promotionLevels = structureService.getPromotionLevelListForBranch(branch.id)
             val validationStamps = structureService.getValidationStampListForBranch(branch.id)
             promotionLevels.forEach { promotionLevel ->

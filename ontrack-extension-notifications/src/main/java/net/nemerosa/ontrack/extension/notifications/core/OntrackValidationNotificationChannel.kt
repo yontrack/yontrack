@@ -85,7 +85,7 @@ class OntrackValidationNotificationChannel(
 
         val status = resolveStatus(config.status, event, context)
 
-        val run = securityService.asAdmin {
+        val run = securityService.asAdmin("validation-notification") {
             structureService.newValidationRun(
                 build = build,
                 validationRunRequest = ValidationRunRequest(
@@ -100,7 +100,7 @@ class OntrackValidationNotificationChannel(
             // Evaluates the run time as a template
             val runTime: Int? = renderRunTime(config.runTime, event, context)
             // Setting the run info
-            securityService.asAdmin {
+            securityService.asAdmin("validation-notification") {
                 runInfoService.setRunInfo(
                     entity = run,
                     input = RunInfoInput(

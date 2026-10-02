@@ -29,7 +29,7 @@ class DefaultIngestionHookProcessingService(
     override fun process(payload: IngestionHookPayload) {
         ingestionHookPayloadStorage.start(payload)
         meterRegistry.increment(payload, IngestionMetrics.Process.startedCount)
-        securityService.asAdmin {
+        securityService.asAdmin(IngestionHookPayload.SYSTEM_REASON) {
             try {
                 meterRegistry.timeForPayload(payload, IngestionMetrics.Process.time) {
                     val outcome = doProcess(payload)

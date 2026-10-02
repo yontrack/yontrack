@@ -65,16 +65,32 @@ class SecurityServiceImpl : SecurityService {
                 ?: anonymous()
         }
 
-    override fun <T> runAsAdmin(supplier: () -> T): () -> T {
+    override val currentActor: Actor?
+        get() {
+            val authentication = SecurityContextHolder.getContext().authentication
+            return when {
+                authentication == null || !authentication.isAuthenticated -> null
+                authentication is AuthenticatedUserAuthentication -> authentication.actor
+                else -> (authentication.principal as? AuthenticatedUser)?.let { Actor.degraded(it.name) }
+            }
+        }
+
+    override fun <T> runAsAdmin(supplier: () -> T): () -> T = runAsAdmin(null, supplier)
+
+    override fun <T> runAsAdmin(reason: String?, supplier: () -> T): () -> T {
         // Gets the current account (if any)
         val account = currentUser
+        // The system acts on behalf of the current actor (if any)
+        val actor = currentActor.runAs(reason)
         // Creates a temporary admin context
-        val adminContext = SecurityContextImpl(RunAsAuthenticatedUser.authentication(account))
+        val adminContext = SecurityContextImpl(RunAsAuthenticatedUser.authentication(account, actor))
         // Returns a callable that sets the context before running the target callable
         return withSecurityContext(supplier, adminContext)
     }
 
     override fun <T> asAdmin(supplier: () -> T): T = runAsAdmin(supplier)()
+
+    override fun <T> asAdmin(reason: String, supplier: () -> T): T = runAsAdmin(reason, supplier)()
 
     override fun <T, R> runner(fn: (T) -> R): (T) -> R {
         // Current context

@@ -6171,6 +6171,8 @@ type QueueDispatchResult {
 type QueuePayload {
   "Identity of the user"
   accountName: String!
+  "Who sent the message, and through which channel. When absent, the message is processed by its account acting as system."
+  actor: JSON
   "Message body for the processor"
   body: JSON!
   "Unique ID of the message"

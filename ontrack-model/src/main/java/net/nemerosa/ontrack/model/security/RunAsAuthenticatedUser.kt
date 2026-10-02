@@ -28,10 +28,17 @@ class RunAsAuthenticatedUser private constructor(
             authenticatedUser = authenticatedUser
         )
 
-        fun authentication(authenticatedUser: AuthenticatedUser?): Authentication {
+        /**
+         * Authentication of the administrator the system runs as.
+         *
+         * @param authenticatedUser User whose context the system runs from, if any
+         * @param actor Actor of the system, see [Actor.runAs]
+         */
+        fun authentication(authenticatedUser: AuthenticatedUser?, actor: Actor): Authentication {
             return AuthenticatedUserAuthentication(
                 authenticatedUser = runAsUser(authenticatedUser),
-                authorities = AuthorityUtils.createAuthorityList(SecurityRole.ADMINISTRATOR.name)
+                authorities = AuthorityUtils.createAuthorityList(SecurityRole.ADMINISTRATOR.name),
+                actor = actor,
             )
         }
 

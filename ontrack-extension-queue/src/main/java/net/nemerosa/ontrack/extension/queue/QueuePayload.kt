@@ -2,9 +2,11 @@ package net.nemerosa.ontrack.extension.queue
 
 import tools.jackson.databind.JsonNode
 import net.nemerosa.ontrack.common.api.APIDescription
+import net.nemerosa.ontrack.graphql.support.JSONType
 import net.nemerosa.ontrack.json.asJson
 import net.nemerosa.ontrack.json.parse
 import net.nemerosa.ontrack.json.parseInto
+import net.nemerosa.ontrack.model.security.Actor
 import java.util.*
 import kotlin.reflect.KClass
 
@@ -18,6 +20,9 @@ class QueuePayload(
     val accountName: String,
     @APIDescription("Message body for the processor")
     val body: JsonNode,
+    @APIDescription("Who sent the message, and through which channel. When absent, the message is processed by its account acting as system.")
+    @JSONType
+    val actor: Actor? = null,
 ) {
     fun <T : Any> parse(payloadType: KClass<out T>): T =
         body.parseInto(payloadType)
@@ -27,12 +32,14 @@ class QueuePayload(
             processor: QueueProcessor<T>,
             accountName: String,
             body: T,
+            actor: Actor? = null,
         ) =
             QueuePayload(
                 id = UUID.randomUUID().toString(),
                 processor = processor.id,
                 accountName = accountName,
-                body = body.asJson()
+                body = body.asJson(),
+                actor = actor,
             )
 
         fun parse(body: JsonNode) = body.parse<QueuePayload>()

@@ -9,6 +9,11 @@ import net.nemerosa.ontrack.model.structure.PromotionRun.Companion.of
 import org.springframework.stereotype.Component
 
 /**
+ * Reason of the system acting as administrator to promote a build automatically.
+ */
+private const val AUTO_PROMOTION = "auto-promotion"
+
+/**
  * When a new validation run is created with a passed status, when the status of an existing validation run
  * becomes passed (`FIXED` for example), or when a promotion is granted, we check all auto promoted promotion levels
  * to know if each of their validation stamps is now passed.
@@ -71,7 +76,7 @@ class AutoPromotionEventListener(
                 .filter { validationStamp: ValidationStamp -> (validationStampId != validationStamp.id()) }
             if (keptValidationStamps.size < property.validationStamps.size) {
                 val editedProperty = property.copy(validationStamps = keptValidationStamps)
-                securityService.asAdmin {
+                securityService.asAdmin(AUTO_PROMOTION) {
                     propertyService.editProperty(
                         promotionLevel,
                         AutoPromotionPropertyType::class.java,
@@ -89,7 +94,7 @@ class AutoPromotionEventListener(
                 property.promotionLevels.filter { pl: PromotionLevel -> (promotionLevelId != pl.id()) }
             if (keptPromotionLevels.size < property.promotionLevels.size) {
                 val editedProperty = property.copy(promotionLevels = keptPromotionLevels)
-                securityService.asAdmin {
+                securityService.asAdmin(AUTO_PROMOTION) {
                     propertyService.editProperty(
                         promotionLevel,
                         AutoPromotionPropertyType::class.java,
@@ -165,7 +170,7 @@ class AutoPromotionEventListener(
                     // Makes sure to raise the auth level because the one
                     // having made a validation might not be granted to
                     // creation a promotion
-                    securityService.asAdmin {
+                    securityService.asAdmin(AUTO_PROMOTION) {
                         structureService.newPromotionRun(
                             of(
                                 build,

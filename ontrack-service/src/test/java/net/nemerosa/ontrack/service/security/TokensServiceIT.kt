@@ -2,7 +2,11 @@ package net.nemerosa.ontrack.service.security
 
 import net.nemerosa.ontrack.common.Time
 import net.nemerosa.ontrack.it.AbstractDSLTestSupport
+import net.nemerosa.ontrack.json.asJson
+import net.nemerosa.ontrack.json.format
 import net.nemerosa.ontrack.model.security.Account
+import net.nemerosa.ontrack.model.security.Actor
+import net.nemerosa.ontrack.model.security.ActorVia
 import net.nemerosa.ontrack.model.security.AccountManagement
 import net.nemerosa.ontrack.model.structure.ID
 import net.nemerosa.ontrack.model.structure.TokenOptions
@@ -10,6 +14,7 @@ import net.nemerosa.ontrack.model.structure.TokensService
 import net.nemerosa.ontrack.test.TestUtils.uid
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.security.core.context.SecurityContextHolder
 import java.time.Duration
 import java.util.*
 import kotlin.test.*
@@ -230,6 +235,58 @@ class TokensServiceIT : AbstractDSLTestSupport() {
                 val firstToken = tokensService.getTokens(tokenAccount.account).first()
                 assertNotNull(firstToken.lastUsed, "Last used date has been set")
             }
+        }
+    }
+
+    @Test
+    fun `Using a token for the security context keeps its name as the actor`() {
+        val (email, token) = asUser {
+            val token = tokensService.generateNewToken(TokenOptions("pipeline"))
+            securityService.currentUser?.account?.email to token.value
+        }
+        val actor = withEmptySecurityContext {
+            assertTrue(tokensService.useTokenForSecurityContext(token))
+            securityService.currentActor
+        }
+        assertEquals(
+            Actor(account = email!!, via = ActorVia.TOKEN, tokenName = "pipeline"),
+            actor,
+        )
+        assertFalse(actor.asJson().format().contains(token), "The actor never carries the value of the token")
+    }
+
+    @Test
+    fun `Using a token for the security context of a webhook`() {
+        val (email, token) = asUser {
+            val token = tokensService.generateNewToken(TokenOptions("hook"))
+            securityService.currentUser?.account?.email to token.value
+        }
+        val actor = withEmptySecurityContext {
+            assertTrue(tokensService.useTokenForSecurityContext(token, ActorVia.WEBHOOK))
+            securityService.currentActor
+        }
+        assertEquals(
+            Actor(account = email!!, via = ActorVia.WEBHOOK, tokenName = "hook"),
+            actor,
+        )
+    }
+
+    @Test
+    fun `An invalid token sets no actor`() {
+        val actor = withEmptySecurityContext {
+            assertFalse(tokensService.useTokenForSecurityContext(UUID.randomUUID().toString()))
+            securityService.currentActor
+        }
+        assertNull(actor)
+    }
+
+    private fun <T> withEmptySecurityContext(code: () -> T): T {
+        val oldContext = SecurityContextHolder.getContext()
+        return try {
+            SecurityContextHolder.setContext(SecurityContextHolder.createEmptyContext())
+            code()
+        } finally {
+            SecurityContextHolder.setContext(oldContext)
         }
     }
 

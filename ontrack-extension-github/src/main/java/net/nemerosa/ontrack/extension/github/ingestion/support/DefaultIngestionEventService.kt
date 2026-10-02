@@ -45,9 +45,10 @@ class DefaultIngestionEventService(
             payload = payload,
             repository = repository,
             accountName = securityService.currentUser?.name
-                ?: error("Missing account name to process the payload")
+                ?: error("Missing account name to process the payload"),
+            actor = securityService.currentActor,
         )
-        securityService.asAdmin {
+        securityService.asAdmin(IngestionHookPayload.SYSTEM_REASON) {
             // Stores it
             storage.store(ingestionHookPayload, payloadSource)
             // Pushes it on the queue

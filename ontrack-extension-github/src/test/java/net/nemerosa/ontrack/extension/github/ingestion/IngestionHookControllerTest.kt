@@ -3,6 +3,7 @@ package net.nemerosa.ontrack.extension.github.ingestion
 import io.micrometer.core.instrument.MeterRegistry
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.verify
 import net.nemerosa.ontrack.extension.github.ingestion.payload.GitHubIngestionHookSignatureMismatchException
 import net.nemerosa.ontrack.extension.github.ingestion.payload.IngestionHookPayload
 import net.nemerosa.ontrack.extension.github.ingestion.payload.IngestionHookPayloadStorage
@@ -16,6 +17,7 @@ import net.nemerosa.ontrack.it.MockAuthenticationStorageService
 import net.nemerosa.ontrack.it.MockSecurityService
 import net.nemerosa.ontrack.json.format
 import net.nemerosa.ontrack.json.parseAsJson
+import net.nemerosa.ontrack.model.security.ActorVia
 import net.nemerosa.ontrack.model.settings.CachedSettingsService
 import net.nemerosa.ontrack.model.structure.TokensService
 import org.junit.jupiter.api.BeforeEach
@@ -31,7 +33,7 @@ class IngestionHookControllerTest {
     @BeforeEach
     fun setup() {
         tokensService = mockk(relaxed = true)
-        every { tokensService.useTokenForSecurityContext(any()) } returns true
+        every { tokensService.useTokenForSecurityContext(any(), any()) } returns true
     }
 
     @Test
@@ -85,6 +87,12 @@ class IngestionHookControllerTest {
 
         assertEquals(body.parseAsJson(), storedPayload?.payload)
         assertEquals(body.parseAsJson(), queuedPayload?.payload)
+
+        // The token of the hook authenticates a webhook
+        verify { tokensService.useTokenForSecurityContext(any(), ActorVia.WEBHOOK) }
+        // The payload carries the actor across the queue
+        assertEquals(authenticationStorageService.getActor(), storedPayload?.actor)
+        assertEquals(authenticationStorageService.getActor(), queuedPayload?.actor)
     }
 
     @Test

@@ -11,7 +11,7 @@ class DefaultJobDecorator(private val securityService: SecurityService) : JobDec
 
     override fun decorate(job: Job, task: Task): Task {
         return {
-            securityService.asAdmin(task)
+            securityService.asAdmin("job:${job.key.type.category.key}/${job.key.type.key}", task)
         }
     }
 

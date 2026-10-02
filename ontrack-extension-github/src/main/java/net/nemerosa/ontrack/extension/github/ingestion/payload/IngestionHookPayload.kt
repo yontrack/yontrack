@@ -5,6 +5,7 @@ import net.nemerosa.ontrack.common.Time
 import net.nemerosa.ontrack.common.api.APIDescription
 import net.nemerosa.ontrack.extension.github.ingestion.processing.IngestionEventProcessingResult
 import net.nemerosa.ontrack.extension.github.ingestion.processing.model.Repository
+import net.nemerosa.ontrack.model.security.Actor
 import java.time.LocalDateTime
 import java.util.*
 
@@ -29,6 +30,9 @@ import java.util.*
  * @property configuration Name of the GitHub configuration to use
  * @property routing Routing information
  * @property queue Queue information
+ * @property accountName Identity of the user
+ * @property actor Who sent the payload, and through which channel - restored with the account when
+ * the payload is processed
  */
 data class IngestionHookPayload(
     @APIDescription("Unique ID for this payload")
@@ -71,4 +75,13 @@ data class IngestionHookPayload(
     val queue: String? = null,
     @APIDescription("Identity of the user")
     val accountName: String? = null,
-)
+    @APIDescription("Who sent the payload, and through which channel")
+    val actor: Actor? = null,
+) {
+    companion object {
+        /**
+         * Reason of the system acting as administrator to ingest a payload.
+         */
+        const val SYSTEM_REASON = "github-ingestion"
+    }
+}

@@ -16,7 +16,7 @@ class ReleaseValidationPropertyLabelListener(
             propertyService.getPropertyValue(build.branch, ReleaseValidationPropertyType::class.java)
         if (releaseValidationProperty != null) {
             // Forcing the creation of the validation stamp if it does not exist
-            securityService.asAdmin {
+            securityService.asAdmin("release-validation") {
                 val vs = structureService.findValidationStampByName(build.project.name, build.branch.name, releaseValidationProperty.validation).getOrNull()
                 if (vs == null) {
                     structureService.newValidationStamp(

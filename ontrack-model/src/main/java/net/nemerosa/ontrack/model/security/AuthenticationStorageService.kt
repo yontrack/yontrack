@@ -15,9 +15,22 @@ interface AuthenticationStorageService {
     fun getAccountId(): String
 
     /**
-     * Given an account ID, executes some code with the associated account ID.
+     * Gets the actor of the current authentication so that it can be restored later on.
+     *
+     * Fails if no authentication is available.
      */
-    fun withAccountId(accountId: String, code: () -> Unit)
+    fun getActor(): Actor
+
+    /**
+     * Given an account ID, executes some code with the associated account ID.
+     *
+     * @param accountId Account ID, as given by [getAccountId]
+     * @param actor Actor, as given by [getActor]. When null, or when it is not the actor of this
+     * account, the code runs as the account acting as system ([Actor.degraded]), or as the system
+     * for a run-as administrator.
+     * @param code Code to run
+     */
+    fun withAccountId(accountId: String, actor: Actor?, code: () -> Unit)
 
     companion object {
         /**

@@ -19,7 +19,7 @@ class BranchAutoEnableBuildEventListener(
         if (event.eventType == EventFactory.NEW_BUILD) {
             val branch = event.getEntity<Branch>(ProjectEntityType.BRANCH)
             if (branch.isDisabled) {
-                securityService.asAdmin {
+                securityService.asAdmin("branch-auto-enable") {
                     structureService.enableBranch(branch)
                 }
             }

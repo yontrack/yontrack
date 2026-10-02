@@ -98,12 +98,19 @@ class TokensServiceImpl(
         }
         ?: false
 
-    override fun useTokenForSecurityContext(token: String): Boolean {
+    override fun useTokenForSecurityContext(token: String, via: ActorVia): Boolean {
         val tokenAccount = findAccountByToken(token)
         return if (tokenAccount == null || !tokenAccount.token.valid) {
             false
         } else {
-            authenticationUserService.asUser(tokenAccount.account)
+            authenticationUserService.asUser(
+                account = tokenAccount.account,
+                actor = Actor(
+                    account = tokenAccount.account.email,
+                    via = via,
+                    tokenName = tokenAccount.token.name,
+                ),
+            )
             true
         }
     }

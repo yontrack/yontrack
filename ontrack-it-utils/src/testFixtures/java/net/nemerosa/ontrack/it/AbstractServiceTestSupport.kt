@@ -16,7 +16,7 @@ import net.nemerosa.ontrack.repository.AccountGroupRepository
 import net.nemerosa.ontrack.repository.AccountRepository
 import net.nemerosa.ontrack.test.TestUtils.uid
 import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.security.authentication.TestingAuthenticationToken
+import org.springframework.security.core.authority.AuthorityUtils
 import org.springframework.security.core.context.SecurityContext
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.security.core.context.SecurityContextImpl
@@ -253,6 +253,22 @@ abstract class AbstractServiceTestSupport : AbstractITTestSupport() {
 
     protected fun asUser(email: String = uid("u-") + "@ontrack.local"): UserCall = UserCall(email = email)
 
+    /**
+     * Runs the [code] authenticated as the [account], having got in as the [actor] - like through
+     * an API token or a JWT.
+     */
+    protected fun <T> asActor(account: Account, actor: Actor, code: () -> T): T {
+        val oldContext = securityTestSupport.setupSecurityContext(
+            user = securityTestSupport.createOntrackAuthenticatedUser(account),
+            actor = actor,
+        )
+        return try {
+            code()
+        } finally {
+            SecurityContextHolder.setContext(oldContext)
+        }
+    }
+
     protected fun asAdmin() = FixedAccountCall(
         account = securityTestSupport.createAdminAccount(),
     )
@@ -446,10 +462,10 @@ abstract class AbstractServiceTestSupport : AbstractITTestSupport() {
         override fun contextSetup() {
             val context: SecurityContext = SecurityContextImpl()
             val ontrackAuthenticatedUser = createOntrackAuthenticatedUser()
-            val authentication = TestingAuthenticationToken(
-                ontrackAuthenticatedUser,
-                "",
-                account.role.name
+            val authentication = AuthenticatedUserAuthentication(
+                authenticatedUser = ontrackAuthenticatedUser,
+                authorities = AuthorityUtils.createAuthorityList(account.role.name),
+                actor = Actor(account = ontrackAuthenticatedUser.name, via = ActorVia.UI),
             )
             context.authentication = authentication
             SecurityContextHolder.setContext(context)

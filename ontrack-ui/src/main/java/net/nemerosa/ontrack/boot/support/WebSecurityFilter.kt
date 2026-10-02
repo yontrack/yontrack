@@ -5,6 +5,9 @@ import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
 import net.nemerosa.ontrack.model.security.Account
 import net.nemerosa.ontrack.model.security.AccountLoginService
+import net.nemerosa.ontrack.model.security.Actor
+import net.nemerosa.ontrack.model.security.ActorJwt
+import net.nemerosa.ontrack.model.security.ActorVia
 import net.nemerosa.ontrack.model.security.AuthenticationUserService
 import net.nemerosa.ontrack.model.structure.TokenAuthenticationToken
 import net.nemerosa.ontrack.model.support.OntrackConfigProperties
@@ -31,20 +34,38 @@ class WebSecurityFilter(
     ) {
         val authentication = SecurityContextHolder.getContext().authentication
         if (authentication != null && authentication.isAuthenticated) {
-            val account = when (authentication) {
-                is JwtAuthenticationToken -> accountFromJwt(authentication)
-                is TokenAuthenticationToken -> accountFromToken(authentication)
-                else -> null
-            }
-            if (account != null) {
-                authenticationUserService.asUser(account)
+            when (authentication) {
+                is JwtAuthenticationToken -> accountFromJwt(authentication)?.let { account ->
+                    authenticationUserService.asUser(account, actorFromJwt(account, authentication))
+                }
+
+                is TokenAuthenticationToken -> authentication.account.let { account ->
+                    authenticationUserService.asUser(
+                        account,
+                        Actor(account = account.email, via = ActorVia.TOKEN),
+                    )
+                }
             }
         }
         filterChain.doFilter(request, response)
     }
 
-    private fun accountFromToken(authentication: TokenAuthenticationToken): Account =
-        authentication.account
+    /**
+     * Actor of a JWT: the UI when the token was issued to one of its clients, a JWT otherwise.
+     */
+    private fun actorFromJwt(account: Account, jwtAuthenticationToken: JwtAuthenticationToken): Actor {
+        val token = jwtAuthenticationToken.token
+        val azp = token.getClaimAsString("azp")
+        val ui = !azp.isNullOrBlank() && azp in ontrackConfigProperties.security.authorization.jwt.uiClients
+        return Actor(
+            account = account.email,
+            via = if (ui) ActorVia.UI else ActorVia.JWT,
+            jwt = ActorJwt(
+                iss = token.getClaimAsString("iss"),
+                sub = token.subject,
+            ),
+        )
+    }
 
     private fun accountFromJwt(jwtAuthenticationToken: JwtAuthenticationToken): Account? {
         val debug = ontrackConfigProperties.security.authorization.jwt.debug

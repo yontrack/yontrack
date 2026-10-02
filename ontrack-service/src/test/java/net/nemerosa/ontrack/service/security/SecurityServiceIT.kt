@@ -17,6 +17,30 @@ class SecurityServiceIT : AbstractDSLTestSupport() {
     private lateinit var roleService: RolesService
 
     @Test
+    fun `Running as admin for a reason acts as the system on behalf of the actor`() {
+        val account = asAdmin { doCreateAccountWithGlobalRole(Roles.GLOBAL_AUTOMATION) }
+        val actor = Actor(account = account.email, via = ActorVia.TOKEN, tokenName = "pipeline")
+        val project = asAdmin { project() }
+        asActor(account, actor) {
+            val systemActor = securityService.asAdmin("auto-promotion") {
+                // Granted as admin
+                assertTrue(securityService.isProjectFunctionGranted(project, ProjectDelete::class.java))
+                securityService.currentActor
+            }
+            assertEquals(Actor.system(reason = "auto-promotion", onBehalfOf = actor), systemActor)
+            // Back to the actor
+            assertEquals(actor, securityService.currentActor)
+        }
+    }
+
+    @Test
+    fun `The actor of a user in tests is the UI`() {
+        asUser {
+            assertEquals(ActorVia.UI, securityService.currentActor?.via)
+        }
+    }
+
+    @Test
     @AsAdminTest
     fun `Running as admin`() {
         project {
@@ -60,7 +84,7 @@ class SecurityServiceIT : AbstractDSLTestSupport() {
         // With a context
         val securedFn = asUser().with(ProjectCreation::class.java).call { securityService.runner(fn) }
         // Calls the secured function
-        assertEquals("test -> TestingAuthenticationToken", securedFn("test"))
+        assertEquals("test -> AuthenticatedUserAuthentication", securedFn("test"))
     }
 
     @Test

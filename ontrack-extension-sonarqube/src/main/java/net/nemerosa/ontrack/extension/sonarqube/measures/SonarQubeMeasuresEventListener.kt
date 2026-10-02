@@ -58,7 +58,7 @@ class SonarQubeMeasuresEventListener(
                                     ) {
                                         // Getting the new data
                                         // Setting the data on the run
-                                        securityService.asAdmin {
+                                        securityService.asAdmin(SONARQUBE_SYSTEM_REASON) {
                                             validationRunService.updateValidationRunData(
                                                 run,
                                                 metricsValidationDataType.data(

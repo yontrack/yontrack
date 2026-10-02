@@ -110,7 +110,7 @@ class YontrackPromotionNotificationChannel(
             )
         }
 
-        val run = securityService.asAdmin {
+        val run = securityService.asAdmin("promotion-notification") {
             structureService.newPromotionRun(
                 PromotionRun.of(
                     build = build,

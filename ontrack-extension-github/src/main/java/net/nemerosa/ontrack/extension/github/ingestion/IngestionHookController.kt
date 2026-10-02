@@ -14,6 +14,7 @@ import net.nemerosa.ontrack.extension.github.ingestion.settings.GitHubIngestionS
 import net.nemerosa.ontrack.json.parse
 import net.nemerosa.ontrack.json.parseAsJson
 import net.nemerosa.ontrack.model.metrics.increment
+import net.nemerosa.ontrack.model.security.ActorVia
 import net.nemerosa.ontrack.model.security.AuthenticationStorageService
 import net.nemerosa.ontrack.model.security.SecurityService
 import net.nemerosa.ontrack.model.settings.CachedSettingsService
@@ -81,7 +82,8 @@ class IngestionHookController(
         // Setting the user security context
         tokensService.checkTokenForSecurityContext(
             token = settings.token,
-            message = "Token is denied"
+            message = "Token is denied",
+            via = ActorVia.WEBHOOK,
         )
         // Getting the repository
         val repository = if (json.has("repository")) {
@@ -116,7 +118,7 @@ class IngestionHookController(
         }
 
         // Running as admin for the actual processing
-        return securityService.asAdmin {
+        return securityService.asAdmin(IngestionHookPayload.SYSTEM_REASON) {
 
             // Creates the payload object
             val payload = IngestionHookPayload(
@@ -129,6 +131,7 @@ class IngestionHookController(
                 repository = repository,
                 configuration = configuration,
                 accountName = authenticationStorageService.getAccountId(),
+                actor = authenticationStorageService.getActor(),
             )
             // Pre-sorting
             when (eventProcessor.preProcessingCheck(payload)) {

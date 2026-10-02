@@ -5,6 +5,7 @@ import net.nemerosa.ontrack.extension.api.ExtensionManager
 import net.nemerosa.ontrack.extension.hook.metrics.*
 import net.nemerosa.ontrack.extension.hook.records.HookRecordService
 import net.nemerosa.ontrack.model.metrics.time
+import net.nemerosa.ontrack.model.security.ActorVia
 import net.nemerosa.ontrack.model.structure.TokensService
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
@@ -60,7 +61,7 @@ class HookController(
             val token = endpoint.checkAccess(request)
                 .takeIf { it.isNotBlank() }
                 ?: throw AccessDeniedException("No token was provided by the hook: $hook")
-            if (!tokensService.useTokenForSecurityContext(token)) {
+            if (!tokensService.useTokenForSecurityContext(token, ActorVia.WEBHOOK)) {
                 throw AccessDeniedException("Token provided by the hook is denied: $hook")
             }
         } catch (any: Exception) {

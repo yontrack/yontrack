@@ -153,6 +153,11 @@ class OntrackConfigProperties {
          * Custom JWT `typ`
          */
         var typ: String = ""
+        /**
+         * Clients of the web UI
+         */
+        @APIDescription("OIDC clients of the web UI. A JWT whose `azp` (authorized party) claim is one of them is recorded as coming from the UI, any other JWT as a direct API call. Defaults to the client of the Docker Compose stacks (`ontrack-client`) and to the one of the Helm chart (`yontrack-client`): set it when the UI uses another client.")
+        var uiClients: List<String> = listOf("ontrack-client", "yontrack-client")
     }
 
     class JwtClaimsConfigProperties {

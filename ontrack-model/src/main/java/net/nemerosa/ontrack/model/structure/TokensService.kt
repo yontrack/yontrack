@@ -2,6 +2,7 @@ package net.nemerosa.ontrack.model.structure
 
 import net.nemerosa.ontrack.common.Time
 import net.nemerosa.ontrack.model.security.Account
+import net.nemerosa.ontrack.model.security.ActorVia
 import java.time.LocalDateTime
 
 /**
@@ -79,9 +80,13 @@ interface TokensService {
     /**
      * Uses a token for the security context
      *
+     * The [actor][net.nemerosa.ontrack.model.security.SecurityService.currentActor] of the context
+     * keeps the name of the token, never its value.
+     *
      * @param token Token to use
+     * @param via Channel the token comes through
      * @return True is the token was valid and could be used
      */
-    fun useTokenForSecurityContext(token: String): Boolean
+    fun useTokenForSecurityContext(token: String, via: ActorVia = ActorVia.TOKEN): Boolean
 
 }

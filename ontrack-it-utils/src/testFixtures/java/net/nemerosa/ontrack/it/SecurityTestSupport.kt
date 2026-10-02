@@ -26,13 +26,23 @@ class SecurityTestSupport(
     private val authenticationUserService: AuthenticationUserService,
 ) {
 
+    /**
+     * Authenticates the [user] in a new security context.
+     *
+     * @param user User to authenticate
+     * @param securityRole Role of the authentication
+     * @param actor How the user got in - by default, through the UI
+     * @return The previous security context
+     */
     fun setupSecurityContext(
         user: AuthenticatedUser,
         securityRole: SecurityRole = SecurityRole.USER,
+        actor: Actor = Actor(account = user.name, via = ActorVia.UI),
     ): SecurityContext {
         val authentication = AuthenticatedUserAuthentication(
             authenticatedUser = user,
-            authorities = AuthorityUtils.createAuthorityList(securityRole.name)
+            authorities = AuthorityUtils.createAuthorityList(securityRole.name),
+            actor = actor,
         )
         val oldContext = SecurityContextHolder.getContext()
         val context: SecurityContext = SecurityContextImpl(authentication)

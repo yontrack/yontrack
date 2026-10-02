@@ -13,10 +13,11 @@ class AuthenticationUserServiceImpl(
     private val accountGroupService: AccountGroupService,
 ) : AuthenticationUserService {
 
-    override fun asUser(account: Account) {
+    override fun asUser(account: Account, actor: Actor) {
         val enrichedAuth = AuthenticatedUserAuthentication(
             authenticatedUser = createAuthenticatedUser(account),
-            authorities = AuthorityUtils.createAuthorityList(SecurityRole.USER.name)
+            authorities = AuthorityUtils.createAuthorityList(SecurityRole.USER.name),
+            actor = actor,
         )
         SecurityContextHolder.getContext().authentication = enrichedAuth
     }

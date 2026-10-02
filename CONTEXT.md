@@ -416,6 +416,17 @@ _Avoid_: event, fact, record. An *event* is what the notification system posts,
 and an entry is often written because of one but is not it; a *record* is the
 recordings extension's.
 
+**Actor**:
+Who made a change and how they got in, as the security context holds it: the
+account, the channel (`ui`, `token`, `jwt`, `webhook` or `system`), the name of
+the API token (never its value) or the issuer and subject of the JWT. When
+Yontrack runs as administrator — an auto-promotion, an ingestion, a job — the
+actor is the *system*, with its reason, acting on behalf of the actor that set it
+off. Every entry carries one, taken at append time.
+_Avoid_: user, signature. A *user* is any authenticated account, whatever the
+channel, and a *signature* keeps only a name and a time — often the build's rather
+than the caller's.
+
 **Endorsement**:
 The instance key's Ed25519 signature over one entry's hash, saying that this
 Yontrack instance wrote that entry. Every entry is endorsed while the key is

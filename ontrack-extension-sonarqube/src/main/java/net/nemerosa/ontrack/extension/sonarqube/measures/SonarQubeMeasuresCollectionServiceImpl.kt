@@ -199,7 +199,7 @@ class SonarQubeMeasuresCollectionServiceImpl(
                 )
             }
             // Storage of metrics for build
-            securityService.asAdmin {
+            securityService.asAdmin(SONARQUBE_SYSTEM_REASON) {
                 entityStore.store(
                     build,
                     STORE,

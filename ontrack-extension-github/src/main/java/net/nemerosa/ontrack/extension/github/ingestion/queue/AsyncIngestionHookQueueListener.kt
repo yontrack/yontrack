@@ -95,7 +95,7 @@ class AsyncIngestionHookQueueListener(
 
             // Gets the account to use from the queue payload
             val accountId = payload.accountName ?: error("Account name is required in the payload")
-            authenticationStorageService.withAccountId(accountId) {
+            authenticationStorageService.withAccountId(accountId, payload.actor) {
                 ingestionHookPayloadStorage.queue(payload, queue)
                 ingestionHookProcessingService.process(payload)
             }

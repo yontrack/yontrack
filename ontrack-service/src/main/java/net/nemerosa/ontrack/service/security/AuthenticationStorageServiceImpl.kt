@@ -25,9 +25,17 @@ class AuthenticationStorageServiceImpl(
         }
     }
 
-    override fun withAccountId(accountId: String, code: () -> Unit) {
+    override fun getActor(): Actor =
+        securityService.currentActor
+            ?: throw AuthenticationStorageServiceNoAuthException()
+
+    override fun withAccountId(accountId: String, actor: Actor?, code: () -> Unit) {
         val authentication = if (accountId == AuthenticationStorageService.RUN_AS_ADMINISTRATOR_ACCOUNT_ID) {
-            RunAsAuthenticatedUser.authentication(null)
+            RunAsAuthenticatedUser.authentication(
+                authenticatedUser = null,
+                actor = actor?.takeIf { it.isSystem }
+                    ?: Actor.system(reason = null),
+            )
         } else {
             val account = securityService.asAdmin {
                 accountService.findAccountByName(accountId)
@@ -36,6 +44,8 @@ class AuthenticationStorageServiceImpl(
             AuthenticatedUserAuthentication(
                 authenticatedUser = user,
                 authorities = AuthorityUtils.createAuthorityList(SecurityRole.USER.name),
+                actor = actor?.takeIf { it.account == account.email }
+                    ?: Actor.degraded(account.email),
             )
         }
         val oldSecurityContext = SecurityContextHolder.getContext()

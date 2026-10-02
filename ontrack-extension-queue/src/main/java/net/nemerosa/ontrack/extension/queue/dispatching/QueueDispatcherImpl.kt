@@ -49,7 +49,8 @@ class QueueDispatcherImpl(
             val queuePayload = QueuePayload.create(
                 processor = queueProcessor,
                 accountName = accountId,
-                body = payload
+                body = payload,
+                actor = authenticationStorageService.getActor(),
             )
             queueRecordService.start(queuePayload, source)
 

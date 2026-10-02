@@ -121,7 +121,7 @@ class QueueListener(
 
                     // Account ID
                     val accountId = qp.accountName
-                    authenticationStorageService.withAccountId(accountId) {
+                    authenticationStorageService.withAccountId(accountId, qp.actor) {
                         try {
                             meterRegistry.queueProcessTime(qp) {
                                 logger.debug("Processing: {}", payload)
