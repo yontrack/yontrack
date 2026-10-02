@@ -1,5 +1,7 @@
 package net.nemerosa.ontrack.service
 
+import net.nemerosa.ontrack.model.events.EventFactory
+import net.nemerosa.ontrack.model.events.EventPostService
 import net.nemerosa.ontrack.model.security.ProjectEdit
 import net.nemerosa.ontrack.model.security.SecurityService
 import net.nemerosa.ontrack.model.structure.*
@@ -14,11 +16,15 @@ class ValidationRunServiceImpl(
     private val validationRunRepository: ValidationRunRepository,
     private val validationRunStatusService: ValidationRunStatusService,
     private val validationDataTypeService: ValidationDataTypeService,
+    private val eventPostService: EventPostService,
+    private val eventFactory: EventFactory,
 ) : ValidationRunService {
 
     override fun updateValidationRunData(run: ValidationRun, data: ValidationRunData<*>?): ValidationRun {
         securityService.checkProjectFunction(run, ProjectEdit::class.java)
-        return validationRunRepository.updateValidationRunData(run, data)
+        val updated = validationRunRepository.updateValidationRunData(run, data)
+        eventPostService.post(eventFactory.updateValidationRunData(updated))
+        return updated
     }
 
     override fun isValidationRunPassed(build: Build, validationStamp: ValidationStamp): Boolean =

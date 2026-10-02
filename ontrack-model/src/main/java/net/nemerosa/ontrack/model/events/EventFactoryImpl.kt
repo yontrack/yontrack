@@ -1,9 +1,12 @@
 package net.nemerosa.ontrack.model.events
 
+import net.nemerosa.ontrack.json.asJson
+import net.nemerosa.ontrack.json.asJsonString
 import net.nemerosa.ontrack.model.events.Event.Companion.of
 import net.nemerosa.ontrack.model.events.EventFactory.Companion.AUTO_PROMOTION_REVOKED
 import net.nemerosa.ontrack.model.events.EventFactory.Companion.DELETE_BRANCH
 import net.nemerosa.ontrack.model.events.EventFactory.Companion.DELETE_BUILD
+import net.nemerosa.ontrack.model.events.EventFactory.Companion.DELETE_BUILD_LINK
 import net.nemerosa.ontrack.model.events.EventFactory.Companion.DELETE_CONFIGURATION
 import net.nemerosa.ontrack.model.events.EventFactory.Companion.DELETE_PROJECT
 import net.nemerosa.ontrack.model.events.EventFactory.Companion.DELETE_PROMOTION_LEVEL
@@ -18,6 +21,8 @@ import net.nemerosa.ontrack.model.events.EventFactory.Companion.IMAGE_PROMOTION_
 import net.nemerosa.ontrack.model.events.EventFactory.Companion.IMAGE_VALIDATION_STAMP
 import net.nemerosa.ontrack.model.events.EventFactory.Companion.NEW_BRANCH
 import net.nemerosa.ontrack.model.events.EventFactory.Companion.NEW_BUILD
+import net.nemerosa.ontrack.model.events.EventFactory.Companion.NEW_BUILD_LINK
+import net.nemerosa.ontrack.model.events.EventFactory.Companion.QUALIFIER
 import net.nemerosa.ontrack.model.events.EventFactory.Companion.NEW_CONFIGURATION
 import net.nemerosa.ontrack.model.events.EventFactory.Companion.NEW_PROJECT
 import net.nemerosa.ontrack.model.events.EventFactory.Companion.NEW_PROMOTION_LEVEL
@@ -34,6 +39,20 @@ import net.nemerosa.ontrack.model.events.EventFactory.Companion.UPDATE_BUILD
 import net.nemerosa.ontrack.model.events.EventFactory.Companion.UPDATE_BUILD_DISPLAY_NAME
 import net.nemerosa.ontrack.model.events.EventFactory.Companion.UPDATE_CONFIGURATION
 import net.nemerosa.ontrack.model.events.EventFactory.Companion.UPDATE_PROJECT
+import net.nemerosa.ontrack.model.events.EventFactory.Companion.UPDATE_RUN_INFO
+import net.nemerosa.ontrack.model.events.EventFactory.Companion.DELETE_VALIDATION_RUN
+import net.nemerosa.ontrack.model.events.EventFactory.Companion.UPDATE_VALIDATION_RUN_DATA
+import net.nemerosa.ontrack.model.events.EventFactory.Companion.VALIDATION_RUN_DATA
+import net.nemerosa.ontrack.model.events.EventFactory.Companion.VALIDATION_RUN_DATA_TYPE
+import net.nemerosa.ontrack.model.events.EventFactory.Companion.VALIDATION_RUN_ID
+import net.nemerosa.ontrack.model.events.EventFactory.Companion.VALIDATION_RUN_ORDER
+import net.nemerosa.ontrack.model.events.EventFactory.Companion.DELETE_RUN_INFO
+import net.nemerosa.ontrack.model.events.EventFactory.Companion.RUNNABLE_ENTITY_TYPE
+import net.nemerosa.ontrack.model.events.EventFactory.Companion.RUN_INFO_RUN_TIME
+import net.nemerosa.ontrack.model.events.EventFactory.Companion.RUN_INFO_SOURCE_TYPE
+import net.nemerosa.ontrack.model.events.EventFactory.Companion.RUN_INFO_SOURCE_URI
+import net.nemerosa.ontrack.model.events.EventFactory.Companion.RUN_INFO_TRIGGER_DATA
+import net.nemerosa.ontrack.model.events.EventFactory.Companion.RUN_INFO_TRIGGER_TYPE
 import net.nemerosa.ontrack.model.events.EventFactory.Companion.UPDATE_PROMOTION_LEVEL
 import net.nemerosa.ontrack.model.events.EventFactory.Companion.UPDATE_VALIDATION_RUN_STATUS_COMMENT
 import net.nemerosa.ontrack.model.events.EventFactory.Companion.UPDATE_VALIDATION_STAMP
@@ -66,6 +85,8 @@ class EventFactoryImpl : EventFactory {
         register(UPDATE_BUILD)
         register(UPDATE_BUILD_DISPLAY_NAME)
         register(DELETE_BUILD)
+        register(NEW_BUILD_LINK)
+        register(DELETE_BUILD_LINK)
 
         register(NEW_PROMOTION_LEVEL)
         register(IMAGE_PROMOTION_LEVEL)
@@ -86,6 +107,11 @@ class EventFactoryImpl : EventFactory {
         register(NEW_VALIDATION_RUN)
         register(NEW_VALIDATION_RUN_STATUS)
         register(UPDATE_VALIDATION_RUN_STATUS_COMMENT)
+        register(DELETE_VALIDATION_RUN)
+        register(UPDATE_VALIDATION_RUN_DATA)
+
+        register(UPDATE_RUN_INFO)
+        register(DELETE_RUN_INFO)
 
         register(PROPERTY_CHANGE)
         register(PROPERTY_DELETE)
@@ -191,6 +217,25 @@ class EventFactoryImpl : EventFactory {
             .with("BUILD_ID", build.id.toString())
             .build()
     }
+
+    override fun newBuildLink(from: Build, to: Build, qualifier: String): Event =
+        buildLinkEvent(NEW_BUILD_LINK, from, to, qualifier)
+
+    override fun deleteBuildLink(from: Build, to: Build, qualifier: String): Event =
+        buildLinkEvent(DELETE_BUILD_LINK, from, to, qualifier)
+
+    /**
+     * The source build is the main entity, the target build an extra one. The signature is the one of the
+     * caller, not the one of the build.
+     */
+    private fun buildLinkEvent(eventType: EventType, from: Build, to: Build, qualifier: String): Event =
+        of(eventType)
+            .withBranch(from.branch)
+            .with(from)
+            .withExtra(to)
+            .withExtra(to.branch)
+            .with(QUALIFIER, qualifier)
+            .build()
 
     override fun newPromotionLevel(promotionLevel: PromotionLevel): Event {
         return of(NEW_PROMOTION_LEVEL)
@@ -298,6 +343,53 @@ class EventFactoryImpl : EventFactory {
             .withValidationRun(validationRun)
             .build()
     }
+
+    /**
+     * The run itself is not referenced since it is gone: only its build and stamp are.
+     */
+    override fun deleteValidationRun(validationRun: ValidationRun): Event =
+        of(DELETE_VALIDATION_RUN)
+            .withBuild(validationRun.build)
+            .with(validationRun.validationStamp)
+            .withNoSignature()
+            .with(VALIDATION_RUN_ID, validationRun.id().toString())
+            .with(VALIDATION_RUN_ORDER, validationRun.runOrder.toString())
+            .withValidationRunStatus(validationRun.lastStatus.statusID)
+            .build()
+
+    override fun updateValidationRunData(validationRun: ValidationRun): Event =
+        of(UPDATE_VALIDATION_RUN_DATA)
+            .withValidationRun(validationRun)
+            .withNoSignature()
+            .with(VALIDATION_RUN_DATA_TYPE, validationRun.data?.descriptor?.id)
+            .with(VALIDATION_RUN_DATA, validationRun.data?.data?.asJson()?.asJsonString())
+            .build()
+
+    override fun updateRunInfo(entity: RunnableEntity, runInfo: RunInfo): Event =
+        runInfoEvent(UPDATE_RUN_INFO, entity)
+            .with(RUN_INFO_SOURCE_TYPE, runInfo.sourceType)
+            .with(RUN_INFO_SOURCE_URI, runInfo.sourceUri)
+            .with(RUN_INFO_TRIGGER_TYPE, runInfo.triggerType)
+            .with(RUN_INFO_TRIGGER_DATA, runInfo.triggerData)
+            .with(RUN_INFO_RUN_TIME, runInfo.runTime?.toString())
+            .build()
+
+    override fun deleteRunInfo(entity: RunnableEntity): Event =
+        runInfoEvent(DELETE_RUN_INFO, entity).build()
+
+    /**
+     * The runnable entity is the reference of the event, along with its build (and its validation stamp for
+     * a validation run). The signature is the one of the caller, not the one of the entity.
+     */
+    private fun runInfoEvent(eventType: EventType, entity: RunnableEntity): Event.EventBuilder =
+        when (entity) {
+            is Build -> of(eventType).withBuild(entity)
+            is ValidationRun -> of(eventType).withValidationRun(entity)
+            else -> of(eventType)
+        }
+            .withRef(entity)
+            .withNoSignature()
+            .with(RUNNABLE_ENTITY_TYPE, entity.runnableEntityType.name)
 
     override fun <T> propertyChange(entity: ProjectEntity, propertyType: PropertyType<T>): Event {
         return of(PROPERTY_CHANGE)

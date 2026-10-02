@@ -1,6 +1,8 @@
 package net.nemerosa.ontrack.service
 
 import net.nemerosa.ontrack.model.Ack
+import net.nemerosa.ontrack.model.events.EventFactory
+import net.nemerosa.ontrack.model.events.EventPostService
 import net.nemerosa.ontrack.model.metrics.MetricsExportService
 import net.nemerosa.ontrack.model.security.ApplicationManagement
 import net.nemerosa.ontrack.model.security.ProjectEdit
@@ -20,6 +22,8 @@ class RunInfoServiceImpl(
     private val structureService: StructureService,
     private val securityService: SecurityService,
     private val metricsExportService: MetricsExportService,
+    private val eventPostService: EventPostService,
+    private val eventFactory: EventFactory,
 ) : RunInfoService {
 
     private val logger: Logger = LoggerFactory.getLogger(RunInfoService::class.java)
@@ -45,15 +49,21 @@ class RunInfoServiceImpl(
             securityService.currentSignature
         )
         exportRunInfoTime(entity, runInfo)
+        eventPostService.post(eventFactory.updateRunInfo(entity, runInfo))
         return runInfo
     }
 
     override fun deleteRunInfo(runnableEntity: RunnableEntity): Ack {
         securityService.checkProjectFunction(runnableEntity, ProjectEdit::class.java)
-        return runInfoRepository.deleteRunInfo(
+        val ack = runInfoRepository.deleteRunInfo(
             runnableEntity.runnableEntityType,
             runnableEntity.id()
         )
+        // No event when there was nothing to delete
+        if (ack.success) {
+            eventPostService.post(eventFactory.deleteRunInfo(runnableEntity))
+        }
+        return ack
     }
 
     /**

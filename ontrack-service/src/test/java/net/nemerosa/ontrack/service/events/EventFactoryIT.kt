@@ -5,6 +5,7 @@ import net.nemerosa.ontrack.extension.api.support.TestPropertyType
 import net.nemerosa.ontrack.it.AbstractDSLTestSupport
 import net.nemerosa.ontrack.model.events.EventFactory
 import net.nemerosa.ontrack.model.events.EventTemplatingService
+import net.nemerosa.ontrack.model.structure.RunInfo
 import net.nemerosa.ontrack.model.support.OntrackConfigProperties
 import net.nemerosa.ontrack.test.TestUtils.uid
 import org.junit.jupiter.api.Test
@@ -363,6 +364,76 @@ class EventFactoryIT : AbstractDSLTestSupport() {
                             val event = eventFactory.updateValidationRunStatusComment(run)
                             assertEquals(
                                 "A status message for the ${vs.name} validation #${run.runOrder} for build $name in branch ${branch.name} of ${project.name} has changed.",
+                                eventTemplatingService.renderEvent(event, emptyMap())
+                            )
+                        }
+                    }
+                }
+
+                // NEW_BUILD_LINK & DELETE_BUILD_LINK
+                project {
+                    branch {
+                        build {
+                            val target = doCreateBuild()
+                            assertEquals(
+                                "Build $name for branch ${branch.name} in ${project.name} has been linked to build ${target.name} for branch ${target.branch.name} in ${target.project.name}.",
+                                eventTemplatingService.renderEvent(eventFactory.newBuildLink(this, target, "dep"), emptyMap())
+                            )
+                            assertEquals(
+                                "Build $name for branch ${branch.name} in ${project.name} is no longer linked to build ${target.name} for branch ${target.branch.name} in ${target.project.name}.",
+                                eventTemplatingService.renderEvent(eventFactory.deleteBuildLink(this, target, "dep"), emptyMap())
+                            )
+                        }
+                    }
+                }
+
+                // UPDATE_RUN_INFO & DELETE_RUN_INFO
+                project {
+                    branch {
+                        val vs = validationStamp()
+                        build {
+                            val runInfo = RunInfo(1, "github", null, null, null, 10, null)
+                            assertEquals(
+                                "Run info of build ${project.name}/${branch.name}/$name has been set.",
+                                eventTemplatingService.renderEvent(eventFactory.updateRunInfo(this, runInfo), emptyMap())
+                            )
+                            assertEquals(
+                                "Run info of build ${project.name}/${branch.name}/$name has been deleted.",
+                                eventTemplatingService.renderEvent(eventFactory.deleteRunInfo(this), emptyMap())
+                            )
+                            val run = validate(vs)
+                            assertEquals(
+                                "Run info of validation run ${vs.name}#1 for ${project.name}/${branch.name}/$name has been set.",
+                                eventTemplatingService.renderEvent(eventFactory.updateRunInfo(run, runInfo), emptyMap())
+                            )
+                        }
+                    }
+                }
+
+                // DELETE_VALIDATION_RUN
+                project {
+                    branch {
+                        val vs = validationStamp()
+                        build {
+                            val run = validate(vs)
+                            val event = eventFactory.deleteValidationRun(run)
+                            assertEquals(
+                                "Validation run #1 for ${vs.name} of build $name has been deleted for branch ${branch.name} in ${project.name}.",
+                                eventTemplatingService.renderEvent(event, emptyMap())
+                            )
+                        }
+                    }
+                }
+
+                // UPDATE_VALIDATION_RUN_DATA
+                project {
+                    branch {
+                        val vs = validationStamp()
+                        build {
+                            val run = validate(vs)
+                            val event = eventFactory.updateValidationRunData(run)
+                            assertEquals(
+                                "Data of the ${vs.name} validation #1 for build $name in branch ${branch.name} of ${project.name} has changed.",
                                 eventTemplatingService.renderEvent(event, emptyMap())
                             )
                         }

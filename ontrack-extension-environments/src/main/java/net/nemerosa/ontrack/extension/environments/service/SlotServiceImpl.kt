@@ -102,6 +102,8 @@ class SlotServiceImpl(
         val deployment = findPipelineById(id)
         if (deployment != null) {
             securityService.checkSlotAccess<SlotPipelineDelete>(deployment.slot)
+            // Posted before the deletion, so that listeners can still read the pipeline
+            eventPostService.post(environmentsEventsFactory.pipelineDeleted(deployment))
             slotPipelineRepository.deleteDeployment(id)
         }
     }

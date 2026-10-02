@@ -18,7 +18,9 @@ import net.nemerosa.ontrack.extension.workflows.engine.WorkflowEngine
 import net.nemerosa.ontrack.extension.workflows.engine.WorkflowInstanceStatus
 import net.nemerosa.ontrack.extension.workflows.execution.WorkflowNodeExecutorService
 import net.nemerosa.ontrack.extension.workflows.execution.validateWorkflowFully
+import net.nemerosa.ontrack.extension.environments.events.EnvironmentsEventsFactory
 import net.nemerosa.ontrack.model.events.Event
+import net.nemerosa.ontrack.model.events.EventPostService
 import net.nemerosa.ontrack.model.events.SerializableEventService
 import net.nemerosa.ontrack.model.security.SecurityService
 import net.nemerosa.ontrack.model.templating.createTemplatingContextData
@@ -38,6 +40,8 @@ class SlotWorkflowServiceImpl(
     private val deploymentTemplatingContextHandler: DeploymentTemplatingContextHandler,
     private val workflowNodeExecutorService: WorkflowNodeExecutorService,
     private val slotPipelineChangeRepository: SlotPipelineChangeRepository,
+    private val eventPostService: EventPostService,
+    private val environmentsEventsFactory: EnvironmentsEventsFactory,
 ) : SlotWorkflowService {
 
     override fun addSlotWorkflow(slotWorkflow: SlotWorkflow) {
@@ -200,6 +204,9 @@ class SlotWorkflowServiceImpl(
                 message = """Workflow "${slotWorkflowInstance.slotWorkflow.workflow.name}" overridden""",
                 overrideMessage = message,
             )
+        )
+        eventPostService.post(
+            environmentsEventsFactory.pipelineWorkflowOverridden(slotWorkflowInstance, user, message)
         )
         // OK
         return SlotAdmissionRuleOverride(

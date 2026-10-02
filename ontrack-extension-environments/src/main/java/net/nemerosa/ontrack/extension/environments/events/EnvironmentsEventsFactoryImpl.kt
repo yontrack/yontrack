@@ -3,6 +3,7 @@ package net.nemerosa.ontrack.extension.environments.events
 import net.nemerosa.ontrack.extension.environments.Environment
 import net.nemerosa.ontrack.extension.environments.Slot
 import net.nemerosa.ontrack.extension.environments.SlotPipeline
+import net.nemerosa.ontrack.extension.environments.workflows.SlotWorkflowInstance
 import net.nemerosa.ontrack.model.events.Event
 import net.nemerosa.ontrack.model.events.EventFactory
 import net.nemerosa.ontrack.model.security.SecurityService
@@ -97,6 +98,30 @@ class EnvironmentsEventsFactoryImpl(
             .withPipeline(pipeline)
             .build()
 
+    override fun pipelineDeleted(pipeline: SlotPipeline): Event =
+        Event.of(EnvironmentsEvents.PIPELINE_DELETED)
+            .withPipeline(pipeline)
+            .withNoSignature()
+            .with(EnvironmentsEvents.EVENT_SLOT_QUALIFIER, pipeline.slot.qualifier)
+            .with(EnvironmentsEvents.EVENT_PIPELINE_NUMBER, pipeline.number.toString())
+            .with(EnvironmentsEvents.EVENT_PIPELINE_STATUS, pipeline.status.name)
+            .build()
+
+    override fun pipelineWorkflowOverridden(
+        slotWorkflowInstance: SlotWorkflowInstance,
+        user: String,
+        message: String
+    ): Event =
+        Event.of(EnvironmentsEvents.PIPELINE_WORKFLOW_OVERRIDDEN)
+            .withPipeline(slotWorkflowInstance.pipeline)
+            .withNoSignature()
+            .with(EnvironmentsEvents.EVENT_SLOT_WORKFLOW_ID, slotWorkflowInstance.slotWorkflow.id)
+            .with(EnvironmentsEvents.EVENT_SLOT_WORKFLOW_INSTANCE_ID, slotWorkflowInstance.id)
+            .with(EnvironmentsEvents.EVENT_WORKFLOW_NAME, slotWorkflowInstance.slotWorkflow.workflow.name)
+            .with(EnvironmentsEvents.EVENT_PIPELINE_OVERRIDING_USER, user)
+            .with(EnvironmentsEvents.EVENT_OVERRIDE_MESSAGE, message)
+            .build()
+
     override fun getName(): String = "Registration of environment events"
 
     override fun startupOrder(): Int = StartupService.JOB_REGISTRATION
@@ -115,6 +140,8 @@ class EnvironmentsEventsFactoryImpl(
         eventFactory.register(EnvironmentsEvents.PIPELINE_FAILED)
         eventFactory.register(EnvironmentsEvents.PIPELINE_STATUS_OVERRIDDEN)
         eventFactory.register(EnvironmentsEvents.PIPELINE_STATUS_CHANGED)
+        eventFactory.register(EnvironmentsEvents.PIPELINE_DELETED)
+        eventFactory.register(EnvironmentsEvents.PIPELINE_WORKFLOW_OVERRIDDEN)
     }
 
 }

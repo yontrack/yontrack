@@ -405,15 +405,22 @@ class StructureServiceImpl(
     override fun createBuildLink(fromBuild: Build, toBuild: Build, qualifier: String) {
         securityService.checkProjectFunction(fromBuild, BuildConfig::class.java)
         securityService.checkProjectFunction(toBuild, ProjectView::class.java)
-        buildLinkRepository.createBuildLink(fromBuild, toBuild, qualifier)
+        val added = buildLinkRepository.createBuildLink(fromBuild, toBuild, qualifier)
         buildLinkListenerService.onBuildLinkAdded(fromBuild, toBuild, qualifier)
+        // Re-asserting an existing link changes nothing - no event
+        if (added) {
+            eventPostService.post(eventFactory.newBuildLink(fromBuild, toBuild, qualifier))
+        }
     }
 
     override fun deleteBuildLink(fromBuild: Build, toBuild: Build, qualifier: String) {
         securityService.checkProjectFunction(fromBuild, BuildConfig::class.java)
         securityService.checkProjectFunction(toBuild, ProjectView::class.java)
-        buildLinkRepository.deleteBuildLink(fromBuild, toBuild, qualifier)
+        val deleted = buildLinkRepository.deleteBuildLink(fromBuild, toBuild, qualifier)
         buildLinkListenerService.onBuildLinkDeleted(fromBuild, toBuild, qualifier)
+        if (deleted) {
+            eventPostService.post(eventFactory.deleteBuildLink(fromBuild, toBuild, qualifier))
+        }
     }
 
     override fun getCountQualifiedBuildsUsedBy(build: Build): Int {
@@ -1264,6 +1271,8 @@ class StructureServiceImpl(
 
     override fun deleteValidationRun(validationRun: ValidationRun): Ack {
         securityService.checkProjectFunction(validationRun, ProjectEdit::class.java)
+        // Posted before the deletion, so that listeners can still read the run
+        eventPostService.post(eventFactory.deleteValidationRun(validationRun))
         return structureRepository.deleteValidationRun(validationRun.id)
     }
 

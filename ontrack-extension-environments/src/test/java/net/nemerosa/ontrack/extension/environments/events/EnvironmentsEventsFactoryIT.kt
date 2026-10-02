@@ -185,4 +185,16 @@ class EnvironmentsEventsFactoryIT : AbstractDSLTestSupport() {
         }
     }
 
+    @Test
+    fun pipelineDeleted() {
+        slotTestSupport.withSlotPipeline { pipeline ->
+            val event = environmentsEventsFactory.pipelineDeleted(pipeline)
+            val text = render(event)
+            assertEquals(
+                """Pipeline #1 of build <a href="http://localhost:3000/build/${pipeline.build.id}">${pipeline.build.name}</a> for environment ${pipeline.slot.environment.name} has been deleted.""",
+                text
+            )
+        }
+    }
+
 }

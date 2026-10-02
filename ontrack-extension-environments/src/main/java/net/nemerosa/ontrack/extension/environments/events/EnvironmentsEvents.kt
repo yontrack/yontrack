@@ -12,6 +12,13 @@ object EnvironmentsEvents {
 
     const val EVENT_PIPELINE_ID = "PIPELINE_ID"
     const val EVENT_PIPELINE_OVERRIDING_USER = "PIPELINE_OVERRIDING_USER"
+    const val EVENT_PIPELINE_NUMBER = "PIPELINE_NUMBER"
+    const val EVENT_PIPELINE_STATUS = "PIPELINE_STATUS"
+
+    const val EVENT_SLOT_WORKFLOW_ID = "SLOT_WORKFLOW_ID"
+    const val EVENT_SLOT_WORKFLOW_INSTANCE_ID = "SLOT_WORKFLOW_INSTANCE_ID"
+    const val EVENT_WORKFLOW_NAME = "WORKFLOW_NAME"
+    const val EVENT_OVERRIDE_MESSAGE = "OVERRIDE_MESSAGE"
 
     private val eventEnvironmentContext = eventContext(
         eventValue(EVENT_ENVIRONMENT_ID, "ID of the environment"),
@@ -149,6 +156,37 @@ object EnvironmentsEvents {
         description = "When a slot pipeline status is updated",
         context = eventPipelineContext.add(
             eventValue(EVENT_PIPELINE_OVERRIDING_USER, "User who has overridden the pipeline status")
+        )
+    )
+
+    /**
+     * The pipeline is gone: the event does not render it as a link, and carries what identifies it.
+     */
+    val PIPELINE_DELETED: EventType = SimpleEventType(
+        id = "slot-pipeline-deleted",
+        template = """
+            Pipeline #${'$'}{$EVENT_PIPELINE_NUMBER} of build ${'$'}{build} for environment ${'$'}{$EVENT_ENVIRONMENT_NAME} has been deleted.
+        """.trimIndent(),
+        description = "When a slot pipeline is deleted",
+        context = eventPipelineContext.add(
+            eventValue(EVENT_SLOT_QUALIFIER, "Qualifier of the slot"),
+            eventValue(EVENT_PIPELINE_NUMBER, "Number of the deleted pipeline in its slot"),
+            eventValue(EVENT_PIPELINE_STATUS, "Status of the pipeline when it was deleted"),
+        )
+    )
+
+    val PIPELINE_WORKFLOW_OVERRIDDEN: EventType = SimpleEventType(
+        id = "slot-pipeline-workflow-overridden",
+        template = """
+            Workflow ${'$'}{$EVENT_WORKFLOW_NAME} of pipeline ${'$'}{#.pipeline} has been overridden by ${'$'}{$EVENT_PIPELINE_OVERRIDING_USER}.
+        """.trimIndent(),
+        description = "When the result of a slot workflow is overridden for a slot pipeline",
+        context = eventPipelineContext.add(
+            eventValue(EVENT_SLOT_WORKFLOW_ID, "ID of the slot workflow"),
+            eventValue(EVENT_SLOT_WORKFLOW_INSTANCE_ID, "ID of the overridden slot workflow instance"),
+            eventValue(EVENT_WORKFLOW_NAME, "Name of the overridden workflow"),
+            eventValue(EVENT_PIPELINE_OVERRIDING_USER, "User who has overridden the workflow"),
+            eventValue(EVENT_OVERRIDE_MESSAGE, "Message given for the override"),
         )
     )
 

@@ -49,6 +49,16 @@ interface EventFactory {
 
     fun deleteBuild(build: Build): Event
 
+    /**
+     * A link from the [from] build to the [to] build has been added with [qualifier].
+     */
+    fun newBuildLink(from: Build, to: Build, qualifier: String): Event
+
+    /**
+     * The link from the [from] build to the [to] build with [qualifier] has been deleted.
+     */
+    fun deleteBuildLink(from: Build, to: Build, qualifier: String): Event
+
     fun newPromotionLevel(promotionLevel: PromotionLevel): Event
 
     fun imagePromotionLevel(promotionLevel: PromotionLevel): Event
@@ -84,6 +94,26 @@ interface EventFactory {
     fun newValidationRunStatus(validationRun: ValidationRun): Event
 
     fun updateValidationRunStatusComment(validationRun: ValidationRun): Event
+
+    /**
+     * The [validationRun] is about to be deleted.
+     */
+    fun deleteValidationRun(validationRun: ValidationRun): Event
+
+    /**
+     * The data of the [validationRun] has been replaced or removed. The run carries its new data.
+     */
+    fun updateValidationRunData(validationRun: ValidationRun): Event
+
+    /**
+     * The [runInfo] of a build or a validation run has been set, created or replaced.
+     */
+    fun updateRunInfo(entity: RunnableEntity, runInfo: RunInfo): Event
+
+    /**
+     * The run info of a build or a validation run has been deleted.
+     */
+    fun deleteRunInfo(entity: RunnableEntity): Event
 
     fun <T> propertyChange(entity: ProjectEntity, propertyType: PropertyType<T>): Event
 
@@ -243,6 +273,36 @@ interface EventFactory {
                 eventProject("Build's project"),
                 eventBranch("Build's branch"),
                 eventValue("BUILD", "Name of the deleted build"),
+            ),
+        )
+
+        val NEW_BUILD_LINK: EventType = SimpleEventType(
+            id = "new_build_link",
+            template = "Build \${build} for branch \${branch} in \${project} has been linked to build \${xBuild} for branch \${xBranch} in \${xProject}.",
+            description = "When a link from a build to another build is added.",
+            context = eventContext(
+                eventProject("Project of the source build"),
+                eventBranch("Branch of the source build"),
+                eventBuild("Source build, which uses the target build"),
+                eventXProject("Project of the target build"),
+                eventXBranch("Branch of the target build"),
+                eventXBuild("Target build, used by the source build"),
+                eventValue(QUALIFIER, "Qualifier of the link, empty for the default link"),
+            ),
+        )
+
+        val DELETE_BUILD_LINK: EventType = SimpleEventType(
+            id = "delete_build_link",
+            template = "Build \${build} for branch \${branch} in \${project} is no longer linked to build \${xBuild} for branch \${xBranch} in \${xProject}.",
+            description = "When a link from a build to another build is deleted.",
+            context = eventContext(
+                eventProject("Project of the source build"),
+                eventBranch("Branch of the source build"),
+                eventBuild("Source build, which used the target build"),
+                eventXProject("Project of the target build"),
+                eventXBranch("Branch of the target build"),
+                eventXBuild("Target build, which was used by the source build"),
+                eventValue(QUALIFIER, "Qualifier of the link, empty for the default link"),
             ),
         )
 
@@ -427,6 +487,69 @@ interface EventFactory {
             ),
         )
 
+        private val runInfoEntityContext = eventContext(
+            eventAnyEntity("Build or validation run whose run info has changed"),
+            eventProject("Project"),
+            eventBranch("Branch"),
+            eventBuild("Build, or build of the validation run"),
+            eventValidationStamp("Validation stamp of the validation run - for a validation run only"),
+            eventValidationRun("Validation run - for a validation run only"),
+            eventValue(RUNNABLE_ENTITY_TYPE, "Type of the entity: build or validation_run"),
+        )
+
+        val UPDATE_RUN_INFO: EventType = SimpleEventType(
+            id = "update_run_info",
+            template = "Run info of \${entity.qualifiedLongName} has been set.",
+            description = "When the run info of a build or of a validation run is set, created or replaced. " +
+                    "A value which is not set is absent from the event.",
+            context = runInfoEntityContext.add(
+                eventValue(RUN_INFO_SOURCE_TYPE, "Type of source (like github)"),
+                eventValue(RUN_INFO_SOURCE_URI, "URI to the source of the run"),
+                eventValue(RUN_INFO_TRIGGER_TYPE, "Type of trigger (like scm or user)"),
+                eventValue(RUN_INFO_TRIGGER_DATA, "Data associated with the trigger (like a user ID or a commit)"),
+                eventValue(RUN_INFO_RUN_TIME, "Time of the run, in seconds"),
+            ),
+        )
+
+        val DELETE_RUN_INFO: EventType = SimpleEventType(
+            id = "delete_run_info",
+            template = "Run info of \${entity.qualifiedLongName} has been deleted.",
+            description = "When the run info of a build or of a validation run is deleted.",
+            context = runInfoEntityContext,
+        )
+
+        val DELETE_VALIDATION_RUN: EventType = SimpleEventType(
+            id = "delete_validation_run",
+            template = "Validation run #\${VALIDATION_RUN_ORDER} for \${validationStamp} of build \${build} has been deleted for branch \${branch} in \${project}.",
+            description = "When the validation run of a build is deleted.",
+            context = eventContext(
+                eventProject("Project"),
+                eventBranch("Branch"),
+                eventBuild("Build of the deleted validation run"),
+                eventValidationStamp("Validation stamp of the deleted validation run"),
+                eventValue(VALIDATION_RUN_ID, "ID of the deleted validation run"),
+                eventValue(VALIDATION_RUN_ORDER, "Order of the deleted validation run for its build, starting at 1"),
+                eventValue("STATUS", "ID of the last status of the deleted validation run"),
+                eventValue("STATUS_NAME", "Name of the last status of the deleted validation run"),
+            ),
+        )
+
+        val UPDATE_VALIDATION_RUN_DATA: EventType = SimpleEventType(
+            id = "update_validation_run_data",
+            template = "Data of the \${validationStamp} validation \${validationRun} for build \${build} in branch \${branch} of \${project} has changed.",
+            description = "When the data of the validation of a build is replaced or removed. " +
+                    "When the data is removed, the event carries no data type and no data.",
+            context = eventContext(
+                eventProject("Project"),
+                eventBranch("Branch"),
+                eventBuild("Validated build"),
+                eventValidationStamp("Validation stamp"),
+                eventValidationRun("Validation run"),
+                eventValue(VALIDATION_RUN_DATA_TYPE, "ID of the new data type"),
+                eventValue(VALIDATION_RUN_DATA, "New data, as JSON"),
+            ),
+        )
+
         val PROPERTY_CHANGE: EventType = SimpleEventType(
             id = "property_change",
             template = "\${PROPERTY_NAME} property has changed for \${entity.qualifiedLongName}.",
@@ -474,5 +597,16 @@ interface EventFactory {
         )
 
         const val DISPLAY_NAME = "DISPLAY_NAME"
+        const val QUALIFIER = "QUALIFIER"
+        const val VALIDATION_RUN_ID = "VALIDATION_RUN_ID"
+        const val VALIDATION_RUN_ORDER = "VALIDATION_RUN_ORDER"
+        const val VALIDATION_RUN_DATA_TYPE = "DATA_TYPE"
+        const val VALIDATION_RUN_DATA = "DATA"
+        const val RUNNABLE_ENTITY_TYPE = "RUNNABLE_ENTITY_TYPE"
+        const val RUN_INFO_SOURCE_TYPE = "SOURCE_TYPE"
+        const val RUN_INFO_SOURCE_URI = "SOURCE_URI"
+        const val RUN_INFO_TRIGGER_TYPE = "TRIGGER_TYPE"
+        const val RUN_INFO_TRIGGER_DATA = "TRIGGER_DATA"
+        const val RUN_INFO_RUN_TIME = "RUN_TIME"
     }
 }
