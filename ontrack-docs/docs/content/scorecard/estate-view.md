@@ -64,8 +64,11 @@ scorecard page on the set of the estate, where each reading explains its value.
 
 Above, the projects of the demo's *Demo products* estate: `petclinic-billing` is *gating* its
 security scans and fixes its findings within the target, but has a `HIGH` finding open for longer
-than the estate allows, while `petclinic-visits` only scans its dependencies where the estate
-expects its code to be scanned too.
+than the estate allows, while `petclinic` and `petclinic-visits` only scan their dependencies where
+the estate expects their code to be scanned too. `petclinic-visits` requires its dependency scan for
+its `SILVER` promotion, which is *gating* as well, but each rung of the maturity needs the ones below
+it: not covered here, it reads *1 · Reported* — and *3 · Gating* in the *Demo production* estate,
+which expects a dependency scan only.
 
 A switch showing the measured readings only appears once a project of the estate holds an
 `ESTIMATED` reading — which Yontrack 6 never produces, so it is not shown.
@@ -94,13 +97,18 @@ project reported it with — then by external ID. Each row gives:
 The list stops at the 20 most widespread findings. A click on a row opens the fan-out of its
 finding, as searching its external ID does; *All open findings* goes back to the list.
 
+![The most widespread findings of an estate](estate-ranked-findings.png)
+
+Above, the findings open in the demo's *Demo products* estate: each is open in one project only, so
+the `HIGH` comes first — `CVE-2024-38816`, also accepted in a second project and resolved in a third.
+
 #### The fan-out of a finding
 
 The search box looks for one finding by its external ID — a CVE, a rule ID — as the scanner gives
 it.
 
-The finding is given with its title and a link to its description, and a summary: *2 projects of
-this estate report CVE-2024-38816: exposed in 1, accepted in 1, resolved in 0* — each project counted
+The finding is given with its title and a link to its description, and a summary: *3 projects of
+this estate report CVE-2024-38816: exposed in 1, accepted in 1, resolved in 1* — each project counted
 once, by its most exposed finding.
 
 Then one row per finding — a project has one per scanner and location — grouped by project, the
@@ -125,9 +133,10 @@ is resolved:
 
 ![The findings fan-out of an estate](estate-fanout.png)
 
-Above, the demo's `CVE-2024-38816`: still exposed on the `release-2.3` branch of
-`petclinic-billing` — it was fixed on `main` — and, in `petclinic-visits`, accepted on
-`spring-webflux` and resolved on `spring-webmvc`.
+Above, the demo's `CVE-2024-38816`, opened from its link
+`?tab=fanout&finding=CVE-2024-38816`: still exposed on the `release-2.3` branch of
+`petclinic-billing` — it was fixed on `main` — in `petclinic-visits`, accepted on `spring-webflux`
+and resolved on `spring-webmvc`, and resolved in `petclinic` as a whole.
 
 ## License
 

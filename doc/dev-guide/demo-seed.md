@@ -285,35 +285,50 @@ not the seed's.
 
 ### The security readings read the findings projects
 
-The security readings of the scorecard (#1912) read the scans of `petclinic-billing` and
-`petclinic-visits`, against what each estate expects (`EstateSpec.security`): "Demo products" a
-dependency and a code scan within a week, a week for a CRITICAL and two for a HIGH; "Demo
+The security readings of the scorecard (#1912) read the scans of `petclinic-billing`,
+`petclinic-visits` and `petclinic`, against what each estate expects (`EstateSpec.security`): "Demo
+products" a dependency and a code scan within a week, a week for a CRITICAL and two for a HIGH; "Demo
 production" a dependency scan, with the freshness of the settings. What each reading shows is a scan
 of the dataset:
 
-- **Maturity at every rung.** `petclinic-billing` is at 3, gating: build 311's dependency scan fails
-  on a CRITICAL nobody accepted, and that build is not promoted. `petclinic-visits` scans its
-  dependencies only, on its last four builds: 1 in "Demo products", 2 in "Demo production" and with
-  no estate. `petclinic` and `petclinic-ui` are at 0 - `SECURITY.SCAN` is a plain stamp, not a scan.
+- **Maturity at every rung, and both routes to gating.** `petclinic-billing` is at 3 by a scan which
+  failed: build 311's dependency scan fails on a CRITICAL nobody accepted, and that build is not
+  promoted. `petclinic-visits` is at 3 by policy (#1982), the route teams should aim for: its SILVER
+  is granted by an auto promotion requiring its `SECURITY.DEPENDENCIES` stamp, and no scan of it ever
+  failed. The ladder is cumulative, so that reads 3 in "Demo production" and with no estate, where
+  its fresh dependency scan covers it, and still 1 in "Demo products", which expects a code scan too.
+  `petclinic` scans its dependencies on `main` and gates on nothing: 2 in "Demo production", 1 in
+  "Demo products". `petclinic-ui` is at 0 - `SECURITY.SCAN` is a plain stamp, not a scan.
 - **Remediation time.** `petclinic-billing` fixes a HIGH on `release-2.3` in eleven days and that
   CRITICAL on `main` in three, each reported on one branch only, so resolved for the project as
-  soon as that branch fixes it: a median of seven days, within the target. `petclinic-visits` takes
-  fourteen days to bump spring-webmvc, and misses it.
+  soon as that branch fixes it: a median of seven days, within the target. `petclinic` takes eight
+  days, within it too, and `petclinic-visits` fourteen days to bump spring-webmvc, and misses it.
 - **Overdue findings.** `CVE-2024-38816`, still open on `release-2.3` sixteen days after its first
   scan, is the one HIGH past its fourteen days. The accepted findings are counted apart.
-- **The fan-out.** `CVE-2024-38816` is also reported by `petclinic-visits`, on spring-webflux under
-  an acceptance and on spring-webmvc until the bump: searched in "Demo products", it is open in one
-  project, accepted and resolved in the other.
+- **The fan-out.** `CVE-2024-38816` is reported by the three projects of "Demo products":
+  `petclinic-billing` still exposes it on `release-2.3`; `petclinic-visits` reports it on
+  spring-webflux under an acceptance and on spring-webmvc until a bump; `petclinic` reports it on
+  spring-webmvc on `main` - its only scanned branch - until the bump of common-library to 3.2.1 in
+  1.4.3, so the project is resolved as a whole. Searched there, it reads *exposed in 1, accepted in
+  1, resolved in 1*, and it opens the ranked list of the tab: no finding is open in more projects,
+  and none of the others is above MEDIUM.
 
 A finding of a project is keyed by its scanner, external ID and location, which is why the CVE on
 spring-webflux and on spring-webmvc are two findings of `petclinic-visits`. And a finding is first
 seen by the first scan *ingested*: each finding the readings time is reported on one branch only, in
 the order its builds are seeded, so that its first observation and its resolution are the dates of
-its builds. `DemoSecurityReadingsSeedTest` pins all of it; the readings themselves are the server's,
-and are checked by seeding the dev stack.
+its builds. `DemoSecurityReadingsSeedTest` pins all of it - the rung of each project in each estate,
+the fan-out summary and the head of the ranked list are read off the dataset there; the readings
+themselves are the server's, and are checked by seeding the dev stack.
+
+An auto promotion requiring a scan is held to the rule [below](#auto-promotion-has-to-reproduce-the-dataset-not-add-to-it):
+`petclinic-visits`' 1.6.1 and 1.6.2 satisfy it and declare SILVER, and 1.5.1 and 1.6.0, whose scan
+warns on the open HIGH, were promoted by hand. `DemoSeedTest` reads a scan's status off its findings
+and a test run's off its failed tests for that, as the server would.
 
 The estate view and its fan-out are in the release-notes screenshots
-(`ontrack-web-tests/screenshots/catalogue.js`, `estate` and `estate-fanout`).
+(`ontrack-web-tests/screenshots/catalogue.js`, `estate`, `estate-ranked-findings` and
+`estate-fanout`).
 
 ### The long tables are a project of their own
 

@@ -533,6 +533,30 @@ object DemoContent {
     )
 
     /**
+     * The dependency scan of a build of [SERVICE] on [MAIN] (#1982). [CVE_FIXED_ON_MAIN] is reported on
+     * spring-webmvc by 1.4.0 to 1.4.2, which use common-library 3.2.0, and no longer by 1.4.3, whose bump
+     * of common-library to 3.2.1 brings spring-webmvc 6.1.13: eight days, within the remediation target of
+     * "Demo products". [MAIN] is the only branch it is scanned on, so the finding is resolved for the
+     * project as a whole - the third state of the fan-out of "Demo products", beside [SECURITY], where it
+     * is still exposed, and [VISITS], where it is accepted.
+     *
+     * The scan reads WARNING while the HIGH is open and PASSED after: nothing on [SERVICE] requires it,
+     * so its promotions are the curated ones, and its security maturity is 2 in "Demo production" -
+     * covered - and 1 in "Demo products", which expects a code scan as well.
+     *
+     * @param webMvcFixed Whether the build carries spring-webmvc 6.1.13
+     */
+    private fun serviceScans(webMvcFixed: Boolean) = listOf(
+        ScanSpec(
+            validationStamp = SECURITY_DEPENDENCIES,
+            format = ScanFormat.FINDINGS,
+            kind = ScanKind.DEPENDENCIES,
+            scanner = "trivy",
+            findings = listOfNotNull(springWebMvcPath.takeUnless { webMvcFixed }),
+        ),
+    )
+
+    /**
      * The main demo project: a branch that reads like a real one, with a maintenance
      * branch beside it and a history of promotions to chart.
      */
@@ -554,7 +578,9 @@ object DemoContent {
                 scmBranch = SCM_MAIN,
                 favourite = true,
                 promotionLevels = fullPromotions + canaryPass,
-                validationStamps = fullValidationStamps,
+                // The dependency scan on this branch only: the maintenance branch has none, and a branch
+                // which never scanned exposes nothing, so the project is resolved as a whole (#1982)
+                validationStamps = fullValidationStamps + dependencyScan,
                 builds = listOf(
                     BuildSpec(
                         name = "101",
@@ -569,6 +595,7 @@ object DemoContent {
                             ValidationSpec(SECURITY_SCAN, PASSED),
                         ),
                         links = listOf(BuildRef(LIBRARY, MAIN, "41")),
+                        scans = serviceScans(webMvcFixed = false),
                         commits = listOf(
                             "feat(api): search owners by their phone number, closes PETCLINIC-142",
                             "test: cover the owner search endpoint",
@@ -587,6 +614,7 @@ object DemoContent {
                             ValidationSpec(SECURITY_SCAN, WARNING, "Two medium advisories in transitive dependencies."),
                         ),
                         links = listOf(BuildRef(LIBRARY, MAIN, "41")),
+                        scans = serviceScans(webMvcFixed = false),
                         commits = listOf(
                             "feat(ui): paginate the visit history, closes PETCLINIC-157",
                             "docs: describe the visit history endpoint",
@@ -603,6 +631,7 @@ object DemoContent {
                             ValidationSpec(INTEGRATION_TESTS, FAILED, "Flaky visit scheduling test."),
                         ),
                         links = listOf(BuildRef(LIBRARY, MAIN, "41")),
+                        scans = serviceScans(webMvcFixed = false),
                         commits = listOf(
                             "feat(admin): administer the vet specialities, closes PETCLINIC-165",
                             "refactor: extract the speciality repository",
@@ -621,6 +650,7 @@ object DemoContent {
                             ValidationSpec(SECURITY_SCAN, PASSED),
                         ),
                         links = listOf(BuildRef(LIBRARY, MAIN, "42")),
+                        scans = serviceScans(webMvcFixed = true),
                         commits = listOf(
                             "fix(tests): stabilise the visit scheduling test, closes PETCLINIC-163",
                             "chore(deps): bump common-library to 3.2.1",
@@ -644,6 +674,7 @@ object DemoContent {
                             ValidationSpec(SECURITY_SCAN, PASSED),
                         ),
                         links = listOf(BuildRef(LIBRARY, MAIN, "42")),
+                        scans = serviceScans(webMvcFixed = true),
                         commits = listOf(
                             "perf(api): cache the pet type reference data, closes PETCLINIC-171",
                             "docs: note when the pet type cache is evicted",
@@ -659,6 +690,7 @@ object DemoContent {
                             ValidationSpec(UNIT_TESTS, FAILED, "Export encoding test."),
                         ),
                         links = listOf(BuildRef(LIBRARY, MAIN, "42")),
+                        scans = serviceScans(webMvcFixed = true),
                         commits = listOf(
                             "feat(export): export the owners as CSV, closes PETCLINIC-178",
                             "style: reformat the export writer",
@@ -680,6 +712,7 @@ object DemoContent {
                             ValidationSpec(SECURITY_SCAN, PASSED),
                         ),
                         links = listOf(BuildRef(LIBRARY, MAIN, "42")),
+                        scans = serviceScans(webMvcFixed = true),
                         commits = listOf(
                             "fix(export): write the CSV in UTF-8, closes PETCLINIC-181",
                             "ci: run the export tests on the canary pipeline",
@@ -1064,10 +1097,11 @@ object DemoContent {
     )
 
     /**
-     * The dependency scan of [VISITS], the only kind of scan it runs: enough for "Demo production",
-     * which expects nothing else, and short of "Demo products", which expects a code scan as well.
+     * The dependency scan of [VISITS] and of [SERVICE], the only kind of scan they run: enough for "Demo
+     * production", which expects nothing else, and short of "Demo products", which expects a code scan
+     * as well.
      */
-    private val visitsDependencies = ValidationStampSpec(
+    private val dependencyScan = ValidationStampSpec(
         SECURITY_DEPENDENCIES,
         "Vulnerabilities of the dependencies, from Trivy.",
         findings = FindingsThresholdsSpec(),
@@ -1106,6 +1140,24 @@ object DemoContent {
                 springWebMvcPath.takeUnless { webMvcFixed },
                 springWebFluxPathAccepted,
             ),
+        ),
+    )
+
+    /**
+     * SILVER on [VISITS]: granted by itself to a BRONZE build whose tests and dependency scan are green.
+     * Requiring a security stamp through the auto promotion is what makes a project *gating* by policy
+     * (#1982) - the route teams should aim for, where [SECURITY] only gets there through a scan which
+     * failed. Its security maturity is 3 wherever it is covered: in "Demo production" and with no estate.
+     *
+     * It reproduces the promotions the dataset declares rather than adding any. The builds before 1.5.1
+     * have no scan and 1.1.0 failed its tests, so none of them satisfies it; 1.5.1 and 1.6.0 carry the
+     * open HIGH, which makes their scan a WARNING the rule does not let through, and were promoted by a
+     * human; 1.6.1 and 1.6.2 satisfy it, and declare SILVER.
+     */
+    private val visitsSilver = silver.copy(
+        autoPromotion = AutoPromotionSpec(
+            validationStamps = listOf(TEST_SUMMARY, SECURITY_DEPENDENCIES),
+            promotionLevels = listOf(BRONZE),
         ),
     )
 
@@ -1156,9 +1208,11 @@ object DemoContent {
      *
      * Its last four builds scan their dependencies (#1912): [CVE_FIXED_ON_MAIN] is reported on
      * spring-webflux under an acceptance, and on spring-webmvc by **1.5.1** and **1.6.0**, until
-     * **1.6.1** bumps it - fourteen days, its remediation time. Its security maturity reads
-     * differently in each set: 1 in "Demo products", which also expects a code scan, and 2 in "Demo
-     * production" and with no estate, where a fresh dependency scan is enough.
+     * **1.6.1** bumps it - fourteen days, its remediation time. Its SILVER requires that scan
+     * ([visitsSilver]), which makes it gating by policy (#1982), and its security maturity reads
+     * differently in each set: 1 in "Demo products", which also expects a code scan - a rung needs the
+     * ones below it - and 3 in "Demo production" and with no estate, where a fresh dependency scan is
+     * enough to be covered.
      */
     private fun visits() = ProjectSpec(
         name = VISITS,
@@ -1168,8 +1222,8 @@ object DemoContent {
             BranchSpec(
                 name = MAIN,
                 description = "Main development branch.",
-                promotionLevels = listOf(bronze, silver, gold),
-                validationStamps = listOf(buildStamp, testSummary, visitsDependencies),
+                promotionLevels = listOf(bronze, visitsSilver, gold),
+                validationStamps = listOf(buildStamp, testSummary, dependencyScan),
                 builds = listOf(
                     visitsBuild("201", "1.0.0", "First release of the visit scheduler.", DaysAgo(88), passing(380)),
                     visitsBuild("202", "1.0.1", "Reminder e-mails for upcoming visits.", DaysAgo(81), passing(386)),
@@ -1287,13 +1341,15 @@ object DemoContent {
      * targets in days:
      *
      * * "Demo products" expects a dependency AND a code scan within a week, and gives a CRITICAL a
-     *   week and a HIGH two. Its maturity reads three rungs: [SECURITY] at 3 (gating), [VISITS] at 1
-     *   (reported, no code scan), [SERVICE] at 0 - its `SECURITY.SCAN` is a plain stamp, not a scan.
+     *   week and a HIGH two. Its maturity reads two rungs: [SECURITY] at 3 (gating, by a failed scan),
+     *   [VISITS] and [SERVICE] at 1 (reported, no code scan) - [VISITS] gates its SILVER on its scan,
+     *   but is not covered here, and a rung needs the ones below it.
      *   [SECURITY] meets its remediation time and misses its overdue target, with one HIGH open past
      *   its two weeks; [VISITS] misses its remediation time, fourteen days for its one HIGH, and has
-     *   nothing overdue; [SERVICE] has resolved nothing, and its remediation time is unknown.
-     * * "Demo production" expects a dependency scan only, fresh by the settings' freshness: [VISITS]
-     *   meets its maturity target at 2 (covered), [SERVICE] and [UI] miss it at 0. Its remediation
+     *   nothing overdue; [SERVICE] meets it, eight days for the CVE it resolved (#1982).
+     * * "Demo production" expects a dependency scan only, fresh by the settings' freshness: its maturity
+     *   reads three rungs - [VISITS] at 3 (gating by policy), [SERVICE] at 2 (covered), both meeting the
+     *   target, and [UI] at 0, missing it: its `SECURITY.SCAN` is a plain stamp, not a scan. Its remediation
      *   targets are set but its overdue reading is judged against nothing: a count of zero shown
      *   without a verdict.
      */

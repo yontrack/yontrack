@@ -561,14 +561,23 @@ class DemoSeedTest {
      *
      * The fake server does not fire auto promotions, so this checks the dataset's own consistency -
      * that every build satisfying the rule is already declared as promoted by it.
+     *
+     * A stamp is passed by its last run, whichever way the dataset posts it: a validation with a
+     * status, a test run - failed by one failed test - or a scan, whose status the findings give (#1982).
      */
     @Test
     fun `no build of the demo would be auto promoted beyond what the dataset declares`() {
         DemoContent.dataset(changelog).projects.forEach { project ->
             project.branches.forEach { branch ->
                 val passed = { build: BuildSpec, stamp: String ->
-                    build.validations.any {
-                        it.validationStamp == stamp && validationStatusPasses(it.status, branch.stamp(stamp))
+                    val validation = build.validations.lastOrNull { it.validationStamp == stamp }
+                    val testRun = build.tests.lastOrNull { it.validationStamp == stamp }
+                    val scan = build.scans.lastOrNull { it.validationStamp == stamp }
+                    when {
+                        validation != null -> validationStatusPasses(validation.status, branch.stamp(stamp))
+                        testRun != null -> testRun.failed == 0
+                        scan != null -> scan.status(branch.stamp(stamp)?.findings!!) == ValidationStatus.PASSED
+                        else -> false
                     }
                 }
                 branch.promotionLevels.forEach { promotionLevel ->

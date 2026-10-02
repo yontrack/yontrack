@@ -52,7 +52,8 @@ const SCORECARD_PROJECT = 'petclinic-visits'
 const ESTATE_PRODUCTION = 'Demo production'
 /**
  * `DemoContent.ESTATE_PRODUCTS`, whose security readings `DemoContent.SECURITY` lights up, and the
- * CVE its findings fan-out shows open in that project and accepted in `SCORECARD_PROJECT` (#1912).
+ * CVE its findings fan-out shows open in that project, accepted in `SCORECARD_PROJECT` (#1912) and
+ * resolved in `SERVICE` (#1982) - the finding its ranked list opens on, too.
  */
 const ESTATE_PRODUCTS = 'Demo products'
 const SECURITY_PROJECT = 'petclinic-billing'
@@ -172,18 +173,26 @@ const catalogue = [
         },
     },
     {
+        slug: 'estate-ranked-findings',
+        description: 'The findings fan-out of an estate, before any search: its most widespread open findings',
+        // The tab is in the URL (#1980), with no finding: the ranked list
+        path: `/extension/scorecard/estate/${encodeURIComponent(ESTATE_PRODUCTS)}?tab=fanout`,
+        element: '[data-testid="estate-scorecard"]',
+        ready: async (page) => {
+            await expect(page.getByTestId(`estate-ranked-projects-${FAN_OUT_CVE}`)).toBeVisible()
+        },
+    },
+    {
         slug: 'estate-fanout',
         description: 'The findings fan-out of an estate: one CVE across its projects',
-        path: `/extension/scorecard/estate/${encodeURIComponent(ESTATE_PRODUCTS)}`,
+        // The shared link of the fan-out (#1980): the tab and the finding searched are in the URL
+        path: `/extension/scorecard/estate/${encodeURIComponent(ESTATE_PRODUCTS)}?tab=fanout&finding=${FAN_OUT_CVE}`,
         element: '[data-testid="estate-scorecard"]',
-        // The tab and the search are not in the URL: the only entry which acts before the shutter
         ready: async (page) => {
-            await page.getByRole('tab', {name: 'Findings fan-out'}).click()
-            await page.getByRole('searchbox', {name: 'External ID of the finding'}).fill(FAN_OUT_CVE)
-            await page.getByRole('searchbox', {name: 'External ID of the finding'}).press('Enter')
             // Every row of a project carries its test id, and the scorecard project has two
             await expect(page.getByTestId(`estate-fanout-state-${SCORECARD_PROJECT}`).first()).toBeVisible()
             await expect(page.getByTestId(`estate-fanout-state-${SECURITY_PROJECT}`).first()).toBeVisible()
+            await expect(page.getByTestId(`estate-fanout-state-${SERVICE}`).first()).toBeVisible()
         },
     },
     {
