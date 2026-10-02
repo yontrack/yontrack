@@ -10,6 +10,7 @@ import {gqlLabelFragment} from "@components/labels/LabelGraphQLFragments";
 import TimestampText from "@components/common/TimestampText";
 import SetExplanation from "@components/extension/scorecard/SetExplanation";
 import SecondaryText from "@components/extension/scorecard/SecondaryText";
+import EstateFindingsFanOut from "@components/extension/scorecard/estates/EstateFindingsFanOut";
 import {
     formatReadingValue,
     latestComputedAt,
@@ -263,7 +264,8 @@ function EstateReadingsTable({estate}) {
 }
 
 /**
- * The scorecard of an estate: what the estate is, and the readings of its projects, in a tab.
+ * The scorecard of an estate: what the estate is, the readings of its projects in a tab, and the
+ * fan-out of one finding over its projects in another.
  *
  * @param name Name of the estate
  */
@@ -298,6 +300,11 @@ export default function EstateScorecardView({name}) {
                         key: 'readings',
                         label: 'Readings',
                         children: <EstateReadingsTable estate={estate}/>,
+                    },
+                    {
+                        key: 'findings',
+                        label: 'Findings fan-out',
+                        children: <EstateFindingsFanOut estate={estate}/>,
                     },
                 ]}
             />

@@ -2154,6 +2154,11 @@ type EnvironmentMatrixRow {
 type Estate {
   "Description of the estate"
   description: String
+  "Security findings having the given external ID (a CVE, a rule ID) among the projects of the estate, by project name: the fan-out of one finding over the estate. Only the projects the user can see, and whose findings the user is granted the view of, are searched."
+  findings(
+    "External ID of the findings"
+    externalId: String!
+  ): [Finding!]!
   "ID of the estate"
   id: Int!
   "Labels selecting the projects of the estate, all of them required"

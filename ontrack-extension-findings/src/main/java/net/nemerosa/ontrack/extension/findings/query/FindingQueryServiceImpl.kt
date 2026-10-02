@@ -127,8 +127,8 @@ class FindingQueryServiceImpl(
         return FindingSeverity.entries.associateWith { counts[it] ?: 0 }
     }
 
-    override fun getFindingsByExternalId(externalId: String): List<Finding> {
-        val findings = findingRepository.findFindingsByExternalId(externalId)
+    override fun getFindingsByExternalId(externalId: String, projectIds: Collection<Int>?): List<Finding> {
+        val findings = findingRepository.findFindingsByExternalId(externalId, projectIds)
         val projects = findings.map { it.projectId }.distinct()
             .mapNotNull { projectId -> visibleProject(projectId) }
             .associateBy { it.id() }

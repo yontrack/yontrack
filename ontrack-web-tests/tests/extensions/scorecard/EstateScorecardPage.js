@@ -73,4 +73,45 @@ export class EstateScorecardPage {
     rollUp(key) {
         return this.page.getByTestId(`estate-rollup-${key}`)
     }
+
+    /**
+     * Opens the findings fan-out tab.
+     */
+    async openFanOut() {
+        await this.page.getByRole('tab', {name: 'Findings fan-out'}).click()
+        await expect(this.page.getByTestId('estate-fanout')).toBeVisible()
+    }
+
+    /**
+     * Searches the fan-out of a finding by its external ID.
+     */
+    async searchFinding(externalId) {
+        const input = this.page.getByTestId('estate-fanout-search').getByRole('searchbox')
+        await input.fill(externalId)
+        await input.press('Enter')
+    }
+
+    fanOutSummary() {
+        return this.page.getByTestId('estate-fanout-summary')
+    }
+
+    /**
+     * Names of the projects of the fan-out, in the order of the rows.
+     */
+    async fanOutProjectNames() {
+        await expect(this.page.getByTestId('estate-fanout-table')).toBeVisible()
+        return this.page.getByTestId(/^estate-fanout-project-/).allTextContents()
+    }
+
+    fanOutState(project) {
+        return this.page.getByTestId(`estate-fanout-state-${project}`)
+    }
+
+    fanOutBranches(project) {
+        return this.page.getByTestId(`estate-fanout-branches-${project}`)
+    }
+
+    fanOutBranch(project, branch) {
+        return this.page.getByTestId(`estate-fanout-branch-${project}-${branch}`)
+    }
 }

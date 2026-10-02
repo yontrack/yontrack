@@ -68,8 +68,12 @@ interface FindingQueryService {
 
     /**
      * Findings having a given external ID, across all the projects, by project name.
+     *
+     * @param externalId External ID of the findings
+     * @param projectIds IDs of the projects to look into, `null` for all of them. Whatever they
+     * are, the projects whose findings the user cannot see are left out.
      */
-    fun getFindingsByExternalId(externalId: String): List<Finding>
+    fun getFindingsByExternalId(externalId: String, projectIds: Collection<Int>? = null): List<Finding>
 
     /**
      * Finding by ID, `null` when it does not exist or cannot be seen.

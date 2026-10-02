@@ -166,6 +166,13 @@ describe('The scorecard of an estate', () => {
         expect(screen.getByTestId('estate-cell-alpha-delivery.leadTime')).toHaveAttribute('data-judgement', 'NONE')
     })
 
+    it('has a findings fan-out tab, beside the readings', () => {
+        renderView()
+        expect(screen.queryByTestId('estate-fanout')).toBeNull()
+        fireEvent.click(screen.getByText('Findings fan-out'))
+        expect(screen.getByTestId('estate-fanout')).toBeInTheDocument()
+    })
+
     it('says when the estate does not exist', () => {
         mockUseQuery.mockReturnValue({data: null, loading: false, finished: true, error: null})
         render(<EstateScorecardView name="Unknown"/>)

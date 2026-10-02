@@ -5,7 +5,9 @@ import graphql.Scalars.GraphQLString
 import graphql.schema.GraphQLNonNull
 import graphql.schema.GraphQLObjectType
 import graphql.schema.GraphQLTypeReference
+import net.nemerosa.ontrack.extension.findings.graphql.GQLTypeFinding
 import net.nemerosa.ontrack.extension.findings.model.FindingKind
+import net.nemerosa.ontrack.extension.findings.query.FindingQueryService
 import net.nemerosa.ontrack.extension.scorecard.engine.MarkerKind
 import net.nemerosa.ontrack.extension.scorecard.estates.*
 import net.nemerosa.ontrack.extension.scorecard.model.ReadingDirection
@@ -17,6 +19,7 @@ import net.nemerosa.ontrack.graphql.schema.GQLTypeProject
 import net.nemerosa.ontrack.graphql.support.doubleField
 import net.nemerosa.ontrack.graphql.support.intField
 import net.nemerosa.ontrack.graphql.support.listType
+import net.nemerosa.ontrack.graphql.support.stringArgument
 import net.nemerosa.ontrack.model.labels.Label
 import org.springframework.stereotype.Component
 
@@ -27,6 +30,7 @@ import org.springframework.stereotype.Component
 class GQLTypeEstate(
     private val estateService: EstateService,
     private val scorecardService: ScorecardService,
+    private val findingQueryService: FindingQueryService,
 ) : GQLType {
 
     override fun getTypeName(): String = Estate::class.java.simpleName
@@ -85,10 +89,29 @@ class GQLTypeEstate(
                     .type(listType(GraphQLTypeReference(ScorecardSet::class.java.simpleName)))
                     .dataFetcher { env -> scorecardService.getEstateSets(env.getSource<Estate>()!!) }
             }
+            .field {
+                it.name("findings")
+                    .description(
+                        "Security findings having the given external ID (a CVE, a rule ID) among the projects of the estate, " +
+                                "by project name: the fan-out of one finding over the estate. Only the projects the user can see, " +
+                                "and whose findings the user is granted the view of, are searched."
+                    )
+                    .argument(stringArgument(ARG_EXTERNAL_ID, "External ID of the findings", nullable = false))
+                    .type(listType(GraphQLTypeReference(GQLTypeFinding.FINDING)))
+                    .dataFetcher { env ->
+                        val estate: Estate = env.getSource()!!
+                        val externalId: String = env.getArgument(ARG_EXTERNAL_ID)!!
+                        findingQueryService.getFindingsByExternalId(
+                            externalId = externalId,
+                            projectIds = estateService.getProjects(estate).map { project -> project.id() },
+                        )
+                    }
+            }
             .build()
 
     companion object {
         const val ESTATE_MARKER = "EstateMarker"
+        private const val ARG_EXTERNAL_ID = "externalId"
     }
 }
 

@@ -93,6 +93,24 @@ class FindingJdbcRepositoryIT : AbstractDSLTestSupport() {
     }
 
     @Test
+    fun `Findings by external ID restricted to some projects`() {
+        val p1 = doCreateProject()
+        val p2 = doCreateProject()
+        val p3 = doCreateProject()
+        val f1 = findingRepository.insertFinding(finding(p1, externalId = "CVE-RESTRICTED"))
+        findingRepository.insertFinding(finding(p2, externalId = "CVE-RESTRICTED"))
+        val f3 = findingRepository.insertFinding(finding(p3, externalId = "CVE-RESTRICTED"))
+        assertEquals(
+            listOf(f1, f3),
+            findingRepository.findFindingsByExternalId("CVE-RESTRICTED", listOf(p1.id(), p3.id()))
+        )
+        assertEquals(
+            emptyList(),
+            findingRepository.findFindingsByExternalId("CVE-RESTRICTED", emptyList())
+        )
+    }
+
+    @Test
     fun `Updating a finding`() {
         val project = doCreateProject()
         val finding = findingRepository.insertFinding(finding(project, externalId = "CVE-3"))

@@ -54,9 +54,13 @@ interface FindingRepository {
     fun findFindingsByProjectAndScanner(projectId: Int, scanner: String): List<Finding>
 
     /**
-     * Gets all the findings having the given external ID, across all projects.
+     * Gets all the findings having the given external ID, across all projects, or across the
+     * given projects only.
+     *
+     * @param externalId External ID of the findings
+     * @param projectIds IDs of the projects to look into, `null` for all of them
      */
-    fun findFindingsByExternalId(externalId: String): List<Finding>
+    fun findFindingsByExternalId(externalId: String, projectIds: Collection<Int>? = null): List<Finding>
 
     /**
      * Goes through all the findings, of all the projects, by ID.

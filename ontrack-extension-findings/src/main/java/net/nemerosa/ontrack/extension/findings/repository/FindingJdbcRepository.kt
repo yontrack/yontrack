@@ -115,11 +115,20 @@ class FindingJdbcRepository(
             mapOf("projectId" to projectId, "scanner" to scanner)
         ) { rs, _ -> toFinding(rs) }
 
-    override fun findFindingsByExternalId(externalId: String): List<Finding> =
-        namedParameterJdbcTemplate!!.query(
-            "SELECT * FROM FINDINGS WHERE EXTERNAL_ID = :externalId ORDER BY ID",
-            mapOf("externalId" to externalId)
-        ) { rs, _ -> toFinding(rs) }
+    override fun findFindingsByExternalId(externalId: String, projectIds: Collection<Int>?): List<Finding> =
+        when {
+            projectIds == null -> namedParameterJdbcTemplate!!.query(
+                "SELECT * FROM FINDINGS WHERE EXTERNAL_ID = :externalId ORDER BY ID",
+                mapOf("externalId" to externalId)
+            ) { rs, _ -> toFinding(rs) }
+
+            projectIds.isEmpty() -> emptyList()
+
+            else -> namedParameterJdbcTemplate!!.query(
+                "SELECT * FROM FINDINGS WHERE EXTERNAL_ID = :externalId AND PROJECT_ID IN (:projectIds) ORDER BY ID",
+                mapOf("externalId" to externalId, "projectIds" to projectIds.distinct())
+            ) { rs, _ -> toFinding(rs) }
+        }
 
     override fun forEachFinding(code: (Finding) -> Unit) {
         namedParameterJdbcTemplate!!.query(

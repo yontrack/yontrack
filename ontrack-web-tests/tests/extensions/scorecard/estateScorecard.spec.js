@@ -11,6 +11,11 @@ import {
     recomputeScorecardAndWait,
 } from "@ontrack/extensions/scorecard/scorecard";
 import {generate} from "@ontrack/utils";
+import {
+    createFindingsValidationStamp,
+    finding,
+    scanWithFindings,
+} from "@ontrack/extensions/findings/findings";
 
 test('estate view: from the user menu to the estate, its readings against its targets, and a project', async ({page, ontrack}) => {
     test.skip(!(await isScorecardLicensed(ontrack)), 'The licence does not allow the estates')
@@ -101,6 +106,94 @@ test('estate view: from the user menu to the estate, its readings against its ta
         await scorecardPage.expectOnPage()
         await expect(page).toHaveURL(new RegExp(`\\?set=${encodeURIComponent(estate.name)}$`))
         await expect(scorecardPage.set(estate.name)).toBeVisible()
+    } finally {
+        await deleteEstate(ontrack, estate)
+    }
+})
+
+/**
+ * A future day, as an ISO date, for an acceptance which holds.
+ */
+const inTenDays = () => {
+    const date = new Date()
+    date.setDate(date.getDate() + 10)
+    return date.toISOString().substring(0, 10)
+}
+
+test('estate view: the fan-out of one finding over the projects of the estate', async ({page, ontrack}) => {
+    test.skip(!(await isScorecardLicensed(ontrack)), 'The licence does not allow the estates')
+
+    const externalId = generate('CVE-')
+    const acceptedUntil = inTenDays()
+    const label = await ontrack.labels().createLabel()
+
+    // Exposed on main, accepted on release
+    const exposed = await ontrack.createProject(generate('b-exposed-'))
+    await ontrack.labels().setProjectLabels(exposed.id, [label.id])
+    const exposedMain = await exposed.createBranch("main")
+    await scanWithFindings(exposedMain, await createFindingsValidationStamp(exposedMain, "SECURITY.IMAGE"), [
+        finding({externalId, severity: "CRITICAL", title: "Remote code execution"}),
+    ])
+    const exposedRelease = await exposed.createBranch("release")
+    await scanWithFindings(exposedRelease, await createFindingsValidationStamp(exposedRelease, "SECURITY.IMAGE"), [
+        finding({externalId, severity: "CRITICAL", title: "Remote code execution", acceptedUntil}),
+    ])
+
+    // Reported, then fixed
+    const fixed = await ontrack.createProject(generate('a-fixed-'))
+    await ontrack.labels().setProjectLabels(fixed.id, [label.id])
+    const fixedMain = await fixed.createBranch("main")
+    const fixedStamp = await createFindingsValidationStamp(fixedMain, "SECURITY.IMAGE")
+    await scanWithFindings(fixedMain, fixedStamp, [finding({externalId, severity: "CRITICAL"})])
+    await scanWithFindings(fixedMain, fixedStamp, [finding({externalId: generate('CVE-OTHER-')})])
+
+    // In the estate, never reporting it
+    const clean = await ontrack.createProject(generate('c-clean-'))
+    await ontrack.labels().setProjectLabels(clean.id, [label.id])
+    const cleanMain = await clean.createBranch("main")
+    await scanWithFindings(cleanMain, await createFindingsValidationStamp(cleanMain, "SECURITY.IMAGE"), [
+        finding({externalId: generate('CVE-OTHER-')}),
+    ])
+
+    // Reporting it, but out of the estate
+    const outside = await ontrack.createProject(generate('d-outside-'))
+    const outsideMain = await outside.createBranch("main")
+    await scanWithFindings(outsideMain, await createFindingsValidationStamp(outsideMain, "SECURITY.IMAGE"), [
+        finding({externalId}),
+    ])
+
+    const estate = await createEstate(ontrack, {
+        name: generate('estate-'),
+        labels: [`${label.category}:${label.name}`],
+    })
+    try {
+        await login(page, ontrack)
+        const estatePage = new EstateScorecardPage(page, ontrack, estate.name)
+        await estatePage.goTo()
+        await estatePage.openFanOut()
+
+        await estatePage.searchFinding(externalId)
+
+        // The projects of the estate reporting it, the exposed ones first, none from outside
+        expect(await estatePage.fanOutProjectNames()).toEqual([exposed.name, fixed.name])
+        await expect(estatePage.fanOutSummary()).toHaveText(
+            `2 projects of this estate report ${externalId}: exposed in 1, accepted in 0, resolved in 1`
+        )
+        await expect(page.getByTestId('estate-fanout-title')).toContainText('Remote code execution')
+
+        // On which branches, since when
+        await expect(estatePage.fanOutState(exposed.name)).toHaveText('Open')
+        await expect(estatePage.fanOutBranch(exposed.name, 'main')).toContainText('since')
+        await expect(estatePage.fanOutBranch(exposed.name, 'release')).toContainText(`accepted until ${acceptedUntil}`)
+
+        // Fixed: no branch left, resolved
+        await expect(estatePage.fanOutState(fixed.name)).toHaveText('Resolved')
+        await expect(estatePage.fanOutBranches(fixed.name)).toContainText('Resolved')
+
+        // An external ID no project of the estate reports
+        const unknown = generate('CVE-NONE-')
+        await estatePage.searchFinding(unknown)
+        await expect(page.getByText(`No project of this estate reports ${unknown}.`)).toBeVisible()
     } finally {
         await deleteEstate(ontrack, estate)
     }
