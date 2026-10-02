@@ -3,11 +3,14 @@ package net.nemerosa.ontrack.extension.audittrail.service
 import io.micrometer.core.instrument.MeterRegistry
 import net.nemerosa.ontrack.common.Time
 import net.nemerosa.ontrack.extension.audittrail.canonical.CanonicalJson
+import net.nemerosa.ontrack.extension.audittrail.endorsement.InstanceKeyService
 import net.nemerosa.ontrack.extension.audittrail.hash.TrailHashFormatV1
 import net.nemerosa.ontrack.extension.audittrail.license.AuditTrailLicense
 import net.nemerosa.ontrack.extension.audittrail.metrics.AuditTrailMetrics
+import net.nemerosa.ontrack.extension.audittrail.model.TrailEndorsement
 import net.nemerosa.ontrack.extension.audittrail.model.TrailEntry
 import net.nemerosa.ontrack.extension.audittrail.model.TrailEntryTypes
+import net.nemerosa.ontrack.extension.audittrail.repository.TrailEndorsementRepository
 import net.nemerosa.ontrack.extension.audittrail.repository.TrailEntryRepository
 import net.nemerosa.ontrack.json.asJson
 import net.nemerosa.ontrack.json.parseAsJson
@@ -25,9 +28,11 @@ import java.time.temporal.ChronoUnit
 @Transactional
 class TrailServiceImpl(
     private val trailEntryRepository: TrailEntryRepository,
+    private val trailEndorsementRepository: TrailEndorsementRepository,
     private val auditTrailLicense: AuditTrailLicense,
     private val securityService: SecurityService,
     private val meterRegistry: MeterRegistry,
+    private val instanceKeyService: InstanceKeyService,
 ) : TrailService {
 
     override fun append(build: Build, type: String, payload: JsonNode, actor: JsonNode): TrailEntry? {
@@ -54,6 +59,11 @@ class TrailServiceImpl(
         return trailEntryRepository.findEntries(build.id())
     }
 
+    override fun getEndorsements(build: Build): List<TrailEndorsement> {
+        securityService.checkProjectFunction(build, ProjectView::class.java)
+        return trailEndorsementRepository.findEndorsements(build.id())
+    }
+
     private fun write(
         build: Build,
         last: TrailEntry?,
@@ -78,11 +88,29 @@ class TrailServiceImpl(
             hash = "",
         )
         val envelope = entry.envelope
-        return trailEntryRepository.insert(
+        val stored = trailEntryRepository.insert(
             entry = entry.copy(hash = TrailHashFormatV1.hash(envelope)),
             canonicalPayload = canonicalPayload,
             canonicalActor = canonicalActor,
             time = envelope.time,
+        )
+        endorse(stored)
+        return stored
+    }
+
+    /**
+     * Endorses an entry by the instance key — or leaves it unendorsed when the key is not
+     * provisioned.
+     */
+    private fun endorse(entry: TrailEntry) {
+        val endorsement = instanceKeyService.endorse(entry.hash) ?: return
+        trailEndorsementRepository.insert(
+            TrailEndorsement(
+                entryId = entry.id,
+                keyId = endorsement.keyId,
+                signature = endorsement.signature,
+                time = entry.time,
+            )
         )
     }
 

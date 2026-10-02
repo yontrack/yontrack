@@ -1,0 +1,21 @@
+{
+  "description": "Endorsements of the three entries of 01-build-created.json by the key of RFC 8032, section 7.1, TEST 1 - a published key, never an instance key. Produced with OpenSSL 3.6: the private key is the PKCS#8 form of the RFC seed, keyId the first 16 hex characters of the SHA-256 of the DER SubjectPublicKeyInfo, each signature the Ed25519 signature of the 32 bytes of the hash, in base64.",
+  "algorithm": "Ed25519",
+  "privateKey": "-----BEGIN PRIVATE KEY-----\nMC4CAQAwBQYDK2VwBCIEIJ1hsZ3v/VpguoRK9JLsLMREScVpezJpGXA7rAMcrn9g\n-----END PRIVATE KEY-----\n",
+  "publicKey": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEA11qYAYKxCrfVS/7TyWQHOg7hcvPapiMlrwIaaPcHURo=\n-----END PUBLIC KEY-----\n",
+  "keyId": "06e3fd8fda29bb60",
+  "endorsements": [
+    {
+      "hash": "4b320b3f1628780eaf5adbc9153975aa05eeb25fd082f97b111588499a6550a6",
+      "signature": "TbRpefKqc1a4K1iXhVIAYiib+udglKU1/1o7SPKi1zuGD1AyreSpjahnzcdwIooEZa+nAtteCEpVWKXMTD/OAg=="
+    },
+    {
+      "hash": "8a78e74944dfb4d80786ff009c402384a693b357769811fecc156ba78eecf7d5",
+      "signature": "jy/gS3HJFRtrw0eZcJ491aAfKgOkjtB02TOxTb9ZTCN2a3AkCk4SQA/Uu/PLDgBUSElyn63PqkhniVYEErHxBQ=="
+    },
+    {
+      "hash": "0f08040748d69d3268d35b4fa8f4b36f8d4777a6b0b2f36996639170c64d0bd6",
+      "signature": "3YT8KN1uoDnSyjjtzPLMZda64XERC++yk8jf85BsnTgVs3+Q9EVXs7JQwW/D2IAXzjhD2irjfTE0GNaNrPMsBQ=="
+    }
+  ]
+}

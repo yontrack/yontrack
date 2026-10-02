@@ -8,6 +8,7 @@ import net.nemerosa.ontrack.extension.audittrail.license.TestLicenseService
 import net.nemerosa.ontrack.extension.audittrail.metrics.AuditTrailMetrics
 import net.nemerosa.ontrack.extension.audittrail.model.TrailEntry
 import net.nemerosa.ontrack.extension.audittrail.model.TrailEntryTypes
+import net.nemerosa.ontrack.extension.audittrail.repository.TrailEndorsementRepository
 import net.nemerosa.ontrack.extension.audittrail.repository.TrailEntryRepository
 import net.nemerosa.ontrack.it.AbstractDSLTestSupport
 import net.nemerosa.ontrack.json.asJson
@@ -29,6 +30,9 @@ class TrailServiceIT : AbstractDSLTestSupport() {
 
     @Autowired
     private lateinit var trailEntryRepository: TrailEntryRepository
+
+    @Autowired
+    private lateinit var trailEndorsementRepository: TrailEndorsementRepository
 
     @Autowired
     private lateinit var testLicenseService: TestLicenseService
@@ -158,11 +162,17 @@ class TrailServiceIT : AbstractDSLTestSupport() {
                         trailService.append(this, TrailEntryTypes.BUILD_CREATED, buildPayload(), ci)
                     }
                     assertEquals(2, trailEntryRepository.findEntries(build.id()).size)
+                    assertEquals(2, trailEndorsementRepository.findEndorsements(build.id()).size)
 
                     structureService.deleteBuild(build.id)
 
                     assertTrue(trailEntryRepository.findEntries(build.id()).isEmpty(), "Trail deleted with its build")
+                    assertTrue(
+                        trailEndorsementRepository.findEndorsements(build.id()).isEmpty(),
+                        "Endorsements deleted with their entries"
+                    )
                     assertEquals(1, trailService.getEntries(other).size, "Trail of the other build untouched")
+                    assertEquals(1, trailService.getEndorsements(other).size, "Endorsements of the other build untouched")
                 }
             }
         }

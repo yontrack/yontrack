@@ -8,7 +8,9 @@ import org.springframework.stereotype.Component
 import java.io.File
 
 /**
- * Reads the secret key directly from a file, never writes them.
+ * Reads the keys directly from the files of a directory, never writes them: the encryption key,
+ * which must be there, and any other key, such as the instance key of the audit trail, from the
+ * file of the same name when it is there.
  *
  * This store is suitable for read-only secrets (stored in K8S secrets
  * mounted as volumes for example).
@@ -20,6 +22,8 @@ class SecretFileConfidentialStore(
 ) : AbstractConfidentialStore() {
 
     private val key: ByteArray
+
+    private val directory: File
 
     init {
         val path = ontrackConfigProperties.fileKeyStore.directory
@@ -38,6 +42,7 @@ class SecretFileConfidentialStore(
                     throw SecretFileConfidentialStoreMissingKeyFileException(keyFile)
                 } else {
                     key = keyFile.readBytes()
+                    this.directory = directory
                 }
             }
         }
@@ -47,10 +52,24 @@ class SecretFileConfidentialStore(
         throw SecretFileConfidentialStoreReadOnlyException(key)
     }
 
+    /**
+     * The encryption key, read at startup, or any other key from the file of the same name in the
+     * directory, read at every call — so that a key mounted after the start, such as the instance
+     * key of the audit trail, is found without a restart.
+     */
     override fun load(key: String): ByteArray? =
         if (key == EncryptionServiceKeys.ENCRYPTION_KEY) {
             this.key
+        } else if (KEY_NAME.matches(key)) {
+            File(directory, key).takeIf { it.isFile && it.canRead() }?.readBytes()
         } else {
             null
         }
+
+    companion object {
+        /**
+         * Names of the keys which are files of the directory: no path, no hidden file.
+         */
+        private val KEY_NAME = Regex("[A-Za-z0-9_-][A-Za-z0-9._-]*")
+    }
 }

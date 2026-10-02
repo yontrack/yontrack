@@ -1,6 +1,7 @@
 package net.nemerosa.ontrack.extension.audittrail.service
 
 import net.nemerosa.ontrack.extension.audittrail.canonical.CanonicalJsonException
+import net.nemerosa.ontrack.extension.audittrail.model.TrailEndorsement
 import net.nemerosa.ontrack.extension.audittrail.model.TrailEntry
 import net.nemerosa.ontrack.model.structure.Build
 import tools.jackson.databind.JsonNode
@@ -24,6 +25,9 @@ interface TrailService {
      * The time of the entry is the server's, at the millisecond. No authorization is checked: the
      * caller records a change which was authorized already.
      *
+     * Every entry is endorsed by the instance key, in the same transaction. When the key is not
+     * provisioned, the entry is written all the same, unendorsed — the trail never stops a change.
+     *
      * @param build Build whose trail is appended to
      * @param type Type of the entry
      * @param payload What changed: a JSON object, within the subset of canonical JSON
@@ -40,4 +44,13 @@ interface TrailService {
      * @return Entries, by seq
      */
     fun getEntries(build: Build): List<TrailEntry>
+
+    /**
+     * Endorsements of the entries of the trail of a build, whether the licence is on or not.
+     *
+     * @param build Build, which the caller is allowed to see
+     * @return Endorsements, by seq of their entries — none for the entries written while the
+     * instance key was not provisioned
+     */
+    fun getEndorsements(build: Build): List<TrailEndorsement>
 }

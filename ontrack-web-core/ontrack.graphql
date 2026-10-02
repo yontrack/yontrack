@@ -114,6 +114,16 @@ type ApplyDashboardsPayload implements PayloadInterface {
   errors: [PayloadUserError]
 }
 
+"Public key of the instance, with which the endorsements of the entries of its trails are verified"
+type AuditTrailKey {
+  "Algorithm of the key: Ed25519"
+  algorithm: String!
+  "ID of the key, named by every endorsement it made: the first 16 hex characters of the SHA-256 of the DER SubjectPublicKeyInfo"
+  keyId: String!
+  "Public key, in PEM"
+  publicKey: String!
+}
+
 "A named authorization"
 type Authorization {
   "Action to authorize"
@@ -5562,6 +5572,8 @@ type Query {
     "Filtering accounts having this token in the name, email or groups"
     token: String
   ): [Account!]
+  "Public keys of the instance, with which the endorsements of the entries of its trails are verified - empty while no key exists"
+  auditTrailKeys: [AuditTrailKey!]!
   "Getting a list of authorizations for the authenticated user"
   authorizations: [Authorization!]!
   "List of audit entries for auto versioning processing orders"
