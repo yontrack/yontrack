@@ -6,7 +6,9 @@ import ScorecardInfo from "@components/extension/scorecard/ScorecardInfo";
 import ReadingSparkline from "@components/extension/scorecard/ReadingSparkline";
 import {
     formatReadingValue,
+    isNeutralJudgement,
     markerText,
+    neutralText,
     readingDescription,
     readingDetailItems,
     readingJudgement,
@@ -35,8 +37,14 @@ const tagStyle = (background, color) => ({
 const NEUTRAL_TAG = tagStyle('var(--ot-scorecard-neutral-bg)', 'var(--ot-text)')
 
 /**
+ * Suffix of the test ID of a neutral judgement: `no-failure`, `no-target`.
+ */
+const neutralTestIdSuffix = (judgement) => judgement.toLowerCase().replaceAll('_', '-')
+
+/**
  * The judgement of a reading as a tag, always in words - `Met` and `Missed` with an icon too, so
- * that they never rest on colour alone. An unknown reading gives its reason on hover and on focus.
+ * that they never rest on colour alone. An unknown reading gives its reason on hover and on focus; a
+ * neutral one - no failure in the window, no target set - says so in words, with no unknown chip.
  */
 export function JudgementTag({reading, testId}) {
     const judgement = readingJudgement(reading)
@@ -68,13 +76,14 @@ export function JudgementTag({reading, testId}) {
                     </Tag>
                 </Tooltip>
             </span>
-        case 'NO_FAILURE':
-            return <Tag {...props} style={NEUTRAL_TAG}>
-                <span data-testid={sub('no-failure')}>
-                    {unknownReasonText('NO_FAILURE')}
-                </span>
-            </Tag>
         default:
+            if (isNeutralJudgement(judgement)) {
+                return <Tag {...props} style={NEUTRAL_TAG}>
+                    <span data-testid={sub(neutralTestIdSuffix(judgement))}>
+                        {neutralText(judgement)}
+                    </span>
+                </Tag>
+            }
             return <Tag {...props} style={NEUTRAL_TAG}>No target</Tag>
     }
 }

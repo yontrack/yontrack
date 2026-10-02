@@ -204,7 +204,7 @@ A reading Yontrack cannot take is `UNKNOWN`, with one of these reasons:
 | `NO_FAILURE`    | Time to restore only: nothing failed in the window, so there was nothing to restore. Shown as *No failure in window*, a neutral state rather than an unknown one. A time to restore never reads 0. |
 | `NO_TEST_STAMP` | Test readings only: no test stamp on the branches in scope.                                 |
 | `NOT_LICENSED`  | Delivery readings up to an environment, when the license does not include the environments. |
-| `NO_TARGET`     | Overdue findings only: no remediation target to judge the findings against — the no-estate set, or an estate with neither a CRITICAL nor a HIGH target. |
+| `NO_TARGET`     | Overdue findings only: no remediation target to judge the findings against — the no-estate set, or an estate with neither a CRITICAL nor a HIGH target. Shown as *No target set*, a neutral state rather than an unknown one: nobody set a target, nothing went wrong. |
 
 ## Computing the readings
 
@@ -264,7 +264,7 @@ Under the cards, the readings of the selected set are tiles, each with:
 
 * its name, and an ⓘ saying what it measures, up to the marker of the set;
 * its judgement, always in words: *Met*, *Missed*, *No target*, *Unknown* — with its reason on
-  hover — or *No failure in window*;
+  hover — or, neutral, *No failure in window* or *No target set*;
 * its value, and its target (*target ≤ 1d*), or *no target in this set*;
 * a sparkline of its daily snapshots over the last 90 days, the target dashed and the zone where it
   is met shaded — below the target when lower is better, above it when higher is — with today's

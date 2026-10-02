@@ -70,7 +70,7 @@ export const READINGS = [
     },
     {
         key: 'security.overdue', name: 'Overdue findings', unit: COUNT, marker: false, direction: LOWER_IS_BETTER,
-        description: 'Open CRITICAL findings older than the CRITICAL remediation target of the estate, plus open HIGH findings older than its HIGH target. Unknown with no target.',
+        description: 'Open CRITICAL findings older than the CRITICAL remediation target of the estate, plus open HIGH findings older than its HIGH target. No target set with neither target.',
     },
 ]
 
@@ -239,15 +239,42 @@ export const unknownReasonText = (reason, key) =>
     READING_UNKNOWN_REASONS[key]?.[reason] ?? UNKNOWN_REASONS[reason] ?? reason
 
 /**
+ * The unknown reasons which say nothing went wrong, rendered neutral rather than unknown - the only
+ * place deciding which they are. Each is its own judgement, by the name of the reason, with its
+ * wording: `text` on a tile, `label` in a cell of the estate view.
+ */
+const NEUTRAL_REASONS = {
+    NO_FAILURE: {text: 'No failure in window', label: 'No failure'},
+    NO_TARGET: {text: 'No target set', label: 'No target set'},
+}
+
+/**
+ * Whether a judgement is neutral: neither measured nor unknown, nothing went wrong.
+ */
+export const isNeutralJudgement = (judgement) => Object.hasOwn(NEUTRAL_REASONS, judgement ?? '')
+
+/**
+ * A neutral judgement in words, on a tile: "No failure in window"; `null` for any other judgement.
+ */
+export const neutralText = (judgement) => isNeutralJudgement(judgement) ? NEUTRAL_REASONS[judgement].text : null
+
+/**
+ * A neutral judgement in a few words, in a cell: "No failure"; `null` for any other judgement.
+ */
+export const neutralLabel = (judgement) => isNeutralJudgement(judgement) ? NEUTRAL_REASONS[judgement].label : null
+
+/**
  * How a reading is to be shown:
  *
  * - `MET` / `MISSED` — measured, against the target of its estate
  * - `SHOWN` — measured, with no target: shown, not judged
  * - `NO_FAILURE` — a time to restore with nothing to restore, rendered neutral rather than unknown
+ * - `NO_TARGET` — overdue findings with no remediation target set, rendered neutral rather than
+ *   unknown
  * - `UNKNOWN` — Yontrack cannot tell, for the `unknownReason`
  */
 export const readingJudgement = (reading) => {
-    if (reading.unknownReason === 'NO_FAILURE') return 'NO_FAILURE'
+    if (isNeutralJudgement(reading.unknownReason)) return reading.unknownReason
     if (reading.basis === 'UNKNOWN' || !isNumber(reading.value)) return 'UNKNOWN'
     if (reading.targetMet === true) return 'MET'
     if (reading.targetMet === false) return 'MISSED'

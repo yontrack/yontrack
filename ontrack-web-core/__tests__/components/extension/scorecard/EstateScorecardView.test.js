@@ -120,6 +120,20 @@ describe('The scorecard of an estate', () => {
         expect(within(noFailure).queryByText('Unknown')).toBeNull()
     })
 
+    it('shows no target set as neutral, not as unknown, and leaves it out of the unknown count', () => {
+        renderView([
+            {
+                project: {id: 7, name: 'alpha'},
+                readings: [reading('security.overdue', {basis: 'UNKNOWN', unknownReason: 'NO_TARGET'})],
+            },
+        ])
+        const noTarget = screen.getByTestId('estate-cell-alpha-security.overdue')
+        expect(noTarget).toHaveAttribute('data-judgement', 'NO_TARGET')
+        expect(noTarget).toHaveTextContent('No target set')
+        expect(within(noTarget).queryByText('Unknown')).toBeNull()
+        expect(screen.getByTestId('estate-rollup-security.overdue')).toHaveTextContent('0 unknown')
+    })
+
     it('shows a reading not computed yet as such', () => {
         renderView()
         const cell = screen.getByTestId('estate-cell-gamma-delivery.leadTime')

@@ -13,7 +13,9 @@ import SecondaryText from "@components/extension/scorecard/SecondaryText";
 import EstateFindingsFanOut from "@components/extension/scorecard/estates/EstateFindingsFanOut";
 import {
     formatReadingValue,
+    isNeutralJudgement,
     latestComputedAt,
+    neutralLabel,
     readingJudgement,
     readingName,
     targetText,
@@ -86,7 +88,8 @@ const cellStyle = (background, color) => ({
 /**
  * One reading of one project: its value, coloured by its target and judged by an icon too, so that
  * the judgement never rests on colour alone. An unknown reading is grey, with its reason on hover
- * and on focus; a time to restore with no failure in the window is neutral, not unknown.
+ * and on focus; a neutral reading - a time to restore with no failure in the window, overdue
+ * findings with no target set - is said in words, not unknown, with its reason on hover and on focus.
  */
 function EstateReadingCell({reading, testId}) {
     if (!reading) {
@@ -126,13 +129,12 @@ function EstateReadingCell({reading, testId}) {
             </Tooltip>
             break
         }
-        case 'NO_FAILURE':
-            content = <Tooltip title={unknownReasonText('NO_FAILURE')}>
-                <SecondaryText tabIndex={0} style={{whiteSpace: 'nowrap'}}>No failure</SecondaryText>
-            </Tooltip>
-            break
         default:
-            content = <span style={{whiteSpace: 'nowrap'}}>{value}</span>
+            content = isNeutralJudgement(judgement) ?
+                <Tooltip title={unknownReasonText(reading.unknownReason, reading.key)}>
+                    <SecondaryText tabIndex={0} style={{whiteSpace: 'nowrap'}}>{neutralLabel(judgement)}</SecondaryText>
+                </Tooltip> :
+                <span style={{whiteSpace: 'nowrap'}}>{value}</span>
     }
     return <span data-testid={testId} data-judgement={judgement}>{content}</span>
 }

@@ -96,7 +96,8 @@ Every field is optional:
 | CRITICAL fixed within        | Number of days a `CRITICAL` finding may stay open before it is **overdue**. Empty for no target. |
 | HIGH fixed within            | Number of days a `HIGH` finding may stay open before it is **overdue**. Empty for no target. |
 
-With neither remediation target, the overdue findings of the estate read `UNKNOWN (NO_TARGET)`;
+With neither remediation target, the overdue findings of the estate read `UNKNOWN (NO_TARGET)`,
+shown as a neutral *No target set* rather than as unknown;
 with one, only the findings of that severity are judged. The remediation time needs no target to
 be measured — the estate may still judge it against a target of its readings.
 

@@ -40,13 +40,16 @@ Each cell is the latest daily reading of the project in the set of the estate:
 * the value alone, when the estate sets no target for the reading;
 * **Unknown**, in grey, when the reading could not be taken: its
   [reason](scorecard.md#unknown-readings) shows on hover and on keyboard focus;
-* **No failure**, neutral, for a time to restore with nothing to restore in the window;
+* **No failure**, neutral, for a time to restore with nothing to restore in the window, and
+  **No target set**, neutral, for overdue findings with no remediation target to judge them against
+  — their reason shows on hover and on keyboard focus too;
 * a dash when the readings of the project have not been computed yet.
 
 The **All projects** row, at the top, rolls each reading up over the projects: the median of the
 values of the projects which have one, the number of projects whose reading is unknown, and the
-number of projects missing the target. A median of rungs or of counts may fall between two of them,
-and keeps its half: *Median 1.5*.
+number of projects missing the target. The neutral readings — *No failure*, *No target set* — are
+neither counted as unknown nor part of the median, and neither are the projects not computed yet.
+A median of rungs or of counts may fall between two of them, and keeps its half: *Median 1.5*.
 
 A click on the heading of a column sorts the projects by that reading, the projects with no value
 last whatever the order; by default, they are sorted by name. The name of a project opens its

@@ -21,7 +21,7 @@ const MEASURED_JUDGEMENTS = ['MET', 'MISSED', 'SHOWN']
 
 /**
  * Whether a reading has a value to show, measured or estimated, judged or not - neither unknown
- * nor a time to restore with no failure in the window.
+ * nor neutral (a time to restore with no failure in the window, overdue findings with no target set).
  */
 export const hasValue = (reading) => !!reading && MEASURED_JUDGEMENTS.includes(readingJudgement(reading))
 
@@ -68,8 +68,9 @@ const median = (values) => {
  *
  * - `median` - of the values of the projects which have one, `null` when none has
  * - `measured` - number of projects with a value
- * - `unknown` - number of projects whose reading is unknown; a time to restore with no failure in
- *   the window is not unknown, and a project whose readings are not computed yet is not counted
+ * - `unknown` - number of projects whose reading is unknown; a neutral reading - a time to restore
+ *   with no failure in the window, overdue findings with no target set - is not unknown, and a
+ *   project whose readings are not computed yet is not counted
  * - `missed` - number of projects whose reading misses the target of the estate
  */
 export const rollUp = (rows, key) => {
@@ -107,7 +108,7 @@ const byName = (a, b) => a.project.name.localeCompare(b.project.name)
  * The rows sorted, as a new list:
  *
  * - by project name when `key` is `project` or not given
- * - by the value of the reading `key` otherwise, the projects with no value - unknown, no failure,
+ * - by the value of the reading `key` otherwise, the projects with no value - unknown, neutral,
  *   not computed - last whatever the order, by name
  *
  * @param order `ascend` (default) or `descend`

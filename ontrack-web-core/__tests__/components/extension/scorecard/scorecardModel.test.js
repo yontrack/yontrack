@@ -7,6 +7,7 @@ import {
     readingDescription,
     readingDescriptions,
     readingDetailItems,
+    isNeutralJudgement,
     readingJudgement,
     readingMarkerKinds,
     readingName,
@@ -265,6 +266,23 @@ describe('readingJudgement', () => {
             unknownReason: 'NO_FAILURE',
             target: 3600,
         }))).toEqual('NO_FAILURE')
+    })
+
+    it('renders no target as neutral, not as unknown', () => {
+        expect(readingJudgement(reading({
+            key: 'security.overdue',
+            value: null,
+            basis: 'UNKNOWN',
+            unknownReason: 'NO_TARGET',
+        }))).toEqual('NO_TARGET')
+    })
+
+    it('tells the neutral judgements from the others', () => {
+        expect(isNeutralJudgement('NO_FAILURE')).toBe(true)
+        expect(isNeutralJudgement('NO_TARGET')).toBe(true)
+        expect(isNeutralJudgement('UNKNOWN')).toBe(false)
+        expect(isNeutralJudgement('SHOWN')).toBe(false)
+        expect(isNeutralJudgement(undefined)).toBe(false)
     })
 
     it('says a reading is unknown whatever its target', () => {

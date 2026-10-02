@@ -132,6 +132,15 @@ describe('rollUp', () => {
         expect(rollUp(rows, 'delivery.mttr')).toEqual({median: 600, measured: 1, unknown: 0, missed: 0})
     })
 
+    it('counts no target set neither as unknown nor in the median', () => {
+        const rows = [
+            row('a', [reading('security.overdue', {value: 3})]),
+            row('b', [reading('security.overdue', {basis: 'UNKNOWN', unknownReason: 'NO_TARGET'})]),
+            row('c', [reading('security.overdue', {basis: 'UNKNOWN', unknownReason: 'NO_TARGET'})]),
+        ]
+        expect(rollUp(rows, 'security.overdue')).toEqual({median: 3, measured: 1, unknown: 0, missed: 0})
+    })
+
     it('counts the readings missing their target', () => {
         const rows = [
             row('a', [reading('delivery.successRate', {value: 80, target: 90, targetMet: false})]),
@@ -144,9 +153,9 @@ describe('rollUp', () => {
     it('has no median with no measured value, and ignores the projects with no reading yet', () => {
         const rows = [
             row('a', []),
-            row('b', [reading('security.overdue', {basis: 'UNKNOWN', unknownReason: 'NO_TARGET'})]),
+            row('b', [reading('security.remediationTime', {basis: 'UNKNOWN', unknownReason: 'NO_SAMPLES'})]),
         ]
-        expect(rollUp(rows, 'security.overdue')).toEqual({median: null, measured: 0, unknown: 1, missed: 0})
+        expect(rollUp(rows, 'security.remediationTime')).toEqual({median: null, measured: 0, unknown: 1, missed: 0})
     })
 })
 

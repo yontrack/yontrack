@@ -145,6 +145,7 @@ describe('A reading tile', () => {
         ['SHOWN', judged({target: null, targetMet: null}), 'No target'],
         ['UNKNOWN', judged({value: null, basis: 'UNKNOWN', unknownReason: 'NO_SAMPLES', targetMet: null}), 'Unknown'],
         ['NO_FAILURE', judged({key: 'delivery.mttr', value: null, basis: 'UNKNOWN', unknownReason: 'NO_FAILURE', targetMet: null}), 'No failure in window'],
+        ['NO_TARGET', judged({key: 'security.overdue', value: null, target: null, basis: 'UNKNOWN', unknownReason: 'NO_TARGET', targetMet: null}), 'No target set'],
     ])('tags a reading which is %s in words', (judgement, reading, text) => {
         render(<ReadingTile reading={reading} testId="tile"/>)
         const tag = screen.getByTestId('tile-judgement')
@@ -166,6 +167,13 @@ describe('A reading tile', () => {
     it('never reads 0 for no failure in the window', () => {
         render(<ReadingTile reading={judged({key: 'delivery.mttr', value: 0, basis: 'UNKNOWN', unknownReason: 'NO_FAILURE', targetMet: null})} testId="tile"/>)
         expect(screen.getByTestId('tile-value')).not.toHaveTextContent('0')
+    })
+
+    it('shows no target set as neutral, with no unknown chip', () => {
+        render(<ReadingTile reading={judged({key: 'security.overdue', value: null, target: null, basis: 'UNKNOWN', unknownReason: 'NO_TARGET', targetMet: null})} testId="tile"/>)
+        expect(screen.getByTestId('tile-no-target')).toHaveTextContent('No target set')
+        expect(screen.queryByTestId('tile-unknown')).toBeNull()
+        expect(screen.getByTestId('tile-judgement')).not.toHaveTextContent('Unknown')
     })
 
     it('gives the reason of an unknown reading', async () => {
