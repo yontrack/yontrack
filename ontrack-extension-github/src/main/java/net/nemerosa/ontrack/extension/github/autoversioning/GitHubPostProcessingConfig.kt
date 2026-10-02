@@ -24,4 +24,6 @@ data class GitHubPostProcessingConfig(
     @APIDescription("List of extra parameters to pass to the workflow (optional, none by default)")
     @ListRef
     val parameters: List<GitHubPostProcessingConfigParam> = emptyList(),
+    @APIDescription("If defined, overrides the GitHub configuration for passing the `id` input to the workflow, used to find its run when GitHub does not return it")
+    val sendId: Boolean? = null,
 )

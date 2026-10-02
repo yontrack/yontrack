@@ -187,9 +187,10 @@ class MockOntrackGitHubClient(
         workflow: String,
         branch: String,
         inputs: Map<String, String>,
+        sendId: Boolean,
         retries: Int,
         retriesDelaySeconds: Int
-    ): WorkflowRun {
+    ): Long {
         TODO("Not yet implemented")
     }
 

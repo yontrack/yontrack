@@ -2,19 +2,11 @@
 
 Notifications can be used to trigger a GitHub Actions workflows on some events.
 
-## Correlation ID
+## Workflow ID
 
-!!! note
-
-    As of December 2025, the GitHub API does not provide a way to retrieve the run ID of a workflow run
-    triggered by a workflow dispatch event.
-
-As a workaround, a correlation ID is always passed as an input to the workflow with name `id`.
-
-It's the responsibility of the workflow to use this `id` input and store it in a file which is then attached as an
-artifact to the run.
-
-For example:
+GitHub returns the run of the workflow a notification starts. When it does not, like on an older GitHub Enterprise
+Server, Yontrack finds the run back through an `id` input it passes to the workflow, which the workflow uploads as an
+artifact:
 
 ```yaml
 on:
@@ -38,7 +30,13 @@ jobs:
           if-no-files-found: error
 ```
 
-The code above is enough for Yontrack to retrieve the correlation ID and attach it to the run.
+The artifact steps are needed only when GitHub does not return the run. The `id` input, however, must be declared
+if and only if it is sent, or GitHub rejects the dispatch.
+
+Whether it is sent is set by the `workflowSendId` field of the
+[GitHub configuration](../../start/configuration/github.md#dispatching-workflows), `true` by default, and overridden by
+the `sendId` field of the notification. A workflow which does not declare `id` needs `sendId: false`, which works only
+with a GitHub returning the run of a dispatch.
 
 ## See also
 

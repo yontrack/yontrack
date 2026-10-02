@@ -9,6 +9,8 @@ import net.nemerosa.ontrack.test.TestUtils
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 class GitHubEngineConfigurationCascIT : AbstractCascTestSupport() {
 
@@ -65,6 +67,10 @@ class GitHubEngineConfigurationCascIT : AbstractCascTestSupport() {
                       "user": {
                         "description": "user field",
                         "type": "string"
+                      },
+                      "workflowSendId": {
+                        "description": "workflowSendId field",
+                        "type": "boolean"
                       }
                     },
                     "required": [
@@ -110,6 +116,45 @@ class GitHubEngineConfigurationCascIT : AbstractCascTestSupport() {
             assertEquals(null, configuration.appId)
             assertEquals(null, configuration.appPrivateKey)
             assertEquals(null, configuration.appInstallationAccountName)
+        }
+    }
+
+    @Test
+    fun `Sending the workflow ID is enabled by default`() {
+        val name = TestUtils.uid("GH")
+        withDisabledConfigurationTest {
+            casc(
+                """
+                    ontrack:
+                        config:
+                            github:
+                                - name: $name
+                                  token: my-secret-token
+                """.trimIndent()
+            )
+        }
+        asAdmin {
+            assertTrue(gitHubConfigurationService.getConfiguration(name).workflowSendId)
+        }
+    }
+
+    @Test
+    fun `Disabling the sending of the workflow ID`() {
+        val name = TestUtils.uid("GH")
+        withDisabledConfigurationTest {
+            casc(
+                """
+                    ontrack:
+                        config:
+                            github:
+                                - name: $name
+                                  token: my-secret-token
+                                  workflow-send-id: false
+                """.trimIndent()
+            )
+        }
+        asAdmin {
+            assertFalse(gitHubConfigurationService.getConfiguration(name).workflowSendId)
         }
     }
 

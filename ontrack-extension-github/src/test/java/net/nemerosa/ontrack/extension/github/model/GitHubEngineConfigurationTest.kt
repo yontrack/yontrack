@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 
 class GitHubEngineConfigurationTest {
@@ -217,6 +218,57 @@ class GitHubEngineConfigurationTest {
     }
 
     @Test
+    fun `Sending the workflow ID is enabled by default`() {
+        assertTrue(
+            mapOf(
+                "name" to "test",
+                "url" to "https://github.com",
+            ).asJson().parse<GitHubEngineConfiguration>().workflowSendId
+        )
+    }
+
+    @Test
+    fun `Sending the workflow ID is disabled from CasC`() {
+        assertFalse(
+            mapOf(
+                "name" to "test",
+                "url" to "https://github.com",
+                "workflow-send-id" to false,
+            ).asJson().parse<GitHubEngineConfiguration>().workflowSendId
+        )
+    }
+
+    @Test
+    fun `Sending the workflow ID is kept by obfuscation, encryption, decryption and credentials injection`() {
+        val configuration = GitHubEngineConfiguration(
+            "ontrack",
+            GitHubEngineConfiguration.GITHUB_COM,
+            oauth2Token = "xxxx",
+            workflowSendId = false,
+        )
+        assertFalse(configuration.obfuscate().workflowSendId)
+        assertFalse(configuration.encrypt { it }.workflowSendId)
+        assertFalse(configuration.decrypt { it }.workflowSendId)
+        assertFalse(configuration.injectCredentials(GitHubEngineConfiguration("ontrack", null)).workflowSendId)
+        assertTrue(
+            GitHubEngineConfiguration("ontrack", null, oauth2Token = "xxxx").injectCredentials(configuration).workflowSendId,
+            "Not a credential: never taken from the old configuration"
+        )
+    }
+
+    @Test
+    fun `Sending the workflow ID is part of the equality`() {
+        assertNotEquals(
+            GitHubEngineConfiguration("ontrack", null, workflowSendId = true),
+            GitHubEngineConfiguration("ontrack", null, workflowSendId = false),
+        )
+        assertNotEquals(
+            GitHubEngineConfiguration("ontrack", null, workflowSendId = true).hashCode(),
+            GitHubEngineConfiguration("ontrack", null, workflowSendId = false).hashCode(),
+        )
+    }
+
+    @Test
     fun obfuscation_of_password() {
         val configuration = GitHubEngineConfiguration(
             "ontrack",
@@ -264,6 +316,7 @@ class GitHubEngineConfigurationTest {
                 "appPrivateKey" to null,
                 "appInstallationAccountName" to null,
                 "autoMergeToken" to null,
+                "workflowSendId" to true,
                 "authenticationType" to "ANONYMOUS",
             ).asJson(),
             GitHubEngineConfiguration(
@@ -306,6 +359,7 @@ class GitHubEngineConfigurationTest {
                 "appPrivateKey" to null,
                 "appInstallationAccountName" to null,
                 "autoMergeToken" to null,
+                "workflowSendId" to true,
                 "authenticationType" to "TOKEN",
             ).asJson(),
             GitHubEngineConfiguration(
@@ -354,6 +408,7 @@ class GitHubEngineConfigurationTest {
                 "appPrivateKey" to "xxxxxxx",
                 "appInstallationAccountName" to null,
                 "autoMergeToken" to null,
+                "workflowSendId" to true,
                 "authenticationType" to "APP",
             ).asJson(),
             GitHubEngineConfiguration(
@@ -423,6 +478,7 @@ class GitHubEngineConfigurationTest {
                 "appPrivateKey" to "xxxxxxx",
                 "appInstallationAccountName" to "test",
                 "autoMergeToken" to null,
+                "workflowSendId" to true,
                 "authenticationType" to "APP",
             ).asJson(),
             GitHubEngineConfiguration(

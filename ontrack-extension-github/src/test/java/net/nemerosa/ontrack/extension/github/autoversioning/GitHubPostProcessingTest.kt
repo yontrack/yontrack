@@ -13,7 +13,6 @@ import net.nemerosa.ontrack.extension.github.client.GitHubWorkflowRunFailedExcep
 import net.nemerosa.ontrack.extension.github.client.GitHubWorkflowRunNotFoundException
 import net.nemerosa.ontrack.extension.github.client.OntrackGitHubClient
 import net.nemerosa.ontrack.extension.github.client.OntrackGitHubClientFactory
-import net.nemerosa.ontrack.extension.github.client.WorkflowRun
 import net.nemerosa.ontrack.extension.github.model.GitHubEngineConfiguration
 import net.nemerosa.ontrack.extension.github.service.GitHubConfigurationService
 import net.nemerosa.ontrack.model.events.PlainEventRenderer
@@ -54,6 +53,7 @@ class GitHubPostProcessingTest {
         every { gitHubConfigurationService.findConfiguration("my-config") } returns gitHubConfig
 
         every { gitHubConfig.url } returns "https://github.com"
+        every { gitHubConfig.workflowSendId } returns true
 
         val processing = GitHubPostProcessing(
             extensionFeature = mockk(),
@@ -135,6 +135,7 @@ class GitHubPostProcessingTest {
                     "version" to "1.0.0",
                     "param1" to "my-release",
                 ),
+                sendId = true,
                 retries = 10,
                 retriesDelaySeconds = 30,
             )
@@ -143,9 +144,36 @@ class GitHubPostProcessingTest {
     }
 
     @Test
+    fun `Sending the ID defaults to the GitHub configuration`() {
+        val client = mockk<OntrackGitHubClient>(relaxed = true)
+
+        runPostProcessing(client, workflowSendId = false)
+
+        verify { client.launchWorkflowRun(any(), any(), any(), any(), sendId = false, any(), any()) }
+    }
+
+    @Test
+    fun `Sending the ID in the post-processing config overrides the GitHub configuration`() {
+        val client = mockk<OntrackGitHubClient>(relaxed = true)
+
+        runPostProcessing(client, sendId = true, workflowSendId = false)
+
+        verify { client.launchWorkflowRun(any(), any(), any(), any(), sendId = true, any(), any()) }
+    }
+
+    @Test
+    fun `Not sending the ID in the post-processing config overrides the GitHub configuration`() {
+        val client = mockk<OntrackGitHubClient>(relaxed = true)
+
+        runPostProcessing(client, sendId = false, workflowSendId = true)
+
+        verify { client.launchWorkflowRun(any(), any(), any(), any(), sendId = false, any(), any()) }
+    }
+
+    @Test
     fun `A workflow run completing without success is a post-processing failure carrying the run link`() {
         val client = mockk<OntrackGitHubClient>()
-        every { client.launchWorkflowRun(any(), any(), any(), any(), any(), any()) } returns launchedRun()
+        every { client.launchWorkflowRun(any(), any(), any(), any(), any(), any(), any()) } returns RUN_ID
         val failure = GitHubWorkflowRunFailedException("repository", RUN_ID)
         every { client.waitUntilWorkflowRun("repository", RUN_ID, any(), any()) } throws failure
 
@@ -162,7 +190,7 @@ class GitHubPostProcessingTest {
     @Test
     fun `A timeout while waiting for the workflow run is a post-processing failure carrying the run link`() {
         val client = mockk<OntrackGitHubClient>()
-        every { client.launchWorkflowRun(any(), any(), any(), any(), any(), any()) } returns launchedRun()
+        every { client.launchWorkflowRun(any(), any(), any(), any(), any(), any(), any()) } returns RUN_ID
         val timeout = TimeoutException("Waiting for workflow run repository/$RUN_ID - Could not get result in time")
         every { client.waitUntilWorkflowRun("repository", RUN_ID, any(), any()) } throws timeout
 
@@ -178,7 +206,7 @@ class GitHubPostProcessingTest {
     @Test
     fun `An HTTP error while waiting for the workflow run is a post-processing failure carrying the run link`() {
         val client = mockk<OntrackGitHubClient>()
-        every { client.launchWorkflowRun(any(), any(), any(), any(), any(), any()) } returns launchedRun()
+        every { client.launchWorkflowRun(any(), any(), any(), any(), any(), any(), any()) } returns RUN_ID
         val httpError = HttpServerErrorException(HttpStatus.BAD_GATEWAY)
         every { client.waitUntilWorkflowRun("repository", RUN_ID, any(), any()) } throws httpError
 
@@ -194,7 +222,7 @@ class GitHubPostProcessingTest {
     fun `A failure to launch the workflow run is propagated unchanged`() {
         val client = mockk<OntrackGitHubClient>()
         val launchError = HttpServerErrorException(HttpStatus.BAD_GATEWAY)
-        every { client.launchWorkflowRun(any(), any(), any(), any(), any(), any()) } throws launchError
+        every { client.launchWorkflowRun(any(), any(), any(), any(), any(), any(), any()) } throws launchError
 
         val ex = assertThrows<HttpServerErrorException> {
             runPostProcessing(client)
@@ -213,7 +241,7 @@ class GitHubPostProcessingTest {
             attempts = 3,
             cause = HttpServerErrorException(HttpStatus.SERVICE_UNAVAILABLE),
         )
-        every { client.launchWorkflowRun(any(), any(), any(), any(), any(), any()) } throws dispatchError
+        every { client.launchWorkflowRun(any(), any(), any(), any(), any(), any(), any()) } throws dispatchError
 
         val ex = assertThrows<GitHubPostProcessingTransientException> {
             runPostProcessing(client)
@@ -233,7 +261,7 @@ class GitHubPostProcessingTest {
             branch = "main",
             cause = TimeoutException("Could not get result in time"),
         )
-        every { client.launchWorkflowRun(any(), any(), any(), any(), any(), any()) } throws notFound
+        every { client.launchWorkflowRun(any(), any(), any(), any(), any(), any(), any()) } throws notFound
 
         val ex = assertThrows<GitHubPostProcessingTransientException> {
             runPostProcessing(client)
@@ -251,19 +279,14 @@ class GitHubPostProcessingTest {
             runPostProcessing(client, ghConfigFound = false)
         }
 
-        verify(exactly = 0) { client.launchWorkflowRun(any(), any(), any(), any(), any(), any()) }
+        verify(exactly = 0) { client.launchWorkflowRun(any(), any(), any(), any(), any(), any(), any()) }
     }
-
-    private fun launchedRun() = WorkflowRun(
-        id = RUN_ID,
-        headBranch = "main",
-        status = "queued",
-        conclusion = null,
-    )
 
     private fun runPostProcessing(
         client: OntrackGitHubClient,
         ghConfigFound: Boolean = true,
+        sendId: Boolean? = null,
+        workflowSendId: Boolean = true,
     ) {
         val ontrackGitHubClientFactory = mockk<OntrackGitHubClientFactory>()
         every { ontrackGitHubClientFactory.create(any()) } returns client
@@ -278,6 +301,7 @@ class GitHubPostProcessingTest {
 
         val gitHubConfig = mockk<GitHubEngineConfiguration>()
         every { gitHubConfig.url } returns "https://github.com"
+        every { gitHubConfig.workflowSendId } returns workflowSendId
         val gitHubConfigurationService = mockk<GitHubConfigurationService>()
         every { gitHubConfigurationService.findConfiguration("my-config") } returns gitHubConfig.takeIf { ghConfigFound }
 
@@ -301,6 +325,7 @@ class GitHubPostProcessingTest {
                 commitMessage = "Post processing",
                 config = null,
                 workflow = null,
+                sendId = sendId,
             ),
             autoVersioningOrder = order,
             repositoryURI = "uri://repository",

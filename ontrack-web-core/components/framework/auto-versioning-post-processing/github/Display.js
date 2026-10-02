@@ -8,6 +8,7 @@ export default function Display({
                                     repository,
                                     branch,
                                     workflow,
+                                    sendId,
                                     parameters = [],
                                 }) {
 
@@ -58,6 +59,14 @@ export default function Display({
             key: 'workflow',
             label: "Specific GitHub workflow job",
             children: <Typography.Text code>{workflow}</Typography.Text>,
+            span: 12,
+        },
+        {
+            key: 'sendId',
+            label: "Send workflow ID",
+            children: sendId === undefined || sendId === null ?
+                <Typography.Text type="secondary">Default (from the GitHub configuration)</Typography.Text> :
+                <Typography.Text>{sendId ? "Yes" : "No"}</Typography.Text>,
             span: 12,
         },
         {

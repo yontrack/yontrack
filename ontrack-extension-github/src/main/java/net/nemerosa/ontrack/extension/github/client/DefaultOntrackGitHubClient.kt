@@ -880,9 +880,10 @@ class DefaultOntrackGitHubClient(
         workflow: String,
         branch: String,
         inputs: Map<String, String>,
+        sendId: Boolean,
         retries: Int,
         retriesDelaySeconds: Int,
-    ): WorkflowRun {
+    ): Long {
         // Getting a client
         val client = createGitHubRestTemplate()
         // Dispatching & looking for the launched workflow run
@@ -892,6 +893,7 @@ class DefaultOntrackGitHubClient(
             workflow = workflow,
             branch = branch,
             inputs = inputs,
+            sendId = sendId,
             retries = retries,
             retriesDelaySeconds = retriesDelaySeconds,
         )

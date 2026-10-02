@@ -120,6 +120,42 @@ export default function GitHubWorkflowNotificationChannelForm({prefix}) {
             >
                 <InputNumber min={1} max={7200}/>
             </Form.Item>
+            <Form.Item
+                name={prefixedFormName(prefix, 'sendId')}
+                label="Send workflow ID"
+                extra="Passing an id input to the workflow. Needed only when GitHub does not return the run of a dispatch. The workflow must declare the id input if and only if it is sent."
+            >
+                <SelectGitHubWorkflowSendId/>
+            </Form.Item>
+        </>
+    )
+}
+
+export function SelectGitHubWorkflowSendId({value, onChange}) {
+    const options = [
+        {
+            value: 'DEFAULT',
+            label: 'Default (from the GitHub configuration)',
+        },
+        {
+            value: 'YES',
+            label: 'Yes - sends the id input',
+        },
+        {
+            value: 'NO',
+            label: 'No - does not send the id input',
+        },
+    ]
+
+    const selected = value === true ? 'YES' : value === false ? 'NO' : 'DEFAULT'
+
+    return (
+        <>
+            <Select
+                options={options}
+                value={selected}
+                onChange={(it) => onChange(it === 'YES' ? true : it === 'NO' ? false : null)}
+            />
         </>
     )
 }

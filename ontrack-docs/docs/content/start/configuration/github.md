@@ -40,3 +40,27 @@ ontrack:
 When Yontrack is restarted, it will be able to access the GitHub API. You can check this by navigating to your user menu
 at _Configurations_ > _GitHub configurations_. You should see the GitHub configuration you just created and you can test
 it by using the :octicons-question-16: button.
+
+## Dispatching workflows
+
+The [auto-versioning post-processing](../../integrations/auto-versioning/github.md) and the
+[GitHub workflow notifications](../../integrations/notifications/github-workflow.md) dispatch GitHub workflows, and
+Yontrack follows the run each dispatch creates.
+
+GitHub returns this run in its answer to the dispatch. When it does not, like on an older GitHub Enterprise Server
+(Yontrack dispatches again without asking for the run if GitHub rejects the request), Yontrack searches for the run using an `id` input it passes to the workflow, which the workflow uploads as an
+artifact.
+
+The `workflowSendId` field of the GitHub configuration (`workflow-send-id` in CasC, _Send workflow ID_ in the form)
+says whether this `id` input is sent. It is `true` by default, and each auto-versioning post-processing configuration
+and each notification can override it with its own `sendId` field.
+
+GitHub rejects a dispatch whose inputs do not match the inputs declared by the workflow:
+
+|                    | Workflow declares `id` (required) | Workflow does not declare `id` |
+|--------------------|-----------------------------------|--------------------------------|
+| `id` is sent       | OK                                | Rejected                       |
+| `id` is not sent   | Rejected                          | OK                             |
+
+Set it to `false` only for workflows which do not declare `id`, on a GitHub which returns the run of a dispatch:
+without the `id` input, a run which is not returned cannot be searched for, and the dispatch fails.

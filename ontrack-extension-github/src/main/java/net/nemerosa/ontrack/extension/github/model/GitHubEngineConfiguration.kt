@@ -21,6 +21,7 @@ import net.nemerosa.ontrack.model.support.CredentialsConfiguration
  * @property appPrivateKey GitHub App private key
  * @property appInstallationAccountName Account name of the GitHub App installation (used when more than 1 installation for the app)
  * @property autoMergeToken Token for an account used to approve pull requests for auto approval processes
+ * @property workflowSendId Default for passing a unique `id` input to the dispatched workflows, used to find their run when GitHub does not return it
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 @SelfDocumented
@@ -39,6 +40,8 @@ open class GitHubEngineConfiguration(
     val appInstallationAccountName: String? = null,
     @JsonAlias("auto-merge-token")
     val autoMergeToken: String? = null,
+    @JsonAlias("workflow-send-id")
+    val workflowSendId: Boolean = true,
 ) : CredentialsConfiguration<GitHubEngineConfiguration> {
 
     /**
@@ -75,6 +78,7 @@ open class GitHubEngineConfiguration(
             appPrivateKey = null,
             appInstallationAccountName = appInstallationAccountName,
             autoMergeToken = null,
+            workflowSendId = workflowSendId,
         )
 
     /**
@@ -112,6 +116,7 @@ open class GitHubEngineConfiguration(
             } else {
                 autoMergeToken
             },
+            workflowSendId = workflowSendId,
         )
     }
 
@@ -125,6 +130,7 @@ open class GitHubEngineConfiguration(
         appPrivateKey = crypting(appPrivateKey?.takeIf { it.isNotBlank() }),
         appInstallationAccountName = appInstallationAccountName,
         autoMergeToken = crypting(autoMergeToken?.takeIf { it.isNotBlank() }),
+        workflowSendId = workflowSendId,
     )
 
     override fun decrypt(decrypting: (encrypted: String?) -> String?) = GitHubEngineConfiguration(
@@ -137,6 +143,7 @@ open class GitHubEngineConfiguration(
         appPrivateKey = decrypting(appPrivateKey?.takeIf { it.isNotBlank() }),
         appInstallationAccountName = appInstallationAccountName,
         autoMergeToken = decrypting(autoMergeToken?.takeIf { it.isNotBlank() }),
+        workflowSendId = workflowSendId,
     )
 
     /**
@@ -168,6 +175,7 @@ open class GitHubEngineConfiguration(
         if (appInstallationAccountName != other.appInstallationAccountName) return false
         if (url != other.url) return false
         if (autoMergeToken != other.autoMergeToken) return false
+        if (workflowSendId != other.workflowSendId) return false
 
         return true
     }
@@ -182,6 +190,7 @@ open class GitHubEngineConfiguration(
         result = 31 * result + (appInstallationAccountName?.hashCode() ?: 0)
         result = 31 * result + url.hashCode()
         result = 31 * result + (autoMergeToken?.hashCode() ?: 0)
+        result = 31 * result + workflowSendId.hashCode()
         return result
     }
 

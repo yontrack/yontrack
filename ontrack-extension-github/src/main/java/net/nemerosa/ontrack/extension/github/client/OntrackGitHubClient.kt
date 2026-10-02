@@ -276,24 +276,30 @@ interface OntrackGitHubClient {
      *
      * The call starting the workflow is retried on transient errors (502, 503, 504 & I/O errors).
      *
+     * The run is taken from the response of the dispatch when GitHub returns it. Otherwise, and only
+     * if [sendId] is `true`, the run is searched for using the `id` input.
+     *
      * @param repository Repository name, like `nemerosa/ontrack`
      * @param workflow Name of the workflow, like `my-workflow.yml`
      * @param branch Branch where to launch the workflow
      * @param inputs List of parameters to pass to the workflow
+     * @param sendId Whether to pass a unique `id` input to the workflow, to search for its run when GitHub does not return it
      * @param retries The number of times we check for successful scheduling
      * @param retriesDelaySeconds The time (in seconds) between two checks for successful scheduling
-     * @return Launched workflow
+     * @return ID of the launched workflow run
      * @throws GitHubWorkflowDispatchException If starting the workflow still fails on transient errors after its retries
      * @throws GitHubWorkflowRunNotFoundException If the run of the started workflow cannot be found in time
+     * @throws GitHubWorkflowRunNotReturnedException If [sendId] is `false` and GitHub does not return the run
      */
     fun launchWorkflowRun(
         repository: String,
         workflow: String,
         branch: String,
         inputs: Map<String, String>,
+        sendId: Boolean,
         retries: Int = 10,
         retriesDelaySeconds: Int = 30,
-    ): WorkflowRun
+    ): Long
 
     /**
      * Waits until a workflow completes.
