@@ -86,6 +86,11 @@ export const rollUp = (rows, key) => {
 }
 
 /**
+ * What the roll-up row says, in words — as `rollUp` counts.
+ */
+export const ESTATE_ROLLUP_TEXT = 'Median over the projects with a value. Unknown counts the projects whose reading is unknown: No failure and No target set are not unknown, and a project not computed yet is not counted. Missed counts the projects missing the target of this estate.'
+
+/**
  * A median in the unit of its reading. The median of counts or of rungs may fall between two of
  * them, and keeps its half rather than being rounded to a count or named after a rung.
  */

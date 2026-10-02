@@ -45,7 +45,11 @@ const estateOf = (projectSets) => ({
     description: 'Our products',
     labels: [],
     marker: {kind: 'PROMOTION', levelName: 'GOLD', environment: null, qualifier: null},
-    readingConfigs: [{key: 'delivery.leadTime', windowDays: null, target: 86400, direction: 'LOWER_IS_BETTER'}],
+    security: {expectedKinds: ['DEPENDENCIES', 'CODE'], freshnessDays: 7},
+    readingConfigs: [
+        {key: 'delivery.leadTime', windowDays: null, target: 86400, direction: 'LOWER_IS_BETTER'},
+        {key: 'security.maturity', windowDays: null, target: 2, direction: 'HIGHER_IS_BETTER'},
+    ],
     projectSets,
 })
 
@@ -233,5 +237,120 @@ describe('The scorecard of an estate', () => {
         mockUseQuery.mockReturnValue({data: null, loading: false, finished: true, error: null})
         render(<EstateScorecardView name="Unknown"/>)
         expect(screen.getByText('No estate is named "Unknown".')).toBeInTheDocument()
+    })
+})
+
+describe('The help on the scorecard of an estate', () => {
+
+    const securitySets = [
+        {
+            project: {id: 7, name: 'alpha'},
+            readings: [
+                reading('security.maturity', {value: 3, direction: 'HIGHER_IS_BETTER', target: 2, targetMet: true}),
+            ],
+        },
+        {
+            project: {id: 8, name: 'beta'},
+            readings: [
+                reading('security.maturity', {value: 2, direction: 'HIGHER_IS_BETTER', target: 2, targetMet: true}),
+            ],
+        },
+    ]
+
+    it('explains a reading and its target from the info of its header', async () => {
+        renderView()
+        fireEvent.mouseEnter(within(column('delivery.leadTime')).getByRole('button', {name: 'About Lead time'}))
+        const info = await screen.findByTestId('estate-column-info-delivery.leadTime')
+        expect(info).toHaveTextContent(/first promotion at the marker level/)
+        expect(info).toHaveTextContent('Target of this estate: 1d or less — met at or under it, missed above.')
+    })
+
+    it('says a reading with no target is shown, not judged', async () => {
+        renderView()
+        fireEvent.mouseEnter(within(column('quality.testPassRate')).getByRole('button', {name: 'About Test pass rate'}))
+        expect(await screen.findByTestId('estate-column-info-quality.testPassRate'))
+            .toHaveTextContent('No target set by this estate: values are shown, not judged.')
+    })
+
+    it('words a delivery reading for the marker of the estate', async () => {
+        mockUseQuery.mockImplementation(() => ({
+            data: {
+                ...estateOf(defaultSets),
+                marker: {kind: 'ENVIRONMENT', levelName: null, environment: 'production', qualifier: null},
+            },
+            loading: false,
+            finished: true,
+            error: null,
+        }))
+        render(<EstateScorecardView name="Products"/>)
+        fireEvent.mouseEnter(within(column('delivery.leadTime')).getByRole('button', {name: 'About Lead time'}))
+        expect(await screen.findByTestId('estate-column-info-delivery.leadTime')).toHaveTextContent(/successful deployment/)
+    })
+
+    it('does not sort when the info of a header is clicked or pressed', () => {
+        renderView()
+        const names = () => screen.getAllByTestId(/^estate-project-/).map(it => it.textContent)
+        const info = within(column('delivery.leadTime')).getByRole('button', {name: 'About Lead time'})
+        fireEvent.click(info)
+        fireEvent.keyDown(info, {key: 'Enter', code: 'Enter', keyCode: 13})
+        fireEvent.click(column('delivery.leadTime'))
+        fireEvent.click(column('delivery.leadTime'))
+        // Two clicks on the header itself: descending, as if the info had never been clicked
+        expect(names()).toEqual(['beta', 'alpha', 'gamma'])
+    })
+
+    it('has no info on the project column', () => {
+        renderView()
+        expect(within(column('project')).queryByRole('button')).toBeNull()
+    })
+
+    it('explains the roll-up row', async () => {
+        renderView()
+        fireEvent.mouseEnter(screen.getByRole('button', {name: 'About All projects'}))
+        const info = await screen.findByTestId('estate-rollup-info')
+        expect(info).toHaveTextContent(/Median over the projects with a value/)
+        expect(info).toHaveTextContent(/No failure and No target set are not unknown/)
+        expect(info).toHaveTextContent(/missing the target of this estate/)
+    })
+
+    it('lists the rungs of the security maturity in its header, its target marked, covered in the terms of the estate', async () => {
+        renderView(securitySets)
+        fireEvent.mouseEnter(within(column('security.maturity')).getByRole('button', {name: 'About Security maturity'}))
+        const info = await screen.findByTestId('estate-column-info-security.maturity')
+        const rungs = within(info).getAllByRole('listitem')
+        expect(rungs.map(it => it.getAttribute('data-rung'))).toEqual(['0', '1', '2', '3'])
+        expect(rungs[2]).toHaveTextContent('2 · Covered← target')
+        expect(rungs[2]).toHaveTextContent('Every expected kind scanned within the last 7 days: Dependencies, Code.')
+        expect(rungs[3]).not.toHaveTextContent('← target')
+        expect(info).toHaveTextContent('Target of this estate: 2 · Covered or more')
+    })
+
+    it('explains the rung of a security maturity cell on focus', async () => {
+        renderView(securitySets)
+        const help = within(screen.getByTestId('estate-cell-alpha-security.maturity')).getByLabelText(/^3 · Gating: /)
+        expect(help).toHaveAttribute('tabindex', '0')
+        fireEvent.focus(help)
+        expect(await screen.findByRole('tooltip')).toHaveTextContent('A security stamp required by a promotion, or a scan which failed in the window.')
+    })
+
+    it('explains the covered rung of a cell in the terms of the estate', () => {
+        renderView(securitySets)
+        expect(within(screen.getByTestId('estate-cell-beta-security.maturity')).getByLabelText(/^2 · Covered: /))
+            .toHaveAttribute('aria-label', '2 · Covered: Every expected kind scanned within the last 7 days: Dependencies, Code.')
+    })
+
+    it('explains the rung of the median, but not a median between two rungs', () => {
+        renderView([securitySets[0]])
+        expect(within(screen.getByTestId('estate-rollup-security.maturity')).getByLabelText(/^3 · Gating: /)).toBeInTheDocument()
+        renderView(securitySets)
+        const rollUps = screen.getAllByTestId('estate-rollup-security.maturity')
+        const between = rollUps[rollUps.length - 1]
+        expect(between).toHaveTextContent('Median 2.5')
+        expect(within(between).queryByLabelText(/·/)).toBeNull()
+    })
+
+    it('has no rung help on another reading', () => {
+        renderView()
+        expect(within(screen.getByTestId('estate-cell-alpha-delivery.leadTime')).queryByRole('generic', {name: /: /})).toBeNull()
     })
 })

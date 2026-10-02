@@ -13,6 +13,7 @@ import {
     judgedReadings,
     latestComputedAt,
     orderedSets,
+    readingCoverage,
     readingName,
     resolveSet,
     SCORECARD_HISTORY_DAYS,
@@ -25,6 +26,7 @@ import TargetRing from "@components/extension/scorecard/TargetRing";
 import ReadingSparkline from "@components/extension/scorecard/ReadingSparkline";
 import SecondaryText from "@components/extension/scorecard/SecondaryText";
 import {JudgementTag} from "@components/extension/scorecard/ReadingTile";
+import RungHelp from "@components/extension/scorecard/RungHelp";
 
 // The Project view shows six tiles at most, two rows of three
 const PROJECT_TILES = 6
@@ -103,7 +105,9 @@ function EstateView({set}) {
                                 {readingName(reading.key)}
                             </span>
                             <span style={{fontWeight: 600, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums'}}>
-                                {formatReadingValue(reading.key, reading.value)}
+                                <RungHelp readingKey={reading.key} value={reading.value} coverage={readingCoverage(reading)}>
+                                    {formatReadingValue(reading.key, reading.value)}
+                                </RungHelp>
                             </span>
                         </li>
                     )
@@ -151,7 +155,9 @@ function ReadingsView({set}) {
                             >
                                 <Typography.Text strong style={{fontSize: 12}} ellipsis>{readingName(reading.key)}</Typography.Text>
                                 <span style={{fontSize: 17, fontWeight: 600, whiteSpace: 'nowrap'}}>
-                                    {formatReadingValue(reading.key, reading.value)}
+                                    <RungHelp readingKey={reading.key} value={reading.value} coverage={readingCoverage(reading)}>
+                                        {formatReadingValue(reading.key, reading.value)}
+                                    </RungHelp>
                                 </span>
                                 <ReadingSparkline reading={reading} height={24} target={unjudgedTargets}/>
                             </div>

@@ -16,9 +16,36 @@ export const RUNG = 'rung'
 export const COUNT = 'count'
 
 /**
- * Names of the rungs of the security maturity, from 0 up.
+ * The rungs of the security maturity, from 0 up, each with its name and what it means — the covered
+ * rung in general terms, see `rungDescription` for the terms of an estate. The wording follows the
+ * user guide of the scorecard.
  */
-export const SECURITY_MATURITY_RUNGS = ['None', 'Reported', 'Covered', 'Gating']
+export const SECURITY_MATURITY_RUNGS = [
+    {name: 'None', description: 'No security scan in the window.'},
+    {name: 'Reported', description: 'At least one security scan in the window.'},
+    {
+        name: 'Covered',
+        description: 'Every kind of scan the estate expects run within its freshness, or any recent scan with no estate.',
+    },
+    {name: 'Gating', description: 'A security stamp required by a promotion, or a scan which failed in the window.'},
+]
+
+const COVERED_RUNG = 2
+
+/**
+ * What the security maturity is, before its rungs.
+ */
+export const SECURITY_MATURITY_INTRO = 'Rung of the security scans of the branches read, each rung holding the ones below.'
+
+/**
+ * The definition of the security maturity, from its rungs.
+ */
+const securityMaturityDescription = () =>
+    `${SECURITY_MATURITY_INTRO.slice(0, -1)}: ` +
+    SECURITY_MATURITY_RUNGS
+        .map(({name, description}, value) => `${value} ${name.toLowerCase()}, ${description.charAt(0).toLowerCase()}${description.slice(1, -1)}`)
+        .join('; ') +
+    '.'
 
 const LOWER_IS_BETTER = 'LOWER_IS_BETTER'
 const HIGHER_IS_BETTER = 'HIGHER_IS_BETTER'
@@ -62,7 +89,7 @@ export const READINGS = [
     },
     {
         key: 'security.maturity', name: 'Security maturity', unit: RUNG, marker: false, direction: HIGHER_IS_BETTER,
-        description: 'Rung of the security scans of the branches read: 0 none; 1 reported, a scan in the window; 2 covered, every kind the estate expects scanned within its freshness (any scan with no estate); 3 gating, a security stamp required by a promotion, or a scan which failed in the window.',
+        description: securityMaturityDescription(),
     },
     {
         key: 'security.remediationTime', name: 'Remediation time', unit: DURATION, marker: false, direction: LOWER_IS_BETTER,
@@ -204,7 +231,7 @@ export const formatReadingValue = (key, value) => {
         case PERCENT:
             return `${round(value, 1)}%`
         case RUNG: {
-            const name = SECURITY_MATURITY_RUNGS[value]
+            const name = SECURITY_MATURITY_RUNGS[value]?.name
             return name ? `${value} · ${name}` : round(value, 2)
         }
         case COUNT:
@@ -304,6 +331,72 @@ export const targetText = (reading) => {
     const symbol = DIRECTION_SYMBOLS[reading.direction] ?? ''
     return `${symbol} ${formatReadingValue(reading.key, reading.target)}`.trim()
 }
+
+/**
+ * The target of a reading of an estate in words, with how it judges a value: "Target of this
+ * estate: 2d or less — met at or under it, missed above."; that values are not judged with no target.
+ */
+export const targetWords = ({key, target, direction}) => {
+    if (!isNumber(target)) return 'No target set by this estate: values are shown, not judged.'
+    const value = formatReadingValue(key, target)
+    return direction === LOWER_IS_BETTER ?
+        `Target of this estate: ${value} or less — met at or under it, missed above.` :
+        `Target of this estate: ${value} or more — met at or above it, missed below.`
+}
+
+/**
+ * The rung a value of a reading stands for, `null` for a reading other than a rung, or for a value
+ * which is no rung — a median between two of them.
+ */
+export const rungOf = (key, value) =>
+    readingOf(key)?.unit === RUNG && Number.isInteger(value) && value >= 0 && value < SECURITY_MATURITY_RUNGS.length ?
+        value : null
+
+/**
+ * What covered means for a security maturity, from its details: `{expectedKinds, freshnessDays}`,
+ * `null` without them.
+ */
+export const readingCoverage = (reading) => {
+    const details = reading?.details
+    return Array.isArray(details?.expectedKinds) ?
+        {expectedKinds: details.expectedKinds, freshnessDays: details.freshnessDays ?? null} :
+        null
+}
+
+/**
+ * What a rung of the security maturity means, `null` for a value which is no rung. With a
+ * `coverage` — `{expectedKinds, freshnessDays}`, the security of an estate or the details of a
+ * reading — the covered rung is said in its terms: "Every expected kind scanned within the last 7
+ * days: Dependencies, Code."; a `null` freshness being the one of the settings.
+ */
+export const rungDescription = (value, coverage = null) => {
+    const rung = Number.isInteger(value) ? SECURITY_MATURITY_RUNGS[value] : null
+    if (!rung) return null
+    if (value !== COVERED_RUNG || !coverage) return rung.description
+    const within = isNumber(coverage.freshnessDays) ?
+        `within the last ${daysText(coverage.freshnessDays)}` :
+        'within the freshness of the scorecard settings'
+    const kinds = coverage.expectedKinds ?? []
+    return kinds.length > 0 ?
+        `Every expected kind scanned ${within}: ${kinds.map(kindName).join(', ')}.` :
+        `Any security scan ${within}.`
+}
+
+/**
+ * The rungs of the security maturity as a list, each with its `value`, `name`, `description` in the
+ * terms of the `coverage`, and its `marks`: `current` for the rung of the reading, `target` for the
+ * rung of its target.
+ */
+export const securityMaturityRungs = ({coverage = null, current = null, target = null} = {}) =>
+    SECURITY_MATURITY_RUNGS.map(({name}, value) => ({
+        value,
+        name,
+        description: rungDescription(value, coverage),
+        marks: [
+            ...(current === value ? ['current'] : []),
+            ...(target === value ? ['target'] : []),
+        ],
+    }))
 
 /**
  * Number of samples the value rests on, `null` when the reading has none to give.

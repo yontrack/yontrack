@@ -167,9 +167,11 @@ export const isScorecardLicensed = async (ontrack) => {
  * @param labels Labels selecting its projects, as `category:name`
  * @param marker Marker, `{kind, levelName}` or `{kind, environment, qualifier}`, default when null
  * @param readings Window and target per reading, `[{key, windowDays, target}]`
+ * @param security What the estate expects of the security scans,
+ *   `{expectedKinds, freshnessDays, criticalTargetDays, highTargetDays}`, none when null
  * @return The estate, with its `id` and `name`
  */
-export const createEstate = async (ontrack, {name, labels, marker = null, readings = []}) => {
+export const createEstate = async (ontrack, {name, labels, marker = null, readings = [], security = null}) => {
     const data = await graphQLCallMutation(
         ontrack.connection,
         'createEstate',
@@ -179,12 +181,14 @@ export const createEstate = async (ontrack, {name, labels, marker = null, readin
                 $labels: [String!]!,
                 $marker: EstateMarkerInput,
                 $readings: [EstateReadingConfigInput!],
+                $security: EstateSecurityInput,
             ) {
                 createEstate(input: {
                     name: $name,
                     labels: $labels,
                     marker: $marker,
                     readings: $readings,
+                    security: $security,
                 }) {
                     estate {
                         id
@@ -196,7 +200,7 @@ export const createEstate = async (ontrack, {name, labels, marker = null, readin
                 }
             }
         `,
-        {name, labels, marker, readings}
+        {name, labels, marker, readings, security}
     )
     return data.createEstate.estate
 }

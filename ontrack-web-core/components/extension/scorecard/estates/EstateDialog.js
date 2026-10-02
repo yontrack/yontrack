@@ -8,7 +8,6 @@ import {
     PER_WEEK,
     PERCENT,
     RUNG,
-    SECURITY_MATURITY_RUNGS,
     readingDirectionSymbol,
     readingName,
     readingUnit,
@@ -20,7 +19,9 @@ import {
     MARKER_DEFAULT,
     MARKER_ENVIRONMENT,
     MARKER_PROMOTION,
+    rungTargetOptions,
 } from "@components/extension/scorecard/estates/estateModel";
+import SecondaryText from "@components/extension/scorecard/SecondaryText";
 import {FINDING_KINDS, kindName} from "@components/extension/findings/findingsModel";
 
 const estateInputFields = `
@@ -148,7 +149,14 @@ function ReadingTargetInput({name, readingKey}) {
                     aria-label={label}
                     allowClear
                     placeholder="None"
-                    options={SECURITY_MATURITY_RUNGS.map((rung, value) => ({value, label: `${symbol} ${value} · ${rung}`}))}
+                    options={rungTargetOptions(readingKey)}
+                    optionRender={option =>
+                        <Space orientation="vertical" size={0}>
+                            <span>{option.label}</span>
+                            <SecondaryText style={{fontSize: 12, whiteSpace: 'normal'}}>{option.data.description}</SecondaryText>
+                        </Space>
+                    }
+                    popupMatchSelectWidth={360}
                     style={{width: '15em'}}
                 />
             </Form.Item>

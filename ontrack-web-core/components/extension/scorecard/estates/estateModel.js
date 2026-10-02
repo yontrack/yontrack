@@ -18,6 +18,8 @@ import {
     readingName,
     readingRank,
     readingUnit,
+    rungDescription,
+    SECURITY_MATURITY_RUNGS,
 } from "@components/extension/scorecard/scorecardModel";
 
 /**
@@ -26,6 +28,19 @@ import {
 export const MARKER_DEFAULT = 'DEFAULT'
 export const MARKER_PROMOTION = 'PROMOTION'
 export const MARKER_ENVIRONMENT = 'ENVIRONMENT'
+
+/**
+ * The rungs a reading of rungs may take as a target, each with its `value`, its `label` after the
+ * symbol of the direction of the reading — `≥ 2 · Covered` — and its `description`, in general terms.
+ */
+export const rungTargetOptions = (key) => {
+    const symbol = readingDirectionSymbol(key)
+    return SECURITY_MATURITY_RUNGS.map(({name}, value) => ({
+        value,
+        label: `${symbol} ${value} · ${name}`,
+        description: rungDescription(value),
+    }))
+}
 
 /**
  * Units a duration target is entered in, the largest last.

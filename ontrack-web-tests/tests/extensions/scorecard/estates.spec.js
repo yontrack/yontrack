@@ -127,6 +127,22 @@ test('estates admin page refuses an estate with no label', async ({page, ontrack
     expect(await findEstate(ontrack, name)).toBeNull()
 })
 
+test('estates admin page says what each rung of the security maturity means, as a target', async ({page, ontrack}) => {
+    test.skip(!(await isScorecardLicensed(ontrack)), 'The licence does not allow the estates')
+
+    await login(page, ontrack)
+    const estatesPage = new EstatesPage(page, ontrack)
+    await estatesPage.goTo()
+
+    await page.getByTestId('estate-create').click()
+    await expect(estatesPage.dialog()).toBeVisible()
+    await estatesPage.dialog().getByLabel('Target of Security maturity', {exact: true}).click()
+    const gating = page.locator('.ant-select-dropdown:visible .ant-select-item-option').filter({hasText: '≥ 3 · Gating'})
+    await expect(gating).toContainText('A security stamp required by a promotion, or a scan which failed in the window.')
+    await page.keyboard.press('Escape')
+    await estatesPage.dialog().getByRole('button', {name: 'Cancel', exact: true}).click()
+})
+
 test('estates menu item and commands hidden for a user without estate management', async ({page, ontrack}) => {
     test.skip(!(await isScorecardLicensed(ontrack)), 'The licence does not allow the estates')
 

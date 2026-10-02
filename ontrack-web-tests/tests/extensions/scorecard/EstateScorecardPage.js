@@ -56,6 +56,40 @@ export class EstateScorecardPage {
     }
 
     /**
+     * Cell of the header of a column, which carries its sort.
+     */
+    columnHeaderCell(key) {
+        return this.page.locator('th').filter({has: this.page.getByTestId(`estate-column-${key}`)}).first()
+    }
+
+    /**
+     * The ⓘ of the header of a reading.
+     */
+    columnInfo(key) {
+        return this.column(key).getByRole('button', {name: /^About /})
+    }
+
+    /**
+     * Opens the ⓘ of the header of a reading, and gives its popover.
+     */
+    async openColumnInfo(key) {
+        await this.columnInfo(key).hover()
+        const info = this.page.getByTestId(`estate-column-info-${key}`)
+        await expect(info).toBeVisible()
+        return info
+    }
+
+    /**
+     * Opens the ⓘ of the roll-up row, and gives its popover.
+     */
+    async openRollUpInfo() {
+        await this.page.getByRole('button', {name: 'About All projects'}).hover()
+        const info = this.page.getByTestId('estate-rollup-info')
+        await expect(info).toBeVisible()
+        return info
+    }
+
+    /**
      * Names of the projects, in the order of the rows.
      */
     async projectNames() {

@@ -11,6 +11,9 @@ import TimestampText from "@components/common/TimestampText";
 import SetExplanation from "@components/extension/scorecard/SetExplanation";
 import SecondaryText from "@components/extension/scorecard/SecondaryText";
 import EstateFindingsFanOut from "@components/extension/scorecard/estates/EstateFindingsFanOut";
+import ScorecardInfo from "@components/extension/scorecard/ScorecardInfo";
+import ReadingDefinition from "@components/extension/scorecard/ReadingDefinition";
+import RungHelp from "@components/extension/scorecard/RungHelp";
 import {
     formatReadingValue,
     isNeutralJudgement,
@@ -19,9 +22,11 @@ import {
     readingJudgement,
     readingName,
     targetText,
+    targetWords,
     unknownReasonText,
 } from "@components/extension/scorecard/scorecardModel";
 import {
+    ESTATE_ROLLUP_TEXT,
     estateReadingKeys,
     ESTATE_TAB_FANOUT,
     ESTATE_TAB_READINGS,
@@ -47,6 +52,10 @@ export const gqlEstateScorecard = gql`
                 levelName
                 environment
                 qualifier
+            }
+            security {
+                expectedKinds
+                freshnessDays
             }
             readingConfigs {
                 key
@@ -93,7 +102,7 @@ const cellStyle = (background, color) => ({
  * and on focus; a neutral reading - a time to restore with no failure in the window, overdue
  * findings with no target set - is said in words, not unknown, with its reason on hover and on focus.
  */
-function EstateReadingCell({reading, testId}) {
+function EstateReadingCell({reading, coverage, testId}) {
     if (!reading) {
         return (
             <span data-testid={testId} data-judgement="NONE">
@@ -102,7 +111,9 @@ function EstateReadingCell({reading, testId}) {
         )
     }
     const judgement = readingJudgement(reading)
-    const value = formatReadingValue(reading.key, reading.value)
+    const value = <RungHelp readingKey={reading.key} value={reading.value} coverage={coverage}>
+        {formatReadingValue(reading.key, reading.value)}
+    </RungHelp>
     let content
     switch (judgement) {
         case 'MET':
@@ -144,11 +155,15 @@ function EstateReadingCell({reading, testId}) {
 /**
  * The roll-up of one reading over the projects of the estate.
  */
-function EstateRollUp({readingKey, rows}) {
+function EstateRollUp({readingKey, rows, coverage}) {
     const {median, unknown, missed} = rollUp(rows, readingKey)
     return (
         <Space orientation="vertical" size={0} data-testid={`estate-rollup-${readingKey}`}>
-            <Typography.Text strong style={{whiteSpace: 'nowrap'}}>Median {formatMedian(readingKey, median)}</Typography.Text>
+            <Typography.Text strong style={{whiteSpace: 'nowrap'}}>
+                Median <RungHelp readingKey={readingKey} value={median} coverage={coverage}>
+                    {formatMedian(readingKey, median)}
+                </RungHelp>
+            </Typography.Text>
             <SecondaryText style={{fontSize: 12, whiteSpace: 'nowrap'}}>{unknown} unknown</SecondaryText>
             <SecondaryText style={{fontSize: 12, whiteSpace: 'nowrap'}}>{missed} missed</SecondaryText>
         </Space>
@@ -171,6 +186,7 @@ function EstateReadingsTable({estate}) {
     const rows = estateRows(projectSets, {measuredOnly: estimated && measuredOnly})
     const sortedRows = sortEstateRows(rows, sort)
     const targets = Object.fromEntries((estate.readingConfigs ?? []).map(config => [config.key, config]))
+    const coverage = estate.security ?? null
     const latest = latestComputedAt({sets: projectSets})
 
     const sortOrder = (key) => sort.key === key ? sort.order : null
@@ -192,10 +208,31 @@ function EstateReadingsTable({estate}) {
         },
         ...keys.map(key => {
             const target = targets[key] ? targetText({key, ...targets[key]}) : null
+            const name = readingName(key)
             return {
                 key,
                 title: <Space orientation="vertical" size={0} data-testid={`estate-column-${key}`}>
-                    <span style={{whiteSpace: 'nowrap'}}>{readingName(key)}</span>
+                    <span style={{display: 'inline-flex', alignItems: 'center', whiteSpace: 'nowrap'}}>
+                        {name}
+                        <ScorecardInfo
+                            label={`About ${name}`}
+                            title={name}
+                            testId={`estate-column-info-${key}`}
+                            content={
+                                <Space orientation="vertical" size={8}>
+                                    <ReadingDefinition
+                                        readingKey={key}
+                                        markerKind={estate.marker?.kind}
+                                        coverage={coverage}
+                                        target={targets[key]?.target ?? null}
+                                    />
+                                    <Typography.Text strong>
+                                        {targetWords({key, ...targets[key]})}
+                                    </Typography.Text>
+                                </Space>
+                            }
+                        />
+                    </span>
                     {
                         target &&
                         <SecondaryText style={{fontSize: 12, fontWeight: 400, whiteSpace: 'nowrap'}}>{target}</SecondaryText>
@@ -206,6 +243,7 @@ function EstateReadingsTable({estate}) {
                 render: (_, row) =>
                     <EstateReadingCell
                         reading={row.readings[key]}
+                        coverage={coverage}
                         testId={`estate-cell-${row.project.name}-${key}`}
                     />,
             }
@@ -246,12 +284,20 @@ function EstateReadingsTable({estate}) {
                     <Table.Summary fixed="top">
                         <Table.Summary.Row data-testid="estate-rollup">
                             <Table.Summary.Cell index={0}>
-                                <Typography.Text strong>All projects</Typography.Text>
+                                <span style={{display: 'inline-flex', alignItems: 'center', whiteSpace: 'nowrap'}}>
+                                    <Typography.Text strong>All projects</Typography.Text>
+                                    <ScorecardInfo
+                                        label="About All projects"
+                                        title="All projects"
+                                        testId="estate-rollup-info"
+                                        content={<Typography.Text>{ESTATE_ROLLUP_TEXT}</Typography.Text>}
+                                    />
+                                </span>
                             </Table.Summary.Cell>
                             {
                                 keys.map((key, index) =>
                                     <Table.Summary.Cell key={key} index={index + 1}>
-                                        <EstateRollUp readingKey={key} rows={rows}/>
+                                        <EstateRollUp readingKey={key} rows={rows} coverage={coverage}/>
                                     </Table.Summary.Cell>
                                 )
                             }

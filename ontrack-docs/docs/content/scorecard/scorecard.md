@@ -164,6 +164,10 @@ Yontrack 6 recorded the kind has the kinds of the findings it reported.
     | 2    | Covered  | Every kind of scan the estate [expects](estates.md#security-scans-and-remediation-targets) has a scan fresher than its freshness. With no expected kind — as always with no estate — some scan is fresher than it. |
     | 3    | Gating   | A `security-findings` stamp is required by a promotion level of its branch, through its [auto promotion](../concepts/model/auto-promotion.md), or a scan was created `FAILED` in the window. |
 
+    In the UI, a rung says what it means on hover and on keyboard focus, and the ⓘ of the reading
+    lists the four rungs, *Covered* in the terms of the set — *Every expected kind scanned within
+    the last 7 days: Code, Dependencies.*
+
     The freshness is the estate's, else the *Security scan freshness* of the [settings](#settings):
     a scan is fresh when it is younger than that many days at the time of the reading, even if it is
     older than the window. The maturity is never unknown: no scan reads 0. Its details give the
@@ -262,7 +266,8 @@ estate the project belongs to, by name.
 The first estate is selected by default, or *Project* when the project belongs to no estate.
 Under the cards, the readings of the selected set are tiles, each with:
 
-* its name, and an ⓘ saying what it measures, up to the marker of the set;
+* its name, and an ⓘ saying what it measures, up to the marker of the set — for the security
+  maturity, its four rungs, the current one and the target one marked;
 * its judgement, always in words: *Met*, *Missed*, *No target*, *Unknown* — with its reason on
   hover — or, neutral, *No failure in window* or *No target set*;
 * its value, and its target (*target ≤ 1d*), or *no target in this set*;

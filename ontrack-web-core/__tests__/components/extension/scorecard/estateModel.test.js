@@ -8,6 +8,7 @@ import {
     estateReadingConfigTexts,
     estateSecurityTexts,
     latestEstateComputedAt,
+    rungTargetOptions,
 } from "@components/extension/scorecard/estates/estateModel";
 
 const estate = (props = {}) => ({
@@ -326,5 +327,16 @@ describe('estateSecurityTexts', () => {
                 'DAST scans fresher than 1 day',
                 'HIGH fixed within 0 days',
             ])
+    })
+})
+
+describe('rungTargetOptions', () => {
+
+    it('offers every rung as a target, after the symbol of its direction, with what it means', () => {
+        const options = rungTargetOptions('security.maturity')
+        expect(options.map(it => it.value)).toEqual([0, 1, 2, 3])
+        expect(options.map(it => it.label)).toEqual(['≥ 0 · None', '≥ 1 · Reported', '≥ 2 · Covered', '≥ 3 · Gating'])
+        expect(options[3].description).toEqual('A security stamp required by a promotion, or a scan which failed in the window.')
+        expect(options[2].description).toMatch(/every kind of scan the estate expects/i)
     })
 })

@@ -6,8 +6,8 @@ import {FaInfoCircle} from "react-icons/fa";
  *
  * The trigger is a button, so that the popover opens on focus for the keyboard as well as on hover
  * — a bare icon cannot be reached — and a popover rather than a tooltip, which holds structured
- * content such as label chips. A click does nothing else: in a column header, it must not reach the
- * header.
+ * content such as label chips. A click or a key does nothing else: in a column header, it must not
+ * reach the header, which sorts on a click and on Enter.
  */
 export default function ScorecardInfo({label, title, content, testId}) {
     return (
@@ -22,6 +22,7 @@ export default function ScorecardInfo({label, title, content, testId}) {
                 icon={<FaInfoCircle/>}
                 aria-label={label}
                 onClick={e => e.stopPropagation()}
+                onKeyDown={e => e.stopPropagation()}
             />
         </Popover>
     )

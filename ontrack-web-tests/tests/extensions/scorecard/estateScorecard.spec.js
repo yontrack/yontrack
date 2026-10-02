@@ -111,6 +111,70 @@ test('estate view: from the user menu to the estate, its readings against its ta
     }
 })
 
+test('estate view: what its readings, their targets, the roll-up and the rungs of the security maturity mean', async ({page, ontrack}) => {
+    test.skip(!(await isScorecardLicensed(ontrack)), 'The licence does not allow the estates')
+
+    const label = await ontrack.labels().createLabel()
+
+    // Promoted to GOLD, never scanned: a security maturity of 0
+    const project = await ontrack.createProject(generate('a-promoted-'))
+    await ontrack.labels().setProjectLabels(project.id, [label.id])
+    const branch = await project.createBranch("main")
+    const gold = await branch.createPromotionLevel("GOLD")
+    for (let i = 0; i < 2; i++) {
+        const build = await branch.createBuild()
+        await build.promote(gold)
+    }
+
+    const estate = await createEstate(ontrack, {
+        name: generate('estate-'),
+        labels: [`${label.category}:${label.name}`],
+        marker: {kind: 'PROMOTION', levelName: 'GOLD'},
+        readings: [
+            {key: 'delivery.leadTime', target: 86400},
+            {key: 'security.maturity', target: 2},
+        ],
+        security: {expectedKinds: ['CODE'], freshnessDays: 7},
+    })
+    try {
+        await recomputeScorecardAndWait(project)
+
+        await login(page, ontrack)
+        const estatePage = new EstateScorecardPage(page, ontrack, estate.name)
+        await estatePage.goTo()
+
+        // The ⓘ of a reading: what it measures, and its target in words
+        const leadTime = await estatePage.openColumnInfo('delivery.leadTime')
+        await expect(leadTime).toContainText('first promotion at the marker level')
+        await expect(leadTime).toContainText('Target of this estate: 1d or less — met at or under it, missed above.')
+        // Clicking it does not sort
+        await estatePage.columnInfo('delivery.leadTime').click()
+        await expect(estatePage.columnHeaderCell('delivery.leadTime')).not.toHaveAttribute('aria-sort')
+
+        // A reading with no target: shown, not judged
+        const passRate = await estatePage.openColumnInfo('quality.testPassRate')
+        await expect(passRate).toContainText('No target set by this estate: values are shown, not judged.')
+
+        // The rungs of the security maturity, the target one marked, covered in the terms of the estate
+        const maturity = await estatePage.openColumnInfo('security.maturity')
+        await expect(maturity.getByRole('listitem')).toHaveCount(4)
+        const covered = maturity.locator('li[data-rung="2"]')
+        await expect(covered).toContainText('2 · Covered← target')
+        await expect(covered).toContainText('Every expected kind scanned within the last 7 days: Code.')
+
+        // The rung of a cell, on focus
+        const rung = estatePage.cell(project.name, 'security.maturity').getByLabel('0 · None: No security scan in the window.')
+        await rung.focus()
+        await expect(page.getByRole('tooltip', {name: 'No security scan in the window.', exact: true})).toBeVisible()
+
+        // The roll-up row
+        const rollUp = await estatePage.openRollUpInfo()
+        await expect(rollUp).toContainText('Median over the projects with a value.')
+    } finally {
+        await deleteEstate(ontrack, estate)
+    }
+})
+
 /**
  * A future day, as an ISO date, for an acceptance which holds.
  */

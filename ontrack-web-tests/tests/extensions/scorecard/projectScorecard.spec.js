@@ -83,6 +83,13 @@ test('project page Scorecard section recomputes the readings and shows them', as
     await expect(page.getByTestId('scorecard-set-info-Project')).toContainText('This project read on its own')
     await section.getByRole('button', {name: 'About Lead time'}).hover()
     await expect(page.getByTestId('scorecard-reading-info-delivery.leadTime')).toContainText('first promotion at the marker level')
+    // Never scanned: the rung of the security maturity is 0, marked as the current one, and its
+    // value says what it means on focus
+    await section.getByRole('button', {name: 'About Security maturity'}).hover()
+    const maturity = page.getByTestId('scorecard-reading-info-security.maturity')
+    await expect(maturity.getByRole('listitem')).toHaveCount(4)
+    await expect(maturity.locator('li[data-rung="0"]')).toContainText('0 · None← current')
+    await expect(section.getByTestId('scorecard-Project-security.maturity-value').getByLabel('0 · None: No security scan in the window.')).toBeVisible()
     await expect(section.getByTestId('scorecard-legend')).toContainText('daily readings over the last 90 days')
 
     // The details of each number are on the scorecard page, on the same set

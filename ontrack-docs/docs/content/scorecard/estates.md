@@ -78,7 +78,7 @@ in the window reads *No failure in window*, neither met nor missed.
 Targets are in the unit of the reading: **seconds** for a duration, **per week** for a frequency,
 **0 to 100** for a rate, a **rung** for the security maturity — `2` for *covered* — and a **count**
 for the overdue findings — `0` for none. The estates page lets you enter a duration in minutes,
-hours or days, and converts it, and a rung by its name.
+hours or days, and converts it, and a rung by its name, each rung saying what it means.
 
 The target of the overdue findings judges their **count**; how old a finding may get before it
 counts is set by the remediation targets of the estate, below.

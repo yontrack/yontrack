@@ -4,11 +4,14 @@ import {FaCheck, FaQuestionCircle, FaTimes} from "react-icons/fa";
 import TimestampText from "@components/common/TimestampText";
 import ScorecardInfo from "@components/extension/scorecard/ScorecardInfo";
 import ReadingSparkline from "@components/extension/scorecard/ReadingSparkline";
+import ReadingDefinition from "@components/extension/scorecard/ReadingDefinition";
+import RungHelp from "@components/extension/scorecard/RungHelp";
 import {
     formatReadingValue,
     isNeutralJudgement,
     markerText,
     neutralText,
+    readingCoverage,
     readingDescription,
     readingDetailItems,
     readingJudgement,
@@ -150,6 +153,16 @@ export default function ReadingTile({reading, size = 'default', testId}) {
     const judgement = readingJudgement(reading)
     const description = readingDescription(reading.key, reading.details?.markerKind)
     const measured = ['MET', 'MISSED', 'SHOWN'].includes(judgement)
+    const coverage = readingCoverage(reading)
+    const definition = (props) =>
+        <ReadingDefinition
+            readingKey={reading.key}
+            markerKind={reading.details?.markerKind}
+            coverage={coverage}
+            current={measured ? reading.value : null}
+            target={reading.target}
+            {...props}
+        />
     const sub = (suffix) => testId ? `${testId}-${suffix}` : undefined
 
     return (
@@ -181,24 +194,27 @@ export default function ReadingTile({reading, size = 'default', testId}) {
                             label={`About ${name}`}
                             title={name}
                             testId={`scorecard-reading-info-${reading.key}`}
-                            content={<Typography.Text>{description}</Typography.Text>}
+                            content={definition()}
                         />
                     }
                 </span>
                 <JudgementTag reading={reading} testId={testId}/>
             </div>
             {
-                large && description &&
-                <SecondaryText style={{fontSize: 12}} data-testid={sub('description')}>
-                    {description}
-                </SecondaryText>
+                large && description && definition({secondary: true, testId: sub('description')})
             }
             <div style={{display: 'flex', alignItems: 'baseline', gap: large ? 12 : 10, flexWrap: 'wrap'}}>
                 <span
                     data-testid={sub('value')}
                     style={{fontSize: large ? 36 : 28, fontWeight: 600, lineHeight: 1.2, letterSpacing: large ? -0.8 : -0.5}}
                 >
-                    {measured ? formatReadingValue(reading.key, reading.value) : '—'}
+                    {
+                        measured ?
+                            <RungHelp readingKey={reading.key} value={reading.value} coverage={coverage}>
+                                {formatReadingValue(reading.key, reading.value)}
+                            </RungHelp> :
+                            '—'
+                    }
                 </span>
                 <SecondaryText style={{fontSize: large ? 13 : 12}} data-testid={sub('target')}>
                     {targetLineText(reading)}

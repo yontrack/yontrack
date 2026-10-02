@@ -36,13 +36,20 @@ link: `/extension/scorecard/estate/<name>?tab=fanout&finding=CVE-2024-38816` ope
 
 One row per project of the estate — among the projects you can see — and one column per reading of
 the [catalogue](scorecard.md#the-readings), in its order. The heading of a column gives the target
-the estate sets for the reading, if any.
+the estate sets for the reading, if any, and an ⓘ which says what the reading measures — up to the
+marker of the estate — and its target in words: *Target of this estate: 2d or less — met at or
+under it, missed above*, or that the estate sets none, the values being shown and not judged. The
+ⓘ of the security maturity lists its four [rungs](scorecard.md#security-readings), the target one
+marked, and words *Covered* in the terms of the estate: the kinds of scan it expects and its
+freshness. An ⓘ opens on hover and on keyboard focus, and never sorts the column.
 
 Each cell is the latest daily reading of the project in the set of the estate:
 
 * **Met**, with a check, or **Missed**, with a cross, when the estate judges the reading: in the
   colour of the judgement, which never stands alone;
 * the value alone, when the estate sets no target for the reading;
+* for the security maturity, the rung — *2 · Covered* — which says what it means on hover and on
+  keyboard focus;
 * **Unknown**, in grey, when the reading could not be taken: its
   [reason](scorecard.md#unknown-readings) shows on hover and on keyboard focus;
 * **No failure**, neutral, for a time to restore with nothing to restore in the window, and
@@ -55,6 +62,7 @@ values of the projects which have one, the number of projects whose reading is u
 number of projects missing the target. The neutral readings — *No failure*, *No target set* — are
 neither counted as unknown nor part of the median, and neither are the projects not computed yet.
 A median of rungs or of counts may fall between two of them, and keeps its half: *Median 1.5*.
+The ⓘ next to *All projects* says what the row counts.
 
 A click on the heading of a column sorts the projects by that reading, the projects with no value
 last whatever the order; by default, they are sorted by name. The name of a project opens its

@@ -211,3 +211,48 @@ describe('A reading tile', () => {
         expect(screen.getByTestId('reading-sparkline')).not.toHaveAttribute('data-zone')
     })
 })
+
+describe('The help on the rungs of the security maturity, on a reading tile', () => {
+
+    const maturity = judged({
+        key: 'security.maturity',
+        direction: 'HIGHER_IS_BETTER',
+        value: 1,
+        target: 2,
+        targetMet: false,
+        details: {count: 3, expectedKinds: ['CODE'], freshnessDays: 14, markerKind: 'PROMOTION'},
+        history: [],
+    })
+
+    it('lists the rungs in the popover, the current one and the target one marked', async () => {
+        render(<ReadingTile reading={maturity} testId="tile"/>)
+        fireEvent.mouseEnter(screen.getByRole('button', {name: 'About Security maturity'}))
+        const info = await screen.findByTestId('scorecard-reading-info-security.maturity')
+        const rungs = within(info).getAllByRole('listitem')
+        expect(rungs).toHaveLength(4)
+        expect(rungs[1]).toHaveTextContent('1 · Reported← current')
+        expect(rungs[2]).toHaveTextContent('2 · Covered← target')
+        expect(rungs[2]).toHaveTextContent('Every expected kind scanned within the last 14 days: Code.')
+    })
+
+    it('lists the rungs inline on a large tile', () => {
+        render(<ReadingTile size="large" reading={maturity} testId="card"/>)
+        const rungs = within(screen.getByTestId('card-description')).getAllByRole('listitem')
+        expect(rungs).toHaveLength(4)
+        expect(rungs[1]).toHaveTextContent('← current')
+    })
+
+    it('explains the rung of its value on focus', async () => {
+        render(<ReadingTile reading={maturity} testId="tile"/>)
+        const help = within(screen.getByTestId('tile-value')).getByLabelText('1 · Reported: At least one security scan in the window.')
+        fireEvent.focus(help)
+        expect(await screen.findByRole('tooltip')).toHaveTextContent('At least one security scan in the window.')
+    })
+
+    it('marks no current rung for an unknown maturity', async () => {
+        render(<ReadingTile reading={{...maturity, value: null, basis: 'UNKNOWN', unknownReason: 'NO_SAMPLES', targetMet: null}} testId="tile"/>)
+        fireEvent.mouseEnter(screen.getByRole('button', {name: 'About Security maturity'}))
+        const info = await screen.findByTestId('scorecard-reading-info-security.maturity')
+        expect(info).not.toHaveTextContent('← current')
+    })
+})
