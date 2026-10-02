@@ -5,8 +5,8 @@ Breakdown of [README.md](README.md) into agent-sized issues. Created on 2026-09-
 Every issue carries `initiative: scorecard` (a new label), `type: enhancement`, `status:todo` and
 `ready-for-agent`, and links back to the README section it implements. Dependencies are recorded
 as native GitHub dependencies as well as prose. Base branch is `v6` for the 6.0 issues, except S5
-(`yontrack-cli` / `main`), and `main` for the 6.1 issues — once 6.0 has become `main`, after the
-6.0 release (`doc/dev-guide/major-branch.md`).
+(`yontrack-cli` / `main`), and `v6` for the security wave too, moved
+from 6.1 to 6.0 on 2026-10-02 (`doc/dev-guide/major-branch.md`).
 
 ## 6.0 — milestone `6.0`
 
@@ -30,15 +30,15 @@ as native GitHub dependencies as well as prose. Base branch is `v6` for the 6.0 
 | S16 | [#1906](https://github.com/yontrack/yontrack/issues/1906) | Demo seed: two estates, backdated deployments, test runs                   | `yontrack` / `v6`       | S4, S11, S14   |
 | S17 | [#1907](https://github.com/yontrack/yontrack/issues/1907) | User documentation and 6.0 migration notes                                 | `yontrack` / `v6`       | S9, S11, S13   |
 
-## 6.1 — milestone `6.1`
+## 6.0, security wave — milestone `6.0` (first planned for 6.1)
 
 | #   | GitHub | Issue                                                                      | Repo / base             | Depends on     |
 |-----|--------|----------------------------------------------------------------------------|-------------------------|----------------|
-| S18 | [#1908](https://github.com/yontrack/yontrack/issues/1908) | Estate security fields and `security.maturity`                             | `yontrack` / `main`     | S10            |
-| S19 | [#1909](https://github.com/yontrack/yontrack/issues/1909) | `security.remediationTime` and `security.overdue`                          | `yontrack` / `main`     | S18            |
-| S20 | [#1910](https://github.com/yontrack/yontrack/issues/1910) | Estate view                                                                | `yontrack` / `main`     | S14, S15       |
-| S21 | [#1911](https://github.com/yontrack/yontrack/issues/1911) | Findings fan-out on the estate view                                        | `yontrack` / `main`     | S20            |
-| S22 | [#1912](https://github.com/yontrack/yontrack/issues/1912) | Demo seed and documentation for 6.1                                        | `yontrack` / `main`     | S19, S21       |
+| S18 | [#1908](https://github.com/yontrack/yontrack/issues/1908) | Estate security fields and `security.maturity`                             | `yontrack` / `v6`       | S10            |
+| S19 | [#1909](https://github.com/yontrack/yontrack/issues/1909) | `security.remediationTime` and `security.overdue`                          | `yontrack` / `v6`       | S18            |
+| S20 | [#1910](https://github.com/yontrack/yontrack/issues/1910) | Estate view                                                                | `yontrack` / `v6`       | S14, S15       |
+| S21 | [#1911](https://github.com/yontrack/yontrack/issues/1911) | Findings fan-out on the estate view                                        | `yontrack` / `v6`       | S20            |
+| S22 | [#1912](https://github.com/yontrack/yontrack/issues/1912) | Demo seed and documentation, security wave                                 | `yontrack` / `v6`       | S19, S21       |
 
 ---
 
@@ -260,9 +260,9 @@ README *Documentation*.
   start change, removed CasC keys.
 - Verified with `./gradlew :ontrack-docs:buildDocs`. Not `[skip ci]`.
 
-## S18 ([#1908](https://github.com/yontrack/yontrack/issues/1908)) — Estate security fields and `security.maturity` (6.1)
+## S18 ([#1908](https://github.com/yontrack/yontrack/issues/1908)) — Estate security fields and `security.maturity`
 
-README *6.1*.
+README *Security wave*.
 
 - Migration: expected kinds, freshness, CRITICAL/HIGH remediation targets on the estate; GraphQL,
   CasC, admin page fields.
@@ -271,7 +271,7 @@ README *6.1*.
 - Tests: unit tests per rung, IT with findings.
 - No mobile impact. Demo: S22.
 
-## S19 ([#1909](https://github.com/yontrack/yontrack/issues/1909)) — `security.remediationTime` and `security.overdue` (6.1)
+## S19 ([#1909](https://github.com/yontrack/yontrack/issues/1909)) — `security.remediationTime` and `security.overdue`
 
 - Median first observation → project-level resolution for CRITICAL+HIGH resolved in the window;
   overdue count against the estate targets; `NO_TARGET` for the no-estate set; accepted count in
@@ -279,20 +279,20 @@ README *6.1*.
 - Tests: IT on findings with backdated observations, a version bump that is not a remediation.
 - No mobile impact. Demo: S22.
 
-## S20 ([#1910](https://github.com/yontrack/yontrack/issues/1910)) — Estate view (6.1)
+## S20 ([#1910](https://github.com/yontrack/yontrack/issues/1910)) — Estate view
 
 - "Scorecards" user-menu item (licensed); estate page with projects × readings, target colours,
   unknown distinct, roll-up row, sort, links to the project scorecard page.
 - Measured-only toggle hidden while no `ESTIMATED` reading exists.
 - **No mobile impact, because the estate view is desktop-only in 6.x.** Demo: S22.
 
-## S21 ([#1911](https://github.com/yontrack/yontrack/issues/1911)) — Findings fan-out on the estate view (6.1)
+## S21 ([#1911](https://github.com/yontrack/yontrack/issues/1911)) — Findings fan-out on the estate view
 
 - Tab: one finding → projects exposed, branches, since when, through the findings cross-project
   query; filtered by project view.
 - No mobile impact. Demo: S22.
 
-## S22 ([#1912](https://github.com/yontrack/yontrack/issues/1912)) — Demo seed and documentation for 6.1
+## S22 ([#1912](https://github.com/yontrack/yontrack/issues/1912)) — Demo seed and documentation, security wave
 
 - The demo estates gain expected kinds and targets; the findings demo project lights up the
   security readings and the fan-out.

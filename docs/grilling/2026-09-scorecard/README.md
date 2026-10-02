@@ -1,10 +1,10 @@
-# Delivery scorecard — Yontrack 6.0 and 6.1
+# Delivery scorecard — Yontrack 6.0
 
 Outcome of the grilling session of 2026-09-28 on the scorecard half of
 [2026-09-scorecard.md](../2026-09-scorecard.md). That session settled the shape (readings,
 scorecard, estates, the removals); this one settles what an agent needs to build it: the
 definitions down to the sample, the table, the job, the estates, the slot failure signal and
-backdated deployments, the UI, the export, the demo and the 6.1 security readings.
+backdated deployments, the UI, the export, the demo and the security readings.
 
 The scorecard document still stands, except where this document says otherwise. Where the two
 disagree, this one wins. Findings are out of scope here: they were specified by
@@ -15,7 +15,7 @@ The issue breakdown is [issues.md](issues.md), under a new `initiative: scorecar
 ## Where we start from
 
 - **Findings are live on `v6`**: finding, observation and stored exposure tables, the
-  `security-findings` data type, the events, the UI. The 6.1 security readings have their input.
+  `security-findings` data type, the events, the UI. The security readings have their input.
 - **Both modules to remove are still there**, on `v6` as on `main`. Latest migration is `V87`.
 - **Indicators footprint**: the module (143 main files); `indicator(s)` sub-packages in `scm` (1),
   `general` (1), `github` (16, the compliance checks), `jenkins` (12, pipeline file and library
@@ -62,9 +62,11 @@ The issue breakdown is [issues.md](issues.md), under a new `initiative: scorecar
   the scorecard engine with the delivery and test readings, **estates as an entity** (licensed,
   GraphQL, KDSL, CasC, admin page) with their per-estate readings on the project scorecard, the
   export, the demo, the docs.
-- **6.1** (milestone `6.1`): the security readings, the estate security fields, the estate view and
-  its findings fan-out. Written now so that the 6.0 table and engine are checked to carry them.
-- 6.0 issues target `v6`; 6.1 issues target `main`, once 6.0 has become `main`.
+- **Security wave** (first planned for 6.1, moved to milestone `6.0` on 2026-10-02): the security
+  readings, the estate security fields, the estate view and its findings fan-out. They were written
+  with the rest so that the table and engine are checked to carry them, and nothing in them waits
+  for a release.
+- All the issues target `v6`.
 
 ### Vocabulary
 
@@ -122,8 +124,8 @@ values explain themselves.
 - **Sets.** Every non-disabled project always gets a **no-estate set** of readings (estate `NULL`,
   promotion marker, no targets), plus one set per estate it belongs to. The core scorecard is the
   same whether or not the project joins an estate; the no-estate set is never judged green or red.
-- **Scope** is recorded on each reading: delivery readings follow the marker; test readings (and,
-  in 6.1, security readings) read the branches matched by the branch model, and **every branch when
+- **Scope** is recorded on each reading: delivery readings follow the marker; test readings (and the
+  security readings) read the branches matched by the branch model, and **every branch when
   the matcher is `null`** (no SCM), as findings already does, saying which case applied.
 
 ### The promotion marker with no estate
@@ -151,7 +153,7 @@ values explain themselves.
 `basis = UNKNOWN` always carries one of: `NO_MARKER` (no promotion level, or no slot in the marker
 environment), `NO_SAMPLES` (nothing reached the marker in the window), `NO_TEST_STAMP`,
 `NO_FAILURE` (MTTR with no failure in the window), `NOT_LICENSED` (environment marker without the
-environments licence). 6.1 adds `NO_TARGET`.
+environments licence), and, for the security wave, `NO_TARGET`.
 
 - `NO_FAILURE` is rendered **neutral** ("no failure in window"), not as unknown-grey. MTTR never
   reads 0.
@@ -182,8 +184,8 @@ environments licence). 6.1 adds `NO_TARGET`.
 ### Settings
 
 A core global settings page, "Delivery scorecard", with CasC: default window (90 days), snapshot
-retention (730 days), the job's cron. Estates override the window per reading. 6.1 adds the
-no-estate freshness (7 days).
+retention (730 days), the job's cron. Estates override the window per reading. The security wave adds
+the no-estate freshness (7 days).
 
 ### Slot `FAILED`
 
@@ -277,17 +279,19 @@ Findings are not exported.
 
 mkdocs pages, each added to `nav:` in `ontrack-docs/mkdocs.yml`:
 
-- 6.0: "Delivery scorecard" (readings, sets, basis, the catalogue with exact definitions and
+- Delivery wave: "Delivery scorecard" (readings, sets, basis, the catalogue with exact definitions and
   unknown reasons); "Estates" (licensed); the promotion-level chart docs updated (TTR start); the
   environments pages for `FAILED` and backdating; the migration-notes entries.
-- 6.1: the security readings and the estate view.
+- Security wave: the security readings and the estate view.
 
-## 6.1
+## Security wave
+
+First planned for 6.1, moved to 6.0 on 2026-10-02.
 
 ### Estate security fields
 
 Expected scan kinds (from the findings `kind` enum), freshness N days, remediation targets in days
-for CRITICAL and for HIGH. Added by a 6.1 migration.
+for CRITICAL and for HIGH. Added by a migration of its own, after the estates one.
 
 ### Readings
 
