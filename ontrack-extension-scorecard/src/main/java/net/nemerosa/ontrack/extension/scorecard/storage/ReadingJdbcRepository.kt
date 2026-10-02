@@ -68,6 +68,17 @@ class ReadingJdbcRepository(
             mapOf("projectId" to projectId)
         ) { rs, _ -> toReading(rs) }
 
+    override fun findLatestByEstate(estateId: Int): List<Reading> =
+        namedParameterJdbcTemplate!!.query(
+            """
+                SELECT DISTINCT ON (PROJECT_ID, READING) *
+                FROM SCORECARD_READINGS
+                WHERE ESTATE_ID = :estateId
+                ORDER BY PROJECT_ID, READING, DAY DESC
+            """.trimIndent(),
+            mapOf("estateId" to estateId)
+        ) { rs, _ -> toReading(rs) }
+
     override fun findHistory(estateId: Int?, projectId: Int, key: String, since: LocalDate): List<Reading> =
         namedParameterJdbcTemplate!!.query(
             """

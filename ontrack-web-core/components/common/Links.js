@@ -98,6 +98,22 @@ export function projectScorecardUri(project, set) {
     return `/extension/scorecard/project/${project.id}${set ? `?set=${encodeURIComponent(set)}` : ''}`
 }
 
+/**
+ * The scorecards of the estates: the list of the estates, each linking to its scorecard.
+ */
+export function scorecardsUri() {
+    return '/extension/scorecard/scorecards'
+}
+
+/**
+ * Scorecard of an estate: its projects × its readings.
+ *
+ * @param estate Estate, with its `name`
+ */
+export function estateScorecardUri(estate) {
+    return `/extension/scorecard/estate/${encodeURIComponent(estate.name)}`
+}
+
 export function restPromotionLevelImageUri(promotionLevel) {
     return `/api/protected/images/promotionLevels/${promotionLevel.id}`
 }

@@ -9,6 +9,8 @@ import net.nemerosa.ontrack.extension.findings.model.FindingKind
 import net.nemerosa.ontrack.extension.scorecard.engine.MarkerKind
 import net.nemerosa.ontrack.extension.scorecard.estates.*
 import net.nemerosa.ontrack.extension.scorecard.model.ReadingDirection
+import net.nemerosa.ontrack.extension.scorecard.service.ScorecardService
+import net.nemerosa.ontrack.extension.scorecard.service.ScorecardSet
 import net.nemerosa.ontrack.graphql.schema.GQLType
 import net.nemerosa.ontrack.graphql.schema.GQLTypeCache
 import net.nemerosa.ontrack.graphql.schema.GQLTypeProject
@@ -24,6 +26,7 @@ import org.springframework.stereotype.Component
 @Component
 class GQLTypeEstate(
     private val estateService: EstateService,
+    private val scorecardService: ScorecardService,
 ) : GQLType {
 
     override fun getTypeName(): String = Estate::class.java.simpleName
@@ -75,6 +78,12 @@ class GQLTypeEstate(
                     .description("Projects the estate selects, the ones carrying all its labels, among the ones the user can see")
                     .type(listType(GraphQLTypeReference(GQLTypeProject.PROJECT)))
                     .dataFetcher { env -> estateService.getProjects(env.getSource<Estate>()!!) }
+            }
+            .field {
+                it.name("projectSets")
+                    .description("Readings of the projects of the estate in its set, one set per project, by project name, among the projects the user can see. A project whose readings have not been computed yet has its set, empty.")
+                    .type(listType(GraphQLTypeReference(ScorecardSet::class.java.simpleName)))
+                    .dataFetcher { env -> scorecardService.getEstateSets(env.getSource<Estate>()!!) }
             }
             .build()
 

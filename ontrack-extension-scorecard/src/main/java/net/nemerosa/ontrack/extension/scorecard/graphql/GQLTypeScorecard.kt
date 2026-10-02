@@ -10,6 +10,7 @@ import net.nemerosa.ontrack.extension.scorecard.service.Scorecard
 import net.nemerosa.ontrack.extension.scorecard.service.ScorecardSet
 import net.nemerosa.ontrack.graphql.schema.GQLType
 import net.nemerosa.ontrack.graphql.schema.GQLTypeCache
+import net.nemerosa.ontrack.graphql.schema.GQLTypeProject
 import net.nemerosa.ontrack.graphql.support.listType
 import org.springframework.stereotype.Component
 
@@ -44,6 +45,11 @@ class GQLTypeScorecardSet : GQLType {
                     .description("Name of the set: Project for the set with no estate")
                     .type(GraphQLNonNull(GraphQLString))
                     .dataFetcher { env -> env.getSource<ScorecardSet>()!!.set.name }
+            }
+            .field {
+                it.name(ScorecardSet::project.name)
+                    .description("Project whose readings these are")
+                    .type(GraphQLNonNull(GraphQLTypeReference(GQLTypeProject.PROJECT)))
             }
             .field {
                 it.name("estate")

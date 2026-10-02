@@ -1,0 +1,306 @@
+import {useState} from "react";
+import {gql} from "graphql-request";
+import Link from "next/link";
+import {Alert, Empty, Skeleton, Space, Switch, Tabs, Tooltip, Typography} from "antd";
+import {FaCheck, FaQuestionCircle, FaTimes} from "react-icons/fa";
+import Table from "@components/common/table/Table";
+import {useQuery} from "@components/services/GraphQL";
+import {projectScorecardUri} from "@components/common/Links";
+import {gqlLabelFragment} from "@components/labels/LabelGraphQLFragments";
+import TimestampText from "@components/common/TimestampText";
+import SetExplanation from "@components/extension/scorecard/SetExplanation";
+import SecondaryText from "@components/extension/scorecard/SecondaryText";
+import {
+    formatReadingValue,
+    latestComputedAt,
+    readingJudgement,
+    readingName,
+    targetText,
+    unknownReasonText,
+} from "@components/extension/scorecard/scorecardModel";
+import {
+    estateReadingKeys,
+    estateRows,
+    formatMedian,
+    hasEstimatedReading,
+    PROJECT_SORT_KEY,
+    rollUp,
+    sortEstateRows,
+} from "@components/extension/scorecard/estates/estateViewModel";
+
+export const gqlEstateScorecard = gql`
+    query EstateScorecard($name: String!) {
+        estate(name: $name) {
+            id
+            name
+            description
+            labels {
+                ...labelFragment
+            }
+            marker {
+                kind
+                levelName
+                environment
+                qualifier
+            }
+            readingConfigs {
+                key
+                windowDays
+                target
+                direction
+            }
+            projectSets {
+                project {
+                    id
+                    name
+                }
+                readings {
+                    key
+                    computedAt
+                    value
+                    basis
+                    unknownReason
+                    direction
+                    target
+                    targetMet
+                }
+            }
+        }
+    }
+    ${gqlLabelFragment}
+`
+
+const cellStyle = (background, color) => ({
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 6,
+    padding: '2px 8px',
+    borderRadius: 6,
+    background,
+    color,
+    fontWeight: 600,
+    whiteSpace: 'nowrap',
+})
+
+/**
+ * One reading of one project: its value, coloured by its target and judged by an icon too, so that
+ * the judgement never rests on colour alone. An unknown reading is grey, with its reason on hover
+ * and on focus; a time to restore with no failure in the window is neutral, not unknown.
+ */
+function EstateReadingCell({reading, testId}) {
+    if (!reading) {
+        return (
+            <span data-testid={testId} data-judgement="NONE">
+                <SecondaryText aria-label="Not computed yet" title="Not computed yet">—</SecondaryText>
+            </span>
+        )
+    }
+    const judgement = readingJudgement(reading)
+    const value = formatReadingValue(reading.key, reading.value)
+    let content
+    switch (judgement) {
+        case 'MET':
+            content = <span style={cellStyle('var(--ot-scorecard-met-bg)', 'var(--ot-scorecard-met-text)')}>
+                <FaCheck role="img" aria-label="Met"/>
+                {value}
+            </span>
+            break
+        case 'MISSED':
+            content = <span style={cellStyle('var(--ot-scorecard-missed-bg)', 'var(--ot-scorecard-missed-text)')}>
+                <FaTimes role="img" aria-label="Missed"/>
+                {value}
+            </span>
+            break
+        case 'UNKNOWN': {
+            const reason = unknownReasonText(reading.unknownReason, reading.key)
+            content = <Tooltip title={reason}>
+                <span
+                    tabIndex={0}
+                    aria-label={`Unknown: ${reason}`}
+                    style={{...cellStyle('var(--ot-scorecard-neutral-bg)', 'var(--ot-text)'), fontWeight: 400}}
+                >
+                    <FaQuestionCircle aria-hidden="true"/>
+                    Unknown
+                </span>
+            </Tooltip>
+            break
+        }
+        case 'NO_FAILURE':
+            content = <Tooltip title={unknownReasonText('NO_FAILURE')}>
+                <SecondaryText tabIndex={0} style={{whiteSpace: 'nowrap'}}>No failure</SecondaryText>
+            </Tooltip>
+            break
+        default:
+            content = <span style={{whiteSpace: 'nowrap'}}>{value}</span>
+    }
+    return <span data-testid={testId} data-judgement={judgement}>{content}</span>
+}
+
+/**
+ * The roll-up of one reading over the projects of the estate.
+ */
+function EstateRollUp({readingKey, rows}) {
+    const {median, unknown, missed} = rollUp(rows, readingKey)
+    return (
+        <Space orientation="vertical" size={0} data-testid={`estate-rollup-${readingKey}`}>
+            <Typography.Text strong style={{whiteSpace: 'nowrap'}}>Median {formatMedian(readingKey, median)}</Typography.Text>
+            <SecondaryText style={{fontSize: 12, whiteSpace: 'nowrap'}}>{unknown} unknown</SecondaryText>
+            <SecondaryText style={{fontSize: 12, whiteSpace: 'nowrap'}}>{missed} missed</SecondaryText>
+        </Space>
+    )
+}
+
+/**
+ * The readings of the projects of an estate: one row per project, one column per reading, coloured
+ * by the targets of the estate, with a roll-up row and a sort on every column. Each project links to
+ * its scorecard page, on the set of the estate.
+ */
+function EstateReadingsTable({estate}) {
+
+    const [sort, setSort] = useState({key: PROJECT_SORT_KEY, order: 'ascend'})
+    const [measuredOnly, setMeasuredOnly] = useState(false)
+
+    const projectSets = estate.projectSets ?? []
+    const keys = estateReadingKeys(projectSets)
+    const estimated = hasEstimatedReading(projectSets)
+    const rows = estateRows(projectSets, {measuredOnly: estimated && measuredOnly})
+    const sortedRows = sortEstateRows(rows, sort)
+    const targets = Object.fromEntries((estate.readingConfigs ?? []).map(config => [config.key, config]))
+    const latest = latestComputedAt({sets: projectSets})
+
+    const sortOrder = (key) => sort.key === key ? sort.order : null
+
+    const columns = [
+        {
+            key: PROJECT_SORT_KEY,
+            title: <span data-testid="estate-column-project">Project</span>,
+            fixed: 'left',
+            sorter: true,
+            sortOrder: sortOrder(PROJECT_SORT_KEY),
+            render: (_, row) =>
+                <Link
+                    href={projectScorecardUri(row.project, estate.name)}
+                    data-testid={`estate-project-${row.project.name}`}
+                >
+                    {row.project.name}
+                </Link>,
+        },
+        ...keys.map(key => {
+            const target = targets[key] ? targetText({key, ...targets[key]}) : null
+            return {
+                key,
+                title: <Space orientation="vertical" size={0} data-testid={`estate-column-${key}`}>
+                    <span style={{whiteSpace: 'nowrap'}}>{readingName(key)}</span>
+                    {
+                        target &&
+                        <SecondaryText style={{fontSize: 12, fontWeight: 400, whiteSpace: 'nowrap'}}>{target}</SecondaryText>
+                    }
+                </Space>,
+                sorter: true,
+                sortOrder: sortOrder(key),
+                render: (_, row) =>
+                    <EstateReadingCell
+                        reading={row.readings[key]}
+                        testId={`estate-cell-${row.project.name}-${key}`}
+                    />,
+            }
+        }),
+    ]
+
+    const onChange = (_pagination, _filters, sorter) => {
+        const {columnKey, order} = Array.isArray(sorter) ? sorter[0] : sorter
+        setSort(order ? {key: columnKey, order} : {key: PROJECT_SORT_KEY, order: 'ascend'})
+    }
+
+    return (
+        <Space orientation="vertical" size={16} style={{width: '100%'}}>
+            {
+                estimated &&
+                <Space size={8}>
+                    <Switch
+                        data-testid="estate-measured-only"
+                        checked={measuredOnly}
+                        onChange={setMeasuredOnly}
+                        aria-label="Measured readings only"
+                    />
+                    <Typography.Text>Measured readings only</Typography.Text>
+                </Space>
+            }
+            <Table
+                data-testid="estate-readings"
+                dataSource={sortedRows}
+                columns={columns}
+                rowKey={row => row.project.id}
+                pagination={false}
+                scroll={{x: 'max-content'}}
+                onChange={onChange}
+                showSorterTooltip={false}
+                locale={{emptyText: 'No project in this estate'}}
+                summary={() =>
+                    rows.length > 0 &&
+                    <Table.Summary fixed="top">
+                        <Table.Summary.Row data-testid="estate-rollup">
+                            <Table.Summary.Cell index={0}>
+                                <Typography.Text strong>All projects</Typography.Text>
+                            </Table.Summary.Cell>
+                            {
+                                keys.map((key, index) =>
+                                    <Table.Summary.Cell key={key} index={index + 1}>
+                                        <EstateRollUp readingKey={key} rows={rows}/>
+                                    </Table.Summary.Cell>
+                                )
+                            }
+                        </Table.Summary.Row>
+                    </Table.Summary>
+                }
+            />
+            <SecondaryText style={{fontSize: 12}} data-testid="estate-legend">
+                {latest ? <>Computed <TimestampText value={latest} relative={true}/> · </> : 'Not computed yet · '}
+                latest daily reading of each project in this estate
+            </SecondaryText>
+        </Space>
+    )
+}
+
+/**
+ * The scorecard of an estate: what the estate is, and the readings of its projects, in a tab.
+ *
+ * @param name Name of the estate
+ */
+export default function EstateScorecardView({name}) {
+
+    const {data: estate, finished, error} = useQuery(
+        gqlEstateScorecard,
+        {
+            variables: {name},
+            deps: [name],
+            condition: !!name,
+            dataFn: data => data.estate,
+        }
+    )
+
+    if (!finished) {
+        return <Skeleton active/>
+    }
+    if (error) {
+        return <Alert type="error" showIcon title={error}/>
+    }
+    if (!estate) {
+        return <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={`No estate is named "${name}".`}/>
+    }
+
+    return (
+        <Space orientation="vertical" size={16} style={{width: '100%'}} data-testid="estate-scorecard">
+            <SetExplanation set={{estate}} testId="estate-explanation"/>
+            <Tabs
+                items={[
+                    {
+                        key: 'readings',
+                        label: 'Readings',
+                        children: <EstateReadingsTable estate={estate}/>,
+                    },
+                ]}
+            />
+        </Space>
+    )
+}

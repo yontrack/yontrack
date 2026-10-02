@@ -19,6 +19,11 @@ interface ReadingRepository {
     fun findLatestByProject(projectId: Int): List<Reading>
 
     /**
+     * Latest snapshot of every reading of every project in the set of an estate.
+     */
+    fun findLatestByEstate(estateId: Int): List<Reading>
+
+    /**
      * Daily snapshots of one reading of a project in one set, from [since] included, oldest first.
      *
      * @param estateId Estate of the set, `null` for the no-estate set

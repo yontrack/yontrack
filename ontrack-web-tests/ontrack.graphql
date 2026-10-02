@@ -2157,6 +2157,8 @@ type Estate {
   marker: EstateMarker
   "Unique name of the estate"
   name: String!
+  "Readings of the projects of the estate in its set, one set per project, by project name, among the projects the user can see. A project whose readings have not been computed yet has its set, empty."
+  projectSets: [ScorecardSet!]!
   "Projects the estate selects, the ones carrying all its labels, among the ones the user can see"
   projects: [Project!]!
   "Window override and target of the readings which have one, by reading key"
@@ -6655,6 +6657,8 @@ type ScorecardSet {
   estate: Estate
   "Name of the set: Project for the set with no estate"
   name: String!
+  "Project whose readings these are"
+  project: Project!
   "Latest snapshot of each reading of the set, in the catalogue order. Empty until the readings are computed."
   readings: [Reading!]!
 }

@@ -2,7 +2,10 @@ package net.nemerosa.ontrack.extension.scorecard.service
 
 import net.nemerosa.ontrack.common.Time
 import net.nemerosa.ontrack.extension.scorecard.engine.ReadingSets
+import net.nemerosa.ontrack.extension.scorecard.estates.Estate
+import net.nemerosa.ontrack.extension.scorecard.estates.EstateService
 import net.nemerosa.ontrack.extension.scorecard.job.ScorecardJobs
+import net.nemerosa.ontrack.extension.scorecard.model.EstateReadingSet
 import net.nemerosa.ontrack.extension.scorecard.model.Reading
 import net.nemerosa.ontrack.extension.scorecard.model.ReadingKeys
 import net.nemerosa.ontrack.extension.scorecard.storage.EstateRepository
@@ -25,6 +28,7 @@ class ScorecardServiceImpl(
     private val scorecardJobs: ScorecardJobs,
     private val jobScheduler: JobScheduler,
     private val estateRepository: EstateRepository,
+    private val estateService: EstateService,
 ) : ScorecardService {
 
     override fun getScorecard(project: Project): Scorecard {
@@ -40,6 +44,21 @@ class ScorecardServiceImpl(
                 )
             }
         )
+    }
+
+    override fun getEstateSets(estate: Estate): List<ScorecardSet> {
+        // Licence and project view
+        val projects = estateService.getProjects(estate)
+        val readings = readingRepository.findLatestByEstate(estate.id)
+            .groupBy { it.projectId }
+        val set = EstateReadingSet(estate)
+        return projects.map { project ->
+            ScorecardSet(
+                set = set,
+                project = project,
+                readings = (readings[project.id()] ?: emptyList()).sortedWith(catalogueOrder),
+            )
+        }
     }
 
     override fun getHistory(reading: Reading, days: Int): List<Reading> =

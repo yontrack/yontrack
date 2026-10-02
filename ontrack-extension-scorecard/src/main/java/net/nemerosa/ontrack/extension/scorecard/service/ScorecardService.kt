@@ -1,5 +1,6 @@
 package net.nemerosa.ontrack.extension.scorecard.service
 
+import net.nemerosa.ontrack.extension.scorecard.estates.Estate
 import net.nemerosa.ontrack.extension.scorecard.model.Reading
 import net.nemerosa.ontrack.model.structure.Project
 import java.util.concurrent.CompletableFuture
@@ -11,6 +12,13 @@ interface ScorecardService {
      * A set is listed even when none of its readings has been computed yet.
      */
     fun getScorecard(project: Project): Scorecard
+
+    /**
+     * The set of an estate of each project it selects, among the ones the user can see, by project
+     * name: the latest snapshot of their readings in this set only. A project whose readings have
+     * not been computed yet has its set, empty. Needs the licensed feature of the estates.
+     */
+    fun getEstateSets(estate: Estate): List<ScorecardSet>
 
     /**
      * Daily snapshots of a reading over the last [days] days, oldest first.

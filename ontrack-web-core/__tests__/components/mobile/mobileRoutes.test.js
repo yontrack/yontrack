@@ -118,6 +118,18 @@ describe('mobileEquivalent', () => {
         expect(describeDesktopRoute('/extension/scorecard/estates')).toEqual('the estates')
     })
 
+    it('leaves the estate view desktop-only', () => {
+        // #1910: the estate view is desktop-only in 6.x. The list of the
+        // scorecards and the page of an estate reach the interstitial, under a
+        // name a user can read.
+        expect(mobileEquivalent('/extension/scorecard/scorecards')).toBeNull()
+        expect(isRedirectExempt('/extension/scorecard/scorecards')).toBe(false)
+        expect(describeDesktopRoute('/extension/scorecard/scorecards')).toEqual('the scorecards of the estates')
+        expect(mobileEquivalent('/extension/scorecard/estate/Products')).toBeNull()
+        expect(isRedirectExempt('/extension/scorecard/estate/Products')).toBe(false)
+        expect(describeDesktopRoute('/extension/scorecard/estate/Products')).toEqual("an estate's scorecard")
+    })
+
     it('leaves the rest of the workflows pages to the interstitial', () => {
         // Only the instance page has a mobile screen. The audit page and the
         // definitions do not, and they have to keep reaching the interstitial

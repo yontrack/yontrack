@@ -29,6 +29,7 @@ import {
     FaServer,
     FaSignOutAlt,
     FaStamp,
+    FaTable,
     FaTag,
     FaTags,
     FaUser,
@@ -107,6 +108,7 @@ export default function UserMenu({userMenu}) {
         'extension/tfc/configurations': <TFCIcon/>,
         'extension/github/ingestion/hook-payloads': <FaGithub/>,
         'extension/scorecard/estates': <FaLayerGroup/>,
+        'extension/scorecard/scorecards': <FaTable/>,
     }
 
     useEffect(() => {
