@@ -143,9 +143,7 @@ class FindingQueryServiceImpl(
     }
 
     override fun getRankedFindings(projectIds: Collection<Int>, size: Int, date: LocalDate): List<RankedFinding> {
-        val countingBranchIds = projectIds.distinct()
-            .mapNotNull { projectId -> visibleProject(projectId) }
-            .associate { project -> project.id() to findingStateService.getCountingBranchIds(project) }
+        val countingBranchIds = countingBranchIds(projectIds)
         if (countingBranchIds.isEmpty()) return emptyList()
         return findingRepository.findRankedFindings(
             countingBranchIds = countingBranchIds,
@@ -153,6 +151,33 @@ class FindingQueryServiceImpl(
             size = size.coerceIn(0, FindingQueryService.MAX_RANKED_FINDINGS),
         )
     }
+
+    override fun getSearchedFindings(
+        projectIds: Collection<Int>,
+        text: String,
+        size: Int,
+        date: LocalDate,
+    ): List<RankedFinding> {
+        val searched = text.trim()
+        if (searched.isEmpty()) return emptyList()
+        val countingBranchIds = countingBranchIds(projectIds)
+        if (countingBranchIds.isEmpty()) return emptyList()
+        return findingRepository.findSearchedFindings(
+            countingBranchIds = countingBranchIds,
+            text = searched,
+            date = date,
+            size = size.coerceIn(0, FindingQueryService.MAX_RANKED_FINDINGS),
+        )
+    }
+
+    /**
+     * The branches which count toward the state of the findings, for each of the projects whose
+     * findings the user can see, by project ID.
+     */
+    private fun countingBranchIds(projectIds: Collection<Int>): Map<Int, Set<Int>> =
+        projectIds.distinct()
+            .mapNotNull { projectId -> visibleProject(projectId) }
+            .associate { project -> project.id() to findingStateService.getCountingBranchIds(project) }
 
     override fun findFindingById(id: Int): Finding? =
         findingRepository.findFindingById(id)?.takeIf { canSeeFindings(it.projectId) }

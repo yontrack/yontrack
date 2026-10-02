@@ -1,3 +1,4 @@
+import {useEffect} from "react";
 import {gql} from "graphql-request";
 import Link from "next/link";
 import {Alert, Button, Empty, Input, Skeleton, Space, Tag, theme, Tooltip, Typography} from "antd";
@@ -16,17 +17,34 @@ import {
     rankedFindingProjectsText,
     rankedFindingRows,
     rankedFindingsCaption,
+    searchedFindingsCaption,
 } from "@components/extension/scorecard/estates/estateFanOutModel";
 
 /**
- * Number of ranked findings listed when nothing is searched
+ * Number of ranked findings listed when nothing is searched, and of findings listed for a search
  */
-const RANKED_FINDINGS_SIZE = 20
+const FINDINGS_LIST_SIZE = 20
 
 export const gqlEstateRankedFindings = gql`
     query EstateRankedFindings($name: String!, $size: Int!) {
         estate(name: $name) {
             rankedFindings(size: $size) {
+                externalId
+                title
+                severity
+                openProjects
+                acceptedProjects
+                resolvedProjects
+                firstSeen
+            }
+        }
+    }
+`
+
+export const gqlEstateSearchedFindings = gql`
+    query EstateSearchedFindings($name: String!, $text: String!, $size: Int!) {
+        estate(name: $name) {
+            searchedFindings(text: $text, size: $size) {
                 externalId
                 title
                 severity
@@ -257,34 +275,15 @@ function FanOutResult({externalId, findings}) {
 }
 
 /**
- * The findings open in the most projects of the estate, one row per external ID: a click on a row
- * opens the fan-out of its finding.
+ * Findings of an estate, one row per external ID, with the number of its projects where each is
+ * open, accepted and resolved: a click on a row opens the fan-out of its finding.
+ *
+ * @param rows Rows of the findings, from `rankedFindingRows`
+ * @param caption What the list shows
+ * @param testId Prefix of the test IDs of the list, of its caption and of its rows
+ * @param onSelect Called with the external ID of the finding whose row is clicked
  */
-function RankedFindings({estate, onSelect}) {
-
-    const {data: rankedFindings, finished, error} = useQuery(
-        gqlEstateRankedFindings,
-        {
-            variables: {name: estate.name, size: RANKED_FINDINGS_SIZE},
-            deps: [estate.name],
-            condition: true,
-            dataFn: data => data.estate?.rankedFindings ?? [],
-        }
-    )
-
-    if (!finished) {
-        return <Skeleton active/>
-    } else if (error) {
-        return <Alert type="error" showIcon title={error}/>
-    }
-
-    const rows = rankedFindingRows(rankedFindings)
-    if (rows.length === 0) {
-        return <Empty
-            image={Empty.PRESENTED_IMAGE_SIMPLE}
-            description="No finding is open in the projects of this estate."
-        />
-    }
+function FindingsRankTable({rows, caption, testId, onSelect}) {
 
     const columns = [
         {
@@ -316,7 +315,7 @@ function RankedFindings({estate, onSelect}) {
             key: 'projects',
             title: 'Projects',
             render: (_, row) =>
-                <span data-testid={`estate-ranked-projects-${row.externalId}`} style={{whiteSpace: 'nowrap'}}>
+                <span data-testid={`${testId}-projects-${row.externalId}`} style={{whiteSpace: 'nowrap'}}>
                     {rankedFindingProjectsText(row)}
                 </span>,
         },
@@ -329,11 +328,9 @@ function RankedFindings({estate, onSelect}) {
 
     return (
         <Space orientation="vertical" size={8} style={{width: '100%'}}>
-            <SecondaryText data-testid="estate-ranked-findings-caption">
-                {rankedFindingsCaption(rows.length, RANKED_FINDINGS_SIZE)}
-            </SecondaryText>
+            <SecondaryText data-testid={`${testId}-findings-caption`}>{caption}</SecondaryText>
             <Table
-                data-testid="estate-ranked-findings"
+                data-testid={`${testId}-findings`}
                 size="small"
                 rowKey="key"
                 columns={columns}
@@ -341,7 +338,7 @@ function RankedFindings({estate, onSelect}) {
                 pagination={false}
                 scroll={{x: 'max-content'}}
                 onRow={row => ({
-                    'data-testid': `estate-ranked-finding-${row.externalId}`,
+                    'data-testid': `${testId}-finding-${row.externalId}`,
                     onClick: () => onSelect(row.externalId),
                     style: {cursor: 'pointer'},
                 })}
@@ -351,40 +348,145 @@ function RankedFindings({estate, onSelect}) {
 }
 
 /**
- * The findings fan-out of an estate: one finding, searched by its external ID (a CVE, a rule ID)
- * or picked among the findings open in the most projects of the estate, and the projects of the
- * estate exposed to it, on which branches, since when — among the projects the user can see and
- * whose findings the user is granted the view of.
- *
- * The external ID is kept by the parent — the estate page keeps it in its URL, so that a fan-out
- * can be shared by its link.
+ * The findings open in the most projects of the estate, one row per external ID: a click on a row
+ * opens the fan-out of its finding.
+ */
+function RankedFindings({estate, onSelect}) {
+
+    const {data: rankedFindings, finished, error} = useQuery(
+        gqlEstateRankedFindings,
+        {
+            variables: {name: estate.name, size: FINDINGS_LIST_SIZE},
+            deps: [estate.name],
+            condition: true,
+            dataFn: data => data.estate?.rankedFindings ?? [],
+        }
+    )
+
+    if (!finished) {
+        return <Skeleton active/>
+    } else if (error) {
+        return <Alert type="error" showIcon title={error}/>
+    }
+
+    const rows = rankedFindingRows(rankedFindings)
+    if (rows.length === 0) {
+        return <Empty
+            image={Empty.PRESENTED_IMAGE_SIMPLE}
+            description="No finding is open in the projects of this estate."
+        />
+    }
+
+    return <FindingsRankTable
+        rows={rows}
+        caption={rankedFindingsCaption(rows.length, FINDINGS_LIST_SIZE)}
+        testId="estate-ranked"
+        onSelect={onSelect}
+    />
+}
+
+/**
+ * The findings of the estate whose external ID contains a text, ignoring case, open or not, one row
+ * per external ID, ranked as the ranked findings are: a click on a row opens the fan-out of its
+ * finding. When only one finding is found, its fan-out is opened right away.
  *
  * @param estate Estate, with its `name`
- * @param externalId External ID of the finding whose fan-out is shown, `null` for the ranked findings
- * @param onExternalIdChange Called with the external ID of the finding to show, `null` for the
- * ranked findings
+ * @param text Text searched among the external IDs
+ * @param onSelect Called with the external ID of the finding whose row is clicked
+ * @param onOnlyOne Called with the external ID of the only finding found
  */
-export default function EstateFindingsFanOut({estate, externalId, onExternalIdChange}) {
+function SearchedFindings({estate, text, onSelect, onOnlyOne}) {
+
+    const {data: searchedFindings, finished, error} = useQuery(
+        gqlEstateSearchedFindings,
+        {
+            variables: {name: estate.name, text, size: FINDINGS_LIST_SIZE},
+            deps: [estate.name, text],
+            condition: true,
+            dataFn: data => data.estate?.searchedFindings ?? [],
+        }
+    )
+
+    const rows = finished && !error ? rankedFindingRows(searchedFindings) : []
+    const onlyOne = rows.length === 1 ? rows[0].externalId : null
+
+    // Opening the fan-out is a change of the state of the page, kept by its parent: not while
+    // rendering. Once per finding found, whatever the identity of the callback, recreated by each
+    // render of the parent.
+    useEffect(() => {
+        if (onlyOne) {
+            onOnlyOne(onlyOne)
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [onlyOne])
+
+    if (!finished || onlyOne) {
+        return <Skeleton active/>
+    } else if (error) {
+        return <Alert type="error" showIcon title={error}/>
+    } else if (rows.length === 0) {
+        return <Empty
+            image={Empty.PRESENTED_IMAGE_SIMPLE}
+            description={`No finding of this estate has an external ID containing "${text}".`}
+        />
+    }
+
+    return <FindingsRankTable
+        rows={rows}
+        caption={searchedFindingsCaption(rows.length, FINDINGS_LIST_SIZE, text)}
+        testId="estate-searched"
+        onSelect={onSelect}
+    />
+}
+
+/**
+ * The findings fan-out of an estate: one finding, picked among the findings open in the most
+ * projects of the estate, or among the ones whose external ID (a CVE, a rule ID) contains the text
+ * searched, ignoring case, and the projects of the estate exposed to it, on which branches, since
+ * when — among the projects the user can see and whose findings the user is granted the view of.
+ *
+ * The finding and the search are kept by the parent — the estate page keeps them in its URL, so
+ * that a fan-out or a search can be shared by its link.
+ *
+ * @param estate Estate, with its `name`
+ * @param finding External ID of the finding whose fan-out is shown, `null` for none
+ * @param search Text searched among the external IDs, `null` for the ranked findings. Kept with the
+ * finding picked among its results, to go back to them.
+ * @param onChange Called with the new `{finding, search}`
+ */
+export default function EstateFindingsFanOut({estate, finding = null, search = null, onChange}) {
 
     const {data: findings, finished, error} = useQuery(
         gqlEstateFindingsFanOut,
         {
-            variables: {name: estate.name, externalId},
-            deps: [estate.name, externalId],
-            condition: !!externalId,
+            variables: {name: estate.name, externalId: finding},
+            deps: [estate.name, finding],
+            condition: !!finding,
             dataFn: data => data.estate?.findings ?? [],
         }
     )
 
     let result
-    if (!externalId) {
-        result = <RankedFindings estate={estate} onSelect={onExternalIdChange}/>
-    } else if (!finished) {
-        result = <Skeleton active/>
-    } else if (error) {
-        result = <Alert type="error" showIcon title={error}/>
+    if (finding) {
+        if (!finished) {
+            result = <Skeleton active/>
+        } else if (error) {
+            result = <Alert type="error" showIcon title={error}/>
+        } else {
+            result = <FanOutResult externalId={finding} findings={findings ?? []}/>
+        }
+    } else if (search) {
+        result = <SearchedFindings
+            // A new search is a new list: not the rows of the previous one while it loads
+            key={search}
+            estate={estate}
+            text={search}
+            onSelect={externalId => onChange({finding: externalId, search})}
+            // The only finding found replaces its search: going back to it would open it again
+            onOnlyOne={externalId => onChange({finding: externalId, search: null})}
+        />
     } else {
-        result = <FanOutResult externalId={externalId} findings={findings ?? []}/>
+        result = <RankedFindings estate={estate} onSelect={externalId => onChange({finding: externalId, search: null})}/>
     }
 
     return (
@@ -394,36 +496,46 @@ export default function EstateFindingsFanOut({estate, externalId, onExternalIdCh
                   * `data-testid` on an antd 6 `Input.Search` lands on its `Space.Compact` wrapper,
                   * not on the `<input>`: a test types into the searchbox inside it.
                   *
-                  * Keyed by the external ID, so that it says the finding shown when it is picked
-                  * elsewhere than in it — a row of the ranked findings, the URL.
+                  * Keyed by what it shows, so that it says the finding shown when it is picked
+                  * elsewhere than in it — a row of the findings, the URL.
                   */}
                 <Input.Search
-                    key={externalId ?? ''}
+                    key={finding ?? search ?? ''}
                     data-testid="estate-fanout-search"
                     style={{maxWidth: 420}}
                     allowClear
                     enterButton="Search"
-                    aria-label="External ID of the finding"
-                    placeholder="External ID, like CVE-2021-44228"
-                    defaultValue={externalId ?? ''}
-                    onSearch={value => onExternalIdChange(fanOutExternalId(value))}
+                    aria-label="External ID of the finding, or part of it"
+                    placeholder="External ID or part of it, like CVE-2021-44228 or csrf"
+                    defaultValue={finding ?? search ?? ''}
+                    onSearch={value => onChange({finding: null, search: fanOutExternalId(value)})}
                 />
                 {
-                    externalId &&
+                    finding && search &&
+                    <Button
+                        type="link"
+                        data-testid="estate-fanout-back-search"
+                        onClick={() => onChange({finding: null, search})}
+                    >
+                        {`Findings containing "${search}"`}
+                    </Button>
+                }
+                {
+                    (finding || search) &&
                     <Button
                         type="link"
                         data-testid="estate-fanout-back"
-                        onClick={() => onExternalIdChange(null)}
+                        onClick={() => onChange({finding: null, search: null})}
                     >
                         All open findings
                     </Button>
                 }
             </Space>
             {
-                !externalId &&
+                !finding && !search &&
                 <SecondaryText>
-                    Search a finding by its external ID, like a CVE or a rule ID, or pick one below, to see the
-                    projects of this estate exposed to it, on which branches, and since when.
+                    Search a finding by its external ID, like a CVE or a rule ID, or by a part of it, or pick one
+                    below, to see the projects of this estate exposed to it, on which branches, and since when.
                 </SecondaryText>
             }
             {result}

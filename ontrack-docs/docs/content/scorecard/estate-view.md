@@ -28,9 +28,10 @@ The page of an estate, at `/extension/scorecard/estate/<name>`, says what the es
 description, its marker and its labels — and has two tabs: **Readings**, the default one, and
 **Findings fan-out**.
 
-The address of the page keeps the tab and the finding searched, so that a fan-out is shared by its
-link: `/extension/scorecard/estate/<name>?tab=fanout&finding=CVE-2024-38816` opens the fan-out of
-`CVE-2024-38816`, and a reload lands on the same fan-out.
+The address of the page keeps the tab, the finding and the text searched, so that a fan-out or a
+search is shared by its link: `/extension/scorecard/estate/<name>?tab=fanout&finding=CVE-2024-38816`
+opens the fan-out of `CVE-2024-38816`, `?tab=fanout&search=cve-2024` the findings whose external ID
+contains `cve-2024`, and a reload lands on the same page.
 
 ### Readings
 
@@ -103,17 +104,29 @@ project reported it with — then by external ID. Each row gives:
 * when it was **first seen**, in any of these projects.
 
 The list stops at the 20 most widespread findings. A click on a row opens the fan-out of its
-finding, as searching its external ID does; *All open findings* goes back to the list.
+finding; *All open findings* goes back to the list.
 
 ![The most widespread findings of an estate](estate-ranked-findings.png)
 
 Above, the findings open in the demo's *Demo products* estate: each is open in one project only, so
 the `HIGH` comes first — `CVE-2024-38816`, also accepted in a second project and resolved in a third.
 
-#### The fan-out of a finding
+#### Searching a finding
 
-The search box looks for one finding by its external ID — a CVE, a rule ID — as the scanner gives
-it.
+The search box looks for the findings whose external ID — a CVE, a rule ID — contains the text
+typed, ignoring case: `38816`, `cve-2024` or `csrf` work as well as the whole external ID. The
+findings found may be open, accepted or resolved in the projects of the estate:
+
+* when only one external ID contains the text, its fan-out opens right away;
+* else, they are listed as the most widespread findings are, and ranked the same way. The list
+  stops at 20 findings, and then asks for more of the external ID. A click on a row opens the
+  fan-out of its finding, from which *Findings containing "…"* goes back to the list;
+* when none does, the tab says so.
+
+In the demo's *Demo products* estate, `csrf` opens the fan-out of
+`java/spring-disabled-csrf-protection`, and `cve-2024` lists four findings.
+
+#### The fan-out of a finding
 
 The finding is given with its title and a link to its description, and a summary: *3 projects of
 this estate report CVE-2024-38816: exposed in 1, accepted in 1, resolved in 1* — each project counted
@@ -157,8 +170,9 @@ The estate view is on the desktop UI only: the [mobile UI](../mobile/index.md) d
 
 In GraphQL, `Estate.projectSets` gives the set of the estate of each of its projects — the readings
 the estate page shows — `Estate.rankedFindings(size)` the findings open in its projects, the most
-widespread first, and `Estate.findings(externalId)` the findings of an external ID among its
-projects:
+widespread first, `Estate.searchedFindings(text, size)` the findings whose external ID contains a
+text, ranked the same way, and `Estate.findings(externalId)` the findings of an external ID among
+its projects:
 
 ```graphql
 {
@@ -176,6 +190,12 @@ projects:
       resolvedProjects
       firstSeen
     }
+    searchedFindings(text: "cve-2024", size: 10) {
+      externalId
+      openProjects
+      acceptedProjects
+      resolvedProjects
+    }
     findings(externalId: "CVE-2024-38816") {
       project { name }
       location
@@ -191,7 +211,9 @@ projects:
 
 `rankedFindings` returns 20 findings unless `size` says otherwise, and never more than 100: the
 ranking is computed by the database over all the findings of the estate, and only its top is
-returned.
+returned. `searchedFindings` is bounded the same way; its text is matched ignoring case, its `%` and `_`
+matching themselves, and a blank one finds nothing. `findings(externalId)` takes the whole external
+ID, as stored.
 
 `counts` says whether the branch of an exposure counts toward the state of the finding in its
 project — the `state` of the finding is rolled up from these branches only.

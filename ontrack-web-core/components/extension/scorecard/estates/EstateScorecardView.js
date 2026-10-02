@@ -317,15 +317,22 @@ function EstateReadingsTable({estate}) {
  * The scorecard of an estate: what the estate is, the readings of its projects in a tab, and the
  * fan-out of one finding over its projects in another.
  *
- * Its tab and the finding searched are kept by the page, in its URL, so that a fan-out can be
- * shared by its link — see `estatePageState`.
+ * Its tab, the finding shown and the text searched are kept by the page, in its URL, so that a
+ * fan-out or a search can be shared by its link — see `estatePageState`.
  *
  * @param name Name of the estate
  * @param tab Tab shown, the readings by default
  * @param finding External ID of the finding whose fan-out is shown, `null` for none
- * @param onChange Called with the new `{tab, finding}` when the user changes the one or the other
+ * @param search Text searched among the external IDs of the findings, `null` for none
+ * @param onChange Called with the new `{tab, finding, search}` when the user changes any of them
  */
-export default function EstateScorecardView({name, tab = ESTATE_TAB_READINGS, finding = null, onChange = () => {}}) {
+export default function EstateScorecardView({
+                                                name,
+                                                tab = ESTATE_TAB_READINGS,
+                                                finding = null,
+                                                search = null,
+                                                onChange = () => {},
+                                            }) {
 
     const {data: estate, finished, error} = useQuery(
         gqlEstateScorecard,
@@ -352,7 +359,7 @@ export default function EstateScorecardView({name, tab = ESTATE_TAB_READINGS, fi
             <SetExplanation set={{estate}} testId="estate-explanation"/>
             <Tabs
                 activeKey={tab}
-                onChange={key => onChange({tab: key, finding})}
+                onChange={key => onChange({tab: key, finding, search})}
                 items={[
                     {
                         key: ESTATE_TAB_READINGS,
@@ -364,8 +371,9 @@ export default function EstateScorecardView({name, tab = ESTATE_TAB_READINGS, fi
                         label: 'Findings fan-out',
                         children: <EstateFindingsFanOut
                             estate={estate}
-                            externalId={finding}
-                            onExternalIdChange={externalId => onChange({tab: ESTATE_TAB_FANOUT, finding: externalId})}
+                            finding={finding}
+                            search={search}
+                            onChange={state => onChange({tab: ESTATE_TAB_FANOUT, ...state})}
                         />,
                     },
                 ]}

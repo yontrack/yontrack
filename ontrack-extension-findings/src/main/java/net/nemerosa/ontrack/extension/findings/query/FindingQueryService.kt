@@ -96,6 +96,24 @@ interface FindingQueryService {
     ): List<RankedFinding>
 
     /**
+     * The external IDs of the findings of the given projects containing a text, ignoring case,
+     * whatever their state: open, accepted or resolved. Ranked as [getRankedFindings] ranks them.
+     *
+     * @param projectIds IDs of the projects to look into. The projects whose findings the user
+     * cannot see are left out.
+     * @param text Text the external IDs contain, trimmed. A blank one finds nothing. The LIKE
+     * wildcards in it match themselves.
+     * @param size Maximum number of external IDs to return, at most [MAX_RANKED_FINDINGS]
+     * @param date Day against which the expiry of the acceptances is evaluated
+     */
+    fun getSearchedFindings(
+        projectIds: Collection<Int>,
+        text: String,
+        size: Int = DEFAULT_RANKED_FINDINGS,
+        date: LocalDate = Time.now.toLocalDate(),
+    ): List<RankedFinding>
+
+    /**
      * Finding by ID, `null` when it does not exist or cannot be seen.
      */
     fun findFindingById(id: Int): Finding?

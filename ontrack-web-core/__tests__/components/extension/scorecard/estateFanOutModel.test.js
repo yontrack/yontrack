@@ -6,6 +6,7 @@ import {
     rankedFindingProjectsText,
     rankedFindingRows,
     rankedFindingsCaption,
+    searchedFindingsCaption,
 } from "@components/extension/scorecard/estates/estateFanOutModel";
 
 const branch = (id, name) => ({id, name})
@@ -214,5 +215,19 @@ describe('The ranked findings of an estate', () => {
     it('says how many findings are open in the estate when they are all listed', () => {
         expect(rankedFindingsCaption(1, 20)).toBe('1 finding open in this estate')
         expect(rankedFindingsCaption(3, 20)).toBe('3 findings open in this estate, the most widespread first')
+    })
+})
+
+describe('The caption of the findings found by a search', () => {
+
+    it('asks for more of the external ID when the list is as long as asked for', () => {
+        expect(searchedFindingsCaption(20, 20, 'cve'))
+            .toBe('The first 20 findings whose external ID contains "cve": type more of it to narrow the search')
+    })
+
+    it('says how many findings were found when they are all listed', () => {
+        expect(searchedFindingsCaption(1, 20, 'cve-2024')).toBe('1 finding whose external ID contains "cve-2024"')
+        expect(searchedFindingsCaption(3, 20, 'cve-2024'))
+            .toBe('3 findings whose external ID contains "cve-2024", the most widespread first')
     })
 })

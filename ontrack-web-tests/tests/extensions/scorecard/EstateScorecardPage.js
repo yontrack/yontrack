@@ -117,12 +117,27 @@ export class EstateScorecardPage {
     }
 
     /**
-     * Searches the fan-out of a finding by its external ID.
+     * Searches the findings by their external ID, or a part of it: the fan-out of the only one found,
+     * else the list of the ones found.
      */
-    async searchFinding(externalId) {
+    async searchFinding(text) {
         const input = this.page.getByTestId('estate-fanout-search').getByRole('searchbox')
-        await input.fill(externalId)
+        await input.fill(text)
         await input.press('Enter')
+    }
+
+    /**
+     * External IDs of the findings found by a search, the most widespread first.
+     */
+    async searchedFindingIds() {
+        await expect(this.page.getByTestId('estate-searched-findings')).toBeVisible()
+        const rows = this.page.getByTestId(/^estate-searched-finding-/)
+        const ids = await rows.evaluateAll(elements => elements.map(it => it.getAttribute('data-testid')))
+        return ids.map(it => it.substring('estate-searched-finding-'.length))
+    }
+
+    searchedFinding(externalId) {
+        return this.page.getByTestId(`estate-searched-finding-${externalId}`)
     }
 
     /**

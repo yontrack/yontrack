@@ -145,24 +145,28 @@ const ESTATE_TABS = [ESTATE_TAB_READINGS, ESTATE_TAB_FANOUT]
 const single = (value) => Array.isArray(value) ? value[0] : value
 
 /**
- * The state of the estate page from the query of its URL — `?tab=fanout&finding=CVE-2024-38816` —
- * so that a fan-out can be shared by its link: its tab, the readings by default, and the external ID
- * of the finding searched, trimmed, `null` when there is none.
+ * The state of the estate page from the query of its URL — `?tab=fanout&finding=CVE-2024-38816`, or
+ * `?tab=fanout&search=cve-2024` — so that a fan-out or a search can be shared by its link: its tab,
+ * the readings by default, the external ID of the finding whose fan-out is shown, and the text
+ * searched among the external IDs — each trimmed, `null` when there is none.
+ *
+ * A finding picked among the results of a search keeps the search, to go back to its results.
  */
 export function estatePageState(query = {}) {
     const tab = single(query?.tab)
-    const finding = single(query?.finding)
     return {
         tab: ESTATE_TABS.includes(tab) ? tab : ESTATE_TAB_READINGS,
-        finding: fanOutExternalId(finding),
+        finding: fanOutExternalId(single(query?.finding)),
+        search: fanOutExternalId(single(query?.search)),
     }
 }
 
 /**
  * The query of the URL from the state of the estate page: the tab when it is not the default one,
- * and the finding searched, whatever the tab, so that going back to the fan-out finds it again.
+ * and the finding and the text searched, whatever the tab, so that going back to the fan-out finds
+ * them again.
  */
-export function estatePageQuery({tab, finding} = {}) {
+export function estatePageQuery({tab, finding, search} = {}) {
     const query = {}
     if (tab && tab !== ESTATE_TAB_READINGS) {
         query.tab = tab
@@ -170,6 +174,10 @@ export function estatePageQuery({tab, finding} = {}) {
     const externalId = fanOutExternalId(finding)
     if (externalId) {
         query.finding = externalId
+    }
+    const text = fanOutExternalId(search)
+    if (text) {
+        query.search = text
     }
     return query
 }

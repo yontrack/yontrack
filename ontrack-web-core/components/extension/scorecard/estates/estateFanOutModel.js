@@ -5,7 +5,8 @@
 import {FINDING_SEVERITIES} from "@components/extension/findings/findingsModel";
 
 /**
- * The external ID to look for, from what the user typed: trimmed, `null` when blank.
+ * The external ID, or the part of it, to look for, from what the user typed: trimmed, `null` when
+ * blank.
  */
 export function fanOutExternalId(text) {
     const value = typeof text === 'string' ? text.trim() : ''
@@ -181,5 +182,23 @@ export function rankedFindingsCaption(count, size) {
         return '1 finding open in this estate'
     } else {
         return `${count} findings open in this estate, the most widespread first`
+    }
+}
+
+/**
+ * What the list of the findings found by a search shows: the top of them when it is as long as
+ * asked for, which asks for more of the external ID, else every finding found.
+ *
+ * @param count Number of findings listed
+ * @param size Number of findings asked for
+ * @param text Text searched among the external IDs
+ */
+export function searchedFindingsCaption(count, size, text) {
+    if (count >= size) {
+        return `The first ${size} findings whose external ID contains "${text}": type more of it to narrow the search`
+    } else if (count === 1) {
+        return `1 finding whose external ID contains "${text}"`
+    } else {
+        return `${count} findings whose external ID contains "${text}", the most widespread first`
     }
 }

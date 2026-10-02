@@ -13,9 +13,9 @@ import {estatePageQuery, estatePageState} from "@components/extension/scorecard/
 export default function EstateScorecardPage() {
     const router = useRouter()
     const {name} = router.query
-    const {tab, finding} = estatePageState(router.query)
+    const {tab, finding, search} = estatePageState(router.query)
 
-    // The tab and the finding searched are in the URL, so that a fan-out can be shared by its link -
+    // The tab, the finding and the search are in the URL, so that a fan-out or a search can be shared by its link -
     // replaced, not pushed, without a full navigation: changing them is not a navigation to go back from
     const onChange = (state) => {
         router.replace(
@@ -36,7 +36,7 @@ export default function EstateScorecardPage() {
                 <CloseCommand key="close" href={scorecardsUri()}/>,
             ]}
         >
-            <EstateScorecardView name={name} tab={tab} finding={finding} onChange={onChange}/>
+            <EstateScorecardView name={name} tab={tab} finding={finding} search={search} onChange={onChange}/>
         </StandardPage>
     )
 }

@@ -135,9 +135,42 @@ class FindingJdbcRepository(
         date: LocalDate,
         size: Int,
     ): List<RankedFinding> {
-        val branchIds = countingBranchIds.values.flatten().distinct()
         // Without any branch which counts, no finding is open
-        if (branchIds.isEmpty() || size <= 0) return emptyList()
+        if (countingBranchIds.values.all { it.isEmpty() }) return emptyList()
+        return rankFindings(countingBranchIds, text = null, date = date, size = size)
+    }
+
+    override fun findSearchedFindings(
+        countingBranchIds: Map<Int, Set<Int>>,
+        text: String,
+        date: LocalDate,
+        size: Int,
+    ): List<RankedFinding> =
+        if (countingBranchIds.isEmpty() || text.isBlank()) {
+            emptyList()
+        } else {
+            rankFindings(countingBranchIds, text = text, date = date, size = size)
+        }
+
+    /**
+     * The external IDs of the findings of some projects, ranked by the number of these projects in
+     * which they are open, then by severity, then by external ID.
+     *
+     * @param text `null` for the findings open in at least one of the projects, else the text the
+     * external IDs of the findings contain, ignoring case, whatever their state
+     */
+    private fun rankFindings(
+        countingBranchIds: Map<Int, Set<Int>>,
+        text: String?,
+        date: LocalDate,
+        size: Int,
+    ): List<RankedFinding> {
+        if (size <= 0) return emptyList()
+        // No branch ID is -1: a project without any branch which counts has none of its findings
+        // open or accepted, which a search must still find, resolved
+        val branchIds = countingBranchIds.values.flatten().distinct().ifEmpty { listOf(-1) }
+        val searched = if (text != null) "AND F.EXTERNAL_ID ILIKE :pattern ESCAPE '\\'" else ""
+        val ranked = if (text != null) "" else "HAVING COUNT(*) FILTER (WHERE STATE_RANK = $STATE_OPEN) > 0"
         // State of each finding on the branches which count, as FindingState rolls it up: open as soon
         // as one of its exposures is, else accepted as soon as one is, else resolved, including
         // when it has no exposure there. Then each project counted once per external ID, by its
@@ -154,7 +187,7 @@ class FindingJdbcRepository(
                            END AS STATE_RANK
                     FROM FINDINGS F
                     LEFT JOIN FINDING_EXPOSURES E ON E.FINDING_ID = F.ID AND E.BRANCH_ID IN (:branchIds)
-                    WHERE F.PROJECT_ID IN (:projectIds)
+                    WHERE F.PROJECT_ID IN (:projectIds) $searched
                     GROUP BY F.ID
                 ),
                 PROJECT_STATES AS (
@@ -169,7 +202,7 @@ class FindingJdbcRepository(
                            COUNT(*) FILTER (WHERE STATE_RANK = $STATE_RESOLVED) AS RESOLVED_PROJECTS
                     FROM PROJECT_STATES
                     GROUP BY EXTERNAL_ID
-                    HAVING COUNT(*) FILTER (WHERE STATE_RANK = $STATE_OPEN) > 0
+                    $ranked
                 ),
                 DETAILS AS (
                     SELECT EXTERNAL_ID,
@@ -192,6 +225,7 @@ class FindingJdbcRepository(
                 .addValue("branchIds", branchIds)
                 .addValue("date", date, java.sql.Types.DATE)
                 .addValue("size", size)
+                .addValue("pattern", text?.let { "%${likeEscape(it)}%" })
         ) { rs, _ ->
             RankedFinding(
                 externalId = rs.getString("EXTERNAL_ID"),
@@ -390,6 +424,12 @@ class FindingJdbcRepository(
     )
 
     companion object {
+
+        /**
+         * A text matching itself in a LIKE pattern escaped by a backslash.
+         */
+        private fun likeEscape(text: String): String =
+            text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
         /**
          * Rank of the maximum severity of a finding, its index in [FindingSeverity]: the most

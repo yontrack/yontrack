@@ -135,12 +135,42 @@ class GQLTypeEstate(
                         )
                     }
             }
+            .field {
+                it.name("searchedFindings")
+                    .description(
+                        "Security findings of the projects of the estate whose external ID contains the given text, ignoring " +
+                                "case, one per external ID, open, accepted or resolved, ranked as the rankedFindings are: by the " +
+                                "number of projects of the estate in which they are open, then by severity, the highest first, " +
+                                "then by external ID. A blank text finds nothing. Only the projects the user can see, and whose " +
+                                "findings the user is granted the view of, are searched."
+                    )
+                    .argument(stringArgument(ARG_TEXT, "Text the external IDs contain, ignoring case", nullable = false))
+                    .argument(
+                        intArgument(
+                            ARG_SIZE,
+                            "Maximum number of findings to return, at most ${FindingQueryService.MAX_RANKED_FINDINGS}",
+                            defaultValue = FindingQueryService.DEFAULT_RANKED_FINDINGS,
+                        )
+                    )
+                    .type(listType(GraphQLTypeReference(RankedFinding::class.java.simpleName)))
+                    .dataFetcher { env ->
+                        val estate: Estate = env.getSource()!!
+                        val text: String = env.getArgument(ARG_TEXT)!!
+                        val size: Int = env.getArgument(ARG_SIZE) ?: FindingQueryService.DEFAULT_RANKED_FINDINGS
+                        findingQueryService.getSearchedFindings(
+                            projectIds = estateService.getProjects(estate).map { project -> project.id() },
+                            text = text,
+                            size = size,
+                        )
+                    }
+            }
             .build()
 
     companion object {
         const val ESTATE_MARKER = "EstateMarker"
         private const val ARG_EXTERNAL_ID = "externalId"
         private const val ARG_SIZE = "size"
+        private const val ARG_TEXT = "text"
     }
 }
 

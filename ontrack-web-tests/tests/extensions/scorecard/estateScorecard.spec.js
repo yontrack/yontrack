@@ -264,7 +264,7 @@ test('estate view: the fan-out of one finding over the projects of the estate', 
         // An external ID no project of the estate reports
         const unknown = generate('CVE-NONE-')
         await estatePage.searchFinding(unknown)
-        await expect(page.getByText(`No project of this estate reports ${unknown}.`)).toBeVisible()
+        await expect(page.getByText(`No finding of this estate has an external ID containing "${unknown}".`)).toBeVisible()
     } finally {
         await deleteEstate(ontrack, estate)
     }
@@ -327,6 +327,66 @@ test('estate view: the most widespread findings, the fan-out of the top one, and
         await page.getByTestId('estate-fanout-back').click()
         expect(await estatePage.rankedFindingIds()).toEqual([widespread, single])
         await expect(page).toHaveURL(/\?tab=fanout$/)
+    } finally {
+        await deleteEstate(ontrack, estate)
+    }
+})
+
+test('estate view: a part of an external ID, in any case, finds the findings containing it', async ({page, ontrack}) => {
+    test.skip(!(await isScorecardLicensed(ontrack)), 'The licence does not allow the estates')
+
+    const prefix = generate('CVE-PART-')
+    const widespread = `${prefix}-1`
+    const single = `${prefix}-2`
+    const rule = `${generate('java/')}-disabled-csrf-protection`
+    const label = await ontrack.labels().createLabel()
+
+    const first = await ontrack.createProject(generate('a-first-'))
+    await ontrack.labels().setProjectLabels(first.id, [label.id])
+    const firstMain = await first.createBranch("main")
+    await scanWithFindings(firstMain, await createFindingsValidationStamp(firstMain, "SECURITY.IMAGE"), [
+        finding({externalId: widespread, title: "Widespread weakness"}),
+        finding({externalId: single, title: "Single weakness"}),
+        finding({externalId: rule, title: "Disabled Spring CSRF protection"}),
+    ])
+    const second = await ontrack.createProject(generate('b-second-'))
+    await ontrack.labels().setProjectLabels(second.id, [label.id])
+    const secondMain = await second.createBranch("main")
+    await scanWithFindings(secondMain, await createFindingsValidationStamp(secondMain, "SECURITY.IMAGE"), [
+        finding({externalId: widespread, title: "Widespread weakness"}),
+    ])
+
+    const estate = await createEstate(ontrack, {
+        name: generate('estate-'),
+        labels: [`${label.category}:${label.name}`],
+    })
+    try {
+        await login(page, ontrack)
+        const estatePage = new EstateScorecardPage(page, ontrack, estate.name)
+        await estatePage.goTo()
+        await estatePage.openFanOut()
+
+        // A part of the external ID, in lower case: the findings containing it, kept in the URL
+        const text = prefix.toLowerCase()
+        await estatePage.searchFinding(text)
+        expect(await estatePage.searchedFindingIds()).toEqual([widespread, single])
+        await expect(page).toHaveURL(new RegExp(`\\?tab=fanout&search=${text}$`))
+
+        // Reloaded, the page lands on the same findings
+        await page.reload()
+        expect(await estatePage.searchedFindingIds()).toEqual([widespread, single])
+
+        // A click on one opens its fan-out, and the findings found are one click away
+        await estatePage.searchedFinding(single).click()
+        expect(await estatePage.fanOutProjectNames()).toEqual([first.name])
+        await page.getByTestId('estate-fanout-back-search').click()
+        expect(await estatePage.searchedFindingIds()).toEqual([widespread, single])
+
+        // A part of only one external ID opens its fan-out, by its external ID as stored
+        await estatePage.searchFinding('Disabled-CSRF')
+        expect(await estatePage.fanOutProjectNames()).toEqual([first.name])
+        await expect(estatePage.fanOutSearch()).toHaveValue(rule)
+        await expect(page).toHaveURL(new RegExp(`\\?tab=fanout&finding=${encodeURIComponent(rule)}$`))
     } finally {
         await deleteEstate(ontrack, estate)
     }

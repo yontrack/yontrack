@@ -4,6 +4,7 @@ import {fireEvent, render, screen, waitFor, within} from "@testing-library/react
 import EstateFindingsFanOut, {
     gqlEstateFindingsFanOut,
     gqlEstateRankedFindings,
+    gqlEstateSearchedFindings,
 } from "@components/extension/scorecard/estates/EstateFindingsFanOut"
 
 Object.defineProperty(window, 'matchMedia', {
@@ -90,42 +91,52 @@ const defaultRanked = [
 ]
 
 /**
- * `useQuery` answering the ranked findings when nothing is searched, and the findings of the
- * external ID once a search has been made.
+ * `useQuery` answering the ranked findings when nothing is searched, the ones whose external ID
+ * contains the text searched, ignoring case, and the findings of the external ID of a fan-out.
+ *
+ * @param searchedFindings The findings a search finds, whatever the text, instead of the ranked
+ * findings containing it
  */
-const mockFindings = (findings = defaultFindings, rankedFindings = defaultRanked) => {
-    mockUseQuery.mockImplementation((query, {condition}) => {
+const mockFindings = (findings = defaultFindings, rankedFindings = defaultRanked, searchedFindings = null) => {
+    mockUseQuery.mockImplementation((query, {condition, variables}) => {
         if (!condition) {
             return {data: null, loading: false, finished: false, error: null}
         } else if (query === gqlEstateFindingsFanOut) {
             return {data: findings, loading: false, finished: true, error: null}
         } else if (query === gqlEstateRankedFindings) {
             return {data: rankedFindings, loading: false, finished: true, error: null}
+        } else if (query === gqlEstateSearchedFindings) {
+            const found = searchedFindings ?? rankedFindings.filter(it =>
+                it.externalId.toLowerCase().includes(variables.text.toLowerCase())
+            )
+            return {data: found, loading: false, finished: true, error: null}
         } else {
             throw new Error('Unexpected query')
         }
     })
 }
 
-const mockOnExternalIdChange = jest.fn()
+const mockOnChange = jest.fn()
 
 /**
- * The fan-out, its external ID kept by its parent, as the estate page keeps it in its URL.
+ * The fan-out, its finding and its search kept by its parent, as the estate page keeps them in its
+ * URL.
  */
-function FanOut({initial = null}) {
-    const [externalId, setExternalId] = useState(initial)
-    const onExternalIdChange = (value) => {
-        mockOnExternalIdChange(value)
-        setExternalId(value)
+function FanOut({initial}) {
+    const [state, setState] = useState(initial)
+    const onChange = (value) => {
+        mockOnChange(value)
+        setState(value)
     }
     return <EstateFindingsFanOut
         estate={{name: 'Products'}}
-        externalId={externalId}
-        onExternalIdChange={onExternalIdChange}
+        finding={state.finding}
+        search={state.search}
+        onChange={onChange}
     />
 }
 
-const renderFanOut = (initial = null) => render(<FanOut initial={initial}/>)
+const renderFanOut = ({finding = null, search = null} = {}) => render(<FanOut initial={{finding, search}}/>)
 
 const search = (text) => {
     const input = within(screen.getByTestId('estate-fanout-search')).getByRole('searchbox')
@@ -141,7 +152,7 @@ const lastQueryOptions = (query = gqlEstateFindingsFanOut) =>
 
 beforeEach(() => {
     mockUseQuery.mockReset()
-    mockOnExternalIdChange.mockReset()
+    mockOnChange.mockReset()
 })
 
 describe('The findings fan-out of an estate', () => {
@@ -177,7 +188,7 @@ describe('The findings fan-out of an estate', () => {
         mockFindings()
         renderFanOut()
         fireEvent.click(screen.getByRole('button', {name: 'CVE-2021-44228'}))
-        expect(mockOnExternalIdChange).toHaveBeenCalledWith('CVE-2021-44228')
+        expect(mockOnChange).toHaveBeenCalledWith({finding: 'CVE-2021-44228', search: null})
         expect(lastQueryOptions().variables).toEqual({name: 'Products', externalId: 'CVE-2021-44228'})
         expect(screen.getByTestId('estate-fanout-table')).toBeInTheDocument()
         // The search says what is shown
@@ -188,12 +199,12 @@ describe('The findings fan-out of an estate', () => {
         mockFindings()
         renderFanOut()
         fireEvent.click(screen.getByText('Path traversal'))
-        expect(mockOnExternalIdChange).toHaveBeenCalledWith('CVE-2024-38816')
+        expect(mockOnChange).toHaveBeenCalledWith({finding: 'CVE-2024-38816', search: null})
     })
 
     it('shows the fan-out of the external ID it is given, without any search', () => {
         mockFindings()
-        renderFanOut('CVE-2021-44228')
+        renderFanOut({finding: 'CVE-2021-44228'})
         expect(lastQueryOptions().variables).toEqual({name: 'Products', externalId: 'CVE-2021-44228'})
         // The ranked findings are not even asked for
         expect(mockUseQuery.mock.calls.filter(call => call[0] === gqlEstateRankedFindings)).toHaveLength(0)
@@ -203,20 +214,91 @@ describe('The findings fan-out of an estate', () => {
 
     it('goes back from a fan-out to the ranked findings', () => {
         mockFindings()
-        renderFanOut('CVE-2021-44228')
+        renderFanOut({finding: 'CVE-2021-44228'})
         fireEvent.click(screen.getByRole('button', {name: 'All open findings'}))
-        expect(mockOnExternalIdChange).toHaveBeenCalledWith(null)
+        expect(mockOnChange).toHaveBeenCalledWith({finding: null, search: null})
         expect(screen.getAllByTestId(/^estate-ranked-finding-/)).toHaveLength(2)
     })
 
-    it('looks for the external ID typed, trimmed, among the projects of the estate', () => {
+    it('searches the external IDs containing the text typed, trimmed, among the projects of the estate', () => {
         mockFindings()
         renderFanOut()
-        search('  CVE-2021-44228 ')
-        expect(mockOnExternalIdChange).toHaveBeenCalledWith('CVE-2021-44228')
-        const options = lastQueryOptions()
+        search('  cve-20 ')
+        expect(mockOnChange).toHaveBeenCalledWith({finding: null, search: 'cve-20'})
+        const options = lastQueryOptions(gqlEstateSearchedFindings)
         expect(options.condition).toBe(true)
-        expect(options.variables).toEqual({name: 'Products', externalId: 'CVE-2021-44228'})
+        expect(options.variables).toEqual({name: 'Products', text: 'cve-20', size: 20})
+        // The search says what is searched
+        expect(within(screen.getByTestId('estate-fanout-search')).getByRole('searchbox')).toHaveValue('cve-20')
+    })
+
+    it('lists the findings found, as the ranked ones, with what was searched', () => {
+        mockFindings()
+        renderFanOut()
+        search('cve-20')
+        expect(screen.queryByTestId('estate-ranked-findings')).toBeNull()
+        const rows = screen.getAllByTestId(/^estate-searched-finding-/)
+        expect(rows.map(it => it.getAttribute('data-testid'))).toEqual([
+            'estate-searched-finding-CVE-2021-44228',
+            'estate-searched-finding-CVE-2024-38816',
+        ])
+        expect(rows[0]).toHaveTextContent('Open in 2 · accepted in 1 · resolved in 1')
+        expect(screen.getByTestId('estate-searched-findings-caption'))
+            .toHaveTextContent('2 findings whose external ID contains "cve-20", the most widespread first')
+    })
+
+    it('says when the findings found are cut, and asks for more of the external ID', () => {
+        const many = Array.from({length: 20}, (_, index) => ranked(`CVE-2024-${1000 + index}`))
+        mockFindings(defaultFindings, defaultRanked, many)
+        renderFanOut()
+        search('cve')
+        expect(screen.getAllByTestId(/^estate-searched-finding-/)).toHaveLength(20)
+        expect(screen.getByTestId('estate-searched-findings-caption'))
+            .toHaveTextContent('The first 20 findings whose external ID contains "cve": type more of it to narrow the search')
+    })
+
+    it('says when no finding of the estate has an external ID containing the text', () => {
+        mockFindings()
+        renderFanOut()
+        search('GHSA')
+        expect(screen.getByText('No finding of this estate has an external ID containing "GHSA".')).toBeInTheDocument()
+        expect(screen.queryByTestId('estate-fanout-table')).toBeNull()
+    })
+
+    it('opens the fan-out of the only finding found, by its external ID as stored', () => {
+        mockFindings()
+        renderFanOut()
+        search('44228')
+        expect(mockOnChange).toHaveBeenLastCalledWith({finding: 'CVE-2021-44228', search: null})
+        expect(lastQueryOptions().variables).toEqual({name: 'Products', externalId: 'CVE-2021-44228'})
+        expect(screen.getByTestId('estate-fanout-table')).toBeInTheDocument()
+        expect(within(screen.getByTestId('estate-fanout-search')).getByRole('searchbox')).toHaveValue('CVE-2021-44228')
+    })
+
+    it('opens the fan-out of a finding found from its row, and goes back to the findings found', () => {
+        mockFindings()
+        renderFanOut()
+        search('cve-20')
+        fireEvent.click(screen.getByText('Path traversal'))
+        expect(mockOnChange).toHaveBeenLastCalledWith({finding: 'CVE-2024-38816', search: 'cve-20'})
+        expect(screen.getByTestId('estate-fanout-table')).toBeInTheDocument()
+
+        fireEvent.click(screen.getByRole('button', {name: 'Findings containing "cve-20"'}))
+        expect(mockOnChange).toHaveBeenLastCalledWith({finding: null, search: 'cve-20'})
+        expect(screen.getAllByTestId(/^estate-searched-finding-/)).toHaveLength(2)
+
+        fireEvent.click(screen.getByRole('button', {name: 'All open findings'}))
+        expect(mockOnChange).toHaveBeenLastCalledWith({finding: null, search: null})
+        expect(screen.getAllByTestId(/^estate-ranked-finding-/)).toHaveLength(2)
+    })
+
+    it('shows the findings found by the search it is given', () => {
+        mockFindings()
+        renderFanOut({search: 'cve-20'})
+        expect(screen.getAllByTestId(/^estate-searched-finding-/)).toHaveLength(2)
+        expect(within(screen.getByTestId('estate-fanout-search')).getByRole('searchbox')).toHaveValue('cve-20')
+        // Not the ones found by the search
+        expect(mockUseQuery.mock.calls.filter(call => call[0] === gqlEstateRankedFindings)).toHaveLength(0)
     })
 
     it('says what the finding is, and how many projects report it', () => {
@@ -331,8 +413,7 @@ describe('The findings fan-out of an estate', () => {
 
     it('says when no project of the estate reports the external ID', () => {
         mockFindings([])
-        renderFanOut()
-        search('CVE-NONE')
+        renderFanOut({finding: 'CVE-NONE'})
         expect(screen.getByText('No project of this estate reports CVE-NONE.')).toBeInTheDocument()
         expect(screen.queryByTestId('estate-fanout-table')).toBeNull()
     })

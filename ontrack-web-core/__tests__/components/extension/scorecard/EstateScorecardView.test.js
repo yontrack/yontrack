@@ -4,6 +4,7 @@ import EstateScorecardView from "@components/extension/scorecard/estates/EstateS
 import {
     gqlEstateFindingsFanOut,
     gqlEstateRankedFindings,
+    gqlEstateSearchedFindings,
 } from "@components/extension/scorecard/estates/EstateFindingsFanOut"
 
 Object.defineProperty(window, 'matchMedia', {
@@ -81,10 +82,10 @@ const column = (key) => screen.getAllByTestId(`estate-column-${key}`)[0]
 
 const mockOnChange = jest.fn()
 
-const renderView = (projectSets = defaultSets, {tab = 'readings', finding = null} = {}) => {
+const renderView = (projectSets = defaultSets, {tab = 'readings', finding = null, search = null} = {}) => {
     const answer = (data) => ({data, loading: false, finished: true, error: null})
     mockUseQuery.mockImplementation((query) => {
-        if (query === gqlEstateRankedFindings) {
+        if (query === gqlEstateRankedFindings || query === gqlEstateSearchedFindings) {
             return answer([{
                 externalId: 'CVE-1',
                 title: 'Remote code execution',
@@ -100,7 +101,7 @@ const renderView = (projectSets = defaultSets, {tab = 'readings', finding = null
             return answer(estateOf(projectSets))
         }
     })
-    return render(<EstateScorecardView name="Products" tab={tab} finding={finding} onChange={mockOnChange}/>)
+    return render(<EstateScorecardView name="Products" tab={tab} finding={finding} search={search} onChange={mockOnChange}/>)
 }
 
 beforeEach(() => {
@@ -212,7 +213,7 @@ describe('The scorecard of an estate', () => {
         renderView()
         expect(screen.queryByTestId('estate-fanout')).toBeNull()
         fireEvent.click(screen.getByText('Findings fan-out'))
-        expect(mockOnChange).toHaveBeenCalledWith({tab: 'fanout', finding: null})
+        expect(mockOnChange).toHaveBeenCalledWith({tab: 'fanout', finding: null, search: null})
     })
 
     it('opens on the tab it is given, with the finding it is given', () => {
@@ -221,16 +222,25 @@ describe('The scorecard of an estate', () => {
         expect(within(screen.getByTestId('estate-fanout-search')).getByRole('searchbox')).toHaveValue('CVE-2024-38816')
     })
 
-    it('keeps the finding searched when going back to the readings', () => {
-        renderView(defaultSets, {tab: 'fanout', finding: 'CVE-2024-38816'})
+    it('keeps the finding and the search when going back to the readings', () => {
+        renderView(defaultSets, {tab: 'fanout', finding: 'CVE-2024-38816', search: 'cve-2024'})
         fireEvent.click(screen.getByText('Readings'))
-        expect(mockOnChange).toHaveBeenCalledWith({tab: 'readings', finding: 'CVE-2024-38816'})
+        expect(mockOnChange).toHaveBeenCalledWith({tab: 'readings', finding: 'CVE-2024-38816', search: 'cve-2024'})
+    })
+
+    it('opens on the search it is given, and says what the fan-out searches', () => {
+        renderView(defaultSets, {tab: 'fanout', search: 'cve'})
+        expect(within(screen.getByTestId('estate-fanout-search')).getByRole('searchbox')).toHaveValue('cve')
+        const input = within(screen.getByTestId('estate-fanout-search')).getByRole('searchbox')
+        fireEvent.change(input, {target: {value: 'csrf'}})
+        fireEvent.keyDown(input, {key: 'Enter', code: 'Enter', keyCode: 13})
+        expect(mockOnChange).toHaveBeenCalledWith({tab: 'fanout', finding: null, search: 'csrf'})
     })
 
     it('says which finding the fan-out opens', () => {
         renderView(defaultSets, {tab: 'fanout', finding: null})
         fireEvent.click(screen.getByRole('button', {name: 'CVE-1'}))
-        expect(mockOnChange).toHaveBeenCalledWith({tab: 'fanout', finding: 'CVE-1'})
+        expect(mockOnChange).toHaveBeenCalledWith({tab: 'fanout', finding: 'CVE-1', search: null})
     })
 
     it('says when the estate does not exist', () => {

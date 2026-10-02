@@ -407,4 +407,137 @@ class EstateFindingsIT : EstatesTestSupport() {
             assertEquals(5, rankedFindings(estate.name).size)
         }
     }
+
+    // Searched findings
+
+    private fun searchedFindings(name: String, text: String, size: Int? = null): List<JsonNode> =
+        run(
+            """
+                query(${'$'}name: String!, ${'$'}text: String!, ${'$'}size: Int) {
+                    estate(name: ${'$'}name) {
+                        searchedFindings(text: ${'$'}text, size: ${'$'}size) {
+                            externalId
+                            title
+                            severity
+                            openProjects
+                            acceptedProjects
+                            resolvedProjects
+                            firstSeen
+                        }
+                    }
+                }
+            """,
+            mapOf("name" to name, "text" to text, "size" to size)
+        ).path("estate").path("searchedFindings").values().toList()
+
+    @Test
+    fun `The findings whose external ID contains the text, ignoring case, open or not, by number of projects where they are open`() {
+        val prefix = uid("CVE-")
+        val open = "$prefix-OPEN"
+        val accepted = "$prefix-ACCEPTED"
+        val resolved = "$prefix-RESOLVED"
+        asAdmin {
+            val label = label()
+            project {
+                labels = listOf(label)
+                scannedBranch().scanEntries(entry(open), entry(accepted, accepted = true))
+            }
+            project {
+                labels = listOf(label)
+                scannedBranch().apply {
+                    scanEntries(entry(resolved), entry("GHSA-jfh8-c2jp-5v3q"))
+                    // Reporting nothing any longer
+                    scanEntries()
+                }
+            }
+            // Not in the estate
+            exposedProject(null, "$prefix-OUTSIDE", "pkg:maven/org.x/y")
+            val estate = estate(label)
+            val expected = listOf("$open: 1/0/0", "$accepted: 0/1/0", "$resolved: 0/0/1")
+            // A part of the external ID, in another case, padded
+            assertEquals(expected, searchedFindings(estate.name, "  ${prefix.lowercase()}  ").counts())
+            assertEquals(expected, searchedFindings(estate.name, prefix.substring(4).lowercase()).counts())
+            // The whole external ID, in another case
+            assertEquals(listOf("$resolved: 0/0/1"), searchedFindings(estate.name, resolved.lowercase()).counts())
+            // Nothing
+            assertEquals(emptyList(), searchedFindings(estate.name, uid("CVE-")).counts())
+            assertEquals(emptyList(), searchedFindings(estate.name, "  ").counts())
+        }
+    }
+
+    @Test
+    fun `A finding of a project without any branch which counts is found, resolved`() {
+        val externalId = uid("CVE-")
+        asAdmin {
+            val label = label()
+            project {
+                labels = listOf(label)
+                // Branch model of the test provider: master|release-.*
+                testBranchModelMatcherProvider.projects += name
+                scannedBranch("feature-x").scanEntries(entry(externalId))
+            }
+            val estate = estate(label)
+            assertEquals(listOf("$externalId: 0/0/1"), searchedFindings(estate.name, externalId.lowercase()).counts())
+        }
+    }
+
+    @Test
+    fun `The wildcards of the searched text match themselves`() {
+        val prefix = uid("CVE-")
+        asAdmin {
+            val label = label()
+            project {
+                labels = listOf(label)
+                scannedBranch().scanEntries(
+                    entry("$prefix-A_B"),
+                    entry("$prefix-AXB"),
+                    entry("$prefix-100%"),
+                    entry("$prefix-1000"),
+                    // Escaped for the JSON of the report
+                    entry("$prefix-C\\\\D"),
+                )
+            }
+            val estate = estate(label)
+            assertEquals(listOf("$prefix-A_B: 1/0/0"), searchedFindings(estate.name, "$prefix-a_b").counts())
+            assertEquals(listOf("$prefix-100%: 1/0/0"), searchedFindings(estate.name, "$prefix-100%").counts())
+            assertEquals(listOf("$prefix-C\\D: 1/0/0"), searchedFindings(estate.name, "$prefix-c\\d").counts())
+        }
+    }
+
+    @Test
+    fun `The searched findings are filtered by the right to see their projects and their findings`() {
+        val externalId = uid("CVE-")
+        val label = asAdmin { label() }
+        val visible = asAdmin { exposedProject(label, externalId, "pkg:maven/org.x/y") }
+        val viewOnly = asAdmin { exposedProject(label, externalId, "pkg:maven/org.x/y") }
+        asAdmin { exposedProject(label, externalId, "pkg:maven/org.x/y") }
+        val estate = estate(label)
+        withNoGrantViewToAll {
+            asUser()
+                .withView(visible)
+                .withProjectFunction(visible, ProjectFindingsView::class.java)
+                .withView(viewOnly)
+                .call {
+                    assertEquals(listOf("$externalId: 1/0/0"), searchedFindings(estate.name, externalId).counts())
+                }
+        }
+    }
+
+    @Test
+    fun `The searched findings are bounded by the size asked for`() {
+        val prefix = uid("CVE-")
+        asAdmin {
+            val label = label()
+            project {
+                labels = listOf(label)
+                scannedBranch().scanEntries(*(1..5).map { entry("$prefix-$it") }.toTypedArray())
+            }
+            val estate = estate(label)
+            assertEquals(
+                listOf("$prefix-1", "$prefix-2"),
+                searchedFindings(estate.name, prefix, size = 2).map { it.path("externalId").asText() }
+            )
+            assertEquals(5, searchedFindings(estate.name, prefix).size)
+        }
+    }
 }

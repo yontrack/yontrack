@@ -2149,6 +2149,13 @@ type Estate {
   ): [RankedFinding!]!
   "Window override and target of the readings which have one, by reading key"
   readingConfigs: [EstateReadingConfig!]!
+  "Security findings of the projects of the estate whose external ID contains the given text, ignoring case, one per external ID, open, accepted or resolved, ranked as the rankedFindings are: by the number of projects of the estate in which they are open, then by severity, the highest first, then by external ID. A blank text finds nothing. Only the projects the user can see, and whose findings the user is granted the view of, are searched."
+  searchedFindings(
+    "Maximum number of findings to return, at most 100"
+    size: Int = 20,
+    "Text the external IDs contain, ignoring case"
+    text: String!
+  ): [RankedFinding!]!
   "What the estate expects of the security scans of its projects"
   security: EstateSecurity!
 }

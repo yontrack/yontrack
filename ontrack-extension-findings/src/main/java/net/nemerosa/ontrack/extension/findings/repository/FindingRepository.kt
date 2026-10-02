@@ -86,6 +86,26 @@ interface FindingRepository {
     ): List<RankedFinding>
 
     /**
+     * The external IDs of the findings of the given projects containing a text, ignoring case,
+     * whatever their state, ranked as [findRankedFindings] ranks them: by the number of these
+     * projects in which they are open, then by severity, the highest first, then by external ID —
+     * aggregated by the database.
+     *
+     * @param countingBranchIds IDs of the branches which count, for each project to look into, by
+     * project ID
+     * @param text Text the external IDs contain, ignoring case. The LIKE wildcards in it match
+     * themselves.
+     * @param date Day against which the expiry of the acceptances is evaluated
+     * @param size Maximum number of external IDs to return
+     */
+    fun findSearchedFindings(
+        countingBranchIds: Map<Int, Set<Int>>,
+        text: String,
+        date: LocalDate,
+        size: Int,
+    ): List<RankedFinding>
+
+    /**
      * Goes through all the findings, of all the projects, by ID.
      */
     fun forEachFinding(code: (Finding) -> Unit)

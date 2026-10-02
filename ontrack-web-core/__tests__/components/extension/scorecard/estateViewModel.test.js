@@ -215,13 +215,13 @@ describe('sortEstateRows', () => {
 describe('The state of the estate page in the query of its URL', () => {
 
     it('opens on the readings, with no finding, by default', () => {
-        expect(estatePageState({name: 'Products'})).toEqual({tab: 'readings', finding: null})
-        expect(estatePageState(undefined)).toEqual({tab: 'readings', finding: null})
+        expect(estatePageState({name: 'Products'})).toEqual({tab: 'readings', finding: null, search: null})
+        expect(estatePageState(undefined)).toEqual({tab: 'readings', finding: null, search: null})
     })
 
     it('reads the fan-out tab and the finding searched', () => {
         expect(estatePageState({name: 'Products', tab: 'fanout', finding: 'CVE-2024-38816'}))
-            .toEqual({tab: 'fanout', finding: 'CVE-2024-38816'})
+            .toEqual({tab: 'fanout', finding: 'CVE-2024-38816', search: null})
     })
 
     it('trims the finding, and ignores a blank one', () => {
@@ -235,7 +235,18 @@ describe('The state of the estate page in the query of its URL', () => {
 
     it('reads the first value of a repeated parameter', () => {
         expect(estatePageState({tab: ['fanout', 'readings'], finding: ['CVE-1', 'CVE-2']}))
-            .toEqual({tab: 'fanout', finding: 'CVE-1'})
+            .toEqual({tab: 'fanout', finding: 'CVE-1', search: null})
+    })
+
+    it('reads the text searched, trimmed, and ignores a blank one', () => {
+        expect(estatePageState({tab: 'fanout', search: '  cve-2024 '}))
+            .toEqual({tab: 'fanout', finding: null, search: 'cve-2024'})
+        expect(estatePageState({tab: 'fanout', search: '  '}).search).toBeNull()
+    })
+
+    it('reads a finding picked among the results of a search, with the search', () => {
+        expect(estatePageState({tab: 'fanout', finding: 'CVE-2024-38816', search: 'cve-2024'}))
+            .toEqual({tab: 'fanout', finding: 'CVE-2024-38816', search: 'cve-2024'})
     })
 
     it('writes the fan-out tab and the finding', () => {
@@ -249,8 +260,17 @@ describe('The state of the estate page in the query of its URL', () => {
         expect(estatePageQuery({tab: 'readings', finding: 'CVE-1'})).toEqual({finding: 'CVE-1'})
     })
 
+    it('writes the text searched, trimmed, whatever the tab', () => {
+        expect(estatePageQuery({tab: 'fanout', finding: null, search: ' cve-2024 '}))
+            .toEqual({tab: 'fanout', search: 'cve-2024'})
+        expect(estatePageQuery({tab: 'readings', search: 'cve'})).toEqual({search: 'cve'})
+        expect(estatePageQuery({tab: 'fanout', search: '  '})).toEqual({tab: 'fanout'})
+    })
+
     it('reads back what it writes', () => {
-        const state = {tab: 'fanout', finding: 'CVE-2024-38816'}
+        const state = {tab: 'fanout', finding: 'CVE-2024-38816', search: null}
         expect(estatePageState(estatePageQuery(state))).toEqual(state)
+        const searched = {tab: 'fanout', finding: 'CVE-2024-38816', search: 'cve-2024'}
+        expect(estatePageState(estatePageQuery(searched))).toEqual(searched)
     })
 })
