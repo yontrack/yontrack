@@ -3,6 +3,9 @@ import {
     fanOutExternalId,
     fanOutRows,
     fanOutSummary,
+    rankedFindingProjectsText,
+    rankedFindingRows,
+    rankedFindingsCaption,
 } from "@components/extension/scorecard/estates/estateFanOutModel";
 
 const branch = (id, name) => ({id, name})
@@ -169,5 +172,47 @@ describe('fanOutSummary', () => {
 
     it('counts nothing for no finding', () => {
         expect(fanOutSummary([])).toEqual({projects: 0, exposed: 0, accepted: 0, resolved: 0})
+    })
+})
+
+describe('The ranked findings of an estate', () => {
+
+    const ranked = (externalId, props = {}) => ({
+        externalId,
+        title: `Title of ${externalId}`,
+        severity: 'HIGH',
+        openProjects: 1,
+        acceptedProjects: 0,
+        resolvedProjects: 0,
+        firstSeen: '2026-09-01T10:00:00Z',
+        ...props,
+    })
+
+    it('keeps the order of the server, one row per external ID, with the number of projects reporting it', () => {
+        const rows = rankedFindingRows([
+            ranked('CVE-2', {openProjects: 3, acceptedProjects: 1, resolvedProjects: 2}),
+            ranked('CVE-1'),
+        ])
+        expect(rows.map(it => [it.key, it.projects])).toEqual([['CVE-2', 6], ['CVE-1', 1]])
+        expect(rows[0].title).toBe('Title of CVE-2')
+    })
+
+    it('has no row for no finding', () => {
+        expect(rankedFindingRows(null)).toEqual([])
+        expect(rankedFindingRows(undefined)).toEqual([])
+    })
+
+    it('says in how many projects a finding is open, accepted and resolved', () => {
+        expect(rankedFindingProjectsText(ranked('CVE-1', {openProjects: 3, acceptedProjects: 1, resolvedProjects: 0})))
+            .toBe('Open in 3 · accepted in 1 · resolved in 0')
+    })
+
+    it('says the list is the top of the ranking when it is as long as asked for', () => {
+        expect(rankedFindingsCaption(20, 20)).toBe('The 20 findings open in the most projects of this estate, the most widespread first')
+    })
+
+    it('says how many findings are open in the estate when they are all listed', () => {
+        expect(rankedFindingsCaption(1, 20)).toBe('1 finding open in this estate')
+        expect(rankedFindingsCaption(3, 20)).toBe('3 findings open in this estate, the most widespread first')
     })
 })

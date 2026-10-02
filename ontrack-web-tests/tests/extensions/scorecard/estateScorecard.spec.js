@@ -205,3 +205,65 @@ test('estate view: the fan-out of one finding over the projects of the estate', 
         await deleteEstate(ontrack, estate)
     }
 })
+
+test('estate view: the most widespread findings, the fan-out of the top one, and its link', async ({page, ontrack}) => {
+    test.skip(!(await isScorecardLicensed(ontrack)), 'The licence does not allow the estates')
+
+    const widespread = generate('CVE-WIDE-')
+    const single = generate('CVE-SINGLE-')
+    const label = await ontrack.labels().createLabel()
+
+    // The widespread finding is open in two projects of the estate, the other one in one only
+    const first = await ontrack.createProject(generate('a-first-'))
+    await ontrack.labels().setProjectLabels(first.id, [label.id])
+    const firstMain = await first.createBranch("main")
+    await scanWithFindings(firstMain, await createFindingsValidationStamp(firstMain, "SECURITY.IMAGE"), [
+        finding({externalId: widespread, severity: "MEDIUM", title: "Widespread weakness"}),
+        finding({externalId: single, severity: "CRITICAL", title: "Single weakness"}),
+    ])
+    const second = await ontrack.createProject(generate('b-second-'))
+    await ontrack.labels().setProjectLabels(second.id, [label.id])
+    const secondMain = await second.createBranch("main")
+    await scanWithFindings(secondMain, await createFindingsValidationStamp(secondMain, "SECURITY.IMAGE"), [
+        finding({externalId: widespread, severity: "MEDIUM", title: "Widespread weakness"}),
+    ])
+
+    const estate = await createEstate(ontrack, {
+        name: generate('estate-'),
+        labels: [`${label.category}:${label.name}`],
+    })
+    try {
+        await login(page, ontrack)
+        const estatePage = new EstateScorecardPage(page, ontrack, estate.name)
+        await estatePage.goTo()
+        await estatePage.openFanOut()
+        await expect(page).toHaveURL(/\?tab=fanout$/)
+
+        // Ranked by the number of projects where they are open, before their severity
+        expect(await estatePage.rankedFindingIds()).toEqual([widespread, single])
+        await expect(estatePage.rankedFinding(widespread)).toContainText('Widespread weakness')
+        await expect(estatePage.rankedFindingProjects(widespread)).toHaveText('Open in 2 · accepted in 0 · resolved in 0')
+
+        // A click on the top finding opens its fan-out, kept in the URL
+        await estatePage.rankedFinding(widespread).click()
+        expect(await estatePage.fanOutProjectNames()).toEqual([first.name, second.name])
+        await expect(estatePage.fanOutSearch()).toHaveValue(widespread)
+        await expect(page).toHaveURL(new RegExp(`\\?tab=fanout&finding=${widespread}$`))
+
+        // Reloaded, the page lands on the same fan-out
+        await page.reload()
+        await expect(page.getByRole('tab', {name: 'Findings fan-out', selected: true})).toBeVisible()
+        expect(await estatePage.fanOutProjectNames()).toEqual([first.name, second.name])
+        await expect(estatePage.fanOutSummary()).toHaveText(
+            `2 projects of this estate report ${widespread}: exposed in 2, accepted in 0, resolved in 0`
+        )
+        await expect(estatePage.fanOutSearch()).toHaveValue(widespread)
+
+        // Back to the list
+        await page.getByTestId('estate-fanout-back').click()
+        expect(await estatePage.rankedFindingIds()).toEqual([widespread, single])
+        await expect(page).toHaveURL(/\?tab=fanout$/)
+    } finally {
+        await deleteEstate(ontrack, estate)
+    }
+})

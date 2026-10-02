@@ -13,6 +13,7 @@ import {
     readingUnit,
     RUNG,
 } from "@components/extension/scorecard/scorecardModel";
+import {fanOutExternalId} from "@components/extension/scorecard/estates/estateFanOutModel";
 
 /**
  * Judgements of a reading which carry a measured value.
@@ -127,4 +128,43 @@ export const sortEstateRows = (rows, {key, order} = {}) => {
         if (vb === null) return -1
         return direction * (va - vb) || byName(a, b)
     })
+}
+
+/**
+ * Tabs of the estate page: its readings, the default one, and the findings fan-out.
+ */
+export const ESTATE_TAB_READINGS = 'readings'
+export const ESTATE_TAB_FANOUT = 'fanout'
+const ESTATE_TABS = [ESTATE_TAB_READINGS, ESTATE_TAB_FANOUT]
+
+const single = (value) => Array.isArray(value) ? value[0] : value
+
+/**
+ * The state of the estate page from the query of its URL — `?tab=fanout&finding=CVE-2024-38816` —
+ * so that a fan-out can be shared by its link: its tab, the readings by default, and the external ID
+ * of the finding searched, trimmed, `null` when there is none.
+ */
+export function estatePageState(query = {}) {
+    const tab = single(query?.tab)
+    const finding = single(query?.finding)
+    return {
+        tab: ESTATE_TABS.includes(tab) ? tab : ESTATE_TAB_READINGS,
+        finding: fanOutExternalId(finding),
+    }
+}
+
+/**
+ * The query of the URL from the state of the estate page: the tab when it is not the default one,
+ * and the finding searched, whatever the tab, so that going back to the fan-out finds it again.
+ */
+export function estatePageQuery({tab, finding} = {}) {
+    const query = {}
+    if (tab && tab !== ESTATE_TAB_READINGS) {
+        query.tab = tab
+    }
+    const externalId = fanOutExternalId(finding)
+    if (externalId) {
+        query.finding = externalId
+    }
+    return query
 }

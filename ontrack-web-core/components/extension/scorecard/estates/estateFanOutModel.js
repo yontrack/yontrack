@@ -143,3 +143,43 @@ export function fanOutSummary(findings = []) {
     })
     return summary
 }
+
+/**
+ * The rows of the ranked findings of an estate, in the order of the server — by number of projects
+ * where the finding is open, then by severity, then by external ID — one per external ID, with the
+ * number of projects reporting it.
+ *
+ * @param {Array} rankedFindings `Estate.rankedFindings`
+ * @returns {Array} The ranked findings, each with its `key` and its number of `projects`
+ */
+export function rankedFindingRows(rankedFindings) {
+    return (rankedFindings ?? []).map(finding => ({
+        ...finding,
+        key: finding.externalId,
+        projects: finding.openProjects + finding.acceptedProjects + finding.resolvedProjects,
+    }))
+}
+
+/**
+ * `Open in 3 · accepted in 1 · resolved in 0`: in how many projects of the estate a ranked finding
+ * is open, accepted and resolved.
+ */
+export const rankedFindingProjectsText = ({openProjects, acceptedProjects, resolvedProjects}) =>
+    `Open in ${openProjects} · accepted in ${acceptedProjects} · resolved in ${resolvedProjects}`
+
+/**
+ * What the list of the ranked findings shows: the top of the ranking when it is as long as asked
+ * for, else every finding open in the estate.
+ *
+ * @param count Number of ranked findings listed
+ * @param size Number of ranked findings asked for
+ */
+export function rankedFindingsCaption(count, size) {
+    if (count >= size) {
+        return `The ${size} findings open in the most projects of this estate, the most widespread first`
+    } else if (count === 1) {
+        return '1 finding open in this estate'
+    } else {
+        return `${count} findings open in this estate, the most widespread first`
+    }
+}

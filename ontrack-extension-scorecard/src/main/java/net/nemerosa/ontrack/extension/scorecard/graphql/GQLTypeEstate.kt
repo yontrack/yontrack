@@ -7,6 +7,7 @@ import graphql.schema.GraphQLObjectType
 import graphql.schema.GraphQLTypeReference
 import net.nemerosa.ontrack.extension.findings.graphql.GQLTypeFinding
 import net.nemerosa.ontrack.extension.findings.model.FindingKind
+import net.nemerosa.ontrack.extension.findings.model.RankedFinding
 import net.nemerosa.ontrack.extension.findings.query.FindingQueryService
 import net.nemerosa.ontrack.extension.scorecard.engine.MarkerKind
 import net.nemerosa.ontrack.extension.scorecard.estates.*
@@ -17,6 +18,7 @@ import net.nemerosa.ontrack.graphql.schema.GQLType
 import net.nemerosa.ontrack.graphql.schema.GQLTypeCache
 import net.nemerosa.ontrack.graphql.schema.GQLTypeProject
 import net.nemerosa.ontrack.graphql.support.doubleField
+import net.nemerosa.ontrack.graphql.support.intArgument
 import net.nemerosa.ontrack.graphql.support.intField
 import net.nemerosa.ontrack.graphql.support.listType
 import net.nemerosa.ontrack.graphql.support.stringArgument
@@ -107,11 +109,38 @@ class GQLTypeEstate(
                         )
                     }
             }
+            .field {
+                it.name("rankedFindings")
+                    .description(
+                        "Security findings open in at least one project of the estate, one per external ID, ranked by the number " +
+                                "of projects of the estate in which they are open, then by severity, the highest first, then by " +
+                                "external ID: which finding hurts the most projects. A finding is open in a project as its state " +
+                                "says, on the branches which count only. Only the projects the user can see, and whose findings " +
+                                "the user is granted the view of, are counted."
+                    )
+                    .argument(
+                        intArgument(
+                            ARG_SIZE,
+                            "Maximum number of findings to return, at most ${FindingQueryService.MAX_RANKED_FINDINGS}",
+                            defaultValue = FindingQueryService.DEFAULT_RANKED_FINDINGS,
+                        )
+                    )
+                    .type(listType(GraphQLTypeReference(RankedFinding::class.java.simpleName)))
+                    .dataFetcher { env ->
+                        val estate: Estate = env.getSource()!!
+                        val size: Int = env.getArgument(ARG_SIZE) ?: FindingQueryService.DEFAULT_RANKED_FINDINGS
+                        findingQueryService.getRankedFindings(
+                            projectIds = estateService.getProjects(estate).map { project -> project.id() },
+                            size = size,
+                        )
+                    }
+            }
             .build()
 
     companion object {
         const val ESTATE_MARKER = "EstateMarker"
         private const val ARG_EXTERNAL_ID = "externalId"
+        private const val ARG_SIZE = "size"
     }
 }
 

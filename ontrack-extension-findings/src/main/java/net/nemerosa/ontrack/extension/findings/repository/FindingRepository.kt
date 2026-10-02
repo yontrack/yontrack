@@ -4,6 +4,9 @@ import net.nemerosa.ontrack.extension.findings.model.Finding
 import net.nemerosa.ontrack.extension.findings.model.FindingExposure
 import net.nemerosa.ontrack.extension.findings.model.FindingObservation
 import net.nemerosa.ontrack.extension.findings.model.FindingSeverity
+import net.nemerosa.ontrack.extension.findings.model.FindingState
+import net.nemerosa.ontrack.extension.findings.model.RankedFinding
+import java.time.LocalDate
 
 /**
  * Storage of the findings, their observations and their exposure.
@@ -61,6 +64,26 @@ interface FindingRepository {
      * @param projectIds IDs of the projects to look into, `null` for all of them
      */
     fun findFindingsByExternalId(externalId: String, projectIds: Collection<Int>? = null): List<Finding>
+
+    /**
+     * The external IDs of the findings open in at least one of the given projects, ranked by the
+     * number of these projects in which they are open, then by severity, the highest first, then
+     * by external ID — aggregated by the database.
+     *
+     * The state of a finding in its project is rolled up from its exposure on the branches which
+     * count only, as [FindingState] says; a project is counted once per external ID, by its most
+     * exposed finding.
+     *
+     * @param countingBranchIds IDs of the branches which count, for each project to look into, by
+     * project ID
+     * @param date Day against which the expiry of the acceptances is evaluated
+     * @param size Maximum number of external IDs to return
+     */
+    fun findRankedFindings(
+        countingBranchIds: Map<Int, Set<Int>>,
+        date: LocalDate,
+        size: Int,
+    ): List<RankedFinding>
 
     /**
      * Goes through all the findings, of all the projects, by ID.

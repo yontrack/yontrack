@@ -130,6 +130,81 @@ class FindingJdbcRepository(
             ) { rs, _ -> toFinding(rs) }
         }
 
+    override fun findRankedFindings(
+        countingBranchIds: Map<Int, Set<Int>>,
+        date: LocalDate,
+        size: Int,
+    ): List<RankedFinding> {
+        val branchIds = countingBranchIds.values.flatten().distinct()
+        // Without any branch which counts, no finding is open
+        if (branchIds.isEmpty() || size <= 0) return emptyList()
+        // State of each finding on the branches which count, as FindingState rolls it up: open as soon
+        // as one of its exposures is, else accepted as soon as one is, else resolved, including
+        // when it has no exposure there. Then each project counted once per external ID, by its
+        // most exposed finding.
+        return namedParameterJdbcTemplate!!.query(
+            """
+                WITH FINDING_STATES AS (
+                    SELECT F.ID, F.PROJECT_ID, F.EXTERNAL_ID, F.TITLE, F.FIRST_SEEN, F.LAST_SEEN,
+                           $SEVERITY_RANK AS SEVERITY_RANK,
+                           CASE
+                               WHEN BOOL_OR(E.RESOLVED_AT IS NULL AND NOT ($ACCEPTANCE_HOLDS)) THEN $STATE_OPEN
+                               WHEN BOOL_OR(E.RESOLVED_AT IS NULL AND ($ACCEPTANCE_HOLDS)) THEN $STATE_ACCEPTED
+                               ELSE $STATE_RESOLVED
+                           END AS STATE_RANK
+                    FROM FINDINGS F
+                    LEFT JOIN FINDING_EXPOSURES E ON E.FINDING_ID = F.ID AND E.BRANCH_ID IN (:branchIds)
+                    WHERE F.PROJECT_ID IN (:projectIds)
+                    GROUP BY F.ID
+                ),
+                PROJECT_STATES AS (
+                    SELECT EXTERNAL_ID, PROJECT_ID, MIN(STATE_RANK) AS STATE_RANK
+                    FROM FINDING_STATES
+                    GROUP BY EXTERNAL_ID, PROJECT_ID
+                ),
+                RANKS AS (
+                    SELECT EXTERNAL_ID,
+                           COUNT(*) FILTER (WHERE STATE_RANK = $STATE_OPEN) AS OPEN_PROJECTS,
+                           COUNT(*) FILTER (WHERE STATE_RANK = $STATE_ACCEPTED) AS ACCEPTED_PROJECTS,
+                           COUNT(*) FILTER (WHERE STATE_RANK = $STATE_RESOLVED) AS RESOLVED_PROJECTS
+                    FROM PROJECT_STATES
+                    GROUP BY EXTERNAL_ID
+                    HAVING COUNT(*) FILTER (WHERE STATE_RANK = $STATE_OPEN) > 0
+                ),
+                DETAILS AS (
+                    SELECT EXTERNAL_ID,
+                           MIN(SEVERITY_RANK) AS SEVERITY_RANK,
+                           MIN(FIRST_SEEN) AS FIRST_SEEN,
+                           (ARRAY_AGG(TITLE ORDER BY STATE_RANK, SEVERITY_RANK, LAST_SEEN DESC, ID))[1] AS TITLE
+                    FROM FINDING_STATES
+                    WHERE EXTERNAL_ID IN (SELECT EXTERNAL_ID FROM RANKS)
+                    GROUP BY EXTERNAL_ID
+                )
+                SELECT R.EXTERNAL_ID, R.OPEN_PROJECTS, R.ACCEPTED_PROJECTS, R.RESOLVED_PROJECTS,
+                       D.SEVERITY_RANK, D.FIRST_SEEN, D.TITLE
+                FROM RANKS R
+                INNER JOIN DETAILS D ON D.EXTERNAL_ID = R.EXTERNAL_ID
+                ORDER BY R.OPEN_PROJECTS DESC, D.SEVERITY_RANK, R.EXTERNAL_ID
+                LIMIT :size
+            """.trimIndent(),
+            MapSqlParameterSource()
+                .addValue("projectIds", countingBranchIds.keys)
+                .addValue("branchIds", branchIds)
+                .addValue("date", date, java.sql.Types.DATE)
+                .addValue("size", size)
+        ) { rs, _ ->
+            RankedFinding(
+                externalId = rs.getString("EXTERNAL_ID"),
+                title = rs.getString("TITLE"),
+                severity = FindingSeverity.entries[rs.getInt("SEVERITY_RANK")],
+                openProjects = rs.getInt("OPEN_PROJECTS"),
+                acceptedProjects = rs.getInt("ACCEPTED_PROJECTS"),
+                resolvedProjects = rs.getInt("RESOLVED_PROJECTS"),
+                firstSeen = rs.readLocalDateTimeNotNull("FIRST_SEEN"),
+            )
+        }
+    }
+
     override fun forEachFinding(code: (Finding) -> Unit) {
         namedParameterJdbcTemplate!!.query(
             "SELECT * FROM FINDINGS ORDER BY ID",
@@ -313,4 +388,30 @@ class FindingJdbcRepository(
         resolvedAt = rs.readLocalDateTime("RESOLVED_AT"),
         resolutionReason = rs.getString("RESOLUTION_REASON")?.let { FindingResolutionReason.valueOf(it) },
     )
+
+    companion object {
+
+        /**
+         * Rank of the maximum severity of a finding, its index in [FindingSeverity]: the most
+         * severe first.
+         */
+        private val SEVERITY_RANK: String = FindingSeverity.entries.joinToString(
+            separator = " ",
+            prefix = "CASE F.MAX_SEVERITY ",
+            postfix = " END",
+        ) { "WHEN '${it.name}' THEN ${it.ordinal}" }
+
+        /**
+         * Whether the acceptance of an exposure holds on the `:date`, as [FindingExposure.stateOn] says.
+         */
+        private const val ACCEPTANCE_HOLDS =
+            "E.ACCEPTED AND (E.ACCEPTANCE_EXPIRES_AT IS NULL OR E.ACCEPTANCE_EXPIRES_AT >= :date)"
+
+        /**
+         * Ranks of the states of a finding, the most exposed first.
+         */
+        private const val STATE_OPEN = 0
+        private const val STATE_ACCEPTED = 1
+        private const val STATE_RESOLVED = 2
+    }
 }

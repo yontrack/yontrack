@@ -1,4 +1,6 @@
 import {
+    estatePageQuery,
+    estatePageState,
     estateReadingKeys,
     estateRows,
     formatMedian,
@@ -207,5 +209,48 @@ describe('sortEstateRows', () => {
         const copy = [...rows]
         sortEstateRows(rows, {key: 'delivery.leadTime', order: 'ascend'})
         expect(rows).toEqual(copy)
+    })
+})
+
+describe('The state of the estate page in the query of its URL', () => {
+
+    it('opens on the readings, with no finding, by default', () => {
+        expect(estatePageState({name: 'Products'})).toEqual({tab: 'readings', finding: null})
+        expect(estatePageState(undefined)).toEqual({tab: 'readings', finding: null})
+    })
+
+    it('reads the fan-out tab and the finding searched', () => {
+        expect(estatePageState({name: 'Products', tab: 'fanout', finding: 'CVE-2024-38816'}))
+            .toEqual({tab: 'fanout', finding: 'CVE-2024-38816'})
+    })
+
+    it('trims the finding, and ignores a blank one', () => {
+        expect(estatePageState({tab: 'fanout', finding: '  CVE-1 '}).finding).toBe('CVE-1')
+        expect(estatePageState({tab: 'fanout', finding: '  '}).finding).toBeNull()
+    })
+
+    it('falls back on the readings for an unknown tab', () => {
+        expect(estatePageState({tab: 'nope'}).tab).toBe('readings')
+    })
+
+    it('reads the first value of a repeated parameter', () => {
+        expect(estatePageState({tab: ['fanout', 'readings'], finding: ['CVE-1', 'CVE-2']}))
+            .toEqual({tab: 'fanout', finding: 'CVE-1'})
+    })
+
+    it('writes the fan-out tab and the finding', () => {
+        expect(estatePageQuery({tab: 'fanout', finding: 'CVE-2024-38816'}))
+            .toEqual({tab: 'fanout', finding: 'CVE-2024-38816'})
+        expect(estatePageQuery({tab: 'fanout', finding: null})).toEqual({tab: 'fanout'})
+    })
+
+    it('leaves the default tab out, and keeps the finding for a return to the fan-out', () => {
+        expect(estatePageQuery({tab: 'readings', finding: null})).toEqual({})
+        expect(estatePageQuery({tab: 'readings', finding: 'CVE-1'})).toEqual({finding: 'CVE-1'})
+    })
+
+    it('reads back what it writes', () => {
+        const state = {tab: 'fanout', finding: 'CVE-2024-38816'}
+        expect(estatePageState(estatePageQuery(state))).toEqual(state)
     })
 })

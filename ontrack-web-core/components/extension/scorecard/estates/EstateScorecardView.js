@@ -23,6 +23,8 @@ import {
 } from "@components/extension/scorecard/scorecardModel";
 import {
     estateReadingKeys,
+    ESTATE_TAB_FANOUT,
+    ESTATE_TAB_READINGS,
     estateRows,
     formatMedian,
     hasEstimatedReading,
@@ -269,9 +271,15 @@ function EstateReadingsTable({estate}) {
  * The scorecard of an estate: what the estate is, the readings of its projects in a tab, and the
  * fan-out of one finding over its projects in another.
  *
+ * Its tab and the finding searched are kept by the page, in its URL, so that a fan-out can be
+ * shared by its link — see `estatePageState`.
+ *
  * @param name Name of the estate
+ * @param tab Tab shown, the readings by default
+ * @param finding External ID of the finding whose fan-out is shown, `null` for none
+ * @param onChange Called with the new `{tab, finding}` when the user changes the one or the other
  */
-export default function EstateScorecardView({name}) {
+export default function EstateScorecardView({name, tab = ESTATE_TAB_READINGS, finding = null, onChange = () => {}}) {
 
     const {data: estate, finished, error} = useQuery(
         gqlEstateScorecard,
@@ -297,16 +305,22 @@ export default function EstateScorecardView({name}) {
         <Space orientation="vertical" size={16} style={{width: '100%'}} data-testid="estate-scorecard">
             <SetExplanation set={{estate}} testId="estate-explanation"/>
             <Tabs
+                activeKey={tab}
+                onChange={key => onChange({tab: key, finding})}
                 items={[
                     {
-                        key: 'readings',
+                        key: ESTATE_TAB_READINGS,
                         label: 'Readings',
                         children: <EstateReadingsTable estate={estate}/>,
                     },
                     {
-                        key: 'findings',
+                        key: ESTATE_TAB_FANOUT,
                         label: 'Findings fan-out',
-                        children: <EstateFindingsFanOut estate={estate}/>,
+                        children: <EstateFindingsFanOut
+                            estate={estate}
+                            externalId={finding}
+                            onExternalIdChange={externalId => onChange({tab: ESTATE_TAB_FANOUT, finding: externalId})}
+                        />,
                     },
                 ]}
             />

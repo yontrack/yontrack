@@ -91,6 +91,31 @@ export class EstateScorecardPage {
         await input.press('Enter')
     }
 
+    /**
+     * External IDs of the ranked findings, the most widespread first.
+     */
+    async rankedFindingIds() {
+        await expect(this.page.getByTestId('estate-ranked-findings')).toBeVisible()
+        const rows = this.page.getByTestId(/^estate-ranked-finding-/)
+        const ids = await rows.evaluateAll(elements => elements.map(it => it.getAttribute('data-testid')))
+        return ids.map(it => it.substring('estate-ranked-finding-'.length))
+    }
+
+    rankedFinding(externalId) {
+        return this.page.getByTestId(`estate-ranked-finding-${externalId}`)
+    }
+
+    rankedFindingProjects(externalId) {
+        return this.page.getByTestId(`estate-ranked-projects-${externalId}`)
+    }
+
+    /**
+     * The searchbox of the fan-out.
+     */
+    fanOutSearch() {
+        return this.page.getByTestId('estate-fanout-search').getByRole('searchbox')
+    }
+
     fanOutSummary() {
         return this.page.getByTestId('estate-fanout-summary')
     }

@@ -56,9 +56,32 @@ class EstateFindingsIT : EstatesTestSupport() {
      * given location.
      */
     private fun Branch.scan(vararg findings: Pair<String, String>) {
-        val entries = findings.joinToString(",") { (externalId, location) ->
-            """{"externalId": "$externalId", "location": "$location", "severity": "HIGH", "title": "$externalId"}"""
+        scanEntries(*findings.map { (externalId, location) -> entry(externalId, location) }.toTypedArray())
+    }
+
+    /**
+     * One entry of a scan report.
+     */
+    private fun entry(
+        externalId: String,
+        location: String = "pkg:maven/org.x/y",
+        severity: String = "HIGH",
+        title: String = externalId,
+        accepted: Boolean = false,
+    ): String {
+        val acceptance = if (accepted) {
+            """, "acceptance": {"statement": "Not reachable", "source": "VEX"}"""
+        } else {
+            ""
         }
+        return """{"externalId": "$externalId", "location": "$location", "severity": "$severity", "title": "$title"$acceptance}"""
+    }
+
+    /**
+     * Posts a scan of a new build of the branch, reporting the given entries.
+     */
+    private fun Branch.scanEntries(vararg findings: String) {
+        val entries = findings.joinToString(",")
         findingsIngestionService.ingest(
             build = build(),
             request = FindingsIngestionRequest(
@@ -217,6 +240,171 @@ class EstateFindingsIT : EstatesTestSupport() {
                 mapOf("feature-x" to true, "master" to true),
                 countingByBranch(estate, externalId)
             )
+        }
+    }
+
+    // Ranked findings
+
+    private fun rankedFindings(name: String, size: Int? = null): List<JsonNode> =
+        run(
+            """
+                query(${'$'}name: String!, ${'$'}size: Int) {
+                    estate(name: ${'$'}name) {
+                        rankedFindings(size: ${'$'}size) {
+                            externalId
+                            title
+                            severity
+                            openProjects
+                            acceptedProjects
+                            resolvedProjects
+                            firstSeen
+                        }
+                    }
+                }
+            """,
+            mapOf("name" to name, "size" to size)
+        ).path("estate").path("rankedFindings").values().toList()
+
+    /**
+     * `externalId: open/accepted/resolved`, for each ranked finding, in order.
+     */
+    private fun List<JsonNode>.counts(): List<String> = map {
+        "${it.path("externalId").asText()}: " +
+                "${it.path("openProjects").asInt()}/${it.path("acceptedProjects").asInt()}/${it.path("resolvedProjects").asInt()}"
+    }
+
+    @Test
+    fun `The findings open in the estate, by number of projects where they are open, then by severity, then by external ID`() {
+        val prefix = uid("CVE-")
+        val wide = "$prefix-3-WIDE"
+        val critical = "$prefix-2-CRITICAL"
+        val highA = "$prefix-1-HIGH"
+        val highB = "$prefix-0-HIGH"
+        asAdmin {
+            val label = label()
+            project {
+                labels = listOf(label)
+                scannedBranch().scanEntries(
+                    entry(wide, severity = "LOW"),
+                    entry(critical, severity = "CRITICAL", title = "Remote code execution"),
+                    entry(highA),
+                    entry(highB),
+                )
+            }
+            project {
+                labels = listOf(label)
+                scannedBranch().scanEntries(entry(wide, severity = "MEDIUM"))
+            }
+            val estate = estate(label)
+            val ranked = rankedFindings(estate.name)
+            assertEquals(
+                listOf("$wide: 2/0/0", "$critical: 1/0/0", "$highB: 1/0/0", "$highA: 1/0/0"),
+                ranked.counts()
+            )
+            // The highest severity of the finding among the projects of the estate
+            assertEquals("MEDIUM", ranked.first().path("severity").asText())
+            assertEquals("Remote code execution", ranked[1].path("title").asText())
+            assertTrue(ranked.all { it.path("firstSeen").asText().isNotBlank() })
+        }
+    }
+
+    @Test
+    fun `A ranked finding counts the projects where it is open, accepted and resolved, and leaves out the findings open nowhere`() {
+        val prefix = uid("CVE-")
+        val ranked = "$prefix-OPEN"
+        val acceptedOnly = "$prefix-ACCEPTED"
+        val resolvedOnly = "$prefix-RESOLVED"
+        asAdmin {
+            val label = label()
+            // Open, on two locations: one project
+            project {
+                labels = listOf(label)
+                scannedBranch().scanEntries(entry(ranked, location = "a"), entry(ranked, location = "b"))
+            }
+            // Accepted
+            project {
+                labels = listOf(label)
+                scannedBranch().scanEntries(entry(ranked, accepted = true), entry(acceptedOnly, accepted = true))
+            }
+            // Resolved
+            project {
+                labels = listOf(label)
+                scannedBranch().apply {
+                    scanEntries(entry(ranked), entry(resolvedOnly))
+                    // Reporting nothing any longer
+                    scanEntries()
+                }
+            }
+            val estate = estate(label)
+            assertEquals(listOf("$ranked: 1/1/1"), rankedFindings(estate.name).counts())
+        }
+    }
+
+    @Test
+    fun `The ranked findings are among the projects of the estate only`() {
+        val externalId = uid("CVE-")
+        asAdmin {
+            val label = label()
+            exposedProject(label, externalId, "pkg:maven/org.x/y")
+            exposedProject(null, externalId, "pkg:maven/org.x/y")
+            exposedProject(null, uid("CVE-"), "pkg:maven/org.x/y")
+            val estate = estate(label)
+            assertEquals(listOf("$externalId: 1/0/0"), rankedFindings(estate.name).counts())
+        }
+    }
+
+    @Test
+    fun `The ranked findings are filtered by the right to see their projects and their findings`() {
+        val externalId = uid("CVE-")
+        val label = asAdmin { label() }
+        val visible = asAdmin { exposedProject(label, externalId, "pkg:maven/org.x/y") }
+        val viewOnly = asAdmin { exposedProject(label, externalId, "pkg:maven/org.x/y") }
+        asAdmin { exposedProject(label, externalId, "pkg:maven/org.x/y") }
+        val estate = estate(label)
+        withNoGrantViewToAll {
+            asUser()
+                .withView(visible)
+                .withProjectFunction(visible, ProjectFindingsView::class.java)
+                .withView(viewOnly)
+                .call {
+                    assertEquals(listOf("$externalId: 1/0/0"), rankedFindings(estate.name).counts())
+                }
+        }
+    }
+
+    @Test
+    fun `A finding exposed on branches outside the branch model only is not open in its project`() {
+        val inModel = uid("CVE-")
+        val outside = uid("CVE-")
+        asAdmin {
+            val label = label()
+            project {
+                labels = listOf(label)
+                // Branch model of the test provider: master|release-.*
+                testBranchModelMatcherProvider.projects += name
+                scannedBranch("master").scanEntries(entry(inModel))
+                scannedBranch("feature-x").scanEntries(entry(inModel), entry(outside))
+            }
+            val estate = estate(label)
+            assertEquals(listOf("$inModel: 1/0/0"), rankedFindings(estate.name).counts())
+        }
+    }
+
+    @Test
+    fun `The ranked findings are bounded by the size asked for`() {
+        val prefix = uid("CVE-")
+        asAdmin {
+            val label = label()
+            project {
+                labels = listOf(label)
+                scannedBranch().scanEntries(*(1..5).map { entry("$prefix-$it") }.toTypedArray())
+            }
+            val estate = estate(label)
+            assertEquals(
+                listOf("$prefix-1", "$prefix-2"),
+                rankedFindings(estate.name, size = 2).map { it.path("externalId").asText() }
+            )
+            assertEquals(5, rankedFindings(estate.name).size)
         }
     }
 }

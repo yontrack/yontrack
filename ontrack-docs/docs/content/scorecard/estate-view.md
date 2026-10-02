@@ -25,7 +25,12 @@ There is no estate of all the projects: the readings of a project on its own are
 ## The estate page
 
 The page of an estate, at `/extension/scorecard/estate/<name>`, says what the estate is — its
-description, its marker and its labels — and has two tabs: **Readings** and **Findings fan-out**.
+description, its marker and its labels — and has two tabs: **Readings**, the default one, and
+**Findings fan-out**.
+
+The address of the page keeps the tab and the finding searched, so that a fan-out is shared by its
+link: `/extension/scorecard/estate/<name>?tab=fanout&finding=CVE-2024-38816` opens the fan-out of
+`CVE-2024-38816`, and a reload lands on the same fan-out.
 
 ### Readings
 
@@ -67,10 +72,32 @@ A switch showing the measured readings only appears once a project of the estate
 
 ### Findings fan-out
 
-The **Findings fan-out** tab searches one [security finding](../integrations/findings/findings.md)
-among the projects of the estate, by its external ID — a CVE, a rule ID — as the scanner gives it.
-Only the projects you can see, and whose findings you are granted the view of
-(`ProjectFindingsView`), are searched.
+The **Findings fan-out** tab follows one [security finding](../integrations/findings/findings.md)
+over the projects of the estate. Only the projects you can see, and whose findings you are granted
+the view of (`ProjectFindingsView`), are looked into.
+
+#### The most widespread findings
+
+Until a finding is searched, the tab answers "which finding hurts the most projects of this
+estate?": it lists the findings open in at least one of its projects, one row per external ID, by
+the number of projects of the estate in which they are open, then by severity — the highest a
+project reported it with — then by external ID. Each row gives:
+
+* the **external ID** and the title of the finding;
+* its **severity**;
+* the number of **projects** in which it is open, accepted and resolved: *Open in 3 · accepted in 1
+  · resolved in 0* — each project counted once, by its most exposed finding, and the state of the
+  finding in a project rolled up from the branches which count only, see
+  [Project roll-up](../integrations/findings/findings.md#project-roll-up);
+* when it was **first seen**, in any of these projects.
+
+The list stops at the 20 most widespread findings. A click on a row opens the fan-out of its
+finding, as searching its external ID does; *All open findings* goes back to the list.
+
+#### The fan-out of a finding
+
+The search box looks for one finding by its external ID — a CVE, a rule ID — as the scanner gives
+it.
 
 The finding is given with its title and a link to its description, and a summary: *2 projects of
 this estate report CVE-2024-38816: exposed in 1, accepted in 1, resolved in 0* — each project counted
@@ -112,7 +139,8 @@ The estate view is on the desktop UI only: the [mobile UI](../mobile/index.md) d
 ## API
 
 In GraphQL, `Estate.projectSets` gives the set of the estate of each of its projects — the readings
-the estate page shows — and `Estate.findings(externalId)` the findings of an external ID among its
+the estate page shows — `Estate.rankedFindings(size)` the findings open in its projects, the most
+widespread first, and `Estate.findings(externalId)` the findings of an external ID among its
 projects:
 
 ```graphql
@@ -121,6 +149,15 @@ projects:
     projectSets {
       project { name }
       readings { key value basis unknownReason target targetMet }
+    }
+    rankedFindings(size: 10) {
+      externalId
+      title
+      severity
+      openProjects
+      acceptedProjects
+      resolvedProjects
+      firstSeen
     }
     findings(externalId: "CVE-2024-38816") {
       project { name }
@@ -134,6 +171,10 @@ projects:
   }
 }
 ```
+
+`rankedFindings` returns 20 findings unless `size` says otherwise, and never more than 100: the
+ranking is computed by the database over all the findings of the estate, and only its top is
+returned.
 
 `counts` says whether the branch of an exposure counts toward the state of the finding in its
 project — the `state` of the finding is rolled up from these branches only.

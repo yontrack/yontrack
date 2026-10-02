@@ -5,6 +5,7 @@ import net.nemerosa.ontrack.extension.findings.model.FindingAcceptance
 import net.nemerosa.ontrack.extension.findings.model.FindingExposureState
 import net.nemerosa.ontrack.extension.findings.model.FindingSeverity
 import net.nemerosa.ontrack.extension.findings.model.FindingState
+import net.nemerosa.ontrack.extension.findings.model.RankedFinding
 import net.nemerosa.ontrack.extension.findings.repository.FindingRepository
 import net.nemerosa.ontrack.extension.findings.security.ProjectFindingsView
 import net.nemerosa.ontrack.extension.findings.state.FindingStateService
@@ -139,6 +140,18 @@ class FindingQueryServiceImpl(
                     .thenBy { it.scanner }
                     .thenBy { it.location }
             )
+    }
+
+    override fun getRankedFindings(projectIds: Collection<Int>, size: Int, date: LocalDate): List<RankedFinding> {
+        val countingBranchIds = projectIds.distinct()
+            .mapNotNull { projectId -> visibleProject(projectId) }
+            .associate { project -> project.id() to findingStateService.getCountingBranchIds(project) }
+        if (countingBranchIds.isEmpty()) return emptyList()
+        return findingRepository.findRankedFindings(
+            countingBranchIds = countingBranchIds,
+            date = date,
+            size = size.coerceIn(0, FindingQueryService.MAX_RANKED_FINDINGS),
+        )
     }
 
     override fun findFindingById(id: Int): Finding? =

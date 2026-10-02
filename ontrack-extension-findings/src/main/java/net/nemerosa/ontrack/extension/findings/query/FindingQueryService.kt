@@ -6,6 +6,7 @@ import net.nemerosa.ontrack.extension.findings.model.FindingAcceptance
 import net.nemerosa.ontrack.extension.findings.model.FindingExposure
 import net.nemerosa.ontrack.extension.findings.model.FindingObservation
 import net.nemerosa.ontrack.extension.findings.model.FindingState
+import net.nemerosa.ontrack.extension.findings.model.RankedFinding
 import net.nemerosa.ontrack.model.pagination.PaginatedList
 import net.nemerosa.ontrack.model.structure.Branch
 import net.nemerosa.ontrack.model.structure.Project
@@ -76,6 +77,25 @@ interface FindingQueryService {
     fun getFindingsByExternalId(externalId: String, projectIds: Collection<Int>? = null): List<Finding>
 
     /**
+     * The external IDs of the findings open in at least one of the given projects, ranked by the
+     * number of these projects in which they are open, then by severity, the highest first, then by
+     * external ID: which finding hurts the most projects.
+     *
+     * The state of a finding in its project is the one of [getFindingState]: rolled up from the
+     * branches which count only.
+     *
+     * @param projectIds IDs of the projects to look into. The projects whose findings the user
+     * cannot see are left out.
+     * @param size Maximum number of external IDs to return, at most [MAX_RANKED_FINDINGS]
+     * @param date Day against which the expiry of the acceptances is evaluated
+     */
+    fun getRankedFindings(
+        projectIds: Collection<Int>,
+        size: Int = DEFAULT_RANKED_FINDINGS,
+        date: LocalDate = Time.now.toLocalDate(),
+    ): List<RankedFinding>
+
+    /**
      * Finding by ID, `null` when it does not exist or cannot be seen.
      */
     fun findFindingById(id: Int): Finding?
@@ -107,6 +127,18 @@ interface FindingQueryService {
      * observation carries none or when all the observations have been purged.
      */
     fun getFindingAcceptance(finding: Finding): FindingAcceptance?
+
+    companion object {
+        /**
+         * Number of ranked findings returned by default
+         */
+        const val DEFAULT_RANKED_FINDINGS = 20
+
+        /**
+         * Maximum number of ranked findings returned, whatever the size asked for
+         */
+        const val MAX_RANKED_FINDINGS = 100
+    }
 }
 
 /**

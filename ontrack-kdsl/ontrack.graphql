@@ -2142,6 +2142,11 @@ type Estate {
   projectSets: [ScorecardSet!]!
   "Projects the estate selects, the ones carrying all its labels, among the ones the user can see"
   projects: [Project!]!
+  "Security findings open in at least one project of the estate, one per external ID, ranked by the number of projects of the estate in which they are open, then by severity, the highest first, then by external ID: which finding hurts the most projects. A finding is open in a project as its state says, on the branches which count only. Only the projects the user can see, and whose findings the user is granted the view of, are counted."
+  rankedFindings(
+    "Maximum number of findings to return, at most 100"
+    size: Int = 20
+  ): [RankedFinding!]!
   "Window override and target of the readings which have one, by reading key"
   readingConfigs: [EstateReadingConfig!]!
   "What the estate expects of the security scans of its projects"
@@ -6228,6 +6233,24 @@ type QueueSource {
   feature: String!
   "ID of the QueueSourceExtension which provides the information."
   id: String!
+}
+
+"One external ID of the security findings of some projects, with the number of these projects in which it is open, accepted or resolved, each project counted once, by its most exposed finding."
+type RankedFinding {
+  "Number of projects in which the finding is accepted, and not open"
+  acceptedProjects: Int!
+  "External ID of the findings, like a CVE or a rule ID"
+  externalId: String!
+  "Earliest time any of the findings was first seen"
+  firstSeen: LocalDateTime!
+  "Number of projects in which the finding is open"
+  openProjects: Int!
+  "Number of projects in which the finding is resolved: neither open nor accepted"
+  resolvedProjects: Int!
+  "Highest maximum severity of the findings"
+  severity: FindingSeverity!
+  "Title of the findings, the one of the most exposed, then most severe, of them"
+  title: String!
 }
 
 "Rate limit representation"
