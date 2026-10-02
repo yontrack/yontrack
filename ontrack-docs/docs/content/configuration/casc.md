@@ -137,6 +137,7 @@ ontrack:
     settings:
       delivery-scorecard:
         windowDays: 90
+        securityFreshnessDays: 7
     estates:
       - name: Products
         labels:
@@ -147,6 +148,10 @@ ontrack:
         readings:
           - key: delivery.leadTime
             target: 86400
+        security:
+          expectedKinds:
+            - DEPENDENCIES
+          highTargetDays: 14
 ```
 
 The `estates` list is **authoritative**: an estate it does not name is deleted, with its

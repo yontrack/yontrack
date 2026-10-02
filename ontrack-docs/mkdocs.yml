@@ -109,6 +109,7 @@ nav:
   - Delivery scorecard:
       - content/scorecard/scorecard.md
       - Estates: content/scorecard/estates.md
+      - Estate view: content/scorecard/estate-view.md
   - Dashboards:
       - Overview: content/dashboards/index.md
       - Dashboards as Code: content/dashboards/dashboards-as-code.md

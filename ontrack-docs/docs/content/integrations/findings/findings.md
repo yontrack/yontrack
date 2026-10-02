@@ -531,6 +531,12 @@ In the UI:
 * the page of a **validation run** lists the findings of this scan.
 * the **search** finds a finding by its external ID: searching `CVE-2021-44228` lists the projects and
   branches where it is exposed or accepted, and leads to the finding page.
+* the **findings fan-out** of an [estate](../../scorecard/estate-view.md#findings-fan-out) lists the
+  projects of the estate reporting an external ID, with the state of the finding in each and the
+  branches exposing it.
+* the [security readings](../../scorecard/scorecard.md#security-readings) of the delivery scorecard
+  read the scans and findings of a project: its security maturity, how long its `CRITICAL` and
+  `HIGH` findings stay open, and how many are open past the targets of its estates.
 
 Everywhere a number of findings is given by severity, it is a tag in the colour of the severity —
 red for critical, orange for high, gold for medium, blue for low, grey for unknown — which names the

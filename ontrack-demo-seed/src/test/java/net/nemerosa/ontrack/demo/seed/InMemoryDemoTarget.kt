@@ -223,6 +223,7 @@ class InMemoryDemoTarget(
             val estate = held.spec
             add("estate ${estate.name} \"${estate.description}\" ${estate.labels} ${estate.marker}")
             estate.readings.forEach { add("  reading ${it.key} window ${it.windowDays} target ${it.target}") }
+            add("  security ${estate.security}")
         }
         dashboards.forEach { held ->
             val dashboard = held.dashboard

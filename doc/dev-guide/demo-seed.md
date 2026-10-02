@@ -283,6 +283,38 @@ demo, and fill in one day at a time on an instance which is not reset daily. Bac
 the ledger's question (`docs/grilling/2026-09-scorecard/README.md`, *What this hands to the ledger*),
 not the seed's.
 
+### The security readings read the findings projects
+
+The security readings of the scorecard (#1912) read the scans of `petclinic-billing` and
+`petclinic-visits`, against what each estate expects (`EstateSpec.security`): "Demo products" a
+dependency and a code scan within a week, a week for a CRITICAL and two for a HIGH; "Demo
+production" a dependency scan, with the freshness of the settings. What each reading shows is a scan
+of the dataset:
+
+- **Maturity at every rung.** `petclinic-billing` is at 3, gating: build 311's dependency scan fails
+  on a CRITICAL nobody accepted, and that build is not promoted. `petclinic-visits` scans its
+  dependencies only, on its last four builds: 1 in "Demo products", 2 in "Demo production" and with
+  no estate. `petclinic` and `petclinic-ui` are at 0 - `SECURITY.SCAN` is a plain stamp, not a scan.
+- **Remediation time.** `petclinic-billing` fixes a HIGH on `release-2.3` in eleven days and that
+  CRITICAL on `main` in three, each reported on one branch only, so resolved for the project as
+  soon as that branch fixes it: a median of seven days, within the target. `petclinic-visits` takes
+  fourteen days to bump spring-webmvc, and misses it.
+- **Overdue findings.** `CVE-2024-38816`, still open on `release-2.3` sixteen days after its first
+  scan, is the one HIGH past its fourteen days. The accepted findings are counted apart.
+- **The fan-out.** `CVE-2024-38816` is also reported by `petclinic-visits`, on spring-webflux under
+  an acceptance and on spring-webmvc until the bump: searched in "Demo products", it is open in one
+  project, accepted and resolved in the other.
+
+A finding of a project is keyed by its scanner, external ID and location, which is why the CVE on
+spring-webflux and on spring-webmvc are two findings of `petclinic-visits`. And a finding is first
+seen by the first scan *ingested*: each finding the readings time is reported on one branch only, in
+the order its builds are seeded, so that its first observation and its resolution are the dates of
+its builds. `DemoSecurityReadingsSeedTest` pins all of it; the readings themselves are the server's,
+and are checked by seeding the dev stack.
+
+The estate view and its fan-out are in the release-notes screenshots
+(`ontrack-web-tests/screenshots/catalogue.js`, `estate` and `estate-fanout`).
+
 ### The long tables are a project of their own
 
 A sticky table header (#1932) only shows on a table which overflows what it is shown in, and the

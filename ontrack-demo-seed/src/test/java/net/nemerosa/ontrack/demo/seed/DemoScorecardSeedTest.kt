@@ -85,7 +85,7 @@ class DemoScorecardSeedTest {
         assertEquals(setOf(DemoContent.SERVICE, DemoContent.VISITS), products intersect production)
         assertTrue((products - production).isNotEmpty(), "A product which is not in production")
         assertTrue((production - products).isNotEmpty(), "Something in production which is not a product")
-        // README *Demo*: the findings are read by the estate of the products (6.1)
+        // README *Demo*: the findings are read by the estate of the products (#1912)
         assertTrue(DemoContent.SECURITY in products, "The findings project is in the products estate")
     }
 

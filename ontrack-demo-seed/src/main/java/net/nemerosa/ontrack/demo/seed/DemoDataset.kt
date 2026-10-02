@@ -568,6 +568,9 @@ enum class ValidationStatus {
  * @property marker What the delivery readings are read up to, `null` for the default marker.
  * @property readings Window override and target per reading. A reading absent here is still shown,
  * over the settings window, and judged against nothing.
+ * @property security What the estate expects of the security scans of its projects, which is what its
+ * security readings are judged by: the kinds of scan which make a project covered, and the remediation
+ * targets its overdue findings are counted against.
  */
 data class EstateSpec(
     val name: String,
@@ -575,6 +578,25 @@ data class EstateSpec(
     val labels: List<String>,
     val marker: EstateMarkerSpec? = null,
     val readings: List<EstateReadingSpec> = emptyList(),
+    val security: EstateSecuritySpec = EstateSecuritySpec(),
+)
+
+/**
+ * What an estate expects of the security scans of its projects - `EstateSecurity` on the server side.
+ *
+ * @property expectedKinds Kinds of scan every project must have run, each fresher than [freshnessDays],
+ * for its security maturity to reach "covered". None: any fresh scan covers a project.
+ * @property freshnessDays Number of days a scan stays fresh, `null` for the one of the settings
+ * @property criticalTargetDays Number of days a CRITICAL finding may stay open before it is overdue,
+ * `null` for no target
+ * @property highTargetDays Number of days a HIGH finding may stay open before it is overdue, `null` for
+ * no target
+ */
+data class EstateSecuritySpec(
+    val expectedKinds: List<ScanKind> = emptyList(),
+    val freshnessDays: Int? = null,
+    val criticalTargetDays: Int? = null,
+    val highTargetDays: Int? = null,
 )
 
 /**
@@ -613,6 +635,9 @@ object ReadingKeys {
     const val DELIVERY_MTTR = "delivery.mttr"
     const val QUALITY_TEST_PASS_RATE = "quality.testPassRate"
     const val QUALITY_TEST_FLAKINESS = "quality.testFlakiness"
+    const val SECURITY_MATURITY = "security.maturity"
+    const val SECURITY_REMEDIATION_TIME = "security.remediationTime"
+    const val SECURITY_OVERDUE = "security.overdue"
 
     val ALL = listOf(
         DELIVERY_LEAD_TIME,
@@ -621,5 +646,8 @@ object ReadingKeys {
         DELIVERY_MTTR,
         QUALITY_TEST_PASS_RATE,
         QUALITY_TEST_FLAKINESS,
+        SECURITY_MATURITY,
+        SECURITY_REMEDIATION_TIME,
+        SECURITY_OVERDUE,
     )
 }

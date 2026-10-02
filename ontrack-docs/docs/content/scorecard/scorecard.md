@@ -1,8 +1,8 @@
 # Delivery scorecard
 
 The **delivery scorecard** of a project answers "how is this project delivering?" with a handful of
-numbers Yontrack takes from its own data — its builds, promotions, deployments and test
-validations. Nothing is entered by hand.
+numbers Yontrack takes from its own data — its builds, promotions, deployments, test
+validations and [security scans](../integrations/findings/findings.md). Nothing is entered by hand.
 
 !!! note
 
@@ -58,8 +58,9 @@ targets. A project's no-estate readings are the same whether or not it belongs t
 
 ## The readings
 
-Six readings make the catalogue. The four **delivery** readings are read up to the marker; the
-two **quality** readings read the test validations of the branches in scope, whatever the marker.
+Nine readings make the catalogue. The four **delivery** readings are read up to the marker; the
+two **quality** readings read the test validations of the branches in scope, and the three
+**security** readings their security scans and findings, whatever the marker.
 
 | Reading       | Key                     | Unit                    | Better when |
 |---------------|-------------------------|-------------------------|-------------|
@@ -69,6 +70,9 @@ two **quality** readings read the test validations of the branches in scope, wha
 | Time to restore | `delivery.mttr`       | Duration (median)       | lower       |
 | Test pass rate | `quality.testPassRate` | Percentage, 0 to 100    | higher      |
 | Test flakiness | `quality.testFlakiness` | Percentage, 0 to 100   | lower       |
+| Security maturity | `security.maturity` | Rung, 0 to 3          | higher      |
+| Remediation time | `security.remediationTime` | Duration (median) | lower      |
+| Overdue findings | `security.overdue`   | Count                   | lower       |
 
 Through the API, durations are given in **seconds**. A duration reading keeps the median as its
 value; its 90th percentile, mean, minimum, maximum and sample count are in its details. There is no
@@ -141,6 +145,54 @@ stamp:
 :   The share of these builds where some test stamp has a `FAILED` run followed — immediately or
     not — by a `PASSED` one.
 
+### Security readings
+
+A **scan** is a run of a `security-findings` validation stamp — a run posted with the report of a
+[security scan](../integrations/findings/findings.md) — on a branch in scope. Its **kind** is the one
+the report was sent with — `IMAGE`, `CODE`, `SECRETS`, `DAST`, `DEPENDENCIES` or `OTHER` — and its
+status is the one the thresholds of its stamp gave it when it was created. A scan sent before
+Yontrack 6 recorded the kind has the kinds of the findings it reported.
+
+**Security maturity**
+:   How far the project has climbed a ladder of four rungs. Each rung needs the ones below it, and
+    the rung is the value, shown as `2 · Covered`:
+
+    | Rung | Name     | Reached when                                                                              |
+    |------|----------|-------------------------------------------------------------------------------------------|
+    | 0    | None     | No scan in the window.                                                                    |
+    | 1    | Reported | A scan in the window.                                                                     |
+    | 2    | Covered  | Every kind of scan the estate [expects](estates.md#security-scans-and-remediation-targets) has a scan fresher than its freshness. With no expected kind — as always with no estate — some scan is fresher than it. |
+    | 3    | Gating   | A `security-findings` stamp is required by a promotion level of its branch, through its [auto promotion](../concepts/model/auto-promotion.md), or a scan was created `FAILED` in the window. |
+
+    The freshness is the estate's, else the *Security scan freshness* of the [settings](#settings):
+    a scan is fresh when it is younger than that many days at the time of the reading, even if it is
+    older than the window. The maturity is never unknown: no scan reads 0. Its details give the
+    scans of the window, the kinds expected, fresh and missing, the failed scans, the stamps
+    required by a promotion and the time of the latest scan.
+
+**Remediation time**
+:   How long the `CRITICAL` and `HIGH` findings of the project stay open: from the **first
+    observation** of a finding to its **resolution in the project**, for the findings resolved in the
+    window. The median goes in the value, with the 90th percentile, mean, minimum, maximum and count
+    in the details. A finding is resolved in the project once no branch in scope exposes it any more
+    — see [Project roll-up](../integrations/findings/findings.md#project-roll-up) — so a vulnerability
+    fixed on `main` and still exposed on a release branch is not remediated yet. The location of a
+    finding carries no version: bumping a dependency to a version which is still vulnerable does not
+    resolve it. It reads the same in every set, and needs no target to be measured.
+
+**Overdue findings**
+:   The open `CRITICAL` findings older than the estate's CRITICAL remediation target, plus the open
+    `HIGH` findings older than its HIGH target, at the time of the reading. The age of a finding runs
+    from its first observation, and a finding is overdue once **strictly** older than its target. An
+    estate with a target for one severity only judges the findings of that severity; with no target
+    at all — the no-estate set, or an estate with neither — the reading is `UNKNOWN (NO_TARGET)`.
+    Its details give the open and overdue findings of each severity, the targets, and the first
+    observation of the oldest overdue finding.
+
+For both remediation readings, the severity of a finding is the highest it was ever reported with,
+and an **accepted** finding is neither open nor resolved: the accepted `CRITICAL` and `HIGH`
+findings are counted apart, as `accepted` in the details.
+
 ### Unknown readings
 
 A reading Yontrack cannot take is `UNKNOWN`, with one of these reasons:
@@ -148,10 +200,11 @@ A reading Yontrack cannot take is `UNKNOWN`, with one of these reasons:
 | Reason          | Meaning                                                                                     |
 |-----------------|---------------------------------------------------------------------------------------------|
 | `NO_MARKER`     | No marker to read up to: no branch in scope has the promotion level, or the project has no slot in the marker environment with that qualifier, or that environment does not exist. |
-| `NO_SAMPLES`    | Nothing to measure in the window: nothing reached the marker, no build was run on a test stamp, or — for the time to restore — an outage is still going on and none was restored. |
+| `NO_SAMPLES`    | Nothing to measure in the window: nothing reached the marker, no build was run on a test stamp, for the time to restore an outage is still going on and none was restored, or — for the remediation time — no `CRITICAL` or `HIGH` finding was resolved in the window. |
 | `NO_FAILURE`    | Time to restore only: nothing failed in the window, so there was nothing to restore. Shown as *No failure in window*, a neutral state rather than an unknown one. A time to restore never reads 0. |
 | `NO_TEST_STAMP` | Test readings only: no test stamp on the branches in scope.                                 |
 | `NOT_LICENSED`  | Delivery readings up to an environment, when the license does not include the environments. |
+| `NO_TARGET`     | Overdue findings only: no remediation target to judge the findings against — the no-estate set, or an estate with neither a CRITICAL nor a HIGH target. |
 
 ## Computing the readings
 
@@ -178,6 +231,7 @@ The *Delivery scorecard* settings, in _System > Settings_, hold:
 | Window     | 90 days       | Number of days a reading is taken over. An estate may override it per reading. |
 | Retention  | 730 days      | Number of days the daily snapshots are kept.                          |
 | Schedule   | `0 0 2 * * *` | Cron schedule of the daily computation, in the time zone of the server. |
+| Security scan freshness | 7 days | Number of days a security scan stays fresh, for the [security maturity](#security-readings) of a project read with no estate, and of an estate which sets none. |
 
 As [code](../configuration/casc.md):
 
@@ -189,6 +243,7 @@ ontrack:
         windowDays: 90
         retentionDays: 730
         cron: "0 0 2 * * *"
+        securityFreshnessDays: 7
 ```
 
 ## On the project page
@@ -239,7 +294,8 @@ its marker and, for an estate, its labels — and gives one large tile per readi
 * the target, and what explains the value: the sample count, the 90th percentile, mean, minimum
   and maximum of a duration, the builds promoted out of those counted and the builds left out as in
   flight, the outages still open, the deployments done and failed, the builds passed or flaky, the
-  test stamps read;
+  test stamps read, the kinds of scan fresh and missing, the failed scans, the open and overdue
+  findings and the accepted ones;
 * when it was computed.
 
 ![An estate on the scorecard page of a project](scorecard-page.png)
@@ -249,6 +305,8 @@ its marker and, for an estate, its labels — and gives one large tile per readi
 The [Project scorecard](../dashboards/widgets/project-scorecard.md) widget shows the scorecard of a
 project on a dashboard: a tab per set, the ring of the targets met in an estate and its judged
 readings, and a link to the scorecard page on the set shown.
+
+The [estate view](estate-view.md) shows the readings of every project of an estate side by side.
 
 The scorecard is on the desktop UI only: the [mobile UI](../mobile/index.md) does not show it.
 

@@ -466,6 +466,20 @@ fun DemoDataset.validate() {
                 problems += "$where reads ${reading.key} over a window of ${reading.windowDays} days."
             }
         }
+        // The server's own checks of the security fields, before anything is deleted
+        val security = estate.security
+        if (security.freshnessDays != null && security.freshnessDays <= 0) {
+            problems += "$where keeps its security scans fresh for ${security.freshnessDays} days."
+        }
+        if (security.criticalTargetDays != null && security.criticalTargetDays < 0) {
+            problems += "$where gives its CRITICAL findings a target of ${security.criticalTargetDays} days."
+        }
+        if (security.highTargetDays != null && security.highTargetDays < 0) {
+            problems += "$where gives its HIGH findings a target of ${security.highTargetDays} days."
+        }
+        if (security.expectedKinds.size != security.expectedKinds.toSet().size) {
+            problems += "$where expects the same kind of scan more than once."
+        }
     }
 
     require(problems.isEmpty()) {

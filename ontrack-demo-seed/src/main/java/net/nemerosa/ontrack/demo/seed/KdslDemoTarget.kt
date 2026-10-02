@@ -43,6 +43,7 @@ import net.nemerosa.ontrack.kdsl.spec.extension.scm.mockScmProjectProperty
 import net.nemerosa.ontrack.kdsl.spec.extension.scorecard.Estate
 import net.nemerosa.ontrack.kdsl.spec.extension.scorecard.EstateMarker
 import net.nemerosa.ontrack.kdsl.spec.extension.scorecard.EstateReadingConfig
+import net.nemerosa.ontrack.kdsl.spec.extension.scorecard.EstateSecurity
 import net.nemerosa.ontrack.kdsl.spec.extension.scorecard.estates
 import net.nemerosa.ontrack.kdsl.spec.extension.scorecard.recomputeScorecardAndWait
 import net.nemerosa.ontrack.kdsl.spec.setProperty
@@ -203,6 +204,12 @@ class KdslDemoTarget(private val ontrack: Ontrack) : DemoTarget {
             readings = spec.readings.map {
                 EstateReadingConfig(key = it.key, windowDays = it.windowDays, target = it.target)
             },
+            security = EstateSecurity(
+                expectedKinds = spec.security.expectedKinds.map { FindingKind.safeValueOf(it.name) },
+                freshnessDays = spec.security.freshnessDays,
+                criticalTargetDays = spec.security.criticalTargetDays,
+                highTargetDays = spec.security.highTargetDays,
+            ),
         )
     }
 

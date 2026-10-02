@@ -230,10 +230,14 @@ This only concerns an instance with pull requests enabled
 ### Delivery metrics and the delivery scorecard
 
 Yontrack 6 introduces the [delivery scorecard](../scorecard/scorecard.md): lead time, frequency,
-success rate, time to restore, test pass rate and test flakiness, read every day for every project
-and kept as daily snapshots, and read together, against targets, in licensed
-[estates](../scorecard/estates.md). The delivery-metrics extension of Yontrack 5 is removed, and
-its promotion-level charts now run on the samples of the scorecard.
+success rate, time to restore, test pass rate and test flakiness, and the
+[security readings](../scorecard/scorecard.md#security-readings) — security maturity, remediation
+time and overdue findings, read from the [security scans](../integrations/findings/findings.md) —
+read every day for every project and kept as daily snapshots, and read together, against targets,
+in licensed [estates](../scorecard/estates.md). The [estate view](../scorecard/estate-view.md) shows
+the projects of an estate side by side, and fans one finding out over them. The delivery-metrics
+extension of Yontrack 5 is removed, and its promotion-level charts now run on the samples of the
+scorecard.
 
 #### For deployers
 
@@ -288,6 +292,13 @@ renaming:
 **New:** the *Delivery scorecard* [settings](../scorecard/scorecard.md#settings), the daily jobs of
 the *Delivery scorecard* category, and the `ontrack_readings_computation` and
 `ontrack_readings_errors` metrics.
+
+#### For API clients
+
+The data of a `security-findings` validation run now records the **kind** of the scan — `IMAGE`,
+`CODE`, `SECRETS`, `DAST`, `DEPENDENCIES` or `OTHER` — beside the counts by severity, as `kind`. It
+is what the [security maturity](../scorecard/scorecard.md#security-readings) reads; a run sent
+before Yontrack 6 has none, and is read by the kinds of the findings it reported.
 
 #### For CasC users
 

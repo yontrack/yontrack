@@ -32,6 +32,13 @@ the `GOLD` promotion in one, its lead time to `production` in another.
 :   Per reading, optionally: a window overriding the one of the
     [settings](scorecard.md#settings), and a target — see [Targets](#targets).
 
+**Security scans**
+:   Optionally: the kinds of scan the projects must run, how long a scan stays fresh, and how long
+    a `CRITICAL` and a `HIGH` finding may stay open — see
+    [Security scans and remediation targets](#security-scans-and-remediation-targets).
+
+The estates are listed, and their projects read side by side, in the [estate view](estate-view.md).
+
 ## Marker
 
 | Marker      | The delivery readings are read up to                                                  |
@@ -60,14 +67,43 @@ A target is one threshold per reading. Which way it judges is fixed by the readi
 | Time to restore  | ≤ target              |
 | Test pass rate   | ≥ target              |
 | Test flakiness   | ≤ target              |
+| Security maturity | ≥ target, a rung from 0 to 3 |
+| Remediation time | ≤ target              |
+| Overdue findings | ≤ target              |
 
 A reading is then **met** or **missed** — there is no third state. A reading with no target is
 shown, not judged, and an unknown reading is not judged either. A time to restore with no failure
 in the window reads *No failure in window*, neither met nor missed.
 
 Targets are in the unit of the reading: **seconds** for a duration, **per week** for a frequency,
-**0 to 100** for a rate. The estates page lets you enter a duration in minutes, hours or days, and
-converts it.
+**0 to 100** for a rate, a **rung** for the security maturity — `2` for *covered* — and a **count**
+for the overdue findings — `0` for none. The estates page lets you enter a duration in minutes,
+hours or days, and converts it, and a rung by its name.
+
+The target of the overdue findings judges their **count**; how old a finding may get before it
+counts is set by the remediation targets of the estate, below.
+
+## Security scans and remediation targets
+
+What an estate expects of the [security scans](../integrations/findings/findings.md) of its
+projects, which is what its [security readings](scorecard.md#security-readings) are read against.
+Every field is optional:
+
+| Field                        | Meaning                                                                       |
+|------------------------------|-------------------------------------------------------------------------------|
+| Expected scans               | Kinds of scan — `IMAGE`, `CODE`, `SECRETS`, `DAST`, `DEPENDENCIES`, `OTHER` — every project must have run, each fresher than the freshness, to be **covered** (maturity 2). None: any fresh scan covers a project, as with no estate. |
+| Scan freshness               | Number of days a scan stays fresh. Empty for the *Security scan freshness* of the [settings](scorecard.md#settings), 7 days by default. |
+| CRITICAL fixed within        | Number of days a `CRITICAL` finding may stay open before it is **overdue**. Empty for no target. |
+| HIGH fixed within            | Number of days a `HIGH` finding may stay open before it is **overdue**. Empty for no target. |
+
+With neither remediation target, the overdue findings of the estate read `UNKNOWN (NO_TARGET)`;
+with one, only the findings of that severity are judged. The remediation time needs no target to
+be measured — the estate may still judge it against a target of its readings.
+
+For example, an estate expecting `DEPENDENCIES` and `CODE` scans within 7 days, with 7 days for a
+`CRITICAL` and 14 for a `HIGH`, reads a project scanning its dependencies only at maturity 1
+(*reported*), and counts as overdue a `HIGH` first seen 16 days ago and still open on any branch in
+scope.
 
 ## The estates page
 
@@ -77,13 +113,16 @@ converts it.
 * the labels,
 * the marker — *Default*, *Promotion: GOLD*, *Environment: production*, with the qualifier if any,
 * the windows and targets — *Lead time: ≤ 1d, over 30 days* — or *Default windows, no target*,
+* the security scans — *Code, Dependencies scans fresher than 7 days*, *CRITICAL fixed within 7
+  days, HIGH within 14 days* — or *Any scan, default freshness*,
 * the number of projects the estate selects, which lists them on click,
 * when the estate's readings were last computed.
 
 *New estate* and the pencil of a row open the estate dialog: the name, the description, the labels,
 the marker — *Default*, *Promotion level* with its name, or *Environment* with its name and an
-optional qualifier — and, per reading, a window in days (empty for the window of the settings) and
-a target (empty for none).
+optional qualifier — per reading, a window in days (empty for the window of the settings) and
+a target (empty for none), and the [security scans](#security-scans-and-remediation-targets): the
+expected kinds, the freshness and the two remediation targets, in days.
 
 *Recompute* on a row queues the recompute of the readings of every project of the estate; the row
 shows it running. *Delete* asks for confirmation, then deletes the estate and its snapshots: the
@@ -91,7 +130,7 @@ projects and the labels are kept.
 
 The estates page is on the desktop UI only.
 
-## Security
+## Permissions
 
 Creating, editing, deleting and recomputing estates needs the `EstateManagement` global function,
 granted to the *Administrator* and *Creator* roles — the ones managing the labels, since the labels
@@ -140,12 +179,26 @@ ontrack:
           kind: ENVIRONMENT
           environment: production
           qualifier: ""          # optional, the default slots
+        readings:
+          - key: security.maturity
+            target: 2            # covered
+          - key: security.overdue
+            target: 0
+        security:
+          expectedKinds:
+            - DEPENDENCIES
+            - IMAGE
+          freshnessDays: 7       # optional, the settings' freshness
+          criticalTargetDays: 7  # optional, no target
+          highTargetDays: 30     # optional, no target
 ```
 
 * A label is written `category:name`, or `name` for a label without a category.
 * `marker` is omitted for the default marker.
 * A reading is listed only for a window override or a target; `windowDays` and `target` are both
   optional.
+* `security` is omitted for an estate expecting nothing of the security scans; each of its fields
+  is optional.
 * **The list is authoritative**: an estate it names is created or updated, and an existing estate
   it does not name is deleted, with its snapshots.
 * Without the Delivery scorecard license, the list is ignored with a warning, and Yontrack starts.
@@ -162,13 +215,19 @@ mutation {
     name: "Products",
     labels: ["portfolio:product"],
     marker: {kind: PROMOTION, levelName: "GOLD"},
-    readings: [{key: "delivery.leadTime", target: 86400}]
+    readings: [{key: "delivery.leadTime", target: 86400}],
+    security: {expectedKinds: [DEPENDENCIES, CODE], criticalTargetDays: 7, highTargetDays: 14}
   }) {
     estate { id name }
     errors { message }
   }
 }
 ```
+
+`Estate.security` gives what the estate expects of the security scans. `Estate.projectSets` gives
+the set of the estate of each of its projects, which is what the [estate view](estate-view.md)
+shows, and `Estate.findings(externalId)` the findings of an external ID among its projects, which is
+its findings fan-out.
 
 On a project, each estate's readings are a set of
 [`Project.scorecard`](scorecard.md#api), with its `estate`, and each reading gives its `target` and
@@ -183,6 +242,12 @@ val estate = ontrack.estates.create(
     marker = EstateMarker.Promotion("GOLD"),
     readings = listOf(
         EstateReadingConfig(key = ReadingKeys.DELIVERY_LEAD_TIME, target = 86400.0),
+        EstateReadingConfig(key = ReadingKeys.SECURITY_OVERDUE, target = 0.0),
+    ),
+    security = EstateSecurity(
+        expectedKinds = listOf(FindingKind.DEPENDENCIES, FindingKind.CODE),
+        criticalTargetDays = 7,
+        highTargetDays = 14,
     ),
 )
 // Recomputes the readings of the estate's projects and waits for them, by project name

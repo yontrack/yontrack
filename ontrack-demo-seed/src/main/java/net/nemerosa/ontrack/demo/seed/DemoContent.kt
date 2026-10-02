@@ -108,6 +108,19 @@ object DemoContent {
     const val CVE_ACCEPTED = "CVE-2022-1471"
 
     /**
+     * A CRITICAL reported by one build of [MAIN] of [SECURITY], whose dependency scan it fails, and
+     * fixed by the next build: a resolved finding for the remediation time, and the failed scan which
+     * makes [SECURITY] gating.
+     */
+    const val CVE_CRITICAL_FIXED = "CVE-2024-1597"
+
+    /**
+     * A HIGH reported by the first build of [SECURITY_RELEASE] and fixed by the next: the other
+     * resolved finding of the remediation time, which reads the median of the two.
+     */
+    const val CVE_HIGH_FIXED = "CVE-2024-7254"
+
+    /**
      * What [silverAuto] selects its validation stamps by. A constant because the demo is read
      * against it in more than one place, and because it is the one piece of the dataset's
      * vocabulary that is a pattern rather than a name: it must keep matching [UNIT_TESTS] and
@@ -773,7 +786,7 @@ object DemoContent {
         // Same team as the service, another language: the two categories cut the demo's
         // projects in two different ways, which is what makes filtering on both interesting.
         // In production, so in the "Demo production" estate - where nothing has ever reached its slot,
-        // whose rules are broken on purpose, and every reading is unknown for want of a deployment.
+        // whose rules are broken on purpose, and every delivery reading is unknown for want of a deployment.
         labels = listOf(LABEL_TEAM_APPS, LABEL_LANGUAGE_JAVASCRIPT, LABEL_RUNS_IN_PRODUCTION),
         branches = listOf(
             BranchSpec(
@@ -874,6 +887,30 @@ object DemoContent {
         fixedVersion = "2.14.0",
     )
 
+    /**
+     * Reported by [CVE_CRITICAL_FIXED]'s build only, and not accepted: it fails the dependency scan of
+     * that build, which is what makes the security maturity of [SECURITY] reach "gating".
+     */
+    private val pgjdbcSqlInjection = FindingSpec(
+        externalId = CVE_CRITICAL_FIXED,
+        location = "pkg:maven/org.postgresql/postgresql",
+        severity = FindingSeverity.CRITICAL,
+        title = "SQL injection in pgjdbc when using the simple query mode",
+        url = "https://nvd.nist.gov/vuln/detail/$CVE_CRITICAL_FIXED",
+        installedVersion = "42.7.1",
+        fixedVersion = "42.7.2",
+    )
+
+    private val protobufStackOverflow = FindingSpec(
+        externalId = CVE_HIGH_FIXED,
+        location = "pkg:maven/com.google.protobuf/protobuf-java",
+        severity = FindingSeverity.HIGH,
+        title = "Stack overflow in protobuf-java when parsing nested groups",
+        url = "https://nvd.nist.gov/vuln/detail/$CVE_HIGH_FIXED",
+        installedVersion = "3.25.3",
+        fixedVersion = "3.25.5",
+    )
+
     private val insecureCookie = FindingSpec(
         externalId = "java/insecure-cookie",
         location = "src/main/java/org/springframework/samples/petclinic/billing/web/InvoiceController.java",
@@ -904,8 +941,9 @@ object DemoContent {
      * with the dev licence.
      *
      * @param highFixed Whether the build carries the fix of [CVE_FIXED_ON_MAIN]
+     * @param alsoReports Findings the dependency scan of this build reports besides the usual ones
      */
-    private fun securityScans(highFixed: Boolean) = listOf(
+    private fun securityScans(highFixed: Boolean, alsoReports: List<FindingSpec>) = listOf(
         ScanSpec(
             validationStamp = SECURITY_DEPENDENCIES,
             format = ScanFormat.FINDINGS,
@@ -915,7 +953,7 @@ object DemoContent {
                 snakeYamlConstructor,
                 springWebMvcPath.takeUnless { highFixed },
                 commonsIoXmlStreamReader,
-            ),
+            ) + alsoReports,
         ),
         ScanSpec(
             validationStamp = SECURITY_CODE,
@@ -932,14 +970,16 @@ object DemoContent {
         description: String,
         creation: BuildCreation,
         highFixed: Boolean = false,
+        alsoReports: List<FindingSpec> = emptyList(),
+        promoted: Boolean = true,
     ) = BuildSpec(
         name = name,
         release = release,
         description = description,
         creation = creation,
-        promotionLevels = listOf(BRONZE),
+        promotionLevels = if (promoted) listOf(BRONZE) else emptyList(),
         validations = listOf(ValidationSpec(BUILD, PASSED)),
-        scans = securityScans(highFixed),
+        scans = securityScans(highFixed, alsoReports),
     )
 
     /**
@@ -953,6 +993,18 @@ object DemoContent {
      *   90 days: it counts as accepted, never as open, and fails no build.
      * * The code scan is posted in SARIF, and carries a HIGH accepted by a suppression - an
      *   acceptance without expiry, which is all SARIF can say.
+     * * [CVE_HIGH_FIXED], a HIGH, is reported by the first build of [SECURITY_RELEASE] and fixed by
+     *   the next one; [CVE_CRITICAL_FIXED], a CRITICAL, is reported by one build of [MAIN] - whose
+     *   dependency scan it FAILS, so the build is not promoted - and fixed by the next one. Each is
+     *   reported on one branch only, so resolved for the project as soon as its branch fixes it:
+     *   eleven days and three days, the two remediations whose median the remediation time reads
+     *   (#1912).
+     *
+     * What the security readings of the scorecard read here, in "Demo products" (#1912): a maturity
+     * of 3 - both expected kinds scanned the day before, and a scan which failed in the window - a
+     * remediation time of seven days, and one overdue finding: [CVE_FIXED_ON_MAIN], open on
+     * [SECURITY_RELEASE] for sixteen days against a target of fourteen for a HIGH. The two accepted
+     * findings are counted apart, in the details of both remediation readings.
      *
      * The release branch is declared - and so scanned - FIRST, because its builds are the oldest:
      * a finding is first seen by the first scan reporting it, whatever the date of a later one,
@@ -961,9 +1013,8 @@ object DemoContent {
     private fun security() = ProjectSpec(
         name = SECURITY,
         description = "Billing service of the sample application - the demo's security findings.",
-        // A product, so in the "Demo products" estate, which is where the security readings of an
-        // estate will read its findings. Up to GOLD, which it does not have: its delivery readings
-        // there are unknown, and say so.
+        // A product, so in the "Demo products" estate, whose security readings read its findings. Up
+        // to GOLD, which it does not have: its delivery readings there are unknown, and say so.
         labels = listOf(LABEL_TEAM_APPS, LABEL_LANGUAGE_JAVA, LABEL_PORTFOLIO_PRODUCT),
         branches = listOf(
             BranchSpec(
@@ -972,8 +1023,11 @@ object DemoContent {
                 promotionLevels = listOf(bronze),
                 validationStamps = securityStamps,
                 builds = listOf(
-                    securityBuild("305", "2.3.4", "Invoice numbering fix.", DaysAgo(16)),
-                    securityBuild("309", "2.3.5", "Rounding of the VAT amounts.", DaysAgo(5)),
+                    securityBuild(
+                        "305", "2.3.4", "Invoice numbering fix.", DaysAgo(16),
+                        alsoReports = listOf(protobufStackOverflow),
+                    ),
+                    securityBuild("309", "2.3.5", "Rounding of the VAT amounts, and protobuf-java 3.25.5.", DaysAgo(5)),
                 ),
             ),
             BranchSpec(
@@ -983,8 +1037,13 @@ object DemoContent {
                 validationStamps = securityStamps,
                 builds = listOf(
                     securityBuild("310", "2.4.0", "Invoices as PDF.", DaysAgo(13)),
-                    securityBuild("311", "2.4.1", "Payment reminders.", DaysAgo(10)),
-                    securityBuild("312", "2.4.2", "Invoice search by owner.", DaysAgo(7)),
+                    // Its dependency scan FAILS on an unaccepted CRITICAL: not promoted
+                    securityBuild(
+                        "311", "2.4.1", "Payment reminders.", DaysAgo(10),
+                        alsoReports = listOf(pgjdbcSqlInjection),
+                        promoted = false,
+                    ),
+                    securityBuild("312", "2.4.2", "Invoice search by owner, and pgjdbc 42.7.2.", DaysAgo(7)),
                     securityBuild(
                         "313", "2.4.3", "Bump of spring-webmvc to 6.1.13.", DaysAgo(4),
                         highFixed = true,
@@ -1005,6 +1064,52 @@ object DemoContent {
     )
 
     /**
+     * The dependency scan of [VISITS], the only kind of scan it runs: enough for "Demo production",
+     * which expects nothing else, and short of "Demo products", which expects a code scan as well.
+     */
+    private val visitsDependencies = ValidationStampSpec(
+        SECURITY_DEPENDENCIES,
+        "Vulnerabilities of the dependencies, from Trivy.",
+        findings = FindingsThresholdsSpec(),
+    )
+
+    /**
+     * [CVE_FIXED_ON_MAIN] again, in [VISITS] this time, on spring-webflux - which the visit scheduler
+     * only uses for its HTTP client - and accepted there: it serves nothing through the functional
+     * endpoints. Another location, so another finding than the one on spring-webmvc.
+     */
+    private val springWebFluxPathAccepted = springWebMvcPath.copy(
+        location = "pkg:maven/org.springframework/spring-webflux",
+        acceptance = AcceptanceSpec(
+            statement = "spring-webflux is only on the class path for the WebClient: the visit " +
+                    "scheduler serves nothing through RouterFunctions, and the vulnerable path is never reached.",
+            source = ".trivyignore.yaml",
+            expiresInDays = 30,
+        ),
+    )
+
+    /**
+     * The dependency scan of a build of [VISITS]. [CVE_FIXED_ON_MAIN] is reported twice: on
+     * spring-webflux under an acceptance, and on spring-webmvc until a bump fixes it. With [SECURITY],
+     * which still exposes it on [SECURITY_RELEASE], it is the finding the fan-out of "Demo products"
+     * shows open, accepted and resolved (#1912).
+     *
+     * @param webMvcFixed Whether the build carries the bump of spring-webmvc
+     */
+    private fun visitsScans(webMvcFixed: Boolean) = listOf(
+        ScanSpec(
+            validationStamp = SECURITY_DEPENDENCIES,
+            format = ScanFormat.FINDINGS,
+            kind = ScanKind.DEPENDENCIES,
+            scanner = "trivy",
+            findings = listOfNotNull(
+                springWebMvcPath.takeUnless { webMvcFixed },
+                springWebFluxPathAccepted,
+            ),
+        ),
+    )
+
+    /**
      * A release of [VISITS]: built, tested, and promoted up the whole ladder unless it says otherwise.
      *
      * @param tests The runs of [TEST_SUMMARY], in order
@@ -1016,6 +1121,7 @@ object DemoContent {
         creation: BuildCreation,
         tests: List<TestRunSpec>,
         promotionLevels: List<String> = listOf(BRONZE, SILVER, GOLD),
+        scans: List<ScanSpec> = emptyList(),
     ) = BuildSpec(
         name = name,
         release = release,
@@ -1024,6 +1130,7 @@ object DemoContent {
         promotionLevels = promotionLevels,
         validations = listOf(ValidationSpec(BUILD, PASSED)),
         tests = tests,
+        scans = scans,
     )
 
     private fun passing(passed: Int) = listOf(TestRunSpec(TEST_SUMMARY, passed = passed))
@@ -1046,6 +1153,12 @@ object DemoContent {
      * Every promotion follows the build by a few hours and every deployment by a day, so the lead
      * time reads in hours in "Demo products" and in days in "Demo production": one project, two
      * different answers, which is what the two estate columns are for.
+     *
+     * Its last four builds scan their dependencies (#1912): [CVE_FIXED_ON_MAIN] is reported on
+     * spring-webflux under an acceptance, and on spring-webmvc by **1.5.1** and **1.6.0**, until
+     * **1.6.1** bumps it - fourteen days, its remediation time. Its security maturity reads
+     * differently in each set: 1 in "Demo products", which also expects a code scan, and 2 in "Demo
+     * production" and with no estate, where a fresh dependency scan is enough.
      */
     private fun visits() = ProjectSpec(
         name = VISITS,
@@ -1056,7 +1169,7 @@ object DemoContent {
                 name = MAIN,
                 description = "Main development branch.",
                 promotionLevels = listOf(bronze, silver, gold),
-                validationStamps = listOf(buildStamp, testSummary),
+                validationStamps = listOf(buildStamp, testSummary, visitsDependencies),
                 builds = listOf(
                     visitsBuild("201", "1.0.0", "First release of the visit scheduler.", DaysAgo(88), passing(380)),
                     visitsBuild("202", "1.0.1", "Reminder e-mails for upcoming visits.", DaysAgo(81), passing(386)),
@@ -1084,14 +1197,25 @@ object DemoContent {
                     visitsBuild("209", "1.4.0", "Waiting list.", DaysAgo(39), passing(420)),
                     visitsBuild("210", "1.4.1", "Waiting list notifications.", DaysAgo(32), passing(424)),
                     visitsBuild("211", "1.5.0", "Visit notes.", DaysAgo(25), passing(431)),
-                    visitsBuild("212", "1.5.1", "Attachments on the visit notes.", DaysAgo(18), passing(436)),
-                    visitsBuild("213", "1.6.0", "Vet availability.", DaysAgo(11), passing(440)),
-                    visitsBuild("214", "1.6.1", "Availability shown in the calendar.", DaysAgo(4), passing(446)),
+                    visitsBuild(
+                        "212", "1.5.1", "Attachments on the visit notes.", DaysAgo(18), passing(436),
+                        scans = visitsScans(webMvcFixed = false),
+                    ),
+                    visitsBuild(
+                        "213", "1.6.0", "Vet availability.", DaysAgo(11), passing(440),
+                        scans = visitsScans(webMvcFixed = false),
+                    ),
+                    visitsBuild(
+                        "214", "1.6.1", "Availability shown in the calendar, and spring-webmvc 6.1.13.", DaysAgo(4),
+                        passing(446),
+                        scans = visitsScans(webMvcFixed = true),
+                    ),
                     // In flight: younger than the lead time to GOLD, so not a failure yet
                     visitsBuild(
                         "215", "1.6.2", "Booking confirmation page.", HoursAgo(3),
                         passing(449),
                         promotionLevels = listOf(BRONZE, SILVER),
+                        scans = visitsScans(webMvcFixed = true),
                     ),
                 ),
             ),
@@ -1158,6 +1282,20 @@ object DemoContent {
      *   rate and time to restore, and misses the frequency over the estate's own 30-day window;
      *   [SERVICE] has had no failure there, so its time to restore reads "no failure" rather than a
      *   verdict; [UI] has never deployed.
+     *
+     * Their security readings (#1912), against the scans each estate expects and its remediation
+     * targets in days:
+     *
+     * * "Demo products" expects a dependency AND a code scan within a week, and gives a CRITICAL a
+     *   week and a HIGH two. Its maturity reads three rungs: [SECURITY] at 3 (gating), [VISITS] at 1
+     *   (reported, no code scan), [SERVICE] at 0 - its `SECURITY.SCAN` is a plain stamp, not a scan.
+     *   [SECURITY] meets its remediation time and misses its overdue target, with one HIGH open past
+     *   its two weeks; [VISITS] misses its remediation time, fourteen days for its one HIGH, and has
+     *   nothing overdue; [SERVICE] has resolved nothing, and its remediation time is unknown.
+     * * "Demo production" expects a dependency scan only, fresh by the settings' freshness: [VISITS]
+     *   meets its maturity target at 2 (covered), [SERVICE] and [UI] miss it at 0. Its remediation
+     *   targets are set but its overdue reading is judged against nothing: a count of zero shown
+     *   without a verdict.
      */
     private fun estates() = listOf(
         EstateSpec(
@@ -1171,6 +1309,15 @@ object DemoContent {
                 EstateReadingSpec(ReadingKeys.DELIVERY_SUCCESS_RATE, target = 80.0),
                 EstateReadingSpec(ReadingKeys.DELIVERY_MTTR, target = 2 * DAY_SECONDS),
                 EstateReadingSpec(ReadingKeys.QUALITY_TEST_PASS_RATE, target = 95.0),
+                EstateReadingSpec(ReadingKeys.SECURITY_MATURITY, target = 2.0),
+                EstateReadingSpec(ReadingKeys.SECURITY_REMEDIATION_TIME, target = 10 * DAY_SECONDS),
+                EstateReadingSpec(ReadingKeys.SECURITY_OVERDUE, target = 0.0),
+            ),
+            security = EstateSecuritySpec(
+                expectedKinds = listOf(ScanKind.DEPENDENCIES, ScanKind.CODE),
+                freshnessDays = 7,
+                criticalTargetDays = 7,
+                highTargetDays = 14,
             ),
         ),
         EstateSpec(
@@ -1183,6 +1330,13 @@ object DemoContent {
                 EstateReadingSpec(ReadingKeys.DELIVERY_FREQUENCY, windowDays = 30, target = 1.0),
                 EstateReadingSpec(ReadingKeys.DELIVERY_SUCCESS_RATE, target = 90.0),
                 EstateReadingSpec(ReadingKeys.DELIVERY_MTTR, target = DAY_SECONDS),
+                EstateReadingSpec(ReadingKeys.SECURITY_MATURITY, target = 2.0),
+            ),
+            // No freshness of its own: the one of the settings
+            security = EstateSecuritySpec(
+                expectedKinds = listOf(ScanKind.DEPENDENCIES),
+                criticalTargetDays = 7,
+                highTargetDays = 30,
             ),
         ),
     )

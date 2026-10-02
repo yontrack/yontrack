@@ -50,6 +50,13 @@ const SECURITY_SCAN = 'SECURITY.SCAN'
 /** `DemoContent.VISITS`, the demo's delivery scorecard, and one of its estates. */
 const SCORECARD_PROJECT = 'petclinic-visits'
 const ESTATE_PRODUCTION = 'Demo production'
+/**
+ * `DemoContent.ESTATE_PRODUCTS`, whose security readings `DemoContent.SECURITY` lights up, and the
+ * CVE its findings fan-out shows open in that project and accepted in `SCORECARD_PROJECT` (#1912).
+ */
+const ESTATE_PRODUCTS = 'Demo products'
+const SECURITY_PROJECT = 'petclinic-billing'
+const FAN_OUT_CVE = 'CVE-2024-38816'
 
 const DASHBOARD_UUID = '1c1f9c3e-8bfa-4a1f-8a0b-4e2f0b0d1a01'
 
@@ -150,6 +157,33 @@ const catalogue = [
             // A value of an estate column: the seed computes the readings, and the estate columns
             // come last, from the same query as the rest.
             await expect(page.getByTestId(`scorecard-${ESTATE_PRODUCTION}-delivery.leadTime-value`)).toBeVisible()
+        },
+    },
+    {
+        slug: 'estate',
+        description: 'The scorecard of an estate: its projects and their readings, against its targets',
+        path: `/extension/scorecard/estate/${encodeURIComponent(ESTATE_PRODUCTS)}`,
+        element: '[data-testid="estate-scorecard"]',
+        ready: async (page) => {
+            // A judged security reading, and the roll-up row: both come from the one query
+            await expect(page.getByTestId(`estate-cell-${SECURITY_PROJECT}-security.maturity`))
+                .toHaveAttribute('data-judgement', 'MET')
+            await expect(page.getByTestId('estate-rollup')).toBeVisible()
+        },
+    },
+    {
+        slug: 'estate-fanout',
+        description: 'The findings fan-out of an estate: one CVE across its projects',
+        path: `/extension/scorecard/estate/${encodeURIComponent(ESTATE_PRODUCTS)}`,
+        element: '[data-testid="estate-scorecard"]',
+        // The tab and the search are not in the URL: the only entry which acts before the shutter
+        ready: async (page) => {
+            await page.getByRole('tab', {name: 'Findings fan-out'}).click()
+            await page.getByRole('searchbox', {name: 'External ID of the finding'}).fill(FAN_OUT_CVE)
+            await page.getByRole('searchbox', {name: 'External ID of the finding'}).press('Enter')
+            // Every row of a project carries its test id, and the scorecard project has two
+            await expect(page.getByTestId(`estate-fanout-state-${SCORECARD_PROJECT}`).first()).toBeVisible()
+            await expect(page.getByTestId(`estate-fanout-state-${SECURITY_PROJECT}`).first()).toBeVisible()
         },
     },
     {
