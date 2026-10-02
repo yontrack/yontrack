@@ -151,7 +151,7 @@ class EventFactoryIT : AbstractDSLTestSupport() {
                 project {
                     branch {
                         build {
-                            val event = eventFactory.updateBuild(this)
+                            val event = eventFactory.updateBuild(this, this)
                             assertEquals(
                                 "Build $name for branch ${branch.name} in ${project.name} has been updated.",
                                 eventTemplatingService.renderEvent(event, emptyMap())
@@ -361,7 +361,7 @@ class EventFactoryIT : AbstractDSLTestSupport() {
                         val vs = validationStamp()
                         build {
                             val run = validate(vs)
-                            val event = eventFactory.updateValidationRunStatusComment(run)
+                            val event = eventFactory.updateValidationRunStatusComment(run, run.lastStatus.id, "New comment")
                             assertEquals(
                                 "A status message for the ${vs.name} validation #${run.runOrder} for build $name in branch ${branch.name} of ${project.name} has changed.",
                                 eventTemplatingService.renderEvent(event, emptyMap())

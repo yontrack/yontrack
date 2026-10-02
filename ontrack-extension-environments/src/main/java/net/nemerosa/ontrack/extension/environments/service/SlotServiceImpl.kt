@@ -971,7 +971,7 @@ class SlotServiceImpl(
             message = "Rule overridden",
             override = override,
         )
-        eventPostService.post(environmentsEventsFactory.pipelineStatusOverridden(pipeline))
+        eventPostService.post(environmentsEventsFactory.pipelineStatusOverridden(pipeline, admissionRuleConfig, message))
     }
 
     override fun deleteSlot(slot: Slot) {
@@ -1031,6 +1031,6 @@ class SlotServiceImpl(
         } else {
             throw SlotPipelineDataNotOngoingException()
         }
-        eventPostService.post(environmentsEventsFactory.pipelineStatusChanged(pipeline))
+        eventPostService.post(environmentsEventsFactory.pipelineStatusChanged(pipeline, admissionRuleConfig))
     }
 }

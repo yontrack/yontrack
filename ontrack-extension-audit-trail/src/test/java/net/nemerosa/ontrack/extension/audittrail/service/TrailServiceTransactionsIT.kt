@@ -1,7 +1,7 @@
 package net.nemerosa.ontrack.extension.audittrail.service
 
 import net.nemerosa.ontrack.extension.audittrail.model.TrailEntryTypes
-import net.nemerosa.ontrack.it.AbstractDSLTestSupport
+import net.nemerosa.ontrack.extension.audittrail.AbstractAuditTrailITSupport
 import net.nemerosa.ontrack.json.asJson
 import net.nemerosa.ontrack.model.structure.Build
 import org.junit.jupiter.api.Test
@@ -23,7 +23,7 @@ import kotlin.test.assertTrue
  * removed at the end.
  */
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
-class TrailServiceTransactionsIT : AbstractDSLTestSupport() {
+class TrailServiceTransactionsIT : AbstractAuditTrailITSupport() {
 
     @Autowired
     private lateinit var trailService: TrailService
@@ -89,7 +89,7 @@ class TrailServiceTransactionsIT : AbstractDSLTestSupport() {
         try {
             val build = asAdmin {
                 var build: Build? = null
-                project.branch { build = build() }
+                project.branch { build = untrailedBuild { this } }
                 build!!
             }
             asAdmin { code(build) }

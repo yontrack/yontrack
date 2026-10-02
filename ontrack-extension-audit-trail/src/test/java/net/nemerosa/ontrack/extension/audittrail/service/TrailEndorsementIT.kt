@@ -10,7 +10,7 @@ import net.nemerosa.ontrack.extension.audittrail.license.AuditTrailLicense
 import net.nemerosa.ontrack.extension.audittrail.model.TrailEntryTypes
 import net.nemerosa.ontrack.extension.audittrail.repository.TrailEndorsementRepository
 import net.nemerosa.ontrack.extension.audittrail.repository.TrailEntryRepository
-import net.nemerosa.ontrack.it.AbstractDSLTestSupport
+import net.nemerosa.ontrack.extension.audittrail.AbstractAuditTrailITSupport
 import net.nemerosa.ontrack.json.asJson
 import net.nemerosa.ontrack.model.security.AbstractConfidentialStore
 import net.nemerosa.ontrack.model.security.ConfidentialStore
@@ -25,7 +25,7 @@ import kotlin.test.assertTrue
  * Endorsement of the entries by the instance key, with the key store of the instance — writable —
  * and with a read-only key store which has no key.
  */
-class TrailEndorsementIT : AbstractDSLTestSupport() {
+class TrailEndorsementIT : AbstractAuditTrailITSupport() {
 
     @Autowired
     private lateinit var trailService: TrailService
@@ -66,7 +66,7 @@ class TrailEndorsementIT : AbstractDSLTestSupport() {
         asAdmin {
             project {
                 branch {
-                    build {
+                    untrailedBuild {
                         // trail.opened, then validation.run
                         trailService.append(this, "validation.run", mapOf("status" to "PASSED").asJson(), ci)
                         trailService.append(this, "promotion.added", mapOf("promotionLevel" to "GOLD").asJson(), ci)
@@ -127,7 +127,7 @@ class TrailEndorsementIT : AbstractDSLTestSupport() {
         asAdmin {
             project {
                 branch {
-                    build {
+                    untrailedBuild {
                         readOnlyTrailService.append(this, TrailEntryTypes.BUILD_CREATED, mapOf("build" to mapOf("id" to id())).asJson(), ci)
                         readOnlyTrailService.append(this, "validation.run", mapOf("status" to "PASSED").asJson(), ci)
 

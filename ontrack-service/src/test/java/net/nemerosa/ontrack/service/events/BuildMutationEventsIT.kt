@@ -1,27 +1,33 @@
 package net.nemerosa.ontrack.service.events
 
+import net.nemerosa.ontrack.common.Time
 import net.nemerosa.ontrack.extension.api.support.TestNumberValidationDataType
 import net.nemerosa.ontrack.it.AbstractDSLTestSupport
 import net.nemerosa.ontrack.it.AsAdminTest
 import net.nemerosa.ontrack.model.events.EventFactory
 import net.nemerosa.ontrack.model.events.EventQueryService
 import net.nemerosa.ontrack.model.events.EventType
+import net.nemerosa.ontrack.model.structure.Build
 import net.nemerosa.ontrack.model.structure.BuildLinkForm
 import net.nemerosa.ontrack.model.structure.BuildLinkFormItem
+import net.nemerosa.ontrack.model.structure.NameDescription
 import net.nemerosa.ontrack.model.structure.ProjectEntity
 import net.nemerosa.ontrack.model.structure.ProjectEntityType
 import net.nemerosa.ontrack.model.structure.RunInfoInput
+import net.nemerosa.ontrack.model.structure.Signature
 import net.nemerosa.ontrack.model.structure.ValidationRunService
 import net.nemerosa.ontrack.model.structure.ValidationRunStatusID
 import net.nemerosa.ontrack.model.structure.data
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
+import java.time.LocalDateTime
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
 /**
- * Build mutations which used to change the story of a build without posting any event (#1957).
+ * Build mutations which used to change the story of a build without posting any event (#1957), and the
+ * values the events of the audit trail need (#1958).
  */
 @AsAdminTest
 class BuildMutationEventsIT : AbstractDSLTestSupport() {
@@ -232,6 +238,49 @@ class BuildMutationEventsIT : AbstractDSLTestSupport() {
         assertEquals(run.id, removal.entities[ProjectEntityType.VALIDATION_RUN]?.id)
         assertNull(removal.values["DATA_TYPE"])
         assertNull(removal.values["DATA"])
+    }
+
+    @Test
+    fun `Replacing the data of a validation run overrides the previous data`() {
+        val vs = doCreateValidationStamp()
+        val build = doCreateBuild(vs.branch, nameDescription())
+        val run = doValidateBuild(build, vs, ValidationRunStatusID.STATUS_PASSED)
+        validationRunService.updateValidationRunData(run, testNumberValidationDataType.data(12))
+        validationRunService.updateValidationRunData(run, testNumberValidationDataType.data(24))
+        assertEquals(24, structureService.getValidationRun(run.id).data?.data)
+        assertEquals("24", eventQueryService.getLastEvent(run, EventFactory.UPDATE_VALIDATION_RUN_DATA)?.getValue("DATA"))
+    }
+
+    @Test
+    fun `Updating a build posts the update_build event with its previous values`() {
+        val build = doCreateBuild(
+            nameDescription = NameDescription.nd("1.0.0", "First"),
+            signature = Signature.of(LocalDateTime.of(2026, 9, 30, 14, 5, 7), "jenkins"),
+        )
+        structureService.saveBuild(
+            build.withName("1.0.1").withSignature(Signature.of(LocalDateTime.of(2026, 9, 1, 8, 0), "other"))
+        )
+        val event = eventQueryService.getLastEvent(build, EventFactory.UPDATE_BUILD)
+        assertNotNull(event, "Build update event posted") {
+            assertEquals("1.0.1", (it.entities[ProjectEntityType.BUILD] as Build).name)
+            assertEquals("1.0.0", it.getValue("PREVIOUS_BUILD_NAME"))
+            assertEquals("First", it.getValue("PREVIOUS_BUILD_DESCRIPTION"))
+            assertEquals(LocalDateTime.of(2026, 9, 30, 14, 5, 7), Time.fromStorage(it.getValue("PREVIOUS_BUILD_CREATION")))
+            assertEquals("jenkins", it.getValue("PREVIOUS_BUILD_CREATOR"))
+        }
+    }
+
+    @Test
+    fun `Editing the comment of a validation run status posts its ID and the new comment`() {
+        val vs = doCreateValidationStamp()
+        val build = doCreateBuild(vs.branch, nameDescription())
+        val run = doValidateBuild(build, vs, ValidationRunStatusID.STATUS_FAILED)
+        structureService.saveValidationRunStatusComment(run, run.lastStatus.id, "Broken")
+        val event = eventQueryService.getLastEvent(run, EventFactory.UPDATE_VALIDATION_RUN_STATUS_COMMENT)
+        assertNotNull(event, "Comment event posted") {
+            assertEquals(run.lastStatus.id(), it.getIntValue("VALIDATION_RUN_STATUS_ID"))
+            assertEquals("Broken", it.getValue("VALIDATION_RUN_STATUS_COMMENT"))
+        }
     }
 
     private fun ProjectEntity.events(eventType: EventType) =

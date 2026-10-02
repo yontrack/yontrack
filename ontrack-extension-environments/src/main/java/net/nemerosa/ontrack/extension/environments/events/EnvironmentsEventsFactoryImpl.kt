@@ -2,6 +2,7 @@ package net.nemerosa.ontrack.extension.environments.events
 
 import net.nemerosa.ontrack.extension.environments.Environment
 import net.nemerosa.ontrack.extension.environments.Slot
+import net.nemerosa.ontrack.extension.environments.SlotAdmissionRuleConfig
 import net.nemerosa.ontrack.extension.environments.SlotPipeline
 import net.nemerosa.ontrack.extension.environments.workflows.SlotWorkflowInstance
 import net.nemerosa.ontrack.model.events.Event
@@ -87,15 +88,27 @@ class EnvironmentsEventsFactoryImpl(
             .withPipeline(pipeline)
             .build()
 
-    override fun pipelineStatusOverridden(pipeline: SlotPipeline): Event =
+    private fun Event.EventBuilder.withAdmissionRule(admissionRuleConfig: SlotAdmissionRuleConfig) = this
+        .with(EnvironmentsEvents.EVENT_ADMISSION_RULE_CONFIG_ID, admissionRuleConfig.id)
+        .with(EnvironmentsEvents.EVENT_ADMISSION_RULE_NAME, admissionRuleConfig.name)
+        .with(EnvironmentsEvents.EVENT_ADMISSION_RULE_ID, admissionRuleConfig.ruleId)
+
+    override fun pipelineStatusOverridden(
+        pipeline: SlotPipeline,
+        admissionRuleConfig: SlotAdmissionRuleConfig,
+        message: String?
+    ): Event =
         Event.of(EnvironmentsEvents.PIPELINE_STATUS_OVERRIDDEN)
             .withPipeline(pipeline)
+            .withAdmissionRule(admissionRuleConfig)
             .with(EnvironmentsEvents.EVENT_PIPELINE_OVERRIDING_USER, securityService.currentSignature.user.name)
+            .with(EnvironmentsEvents.EVENT_OVERRIDE_MESSAGE, message)
             .build()
 
-    override fun pipelineStatusChanged(pipeline: SlotPipeline): Event =
+    override fun pipelineStatusChanged(pipeline: SlotPipeline, admissionRuleConfig: SlotAdmissionRuleConfig): Event =
         Event.of(EnvironmentsEvents.PIPELINE_STATUS_CHANGED)
             .withPipeline(pipeline)
+            .withAdmissionRule(admissionRuleConfig)
             .build()
 
     override fun pipelineDeleted(pipeline: SlotPipeline): Event =

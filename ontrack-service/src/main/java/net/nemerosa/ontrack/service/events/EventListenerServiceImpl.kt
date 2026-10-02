@@ -6,6 +6,7 @@ import net.nemerosa.ontrack.model.events.EventListener
 import net.nemerosa.ontrack.model.events.EventListenerService
 import net.nemerosa.ontrack.model.metrics.time
 import org.springframework.context.ApplicationContext
+import org.springframework.core.annotation.AnnotationAwareOrderComparator
 import org.springframework.stereotype.Service
 
 @Service
@@ -16,10 +17,14 @@ class EventListenerServiceImpl(
 
     // private val logger = LoggerFactory.getLogger(EventListenerServiceImpl::class.java)
 
-    private val listeners: Collection<EventListener> by lazy {
+    /**
+     * Listeners, in their [order][org.springframework.core.annotation.Order], those without one in the
+     * order of their registration.
+     */
+    private val listeners: List<EventListener> by lazy {
         context.getBeansOfType(
             EventListener::class.java
-        ).values
+        ).values.sortedWith(AnnotationAwareOrderComparator.INSTANCE)
     }
 
     override fun onEvent(event: Event) {

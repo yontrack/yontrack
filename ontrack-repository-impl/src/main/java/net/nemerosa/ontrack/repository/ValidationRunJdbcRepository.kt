@@ -16,7 +16,11 @@ class ValidationRunJdbcRepository(
     ): ValidationRun {
         if (data != null) {
             namedParameterJdbcTemplate!!.update(
-                "INSERT INTO VALIDATION_RUN_DATA(VALIDATION_RUN, DATA_TYPE_ID, DATA) VALUES (:validationRunId, :dataTypeId, CAST(:data AS JSONB))",
+                """
+                    INSERT INTO VALIDATION_RUN_DATA(VALIDATION_RUN, DATA_TYPE_ID, DATA)
+                    VALUES (:validationRunId, :dataTypeId, CAST(:data AS JSONB))
+                    ON CONFLICT (VALIDATION_RUN) DO UPDATE SET DATA_TYPE_ID = EXCLUDED.DATA_TYPE_ID, DATA = EXCLUDED.DATA
+                """.trimIndent(),
                 mapOf(
                     "validationRunId" to run.id(),
                     "dataTypeId" to data.descriptor.id,

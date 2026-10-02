@@ -1,9 +1,12 @@
 package net.nemerosa.ontrack.extension.environments.events
 
 import net.nemerosa.ontrack.extension.environments.EnvironmentTestSupport
+import net.nemerosa.ontrack.extension.environments.SlotAdmissionRuleConfig
+import net.nemerosa.ontrack.extension.environments.SlotPipeline
 import net.nemerosa.ontrack.extension.environments.SlotTestSupport
 import net.nemerosa.ontrack.it.AbstractDSLTestSupport
 import net.nemerosa.ontrack.it.AsAdminTest
+import net.nemerosa.ontrack.json.asJson
 import net.nemerosa.ontrack.model.events.Event
 import net.nemerosa.ontrack.model.events.EventTemplatingService
 import net.nemerosa.ontrack.model.events.HtmlNotificationEventRenderer
@@ -163,7 +166,10 @@ class EnvironmentsEventsFactoryIT : AbstractDSLTestSupport() {
         slotTestSupport.withSlotPipeline { pipeline ->
             asGlobalRole(Roles.GLOBAL_ADMINISTRATOR) {
                 val user = securityService.currentSignature.user.name
-                val event = environmentsEventsFactory.pipelineStatusOverridden(pipeline)
+                val event = environmentsEventsFactory.pipelineStatusOverridden(pipeline, approval(pipeline), "Approved by phone")
+                assertEquals("approval", event.getValue(EnvironmentsEvents.EVENT_ADMISSION_RULE_NAME))
+                assertEquals("manual", event.getValue(EnvironmentsEvents.EVENT_ADMISSION_RULE_ID))
+                assertEquals("Approved by phone", event.getValue(EnvironmentsEvents.EVENT_OVERRIDE_MESSAGE))
                 val text = render(event)
                 assertEquals(
                     """Pipeline <a href="http://localhost:3000/extension/environments/pipeline/${pipeline.id}">${pipeline.slot.environment.name}/${pipeline.slot.project.name}#1</a> status has been overridden by $user.""",
@@ -176,7 +182,10 @@ class EnvironmentsEventsFactoryIT : AbstractDSLTestSupport() {
     @Test
     fun pipelineStatusChanged() {
         slotTestSupport.withSlotPipeline { pipeline ->
-            val event = environmentsEventsFactory.pipelineStatusChanged(pipeline)
+            val config = approval(pipeline)
+            val event = environmentsEventsFactory.pipelineStatusChanged(pipeline, config)
+            assertEquals(config.id, event.getValue(EnvironmentsEvents.EVENT_ADMISSION_RULE_CONFIG_ID))
+            assertEquals("approval", event.getValue(EnvironmentsEvents.EVENT_ADMISSION_RULE_NAME))
             val text = render(event)
             assertEquals(
                 """Pipeline <a href="http://localhost:3000/extension/environments/pipeline/${pipeline.id}">${pipeline.slot.environment.name}/${pipeline.slot.project.name}#1</a> status has been updated.""",
@@ -197,4 +206,12 @@ class EnvironmentsEventsFactoryIT : AbstractDSLTestSupport() {
         }
     }
 
+
+    private fun approval(pipeline: SlotPipeline) = SlotAdmissionRuleConfig(
+        slot = pipeline.slot,
+        name = "approval",
+        description = null,
+        ruleId = "manual",
+        ruleConfig = mapOf("message" to "Approval").asJson(),
+    )
 }

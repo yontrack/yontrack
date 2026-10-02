@@ -43,7 +43,11 @@ interface EventFactory {
 
     fun newBuild(build: Build): Event
 
-    fun updateBuild(build: Build): Event
+    /**
+     * The [build] has been saved, replacing the [previous] values of its name, description and
+     * signature.
+     */
+    fun updateBuild(build: Build, previous: Build): Event
 
     fun updateBuildDisplayName(build: Build, displayName: String): Event
 
@@ -93,7 +97,11 @@ interface EventFactory {
 
     fun newValidationRunStatus(validationRun: ValidationRun): Event
 
-    fun updateValidationRunStatusComment(validationRun: ValidationRun): Event
+    /**
+     * The comment of the status [validationRunStatusId] of the [validationRun] has been replaced by
+     * [comment].
+     */
+    fun updateValidationRunStatusComment(validationRun: ValidationRun, validationRunStatusId: ID, comment: String): Event
 
     /**
      * The [validationRun] is about to be deleted.
@@ -247,11 +255,15 @@ interface EventFactory {
         val UPDATE_BUILD: EventType = SimpleEventType(
             id = "update_build",
             template = "Build \${build} for branch \${branch} in \${project} has been updated.",
-            description = "When a build is updated.",
+            description = "When a build is updated. A previous value which was not set is absent from the event.",
             context = eventContext(
                 eventProject("Build's project"),
                 eventBranch("Build's branch"),
                 eventBuild("Updated build"),
+                eventValue(PREVIOUS_BUILD_NAME, "Name of the build before the update"),
+                eventValue(PREVIOUS_BUILD_DESCRIPTION, "Description of the build before the update"),
+                eventValue(PREVIOUS_BUILD_CREATION, "Creation time of the build before the update, ISO-8601 UTC"),
+                eventValue(PREVIOUS_BUILD_CREATOR, "Creator of the build before the update"),
             ),
         )
         val UPDATE_BUILD_DISPLAY_NAME: EventType = SimpleEventType(
@@ -484,6 +496,8 @@ interface EventFactory {
                 eventBuild("Validated build"),
                 eventValidationStamp("Validation stamp"),
                 eventValidationRun("Validation run"),
+                eventValue(VALIDATION_RUN_STATUS_ID, "ID of the status whose comment has changed"),
+                eventValue(VALIDATION_RUN_STATUS_COMMENT, "New comment of the status"),
             ),
         )
 
@@ -597,9 +611,15 @@ interface EventFactory {
         )
 
         const val DISPLAY_NAME = "DISPLAY_NAME"
+        const val PREVIOUS_BUILD_NAME = "PREVIOUS_BUILD_NAME"
+        const val PREVIOUS_BUILD_DESCRIPTION = "PREVIOUS_BUILD_DESCRIPTION"
+        const val PREVIOUS_BUILD_CREATION = "PREVIOUS_BUILD_CREATION"
+        const val PREVIOUS_BUILD_CREATOR = "PREVIOUS_BUILD_CREATOR"
         const val QUALIFIER = "QUALIFIER"
         const val VALIDATION_RUN_ID = "VALIDATION_RUN_ID"
         const val VALIDATION_RUN_ORDER = "VALIDATION_RUN_ORDER"
+        const val VALIDATION_RUN_STATUS_ID = "VALIDATION_RUN_STATUS_ID"
+        const val VALIDATION_RUN_STATUS_COMMENT = "VALIDATION_RUN_STATUS_COMMENT"
         const val VALIDATION_RUN_DATA_TYPE = "DATA_TYPE"
         const val VALIDATION_RUN_DATA = "DATA"
         const val RUNNABLE_ENTITY_TYPE = "RUNNABLE_ENTITY_TYPE"

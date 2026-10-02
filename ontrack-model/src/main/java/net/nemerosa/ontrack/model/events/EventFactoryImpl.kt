@@ -1,5 +1,6 @@
 package net.nemerosa.ontrack.model.events
 
+import net.nemerosa.ontrack.common.Time
 import net.nemerosa.ontrack.json.asJson
 import net.nemerosa.ontrack.json.asJsonString
 import net.nemerosa.ontrack.model.events.Event.Companion.of
@@ -30,6 +31,10 @@ import net.nemerosa.ontrack.model.events.EventFactory.Companion.NEW_PROMOTION_RU
 import net.nemerosa.ontrack.model.events.EventFactory.Companion.NEW_VALIDATION_RUN
 import net.nemerosa.ontrack.model.events.EventFactory.Companion.NEW_VALIDATION_RUN_STATUS
 import net.nemerosa.ontrack.model.events.EventFactory.Companion.NEW_VALIDATION_STAMP
+import net.nemerosa.ontrack.model.events.EventFactory.Companion.PREVIOUS_BUILD_CREATION
+import net.nemerosa.ontrack.model.events.EventFactory.Companion.PREVIOUS_BUILD_CREATOR
+import net.nemerosa.ontrack.model.events.EventFactory.Companion.PREVIOUS_BUILD_DESCRIPTION
+import net.nemerosa.ontrack.model.events.EventFactory.Companion.PREVIOUS_BUILD_NAME
 import net.nemerosa.ontrack.model.events.EventFactory.Companion.PROPERTY_CHANGE
 import net.nemerosa.ontrack.model.events.EventFactory.Companion.PROPERTY_DELETE
 import net.nemerosa.ontrack.model.events.EventFactory.Companion.REORDER_PROMOTION_LEVEL
@@ -46,6 +51,8 @@ import net.nemerosa.ontrack.model.events.EventFactory.Companion.VALIDATION_RUN_D
 import net.nemerosa.ontrack.model.events.EventFactory.Companion.VALIDATION_RUN_DATA_TYPE
 import net.nemerosa.ontrack.model.events.EventFactory.Companion.VALIDATION_RUN_ID
 import net.nemerosa.ontrack.model.events.EventFactory.Companion.VALIDATION_RUN_ORDER
+import net.nemerosa.ontrack.model.events.EventFactory.Companion.VALIDATION_RUN_STATUS_COMMENT
+import net.nemerosa.ontrack.model.events.EventFactory.Companion.VALIDATION_RUN_STATUS_ID
 import net.nemerosa.ontrack.model.events.EventFactory.Companion.DELETE_RUN_INFO
 import net.nemerosa.ontrack.model.events.EventFactory.Companion.RUNNABLE_ENTITY_TYPE
 import net.nemerosa.ontrack.model.events.EventFactory.Companion.RUN_INFO_RUN_TIME
@@ -196,10 +203,14 @@ class EventFactoryImpl : EventFactory {
             .build()
     }
 
-    override fun updateBuild(build: Build): Event {
+    override fun updateBuild(build: Build, previous: Build): Event {
         return of(UPDATE_BUILD)
             .withBuild(build)
             .withNoSignature()
+            .with(PREVIOUS_BUILD_NAME, previous.name)
+            .with(PREVIOUS_BUILD_DESCRIPTION, previous.description)
+            .with(PREVIOUS_BUILD_CREATION, Time.store(previous.signature.time))
+            .with(PREVIOUS_BUILD_CREATOR, previous.signature.user.name)
             .build()
     }
 
@@ -338,9 +349,15 @@ class EventFactoryImpl : EventFactory {
             .build()
     }
 
-    override fun updateValidationRunStatusComment(validationRun: ValidationRun): Event {
+    override fun updateValidationRunStatusComment(
+        validationRun: ValidationRun,
+        validationRunStatusId: ID,
+        comment: String
+    ): Event {
         return of(UPDATE_VALIDATION_RUN_STATUS_COMMENT)
             .withValidationRun(validationRun)
+            .with(VALIDATION_RUN_STATUS_ID, validationRunStatusId.toString())
+            .with(VALIDATION_RUN_STATUS_COMMENT, comment)
             .build()
     }
 

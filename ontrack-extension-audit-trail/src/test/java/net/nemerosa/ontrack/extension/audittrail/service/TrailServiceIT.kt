@@ -4,13 +4,12 @@ import io.micrometer.core.instrument.MeterRegistry
 import net.nemerosa.ontrack.extension.audittrail.canonical.CanonicalJsonException
 import net.nemerosa.ontrack.extension.audittrail.license.AuditTrailLicensedFeatureProvider.Companion.FEATURE_AUDIT_TRAIL
 import net.nemerosa.ontrack.extension.audittrail.hash.TrailHashFormatV1
-import net.nemerosa.ontrack.extension.audittrail.license.TestLicenseService
 import net.nemerosa.ontrack.extension.audittrail.metrics.AuditTrailMetrics
 import net.nemerosa.ontrack.extension.audittrail.model.TrailEntry
 import net.nemerosa.ontrack.extension.audittrail.model.TrailEntryTypes
 import net.nemerosa.ontrack.extension.audittrail.repository.TrailEndorsementRepository
 import net.nemerosa.ontrack.extension.audittrail.repository.TrailEntryRepository
-import net.nemerosa.ontrack.it.AbstractDSLTestSupport
+import net.nemerosa.ontrack.extension.audittrail.AbstractAuditTrailITSupport
 import net.nemerosa.ontrack.json.asJson
 import net.nemerosa.ontrack.model.structure.Build
 import org.junit.jupiter.api.Test
@@ -23,7 +22,7 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-class TrailServiceIT : AbstractDSLTestSupport() {
+class TrailServiceIT : AbstractAuditTrailITSupport() {
 
     @Autowired
     private lateinit var trailService: TrailService
@@ -35,9 +34,6 @@ class TrailServiceIT : AbstractDSLTestSupport() {
     private lateinit var trailEndorsementRepository: TrailEndorsementRepository
 
     @Autowired
-    private lateinit var testLicenseService: TestLicenseService
-
-    @Autowired
     private lateinit var meterRegistry: MeterRegistry
 
     private val ci: JsonNode = mapOf("account" to "ci-bot", "via" to "token", "tokenName" to "ci-demo").asJson()
@@ -47,7 +43,7 @@ class TrailServiceIT : AbstractDSLTestSupport() {
         asAdmin {
             project {
                 branch {
-                    build {
+                    untrailedBuild {
                         val created = trailService.append(this, TrailEntryTypes.BUILD_CREATED, buildPayload(), ci)
                         val promoted = trailService.append(
                             this,
@@ -79,7 +75,7 @@ class TrailServiceIT : AbstractDSLTestSupport() {
         asAdmin {
             project {
                 branch {
-                    build {
+                    untrailedBuild {
                         val validated = trailService.append(
                             this,
                             "validation.run",
@@ -131,7 +127,7 @@ class TrailServiceIT : AbstractDSLTestSupport() {
         asAdmin {
             project {
                 branch {
-                    build {
+                    untrailedBuild {
                         testLicenseService.withoutFeature(FEATURE_AUDIT_TRAIL) {
                             assertNull(trailService.append(this, TrailEntryTypes.BUILD_CREATED, buildPayload(), ci))
                             assertNull(trailService.append(this, "validation.run", mapOf("status" to "PASSED").asJson(), ci))
@@ -154,12 +150,14 @@ class TrailServiceIT : AbstractDSLTestSupport() {
         asAdmin {
             project {
                 branch {
-                    val build = build {
+                    val build = untrailedBuild {
                         trailService.append(this, TrailEntryTypes.BUILD_CREATED, buildPayload(), ci)
                         trailService.append(this, "promotion.added", mapOf("promotionLevel" to "GOLD").asJson(), ci)
+                        this
                     }
-                    val other = build {
+                    val other = untrailedBuild {
                         trailService.append(this, TrailEntryTypes.BUILD_CREATED, buildPayload(), ci)
+                        this
                     }
                     assertEquals(2, trailEntryRepository.findEntries(build.id()).size)
                     assertEquals(2, trailEndorsementRepository.findEndorsements(build.id()).size)
@@ -183,7 +181,7 @@ class TrailServiceIT : AbstractDSLTestSupport() {
         asAdmin {
             project {
                 branch {
-                    build {
+                    untrailedBuild {
                         trailService.append(this, TrailEntryTypes.BUILD_CREATED, buildPayload(), ci)
                         assertThrows<CanonicalJsonException> {
                             trailService.append(this, "validation.data", mapOf("coverage" to 87.5).asJson(), ci)

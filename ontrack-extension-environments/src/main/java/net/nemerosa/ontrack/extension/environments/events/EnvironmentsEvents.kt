@@ -20,6 +20,10 @@ object EnvironmentsEvents {
     const val EVENT_WORKFLOW_NAME = "WORKFLOW_NAME"
     const val EVENT_OVERRIDE_MESSAGE = "OVERRIDE_MESSAGE"
 
+    const val EVENT_ADMISSION_RULE_CONFIG_ID = "ADMISSION_RULE_CONFIG_ID"
+    const val EVENT_ADMISSION_RULE_NAME = "ADMISSION_RULE_NAME"
+    const val EVENT_ADMISSION_RULE_ID = "ADMISSION_RULE_ID"
+
     private val eventEnvironmentContext = eventContext(
         eventValue(EVENT_ENVIRONMENT_ID, "ID of the environment"),
         eventValue(EVENT_ENVIRONMENT_NAME, "Name of the environment"),
@@ -36,6 +40,12 @@ object EnvironmentsEvents {
         eventProject("Project of the build in the pipeline"),
         eventBranch("Branch of the build in the pipeline"),
         eventBuild("Build in the pipeline"),
+    )
+
+    private val eventPipelineAdmissionRuleContext = eventPipelineContext.add(
+        eventValue(EVENT_ADMISSION_RULE_CONFIG_ID, "ID of the configuration of the admission rule in the slot"),
+        eventValue(EVENT_ADMISSION_RULE_NAME, "Name of the admission rule in the slot"),
+        eventValue(EVENT_ADMISSION_RULE_ID, "ID of the type of the admission rule (like manual)"),
     )
 
     val ENVIRONMENT_CREATION: EventType = SimpleEventType(
@@ -144,8 +154,8 @@ object EnvironmentsEvents {
         template = """
             Pipeline ${'$'}{#.pipeline} status has been updated.
         """.trimIndent(),
-        description = "When a slot pipeline status is updated",
-        context = eventPipelineContext
+        description = "When the data of an admission rule of a slot pipeline is set",
+        context = eventPipelineAdmissionRuleContext
     )
 
     val PIPELINE_STATUS_OVERRIDDEN: EventType = SimpleEventType(
@@ -153,9 +163,10 @@ object EnvironmentsEvents {
         template = """
             Pipeline ${'$'}{#.pipeline} status has been overridden by ${'$'}{$EVENT_PIPELINE_OVERRIDING_USER}.
         """.trimIndent(),
-        description = "When a slot pipeline status is updated",
-        context = eventPipelineContext.add(
-            eventValue(EVENT_PIPELINE_OVERRIDING_USER, "User who has overridden the pipeline status")
+        description = "When an admission rule of a slot pipeline is overridden",
+        context = eventPipelineAdmissionRuleContext.add(
+            eventValue(EVENT_PIPELINE_OVERRIDING_USER, "User who has overridden the pipeline status"),
+            eventValue(EVENT_OVERRIDE_MESSAGE, "Message given for the override"),
         )
     )
 

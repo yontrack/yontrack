@@ -7,6 +7,7 @@ description = "Audit trail: the hash-chained trail of every build, its endorseme
 dependencies {
     api(project(":ontrack-extension-support"))
 
+    implementation(project(":ontrack-extension-environments"))
     implementation(project(":ontrack-extension-license"))
     implementation(project(":ontrack-repository-support"))
     implementation(project(":ontrack-ui-graphql"))
@@ -16,6 +17,10 @@ dependencies {
     testImplementation(testFixtures(project(":ontrack-it-utils")))
     testImplementation(testFixtures(project(":ontrack-extension-api")))
     testImplementation(testFixtures(project(":ontrack-ui-graphql")))
+    testImplementation(project(":ontrack-extension-general"))
+    testImplementation(project(":ontrack-extension-workflows"))
+    testImplementation(testFixtures(project(":ontrack-extension-workflows")))
+    testImplementation(testFixtures(project(":ontrack-extension-queue")))
 
     testRuntimeOnly(project(":ontrack-service"))
     testRuntimeOnly(project(":ontrack-repository-impl"))

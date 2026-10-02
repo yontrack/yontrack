@@ -296,21 +296,21 @@ class StructureServiceImpl(
         isEntityDefined(build.branch.project, "Project must be defined")
         // Security
         securityService.checkProjectFunction(build.branch.project.id(), BuildEdit::class.java)
+        // Values before the update
+        val previous = getBuild(build.id)
         // Signature change check
-        validationSignatureChange(build)
+        validationSignatureChange(previous, build)
         // Build validation
         validateBuild(build)
         // Repository
         val savedBuild = structureRepository.saveBuild(build)
         // Event
-        eventPostService.post(eventFactory.updateBuild(savedBuild))
+        eventPostService.post(eventFactory.updateBuild(savedBuild, previous))
         // OK
         return getBuild(build.id)
     }
 
-    private fun validationSignatureChange(build: Build) {
-        // Get the original build signature
-        val orig = getBuild(build.id)
+    private fun validationSignatureChange(orig: Build, build: Build) {
         // Compares the signatures
         if (orig.signature != build.signature) {
             // Checks the authorisation
@@ -1589,7 +1589,7 @@ class StructureServiceImpl(
         // Saving the new comment
         structureRepository.saveValidationRunStatusComment(runStatus, comment)
         // Event
-        eventPostService.post(eventFactory.updateValidationRunStatusComment(run))
+        eventPostService.post(eventFactory.updateValidationRunStatusComment(run, runStatusId, comment))
         // Reloading the run
         return getValidationRun(run.id)
     }
