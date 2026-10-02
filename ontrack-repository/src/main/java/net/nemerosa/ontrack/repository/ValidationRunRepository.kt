@@ -1,6 +1,7 @@
 package net.nemerosa.ontrack.repository
 
 import net.nemerosa.ontrack.model.structure.Build
+import net.nemerosa.ontrack.model.structure.CascadedValidationRun
 import net.nemerosa.ontrack.model.structure.ValidationRun
 import net.nemerosa.ontrack.model.structure.ValidationRunData
 import net.nemerosa.ontrack.model.structure.ValidationStamp
@@ -28,5 +29,13 @@ interface ValidationRunRepository {
      * If there was no run at all, the function returns `null`.
      */
     fun getLastValidationRunStatusId(build: Build, validationStamp: ValidationStamp): String?
+
+    /**
+     * Lists the validation runs of a validation stamp, as its deletion would take them.
+     *
+     * @param validationStamp Validation stamp
+     * @return Its runs, with their builds, run orders and last statuses, ordered by build and run ID
+     */
+    fun findCascadedValidationRuns(validationStamp: ValidationStamp): List<CascadedValidationRun>
 
 }

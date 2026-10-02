@@ -9,8 +9,12 @@ package net.nemerosa.ontrack.extension.audittrail.model
  * (`TrailHashFormatV1.formatTime`). What a caller supplied — a back-dated time, a user name — is
  * kept as `claimed: {time, user}`, the entry's own time and actor being the server's.
  *
- * The `evidence.*` types come with the evidence service, and the `reason: cascade/<cause>` of
- * `validation.deleted`, `promotion.removed` and `link.removed` with the cascading deletions.
+ * The `evidence.*` types come with the evidence service.
+ *
+ * A deletion which reaches builds beyond the deleted entity — a validation stamp, a promotion level,
+ * a build other builds link to — writes on each of them `validation.deleted`, `promotion.removed`
+ * or `link.removed`, with a `reason: cascade/<cause>` ([TrailCascadeReasons]). The deletions of a
+ * branch or a project write nothing: the trails go with the builds.
  */
 object TrailEntryTypes {
 
@@ -52,7 +56,8 @@ object TrailEntryTypes {
     const val LINK_ADDED = "link.added"
 
     /**
-     * Link removed from the build to another one: as [LINK_ADDED].
+     * Link removed from the build to another one: as [LINK_ADDED] — plus
+     * `reason: cascade/target-build-deleted` when the link went with its target build.
      */
     const val LINK_REMOVED = "link.removed"
 
@@ -82,7 +87,8 @@ object TrailEntryTypes {
     const val VALIDATION_DATA = "validation.data"
 
     /**
-     * Validation run deleted: `{validationStamp, validationRun, status}`, its last status.
+     * Validation run deleted: `{validationStamp, validationRun, status}`, its last status — plus
+     * `reason: cascade/validation-stamp-deleted` when the run went with its validation stamp.
      */
     const val VALIDATION_DELETED = "validation.deleted"
 
@@ -93,7 +99,8 @@ object TrailEntryTypes {
     const val PROMOTION_ADDED = "promotion.added"
 
     /**
-     * Promotion run deleted: `{promotionLevel, promotionRun}`.
+     * Promotion run deleted: `{promotionLevel, promotionRun}` — plus
+     * `reason: cascade/promotion-level-deleted` when the run went with its promotion level.
      */
     const val PROMOTION_REMOVED = "promotion.removed"
 

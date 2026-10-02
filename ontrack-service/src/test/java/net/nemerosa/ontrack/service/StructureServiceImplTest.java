@@ -11,6 +11,7 @@ import net.nemerosa.ontrack.model.settings.PredefinedValidationStampService;
 import net.nemerosa.ontrack.model.structure.*;
 import net.nemerosa.ontrack.repository.*;
 import org.junit.jupiter.api.BeforeEach;
+import org.springframework.beans.factory.support.StaticListableBeanFactory;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;
@@ -65,7 +66,9 @@ public class StructureServiceImplTest {
                 coreBuildFilterRepository,
                 mock(MetricsExportService.class),
                 mock(PromotionRunRepository.class),
-                mock(PromotionLevelRepository.class)
+                mock(PromotionLevelRepository.class),
+                mock(ValidationRunRepository.class),
+                new StaticListableBeanFactory().getBeanProvider(CascadeDeletionListener.class)
         );
         // Model
         Project project = Project.of(nd("P", "Project")).withId(ID.of(1));

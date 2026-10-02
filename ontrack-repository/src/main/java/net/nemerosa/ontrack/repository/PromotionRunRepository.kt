@@ -24,4 +24,12 @@ interface PromotionRunRepository {
     fun savePromotionRunFieldValues(promotionRunId: ID, fieldValues: List<PromotionRunFieldValue>)
 
     fun getPromotionRunFieldValues(promotionRunId: ID): List<PromotionRunFieldValue>
+
+    /**
+     * Lists the promotion runs of a promotion level, as its deletion would take them.
+     *
+     * @param promotionLevel Promotion level
+     * @return Its runs, with their builds, ordered by build and run ID
+     */
+    fun findCascadedPromotionRuns(promotionLevel: PromotionLevel): List<CascadedPromotionRun>
 }

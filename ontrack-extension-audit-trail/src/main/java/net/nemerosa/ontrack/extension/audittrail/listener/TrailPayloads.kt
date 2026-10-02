@@ -3,6 +3,7 @@ package net.nemerosa.ontrack.extension.audittrail.listener
 import net.nemerosa.ontrack.extension.audittrail.canonical.CanonicalJson
 import net.nemerosa.ontrack.extension.audittrail.hash.TrailHashFormatV1
 import net.nemerosa.ontrack.model.structure.Build
+import net.nemerosa.ontrack.model.structure.PromotionLevel
 import net.nemerosa.ontrack.model.structure.Signature
 import net.nemerosa.ontrack.model.structure.ValidationRun
 import net.nemerosa.ontrack.model.structure.ValidationStamp
@@ -78,6 +79,14 @@ object TrailPayloads {
      */
     fun validationRun(validationRun: ValidationRun): Map<String, Any> =
         validationRun(validationRun.id(), validationRun.runOrder)
+
+    /**
+     * A promotion level, as an entry refers to it.
+     */
+    fun promotionLevel(promotionLevel: PromotionLevel): Map<String, Any> = mapOf(
+        "id" to promotionLevel.id(),
+        "name" to promotionLevel.name,
+    )
 
     /**
      * What a signature claims: a time, and a user name.

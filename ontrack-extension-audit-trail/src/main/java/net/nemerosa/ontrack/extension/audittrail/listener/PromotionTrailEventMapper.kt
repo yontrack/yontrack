@@ -2,6 +2,7 @@ package net.nemerosa.ontrack.extension.audittrail.listener
 
 import net.nemerosa.ontrack.extension.audittrail.listener.TrailPayloads.claimed
 import net.nemerosa.ontrack.extension.audittrail.listener.TrailPayloads.payload
+import net.nemerosa.ontrack.extension.audittrail.listener.TrailPayloads.promotionLevel
 import net.nemerosa.ontrack.extension.audittrail.model.TrailEntryTypes
 import net.nemerosa.ontrack.model.events.Event
 import net.nemerosa.ontrack.model.events.EventFactory
@@ -59,11 +60,6 @@ class PromotionTrailEventMapper : TrailEventMapper {
 
             else -> emptyList()
         }
-
-    private fun promotionLevel(promotionLevel: PromotionLevel): Map<String, Any> = mapOf(
-        "id" to promotionLevel.id(),
-        "name" to promotionLevel.name,
-    )
 
     companion object {
         /**

@@ -137,5 +137,30 @@ class PromotionRunJdbcRepository(
         ).isNotEmpty()
     }
 
-
+    override fun findCascadedPromotionRuns(promotionLevel: PromotionLevel): List<CascadedPromotionRun> {
+        val builds = mutableMapOf<Int, Build>()
+        return namedParameterJdbcTemplate!!.query(
+            """
+                SELECT PR.ID, PR.BUILDID, B.NAME, B.DESCRIPTION, B.CREATION, B.CREATOR
+                FROM PROMOTION_RUNS PR
+                INNER JOIN BUILDS B ON B.ID = PR.BUILDID
+                WHERE PR.PROMOTIONLEVELID = :promotionLevelId
+                ORDER BY PR.BUILDID, PR.ID
+            """,
+            mapOf("promotionLevelId" to promotionLevel.id())
+        ) { rs, _ ->
+            CascadedPromotionRun(
+                build = builds.getOrPut(rs.getInt("BUILDID")) {
+                    Build(
+                        id = ID.of(rs.getInt("BUILDID")),
+                        name = rs.getString("NAME"),
+                        description = rs.getString("DESCRIPTION"),
+                        branch = promotionLevel.branch,
+                        signature = readSignature(rs),
+                    )
+                },
+                id = rs.getInt("ID"),
+            )
+        }
+    }
 }

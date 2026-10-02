@@ -26,6 +26,7 @@ import net.nemerosa.ontrack.repository.*
 import org.apache.commons.lang3.StringUtils
 import org.apache.commons.lang3.Validate
 import org.slf4j.LoggerFactory
+import org.springframework.beans.factory.ObjectProvider
 import org.springframework.security.access.AccessDeniedException
 import org.springframework.stereotype.Service
 import java.time.LocalDateTime
@@ -56,6 +57,11 @@ class StructureServiceImpl(
     private val metricsExportService: MetricsExportService,
     private val promotionRunRepository: PromotionRunRepository,
     private val promotionLevelRepository: PromotionLevelRepository,
+    private val validationRunRepository: ValidationRunRepository,
+    /**
+     * Provided lazily: a listener may depend on services which depend on this one.
+     */
+    private val cascadeDeletionListeners: ObjectProvider<CascadeDeletionListener>,
 ) : StructureService {
 
     private val logger = LoggerFactory.getLogger(StructureService::class.java)
@@ -257,7 +263,25 @@ class StructureServiceImpl(
         val build = getBuild(buildId)
         securityService.checkProjectFunction(build.projectId(), BuildDelete::class.java)
         eventPostService.post(eventFactory.deleteBuild(build))
+        beforeCascadeDeletion { listeners ->
+            val links = buildLinkRepository.getQualifiedBuildsUsing(build)
+                .filter { it.build.id() != build.id() }
+                .map { CascadedBuildLink(build = it.build, qualifier = it.qualifier) }
+                .sortedWith(compareBy({ it.build.id() }, { it.qualifier }))
+            listeners.forEach { it.beforeBuildDeletion(build, links) }
+        }
         return structureRepository.deleteBuild(buildId)
+    }
+
+    /**
+     * Tells the [cascade deletion listeners][CascadeDeletionListener] what a deletion is about to
+     * take — listing it only when one of them is listening.
+     */
+    private fun beforeCascadeDeletion(code: (listeners: List<CascadeDeletionListener>) -> Unit) {
+        val listeners = cascadeDeletionListeners.orderedStream().filter { it.isListening }.toList()
+        if (listeners.isNotEmpty()) {
+            code(listeners)
+        }
     }
 
     override fun getPreviousBuild(buildId: ID): Build? {
@@ -659,6 +683,10 @@ class StructureServiceImpl(
         val promotionLevel = getPromotionLevel(promotionLevelId)
         securityService.checkProjectFunction(promotionLevel.projectId(), PromotionLevelDelete::class.java)
         eventPostService.post(eventFactory.deletePromotionLevel(promotionLevel))
+        beforeCascadeDeletion { listeners ->
+            val runs = promotionRunRepository.findCascadedPromotionRuns(promotionLevel)
+            listeners.forEach { it.beforePromotionLevelDeletion(promotionLevel, runs) }
+        }
         return structureRepository.deletePromotionLevel(promotionLevelId)
     }
 
@@ -1029,6 +1057,10 @@ class StructureServiceImpl(
         val validationStamp = getValidationStamp(validationStampId)
         securityService.checkProjectFunction(validationStamp.projectId(), ValidationStampDelete::class.java)
         eventPostService.post(eventFactory.deleteValidationStamp(validationStamp))
+        beforeCascadeDeletion { listeners ->
+            val runs = validationRunRepository.findCascadedValidationRuns(validationStamp)
+            listeners.forEach { it.beforeValidationStampDeletion(validationStamp, runs) }
+        }
         return structureRepository.deleteValidationStamp(validationStampId)
     }
 

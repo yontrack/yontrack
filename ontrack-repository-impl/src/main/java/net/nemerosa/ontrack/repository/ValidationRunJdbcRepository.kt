@@ -3,6 +3,7 @@ package net.nemerosa.ontrack.repository
 import net.nemerosa.ontrack.model.structure.*
 import net.nemerosa.ontrack.repository.support.AbstractJdbcRepository
 import org.springframework.stereotype.Repository
+import java.sql.ResultSet
 import javax.sql.DataSource
 
 @Repository
@@ -56,5 +57,46 @@ class ValidationRunJdbcRepository(
             String::class.java
         ).firstOrNull()
     }
+
+    override fun findCascadedValidationRuns(validationStamp: ValidationStamp): List<CascadedValidationRun> {
+        val builds = mutableMapOf<Int, Build>()
+        return namedParameterJdbcTemplate!!.query(
+            """
+                SELECT VR.ID, VR.BUILDID, B.NAME, B.DESCRIPTION, B.CREATION, B.CREATOR,
+                       ROW_NUMBER() OVER (PARTITION BY VR.BUILDID ORDER BY VR.ID) AS RUN_ORDER,
+                       (
+                           SELECT VRS.VALIDATIONRUNSTATUSID
+                           FROM VALIDATION_RUN_STATUSES VRS
+                           WHERE VRS.VALIDATIONRUNID = VR.ID
+                           ORDER BY VRS.CREATION DESC, VRS.ID DESC
+                           LIMIT 1
+                       ) AS STATUS
+                FROM VALIDATION_RUNS VR
+                INNER JOIN BUILDS B ON B.ID = VR.BUILDID
+                WHERE VR.VALIDATIONSTAMPID = :validationStampId
+                ORDER BY VR.BUILDID, VR.ID
+            """,
+            mapOf("validationStampId" to validationStamp.id())
+        ) { rs, _ ->
+            CascadedValidationRun(
+                build = builds.getOrPut(rs.getInt("BUILDID")) { toBuild(rs, validationStamp.branch) },
+                id = rs.getInt("ID"),
+                runOrder = rs.getInt("RUN_ORDER"),
+                status = rs.getString("STATUS"),
+            )
+        }
+    }
+
+    /**
+     * A build of the [branch] from the columns `BUILDID`, `NAME`, `DESCRIPTION`, `CREATION` and
+     * `CREATOR`.
+     */
+    private fun toBuild(rs: ResultSet, branch: Branch) = Build(
+        id = ID.of(rs.getInt("BUILDID")),
+        name = rs.getString("NAME"),
+        description = rs.getString("DESCRIPTION"),
+        branch = branch,
+        signature = readSignature(rs),
+    )
 
 }
