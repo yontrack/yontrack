@@ -2,16 +2,45 @@ package net.nemerosa.ontrack.extension.audittrail.events
 
 import net.nemerosa.ontrack.extension.audittrail.verification.TrailVerification
 import net.nemerosa.ontrack.model.events.*
+import net.nemerosa.ontrack.extension.audittrail.evidence.Evidence
 import net.nemerosa.ontrack.model.structure.Build
+import net.nemerosa.ontrack.model.structure.Signature
+import net.nemerosa.ontrack.model.structure.ValidationRun
 
 /**
- * Notifiable events of the audit trail, the build being their entity: a subscription on a build,
- * its branch or its project sees them.
+ * Notifiable events of the audit trail, about a build or one of its validation runs: a
+ * subscription on the build, its branch or its project sees them.
  */
 object AuditTrailEvents {
 
     const val EVENT_FIRST_BROKEN_SEQ = "FIRST_BROKEN_SEQ"
     const val EVENT_REASON = "REASON"
+    const val EVENT_EVIDENCE_ID = "EVIDENCE_ID"
+    const val EVENT_EVIDENCE_FILE_NAME = "EVIDENCE_FILE_NAME"
+    const val EVENT_EVIDENCE_MEDIA_TYPE = "EVIDENCE_MEDIA_TYPE"
+    const val EVENT_EVIDENCE_SIZE = "EVIDENCE_SIZE"
+    const val EVENT_EVIDENCE_SHA256 = "EVIDENCE_SHA256"
+
+    val EVIDENCE_ATTACHED: EventType = SimpleEventType(
+        id = "evidence.attached",
+        template = $$"""
+            Evidence ${$$EVENT_EVIDENCE_FILE_NAME} has been attached to the ${validationStamp} validation ${validationRun} of build ${build} in branch ${branch} of ${project}.
+        """.trimIndent(),
+        description = "When an evidence - a file - is attached to a validation run. The evidence is referenced " +
+                "by an evidence.attached entry of the trail of the build, with its SHA-256.",
+        context = eventContext(
+            eventProject("Project of the build"),
+            eventBranch("Branch of the build"),
+            eventBuild("Build of the validation run"),
+            eventValidationStamp("Validation stamp of the validation run"),
+            eventValidationRun("Validation run the evidence is attached to"),
+            eventValue(EVENT_EVIDENCE_ID, "ID of the evidence"),
+            eventValue(EVENT_EVIDENCE_FILE_NAME, "Name of the file of the evidence"),
+            eventValue(EVENT_EVIDENCE_MEDIA_TYPE, "Media type of the evidence, as declared"),
+            eventValue(EVENT_EVIDENCE_SIZE, "Size of the evidence, in bytes"),
+            eventValue(EVENT_EVIDENCE_SHA256, "SHA-256 of the content of the evidence, in lowercase hexadecimal"),
+        ),
+    )
 
     val TRAIL_VERIFICATION_FAILED: EventType = SimpleEventType(
         id = "trail.verification.failed",
@@ -32,6 +61,24 @@ object AuditTrailEvents {
             eventValue(EVENT_REASON, "Check failed by this entry, for a human"),
         ),
     )
+
+    /**
+     * Event for an evidence attached to a validation run.
+     *
+     * @param validationRun Validation run the evidence is attached to
+     * @param evidence Attached evidence
+     * @param signature Who attached it, and when
+     */
+    fun evidenceAttached(validationRun: ValidationRun, evidence: Evidence, signature: Signature): Event =
+        Event.of(EVIDENCE_ATTACHED)
+            .withValidationRun(validationRun)
+            .with(signature)
+            .with(EVENT_EVIDENCE_ID, evidence.id.toString())
+            .with(EVENT_EVIDENCE_FILE_NAME, evidence.fileName)
+            .with(EVENT_EVIDENCE_MEDIA_TYPE, evidence.mediaType)
+            .with(EVENT_EVIDENCE_SIZE, evidence.size.toString())
+            .with(EVENT_EVIDENCE_SHA256, evidence.sha256)
+            .build()
 
     /**
      * Event for the failed verification of the trail of a build.

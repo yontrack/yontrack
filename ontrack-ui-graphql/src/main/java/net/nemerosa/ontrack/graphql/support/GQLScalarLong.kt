@@ -3,23 +3,25 @@ package net.nemerosa.ontrack.graphql.support
 import graphql.language.IntValue
 import graphql.language.StringValue
 import graphql.schema.*
-import java.math.BigInteger
 
 /**
  * Long scalar type.
+ *
+ * Output as a JSON number: the serialized value is the `Long` itself, never a literal of the
+ * GraphQL language, which JSON would render as an object.
  */
 object GQLScalarLong {
     val INSTANCE: GraphQLScalarType = GraphQLScalarType.newScalar()
             .name("Long")
             .description("Long signed integer")
             .coercing(
-                    object : Coercing<Long, IntValue> {
+                    object : Coercing<Long, Long> {
 
-                        override fun serialize(dataFetcherResult: Any): IntValue =
-                                if (dataFetcherResult is Long) {
-                                    IntValue(BigInteger.valueOf(dataFetcherResult))
-                                } else {
-                                    throw CoercingSerializeException("Cannot serialize ${dataFetcherResult::class.java} into a string")
+                        override fun serialize(dataFetcherResult: Any): Long =
+                                when (dataFetcherResult) {
+                                    is Long -> dataFetcherResult
+                                    is Int -> dataFetcherResult.toLong()
+                                    else -> throw CoercingSerializeException("Cannot serialize ${dataFetcherResult::class.java} into a long")
                                 }
 
                         override fun parseValue(input: Any): Long =

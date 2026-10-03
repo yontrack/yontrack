@@ -28,6 +28,12 @@ spring:
   # Default profile
   profiles:
     default: prod
+  # Multipart requests are parsed only once a controller reads their parts: the upload of an
+  # evidence reads them after its authorization (#1964). Their size limits are raised to the
+  # maximum size of an evidence by the audit trail (EvidenceMultipartConfiguration).
+  servlet:
+    multipart:
+      resolve-lazily: true
   # GraphQL
   graphql:
     schema:

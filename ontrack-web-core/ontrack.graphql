@@ -2383,6 +2383,44 @@ type EventType {
   id: String!
 }
 
+"A file attached to a validation run, referenced by an evidence.attached entry of the trail of its build"
+type Evidence {
+  "Server time of the upload, UTC"
+  collectedAt: LocalDateTime!
+  "Actor of the upload, as entries carry it"
+  collectedBy: JSON!
+  "When the evidence was deleted, null while it is not"
+  deletedAt: LocalDateTime
+  "Path of the download of the content, relative to the root of the API - null once the evidence is deleted"
+  downloadUrl: String
+  "SHA-256 the client claimed, which matched the computed one"
+  externalDigest: String
+  "Name of the file - a label, never a path"
+  fileName: String!
+  "ID of the evidence"
+  id: Int!
+  "Media type declared by the client - the download serves it as such only for the allow-listed types whose content agrees with it"
+  mediaType: String!
+  "SHA-256 of the content as the server computed it, in lowercase hexadecimal"
+  sha256: String!
+  "Size of the content, in bytes"
+  size: Long!
+  "Where the client says the evidence comes from"
+  source: EvidenceSource
+  "ID of the validation run the evidence is attached to"
+  validationRunId: Int!
+}
+
+"Where an evidence comes from, as its client claims it"
+type EvidenceSource {
+  "Tool which produced the evidence, like trivy"
+  tool: String
+  "Where the evidence was produced - a CI job, a report: an HTTP or HTTPS URL"
+  url: String
+  "Version of the tool"
+  version: String
+}
+
 type ExtensionFeatureDescription {
   "Feature description"
   description: String
@@ -8467,6 +8505,8 @@ type ValidationRun implements Authorizable & ProjectEntity {
     type: String
   ): [Decoration!]!
   description: String
+  "Evidences attached to the validation run, deleted ones included, in the order of their upload"
+  evidence: [Evidence!]!
   "Security findings reported by this run, each with its observation by this run (the severity, the installed version, the acceptance), the most severe first. Empty for a run which is not a security scan, and for a user who is not granted the view of the findings of the project."
   findings: [FindingObservation!]!
   id: ID!

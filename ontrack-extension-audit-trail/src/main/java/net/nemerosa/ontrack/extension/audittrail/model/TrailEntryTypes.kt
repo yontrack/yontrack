@@ -9,7 +9,7 @@ package net.nemerosa.ontrack.extension.audittrail.model
  * (`TrailHashFormatV1.formatTime`). What a caller supplied — a back-dated time, a user name — is
  * kept as `claimed: {time, user}`, the entry's own time and actor being the server's.
  *
- * The `evidence.*` types come with the evidence service.
+ * The `evidence.*` types are written by the evidence service, not from events.
  *
  * A deletion which reaches builds beyond the deleted entity — a validation stamp, a promotion level,
  * a build other builds link to — writes on each of them `validation.deleted`, `promotion.removed`
@@ -91,6 +91,15 @@ object TrailEntryTypes {
      * `reason: cascade/validation-stamp-deleted` when the run went with its validation stamp.
      */
     const val VALIDATION_DELETED = "validation.deleted"
+
+    /**
+     * Evidence attached to a validation run of the build: `{validationStamp, validationRun,
+     * evidence: {id, fileName, mediaType, size, sha256, source: {tool, version, url},
+     * externalDigest}}` — `sha256` being the SHA-256 the server computed, `externalDigest` the one
+     * the client claimed, which matched it. Written by the evidence service, in the transaction of
+     * the upload.
+     */
+    const val EVIDENCE_ATTACHED = "evidence.attached"
 
     /**
      * Promotion of the build: `{promotionLevel: {id, name}, promotionRun: {id}, description,
