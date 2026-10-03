@@ -5,7 +5,7 @@ import {buildBreadcrumbs} from "@components/common/Breadcrumbs";
 import LoadingContainer from "@components/common/LoadingContainer";
 import {gql} from "graphql-request";
 import {CloseCommand, Command} from "@components/common/Commands";
-import {branchUri, buildLinksUri} from "@components/common/Links";
+import {branchUri, buildAuditTrailUri, buildLinksUri} from "@components/common/Links";
 import {
     gqlDecorationFragment,
     gqlInformationFragment,
@@ -19,7 +19,7 @@ import InfoViewDrawer from "@components/common/InfoViewDrawer";
 import {useQuery} from "@components/services/GraphQL";
 import StoredGridLayoutResetCommand from "@components/grid/StoredGridLayoutResetCommand";
 import StoredGridLayoutContextProvider from "@components/grid/StoredGridLayoutContext";
-import {FaProjectDiagram} from "react-icons/fa";
+import {FaProjectDiagram, FaShieldAlt} from "react-icons/fa";
 import UserMenuActions from "@components/entities/UserMenuActions";
 import EditBuildCommand from "@components/builds/EditBuildCommand";
 import AnnotatedDescription from "@components/common/AnnotatedDescription";
@@ -138,6 +138,19 @@ export default function BuildView({id}) {
                 title="Displays downstream and upstream dependencies"
             />,
         )
+        // Granted when the build has a trail to read: the licence is folded in on the server
+        if (isAuthorized(build, "auditTrail", "view")) {
+            commands.push(
+                <Command
+                    key="audit-trail"
+                    icon={<FaShieldAlt/>}
+                    href={buildAuditTrailUri(build)}
+                    text="Audit trail"
+                    title="Displays the audit trail of the build: its entries and their verification"
+                    testId="build-audit-trail-command"
+                />,
+            )
+        }
         if (isAuthorized(build, "build", "edit")) {
             commands.push(
                 <EditBuildCommand

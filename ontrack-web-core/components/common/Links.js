@@ -39,6 +39,18 @@ export function buildLinksUri(build) {
     return `/build/${build.id}/links`
 }
 
+export function buildAuditTrailUri(build) {
+    return `/build/${build.id}/audit-trail`
+}
+
+/**
+ * Download of the JSON export of the trail of a build, through the protected downloads of the UI,
+ * which carry the token of the session.
+ */
+export function buildAuditTrailExportUri(build) {
+    return `/api/protected/downloads/audit-trail/builds/${build.id}/export`
+}
+
 export function scmChangeLogUri(from, to) {
     return `/extension/scm/changelog?from=${from}&to=${to}`
 }

@@ -126,6 +126,15 @@ describe('mobileEquivalent', () => {
         expect(describeDesktopRoute('/extension/audit-trail/status')).toEqual('the audit trail status')
     })
 
+    it('leaves the audit trail of a build desktop-only', () => {
+        // #1967: the trail is an audit tool, not a phone one, and the mobile UI has no
+        // validation run page. The sub-page of a build reaches the interstitial, under a
+        // name a user can read, rather than the mobile build screen.
+        expect(mobileEquivalent('/build/56/audit-trail')).toBeNull()
+        expect(isRedirectExempt('/build/56/audit-trail')).toBe(false)
+        expect(describeDesktopRoute('/build/56/audit-trail')).toEqual("a build's audit trail")
+    })
+
     it('leaves the estate view desktop-only', () => {
         // #1910: the estate view is desktop-only in 6.x. The list of the
         // scorecards and the page of an estate reach the interstitial, under a

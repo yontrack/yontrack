@@ -282,6 +282,8 @@ const DESCRIPTIONS = [
     [/^\/core\/ref\//, 'a reference page'],
     [/^\/project\//, 'a project'],
     [/^\/branch\//, 'a branch'],
+    // No audit trail in the mobile UI in 6.0: an audit tool, not a phone one (#1967)
+    [/^\/build\/\d+\/audit-trail$/, "a build's audit trail"],
     [/^\/build\//, 'a build'],
     [/^\/promotionLevel\//, 'a promotion level'],
     [/^\/promotionRun\//, 'a promotion'],
