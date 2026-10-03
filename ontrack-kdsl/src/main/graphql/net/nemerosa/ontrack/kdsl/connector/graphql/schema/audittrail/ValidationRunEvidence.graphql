@@ -1,0 +1,7 @@
+query ValidationRunEvidence($validationRunId: Int!) {
+    validationRuns(id: $validationRunId) {
+        evidence {
+            ...EvidenceFragment
+        }
+    }
+}

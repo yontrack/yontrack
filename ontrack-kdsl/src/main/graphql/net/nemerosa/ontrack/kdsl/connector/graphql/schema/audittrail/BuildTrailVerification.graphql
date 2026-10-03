@@ -1,0 +1,21 @@
+query BuildTrailVerification($buildId: Int!, $includeEvidence: Boolean!) {
+    builds(id: $buildId) {
+        auditTrail {
+            verification(includeEvidence: $includeEvidence) {
+                chainIntact
+                firstBrokenSeq
+                endorsementsValid
+                firstInvalidEndorsementSeq
+                partial
+                unendorsedFromSeq
+                missingEvidence
+                alteredEvidence
+                problems {
+                    seq
+                    type
+                    message
+                }
+            }
+        }
+    }
+}

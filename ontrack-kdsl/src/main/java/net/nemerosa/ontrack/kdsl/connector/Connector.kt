@@ -44,20 +44,29 @@ interface Connector {
     )
 
     /**
-     * Deletes a payload to a relative URL.
+     * Deletes a resource at a relative URL.
+     *
+     * @return Response, with the body the server answered, if any
      */
     fun delete(
         path: String,
         headers: Map<String, String> = emptyMap()
-    )
+    ): ConnectorResponse
 
     /**
-     * Uploading a single file using REST
+     * Uploading a single file using REST, as a `multipart/form-data` request.
+     *
+     * @param path Relative URL
+     * @param headers Additional headers
+     * @param file File to upload, sent in the part named after [FileContent.name]
+     * @param fields Text fields sent along the file, each in its own part
+     * @return Response of the upload
      */
     fun uploadFile(
         path: String,
         headers: Map<String, String> = emptyMap(),
         file: FileContent,
-    )
+        fields: Map<String, String> = emptyMap(),
+    ): ConnectorResponse
 
 }

@@ -1,0 +1,24 @@
+query BuildTrail($buildId: Int!) {
+    builds(id: $buildId) {
+        auditTrail {
+            entries {
+                id
+                seq
+                schemaVersion
+                type
+                time
+                actor
+                prevHash
+                payload
+                hash
+            }
+            endorsements {
+                entryId
+                seq
+                keyId
+                signature
+                time
+            }
+        }
+    }
+}

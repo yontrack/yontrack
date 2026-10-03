@@ -11,6 +11,11 @@ interface ConnectorResponseBody {
 
     fun asTextOrNull(charset: Charset = Charsets.UTF_8): String?
 
+    /**
+     * Raw content of the body, empty when there is none.
+     */
+    fun asBytes(): ByteArray
+
     fun asJson(): JsonNode = asText().parseAsJson()
 
     fun asJsonOrNull(): JsonNode? = asTextOrNull()?.parseAsJson()

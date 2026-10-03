@@ -1,0 +1,18 @@
+fragment EvidenceFragment on Evidence {
+    id
+    validationRunId
+    fileName
+    mediaType
+    size
+    sha256
+    collectedAt
+    collectedBy
+    source {
+        tool
+        version
+        url
+    }
+    externalDigest
+    deletedAt
+    downloadUrl
+}

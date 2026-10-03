@@ -7,6 +7,7 @@ import net.nemerosa.ontrack.kdsl.connector.FileContent
 import org.springframework.core.io.ByteArrayResource
 import org.springframework.http.HttpEntity
 import org.springframework.http.HttpHeaders
+import org.springframework.http.HttpMethod
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
 import org.springframework.util.LinkedMultiValueMap
@@ -72,6 +73,8 @@ class DefaultConnector(
 
             override fun asText(charset: Charset): String =
                 asTextOrNull(charset) ?: ""
+
+            override fun asBytes(): ByteArray = response.body ?: ByteArray(0)
         }
     }
 
@@ -84,11 +87,17 @@ class DefaultConnector(
         restTemplate(headers).put(path, body)
     }
 
-    override fun delete(path: String, headers: Map<String, String>) {
-        restTemplate(headers).delete(path)
+    override fun delete(path: String, headers: Map<String, String>): ConnectorResponse {
+        val response = restTemplate(headers).exchange(path, HttpMethod.DELETE, null, ByteArray::class.java)
+        return RestTemplateConnectorResponse(response)
     }
 
-    override fun uploadFile(path: String, headers: Map<String, String>, file: FileContent) {
+    override fun uploadFile(
+        path: String,
+        headers: Map<String, String>,
+        file: FileContent,
+        fields: Map<String, String>,
+    ): ConnectorResponse {
         val actualHeaders = headers.toMutableMap()
         actualHeaders["Content-Type"] = MediaType.MULTIPART_FORM_DATA.toString()
 
@@ -102,14 +111,18 @@ class DefaultConnector(
         val fileEntity = HttpEntity<ByteArrayResource>(resource, fileHeaders)
         val body: MultiValueMap<String, Any> = LinkedMultiValueMap()
         body.add(file.name, fileEntity)
+        fields.forEach { (name, value) ->
+            body.add(name, value)
+        }
 
         val requestEntity: HttpEntity<MultiValueMap<String, Any>> = HttpEntity(body)
 
-        restTemplate(actualHeaders).postForEntity(
+        val response = restTemplate(actualHeaders).postForEntity(
             path,
             requestEntity,
-            String::class.java
+            ByteArray::class.java
         )
+        return RestTemplateConnectorResponse(response)
     }
 
     private fun restTemplate(
