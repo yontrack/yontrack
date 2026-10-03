@@ -12,3 +12,56 @@ extend type Query {
     """Public keys of the instance, with which the endorsements of the entries of its trails are verified - empty while no key exists"""
     auditTrailKeys: [AuditTrailKey!]!
 }
+
+"""State of the evidence storage of the audit trail"""
+enum AuditTrailStorageState {
+    """The storage properties are not all set: evidence cannot be attached"""
+    NOT_CONFIGURED
+    """The bucket cannot be reached - service down, bucket missing, credentials refused: evidence cannot be attached"""
+    UNREACHABLE
+    """The bucket is reachable"""
+    OK
+}
+
+"""Whether the instance key can endorse the entries"""
+enum AuditTrailKeyStatus {
+    """The key is there: every entry is endorsed"""
+    OK
+    """No usable key, and none could be generated: entries are written but not endorsed"""
+    NOT_PROVISIONED
+}
+
+"""Status and configuration of the evidence storage - never its credentials"""
+type AuditTrailStorageStatus {
+    """State of the storage, as its last probe found it"""
+    state: AuditTrailStorageState!
+    """Why the storage is not OK - null when it is"""
+    message: String
+    """When the storage was last probed, UTC, ISO-8601 local date time"""
+    checkedAt: String!
+    """Configured endpoint"""
+    endpoint: String
+    """Configured bucket"""
+    bucket: String
+    """Configured region"""
+    region: String!
+    """Whether the bucket is addressed path-style"""
+    pathStyle: Boolean!
+}
+
+"""Status of the audit trail"""
+type AuditTrailStatus {
+    """Whether the licence allows the audit trail"""
+    licensed: Boolean!
+    """Status of the evidence storage"""
+    storage: AuditTrailStorageStatus!
+    """Whether the instance key can endorse the entries"""
+    keyStatus: AuditTrailKeyStatus!
+    """Public keys of the instance - empty while no key exists"""
+    keys: [AuditTrailKey!]!
+}
+
+extend type Query {
+    """Status of the audit trail: licence, evidence storage and instance key - requires the global settings"""
+    auditTrailStatus: AuditTrailStatus!
+}

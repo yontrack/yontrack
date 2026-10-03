@@ -8,7 +8,10 @@ import net.nemerosa.ontrack.model.annotations.getPropertyDescription
 import net.nemerosa.ontrack.model.docs.DocumentationIgnore
 import org.junit.jupiter.api.Test
 import org.springframework.boot.context.properties.ConfigurationProperties
+import org.springframework.boot.convert.DataSizeUnit
 import org.springframework.boot.convert.DurationUnit
+import org.springframework.util.unit.DataSize
+import org.springframework.util.unit.DataUnit
 import java.time.Duration
 import kotlin.reflect.KClass
 import kotlin.reflect.KProperty
@@ -18,6 +21,7 @@ import kotlin.reflect.full.createInstance
 import kotlin.reflect.full.findAnnotation
 import kotlin.reflect.full.hasAnnotation
 import kotlin.reflect.full.memberProperties
+import kotlin.reflect.jvm.javaField
 import kotlin.reflect.jvm.jvmName
 
 class ConfigDocumentationIT : AbstractDocGenIT() {
@@ -74,10 +78,24 @@ class ConfigDocumentationIT : AbstractDocGenIT() {
 
             // Fields
             s.table("Name", "Environment", "Description", "Default value", "Notes")
-            writeProperties(s, directoryContext, configuration, configuration)
+            writeProperties(s, directoryContext, configuration, defaults(configuration))
 
         }
     }
+
+    /**
+     * The default values of a configuration: a new instance of its class when it has a constructor
+     * without arguments, the bean itself otherwise.
+     *
+     * The bean is bound to the environment of the tests — the `dev` profile and the properties of
+     * the integration test stack, its storage credentials among them — which are not defaults.
+     */
+    private fun defaults(configuration: Any): Any =
+        try {
+            configuration::class.createInstance()
+        } catch (_: IllegalArgumentException) {
+            configuration
+        }
 
     private fun writeProperties(
         s: StringBuilder,
@@ -208,6 +226,15 @@ class ConfigDocumentationIT : AbstractDocGenIT() {
                         current = child,
                         deprecatedReason = deprecatedReason,
                     )
+                } else if (child is DataSize) {
+                    writeDataSizeProperty(
+                        s = s,
+                        propertyName = propertyName,
+                        envName = envName,
+                        member = member,
+                        current = child,
+                        deprecatedReason = deprecatedReason,
+                    )
                 } else {
                     writeProperties(
                         s = s,
@@ -240,6 +267,33 @@ class ConfigDocumentationIT : AbstractDocGenIT() {
         if (durationUnit != null) {
             val unit = durationUnit.value
             defaultValue += " (${unit.name})"
+        }
+
+        writeProperty(s, propertyName, envName, description, defaultValue, deprecatedReason)
+    }
+
+    /**
+     * A data size, in the unit of its [DataSizeUnit] when it has one, in bytes otherwise.
+     */
+    private fun writeDataSizeProperty(
+        s: StringBuilder,
+        propertyName: String,
+        envName: String,
+        member: KProperty1<out Any, *>,
+        current: DataSize,
+        deprecatedReason: String,
+    ) {
+        val description = getPropertyDescription(member)
+
+        // The annotation targets the field: Kotlin puts it on the backing field, not on the property
+        val unitAnnotation = member.findAnnotation<DataSizeUnit>()
+            ?: member.javaField?.getAnnotation(DataSizeUnit::class.java)
+        val defaultValue = when (val unit = unitAnnotation?.value) {
+            null, DataUnit.BYTES -> "${current.toBytes()} (BYTES)"
+            DataUnit.KILOBYTES -> "${current.toKilobytes()} (${unit.name})"
+            DataUnit.MEGABYTES -> "${current.toMegabytes()} (${unit.name})"
+            DataUnit.GIGABYTES -> "${current.toGigabytes()} (${unit.name})"
+            DataUnit.TERABYTES -> "${current.toTerabytes()} (${unit.name})"
         }
 
         writeProperty(s, propertyName, envName, description, defaultValue, deprecatedReason)

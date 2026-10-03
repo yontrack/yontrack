@@ -274,6 +274,8 @@ const DESCRIPTIONS = [
     // No estate view in the mobile UI in 6.x (#1910)
     [/^\/extension\/scorecard\/scorecards$/, 'the scorecards of the estates'],
     [/^\/extension\/scorecard\/estate\//, "an estate's scorecard"],
+    // No audit trail status in the mobile UI: an admin page, desktop-only (#1963)
+    [/^\/extension\/audit-trail\/status$/, 'the audit trail status'],
     [/^\/extension\//, 'an extension page'],
     [/^\/core\/admin\//, 'an administration page'],
     [/^\/core\/config\//, 'a configuration page'],

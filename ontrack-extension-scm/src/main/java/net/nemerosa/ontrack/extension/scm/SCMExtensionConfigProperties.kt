@@ -30,7 +30,7 @@ class SCMExtensionConfigProperties {
         @APIDescription(
             "Enables the mock SCM, which keeps repositories, branches, commits and issues in memory " +
                     "instead of talking to a real SCM. Disabled by default; always enabled in the `dev` " +
-                    "profile (the value shown opposite is the one the documentation build runs with). " +
+                    "profile. " +
                     "Enable it only on demonstration or test instances - never on an instance tracking " +
                     "real deliveries, where it would let a project claim an SCM that answers with " +
                     "whatever anyone posted to it. Its data lives on the bean and does not survive a " +

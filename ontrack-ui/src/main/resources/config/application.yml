@@ -58,6 +58,13 @@ management:
   endpoint:
     health:
       show-details: when-authorized
+      # DEGRADED: a feature does not work while the instance does - the evidence storage of the
+      # audit trail, for example (#1963). It ranks between OUT_OF_SERVICE and UP, so that it never
+      # hides a DOWN, and it answers HTTP 200, so that it never takes a pod out.
+      status:
+        order: DOWN, OUT_OF_SERVICE, DEGRADED, UP, UNKNOWN
+        http-mapping:
+          DEGRADED: 200
     # Getting a token for an account is used only for testing and must be explicitly granted
     account:
       access: none

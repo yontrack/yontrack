@@ -31,7 +31,7 @@ class WorkflowConfigurationProperties {
         @APIDescription(
             "Enables the \"Simulated gate\" workflow node executor, which reports a pre-configured outcome " +
                     "without performing any real action. Disabled by default; always enabled in the `dev` " +
-                    "profile (the value shown opposite is the one the documentation build runs with). Enable it only on " +
+                    "profile. Enable it only on " +
                     "demonstration or test instances - never on an instance tracking real deliveries, where it " +
                     "would let a workflow report a gate as passed without anything having been verified."
         )

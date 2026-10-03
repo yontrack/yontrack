@@ -118,6 +118,14 @@ describe('mobileEquivalent', () => {
         expect(describeDesktopRoute('/extension/scorecard/estates')).toEqual('the estates')
     })
 
+    it('leaves the audit trail status page desktop-only', () => {
+        // #1963: an admin page, which the mobile UI does not serve. It reaches
+        // the interstitial, under a name a user can read.
+        expect(mobileEquivalent('/extension/audit-trail/status')).toBeNull()
+        expect(isRedirectExempt('/extension/audit-trail/status')).toBe(false)
+        expect(describeDesktopRoute('/extension/audit-trail/status')).toEqual('the audit trail status')
+    })
+
     it('leaves the estate view desktop-only', () => {
         // #1910: the estate view is desktop-only in 6.x. The list of the
         // scorecards and the page of an estate reach the interstitial, under a
