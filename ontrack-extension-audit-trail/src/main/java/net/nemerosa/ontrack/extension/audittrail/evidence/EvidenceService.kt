@@ -7,7 +7,8 @@ import net.nemerosa.ontrack.model.structure.ValidationRun
  *
  * Reading and downloading need the view of the project, whatever the licence: evidences stay
  * readable after it lapses. Attaching needs the creation of validation runs on the project, the
- * licence, and the storage.
+ * licence, and the storage. Deleting needs [EvidenceDelete][net.nemerosa.ontrack.extension.audittrail.security.EvidenceDelete]
+ * on the project and the licence, but not the storage.
  */
 interface EvidenceService {
 
@@ -33,7 +34,7 @@ interface EvidenceService {
      * @param upload Evidence as sent
      * @return Attached evidence
      * @throws EvidenceException When the evidence is refused — see [checkAttach] and
-     * [EvidenceBlobStore.store]
+     * [EvidenceBlobStore.stage]
      */
     fun attach(validationRun: ValidationRun, upload: EvidenceUpload): Evidence
 
@@ -60,4 +61,22 @@ interface EvidenceService {
      * when its content is missing from the storage
      */
     fun download(id: Int): EvidenceDownload
+
+    /**
+     * Deletes an evidence: it is kept, marked as deleted, and an `evidence.deleted` entry and its
+     * event are written in one transaction; its blob is then removed, unless another evidence
+     * which is not deleted references it. When the storage cannot be used, the blob is left to
+     * the sweep.
+     *
+     * @param id ID of the evidence
+     * @return Deleted evidence
+     * @throws EvidenceNotFoundException When there is no such evidence, or when it is deleted
+     * already
+     * @throws org.springframework.security.access.AccessDeniedException Without
+     * [EvidenceDelete][net.nemerosa.ontrack.extension.audittrail.security.EvidenceDelete] on its
+     * project
+     * @throws EvidenceException [EvidenceError.NOT_LICENSED] when the licence is off: the
+     * deletion could not be written to the trail
+     */
+    fun delete(id: Int): Evidence
 }

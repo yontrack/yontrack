@@ -8,6 +8,7 @@ import net.nemerosa.ontrack.extension.audittrail.listener.TrailPayloads.payload
 import net.nemerosa.ontrack.extension.audittrail.listener.TrailPayloads.validationRun
 import net.nemerosa.ontrack.extension.audittrail.listener.TrailPayloads.validationStamp
 import net.nemerosa.ontrack.extension.audittrail.model.TrailEntryTypes
+import net.nemerosa.ontrack.extension.audittrail.security.EvidenceDelete
 import net.nemerosa.ontrack.extension.audittrail.service.TrailService
 import net.nemerosa.ontrack.extension.audittrail.storage.EvidenceStorageService
 import net.nemerosa.ontrack.extension.audittrail.storage.EvidenceStorageState
@@ -21,6 +22,7 @@ import net.nemerosa.ontrack.model.security.ValidationRunCreate
 import net.nemerosa.ontrack.model.structure.ID
 import net.nemerosa.ontrack.model.structure.StructureService
 import net.nemerosa.ontrack.model.structure.ValidationRun
+import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.support.TransactionTemplate
 import java.io.BufferedInputStream
@@ -28,9 +30,15 @@ import java.time.temporal.ChronoUnit
 
 /**
  * The content of an evidence is streamed to the storage **outside** of any transaction of this
- * service — a big upload never holds a database connection — and its metadata, its trail entry and
- * its event are written in one transaction afterwards. A blob stored for an evidence whose
- * transaction then fails is referenced by no row: the collection of the blobs deletes it.
+ * service — a big upload never holds a database connection. It is then copied to its blob, and its
+ * metadata, its trail entry and its event are written, in one transaction holding the lock of the
+ * blob: the [collection of the blobs][EvidenceBlobCollector] never removes a blob between its copy
+ * and the commit of the evidence referencing it. A blob copied for an evidence whose transaction
+ * then fails is referenced by no row: the sweep removes it.
+ *
+ * A deletion keeps the evidence, marked as deleted, writes `evidence.deleted` and its event in one
+ * transaction, then removes its blob unless another evidence references it — leaving it to the
+ * sweep when the storage cannot be used.
  */
 @Service
 class EvidenceServiceImpl(
@@ -40,10 +48,13 @@ class EvidenceServiceImpl(
     private val evidenceStorageService: EvidenceStorageService,
     private val evidenceBlobStore: EvidenceBlobStore,
     private val evidenceRepository: EvidenceRepository,
+    private val evidenceBlobCollector: EvidenceBlobCollector,
     private val trailService: TrailService,
     private val eventPostService: EventPostService,
     private val transactionTemplate: TransactionTemplate,
 ) : EvidenceService {
+
+    private val logger = LoggerFactory.getLogger(EvidenceServiceImpl::class.java)
 
     override fun checkAttach(validationRun: ValidationRun) {
         securityService.checkProjectFunction(validationRun, ValidationRunCreate::class.java)
@@ -78,13 +89,30 @@ class EvidenceServiceImpl(
         if (upload.size < 0) {
             throw EvidenceException(EvidenceError.INVALID, "The size of the evidence is unknown.")
         }
-        val blob = upload.content().use { content ->
-            evidenceBlobStore.store(content, upload.size, externalDigest)
+        val staged = upload.content().use { content ->
+            evidenceBlobStore.stage(content, upload.size, externalDigest)
         }
+        try {
+            return attach(validationRun, staged, fileName, mediaType, source, externalDigest)
+        } finally {
+            evidenceBlobStore.discard(staged)
+        }
+    }
+
+    private fun attach(
+        validationRun: ValidationRun,
+        staged: EvidenceStagedBlob,
+        fileName: String,
+        mediaType: String,
+        source: EvidenceSource?,
+        externalDigest: String?,
+    ): Evidence {
         // The actor is taken from the security context, as for any entry
         val actor = (securityService.currentActor ?: Actor.system(reason = null)).asJson()
         val signature = securityService.currentSignature
         return transactionTemplate.execute {
+            evidenceRepository.lockBlob(staged.sha256)
+            val blob = evidenceBlobStore.persist(staged)
             val evidence = evidenceRepository.insert(
                 Evidence(
                     id = 0,
@@ -124,6 +152,54 @@ class EvidenceServiceImpl(
             eventPostService.post(AuditTrailEvents.evidenceAttached(validationRun, evidence, signature))
             evidence
         }
+    }
+
+    override fun delete(id: Int): Evidence {
+        val existing = evidenceRepository.findById(id)?.takeIf { it.deletedAt == null }
+            ?: throw EvidenceNotFoundException("Evidence $id cannot be found.")
+        // Checks the view of the project
+        val validationRun = structureService.getValidationRun(ID.of(existing.validationRunId))
+        securityService.checkProjectFunction(validationRun, EvidenceDelete::class.java)
+        if (!auditTrailLicense.auditTrailEnabled) {
+            // The deletion would be missing from the trail
+            throw EvidenceException(
+                EvidenceError.NOT_LICENSED,
+                "The licence does not allow the audit trail: no evidence can be deleted."
+            )
+        }
+        val actor = (securityService.currentActor ?: Actor.system(reason = null)).asJson()
+        val signature = securityService.currentSignature
+        val deleted = transactionTemplate.execute {
+            val deletedAt = Time.now.truncatedTo(ChronoUnit.MILLIS)
+            if (!evidenceRepository.markDeleted(id, deletedAt)) {
+                // Deleted concurrently
+                throw EvidenceNotFoundException("Evidence $id cannot be found.")
+            }
+            val evidence = existing.copy(deletedAt = deletedAt)
+            trailService.append(
+                build = validationRun.build,
+                type = TrailEntryTypes.EVIDENCE_DELETED,
+                payload = payload(
+                    "validationStamp" to validationStamp(validationRun.validationStamp),
+                    "validationRun" to validationRun(validationRun),
+                    "evidence" to mapOf(
+                        "id" to evidence.id,
+                        "fileName" to evidence.fileName,
+                        "sha256" to evidence.sha256,
+                    ),
+                ),
+                actor = actor,
+            )
+            eventPostService.post(AuditTrailEvents.evidenceDeleted(validationRun, evidence, signature))
+            evidence
+        }
+        // The blob, once the deletion is committed
+        try {
+            evidenceBlobCollector.collect(deleted.sha256)
+        } catch (e: EvidenceException) {
+            logger.warn("[audit-trail] The blob of evidence $id is left to the sweep: ${e.message}")
+        }
+        return deleted
     }
 
     override fun getEvidences(validationRun: ValidationRun): List<Evidence> {

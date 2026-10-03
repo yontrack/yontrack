@@ -40,4 +40,19 @@ object EvidenceBlobKeys {
      * Key of an upload in progress.
      */
     fun upload(id: UUID): String = UPLOADS + id
+
+    private val BLOB_KEY = Regex("^blobs/([0-9a-f]{64})$")
+
+    private val UPLOAD_KEY = Regex("^uploads/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
+
+    /**
+     * SHA-256 of the content of a blob, read from its key — `null` when the key is not the one of
+     * a blob.
+     */
+    fun sha256(key: String): String? = BLOB_KEY.matchEntire(key)?.groupValues?.get(1)
+
+    /**
+     * Whether a key is the one of a blob or of an upload, and nothing else.
+     */
+    fun isKey(key: String): Boolean = BLOB_KEY.matches(key) || UPLOAD_KEY.matches(key)
 }

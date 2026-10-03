@@ -12,7 +12,8 @@ import net.nemerosa.ontrack.model.docs.DocumentationIgnore
  * Metrics of the audit trail.
  *
  * An entry is appended in the transaction of the change it records, under a lock on the trail of
- * its build: the append timer keeps the cost it adds to every change under watch.
+ * its build: the append timer keeps the cost it adds to every change under watch. The evidence
+ * gauges follow what the projects keep in the evidence storage.
  */
 @Suppress("ConstPropertyName")
 @MetricsDocumentation
@@ -41,8 +42,34 @@ object AuditTrailMetrics {
     )
     const val verificationFailures = "ontrack_audit_trail_verification_failures"
 
+    @APIDescription(
+        "Number of the evidences of a project which are not deleted. Refreshed every 15 minutes; a project " +
+                "without any evidence has no value."
+    )
+    @MetricsMeterDocumentation(
+        type = MetricsMeterType.GAUGE,
+        tags = [
+            MetricsMeterTag(Tags.PROJECT, "Name of the project"),
+        ]
+    )
+    const val evidenceCount = "ontrack_audit_trail_evidences"
+
+    @APIDescription(
+        "Total size, in bytes, of the evidences of a project which are not deleted — a content shared by " +
+                "several evidences counted for each, although the storage keeps it once. Refreshed every 15 " +
+                "minutes; a project without any evidence has no value."
+    )
+    @MetricsMeterDocumentation(
+        type = MetricsMeterType.GAUGE,
+        tags = [
+            MetricsMeterTag(Tags.PROJECT, "Name of the project"),
+        ]
+    )
+    const val evidenceSize = "ontrack_audit_trail_evidence_bytes"
+
     @DocumentationIgnore
     object Tags {
         const val TYPE = "type"
+        const val PROJECT = "project"
     }
 }

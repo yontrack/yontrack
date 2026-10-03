@@ -1,12 +1,10 @@
 package net.nemerosa.ontrack.extension.audittrail.evidence
 
-import net.nemerosa.ontrack.extension.audittrail.AbstractAuditTrailITSupport
 import net.nemerosa.ontrack.extension.audittrail.AuditTrailConfigProperties
 import net.nemerosa.ontrack.extension.audittrail.events.AuditTrailEvents
 import net.nemerosa.ontrack.extension.audittrail.license.AuditTrailLicense
 import net.nemerosa.ontrack.extension.audittrail.model.TrailEntryTypes
 import net.nemerosa.ontrack.extension.audittrail.service.TrailService
-import net.nemerosa.ontrack.extension.audittrail.storage.EvidenceStorageService
 import net.nemerosa.ontrack.extension.audittrail.storage.EvidenceStorageServiceImpl
 import net.nemerosa.ontrack.extension.audittrail.ui.EvidenceController
 import net.nemerosa.ontrack.extension.audittrail.ui.EvidenceView
@@ -22,19 +20,12 @@ import org.junit.jupiter.api.assertThrows
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.http.HttpHeaders
 import org.springframework.mock.web.MockHttpServletResponse
-import org.springframework.mock.web.MockMultipartFile
 import org.springframework.mock.web.MockMultipartHttpServletRequest
 import org.springframework.security.access.AccessDeniedException
 import org.springframework.transaction.support.TransactionTemplate
 import org.springframework.util.unit.DataSize
 import software.amazon.awssdk.core.sync.RequestBody
-import software.amazon.awssdk.services.s3.model.DeleteObjectRequest
-import software.amazon.awssdk.services.s3.model.GetObjectRequest
-import software.amazon.awssdk.services.s3.model.ListObjectsV2Request
-import software.amazon.awssdk.services.s3.model.NoSuchKeyException
 import software.amazon.awssdk.services.s3.model.PutObjectRequest
-import java.security.MessageDigest
-import java.util.*
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
@@ -45,23 +36,8 @@ import kotlin.test.fail
 /**
  * Upload, listing, download and verification of the evidences, against the MinIO of the
  * integration test stack.
- *
- * Every test uploads a content of its own: blobs are addressed by their content, and a content
- * shared between tests would share their blob.
  */
-class EvidenceIT : AbstractAuditTrailITSupport() {
-
-    @Autowired
-    private lateinit var evidenceController: EvidenceController
-
-    @Autowired
-    private lateinit var evidenceService: EvidenceService
-
-    @Autowired
-    private lateinit var evidenceStorageService: EvidenceStorageService
-
-    @Autowired
-    private lateinit var evidenceRepository: EvidenceRepository
+class EvidenceIT : AbstractEvidenceITSupport() {
 
     @Autowired
     private lateinit var auditTrailConfigProperties: AuditTrailConfigProperties
@@ -83,87 +59,6 @@ class EvidenceIT : AbstractAuditTrailITSupport() {
 
     @Autowired
     private lateinit var transactionTemplate: TransactionTemplate
-
-    // Content
-
-    private fun pdf() = "%PDF-1.7\n% ${uid("pdf-")}\n".toByteArray()
-
-    private fun html() = "<!DOCTYPE html><html><script>alert(document.cookie)</script><!-- ${uid("h-")} --></html>".toByteArray()
-
-    private fun png() = byteArrayOf(0x89.toByte(), 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A) + uid("png-").toByteArray()
-
-    /**
-     * SHA-256 of a content, computed by the JDK, independently of the code under test.
-     */
-    private fun sha256(content: ByteArray): String =
-        HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(content))
-
-    // Storage
-
-    private val client get() = assertNotNull(evidenceStorageService.client, "Storage of the stack")
-
-    private fun blob(sha256: String): ByteArray? =
-        try {
-            client.s3.getObjectAsBytes(
-                GetObjectRequest.builder().bucket(client.bucket).key("blobs/$sha256").build()
-            ).asByteArray()
-        } catch (_: NoSuchKeyException) {
-            null
-        }
-
-    private fun uploads(): Int =
-        client.s3.listObjectsV2(
-            ListObjectsV2Request.builder().bucket(client.bucket).prefix("uploads/").build()
-        ).keyCount()
-
-    // Validation runs
-
-    /**
-     * A validation run, the first one of its build: `build.created` is seq 1 and `validation.run`
-     * seq 2 of the trail of its build.
-     */
-    private fun validationRun(code: ValidationRun.() -> Unit) {
-        asAdmin {
-            project {
-                branch {
-                    val vs = validationStamp()
-                    build {
-                        validate(vs).code()
-                    }
-                }
-            }
-        }
-    }
-
-    /**
-     * Runs [code] as a user who can create validation runs on the project of the run, as CI does.
-     */
-    private fun <T> ValidationRun.asCreator(code: () -> T): T =
-        asUserWithView(this).withProjectFunction(this, ValidationRunCreate::class.java).call(code)
-
-    private fun request(
-        content: ByteArray,
-        fileName: String? = "report.pdf",
-        partType: String? = "application/pdf",
-        fields: Map<String, String> = emptyMap(),
-    ) = MockMultipartHttpServletRequest().apply {
-        addFile(MockMultipartFile(EvidenceController.PART_FILE, fileName, partType, content))
-        fields.forEach { (name, value) -> addParameter(name, value) }
-    }
-
-    /**
-     * Uploads an evidence through the REST end point, as a creator of validation runs.
-     */
-    private fun ValidationRun.upload(
-        content: ByteArray,
-        fileName: String? = "report.pdf",
-        partType: String? = "application/pdf",
-        fields: Map<String, String> = emptyMap(),
-    ): EvidenceView = asCreator {
-        val response = evidenceController.upload(id(), request(content, fileName, partType, fields))
-        assertEquals(201, response.statusCode.value())
-        response.body!!
-    }
 
     private fun ValidationRun.refused(error: EvidenceError, content: ByteArray, fields: Map<String, String> = emptyMap()) {
         val ex = assertThrows<EvidenceException> {
@@ -669,13 +564,15 @@ class EvidenceIT : AbstractAuditTrailITSupport() {
             this.storage.storage()
         }
         val storageService = EvidenceStorageServiceImpl(properties)
+        val blobStore = EvidenceBlobStoreImpl(storageService, properties)
         val service = EvidenceServiceImpl(
             structureService = structureService,
             securityService = securityService,
             auditTrailLicense = auditTrailLicense,
             evidenceStorageService = storageService,
-            evidenceBlobStore = EvidenceBlobStoreImpl(storageService, properties),
+            evidenceBlobStore = blobStore,
             evidenceRepository = evidenceRepository,
+            evidenceBlobCollector = EvidenceBlobCollectorImpl(blobStore, evidenceRepository, transactionTemplate),
             trailService = trailService,
             eventPostService = eventPostService,
             transactionTemplate = transactionTemplate,
@@ -729,10 +626,6 @@ class EvidenceIT : AbstractAuditTrailITSupport() {
 
     // Verification
 
-    private fun deleteBlob(sha256: String) {
-        client.s3.deleteObject(DeleteObjectRequest.builder().bucket(client.bucket).key("blobs/$sha256").build())
-    }
-
     private fun alterBlob(sha256: String) {
         client.s3.putObject(
             PutObjectRequest.builder().bucket(client.bucket).key("blobs/$sha256").build(),
@@ -785,7 +678,7 @@ class EvidenceIT : AbstractAuditTrailITSupport() {
             val evidence = upload(pdf())
             asAdmin { structureService.deleteValidationRun(this) }
             assertNull(evidenceRepository.findById(evidence.id))
-            assertFalse(blob(evidence.sha256) == null, "The blob is left for the collection of the blobs")
+            assertFalse(blob(evidence.sha256) == null, "The blob is left for the sweep")
         }
     }
 }

@@ -4,6 +4,9 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import java.util.*
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 /**
  * Keys of the evidence in the storage: content-addressed by their SHA-256, never named after
@@ -36,5 +39,45 @@ class EvidenceBlobKeysTest {
     fun `The key of an upload in progress is a UUID under uploads`() {
         val uuid = UUID.fromString("0b1e7f4c-5d0a-4a43-9a3c-2f0d6b8e1c11")
         assertEquals("uploads/0b1e7f4c-5d0a-4a43-9a3c-2f0d6b8e1c11", EvidenceBlobKeys.upload(uuid))
+    }
+
+    @Test
+    fun `The SHA-256 of a blob is read back from its key`() {
+        assertEquals(sha, EvidenceBlobKeys.sha256(EvidenceBlobKeys.blob(sha)))
+    }
+
+    @Test
+    fun `Only the key of a blob gives a SHA-256`() {
+        listOf(
+            "uploads/0b1e7f4c-5d0a-4a43-9a3c-2f0d6b8e1c11",
+            "blobs/${sha.uppercase()}",
+            "blobs/$sha/x",
+            "blobs/",
+            "other/$sha",
+        ).forEach { key ->
+            assertNull(EvidenceBlobKeys.sha256(key), key)
+        }
+    }
+
+    @Test
+    fun `Keys of the blobs and of the uploads are recognized as such`() {
+        assertTrue(EvidenceBlobKeys.isKey("blobs/$sha"))
+        assertTrue(EvidenceBlobKeys.isKey("uploads/0b1e7f4c-5d0a-4a43-9a3c-2f0d6b8e1c11"))
+    }
+
+    @Test
+    fun `Nothing else is a key of the evidence`() {
+        listOf(
+            "",
+            "blobs/",
+            "uploads/",
+            "uploads/../blobs/$sha",
+            "uploads/not-a-uuid",
+            "blobs/$sha/..",
+            "other/$sha",
+            "/blobs/$sha",
+        ).forEach { key ->
+            assertFalse(EvidenceBlobKeys.isKey(key), key)
+        }
     }
 }

@@ -1,8 +1,8 @@
 package net.nemerosa.ontrack.extension.audittrail.events
 
+import net.nemerosa.ontrack.extension.audittrail.evidence.Evidence
 import net.nemerosa.ontrack.extension.audittrail.verification.TrailVerification
 import net.nemerosa.ontrack.model.events.*
-import net.nemerosa.ontrack.extension.audittrail.evidence.Evidence
 import net.nemerosa.ontrack.model.structure.Build
 import net.nemerosa.ontrack.model.structure.Signature
 import net.nemerosa.ontrack.model.structure.ValidationRun
@@ -42,6 +42,28 @@ object AuditTrailEvents {
         ),
     )
 
+    val EVIDENCE_DELETED: EventType = SimpleEventType(
+        id = "evidence.deleted",
+        template = $$"""
+            Evidence ${$$EVENT_EVIDENCE_FILE_NAME} has been deleted from the ${validationStamp} validation ${validationRun} of build ${build} in branch ${branch} of ${project}.
+        """.trimIndent(),
+        description = "When an evidence is deleted from a validation run. The deletion is recorded by an " +
+                "evidence.deleted entry of the trail of the build; the evidence is kept, marked as deleted, " +
+                "and its content is removed from the storage unless another evidence has the same content.",
+        context = eventContext(
+            eventProject("Project of the build"),
+            eventBranch("Branch of the build"),
+            eventBuild("Build of the validation run"),
+            eventValidationStamp("Validation stamp of the validation run"),
+            eventValidationRun("Validation run the evidence was attached to"),
+            eventValue(EVENT_EVIDENCE_ID, "ID of the evidence"),
+            eventValue(EVENT_EVIDENCE_FILE_NAME, "Name of the file of the evidence"),
+            eventValue(EVENT_EVIDENCE_MEDIA_TYPE, "Media type of the evidence, as declared"),
+            eventValue(EVENT_EVIDENCE_SIZE, "Size of the evidence, in bytes"),
+            eventValue(EVENT_EVIDENCE_SHA256, "SHA-256 of the content of the evidence, in lowercase hexadecimal"),
+        ),
+    )
+
     val TRAIL_VERIFICATION_FAILED: EventType = SimpleEventType(
         id = "trail.verification.failed",
         template = $$"""
@@ -70,7 +92,20 @@ object AuditTrailEvents {
      * @param signature Who attached it, and when
      */
     fun evidenceAttached(validationRun: ValidationRun, evidence: Evidence, signature: Signature): Event =
-        Event.of(EVIDENCE_ATTACHED)
+        evidenceEvent(EVIDENCE_ATTACHED, validationRun, evidence, signature)
+
+    /**
+     * Event for an evidence deleted from a validation run.
+     *
+     * @param validationRun Validation run the evidence was attached to
+     * @param evidence Deleted evidence
+     * @param signature Who deleted it, and when
+     */
+    fun evidenceDeleted(validationRun: ValidationRun, evidence: Evidence, signature: Signature): Event =
+        evidenceEvent(EVIDENCE_DELETED, validationRun, evidence, signature)
+
+    private fun evidenceEvent(eventType: EventType, validationRun: ValidationRun, evidence: Evidence, signature: Signature): Event =
+        Event.of(eventType)
             .withValidationRun(validationRun)
             .with(signature)
             .with(EVENT_EVIDENCE_ID, evidence.id.toString())

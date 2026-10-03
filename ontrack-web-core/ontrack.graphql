@@ -1607,6 +1607,14 @@ type DeleteEstatePayload implements Payload {
   errors: [UserError]
 }
 
+"Output type for the deleteEvidence mutation."
+type DeleteEvidencePayload implements Payload {
+  "List of errors"
+  errors: [UserError]
+  "Deleted evidence"
+  evidence: Evidence
+}
+
 "Output type for the deleteGenericProperty mutation."
 type DeleteGenericPropertyPayload implements Payload {
   "List of errors"
@@ -3862,6 +3870,11 @@ type Mutation {
     "Input for the mutation"
     input: DeleteEstateInput
   ): DeleteEstatePayload
+  "Deletes an evidence: it is kept, marked as deleted, and its deletion is written to the trail of its build. Requires the EvidenceDelete function on its project."
+  deleteEvidence(
+    "Input for the mutation"
+    input: DeleteEvidenceInput
+  ): DeleteEvidencePayload
   "Generic deletion for a property and an entity"
   deleteGenericProperty(
     "Input for the mutation"
@@ -10165,6 +10178,12 @@ input DeleteEnvironmentInput {
 "Input type for the deleteEstate mutation."
 input DeleteEstateInput {
   "ID of the estate"
+  id: Int!
+}
+
+"Input type for the deleteEvidence mutation."
+input DeleteEvidenceInput {
+  "ID of the evidence to delete"
   id: Int!
 }
 

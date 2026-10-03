@@ -21,7 +21,7 @@ import org.springframework.web.multipart.MultipartHttpServletRequest
 import java.nio.charset.StandardCharsets
 
 /**
- * Upload and download of the evidences.
+ * Upload, download and deletion of the evidences.
  *
  * Refusals of an evidence answer an [EvidenceErrorMessage], whose `code` is the one of its
  * [EvidenceError].
@@ -99,6 +99,17 @@ class EvidenceController(
             response.flushBuffer()
         }
     }
+
+    /**
+     * Deletes an evidence: it is kept, marked as deleted, and its deletion is written to the trail
+     * of its build. Needs `EvidenceDelete` on its project.
+     *
+     * @param evidenceId ID of the evidence
+     * @return Deleted evidence
+     */
+    @DeleteMapping("evidence/{evidenceId}")
+    fun delete(@PathVariable evidenceId: Int): EvidenceView =
+        EvidenceView.of(evidenceService.delete(evidenceId))
 
     /**
      * Refusal of an evidence, with its code.

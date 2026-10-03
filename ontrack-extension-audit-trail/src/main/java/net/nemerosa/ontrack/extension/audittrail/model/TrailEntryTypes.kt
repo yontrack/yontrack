@@ -102,6 +102,14 @@ object TrailEntryTypes {
     const val EVIDENCE_ATTACHED = "evidence.attached"
 
     /**
+     * Evidence of a validation run of the build deleted: `{validationStamp, validationRun,
+     * evidence: {id, fileName, sha256}}`. Written by the evidence service, in the transaction of
+     * the deletion. The verification of the evidence skips the `evidence.attached` entry of an
+     * evidence a later `evidence.deleted` names, whose blob may be gone.
+     */
+    const val EVIDENCE_DELETED = "evidence.deleted"
+
+    /**
      * Promotion of the build: `{promotionLevel: {id, name}, promotionRun: {id}, description,
      * claimed}`.
      */

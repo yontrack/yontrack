@@ -19,5 +19,6 @@ class AuditTrailEventsRegistration(
     override fun start() {
         eventFactory.register(AuditTrailEvents.TRAIL_VERIFICATION_FAILED)
         eventFactory.register(AuditTrailEvents.EVIDENCE_ATTACHED)
+        eventFactory.register(AuditTrailEvents.EVIDENCE_DELETED)
     }
 }

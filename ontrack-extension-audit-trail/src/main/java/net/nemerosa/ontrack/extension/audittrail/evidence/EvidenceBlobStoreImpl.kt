@@ -11,6 +11,7 @@ import software.amazon.awssdk.core.sync.RequestBody
 import software.amazon.awssdk.services.s3.model.CopyObjectRequest
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest
 import software.amazon.awssdk.services.s3.model.GetObjectRequest
+import software.amazon.awssdk.services.s3.model.ListObjectsV2Request
 import software.amazon.awssdk.services.s3.model.NoSuchKeyException
 import software.amazon.awssdk.services.s3.model.PutObjectRequest
 import software.amazon.awssdk.services.s3.model.S3Exception
@@ -27,7 +28,7 @@ class EvidenceBlobStoreImpl(
 
     private val logger = LoggerFactory.getLogger(EvidenceBlobStoreImpl::class.java)
 
-    override fun store(content: InputStream, size: Long, expectedSha256: String?): EvidenceBlob {
+    override fun stage(content: InputStream, size: Long, expectedSha256: String?): EvidenceStagedBlob {
         val maxSize = auditTrailConfigProperties.storage.maxSize.toBytes()
         if (size > maxSize) {
             throw tooLarge(maxSize)
@@ -35,6 +36,7 @@ class EvidenceBlobStoreImpl(
         val client = client()
         val uploadKey = EvidenceBlobKeys.upload(UUID.randomUUID())
         val digest = EvidenceDigestInputStream(content, maxSize)
+        var staged = false
         try {
             var provided = false
             client.s3.putObject(
@@ -70,22 +72,40 @@ class EvidenceBlobStoreImpl(
                     "The SHA-256 of the evidence is $sha256, not the claimed $expectedSha256."
                 )
             }
-            client.s3.copyObject(
-                CopyObjectRequest.builder()
-                    .sourceBucket(client.bucket)
-                    .sourceKey(uploadKey)
-                    .destinationBucket(client.bucket)
-                    .destinationKey(EvidenceBlobKeys.blob(sha256))
-                    .build()
-            )
-            return EvidenceBlob(sha256 = sha256, size = size)
+            staged = true
+            return EvidenceStagedBlob(uploadKey = uploadKey, sha256 = sha256, size = size)
         } catch (e: SdkException) {
             // Refusals raised while the SDK was reading the content
             e.evidenceCause()?.let { throw it }
             throw unreachable("The evidence cannot be stored", e)
         } finally {
-            delete(client, uploadKey)
+            // A refused content leaves nothing behind
+            if (!staged) {
+                delete(client, uploadKey)
+            }
         }
+    }
+
+    override fun persist(staged: EvidenceStagedBlob): EvidenceBlob {
+        val client = client()
+        try {
+            client.s3.copyObject(
+                CopyObjectRequest.builder()
+                    .sourceBucket(client.bucket)
+                    .sourceKey(staged.uploadKey)
+                    .destinationBucket(client.bucket)
+                    .destinationKey(EvidenceBlobKeys.blob(staged.sha256))
+                    .build()
+            )
+        } catch (e: SdkException) {
+            throw unreachable("The evidence cannot be stored", e)
+        }
+        return EvidenceBlob(sha256 = staged.sha256, size = staged.size)
+    }
+
+    override fun discard(staged: EvidenceStagedBlob) {
+        val client = evidenceStorageService.client ?: return
+        delete(client, staged.uploadKey)
     }
 
     override fun open(sha256: String): EvidenceBlobContent? {
@@ -122,6 +142,43 @@ class EvidenceBlobStoreImpl(
         return if (digest.sha256 == sha256) EvidenceBlobCheck.OK else EvidenceBlobCheck.ALTERED
     }
 
+    override fun list(prefix: String): Sequence<EvidenceStoredObject> {
+        require(prefix == EvidenceBlobKeys.BLOBS || prefix == EvidenceBlobKeys.UPLOADS) {
+            "Not a prefix of the evidence: $prefix"
+        }
+        val client = client()
+        return sequence {
+            var token: String? = null
+            do {
+                val response = try {
+                    client.s3.listObjectsV2(
+                        ListObjectsV2Request.builder()
+                            .bucket(client.bucket)
+                            .prefix(prefix)
+                            .continuationToken(token)
+                            .build()
+                    )
+                } catch (e: SdkException) {
+                    throw unreachable("The evidence storage cannot be listed", e)
+                }
+                response.contents().forEach { o ->
+                    yield(EvidenceStoredObject(key = o.key(), lastModified = o.lastModified()))
+                }
+                token = if (response.isTruncated == true) response.nextContinuationToken() else null
+            } while (token != null)
+        }
+    }
+
+    override fun remove(key: String) {
+        require(EvidenceBlobKeys.isKey(key)) { "Not a key of the evidence: $key" }
+        val client = client()
+        try {
+            client.s3.deleteObject(DeleteObjectRequest.builder().bucket(client.bucket).key(key).build())
+        } catch (e: SdkException) {
+            throw unreachable("The evidence cannot be removed", e)
+        }
+    }
+
     /**
      * Client of the storage, when it is configured and was not found unreachable.
      */
@@ -145,7 +202,7 @@ class EvidenceBlobStoreImpl(
         try {
             client.s3.deleteObject(DeleteObjectRequest.builder().bucket(client.bucket).key(key).build())
         } catch (e: SdkException) {
-            // Left for the collection of the blobs
+            // Left for the sweep
             logger.warn("[audit-trail] Upload $key could not be deleted: ${e.message}")
         }
     }
