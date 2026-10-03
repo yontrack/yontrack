@@ -57,6 +57,22 @@ describe('next.config.js headers()', () => {
         expect(headers['Content-Security-Policy-Report-Only']).toContain("default-src 'self'")
     })
 
+    it('leaves the Content-Security-Policy of an evidence download to its route', async () => {
+        const headers = await configHeadersFor('/api/protected/downloads/audit-trail/evidence/42')
+        // The route passes the policy of the backend on: a sandbox, which the policy of the UI
+        // would replace
+        expect(headers['Content-Security-Policy']).toBeUndefined()
+        expect(headers['X-Content-Type-Options']).toEqual('nosniff')
+        expect(headers['Referrer-Policy']).toEqual('strict-origin-when-cross-origin')
+        expect(headers['X-Frame-Options']).toEqual('SAMEORIGIN')
+        expect(headers['Permissions-Policy']).toContain('camera=()')
+    })
+
+    it('keeps the Content-Security-Policy of the UI on the other downloads', async () => {
+        const headers = await configHeadersFor('/api/protected/downloads/audit-trail/builds/5/export')
+        expect(headers['Content-Security-Policy']).toEqual("frame-ancestors 'self'")
+    })
+
     it('does not send HSTS: that is the ingress\'s to send', async () => {
         const headers = await configHeadersFor('/')
         expect(Object.keys(headers).map(key => key.toLowerCase())).not.toContain('strict-transport-security')

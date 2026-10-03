@@ -162,10 +162,10 @@ type AuditTrailKey {
 
 "Status of the audit trail"
 type AuditTrailStatus {
-  "Public keys of the instance - empty while no key exists"
-  keys: [AuditTrailKey!]!
   "Whether the instance key can endorse the entries"
   keyStatus: AuditTrailKeyStatus!
+  "Public keys of the instance - empty while no key exists"
+  keys: [AuditTrailKey!]!
   "Whether the licence allows the audit trail"
   licensed: Boolean!
   "Status of the evidence storage"
@@ -5747,6 +5747,8 @@ type Query {
   auditTrailKeys: [AuditTrailKey!]!
   "Status of the audit trail: licence, evidence storage and instance key - requires the global settings"
   auditTrailStatus: AuditTrailStatus!
+  "State of the evidence storage, as its last probe found it - readable by every user, without the configuration of the storage"
+  auditTrailStorageState: AuditTrailStorageState!
   "Getting a list of authorizations for the authenticated user"
   authorizations: [Authorization!]!
   "List of audit entries for auto versioning processing orders"

@@ -1,4 +1,4 @@
-const {securityHeaders} = require('./components/security/securityHeaders')
+const {securityHeaderRules} = require('./components/security/securityHeaders')
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
@@ -26,15 +26,12 @@ const nextConfig = {
      * Security headers on every route - pages, `/mobile`, `/api/*` and static
      * assets alike (#1770). Evaluated at build time: the one value a running
      * container can change, who may frame the pages, is applied by
-     * `proxy.js`. See `components/security/securityHeaders.js`.
+     * `proxy.js`. The evidence downloads keep the Content-Security-Policy
+     * of the backend instead of the UI's one. See
+     * `components/security/securityHeaders.js`.
      */
     async headers() {
-        return [
-            {
-                source: '/:path*',
-                headers: securityHeaders({development: process.env.NODE_ENV === 'development'}),
-            },
-        ]
+        return securityHeaderRules({development: process.env.NODE_ENV === 'development'})
     },
 }
 

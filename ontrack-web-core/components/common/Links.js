@@ -51,6 +51,21 @@ export function buildAuditTrailExportUri(build) {
     return `/api/protected/downloads/audit-trail/builds/${build.id}/export`
 }
 
+/**
+ * Content of an evidence, through the protected downloads of the UI, which carry the token of the
+ * session and keep the headers the backend serves it with.
+ */
+export function evidenceDownloadUri(evidence) {
+    return `/api/protected/downloads/audit-trail/evidence/${evidence.id}`
+}
+
+/**
+ * Upload of an evidence to a validation run, through the protected uploads of the UI.
+ */
+export function validationRunEvidenceUploadUri(run) {
+    return `/api/protected/uploads/audit-trail/validation-runs/${run.id}/evidence`
+}
+
 export function scmChangeLogUri(from, to) {
     return `/extension/scm/changelog?from=${from}&to=${to}`
 }

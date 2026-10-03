@@ -65,3 +65,8 @@ extend type Query {
     """Status of the audit trail: licence, evidence storage and instance key - requires the global settings"""
     auditTrailStatus: AuditTrailStatus!
 }
+
+extend type Query {
+    """State of the evidence storage, as its last probe found it - readable by every user, without the configuration of the storage"""
+    auditTrailStorageState: AuditTrailStorageState!
+}

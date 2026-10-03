@@ -27,6 +27,8 @@ import InfoViewDrawer from "@components/common/InfoViewDrawer";
 import {gqlInformationFragment, gqlPropertiesFragment} from "@components/services/fragments";
 import {isFindingsRun} from "@components/extension/findings/findingsModel";
 import ValidationRunFindings from "@components/extension/findings/run/ValidationRunFindings";
+import {showEvidenceCell} from "@components/extension/audit-trail/evidenceModel";
+import ValidationRunEvidence from "@components/extension/audit-trail/ValidationRunEvidence";
 
 const EMPTY_RUN = {}
 
@@ -44,6 +46,9 @@ export default function ValidationRunView({id}) {
                     }
                     information {
                         ...informationFragment
+                    }
+                    evidence {
+                        id
                     }
                     validationStamp {
                         id
@@ -115,17 +120,22 @@ export default function ValidationRunView({id}) {
     const sectionRunData = "section-run-data"
     const sectionRunInfo = "section-run-info"
     const tableRunFindings = "table-run-findings"
+    const tableRunEvidence = "table-run-evidence"
 
     // The findings of a security scan, for a user granted their view only
     const showFindings = isFindingsRun(run) &&
         !!run.build?.branch?.project &&
         isAuthorized(run.build.branch.project, 'findings', 'view')
 
+    // The evidence of the run, when it has some or when the user may upload some
+    const showEvidence = showEvidenceCell(run)
+
     const defaultLayout = [
         {i: tableRunStatuses, x: 0, y: 0, w: 6, h: 12},
         {i: sectionRunData, x: 6, y: 0, w: 6, h: 6},
         {i: sectionRunInfo, x: 6, y: 6, w: 6, h: 6},
         ...(showFindings ? [{i: tableRunFindings, x: 0, y: 12, w: 12, h: 14}] : []),
+        ...(showEvidence ? [{i: tableRunEvidence, x: 0, y: showFindings ? 26 : 12, w: 12, h: 10}] : []),
     ]
 
     const items = [
@@ -199,12 +209,23 @@ export default function ValidationRunView({id}) {
                 <ValidationRunFindings run={run}/>
             </GridCell>
         }] : []),
+        ...(showEvidence ? [{
+            id: tableRunEvidence,
+            content: <GridCell
+                id={tableRunEvidence}
+                title="Evidence"
+                padding={true}
+            >
+                <ValidationRunEvidence run={run}/>
+            </GridCell>
+        }] : []),
     ]
 
-    // A security scan has a layout of its own, with its findings, so that a layout stored for one
-    // kind of run never lacks the cell of another one. The key remounts the layout when the kind
-    // of the run is known, reading the stored layout of that kind.
-    const layoutId = showFindings ? "page-validation-run-findings-layout" : "page-validation-run-layout"
+    // A security scan has a layout of its own, with its findings, and so has a run showing its
+    // evidence, so that a layout stored for one kind of run never lacks the cell of another one.
+    // The key remounts the layout when the kind of the run is known, reading the stored layout of
+    // that kind.
+    const layoutId = `page-validation-run${showFindings ? '-findings' : ''}${showEvidence ? '-evidence' : ''}-layout`
 
     return (
         <>

@@ -109,6 +109,37 @@ function securityHeaders({development = false} = {}) {
 }
 
 /**
+ * The downloads of evidence, whose `Content-Security-Policy` is the backend's — a sandbox for
+ * anything but an inline PDF, with no resource allowed — passed on by their route
+ * (`app/api/protected/downloads/downloads.js`), which adds `frame-ancestors 'self'` to it. The
+ * policy of `securityHeaders()` would replace it: Next applies the headers of the config over the
+ * ones of a route.
+ */
+const EVIDENCE_DOWNLOADS = '/api/protected/downloads/audit-trail/evidence'
+
+/**
+ * The header rules of `headers()` in `next.config.js`: the security headers on every route, but
+ * the `Content-Security-Policy` of the evidence downloads, which is their route's.
+ *
+ * @param {object} [options]
+ * @param {boolean} [options.development] Whether the UI runs with `next dev`.
+ * @returns {{source: string, headers: {key: string, value: string}[]}[]}
+ */
+function securityHeaderRules({development = false} = {}) {
+    const headers = securityHeaders({development})
+    return [
+        {
+            source: `/((?!${EVIDENCE_DOWNLOADS.substring(1)}/).*)`,
+            headers,
+        },
+        {
+            source: `${EVIDENCE_DOWNLOADS}/:path*`,
+            headers: headers.filter(({key}) => key !== 'Content-Security-Policy'),
+        },
+    ]
+}
+
+/**
  * A source list and nothing else: no `;` starting another directive, no `,`
  * starting another policy, no line break starting another header.
  */
@@ -146,5 +177,6 @@ module.exports = {
     DEFAULT_FRAME_ANCESTORS,
     contentSecurityPolicyReportOnly,
     frameAncestorsOverride,
+    securityHeaderRules,
     securityHeaders,
 }
