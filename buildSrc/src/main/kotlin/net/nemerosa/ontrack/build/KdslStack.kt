@@ -55,6 +55,13 @@ object KdslStack {
     const val BASE_INFLUXDB = 8086
     const val BASE_ONTRACK_MGMT = 8800
 
+    /**
+     * MinIO's S3 API (#1962), above every other port of the stack. Only the main variant runs a
+     * MinIO -- the `-ldap` and `-oidc` ones test authentication -- but they share the slot, so the
+     * port is probed for all three.
+     */
+    const val BASE_MINIO = Minio.BASE_PORT
+
     val BASE_PORTS = listOf(
         BASE_UI,
         BASE_LDAP,
@@ -67,6 +74,7 @@ object KdslStack {
         BASE_ONTRACK,
         BASE_INFLUXDB,
         BASE_ONTRACK_MGMT,
+        BASE_MINIO,
     )
 
     const val INSTANCE_ENV_PATH = ".yontrack-kdsl/instance.env"
@@ -145,12 +153,19 @@ data class KdslStackInstance(
     val ontrackPort: Int = StackSlots.port(KdslStack.BASE_ONTRACK, slot)
     val influxdbPort: Int = StackSlots.port(KdslStack.BASE_INFLUXDB, slot)
     val ontrackManagementPort: Int = StackSlots.port(KdslStack.BASE_ONTRACK_MGMT, slot)
+    val minioPort: Int = StackSlots.port(KdslStack.BASE_MINIO, slot)
 
     val ontrackUrl: String = "http://localhost:$ontrackPort"
     val ontrackManagementUrl: String = "http://localhost:$ontrackManagementPort/manage"
     val influxdbUrl: String = "http://localhost:$influxdbPort"
     val uiUrl: String = "http://localhost:$uiPort"
     val keycloakUrl: String = "http://localhost:$keycloakPort"
+
+    /**
+     * MinIO as seen from the host. Yontrack, in its container, reaches it as `http://minio:9000`,
+     * which `compose/docker-compose-kdsl.yml` configures itself.
+     */
+    val minioUrl: String = "http://localhost:$minioPort"
 
     /** Passed to `docker compose`, and read by the three `docker-compose-kdsl*.yml` files. */
     val composeEnvironment: Map<String, String> = mapOf(
@@ -165,6 +180,7 @@ data class KdslStackInstance(
         "YONTRACK_KDSL_ONTRACK_PORT" to ontrackPort.toString(),
         "YONTRACK_KDSL_INFLUXDB_PORT" to influxdbPort.toString(),
         "YONTRACK_KDSL_ONTRACK_MGMT_PORT" to ontrackManagementPort.toString(),
+        "YONTRACK_KDSL_MINIO_PORT" to minioPort.toString(),
     )
 
     /**
@@ -208,6 +224,7 @@ data class KdslStackInstance(
                 "YONTRACK_KDSL_UI_URL" to uiUrl,
                 "YONTRACK_KDSL_ONTRACK_URL" to ontrackUrl,
                 "YONTRACK_KDSL_KEYCLOAK_URL" to keycloakUrl,
+                "YONTRACK_KDSL_MINIO_URL" to minioUrl,
             ) + composeEnvironment,
             systemProperties = systemProperties,
         )
@@ -215,5 +232,5 @@ data class KdslStackInstance(
 
     fun describe(): String =
         "slot $slot (project $projectName): yontrack $ontrackPort, management " +
-                "$ontrackManagementPort, ui $uiPort, keycloak $keycloakPort, influxdb $influxdbPort"
+                "$ontrackManagementPort, ui $uiPort, keycloak $keycloakPort, influxdb $influxdbPort, minio $minioPort"
 }

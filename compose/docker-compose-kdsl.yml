@@ -57,6 +57,33 @@ services:
       - "${YONTRACK_KDSL_RABBIT_MGMT_PORT:-15672}:15672"
       - "${YONTRACK_KDSL_RABBIT_PORT:-5672}:5672"
 
+  # S3-compatible storage for the evidence of the audit trail (#1962).
+  # pgsty/silo is the community fork of MinIO -- the upstream image is no
+  # longer published -- pinned by release and digest. Its bucket is created at
+  # start by minio/start.sh, and the service is healthy once it exists.
+  # buildSrc's `Minio` holds the image, bucket and credentials, and `MinioTest`
+  # keeps this file in step with it.
+  minio:
+    image: "pgsty/silo:RELEASE.2026-09-16T00-00-00Z@sha256:635197cb9f36d01bee221d34d1c7d7960f6a95c48b0b6c01d99cd13bdae51a46"
+    entrypoint: [ "/bin/sh", "/yontrack/start.sh" ]
+    environment:
+      MINIO_ROOT_USER: yontrack-minio
+      MINIO_ROOT_PASSWORD: yontrack-minio-secret
+      YONTRACK_MINIO_BUCKET: yontrack-audit-trail
+    ports:
+      - "${YONTRACK_KDSL_MINIO_PORT:-19000}:9000"
+    volumes:
+      - ./minio/start.sh:/yontrack/start.sh:ro
+    # Nothing to keep between runs: the data lives in memory.
+    tmpfs:
+      - /data
+    healthcheck:
+      test: [ "CMD-SHELL", "test -f /tmp/yontrack-bucket-ready && silo healthcheck --quiet" ]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
+
   ontrack:
     image: "nemerosa/ontrack:${ONTRACK_VERSION:-latest}"
     ports:
@@ -71,6 +98,8 @@ services:
         condition: service_started
       keycloak:
         condition: service_started
+      minio:
+        condition: service_healthy
     environment:
       # Development configuration
       SPRING_PROFILES_ACTIVE: dev
@@ -115,6 +144,13 @@ services:
       ONTRACK_INFLUXDB_URI: http://influxdb:8086
       # ... Jira in mock mode
       ONTRACK_EXTENSION_JIRA_CLIENT_TYPE: mock
+      # ... audit trail evidence in the stack's MinIO (#1962), reached inside the network
+      ONTRACK_EXTENSION_AUDITTRAIL_STORAGE_ENDPOINT: http://minio:9000
+      ONTRACK_EXTENSION_AUDITTRAIL_STORAGE_BUCKET: yontrack-audit-trail
+      ONTRACK_EXTENSION_AUDITTRAIL_STORAGE_REGION: us-east-1
+      ONTRACK_EXTENSION_AUDITTRAIL_STORAGE_PATHSTYLE: "true"
+      ONTRACK_EXTENSION_AUDITTRAIL_STORAGE_ACCESSKEY: yontrack-minio
+      ONTRACK_EXTENSION_AUDITTRAIL_STORAGE_SECRETKEY: yontrack-minio-secret
 
   ui:
     image: "nemerosa/ontrack-ui:${ONTRACK_VERSION:-latest}"

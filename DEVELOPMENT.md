@@ -59,6 +59,8 @@ offsets every port by `slot * 100`:
 | Keycloak       | 8008   | 8108   |
 | Postgres       | 5432   | 5532   |
 | RabbitMQ       | 5672   | 5772   |
+| MinIO (S3)     | 19000  | 19100  |
+| MinIO console  | 19001  | 19101  |
 
 The resolved ports are written to `.yontrack-dev/instance.env` in the checkout,
 along with the logs of each tier. Set `YONTRACK_DEV_NAME` to name an instance
@@ -66,6 +68,38 @@ explicitly instead of deriving the name from the directory.
 
 InfluxDB is off by default and can be opted into with a Compose profile
 (`--profile influxdb`).
+
+### Object storage (MinIO)
+
+Every stack -- development, integration tests, KDSL acceptance -- runs an
+S3-compatible object store for the evidence of the audit trail (#1962), with
+its bucket created at start: the service only reports healthy once the bucket
+exists, so a stack that is up has it.
+
+| Setting    | Value                   |
+|------------|-------------------------|
+| Bucket     | `yontrack-audit-trail`  |
+| Region     | `us-east-1`             |
+| Access key | `yontrack-minio`        |
+| Secret key | `yontrack-minio-secret` |
+| Addressing | path-style              |
+
+Yontrack is started with the `ontrack.extension.audit-trail.storage.*`
+properties pointing at it -- the `ONTRACK_EXTENSION_AUDITTRAIL_STORAGE_*`
+environment of the backend in the development and KDSL stacks, `-D` options
+for the integration tests. The development stack also publishes the web
+console, where you log in with the access and secret keys; its objects are kept
+in a volume until `down --clean`, while the test stacks keep theirs in memory.
+
+The image is not MinIO's own: MinIO Inc. stopped publishing community images in
+2025 and `minio/minio` has since left Docker Hub. The stacks run
+[`pgsty/silo`](https://hub.docker.com/r/pgsty/silo), the community fork of
+MinIO (formerly `pgsty/minio`) -- same `MINIO_*` environment, same S3 API --
+pinned by release and digest. The image, the bucket and the credentials are
+declared in `Minio` in `buildSrc`, repeated in the three Compose files and in
+`scripts/dev-stack.sh`, and `MinioTest` (`./gradlew -p buildSrc test`) fails
+when they drift apart -- so a bump of the image is a change to those four
+places. `compose/minio/start.sh` starts the server and creates the bucket.
 
 The development stack has no Elasticsearch: search runs in Postgres (ADR 0017).
 Elasticsearch is only an optional target of the metrics export, and only the
@@ -181,7 +215,7 @@ locked are listed, with a reason, in `DependencyLocking.EXCLUDED_CONFIGURATIONS`
 ```
 
 The task brings up `compose/docker-compose-it.yml` -- Postgres,
-Elasticsearch, RabbitMQ and Vault -- and tears it down again afterwards.
+Elasticsearch, RabbitMQ, Vault and MinIO -- and tears it down again afterwards.
 
 Like the development stack, that middleware is an *instance* of the checkout,
 so two worktrees can run their integration tests at the same time. The main
@@ -195,6 +229,7 @@ hashes into a slot from 1 to 9, which offsets every port by `slot * 100`:
 | RabbitMQ       | 5672   | 5772   |
 | RabbitMQ admin | 15672  | 15772  |
 | Vault          | 8200   | 8300   |
+| MinIO (S3)     | 19000  | 19100  |
 
 A slot whose ports are taken is bumped along until a free one is found, which
 is also what lets the integration tests run while a development stack is up in
@@ -205,7 +240,7 @@ configuration of any kind.
 
 Running a single integration test **from the IDE** is the one case that does:
 on the main working copy the defaults baked into the tests are right, but in a
-linked worktree the four `-D` options at the bottom of
+linked worktree the `-D` options at the bottom of
 `.yontrack-it/instance.env` have to go into the run configuration.
 
 The arithmetic lives in `ItStack` in `buildSrc`, is covered by `ItStackTest`
@@ -224,7 +259,7 @@ it loads a large dataset and measures the search on it, and is not part of
 
 The task builds the Yontrack and UI images, brings up
 `compose/docker-compose-kdsl.yml` -- a full Yontrack plus its UI, Postgres,
-RabbitMQ, Keycloak and InfluxDB -- and tears it down afterwards.
+RabbitMQ, Keycloak, InfluxDB and MinIO -- and tears it down afterwards.
 
 That stack is an instance of the checkout too. The main working copy takes
 slot 0 and keeps the historical ports; a linked worktree hashes into a slot
@@ -240,6 +275,7 @@ from 1 to 3, which offsets every port by `slot * 100`:
 | Postgres       | 5432   | 5532   |
 | RabbitMQ       | 5672   | 5772   |
 | JaCoCo agent   | 6300   | 6400   |
+| MinIO (S3)     | 19000  | 19100  |
 
 The JaCoCo agent port is only *published* under `-Pcoverage`, which adds
 `compose/docker-compose-coverage.yml` on top of the base file and puts the
@@ -259,7 +295,8 @@ still wins, which is how you point the suite at an instance you started
 yourself.
 
 The `-ldap` and `-oidc` variants share the same slot: they are sequenced never
-to be up at the same time.
+to be up at the same time. They have no MinIO -- they test authentication --
+but the slot reserves its port for them all the same.
 
 A slot is claimed by the `kdslStackSlot` task, which every acceptance task
 runs first -- never while Gradle is configuring the build. A `./gradlew` that

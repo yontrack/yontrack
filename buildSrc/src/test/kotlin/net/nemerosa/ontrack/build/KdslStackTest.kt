@@ -18,6 +18,7 @@ class KdslStackTest {
         assertEquals(8086, instance.influxdbPort)
         assertEquals(3000, instance.uiPort)
         assertEquals(8008, instance.keycloakPort)
+        assertEquals(19000, instance.minioPort)
         assertEquals("http://localhost:8080", instance.ontrackUrl)
         assertEquals("http://localhost:8800/manage", instance.ontrackManagementUrl)
         assertEquals("http://localhost:8086", instance.influxdbUrl)
@@ -40,6 +41,8 @@ class KdslStackTest {
         assertEquals(8286, instance.influxdbPort)
         assertEquals(9000, instance.ontrackManagementPort)
         assertEquals(6500, instance.jacocoPort)
+        assertEquals(19200, instance.minioPort)
+        assertEquals("http://localhost:19200", instance.minioUrl)
         assertEquals("http://localhost:9000/manage", instance.ontrackManagementUrl)
     }
 
@@ -177,6 +180,8 @@ class KdslStackTest {
             val text = file.readText()
             assertTrue(text.contains("YONTRACK_KDSL_ONTRACK_PORT=8380"), text)
             assertTrue(text.contains("YONTRACK_KDSL_JACOCO_PORT=6600"), text)
+            assertTrue(text.contains("YONTRACK_KDSL_MINIO_PORT=19300"), text)
+            assertTrue(text.contains("YONTRACK_KDSL_MINIO_URL=http://localhost:19300"), text)
             assertTrue(text.contains("KDSL_OIDC_PROJECT=yontrack-kdsl-oidc-feature-a"), text)
         } finally {
             dir.deleteRecursively()

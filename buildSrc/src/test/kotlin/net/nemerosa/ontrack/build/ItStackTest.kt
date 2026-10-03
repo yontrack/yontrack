@@ -16,9 +16,11 @@ class ItStackTest {
         assertEquals(5972, instance.rabbitPort)
         assertEquals(15972, instance.rabbitManagementPort)
         assertEquals(8500, instance.vaultPort)
+        assertEquals(19300, instance.minioPort)
         assertEquals("jdbc:postgresql://localhost:5732/ontrack", instance.jdbcUrl)
         assertEquals("http://localhost:9500", instance.elasticUri)
         assertEquals("http://localhost:8500", instance.vaultUri)
+        assertEquals("http://localhost:19300", instance.minioUrl)
     }
 
     @Test
@@ -38,6 +40,7 @@ class ItStackTest {
         assertEquals(9200, instance.elasticPort)
         assertEquals(5672, instance.rabbitPort)
         assertEquals(8200, instance.vaultPort)
+        assertEquals(19000, instance.minioPort)
         assertEquals("jdbc:postgresql://localhost:5432/ontrack", instance.jdbcUrl)
     }
 
@@ -52,9 +55,21 @@ class ItStackTest {
             instance.elasticPort,
             instance.rabbitPort,
             instance.vaultPort,
+            instance.minioPort,
         ).forEach { port ->
             assertTrue(properties.contains(port.toString()), "no property points at port $port")
         }
+    }
+
+    @Test
+    fun `the tests are pointed at the MinIO bucket of the instance`() {
+        // The audit trail stores its evidence in S3 (#1962): every integration test runs against
+        // the bucket of its own checkout's MinIO.
+        val instance = ItStackInstance(slug = "feature-a", slot = 3)
+        assertEquals(
+            Minio.storageProperties("http://localhost:19300"),
+            instance.systemProperties.filterKeys { it.startsWith("ontrack.extension.audit-trail.storage.") },
+        )
     }
 
     @Test
@@ -76,6 +91,7 @@ class ItStackTest {
             assertEquals(6, StackSlots.readRecordedSlot(file, ItStack.SLOT_KEY))
             val text = file.readText()
             assertTrue(text.contains("YONTRACK_IT_POSTGRES_PORT=6032"), text)
+            assertTrue(text.contains("YONTRACK_IT_MINIO_PORT=19600"), text)
             assertTrue(text.contains("IT_PROJECT=yontrack-it-feature-a"), text)
         } finally {
             dir.deleteRecursively()

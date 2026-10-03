@@ -36,11 +36,19 @@ DS_SLOT_MAX=9
 
 # The base port of every service an instance always publishes, and therefore
 # probes before claiming a slot: UI, backend, management, Keycloak, Postgres,
-# RabbitMQ and its management console. InfluxDB is behind a Compose profile and
-# is not probed. Elasticsearch and Kibana left the dev stack with #1883: search
+# RabbitMQ and its management console, MinIO and its console (#1962). InfluxDB
+# is behind a Compose profile and is not probed. Elasticsearch and Kibana left the dev stack with #1883: search
 # runs in Postgres (ADR 0017), and only the integration test stack still has an
 # Elasticsearch, for the metrics export's own tests.
-DS_BASE_PORTS="3000 8080 8800 8008 5432 5672 15672"
+DS_BASE_PORTS="3000 8080 8800 8008 5432 5672 15672 19000 19001"
+
+# The bucket of the instance's MinIO and its credentials, which
+# compose/docker-compose-dev.yml creates and buildSrc's `Minio` spells out for
+# the test stacks -- `MinioTest` keeps the three in step.
+DS_MINIO_BUCKET="yontrack-audit-trail"
+DS_MINIO_REGION="us-east-1"
+DS_MINIO_ACCESS_KEY="yontrack-minio"
+DS_MINIO_SECRET_KEY="yontrack-minio-secret"
 
 # Turns a checkout path into a short, filesystem- and Docker-safe name.
 ds_slug() {
@@ -70,6 +78,19 @@ ds_offset() {
 
 ds_port() {
     printf '%s' $(($1 + $(ds_offset "$2")))
+}
+
+# The environment pointing the backend at the audit trail bucket behind the
+# given S3 endpoint, one assignment per line, for `env`. MinIO is addressed
+# path-style: a bucket host name under localhost resolves nowhere.
+ds_storage_env() {
+    printf '%s\n' \
+        "ONTRACK_EXTENSION_AUDITTRAIL_STORAGE_ENDPOINT=$1" \
+        "ONTRACK_EXTENSION_AUDITTRAIL_STORAGE_BUCKET=$DS_MINIO_BUCKET" \
+        "ONTRACK_EXTENSION_AUDITTRAIL_STORAGE_REGION=$DS_MINIO_REGION" \
+        "ONTRACK_EXTENSION_AUDITTRAIL_STORAGE_PATHSTYLE=true" \
+        "ONTRACK_EXTENSION_AUDITTRAIL_STORAGE_ACCESSKEY=$DS_MINIO_ACCESS_KEY" \
+        "ONTRACK_EXTENSION_AUDITTRAIL_STORAGE_SECRETKEY=$DS_MINIO_SECRET_KEY"
 }
 
 ds_project() {
@@ -193,11 +214,15 @@ ds_resolve_instance() {
     DS_PORT_RABBIT="$(ds_port 5672 "$DS_SLOT")"
     DS_PORT_RABBIT_MGMT="$(ds_port 15672 "$DS_SLOT")"
     DS_PORT_INFLUXDB="$(ds_port 8086 "$DS_SLOT")"
+    DS_PORT_MINIO="$(ds_port 19000 "$DS_SLOT")"
+    DS_PORT_MINIO_CONSOLE="$(ds_port 19001 "$DS_SLOT")"
 
     DS_URL_UI="http://localhost:$DS_PORT_UI"
     DS_URL_APP="http://localhost:$DS_PORT_APP"
     DS_URL_MGMT="http://localhost:$DS_PORT_MGMT/manage"
     DS_URL_ISSUER="http://localhost:$DS_PORT_KEYCLOAK/realms/ontrack"
+    DS_URL_MINIO="http://localhost:$DS_PORT_MINIO"
+    DS_URL_MINIO_CONSOLE="http://localhost:$DS_PORT_MINIO_CONSOLE"
 
     DS_BACKEND_PID="$DS_STATE_DIR/backend.pid"
     DS_FRONTEND_PID="$DS_STATE_DIR/frontend.pid"
@@ -220,8 +245,12 @@ YONTRACK_DEV_MGMT_PORT=$DS_PORT_MGMT
 YONTRACK_DEV_KEYCLOAK_PORT=$DS_PORT_KEYCLOAK
 YONTRACK_DEV_POSTGRES_PORT=$DS_PORT_POSTGRES
 YONTRACK_DEV_RABBIT_PORT=$DS_PORT_RABBIT
+YONTRACK_DEV_MINIO_PORT=$DS_PORT_MINIO
+YONTRACK_DEV_MINIO_CONSOLE_PORT=$DS_PORT_MINIO_CONSOLE
 YONTRACK_DEV_UI_URL=$DS_URL_UI
 YONTRACK_DEV_APP_URL=$DS_URL_APP
+YONTRACK_DEV_MINIO_URL=$DS_URL_MINIO
+YONTRACK_DEV_MINIO_BUCKET=$DS_MINIO_BUCKET
 EOF
 }
 
@@ -235,6 +264,8 @@ ds_compose() {
     YONTRACK_DEV_RABBIT_MGMT_PORT="$DS_PORT_RABBIT_MGMT" \
     YONTRACK_DEV_KEYCLOAK_PORT="$DS_PORT_KEYCLOAK" \
     YONTRACK_DEV_INFLUXDB_PORT="$DS_PORT_INFLUXDB" \
+    YONTRACK_DEV_MINIO_PORT="$DS_PORT_MINIO" \
+    YONTRACK_DEV_MINIO_CONSOLE_PORT="$DS_PORT_MINIO_CONSOLE" \
     YONTRACK_DEV_KEYCLOAK_URL="http://localhost:$DS_PORT_KEYCLOAK" \
         docker compose -p "$DS_PROJECT" -f "$DS_COMPOSE_FILE" "$@"
 }
@@ -250,6 +281,7 @@ ds_infra_up() {
     ds_log "Postgres localhost:$DS_PORT_POSTGRES"
     ds_log "RabbitMQ localhost:$DS_PORT_RABBIT"
     ds_log "Keycloak http://localhost:$DS_PORT_KEYCLOAK"
+    ds_log "MinIO    $DS_URL_MINIO (bucket $DS_MINIO_BUCKET, console $DS_URL_MINIO_CONSOLE)"
 }
 
 # ===========================================================================
@@ -355,6 +387,11 @@ ds_backend_up() {
     # profile because the acceptance tests run on that same profile, create their mock SCM
     # data inside the test, and would only pay for the writes. Here it means that a
     # "restart backend" after a Kotlin change keeps whatever was seeded.
+    #
+    # The ONTRACK_EXTENSION_AUDITTRAIL_STORAGE_* assignments point the audit trail at the
+    # instance's MinIO bucket (#1962). They contain no spaces, so the word splitting of the
+    # unquoted substitution is what turns them into separate arguments of `env`.
+    # shellcheck disable=SC2046
     ds_spawn "$DS_BACKEND_PID" "$DS_BACKEND_LOG" \
         env \
             SPRING_PROFILES_ACTIVE=dev \
@@ -370,6 +407,7 @@ ds_backend_up() {
             ONTRACK_CONFIG_TEMPLATING_ERRORS=LOGGING_STACK \
             ONTRACK_EXTENSION_JIRA_CLIENT_TYPE=mock \
             ONTRACK_CONFIG_EXTENSION_SCM_MOCK_PERSISTENT=true \
+            $(ds_storage_env "$DS_URL_MINIO") \
         "$DS_TOPLEVEL/gradlew" -p "$DS_TOPLEVEL" --no-daemon :ontrack-ui:bootRun
 
     ds_log "starting (first run compiles, this can take a few minutes)"
@@ -428,6 +466,8 @@ Yontrack dev stack '$DS_SLUG' is up (slot $DS_SLOT).
   API         $DS_URL_APP
   Management  $DS_URL_MGMT
   Keycloak    http://localhost:$DS_PORT_KEYCLOAK  (admin/admin)
+  MinIO       $DS_URL_MINIO  (bucket $DS_MINIO_BUCKET)
+  MinIO UI    $DS_URL_MINIO_CONSOLE  ($DS_MINIO_ACCESS_KEY/$DS_MINIO_SECRET_KEY)
 
   Backend log   $DS_BACKEND_LOG
   Frontend log  $DS_FRONTEND_LOG

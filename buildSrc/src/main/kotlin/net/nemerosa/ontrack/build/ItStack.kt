@@ -15,7 +15,8 @@ object ItStack {
      * want the same host port across those ten slots: two services may share
      * a base residue modulo 100 only if their ten-slot ranges do not overlap,
      * which here means Vault (8200-9100) staying clear of Elasticsearch
-     * (9200-10100). `StackSlotsTest` holds the build to it.
+     * (9200-10100). MinIO (19000-19900) sits above everything else. `StackSlotsTest` holds the
+     * build to it.
      */
     const val SLOT_MAX = 9
 
@@ -24,6 +25,7 @@ object ItStack {
     const val BASE_RABBIT = 5672
     const val BASE_RABBIT_MGMT = 15672
     const val BASE_VAULT = 8200
+    const val BASE_MINIO = Minio.BASE_PORT
 
     val BASE_PORTS = listOf(
         BASE_POSTGRES,
@@ -31,6 +33,7 @@ object ItStack {
         BASE_RABBIT,
         BASE_RABBIT_MGMT,
         BASE_VAULT,
+        BASE_MINIO,
     )
 
     const val INSTANCE_ENV_PATH = ".yontrack-it/instance.env"
@@ -99,10 +102,12 @@ data class ItStackInstance(
     val rabbitPort: Int = StackSlots.port(ItStack.BASE_RABBIT, slot)
     val rabbitManagementPort: Int = StackSlots.port(ItStack.BASE_RABBIT_MGMT, slot)
     val vaultPort: Int = StackSlots.port(ItStack.BASE_VAULT, slot)
+    val minioPort: Int = StackSlots.port(ItStack.BASE_MINIO, slot)
 
     val jdbcUrl: String = "jdbc:postgresql://localhost:$postgresPort/ontrack"
     val elasticUri: String = "http://localhost:$elasticPort"
     val vaultUri: String = "http://localhost:$vaultPort"
+    val minioUrl: String = "http://localhost:$minioPort"
 
     /** Passed to `docker compose`, and read by `compose/docker-compose-it.yml`. */
     val composeEnvironment: Map<String, String> = mapOf(
@@ -111,18 +116,20 @@ data class ItStackInstance(
         "YONTRACK_IT_RABBIT_PORT" to rabbitPort.toString(),
         "YONTRACK_IT_RABBIT_MGMT_PORT" to rabbitManagementPort.toString(),
         "YONTRACK_IT_VAULT_PORT" to vaultPort.toString(),
+        "YONTRACK_IT_MINIO_PORT" to minioPort.toString(),
     )
 
     /**
      * The Spring properties the tests need in order to talk to *this*
-     * instance rather than to the historical ports.
+     * instance rather than to the historical ports -- and at the bucket of its MinIO, where the
+     * audit trail keeps its evidence (#1962).
      */
     val systemProperties: Map<String, String> = mapOf(
         "spring.datasource.url" to jdbcUrl,
         "spring.rabbitmq.port" to rabbitPort.toString(),
         "spring.elasticsearch.uris" to elasticUri,
         "ontrack.config.vault.uri" to vaultUri,
-    )
+    ) + Minio.storageProperties(minioUrl)
 
     fun writeInstanceEnv(file: File) {
         StackSlots.writeInstanceEnv(
@@ -138,5 +145,5 @@ data class ItStackInstance(
 
     fun describe(): String =
         "slot $slot (project $projectName): postgres $postgresPort, elasticsearch $elasticPort, " +
-                "rabbit $rabbitPort, vault $vaultPort"
+                "rabbit $rabbitPort, vault $vaultPort, minio $minioPort"
 }

@@ -101,6 +101,8 @@ assert_eq "8108" "$(ds_port 8008 1)" "ds_port: Keycloak on slot 1"
 assert_eq "5532" "$(ds_port 5432 1)" "ds_port: Postgres on slot 1"
 assert_eq "5772" "$(ds_port 5672 1)" "ds_port: RabbitMQ on slot 1"
 assert_eq "15772" "$(ds_port 15672 1)" "ds_port: Rabbit management on slot 1"
+assert_eq "19100" "$(ds_port 19000 1)" "ds_port: MinIO on slot 1"
+assert_eq "19101" "$(ds_port 19001 1)" "ds_port: MinIO console on slot 1"
 
 # --- DS_BASE_PORTS ---------------------------------------------------------
 
@@ -116,7 +118,7 @@ for gone in 9200 5601; do
     esac
 done
 
-assert_eq "3000 8080 8800 8008 5432 5672 15672" "$DS_BASE_PORTS" \
+assert_eq "3000 8080 8800 8008 5432 5672 15672 19000 19001" "$DS_BASE_PORTS" \
     "DS_BASE_PORTS lists the services the dev stack always publishes"
 
 # No port of one slot lands on a port of another slot, over the whole range.
@@ -132,6 +134,19 @@ if [ -n "$collisions" ]; then
     tests_failed=$((tests_failed + 1))
     echo "FAIL: ports collide across slots 0-$DS_SLOT_MAX: $collisions"
 fi
+
+# --- ds_storage_env --------------------------------------------------------
+
+# The backend is pointed at the bucket of the instance's MinIO (#1962), with the
+# same bucket and credentials as compose/docker-compose-dev.yml.
+assert_eq "ONTRACK_EXTENSION_AUDITTRAIL_STORAGE_ENDPOINT=http://localhost:19100
+ONTRACK_EXTENSION_AUDITTRAIL_STORAGE_BUCKET=yontrack-audit-trail
+ONTRACK_EXTENSION_AUDITTRAIL_STORAGE_REGION=us-east-1
+ONTRACK_EXTENSION_AUDITTRAIL_STORAGE_PATHSTYLE=true
+ONTRACK_EXTENSION_AUDITTRAIL_STORAGE_ACCESSKEY=yontrack-minio
+ONTRACK_EXTENSION_AUDITTRAIL_STORAGE_SECRETKEY=yontrack-minio-secret" \
+    "$(ds_storage_env http://localhost:19100)" \
+    "ds_storage_env points the backend at the MinIO bucket"
 
 # --- ds_project ------------------------------------------------------------
 
