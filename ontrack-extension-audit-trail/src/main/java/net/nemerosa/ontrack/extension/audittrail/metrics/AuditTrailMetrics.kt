@@ -32,6 +32,15 @@ object AuditTrailMetrics {
     )
     const val append = "ontrack_audit_trail_append"
 
+    @APIDescription(
+        "Number of trails found tampered with by the daily verification — a broken chain or an invalid " +
+                "endorsement. A trail is verified again, and counted again, each time it gains entries."
+    )
+    @MetricsMeterDocumentation(
+        type = MetricsMeterType.COUNT,
+    )
+    const val verificationFailures = "ontrack_audit_trail_verification_failures"
+
     @DocumentationIgnore
     object Tags {
         const val TYPE = "type"

@@ -66,6 +66,19 @@ class TrailEntryJdbcRepository(
             mapOf("buildId" to buildId)
         ) { rs, _ -> toEntry(rs) }
 
+    override fun findLastEntryId(): Int? =
+        namedParameterJdbcTemplate.queryForObject(
+            "SELECT MAX(ID) FROM BUILD_TRAIL_ENTRY",
+            emptyMap<String, Any>(),
+            Int::class.javaObjectType,
+        )
+
+    override fun findBuildIdsWithEntriesBetween(afterEntryId: Int, upToEntryId: Int): List<Int> =
+        namedParameterJdbcTemplate.query(
+            "SELECT DISTINCT BUILD_ID FROM BUILD_TRAIL_ENTRY WHERE ID > :after AND ID <= :upTo ORDER BY BUILD_ID",
+            mapOf("after" to afterEntryId, "upTo" to upToEntryId),
+        ) { rs, _ -> rs.getInt("BUILD_ID") }
+
     private fun toEntry(rs: ResultSet) = TrailEntry(
         id = rs.getInt("ID"),
         buildId = rs.getInt("BUILD_ID"),

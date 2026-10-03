@@ -42,4 +42,20 @@ interface TrailEntryRepository {
      * @return Entries, by seq
      */
     fun findEntries(buildId: Int): List<TrailEntry>
+
+    /**
+     * ID of the last entry stored, all trails together.
+     *
+     * @return Highest ID of the entries, or `null` when there is none
+     */
+    fun findLastEntryId(): Int?
+
+    /**
+     * Builds whose trails gained entries in a range of IDs.
+     *
+     * @param afterEntryId Lower bound of the range, excluded
+     * @param upToEntryId Upper bound of the range, included
+     * @return IDs of the builds having entries whose IDs are in the range, by ID
+     */
+    fun findBuildIdsWithEntriesBetween(afterEntryId: Int, upToEntryId: Int): List<Int>
 }

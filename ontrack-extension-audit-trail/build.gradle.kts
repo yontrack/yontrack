@@ -21,6 +21,8 @@ dependencies {
     testImplementation(project(":ontrack-extension-workflows"))
     testImplementation(testFixtures(project(":ontrack-extension-workflows")))
     testImplementation(testFixtures(project(":ontrack-extension-queue")))
+    testImplementation(project(":ontrack-extension-notifications"))
+    testImplementation(testFixtures(project(":ontrack-extension-notifications")))
 
     testRuntimeOnly(project(":ontrack-service"))
     testRuntimeOnly(project(":ontrack-repository-impl"))
