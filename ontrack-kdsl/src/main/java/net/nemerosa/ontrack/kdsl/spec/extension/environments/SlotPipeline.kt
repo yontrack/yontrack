@@ -7,6 +7,8 @@ import net.nemerosa.ontrack.kdsl.connector.graphql.convert
 import net.nemerosa.ontrack.kdsl.connector.graphql.schema.CancelPipelineMutation
 import net.nemerosa.ontrack.kdsl.connector.graphql.schema.FailPipelineMutation
 import net.nemerosa.ontrack.kdsl.connector.graphql.schema.FinishDeploymentPipelineMutation
+import net.nemerosa.ontrack.kdsl.connector.graphql.schema.OverridePipelineRuleMutation
+import net.nemerosa.ontrack.kdsl.connector.graphql.schema.PipelineAdmissionRulesQuery
 import net.nemerosa.ontrack.kdsl.connector.graphql.schema.PipelineRequiredInputsQuery
 import net.nemerosa.ontrack.kdsl.connector.graphql.schema.StartDeployingPipelineMutation
 import net.nemerosa.ontrack.kdsl.connector.graphql.schema.UpdatePipelineDataMutation
@@ -133,6 +135,31 @@ class SlotPipeline(
             )
         ) { it?.updatePipelineData?.payloadUserErrors?.convert() }
         // OK
+        return this
+    }
+
+
+    /**
+     * Overrides an admission rule of this pipeline, so that it no longer blocks the deployment.
+     * The override is recorded with its message and its author.
+     *
+     * @param rule Name of the admission rule, as configured on the slot
+     * @param message Why the rule is overridden
+     * @throws IllegalStateException When the slot has no admission rule of that name
+     */
+    fun overrideRule(rule: String, message: String): SlotPipeline {
+        val configId = graphqlConnector.query(
+            PipelineAdmissionRulesQuery(id)
+        )?.slotPipelineById?.admissionRules?.find {
+            it.admissionRuleConfig.name == rule
+        }?.admissionRuleConfig?.id ?: error("No admission rule named $rule for the pipeline $id")
+        graphqlConnector.mutate(
+            OverridePipelineRuleMutation(
+                pipelineId = id,
+                admissionRuleConfigId = configId,
+                message = message,
+            )
+        ) { it?.overridePipelineRule?.payloadUserErrors?.convert() }
         return this
     }
 

@@ -1,0 +1,49 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.6",
+  "serialNumber": "urn:uuid:5b0c7a52-3f53-4f4e-9c55-6a4c1e2d7b10",
+  "version": 1,
+  "metadata": {
+    "tools": {
+      "components": [
+        {
+          "type": "application",
+          "name": "cyclonedx-gradle-plugin",
+          "version": "1.10.0"
+        }
+      ]
+    },
+    "component": {
+      "type": "application",
+      "name": "audit-trail-demo",
+      "version": "2.4.0",
+      "purl": "pkg:maven/net.example/audit-trail-demo@2.4.0"
+    }
+  },
+  "components": [
+    {
+      "type": "library",
+      "name": "common-library",
+      "version": "3.2.1",
+      "purl": "pkg:maven/net.example/common-library@3.2.1"
+    },
+    {
+      "type": "library",
+      "name": "petclinic-client",
+      "version": "1.4.6",
+      "purl": "pkg:maven/net.example/petclinic-client@1.4.6"
+    },
+    {
+      "type": "library",
+      "name": "jackson-databind",
+      "version": "2.18.2",
+      "purl": "pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.18.2"
+    },
+    {
+      "type": "library",
+      "name": "spring-webmvc",
+      "version": "6.2.1",
+      "purl": "pkg:maven/org.springframework/spring-webmvc@6.2.1"
+    }
+  ]
+}

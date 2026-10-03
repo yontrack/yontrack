@@ -1,0 +1,9 @@
+mutation RevokeToken(
+    $name: String!,
+) {
+    revokeToken(input: {
+        name: $name,
+    }) {
+        ...PayloadUserErrors
+    }
+}

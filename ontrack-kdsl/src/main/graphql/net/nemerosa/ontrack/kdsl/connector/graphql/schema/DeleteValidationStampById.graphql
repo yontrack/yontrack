@@ -1,0 +1,9 @@
+mutation DeleteValidationStampById(
+    $id: Int!,
+) {
+    deleteValidationStampById(input: {
+        id: $id,
+    }) {
+        ...PayloadUserErrors
+    }
+}

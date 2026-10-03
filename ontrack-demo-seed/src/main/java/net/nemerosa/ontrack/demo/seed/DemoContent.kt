@@ -4,6 +4,7 @@ import net.nemerosa.ontrack.demo.seed.BuildCreation.At
 import net.nemerosa.ontrack.demo.seed.BuildCreation.DaysAgo
 import net.nemerosa.ontrack.demo.seed.BuildCreation.HoursAgo
 import net.nemerosa.ontrack.demo.seed.ValidationStatus.FAILED
+import net.nemerosa.ontrack.demo.seed.ValidationStatus.FIXED
 import net.nemerosa.ontrack.demo.seed.ValidationStatus.PASSED
 import net.nemerosa.ontrack.demo.seed.ValidationStatus.WARNING
 import net.nemerosa.ontrack.json.asJson
@@ -187,6 +188,49 @@ object DemoContent {
     const val ESTATE_PRODUCTION = "Demo production"
 
     /**
+     * The project of the audit trail (#1970): a release build with its whole story, from the token of
+     * its pipeline to its deployment in production, with evidence of every kind. A project of its own
+     * for the reason [SECURITY] is one: its trail is read entry by entry, and the curated readings of
+     * [SERVICE] are not a story worth reading that way.
+     */
+    const val AUDIT_TRAIL = "audit-trail-demo"
+
+    /**
+     * The project whose trail is deliberately tampered with, through the demonstration tampering
+     * switch: its verification breaks at [AUDIT_TRAIL_TAMPERED_SEQ]. Left out of the reset on an
+     * instance without the switch - which is every instance tracking real deliveries.
+     */
+    const val AUDIT_TRAIL_TAMPERED = "audit-trail-tampered"
+
+    /** The release build of [AUDIT_TRAIL], the one whose trail is worth opening. */
+    const val AUDIT_TRAIL_RELEASE = "121"
+
+    /** The build of [AUDIT_TRAIL_TAMPERED]. */
+    const val AUDIT_TRAIL_TAMPERED_BUILD = "7"
+
+    /** Where the trail of [AUDIT_TRAIL_TAMPERED_BUILD] breaks. */
+    const val AUDIT_TRAIL_TAMPERED_SEQ = 4
+
+    /**
+     * The API token the pipeline of [AUDIT_TRAIL] posts through, which its trail shows as the actor
+     * of everything the pipeline did - `token:ci-demo`.
+     */
+    const val CI_TOKEN = "ci-demo"
+
+    const val UI_TESTS = "UI.TESTS"
+    const val SBOM = "SBOM"
+    const val DAST = "DAST"
+
+    /**
+     * The stamp of [AUDIT_TRAIL] deleted at the end of the reset, which is what puts
+     * `validation.deleted` with the reason `cascade/validation-stamp-deleted` on both its builds.
+     */
+    const val LEGACY_LINT = "LEGACY.LINT"
+
+    /** The admission rule of the production slot of [AUDIT_TRAIL] the deployment overrides. */
+    const val CHANGE_APPROVAL = "change-approval"
+
+    /**
      * The whole dataset, curated part and changelog project together.
      *
      * @param changelog Commits since the last release, one build each.
@@ -200,10 +244,12 @@ object DemoContent {
             security(),
             visits(),
             e2e(),
+            auditTrail(),
+            auditTrailTampered(),
             changelogProject(changelog),
         ),
         environments = environments(),
-        deployments = deployments() + visitsDeployments(),
+        deployments = deployments() + visitsDeployments() + auditTrailDeployments(),
         dashboard = dashboard(),
         estates = estates(),
     )
@@ -1512,6 +1558,258 @@ object DemoContent {
      * The point is not realism: it is that the demo keeps showing this month's work
      * without anyone having to remember to update the curated dataset.
      */
+    // ---------------------------------------------------------------------------------------------
+    // The audit trail (#1970)
+    // ---------------------------------------------------------------------------------------------
+
+    /**
+     * The story of a release, as its trail records it: [AUDIT_TRAIL_RELEASE] is created by its
+     * pipeline through the [CI_TOKEN] token, which sets its release and commit properties, runs seven
+     * validations with their evidence, promotes it BRONZE, SILVER then GOLD and links it to two
+     * dependency builds. A person then passes the failed unit tests with a comment and deletes a log
+     * attached by mistake - the trail shows both under another actor than the pipeline - and deploys
+     * it to staging, then to production, overriding the change approval. Last, [LEGACY_LINT] is
+     * deleted, and both builds of the project record the run they lose.
+     *
+     * The evidence is one file of each kind the evidence page handles: a PDF and a PNG shown inline,
+     * a CycloneDX SBOM in JSON and a JUnit summary in plain text, and a ZAP report in HTML, which is
+     * always downloaded, never rendered. Without an evidence storage, it is all left out and the rest
+     * of the story is seeded.
+     */
+    private fun auditTrail() = ProjectSpec(
+        name = AUDIT_TRAIL,
+        description = "The audit trail of a release: who did what to build $AUDIT_TRAIL_RELEASE (2.4.0), with " +
+                "the evidence, in a chain anyone can verify. Open its Audit trail page.",
+        labels = listOf(LABEL_TEAM_PLATFORM, LABEL_LANGUAGE_KOTLIN),
+        requires = listOf(DemoCapability.AUDIT_TRAIL),
+        scm = ScmSpec(
+            repository = AUDIT_TRAIL,
+            issues = listOf(
+                IssueSpec("AUDIT-12", "Record who changed what on a release", type = "feature"),
+                IssueSpec("AUDIT-13", "Keep the evidence of a deleted validation run", type = "defect"),
+            ),
+        ),
+        branches = listOf(
+            BranchSpec(
+                name = MAIN,
+                description = "Main development branch, released from.",
+                scmBranch = SCM_MAIN,
+                promotionLevels = plainPromotions,
+                validationStamps = listOf(
+                    buildStamp,
+                    unitTests,
+                    ValidationStampSpec(UI_TESTS, "End-to-end tests of the user interface, with screenshots."),
+                    ValidationStampSpec(SBOM, "Software bill of materials, in CycloneDX."),
+                    securityScan,
+                    ValidationStampSpec(DAST, "Dynamic application security testing, against staging."),
+                    ValidationStampSpec(
+                        LEGACY_LINT,
+                        "The old linter, retired after the release: deleting the stamp takes its runs with it.",
+                        deleted = true,
+                    ),
+                ),
+                builds = listOf(
+                    BuildSpec(
+                        name = "120",
+                        release = "2.4.0-rc.1",
+                        description = "Release candidate of 2.4.0.",
+                        creation = DaysAgo(3),
+                        token = CI_TOKEN,
+                        commits = listOf("feat(audit): record who changed what on a release (AUDIT-12)"),
+                        promotionLevels = listOf(BRONZE),
+                        validations = listOf(
+                            ValidationSpec(BUILD, PASSED),
+                            ValidationSpec(UNIT_TESTS, PASSED),
+                            ValidationSpec(LEGACY_LINT, PASSED),
+                        ),
+                    ),
+                    BuildSpec(
+                        name = AUDIT_TRAIL_RELEASE,
+                        release = "2.4.0",
+                        description = "Release 2.4.0.",
+                        // Hours rather than a day: the newest build, and room for its ten rungs
+                        creation = HoursAgo(14),
+                        token = CI_TOKEN,
+                        commits = listOf(
+                            "fix(audit): keep the evidence of a deleted validation run (AUDIT-13)",
+                            "chore(release): 2.4.0",
+                        ),
+                        promotionLevels = listOf(BRONZE, SILVER, GOLD),
+                        validations = listOf(
+                            ValidationSpec(BUILD, PASSED),
+                            // The run a person looks at: FAILED by the pipeline, PASSED by somebody
+                            // who read the failure, with the reason - the trail has both, by two actors
+                            ValidationSpec(
+                                UNIT_TESTS,
+                                FAILED,
+                                description = "1 failure out of 1284 tests.",
+                                evidence = listOf(
+                                    EvidenceSpec(
+                                        fileName = "junit-summary.txt",
+                                        mediaType = "text/plain",
+                                        resource = "junit-summary.txt",
+                                        sourceTool = "junit",
+                                        sourceVersion = "5.11.3",
+                                    ),
+                                ),
+                                // FIXED, the passed status a FAILED run can be given: Yontrack does
+                                // not allow FAILED to PASSED
+                                statusChanges = listOf(
+                                    StatusChangeSpec(
+                                        FIXED,
+                                        "Reviewed: the one failure is ClockSkewTest, a known flaky test " +
+                                                "fixed in AUDIT-14 - not a defect of the release.",
+                                    ),
+                                ),
+                            ),
+                            ValidationSpec(
+                                UI_TESTS,
+                                PASSED,
+                                evidence = listOf(
+                                    EvidenceSpec(
+                                        fileName = "checkout-page.png",
+                                        mediaType = "image/png",
+                                        resource = "checkout-page.png",
+                                        sourceTool = "playwright",
+                                        sourceVersion = "1.49.1",
+                                    ),
+                                ),
+                            ),
+                            ValidationSpec(
+                                SBOM,
+                                PASSED,
+                                evidence = listOf(
+                                    EvidenceSpec(
+                                        fileName = "sbom.cdx.json",
+                                        mediaType = "application/vnd.cyclonedx+json",
+                                        resource = "sbom.cdx.json",
+                                        sourceTool = "cyclonedx-gradle-plugin",
+                                        sourceVersion = "1.10.0",
+                                    ),
+                                ),
+                            ),
+                            ValidationSpec(
+                                SECURITY_SCAN,
+                                PASSED,
+                                evidence = listOf(
+                                    EvidenceSpec(
+                                        fileName = "trivy-report.pdf",
+                                        mediaType = "application/pdf",
+                                        resource = "trivy-report.pdf",
+                                        sourceTool = "trivy",
+                                        sourceVersion = "0.56.2",
+                                    ),
+                                    // Attached by mistake with the report, and deleted: kept, marked
+                                    // as deleted, and its deletion in the trail
+                                    EvidenceSpec(
+                                        fileName = "trivy-debug.log",
+                                        mediaType = "text/plain",
+                                        resource = "trivy-debug.log",
+                                        sourceTool = "trivy",
+                                        sourceVersion = "0.56.2",
+                                        deleted = true,
+                                    ),
+                                ),
+                            ),
+                            ValidationSpec(
+                                DAST,
+                                PASSED,
+                                evidence = listOf(
+                                    // HTML: downloaded, never rendered in the origin of Yontrack
+                                    EvidenceSpec(
+                                        fileName = "zap-report.html",
+                                        mediaType = "text/html",
+                                        resource = "zap-report.html",
+                                        sourceTool = "zap",
+                                        sourceVersion = "2.15.0",
+                                    ),
+                                ),
+                            ),
+                            ValidationSpec(LEGACY_LINT, PASSED),
+                        ),
+                        links = listOf(
+                            BuildRef(LIBRARY, MAIN, "42"),
+                            BuildRef(SERVICE, MAIN, "107"),
+                        ),
+                    ),
+                ),
+            ),
+        ),
+    )
+
+    /**
+     * One build and a handful of entries, one of which - [AUDIT_TRAIL_TAMPERED_SEQ], the validation
+     * run of the failed scan - is rewritten to read PASSED once everything is seeded. Its evidence
+     * still says FAILED, and its trail breaks at that entry: what tampering looks like, on an
+     * instance which allows it for that purpose only.
+     */
+    private fun auditTrailTampered() = ProjectSpec(
+        name = AUDIT_TRAIL_TAMPERED,
+        description = "DELIBERATELY TAMPERED: entry $AUDIT_TRAIL_TAMPERED_SEQ of the trail of build " +
+                "$AUDIT_TRAIL_TAMPERED_BUILD was rewritten after the fact, through the demonstration tampering " +
+                "switch, to turn a failed scan into a passed one. Its verification breaks there - which is the point.",
+        labels = listOf(LABEL_TEAM_PLATFORM, LABEL_LANGUAGE_KOTLIN),
+        requires = listOf(DemoCapability.AUDIT_TRAIL, DemoCapability.TRAIL_TAMPERING),
+        branches = listOf(
+            BranchSpec(
+                name = MAIN,
+                description = "Main development branch.",
+                validationStamps = listOf(securityScan, unitTests),
+                builds = listOf(
+                    // Its trail: build.created, build.updated (backdated), property.set (release),
+                    // then the scan at 4 - the entry rewritten - its evidence and the unit tests
+                    BuildSpec(
+                        name = AUDIT_TRAIL_TAMPERED_BUILD,
+                        release = "1.0.0",
+                        description = "A build whose failed scan was rewritten as passed in its trail.",
+                        creation = DaysAgo(1),
+                        validations = listOf(
+                            ValidationSpec(
+                                SECURITY_SCAN,
+                                FAILED,
+                                description = "1 HIGH vulnerability.",
+                                evidence = listOf(
+                                    EvidenceSpec(
+                                        fileName = "scan-report.pdf",
+                                        mediaType = "application/pdf",
+                                        resource = "tampered-scan-report.pdf",
+                                        sourceTool = "trivy",
+                                        sourceVersion = "0.56.2",
+                                    ),
+                                ),
+                            ),
+                            ValidationSpec(UNIT_TESTS, PASSED),
+                        ),
+                        tampering = TamperingSpec(
+                            seq = AUDIT_TRAIL_TAMPERED_SEQ,
+                            type = "validation.run",
+                            payload = mapOf("status" to "PASSED"),
+                        ),
+                    ),
+                ),
+            ),
+        ),
+    )
+
+    /**
+     * Staging, then production, where the change approval is overridden: the change was approved
+     * outside Yontrack, and the override says where. Both at the reset - their slots are the
+     * project's own, so no dated history is in their way.
+     */
+    private fun auditTrailDeployments() = listOf(
+        DeploymentSpec(STAGING, BuildRef(AUDIT_TRAIL, MAIN, AUDIT_TRAIL_RELEASE)),
+        DeploymentSpec(
+            PRODUCTION,
+            BuildRef(AUDIT_TRAIL, MAIN, AUDIT_TRAIL_RELEASE),
+            overrides = listOf(
+                RuleOverrideSpec(
+                    rule = CHANGE_APPROVAL,
+                    message = "Approved by the change advisory board in CHG-2041, outside Yontrack.",
+                ),
+            ),
+        ),
+    )
+
     private fun changelogProject(changelog: List<ChangelogEntry>) = ProjectSpec(
         name = CHANGELOG,
         description = "Yontrack itself, seeded from the changelog since the last release.",
@@ -1604,6 +1902,18 @@ object DemoContent {
                         ),
                     ),
                 ),
+                // The audit trail's release goes through staging before production (#1970)
+                SlotSpec(
+                    project = AUDIT_TRAIL,
+                    description = "Audit trail demo on staging.",
+                    admissionRules = listOf(
+                        SlotAdmissionRuleSpec(
+                            name = "silver",
+                            ruleId = SlotAdmissionRules.PROMOTION,
+                            config = mapOf("promotion" to SILVER),
+                        ),
+                    ),
+                ),
                 // The upstream half of the `canary` story - see the production slot below for
                 // why the qualifier is in the demo at all. It holds 107, the head of `main`,
                 // which is newer than anything the canary production slot holds (nothing), and
@@ -1666,6 +1976,29 @@ object DemoContent {
                             name = "gold",
                             ruleId = SlotAdmissionRules.PROMOTION,
                             config = mapOf("promotion" to GOLD),
+                        ),
+                    ),
+                ),
+                // GOLD, out of staging, and a change approval nobody gives in Yontrack: the deployment
+                // overrides it, and the trail of the build records the override with its message
+                SlotSpec(
+                    project = AUDIT_TRAIL,
+                    description = "Audit trail demo in production.",
+                    admissionRules = listOf(
+                        SlotAdmissionRuleSpec(
+                            name = "gold",
+                            ruleId = SlotAdmissionRules.PROMOTION,
+                            config = mapOf("promotion" to GOLD),
+                        ),
+                        SlotAdmissionRuleSpec(
+                            name = "staging",
+                            ruleId = SlotAdmissionRules.ENVIRONMENT,
+                            config = mapOf("environmentName" to STAGING, "qualifier" to ""),
+                        ),
+                        SlotAdmissionRuleSpec(
+                            name = CHANGE_APPROVAL,
+                            ruleId = SlotAdmissionRules.MANUAL,
+                            config = mapOf("message" to "Approve the change in production."),
                         ),
                     ),
                 ),

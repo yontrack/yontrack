@@ -1,0 +1,44 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>
+endobj
+4 0 obj
+<< /Length 899 >>
+stream
+BT /F1 16 Tf 50 780 Td (Trivy scan report - audit-trail-tampered 1.0.0) Tj ET
+BT /F1 10 Tf 50 750 Td (Target: ghcr.io/example/audit-trail-tampered:1.0.0 \(debian 12.7\)) Tj ET
+BT /F1 10 Tf 50 734 Td (Scanner: Trivy 0.56.2 - vulnerability scanning) Tj ET
+BT /F1 10 Tf 50 718 Td () Tj ET
+BT /F1 10 Tf 50 702 Td (Severity     Count) Tj ET
+BT /F1 10 Tf 50 686 Td (CRITICAL     0) Tj ET
+BT /F1 10 Tf 50 670 Td (HIGH         1) Tj ET
+BT /F1 10 Tf 50 654 Td () Tj ET
+BT /F1 10 Tf 50 638 Td (HIGH  CVE-2024-0002  libexample 1.2.0  fixed in 1.2.4  \(demonstration data\)) Tj ET
+BT /F1 10 Tf 50 622 Td () Tj ET
+BT /F1 10 Tf 50 606 Td (Policy: no CRITICAL, no HIGH - FAILED.) Tj ET
+BT /F1 10 Tf 50 590 Td (The trail of this build was rewritten afterwards to read PASSED: its verification) Tj ET
+BT /F1 10 Tf 50 574 Td (breaks at the rewritten entry. Demonstration data, generated for the Yontrack demo.) Tj ET
+endstream
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000241 00000 n 
+0000001190 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+1260
+%%EOF

@@ -115,6 +115,13 @@ class GQLScalarJSONTest {
     }
 
     @Test
+    fun `The name of a token is kept, as the actor of a trail entry carries it`() {
+        val actor = mapOf("account" to "ci@example.com", "via" to "token", "tokenName" to "ci-demo")
+        val json = GQLScalarJSON.TYPE.coercing.serialize(actor) as JsonNode
+        assertEquals("ci-demo", json.path("tokenName").asString())
+    }
+
+    @Test
     fun `Obfuscation of oauth2Token`() {
         // Data with password
         val data = SampleConfig(oauth2Token = "token")

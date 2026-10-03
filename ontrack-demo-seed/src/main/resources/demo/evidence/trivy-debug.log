@@ -1,0 +1,7 @@
+2026-03-01T09:12:03Z  DEBUG  [trivy] Loading the vulnerability database from the cache
+2026-03-01T09:12:04Z  DEBUG  [trivy] Detecting the OS: debian 12.7
+2026-03-01T09:12:04Z  DEBUG  [trivy] Analysing 214 OS packages and 96 Java libraries
+2026-03-01T09:12:09Z  DEBUG  [trivy] Writing the report to trivy-report.pdf
+
+A debug log of the scanner, attached by mistake with its report: deleted, and its
+deletion recorded in the trail. Demonstration data, generated for the Yontrack demo.

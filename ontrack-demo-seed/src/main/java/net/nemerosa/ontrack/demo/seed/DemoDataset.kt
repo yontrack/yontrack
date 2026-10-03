@@ -52,6 +52,11 @@ data class DemoDataset(
  * an auto promotion names a validation stamp. A label is instance-level, so it is declared once
  * in [DemoDataset.labels] and named here as many times as projects carry it.
  */
+/**
+ * @property requires What the project needs of the instance beyond what the rest of the demo does.
+ * A project whose requirement the instance does not meet is left out of the reset, with a line in
+ * the log saying why, rather than failing it: the demo is still worth having without it.
+ */
 data class ProjectSpec(
     val name: String,
     val description: String,
@@ -59,7 +64,33 @@ data class ProjectSpec(
     val scm: ScmSpec? = null,
     val favourite: Boolean = false,
     val labels: List<String> = emptyList(),
+    val requires: List<DemoCapability> = emptyList(),
 )
+
+/**
+ * What a part of the dataset needs of the instance and the instance may not offer - each checked
+ * before the reset, by [DemoTarget.unavailable].
+ *
+ * Unlike the mock SCM or a licensed feature the rest of the demo is built on, a missing capability
+ * does not stop the reset: the part needing it is skipped, and the log says so.
+ */
+enum class DemoCapability(val display: String) {
+    /** The licensed feature of the audit trail, without which no build has a trail. */
+    AUDIT_TRAIL("the audit trail"),
+
+    /**
+     * Evidence: the audit trail licensed, its storage reachable, and its REST API reachable from
+     * the seed - an evidence is uploaded as `multipart/form-data`, which GraphQL does not take.
+     */
+    EVIDENCE("evidence"),
+
+    /**
+     * The demonstration tampering switch, `ontrack.extension.audit-trail.demo-tampering.enabled`,
+     * and the REST API of the audit trail reachable from the seed, which is where it rewrites an
+     * entry.
+     */
+    TRAIL_TAMPERING("trail tampering"),
+}
 
 /**
  * A project label: a coloured tag put on any number of projects.
@@ -189,12 +220,18 @@ data class WorkflowSpec(val yaml: String)
  * ever give a status, never CHML counts, so the thresholds are there for what the stamp *says* - its
  * configuration and, through [CHMLSpec.warningPassesAutoPromotion], how the auto promotion reads it.
  */
+/**
+ * @property deleted Whether the stamp is deleted once the whole dataset is seeded. Its runs go with
+ * it, and every build carrying one records it in its trail as `validation.deleted`, with the reason
+ * `cascade/validation-stamp-deleted` - which is the only reason to declare a stamp only to delete it.
+ */
 data class ValidationStampSpec(
     val name: String,
     val description: String,
     val findings: FindingsThresholdsSpec? = null,
     val tests: Boolean = false,
     val chml: CHMLSpec? = null,
+    val deleted: Boolean = false,
 )
 
 /**
@@ -248,6 +285,12 @@ enum class CHML {
  * @property tests Runs of `tests` stamps, in order, each with the counts of its tests. Two runs of
  * the same stamp, failed then passed, are what a flaky build is. They take their rungs on the
  * build's ladder after its [validations].
+ * @property token Name of the API token the build is created through, and its story written - the
+ * properties, validations, evidence, promotions and links a CI pipeline posts. It is what the trail
+ * of the build shows as the actor of those entries, `token:<name>`. The seed generates the token for
+ * the account it runs as, and revokes it at the end of the reset: it is an administrator's.
+ * @property tampering An entry of the trail of the build rewritten once everything is seeded, so
+ * that its verification breaks there. Only on a project requiring [DemoCapability.TRAIL_TAMPERING].
  */
 data class BuildSpec(
     val name: String,
@@ -260,6 +303,25 @@ data class BuildSpec(
     val commits: List<String> = emptyList(),
     val scans: List<ScanSpec> = emptyList(),
     val tests: List<TestRunSpec> = emptyList(),
+    val token: String? = null,
+    val tampering: TamperingSpec? = null,
+)
+
+/**
+ * The rewrite of one entry of the trail of a build, through the demonstration tampering endpoint:
+ * the fields of [payload] replace those of the payload of the entry, and its hash is left as it
+ * was, so that the verification of the trail breaks at [seq].
+ *
+ * @property seq Position of the entry in the trail, from 1
+ * @property type Type of the entry the dataset expects at [seq], like `validation.run`: the seed
+ * refuses to rewrite another one, since the entries are numbered by the server and a change of the
+ * seed's order would otherwise tamper with something the demo does not describe
+ * @property payload Fields replacing those of the payload of the entry
+ */
+data class TamperingSpec(
+    val seq: Int,
+    val type: String,
+    val payload: Map<String, Any>,
 )
 
 /**
@@ -318,10 +380,53 @@ sealed interface BuildCreation {
     }
 }
 
+/**
+ * @property evidence Files attached to the run as its evidence, in order, through the token of the
+ * build when it has one. Skipped, with a line in the log, on an instance which cannot take evidence.
+ * @property statusChanges Statuses the run is given after it is created, in order, by the account
+ * the seed runs as - a person looking at the run, not the pipeline which posted it.
+ */
 data class ValidationSpec(
     val validationStamp: String,
     val status: ValidationStatus,
     val description: String = "",
+    val evidence: List<EvidenceSpec> = emptyList(),
+    val statusChanges: List<StatusChangeSpec> = emptyList(),
+)
+
+/**
+ * A new status given to a validation run.
+ *
+ * @property description Why - the comment shown beside the status
+ */
+data class StatusChangeSpec(
+    val status: ValidationStatus,
+    val description: String,
+)
+
+/**
+ * A file attached to a validation run as its evidence.
+ *
+ * @property fileName Name of the file, as the evidence shows it
+ * @property mediaType Media type declared on upload. The server decides how to serve it: a PDF, a
+ * JSON document, plain text or an image may be shown inline, HTML is always downloaded.
+ * @property resource Name of the file holding the content, in the `demo/evidence` resources of this
+ * module - small, generated or written by hand, and identical on every run, so that the digests the
+ * trail records are the same from one reset to the next
+ * @property sourceTool Tool which produced the evidence, as a CI would claim it
+ * @property sourceVersion Version of that tool
+ * @property sourceUrl Where the evidence was produced
+ * @property deleted Whether the evidence is deleted after it is attached, by the account the seed
+ * runs as: it is kept, marked as deleted, and its deletion is recorded in the trail
+ */
+data class EvidenceSpec(
+    val fileName: String,
+    val mediaType: String,
+    val resource: String,
+    val sourceTool: String? = null,
+    val sourceVersion: String? = null,
+    val sourceUrl: String? = null,
+    val deleted: Boolean = false,
 )
 
 /**
@@ -484,6 +589,8 @@ data class SlotWorkflowSpec(
  * one slot are dated in the order they are declared, and a dated one never follows one at the reset.
  * @property message Why a [DeploymentStop.FAILED] deployment failed, or why a
  * [DeploymentStop.CANCELLED] one was cancelled.
+ * @property overrides Admission rules overridden before the deployment starts. An overridden rule
+ * is not asked whether it admits the build - that is what overriding it means.
  */
 data class DeploymentSpec(
     val environment: String,
@@ -492,6 +599,19 @@ data class DeploymentSpec(
     val qualifier: String = "",
     val at: BuildCreation? = null,
     val message: String? = null,
+    val overrides: List<RuleOverrideSpec> = emptyList(),
+)
+
+/**
+ * An admission rule of the slot overridden for one deployment, before it starts: the rule stops
+ * blocking it, and the override is recorded with its message.
+ *
+ * @property rule Name of the admission rule, as the slot configures it
+ * @property message Why it is overridden
+ */
+data class RuleOverrideSpec(
+    val rule: String,
+    val message: String,
 )
 
 /**
@@ -557,6 +677,13 @@ enum class ValidationStatus {
     PASSED,
     FAILED,
     WARNING,
+
+    /**
+     * A failure somebody fixed, and a passed status - the one a FAILED run can be moved to and pass:
+     * Yontrack does not allow FAILED to PASSED. Never the status a run is created with, only one it
+     * is given afterwards - see [ValidationSpec.statusChanges].
+     */
+    FIXED,
 }
 
 /**

@@ -46,6 +46,12 @@ the seed — keep it in sync by hand whenever that file changes.
 | Sticky header inside a section              | `petclinic-e2e` / `main`, build `nightly-30`, _Validations_ section    | 30 runs, one failed (`E2E.PAYMENTS`); the column headers stay at the top of the section while it scrolls |
 | Sticky header after _Load more_             | `petclinic-e2e` / `main`, stamp `E2E.SMOKE`, _Validation history_      | A run on every build, two failed; _Load more..._ a few times and the section scrolls under its header |
 | Sticky header in a widget                   | Dashboard "Yontrack demo", widget "End-to-end suites"                  | 15 branches of `petclinic-e2e`, more than the widget holds; the `BRONZE` and suite headers stay put |
+| Audit trail of a release, intact            | `audit-trail-demo` / `main`, build `121` (2.4.0), _Audit trail_         | 32 entries, "Intact"; the pipeline's entries by `token ci-demo`, the status change, the deleted evidence and the deployments by the seeding account |
+| A failed run fixed with a comment           | `audit-trail-demo`, build `121`, `UNIT.TESTS`                            | FAILED by the pipeline, then FIXED by a person with the reason; both in the trail |
+| Evidence of every kind                      | `audit-trail-demo`, build `121`, the validation runs, _Evidence_        | A Trivy PDF, a PNG screenshot, a CycloneDX SBOM, a JUnit summary, a ZAP report in HTML (downloaded, never rendered) and `trivy-debug.log`, deleted |
+| An overridden admission rule                | `production` environment, `audit-trail-demo` slot                       | The change approval overridden with its message; `deployment.rule-overridden` in the trail of `121` |
+| A deleted validation stamp, as a cascade    | `audit-trail-demo`, builds `120` and `121`, _Audit trail_               | The last entry of each: `validation.deleted` of `LEGACY.LINT`, reason `cascade/validation-stamp-deleted` |
+| A tampered trail                            | `audit-trail-tampered` / `main`, build `7`, _Audit trail_                | "Broken at seq 4": the FAILED scan rewritten as PASSED; only on an instance with the demonstration tampering switch on |
 
 ## Projects
 
@@ -57,6 +63,8 @@ the seed — keep it in sync by hand whenever that file changes.
 | `petclinic-billing` | `release-2.3`, `main`       | `team:apps`, `language:java`, `portfolio:product` | The security findings: two scans per build, one of them in SARIF       |
 | `petclinic-visits` | `main`                       | `team:apps`, `language:kotlin`, `portfolio:product`, `runs-in:production` | The delivery scorecard: 90 days of releases, test runs and production deployments |
 | `petclinic-e2e`    | `main`, 14 `feature-*`       | `team:apps`, `language:javascript`       | The long tables: 30 nightly builds, 30 end-to-end suite stamps, 15 branches - enough for every table showing them to scroll |
+| `audit-trail-demo` | `main`                       | `team:platform`, `language:kotlin`       | The audit trail: a release with its whole story and its evidence; left out without the licensed feature |
+| `audit-trail-tampered` | `main`                   | `team:platform`, `language:kotlin`       | A trail deliberately tampered with; left out without the demonstration tampering switch |
 | `yontrack`         | `main`                       | `team:platform`, `language:kotlin`       | Yontrack's own changelog, reseeded from git on every run              |
 
 ## Labels

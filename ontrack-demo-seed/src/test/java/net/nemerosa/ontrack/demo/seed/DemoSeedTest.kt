@@ -39,8 +39,8 @@ private class RecordingDemoTarget(
         private val delegate: DemoBranch,
         private val record: (String) -> Unit,
     ) : DemoBranch by delegate {
-        override fun createBuild(name: String, description: String, creation: LocalDateTime): DemoBuild =
-            RecordingBuild(delegate.createBuild(name, description, creation), record)
+        override fun createBuild(name: String, description: String, creation: LocalDateTime, token: DemoToken?): DemoBuild =
+            RecordingBuild(delegate.createBuild(name, description, creation, token), record)
     }
 
     private class RecordingBuild(
@@ -58,9 +58,9 @@ private class RecordingDemoTarget(
             status: ValidationStatus,
             description: String,
             at: LocalDateTime,
-        ) {
+        ): DemoValidationRun {
             record("validate $validationStamp")
-            delegate.validate(validationStamp, status, description, at)
+            return delegate.validate(validationStamp, status, description, at)
         }
     }
 }
@@ -151,6 +151,8 @@ class DemoSeedTest {
                 DemoContent.SECURITY,
                 DemoContent.VISITS,
                 DemoContent.E2E,
+                DemoContent.AUDIT_TRAIL,
+                DemoContent.AUDIT_TRAIL_TAMPERED,
                 DemoContent.CHANGELOG,
             ),
             target.projects().map { it.name },
@@ -776,14 +778,42 @@ class DemoSeedTest {
     }
 
     /**
-     * The promotions are created BEFORE the validations however the times read, because
-     * `AutoPromotionEventListener` promotes a build as soon as a run completes the set a level
-     * names and stamps that promotion with the time of the call. Seeding the runs first would hand
-     * the demo a second promotion on the same level, dated at the reset — which is the reading
-     * #1718 exists to remove.
+     * On a branch with an auto promotion, the promotions are created BEFORE the validations however
+     * the times read, because `AutoPromotionEventListener` promotes a build as soon as a run
+     * completes the set a level names and stamps that promotion with the time of the call. Seeding
+     * the runs first would hand the demo a second promotion on the same level, dated at the reset —
+     * which is the reading #1718 exists to remove.
      */
     @Test
-    fun `a build is promoted before its validations are recorded`() {
+    fun `a build of a branch with an auto promotion is promoted before its validations are recorded`() {
+        val calls = mutableListOf<String>()
+        val target = RecordingDemoTarget(InMemoryDemoTarget(), calls::add)
+        seed(target).run(
+            datasetWithPromotionLevels(
+                PromotionLevelSpec("SILVER", "", autoPromotion = AutoPromotionSpec(validationStamps = listOf("BUILD"))),
+                validationStamps = listOf(ValidationStampSpec("BUILD", "")),
+                builds = listOf(
+                    BuildSpec(
+                        name = "1",
+                        description = "",
+                        creation = BuildCreation.DaysAgo(1),
+                        promotionLevels = listOf("SILVER"),
+                        validations = listOf(ValidationSpec("BUILD", ValidationStatus.PASSED)),
+                    ),
+                ),
+            )
+        )
+
+        assertEquals(listOf("promote SILVER", "validate BUILD"), calls)
+    }
+
+    /**
+     * Everywhere else, a build is validated then promoted, as a pipeline does it: the trail of a
+     * build records its changes in the order they are made (#1970), and one reading "promoted to
+     * GOLD, then validated" is the wrong story.
+     */
+    @Test
+    fun `a build of a branch without auto promotion is validated before it is promoted`() {
         val calls = mutableListOf<String>()
         val target = RecordingDemoTarget(InMemoryDemoTarget(), calls::add)
         seed(target).run(
@@ -802,7 +832,7 @@ class DemoSeedTest {
             )
         )
 
-        assertEquals(listOf("promote SILVER", "validate BUILD"), calls)
+        assertEquals(listOf("validate BUILD", "promote SILVER"), calls)
     }
 
     private fun datasetWithPromotionLevels(

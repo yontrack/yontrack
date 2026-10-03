@@ -24,10 +24,17 @@ class DemoSeed(
     private val log: (String) -> Unit = ::println,
 ) {
 
-    fun run(dataset: DemoDataset) {
+    fun run(fullDataset: DemoDataset) {
         // Before anything is deleted: a dataset the server would reject must not cost the
         // demo its current content.
-        dataset.validate()
+        fullDataset.validate()
+        // Read-only as well, and before the reset for the same reason: a part of the dataset needing
+        // something the instance does not offer is left out, rather than failing half-way through
+        val capabilities = Capabilities()
+        val dataset = withoutUnavailableProjects(fullDataset, capabilities)
+        val evidence = dataset.declaresEvidence() && capabilities.available(DemoCapability.EVIDENCE) { reason ->
+            log("Leaving out the evidence: ${DemoCapability.EVIDENCE.display} is not available on this instance - $reason")
+        }
         // Same reason, one step further: a dataset can be valid and still ask the instance
         // for something it does not run.
         if (dataset.projects.any { it.scm != null }) {
@@ -48,8 +55,64 @@ class DemoSeed(
         }
         val now = LocalDateTime.now(clock)
         reset()
-        create(dataset, now)
+        create(dataset, now, evidence)
     }
+
+    /**
+     * What the instance offers, each asked once.
+     */
+    private inner class Capabilities {
+        private val reasons = mutableMapOf<DemoCapability, String?>()
+
+        fun reason(capability: DemoCapability): String? {
+            if (capability !in reasons) {
+                reasons[capability] = target.unavailable(capability)
+            }
+            return reasons[capability]
+        }
+
+        /**
+         * Whether [capability] is available, calling [onUnavailable] with the reason when it is not.
+         */
+        fun available(capability: DemoCapability, onUnavailable: (String) -> Unit): Boolean {
+            val reason = reason(capability)
+            return if (reason == null) {
+                true
+            } else {
+                onUnavailable(reason)
+                false
+            }
+        }
+    }
+
+    /**
+     * The dataset without the projects requiring what the instance does not offer, nor their slots
+     * and deployments - `validate` has already ruled out a link from another project to one of them.
+     */
+    private fun withoutUnavailableProjects(dataset: DemoDataset, capabilities: Capabilities): DemoDataset {
+        val left = dataset.projects.filter { project ->
+            project.requires.all { capability ->
+                capabilities.available(capability) { reason ->
+                    log("Leaving out the project ${project.name}: ${capability.display} is not available on this instance - $reason")
+                }
+            }
+        }.map { it.name }.toSet()
+        if (left.size == dataset.projects.size) return dataset
+        return dataset.copy(
+            projects = dataset.projects.filter { it.name in left },
+            environments = dataset.environments.map { environment ->
+                environment.copy(slots = environment.slots.filter { it.project in left })
+            },
+            deployments = dataset.deployments.filter { it.build.project in left },
+        )
+    }
+
+    private fun DemoDataset.declaresEvidence(): Boolean =
+        projects.any { project ->
+            project.branches.any { branch ->
+                branch.builds.any { build -> build.validations.any { it.evidence.isNotEmpty() } }
+            }
+        }
 
     /**
      * Environments before projects: a slot belongs to both, and deleting the environment
@@ -89,8 +152,32 @@ class DemoSeed(
         }
     }
 
-    private fun create(dataset: DemoDataset, now: LocalDateTime) {
+    /**
+     * @param evidence Whether the instance takes evidence
+     */
+    private fun create(dataset: DemoDataset, now: LocalDateTime, evidence: Boolean) {
+        // Before anything is created through them, and revoked whatever happens: they are the tokens
+        // of the account the seed runs as, an administrator's
+        val tokens = dataset.projects
+            .flatMap { project -> project.branches.flatMap { branch -> branch.builds.mapNotNull { it.token } } }
+            .distinct()
+            .associateWith { name ->
+                log("Generating the API token $name")
+                target.openToken(name)
+            }
+        try {
+            create(dataset, now, evidence, tokens)
+        } finally {
+            tokens.values.forEach { token ->
+                log("Revoking the API token ${token.name}")
+                token.revoke()
+            }
+        }
+    }
+
+    private fun create(dataset: DemoDataset, now: LocalDateTime, evidence: Boolean, tokens: Map<String, DemoToken>) {
         val projects = mutableMapOf<String, DemoProject>()
+        val branches = mutableMapOf<Pair<String, String>, DemoBranch>()
         val builds = mutableMapOf<BuildRef, DemoBuild>()
 
         // Before the projects: a project is given its labels as it is created, and the
@@ -114,7 +201,8 @@ class DemoSeed(
                 project.setLabels(spec.labels.map { labels.getValue(it) })
             }
             spec.branches.forEach { branchSpec ->
-                createBranch(spec, branchSpec, project, now, builds)
+                branches[spec.name to branchSpec.name] =
+                    createBranch(spec, branchSpec, project, now, builds, tokens, evidence)
             }
         }
 
@@ -168,6 +256,7 @@ class DemoSeed(
                     stopAt = spec.stopAt,
                     times = spec.at?.let { deploymentTimes(it.resolve(now), now) },
                     message = spec.message,
+                    overrides = spec.overrides,
                 )
         }
 
@@ -181,6 +270,31 @@ class DemoSeed(
                     log("Adding ${workflowSpec.trigger} workflow to slot ${slotName(spec, slotSpec)}")
                     slots.getValue(Triple(spec.name, slotSpec.project, slotSpec.qualifier))
                         .addWorkflow(workflowSpec)
+                }
+            }
+        }
+
+        // Once everything else of their builds is there - deployments included - so that the
+        // `validation.deleted` entries of the cascade come last in their trails, as a stamp retired
+        // after the release would
+        dataset.projects.forEach { project ->
+            project.branches.forEach { branch ->
+                branch.validationStamps.filter { it.deleted }.forEach { stamp ->
+                    log("Deleting the validation stamp ${stamp.name} of ${project.name}/${branch.name}")
+                    branches.getValue(project.name to branch.name).deleteValidationStamp(stamp.name)
+                }
+            }
+        }
+
+        // Last of the trails: an entry is rewritten once it exists, and the ones after it are left
+        // alone, so that the verification breaks at the tampered one and nowhere else
+        dataset.projects.forEach { project ->
+            project.branches.forEach { branch ->
+                branch.builds.forEach { build ->
+                    build.tampering?.let { tampering ->
+                        log("Tampering with entry ${tampering.seq} of the trail of ${project.name}/${branch.name}/${build.name}")
+                        builds.getValue(BuildRef(project.name, branch.name, build.name)).tamper(tampering)
+                    }
                 }
             }
         }
@@ -227,7 +341,9 @@ class DemoSeed(
         project: DemoProject,
         now: LocalDateTime,
         builds: MutableMap<BuildRef, DemoBuild>,
-    ) {
+        tokens: Map<String, DemoToken>,
+        evidence: Boolean,
+    ): DemoBranch {
         val branch = project.createBranch(spec.name, spec.description)
         spec.scmBranch?.let { branch.configureScmBranch(it) }
         if (spec.favourite) branch.markAsFavourite()
@@ -248,9 +364,16 @@ class DemoSeed(
                 branch.setPreviousPromotionCondition(promotionLevel.name, true)
             }
         }
+        // Only where an auto promotion can fire - see below
+        val promotionsFirst = spec.promotionLevels.any { it.autoPromotion != null }
         spec.builds.forEach { buildSpec ->
             val creation = buildSpec.creation.resolve(now)
-            val build = branch.createBuild(buildSpec.name, buildSpec.description, creation)
+            val build = branch.createBuild(
+                name = buildSpec.name,
+                description = buildSpec.description,
+                creation = creation,
+                token = buildSpec.token?.let { tokens.getValue(it) },
+            )
             builds[BuildRef(projectSpec.name, spec.name, buildSpec.name)] = build
             buildSpec.release?.let { build.setRelease(it) }
             // The build is built from the last commit declared for it; the ones before are
@@ -285,21 +408,45 @@ class DemoSeed(
             } else {
                 Duration.ZERO
             }
-            // The promotions are still CREATED before the validations, whatever the times say.
-            // `AutoPromotionEventListener` promotes a build the moment a run completes the set a
-            // level names, and it stamps that run with the time of the call rather than with the
-            // time of the validation - so seeding the runs first would hand the demo a second,
-            // same-level promotion dated at the reset, which is the very reading this is fixing.
-            buildSpec.promotionLevels.forEachIndexed { index, promotionLevel ->
-                build.promote(promotionLevel, "", creation.plus(step.multipliedBy(validationCount + index + 1L)))
+            // On a branch with an auto promotion, the promotions are still CREATED before the
+            // validations, whatever the times say. `AutoPromotionEventListener` promotes a build the
+            // moment a run completes the set a level names, and it stamps that run with the time of
+            // the call rather than with the time of the validation - so seeding the runs first would
+            // hand the demo a second, same-level promotion dated at the reset, which is the very
+            // reading this is fixing.
+            //
+            // Everywhere else they come after, as they would in a real pipeline: the trail of a
+            // build records its changes in the order they are made, whatever times they claim, and
+            // a trail where a build is promoted to GOLD before any of its validations ran is the
+            // wrong story to tell an auditor.
+            val promote = {
+                buildSpec.promotionLevels.forEachIndexed { index, promotionLevel ->
+                    build.promote(promotionLevel, "", creation.plus(step.multipliedBy(validationCount + index + 1L)))
+                }
             }
+            if (promotionsFirst) promote()
             buildSpec.validations.forEachIndexed { index, validation ->
-                build.validate(
+                val run = build.validate(
                     validation.validationStamp,
                     validation.status,
                     validation.description,
                     creation.plus(step.multipliedBy(index + 1L)),
                 )
+                // Posted by the pipeline with the run, the evidence comes first; a person then looks
+                // at the run, which is when its status changes and a file attached by mistake goes
+                val attached = if (evidence) {
+                    validation.evidence.map { spec ->
+                        log("Attaching ${spec.fileName} to ${validation.validationStamp} of ${projectSpec.name}/${buildSpec.name}")
+                        spec to run.attachEvidence(spec, EvidenceFiles.content(spec.resource))
+                    }
+                } else {
+                    emptyList()
+                }
+                validation.statusChanges.forEach { run.changeStatus(it) }
+                attached.filter { (spec, _) -> spec.deleted }.forEach { (spec, attachedEvidence) ->
+                    log("Deleting the evidence ${spec.fileName} of ${validation.validationStamp} of ${projectSpec.name}/${buildSpec.name}")
+                    attachedEvidence.delete()
+                }
             }
             // In the order they are declared, each on its own rung: a failed run followed by a passed
             // one of the same stamp is what makes the build flaky, and the order of the runs is all
@@ -319,7 +466,9 @@ class DemoSeed(
                     ),
                 )
             }
+            if (!promotionsFirst) promote()
         }
+        return branch
     }
 
     // validate() has already ruled out a reference the dataset does not create.

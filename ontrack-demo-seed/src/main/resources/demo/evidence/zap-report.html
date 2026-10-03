@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>ZAP baseline scan - audit-trail-demo 2.4.0</title>
+</head>
+<body>
+<h1>ZAP baseline scan</h1>
+<p>Target: https://staging.example.com/audit-trail-demo - ZAP 2.15.0, passive scan only.</p>
+<table>
+<tr><th>Risk</th><th>Alerts</th></tr>
+<tr><td>High</td><td>0</td></tr>
+<tr><td>Medium</td><td>0</td></tr>
+<tr><td>Low</td><td>2</td></tr>
+<tr><td>Informational</td><td>3</td></tr>
+</table>
+<h2>Low</h2>
+<ul>
+<li>Cookie without SameSite attribute (demonstration data)</li>
+<li>Server leaks version information via the "Server" header (demonstration data)</li>
+</ul>
+<p>An HTML report: Yontrack never renders it, it is downloaded. Demonstration data, generated for the Yontrack demo.</p>
+</body>
+</html>

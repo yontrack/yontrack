@@ -88,6 +88,25 @@ interface DemoTarget {
     fun checkScorecardLicensed()
 
     /**
+     * Why the instance cannot offer [capability], or `null` when it can.
+     *
+     * Asked before the reset, and read-only: unlike [checkScmAvailable], a missing capability does
+     * not stop the reset - the part of the dataset needing it is skipped, and the answer is what the
+     * log says about it. It has to be the actual reason, worded for whoever reads the log of a
+     * deployment: "the storage is NOT_CONFIGURED", not "unavailable".
+     */
+    fun unavailable(capability: DemoCapability): String?
+
+    /**
+     * Generates an API token named [name] for the account the seed runs as, revoking first any
+     * token of that name - one an interrupted run left behind, since a name is unique per account.
+     *
+     * The token is an administrator's, like the account's: the seed revokes it once the dataset is
+     * seeded.
+     */
+    fun openToken(name: String): DemoToken
+
+    /**
      * Every estate of the delivery scorecard on the instance - none when the instance is not
      * licensed for them. An estate names labels, and the server refuses to delete a label an estate
      * selects its projects by, so the reset deletes the estates first.
@@ -101,6 +120,16 @@ interface DemoTarget {
      * name unless the UUID matches, so the seed always names a fixed one.
      */
     fun saveDashboard(dashboard: DemoDashboard)
+}
+
+/**
+ * An API token the seed generated, through which builds are created - see [BuildSpec.token].
+ */
+interface DemoToken {
+    val name: String
+
+    /** Revokes the token: nothing created through it can be changed through it any more. */
+    fun revoke()
 }
 
 interface DemoEstate {
@@ -224,7 +253,19 @@ interface DemoBranch {
      * reads.
      */
     fun setPreviousPromotionCondition(promotionLevel: String, required: Boolean)
-    fun createBuild(name: String, description: String, creation: LocalDateTime): DemoBuild
+
+    /**
+     * @param token Token the build is created through, and everything done to it through the
+     * returned handle - its properties, validations, evidence, promotions and links. The account
+     * the seed runs as otherwise.
+     */
+    fun createBuild(name: String, description: String, creation: LocalDateTime, token: DemoToken? = null): DemoBuild
+
+    /**
+     * Deletes a validation stamp of this branch, and its runs with it - see
+     * [ValidationStampSpec.deleted].
+     */
+    fun deleteValidationStamp(name: String)
 }
 
 interface DemoBuild {
@@ -244,7 +285,7 @@ interface DemoBuild {
      * of the reset reads as having happened seconds ago whatever the age of the build it names, and
      * on a delivery map that puts the stamp *after* the promotion it granted (#1718).
      */
-    fun validate(validationStamp: String, status: ValidationStatus, description: String, at: LocalDateTime)
+    fun validate(validationStamp: String, status: ValidationStatus, description: String, at: LocalDateTime): DemoValidationRun
 
     /**
      * Posts the report of a security scan on a `security-findings` stamp, dated at [at] for the
@@ -273,6 +314,43 @@ interface DemoBuild {
      * it starts or stops.
      */
     fun setCommit(commitId: String)
+
+    /**
+     * Rewrites an entry of the trail of this build, through the demonstration tampering endpoint,
+     * as the account the seed runs as.
+     *
+     * @throws IllegalStateException When the entry at [TamperingSpec.seq] is not of
+     * [TamperingSpec.type]
+     */
+    fun tamper(spec: TamperingSpec)
+}
+
+/**
+ * A validation run the seed has just created.
+ */
+interface DemoValidationRun {
+
+    /**
+     * Attaches a file to the run as its evidence, through the token the build was created with,
+     * when it was.
+     *
+     * @param content Content of the file
+     */
+    fun attachEvidence(spec: EvidenceSpec, content: ByteArray): DemoEvidence
+
+    /**
+     * Gives the run a new status, as the account the seed runs as: a person looking at the run.
+     */
+    fun changeStatus(change: StatusChangeSpec)
+}
+
+/**
+ * An evidence the seed has attached.
+ */
+interface DemoEvidence {
+
+    /** Deletes the evidence, as the account the seed runs as. */
+    fun delete()
 }
 
 interface DemoEnvironment {
@@ -289,8 +367,15 @@ interface DemoSlot {
      *
      * @param times When each step happens, `null` for a deployment happening at the reset
      * @param message Why a failed deployment failed, or why a cancelled one was cancelled
+     * @param overrides Admission rules overridden once the deployment is created, before it starts
      */
-    fun deploy(build: DemoBuild, stopAt: DeploymentStop, times: DeploymentTimes?, message: String?)
+    fun deploy(
+        build: DemoBuild,
+        stopAt: DeploymentStop,
+        times: DeploymentTimes?,
+        message: String?,
+        overrides: List<RuleOverrideSpec> = emptyList(),
+    )
 
     /**
      * Configures an admission rule on this slot.

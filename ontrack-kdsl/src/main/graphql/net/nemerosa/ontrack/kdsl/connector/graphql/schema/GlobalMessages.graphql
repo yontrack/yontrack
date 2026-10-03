@@ -1,0 +1,6 @@
+query GlobalMessages {
+    globalMessages {
+        type
+        content
+    }
+}

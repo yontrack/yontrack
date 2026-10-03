@@ -14,7 +14,9 @@ they outlive a project deletion: a label is global and carried by several projec
 deleting every project leaves every label behind.
 
 The token it runs with needs admin-level rights: it deletes projects, manages environments
-and labels (`LabelManagement`) and shares a dashboard (`DashboardSharing`).
+and labels (`LabelManagement`) and shares a dashboard (`DashboardSharing`). It also generates a
+second token for its own account, `ci-demo`, which the audit trail demo is created through, and
+revokes it at the end of the reset - see [The audit trail](#the-audit-trail) below.
 
 ## Running it
 
@@ -76,6 +78,40 @@ A licensed feature is needed as well, for the same reason:
 Unlike the two properties, a missing licence is caught before the reset: the seed reads the
 licence of the instance through `licenseInfo` and stops with "Nothing was deleted" when a
 feature is not enabled, as it does when the mock SCM is off.
+
+The audit trail is the exception: what it needs does **not** stop the reset. Each piece is asked
+before anything is deleted, and when the instance cannot offer it the part of the demo needing it
+is left out, with a `Leaving out ...` line in the log saying why:
+
+| What | Needed by | Without it |
+|------|-----------|------------|
+| The licensed feature `extension.audit-trail` | `audit-trail-demo` and `audit-trail-tampered` | Both projects are left out, with their slots and deployments |
+| An evidence storage in state `OK` (`auditTrailStorageState`) - the `ontrack.extension.audit-trail.storage.*` properties, `auditTrail.storage.*` in the chart | The evidence of both projects | The evidence is left out; the rest of both projects is seeded |
+| The demonstration tampering switch, `ontrack.extension.audit-trail.demo-tampering.enabled` (`ONTRACK_EXTENSION_AUDITTRAIL_DEMOTAMPERING_ENABLED`) | `audit-trail-tampered` | The project is left out |
+| `/rest/extension/audit-trail/` routed to the backend | The evidence, which is uploaded as `multipart/form-data`, and the tampering, which is a REST end point | Both are left out, as above |
+
+The switch is seen from outside through the permanent error message it raises, and the REST route
+by asking `GET /rest/extension/audit-trail/keys` for the public keys: anything but a JSON array is
+an ingress sending the call to the Next UI.
+
+**The deployed instances do not route it yet.** The chart's ingress
+(`charts/yontrack/templates/ingress.yaml` in `yontrack/yontrack-chart`) sends `/graphql` and
+`/hook` to the backend and everything else to the Next UI, so on v6.dev the seed leaves out the
+evidence and `audit-trail-tampered` whatever the storage and the switch say. What is missing is a
+`/rest/extension/audit-trail` path to the backend service in that template - which is also what a
+pipeline posting evidence from outside the cluster needs, demo or not. It is a change of the chart,
+not of this repository.
+
+Never turn the switch on for an instance tracking real deliveries: while it is on, every trail of
+the instance proves nothing, and every page says so. The local dev stack leaves it off too; to see
+the tampered project locally, restart the backend with it:
+
+```bash
+ONTRACK_EXTENSION_AUDITTRAIL_DEMOTAMPERING_ENABLED=true scripts/dev-stack.sh restart backend
+```
+
+`scripts/dev-stack.sh` passes its environment on to the backend, and the dev stack has its MinIO,
+so the whole audit trail demo is then seeded.
 
 A third one is optional, and only on a long-lived instance:
 
@@ -219,11 +255,13 @@ promotion it granted (#1718).
 
 Two things bound the ladder. It is squeezed into whatever time the build actually has behind it —
 the newest build of the dataset is hours old, and an hour per step would date its top rungs in the
-future, which reads as a defect in Yontrack rather than in the dataset. And the promotion runs are
-still *created* before the validation runs, whatever their times say: `AutoPromotionEventListener`
-promotes a build the moment a run completes the set a level names, stamping that promotion with the
-time of the call, so seeding the runs first would add a second same-level promotion dated at the
-reset.
+future, which reads as a defect in Yontrack rather than in the dataset. And on a branch with an auto
+promotion, the promotion runs are still *created* before the validation runs, whatever their times
+say: `AutoPromotionEventListener` promotes a build the moment a run completes the set a level names,
+stamping that promotion with the time of the call, so seeding the runs first would add a second
+same-level promotion dated at the reset. Everywhere else the validations are created first, as a
+pipeline does it: the trail of a build records its changes in the order they are made, and a trail
+reading "promoted to GOLD, then validated" is the wrong story (#1970).
 
 `DemoSeedTest.nothing of the demo is dated after the reset which created it` pins the bounds for
 builds, promotions and validations alike.
@@ -397,6 +435,38 @@ production, and staging then takes another build, is a sequence no per-slot fiel
 express. `InMemoryDemoTarget` enforces the admission rules as the server does, so an order
 the server would refuse fails in the unit tests rather than half-way through a real reset.
 
+### The audit trail
+
+Two projects show the audit trail (#1970), and `DemoAuditTrailSeedTest` pins what each shows:
+
+- **`audit-trail-demo`**: build `121` (2.4.0) is created, given its properties, validated with its
+  evidence, promoted and linked through the `ci-demo` token (`BuildSpec.token`), which is what its
+  trail shows as the actor of those entries. A person - the account the seed runs as - then gives
+  the failed `UNIT.TESTS` run the status FIXED with a comment (`ValidationSpec.statusChanges`;
+  Yontrack does not allow FAILED to PASSED, FIXED is the passed status a failed run can be given),
+  deletes a log attached by mistake (`EvidenceSpec.deleted`), and deploys the build to staging, then
+  to production, overriding the change approval there (`DeploymentSpec.overrides`). Last,
+  `LEGACY.LINT` is deleted (`ValidationStampSpec.deleted`), and both builds of the project record
+  `validation.deleted` with the reason `cascade/validation-stamp-deleted`.
+- **`audit-trail-tampered`**: build `7`, whose fourth entry - the FAILED scan - is rewritten as PASSED
+  once everything is seeded (`BuildSpec.tampering`). Its verification breaks at seq 4.
+
+The evidence files are in `src/main/resources/demo/evidence`: small, written or generated once and
+committed, so that their digests are the same on every reset. One of each kind the evidence table
+handles - a PDF and a PNG shown inline, a CycloneDX SBOM in JSON and a JUnit summary in plain text,
+an HTML ZAP report which the server only ever serves as a download - and no real data in any of
+them.
+
+The entries are numbered by the server, in the order the seed makes its calls - and the backdating
+of a build is a call of its own, so every build's trail starts with `build.created` then
+`build.updated`. A tampering therefore names the type of entry it expects as well as its seq, and
+the seed refuses to rewrite anything else. `InMemoryDemoTarget` writes the trails in the same order,
+which is what lets the unit tests check that seq 4 is the scan.
+
+`ProjectSpec.requires` and `DemoTarget.unavailable` are what leave a project out on an instance
+which cannot offer what it needs - see [What the target instance must have](#what-the-target-instance-must-have).
+A project which may be left out is not linked to from another one: `validate` refuses it.
+
 ## How it is put together
 
 | Piece               | Role                                                                  |
@@ -410,6 +480,7 @@ the server would refuse fails in the unit tests rather than half-way through a r
 | `DemoSeedConfig`    | Environment variables, and the URL guard.                              |
 | `DemoDatasetValidation` | Rejects a bad dataset before the reset deletes anything.           |
 | `FindingsReports`   | Renders the report of a security scan, in the neutral format or in SARIF. |
+| `EvidenceFiles`     | The files the dataset attaches as evidence, from the module's resources. |
 
 The `DemoTarget` seam is what makes the acceptance criterion testable: the unit tests run
 the whole seed twice against an in-memory instance and compare the two states, with no

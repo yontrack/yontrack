@@ -112,6 +112,15 @@ fun DemoDataset.validate() {
             // such a name - it is exactly what the delivery map draws as an unresolved checkpoint,
             // see #1705 - but curated content must not carry one: nobody looking at the demo can
             // tell a deliberate one from a mistake.
+            // A deleted stamp takes its runs with it, and an auto promotion naming it would name an
+            // entity which is gone by the end of the reset
+            val deletedStamps = branch.validationStamps.filter { it.deleted }.map { it.name }.toSet()
+            branch.promotionLevels.forEach { promotionLevel ->
+                promotionLevel.autoPromotion?.validationStamps?.filter { it in deletedStamps }?.forEach { stamp ->
+                    problems += "Promotion level ${promotionLevel.name} of ${project.name}/${branch.name} is " +
+                            "auto promoted by $stamp, which the dataset deletes."
+                }
+            }
             branch.promotionLevels.forEach { promotionLevel ->
                 val where = "Promotion level ${promotionLevel.name} of ${project.name}/${branch.name}"
                 promotionLevel.dependsOn.forEach { dependency ->
@@ -200,6 +209,56 @@ fun DemoDataset.validate() {
                     }
                     promoted += promotionLevel
                 }
+                if (build.token != null && !TOKEN_NAME.matches(build.token)) {
+                    problems += "Build ${build.name} of ${project.name}/${branch.name} is created through " +
+                            "the token \"${build.token}\"; a token name has letters, digits, dots, dashes " +
+                            "or underscores only."
+                }
+                build.tampering?.let { tampering ->
+                    val where = "Build ${build.name} of ${project.name}/${branch.name}"
+                    // Without the switch the project is left out; without the requirement it would
+                    // be seeded, and the reset would fail on the tampering, at its very end
+                    if (DemoCapability.TRAIL_TAMPERING !in project.requires) {
+                        problems += "$where tampers with its trail, but ${project.name} does not require " +
+                                "${DemoCapability.TRAIL_TAMPERING.display}."
+                    }
+                    if (tampering.seq < 1) {
+                        problems += "$where tampers with the entry ${tampering.seq} of its trail; entries " +
+                                "are numbered from 1."
+                    }
+                    if (tampering.payload.isEmpty()) {
+                        problems += "$where tampers with the entry ${tampering.seq} of its trail, and " +
+                                "changes nothing in it."
+                    }
+                }
+                build.validations.forEach { validation ->
+                    val where = "The ${validation.validationStamp} validation of build ${build.name} of " +
+                            "${project.name}/${branch.name}"
+                    if (!isInitialStatus(validation.status)) {
+                        problems += "$where is created ${validation.status}, which is only a status a run " +
+                                "is given afterwards."
+                    }
+                    validation.statusChanges.fold(validation.status) { from, change ->
+                        if (!statusChangeAllowed(from, change.status)) {
+                            problems += "$where goes from $from to ${change.status}, which Yontrack does not allow."
+                        }
+                        change.status
+                    }
+                    validation.evidence.forEach { evidence ->
+                        if (evidence.fileName.isBlank() || '/' in evidence.fileName || '\\' in evidence.fileName) {
+                            problems += "$where attaches an evidence named \"${evidence.fileName}\"; " +
+                                    "an evidence is named by a file name, not a path."
+                        }
+                        if (!MEDIA_TYPE.matches(evidence.mediaType)) {
+                            problems += "$where attaches ${evidence.fileName} as \"${evidence.mediaType}\", " +
+                                    "which is not a type/subtype media type."
+                        }
+                        if (!EvidenceFiles.exists(evidence.resource)) {
+                            problems += "$where attaches ${evidence.fileName} from ${evidence.resource}, " +
+                                    "which is not in the evidence files of the demo seed."
+                        }
+                    }
+                }
                 if (build.commits.isNotEmpty() && branch.scmBranch == null) {
                     problems += "Build ${build.name} of ${project.name}/${branch.name} declares " +
                             "commits, but the branch follows no SCM branch."
@@ -278,12 +337,21 @@ fun DemoDataset.validate() {
         }
     }
 
+    // A project requiring a capability may be left out of the reset, and a link to one of its builds
+    // would then point at nothing - from another project, that is: its own links go with it
+    val optionalProjects = projects.filter { it.requires.isNotEmpty() }.map { it.name }.toSet()
+
     // Links and deployments point at builds by name, and are only resolvable once every
     // project has been walked.
     projects.forEach { project ->
         project.branches.forEach { branch ->
             branch.builds.forEach { build ->
                 build.links.forEach { ref ->
+                    if (ref.project in optionalProjects && ref.project != project.name) {
+                        problems += "Build ${build.name} of ${project.name}/${branch.name} uses " +
+                                "${ref.build} of ${ref.project}, which is left out of the reset on an " +
+                                "instance which cannot offer what it requires."
+                    }
                     if (ref !in buildRefs) {
                         problems += "Build ${build.name} of ${project.name}/${branch.name} " +
                                 "uses ${ref.build} of ${ref.project}/${ref.branch}, " +
@@ -368,7 +436,15 @@ fun DemoDataset.validate() {
 
             else -> {
                 val build = builds.getValue(ref)
-                slot.admissionRules.forEach { rule ->
+                val overridden = deployment.overrides.map { it.rule }.toSet()
+                slot.admissionRules.filter { it.name !in overridden }.forEach { rule ->
+                    // Nothing in the dataset answers an approval: unless it is overridden, a manual
+                    // rule leaves the deployment a candidate whatever it was asked to be
+                    if (rule.ruleId == SlotAdmissionRules.MANUAL) {
+                        problems += "The ${deployment.environment}/${ref.project} slot waits for the " +
+                                "approval ${rule.name}, and ${ref.build} is deployed past it without " +
+                                "overriding it."
+                    }
                     val required = rule.config["promotion"] as? String
                     if (rule.ruleId == SlotAdmissionRules.PROMOTION && required != null &&
                         required !in build.promotionLevels
@@ -383,6 +459,25 @@ fun DemoDataset.validate() {
                     }
                 }
             }
+        }
+    }
+
+    deployments.forEach { deployment ->
+        val ref = deployment.build
+        val slot = environments.find { it.name == deployment.environment }
+            ?.slots?.find { it.project == ref.project && it.qualifier == deployment.qualifier }
+            ?: return@forEach
+        deployment.overrides.forEach { override ->
+            if (slot.admissionRules.none { it.name == override.rule }) {
+                problems += "A deployment of ${ref.build} on ${deployment.environment}/${ref.project} " +
+                        "overrides the admission rule ${override.rule}, which the slot does not have."
+            }
+        }
+        if (deployment.overrides.isNotEmpty() &&
+            (deployment.stopAt == DeploymentStop.CANDIDATE || deployment.stopAt == DeploymentStop.CANCELLED)
+        ) {
+            problems += "A deployment of ${ref.build} on ${deployment.environment}/${ref.project} " +
+                    "overrides admission rules, and never starts: an override is for a deployment which does."
         }
     }
 
@@ -501,3 +596,14 @@ private val ENTITY_NAME = Regex("[A-Za-z0-9._-]+")
  * an issues section that silently stays empty.
  */
 private val ISSUE_KEY = Regex("[A-Z]+-\\d+")
+
+/**
+ * What the dataset names its tokens by. The server takes any name; the dataset keeps to the names
+ * of its entities, because the name is what the trail shows as the actor, `token:<name>`.
+ */
+private val TOKEN_NAME = Regex("[A-Za-z0-9._-]+")
+
+/**
+ * A `type/subtype` media type, without parameters - what the server keeps of a declared one.
+ */
+private val MEDIA_TYPE = Regex("[a-z0-9][a-z0-9.+-]*/[a-z0-9][a-z0-9.+-]*")

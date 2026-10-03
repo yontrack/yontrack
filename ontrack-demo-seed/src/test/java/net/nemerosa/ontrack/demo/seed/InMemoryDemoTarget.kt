@@ -30,7 +30,17 @@ class InMemoryDemoTarget(
      * models an instance whose licence does not.
      */
     private val scorecardLicensed: Boolean = true,
+    /**
+     * What the instance does not offer, with the reason [unavailable] gives. Everything is offered
+     * by default, as on the local dev stack with its storage and the tampering switch on.
+     */
+    private val unavailableCapabilities: Map<DemoCapability, String> = emptyMap(),
 ) : DemoTarget {
+
+    /**
+     * Names of the API tokens of the seeding account which are still valid.
+     */
+    val tokens = mutableSetOf<String>()
 
     private val projects = mutableListOf<InMemoryProject>()
 
@@ -101,6 +111,25 @@ class InMemoryDemoTarget(
         journal += "environment $name"
         return InMemoryEnvironment(name, order, description, tags).also { environments += it }
     }
+
+    override fun unavailable(capability: DemoCapability): String? = unavailableCapabilities[capability]
+
+    override fun openToken(name: String): DemoToken {
+        tokens -= name
+        tokens += name
+        return InMemoryToken(name)
+    }
+
+    inner class InMemoryToken(override val name: String) : DemoToken {
+        override fun revoke() {
+            tokens -= name
+        }
+    }
+
+    /**
+     * Whether the trails are written: only while the licence allows the audit trail.
+     */
+    private val trailsWritten: Boolean get() = DemoCapability.AUDIT_TRAIL !in unavailableCapabilities
 
     override fun checkScmAvailable() {
         check(scmEnabled) { "The mock SCM is not enabled on this instance. Nothing was deleted." }
@@ -176,12 +205,20 @@ class InMemoryDemoTarget(
                     branch.findingsStamps[stamp]?.let { add("      findings $it") }
                     branch.chmlStamps[stamp]?.let { add("      chml $it") }
                 }
+                branch.deletedValidationStamps.forEach { add("    deleted validation stamp $it") }
                 branch.builds.forEach { build ->
                     add("    build ${build.name} \"${build.description}\" at ${build.creation}")
+                    build.token?.let { add("      through the token ${it.name}") }
                     build.releaseVersion?.let { add("      release $it") }
                     build.commitId?.let { add("      built from $it") }
                     build.promotions.forEach { add("      promotion ${it.first} at ${it.second}") }
-                    build.validations.forEach { add("      validation ${it.stamp} ${it.status} at ${it.at}") }
+                    build.validations.forEach { validation ->
+                        add("      validation ${validation.stamp} ${validation.status} at ${validation.at}")
+                        validation.statusChanges.forEach { add("        status ${it.status} \"${it.description}\"") }
+                        validation.evidence.forEach {
+                            add("        evidence ${it.spec.fileName} ${it.spec.mediaType} ${it.sha256}" + if (it.deleted) " deleted" else "")
+                        }
+                    }
                     build.testRuns.forEach {
                         add("      tests ${it.run.validationStamp} ${it.run.passed}/${it.run.skipped}/${it.run.failed} ${it.status} at ${it.at}")
                     }
@@ -190,6 +227,7 @@ class InMemoryDemoTarget(
                         add("        report ${scan.report}")
                     }
                     build.links.forEach { add("      uses ${it.branch.project.name}/${it.name}") }
+                    build.trail.forEach { add("      trail $it") }
                 }
             }
         }
@@ -200,6 +238,7 @@ class InMemoryDemoTarget(
                 slot.admissionRules.forEach { add("    rule ${it.name} ${it.ruleId} ${it.config}") }
                 slot.workflows.forEach { add("    workflow on ${it.trigger}: ${it.yaml.lines().first()}") }
                 slot.deployments.forEach {
+                    it.overrides.forEach { override -> add("    overriding ${override.rule} \"${override.message}\"") }
                     val what = when (it.stopAt) {
                         DeploymentStop.DONE -> "deployed"
                         DeploymentStop.FAILED -> "failed"
@@ -219,6 +258,7 @@ class InMemoryDemoTarget(
         scmRepositories.keys
             .filter { name -> projects.none { it.scmRepositoryName == name } }
             .forEach { add("orphan scm $it") }
+        tokens.sorted().forEach { add("token $it") }
         estates.forEach { held ->
             val estate = held.spec
             add("estate ${estate.name} \"${estate.description}\" ${estate.labels} ${estate.marker}")
@@ -349,6 +389,7 @@ class InMemoryDemoTarget(
 
         val promotionLevels = mutableListOf<String>()
         val validationStamps = mutableListOf<String>()
+        val deletedValidationStamps = mutableListOf<String>()
         /** Thresholds of the `security-findings` stamps, by name. */
         val findingsStamps = mutableMapOf<String, FindingsThresholdsSpec>()
         /** The `tests` stamps, of the test summary data type. */
@@ -451,11 +492,43 @@ class InMemoryDemoTarget(
             }
         }
 
-        override fun createBuild(name: String, description: String, creation: LocalDateTime): DemoBuild {
+        override fun createBuild(name: String, description: String, creation: LocalDateTime, token: DemoToken?): DemoBuild {
             checkName(name, "Build")
             require(builds.none { it.name == name }) { "Build $name already exists in ${project.name}/${this.name}" }
-            return InMemoryBuild(this, name, description, creation).also { builds += it }
+            token?.let { requireValid(it) }
+            return InMemoryBuild(this, name, description, creation, token).also { build ->
+                builds += build
+                // Two calls, as the seed makes them: Yontrack stamps a build with the time it is
+                // created, and the seed backdates it in a second one - which its trail records
+                build.entry("build.created")
+                build.entry("build.updated", "creation" to creation)
+            }
         }
+
+        /**
+         * As the server does: the runs of the stamp go with it, and each of their builds records it.
+         */
+        override fun deleteValidationStamp(name: String) {
+            require(name in validationStamps) { "No validation stamp $name in ${project.name}/${this.name}" }
+            builds.forEach { build ->
+                build.validations.filter { it.stamp == name }.forEach { run ->
+                    build.validations -= run
+                    build.entry(
+                        "validation.deleted",
+                        "validationStamp" to name,
+                        "status" to run.status,
+                        "reason" to "cascade/validation-stamp-deleted",
+                        actor = SEED_ACTOR,
+                    )
+                }
+            }
+            validationStamps -= name
+            deletedValidationStamps += name
+        }
+    }
+
+    private fun requireValid(token: DemoToken) {
+        check(token.name in tokens) { "The token ${token.name} is revoked" }
     }
 
     inner class InMemoryBuild(
@@ -463,7 +536,36 @@ class InMemoryDemoTarget(
         override val name: String,
         val description: String,
         val creation: LocalDateTime,
+        /** What the build was created through, and what everything done through this handle is. */
+        val token: DemoToken? = null,
     ) : DemoBuild {
+
+        /**
+         * The trail of the build, as the server writes it - only while the licence allows it.
+         */
+        val trail = mutableListOf<InMemoryEntry>()
+
+        /**
+         * The actor of what is done through this handle: the token of the build, or the account the
+         * seed runs as. A revoked token is refused, as the server refuses it.
+         */
+        private val actor: String
+            get() = token?.let {
+                requireValid(it)
+                "token:${it.name}"
+            } ?: SEED_ACTOR
+
+        fun entry(type: String, vararg payload: Pair<String, Any?>, actor: String = this.actor) {
+            if (trailsWritten) {
+                trail += InMemoryEntry(trail.size + 1, type, actor, payload.toMap())
+            }
+        }
+
+        /**
+         * Position of the first entry of the trail whose payload was rewritten - where its
+         * verification breaks - `null` when none was.
+         */
+        val firstBrokenSeq: Int? get() = trail.firstOrNull { it.tampered }?.seq
 
         var releaseVersion: String? = null
         // Named for its getter, not for the interface: `commit` would clash with setCommit
@@ -477,6 +579,20 @@ class InMemoryDemoTarget(
 
         override fun setRelease(release: String) {
             releaseVersion = release
+            entry("property.set", "propertyType" to "release")
+        }
+
+        override fun tamper(spec: TamperingSpec) {
+            check(DemoCapability.TRAIL_TAMPERING !in unavailableCapabilities) {
+                "The demonstration tampering end point does not exist on this instance"
+            }
+            val index = spec.seq - 1
+            val entry = trail.getOrNull(index)
+                ?: error("The trail of build $name has no entry ${spec.seq} to tamper with")
+            check(entry.type == spec.type) {
+                "Entry ${spec.seq} of the trail of build $name is ${entry.type}, not ${spec.type}"
+            }
+            trail[index] = entry.copy(payload = entry.payload + spec.payload, tampered = true)
         }
 
         override fun promote(promotionLevel: String, description: String, at: LocalDateTime) {
@@ -508,6 +624,7 @@ class InMemoryDemoTarget(
                     }
             }
             promotions += promotionLevel to at
+            entry("promotion.added", "promotionLevel" to promotionLevel)
         }
 
         override fun validate(
@@ -515,7 +632,7 @@ class InMemoryDemoTarget(
             status: ValidationStatus,
             description: String,
             at: LocalDateTime,
-        ) {
+        ): DemoValidationRun {
             require(validationStamp in branch.validationStamps) {
                 "No validation stamp $validationStamp on ${branch.project.name}/${branch.name}"
             }
@@ -528,7 +645,8 @@ class InMemoryDemoTarget(
             require(validationStamp !in branch.testsStamps) {
                 "$validationStamp on ${branch.project.name}/${branch.name} is a tests stamp, and takes the counts of its tests"
             }
-            validations += InMemoryValidation(validationStamp, status, at)
+            entry("validation.run", "validationStamp" to validationStamp, "status" to status)
+            return InMemoryValidation(this, validationStamp, status, at).also { validations += it }
         }
 
         override fun validateWithTests(run: TestRunSpec, at: LocalDateTime) {
@@ -541,6 +659,7 @@ class InMemoryDemoTarget(
             // `TestSummaryValidationConfig.computeStatus`, for a stamp with the default configuration
             val status = if (run.failed > 0) ValidationStatus.FAILED else ValidationStatus.PASSED
             testRuns += InMemoryTestRun(run, status, at)
+            entry("validation.run", "validationStamp" to run.validationStamp, "status" to status)
         }
 
         override fun scan(scan: ScanSpec, report: JsonNode, at: LocalDateTime) {
@@ -552,14 +671,81 @@ class InMemoryDemoTarget(
                 "Findings report format `sarif` needs the licensed feature \"Native scanner formats\""
             }
             scans += InMemoryScan(scan, report, at)
+            entry("validation.run", "validationStamp" to scan.validationStamp)
         }
 
         override fun linkTo(build: DemoBuild) {
             links += build as InMemoryBuild
+            entry("link.added", "target" to "${build.branch.project.name}/${build.name}")
         }
 
         override fun setCommit(commitId: String) {
             this.commitId = commitId
+            entry("property.set", "propertyType" to "commit")
+        }
+    }
+
+    /**
+     * One run of a validation stamp on a build, with the time the seed dated it at — which is
+     * a fact about the demo the same way a promotion's time is (#1718).
+     *
+     * @property status Its last status
+     */
+    inner class InMemoryValidation(
+        val build: InMemoryBuild,
+        val stamp: String,
+        status: ValidationStatus,
+        val at: LocalDateTime,
+    ) : DemoValidationRun {
+
+        var status: ValidationStatus = status
+            private set
+
+        val statusChanges = mutableListOf<StatusChangeSpec>()
+        val evidence = mutableListOf<InMemoryEvidence>()
+
+        override fun attachEvidence(spec: EvidenceSpec, content: ByteArray): DemoEvidence {
+            // The storage is checked on every upload, and nothing is attached without it
+            unavailableCapabilities[DemoCapability.EVIDENCE]?.let { reason -> error("Evidence refused: $reason") }
+            val sha256 = MessageDigest.getInstance("SHA-256").digest(content).joinToString("") { "%02x".format(it) }
+            build.entry("evidence.attached", "validationStamp" to stamp, "fileName" to spec.fileName, "sha256" to sha256)
+            return InMemoryEvidence(this, spec, sha256).also { evidence += it }
+        }
+
+        override fun changeStatus(change: StatusChangeSpec) {
+            require(statusChangeAllowed(status, change.status)) {
+                "[$status] --> [${change.status}] change is not allowed."
+            }
+            status = change.status
+            statusChanges += change
+            build.entry(
+                "validation.status",
+                "validationStamp" to stamp,
+                "status" to change.status,
+                "description" to change.description,
+                actor = SEED_ACTOR,
+            )
+        }
+    }
+
+    inner class InMemoryEvidence(
+        val run: InMemoryValidation,
+        val spec: EvidenceSpec,
+        val sha256: String,
+    ) : DemoEvidence {
+
+        var deleted: Boolean = false
+            private set
+
+        override fun delete() {
+            check(!deleted) { "Evidence ${spec.fileName} is already deleted" }
+            deleted = true
+            run.build.entry(
+                "evidence.deleted",
+                "validationStamp" to run.stamp,
+                "fileName" to spec.fileName,
+                actor = SEED_ACTOR,
+            )
         }
     }
 
@@ -637,7 +823,13 @@ class InMemoryDemoTarget(
          * one mistake it is easy to make is putting them in an order the server refuses,
          * which on a real instance leaves the demo deleted and the slot empty.
          */
-        override fun deploy(build: DemoBuild, stopAt: DeploymentStop, times: DeploymentTimes?, message: String?) {
+        override fun deploy(
+            build: DemoBuild,
+            stopAt: DeploymentStop,
+            times: DeploymentTimes?,
+            message: String?,
+            overrides: List<RuleOverrideSpec>,
+        ) {
             build as InMemoryBuild
             require(build.branch.project == project) {
                 "Cannot deploy ${build.branch.project.name} build on the ${project.name} slot"
@@ -660,10 +852,36 @@ class InMemoryDemoTarget(
             // A candidate is deliberately allowed to be refused - see [DeploymentStop.CANDIDATE].
             // The checks below ask whether the server would let this deployment START, and a
             // candidate never does - nor does one cancelled before it started.
-            if (stopAt != DeploymentStop.CANDIDATE && stopAt != DeploymentStop.CANCELLED) {
-                admissionRules.forEach { rule -> check(rule, build) }
+            overrides.forEach { override ->
+                require(admissionRules.any { it.name == override.rule }) {
+                    "No admission rule ${override.rule} in ${environment.name}/${project.name}"
+                }
             }
-            deployments += InMemoryDeployment(build, stopAt, times, message)
+            if (stopAt != DeploymentStop.CANDIDATE && stopAt != DeploymentStop.CANCELLED) {
+                val overridden = overrides.map { it.rule }.toSet()
+                admissionRules.filter { it.name !in overridden }.forEach { rule -> check(rule, build) }
+            }
+            deployments += InMemoryDeployment(build, stopAt, times, message, overrides)
+            // As `DeploymentTrailEventMapper` writes them, by the account the seed runs as
+            val deployment = "${environment.name}/${project.name}${qualifierSuffix(qualifier)}"
+            fun entry(type: String, vararg payload: Pair<String, Any?>) =
+                build.entry(type, "deployment" to deployment, *payload, actor = SEED_ACTOR)
+            entry("deployment.created")
+            overrides.forEach { entry("deployment.rule-overridden", "rule" to it.rule, "message" to it.message) }
+            when (stopAt) {
+                DeploymentStop.CANDIDATE -> Unit
+                DeploymentStop.CANCELLED -> entry("deployment.cancelled")
+                DeploymentStop.RUNNING -> entry("deployment.running")
+                DeploymentStop.DONE -> {
+                    entry("deployment.running")
+                    entry("deployment.done")
+                }
+
+                DeploymentStop.FAILED -> {
+                    entry("deployment.running")
+                    entry("deployment.failed")
+                }
+            }
         }
 
         private fun check(rule: SlotAdmissionRuleSpec, build: InMemoryBuild) {
@@ -679,6 +897,9 @@ class InMemoryDemoTarget(
                 SlotAdmissionRules.BRANCH_PATTERN -> require(branchIncludedByPattern(build.branch.name, rule.config)) {
                     "$where admits no build of ${build.branch.name}, and ${build.name} is one."
                 }
+
+                // Nothing in the dataset answers an approval, so the deployment waits on it
+                SlotAdmissionRules.MANUAL -> error("$where waits for the approval ${rule.name}, which nobody gave.")
 
                 SlotAdmissionRules.ENVIRONMENT -> {
                     val previousName = rule.config["environmentName"] as? String
@@ -710,23 +931,32 @@ class InMemoryDemoTarget(
         val stopAt: DeploymentStop,
         val times: DeploymentTimes? = null,
         val message: String? = null,
+        val overrides: List<RuleOverrideSpec> = emptyList(),
     )
+
+    /**
+     * One entry of the trail of a build: its type, its actor - `token:<name>`, or [SEED_ACTOR] - and
+     * the part of its payload the tests read.
+     *
+     * @property tampered Whether its payload was rewritten after it was written, which is where the
+     * verification of the trail breaks
+     */
+    data class InMemoryEntry(
+        val seq: Int,
+        val type: String,
+        val actor: String,
+        val payload: Map<String, Any?>,
+        val tampered: Boolean = false,
+    ) {
+        override fun toString(): String =
+            "#$seq $type by $actor $payload" + if (tampered) " (tampered)" else ""
+    }
 
     /**
      * One run of a `tests` stamp on a build, with the status the server computes from its counts.
      */
     data class InMemoryTestRun(
         val run: TestRunSpec,
-        val status: ValidationStatus,
-        val at: LocalDateTime,
-    )
-
-    /**
-     * One run of a validation stamp on a build, with the time the seed dated it at — which is
-     * a fact about the demo the same way a promotion's time is (#1718).
-     */
-    data class InMemoryValidation(
-        val stamp: String,
         val status: ValidationStatus,
         val at: LocalDateTime,
     )
@@ -770,6 +1000,12 @@ class InMemoryDemoTarget(
     }
 
     companion object {
+
+        /**
+         * The actor of what the account the seed runs as does by itself, without a token of the
+         * dataset.
+         */
+        const val SEED_ACTOR = "seed"
 
         /**
          * What Yontrack accepts as an entity name — `NameDescription.NAME` on the server

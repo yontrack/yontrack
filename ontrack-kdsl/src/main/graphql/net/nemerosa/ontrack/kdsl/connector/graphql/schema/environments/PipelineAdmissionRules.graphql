@@ -1,0 +1,14 @@
+query PipelineAdmissionRules(
+    $id: String!,
+) {
+    slotPipelineById(id: $id) {
+        admissionRules {
+            admissionRuleConfig {
+                id
+                name
+                ruleId
+            }
+            overridden
+        }
+    }
+}

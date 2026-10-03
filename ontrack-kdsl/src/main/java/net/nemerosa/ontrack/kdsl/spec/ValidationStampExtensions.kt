@@ -4,6 +4,7 @@ import tools.jackson.databind.JsonNode
 import net.nemerosa.ontrack.json.asJson
 import net.nemerosa.ontrack.kdsl.connector.Connected
 import net.nemerosa.ontrack.kdsl.connector.graphql.convert
+import net.nemerosa.ontrack.kdsl.connector.graphql.schema.DeleteValidationStampByIdMutation
 import net.nemerosa.ontrack.kdsl.connector.graphql.schema.ValidationStampDeletePropertyMutation
 import net.nemerosa.ontrack.kdsl.connector.graphql.schema.ValidationStampGetPropertyQuery
 import net.nemerosa.ontrack.kdsl.connector.graphql.schema.ValidationStampSetPropertyMutation
@@ -77,3 +78,14 @@ fun ValidationStamp.getProperty(
     graphqlConnector.query(
         ValidationStampGetPropertyQuery(id.toInt(), type)
     )?.validationStamp?.properties?.firstOrNull()?.value?.asJson()
+
+/**
+ * Deletes this validation stamp, and its runs with it.
+ */
+fun ValidationStamp.delete() {
+    graphqlConnector.mutate(
+        DeleteValidationStampByIdMutation(id.toInt())
+    ) {
+        it?.deleteValidationStampById?.payloadUserErrors?.convert()
+    }
+}

@@ -34,6 +34,15 @@ object GQLScalarJSON {
     )
 
     /**
+     * Fields exposed even though their name contains a forbidden token, because they never hold a
+     * secret: `tokenName` names an API token - the actor of a trail entry carries it, and the name of
+     * a token is no more secret than the list of tokens an account shows (#1970).
+     */
+    private val allowedFields = setOf(
+        "tokenName",
+    )
+
+    /**
      * The actual type to register
      */
     val TYPE: GraphQLScalarType = GraphQLScalarType.newScalar()
@@ -104,7 +113,9 @@ object GQLScalarJSON {
                                 factory,
                                 properties().asSequence()
                                     .filter { (name, value) ->
-                                        if (value is StringNode || value is NullNode) {
+                                        if (name in allowedFields) {
+                                            true
+                                        } else if (value is StringNode || value is NullNode) {
                                             // Keeping the field only if name not containing any forbidden token
                                             forbiddenFields.none { part ->
                                                 name.contains(part, ignoreCase = true)

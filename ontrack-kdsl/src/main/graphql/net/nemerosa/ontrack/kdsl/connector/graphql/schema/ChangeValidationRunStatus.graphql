@@ -1,0 +1,13 @@
+mutation ChangeValidationRunStatus(
+    $validationRunId: Int!,
+    $validationRunStatusId: String!,
+    $description: String,
+) {
+    changeValidationRunStatus(input: {
+        validationRunId: $validationRunId,
+        validationRunStatusId: $validationRunStatusId,
+        description: $description,
+    }) {
+        ...PayloadUserErrors
+    }
+}

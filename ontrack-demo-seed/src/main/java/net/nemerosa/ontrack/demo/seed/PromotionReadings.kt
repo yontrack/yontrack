@@ -38,7 +38,7 @@ internal fun autoPromotionSelectsStamp(name: String, spec: AutoPromotionSpec): B
  * [validate] refuses anyway, and which reads as a stamp without any data type
  */
 internal fun validationStatusPasses(status: ValidationStatus, stamp: ValidationStampSpec?): Boolean =
-    status == ValidationStatus.PASSED ||
+    status == ValidationStatus.PASSED || status == ValidationStatus.FIXED ||
             (status == ValidationStatus.WARNING && stamp?.chml?.warningPassesAutoPromotion == true)
 
 /**

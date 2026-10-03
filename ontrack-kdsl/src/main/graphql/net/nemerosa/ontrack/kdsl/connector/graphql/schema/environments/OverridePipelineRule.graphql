@@ -1,0 +1,13 @@
+mutation OverridePipelineRule(
+    $pipelineId: String!,
+    $admissionRuleConfigId: String!,
+    $message: String!,
+) {
+    overridePipelineRule(input: {
+        pipelineId: $pipelineId,
+        admissionRuleConfigId: $admissionRuleConfigId,
+        message: $message,
+    }) {
+        ...PayloadUserErrors
+    }
+}

@@ -1,0 +1,12 @@
+mutation GenerateToken(
+    $name: String!,
+) {
+    generateToken(input: {
+        name: $name,
+    }) {
+        ...PayloadUserErrors
+        token {
+            value
+        }
+    }
+}
