@@ -3,6 +3,7 @@ package net.nemerosa.ontrack.extension.audittrail.message
 import io.mockk.every
 import io.mockk.mockk
 import net.nemerosa.ontrack.common.Time
+import net.nemerosa.ontrack.extension.audittrail.AuditTrailConfigProperties
 import net.nemerosa.ontrack.extension.audittrail.AuditTrailExtensionFeature
 import net.nemerosa.ontrack.extension.audittrail.endorsement.InstanceKeyService
 import net.nemerosa.ontrack.extension.audittrail.endorsement.InstanceKeyStatus
@@ -22,19 +23,28 @@ class AuditTrailMessageTest {
     private val licenseControlService = mockk<LicenseControlService>()
     private val evidenceStorageService = mockk<EvidenceStorageService>()
     private val instanceKeyService = mockk<InstanceKeyService>()
+    private val auditTrailConfigProperties = AuditTrailConfigProperties()
 
     private val message = AuditTrailMessage(
         extensionFeature = mockk<AuditTrailExtensionFeature>(relaxed = true),
+        auditTrailConfigProperties = auditTrailConfigProperties,
         auditTrailLicense = AuditTrailLicense(licenseControlService),
         evidenceStorageService = evidenceStorageService,
         instanceKeyService = instanceKeyService,
+    )
+
+    private val tamperingMessage = Message(
+        type = MessageType.ERROR,
+        content = "This instance allows trail tampering for demonstration: its trails prove nothing.",
     )
 
     private fun given(
         licensed: Boolean = true,
         storage: EvidenceStorageState = EvidenceStorageState.OK,
         key: InstanceKeyStatus = InstanceKeyStatus.OK,
+        demoTampering: Boolean = false,
     ) {
+        auditTrailConfigProperties.demoTampering.enabled = demoTampering
         every { licenseControlService.isFeatureEnabled(FEATURE_AUDIT_TRAIL) } returns licensed
         every { evidenceStorageService.status } returns EvidenceStorageStatus(
             state = storage,
@@ -109,5 +119,34 @@ class AuditTrailMessageTest {
             key = InstanceKeyStatus.NOT_PROVISIONED,
         )
         assertEquals(emptyList(), message.globalMessages)
+    }
+
+    @Test
+    fun `Demo tampering is off by default`() {
+        assertEquals(false, AuditTrailConfigProperties().demoTampering.enabled)
+    }
+
+    @Test
+    fun `Permanent error while demo tampering is allowed`() {
+        given(demoTampering = true)
+        assertEquals(listOf(tamperingMessage), message.globalMessages)
+    }
+
+    @Test
+    fun `Demo tampering error first, before the storage and key messages`() {
+        given(
+            demoTampering = true,
+            storage = EvidenceStorageState.NOT_CONFIGURED,
+            key = InstanceKeyStatus.NOT_PROVISIONED,
+        )
+        val messages = message.globalMessages
+        assertEquals(tamperingMessage, messages.first())
+        assertEquals(listOf(MessageType.ERROR, MessageType.WARNING, MessageType.ERROR), messages.map { it.type })
+    }
+
+    @Test
+    fun `Demo tampering error even while the licence is off`() {
+        given(licensed = false, demoTampering = true)
+        assertEquals(listOf(tamperingMessage), message.globalMessages)
     }
 }

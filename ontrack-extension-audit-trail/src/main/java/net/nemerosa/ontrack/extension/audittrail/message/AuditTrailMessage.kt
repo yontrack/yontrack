@@ -1,6 +1,7 @@
 package net.nemerosa.ontrack.extension.audittrail.message
 
 import net.nemerosa.ontrack.extension.api.GlobalMessageExtension
+import net.nemerosa.ontrack.extension.audittrail.AuditTrailConfigProperties
 import net.nemerosa.ontrack.extension.audittrail.AuditTrailExtensionFeature
 import net.nemerosa.ontrack.extension.audittrail.endorsement.InstanceKeyService
 import net.nemerosa.ontrack.extension.audittrail.endorsement.InstanceKeyStatus
@@ -13,9 +14,13 @@ import net.nemerosa.ontrack.model.message.MessageType
 import org.springframework.stereotype.Component
 
 /**
- * Global messages of the audit trail, shown to everybody, only while the licence is on: the
- * evidence storage which is not configured or unreachable, and the instance key which is not
- * provisioned.
+ * Global messages of the audit trail, shown to everybody:
+ *
+ * - while the demonstration tampering is allowed, a permanent error, whatever the licence: the
+ *   trails already written can be tampered with and are still shown and exported after the licence
+ *   lapses;
+ * - only while the licence is on, the evidence storage which is not configured or unreachable, and
+ *   the instance key which is not provisioned.
  *
  * The messages do not say why: the reason, which may name hosts and buckets, is on the audit
  * trail status page, for the administrators.
@@ -23,16 +28,28 @@ import org.springframework.stereotype.Component
 @Component
 class AuditTrailMessage(
     extensionFeature: AuditTrailExtensionFeature,
+    private val auditTrailConfigProperties: AuditTrailConfigProperties,
     private val auditTrailLicense: AuditTrailLicense,
     private val evidenceStorageService: EvidenceStorageService,
     private val instanceKeyService: InstanceKeyService,
 ) : AbstractExtension(extensionFeature), GlobalMessageExtension {
 
     override val globalMessages: List<Message>
-        get() = if (auditTrailLicense.auditTrailEnabled) {
-            listOfNotNull(storageMessage(), keyMessage())
+        get() = listOfNotNull(demoTamperingMessage()) +
+                if (auditTrailLicense.auditTrailEnabled) {
+                    listOfNotNull(storageMessage(), keyMessage())
+                } else {
+                    emptyList()
+                }
+
+    private fun demoTamperingMessage(): Message? =
+        if (auditTrailConfigProperties.demoTampering.enabled) {
+            Message(
+                type = MessageType.ERROR,
+                content = "This instance allows trail tampering for demonstration: its trails prove nothing.",
+            )
         } else {
-            emptyList()
+            null
         }
 
     private fun storageMessage(): Message? =

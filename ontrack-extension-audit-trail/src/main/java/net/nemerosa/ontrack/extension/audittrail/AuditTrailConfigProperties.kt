@@ -14,13 +14,18 @@ import org.springframework.util.unit.DataUnit
 @ConfigurationProperties(prefix = AuditTrailConfigProperties.PREFIX)
 @Component
 @APIName("Audit trail configuration")
-@APIDescription("Configuration of the audit trail, and of the storage of its evidence.")
+@APIDescription("Configuration of the audit trail, of the storage of its evidence, and of the demonstration tampering switch.")
 class AuditTrailConfigProperties {
 
     /**
      * Storage of the evidence
      */
     var storage = StorageProperties()
+
+    /**
+     * Tampering with the trails, for demonstration only
+     */
+    var demoTampering = DemoTamperingProperties()
 
     /**
      * Storage of the evidence: an S3-compatible bucket — MinIO, AWS S3, DigitalOcean Spaces...
@@ -66,11 +71,34 @@ class AuditTrailConfigProperties {
             )
     }
 
+    /**
+     * Tampering with the trails, for demonstration only (#1969).
+     *
+     * When enabled, a global administrator may rewrite the payload of any entry of any trail,
+     * through `PUT /rest/extension/audit-trail/demo-tampering/builds/{buildId}/entries/{seq}/payload`,
+     * so that a demonstration can show a broken chain. When disabled — the default — that endpoint
+     * does not exist at all.
+     */
+    class DemoTamperingProperties {
+
+        @APIDescription(
+            "Allows a global administrator to rewrite the payload of a trail entry through the API, " +
+                    "to demonstrate a broken chain. Never enable it in production: while it is on, the " +
+                    "trails of the instance prove nothing, and every page says so in a permanent error message."
+        )
+        var enabled: Boolean = false
+    }
+
     companion object {
         /**
          * Prefix of the properties of the audit trail
          */
         const val PREFIX = "ontrack.extension.audit-trail"
+
+        /**
+         * Prefix of the properties of the demonstration tampering
+         */
+        const val DEMO_TAMPERING_PREFIX = "$PREFIX.demo-tampering"
 
         /**
          * Default region of the evidence storage, the one MinIO uses

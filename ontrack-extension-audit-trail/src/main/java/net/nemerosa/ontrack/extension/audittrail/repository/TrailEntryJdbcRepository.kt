@@ -66,6 +66,19 @@ class TrailEntryJdbcRepository(
             mapOf("buildId" to buildId)
         ) { rs, _ -> toEntry(rs) }
 
+    override fun findEntry(buildId: Int, seq: Int): TrailEntry? =
+        namedParameterJdbcTemplate.query(
+            "SELECT * FROM BUILD_TRAIL_ENTRY WHERE BUILD_ID = :buildId AND SEQ = :seq",
+            mapOf("buildId" to buildId, "seq" to seq)
+        ) { rs, _ -> toEntry(rs) }.firstOrNull()
+
+    override fun tamperPayload(entryId: Int, canonicalPayload: String) {
+        namedParameterJdbcTemplate.update(
+            "UPDATE BUILD_TRAIL_ENTRY SET PAYLOAD = :payload WHERE ID = :id",
+            mapOf("id" to entryId, "payload" to canonicalPayload)
+        )
+    }
+
     override fun findLastEntryId(): Int? =
         namedParameterJdbcTemplate.queryForObject(
             "SELECT MAX(ID) FROM BUILD_TRAIL_ENTRY",

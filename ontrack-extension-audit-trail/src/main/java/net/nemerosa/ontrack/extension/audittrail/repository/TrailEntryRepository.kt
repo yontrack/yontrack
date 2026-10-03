@@ -58,4 +58,25 @@ interface TrailEntryRepository {
      * @return IDs of the builds having entries whose IDs are in the range, by ID
      */
     fun findBuildIdsWithEntriesBetween(afterEntryId: Int, upToEntryId: Int): List<Int>
+
+    /**
+     * Entry of the trail of a build at a given position.
+     *
+     * @param buildId ID of the build
+     * @param seq Position of the entry
+     * @return Entry, or `null` when the trail has none at this position
+     */
+    fun findEntry(buildId: Int, seq: Int): TrailEntry?
+
+    /**
+     * Replaces the payload of an entry, and nothing else: its hash, its previous hash and its
+     * endorsements are left as they are, so that the verification of the trail breaks at it.
+     *
+     * Only for the demonstration tampering (`DemoTamperingService`): a trail is otherwise never
+     * updated.
+     *
+     * @param entryId ID of the entry
+     * @param canonicalPayload Canonical JSON text of the new payload
+     */
+    fun tamperPayload(entryId: Int, canonicalPayload: String)
 }
