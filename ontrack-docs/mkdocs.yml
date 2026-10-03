@@ -110,6 +110,7 @@ nav:
       - content/scorecard/scorecard.md
       - Estates: content/scorecard/estates.md
       - Estate view: content/scorecard/estate-view.md
+  - Audit trail: content/audit-trail/index.md
   - Dashboards:
       - Overview: content/dashboards/index.md
       - Dashboards as Code: content/dashboards/dashboards-as-code.md

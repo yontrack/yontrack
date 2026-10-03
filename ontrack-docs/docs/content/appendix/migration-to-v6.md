@@ -336,6 +336,32 @@ and be [recorded after the fact](../integrations/environments/environments.md#ba
 `Build.startPipeline`, `SlotPipeline.startDeploying` and `SlotPipeline.finishDeployment` take an
 optional `dateTime`.
 
+### Audit trail
+
+Yontrack 6 records the story of every build in an [audit trail](../audit-trail/index.md), under
+license, with evidence attached to the validation runs. Without the license, nothing is recorded,
+but these changes, which came with it, apply to every installation.
+
+#### For deployers
+
+* **`DEGRADED` health** — the health has a new status, `DEGRADED`, answered with HTTP `200`: a
+  feature does not work while the instance does. The overall status is `DEGRADED` while the
+  license of the audit trail is on and its evidence storage is not configured or cannot be
+  reached. A monitoring which expected only `UP` or `DOWN` must accept it. See
+  [Management port](../operations/management-port.md).
+* **Multipart limits** — `spring.servlet.multipart.max-file-size` and `max-request-size` are raised
+  for every multipart request to the maximum size of an evidence,
+  `ontrack.extension.audit-trail.storage.max-size` (50 MB by default) — plus 1 MB for the request.
+  The multipart requests are parsed only once a controller reads them.
+* **Ingress** — the CI pipelines upload evidence to `/rest/extension/audit-trail`: an ingress which
+  routes only `/graphql` and `/hook` to the backend must route it too. See
+  [Uploading evidence](../audit-trail/index.md#uploading-evidence).
+
+#### For API clients
+
+* **Unknown paths with a token** — a call authenticated by an API token to a path which does not
+  exist now answers `404`, as for any other authenticated caller, where it answered `401`.
+
 ## Removed
 
 Yontrack 6 removes what Yontrack 5 deprecated. Each item is listed here with what to use instead,

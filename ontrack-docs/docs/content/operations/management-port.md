@@ -16,7 +16,7 @@ separate **management port**, `8800` by default, under the `/manage` base path.
 
 | Endpoint              | Purpose                                                     |
 |-----------------------|-------------------------------------------------------------|
-| `/manage/health`      | Overall status (`UP` / `DOWN`), **without** any details     |
+| `/manage/health`      | Overall status (`UP`, `DEGRADED`, `DOWN`...), **without** any details |
 | `/manage/info`        | Application information                                     |
 | `/manage/prometheus`  | Metrics in the Prometheus format                            |
 
@@ -24,6 +24,10 @@ Every other endpoint answers as if it did not exist.
 
 Health only returns its overall status: the details of each component (database,
 RabbitMQ, ...) are not shown to anonymous callers, and the management port has no other kind.
+
+`DEGRADED` says that a feature does not work while the instance does — the evidence storage of
+the [audit trail](../audit-trail/index.md#status-of-the-storage), for example. It is answered with
+HTTP `200`, like `UP`: a probe keeps the instance in service.
 
 !!! note "Changed in 5.5"
 
