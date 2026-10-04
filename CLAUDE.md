@@ -304,8 +304,7 @@ Follow this order for every non-trivial change:
 - **Always** end the message of a commit an agent wrote with its `Co-Authored-By` trailer — the
   attribution line the session gives, e.g. `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
   It is the audit trail of which changes an agent made, and with which model. This overrides any
-  older instruction to leave the trailer out, including the "Never add a `Co-Authored-By` trailer"
-  guardrail in `.claude/skills/run-initiative/SKILL.md`. The trailer goes in the body, so the
+  instruction to leave the trailer out. The trailer goes in the body, so the
   subject stays `#1234 Some message` (plus `[skip ci]` where it applies), and `Co-Authored-By` is
   not an issue-trailer keyword, so it links nothing.
 
