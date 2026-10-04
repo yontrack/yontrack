@@ -218,7 +218,8 @@ configuration:
         DOCUMENTATION: {}
         # A check rather than a publication: the release page is hand-written end-user prose in
         # the wiki, produced before GOLD is granted (#1670), and this records that it is there
-        # and reachable from the index. The GitHub release links to it.
+        # and reachable from the index. The GitHub release links to it. Never reported for a
+        # pre-release, which has no page - and so never gets RELEASE, see below (#1987).
         WIKI: {}
       promotions:
         # DOCS sits here so that a docs build breaking is seen on the commit that broke it,
@@ -281,6 +282,16 @@ configuration:
         # RELEASE requires GOLD requires SILVER requires DEMO.SMOKE. That is the intended
         # constraint, not a side effect (#1673). On a release branch SILVER does not require
         # DEMO.SMOKE - see the SILVER comment above - so a patch is gated on GOLD alone (#1702).
+        #
+        # A pre-release - `6.0-alpha.N`, `6.0-beta.N` - is NEVER granted RELEASE (#1987). GOLD
+        # publishes it, and release.yml stamps DOCKER.HUB, DOCUMENTATION and GITHUB.RELEASE, but
+        # not WIKI: a pre-release has no wiki page, and `scripts/release.sh wiki` says so with
+        # `report=false`. Missing WIKI is what keeps every RELEASE side effect away from it - the
+        # self.dev slot, the `#internal-releases` message and the doc.yontrack.com dispatch below,
+        # and the `#releases` announcement under `custom.configs`. None of them can be filtered on
+        # the version instead: the slot's admission rules see branches and promotions only, and
+        # the `#releases` subscription, once created by a GA build, is never removed by CI. If
+        # WIKI ever gets reported for a pre-release, all four fire.
         RELEASE:
           promotions:
             - GOLD
@@ -336,6 +347,7 @@ configuration:
                       # doc/dev-guide/patch-release.md before relying on either spelling.
                       - name: branch
                         value: "${branch}"
+        # Never for a pre-release, which is not granted RELEASE: see the RELEASE promotion above.
         RELEASE:
           - name: On internal release
             nodes:
@@ -642,6 +654,10 @@ configuration:
                   # No `lastBranchOnly`: it orders branches by the version in their name, so any
                   # `release-*` branch would win over `main`, and no build of `main` could be
                   # deployed again while one exists.
+                  #
+                  # Nothing here can keep a 6.0 alpha on `main` out: no admission rule reads the
+                  # version. The promotion rule does - a pre-release is never granted RELEASE, see
+                  # the RELEASE promotion under `defaults` (#1987).
                   - name: "branchPattern"
                     ruleId: "branchPattern"
                     ruleConfig:
@@ -709,6 +725,12 @@ configuration:
       # build at all - every build on main and release/* is a candidate now, and the release is
       # published from one of them by release.yml. Without the alternative this block matches
       # nothing, and the `#releases` subscription below silently stops being configured.
+      #
+      # A pre-release candidate, `6.0-alpha.N-rc-<run>`, does not match, and that is intended: a
+      # pre-release is not announced on `#releases`, and has no wiki page to link (#1987). It is
+      # not what keeps the announcement away, though. CI never removes a subscription, so the one
+      # the last 5.x build created on `main` is still there during the 6.0 alphas; what keeps it
+      # quiet is that a pre-release is never granted RELEASE - see the RELEASE promotion above.
       - conditions:
           - name: environment-regex
             config:

@@ -19,6 +19,12 @@ name: Release
 # The logic lives in scripts/release.sh so that scripts/release-test.sh can exercise it against
 # stubbed clients. Most of that logic is about refusing to run, which is the part worth testing:
 # publishing is the one step in this pipeline that cannot be undone.
+#
+# A pre-release - `6.0-alpha.N`, `6.0-beta.N` - goes through here too (#1987). It is published to
+# Docker Hub, S3 and GitHub like any release, but the GitHub release is marked as a pre-release
+# and never Latest, and it has no wiki page. WIKI is therefore not reported for it, so RELEASE is
+# never granted, and nothing keyed off RELEASE fires: see the RELEASE comments in
+# .yontrack/ci.yaml.
 
 on:
   workflow_dispatch:
@@ -174,16 +180,22 @@ jobs:
       # release body links this page, so a missing one would make the release a dead end, and
       # every other step is easier to not-do than to undo. WIKI stays a check, not a publication
       # step - the page is written by a human before GOLD is granted.
+      #
+      # A pre-release has no page and passes without a check, with `report=false`: see below.
       - name: Check the wiki release page
         id: wiki
         env:
           REL_VERSION: ${{ steps.resolve.outputs.version }}
         run: scripts/release.sh wiki
 
+      # Not for a pre-release, on purpose: `report` is false there. RELEASE requires WIKI, so a
+      # pre-release records its publication with the three other stamps without being granted
+      # RELEASE - which is what keeps it off self.dev, Slack and doc.yontrack.com (#1987).
       - name: Validate WIKI
         if: >-
           ${{ !cancelled()
             && steps.resolve.outputs.build != ''
+            && steps.wiki.outputs.report == 'true'
             && (steps.wiki.outcome == 'success' || steps.wiki.outcome == 'failure') }}
         env:
           WIKI_OUTCOME: ${{ steps.wiki.outcome }}
@@ -330,6 +342,7 @@ jobs:
       # `--latest` is spelled out because `gh` leaves GitHub's `make_latest` at its default of
       # true, and a 5.3.2 patch published after 5.4.0 would take the repository's "Latest release"
       # badge and flip the README's shields.io version. `resolve` works out which it is (#1702).
+      # A pre-release is never Latest, and is marked `--prerelease` (#1987).
       #
       # `REL_SHA` is the upper bound of the changelog fallback: on a freshly cut release branch
       # Yontrack has no previous RELEASE-promoted build to measure from, and the git range from
@@ -341,6 +354,7 @@ jobs:
           VERSION: ${{ steps.resolve.outputs.version }}
           SHA: ${{ steps.resolve.outputs.sha }}
           LATEST: ${{ steps.resolve.outputs.latest }}
+          PRERELEASE: ${{ steps.resolve.outputs.prerelease }}
           REL_VERSION: ${{ steps.resolve.outputs.version }}
           REL_BUILD_ID: ${{ steps.resolve.outputs.build_id }}
           REL_SHA: ${{ steps.resolve.outputs.sha }}
@@ -348,10 +362,15 @@ jobs:
           set -euo pipefail
           scripts/release.sh body > release-body.md
           cat release-body.md
+          prerelease_flag=()
+          if [ "$PRERELEASE" = "true" ]; then
+            prerelease_flag=(--prerelease)
+          fi
           gh release create "$VERSION" \
             --title "$VERSION" \
             --target "$SHA" \
             --latest="$LATEST" \
+            "${prerelease_flag[@]}" \
             --notes-file release-body.md
 
       # ------------------------------------------------------------------------------------
@@ -411,7 +430,7 @@ jobs:
         env:
           VERSION: ${{ steps.resolve.outputs.version }}
           RC_VERSION: ${{ steps.resolve.outputs.rc_version }}
-          WIKI: ${{ steps.wiki.outcome }}
+          WIKI: ${{ steps.wiki.outputs.report == 'false' && 'not required (pre-release)' || steps.wiki.outcome }}
           PUSH: ${{ steps.push.outcome }}
           UPLOAD: ${{ steps.upload.outcome }}
           RELEASED: ${{ steps.release.outcome }}

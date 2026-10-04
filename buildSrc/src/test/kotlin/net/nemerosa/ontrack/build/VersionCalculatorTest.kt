@@ -79,6 +79,29 @@ class VersionCalculatorTest {
         assertEquals("5.3-beta.4", version)
     }
 
+    // The first 6.0 alpha: only the 5.x releases are tagged, and none of them counts (#1987).
+    @Test
+    fun `main under GitHub Actions starts an alpha at zero`() {
+        val version = calculator(
+            githubRefName = "main",
+            gitBranch = "HEAD",
+            versionFile = "6.0-alpha",
+            tags = listOf("5.5.6", "5.5.7", "5.0-beta.3"),
+        ).computeVersion()
+        assertEquals("6.0-alpha.0", version)
+    }
+
+    @Test
+    fun `main under GitHub Actions continues an alpha from its last tag`() {
+        val version = calculator(
+            githubRefName = "main",
+            gitBranch = "HEAD",
+            versionFile = "6.0-alpha",
+            tags = listOf("5.5.7", "6.0-alpha.0", "6.0-alpha.1"),
+        ).computeVersion()
+        assertEquals("6.0-alpha.2", version)
+    }
+
     // --- GITHUB_REF_NAME=release/5.2 -> release versioning ---
 
     @Test

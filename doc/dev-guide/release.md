@@ -1,7 +1,8 @@
 # Releasing
 
 Granting `GOLD` on a build publishes it. `.github/workflows/release.yml` does the publishing and
-reports the four validations that grant `RELEASE`.
+reports the four validations that grant `RELEASE` — three of them for a pre-release, which is never
+granted `RELEASE`: see [Pre-releases](#pre-releases).
 
 Nothing is rebuilt. The images are re-tagged from the GHCR tags CI already pushed, the
 documentation is the artefact CI already archived, and what ships is the release candidate itself
@@ -15,7 +16,7 @@ under its base version — see
 | `BRONZE`  | `BUILD`, `UI_UNIT`, `INTEGRATION`, `KDSL.ACCEPTANCE`, `PLAYWRIGHT`, `DOCS` | The build is green    |
 | `SILVER`  | `BRONZE` + `DEMO.SMOKE` on `main`; `BRONZE` alone on a release branch | Deployed to the demo and verified — or, on a release branch, green |
 | `GOLD`    | `SILVER`, granted **by hand**                                | A human tested the demo and approved the release |
-| `RELEASE` | `GOLD` + `DOCKER.HUB`, `GITHUB.RELEASE`, `DOCUMENTATION`, `WIKI` | Publication completed          |
+| `RELEASE` | `GOLD` + `DOCKER.HUB`, `GITHUB.RELEASE`, `DOCUMENTATION`, `WIKI` | Publication of a GA completed |
 
 `GOLD` *triggers* publication; `RELEASE` *records* that it succeeded. A promotion whose validations
 were its own triggers would be circular, which is why both levels exist. `RELEASE` is a receipt.
@@ -107,7 +108,48 @@ The rc version is still needed throughout: it is the GHCR tag the images are re-
 Whether the published version takes GitHub's "Latest release" badge is decided rather than defaulted:
 `resolve` compares it against every released tag and passes `--latest=<true|false>`. Left at `gh`'s
 default of true, a 5.3.2 patch published after 5.4.0 would take the badge and flip the README's
-shields.io version to the previous minor.
+shields.io version to the previous minor. A pre-release is never Latest — see
+[Pre-releases](#pre-releases).
+
+## Pre-releases
+
+A `VERSION` of `X.Y-alpha` or `X.Y-beta` on `main` builds `X.Y-alpha.N` or `X.Y-beta.N` —
+`VersionCalculator` numbers them from the existing tags, starting at 0 — and CI turns that into the
+usual `X.Y-alpha.N-rc-<run>` candidate. A pre-release is released through `GOLD` like any other
+version, and the guards, the Docker Hub tags and the S3 docs under `release/<version>/` are the same.
+What differs:
+
+| | GA (`6.0.0`) | Pre-release (`6.0-alpha.2`) |
+|---|---|---|
+| GitHub release | Latest when it is the highest GA | Marked as a pre-release, never Latest |
+| Wiki page | Required, checked, stamped `WIKI` | None: not checked, `WIKI` not stamped |
+| Release body | Wiki link, then Yontrack's changelog since the last `RELEASE` | Git log since the previous pre-release |
+| `RELEASE` | Granted | **Never granted** |
+| self.dev, `#internal-releases`, `#releases`, doc.yontrack.com | Yes | No |
+
+**Ordering:** `6.0-alpha.N` < `6.0-beta.M` < `6.0.0`, and `5.5.7` < `6.0-alpha.0`.
+
+**Notes base:** a pre-release's git log starts at the previous pre-release of the same `X.Y` (alpha
+or beta), or at the highest GA below it when it is the first: `6.0-alpha.0` starts at `5.5.7` and
+`6.0-beta.0` at the last alpha. A GA ignores pre-releases, so `6.0.0` covers everything since
+`5.5.7`.
+
+**Why no `RELEASE`:** a pre-release must not deploy to self.dev, post on Slack or dispatch
+doc.yontrack.com, and those cannot be filtered on the version. The self.dev slot's admission rules
+see branches and promotions only, and CI never removes the `#releases` subscription that the last
+GA build created on `main`. So `release.yml` records the publication with `DOCKER.HUB`,
+`DOCUMENTATION` and `GITHUB.RELEASE` and leaves `WIKI` out. `RELEASE` requires all four, so it is
+never granted and none of these fire. As a bonus, `6.0.0`'s Yontrack changelog then runs from the
+last `RELEASE` on `main` — `5.5.7`, the last GA released from it — rather than from its last beta.
+
+**Cutting one:**
+
+1. Set `VERSION` to `X.Y-alpha` (later `X.Y-beta`, then `X.Y`) on `main` and push.
+2. Wait for the build to reach `SILVER`, as for any release.
+3. Grant `GOLD`. No wiki page is needed.
+4. `/release-milestone X.Y X.Y-alpha.N` to mark the milestone's ready issues as released in it.
+
+`scripts/security-rescan.sh` still rescans GA releases only.
 
 ## What is no longer possible
 
