@@ -1,6 +1,6 @@
 ---
 name: run-initiative
-description: Work through every ready-for-agent issue of a Yontrack initiative, optionally restricted to one milestone, one at a time, each to full completion — branch, implement, merge to the issues' base branch (main, or v6 for next-major work), wait for CI, mark ready. Presents the issue list for approval before starting. Use when asked to implement, work through, or batch an initiative's issues, or an initiative's issues for a given milestone.
+description: Work through every ready-for-agent issue of a Yontrack initiative, optionally restricted to one milestone, one at a time, each to full completion — branch, implement, merge to the issues' base branch (main, or release/5.5 for a 5.x-only fix, cherry-picking 5.5 fixes from main), wait for CI, mark ready. Presents the issue list for approval before starting. Use when asked to implement, work through, or batch an initiative's issues, or an initiative's issues for a given milestone.
 user-invocable: true
 ---
 
@@ -22,9 +22,12 @@ branch, and verified against CI before the next one starts. There is exactly one
 the approval gate in Step 4. Everything after it runs without checking in.
 
 **`{base}` below is the base branch of the run** — `main`, unless the issues say otherwise (Step 3b):
-`v6` for work on the next major while it is built on its own branch
-(`doc/dev-guide/major-branch.md`). Every `{base}` in this skill, in prose and in commands, is that
-one branch. Never land a `v6` issue on `main`, nor the reverse.
+`release/5.5` for a bug that exists only in 5.x (`doc/dev-guide/patch-release.md`). Every `{base}`
+in this skill, in prose and in commands, is that one branch. Never land a `release/5.5` issue on
+`main`, nor the reverse.
+
+A 5.x fix that also applies to 6.x lands on `main` like any other issue, and is then
+**cherry-picked** onto `release/5.5` (Step 7). Such an issue belongs to a `main` run.
 
 ---
 
@@ -145,7 +148,7 @@ another repository — keeps its place in the order only if that dependency is a
 ## Step 3b — Resolve the base branch
 
 Each issue body states where it lands on a `**Base branch:**` line — e.g.
-``**Base branch:** `v6` — branch from `origin/v6`, merge back into `v6` ``. Read it for every issue:
+``**Base branch:** `main`, cherry-pick to `release/5.5` ``. Read it for every issue:
 
 ```bash
 for n in {numbers}; do
@@ -153,7 +156,10 @@ for n in {numbers}; do
 done
 ```
 
-- A body with no such line lands on `main`.
+- A body with no such line lands on `main`. In milestone `5.5`, it is also cherry-picked to
+  `release/5.5`, as if it said so.
+- `main, cherry-pick to release/5.5` lands on `main`: `{base}` is `main`, and the issue is flagged
+  for the cherry-pick in Step 4 and in its brief.
 - **Every issue of the run must share one base.** When they do not, the run cannot go ahead as
   one chain: show the split in Step 4 and let the operator pick one base — typically by narrowing
   to a milestone — rather than guessing.
@@ -178,7 +184,8 @@ Alongside the table give:
 - the proposed order, with the one-line reason for each position
 - the estimated cost — issue count × (implementation + the current `{base}` CI duration), which you can
   read from `gh run list --workflow=ci.yml --branch {base} --limit 5 --json createdAt,updatedAt`
-- the milestone used, if any, and the base branch `{base}` every issue will land on
+- the milestone used, if any, and the base branch `{base}` every issue will land on, and which
+  issues are also cherry-picked to `release/5.5`
 - anything that looks off: an issue in the set that is not really part of the initiative's theme, one
   carrying `priority:high`, one whose body is thin despite the `ready-for-agent` label
 - the issues left out: outside the milestone, in another repository, blocked, or with a base
@@ -197,8 +204,8 @@ Then ask for approval, and accept any of these answers:
 - Confirm you are in the main checkout and **not** in a git worktree (`git rev-parse --git-dir`) — the
   project skills this batch depends on only load from the main checkout. Do not create a worktree.
 - Confirm the working tree is clean, that the checkout is on `{base}`, and that `{base}` is up to date
-  with `origin/{base}`. The main checkout may well sit on `v6` while a run targets `main`, or the
-  reverse: switch it only if it is clean and no other session is live in it.
+  with `origin/{base}`. The main checkout may well sit on `release/5.5` while a run targets `main`, or
+  the reverse: switch it only if it is clean and no other session is live in it.
 - Check with `ListAgents` whether another session is live in this checkout. A chain of merges and
   pushes to `{base}` will collide with concurrent work — report what you found before continuing.
 
@@ -219,6 +226,8 @@ For each approved issue, in order:
     - `git log origin/{base} --oneline | grep "#{number}"` — the commit is really on `{base}`
     - `gh run list --workflow=ci.yml --branch {base} --json headSha,conclusion` — that SHA is really green
       (for a docs-only `[skip ci]` commit: it really touches only docs, and its parent's run is green)
+    - for a cherry-picked issue, `git log origin/release/5.5 --oneline | grep "#{number}"` and a green
+      `release/5.5` run for that SHA
     - `gh issue view {number} --json labels,state,milestone` — the issue is really on `status:ready`,
       and closed unless it has no milestone
 4. **Close any gap yourself before moving on** — the invariant is the orchestrator's responsibility,
@@ -299,6 +308,12 @@ Give every subagent all of this:
   Green `{base}` and a landed commit is the definition of ready; there is no further judgement to make.
   The one exception: an issue with **no milestone** stays open at `status:ready` — never guess a
   milestone — and your report says so.
+- **For an issue flagged for the cherry-pick**, once the `{base}` run is green and before marking
+  it ready, put the commit on `release/5.5` and wait for that branch's run as well — `/fix-issue`
+  Step 6 has the commands. `release/5.5` takes **no Flyway migration**
+  (`doc/dev-guide/patch-release.md`, rule 5): a fix that needs one is not cherry-picked — halt.
+  A cherry-pick that does not apply cleanly is a halt too. The close comment names both branches:
+  "Merged into \`main\`, cherry-picked to \`release/5.5\`, ships with <milestone>."
 - **A docs-only `[skip ci]` push has no run to wait for.** Once the commit is on `origin/{base}` and
   the run of the commit before it was green, mark it ready and close it straight away, and report "CI
   skipped by design" in place of a run URL.
@@ -321,6 +336,8 @@ seed, routine refactors in the area being touched.
 **Halt and report — these only:**
 - `{base}` CI red after the merge
 - a merge conflict on `{base}` that is not mechanically resolvable
+- a cherry-pick onto `release/5.5` that does not apply cleanly, needs a Flyway migration, or turns
+  `release/5.5` CI red
 - a test failure that resists diagnosis after a bounded effort — no open-ended fixing loops
 - the spec is ambiguous in a way where two readings produce materially different features
 - a permission prompt or credential the agent cannot satisfy
@@ -331,7 +348,7 @@ confirmed green.
 
 **"The issue body said not to merge" is not a halt condition** — it is not even a decision. See *The
 landing invariant* above: merge, go green, mark ready, and note the discrepancy in the report. The
-only things that stop an issue from landing are the five failures listed above.
+only things that stop an issue from landing are the failures listed above.
 
 ---
 

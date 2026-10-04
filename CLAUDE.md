@@ -95,10 +95,11 @@ ports per checkout so that several worktrees and agents can run at once:
 Every change follows this lifecycle, end to end — don't stop after step 2:
 
 1. **Branch locally, from the latest base** — before making any change, `git fetch origin` and create
-   a branch named `claude/<short-description>-pipeline` from `origin/main` — or from `origin/v6` for
-   6.0 work (`doc/dev-guide/major-branch.md`). A worktree or checkout starts wherever it was created,
-   often an older commit: the branch point is `origin/<base>` itself, so check
-   `git merge-base HEAD origin/<base>` equals `git rev-parse origin/<base>` before the first commit.
+   a branch named `claude/<short-description>-pipeline` from `origin/main` — or from
+   `origin/release/5.5` for a bug that exists only in 5.x (`doc/dev-guide/patch-release.md`). A
+   worktree or checkout starts wherever it was created, often an older commit: the branch point is
+   `origin/<base>` itself, so check `git merge-base HEAD origin/<base>` equals
+   `git rev-parse origin/<base>` before the first commit.
    A `git fetch` that fails in the sandbox has not fetched — rerun it outside rather than trusting
    the stale ref (use the `/fix-issue` skill when working from a GitHub issue)
 2. **Mark the issue as in progress** — when the change comes from a GitHub issue, move it to
@@ -108,7 +109,9 @@ Every change follows this lifecycle, end to end — don't stop after step 2:
    *Commit messages* below
 4. **Show it in the demo** — a user-visible feature adds itself to `DemoContent` in
    `ontrack-demo-seed` (see *Definition of done* below); say which way you decided either way
-5. **Land on `main`** — merge the branch into `main`, then `git push origin main`
+5. **Land on `main`** — merge the branch into `main`, then `git push origin main`. A fix in
+   milestone `5.5` is then cherry-picked onto `release/5.5`, unless it went there directly
+   (`/fix-issue` has the steps)
 6. **Delete the local branch** — `git branch -d <branch>` once it is merged
 7. **Wait for the `main` build, then mark the issue ready and close it** — once CI on `main` is
    green, move the issue to `status:ready` and close it, provided it has a milestone (see *Issue

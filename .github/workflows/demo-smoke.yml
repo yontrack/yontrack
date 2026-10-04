@@ -2,13 +2,10 @@ name: Demo smoke
 
 # Verifies a deployment and reports DEMO.SMOKE on the build that was deployed.
 #
-# Two instances go through it, chosen by the `target` input: the public demo, deployed from
-# `main`, and v6.dev.yontrack.com, deployed from the next-major branch (see
-# doc/dev-guide/major-branch.md). Everything below is the same for both except the URL, the
-# credentials and the concurrency group, each marked where it differs.
-#
-# On v6 the seed is the point rather than the verification: the environment has no data of its
-# own, and this is what provisions it on every deployment.
+# The instance is chosen by the `target` input. Today there is one, the public demo, deployed
+# from `main`. A next-major environment adds itself as a second target (see
+# doc/dev-guide/major-branch.md): everything per-instance - the URL, the credentials and the
+# concurrency group - is resolved from `target`, and marked where it is.
 #
 # Dispatched by the slot's RUNNING workflow through the `github-workflow` notification
 # channel - see .yontrack/ci.yaml - once the slot has marked the deployment done. That moment
@@ -52,7 +49,6 @@ on:
         type: choice
         options:
           - demo
-          - v6
       project:
         description: 'Yontrack project holding the build'
         required: false
@@ -61,26 +57,21 @@ on:
       branch:
         description: 'Yontrack branch holding the build'
         required: false
-        # `main` suits the demo, which is the default target. A v6 dispatch passes `v6`.
+        # `main` suits the demo, which is the default target.
         default: main
         type: string
 
 # One thing at a time on a given instance, and queue rather than cancel: the seed wipes it, so
 # two overlapping runs would reset it under each other's feet.
 #
-# Per target, and that is the point: a v6 run has no reason to queue behind a demo run. The
-# demo's group is `demo-instance` rather than `demo-smoke` because it is shared with
+# Per target: a run on one instance has no reason to queue behind a run on another. The demo's
+# group is `demo-instance` rather than `demo-smoke` because it is shared with
 # .github/workflows/dast-passive.yml (#1765): the passive DAST scan crawls the demo for minutes,
 # and a reset starting underneath it would have the scanner walking an instance that is being
 # deleted around it - which reads as a broken scan, or worse as a clean one. Anything else that
-# touches the demo joins that group too. Nothing scans v6, so `v6-instance` has only this
-# workflow in it today.
-#
-# `github.event.inputs` rather than `inputs`: the `inputs` context is not available to
-# `concurrency`, and an unresolved expression here would silently collapse both targets into one
-# group.
+# touches the demo joins that group too.
 concurrency:
-  group: ${{ github.event.inputs.target == 'v6' && 'v6-instance' || 'demo-instance' }}
+  group: demo-instance
   cancel-in-progress: false
 
 permissions:
@@ -95,7 +86,7 @@ env:
   #
   # The `vars.*` overrides exist so an instance can be repointed without a commit. The literals
   # are the deployed hostnames.
-  DEMO_URL: ${{ inputs.target == 'v6' && (vars.V6_URL || 'https://v6.dev.yontrack.com') || (vars.DEMO_URL || 'https://demo.dev.yontrack.com') }}
+  DEMO_URL: ${{ vars.DEMO_URL || 'https://demo.dev.yontrack.com' }}
   DEMO_SEEDED_PROJECT: petclinic
   DEMO_PROJECT: ${{ inputs.project }}
   DEMO_BRANCH: ${{ inputs.branch }}
@@ -107,19 +98,17 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     # The target's own credentials, resolved once and mapped onto the DEMO_* names the script and
-    # the Playwright spec read. Two instances, two databases, two Keycloak realms: nothing is
-    # shared, and a v6 run authenticating with the demo's token would simply be refused.
+    # the Playwright spec read. A second target brings its own: two instances share no database and
+    # no Keycloak realm.
     #
     # Here rather than in the workflow-level `env` above, which is the natural home for the rest:
-    # the `secrets` context is not available to that one.
-    #
-    # An absent secret is an empty string, which is falsy, so a missing `V6_TOKEN` would fall
-    # through to the demo's. That would not touch the demo - DEMO_URL is already v6's - but it
-    # would fail deep inside the poll. `Check the target's credentials` below stops it at the door.
+    # the `secrets` context is not available to that one. An absent secret is an empty string,
+    # which would fail deep inside the poll; `Check the target's credentials` below stops it at
+    # the door.
     env:
-      TARGET_TOKEN: ${{ inputs.target == 'v6' && secrets.V6_TOKEN || secrets.DEMO_TOKEN }}
-      TARGET_USERNAME: ${{ inputs.target == 'v6' && secrets.V6_USERNAME || secrets.DEMO_USERNAME }}
-      TARGET_PASSWORD: ${{ inputs.target == 'v6' && secrets.V6_PASSWORD || secrets.DEMO_PASSWORD }}
+      TARGET_TOKEN: ${{ secrets.DEMO_TOKEN }}
+      TARGET_USERNAME: ${{ secrets.DEMO_USERNAME }}
+      TARGET_PASSWORD: ${{ secrets.DEMO_PASSWORD }}
     steps:
       # The run time reported for the validation is measured from here.
       - name: Record the job start
@@ -232,9 +221,8 @@ jobs:
           YONTRACK_URL: ${{ env.DEMO_URL }}
           YONTRACK_TOKEN: ${{ env.TARGET_TOKEN }}
           # The seed refuses any URL not matching `demo.`/localhost, since it deletes every
-          # project. v6 is not `demo.`, so it is allowed explicitly - and only its exact host, so
-          # a mistyped V6_URL still stops here. Empty for the demo target: the default applies.
-          DEMO_SEED_URL_PATTERN: ${{ inputs.target == 'v6' && '^https://v6\.dev\.yontrack\.com(?=[:/]|$)' || '' }}
+          # project. A target that is not `demo.` allows its own exact host through
+          # DEMO_SEED_URL_PATTERN; the demo needs none, and the default applies.
         run: ontrack-demo-seed/build/install/ontrack-demo-seed/bin/ontrack-demo-seed
 
       # ------------------------------------------------------------------------------------
@@ -252,8 +240,8 @@ jobs:
       # The canonical declaration of the scanner roles is security/dast/casc.yaml.
       #
       # Runs on every target, and nothing here is demo-specific: the mutation re-applies
-      # whatever CasC the *instance* carries, not a file sent from here, so on v6 it restores
-      # v6's own declaration after the seed. The project-role assertion that follows it passes
+      # whatever CasC the *instance* carries, not a file sent from here, so on another target it
+      # restores that instance's own declaration. The project-role assertion that follows it passes
       # on an instance that declares no DAST group at all - see dsm_casc_project_role.
       # ------------------------------------------------------------------------------------
 

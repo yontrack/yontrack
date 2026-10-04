@@ -86,13 +86,13 @@ internal class VersionCalculator(
 
     companion object {
         /**
-         * A `v<major>` branch is the long-lived development branch of the next major - `v6` while
-         * `main` is still building 5.x. It is a second `main`, not a feature branch: it carries its
-         * own `VERSION` file (`6.0`), it is built and promoted like `main`, and it has a deployment
-         * environment of its own. So it takes the same versioning path, which reads that `VERSION`
-         * and the `6.0.<n>` tags.
+         * A `v<major>` branch is the long-lived development branch of the next major - `v7` while
+         * `main` is still building 6.x, as `v6` was while it built 5.x. It is a second `main`, not
+         * a feature branch: it carries its own `VERSION` file (`7.0`), it is built and promoted
+         * like `main`, and it has a deployment environment of its own. So it takes the same
+         * versioning path, which reads that `VERSION` and the `7.0.<n>` tags.
          *
-         * Anchored and digits-only on purpose: `v6` is a major branch, `v6-spring-boot-4` is a
+         * Anchored and digits-only on purpose: `v7` is a major branch, `v7-spring-boot-5` is a
          * feature branch working towards it and must keep the feature version shape.
          *
          * See doc/dev-guide/major-branch.md.

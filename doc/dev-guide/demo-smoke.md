@@ -8,25 +8,21 @@ build.
 `SILVER` requires that stamp, on top of `BRONZE`, so a green run of this workflow is what
 promotes the build to `SILVER` - see [`SILVER`](#silver) below.
 
-## Two instances, one workflow
+## One workflow, one target per instance
 
-The `target` input picks the instance: `demo` (the default) or `v6`, the next-major environment -
-see [the next-major branch](major-branch.md). Everything the workflow does is the same for both;
-only three things are resolved from `target`:
+The `target` input picks the instance. Today there is one, `demo` (the default). Three things are
+resolved from it:
 
-| | `demo` | `v6` |
-|---|---|---|
-| URL | `vars.DEMO_URL`, default `https://demo.dev.yontrack.com` | `vars.V6_URL`, default `https://v6.dev.yontrack.com` |
-| Credentials | `secrets.DEMO_TOKEN` / `DEMO_USERNAME` / `DEMO_PASSWORD` | `secrets.V6_TOKEN` / `V6_USERNAME` / `V6_PASSWORD` |
-| Concurrency group | `demo-instance`, shared with the passive DAST scan | `v6-instance`, this workflow alone |
+| | `demo` |
+|---|---|
+| URL | `vars.DEMO_URL`, default `https://demo.dev.yontrack.com` |
+| Credentials | `secrets.DEMO_TOKEN` / `DEMO_USERNAME` / `DEMO_PASSWORD` |
+| Concurrency group | `demo-instance`, shared with the passive DAST scan |
 
-Two instances, two databases, two Keycloak realms: nothing is shared. A missing secret is an
-empty string, so an unconfigured target would otherwise fall through to the demo's credentials
-and fail deep inside the poll; `Check the target's credentials` stops that at the door, right
-after the correlation artifact is published and before anything talks to the instance.
-
-On `v6` the seed is the point rather than the verification: the environment has no data of its
-own, and this workflow is what provisions it on every deployment.
+A next-major environment comes back as a second target, with its own URL, secrets and
+concurrency group — see [the next-major branch](major-branch.md). A missing secret is an empty
+string, which would fail deep inside the poll; `Check the target's credentials` stops that at the
+door, right after the correlation artifact is published and before anything talks to the instance.
 
 ## What it does
 
@@ -84,8 +80,8 @@ DAST CasC there and nothing to restore, and the step says so and passes.
 ## `SILVER`
 
 `.yontrack/ci.yaml` declares `SILVER` as `promotions: [BRONZE]` in its defaults, and adds
-`validations: [DEMO.SMOKE]` in the `^main$` and `^v6$` blocks - the branches that have an
-instance to be verified on. It needs no workflow node of its own, and nothing dispatches it:
+`validations: [DEMO.SMOKE]` in the `^main$` block - the branch that has an instance to be
+verified on. It needs no workflow node of its own, and nothing dispatches it:
 auto-promotion grants it as soon as both prerequisites hold, and `DEMO.SMOKE` is always the
 later of the two.
 
@@ -165,11 +161,6 @@ Dispatched by a slot's `RUNNING` workflow through the `github-workflow` notifica
 The demo slot passes only the version: `project` and `branch` come from the workflow's own
 defaults, `yontrack` and `main`, which is what that slot is scoped to anyway.
 
-The v6 slot passes `version`, `target: v6` and `branch: v6` - the branch has to be spelled out
-because the default is `main`, and a v6 version would not resolve there. It also dispatches with
-`reference: v6` rather than `main`, so the seed program and the Playwright spec that run are the
-ones belonging to the code under test; the workflow file itself is the same on both branches.
-
 It can also be dispatched by hand from the Actions tab with a version and a target.
 
 ### The `id` input
@@ -197,9 +188,6 @@ See [the channel's documentation](../../ontrack-docs/docs/content/integrations/n
 | `vars.DEMO_URL` | The demo, defaulting to `https://demo.dev.yontrack.com` |
 | `secrets.DEMO_TOKEN` | API token on the demo - admin-level, since the seed deletes every project |
 | `secrets.DEMO_USERNAME`, `secrets.DEMO_PASSWORD` | Keycloak credentials the browser signs in with |
-| `vars.V6_URL` | The v6 instance, defaulting to `https://v6.dev.yontrack.com` |
-| `secrets.V6_TOKEN` | API token on it - admin-level, for the same reason |
-| `secrets.V6_USERNAME`, `secrets.V6_PASSWORD` | Its Keycloak credentials |
 
 ## The pieces
 

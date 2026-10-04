@@ -4,22 +4,19 @@
 # Postgres of the integration test stack - and records its report as the SEARCH.PERFORMANCE stamp
 # on the Yontrack build of the commit it measured: the seven figures as `metrics` when the run
 # passed, FAILED with the reason when it did not. The stamp is declared in .yontrack/ci.yaml, and
-# doc/dev-guide/search-perf-test.md (on `v6` until the cutover) is the page for the test itself.
+# doc/dev-guide/search-perf-test.md is the page for the test itself.
 #
 # Nightly rather than in ci.yml: the test takes minutes and a runner of its own, and what it
 # watches - whether each query shape still uses its index, and how the p95s drift - does not need
-# every commit. Scheduled workflows only ever run from the default branch, which is why this file
-# lives on `main` even though what it measures is on `v6`.
+# every commit.
 #
 # Two checkouts, deliberately. The root is this workflow's own commit, for scripts/: the pipeline
-# is `main`'s, like every other workflow's. `measured/` is the code under test, at the commit of
+# is `main`'s, like every other workflow's, whichever ref is measured. `measured/` is the code under test, at the commit of
 # the Yontrack build the stamp goes on - which is the head of the branch when it has a build, and
 # otherwise the newest commit that has one (scripts/search-perf-validate.sh says why).
 #
 # Where it reports: the instance, project and branch ci.yml registers the builds in - `yontrack`
-# on vars.YONTRACK_URL (self.dev), branch `v6`. Not onto v6.dev as well: the findings mirror
-# (#1869) exists because self.dev's 5.x cannot take findings, and it takes `metrics` perfectly
-# well. v6.dev holds none of v6's builds and is re-seeded on every deployment.
+# on vars.YONTRACK_URL (self.dev), branch `main`.
 name: Search performance
 
 on:
@@ -32,7 +29,7 @@ on:
       ref:
         description: 'Branch to measure. Its Yontrack branch has the same name, with "/" as "-".'
         required: false
-        default: v6
+        default: main
         type: string
 
 # One measure at a time: two on one runner pool would not disturb each other, but two posting on
@@ -45,12 +42,10 @@ permissions:
   contents: read
 
 env:
-  # THE branch measured. `v6` until 6.0 is merged into `main` - search on Postgres is 6.0 work and
-  # `main` has no searchPerfTest - and then `main`: change this default AND the input's above, and
-  # the JDK below if `main`'s differs. Listed in "The cutover" of doc/dev-guide/major-branch.md
-  # on `v6`.
-  SEARCH_PERF_REF: ${{ inputs.ref || 'v6' }}
-  # The JDK of the code measured, not of `main`'s ci.yml: `v6` builds on 25.
+  # THE branch measured. To measure another one, change this default AND the input's above, and
+  # the JDK below if that branch builds on another one.
+  SEARCH_PERF_REF: ${{ inputs.ref || 'main' }}
+  # The JDK of the code measured: `main` builds on 25.
   SEARCH_PERF_JAVA: "25"
   # Pinned, like ci.yml's: an unpinned CLI lets a Yontrack release turn a green run red.
   YONTRACK_CLI_VERSION: "5.7.0"
@@ -123,8 +118,8 @@ jobs:
           distribution: zulu
           java-version: ${{ env.SEARCH_PERF_JAVA }}
 
-      # Read-only: this runs on `main`, so it would otherwise write `v6`'s Gradle state into
-      # `main`'s cache entries, and evict the ones `main`'s CI restores from (#1870).
+      # Read-only: this runs on `main`, so it would otherwise write its Gradle state into `main`'s
+      # cache entries, and evict the ones `main`'s CI restores from (#1870).
       - uses: gradle/actions/setup-gradle@v6
         with:
           cache-read-only: true

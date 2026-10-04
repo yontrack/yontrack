@@ -32,15 +32,15 @@
 #
 # Which build
 # -----------
-# "The build of the checked-out commit" - but the head of `v6` is often a commit with no build:
-# a `Merge main into v6 [skip ci]`, a docs commit under `[skip ci]`, or a push whose CI has not
-# registered its build yet. Failing then would lose the night for nothing. So `resolve` walks back
+# "The build of the checked-out commit" - but the head of `main` is often a commit with no build:
+# a docs commit under `[skip ci]`, or a push whose CI has not registered its build yet. Failing
+# then would lose the night for nothing. So `resolve` walks back
 # to the newest commit that has one, and the workflow checks THAT commit out before measuring:
 # the commit measured and the commit of the build reported on are always the same one. What it
 # skipped over is `[skip ci]` by convention, which is to say documentation.
 #
 # The search is by commit on the branch, not on the whole project: a commit pushed on a working
-# branch and on `v6` has a build on each, and the stamp belongs on `v6`'s.
+# branch and on `main` has a build on each, and the stamp belongs on `main`'s.
 #
 # What is sent
 # ------------

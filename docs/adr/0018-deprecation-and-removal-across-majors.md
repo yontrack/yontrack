@@ -43,7 +43,7 @@ instead.`, or `No replacement.` — and the issue carrying out the removal, `See
 explanation goes in the KDoc, the Javadoc or the GraphQL description, not in the marker. The
 cleanup of a major is then one grep: `git grep "Removed in V7"`.
 
-`Removed in V6` and `Removed in V7` are both accepted on `v6`: the 5.5 readiness patch (#1916)
+`Removed in V6` and `Removed in V7` are both accepted until 6.0.0: the 5.5 readiness patch (#1916)
 brought `Removed in V6` markers in through the main → v6 merge, and each stays until its removal
 issue lands.
 
@@ -140,8 +140,13 @@ An issue removing or deprecating an item:
 
 ## The cutover gate
 
-`v6` does not become `main` while there is a `Removed in V6` marker left, or an entry in the
-baseline (`doc/dev-guide/major-branch.md`).
+6.0.0 is not released while there is a `Removed in V6` marker left, or an entry in the baseline
+(`doc/dev-guide/major-branch.md`).
+
+The gate first stood at the merge: `v6` was not to become `main` before it passed. It moved to the
+6.0.0 GA release at the cutover (#1989): what it protects is what users receive, and only a release
+delivers anything to them. The pre-releases ship from `main` meanwhile, and the gate is one of the
+criteria for GA (`doc/dev-guide/release.md`).
 
 ## Consequences
 

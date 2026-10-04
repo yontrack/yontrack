@@ -21,6 +21,22 @@ These were settled in a design review. The rationale matters as much as the choi
 | 5 | **A patch must not contain a Flyway migration.** | If 5.3.2 adds `V82` and `main` independently adds `V82`, a user upgrading 5.3.2 → 5.4.0 hits a checksum conflict. If a fix needs a schema change, it is not a patch. |
 | 6 | **Retire the release branch at the next minor cutover** — delete the git branch, keep the Yontrack branch. | The Yontrack branch holds the build and validation history for what shipped; deleting it destroys the audit trail. See [Minor cutover](minor-cutover.md). |
 
+### The exception: the last minor of the previous major
+
+When `main` moves to a new major, the last minor of the previous one — 5.5, once `main` builds 6.x
+— keeps a maintenance branch, `release/5.5`, cut from its last released tag (`5.5.7`) at the
+[major cutover](major-branch.md#the-cutover), as rule 3 cuts any release branch. Three rules bend
+for it, and the others hold:
+
+* **Rule 1:** it may live next to the current major's release branch — `release/5.5` beside a
+  `release/6.0` once 6.1 ships. It is the one exception to "one live release branch at a time".
+* **Rule 4:** a fix still lands on `main` first and is cherry-picked, except for a bug that exists
+  only in the previous major, in code the new major removed. That one lands on `release/5.5`
+  directly: there is nothing on `main` to fix. Its issue says so on its `**Base branch:**` line.
+* **Rule 6:** it is not retired at the next minor cutover. Retiring it is Damien's call.
+
+Rule 5 holds in full: no Flyway migration on `release/5.5`, whatever the fix.
+
 ## Two names for one branch
 
 Both appear below, and using the wrong one is the likeliest way to get this subtly wrong.
