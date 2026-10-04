@@ -134,18 +134,17 @@ database is then reachable on the Postgres port of `.yontrack-it/instance.env`, 
 03:17 UTC, and on demand (#1887):
 
 ```bash
-gh workflow run search-perf.yml --ref main            # measures v6
-gh workflow run search-perf.yml --ref main -f ref=v6  # the same, explicitly
+gh workflow run search-perf.yml --ref main                         # measures main
+gh workflow run search-perf.yml --ref main -f ref=claude/x-pipeline  # another branch
 ```
 
-The workflow lives on `main`, since GitHub only schedules the default branch's workflows, but it
-**measures `v6`** until 6.0 is merged into `main` — then `SEARCH_PERF_REF` switches to `main`
-(one line, and an item of *The cutover* in [major-branch.md](major-branch.md)).
+The workflow lives on `main`, since GitHub only schedules the default branch's workflows, and it
+measures `main` (`SEARCH_PERF_REF`).
 
-- **Which build.** The Yontrack build of the head of `v6`, on the instance, project and branch
-  `ci.yml` registers it in: `yontrack` on self.dev, branch `v6`. When the head has no build — a
+- **Which build.** The Yontrack build of the head of `main`, on the instance, project and branch
+  `ci.yml` registers it in: `yontrack` on self.dev, branch `main`. When the head has no build — a
   `[skip ci]` commit, or a push whose CI has not registered it yet — the newest commit that has one,
-  and that is the commit checked out and measured. Never v6.dev: it holds none of `v6`'s builds.
+  and that is the commit checked out and measured.
 - **What is sent.** The five figures of the report as `metrics`, PASSED — a p95 over its budget
   included, named in the description. **FAILED** with no figure when the run failed: a failed
   `EXPLAIN` assertion (scenario, query, statement and reason in the description), a p95 past its

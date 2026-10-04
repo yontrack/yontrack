@@ -47,7 +47,20 @@ Examples:
 
 ## Step 3 — Create the branch
 
-The base is `main`, or `v6` for an issue in the 6.0 milestone (`doc/dev-guide/major-branch.md`).
+The base follows the milestone:
+
+- **Any milestone but `5.5`**, or none: the base is `main`.
+- **Milestone `5.5`** — a fix for the 5.x line, maintained on `release/5.5`. The body's
+  `**Base branch:**` line says which of the two it is:
+  - `main, cherry-pick to release/5.5` — the base is `main`, and Step 6 cherry-picks the commit onto
+    `release/5.5` once it has landed. This is the default for a 5.5 issue: a fix living only on the
+    5.x branch is a regression in 6.x waiting to happen.
+  - `release/5.5` — the bug exists only in 5.x, in code that 6.0 removed. The base is `release/5.5`,
+    and there is nothing to cherry-pick.
+
+  A `5.5` issue with no `**Base branch:**` line takes the first form.
+  `doc/dev-guide/patch-release.md` has the rules, among them **no Flyway migration** on `release/5.5`.
+
 Branch from the freshly fetched remote ref, never from wherever the worktree happens to stand:
 
 ```bash
@@ -103,18 +116,34 @@ See *Commit messages* in CLAUDE.md for what that prefix costs in the semantic ch
 
 ---
 
-## Step 6 — Land on `main`, mark the issue ready and close it
+## Step 6 — Land on the base, mark the issue ready and close it
 
-Follow the workflow lifecycle in `CLAUDE.md`: merge the branch into `main`, push, and delete the local
-branch. Then wait for the CI build on `main` for the pushed commit:
+Follow the workflow lifecycle in `CLAUDE.md`: merge the branch into `<base>`, push, and delete the local
+branch. Then wait for the CI build on `<base>` for the pushed commit:
 
 ```bash
-gh run list --workflow=ci.yml --branch main --limit 1 --json databaseId,headSha,status,conclusion,url
+gh run list --workflow=ci.yml --branch <base> --limit 1 --json databaseId,headSha,status,conclusion,url
 gh run watch <run-id>
 ```
 
-Only when that run's `conclusion` is `success` for the commit you pushed, move the issue to ready and
-close it — provided it has a milestone:
+**For `main, cherry-pick to release/5.5`**, once that `main` run is green, cherry-pick the commit onto
+`release/5.5` and wait for that branch's build as well:
+
+```bash
+git fetch origin            # outside the sandbox
+git checkout -b claude/{short-description}-5.5-pipeline origin/release/5.5
+git cherry-pick -x <sha on main>
+git push origin HEAD:release/5.5
+git checkout - && git branch -D claude/{short-description}-5.5-pipeline
+gh run list --workflow=ci.yml --branch release/5.5 --limit 1 --json databaseId,headSha,status,conclusion,url
+gh run watch <run-id>
+```
+
+A cherry-pick that does not apply cleanly is not resolved by guessing: stop and report it. The base in
+the close comment below is then `main`, cherry-picked to `release/5.5`.
+
+Only when the run's `conclusion` is `success` for the commit you pushed — both runs, for a
+cherry-pick — move the issue to ready and close it, provided it has a milestone:
 
 ```bash
 gh issue view {number} --json milestone --jq '.milestone.title'
@@ -138,6 +167,7 @@ on an unverified build.
 After implementing, provide a concise summary:
 - What was changed and in which files
 - What tests cover the fix
-- The branch name, whether it landed on `main`, and the resulting issue status label
+- The branch name, whether it landed on `<base>` (and was cherry-picked to `release/5.5`), and the
+  resulting issue status label
 
 **Never open a pull request** — leave that to the user.

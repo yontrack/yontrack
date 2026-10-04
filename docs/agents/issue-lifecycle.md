@@ -52,7 +52,8 @@ open buried the real backlog under finished issues. What says it has not shipped
   every release query and is never marked released. If the issue has none, apply `status:ready`,
   leave it **open**, and say so — Damien sets the milestone and closes it. Never guess a milestone.
 - Close with the default reason (`completed`), never `not planned`, and name the base branch
-  (`main`, or `v6` for 6.0 work) and the milestone in the comment.
+  (`main`, `main` cherry-picked to `release/5.5`, or `release/5.5` for a 5.x-only fix) and the
+  milestone in the comment.
 - A ready issue that turns out not to work is **reopened** and moved back to `status:wip`, in the
   same step: `gh issue reopen <number>`, then the `status:wip` edit.
 

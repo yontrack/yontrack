@@ -57,7 +57,7 @@ run_script() {
 }
 
 run_validate() {
-    run_script validate "$1" yontrack v6 20260925231746-413 \
+    run_script validate "$1" yontrack main 20260925231746-413 \
         -- --run-time 600 --source-type github-workflow --source-uri "$RUN_URL" \
            --trigger-type schedule --trigger-data abc123
 }
@@ -100,7 +100,7 @@ write_report
 run_validate "$REPORT"
 assert_eq "0" "$script_status" "a clean run succeeds: $out"
 assert_eq "1" "$(grep -c . <<< "$calls")" "one call"
-assert_contains "$calls" "validate --project yontrack --branch v6 --build 20260925231746-413 --validation SEARCH.PERFORMANCE" \
+assert_contains "$calls" "validate --project yontrack --branch main --build 20260925231746-413 --validation SEARCH.PERFORMANCE" \
     "on the resolved build, spelled out: nothing in this workflow exports YONTRACK_BUILD_NAME"
 assert_contains "$calls" \
     "metrics --metric palette_p95=361.6 --metric results_p95=508.4 --metric commit_lookup_p95=49.6 --metric exact_build_p95=73.9 --metric palette_restricted_p95=71.9 --metric results_restricted_p95=127.1 --metric rebuild_seconds=139.7" \
@@ -216,7 +216,7 @@ FAKE_CLI_FAIL=1 run_validate "$REPORT"
 assert_eq "1" "$script_status" "a PASSED that could not be posted fails the step"
 assert_contains "$out" "Could not post SEARCH.PERFORMANCE" "and says so"
 
-run_script validate "$REPORT" yontrack v6
+run_script validate "$REPORT" yontrack main
 assert_eq "1" "$script_status" "no build, no call"
 assert_eq "" "$calls" "nothing is sent"
 
@@ -225,7 +225,7 @@ assert_eq "" "$calls" "nothing is sent"
 # ===============================================================================================
 
 REPO="$WORK/repo"
-git init -q -b v6 "$REPO"
+git init -q -b main "$REPO"
 for message in one two three; do
     git -C "$REPO" -c user.name=t -c user.email=t@t commit -q --allow-empty -m "$message"
 done
@@ -233,16 +233,16 @@ c1="$(git -C "$REPO" rev-parse HEAD~2)"
 c2="$(git -C "$REPO" rev-parse HEAD~1)"
 c3="$(git -C "$REPO" rev-parse HEAD)"
 build_json() {
-    printf '{"Id":"1","Name":"%s","DisplayName":"%s","Branch":{"Name":"v6","Project":{"Name":"yontrack"}}}' "$1" "$2"
+    printf '{"Id":"1","Name":"%s","DisplayName":"%s","Branch":{"Name":"main","Project":{"Name":"yontrack"}}}' "$1" "$2"
 }
 
 {
     echo "$c1 $(build_json b-1 6.0.0-rc-1)"
     echo "$c3 $(build_json b-3 6.0.0-rc-3)"
 } > "$WORK/builds.txt"
-run_script resolve yontrack v6 "$REPO"
+run_script resolve yontrack main "$REPO"
 assert_eq "0" "$script_status" "the head has a build: $out"
-assert_contains "$calls" "build search --project yontrack --branch v6 --commit $c3 --count 1 --output json --accept-not-found" \
+assert_contains "$calls" "build search --project yontrack --branch main --commit $c3 --count 1 --output json --accept-not-found" \
     "searched on the branch, by commit"
 assert_eq "1" "$(grep -c . <<< "$calls")" "the head only"
 assert_eq "commit=$c3
@@ -252,26 +252,26 @@ assert_not_contains "$out" "::notice" "nothing to notice"
 
 # The head is a [skip ci] commit, with no build of its own.
 echo "$c1 $(build_json b-1 6.0.0-rc-1)" > "$WORK/builds.txt"
-run_script resolve yontrack v6 "$REPO"
+run_script resolve yontrack main "$REPO"
 assert_eq "0" "$script_status" "an older commit with a build will do"
 assert_eq "$c3 $c2 $c1" "$(sed -e 's/.*--commit //' -e 's/ .*//' <<< "$calls" | tr '\n' ' ' | sed 's/ $//')" \
     "walking back one commit at a time, from the head"
 assert_contains "$(cat "$WORK/github-output.txt")" "commit=$c1" "and the commit to check out is that one"
 assert_contains "$(cat "$WORK/github-output.txt")" "build=b-1" "with its build"
-assert_contains "$out" "::notice title=SEARCH.PERFORMANCE::The head of v6 ($c3) has no Yontrack build; measuring $c1 instead" \
+assert_contains "$out" "::notice title=SEARCH.PERFORMANCE::The head of main ($c3) has no Yontrack build; measuring $c1 instead" \
     "which the run says"
 
-SEARCH_PERF_MAX_COMMITS=2 run_script resolve yontrack v6 "$REPO"
+SEARCH_PERF_MAX_COMMITS=2 run_script resolve yontrack main "$REPO"
 assert_eq "1" "$script_status" "no build in the window: fails"
 assert_eq "2" "$(grep -c . <<< "$calls")" "having looked no further than the window"
-assert_contains "$out" "None of the last 2 commits of v6 has a build" "and says so"
+assert_contains "$out" "None of the last 2 commits of main has a build" "and says so"
 assert_eq "" "$(cat "$WORK/github-output.txt" 2>/dev/null)" "with no output"
 
-FAKE_CLI_FAIL=1 run_script resolve yontrack v6 "$REPO"
+FAKE_CLI_FAIL=1 run_script resolve yontrack main "$REPO"
 assert_eq "1" "$script_status" "an instance that cannot be reached fails"
 assert_eq "1" "$(grep -c . <<< "$calls")" "at once, rather than reading as no build and walking on"
 
-run_script resolve yontrack v6 "$WORK/not-a-repo"
+run_script resolve yontrack main "$WORK/not-a-repo"
 assert_eq "1" "$script_status" "no history, no build"
 
 run_script nonsense

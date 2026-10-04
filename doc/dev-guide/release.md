@@ -151,6 +151,19 @@ last `RELEASE` on `main` — `5.5.7`, the last GA released from it — rather th
 
 `scripts/security-rescan.sh` still rescans GA releases only.
 
+### From alpha to GA
+
+The stage moves on a change of `VERSION`, against these criteria:
+
+* **Alpha → beta** (`X.Y-alpha` → `X.Y-beta`): the `X.Y` milestone has no open feature left. Bugs
+  may remain.
+* **Beta → GA** (`X.Y-beta` → `X.Y`), when all three hold:
+  * the deprecation gate passes — no `Removed in V<X>` marker left and an empty marker baseline,
+    see [the gate](major-branch.md#the-gate);
+  * the `X.Y` milestone is empty;
+  * an upgrade from a real database of the previous major's last minor has been run — a 5.5.x
+    database for 6.0, whose floor is `V68`.
+
 ## What is no longer possible
 
 `ci.yml` publishes nothing. The `RELEASE` and `JUST_BUILD_AND_PUSH` dispatch inputs, the

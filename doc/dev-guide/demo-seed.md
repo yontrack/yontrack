@@ -96,7 +96,7 @@ an ingress sending the call to the Next UI.
 
 **The deployed instances do not route it yet.** The chart's ingress
 (`charts/yontrack/templates/ingress.yaml` in `yontrack/yontrack-chart`) sends `/graphql` and
-`/hook` to the backend and everything else to the Next UI, so on v6.dev the seed leaves out the
+`/hook` to the backend and everything else to the Next UI, so on demo.dev the seed leaves out the
 evidence and `audit-trail-tampered` whatever the storage and the switch say. What is missing is a
 `/rest/extension/audit-trail` path to the backend service in that template - which is also what a
 pipeline posting evidence from outside the cluster needs, demo or not. It is a change of the chart,

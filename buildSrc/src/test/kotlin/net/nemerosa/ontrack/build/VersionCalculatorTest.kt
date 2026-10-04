@@ -201,34 +201,34 @@ class VersionCalculatorTest {
         assertEquals("5.3-claude-github-actions-pipeline-deadbee", version)
     }
 
-    // --- GITHUB_REF_NAME=v6 -> main versioning ---
+    // --- GITHUB_REF_NAME=v7 -> main versioning ---
 
     /**
-     * The next-major development branch (`v6`) is a second `main`: its own VERSION file, its own
+     * The next-major development branch (`v7`) is a second `main`: its own VERSION file, its own
      * promotion chain, its own environment. So it versions like `main` - from the VERSION file it
      * carries and the tags of that major - and not like a feature branch.
      */
     @Test
     fun `a major branch under GitHub Actions versions like main`() {
         val version = calculator(
-            githubRefName = "v6",
+            githubRefName = "v7",
             gitBranch = "HEAD",
-            versionFile = "6.0",
-            tags = listOf("5.5.0", "5.5.1"),
+            versionFile = "7.0",
+            tags = listOf("6.0.0", "6.0.1"),
             shortCommit = "deadbee",
         ).computeVersion()
-        assertEquals("6.0.0", version)
+        assertEquals("7.0.0", version)
     }
 
     @Test
     fun `a major branch takes the next patch of its own major`() {
         val version = calculator(
-            githubRefName = "v6",
+            githubRefName = "v7",
             gitBranch = "HEAD",
-            versionFile = "6.0",
-            tags = listOf("6.0.0", "6.0.3", "5.5.9"),
+            versionFile = "7.0",
+            tags = listOf("7.0.0", "7.0.3", "6.0.9"),
         ).computeVersion()
-        assertEquals("6.0.4", version)
+        assertEquals("7.0.4", version)
     }
 
     /**
@@ -238,12 +238,12 @@ class VersionCalculatorTest {
     @Test
     fun `a branch named after a major but with a suffix is a feature branch`() {
         val version = calculator(
-            githubRefName = "v6-spring-boot-4",
+            githubRefName = "v7-spring-boot-5",
             gitBranch = "HEAD",
-            versionFile = "6.0",
+            versionFile = "7.0",
             shortCommit = "deadbee",
         ).computeVersion()
-        assertEquals("6.0-v6-spring-boot-4-deadbee", version)
+        assertEquals("7.0-v7-spring-boot-5-deadbee", version)
     }
 
     // --- Feature branches ---

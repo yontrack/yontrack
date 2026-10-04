@@ -303,7 +303,7 @@ jobs:
           # `v<major>` is the development branch of the next major - a second `main`, with its own
           # VERSION file, its own promotion chain and its own environment - so it produces release
           # candidates just as main does. See doc/dev-guide/major-branch.md. Two patterns rather
-          # than a regex because `case` globs cannot express `v[0-9]+`; `v6-spring-boot-4` is a
+          # than a regex because `case` globs cannot express `v[0-9]+`; `v7-spring-boot-5` is a
           # feature branch and deliberately matches neither, exactly as in `VersionCalculator`.
           case "$BRANCH_NAME" in
             main|release/*|v[0-9]|v[0-9][0-9]) VERSION="${BASE_VERSION}-rc-${RUN_NUMBER}" ;;
