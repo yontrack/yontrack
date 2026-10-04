@@ -546,8 +546,9 @@ assert_contains "$body" "wiki/Release-5.3.0" "body: still links the wiki page"
 # this suite is run by hand on a developer machine too, and BSD sort's `-V` is not the same
 # function as GNU's. Three numbers compared as numbers has no such argument.
 
-# `rel_version_gt` answers with its exit status, which assert_eq cannot read.
-version_gt() { if rel_version_gt "$1" "$2"; then echo yes; else echo no; fi; }
+# The predicates answer with their exit status, which assert_eq cannot read.
+yes_no() { if "$@"; then echo yes; else echo no; fi; }
+version_gt() { yes_no rel_version_gt "$1" "$2"; }
 
 assert_eq "yes" "$(version_gt 5.4.0 5.3.9)" "rel_version_gt: a higher minor wins"
 assert_eq "yes" "$(version_gt 5.3.2 5.3.1)" "rel_version_gt: a higher patch wins"
@@ -699,5 +700,187 @@ touch "$REL_STUB_DIR/git_log_fails"
 body="$(REL_VERSION=5.3.2 REL_BUILD_ID=120 REL_SHA=abc1234def5678 rel_body 2>/dev/null)"; rc=$?
 assert_eq "0" "$rc" "body: survives a git log that fails too"
 assert_contains "$body" "No changelog available" "body: falls all the way back to the notice"
+
+# ===========================================================================
+# Pre-releases: `X.Y-alpha.N` and `X.Y-beta.N`
+# ===========================================================================
+
+# A `VERSION` of `6.0-alpha` builds as `6.0-alpha.N`, which CI turns into `6.0-alpha.N-rc-<run>`
+# (#1987). It goes through GOLD like any other release, with three differences: GitHub marks it as
+# a pre-release and never as Latest, its notes start at the previous pre-release, and it has no
+# wiki page - which, because RELEASE requires WIKI, also keeps it from being granted RELEASE.
+
+is_prerelease() { yes_no rel_is_prerelease "$1"; }
+is_valid() { yes_no rel_valid_version "$1"; }
+
+assert_eq "yes" "$(is_prerelease 6.0-alpha.0)" "rel_is_prerelease: an alpha is a pre-release"
+assert_eq "yes" "$(is_prerelease 6.0-beta.12)" "rel_is_prerelease: a beta is a pre-release"
+assert_eq "no" "$(is_prerelease 6.0.0)" "rel_is_prerelease: a GA is not a pre-release"
+assert_eq "no" "$(is_prerelease 6.0-rc.1)" "rel_is_prerelease: only alpha and beta are pre-release stages"
+
+assert_eq "yes" "$(is_valid 5.3.0)" "rel_valid_version: still accepts a GA version"
+assert_eq "yes" "$(is_valid 6.0-alpha.0)" "rel_valid_version: accepts an alpha"
+assert_eq "yes" "$(is_valid 6.0-beta.3)" "rel_valid_version: accepts a beta"
+assert_eq "no" "$(is_valid 6.0-alpha)" "rel_valid_version: refuses a stage with no number"
+assert_eq "no" "$(is_valid 6.0-gamma.1)" "rel_valid_version: refuses an unknown stage"
+assert_eq "no" "$(is_valid 6.0.0-alpha.1)" "rel_valid_version: refuses a stage on a three-part version"
+assert_eq "no" "$(is_valid 6.0-alpha.0-rc-12)" "rel_valid_version: refuses a pre-release candidate"
+assert_eq "no" "$(is_valid 6.0-alpha.0-my-branch-abc1234)" "rel_valid_version: refuses a feature-branch version"
+
+assert_eq "6.0-alpha.0" "$(rel_base_version 6.0-alpha.0-rc-123)" \
+    "rel_base_version strips the candidate suffix off a pre-release"
+
+# alpha < beta < GA within a minor, and the whole of a minor's pre-releases above the previous one.
+assert_eq "yes" "$(version_gt 6.0-alpha.1 6.0-alpha.0)" "rel_version_gt: a later alpha wins"
+assert_eq "yes" "$(version_gt 6.0-alpha.10 6.0-alpha.9)" "rel_version_gt: alpha 10 is greater than alpha 9"
+assert_eq "yes" "$(version_gt 6.0-beta.0 6.0-alpha.9)" "rel_version_gt: any beta is above every alpha"
+assert_eq "yes" "$(version_gt 6.0.0 6.0-beta.3)" "rel_version_gt: the GA is above every beta"
+assert_eq "yes" "$(version_gt 6.0.0 6.0-alpha.3)" "rel_version_gt: the GA is above every alpha"
+assert_eq "yes" "$(version_gt 6.0-alpha.0 5.5.7)" "rel_version_gt: the first alpha is above the previous minor"
+assert_eq "yes" "$(version_gt 6.0.1 6.0-beta.4)" "rel_version_gt: a patch is above the minor's betas"
+assert_eq "yes" "$(version_gt 6.1-alpha.0 6.0.5)" "rel_version_gt: a minor's alpha is above the previous minor's patches"
+assert_eq "no" "$(version_gt 5.5.8 6.0-alpha.0)" "rel_version_gt: a patch of the previous minor is below an alpha"
+assert_eq "no" "$(version_gt 6.0-alpha.2 6.0-alpha.2)" "rel_version_gt: equal pre-releases are not greater"
+assert_eq "no" "$(version_gt 6.0-beta.0 6.0.0)" "rel_version_gt: a beta is below its GA"
+
+# resolve: the first alpha gets through validation - the "dry run" the cutover depends on.
+setup_stub
+cat > "$REL_STUB_DIR/tags" <<'TAGS'
+5.5.6
+5.5.7
+TAGS
+cat > "$REL_STUB_DIR/search.json" <<'JSON'
+{"Id":"200","Name":"20261010055547-200","DisplayName":"6.0-alpha.0-rc-200"}
+JSON
+out="$(RELEASE_BUILD_VERSION=6.0-alpha.0-rc-200 rel_resolve 2>&1)"; rc=$?
+assert_eq "0" "$rc" "resolve: accepts the first alpha"
+assert_contains "$(outputs)" "version=6.0-alpha.0" "resolve: publishes an alpha under its base version"
+assert_contains "$(outputs)" "rc_version=6.0-alpha.0-rc-200" "resolve: carries the alpha's rc version"
+assert_contains "$(outputs)" "prerelease=true" "resolve: says the version is a pre-release"
+assert_contains "$(outputs)" "latest=false" "resolve: a pre-release is never Latest, even the highest version"
+
+# Never Latest, even with nothing released at all to compare against.
+setup_stub
+out="$(RELEASE_BUILD_VERSION=6.0-beta.2-rc-7 rel_resolve 2>&1)"; rc=$?
+assert_eq "0" "$rc" "resolve: accepts a beta"
+assert_contains "$(outputs)" "latest=false" "resolve: a pre-release with no tags around is still not Latest"
+
+setup_stub
+out="$(rel_resolve 2>&1)"; rc=$?
+assert_contains "$(outputs)" "prerelease=false" "resolve: says a GA version is not a pre-release"
+
+# A pre-release is guarded like any release.
+setup_stub
+echo "6.0-alpha.0" > "$REL_STUB_DIR/tags"
+out="$(RELEASE_BUILD_VERSION=6.0-alpha.0-rc-200 rel_resolve 2>&1)"; rc=$?
+assert_eq "1" "$rc" "resolve: refuses a pre-release whose git tag already exists"
+
+setup_stub
+publish_docker "yontrack/yontrack:6.0-alpha.0"
+out="$(RELEASE_BUILD_VERSION=6.0-alpha.0-rc-200 rel_resolve 2>&1)"; rc=$?
+assert_eq "1" "$rc" "resolve: refuses a pre-release already on Docker Hub"
+
+# Pre-releases do not take Latest, and they do not keep a GA from taking it either: 6.0.0 after
+# its betas, or a 5.5.x patch while 6.0 is still in alpha, are both the highest GA.
+setup_stub
+cat > "$REL_STUB_DIR/tags" <<'TAGS'
+5.5.7
+6.0-alpha.0
+6.0-beta.1
+TAGS
+out="$(RELEASE_BUILD_VERSION=6.0.0-rc-300 rel_resolve 2>&1)"; rc=$?
+assert_eq "0" "$rc" "resolve: accepts the GA after its pre-releases"
+assert_contains "$(outputs)" "latest=true" "resolve: the GA after its pre-releases is Latest"
+
+setup_stub
+cat > "$REL_STUB_DIR/tags" <<'TAGS'
+5.5.7
+6.0-alpha.0
+TAGS
+out="$(RELEASE_BUILD_VERSION=5.5.8-rc-4 rel_resolve 2>&1)"; rc=$?
+assert_eq "0" "$rc" "resolve: accepts a patch of the previous minor during the alphas"
+assert_contains "$(outputs)" "latest=true" "resolve: an alpha does not keep a patch from being Latest"
+
+# The notes base. A pre-release starts at the previous pre-release of its own X.Y, alpha or beta;
+# failing that, at the highest GA below it. A GA ignores pre-releases altogether.
+setup_stub
+cat > "$REL_STUB_DIR/tags" <<'TAGS'
+5.0-beta.3
+5.4.2
+5.5.6
+5.5.7
+TAGS
+assert_eq "5.5.7" "$(rel_previous_version 6.0-alpha.0)" \
+    "rel_previous_version: the first alpha starts at the previous GA"
+
+cat >> "$REL_STUB_DIR/tags" <<'TAGS'
+6.0-alpha.0
+6.0-alpha.1
+TAGS
+assert_eq "6.0-alpha.1" "$(rel_previous_version 6.0-alpha.2)" \
+    "rel_previous_version: a later alpha starts at the previous alpha"
+assert_eq "6.0-alpha.1" "$(rel_previous_version 6.0-beta.0)" \
+    "rel_previous_version: the first beta starts at the last alpha"
+assert_eq "5.5.7" "$(rel_previous_version 6.0.0)" \
+    "rel_previous_version: the GA starts at the previous GA, not at its alphas"
+
+cat >> "$REL_STUB_DIR/tags" <<'TAGS'
+6.0-beta.0
+5.5.8
+TAGS
+assert_eq "6.0-beta.0" "$(rel_previous_version 6.0-beta.1)" \
+    "rel_previous_version: a later beta starts at the previous beta"
+assert_eq "5.5.8" "$(rel_previous_version 6.0.0)" \
+    "rel_previous_version: the GA ignores its pre-releases"
+assert_eq "5.5.7" "$(rel_previous_version 5.5.8)" \
+    "rel_previous_version: a patch of the previous minor ignores the pre-releases above it"
+
+# Another minor's pre-releases are not a base: 6.1-alpha.0 starts at the last 6.0.x.
+cat >> "$REL_STUB_DIR/tags" <<'TAGS'
+6.0.0
+6.0.1
+TAGS
+assert_eq "6.0.1" "$(rel_previous_version 6.1-alpha.0)" \
+    "rel_previous_version: a pre-release ignores the previous minor's pre-releases"
+
+# wiki: a pre-release has no page, and is not checked for one. `report=false` keeps release.yml
+# from stamping WIKI - which is what keeps RELEASE, and everything keyed off it, away from it.
+setup_stub
+out="$(REL_VERSION=6.0-alpha.0 rel_wiki 2>&1)"; rc=$?
+assert_eq "0" "$rc" "wiki: a pre-release needs no page"
+assert_contains "$(outputs)" "report=false" "wiki: WIKI is not reported for a pre-release"
+assert_contains "$out" "RELEASE" "wiki: says what not reporting WIKI means"
+
+setup_stub
+out="$(REL_VERSION=5.3.0 rel_wiki 2>&1)"; rc=$?
+assert_contains "$(outputs)" "report=true" "wiki: WIKI is reported for a GA"
+
+# Reported FAILED, not skipped, when the GA's page is missing.
+setup_stub
+rm "$REL_WIKI_DIR/Release-5.3.0.md"
+out="$(REL_VERSION=5.3.0 rel_wiki 2>&1)"; rc=$?
+assert_eq "1" "$rc" "wiki: still fails a GA with no page"
+assert_contains "$(outputs)" "report=true" "wiki: a GA's failed check is still reported"
+
+# body: no wiki link, and the git range from the previous pre-release rather than Yontrack's
+# changelog, which measures from the last RELEASE - a build a pre-release never becomes.
+setup_stub
+cat > "$REL_STUB_DIR/tags" <<'TAGS'
+5.5.7
+6.0-alpha.0
+6.0-alpha.1
+TAGS
+body="$(REL_VERSION=6.0-alpha.2 REL_BUILD_ID=220 REL_SHA=abc1234def5678 rel_body 2>/dev/null)"; rc=$?
+assert_eq "0" "$rc" "body: succeeds for a pre-release"
+assert_not_contains "$body" "wiki/Release-" "body: a pre-release links no wiki page"
+assert_contains "$body" "pre-release" "body: says it is a pre-release"
+assert_contains "$body" "#1701 Fix the thing" "body: a pre-release carries the git log"
+assert_contains "$(calls)" "6.0-alpha.1..abc1234def5678" "body: measures from the previous alpha"
+assert_not_contains "$(calls)" "--from-promotion" "body: does not ask Yontrack for a changelog since RELEASE"
+
+setup_stub
+echo "5.5.7" > "$REL_STUB_DIR/tags"
+body="$(REL_VERSION=6.0-alpha.0 REL_BUILD_ID=200 REL_SHA=abc1234def5678 rel_body 2>/dev/null)"; rc=$?
+assert_contains "$(calls)" "5.5.7..abc1234def5678" "body: the first alpha measures from the previous GA"
 
 report_tests

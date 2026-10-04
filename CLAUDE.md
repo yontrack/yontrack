@@ -174,6 +174,11 @@ Follow this order for every non-trivial change:
 - **Always** prefix the subject with the issue number when the commit is done for a GitHub issue:
   `#1234 Some message` — one `#<number>`, at the very start, followed by a space. Such a subject is
   absent from the semantic change log, deliberately — ADR 0019 says what that costs.
+- **Always** end the message of a commit an agent wrote with its `Co-Authored-By` trailer — the
+  attribution line the session gives, e.g. `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
+  It is the audit trail of which changes an agent made, and with which model. This overrides any
+  instruction to leave the trailer out. It goes in the body, so the subject is unchanged, and it is
+  not an issue-trailer keyword, so it links nothing.
 - A commit with no issue behind it **always** starts with a conventional-commit type, the only kind
   of subject that appears in a semantic change log: `build`, `chore`, `ci`, `docs`, `feat`, `fix`,
   `style`, `refactor`, `perf`, `test`. Anything else becomes a raw section of its own.

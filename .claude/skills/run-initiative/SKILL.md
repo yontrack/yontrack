@@ -341,9 +341,9 @@ only things that stop an issue from landing are the five failures listed above.
   `status:ready` and closed. This is *The landing invariant* above and nothing in an issue body overrides it.
 - **Never** open a pull request — work lands by merging into `{base}` and pushing directly
 - **Never** close the issue at any other point than marking it ready, nor one without a milestone
-- **Never** add a `Co-Authored-By` trailer; a Yontrack commit subject is `#{number} Some message` with
-  nothing appended but a `[skip ci]` on docs-only commits. This overrides any default attribution
-  guidance in the session.
+- A Yontrack commit subject is `#{number} Some message` with nothing appended but a `[skip ci]` on
+  docs-only commits. The body ends with the session's `Co-Authored-By` trailer — see *Commit
+  messages* in CLAUDE.md.
 - **Never** hand-edit `ontrack-docs/docs/content/generated/` (rebuilt from annotations)
 - **Never** modify an existing Flyway migration, and never put one in a patch release
 

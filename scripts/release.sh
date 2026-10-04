@@ -12,15 +12,17 @@
 #
 #   resolve  Finds the build the version names, works out the version to publish, and refuses
 #            to publish over anything that already exists. Outputs `version`, `rc_version`,
-#            `build`, `build_id`, `run_id`, `sha` and `latest`; every later step is driven by
-#            those.
+#            `build`, `build_id`, `run_id`, `sha`, `latest` and `prerelease`; every later step is
+#            driven by those.
 #   docs     Finds the docs artefact on the CI run recorded on the build, before anything is
 #            published. Outputs `artifact_id`.
 #   wiki     Checks the release page exists in the wiki and is reachable from the index. A
-#            check, not a publication step - the page is written by a human before GOLD.
+#            check, not a publication step - the page is written by a human before GOLD. Outputs
+#            `report`, false for a pre-release, which has no page and is not stamped WIKI.
 #   body     Composes the GitHub release body: the wiki link first, the changelog second. Falls
 #            back to the git range when Yontrack has no changelog to give, which is the normal
-#            case on a freshly cut release branch.
+#            case on a freshly cut release branch. A pre-release has no wiki link, and the git
+#            range is its changelog.
 #
 # Environment:
 #   YONTRACK_URL           Yontrack instance
@@ -81,36 +83,62 @@ rel_base_version() {
     printf '%s' "$1" | sed -E 's/-rc-[0-9]+$//'
 }
 
-# A version is three dot-separated numbers and nothing else. A build with no `release` property
-# has its own name - a timestamp-run pair - as its display name, and publishing under that
-# would tag Docker Hub with a timestamp.
-rel_valid_version() {
-    printf '%s' "$1" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'
+# A version as five numbers to compare field by field: major, minor, patch, stage, stage number.
+# The stage is 0 for alpha, 1 for beta and 2 for a GA, which puts `6.0-alpha.N` < `6.0-beta.M` <
+# `6.0.0`, and a pre-release's patch is 0, which puts `6.0.1` above `6.0-beta.M` and `5.5.7` below
+# `6.0-alpha.0`. Fails on anything that is not a version.
+rel_version_key() {
+    local v="$1"
+    if [[ "$v" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+        echo "${BASH_REMATCH[1]} ${BASH_REMATCH[2]} ${BASH_REMATCH[3]} 2 0"
+    elif [[ "$v" =~ ^([0-9]+)\.([0-9]+)-(alpha|beta)\.([0-9]+)$ ]]; then
+        local stage=0
+        [ "${BASH_REMATCH[3]}" = "beta" ] && stage=1
+        echo "${BASH_REMATCH[1]} ${BASH_REMATCH[2]} 0 $stage ${BASH_REMATCH[4]}"
+    else
+        return 1
+    fi
 }
 
-# Whether $1 is strictly greater than $2, both `X.Y.Z`.
+# A version is three dot-separated numbers, or a pre-release, and nothing else. A build with no
+# `release` property has its own name - a timestamp-run pair - as its display name, and
+# publishing under that would tag Docker Hub with a timestamp.
+rel_valid_version() {
+    rel_version_key "$1" > /dev/null
+}
+
+# A pre-release: `X.Y-alpha.N` or `X.Y-beta.N`, what `VersionCalculator` builds from a `VERSION`
+# of `X.Y-alpha` or `X.Y-beta` (#1987). Published like a release, but as a GitHub pre-release,
+# never Latest, with no wiki page - and so never granted RELEASE, see `rel_wiki`.
+rel_is_prerelease() {
+    local key
+    key="$(rel_version_key "$1")" || return 1
+    [ "$(echo "$key" | cut -d' ' -f4)" != 2 ]
+}
+
+# Whether $1 is strictly greater than $2, both versions in `rel_valid_version`'s sense.
 #
 # Field by field as numbers, rather than `sort -V`: the release runs on ubuntu-latest, but
 # release-test.sh is run by hand on a developer machine too, and BSD `sort -V` is not GNU's. The
 # comparison that matters either way is 5.3.10 against 5.3.9, which any string ordering gets
-# backwards.
+# backwards - and `6.0-beta.0` against `6.0.0`, which `sort -V` gets backwards too.
 rel_version_gt() {
-    local i av bv
+    local i ak bk
     local -a af bf
-    IFS=. read -r -a af <<< "$1"
-    IFS=. read -r -a bf <<< "$2"
-    for i in 0 1 2; do
-        av="${af[i]:-0}"
-        bv="${bf[i]:-0}"
-        [ "$av" -gt "$bv" ] && return 0
-        [ "$av" -lt "$bv" ] && return 1
+    ak="$(rel_version_key "$1")" || return 1
+    bk="$(rel_version_key "$2")" || return 1
+    read -r -a af <<< "$ak"
+    read -r -a bf <<< "$bk"
+    for i in 0 1 2 3 4; do
+        [ "${af[i]}" -gt "${bf[i]}" ] && return 0
+        [ "${af[i]}" -lt "${bf[i]}" ] && return 1
     done
     return 1
 }
 
-# Every released version, from the git tags. `rel_valid_version`'s shape, and nothing else: the
-# repository also carries `experimental-pipeline-<sha>` tags and `-rc-` candidates, and neither is
-# a release.
+# Every released version, pre-releases included, from the git tags. `rel_valid_version`'s shape,
+# and nothing else: the repository also carries `experimental-pipeline-<sha>` tags and `-rc-`
+# candidates, and neither is a release.
 rel_version_tags() {
     rel_git_tags | while read -r tag; do
         rel_valid_version "$tag" && printf '%s\n' "$tag"
@@ -128,27 +156,45 @@ rel_version_tags() {
 # `gh release create` defaults `make_latest` to true. Left at that default, a 5.3.2 patch
 # published after 5.4.0 takes the badge and flips the README's `shields.io/github/v/release`,
 # announcing a patch of the *previous* minor as the current release (#1702).
+#
+# A pre-release is never Latest, and pre-releases are not in the comparison: a 5.5.8 patch
+# published while 6.0 is in alpha is the highest GA, and GitHub would not give the badge to a
+# pre-release anyway.
 rel_is_latest() {
     local version="$1" tag
+    rel_is_prerelease "$version" && return 1
     while read -r tag; do
         [ -n "$tag" ] || continue
+        rel_is_prerelease "$tag" && continue
         rel_version_gt "$tag" "$version" && return 1
     done <<< "$(rel_version_tags)"
     return 0
 }
 
-# The highest released version below $1, or empty when nothing came before it. The lower boundary
-# of the changelog fallback below.
+# The released version below $1 its notes start at, or empty when nothing came before it. The
+# lower boundary of the changelog fallback below.
+#
+# A GA starts at the highest GA below it: pre-releases are ignored, so 6.0.0 starts at 5.5.7 and
+# its notes cover the whole of 6.0. A pre-release starts at the previous pre-release of its own
+# X.Y, alpha or beta, or at the highest GA below it when it is the first: `6.0-alpha.0` starts at
+# 5.5.7, `6.0-beta.0` at the last alpha.
 rel_previous_version() {
-    local version="$1" tag best=""
+    local version="$1" tag best="" best_pre=""
     while read -r tag; do
         [ -n "$tag" ] || continue
         rel_version_gt "$version" "$tag" || continue
-        if [ -z "$best" ] || rel_version_gt "$tag" "$best"; then
+        if rel_is_prerelease "$tag"; then
+            rel_is_prerelease "$version" || continue
+            # Same X.Y: what comes before the stage, `6.0` in `6.0-alpha.1`.
+            [ "${tag%%-*}" = "${version%%-*}" ] || continue
+            if [ -z "$best_pre" ] || rel_version_gt "$tag" "$best_pre"; then
+                best_pre="$tag"
+            fi
+        elif [ -z "$best" ] || rel_version_gt "$tag" "$best"; then
             best="$tag"
         fi
     done <<< "$(rel_version_tags)"
-    printf '%s' "$best"
+    printf '%s' "${best_pre:-$best}"
 }
 
 # ---------------------------------------------------------------------------------------------
@@ -324,9 +370,12 @@ rel_resolve() {
     # step. See `rel_is_latest`.
     local latest=false
     rel_is_latest "$version" && latest=true
+    local prerelease=false
+    rel_is_prerelease "$version" && prerelease=true
 
     rel_log "Releasing $rc_version (build $build_name) as $version, from CI run $run_id on $sha."
     rel_log "Latest release: $latest."
+    rel_log "Pre-release: $prerelease."
     rel_output version "$version"
     rel_output rc_version "$rc_version"
     rel_output build "$build_name"
@@ -334,6 +383,7 @@ rel_resolve() {
     rel_output run_id "$run_id"
     rel_output sha "$sha"
     rel_output latest "$latest"
+    rel_output prerelease "$prerelease"
     rel_summary "Releasing \`$rc_version\` as \`$version\` from [CI run $run_id](${GITHUB_SERVER_URL:-https://github.com}/$REL_REPOSITORY/actions/runs/$run_id)."
     return 0
 }
@@ -373,8 +423,25 @@ rel_docs() {
 # `WIKI` is a validation on the build like the other three, but it records a check rather than a
 # publication - the page is what makes the GitHub release worth opening, and the release links
 # to it, so a missing or unreachable page makes the release a dead end.
+#
+# A pre-release has no page, and its release does not link one. It is not checked, and `report`
+# says so: release.yml stamps WIKI only when it is true. RELEASE requires WIKI, so a pre-release
+# records its publication - DOCKER.HUB, DOCUMENTATION, GITHUB.RELEASE - without being granted
+# RELEASE, and nothing keyed off RELEASE fires for it: no self.dev deployment, no Slack message,
+# no doc.yontrack.com dispatch (#1987). The self.dev slot's admission rules cannot tell an alpha
+# from a GA, and a notification subscription made by CI is never removed, so filtering each of
+# them on the version is not an option. See `.yontrack/ci.yaml`.
 rel_wiki() {
     local version="${REL_VERSION:-}" dir="${REL_WIKI_DIR:-wiki}"
+
+    if rel_is_prerelease "$version"; then
+        rel_output report false
+        rel_log "$version is a pre-release: no release page is required, WIKI is not reported, and RELEASE is not granted."
+        return 0
+    fi
+    # Before any check: a GA whose check fails is still stamped, FAILED.
+    rel_output report true
+
     [ -n "$version" ] || { rel_fail "REL_VERSION is not set: no page to look for."; return 1; }
 
     local page="Release-$version.md"
@@ -433,6 +500,17 @@ rel_body() {
     local version="${REL_VERSION:-}" changelog
     [ -n "$version" ] || { rel_fail "REL_VERSION is not set: nothing to describe."; return 1; }
 
+    # A pre-release has no wiki page to link, and Yontrack's changelog measures from the last
+    # RELEASE, which a pre-release never becomes: from `6.0-alpha.3` it would reach back to 5.5.7.
+    # The git range from the previous pre-release is the changelog there.
+    if rel_is_prerelease "$version"; then
+        changelog="$(rel_git_changelog 2>/dev/null)" || changelog=""
+        printf '## Pre-release\n\n'
+        printf 'A pre-release of Yontrack %s, with no release notes page of its own.\n\n' "${version%%-*}"
+        rel_body_changes "$changelog"
+        return 0
+    fi
+
     # A changelog that cannot be computed must not sink the release. The first release after
     # this pipeline lands has no previous RELEASE build to measure from, and the part a human
     # wrote - the wiki page - is there either way.
@@ -447,13 +525,18 @@ rel_body() {
 
     printf '## Release notes\n\n'
     printf '%s/%s/wiki/Release-%s\n\n' "${GITHUB_SERVER_URL:-https://github.com}" "$REL_REPOSITORY" "$version"
+    rel_body_changes "$changelog"
+    return 0
+}
+
+# The `Changes` section of the release body, saying so when there is nothing to show.
+rel_body_changes() {
     printf '## Changes\n\n'
-    if [ -n "$changelog" ]; then
-        printf '%s\n' "$changelog"
+    if [ -n "$1" ]; then
+        printf '%s\n' "$1"
     else
         printf '_No changelog available._\n'
     fi
-    return 0
 }
 
 rel_main() {
