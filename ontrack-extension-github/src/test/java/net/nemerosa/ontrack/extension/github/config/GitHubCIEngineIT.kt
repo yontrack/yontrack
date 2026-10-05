@@ -3,6 +3,7 @@ package net.nemerosa.ontrack.extension.github.config
 import net.nemerosa.ontrack.extension.config.ConfigTestSupport
 import net.nemerosa.ontrack.extension.config.EnvFixtures
 import net.nemerosa.ontrack.extension.github.AbstractGitHubTestSupport
+import net.nemerosa.ontrack.extension.github.client.UseGitHubClientMock
 import net.nemerosa.ontrack.extension.github.workflow.BuildGitHubWorkflowRunPropertyType
 import net.nemerosa.ontrack.it.AsAdminTest
 import org.junit.jupiter.api.Test
@@ -11,6 +12,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
+@UseGitHubClientMock
 class GitHubCIEngineIT : AbstractGitHubTestSupport() {
 
     @Autowired
