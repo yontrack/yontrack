@@ -2,6 +2,7 @@ package net.nemerosa.ontrack.extension.github.ingestion.processing.events
 
 import net.nemerosa.ontrack.common.Time
 import net.nemerosa.ontrack.extension.general.AutoPromotionPropertyType
+import net.nemerosa.ontrack.extension.github.client.UseGitHubClientMock
 import net.nemerosa.ontrack.extension.github.ingestion.AbstractIngestionTestSupport
 import net.nemerosa.ontrack.extension.github.ingestion.IngestionHookFixtures
 import net.nemerosa.ontrack.extension.github.ingestion.config.model.IngestionConfig
@@ -30,6 +31,7 @@ import kotlin.test.fail
  * Testing the auto promotion setup.
  */
 @ContextConfiguration(classes = [ConfigLoaderServiceITMockConfig::class])
+@UseGitHubClientMock
 class AutoPromotionIT : AbstractIngestionTestSupport() {
 
     @Autowired

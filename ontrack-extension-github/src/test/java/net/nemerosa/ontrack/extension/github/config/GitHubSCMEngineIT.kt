@@ -9,6 +9,7 @@ import net.nemerosa.ontrack.extension.git.property.GitBranchConfigurationPropert
 import net.nemerosa.ontrack.extension.git.property.GitCommitPropertyType
 import net.nemerosa.ontrack.extension.git.support.GitCommitPropertyCommitLink
 import net.nemerosa.ontrack.extension.github.AbstractGitHubTestSupport
+import net.nemerosa.ontrack.extension.github.client.UseGitHubClientMock
 import net.nemerosa.ontrack.extension.github.property.GitHubProjectConfigurationPropertyType
 import net.nemerosa.ontrack.extension.github.service.GitHubConfigurationService
 import net.nemerosa.ontrack.it.AsAdminTest
@@ -23,6 +24,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 
+@UseGitHubClientMock
 class GitHubSCMEngineIT : AbstractGitHubTestSupport() {
 
     @Autowired
