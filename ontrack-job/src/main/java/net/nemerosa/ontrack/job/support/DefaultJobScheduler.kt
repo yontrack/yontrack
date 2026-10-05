@@ -447,16 +447,33 @@ constructor(
                 } else if (paused.get() && !force) {
                     logger.debug("[job][run]{} Not allowed to run now because paused", job.key)
                     return Optional.empty()
-                } else if (currentExecution.get() != null) {
-                    logger.debug("[job][run]{} Not allowed to run now because already running", job.key)
-                    return Optional.empty()
                 } else {
+                    // Registers the execution before submitting the task, since the task
+                    // clears it on completion, possibly before the submission returns
+                    val execution = CompletableFuture<Void?>()
+                    if (!currentExecution.compareAndSet(null, execution)) {
+                        logger.debug("[job][run]{} Not allowed to run now because already running", job.key)
+                        return Optional.empty()
+                    }
                     // Task to run
                     val taskRun = run
                     // Scheduling
                     logger.debug("[job][run]{} Job task submitted asynchronously", job.key)
-                    val execution = CompletableFuture.runAsync(taskRun, jobExecutorService)
-                    currentExecution.set(execution)
+                    try {
+                        jobExecutorService.execute {
+                            // Stopped before having started
+                            if (execution.isDone) return@execute
+                            try {
+                                taskRun.run()
+                                execution.complete(null)
+                            } catch (any: Throwable) {
+                                execution.completeExceptionally(any)
+                            }
+                        }
+                    } catch (any: RejectedExecutionException) {
+                        currentExecution.compareAndSet(execution, null)
+                        throw any
+                    }
                     return Optional.of(execution)
                 }
             } else {

@@ -180,6 +180,28 @@ class JobSchedulingTest : AbstractJobTest() {
     }
 
     @Test
+    fun `A job completing before its submission returns can be fired again`() {
+        // Runs the task inline, so it completes before the submission returns
+        val jobScheduler = DefaultJobScheduler(
+                jobDecorator = NOPJobDecorator.INSTANCE,
+                scheduler = scheduler,
+                jobListener = NOPJobListener.INSTANCE,
+                initiallyPaused = false,
+                jobExecutorService = { it.run() },
+                scattering = false,
+                scatteringRatio = 1.0
+        )
+        val job = ConfigurableJob()
+        jobScheduler.schedule(job, Schedule.NONE)
+        jobScheduler.fireImmediately(job.key).orElseThrow { IllegalStateException("First run not fired") }.get()
+        assertPresent(jobScheduler.getJobStatus(job.key)) {
+            assertFalse(it.isRunning, "Job is no longer running")
+        }
+        jobScheduler.fireImmediately(job.key).orElseThrow { IllegalStateException("Second run not fired") }.get()
+        assertEquals(2, job.count)
+    }
+
+    @Test
     fun `Removing a running job`() {
         scheduler {
             val job = job(Schedule.EVERY_SECOND)
