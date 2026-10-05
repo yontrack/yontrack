@@ -367,6 +367,19 @@ jobs:
           VERSION: ${{ needs.setup.outputs.version }}
         run: yontrack build set-property release "$VERSION"
 
+      # The same version a second time, as the `rc-version` meta-info item. The `release`
+      # property above becomes the base version when release.yml publishes the build; this item
+      # never changes, and stays the GHCR tag the build was pushed as. The demo slot deploys it
+      # and demo-smoke.yml resolves the build by it (#1999).
+      - name: Record the rc version on the build
+        env:
+          VERSION: ${{ needs.setup.outputs.version }}
+          BUILD_ID: ${{ steps.config.outputs.buildId }}
+        run: |
+          set -euo pipefail
+          source scripts/yontrack-build.sh
+          yontrack_record_rc_version "$BUILD_ID" "$VERSION"
+
   # ---------------------------------------------------------------------------------------------
   # Compile, unit tests, backend Docker image.
   #

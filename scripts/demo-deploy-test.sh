@@ -82,6 +82,16 @@ if [ "${1:-}" = "slot" ] && [ "${2:-}" = "pipeline" ] && [ "${3:-}" = "start" ];
     exit 0
 fi
 
+# The rc version the slot will deploy, rendered from the build's `rc-version` meta-info item.
+if [ "${1:-}" = "graphql" ]; then
+    if [ -f "$DD_STUB_DIR/rc_fails" ]; then
+        echo "cannot reach Yontrack" >&2
+        exit 1
+    fi
+    emit rc.json
+    exit 0
+fi
+
 echo "unexpected command: $*" >&2
 exit 1
 STUB
@@ -119,6 +129,10 @@ JSON
 
     cat > "$DD_STUB_DIR/resolve.json" <<'JSON'
 {"Id":"77","Name":"20260801010101-77","DisplayName":"5.3.0-rc-77"}
+JSON
+
+    cat > "$DD_STUB_DIR/rc.json" <<'JSON'
+{"build":{"rcVersion":"5.3.0-rc-100"}}
 JSON
 }
 
@@ -283,6 +297,27 @@ JSON
 out="$(dd_main 2>&1)"; rc=$?
 assert_eq "1" "$rc" "unreadable build: fails rather than deploying something unnamed"
 assert_not_contains "$(calls)" "slot pipeline start" "unreadable build: starts no pipeline"
+
+# A build CI registered before it recorded the `rc-version` item: the slot would render it
+# as `#error` and write that as the image tag, which is the demo down again (#1999). Refused
+# before anything starts, nightly or manual alike.
+setup_stub
+echo '{"build":{"rcVersion":""}}' > "$DD_STUB_DIR/rc.json"
+out="$(DEMO_MANUAL=true dd_main 2>&1)"; rc=$?
+assert_eq "1" "$rc" "no rc version: fails"
+assert_contains "$out" "rc-version" "no rc version: names the missing item"
+assert_not_contains "$(calls)" "slot pipeline start" "no rc version: starts no pipeline"
+assert_contains "$(calls)" '{"id":100}' "no rc version: asks about the resolved build"
+
+setup_stub
+touch "$DD_STUB_DIR/rc_fails"
+out="$(dd_main 2>&1)"; rc=$?
+assert_eq "1" "$rc" "rc version unreadable: fails"
+assert_not_contains "$(calls)" "slot pipeline start" "rc version unreadable: starts no pipeline"
+
+setup_stub
+out="$(dd_main 2>&1)"; rc=$?
+assert_contains "$out" "image tag 5.3.0-rc-100" "a build with an rc version: says which tag the demo gets"
 
 # --- report ----------------------------------------------------------------
 

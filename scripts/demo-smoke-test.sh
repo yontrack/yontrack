@@ -80,6 +80,12 @@ STUB
 chmod +x "$STUB_ROOT/bin/curl"
 
 # The Yontrack CLI, used only to resolve the deployed version back to a build name.
+#
+# Two lookups, told apart by their flags: by the `rc-version` meta-info item, answered from
+# rc-build.json (absent by default, which is a build CI registered before that item existed),
+# and by display name, answered from build.json. `search_empty` and `search_fails` hit both;
+# `display_search_empty` only the second, which is what a GOLD build looks like: its display
+# name is no longer the rc version.
 cat > "$STUB_ROOT/bin/yontrack" <<'STUB'
 #!/usr/bin/env bash
 set -uo pipefail
@@ -94,7 +100,21 @@ if [ "${1:-}" = "build" ] && [ "${2:-}" = "search" ]; then
     if [ -f "$DSM_STUB_DIR/search_empty" ]; then
         exit 0
     fi
+    case " $* " in
+        *" --with-property "*)
+            [ -f "$DSM_STUB_DIR/rc-build.json" ] && cat "$DSM_STUB_DIR/rc-build.json"
+            exit 0
+            ;;
+    esac
+    if [ -f "$DSM_STUB_DIR/display_search_empty" ]; then
+        exit 0
+    fi
     cat "$DSM_STUB_DIR/build.json"
+    exit 0
+fi
+
+if [ "${1:-}" = "graphql" ]; then
+    echo '{"data":{"setBuildMetaInfoPropertyById":{"errors":null}}}'
     exit 0
 fi
 
@@ -412,6 +432,29 @@ out="$(dsm_resolve_build 5.3.0-rc-10 2>&1)"
 assert_contains "$(calls)" '--with-display-name ^5\.3\.0-rc-10$' \
     "dsm_resolve_build asks for an exact match on the display name"
 
+# A GOLD build: the release property, and with it the display name, became the base version
+# when release.yml published it. The rc version the slot deployed is still on the build, as its
+# `rc-version` meta-info item, which nothing renames (#1999).
+setup_stub
+echo '{"Id":"562","Name":"20261005092915-562","DisplayName":"6.0-alpha.0"}' > "$DSM_STUB_DIR/rc-build.json"
+touch "$DSM_STUB_DIR/display_search_empty"
+out="$(dsm_resolve_build 6.0-alpha.0-rc-562 2>&1)"; rc=$?
+assert_eq "0" "$rc" "dsm_resolve_build finds a GOLD build by its rc version"
+assert_eq "20261005092915-562" "$out" "dsm_resolve_build returns the GOLD build's name"
+assert_contains "$(calls)" \
+    '--with-property net.nemerosa.ontrack.extension.general.MetaInfoPropertyType --with-property-value rc-version:6.0-alpha.0-rc-562' \
+    "dsm_resolve_build looks the rc version up in the build's meta-info"
+assert_not_contains "$(calls)" "--with-display-name" \
+    "dsm_resolve_build does not fall back once the meta-info has answered"
+
+# A build registered before CI recorded the meta-info item: its display name is still the rc
+# version, unless it went GOLD since.
+setup_stub
+out="$(dsm_resolve_build 5.3.0-rc-100 2>&1)"; rc=$?
+assert_eq "0" "$rc" "dsm_resolve_build falls back to the display name without the meta-info"
+assert_contains "$(calls)" '--with-display-name ^5\.3\.0-rc-100$' \
+    "dsm_resolve_build falls back to an exact display name match"
+
 setup_stub
 touch "$DSM_STUB_DIR/search_empty"
 out="$(dsm_resolve_build 5.3.0-rc-999 2>&1)"; rc=$?
@@ -427,6 +470,29 @@ setup_stub
 echo '{"unexpected":"shape"}' > "$DSM_STUB_DIR/build.json"
 out="$(dsm_resolve_build 5.3.0-rc-100 2>&1)"; rc=$?
 assert_eq "1" "$rc" "dsm_resolve_build fails rather than validating something unnamed"
+
+# --- yontrack_record_rc_version ---------------------------------------------
+
+# What ci.yml records is what the lookup above, and the demo slot in .yontrack/ci.yaml, read:
+# the same item name, appended to the build's other meta-info rather than replacing it.
+setup_stub
+out="$(yontrack_record_rc_version 562 6.0-alpha.0-rc-562 2>&1)"; rc=$?
+assert_eq "0" "$rc" "yontrack_record_rc_version passes when the mutation does"
+assert_contains "$(calls)" '"id":562' "yontrack_record_rc_version targets the build by its ID"
+assert_contains "$(calls)" '"append":true' "yontrack_record_rc_version keeps the other meta-info items"
+assert_contains "$(calls)" '{"name":"rc-version","value":"6.0-alpha.0-rc-562"}' \
+    "yontrack_record_rc_version records the item the lookup reads"
+assert_contains "$(calls)" "--fail-on-user-errors" \
+    "yontrack_record_rc_version fails when the mutation reports an error"
+
+# The demo slot hands the same item to the gitops repository as `image.tag` and to this script
+# as the version to wait for and resolve. `${build.release}` there is the bug of #1999: it is the
+# base version once the build is GOLD, a tag GHCR never carries.
+demo_slot="$(sed -n '/- name: demo.dev.yontrack.com/,/- name: self.dev.yontrack.com/p' \
+    "$SCRIPT_DIR/../.yontrack/ci.yaml" | grep -v '^ *#')"
+assert_eq "2" "$(grep -c 'build.meta?name=rc-version&error=true' <<<"$demo_slot")" \
+    "the demo slot deploys and smoke-tests the rc-version item"
+assert_not_contains "$demo_slot" 'build.release' "the demo slot never reads the release property"
 
 # --- the entry points -------------------------------------------------------
 

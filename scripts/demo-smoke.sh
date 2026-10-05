@@ -316,11 +316,19 @@ dsm_casc_project_role() {
 # DEMO.SMOKE is reported with `yontrack validate --build`, which takes the build *name* - the
 # opaque timestamp-run pair. The slot workflow cannot pass it: `${build}` renders the build's
 # display name, which is the release property, and no templating source exposes the raw name.
-# So the version is resolved back to a build here, the same way demo-deploy.sh resolves the
-# one it deploys - and by the same code, so the two cannot drift onto different builds.
+# So the version is resolved back to a build here, by the same shared code demo-deploy.sh
+# uses, so the two cannot drift onto different builds.
+#
+# The version is the rc version, the one the image was built as and reports as `full`, and it
+# is looked up in the build's `rc-version` meta-info first: once the build goes GOLD its display
+# name is the base version, and the rc version names nothing else (#1999). The display name is
+# the fallback, for builds CI registered before it recorded that item.
 dsm_resolve_build() {
     local version="$1" json name
-    json="$(yontrack_build_by_display_name "$DSM_YONTRACK_PROJECT" "$DSM_YONTRACK_BRANCH" "$version")" || return 1
+    json="$(yontrack_build_by_rc_version "$DSM_YONTRACK_PROJECT" "$DSM_YONTRACK_BRANCH" "$version")" || return 1
+    if [ -z "$json" ]; then
+        json="$(yontrack_build_by_display_name "$DSM_YONTRACK_PROJECT" "$DSM_YONTRACK_BRANCH" "$version")" || return 1
+    fi
     [ -z "$json" ] && {
         dsm_fail "No build named $version in $DSM_YONTRACK_PROJECT/$DSM_YONTRACK_BRANCH."
         return 1

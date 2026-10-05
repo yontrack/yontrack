@@ -491,10 +491,24 @@ configuration:
                           targetPropertyType: "yaml-path"
                           targetProperty: "image.tag"
                           # The build NAME is a timestamp-run pair (20260901055547-36), never
-                          # a tag. The `release` property, which ci.yml sets on every build, is
-                          # the version - 5.3.0-rc-36 on main - and that IS the durable GHCR tag
-                          # pushed by #1661. Same reasoning as the self slot, see #1660.
-                          targetVersion: "${build.release}"
+                          # a tag. The rc version - 5.3.0-rc-36 on main - IS the durable GHCR tag
+                          # pushed by #1661, and ci.yml records it on every build twice: as the
+                          # `release` property and as the `rc-version` meta-info item.
+                          #
+                          # The meta-info item, not `${build.release}`: release.yml rewrites the
+                          # release property to the base version when the build goes GOLD, and
+                          # GHCR never carries that tag - so a GOLD build deployed here, by the
+                          # nightly or by hand, left the demo in ImagePullBackOff (#1999). The
+                          # self slot, below, pulls from Docker Hub, where the base version is
+                          # the tag, and keeps `${build.release}`.
+                          #
+                          # A build registered before CI recorded the item has nothing to render
+                          # here: `error=true` turns that into a templating error, which the default
+                          # `ontrack.config.templating.errors`, IGNORE, renders as
+                          # `#error` - no better a tag than an empty one. demo-deploy.sh refuses
+                          # such a build before starting the pipeline; a deployment started from
+                          # the slot UI is not checked.
+                          targetVersion: "${build.meta?name=rc-version&error=true}"
                           autoApproval: true
                           prTitleTemplate: "Deploying ${sourceProject} version ${VERSION} to the demo"
                           prBodyTemplateFormat: "markdown"
@@ -517,6 +531,11 @@ configuration:
                       # display name rather than its name, so the workflow resolves the build
                       # itself. `project` and `branch` are left to the workflow's own defaults
                       # (yontrack/main), which is also what this slot is scoped to.
+                      #
+                      # The rc version, as for `image.tag` above: it is what the image reports
+                      # as `info.version.full`, which the workflow waits for, and what it
+                      # resolves the build by. The base version would match neither once the
+                      # build is GOLD (#1999).
                       - id: "smoke"
                         description: "Smoke-testing the demo deployment"
                         parents:
@@ -533,7 +552,7 @@ configuration:
                             callMode: ASYNC
                             inputs:
                               - name: version
-                                value: "${build.release}"
+                                value: "${build.meta?name=rc-version&error=true}"
               - name: self.dev.yontrack.com
                 admissionRules:
                   # A RELEASE build is deployable from `main` and from a patch branch alike. The
