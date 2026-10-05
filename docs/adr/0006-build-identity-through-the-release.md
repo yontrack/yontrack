@@ -122,9 +122,20 @@ so `release.yml` hard-fails when the git tag or any of the four Docker Hub tags
 already exists. Silently overwriting a published tag is the worst failure this
 design can produce, and it is the derivation that makes it possible at all.
 
-**Auto-versioning templates read `${build.release}`, never `${build}`.** The slot
-that deploys to the demo needs the GHCR tag, which is the version, not the build
-name. This was got wrong once already — the `self` slot's `targetVersion` was
-`${build}`, which renders the name — and the shape of this decision is what makes
-that error easy to make and easy to miss: both render *something*, and only one
-of them is a tag.
+**Auto-versioning templates read the version, never `${build}`.** A slot needs
+an image tag, which is a version, not the build name. This was got wrong once
+already — the `self` slot's `targetVersion` was `${build}`, which renders the
+name — and the shape of this decision is what makes that error easy to make and
+easy to miss: both render *something*, and only one of them is a tag.
+
+Which version depends on the registry the slot pulls from. `self` pulls RELEASE
+builds from Docker Hub, where the tag is the base version, and reads
+`${build.release}`. The demo pulls from GHCR, which only ever carries the rc
+version, and `${build.release}` stops being that version the moment the build
+goes GOLD: a GOLD build deployed there wrote a tag GHCR does not have, and took
+the demo down (#1999). So `ci.yml` also records the rc version as the build's
+`rc-version` meta-info item, which nothing renames, and the demo slot reads
+`${build.meta?name=rc-version&error=true}` — as does `demo-smoke.yml`, which
+waits for the version the image reports as `full`, the rc one, and resolves the
+build by that item. `demo-deploy.sh` refuses a build without it rather than let
+the slot render `#error` as a tag.

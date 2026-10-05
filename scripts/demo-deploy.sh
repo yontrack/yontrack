@@ -124,7 +124,17 @@ dd_main() {
         return 0
     fi
 
-    dd_log "Starting a deployment of $build_display on $slot_id"
+    # The slot deploys the build's `rc-version` meta-info item as the image tag. A build CI
+    # registered before it recorded that item has none, and the slot would render it as `#error`
+    # - a tag GHCR does not carry, so the demo's only pod would sit in ImagePullBackOff (#1999).
+    local rc_version
+    rc_version="$(yontrack_rc_version_of "$build_id")" || return 1
+    [ -z "$rc_version" ] && {
+        dd_fail "Build $build_display carries no rc-version meta-info item, so the demo slot has no image tag to deploy. See #1999."
+        return 1
+    }
+
+    dd_log "Starting a deployment of $build_display on $slot_id, image tag $rc_version"
     local start_json pipeline_id pipeline_number
     # The CLI fails on its own when the payload carries errors, or when no
     # pipeline came back without one either.
