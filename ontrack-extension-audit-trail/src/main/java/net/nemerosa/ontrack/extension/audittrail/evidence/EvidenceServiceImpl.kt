@@ -19,6 +19,7 @@ import net.nemerosa.ontrack.model.security.Actor
 import net.nemerosa.ontrack.model.security.ProjectView
 import net.nemerosa.ontrack.model.security.SecurityService
 import net.nemerosa.ontrack.model.security.ValidationRunCreate
+import net.nemerosa.ontrack.model.structure.Build
 import net.nemerosa.ontrack.model.structure.ID
 import net.nemerosa.ontrack.model.structure.StructureService
 import net.nemerosa.ontrack.model.structure.ValidationRun
@@ -205,6 +206,11 @@ class EvidenceServiceImpl(
     override fun getEvidences(validationRun: ValidationRun): List<Evidence> {
         securityService.checkProjectFunction(validationRun, ProjectView::class.java)
         return evidenceRepository.findByValidationRun(validationRun.id())
+    }
+
+    override fun getEvidences(build: Build): List<Evidence> {
+        securityService.checkProjectFunction(build, ProjectView::class.java)
+        return evidenceRepository.findByBuild(build.id())
     }
 
     override fun getEvidence(id: Int): Evidence {

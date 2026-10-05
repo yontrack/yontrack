@@ -904,6 +904,8 @@ type BuildAuditTrail {
   endorsements: [AuditTrailEndorsement!]!
   "Entries of the trail, by seq"
   entries: [AuditTrailEntry!]!
+  "Evidences of every validation run of the build, deleted ones included, in the order of their upload"
+  evidence: [Evidence!]!
   "Verification of the trail: its chain, its endorsements and, on demand, its evidence"
   verification(
     "Whether to check the evidence the trail references too"
@@ -2415,6 +2417,8 @@ type Evidence {
   size: Long!
   "Where the client says the evidence comes from"
   source: EvidenceSource
+  "Validation run the evidence is attached to"
+  validationRun: ValidationRun!
   "ID of the validation run the evidence is attached to"
   validationRunId: Int!
 }

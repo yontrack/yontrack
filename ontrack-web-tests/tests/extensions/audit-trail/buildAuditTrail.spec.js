@@ -94,3 +94,41 @@ test('audit trail of a build whose trail is broken', async ({page, ontrack}) => 
     // The entry failing the verification is marked in the table, not by its colour alone
     await expect(page.getByTestId('audit-trail-entries').getByRole('img', {name: 'Fails the verification'})).toHaveCount(1)
 })
+
+test('evidence of every validation of a build on its audit trail', async ({page, ontrack}) => {
+    const project = await ontrack.createProject()
+    const branch = await project.createBranch()
+    const scan = await branch.createValidationStamp()
+    const tests = await branch.createValidationStamp()
+    const build = await branch.createBuild()
+    const scanRun = await build.validate(scan, {status: "PASSED"})
+    const testsRun = await build.validate(tests, {status: "PASSED"})
+    await scanRun.uploadEvidence({name: 'trivy.json', mimeType: 'application/json', content: '{"vulnerabilities": []}'})
+    await testsRun.uploadEvidence({name: 'junit.txt', mimeType: 'text/plain', content: '42 tests passed'})
+
+    await login(page, ontrack)
+    await goToAuditTrail(page, build)
+
+    // The evidence of both validations, with the run each is attached to
+    const evidence = page.getByTestId('audit-trail-evidence')
+    await expect(evidence).toContainText('Evidence (2)')
+    await expect(evidence.getByText('trivy.json')).toBeVisible()
+    await expect(evidence.getByText('junit.txt')).toBeVisible()
+    await expect(evidence.getByRole('link', {name: `${scan.name} #1`})).toBeVisible()
+    await expect(evidence.getByRole('link', {name: `${tests.name} #1`})).toBeVisible()
+
+    // A filter on the name narrows the list, the title keeping the total
+    await evidence.getByRole('button', {name: 'Filter by name or SHA-256'}).click()
+    const nameFilter = page.getByPlaceholder('Name or SHA-256')
+    await nameFilter.fill('TRIVY')
+    await nameFilter.press('Enter')
+    await expect(evidence.getByText('trivy.json')).toBeVisible()
+    await expect(evidence.getByText('junit.txt')).toHaveCount(0)
+    await expect(evidence).toContainText('Evidence (2)')
+    await expect(page.getByTestId('build-evidence-filtered')).toHaveText('1 of 2 evidence')
+
+    // The verification of the evidence finds it intact
+    await page.getByTestId('audit-trail-verify-evidence').click()
+    await expect(page.getByTestId('audit-trail-evidence-badge')).toHaveText('Evidence intact')
+    await expect(evidence.getByTestId('evidence-flag')).toHaveCount(0)
+})

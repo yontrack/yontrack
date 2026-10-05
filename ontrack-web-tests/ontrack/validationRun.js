@@ -1,5 +1,6 @@
 import {graphQLCall, graphQLCallMutation} from "@ontrack/graphql";
 import {gql} from "graphql-request";
+import {restCallPostMultipart} from "@ontrack/rest";
 
 const validationRunFragment = gql`
     fragment ValidationRunData on ValidationRun {
@@ -97,7 +98,23 @@ const validationRunInstance = (ontrack, build, validationStamp, data) => {
         validationStamp,
     }
 
-    // TODO Validation run methods
+    /**
+     * Attaches an evidence to the validation run, through its upload end point.
+     *
+     * @param name Name of the file
+     * @param mimeType Its media type
+     * @param content Its content, as a string
+     * @return The evidence
+     */
+    run.uploadEvidence = async ({name, mimeType, content}) => {
+        const formData = new FormData()
+        formData.append('file', new Blob([content], {type: mimeType}), name)
+        return restCallPostMultipart(
+            ontrack.connection,
+            `/rest/extension/audit-trail/validation-runs/${run.id}/evidence`,
+            formData,
+        )
+    }
 
     return run
 }

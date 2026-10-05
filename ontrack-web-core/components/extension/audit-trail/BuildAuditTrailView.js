@@ -14,6 +14,8 @@ import PageSection from "@components/common/PageSection";
 import Table from "@components/common/table/Table";
 import TimestampText from "@components/common/TimestampText";
 import {actorText, entrySummary, evidenceBadge, trailBadge} from "@components/extension/audit-trail/auditTrailModel";
+import {evidenceVerificationFlags} from "@components/extension/audit-trail/evidenceModel";
+import BuildEvidence from "@components/extension/audit-trail/BuildEvidence";
 
 const gqlVerificationFields = `
     chainIntact
@@ -33,6 +35,7 @@ const gqlVerificationFields = `
 
 export const gqlBuildAuditTrail = gql`
     query BuildAuditTrail($id: Int!) {
+        auditTrailStorageState
         build(id: $id) {
             id
             name
@@ -63,6 +66,30 @@ export const gqlBuildAuditTrail = gql`
                     keyId
                     time
                 }
+                evidence {
+                    id
+                    fileName
+                    mediaType
+                    size
+                    sha256
+                    collectedAt
+                    collectedBy
+                    source {
+                        tool
+                        version
+                        url
+                    }
+                    externalDigest
+                    deletedAt
+                    downloadUrl
+                    validationRun {
+                        id
+                        runOrder
+                        validationStamp {
+                            name
+                        }
+                    }
+                }
                 verification {
                     ${gqlVerificationFields}
                 }
@@ -84,6 +111,8 @@ export const gqlBuildAuditTrailEvidenceVerification = gql`
 `
 
 const NO_ENTRIES = []
+
+const NO_EVIDENCE = []
 
 /**
  * Icon of each state of the badge, next to its text, so that the state never relies on the
@@ -127,12 +156,13 @@ const JsonBlock = ({value, label}) =>
 
 /**
  * The trail of a build: its verification badge, with the verification of its evidence on demand,
- * and its entries.
+ * the evidence of its validations, and its entries.
  *
  * @param buildId ID of the build
  * @param auditTrail `BuildAuditTrail` of the build
+ * @param storageState `AuditTrailStorageState`
  */
-export function BuildAuditTrailContent({buildId, auditTrail}) {
+export function BuildAuditTrailContent({buildId, auditTrail, storageState}) {
 
     // Verification including the evidence, run on demand - it reads every blob back
     const [evidenceVerification, setEvidenceVerification] = useState(null)
@@ -162,6 +192,7 @@ export function BuildAuditTrailContent({buildId, auditTrail}) {
     const entries = auditTrail.entries ?? NO_ENTRIES
     const endorsedSeqs = new Map((auditTrail.endorsements ?? []).map(endorsement => [endorsement.seq, endorsement]))
     const problemSeqs = new Set(problems.map(problem => problem.seq))
+    const evidenceFlags = evidenceVerificationFlags(entries, verification)
 
     return (
         <Space orientation="vertical" className="ot-line">
@@ -216,6 +247,11 @@ export function BuildAuditTrailContent({buildId, auditTrail}) {
                     }
                 </Space>
             </PageSection>
+            <BuildEvidence
+                evidence={auditTrail.evidence ?? NO_EVIDENCE}
+                flags={evidenceFlags}
+                storageState={storageState}
+            />
             <PageSection id="audit-trail-entries" title={`Entries (${entries.length})`}>
                 <Table
                     dataSource={entries}
@@ -305,12 +341,12 @@ export function BuildAuditTrailContent({buildId, auditTrail}) {
  */
 export default function BuildAuditTrailView({id}) {
 
-    const {data: loadedBuild, loading, finished, error} = useQuery(gqlBuildAuditTrail, {
+    const {data, loading, finished, error} = useQuery(gqlBuildAuditTrail, {
         variables: {id: Number(id)},
         deps: [id],
         condition: !!id,
-        dataFn: data => data.build,
     })
+    const loadedBuild = data?.build
     const auditTrail = loadedBuild?.auditTrail
 
     const commands = []
@@ -354,7 +390,11 @@ export default function BuildAuditTrailView({id}) {
                         />
                     }
                     {
-                        auditTrail && <BuildAuditTrailContent buildId={id} auditTrail={auditTrail}/>
+                        auditTrail && <BuildAuditTrailContent
+                            buildId={id}
+                            auditTrail={auditTrail}
+                            storageState={data.auditTrailStorageState}
+                        />
                     }
                 </LoadingContainer>
             </MainPage>

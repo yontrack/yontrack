@@ -56,9 +56,35 @@ const auditTrail = (overrides = {}) => ({
         {seq: 1, keyId: '0123456789abcdef', time: '2026-10-03T08:15:30.120Z'},
         {seq: 2, keyId: '0123456789abcdef', time: '2026-10-03T08:16:00.000Z'},
     ],
+    evidence: [],
     verification: verification(),
     ...overrides,
 })
+
+const evidenceEntry = {
+    id: 3, seq: 3, type: 'evidence.attached', time: '2026-10-03T08:17:00.000Z', actor,
+    payload: {
+        validationStamp: {id: 4, name: 'scan'},
+        validationRun: {id: 8, order: 1},
+        evidence: {id: 21, fileName: 'trivy.json'},
+    },
+    prevHash: 'h2', hash: 'h3',
+}
+
+const evidence = {
+    id: 21,
+    fileName: 'trivy.json',
+    mediaType: 'application/json',
+    size: 2048,
+    sha256: 'b'.repeat(64),
+    collectedAt: '2026-10-03T08:17:00.000',
+    collectedBy: actor,
+    source: null,
+    externalDigest: null,
+    deletedAt: null,
+    downloadUrl: '/rest/extension/audit-trail/evidence/21/download',
+    validationRun: {id: 8, runOrder: 1, validationStamp: {name: 'scan'}},
+}
 
 describe('BuildAuditTrailContent', () => {
 
@@ -106,5 +132,31 @@ describe('BuildAuditTrailContent', () => {
         expect(await screen.findByTestId('audit-trail-evidence-error'))
             .toHaveTextContent('The evidence storage cannot be reached.')
         expect(screen.getByTestId('audit-trail-badge')).toHaveTextContent('Intact')
+    })
+
+    it('shows the evidence of the build between the verification and the entries', () => {
+        const trail = auditTrail({evidence: [evidence]})
+        trail.entries.push(evidenceEntry)
+        render(<BuildAuditTrailContent buildId={5} auditTrail={trail} storageState="OK"/>)
+        const verificationSection = screen.getByTestId('audit-trail-verification')
+        const evidenceSection = screen.getByTestId('audit-trail-evidence')
+        const entriesSection = screen.getByTestId('audit-trail-entries')
+        expect(verificationSection.compareDocumentPosition(evidenceSection) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+        expect(evidenceSection.compareDocumentPosition(entriesSection) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+        expect(within(evidenceSection).getByText('Evidence (1)')).toBeInTheDocument()
+        expect(within(evidenceSection).getByText('trivy.json')).toBeInTheDocument()
+        expect(within(evidenceSection).queryByTestId('evidence-flag')).toBeNull()
+    })
+
+    it('flags the evidence the verification of the evidence found altered', async () => {
+        mockCallGraphQL.mockResolvedValue({
+            build: {auditTrail: {verification: verification({missingEvidence: [], alteredEvidence: [3]})}},
+        })
+        const trail = auditTrail({evidence: [evidence]})
+        trail.entries.push(evidenceEntry)
+        render(<BuildAuditTrailContent buildId={5} auditTrail={trail} storageState="OK"/>)
+        fireEvent.click(screen.getByTestId('audit-trail-verify-evidence'))
+        const evidenceSection = screen.getByTestId('audit-trail-evidence')
+        expect(await within(evidenceSection).findByTestId('evidence-flag')).toHaveTextContent('Altered')
     })
 })

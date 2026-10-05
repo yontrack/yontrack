@@ -1,5 +1,6 @@
 package net.nemerosa.ontrack.extension.audittrail.evidence
 
+import net.nemerosa.ontrack.model.structure.Build
 import net.nemerosa.ontrack.model.structure.ValidationRun
 
 /**
@@ -44,6 +45,14 @@ interface EvidenceService {
      * @param validationRun Validation run, which the current user can see
      */
     fun getEvidences(validationRun: ValidationRun): List<Evidence>
+
+    /**
+     * Evidences of every validation run of a build — every run of every stamp — deleted ones
+     * included, in the order of their upload.
+     *
+     * @param build Build, which the current user can see
+     */
+    fun getEvidences(build: Build): List<Evidence>
 
     /**
      * Evidence by ID, as long as the current user can see its validation run.

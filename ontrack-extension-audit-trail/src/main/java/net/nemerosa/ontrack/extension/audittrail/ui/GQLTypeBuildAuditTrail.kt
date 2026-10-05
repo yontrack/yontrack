@@ -3,6 +3,7 @@ package net.nemerosa.ontrack.extension.audittrail.ui
 import graphql.Scalars.GraphQLBoolean
 import graphql.schema.GraphQLArgument
 import graphql.schema.GraphQLObjectType
+import net.nemerosa.ontrack.extension.audittrail.evidence.EvidenceService
 import net.nemerosa.ontrack.extension.audittrail.hash.TrailHashFormatV1
 import net.nemerosa.ontrack.extension.audittrail.service.TrailService
 import net.nemerosa.ontrack.extension.audittrail.verification.TrailVerificationService
@@ -13,14 +14,17 @@ import net.nemerosa.ontrack.graphql.support.toNotNull
 import org.springframework.stereotype.Component
 
 /**
- * `BuildAuditTrail` — the trail of a build: its entries, their endorsements and its verification.
+ * `BuildAuditTrail` — the trail of a build: its entries, their endorsements, the evidence of its
+ * validation runs and its verification.
  */
 @Component
 class GQLTypeBuildAuditTrail(
     private val gqlTypeAuditTrailEntry: GQLTypeAuditTrailEntry,
     private val gqlTypeAuditTrailEndorsement: GQLTypeAuditTrailEndorsement,
     private val gqlTypeAuditTrailVerification: GQLTypeAuditTrailVerification,
+    private val gqlTypeEvidence: GQLTypeEvidence,
     private val trailService: TrailService,
+    private val evidenceService: EvidenceService,
     private val trailVerificationService: TrailVerificationService,
 ) : GQLType {
 
@@ -55,6 +59,15 @@ class GQLTypeBuildAuditTrail(
                                 time = TrailHashFormatV1.formatTime(endorsement.time),
                             )
                         }
+                    }
+            }
+            .field {
+                it.name("evidence")
+                    .description("Evidences of every validation run of the build, deleted ones included, in the order of their upload")
+                    .type(listType(gqlTypeEvidence.typeRef))
+                    .dataFetcher { env ->
+                        val trail: BuildAuditTrail = env.getSource()!!
+                        evidenceService.getEvidences(trail.build).map { evidence -> EvidenceView.of(evidence) }
                     }
             }
             .field {

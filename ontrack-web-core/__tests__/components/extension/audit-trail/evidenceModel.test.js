@@ -3,7 +3,10 @@ import {
     canUploadEvidence,
     evidenceSize,
     evidenceSourceUrl,
+    evidenceFilterOptions,
     evidenceStorageMessage,
+    evidenceVerificationFlags,
+    filterEvidence,
     isPreviewOffered,
     PREVIEW_MAX_SIZE,
     previewKind,
@@ -202,5 +205,121 @@ describe('uploadErrorText', () => {
 
     it('falls back on the status', () => {
         expect(uploadErrorText(502, null)).toBe('The evidence could not be uploaded (HTTP 502).')
+    })
+})
+
+const buildEvidence = (id, overrides = {}) => evidence({
+    id,
+    sha256: `${id}`.repeat(64).substring(0, 64),
+    validationRun: {id: 100 + id, runOrder: 1, validationStamp: {name: 'scan'}},
+    ...overrides,
+})
+
+const attached = (seq, evidenceId) => ({seq, type: 'evidence.attached', payload: {evidence: {id: evidenceId}}})
+
+describe('evidenceVerificationFlags', () => {
+
+    const entries = [
+        {seq: 1, type: 'build.created', payload: {}},
+        attached(2, 10),
+        attached(3, 11),
+        attached(4, 12),
+        {seq: 5, type: 'evidence.deleted', payload: {evidence: {id: 12}}},
+    ]
+
+    it('flags nothing while the evidence was not verified', () => {
+        const flags = evidenceVerificationFlags(entries, {missingEvidence: null, alteredEvidence: null})
+        expect(flags.verified).toBe(false)
+        expect(flags.byId.size).toBe(0)
+    })
+
+    it('flags nothing when the evidence is intact', () => {
+        const flags = evidenceVerificationFlags(entries, {missingEvidence: [], alteredEvidence: []})
+        expect(flags.verified).toBe(true)
+        expect(flags.byId.size).toBe(0)
+    })
+
+    it('maps the seqs of the failing entries to their evidence', () => {
+        const flags = evidenceVerificationFlags(entries, {missingEvidence: [2], alteredEvidence: [4]})
+        expect(flags.verified).toBe(true)
+        expect(flags.byId.get(10)).toBe('missing')
+        expect(flags.byId.get(11)).toBeUndefined()
+        expect(flags.byId.get(12)).toBe('altered')
+    })
+
+    it('ignores a seq which is not an evidence.attached entry', () => {
+        const flags = evidenceVerificationFlags(entries, {missingEvidence: [1, 5], alteredEvidence: []})
+        expect(flags.byId.size).toBe(0)
+    })
+})
+
+describe('evidenceFilterOptions', () => {
+
+    it('lists the media types and the validation stamps present, sorted, once each', () => {
+        const options = evidenceFilterOptions([
+            buildEvidence(1, {mediaType: 'image/png', validationRun: {validationStamp: {name: 'tests'}}}),
+            buildEvidence(2, {mediaType: 'application/pdf'}),
+            buildEvidence(3, {mediaType: 'image/png'}),
+        ])
+        expect(options.mediaTypes).toEqual(['application/pdf', 'image/png'])
+        expect(options.validationStamps).toEqual(['scan', 'tests'])
+    })
+
+    it('lists nothing for no evidence', () => {
+        expect(evidenceFilterOptions([])).toEqual({mediaTypes: [], validationStamps: []})
+    })
+})
+
+describe('filterEvidence', () => {
+
+    const items = [
+        buildEvidence(1, {fileName: 'Trivy-Report.pdf', sha256: 'abcdef' + '0'.repeat(58)}),
+        buildEvidence(2, {fileName: 'sbom.json', mediaType: 'application/json', validationRun: {validationStamp: {name: 'sbom'}}}),
+        buildEvidence(3, {fileName: 'old.pdf', deletedAt: '2026-10-01T10:00:00Z', downloadUrl: null}),
+        buildEvidence(4, {fileName: 'screenshot.png', mediaType: 'image/png', sha256: 'fedcba' + '1'.repeat(58)}),
+    ]
+    const noFlags = {verified: false, byId: new Map()}
+    const ids = (filtered) => filtered.map(item => item.id)
+
+    it('keeps everything without a filter', () => {
+        expect(ids(filterEvidence(items, {}, noFlags))).toEqual([1, 2, 3, 4])
+    })
+
+    it('matches the text against the name, ignoring the case', () => {
+        expect(ids(filterEvidence(items, {text: 'report'}, noFlags))).toEqual([1])
+    })
+
+    it('matches the text against the start of the SHA-256, ignoring the case', () => {
+        expect(ids(filterEvidence(items, {text: 'FEDC'}, noFlags))).toEqual([4])
+        // Not in the middle of the SHA-256
+        expect(ids(filterEvidence(items, {text: 'cdef'}, noFlags))).toEqual([])
+    })
+
+    it('ignores a blank text', () => {
+        expect(ids(filterEvidence(items, {text: '  '}, noFlags))).toEqual([1, 2, 3, 4])
+    })
+
+    it('keeps the media types picked', () => {
+        expect(ids(filterEvidence(items, {mediaTypes: ['application/json', 'image/png']}, noFlags))).toEqual([2, 4])
+    })
+
+    it('keeps the validation stamps picked', () => {
+        expect(ids(filterEvidence(items, {validationStamps: ['sbom']}, noFlags))).toEqual([2])
+    })
+
+    it('keeps the active or the deleted evidence', () => {
+        expect(ids(filterEvidence(items, {states: ['active']}, noFlags))).toEqual([1, 2, 4])
+        expect(ids(filterEvidence(items, {states: ['deleted']}, noFlags))).toEqual([3])
+        expect(ids(filterEvidence(items, {states: ['active', 'deleted']}, noFlags))).toEqual([1, 2, 3, 4])
+    })
+
+    it('keeps the evidence failing the verification', () => {
+        const flags = {verified: true, byId: new Map([[2, 'missing'], [4, 'altered']])}
+        expect(ids(filterEvidence(items, {states: ['failing']}, flags))).toEqual([2, 4])
+        expect(ids(filterEvidence(items, {states: ['deleted', 'failing']}, flags))).toEqual([2, 3, 4])
+    })
+
+    it('combines the filters', () => {
+        expect(ids(filterEvidence(items, {text: '.p', mediaTypes: ['application/pdf'], states: ['active']}, noFlags))).toEqual([1])
     })
 })

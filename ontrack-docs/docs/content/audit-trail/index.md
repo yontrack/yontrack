@@ -126,6 +126,14 @@ The page shows:
 * **Verify including evidence**, which verifies the trail again, reading every evidence back from
   the storage to check its SHA-256, and adds a second badge — *Evidence intact*, or the seqs of
   the `evidence.attached` entries whose file is missing or altered;
+* the **evidence** of every validation of the build — every run of every validation stamp, deleted
+  evidence included — in the order of its upload. Each evidence shows its validation run, linked to
+  its page, and its state: *Active* or *Deleted*, marked *Missing* or *Altered* once **Verify
+  including evidence** found its file absent or changed. The list can be filtered by name or start
+  of SHA-256, by type, by validation stamp and by state — the title keeps the total. Evidence is
+  previewed and downloaded here; it is uploaded and deleted on the
+  [validation run page](#evidence-on-a-validation-run). When the evidence storage is not
+  configured or cannot be reached, the list still shows, without preview nor download;
 * the **entries**: seq, time, type, actor and a summary, each expandable to its payload and actor;
 * **Export JSON**, which downloads the [export](#json-export) of the trail.
 

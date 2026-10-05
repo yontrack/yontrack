@@ -1,22 +1,17 @@
 import {useState} from "react";
 import {gql} from "graphql-request";
-import {Alert, Button, Empty, Popconfirm, Space, Tag, Typography} from "antd";
-import {FaDownload, FaEye, FaTrash, FaUpload} from "react-icons/fa";
+import {Alert, Button, Empty, Popconfirm, Space, Typography} from "antd";
+import {FaTrash, FaUpload} from "react-icons/fa";
 import Table from "@components/common/table/Table";
-import TimestampText from "@components/common/TimestampText";
 import {callGraphQL, useQuery} from "@components/services/GraphQL";
 import {getGraphQLErrors} from "@components/services/graphql-utils";
 import {useRefresh} from "@components/common/RefreshUtils";
-import {evidenceDownloadUri} from "@components/common/Links";
-import {actorText} from "@components/extension/audit-trail/auditTrailModel";
 import {
     canDeleteEvidence,
     canUploadEvidence,
-    evidenceSize,
-    evidenceSourceUrl,
     evidenceStorageMessage,
-    isPreviewOffered,
 } from "@components/extension/audit-trail/evidenceModel";
+import {EvidenceReadActions, evidenceColumns} from "@components/extension/audit-trail/EvidenceCells";
 import EvidencePreview from "@components/extension/audit-trail/EvidencePreview";
 import EvidenceUploadDialog from "@components/extension/audit-trail/EvidenceUploadDialog";
 
@@ -57,28 +52,6 @@ const gqlDeleteEvidence = gql`
 `
 
 const NO_EVIDENCE = []
-
-/**
- * Where an evidence comes from, as its client said it.
- */
-const EvidenceSourceCell = ({source}) => {
-    if (!source) {
-        return <Typography.Text type="secondary">-</Typography.Text>
-    }
-    const tool = [source.tool, source.version].filter(it => !!it).join(' ')
-    const url = evidenceSourceUrl(source.url)
-    return (
-        <Space orientation="vertical" size={0}>
-            {tool && <Typography.Text>{tool}</Typography.Text>}
-            {
-                url &&
-                <Typography.Link href={url} target="_blank" rel="noopener noreferrer" style={{wordBreak: 'break-all'}}>
-                    {url}
-                </Typography.Link>
-            }
-        </Space>
-    )
-}
 
 /**
  * The evidence of a validation run, as the cell of its page shows it: the list, with a preview of
@@ -130,82 +103,14 @@ export function ValidationRunEvidenceContent({run, evidence, storageState, loadi
     }
 
     const columns = [
-        {
-            key: 'fileName',
-            title: 'Name',
-            render: (_, item) =>
-                item.deletedAt ?
-                    <Space orientation="vertical" size={0}>
-                        <Typography.Text delete type="secondary">{item.fileName}</Typography.Text>
-                        <span>
-                            <Tag>Deleted</Tag>
-                            <TimestampText value={item.deletedAt}/>
-                        </span>
-                    </Space> :
-                    <Typography.Text strong>{item.fileName}</Typography.Text>,
-        },
-        {
-            key: 'mediaType',
-            title: 'Type',
-            render: (_, {mediaType}) => <Typography.Text code>{mediaType}</Typography.Text>,
-        },
-        {
-            key: 'size',
-            title: 'Size',
-            render: (_, {size}) => <span title={`${size} bytes`}>{evidenceSize(size)}</span>,
-        },
-        {
-            key: 'sha256',
-            title: 'SHA-256',
-            width: '22em',
-            render: (_, {sha256}) =>
-                <Typography.Text
-                    code
-                    copyable={{text: sha256, tooltips: ['Copy the SHA-256', 'Copied']}}
-                    style={{wordBreak: 'break-all', fontSize: '0.85em'}}
-                >{sha256}</Typography.Text>,
-        },
-        {
-            key: 'collected',
-            title: 'Collected',
-            render: (_, {collectedAt, collectedBy}) =>
-                <Space orientation="vertical" size={0}>
-                    <TimestampText value={collectedAt}/>
-                    <Typography.Text type="secondary">{actorText(collectedBy)}</Typography.Text>
-                </Space>,
-        },
-        {
-            key: 'source',
-            title: 'Source',
-            render: (_, {source}) => <EvidenceSourceCell source={source}/>,
-        },
+        ...evidenceColumns(),
         {
             key: 'actions',
             title: 'Actions',
             render: (_, item) =>
                 !item.deletedAt &&
                 <Space size="small">
-                    {
-                        isPreviewOffered(item) &&
-                        <Button
-                            size="small"
-                            icon={<FaEye aria-hidden="true"/>}
-                            aria-label={`Preview ${item.fileName}`}
-                            title="Preview"
-                            onClick={() => setPreview(item)}
-                        />
-                    }
-                    {
-                        item.downloadUrl &&
-                        <Button
-                            size="small"
-                            icon={<FaDownload aria-hidden="true"/>}
-                            href={evidenceDownloadUri(item)}
-                            download={item.fileName}
-                            aria-label={`Download ${item.fileName}`}
-                            title="Download"
-                        />
-                    }
+                    <EvidenceReadActions item={item} onPreview={setPreview}/>
                     {
                         canDelete &&
                         <Popconfirm

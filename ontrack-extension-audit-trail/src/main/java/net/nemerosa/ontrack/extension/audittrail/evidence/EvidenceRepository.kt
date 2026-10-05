@@ -27,6 +27,12 @@ interface EvidenceRepository {
     fun findByValidationRun(validationRunId: Int): List<Evidence>
 
     /**
+     * Evidences attached to the validation runs of a build, deleted ones included, in the order of
+     * their upload.
+     */
+    fun findByBuild(buildId: Int): List<Evidence>
+
+    /**
      * Marks an evidence as deleted, its row being kept.
      *
      * @param id ID of the evidence

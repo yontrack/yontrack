@@ -156,3 +156,90 @@ export const evidenceSourceUrl = (url) =>
  */
 export const uploadErrorText = (status, body) =>
     body?.message || body?.error || `The evidence could not be uploaded (HTTP ${status}).`
+
+/**
+ * The evidence the verification found missing or altered, once the evidence was verified.
+ *
+ * The verification names the failing `evidence.attached` entries by their seq: each is mapped to
+ * the evidence its payload records. A seq which is not an `evidence.attached` entry is ignored.
+ *
+ * @param entries Entries of the trail
+ * @param verification `AuditTrailVerification`, whose `missingEvidence` and `alteredEvidence` are
+ * `null` until the evidence is verified
+ * @return {{verified: boolean, byId: Map<number, 'missing'|'altered'>}} Whether the evidence was
+ * verified, and the flag of each failing evidence by its ID
+ */
+export const evidenceVerificationFlags = (entries, verification) => {
+    const missing = verification?.missingEvidence
+    const altered = verification?.alteredEvidence
+    const byId = new Map()
+    const verified = !!missing || !!altered
+    if (verified) {
+        const evidenceIds = new Map(
+            (entries ?? [])
+                .filter(entry => entry.type === 'evidence.attached')
+                .map(entry => [entry.seq, entry.payload?.evidence?.id])
+        )
+        const flag = (seqs, value) => (seqs ?? []).forEach(seq => {
+            const id = evidenceIds.get(seq)
+            if (id !== undefined && id !== null) {
+                byId.set(id, value)
+            }
+        })
+        flag(missing, 'missing')
+        flag(altered, 'altered')
+    }
+    return {verified, byId}
+}
+
+const distinctSorted = (values) => [...new Set(values.filter(value => !!value))].sort()
+
+/**
+ * What the filters of the evidence of a build offer to pick: the media types and the validation
+ * stamps present among the evidence, sorted, once each.
+ *
+ * @param evidence Evidence of the build, each with its `validationRun`
+ */
+export const evidenceFilterOptions = (evidence) => ({
+    mediaTypes: distinctSorted(evidence.map(item => item.mediaType)),
+    validationStamps: distinctSorted(evidence.map(item => item.validationRun?.validationStamp?.name)),
+})
+
+/**
+ * State of an evidence for the State filter: `active` or `deleted`, and `failing` too when the
+ * verification flagged it.
+ */
+const evidenceStates = (item, flags) => {
+    const states = [item.deletedAt ? 'deleted' : 'active']
+    if (flags?.byId?.has(item.id)) {
+        states.push('failing')
+    }
+    return states
+}
+
+const matchesText = (item, text) => {
+    const needle = text.trim().toLowerCase()
+    return !needle ||
+        item.fileName.toLowerCase().includes(needle) ||
+        item.sha256.toLowerCase().startsWith(needle)
+}
+
+const matchesAny = (picked, values) => !picked || picked.length === 0 || values.some(value => picked.includes(value))
+
+/**
+ * The evidence of a build kept by the filters of its table. An absent or empty filter keeps
+ * everything; the filters combine.
+ *
+ * @param evidence Evidence of the build, each with its `validationRun`
+ * @param filters `text` — matching the name, ignoring the case, or the start of the SHA-256;
+ * `mediaTypes`, `validationStamps` — those picked; `states` — among `active`, `deleted` and
+ * `failing`
+ * @param flags Flags of the verification, from {@link evidenceVerificationFlags}
+ */
+export const filterEvidence = (evidence, {text, mediaTypes, validationStamps, states} = {}, flags) =>
+    evidence.filter(item =>
+        matchesText(item, text ?? '') &&
+        matchesAny(mediaTypes, [item.mediaType]) &&
+        matchesAny(validationStamps, [item.validationRun?.validationStamp?.name]) &&
+        matchesAny(states, evidenceStates(item, flags))
+    )
