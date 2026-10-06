@@ -44,34 +44,48 @@ under it, missed above*, or that the estate sets none, the values being shown an
 marked, and words *Covered* in the terms of the estate: the kinds of scan it expects and its
 freshness. An ⓘ opens on hover and on keyboard focus, and never sorts the column.
 
-Each cell is the latest daily reading of the project in the set of the estate:
+The readings read as a heatmap: each cell is a block of the same size, the latest daily reading of
+the project in the set of the estate, filled with the colour of its judgement — so that the
+projects which struggle, and on what, show before any value is read:
 
-* **Met**, with a check, or **Missed**, with a cross, when the estate judges the reading: in the
-  colour of the judgement, which never stands alone;
-* the value alone, when the estate sets no target for the reading;
-* for the security maturity, the rung — *2 · Covered* — which says what it means on hover and on
-  keyboard focus;
-* **Unknown**, in grey, when the reading could not be taken: its
-  [reason](scorecard.md#unknown-readings) shows on hover and on keyboard focus;
-* **No failure**, neutral, for a time to restore with nothing to restore in the window, and
-  **No target set**, neutral, for overdue findings with no remediation target to judge them against
-  — their reason shows on hover and on keyboard focus too;
+* **Met**, green with a check, or **Missed**, orange with a cross, when the estate judges the
+  reading — the colour never stands alone;
+* **neutral**, a grey fill, when the reading is not judged: the value alone when the estate sets no
+  target for the reading, **No failure** for a time to restore with nothing to restore in the
+  window, and **No target set** for overdue findings with no remediation target to judge them
+  against;
+* **Unknown**, a dashed outline with a question mark and no fill, so that it never looks judged,
+  when the reading could not be taken;
 * a dash when the readings of the project have not been computed yet.
 
-The **All projects** row, at the top, rolls each reading up over the projects: the median of the
-values of the projects which have one, the number of projects whose reading is unknown, and the
-number of projects missing the target. The neutral readings — *No failure*, *No target set* — are
-neither counted as unknown nor part of the median, and neither are the projects not computed yet.
-A median of rungs or of counts may fall between two of them, and keeps its half: *Median 1.5*.
-The ⓘ next to *All projects* says what the row counts.
+A cell gives its value in short — the security maturity reads its rung, *2 · Covered* — and its
+hover, or its keyboard focus, the project, the reading, its full value and the target of the
+estate. The hover of an unknown or neutral reading gives its [reason](scorecard.md#unknown-readings)
+too, and the one of a security maturity what its rung means. The line under
+the table names each judgement with its icon and its swatch.
 
-A click on the heading of a column sorts the projects by that reading, the projects with no value
-last whatever the order; by default, they are sorted by name. The name of a project opens its
-scorecard page on the set of the estate, where each reading explains its value.
+The **Summary** column, on the right, sums each project up: a thin bar of its readings by judgement
+— missed, met, neutral, unknown — and how many of its judged readings are met, *3 of 5 met*, the
+neutral and unknown readings not being judged. The bar spells its counts out to a screen reader.
+
+The **All projects** row, at the top, rolls each reading up over the projects: the median of the
+values of the projects which have one, above the same thin bar of the projects by judgement, and
+their counts in one line: the mark of each judgement and its number, the zeros left out, in words
+on hover — *1 missed · 2 met*. The neutral readings — a value
+with no target, *No failure*, *No target set* — are neither unknown nor part of the median, and the
+projects not computed yet are counted nowhere. A median of rungs or of counts may fall between two
+of them, and keeps its half: *Median 1.5*. The ⓘ next to *All projects* says what the row counts.
+
+The worst projects come first: by default, the projects are sorted by their number of missed
+readings, the most first, then by name. A click on the heading of the *Summary* column turns this
+order around; a click on the heading of a reading sorts the projects by its value, the projects with
+no value last whatever the order, and one on *Project* by name. The name of a project, fixed on the
+left, opens its scorecard page on the set of the estate, where each reading explains its value.
 
 ![The readings of the projects of an estate](estate-view.png)
 
-Above, the projects of the demo's *Demo products* estate: `petclinic-billing` is *gating* its
+Above, the projects of the demo's *Demo products* estate, the worst first: `petclinic` and
+`petclinic-visits` each miss four targets, `petclinic-billing` one. `petclinic-billing` is *gating* its
 security scans and fixes its findings within the target, but has a `HIGH` finding open for longer
 than the estate allows, while `petclinic` and `petclinic-visits` only scan their dependencies where
 the estate expects their code to be scanned too. `petclinic-visits` requires its dependency scan for

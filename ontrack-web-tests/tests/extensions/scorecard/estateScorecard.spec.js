@@ -22,8 +22,9 @@ test('estate view: from the user menu to the estate, its readings against its ta
 
     const label = await ontrack.labels().createLabel()
 
-    // Promoted to GOLD three times: lead times of seconds, three promotions in the window
-    const promoted = await ontrack.createProject(generate('a-promoted-'))
+    // Promoted to GOLD three times: lead times of seconds, three promotions in the window - named
+    // after the other project, so that the worst-first order is not the alphabetical one
+    const promoted = await ontrack.createProject(generate('b-promoted-'))
     await ontrack.labels().setProjectLabels(promoted.id, [label.id])
     const branch = await promoted.createBranch("main")
     const gold = await branch.createPromotionLevel("GOLD")
@@ -33,7 +34,7 @@ test('estate view: from the user menu to the estate, its readings against its ta
     }
 
     // No promotion level: nothing to read up to
-    const unread = await ontrack.createProject(generate('b-unread-'))
+    const unread = await ontrack.createProject(generate('a-unread-'))
     await ontrack.labels().setProjectLabels(unread.id, [label.id])
     await unread.createBranch("main")
 
@@ -64,8 +65,12 @@ test('estate view: from the user menu to the estate, its readings against its ta
         const estatePage = new EstateScorecardPage(page, ontrack, estate.name)
         await estatePage.expectOnPage()
         await expect(page.getByTestId('estate-explanation')).toContainText('Marker: Promotion: GOLD')
+        // The worst projects first: the one missing a target before the one with none judged
         expect(await estatePage.projectNames()).toEqual([promoted.name, unread.name])
         await expect(estatePage.column('delivery.leadTime')).toContainText('≤ 1d')
+        await expect(estatePage.summary(promoted.name)).toHaveText('1 of 2 met')
+        await expect(estatePage.summary(promoted.name).getByRole('img', {name: /^1 missed, 1 met, /})).toBeVisible()
+        await expect(estatePage.summary(unread.name)).toHaveText('None judged')
 
         // Judged against the targets of the estate
         await expect(estatePage.cell(promoted.name, 'delivery.leadTime')).toHaveAttribute('data-judgement', 'MET')
@@ -81,11 +86,11 @@ test('estate view: from the user menu to the estate, its readings against its ta
         await expect(unknown).toHaveAttribute('data-judgement', 'UNKNOWN')
         await expect(unknown.getByLabel(/^Unknown: No marker/)).toBeVisible()
 
-        // The roll-up row
-        await expect(estatePage.rollUp('delivery.leadTime')).toContainText('1 unknown')
-        await expect(estatePage.rollUp('delivery.leadTime')).toContainText('0 missed')
+        // The roll-up row: the median, a bar of the projects by judgement, and their counts
+        await expect(estatePage.rollUpCounts('delivery.leadTime')).toHaveAttribute('title', '1 met · 1 unknown')
+        await expect(estatePage.rollUpCounts('delivery.leadTime').getByRole('img', {name: '1 unknown'})).toBeVisible()
         await expect(estatePage.rollUp('delivery.frequency')).toContainText(/Median [0-9.]+ \/ week/)
-        await expect(estatePage.rollUp('delivery.frequency')).toContainText('1 missed')
+        await expect(estatePage.rollUpCounts('delivery.frequency').getByRole('img', {name: '1 missed'})).toBeVisible()
 
         // Nothing estimated in 6.x: no measured-only toggle
         await expect(page.getByTestId('estate-measured-only')).toHaveCount(0)
@@ -95,10 +100,16 @@ test('estate view: from the user menu to the estate, its readings against its ta
         expect(await estatePage.projectNames()).toEqual([promoted.name, unread.name])
         await estatePage.column('delivery.leadTime').click()
         expect(await estatePage.projectNames()).toEqual([promoted.name, unread.name])
-        // Sorted by name, the other way
-        await estatePage.column('project').click()
+        // Sorted by name, either way
         await estatePage.column('project').click()
         expect(await estatePage.projectNames()).toEqual([unread.name, promoted.name])
+        await estatePage.column('project').click()
+        expect(await estatePage.projectNames()).toEqual([promoted.name, unread.name])
+        // Sorted by missed readings, the other way: the cells keep their judgement
+        await estatePage.column('summary').click()
+        await estatePage.column('summary').click()
+        expect(await estatePage.projectNames()).toEqual([unread.name, promoted.name])
+        await expect(estatePage.cell(promoted.name, 'delivery.frequency')).toHaveAttribute('data-judgement', 'MISSED')
 
         // Each project links to its scorecard page, on the set of the estate
         await estatePage.project(promoted.name).click()
@@ -165,7 +176,11 @@ test('estate view: what its readings, their targets, the roll-up and the rungs o
         // The rung of a cell, on focus
         const rung = estatePage.cell(project.name, 'security.maturity').getByLabel('0 · None: No security scan in the window.')
         await rung.focus()
-        await expect(page.getByRole('tooltip', {name: 'No security scan in the window.', exact: true})).toBeVisible()
+        // Its hover gives the project, the reading, its value and its target too
+        const details = page.getByTestId(`estate-cell-details-${project.name}-security.maturity`)
+        await expect(details).toBeVisible()
+        await expect(details).toContainText('No security scan in the window.')
+        await expect(details).toContainText('Target: ≥ 2 · Covered')
 
         // The roll-up row
         const rollUp = await estatePage.openRollUpInfo()

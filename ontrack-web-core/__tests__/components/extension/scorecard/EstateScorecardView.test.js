@@ -138,6 +138,47 @@ describe('The scorecard of an estate', () => {
         expect(shown).toHaveTextContent('92%')
     })
 
+    // jsdom drops the styles holding a CSS variable: the fill of a cell is named by its data-fill
+    it('fills each cell with the colour of its judgement, unknown being a dashed outline with no fill', () => {
+        renderView()
+        expect(screen.getByTestId('estate-cell-alpha-delivery.leadTime')).toHaveAttribute('data-fill', 'met')
+        expect(screen.getByTestId('estate-cell-beta-delivery.leadTime')).toHaveAttribute('data-fill', 'missed')
+        expect(screen.getByTestId('estate-cell-alpha-delivery.mttr')).toHaveAttribute('data-fill', 'neutral')
+        expect(screen.getByTestId('estate-cell-alpha-quality.testPassRate')).toHaveAttribute('data-fill', 'neutral')
+        expect(screen.getByTestId('estate-cell-gamma-delivery.leadTime')).toHaveAttribute('data-fill', 'none')
+        const unknown = screen.getByTestId('estate-cell-beta-delivery.mttr')
+        expect(unknown).toHaveAttribute('data-fill', 'unknown')
+        expect(unknown).toHaveStyle({borderStyle: 'dashed', backgroundColor: 'transparent'})
+        expect(unknown.querySelector('svg')).not.toBeNull()
+        expect(unknown).toHaveTextContent('Unknown')
+    })
+
+    it('gives the project, the reading, its value and its target on the hover of a cell', async () => {
+        renderView()
+        fireEvent.mouseEnter(screen.getByTestId('estate-cell-beta-delivery.leadTime'))
+        const details = await screen.findByTestId('estate-cell-details-beta-delivery.leadTime')
+        expect(details).toHaveTextContent('beta')
+        expect(details).toHaveTextContent('Lead time: 2d — missed')
+        expect(details).toHaveTextContent('Target: ≤ 1d')
+    })
+
+    it('gives the details of a judged cell on keyboard focus too', async () => {
+        renderView()
+        const focusable = screen.getByTestId('estate-cell-alpha-delivery.leadTime').querySelector('[tabindex="0"]')
+        fireEvent.focus(focusable)
+        const details = await screen.findByTestId('estate-cell-details-alpha-delivery.leadTime')
+        expect(details).toHaveTextContent('Lead time: 1h — met')
+    })
+
+    it('gives the reason of an unknown reading on the focus of its cell', async () => {
+        renderView()
+        fireEvent.focus(screen.getByTestId('estate-cell-beta-delivery.mttr'))
+        const details = await screen.findByTestId('estate-cell-details-beta-delivery.mttr')
+        expect(details).toHaveTextContent('Time to restore: Unknown')
+        expect(details).toHaveTextContent('Nothing reached the marker in the window')
+        expect(details).toHaveTextContent('No target set by this estate')
+    })
+
     it('shows an unknown reading apart from no failure in the window, which is neutral', () => {
         renderView()
         const unknown = screen.getByTestId('estate-cell-beta-delivery.mttr')
@@ -160,7 +201,7 @@ describe('The scorecard of an estate', () => {
         expect(noTarget).toHaveAttribute('data-judgement', 'NO_TARGET')
         expect(noTarget).toHaveTextContent('No target set')
         expect(within(noTarget).queryByText('Unknown')).toBeNull()
-        expect(screen.getByTestId('estate-rollup-security.overdue')).toHaveTextContent('0 unknown')
+        expect(screen.getByTestId('estate-rollup-counts-security.overdue')).toHaveAttribute('title', '1 neutral')
     })
 
     it('shows a reading not computed yet as such', () => {
@@ -170,26 +211,82 @@ describe('The scorecard of an estate', () => {
         expect(within(cell).getByLabelText('Not computed yet')).toBeInTheDocument()
     })
 
-    it('rolls each reading up: median, unknown count, missed count', () => {
+    it('rolls each reading up: its median above a bar of the projects by judgement, their counts under it', () => {
         renderView()
         const leadTime = screen.getByTestId('estate-rollup-delivery.leadTime')
         expect(leadTime).toHaveTextContent('Median 1d')
-        expect(leadTime).toHaveTextContent('1 missed')
-        expect(leadTime).toHaveTextContent('0 unknown')
+        expect(within(leadTime).getByRole('img', {name: '1 missed, 1 met, 0 neutral, 0 unknown'})).toBeInTheDocument()
+        // The counts in one line: a mark and a number each, the zeros left out, in words on hover
+        const leadTimeCounts = within(leadTime).getByTestId('estate-rollup-counts-delivery.leadTime')
+        expect(within(leadTimeCounts).getAllByRole('img').map(it => it.getAttribute('aria-label')))
+            .toEqual(['1 missed', '1 met'])
+        expect(leadTimeCounts).toHaveTextContent(/^11$/)
+        expect(leadTimeCounts).toHaveAttribute('title', '1 missed · 1 met')
         const mttr = screen.getByTestId('estate-rollup-delivery.mttr')
         expect(mttr).toHaveTextContent('Median -')
-        expect(mttr).toHaveTextContent('1 unknown')
-        expect(mttr).toHaveTextContent('0 missed')
+        expect(within(mttr).getByRole('img', {name: '0 missed, 0 met, 1 neutral, 1 unknown'})).toBeInTheDocument()
+        const mttrCounts = within(mttr).getByTestId('estate-rollup-counts-delivery.mttr')
+        expect(within(mttrCounts).getAllByRole('img').map(it => it.getAttribute('aria-label')))
+            .toEqual(['1 neutral', '1 unknown'])
+        const frequency = screen.getByTestId('estate-rollup-delivery.frequency')
+        expect(within(frequency).getByTestId('estate-rollup-counts-delivery.frequency')).toHaveTextContent(/^Not computed yet$/)
+    })
+
+    it('sums each project up: a bar of its readings by judgement, and how many of its judged ones are met', () => {
+        renderView()
+        const alpha = screen.getByTestId('estate-summary-alpha')
+        expect(alpha).toHaveTextContent(/^1 of 1 met$/)
+        expect(within(alpha).getByRole('img', {name: '0 missed, 1 met, 2 neutral, 0 unknown'})).toBeInTheDocument()
+        const beta = screen.getByTestId('estate-summary-beta')
+        expect(beta).toHaveTextContent(/^0 of 1 met$/)
+        expect(within(beta).getByRole('img', {name: '1 missed, 0 met, 0 neutral, 1 unknown'})).toBeInTheDocument()
+        expect(screen.getByTestId('estate-summary-gamma')).toHaveTextContent(/^None judged$/)
+    })
+
+    it('shows the worst projects first: the most missed readings first, then by name', () => {
+        renderView()
+        const names = () => screen.getAllByTestId(/^estate-project-/).map(it => it.textContent)
+        expect(names()).toEqual(['beta', 'alpha', 'gamma'])
+        // Default sort, shown on the summary column: a click on it turns it around
+        fireEvent.click(column('summary'))
+        expect(names()).toEqual(['alpha', 'gamma', 'beta'])
+        fireEvent.click(column('summary'))
+        expect(names()).toEqual(['beta', 'alpha', 'gamma'])
+    })
+
+    it('sorts the projects by name from its header', () => {
+        renderView()
+        const names = () => screen.getAllByTestId(/^estate-project-/).map(it => it.textContent)
+        fireEvent.click(column('project'))
+        expect(names()).toEqual(['alpha', 'beta', 'gamma'])
+        fireEvent.click(column('project'))
+        expect(names()).toEqual(['gamma', 'beta', 'alpha'])
+        // Back to the default sort
+        fireEvent.click(column('project'))
+        expect(names()).toEqual(['beta', 'alpha', 'gamma'])
     })
 
     it('sorts the projects by a reading from its header', () => {
         renderView()
         const names = () => screen.getAllByTestId(/^estate-project-/).map(it => it.textContent)
-        expect(names()).toEqual(['alpha', 'beta', 'gamma'])
         fireEvent.click(column('delivery.leadTime'))
         expect(names()).toEqual(['alpha', 'beta', 'gamma'])
         fireEvent.click(column('delivery.leadTime'))
         expect(names()).toEqual(['beta', 'alpha', 'gamma'])
+    })
+
+    it('names each judgement in the legend, with its icon and its swatch', () => {
+        renderView()
+        const legend = screen.getByTestId('estate-legend')
+        ;['met', 'missed', 'neutral', 'unknown', 'none'].forEach(judgement =>
+            expect(within(legend).getByTestId(`estate-legend-${judgement}`)).toBeInTheDocument()
+        )
+        expect(legend).toHaveTextContent('Met')
+        expect(legend).toHaveTextContent('Missed')
+        expect(legend).toHaveTextContent('Neutral: not judged')
+        expect(legend).toHaveTextContent('Unknown')
+        expect(within(legend).getByTestId('estate-legend-none')).toHaveTextContent('—Not computed yet')
+        expect(legend).toHaveTextContent('latest daily reading of each project in this estate')
     })
 
     it('has no measured-only toggle while no reading is estimated', () => {
@@ -319,8 +416,9 @@ describe('The help on the scorecard of an estate', () => {
         fireEvent.mouseEnter(screen.getByRole('button', {name: 'About All projects'}))
         const info = await screen.findByTestId('estate-rollup-info')
         expect(info).toHaveTextContent(/Median over the projects with a value/)
-        expect(info).toHaveTextContent(/No failure and No target set are not unknown/)
         expect(info).toHaveTextContent(/missing the target of this estate/)
+        expect(info).toHaveTextContent(/Neutral counts the ones not judged, which are not unknown: a value with no target, No failure, No target set/)
+        expect(info).toHaveTextContent(/A project not computed yet is counted nowhere/)
     })
 
     it('lists the rungs of the security maturity in its header, its target marked, covered in the terms of the estate', async () => {

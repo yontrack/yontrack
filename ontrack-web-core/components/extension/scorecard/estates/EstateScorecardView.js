@@ -7,13 +7,13 @@ import Table from "@components/common/table/Table";
 import {useQuery} from "@components/services/GraphQL";
 import {projectScorecardUri} from "@components/common/Links";
 import {gqlLabelFragment} from "@components/labels/LabelGraphQLFragments";
-import TimestampText from "@components/common/TimestampText";
 import SetExplanation from "@components/extension/scorecard/SetExplanation";
 import SecondaryText from "@components/extension/scorecard/SecondaryText";
 import EstateFindingsFanOut from "@components/extension/scorecard/estates/EstateFindingsFanOut";
 import ScorecardInfo from "@components/extension/scorecard/ScorecardInfo";
 import ReadingDefinition from "@components/extension/scorecard/ReadingDefinition";
 import RungHelp from "@components/extension/scorecard/RungHelp";
+import {ScorecardLegendItem, ScorecardLegendLine} from "@components/extension/scorecard/ScorecardLegend";
 import {
     formatReadingValue,
     isNeutralJudgement,
@@ -21,21 +21,32 @@ import {
     neutralLabel,
     readingJudgement,
     readingName,
+    rungDescription,
+    rungOf,
     targetText,
     targetWords,
     unknownReasonText,
 } from "@components/extension/scorecard/scorecardModel";
 import {
+    countSegments,
+    countsLabel,
+    countsText,
+    countWords,
+    DEFAULT_ESTATE_SORT,
     ESTATE_ROLLUP_TEXT,
+    estateJudgement,
     estateReadingKeys,
+    estateRowCounts,
     ESTATE_TAB_FANOUT,
     ESTATE_TAB_READINGS,
     estateRows,
     formatMedian,
     hasEstimatedReading,
+    metText,
     PROJECT_SORT_KEY,
     rollUp,
     sortEstateRows,
+    SUMMARY_SORT_KEY,
 } from "@components/extension/scorecard/estates/estateViewModel";
 
 export const gqlEstateScorecard = gql`
@@ -84,100 +95,391 @@ export const gqlEstateScorecard = gql`
     ${gqlLabelFragment}
 `
 
-const cellStyle = (background, color) => ({
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: 6,
-    padding: '2px 8px',
-    borderRadius: 6,
-    background,
-    color,
-    fontWeight: 600,
-    whiteSpace: 'nowrap',
-})
+/**
+ * Width of a cell of the heatmap: about ten readings, the project and the summary fit a window
+ * 1280 px wide. A value longer than this is cut, and given in full on hover.
+ */
+const CELL_WIDTH = 80
+const CELL_HEIGHT = 28
 
 /**
- * One reading of one project: its value, coloured by its target and judged by an icon too, so that
- * the judgement never rests on colour alone. An unknown reading is grey, with its reason on hover
- * and on focus; a neutral reading - a time to restore with no failure in the window, overdue
- * findings with no target set - is said in words, not unknown, with its reason on hover and on focus.
+ * Horizontal padding of a cell of a small table.
  */
-function EstateReadingCell({reading, coverage, testId}) {
-    if (!reading) {
-        return (
-            <span data-testid={testId} data-judgement="NONE">
-                <SecondaryText aria-label="Not computed yet" title="Not computed yet">—</SecondaryText>
-            </span>
-        )
-    }
-    const judgement = readingJudgement(reading)
-    const value = <RungHelp readingKey={reading.key} value={reading.value} coverage={coverage}>
-        {formatReadingValue(reading.key, reading.value)}
-    </RungHelp>
-    let content
-    switch (judgement) {
-        case 'MET':
-            content = <span style={cellStyle('var(--ot-scorecard-met-bg)', 'var(--ot-scorecard-met-text)')}>
-                <FaCheck role="img" aria-label="Met"/>
-                {value}
-            </span>
-            break
-        case 'MISSED':
-            content = <span style={cellStyle('var(--ot-scorecard-missed-bg)', 'var(--ot-scorecard-missed-text)')}>
-                <FaTimes role="img" aria-label="Missed"/>
-                {value}
-            </span>
-            break
-        case 'UNKNOWN': {
-            const reason = unknownReasonText(reading.unknownReason, reading.key)
-            content = <Tooltip title={reason}>
-                <span
-                    tabIndex={0}
-                    aria-label={`Unknown: ${reason}`}
-                    style={{...cellStyle('var(--ot-scorecard-neutral-bg)', 'var(--ot-text)'), fontWeight: 400}}
-                >
-                    <FaQuestionCircle aria-hidden="true"/>
-                    Unknown
-                </span>
-            </Tooltip>
-            break
-        }
-        default:
-            content = isNeutralJudgement(judgement) ?
-                <Tooltip title={unknownReasonText(reading.unknownReason, reading.key)}>
-                    <SecondaryText tabIndex={0} style={{whiteSpace: 'nowrap'}}>{neutralLabel(judgement)}</SecondaryText>
-                </Tooltip> :
-                <span style={{whiteSpace: 'nowrap'}}>{value}</span>
-    }
-    return <span data-testid={testId} data-judgement={judgement}>{content}</span>
+const TABLE_CELL_PADDING = 16
+
+/**
+ * Width of the column of a reading, with the padding of a small table.
+ */
+const READING_COLUMN_WIDTH = CELL_WIDTH + TABLE_CELL_PADDING
+
+/**
+ * Width of the summary of a project, and of its column.
+ */
+const SUMMARY_WIDTH = 96
+
+const blockStyle = {
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    boxSizing: 'border-box',
+    width: CELL_WIDTH,
+    height: CELL_HEIGHT,
+    borderRadius: 4,
+    fontSize: 12,
+    whiteSpace: 'nowrap',
+    overflow: 'hidden',
 }
 
 /**
- * The roll-up of one reading over the projects of the estate.
+ * The fills of a cell, by its judgement - see `estateJudgement`. An unknown reading has none, only
+ * a dashed outline, so that it never looks judged.
  */
-function EstateRollUp({readingKey, rows, coverage}) {
-    const {median, unknown, missed} = rollUp(rows, readingKey)
+const CELL_FILLS = {
+    met: {
+        backgroundColor: 'var(--ot-scorecard-met-bg)',
+        color: 'var(--ot-scorecard-met-text)',
+        fontWeight: 600,
+    },
+    missed: {
+        backgroundColor: 'var(--ot-scorecard-missed-bg)',
+        color: 'var(--ot-scorecard-missed-text)',
+        fontWeight: 600,
+    },
+    neutral: {
+        backgroundColor: 'var(--ot-scorecard-neutral-bg)',
+        color: 'var(--ot-text)',
+    },
+    unknown: {
+        backgroundColor: 'transparent',
+        borderWidth: 1,
+        borderStyle: 'dashed',
+        borderColor: 'var(--ot-scorecard-unknown)',
+        color: 'var(--ot-text)',
+    },
+}
+
+/**
+ * The segments of a stacked bar by judgement — see `countSegments`.
+ */
+const SEGMENT_STYLES = {
+    missed: {backgroundColor: 'var(--ot-scorecard-missed)'},
+    met: {backgroundColor: 'var(--ot-scorecard-met)'},
+    neutral: {backgroundColor: 'var(--ot-scorecard-neutral)'},
+    unknown: {
+        backgroundColor: 'transparent',
+        borderWidth: 1,
+        borderStyle: 'dashed',
+        borderColor: 'var(--ot-scorecard-unknown)',
+    },
+}
+
+/**
+ * A thin bar of counts by judgement, the missed ones first, which spells the counts out in its label.
+ */
+function CountsBar({counts, testId}) {
+    const segments = countSegments(counts)
     return (
-        <Space orientation="vertical" size={0} data-testid={`estate-rollup-${readingKey}`}>
-            <Typography.Text strong style={{whiteSpace: 'nowrap'}}>
-                Median <RungHelp readingKey={readingKey} value={median} coverage={coverage}>
-                    {formatMedian(readingKey, median)}
-                </RungHelp>
-            </Typography.Text>
-            <SecondaryText style={{fontSize: 12, whiteSpace: 'nowrap'}}>{unknown} unknown</SecondaryText>
-            <SecondaryText style={{fontSize: 12, whiteSpace: 'nowrap'}}>{missed} missed</SecondaryText>
-        </Space>
+        <div
+            role="img"
+            aria-label={countsLabel(counts)}
+            data-testid={testId}
+            style={{
+                display: 'flex',
+                gap: 1,
+                width: '100%',
+                height: 8,
+                borderRadius: 2,
+                overflow: 'hidden',
+                backgroundColor: segments.length === 0 ? 'var(--ot-border-subtle)' : undefined,
+            }}
+        >
+            {
+                segments.map(({judgement, count}) =>
+                    <span
+                        key={judgement}
+                        data-judgement={judgement}
+                        style={{flex: `${count} 0 0`, boxSizing: 'border-box', ...SEGMENT_STYLES[judgement]}}
+                    />
+                )
+            }
+        </div>
     )
 }
 
 /**
- * The readings of the projects of an estate: one row per project, one column per reading, coloured
- * by the targets of the estate, with a roll-up row and a sort on every column. Each project links to
- * its scorecard page, on the set of the estate.
+ * What the hover of a cell says: the project, the reading, its full value and its target, and why
+ * it is unknown or neutral, or what its rung means.
+ */
+function EstateCellDetails({project, reading, valueText, note, testId}) {
+    const target = targetText(reading)
+    return (
+        <div data-testid={testId}>
+            <div style={{fontWeight: 600}}>{project.name}</div>
+            <div>{readingName(reading.key)}: {valueText}</div>
+            <div>{target ? `Target: ${target}` : 'No target set by this estate'}</div>
+            {note && <div>{note}</div>}
+        </div>
+    )
+}
+
+const CellValue = ({children}) =>
+    <span style={{overflow: 'hidden', textOverflow: 'ellipsis'}}>{children}</span>
+
+const judgedContent = (icon, formatted) => <>
+    {icon}
+    <CellValue>{formatted}</CellValue>
+</>
+
+/**
+ * What the cell of a reading shows and says, by its judgement: its `content`, its value in words
+ * for its hover, `valueText`, a `note` for its hover - why it is unknown or neutral, what its rung
+ * means - and the `label` of a cell whose content does not say it all - unknown, a rung.
+ */
+const cellParts = (reading, coverage) => {
+    const judgement = readingJudgement(reading)
+    const formatted = formatReadingValue(reading.key, reading.value)
+    const rung = rungOf(reading.key, reading.value)
+    const rungText = rung !== null ? rungDescription(rung, coverage) : null
+    const rungLabel = rungText ? `${formatted}: ${rungText}` : undefined
+    const reason = unknownReasonText(reading.unknownReason, reading.key)
+    switch (judgement) {
+        case 'MET':
+            return {
+                content: judgedContent(<FaCheck role="img" aria-label="Met" style={{flexShrink: 0}}/>, formatted),
+                valueText: `${formatted} — met`,
+                note: rungText,
+                label: rungLabel,
+            }
+        case 'MISSED':
+            return {
+                content: judgedContent(<FaTimes role="img" aria-label="Missed" style={{flexShrink: 0}}/>, formatted),
+                valueText: `${formatted} — missed`,
+                note: rungText,
+                label: rungLabel,
+            }
+        case 'UNKNOWN':
+            return {
+                content: <><FaQuestionCircle aria-hidden="true" style={{flexShrink: 0}}/>Unknown</>,
+                valueText: 'Unknown',
+                note: reason,
+                label: `Unknown: ${reason}`,
+            }
+        default:
+            return isNeutralJudgement(judgement) ? {
+                content: <CellValue>{neutralLabel(judgement)}</CellValue>,
+                valueText: neutralLabel(judgement),
+                note: reason,
+            } : {
+                content: <CellValue>{formatted}</CellValue>,
+                valueText: formatted,
+                note: rungText,
+                label: rungLabel,
+            }
+    }
+}
+
+/**
+ * One reading of one project: a block of the heatmap, filled with the colour of its judgement and
+ * judged by an icon too, so that the judgement never rests on colour alone, with its value. An
+ * unknown reading is a dashed outline, with its reason on hover and on focus; a neutral reading -
+ * a value with no target, a time to restore with no failure in the window, overdue findings with
+ * no target set - is said in words, not unknown, with its reason on hover and on focus. The hover
+ * gives the project, the reading, the full value and the target.
+ */
+function EstateReadingCell({project, reading, coverage, testId}) {
+    if (!reading) {
+        return (
+            <span data-testid={testId} data-judgement="NONE" data-fill="none" style={blockStyle}>
+                <SecondaryText aria-label="Not computed yet" title="Not computed yet">—</SecondaryText>
+            </span>
+        )
+    }
+    const {content, valueText, note, label} = cellParts(reading, coverage)
+    const fill = estateJudgement(reading)
+    return (
+        <Tooltip
+            trigger={['hover', 'focus']}
+            title={
+                <EstateCellDetails
+                    project={project}
+                    reading={reading}
+                    valueText={valueText}
+                    note={note}
+                    testId={`estate-cell-details-${project.name}-${reading.key}`}
+                />
+            }
+        >
+            <span
+                data-testid={testId}
+                data-judgement={readingJudgement(reading)}
+                data-fill={fill}
+                style={{...blockStyle, ...CELL_FILLS[fill]}}
+            >
+                {/* Focusable, so that the keyboard gets the details of its hover too: a value cut short, a reason */}
+                <span
+                    tabIndex={0}
+                    aria-label={label}
+                    style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 4,
+                        width: '100%',
+                        height: '100%',
+                        padding: '0 6px',
+                        overflow: 'hidden',
+                        cursor: 'help',
+                    }}
+                >
+                    {content}
+                </span>
+            </span>
+        </Tooltip>
+    )
+}
+
+/**
+ * The summary of one project: a bar of its readings by judgement, and how many of its judged
+ * readings are met.
+ */
+function EstateProjectSummary({row}) {
+    const counts = estateRowCounts(row)
+    return (
+        <div
+            data-testid={`estate-summary-${row.project.name}`}
+            style={{display: 'flex', flexDirection: 'column', gap: 4, width: SUMMARY_WIDTH}}
+        >
+            <CountsBar counts={counts} testId={`estate-summary-bar-${row.project.name}`}/>
+            <SecondaryText style={{fontSize: 12, whiteSpace: 'nowrap'}}>{metText(counts)}</SecondaryText>
+        </div>
+    )
+}
+
+/**
+ * The mark of a judgement in a line of counts: the icon of its cell, a swatch of its bar for the
+ * neutral ones, which have no icon.
+ */
+const COUNT_MARKS = {
+    missed: <FaTimes aria-hidden="true" size={9} style={{color: 'var(--ot-scorecard-missed-text)'}}/>,
+    met: <FaCheck aria-hidden="true" size={9} style={{color: 'var(--ot-scorecard-met-text)'}}/>,
+    neutral: <span
+        aria-hidden="true"
+        style={{display: 'inline-block', width: 8, height: 8, borderRadius: 2, ...SEGMENT_STYLES.neutral}}
+    />,
+    unknown: <FaQuestionCircle aria-hidden="true" size={9}/>,
+}
+
+/**
+ * Counts by judgement in one short line, the zeros left out: each one a mark and a number, said in
+ * words in its label and in the hover of the line. Four counts of one digit fit in a cell.
+ */
+function CountsLine({counts, testId}) {
+    const segments = countSegments(counts)
+    return (
+        <SecondaryText
+            data-testid={testId}
+            title={countsText(counts)}
+            style={{fontSize: 11, display: 'inline-flex', alignItems: 'center', columnGap: 3, whiteSpace: 'nowrap'}}
+        >
+            {segments.length === 0 && countsText(counts)}
+            {
+                segments.map(({judgement, count}) =>
+                    <span
+                        key={judgement}
+                        role="img"
+                        aria-label={countWords(judgement, count)}
+                        style={{display: 'inline-flex', alignItems: 'center', gap: 2}}
+                    >
+                        {COUNT_MARKS[judgement]}{count}
+                    </span>
+                )
+            }
+        </SecondaryText>
+    )
+}
+
+/**
+ * The roll-up of one reading over the projects of the estate: its median, above a bar of the
+ * projects by judgement, and their counts.
+ */
+function EstateRollUp({readingKey, rows, coverage}) {
+    const counts = rollUp(rows, readingKey)
+    return (
+        <div
+            data-testid={`estate-rollup-${readingKey}`}
+            style={{display: 'flex', flexDirection: 'column', gap: 4, width: CELL_WIDTH}}
+        >
+            <Typography.Text strong style={{fontSize: 12}}>
+                Median <RungHelp readingKey={readingKey} value={counts.median} coverage={coverage}>
+                    {formatMedian(readingKey, counts.median)}
+                </RungHelp>
+            </Typography.Text>
+            <CountsBar counts={counts} testId={`estate-rollup-bar-${readingKey}`}/>
+            <CountsLine counts={counts} testId={`estate-rollup-counts-${readingKey}`}/>
+        </div>
+    )
+}
+
+/**
+ * The swatch of a judgement in the legend: a small cell, with its icon.
+ */
+const JudgementSwatch = ({fill, icon}) =>
+    <span
+        aria-hidden="true"
+        style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxSizing: 'border-box',
+            width: 20,
+            height: 14,
+            borderRadius: 3,
+            fontSize: 10,
+            ...fill,
+        }}
+    >
+        {icon}
+    </span>
+
+/**
+ * The line under the readings: when they were computed, and a legend of the judgements of a cell.
+ */
+function EstateLegend({latest}) {
+    return (
+        <ScorecardLegendLine
+            testId="estate-legend"
+            latest={latest}
+            notComputed="Not computed yet"
+            description="latest daily reading of each project in this estate"
+        >
+            <ScorecardLegendItem testId="estate-legend-met" swatch={<JudgementSwatch fill={CELL_FILLS.met} icon={<FaCheck/>}/>}>
+                Met
+            </ScorecardLegendItem>
+            <ScorecardLegendItem testId="estate-legend-missed" swatch={<JudgementSwatch fill={CELL_FILLS.missed} icon={<FaTimes/>}/>}>
+                Missed
+            </ScorecardLegendItem>
+            <ScorecardLegendItem testId="estate-legend-neutral" swatch={<JudgementSwatch fill={CELL_FILLS.neutral}/>}>
+                Neutral: not judged
+            </ScorecardLegendItem>
+            <ScorecardLegendItem testId="estate-legend-unknown" swatch={<JudgementSwatch fill={CELL_FILLS.unknown} icon={<FaQuestionCircle/>}/>}>
+                Unknown
+            </ScorecardLegendItem>
+            <ScorecardLegendItem testId="estate-legend-none" swatch={<JudgementSwatch icon="—"/>}>
+                Not computed yet
+            </ScorecardLegendItem>
+        </ScorecardLegendLine>
+    )
+}
+
+/**
+ * The readings of the projects of an estate as a heatmap: one row per project, one column per
+ * reading, each cell filled by its judgement against the targets of the estate, a summary of each
+ * project on the right, a roll-up row and a sort on every column - the worst projects first by
+ * default. Each project links to its scorecard page, on the set of the estate.
  */
 function EstateReadingsTable({estate}) {
 
-    const [sort, setSort] = useState({key: PROJECT_SORT_KEY, order: 'ascend'})
+    const [sort, setSort] = useState(DEFAULT_ESTATE_SORT)
     const [measuredOnly, setMeasuredOnly] = useState(false)
 
     const projectSets = estate.projectSets ?? []
@@ -211,8 +513,9 @@ function EstateReadingsTable({estate}) {
             const name = readingName(key)
             return {
                 key,
+                width: READING_COLUMN_WIDTH,
                 title: <Space orientation="vertical" size={0} data-testid={`estate-column-${key}`}>
-                    <span style={{display: 'inline-flex', alignItems: 'center', whiteSpace: 'nowrap'}}>
+                    <span style={{display: 'inline-flex', alignItems: 'center', fontSize: 12}}>
                         {name}
                         <ScorecardInfo
                             label={`About ${name}`}
@@ -242,17 +545,28 @@ function EstateReadingsTable({estate}) {
                 sortOrder: sortOrder(key),
                 render: (_, row) =>
                     <EstateReadingCell
+                        project={row.project}
                         reading={row.readings[key]}
                         coverage={coverage}
                         testId={`estate-cell-${row.project.name}-${key}`}
                     />,
             }
         }),
+        {
+            key: SUMMARY_SORT_KEY,
+            title: <span data-testid="estate-column-summary" style={{fontSize: 12}}>Summary</span>,
+            width: SUMMARY_WIDTH + TABLE_CELL_PADDING,
+            sorter: true,
+            // The worst projects first, then the other way
+            sortDirections: ['descend', 'ascend'],
+            sortOrder: sortOrder(SUMMARY_SORT_KEY),
+            render: (_, row) => <EstateProjectSummary row={row}/>,
+        },
     ]
 
     const onChange = (_pagination, _filters, sorter) => {
         const {columnKey, order} = Array.isArray(sorter) ? sorter[0] : sorter
-        setSort(order ? {key: columnKey, order} : {key: PROJECT_SORT_KEY, order: 'ascend'})
+        setSort(order ? {key: columnKey, order} : DEFAULT_ESTATE_SORT)
     }
 
     return (
@@ -275,6 +589,7 @@ function EstateReadingsTable({estate}) {
                 columns={columns}
                 rowKey={row => row.project.id}
                 pagination={false}
+                size="small"
                 scroll={{x: 'max-content'}}
                 onChange={onChange}
                 showSorterTooltip={false}
@@ -301,14 +616,12 @@ function EstateReadingsTable({estate}) {
                                     </Table.Summary.Cell>
                                 )
                             }
+                            <Table.Summary.Cell index={keys.length + 1}/>
                         </Table.Summary.Row>
                     </Table.Summary>
                 }
             />
-            <SecondaryText style={{fontSize: 12}} data-testid="estate-legend">
-                {latest ? <>Computed <TimestampText value={latest} relative={true}/> · </> : 'Not computed yet · '}
-                latest daily reading of each project in this estate
-            </SecondaryText>
+            <EstateLegend latest={latest}/>
         </Space>
     )
 }

@@ -109,6 +109,21 @@ export class EstateScorecardPage {
     }
 
     /**
+     * Counts of the roll-up of a reading: a mark and a number each, in words in their labels and in
+     * the title of the line.
+     */
+    rollUpCounts(key) {
+        return this.page.getByTestId(`estate-rollup-counts-${key}`)
+    }
+
+    /**
+     * Summary of a project: a bar of its readings by judgement, and how many of its judged readings are met.
+     */
+    summary(project) {
+        return this.page.getByTestId(`estate-summary-${project}`)
+    }
+
+    /**
      * Opens the findings fan-out tab.
      */
     async openFanOut() {

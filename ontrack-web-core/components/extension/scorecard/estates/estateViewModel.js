@@ -65,6 +65,54 @@ const median = (values) => {
 }
 
 /**
+ * The judgements of the heatmap of the estate view, in the order of its bars, the worst first:
+ *
+ * - `missed` / `met` - judged against the target of the estate
+ * - `neutral` - not judged, nothing went wrong: a value with no target, a time to restore with no
+ *   failure in the window, overdue findings with no target set
+ * - `unknown` - Yontrack cannot tell
+ *
+ * A reading not computed yet has none.
+ */
+const ESTATE_JUDGEMENTS = ['missed', 'met', 'neutral', 'unknown']
+
+/**
+ * The judgement of a reading in the heatmap of the estate view - one of `ESTATE_JUDGEMENTS` -
+ * `null` for a reading not computed yet.
+ */
+export const estateJudgement = (reading) => {
+    if (!reading) return null
+    switch (readingJudgement(reading)) {
+        case 'MISSED':
+            return 'missed'
+        case 'MET':
+            return 'met'
+        case 'UNKNOWN':
+            return 'unknown'
+        default:
+            return 'neutral'
+    }
+}
+
+const countJudgements = (readings) => {
+    const counts = Object.fromEntries(ESTATE_JUDGEMENTS.map(it => [it, 0]))
+    readings.forEach(reading => {
+        const judgement = estateJudgement(reading)
+        if (judgement) counts[judgement]++
+    })
+    return counts
+}
+
+/**
+ * The readings of one row by judgement - `missed`, `met`, `neutral`, `unknown` - and `judged`,
+ * the met and missed ones only. The readings not computed yet are counted nowhere.
+ */
+export const estateRowCounts = (row) => {
+    const counts = countJudgements(Object.values(row.readings))
+    return {...counts, judged: counts.missed + counts.met}
+}
+
+/**
  * The roll-up of one reading over the rows of an estate:
  *
  * - `median` - of the values of the projects which have one, `null` when none has
@@ -73,6 +121,9 @@ const median = (values) => {
  *   with no failure in the window, overdue findings with no target set - is not unknown, and a
  *   project whose readings are not computed yet is not counted
  * - `missed` - number of projects whose reading misses the target of the estate
+ * - `met` - number of projects whose reading meets the target of the estate
+ * - `neutral` - number of projects whose reading is not judged, nothing having gone wrong: a value
+ *   with no target, no failure in the window, no target set
  */
 export const rollUp = (rows, key) => {
     const readings = rows.map(row => row.readings[key]).filter(it => it)
@@ -80,15 +131,46 @@ export const rollUp = (rows, key) => {
     return {
         median: median(values),
         measured: values.length,
-        unknown: readings.filter(it => readingJudgement(it) === 'UNKNOWN').length,
-        missed: readings.filter(it => readingJudgement(it) === 'MISSED').length,
+        ...countJudgements(readings),
     }
 }
 
 /**
+ * The segments of the stacked bar of some counts by judgement, in the order of `ESTATE_JUDGEMENTS`,
+ * each with its `count`; the empty ones left out.
+ */
+export const countSegments = (counts) => ESTATE_JUDGEMENTS
+    .filter(it => counts[it] > 0)
+    .map(it => ({judgement: it, count: counts[it]}))
+
+/**
+ * One count of a judgement in words: "2 met".
+ */
+export const countWords = (judgement, count) => `${count} ${judgement}`
+
+/**
+ * Every count by judgement, for the label of a stacked bar: "1 missed, 2 met, 0 neutral, 1 unknown".
+ */
+export const countsLabel = (counts) => ESTATE_JUDGEMENTS.map(it => countWords(it, counts[it])).join(', ')
+
+/**
+ * The counts by judgement in one short line, the zeros left out: "1 missed · 2 met · 1 unknown";
+ * "Not computed yet" with none.
+ */
+export const countsText = (counts) => {
+    const parts = countSegments(counts).map(({judgement, count}) => countWords(judgement, count))
+    return parts.length > 0 ? parts.join(' · ') : 'Not computed yet'
+}
+
+/**
+ * How many of the judged readings of a row are met: "2 of 3 met"; "None judged" with none.
+ */
+export const metText = ({met, judged}) => judged > 0 ? `${met} of ${judged} met` : 'None judged'
+
+/**
  * What the roll-up row says, in words — as `rollUp` counts.
  */
-export const ESTATE_ROLLUP_TEXT = 'Median over the projects with a value. Unknown counts the projects whose reading is unknown: No failure and No target set are not unknown, and a project not computed yet is not counted. Missed counts the projects missing the target of this estate.'
+export const ESTATE_ROLLUP_TEXT = 'Median over the projects with a value. Missed counts the projects missing the target of this estate, and met the ones meeting it. Neutral counts the ones not judged, which are not unknown: a value with no target, No failure, No target set. Unknown counts the projects whose reading is unknown. A project not computed yet is counted nowhere.'
 
 /**
  * A median in the unit of its reading. The median of counts or of rungs may fall between two of
@@ -108,21 +190,39 @@ export const formatMedian = (key, value) => {
  */
 export const PROJECT_SORT_KEY = 'project'
 
+/**
+ * The key of the sort by the number of missed readings of a project, its summary.
+ */
+export const SUMMARY_SORT_KEY = 'summary'
+
+/**
+ * The sort of the estate view until the user picks another: the worst projects first, the ones
+ * missing the most readings, then by name.
+ */
+export const DEFAULT_ESTATE_SORT = {key: SUMMARY_SORT_KEY, order: 'descend'}
+
 const byName = (a, b) => a.project.name.localeCompare(b.project.name)
 
 /**
  * The rows sorted, as a new list:
  *
- * - by project name when `key` is `project` or not given
+ * - by the number of missed readings, then by name, when `key` is `summary` or not given - the
+ *   worst projects first when not given
+ * - by project name when `key` is `project`
  * - by the value of the reading `key` otherwise, the projects with no value - unknown, neutral,
  *   not computed - last whatever the order, by name
  *
  * @param order `ascend` (default) or `descend`
  */
-export const sortEstateRows = (rows, {key, order} = {}) => {
+export const sortEstateRows = (rows, sort = {}) => {
+    const {key, order} = sort.key ? sort : DEFAULT_ESTATE_SORT
     const direction = order === 'descend' ? -1 : 1
-    if (!key || key === PROJECT_SORT_KEY) {
+    if (key === PROJECT_SORT_KEY) {
         return [...rows].sort((a, b) => direction * byName(a, b))
+    }
+    if (key === SUMMARY_SORT_KEY) {
+        const missed = new Map(rows.map(row => [row, estateRowCounts(row).missed]))
+        return [...rows].sort((a, b) => direction * (missed.get(a) - missed.get(b)) || byName(a, b))
     }
     const valueOf = (row) => hasValue(row.readings[key]) ? row.readings[key].value : null
     return [...rows].sort((a, b) => {

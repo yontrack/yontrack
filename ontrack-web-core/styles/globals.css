@@ -104,6 +104,9 @@
     --ot-scorecard-missed-text: #a9380b;
     --ot-scorecard-missed-bg: #fce9df;
     --ot-scorecard-neutral-bg: #efebf3;
+    /* The marks of the readings not judged, and the dashed outline of the unknown ones: 3:1 on the page */
+    --ot-scorecard-neutral: #8a8196;
+    --ot-scorecard-unknown: #6b6b6b;
     --ot-scorecard-selected-bg: var(--ot-brand-light-gray);
 }
 
@@ -182,6 +185,8 @@
     --ot-scorecard-missed-text: #ffa472;
     --ot-scorecard-missed-bg: #3a2216;
     --ot-scorecard-neutral-bg: #2d2833;
+    --ot-scorecard-neutral: #7d7488;
+    --ot-scorecard-unknown: #8c8c8c;
     --ot-scorecard-selected-bg: #2a2433;
 }
 
