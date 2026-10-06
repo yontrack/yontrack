@@ -117,4 +117,5 @@ org.springframework:spring-expression:7.0.9=runtimeClasspath,testCompileClasspat
 org.springframework:spring-test:7.0.9=testCompileClasspath,testRuntimeClasspath
 org.xmlunit:xmlunit-core:2.11.0=testCompileClasspath,testRuntimeClasspath
 org.yaml:snakeyaml:2.6=testCompileClasspath,testRuntimeClasspath
+tools.jackson:jackson-bom:3.1.7=annotationProcessor,compileClasspath,runtimeClasspath,testAnnotationProcessor,testCompileClasspath,testRuntimeClasspath
 empty=implementationDependenciesMetadata,kotlinCompilerPluginClasspath,kotlinNativeCompilerPluginClasspath,kotlinScriptDefExtensions,testImplementationDependenciesMetadata,testKotlinScriptDefExtensions

@@ -319,6 +319,7 @@ configure(javaProjects) {
     val msgpackCoreVersion = "0.9.12"
     val commonsBeanutilsVersion = "1.11.0"
     val tomcatVersion = "11.0.26"
+    val jackson3Version = "3.1.7"
 
     // The BOMs. The Spring Boot one is what io.spring.dependency-management imported; the other two
     // are the BOMs it imports itself, restated at the versions this build wants, in place of the
@@ -327,12 +328,16 @@ configure(javaProjects) {
         SpringBootPlugin.BOM_COORDINATES,
         "org.jetbrains.kotlin:kotlin-bom:$kotlinVersion",
         "org.jetbrains.kotlinx:kotlinx-coroutines-bom:$kotlinCoroutinesVersion",
+        // Jackson 3 pinned past the Spring Boot BOM (4.1.1 manages 3.1.5) to clear the HIGHs of the
+        // backend image scan: CVE-2026-68497, CVE-2026-89407, CVE-2026-89425, CVE-2026-91776,
+        // CVE-2026-91777 (fixed in 3.1.7). Remove once the Spring Boot BOM manages >= 3.1.7.
+        "tools.jackson:jackson-bom:$jackson3Version",
     )
 
     // The former `dependencyManagement { dependencies { ... } }` entries, one constraint each.
     val versionConstraints = listOf(
         "commons-io:commons-io:2.18.0",
-        "org.jsoup:jsoup:1.23.1",
+        "org.jsoup:jsoup:1.23.2",
         "org.apache.commons:commons-math3:3.6.1",
         "org.apache.commons:commons-text:1.13.0",
         "org.jgrapht:jgrapht-core:1.5.2",
