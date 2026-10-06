@@ -26,12 +26,16 @@ import org.springframework.stereotype.Component
  * not matched by similarity: a CVE similar to the one looked for is another vulnerability. Its
  * title is the text, and its last sighting its recency.
  *
- * The document carries the branches the finding is exposed on, so it is written again whenever
- * they may change, in the transaction of the change:
+ * The document carries the branches the finding is exposed on, and the state of the finding in
+ * its project, which only its enabled branches count. It is written again whenever they may
+ * change, in the transaction of the change:
  *
  * - by the ingestion of a scan, for the findings it reports or resolves;
- * - when the project is updated (its name), or when a branch is updated, enabled, disabled or
- *   deleted, for the findings exposed on it.
+ * - when a branch is updated — which enabling or disabling it is as well, and so is changing its
+ *   state from its update form — or deleted, for the findings exposed on it.
+ *
+ * The names of the project and of the branches are resolved when searching ([nameReferences]), and
+ * the documents are not matched on them: an update of the project needs no rewrite.
  *
  * What changes without any event — an acceptance expiring, the branching model of the project
  * changing, the state of a finding in its project after the deletion of a branch — is caught up
@@ -101,14 +105,8 @@ class FindingSearchIndexer(
 
     override fun onEvent(event: Event) {
         when (event.eventType) {
-            EventFactory.UPDATE_PROJECT -> {
-                val project = event.getEntity<Project>(ProjectEntityType.PROJECT)
-                indexFindings(project, findingRepository.findFindingsByProject(project.id()))
-            }
-
-            EventFactory.UPDATE_BRANCH,
-            EventFactory.ENABLE_BRANCH,
-            EventFactory.DISABLE_BRANCH -> {
+            // Posted on enabling and disabling as well, before their own events
+            EventFactory.UPDATE_BRANCH -> {
                 val branch = event.getEntity<Branch>(ProjectEntityType.BRANCH)
                 onBranchChanged(branch.project, branch.id())
             }

@@ -15,9 +15,11 @@ import org.springframework.stereotype.Component
  * its recency.
  *
  * The documents are written by the hooks of the [GitBranchConfigurationPropertyType], in the
- * transaction of the change of property, and rewritten when the branch or its project is
- * updated, since they carry their names. The documents of a deleted branch are deleted by the
- * search service.
+ * transaction of the change of property, and rewritten when the branch is updated — which
+ * enabling or disabling it is as well — since they carry its description and its state. The names
+ * of the branch and of its project are resolved when searching ([nameReferences]), and the
+ * documents are not matched on them: an update of the project needs no rewrite. The documents of
+ * a deleted branch are deleted by the search service.
  */
 @Component
 class GitBranchSearchIndexer(
@@ -65,17 +67,10 @@ class GitBranchSearchIndexer(
 
     override fun onEvent(event: Event) {
         when (event.eventType) {
-            // The enabling and disabling events carry the branch as it was before the change
-            EventFactory.UPDATE_BRANCH,
-            EventFactory.ENABLE_BRANCH,
-            EventFactory.DISABLE_BRANCH -> structureService.findBranchByID(
+            // Posted on enabling and disabling as well, before their own events
+            EventFactory.UPDATE_BRANCH -> structureService.findBranchByID(
                 event.getEntity<Branch>(ProjectEntityType.BRANCH).id
             )?.let { reindex(it) }
-
-            EventFactory.UPDATE_PROJECT -> {
-                val project = event.getEntity<Project>(ProjectEntityType.PROJECT)
-                structureService.getBranchesForProject(project.id).forEach { reindex(it) }
-            }
         }
     }
 

@@ -233,7 +233,7 @@ class FindingSearchIT : AbstractQLKTITSupport() {
     }
 
     @Test
-    fun `Renaming or deleting a branch rewrites the results of its findings`() {
+    fun `Renaming or deleting a branch updates the results of its findings`() {
         val cve = uid("CVE-")
         asAdmin {
             project {
@@ -255,19 +255,50 @@ class FindingSearchIT : AbstractQLKTITSupport() {
     }
 
     @Test
-    fun `Renaming a project rewrites the results of its findings`() {
+    fun `Disabling or enabling a branch updates the state of its findings`() {
+        val cve = uid("CVE-")
+        asAdmin {
+            project {
+                val main = branch("main") {
+                    scan(findingsStamp(), entry(cve))
+                }
+                assertEquals("OPEN", state(cve))
+
+                structureService.disableBranch(main)
+                assertEquals("RESOLVED", state(cve), "A disabled branch does not count")
+
+                structureService.enableBranch(structureService.getBranch(main.id))
+                assertEquals("OPEN", state(cve))
+
+                // The update form of a branch changes its state as well
+                structureService.saveBranch(structureService.getBranch(main.id).withDisabled(true))
+                assertEquals("RESOLVED", state(cve))
+            }
+        }
+    }
+
+    @Test
+    fun `Renaming a project shows its new name in the results of its findings, without rewriting them`() {
         val cve = uid("CVE-")
         asAdmin {
             val project = project {
                 branch { scan(findingsStamp(), entry(cve)) }
             }
+            val oldName = project.name
             val name = uid("P")
             structureService.saveProject(
                 Project(project.id, name, project.description, project.isDisabled, project.signature)
             )
             assertEquals(
                 listOf(name),
-                search(cve).map { it.path("data").path("project").path("name").asText() }
+                search(cve).map { it.path("data").path("project").path("name").asText() },
+                "The name is resolved when searching"
+            )
+            val id = findingRepository.findFindingsByProject(project.id()).single().id
+            assertEquals(
+                oldName,
+                storedData(id.toString()).path("project").path("name").asText(),
+                "The document is not rewritten by the update of the project"
             )
         }
     }
@@ -328,6 +359,22 @@ class FindingSearchIT : AbstractQLKTITSupport() {
                 }
             """
         ).path("search").path("items").toList()
+
+    /**
+     * State of the finding of the single result of a query
+     */
+    private fun state(query: String): String =
+        search(query).single().path("data").path("finding").path("state").asText()
+
+    /**
+     * Data of a finding document as stored, before the names are resolved
+     */
+    private fun storedData(key: String): JsonNode =
+        namedParameterJdbcTemplate.queryForObject(
+            "SELECT DATA::text FROM SEARCH_DOCUMENTS WHERE TYPE = :type AND KEY = :key",
+            mapOf("type" to FINDING_SEARCH_RESULT_TYPE, "key" to key),
+            String::class.java,
+        )!!.parseAsJson()
 
     /**
      * Names of the branches the single result of a query is exposed on

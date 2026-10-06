@@ -216,6 +216,14 @@ a transaction which is rolled back.
 A type matched on no other entity's name — the commits, the issues — declares no rename scope:
 their names are resolved when searching, with no write at all.
 
+**Do not listen to an update for the names it may carry.** An indexer subscribes to the events of
+what its documents carry *besides* the names: `GitBranchSearchIndexer` rewrites its document on
+`UPDATE_BRANCH` for the description and the state of the branch, and the findings for the state of
+the finding, which counts the enabled branches only — but neither listens to `UPDATE_PROJECT` any
+longer (#2005). `UPDATE_BRANCH` is posted on enabling and disabling too, the update form being able
+to change the state as well: listening to `ENABLE_BRANCH` / `DISABLE_BRANCH` on top of it writes the
+same documents twice.
+
 ### A type without a project
 
 Documents with a `null` `projectId` are only visible to the users granted the `globalFunction` of

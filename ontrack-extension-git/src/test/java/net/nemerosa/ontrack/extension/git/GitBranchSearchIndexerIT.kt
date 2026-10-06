@@ -1,6 +1,7 @@
 package net.nemerosa.ontrack.extension.git
 
 import net.nemerosa.ontrack.extension.git.property.GitBranchConfigurationPropertyType
+import net.nemerosa.ontrack.json.parseAsJson
 import net.nemerosa.ontrack.model.security.Roles
 import net.nemerosa.ontrack.model.structure.Branch
 import net.nemerosa.ontrack.model.structure.NameDescription
@@ -11,6 +12,7 @@ import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
+import tools.jackson.databind.JsonNode
 import java.util.UUID
 import kotlin.test.assertEquals
 
@@ -96,30 +98,45 @@ class GitBranchSearchIndexerIT : AbstractGitTestSupport() {
     }
 
     @Test
-    fun `The Git branch of an updated branch renders its new name and state`() {
+    fun `The Git branch of an updated branch renders its new name, description and state`() {
         val gitBranch = token()
         val branch = project().branch(token())
         branch.gitBranch(gitBranch)
         val newName = token()
-        asAdmin { structureService.saveBranch(branch.copy(name = newName)) }
+        asAdmin { structureService.saveBranch(branch.copy(name = newName, description = "New description")) }
         asAdmin { structureService.disableBranch(structureService.getBranch(branch.id)) }
-        @Suppress("UNCHECKED_CAST")
-        val branchData = asUser { search(gitBranch).items }.single().data?.get("branch") as Map<String, *>
-        assertEquals(newName, branchData["name"])
-        assertEquals(true, branchData["disabled"])
+        branchData(gitBranch).let { branchData ->
+            assertEquals(newName, branchData["name"])
+            assertEquals("New description", branchData["description"])
+            assertEquals(true, branchData["disabled"])
+        }
+        asAdmin { structureService.enableBranch(structureService.getBranch(branch.id)) }
+        assertEquals(false, branchData(gitBranch)["disabled"])
+        // The update form of a branch changes its state as well
+        asAdmin { structureService.saveBranch(structureService.getBranch(branch.id).withDisabled(true)) }
+        assertEquals(true, branchData(gitBranch)["disabled"])
     }
 
     @Test
-    fun `The Git branch of a branch of a renamed project renders its new name`() {
+    fun `The Git branch of a branch of a renamed project renders its new name, without being rewritten`() {
         val gitBranch = token()
         val project = project()
-        project.branch(token()).gitBranch(gitBranch)
+        val branch = project.branch(token())
+        branch.gitBranch(gitBranch)
+        val oldName = project.name
         val newName = token()
         asAdmin { structureService.saveProject(project.copy(name = newName)) }
         @Suppress("UNCHECKED_CAST")
-        val branchData = asUser { search(gitBranch).items }.single().data?.get("branch") as Map<String, *>
-        @Suppress("UNCHECKED_CAST")
-        assertEquals(newName, (branchData["project"] as Map<String, *>)["name"])
+        assertEquals(
+            newName,
+            (branchData(gitBranch)["project"] as Map<String, *>)["name"],
+            "The name is resolved when searching"
+        )
+        assertEquals(
+            oldName,
+            storedData(branch.id.toString()).path("branch").path("project").path("name").asText(),
+            "The document is not rewritten by the update of the project"
+        )
     }
 
     @Test
@@ -160,6 +177,20 @@ class GitBranchSearchIndexerIT : AbstractGitTestSupport() {
             asAdmin { structureService.deleteProject(project.id) }
         }
     }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun branchData(gitBranch: String) =
+        asUser { search(gitBranch).items }.single().data?.get("branch") as Map<String, *>
+
+    /**
+     * Data of a Git branch document as stored, before the names are resolved
+     */
+    private fun storedData(key: String): JsonNode =
+        namedParameterJdbcTemplate.queryForObject(
+            "SELECT DATA::text FROM SEARCH_DOCUMENTS WHERE TYPE = :type AND KEY = :key",
+            mapOf("type" to GitBranchSearchIndexer.SEARCH_RESULT_TYPE, "key" to key),
+            String::class.java,
+        )!!.parseAsJson()
 
     private fun Project.branch(name: String, description: String) =
         structureService.newBranch(Branch.of(this, NameDescription.nd(name, description)))
