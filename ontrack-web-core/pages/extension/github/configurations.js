@@ -156,7 +156,7 @@ export default function GitHubConfigurationsPage() {
             label="Send workflow ID"
             extra="Default for passing an id input to the dispatched workflows (auto-versioning post-processing, notifications). Needed only when this GitHub does not return the run of a dispatch. A workflow must declare the id input if and only if it is sent."
             valuePropName="checked"
-            initialValue={true}
+            initialValue={false}
         >
             <Switch/>
         </Form.Item>,

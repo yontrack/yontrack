@@ -128,10 +128,6 @@ on:
   # Manual trigger only
   workflow_dispatch:
     inputs:
-      id:
-        description: "Unique client ID"
-        required: true
-        type: string
       repository:
         description: "Repository to process, like 'yontrack/yontrack'"
         required: true
@@ -163,15 +159,6 @@ jobs:
     container:
       image: ${{ inputs.docker_image }}
     steps:
-      - name: logging
-        run: |
-          touch inputs.properties
-      - name: artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: inputs-${{ inputs.id }}.properties
-          path: inputs.properties
-          if-no-files-found: error
       - name: checkout
         uses: actions/checkout@v3
         with:
@@ -193,7 +180,7 @@ jobs:
 !!! important
 
     * all the [inputs Yontrack sends](#workflow-inputs) must be declared, otherwise GitHub rejects the dispatch
-    * the `id` input must be declared if and only if Yontrack sends it, and its `inputs-<id>.properties` artifact is needed only when GitHub does not return the run of the dispatch - see [Workflow ID](#workflow-id)
+    * the `id` input is declared only when Yontrack sends it, which it does not by default - see [Workflow ID](#workflow-id)
     * commit & pushing the changed files is required for the post-processing to be considered complete
 
     The rest of the workflow can be adapted at will.
@@ -201,10 +188,34 @@ jobs:
 ### Workflow ID
 
 GitHub returns the run of the workflow it has started. When it does not, like on an older GitHub Enterprise Server,
-Yontrack finds the run back through the `id` input: the workflow uploads an `inputs-<id>.properties` artifact, like the
-`logging` and `artifact` steps of the [example above](#workflow-inputs).
+Yontrack finds the run back through an `id` input. Sending it is set by the `workflowSendId` field of the
+[GitHub configuration](../../start/configuration/github.md#dispatching-workflows), `false` by default, and overridden by
+the `sendId` parameter.
 
-Whether the `id` input is sent is set by the `workflowSendId` field of the
-[GitHub configuration](../../start/configuration/github.md#dispatching-workflows), `true` by default, and overridden by
-the `sendId` parameter. A workflow which does not declare `id` needs `sendId: false`, which works only with a GitHub
-returning the run of a dispatch.
+With `sendId: true`, the workflow must declare the `id` input, or GitHub rejects the dispatch, and upload an
+`inputs-<id>.properties` artifact for its run to be found:
+
+{% raw %}
+```yaml
+on:
+  workflow_dispatch:
+    inputs:
+      id:
+        description: "Unique client ID"
+        required: true
+        type: string
+      # ... the other inputs
+jobs:
+  processing:
+    steps:
+      - name: logging
+        run: touch inputs.properties
+      - name: artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: inputs-${{ inputs.id }}.properties
+          path: inputs.properties
+          if-no-files-found: error
+      # ... the other steps
+```
+{% endraw %}

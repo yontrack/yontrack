@@ -14,7 +14,7 @@ class GitHubConfigurationsMutationsIT : AbstractGitHubTestSupport() {
     private lateinit var gitHubConfigurationService: GitHubConfigurationService
 
     @Test
-    fun `Creating a GitHub configuration sends the workflow ID by default`() {
+    fun `Creating a GitHub configuration does not send the workflow ID by default`() {
         val name = uid("GH")
         asAdmin {
             withDisabledConfigurationTest {
@@ -25,39 +25,6 @@ class GitHubConfigurationsMutationsIT : AbstractGitHubTestSupport() {
                                 name: "$name",
                                 url: null,
                                 oauth2Token: "some-token",
-                            }) {
-                                configuration {
-                                    workflowSendId
-                                }
-                                errors {
-                                    message
-                                }
-                            }
-                        }
-                    """
-                ) { data ->
-                    checkGraphQLUserErrors(data, "createGitHubConfiguration") { node ->
-                        assertTrue(node.path("configuration").path("workflowSendId").asBoolean())
-                    }
-                }
-            }
-            assertTrue(gitHubConfigurationService.getConfiguration(name).workflowSendId)
-        }
-    }
-
-    @Test
-    fun `Creating a GitHub configuration without sending the workflow ID`() {
-        val name = uid("GH")
-        asAdmin {
-            withDisabledConfigurationTest {
-                run(
-                    """
-                        mutation {
-                            createGitHubConfiguration(input: {
-                                name: "$name",
-                                url: null,
-                                oauth2Token: "some-token",
-                                workflowSendId: false,
                             }) {
                                 configuration {
                                     workflowSendId
@@ -75,6 +42,39 @@ class GitHubConfigurationsMutationsIT : AbstractGitHubTestSupport() {
                 }
             }
             assertFalse(gitHubConfigurationService.getConfiguration(name).workflowSendId)
+        }
+    }
+
+    @Test
+    fun `Creating a GitHub configuration sending the workflow ID`() {
+        val name = uid("GH")
+        asAdmin {
+            withDisabledConfigurationTest {
+                run(
+                    """
+                        mutation {
+                            createGitHubConfiguration(input: {
+                                name: "$name",
+                                url: null,
+                                oauth2Token: "some-token",
+                                workflowSendId: true,
+                            }) {
+                                configuration {
+                                    workflowSendId
+                                }
+                                errors {
+                                    message
+                                }
+                            }
+                        }
+                    """
+                ) { data ->
+                    checkGraphQLUserErrors(data, "createGitHubConfiguration") { node ->
+                        assertTrue(node.path("configuration").path("workflowSendId").asBoolean())
+                    }
+                }
+            }
+            assertTrue(gitHubConfigurationService.getConfiguration(name).workflowSendId)
         }
     }
 

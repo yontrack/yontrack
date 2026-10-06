@@ -242,9 +242,10 @@ open class GitHubEngineConfiguration(
         const val GITHUB_COM = "https://github.com"
 
         /**
-         * Default for [workflowSendId].
+         * Default for [workflowSendId]: with the run returned by GitHub, the `id` input is needed only on
+         * a GitHub which does not return it. Configurations stored before 6.0 keep `true` (migration V99).
          */
-        const val DEFAULT_WORKFLOW_SEND_ID = true
+        const val DEFAULT_WORKFLOW_SEND_ID = false
 
     }
 

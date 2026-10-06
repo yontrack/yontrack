@@ -42,7 +42,8 @@ class GitHubWorkflowNotificationChannelTest {
             name = gitHubConfigName,
             url = URL,
             user = "someuser",
-            password = "somepassword"
+            password = "somepassword",
+            workflowSendId = true,
         )
 
         gitHubConfigurationService = mockk()

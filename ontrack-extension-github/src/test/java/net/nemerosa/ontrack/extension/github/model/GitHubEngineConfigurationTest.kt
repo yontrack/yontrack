@@ -218,8 +218,8 @@ class GitHubEngineConfigurationTest {
     }
 
     @Test
-    fun `Sending the workflow ID is enabled by default`() {
-        assertTrue(
+    fun `Sending the workflow ID is disabled by default`() {
+        assertFalse(
             mapOf(
                 "name" to "test",
                 "url" to "https://github.com",
@@ -251,7 +251,8 @@ class GitHubEngineConfigurationTest {
         assertFalse(configuration.decrypt { it }.workflowSendId)
         assertFalse(configuration.injectCredentials(GitHubEngineConfiguration("ontrack", null)).workflowSendId)
         assertTrue(
-            GitHubEngineConfiguration("ontrack", null, oauth2Token = "xxxx").injectCredentials(configuration).workflowSendId,
+            GitHubEngineConfiguration("ontrack", null, oauth2Token = "xxxx", workflowSendId = true)
+                .injectCredentials(configuration).workflowSendId,
             "Not a credential: never taken from the old configuration"
         )
     }
@@ -316,7 +317,7 @@ class GitHubEngineConfigurationTest {
                 "appPrivateKey" to null,
                 "appInstallationAccountName" to null,
                 "autoMergeToken" to null,
-                "workflowSendId" to true,
+                "workflowSendId" to false,
                 "authenticationType" to "ANONYMOUS",
             ).asJson(),
             GitHubEngineConfiguration(
@@ -359,7 +360,7 @@ class GitHubEngineConfigurationTest {
                 "appPrivateKey" to null,
                 "appInstallationAccountName" to null,
                 "autoMergeToken" to null,
-                "workflowSendId" to true,
+                "workflowSendId" to false,
                 "authenticationType" to "TOKEN",
             ).asJson(),
             GitHubEngineConfiguration(
@@ -408,7 +409,7 @@ class GitHubEngineConfigurationTest {
                 "appPrivateKey" to "xxxxxxx",
                 "appInstallationAccountName" to null,
                 "autoMergeToken" to null,
-                "workflowSendId" to true,
+                "workflowSendId" to false,
                 "authenticationType" to "APP",
             ).asJson(),
             GitHubEngineConfiguration(
@@ -478,7 +479,7 @@ class GitHubEngineConfigurationTest {
                 "appPrivateKey" to "xxxxxxx",
                 "appInstallationAccountName" to "test",
                 "autoMergeToken" to null,
-                "workflowSendId" to true,
+                "workflowSendId" to false,
                 "authenticationType" to "APP",
             ).asJson(),
             GitHubEngineConfiguration(

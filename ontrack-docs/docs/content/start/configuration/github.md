@@ -52,8 +52,9 @@ GitHub returns this run in its answer to the dispatch. When it does not, like on
 artifact.
 
 The `workflowSendId` field of the GitHub configuration (also in CasC, _Send workflow ID_ in the form)
-says whether this `id` input is sent. It is `true` by default, and each auto-versioning post-processing configuration
-and each notification can override it with its own `sendId` field.
+says whether this `id` input is sent. It is `false` by default, and each auto-versioning post-processing configuration
+and each notification can override it with its own `sendId` field. A configuration created before Yontrack 6 keeps
+`true`, unless it is defined as code: see [Migration to V6](../../appendix/migration-to-v6.md#github-workflow-id-no-longer-sent-by-default).
 
 GitHub rejects a dispatch whose inputs do not match the inputs declared by the workflow:
 
@@ -62,5 +63,5 @@ GitHub rejects a dispatch whose inputs do not match the inputs declared by the w
 | `id` is sent       | OK                                | Rejected                       |
 | `id` is not sent   | Rejected                          | OK                             |
 
-Set it to `false` only for workflows which do not declare `id`, on a GitHub which returns the run of a dispatch:
+Set it to `true` only on a GitHub which does not return the run of a dispatch, for workflows which declare `id`:
 without the `id` input, a run which is not returned cannot be searched for, and the dispatch fails.

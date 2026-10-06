@@ -9720,7 +9720,7 @@ input CreateGitHubConfigurationInput {
   url: String
   "User name for authentication"
   user: String
-  "Whether to pass the id input to the dispatched workflows, to find their run when GitHub does not return it. Defaults to true."
+  "Whether to pass the id input to the dispatched workflows, to find their run when GitHub does not return it. Defaults to false."
   workflowSendId: Boolean
 }
 

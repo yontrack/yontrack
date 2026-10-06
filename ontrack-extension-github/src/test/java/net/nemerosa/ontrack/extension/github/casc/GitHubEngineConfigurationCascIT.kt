@@ -133,7 +133,7 @@ class GitHubEngineConfigurationCascIT : AbstractCascTestSupport() {
     }
 
     @Test
-    fun `Sending the workflow ID is enabled by default`() {
+    fun `Sending the workflow ID is disabled by default`() {
         val name = TestUtils.uid("GH")
         withDisabledConfigurationTest {
             casc(
@@ -143,6 +143,26 @@ class GitHubEngineConfigurationCascIT : AbstractCascTestSupport() {
                             github:
                                 - name: $name
                                   token: my-secret-token
+                """.trimIndent()
+            )
+        }
+        asAdmin {
+            assertFalse(gitHubConfigurationService.getConfiguration(name).workflowSendId)
+        }
+    }
+
+    @Test
+    fun `Enabling the sending of the workflow ID`() {
+        val name = TestUtils.uid("GH")
+        withDisabledConfigurationTest {
+            casc(
+                """
+                    ontrack:
+                        config:
+                            github:
+                                - name: $name
+                                  token: my-secret-token
+                                  workflowSendId: true
                 """.trimIndent()
             )
         }

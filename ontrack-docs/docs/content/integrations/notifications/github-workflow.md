@@ -2,11 +2,32 @@
 
 Notifications can be used to trigger a GitHub Actions workflows on some events.
 
+The workflow declares the `inputs` of the notification, and nothing else:
+
+```yaml
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to deploy"
+        required: true
+        type: string
+jobs:
+  my-job:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Deploying {{ '${{ inputs.version }}' }}"
+```
+
 ## Workflow ID
 
 GitHub returns the run of the workflow a notification starts. When it does not, like on an older GitHub Enterprise
-Server, Yontrack finds the run back through an `id` input it passes to the workflow, which the workflow uploads as an
-artifact:
+Server, Yontrack finds the run back through an `id` input. Sending it is set by the `workflowSendId` field of the
+[GitHub configuration](../../start/configuration/github.md#dispatching-workflows), `false` by default, and overridden by
+the `sendId` field of the notification.
+
+With `sendId: true`, the workflow must declare the `id` input, or GitHub rejects the dispatch, and upload an
+`inputs-<id>.properties` artifact for its run to be found:
 
 ```yaml
 on:
@@ -29,14 +50,6 @@ jobs:
           path: inputs.properties
           if-no-files-found: error
 ```
-
-The artifact steps are needed only when GitHub does not return the run. The `id` input, however, must be declared
-if and only if it is sent, or GitHub rejects the dispatch.
-
-Whether it is sent is set by the `workflowSendId` field of the
-[GitHub configuration](../../start/configuration/github.md#dispatching-workflows), `true` by default, and overridden by
-the `sendId` field of the notification. A workflow which does not declare `id` needs `sendId: false`, which works only
-with a GitHub returning the run of a dispatch.
 
 ## See also
 

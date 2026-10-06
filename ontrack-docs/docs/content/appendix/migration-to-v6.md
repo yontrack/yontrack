@@ -362,6 +362,32 @@ but these changes, which came with it, apply to every installation.
 * **Unknown paths with a token** — a call authenticated by an API token to a path which does not
   exist now answers `404`, as for any other authenticated caller, where it answered `401`.
 
+### GitHub workflow ID no longer sent by default
+
+GitHub returns the run of a workflow it dispatches, so the `id` input which Yontrack passed to find
+it is needed only on a GitHub which does not return it. The `workflowSendId` field of a
+[GitHub configuration](../start/configuration/github.md#dispatching-workflows) is now `false` by
+default: the auto-versioning post-processing and the GitHub workflow notifications no longer send
+`id`, unless their `sendId` says otherwise.
+
+#### For deployers
+
+The GitHub configurations stored before the upgrade keep `workflowSendId: true`: the upgrade
+writes it into those which did not set it. Nothing changes for them.
+
+#### For API clients
+
+`createGitHubConfiguration` without a `workflowSendId` input now creates a configuration with
+`workflowSendId: false`.
+
+#### For CasC users
+
+A GitHub configuration defined as code is applied again from its YAML at startup, so the upgrade
+does not keep its former value: without `workflowSendId`, it becomes `false`, and a workflow
+declaring the `id` input rejects the dispatch. Either add `workflowSendId: true` to the
+configuration to keep sending `id`, or remove the `id` input and the `inputs-<id>.properties`
+artifact step from the workflows — on a GitHub which returns the run of a dispatch.
+
 ## Removed
 
 Yontrack 6 removes what Yontrack 5 deprecated. Each item is listed here with what to use instead,
