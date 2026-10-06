@@ -125,6 +125,24 @@ The status of the run is computed from the number of findings the scan reports a
 
 A value of `0` disables its threshold.
 
+As for CHML, the stamp can also let a warning through to the
+[auto promotion](../../concepts/model/auto-promotion.md), with `warningPassesAutoPromotion` — optional,
+`false` by default:
+
+```yaml
+        SECURITY.IMAGE:
+          security-findings:
+            warningLevel: HIGH
+            warningValue: 1
+            failedLevel: CRITICAL
+            failedValue: 1
+            warningPassesAutoPromotion: true
+```
+
+A run whose last status is `WARNING` then counts as passed for the auto promotion, and only for it: it
+still shows as a warning everywhere else. A warning later moved to another status, `EXPLAINED` for
+example, does not count.
+
 !!! warning
 
     As for CHML, a threshold counts the findings of **exactly** its severity, not of this severity

@@ -24,6 +24,8 @@ import tools.jackson.databind.JsonNode
  * Its configuration is the one of CHML — warning and failure thresholds on a severity — and its
  * status is computed as CHML computes it, on the counts of the findings which are not accepted.
  * UNKNOWN findings are counted and shown, but never trip a threshold, since CHML has no such level.
+ * A `WARNING` run counts as passed for the auto promotion as it does for CHML, when the stamp opts
+ * in with `warningPassesAutoPromotion`.
  *
  * The run data holds the counts only, under the keys of CHML plus `unknown` and `accepted`; the
  * findings themselves are in their own tables. Its metrics are the ones of CHML, which it declares
@@ -63,6 +65,14 @@ class FindingsValidationDataType(
         config: CHMLValidationDataTypeConfig?,
         data: FindingsValidationDataTypeData,
     ): ValidationRunStatusID? = chml.computeStatus(config, data.asCHML())
+
+    /**
+     * As for CHML, a `WARNING` run counts as passed for the auto promotion when the stamp opts in.
+     */
+    override fun isPassedForAutoPromotion(
+        config: CHMLValidationDataTypeConfig?,
+        status: ValidationRunStatusID,
+    ): Boolean = chml.isPassedForAutoPromotion(config, status)
 
     override fun validateData(
         config: CHMLValidationDataTypeConfig?,

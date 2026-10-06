@@ -12,7 +12,7 @@ Auto promotion is configured by setting the "Auto promotion" property on a promo
 
     A validation counts as passed when the status of its **last** run is `PASSED` or `FIXED` — a validation which failed and was later fixed counts towards the auto promotion.
 
-    A [CHML](index.md#chml) validation stamp can also opt in, with `warningPassesAutoPromotion`, to having a last run in `WARNING` status count as passed. This applies to the auto promotion only — a `WARNING` run still shows as a warning everywhere else — and only to a last status of exactly `WARNING`: a warning later moved to another status, `INVESTIGATING` or `EXPLAINED` for example, does not count. With this option, a `WARNING` run both promotes a build and leaves an [auto revoked](#revoking-a-promotion) promotion standing.
+    A [CHML](index.md#chml) or [Security findings](../../integrations/findings/findings.md#the-validation-stamp-type) validation stamp can also opt in, with `warningPassesAutoPromotion`, to having a last run in `WARNING` status count as passed. This applies to the auto promotion only — a `WARNING` run still shows as a warning everywhere else — and only to a last status of exactly `WARNING`: a warning later moved to another status, `INVESTIGATING` or `EXPLAINED` for example, does not count. With this option, a `WARNING` run both promotes a build and leaves an [auto revoked](#revoking-a-promotion) promotion standing.
 
 ## Selecting the validations
 

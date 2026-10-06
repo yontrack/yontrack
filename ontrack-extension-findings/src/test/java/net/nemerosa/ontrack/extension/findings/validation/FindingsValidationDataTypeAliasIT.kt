@@ -13,6 +13,8 @@ import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import kotlin.jvm.optionals.getOrNull
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 import kotlin.test.fail
 
 class FindingsValidationDataTypeAliasIT : AbstractDSLTestSupport() {
@@ -55,6 +57,39 @@ class FindingsValidationDataTypeAliasIT : AbstractDSLTestSupport() {
         assertIs<CHMLValidationDataTypeConfig>(vs.dataType?.config) {
             assertEquals(CHMLLevel(CHML.HIGH, 1), it.warningLevel)
             assertEquals(CHMLLevel(CHML.CRITICAL, 1), it.failedLevel)
+            assertFalse(it.warningPassesAutoPromotion)
+        }
+    }
+
+    @Test
+    @AsAdminTest
+    fun `security-findings validation data type alias accepting warnings for the auto promotion`() {
+        val branch = configTestSupport.configureBranch(
+            yaml = """
+                version: v1
+                configuration:
+                    defaults:
+                        branch:
+                            validations:
+                                SECURITY.IMAGE:
+                                    security-findings:
+                                        warningLevel: HIGH
+                                        warningValue: 1
+                                        failedLevel: CRITICAL
+                                        failedValue: 1
+                                        warningPassesAutoPromotion: true
+            """.trimIndent(),
+            ci = "generic",
+            scm = "mock",
+            env = EnvFixtures.generic(configuredProjectName)
+        )
+
+        val vs = structureService.findValidationStampByName(branch.project.name, branch.name, "SECURITY.IMAGE")
+            .getOrNull()
+            ?: fail("Cannot find SECURITY.IMAGE validation stamp")
+
+        assertIs<CHMLValidationDataTypeConfig>(vs.dataType?.config) {
+            assertTrue(it.warningPassesAutoPromotion)
         }
     }
 }

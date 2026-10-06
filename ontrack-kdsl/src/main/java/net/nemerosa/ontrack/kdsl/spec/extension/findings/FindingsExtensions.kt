@@ -59,6 +59,8 @@ enum class FindingsReportFormat(val id: String) {
  * @param warningValue Count of findings at [warningLevel] or above for a warning
  * @param failedLevel Level of the failure threshold (`CRITICAL`, `HIGH`, `MEDIUM` or `LOW`)
  * @param failedValue Count of findings at [failedLevel] or above for a failure
+ * @param warningPassesAutoPromotion If `true`, a run in `WARNING` status counts as passed for the
+ * auto promotion — and only for it
  * @return Created validation stamp
  */
 fun Branch.createFindingsValidationStamp(
@@ -68,6 +70,7 @@ fun Branch.createFindingsValidationStamp(
     warningValue: Int = 1,
     failedLevel: String = "CRITICAL",
     failedValue: Int = 1,
+    warningPassesAutoPromotion: Boolean = false,
 ): ValidationStamp = createValidationStamp(
     name = name,
     description = description,
@@ -77,6 +80,7 @@ fun Branch.createFindingsValidationStamp(
         "warningValue" to warningValue,
         "failedLevel" to failedLevel,
         "failedValue" to failedValue,
+        "warningPassesAutoPromotion" to warningPassesAutoPromotion,
     ),
 )
 

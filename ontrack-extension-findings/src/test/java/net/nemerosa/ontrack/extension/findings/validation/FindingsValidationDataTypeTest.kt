@@ -11,7 +11,9 @@ import net.nemerosa.ontrack.json.asJson
 import net.nemerosa.ontrack.model.structure.ValidationRunStatusID
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class FindingsValidationDataTypeTest {
 
@@ -24,6 +26,8 @@ class FindingsValidationDataTypeTest {
         warningLevel = CHMLLevel(CHML.HIGH, 1),
         failedLevel = CHMLLevel(CHML.CRITICAL, 1),
     )
+
+    private val tolerant = config.copy(warningPassesAutoPromotion = true)
 
     @Test
     fun `Passed when no threshold is reached`() {
@@ -124,6 +128,44 @@ class FindingsValidationDataTypeTest {
                 ).asJson()
             )
         )
+    }
+
+    @Test
+    fun `Configuration from a form carries the warning tolerance for auto promotion, as CHML`() {
+        val parsed = dataType.fromConfigForm(
+            mapOf(
+                "warningLevel" to "HIGH",
+                "warningValue" to 1,
+                "failedLevel" to "CRITICAL",
+                "failedValue" to 1,
+                "warningPassesAutoPromotion" to true,
+            ).asJson()
+        )
+        assertEquals(tolerant, parsed)
+        assertTrue(dataType.configToFormJson(tolerant)!!.path("warningPassesAutoPromotion").asBoolean())
+    }
+
+    @Test
+    fun `Passed for auto promotion with the flag off`() {
+        assertTrue(dataType.isPassedForAutoPromotion(config, ValidationRunStatusID.STATUS_PASSED))
+        assertFalse(dataType.isPassedForAutoPromotion(config, ValidationRunStatusID.STATUS_WARNING))
+        assertFalse(dataType.isPassedForAutoPromotion(config, ValidationRunStatusID.STATUS_FAILED))
+        assertFalse(dataType.isPassedForAutoPromotion(config, ValidationRunStatusID.STATUS_EXPLAINED))
+    }
+
+    @Test
+    fun `Passed for auto promotion with the flag on, as CHML`() {
+        assertTrue(dataType.isPassedForAutoPromotion(tolerant, ValidationRunStatusID.STATUS_PASSED))
+        assertTrue(dataType.isPassedForAutoPromotion(tolerant, ValidationRunStatusID.STATUS_WARNING))
+        assertFalse(dataType.isPassedForAutoPromotion(tolerant, ValidationRunStatusID.STATUS_FAILED))
+        // Only a last status of exactly WARNING is accepted
+        assertFalse(dataType.isPassedForAutoPromotion(tolerant, ValidationRunStatusID.STATUS_EXPLAINED))
+    }
+
+    @Test
+    fun `Passed for auto promotion without any config`() {
+        assertTrue(dataType.isPassedForAutoPromotion(null, ValidationRunStatusID.STATUS_PASSED))
+        assertFalse(dataType.isPassedForAutoPromotion(null, ValidationRunStatusID.STATUS_WARNING))
     }
 
     @Test
