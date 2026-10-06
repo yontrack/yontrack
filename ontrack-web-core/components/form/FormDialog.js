@@ -90,6 +90,7 @@ export default function FormDialog({
         actualQuery,
         {
             userNodeName: getActualUserNode(),
+            statusNodeName: dialog.statusNode,
             onSuccess: formOnSuccess,
         }
     )

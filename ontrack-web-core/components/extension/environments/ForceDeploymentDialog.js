@@ -26,10 +26,17 @@ export const useForceDeploymentDialog = ({onForced}) => {
                     errors {
                         message
                     }
+                    finishStatus {
+                        ok
+                        message
+                    }
                 }
             }
         `,
         userNode: 'finishSlotPipelineDeployment',
+        // Forcing skips the status and workflow checks, not all of them: a deployment superseded
+        // on its slot is refused through `finishStatus`, with no GraphQL error
+        statusNode: 'finishStatus',
         onSuccess: onForced,
     })
 }

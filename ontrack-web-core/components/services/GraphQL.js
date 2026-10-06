@@ -99,7 +99,11 @@ export const useQueries = (queries = [], {
     }
 }
 
-export const useMutation = (query, {userNodeName, onSuccess}) => {
+/**
+ * `statusNodeName` names an optional `{ok message}` node of the payload, through which some
+ * mutations refuse an action without any GraphQL error: `ok` false is then an error too.
+ */
+export const useMutation = (query, {userNodeName, statusNodeName, onSuccess}) => {
     const [data, setData] = useState({})
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState()
@@ -112,8 +116,11 @@ export const useMutation = (query, {userNodeName, onSuccess}) => {
             if (userNode) {
                 setData(userNode)
                 const errors = userNode.errors
+                const status = statusNodeName ? userNode[statusNodeName] : undefined
                 if (errors && errors.length > 0) {
                     setError(errors[0].message)
+                } else if (status?.ok === false) {
+                    setError(status.message || "The action has been refused.")
                 } else if (onSuccess) {
                     onSuccess(userNode)
                 }
