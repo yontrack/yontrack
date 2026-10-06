@@ -1,6 +1,7 @@
 package net.nemerosa.ontrack.extension.audittrail.listener
 
 import net.nemerosa.ontrack.extension.audittrail.canonical.CanonicalJson
+import net.nemerosa.ontrack.extension.audittrail.evidence.Evidence
 import net.nemerosa.ontrack.extension.audittrail.hash.TrailHashFormatV1
 import net.nemerosa.ontrack.model.structure.Build
 import net.nemerosa.ontrack.model.structure.PromotionLevel
@@ -79,6 +80,15 @@ object TrailPayloads {
      */
     fun validationRun(validationRun: ValidationRun): Map<String, Any> =
         validationRun(validationRun.id(), validationRun.runOrder)
+
+    /**
+     * An evidence, as its deletion refers to it — by the user, or with its validation run.
+     */
+    fun deletedEvidence(evidence: Evidence): Map<String, Any> = mapOf(
+        "id" to evidence.id,
+        "fileName" to evidence.fileName,
+        "sha256" to evidence.sha256,
+    )
 
     /**
      * A promotion level, as an entry refers to it.

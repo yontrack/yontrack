@@ -447,7 +447,8 @@ Two projects show the audit trail (#1970), and `DemoAuditTrailSeedTest` pins wha
   deletes a log attached by mistake (`EvidenceSpec.deleted`), and deploys the build to staging, then
   to production, overriding the change approval there (`DeploymentSpec.overrides`). Last,
   `LEGACY.LINT` is deleted (`ValidationStampSpec.deleted`), and both builds of the project record
-  `validation.deleted` with the reason `cascade/validation-stamp-deleted`.
+  `validation.deleted` with the reason `cascade/validation-stamp-deleted` - the release first
+  records `evidence.deleted` for the lint report attached to its run, which goes with it.
 - **`audit-trail-tampered`**: build `7`, whose fourth entry - the FAILED scan - is rewritten as PASSED
   once everything is seeded (`BuildSpec.tampering`). Its verification breaks at seq 4.
 

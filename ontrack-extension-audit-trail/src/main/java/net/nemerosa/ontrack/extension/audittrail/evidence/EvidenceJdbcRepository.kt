@@ -74,6 +74,17 @@ class EvidenceJdbcRepository(
             mapOf("buildId" to buildId),
         ) { rs, _ -> toEvidence(rs) }
 
+    override fun findByValidationStamp(validationStampId: Int): List<Evidence> =
+        namedParameterJdbcTemplate.query(
+            """
+                SELECT E.* FROM EVIDENCE E
+                INNER JOIN VALIDATION_RUNS VR ON VR.ID = E.VALIDATION_RUN_ID
+                WHERE VR.VALIDATIONSTAMPID = :validationStampId
+                ORDER BY E.VALIDATION_RUN_ID, E.ID
+            """.trimIndent(),
+            mapOf("validationStampId" to validationStampId),
+        ) { rs, _ -> toEvidence(rs) }
+
     override fun markDeleted(id: Int, deletedAt: LocalDateTime): Boolean =
         namedParameterJdbcTemplate.update(
             "UPDATE EVIDENCE SET DELETED_AT = :deletedAt WHERE ID = :id AND DELETED_AT IS NULL",

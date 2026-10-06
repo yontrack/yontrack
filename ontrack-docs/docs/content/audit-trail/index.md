@@ -320,7 +320,13 @@ entry to the trail and posts the [`evidence.deleted`](../generated/events/event-
 event. Its file is removed from the storage unless another evidence has the same content. Deleting
 evidence requires the license, like uploading it.
 
-Evidence also goes with its validation run, and therefore with its build.
+Evidence also goes with its validation run — deleted on its own, or with its validation stamp —
+and therefore with its build. A validation run which goes writes, before its `validation.deleted`
+entry, an `evidence.deleted` entry for each of its evidences which was not deleted already, with
+the `reason` of the [cascade](#entry-types): the trail records that the evidence went, and
+*Verify including evidence* does not report it as missing once its file is swept. Unlike an
+evidence a user deleted, such an evidence is no longer listed on the
+[audit trail page](#the-audit-trail-of-a-build) — its `evidence.deleted` entry is.
 
 The files are stored once per content (`blobs/<sha256>` in the bucket) and shared between the
 evidence which has the same content. A **daily sweep** removes the files which no evidence
@@ -486,7 +492,7 @@ validation stamps, validation runs and promotion levels are referred to as
 | `validation.data`               | Data of a validation run replaced                                  | `validationStamp`, `validationRun`, `data: {type, sha256}` — no `data` when removed           |
 | `validation.deleted`            | Validation run deleted                                             | `validationStamp`, `validationRun`, `status` (its last one), plus `reason` for a cascade       |
 | `evidence.attached`             | Evidence attached to a validation run of the build                 | `validationStamp`, `validationRun`, `evidence: {id, fileName, mediaType, size, sha256, source: {tool, version, url}, externalDigest}` |
-| `evidence.deleted`              | Evidence deleted                                                   | `validationStamp`, `validationRun`, `evidence: {id, fileName, sha256}`                        |
+| `evidence.deleted`              | Evidence deleted                                                   | `validationStamp`, `validationRun`, `evidence: {id, fileName, sha256}`, plus `reason` for a cascade |
 | `promotion.added`               | Build promoted                                                     | `promotionLevel`, `promotionRun: {id}`, `description`, `claimed`                              |
 | `promotion.removed`             | Promotion run deleted                                              | `promotionLevel`, `promotionRun`, plus `reason` for a cascade                                 |
 | `runinfo.set`                   | Run info set on the build or one of its validation runs            | `runnable`, `runInfo: {sourceType, sourceUri, triggerType, triggerData, runTime}`             |
@@ -509,10 +515,13 @@ them, with a `reason`:
 | Deleted                       | Entry on each affected build | `reason`                            |
 |-------------------------------|------------------------------|-------------------------------------|
 | A validation stamp            | `validation.deleted`         | `cascade/validation-stamp-deleted`  |
+| A validation stamp            | `evidence.deleted`, for each evidence of its runs | `cascade/validation-stamp-deleted` |
+| A validation run              | `evidence.deleted`, for each of its evidences | `cascade/validation-run-deleted` |
 | A promotion level             | `promotion.removed`          | `cascade/promotion-level-deleted`   |
 | A build other builds link to  | `link.removed`               | `cascade/target-build-deleted`      |
 
-Deleting a branch or a project writes nothing: the trails go with the builds.
+The `evidence.deleted` entries of a run come before its `validation.deleted` entry. A cascade
+posts no event. Deleting a branch or a project writes nothing: the trails go with the builds.
 
 An entry is written in the database transaction of its change: both are committed, or neither.
 A GraphQL mutation made of several steps writes several entries, and a change committed despite an

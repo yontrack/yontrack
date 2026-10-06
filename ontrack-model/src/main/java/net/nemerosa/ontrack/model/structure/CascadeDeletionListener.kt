@@ -3,7 +3,8 @@ package net.nemerosa.ontrack.model.structure
 /**
  * Told what a deletion takes with it on builds other than the deleted entity: the validation runs
  * of a deleted validation stamp, the promotion runs of a deleted promotion level, and the links
- * other builds hold to a deleted build.
+ * other builds hold to a deleted build — and told of a validation run deleted on its own, which
+ * takes with it what is attached to it.
  *
  * Called just before the deletion, in its transaction, while what it takes can still be read: what
  * a listener writes is committed or rolled back with the deletion, and a listener which fails
@@ -26,6 +27,14 @@ interface CascadeDeletionListener {
      * @param runs Its validation runs, ordered by build and run ID
      */
     fun beforeValidationStampDeletion(validationStamp: ValidationStamp, runs: List<CascadedValidationRun>)
+
+    /**
+     * Before the deletion of a validation run on its own — before the event of its deletion is
+     * posted.
+     *
+     * @param validationRun Validation run about to be deleted
+     */
+    fun beforeValidationRunDeletion(validationRun: ValidationRun)
 
     /**
      * Before the deletion of a promotion level.

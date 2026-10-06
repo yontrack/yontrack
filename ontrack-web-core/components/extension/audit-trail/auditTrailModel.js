@@ -125,10 +125,12 @@ export function actorText(actor) {
 }
 
 /**
- * What a deletion reaching the build beyond the deleted entity says, by the `reason` of its entry.
+ * What a deletion reaching the build beyond the deleted entity - or the evidence going with its
+ * validation run - says, by the `reason` of its entry.
  */
 const CASCADE_REASONS = {
     'cascade/validation-stamp-deleted': 'with its validation stamp',
+    'cascade/validation-run-deleted': 'with its validation run',
     'cascade/promotion-level-deleted': 'with its promotion level',
     'cascade/target-build-deleted': 'with its target build',
 }

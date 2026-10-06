@@ -1,0 +1,7 @@
+legacy-lint 3.2.0 - audit-trail-demo 2.4.0
+==========================================
+
+Files checked: 412
+Rules applied: 87
+
+No violation.

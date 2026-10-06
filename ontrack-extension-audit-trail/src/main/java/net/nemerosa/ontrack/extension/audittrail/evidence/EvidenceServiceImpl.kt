@@ -4,6 +4,7 @@ import net.nemerosa.ontrack.common.Time
 import net.nemerosa.ontrack.extension.audittrail.canonical.CanonicalJson
 import net.nemerosa.ontrack.extension.audittrail.events.AuditTrailEvents
 import net.nemerosa.ontrack.extension.audittrail.license.AuditTrailLicense
+import net.nemerosa.ontrack.extension.audittrail.listener.TrailPayloads.deletedEvidence
 import net.nemerosa.ontrack.extension.audittrail.listener.TrailPayloads.payload
 import net.nemerosa.ontrack.extension.audittrail.listener.TrailPayloads.validationRun
 import net.nemerosa.ontrack.extension.audittrail.listener.TrailPayloads.validationStamp
@@ -183,11 +184,7 @@ class EvidenceServiceImpl(
                 payload = payload(
                     "validationStamp" to validationStamp(validationRun.validationStamp),
                     "validationRun" to validationRun(validationRun),
-                    "evidence" to mapOf(
-                        "id" to evidence.id,
-                        "fileName" to evidence.fileName,
-                        "sha256" to evidence.sha256,
-                    ),
+                    "evidence" to deletedEvidence(evidence),
                 ),
                 actor = actor,
             )

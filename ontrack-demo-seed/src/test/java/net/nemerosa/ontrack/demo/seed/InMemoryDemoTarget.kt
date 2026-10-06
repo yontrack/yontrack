@@ -506,13 +506,23 @@ class InMemoryDemoTarget(
         }
 
         /**
-         * As the server does: the runs of the stamp go with it, and each of their builds records it.
+         * As the server does: the runs of the stamp go with it, and each of their builds records it
+         * - the evidence of a run which is not deleted already first, then the run.
          */
         override fun deleteValidationStamp(name: String) {
             require(name in validationStamps) { "No validation stamp $name in ${project.name}/${this.name}" }
             builds.forEach { build ->
                 build.validations.filter { it.stamp == name }.forEach { run ->
                     build.validations -= run
+                    run.evidence.filter { !it.deleted }.forEach { evidence ->
+                        build.entry(
+                            "evidence.deleted",
+                            "validationStamp" to name,
+                            "fileName" to evidence.spec.fileName,
+                            "reason" to "cascade/validation-stamp-deleted",
+                            actor = SEED_ACTOR,
+                        )
+                    }
                     build.entry(
                         "validation.deleted",
                         "validationStamp" to name,

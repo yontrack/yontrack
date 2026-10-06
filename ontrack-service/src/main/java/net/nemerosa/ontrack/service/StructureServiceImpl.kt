@@ -1303,6 +1303,10 @@ class StructureServiceImpl(
 
     override fun deleteValidationRun(validationRun: ValidationRun): Ack {
         securityService.checkProjectFunction(validationRun, ProjectEdit::class.java)
+        // Before the event, so that what goes with the run is recorded before the run itself
+        beforeCascadeDeletion { listeners ->
+            listeners.forEach { it.beforeValidationRunDeletion(validationRun) }
+        }
         // Posted before the deletion, so that listeners can still read the run
         eventPostService.post(eventFactory.deleteValidationRun(validationRun))
         return structureRepository.deleteValidationRun(validationRun.id)

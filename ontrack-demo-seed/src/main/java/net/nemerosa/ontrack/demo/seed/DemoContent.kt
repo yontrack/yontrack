@@ -1569,7 +1569,8 @@ object DemoContent {
      * dependency builds. A person then passes the failed unit tests with a comment and deletes a log
      * attached by mistake - the trail shows both under another actor than the pipeline - and deploys
      * it to staging, then to production, overriding the change approval. Last, [LEGACY_LINT] is
-     * deleted, and both builds of the project record the run they lose.
+     * deleted, and both builds of the project record the run they lose - the release also the lint
+     * report attached to its run, which goes with it (#2002).
      *
      * The evidence is one file of each kind the evidence page handles: a PDF and a PNG shown inline,
      * a CycloneDX SBOM in JSON and a JUnit summary in plain text, and a ZAP report in HTML, which is
@@ -1586,7 +1587,7 @@ object DemoContent {
             repository = AUDIT_TRAIL,
             issues = listOf(
                 IssueSpec("AUDIT-12", "Record who changed what on a release", type = "feature"),
-                IssueSpec("AUDIT-13", "Keep the evidence of a deleted validation run", type = "defect"),
+                IssueSpec("AUDIT-13", "Record the evidence of a deleted validation run", type = "defect"),
             ),
         ),
         branches = listOf(
@@ -1631,7 +1632,7 @@ object DemoContent {
                         creation = HoursAgo(14),
                         token = CI_TOKEN,
                         commits = listOf(
-                            "fix(audit): keep the evidence of a deleted validation run (AUDIT-13)",
+                            "fix(audit): record the evidence of a deleted validation run (AUDIT-13)",
                             "chore(release): 2.4.0",
                         ),
                         promotionLevels = listOf(BRONZE, SILVER, GOLD),
@@ -1725,7 +1726,21 @@ object DemoContent {
                                     ),
                                 ),
                             ),
-                            ValidationSpec(LEGACY_LINT, PASSED),
+                            // Goes with the stamp: the trail records the report as deleted, so
+                            // that the verification does not report it missing once swept (#2002)
+                            ValidationSpec(
+                                LEGACY_LINT,
+                                PASSED,
+                                evidence = listOf(
+                                    EvidenceSpec(
+                                        fileName = "legacy-lint.txt",
+                                        mediaType = "text/plain",
+                                        resource = "legacy-lint.txt",
+                                        sourceTool = "legacy-lint",
+                                        sourceVersion = "3.2.0",
+                                    ),
+                                ),
+                            ),
                         ),
                         links = listOf(
                             BuildRef(LIBRARY, MAIN, "42"),

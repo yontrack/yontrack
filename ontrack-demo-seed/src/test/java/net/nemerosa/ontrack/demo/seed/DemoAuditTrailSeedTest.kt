@@ -64,7 +64,7 @@ class DemoAuditTrailSeedTest {
         assertEquals(ValidationStatus.FIXED, status.payload["status"])
         assertTrue((status.payload["description"] as String).isNotBlank())
 
-        val deleted = trail.single { it.type == "evidence.deleted" }
+        val deleted = trail.single { it.type == "evidence.deleted" && "reason" !in it.payload }
         assertEquals(InMemoryDemoTarget.SEED_ACTOR, deleted.actor)
         assertEquals("trivy-debug.log", deleted.payload["fileName"])
     }
@@ -143,6 +143,18 @@ class DemoAuditTrailSeedTest {
             assertEquals("cascade/validation-stamp-deleted", entry.payload["reason"])
             assertTrue(build.validations.none { it.stamp == DemoContent.LEGACY_LINT })
         }
+    }
+
+    @Test
+    fun `the lint report of the release goes with the deleted validation stamp, recorded before its run`() {
+        val trail = seeded().release().trail
+
+        val evidence = trail.single { it.type == "evidence.deleted" && "reason" in it.payload }
+        assertEquals("legacy-lint.txt", evidence.payload["fileName"])
+        assertEquals(DemoContent.LEGACY_LINT, evidence.payload["validationStamp"])
+        assertEquals("cascade/validation-stamp-deleted", evidence.payload["reason"])
+        val run = trail.single { it.type == "validation.deleted" }
+        assertEquals(evidence.seq + 1, run.seq, "The evidence, then its run: $trail")
     }
 
     @Test

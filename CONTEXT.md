@@ -440,7 +440,8 @@ A file attached to a validation run â€” a scan report, an SBOM, a test summary â
 stored by its content hash and referenced by the trail entry recording its
 attachment. Evidence is immutable: a new upload is a new evidence. Deleting an
 evidence keeps it, marked as deleted, and records the deletion in the trail; its
-content goes once no other evidence has it.
+content goes once no other evidence has it. Evidence also goes with its
+validation run, and that is recorded in the trail as a deletion too.
 _Avoid_: attachment, artifact, document. An *artifact* is what a build produces.
 
 *Seal* (the frozen, self-contained package of a trail) and *Instance trail* (the

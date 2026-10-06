@@ -13,8 +13,9 @@ package net.nemerosa.ontrack.extension.audittrail.model
  *
  * A deletion which reaches builds beyond the deleted entity — a validation stamp, a promotion level,
  * a build other builds link to — writes on each of them `validation.deleted`, `promotion.removed`
- * or `link.removed`, with a `reason: cascade/<cause>` ([TrailCascadeReasons]). The deletions of a
- * branch or a project write nothing: the trails go with the builds.
+ * or `link.removed`, with a `reason: cascade/<cause>` ([TrailCascadeReasons]). A validation run
+ * which goes, on its own or with its stamp, writes `evidence.deleted` for its evidence the same
+ * way. The deletions of a branch or a project write nothing: the trails go with the builds.
  */
 object TrailEntryTypes {
 
@@ -104,8 +105,11 @@ object TrailEntryTypes {
     /**
      * Evidence of a validation run of the build deleted: `{validationStamp, validationRun,
      * evidence: {id, fileName, sha256}}`. Written by the evidence service, in the transaction of
-     * the deletion. The verification of the evidence skips the `evidence.attached` entry of an
-     * evidence a later `evidence.deleted` names, whose blob may be gone.
+     * the deletion — or, for the evidence going with its validation run, before the run's
+     * `validation.deleted`, with a `reason`: `cascade/validation-run-deleted` or
+     * `cascade/validation-stamp-deleted`. The verification of the evidence skips the
+     * `evidence.attached` entry of an evidence a later `evidence.deleted` names, whose blob may be
+     * gone.
      */
     const val EVIDENCE_DELETED = "evidence.deleted"
 
