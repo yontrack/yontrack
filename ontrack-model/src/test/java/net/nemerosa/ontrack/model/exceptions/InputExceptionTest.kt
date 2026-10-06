@@ -10,6 +10,8 @@ class InputExceptionTest {
         vararg parameters: Any,
     ) : InputException(pattern, *parameters)
 
+    private class TestMessageInputException(message: String) : InputException(message)
+
     private class TestNotFoundException(
         pattern: String,
         vararg parameters: Any,
@@ -44,6 +46,14 @@ class InputExceptionTest {
         assertEquals(
             "Branch not found: main.",
             TestNotFoundException("Branch not found: %s.", "main").message,
+        )
+    }
+
+    @Test
+    fun `a message is kept as it is, format specifiers included`() {
+        assertEquals(
+            "Token name %s%n already exists.",
+            TestMessageInputException("Token name %s%n already exists.").message,
         )
     }
 }
