@@ -15,6 +15,16 @@ buildscript {
     dependencyLocking {
         lockMode.set(LockMode.STRICT)
     }
+    // Jackson 3 of the plugin classpath (3.1.5 via the Spring Boot plugin) pinned past
+    // GHSA-7hhh-6rmp-j9qf, GHSA-p6pp-m3f8-5c89, GHSA-cxp5-3px4-pw24, GHSA-wv8q-qhhj-9h54 and
+    // GHSA-q4xh-88c3-wmh7 (fixed in 3.1.7), like the application's own pin further down. Never
+    // shipped, but in the dependency graph. Remove once the Spring Boot plugin brings >= 3.1.7.
+    dependencies {
+        constraints {
+            classpath("tools.jackson.core:jackson-core:3.1.7")
+            classpath("tools.jackson.core:jackson-databind:3.1.7")
+        }
+    }
 }
 
 plugins {
