@@ -5,9 +5,10 @@
 # with --require-hashes --only-binary :all:, so a file that is not exactly this one is refused, and
 # nothing is built from source on the runner.
 #
-# The transitive dependencies are listed too - --require-hashes insists - at the newest version
-# requests 2.25.1 accepts (urllib3 < 1.27, chardet < 5, idna < 3). PySocks is left out: graphql-cop
-# imports it only for --tor.
+# The transitive dependencies are listed too - --require-hashes insists, and refuses the whole file
+# when one is missing. Moving requests moves them: requests 2.33.0 needs urllib3, idna, certifi and
+# charset-normalizer (chardet only for an extra). PySocks is left out: graphql-cop imports it only
+# for --tor.
 #
 # Move this file and GRAPHQL_COP_REF in .github/workflows/dast-passive.yml together.
 requests==2.33.0 \
@@ -17,11 +18,12 @@ simplejson==3.17.6 \
     --hash=sha256:f63600ec06982cdf480899026f4fda622776f5fabed9a869fdb32d72bc17e99a
 termcolor==2.2.0 \
     --hash=sha256:91ddd848e7251200eac969846cbae2dacd7d71c2871e92733289e7e3666f48e7
-urllib3==2.7.0 \
-    --hash=sha256:231e0ec3b63ceb14667c67be60f2f2c40a518cb38b03af60abc813da26505f4c \
-    --hash=sha256:9fb4c81ebbb1ce9531cce37674bbc6f1360472bc18ca9a553ede278ef7276897
-chardet==4.0.0 \
-    --hash=sha256:f864054d66fd9118f2e67044ac8981a54775ec5b67aed0441892edb553d21da5
+urllib3==2.8.0 \
+    --hash=sha256:63bf2ead4c879426ebf22ef2a781eeb4aa3b4ae798a0435506f8687fd5bb9b63 \
+    --hash=sha256:0cf3cae568d36aa9576b28dfb35f11328f1cb974ca7647d9475ebb86c75ac6e3
+charset-normalizer==3.5.2 \
+    --hash=sha256:8a893cc101149f80a653f82062ebc95b34525a2614382e1da5458fe7c6997249 \
+    --hash=sha256:b6b751274acb69d77b3323d6b7dbaa3c7fdfc1eb829b7eb61d262f32e1af9685
 idna==3.15 \
     --hash=sha256:048adeaf8c2d788c40fee287673ccaa74c24ffd8dcf09ffa555a2fbb59f10ac8 \
     --hash=sha256:ca962446ea538f7092a95e057da437618e886f4d349216d2b1e294abfdb65fdc
