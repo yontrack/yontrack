@@ -901,35 +901,40 @@ comes here.
 already the confirmation; a modal on a screen the user deliberately navigated to is friction
 that makes a phone app feel like a form.
 
-**It lands them on `/mobile`** — `signOut({callbackUrl: MOBILE_HOME})`, not the default.
-`signOut()` with no argument defaults `callbackUrl` to the *current* URL, so signing out of
-`/mobile/build/12` would leave that build as the callback and signing back in would return to
-it: on a shared phone, the wrong souvenir. `/mobile` is redirect-exempt so the proxy
-leaves it alone, `AuthProvider` sends the unauthenticated visitor to the sign-in page on its
-own, and signing back in lands on the mobile home. `mobile.spec.js` asserts that last hop
-rather than restating the default, which is the only way the decision stays made.
+**It lands them on `/mobile`** — `federatedSignOut({returnTo: MOBILE_HOME})`, not the current
+URL. Signing out of `/mobile/build/12` and back to it would return the next person to pick up
+the phone to that build: on a shared phone, the wrong souvenir. `/mobile` is redirect-exempt so
+the proxy leaves it alone, `AuthProvider` sends the unauthenticated visitor to the sign-in page
+on its own, and signing back in lands on the mobile home. `mobile.spec.js` asserts that last hop
+rather than restating the default, which is the only way the decision stays made. The desktop
+user menu does the same with `DESKTOP_HOME`.
 
 **No route-map entry.** `/mobile/account` stands in for no desktop route, and
 `/core/admin/userProfile` is deliberately *not* mapped to it: the two share a name and nothing
 else, and redirecting a phone there would answer a link about API tokens with a sign-out
 button. It keeps falling through to the interstitial as "an administration page".
 
-#### Sign-out is local, deliberately
+#### Sign-out ends the identity provider's session (#1734)
 
-`signOut` drops Yontrack's own session and **leaves the identity provider's alone** — there is
-no `events.signOut` in `authOptions` and no `end_session_endpoint` call, so the Keycloak SSO
-cookie survives and the next sign-in is silent. That is exactly as true of the desktop UI
-today.
+Both "Sign out" controls — this screen's and the desktop user menu's — go through
+`federatedSignOut` (`components/security/federatedSignOut.js`), which ends the identity
+provider's session as well as Yontrack's, so that the next sign-in asks who is there instead of
+answering silently. That is the case a shared or long-lived phone is.
 
-Making it a real sign-out is **#1734**, and it stays there: it is a shared auth change touching
-both UIs, both provider configurations and the 401 handler, with a back-channel/front-channel
-fork that deserves its own decision rather than riding in on a phone screen.
+- `/api/auth/federated-signout` ends the provider's session *before* the local sign-out, which
+  deletes the tokens it needs. The `keycloak` provider does it on the back-channel (a server-side
+  POST with the refresh token); the generic `oidc` provider answers with the provider's
+  `end_session_endpoint`, and the browser goes there once signed out locally.
+- The provider sends the browser back to `/api/auth/signout-complete` — the one URL an operator
+  registers — which forwards to `/` or `/mobile`, as remembered by a short-lived cookie that can
+  hold nothing else.
+- Fail-open: whatever fails at the provider, the local session ends, and the server logs why.
+- `NEXTAUTH_FEDERATED_SIGNOUT=false` turns it off for an instance.
+- The 401 handler of `callGraphQL` is **not** a sign-out the user asked for, and stays
+  local-only.
 
-**Nothing is said to the user about it here.** The desktop makes no such statement, and a
-caveat the user can do nothing about reads as a malfunction. It is recorded here and in #1734,
-where it is actionable. The one place it shows up in code is `mobile.spec.js`: signing back in
-after a sign-out may never be asked for credentials, so the helper that does it copes with
-both.
+The operator side — what to register at Keycloak, Auth0 or Entra — is in the user docs
+(`security/oidc.md`, *Sign-out*).
 
 The `yontrack-ui=desktop` cookie is left entirely alone by sign out. It is a *device* choice
 and signing out is a *user* action; clearing it would move the next person to pick up the phone

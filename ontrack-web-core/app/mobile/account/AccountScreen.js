@@ -44,19 +44,16 @@
  * deliberately navigated to is friction that makes a phone app feel like a form.
  * The desktop does not confirm either.
  *
- * **It is a local sign-out**, exactly as the desktop's is: `signOut` drops
- * Yontrack's own session and leaves the identity provider's alone, so the
- * Keycloak SSO cookie survives and the next sign-in is silent. Making it a real
- * sign-out is #1734 - a shared auth change touching both UIs, both provider
- * configurations and the 401 handler. Nothing is said about it here: the desktop
- * makes no such statement, and a caveat the user can do nothing about reads as a
- * malfunction.
+ * **It is a real sign-out**, exactly as the desktop's is (#1734):
+ * `federatedSignOut` ends the identity provider's session as well as Yontrack's,
+ * so that the next sign-in asks who is there instead of answering silently - the
+ * case a shared or long-lived phone is.
  */
 
 import {Button, Space, Typography} from "antd"
 import {useContext} from "react"
 import {FaSignOutAlt} from "react-icons/fa"
-import {signOut} from "next-auth/react"
+import {federatedSignOut} from "@components/security/federatedSignOut"
 import {UserContext} from "@components/providers/UserProvider"
 import {useRefData} from "@components/providers/RefDataProvider"
 import MobileScreen from "@components/mobile/layout/MobileScreen"
@@ -71,16 +68,18 @@ export default function MobileAccountScreen() {
     const {version} = useRefData()
 
     /*
-     * `MOBILE_HOME`, and not the default.
+     * `MOBILE_HOME`, and not the current URL.
      *
-     * `signOut()` with no argument defaults `callbackUrl` to the current URL.
-     * Signing out of `/mobile/build/12` would therefore leave that build as the
-     * callback, and signing back in would return to it - on a shared phone, the
-     * wrong souvenir. `/mobile` is redirect-exempt so the proxy leaves it
-     * alone, and `AuthProvider` sends the unauthenticated visitor to the sign-in
-     * page on its own.
+     * Signing out of `/mobile/build/12` and back to it would bring the next
+     * person to pick up the phone straight back to that build - on a shared
+     * phone, the wrong souvenir. `/mobile` is redirect-exempt so the proxy
+     * leaves it alone, and `AuthProvider` sends the unauthenticated visitor to
+     * the sign-in page on its own.
+     *
+     * And a real sign-out: the identity provider's session ends too, so that
+     * signing back in asks who is there (#1734).
      */
-    const onSignOut = () => signOut({callbackUrl: MOBILE_HOME})
+    const onSignOut = () => federatedSignOut({returnTo: MOBILE_HOME})
 
     /*
      * The email is context for the username, and it is not context for itself:

@@ -158,6 +158,8 @@ export async function callGraphQL({
     if (res.ok) {
         return await res.json()
     } else if (res.status === 401) {
+        // Local only, deliberately - not `federatedSignOut`: the backend refused the access
+        // token, which is not the user asking to leave the identity provider (#1734)
         await signOut()
     } else {
         console.error(res)

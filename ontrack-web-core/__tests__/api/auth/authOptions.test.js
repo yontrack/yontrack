@@ -50,6 +50,7 @@ describe("authOptions callbacks", () => {
                 account: {
                     access_token: "at-123",
                     refresh_token: "rt-456",
+                    id_token: "it-789",
                     expires_at: 1700000000,
                 },
             })
@@ -58,6 +59,8 @@ describe("authOptions callbacks", () => {
                 sub: "user1",
                 accessToken: "at-123",
                 refreshToken: "rt-456",
+                // oidc: the front-channel sign-out sends it as `id_token_hint` (#1734)
+                idToken: "it-789",
                 expiresAt: 1700000000,
             })
             expect(global.fetch).not.toHaveBeenCalled()
@@ -162,6 +165,29 @@ describe("authOptions callbacks", () => {
             expect(result.accessToken).toBe("new-at")
         })
 
+        it("keeps the id token across a refresh, or takes the new one", async () => {
+            Date.now = jest.fn(() => 2_000_000_000_000)
+            const discovery = {ok: true, json: async () => ({token_endpoint: TOKEN_ENDPOINT})}
+
+            global.fetch
+                .mockResolvedValueOnce(discovery)
+                .mockResolvedValueOnce(mockTokenResponse())
+            const kept = await authOptions.callbacks.jwt({
+                token: {accessToken: "old", refreshToken: "rt", idToken: "it-old", expiresAt: 1},
+                account: null,
+            })
+            expect(kept.idToken).toBe("it-old")
+
+            global.fetch
+                .mockResolvedValueOnce(discovery)
+                .mockResolvedValueOnce(mockTokenResponse({id_token: "it-new"}))
+            const renewed = await authOptions.callbacks.jwt({
+                token: {accessToken: "old", refreshToken: "rt", idToken: "it-old", expiresAt: 1},
+                account: null,
+            })
+            expect(renewed.idToken).toBe("it-new")
+        })
+
         it("returns RefreshTokenError on HTTP error from token endpoint", async () => {
             Date.now = jest.fn(() => 2_000_000_000_000)
 
@@ -236,26 +262,66 @@ describe("authOptions callbacks", () => {
 
     describe("session callback", () => {
 
-        it("passes accessToken, refreshToken, and error to session", async () => {
+        it("passes the access token to the session", async () => {
             const session = {}
-            const token = {accessToken: "x", refreshToken: "rt-x", error: "RefreshTokenError"}
+            const token = {accessToken: "x", refreshToken: "rt-x", idToken: "it-x"}
 
             const result = await authOptions.callbacks.session({session, token})
 
             expect(result.accessToken).toBe("x")
-            expect(result.refreshToken).toBe("rt-x")
-            expect(result.error).toBe("RefreshTokenError")
         })
 
-        it("leaves error undefined when token has no error", async () => {
+        it("never passes the refresh token, the id token or the error to the session", async () => {
+            // `/api/auth/session` hands the session to the browser (#1734)
             const session = {}
-            const token = {accessToken: "y", refreshToken: "rt-y"}
+            const token = {accessToken: "x", refreshToken: "rt-x", idToken: "it-x", error: "RefreshTokenError"}
 
             const result = await authOptions.callbacks.session({session, token})
 
-            expect(result.accessToken).toBe("y")
-            expect(result.refreshToken).toBe("rt-y")
-            expect(result.error).toBeUndefined()
+            expect(result).not.toHaveProperty("refreshToken")
+            expect(result).not.toHaveProperty("idToken")
+            expect(result).not.toHaveProperty("error")
         })
+    })
+})
+
+// ------------------------------------------------------------------ //
+// Per-provider behaviour, each with its own load of the module
+// ------------------------------------------------------------------ //
+
+describe("authOptions per provider", () => {
+
+    const originalEnv = process.env
+
+    afterEach(() => {
+        process.env = originalEnv
+        jest.restoreAllMocks()
+    })
+
+    const loadWith = (env) => {
+        process.env = {...originalEnv, ...env}
+        let options
+        jest.isolateModules(() => {
+            options = require("../../../app/api/auth/authOptions").authOptions
+        })
+        return options
+    }
+
+    const keycloakEnv = {
+        NEXTAUTH_PROVIDER: undefined,
+        NEXTAUTH_ISSUER: "https://sso.example.com/realms/ontrack",
+        NEXTAUTH_FEDERATED_SIGNOUT: undefined,
+    }
+
+    it("does not keep the id token for the keycloak provider, which signs out on the back-channel", async () => {
+        const options = loadWith(keycloakEnv)
+
+        const result = await options.callbacks.jwt({
+            token: {sub: "user1"},
+            account: {access_token: "at", refresh_token: "rt", id_token: "it", expires_at: 1700000000},
+        })
+
+        expect(result.refreshToken).toBe("rt")
+        expect(result).not.toHaveProperty("idToken")
     })
 })

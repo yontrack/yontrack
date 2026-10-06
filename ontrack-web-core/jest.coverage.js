@@ -32,6 +32,7 @@ module.exports = {
         'components/**/*.{js,jsx}',
         'pages/**/*.{js,jsx}',
         'proxy.js',
+        'instrumentation.js',
         '!**/node_modules/**',
     ],
 

@@ -42,7 +42,8 @@ import {MainLayoutContext} from "@components/layouts/MainLayout";
 import UserMenuItemLink from "@components/layouts/UserMenuItemLink";
 import {useRefData} from "@components/providers/RefDataProvider";
 import SonarqubeIcon from "@components/extension/sonarqube/SonarqubeIcon";
-import {signOut} from "next-auth/react";
+import {federatedSignOut} from "@components/security/federatedSignOut";
+import {DESKTOP_HOME} from "@components/mobile/mobileRoutes";
 import Link from "next/link";
 import TFCIcon from "@components/extension/tfc/TFCIcon";
 import ThemeSwitch from "@components/layouts/ThemeSwitch";
@@ -67,7 +68,9 @@ export const groupIcons = {
 
 export default function UserMenu({userMenu}) {
 
-    const logout = () => signOut()
+    // The desktop home, not the current page: the next person on a shared device must not land
+    // where this one left off. And the identity provider's session ends too (#1734).
+    const logout = () => federatedSignOut({returnTo: DESKTOP_HOME})
 
     const {toggleExpansion} = useContext(MainLayoutContext)
     const {version} = useRefData()

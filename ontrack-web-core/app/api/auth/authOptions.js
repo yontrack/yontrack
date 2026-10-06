@@ -49,6 +49,13 @@ if (providerId === "oidc") {
     providers.push(provider)
 }
 
+/**
+ * The `oidc` provider signs out on the front-channel, which needs the id token as
+ * `id_token_hint`; the `keycloak` provider signs out on the back-channel and does not, so its
+ * session cookie does not grow (#1734).
+ */
+const keepIdToken = providerId === "oidc"
+
 const baseAuthOptions = {
     providers: providers,
     // pages: {
@@ -62,6 +69,7 @@ const baseAuthOptions = {
                     ...token,
                     accessToken: account.access_token,
                     refreshToken: account.refresh_token,
+                    ...(keepIdToken && account.id_token ? {idToken: account.id_token} : {}),
                     expiresAt: account.expires_at,
                 }
             }
@@ -106,16 +114,20 @@ const baseAuthOptions = {
                     accessToken: newTokens.access_token,
                     expiresAt: newExpiresAt,
                     refreshToken: newTokens.refresh_token ?? token.refreshToken,
+                    ...(keepIdToken && newTokens.id_token ? {idToken: newTokens.id_token} : {}),
                 }
             } catch (error) {
                 console.error("Token refresh failed:", error)
                 return {...token, error: "RefreshTokenError"}
             }
         },
+        /**
+         * `/api/auth/session` hands the session to the browser: only the access token goes there,
+         * which the API routes read through `getServerSession`. The refresh token and the id
+         * token stay in the JWT, read on the server with `getToken` (#1734).
+         */
         async session({session, token}) {
             session.accessToken = token.accessToken
-            session.refreshToken = token.refreshToken
-            session.error = token.error
             return session
         }
     },

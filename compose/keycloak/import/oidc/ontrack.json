@@ -138,6 +138,9 @@
         "http://localhost:3200/api/auth/callback/oidc",
         "http://localhost:3300/api/auth/callback/oidc"
       ],
+      "attributes": {
+        "post.logout.redirect.uris": "http://localhost:3000/api/auth/signout-complete##http://localhost:3100/api/auth/signout-complete##http://localhost:3200/api/auth/signout-complete##http://localhost:3300/api/auth/signout-complete"
+      },
       "webOrigins": [
         "+"
       ],

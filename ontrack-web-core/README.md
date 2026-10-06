@@ -14,10 +14,11 @@ Ontrack Web Core (Next UI)
 | NEXTAUTH_PROVIDER              | _None_                                             | If `oidc`, activates direct OIDC authentication. Otherwise, uses the Keycloak IdP |
 | NEXTAUTH_PROVIDER_NAME         | `OIDC` if using OIDC, `Yontrack` if using Keycloak | Display name of the IdP to show on the signin page                                |
 | NEXTAUTH_ISSUER                | _Required_                                         | OIDC issuer URL (public-facing, used for browser redirects and id_token validation) |
-| NEXTAUTH_ISSUER_INTERNAL       | _None_                                             | Internal issuer URL for server-side back-channel calls (token exchange, JWKS). Use when HTTPS is terminated outside the cluster (e.g. at a load balancer) and pods cannot reach the public HTTPS URL. Keycloak only. |
+| NEXTAUTH_ISSUER_INTERNAL       | _None_                                             | Internal issuer URL for server-side back-channel calls (token exchange, JWKS, sign-out). Use when HTTPS is terminated outside the cluster (e.g. at a load balancer) and pods cannot reach the public HTTPS URL. Keycloak only. |
 | NEXTAUTH_CLIENT_ID             | _Required_                                         | OIDC client ID                                                                    |
 | NEXTAUTH_CLIENT_SECRET         | _Required_                                         | OIDC client secret                                                                |
 | NEXTAUTH_AUDIENCE              | _None_                                             | Audience URI used for OIDC (optional)                                             |
+| NEXTAUTH_FEDERATED_SIGNOUT     | `true`                                             | `false` signs out of Yontrack only, leaving the identity provider's session alone. With `NEXTAUTH_PROVIDER=oidc`, `true` needs `<NEXTAUTH_URL>/api/auth/signout-complete` registered at the provider as a post-logout redirect URI |
 
 ## Architecture Decisions Records
 

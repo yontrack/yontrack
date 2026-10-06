@@ -71,4 +71,28 @@ class KeycloakRealmsTest {
             }
         }
     }
+
+    /**
+     * The realm whose client runs the UI's generic `oidc` provider, which signs out on the
+     * front-channel (#1734): Keycloak refuses any `post_logout_redirect_uri` the client does not
+     * list, and the `oidc` leg of the UI tests would land on its "Invalid redirect uri" page. The
+     * `keycloak` realms sign out on the back-channel and list none - that they need none is the
+     * point.
+     */
+    @Test
+    @Suppress("UNCHECKED_CAST")
+    fun `the oidc realm accepts the sign-out landing of the UI of every KDSL slot`() {
+        val realm = realms.firstOrNull { it.parentFile.name == "oidc" } ?: fail("no oidc realm")
+        val attributes = uiClient(realm)["attributes"] as Map<String, Any?>? ?: emptyMap()
+        val uris = (attributes["post.logout.redirect.uris"] as String?)
+            ?.split("##")
+            ?.map { URI(it) }
+            ?: emptyList()
+        val ports = uris.filter { it.path == "/api/auth/signout-complete" }.map { it.port }.toSet()
+        val missing = kdslUiPorts - ports
+        assertTrue(
+            missing.isEmpty(),
+            "${realm.path}: post-logout redirect URIs miss the UI ports $missing of the KDSL slots",
+        )
+    }
 }

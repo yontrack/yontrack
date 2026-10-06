@@ -3,9 +3,15 @@ import {act, render, screen} from "@testing-library/react"
 import {UserContext} from "@components/providers/UserProvider"
 import {RefDataContext} from "@components/providers/RefDataProvider"
 
-const signOut = jest.fn()
-jest.mock("next-auth/react", () => ({
-    signOut: (...args) => signOut(...args),
+/*
+ * The module, for the same reason as `switchToDesktopUI` below: the screen's
+ * contract is that sign-out goes *through* `federatedSignOut`, which ends the
+ * identity provider's session too (#1734) and has its own coverage in
+ * `federatedSignOut.test.js`.
+ */
+const federatedSignOut = jest.fn()
+jest.mock("../../../components/security/federatedSignOut", () => ({
+    federatedSignOut: (...args) => federatedSignOut(...args),
 }))
 
 /*
@@ -33,7 +39,7 @@ const renderScreen = ({user = {}, version = '5.4.0'} = {}) => render(
 const ADMIN = {name: 'admin', fullName: "Administrator", email: 'admin@example.com'}
 
 beforeEach(() => {
-    signOut.mockClear()
+    federatedSignOut.mockClear()
     switchToDesktopUI.mockClear()
 })
 
@@ -188,22 +194,21 @@ describe('the mobile account screen', () => {
             // form. The desktop does not confirm either.
             renderScreen({user: ADMIN})
             act(() => screen.getByTestId('mobile-account-sign-out').click())
-            expect(signOut).toHaveBeenCalledTimes(1)
+            expect(federatedSignOut).toHaveBeenCalledTimes(1)
         })
 
         it('comes back to the mobile home, not to the screen they signed out of', () => {
-            // `signOut()` with no argument defaults `callbackUrl` to the current
-            // URL, so signing out of `/mobile/build/12` would leave that build as
-            // the callback and signing back in would return to it - on a shared
-            // phone, the wrong souvenir.
+            // Coming back to the current URL would bring the next person on a
+            // shared phone straight back to the build the last one left on -
+            // the wrong souvenir.
             renderScreen({user: ADMIN})
             act(() => screen.getByTestId('mobile-account-sign-out').click())
-            expect(signOut).toHaveBeenCalledWith({callbackUrl: '/mobile'})
+            expect(federatedSignOut).toHaveBeenCalledWith({returnTo: '/mobile'})
         })
 
         it('does not sign anyone out merely for opening the screen', () => {
             renderScreen({user: ADMIN})
-            expect(signOut).not.toHaveBeenCalled()
+            expect(federatedSignOut).not.toHaveBeenCalled()
         })
     })
 

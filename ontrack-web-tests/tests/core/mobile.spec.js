@@ -99,24 +99,20 @@ const signInOnPhone = (page, ontrack) => login(page, ontrack, undefined, undefin
  * `login` starts with a `goto`, which would decide the callback the test is
  * there to assert: where the sign-out put the user is exactly the question.
  *
- * The provider's own form is not guaranteed to appear. Yontrack's sign-out is
- * local - it ends Yontrack's session and leaves the identity provider's alone,
- * on the desktop UI as much as here, and making it a real sign-out is #1734 -
- * so the provider can answer silently and hand the session straight back.
+ * The provider's own form **must** appear: signing out ends the identity
+ * provider's session as well as Yontrack's (#1734), so the provider cannot
+ * answer silently and hand the session straight back.
  */
 const signBackInOnPhone = async (page, ontrack) => {
     await (await signInButton(page)).click()
 
     const usernameField = page.getByRole("textbox", {exact: false, name: "Username"})
-    // Either the provider asks, or it has already answered and the screen is up.
-    await expect(usernameField.or(page.getByTestId('mobile-screen-title')).first()).toBeVisible()
+    await expect(usernameField).toBeVisible()
 
-    if (await usernameField.isVisible()) {
-        const {username, password} = ontrack.connection.credentials
-        await usernameField.fill(username)
-        await page.getByRole("textbox", {exact: false, name: "Password"}).fill(password)
-        await page.getByRole("button", {name: "Sign In", exact: true}).click()
-    }
+    const {username, password} = ontrack.connection.credentials
+    await usernameField.fill(username)
+    await page.getByRole("textbox", {exact: false, name: "Password"}).fill(password)
+    await page.getByRole("button", {name: "Sign In", exact: true}).click()
 }
 
 /**
@@ -1229,11 +1225,14 @@ test.describe('the mobile UI on a phone', () => {
         }
     })
 
-    test('signing out comes back to the mobile home, not to where they were', async ({page, ontrack}) => {
-        // The assertion that actually pins the `callbackUrl` decision. With
-        // `signOut()` and no argument the callback defaults to the current URL,
-        // so signing out of a branch screen would bring the *next* person to
-        // pick up the phone straight back to it.
+    test('signing out comes back to the mobile home, not to where they were', {tag: "@auth"}, async ({page, ontrack}) => {
+        // The assertion that actually pins the `returnTo` decision. Coming back
+        // to the current URL would bring the *next* person to pick up the phone
+        // straight back to the branch screen.
+        //
+        // Tagged `@auth`: it is also the mobile half of the federated sign-out
+        // (#1734) - `signBackInOnPhone` insists the provider asks again - and
+        // runs on the `ldap` and `oidc` legs as well as `main`.
         const project = await ontrack.createProject()
         const branch = await project.createBranch()
 

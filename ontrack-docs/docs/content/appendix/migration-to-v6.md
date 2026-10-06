@@ -388,6 +388,25 @@ declaring the `id` input rejects the dispatch. Either add `workflowSendId: true`
 configuration to keep sending `id`, or remove the `id` input and the `inputs-<id>.properties`
 artifact step from the workflows — on a GitHub which returns the run of a dispatch.
 
+### Federated sign-out
+
+Signing out of Yontrack now also ends the session at the identity provider, so that signing back
+in asks for the credentials again instead of being answered silently. See
+[Sign-out](../security/oidc.md#sign-out).
+
+#### For deployers
+
+* **The Keycloak provider of the UI** — Yontrack's own Keycloak, the default, or a Keycloak of
+  yours, with `NEXTAUTH_PROVIDER` not set to `oidc` — nothing to do: the session is ended from the
+  server.
+* **The generic OIDC provider of the UI** (`NEXTAUTH_PROVIDER=oidc` — Auth0, Microsoft Entra ID,
+  any OIDC provider, see [OIDC authentication](../security/oidc.md)) — register
+  `https://<your-yontrack>/api/auth/signout-complete` at the provider, as a post-logout redirect
+  URI: see [Sign-out](../security/oidc.md#sign-out) for where. Until it is registered,
+  signing out leaves the user on the provider's page — an error page on Keycloak and Auth0 —
+  instead of coming back to Yontrack. To keep signing out of Yontrack only, set the
+  `NEXTAUTH_FEDERATED_SIGNOUT` environment variable of the UI to `false`.
+
 ## Removed
 
 Yontrack 6 removes what Yontrack 5 deprecated. Each item is listed here with what to use instead,
