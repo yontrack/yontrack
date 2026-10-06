@@ -1,4 +1,4 @@
-import {signOut} from "next-auth/react"
+import {getCsrfToken, signOut} from "next-auth/react"
 
 /**
  * Signs the user out of Yontrack **and** of the identity provider (#1734) - the one helper behind
@@ -9,6 +9,11 @@ import {signOut} from "next-auth/react"
  * 2. The local session ends - **always**, whatever happened in step 1.
  * 3. The browser lands on `returnTo` (`/` or `/mobile`), either directly or, when the provider
  *    has to see the browser itself (front-channel), through the provider and back.
+ *
+ * On the front-channel, the local session ends through next-auth's own `POST /api/auth/signout`
+ * rather than `signOut({redirect: false})`: the latter refreshes the session of the page, and
+ * `AuthProvider` answers an unauthenticated session with `signIn()` - a navigation to the sign-in
+ * page, with the current page as the callback, which overtakes the one to the provider.
  *
  * Not for the 401 handler of `callGraphQL`, which signs out locally only: a 401 means the backend
  * refused the access token, not that the user asked to leave.
@@ -32,10 +37,32 @@ export async function federatedSignOut({returnTo}, {navigate = (url) => window.l
         // Fail-open: the local session ends anyway, below
     }
 
-    if (url) {
-        await signOut({redirect: false})
+    if (url && await endLocalSessionQuietly(returnTo)) {
         navigate(url)
     } else {
         await signOut({callbackUrl: returnTo})
+    }
+}
+
+/**
+ * Ends the local session without telling the page, which is about to leave for the provider.
+ *
+ * @return `false` when the session could not be ended this way - the caller then falls back on
+ * `signOut()`, so that the local session ends whatever happens
+ */
+async function endLocalSessionQuietly(returnTo) {
+    try {
+        const response = await fetch("/api/auth/signout", {
+            method: "POST",
+            headers: {"Content-Type": "application/x-www-form-urlencoded"},
+            body: new URLSearchParams({
+                csrfToken: await getCsrfToken(),
+                callbackUrl: returnTo,
+                json: "true",
+            }).toString(),
+        })
+        return response.ok
+    } catch (ignored) {
+        return false
     }
 }
