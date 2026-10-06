@@ -166,6 +166,46 @@ Yontrack 6 searches in its Postgres database, and no longer needs Elasticsearch.
   metrics by `ontrack_search_*`: `ontrack_elasticsearch_index_all{index}` is now
   `ontrack_search_index_all{type}`, next to `ontrack_search_index_errors{type}`.
 
+#### For Helm chart users
+
+Version 6.x of the [Helm chart](https://github.com/yontrack/yontrack-chart) installs Yontrack 6.
+See also its [Upgrading to 6.x](https://github.com/yontrack/yontrack-chart#upgrading-to-6x) section.
+
+* **No bundled Elasticsearch** — chart 6.x no longer deploys Elasticsearch: the Bitnami
+  Elasticsearch sub-chart is gone. Remove `elasticsearch.enabled` and the other settings of that
+  sub-chart from your values: values from 5.x which keep `elasticsearch.enabled: true` make the
+  chart fail to render, with a pointer to its README. Remove the `SPRING_ELASTICSEARCH_*`
+  environment variables as well: the metrics export is configured by the `elasticsearch.*` values
+  below, which set them.
+* **Leftover volume** — after a `helm upgrade` from 5.x, the volume of the former Elasticsearch
+  instance is kept, but no longer used: the search is rebuilt from Postgres. Delete it with:
+
+    ```bash
+    kubectl delete pvc data-<release>-elasticsearch-master-0
+    ```
+
+* **Metrics export** — to export the metrics to an existing Elasticsearch cluster, enable it in
+  the values:
+
+    ```yaml
+    elasticsearch:
+      metrics:
+        enabled: true
+        index: ontrack_metrics   # default
+      uris: https://es.example.com:9200
+      username: yontrack
+      existingSecret: yontrack-es   # secret holding the password
+      existingSecretPasswordKey: password
+    ```
+
+    The chart only wires the `target: MAIN` export, through the `spring.elasticsearch.*`
+    properties. `uris` is required when the export is enabled; `username` and `existingSecret` are
+    optional.
+
+* **`pg_trgm`** — nothing to do with the Postgres bundled by the chart: the `ontrack` user owns
+  the database, so Yontrack creates the extension itself. With an external database, the
+  `pg_trgm` rule of *For deployers* above applies.
+
 #### For API clients
 
 * The `POST /rest/search/index/type/{type}` and `POST /rest/search/index/reset` endpoints are
