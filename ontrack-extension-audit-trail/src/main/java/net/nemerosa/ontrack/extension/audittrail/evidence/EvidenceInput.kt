@@ -175,13 +175,13 @@ object EvidenceInput {
         return if (taken.lastOrNull()?.isHighSurrogate() == true) taken.dropLast(1) else taken
     }
 
-    /**
-     * Bidirectional formatting characters, which make a name display otherwise than it reads:
-     * LRE, RLE, PDF, LRO, RLO (U+202A–U+202E), LRI, RLI, FSI, PDI (U+2066–U+2069), LRM, RLM
-     * (U+200E–U+200F) and ALM (U+061C).
-     */
-    private fun Char.isBidiControl(): Boolean =
-        this in '‪'..'‮' || this in '⁦'..'⁩' || this == '‎' || this == '‏' || this == '؜'
-
     private fun invalid(message: String): Nothing = throw EvidenceException(EvidenceError.INVALID, message)
 }
+
+/**
+ * Bidirectional formatting characters, which make a name display otherwise than it reads:
+ * LRE, RLE, PDF, LRO, RLO (U+202A–U+202E), LRI, RLI, FSI, PDI (U+2066–U+2069), LRM, RLM
+ * (U+200E–U+200F) and ALM (U+061C).
+ */
+internal fun Char.isBidiControl(): Boolean =
+    this in '‪'..'‮' || this in '⁦'..'⁩' || this == '‎' || this == '‏' || this == '؜'

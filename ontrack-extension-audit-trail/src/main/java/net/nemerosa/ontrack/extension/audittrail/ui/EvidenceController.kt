@@ -116,15 +116,7 @@ class EvidenceController(
      */
     @ExceptionHandler(EvidenceException::class)
     fun onEvidenceException(ex: EvidenceException): ResponseEntity<EvidenceErrorMessage> =
-        ResponseEntity.status(ex.error.status)
-            .contentType(MediaType.APPLICATION_JSON)
-            .body(
-                EvidenceErrorMessage(
-                    status = ex.error.status,
-                    code = ex.error.code,
-                    message = ex.message ?: ex.error.code,
-                )
-            )
+        EvidenceErrorMessage.response(ex)
 
     private fun readFile(request: MultipartHttpServletRequest): MultipartFile {
         val file = try {

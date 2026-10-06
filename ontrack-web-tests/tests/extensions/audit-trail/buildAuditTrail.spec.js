@@ -2,6 +2,32 @@ import {expect} from "@playwright/test";
 import {test} from "../../fixtures/connection";
 import {login} from "../../core/login";
 import {BuildPage} from "../../core/builds/BuildPage";
+import {readFile} from "node:fs/promises";
+
+/**
+ * Names of the files of a ZIP, in the order of its central directory.
+ */
+const zipEntryNames = (zip) => {
+    // End of the central directory: the last record, before an optional comment
+    let end = zip.length - 22
+    while (end >= 0 && zip.readUInt32LE(end) !== 0x06054b50) {
+        end--
+    }
+    if (end < 0) {
+        throw new Error("Not a ZIP")
+    }
+    const count = zip.readUInt16LE(end + 10)
+    let offset = zip.readUInt32LE(end + 16)
+    const names = []
+    for (let i = 0; i < count; i++) {
+        const nameLength = zip.readUInt16LE(offset + 28)
+        const extraLength = zip.readUInt16LE(offset + 30)
+        const commentLength = zip.readUInt16LE(offset + 32)
+        names.push(zip.toString('utf8', offset + 46, offset + 46 + nameLength))
+        offset += 46 + nameLength + extraLength + commentLength
+    }
+    return names
+}
 
 /**
  * A build with a short story: created, validated, promoted.
@@ -103,8 +129,8 @@ test('evidence of every validation of a build on its audit trail', async ({page,
     const build = await branch.createBuild()
     const scanRun = await build.validate(scan, {status: "PASSED"})
     const testsRun = await build.validate(tests, {status: "PASSED"})
-    await scanRun.uploadEvidence({name: 'trivy.json', mimeType: 'application/json', content: '{"vulnerabilities": []}'})
-    await testsRun.uploadEvidence({name: 'junit.txt', mimeType: 'text/plain', content: '42 tests passed'})
+    const trivy = await scanRun.uploadEvidence({name: 'trivy.json', mimeType: 'application/json', content: '{"vulnerabilities": []}'})
+    const junit = await testsRun.uploadEvidence({name: 'junit.txt', mimeType: 'text/plain', content: '42 tests passed'})
 
     await login(page, ontrack)
     await goToAuditTrail(page, build)
@@ -131,4 +157,19 @@ test('evidence of every validation of a build on its audit trail', async ({page,
     await page.getByTestId('audit-trail-verify-evidence').click()
     await expect(page.getByTestId('audit-trail-evidence-badge')).toHaveText('Evidence intact')
     await expect(evidence.getByTestId('evidence-flag')).toHaveCount(0)
+
+    // Every evidence is downloaded at once, whatever the filters, with the trail and the manifest
+    const archiveButton = page.getByTestId('build-evidence-archive')
+    await expect(archiveButton).toHaveText('Download all (2)')
+    const downloadPromise = page.waitForEvent('download')
+    await archiveButton.click()
+    const download = await downloadPromise
+    expect(download.suggestedFilename()).toBe(`audit-trail-${project.name}-${branch.name}-${build.name}.zip`)
+    const names = zipEntryNames(await readFile(await download.path()))
+    expect(names).toEqual([
+        'audit-trail.json',
+        `${scan.name}/1/${trivy.id}-trivy.json`,
+        `${tests.name}/1/${junit.id}-junit.txt`,
+        'manifest.json',
+    ])
 })

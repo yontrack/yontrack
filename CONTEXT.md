@@ -444,6 +444,14 @@ content goes once no other evidence has it. Evidence also goes with its
 validation run, and that is recorded in the trail as a deletion too.
 _Avoid_: attachment, artifact, document. An *artifact* is what a build produces.
 
+**Evidence archive**:
+The ZIP of one build's active evidence, with a manifest of all its evidence and the
+export of its trail, downloaded from the build's audit trail page. It is not
+signed: its files are vouched for only by the SHA-256s which the signed trail
+records.
+_Avoid_: package, bundle, seal. Yontrack 6.0 has no sealing: an archive missing a
+file, or carrying an extra one, cannot be detected from the archive alone.
+
 *Seal* (the frozen, self-contained package of a trail) and *Instance trail* (the
 trail of changes to the audit feature itself) are reserved for 6.x: do not use
 them for anything else.

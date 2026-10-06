@@ -1,5 +1,5 @@
 import "@testing-library/jest-dom"
-import {fireEvent, render, screen, within} from "@testing-library/react"
+import {fireEvent, render, screen, waitFor, within} from "@testing-library/react"
 import BuildEvidence from "@components/extension/audit-trail/BuildEvidence"
 
 // antd's Table asks for the media queries of its responsive columns, which jsdom does not answer
@@ -37,6 +37,7 @@ const noFlags = {verified: false, byId: new Map()}
 
 const renderEvidence = (props = {}) => render(
     <BuildEvidence
+        buildId={42}
         evidence={[evidence(1)]}
         flags={noFlags}
         storageState="OK"
@@ -144,5 +145,67 @@ describe('BuildEvidence', () => {
         pick('State', 'Fails the verification')
         expect(screen.getByText('No evidence matches the filters')).toBeInTheDocument()
         expect(screen.getByTestId('build-evidence-filtered')).toHaveTextContent('0 of 3 evidence')
+    })
+
+    describe('download of the evidence archive', () => {
+
+        const archiveButton = () => screen.getByTestId('build-evidence-archive')
+
+        const hoverArchiveButton = () => fireEvent.mouseEnter(archiveButton())
+
+        it('downloads the archive of the build, counting its active evidence only', async () => {
+            renderEvidence({
+                evidence: [
+                    evidence(1),
+                    evidence(2),
+                    evidence(3, {deletedAt: '2026-10-04T10:00:00', downloadUrl: null}),
+                ],
+            })
+            const button = archiveButton()
+            expect(button).toHaveTextContent('Download all (2)')
+            expect(button).toHaveAttribute('href', '/api/protected/downloads/audit-trail/builds/42/evidence-archive')
+            expect(button).toHaveAttribute('download')
+            expect(button).not.toHaveAttribute('aria-disabled', 'true')
+            hoverArchiveButton()
+            await waitFor(() =>
+                expect(screen.getByRole('tooltip')).toHaveTextContent('Every active evidence, its manifest and the trail, as a ZIP')
+            )
+        })
+
+        it('cannot download the archive while the storage cannot be used, and says why', async () => {
+            renderEvidence({storageState: 'NOT_CONFIGURED'})
+            const button = archiveButton()
+            expect(button).toHaveTextContent('Download all (1)')
+            expect(button).not.toHaveAttribute('href')
+            expect(button).toHaveAttribute('aria-disabled', 'true')
+            hoverArchiveButton()
+            await waitFor(() =>
+                expect(screen.getByRole('tooltip')).toHaveTextContent('Evidence storage is not configured.')
+            )
+        })
+
+        it('cannot download the archive without any active evidence, and says why', async () => {
+            renderEvidence({evidence: [evidence(1, {deletedAt: '2026-10-04T10:00:00', downloadUrl: null})]})
+            const button = archiveButton()
+            expect(button).toHaveTextContent('Download all (0)')
+            expect(button).not.toHaveAttribute('href')
+            expect(button).toHaveAttribute('aria-disabled', 'true')
+            hoverArchiveButton()
+            await waitFor(() =>
+                expect(screen.getByRole('tooltip')).toHaveTextContent('No active evidence to download')
+            )
+        })
+
+        it('downloads the archive of every evidence, whatever the filters', () => {
+            renderEvidence({
+                evidence: [evidence(1), evidence(2, {fileName: 'sbom.json'})],
+            })
+            const table = screen.getByTestId('build-evidence')
+            fireEvent.click(within(table).getByRole('button', {name: 'Filter by name or SHA-256'}))
+            fireEvent.change(screen.getByPlaceholderText('Name or SHA-256'), {target: {value: 'SBOM'}})
+            fireEvent.click(screen.getByRole('button', {name: /Search/}))
+            expect(screen.getByTestId('build-evidence-filtered')).toHaveTextContent('1 of 2 evidence')
+            expect(archiveButton()).toHaveTextContent('Download all (2)')
+        })
     })
 })

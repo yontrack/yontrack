@@ -1,11 +1,11 @@
 import {useState} from "react";
-import {Alert, Empty, Space, theme, Typography} from "antd";
-import {FaSearch} from "react-icons/fa";
+import {Alert, Button, Empty, Space, theme, Tooltip, Typography} from "antd";
+import {FaDownload, FaSearch} from "react-icons/fa";
 import Link from "next/link";
 import Table from "@components/common/table/Table";
 import PageSection from "@components/common/PageSection";
 import TableColumnFilterDropdownInput from "@components/common/table/TableColumnFilterDropdownInput";
-import {validationRunUri} from "@components/common/Links";
+import {buildEvidenceArchiveUri, validationRunUri} from "@components/common/Links";
 import {
     evidenceFilterOptions,
     evidenceStorageMessage,
@@ -20,19 +20,48 @@ import EvidencePreview from "@components/extension/audit-trail/EvidencePreview";
 const isFiltered = (tableFilters) => Object.values(tableFilters).some(value => value && value.length > 0)
 
 /**
+ * Download of the evidence archive of the build — disabled, saying why, when it cannot be.
+ *
+ * @param buildId ID of the build
+ * @param activeCount Number of active evidence of the build
+ * @param storageMessage Why the storage cannot be used, if it cannot
+ */
+const EvidenceArchiveButton = ({buildId, activeCount, storageMessage}) => {
+    const reason = storageMessage ?? (activeCount === 0 ? 'No active evidence to download' : null)
+    return (
+        <Tooltip title={reason ?? 'Every active evidence, its manifest and the trail, as a ZIP'}>
+            <Button
+                size="small"
+                icon={<FaDownload aria-hidden="true"/>}
+                href={buildEvidenceArchiveUri({id: buildId})}
+                download
+                disabled={!!reason}
+                data-testid="build-evidence-archive"
+            >
+                Download all ({activeCount})
+            </Button>
+        </Tooltip>
+    )
+}
+
+/**
  * The Evidence section of the audit trail page of a build: the evidence of every validation run of
  * the build, deleted ones included, with their validation, their state and what the verification
  * found wrong with them — filtered on the page, previewed and downloaded, but neither uploaded nor
  * deleted, which belong to the validation run page.
  *
+ * Every active evidence is downloaded at once as the evidence archive of the build, whatever the
+ * filters.
+ *
  * When the evidence storage cannot be used, the list still shows — its metadata and hashes come
  * from the database — but nothing can be previewed or downloaded.
  *
+ * @param buildId ID of the build
  * @param evidence Evidence of the build, each with its `validationRun`
  * @param flags Flags of the verification, from `evidenceVerificationFlags`
  * @param storageState `AuditTrailStorageState`
  */
-export default function BuildEvidence({evidence, flags, storageState}) {
+export default function BuildEvidence({buildId, evidence, flags, storageState}) {
 
     const {token} = theme.useToken()
     const [preview, setPreview] = useState(null)
@@ -52,6 +81,7 @@ export default function BuildEvidence({evidence, flags, storageState}) {
         flags,
     )
     const filtering = isFiltered(tableFilters)
+    const activeCount = evidence.filter(item => !item.deletedAt).length
 
     const stateOptions = [
         {text: 'Active', value: 'active'},
@@ -114,7 +144,11 @@ export default function BuildEvidence({evidence, flags, storageState}) {
     }
 
     return (
-        <PageSection id="audit-trail-evidence" title={`Evidence (${evidence.length})`}>
+        <PageSection
+            id="audit-trail-evidence"
+            title={`Evidence (${evidence.length})`}
+            extra={<EvidenceArchiveButton buildId={buildId} activeCount={activeCount} storageMessage={storageMessage}/>}
+        >
             <Space orientation="vertical" className="ot-line">
                 {
                     storageMessage &&

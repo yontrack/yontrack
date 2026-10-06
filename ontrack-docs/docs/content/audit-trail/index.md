@@ -28,13 +28,18 @@ history, and it was not rewritten". Concretely:
 * the evidence attached to a validation run is recorded by its SHA-256: a verification which reads
   the evidence back detects an altered or vanished file;
 * a trail can be exported as one JSON document and verified offline, with nothing but its content
-  — see [Verifying a trail offline](#verifying-a-trail-offline).
+  — see [Verifying a trail offline](#verifying-a-trail-offline);
+* the evidence of a build can be downloaded at once, with its trail, as an
+  [evidence archive](#evidence-archive), whose files are checked offline against the trail.
 
 Yontrack 6.0 does **not** give:
 
 * **third-party proof of time** — no RFC 3161 timestamping authority (TSA), no transparency log:
   the times of the entries are the server's;
-* **sealing** — no frozen, self-contained package of a trail;
+* **sealing** — no frozen, self-contained package of a trail. The
+  [evidence archive](#evidence-archive) is not signed: its files are vouched for only by the
+  SHA-256s which the signed trail records, so an archive missing a file, or carrying an extra one,
+  cannot be detected from the archive alone;
 * **retention independent of the builds** — a trail goes with its build: deleting a build, its
   branch or its project deletes its trail and its evidence;
 * **detection of the gaps while the license was off** — nothing is recorded while the license is
@@ -132,8 +137,11 @@ The page shows:
   including evidence** found its file absent or changed. The list can be filtered by name or start
   of SHA-256, by type, by validation stamp and by state — the title keeps the total. Evidence is
   previewed and downloaded here; it is uploaded and deleted on the
-  [validation run page](#evidence-on-a-validation-run). When the evidence storage is not
-  configured or cannot be reached, the list still shows, without preview nor download;
+  [validation run page](#evidence-on-a-validation-run). **Download all (N)**, N being the number
+  of active evidence, downloads the [evidence archive](#evidence-archive) of the build: every
+  active evidence, whatever the filters, with its manifest and the trail. When the evidence
+  storage is not configured or cannot be reached, the list still shows, without preview nor
+  download, and *Download all* is disabled — as it is when no evidence is active;
 * the **entries**: seq, time, type, actor and a summary, each expandable to its payload and actor;
 * **Export JSON**, which downloads the [export](#json-export) of the trail.
 
@@ -787,6 +795,87 @@ It is available whatever the license, as long as the build has a trail.
 The fields of an entry but `hash` and `endorsements` are its envelope, as hashed. The server
 verifies a trail the same way, from its export: one algorithm, online and offline.
 
+### Evidence archive
+
+The **evidence archive** of a build is one ZIP of its active evidence, with the manifest of all its
+evidence and the [export](#json-export) of its trail — what an auditor needs to check the evidence
+offline against the signed trail.
+
+* REST: `GET /rest/extension/audit-trail/builds/{buildId}/evidence-archive`, downloaded as
+  `audit-trail-<project>-<branch>-<build>.zip`;
+* *Download all* in the Evidence section of the [audit trail page](#the-audit-trail-of-a-build).
+
+It needs the same rights as downloading one evidence — seeing the project — and is available
+whatever the license, as long as the build has a trail; `404` otherwise. When the evidence storage
+is not configured or cannot be reached, it is refused before anything is written, with a `503`
+and the code `audit-trail.evidence.storage-not-configured` or
+`audit-trail.evidence.storage-unreachable`. Its size has no limit: it is streamed, file by file,
+from the storage. A failure of the storage while it is written aborts the download — what was
+received is no valid ZIP.
+
+```
+audit-trail.json                                     the export of the trail
+<validationStamp>/<runOrder>/<evidenceId>-<fileName>  one file per active evidence, in the order of their upload
+manifest.json                                        written last
+```
+
+* Every **active** evidence of the build has its file — every run of every validation stamp. A
+  deleted evidence has none: it is only listed in the manifest.
+* Two evidence of the same content are two files.
+* The names of the stamps and of the files are made safe: path separators, the characters Windows
+  refuses (`:*?"<>|`), control characters, bidirectional overrides and leading dots are replaced by
+  `_`, so that no file escapes its folder once unzipped. The ID of the evidence keeps every path
+  unique. The manifest keeps the file name as stored.
+* Each file is hashed while it is written: a file whose SHA-256 is no longer the recorded one is
+  still in the archive, as stored, and marked `altered`; an evidence whose file is absent from the
+  storage has no file, is marked `missing`, and the download still succeeds.
+
+`manifest.json` lists every evidence of the build, deleted ones included, so that each
+`evidence.attached` entry of the trail has its line — but for the evidence which went with its
+validation run or its validation stamp: it is gone from Yontrack, and its `evidence.deleted` entry,
+with the reason `cascade/validation-run-deleted` or `cascade/validation-stamp-deleted`, is all that
+says what became of it. **Its shape is a compatibility contract**, as the one of the export: a
+change to it is a new `manifestVersion`.
+
+```json
+{
+  "manifestVersion": 1,
+  "exportedAt": "2026-10-02T09:00:00.000Z",
+  "build": {"id": 1042, "project": "payments", "branch": "release-2.4", "name": "2.4.7"},
+  "evidence": [
+    {
+      "id": 17,
+      "fileName": "trivy.json",
+      "mediaType": "application/json",
+      "size": 2048,
+      "sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+      "collectedAt": "2026-10-02T08:20:00.000Z",
+      "collectedBy": {"account": "ci-bot", "via": "token", "tokenName": "ci-demo"},
+      "source": {"tool": "trivy", "version": "0.50.1", "url": "https://ci.example.com/job/1"},
+      "externalDigest": null,
+      "validationRun": {"id": 311, "validationStamp": "scan", "runOrder": 1},
+      "state": "active",
+      "path": "scan/1/17-trivy.json"
+    }
+  ]
+}
+```
+
+| Field                | Description                                                                                         |
+|----------------------|-----------------------------------------------------------------------------------------------------|
+| `manifestVersion`    | Version of the shape of the manifest: `1`.                                                          |
+| `exportedAt`         | Server time of the archive — the `exportedAt` of its `audit-trail.json`.                            |
+| `build`              | `{id, project, branch, name}` of the build.                                                         |
+| `evidence`           | Every evidence of the build, deleted ones included, in the order of their upload — but those gone with their validation run. |
+| `…id`, `fileName`, `mediaType`, `size`, `sha256`, `collectedAt`, `collectedBy`, `source`, `externalDigest` | The evidence as recorded — `sha256` is the one of its `evidence.attached` entry. |
+| `…validationRun`     | `{id, validationStamp, runOrder}` of the run the evidence is attached to.                           |
+| `…state`             | `active`: its file is in the archive, with its SHA-256. `altered`: its file is in the archive, as stored, with another SHA-256. `missing`: its file is absent from the storage. `deleted`: the evidence is deleted. |
+| `…path`              | Path of its file in the archive — absent for `missing` and `deleted`.                               |
+| `…actualSha256`      | SHA-256 of its file as read — only for `altered`.                                                   |
+| `…deletedAt`         | When it was deleted — only for `deleted`. Who deleted it is in its `evidence.deleted` entry.        |
+
+The archive itself is not signed: see [What it gives, and what it does not](#what-it-gives-and-what-it-does-not).
+
 ### Verifying a trail offline
 
 The export carries its own keys, so it proves that it was not altered since it was exported, and
@@ -809,6 +898,12 @@ echo -n "$HASH" | xxd -r -p > hash.bin
 echo -n "$SIGNATURE" | base64 -d > signature.bin
 openssl pkeyutl -verify -pubin -inkey key.pem -rawin -in hash.bin -sigfile signature.bin
 ```
+
+To verify the files of an [evidence archive](#evidence-archive), verify its `audit-trail.json` as
+an export, then, for each `evidence.attached` entry which no `evidence.deleted` entry follows,
+compute the SHA-256 of the file which the manifest gives for its `payload.evidence.id`, and compare
+it with `payload.evidence.sha256`. The
+manifest's own `state` is what the server found: the trail, not the manifest, is what is signed.
 
 The offline verification command of the `yontrack` CLI is coming
 ([yontrack/yontrack-cli#83](https://github.com/yontrack/yontrack-cli/issues/83)).
@@ -836,6 +931,7 @@ An implementation of the verification should pass all of them:
 | Read the trail of a build         |                                                                         | `Build.auditTrail { entries endorsements }`    |
 | Verify it                         |                                                                         | `Build.auditTrail { verification(includeEvidence) }` |
 | Export it                         | `GET /rest/extension/audit-trail/builds/{buildId}/export`               |                                                |
+| Download its evidence archive     | `GET /rest/extension/audit-trail/builds/{buildId}/evidence-archive`     |                                                |
 | Public keys                       | `GET /rest/extension/audit-trail/keys`                                  | `auditTrailKeys`                               |
 | Evidence of a validation run      |                                                                         | `ValidationRun.evidence`                       |
 | Upload evidence                   | `POST /rest/extension/audit-trail/validation-runs/{validationRunId}/evidence` |                                          |
@@ -893,7 +989,8 @@ trail:
 > same transaction as each change, with the actor who made it (account, API token name, JWT issuer
 > and subject, or the system and its reason). Validation runs carry evidence — reports, SBOMs,
 > screenshots — stored in an S3-compatible bucket and recorded by their SHA-256. A trail is
-> verified in the UI, through the API and daily, and exported as JSON to be verified offline.
+> verified in the UI, through the API and daily, and exported as JSON to be verified offline; the
+> evidence of a build is downloaded at once, with its trail, as a ZIP archive.
 > What 6.0 gives is **integrity and origin**: this Yontrack produced this history, and it was not
 > rewritten. It does **not** give third-party proof of time (no TSA), sealing, retention
 > independent of the builds (a trail goes with its build), detection of the periods during which

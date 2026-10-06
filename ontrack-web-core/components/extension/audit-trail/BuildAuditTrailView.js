@@ -248,6 +248,7 @@ export function BuildAuditTrailContent({buildId, auditTrail, storageState}) {
                 </Space>
             </PageSection>
             <BuildEvidence
+                buildId={buildId}
                 evidence={auditTrail.evidence ?? NO_EVIDENCE}
                 flags={evidenceFlags}
                 storageState={storageState}

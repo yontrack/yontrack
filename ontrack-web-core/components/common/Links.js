@@ -52,6 +52,14 @@ export function buildAuditTrailExportUri(build) {
 }
 
 /**
+ * Download of the evidence archive of a build — a ZIP of its active evidence, its manifest and its
+ * trail — through the protected downloads of the UI, which carry the token of the session.
+ */
+export function buildEvidenceArchiveUri(build) {
+    return `/api/protected/downloads/audit-trail/builds/${build.id}/evidence-archive`
+}
+
+/**
  * Content of an evidence, through the protected downloads of the UI, which carry the token of the
  * session and keep the headers the backend serves it with.
  */

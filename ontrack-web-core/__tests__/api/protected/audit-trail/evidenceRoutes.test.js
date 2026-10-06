@@ -14,6 +14,7 @@ jest.mock("../../../../app/api/protected/backend", () => ({
 import {getAccessToken} from "../../../../app/api/protected/backend"
 import {GET} from "../../../../app/api/protected/downloads/audit-trail/evidence/[id]/route"
 import {POST} from "../../../../app/api/protected/uploads/audit-trail/validation-runs/[id]/evidence/route"
+import {GET as GET_ARCHIVE} from "../../../../app/api/protected/downloads/audit-trail/builds/[id]/evidence-archive/route"
 
 const props = (params) => ({params: Promise.resolve(params)})
 
@@ -143,6 +144,55 @@ describe("evidence upload route", () => {
         global.fetch = jest.fn()
         const response = await POST(uploadRequest(), props({id: "42"}))
         expect(response.status).toBe(401)
+        expect(global.fetch).not.toHaveBeenCalled()
+    })
+})
+
+describe("evidence archive download route", () => {
+
+    const originalFetch = global.fetch
+
+    afterEach(() => {
+        global.fetch = originalFetch
+    })
+
+    it("streams the archive of the build with the token of the session", async () => {
+        const body = new ReadableStream({
+            start(controller) {
+                controller.enqueue(new TextEncoder().encode("PK"))
+                controller.close()
+            },
+        })
+        global.fetch = jest.fn(async () => new Response(body, {
+            status: 200,
+            headers: {
+                'Content-Type': 'application/zip',
+                'Content-Disposition': 'attachment; filename="audit-trail-p-b-1.zip"',
+            },
+        }))
+        const response = await GET_ARCHIVE(new Request("http://localhost/"), props({id: "42"}))
+        expect(global.fetch).toHaveBeenCalledWith(
+            "http://backend/rest/extension/audit-trail/builds/42/evidence-archive",
+            expect.objectContaining({headers: {Authorization: "Bearer token"}}),
+        )
+        expect(response.status).toBe(200)
+        expect(response.headers.get('content-type')).toBe('application/zip')
+        expect(response.headers.get('content-disposition')).toBe('attachment; filename="audit-trail-p-b-1.zip"')
+        // Passed on as a stream, never read whole
+        expect(response.body).toBeInstanceOf(ReadableStream)
+        expect(await response.text()).toBe("PK")
+    })
+
+    it("passes a refusal of the backend on", async () => {
+        global.fetch = jest.fn(async () => new Response(null, {status: 503, statusText: "Service Unavailable"}))
+        const response = await GET_ARCHIVE(new Request("http://localhost/"), props({id: "42"}))
+        expect(response.status).toBe(503)
+    })
+
+    it("refuses anything but a build ID", async () => {
+        global.fetch = jest.fn()
+        const response = await GET_ARCHIVE(new Request("http://localhost/"), props({id: "42/../../admin"}))
+        expect(response.status).toBe(400)
         expect(global.fetch).not.toHaveBeenCalled()
     })
 })
