@@ -76,6 +76,8 @@ env:
   ZAP_IMAGE: ghcr.io/zaproxy/zaproxy@sha256:781a2bdaea47324e7bab583e2263f21d257b0aee61ed51521a5be45f5f5081ef
   # GHCR images of the build being scanned, tagged with the durable version (the build's display name).
   GHCR_ONTRACK: ghcr.io/${{ github.repository }}/ontrack
+  # Where a released build's image is, under its release tag (see "Pull the build's image").
+  DOCKERHUB_ONTRACK: yontrack/yontrack
   # Where the reports go. Private, and the only place any detail is allowed to exist.
   REPORTS_REPOSITORY: yontrack/security-reports
   # The throwaway stack, on the runner. Fixed ports: this job is alone on its runner (see the compose
@@ -205,14 +207,25 @@ jobs:
 
       # The compose file resolves the backend as nemerosa/ontrack:${ONTRACK_VERSION}. Pull the BRONZE
       # image by its durable version tag and re-tag it, exactly as the kdsl job of ci.yml does.
+      #
+      # A released build is the exception: the release rewrites its display name to the release
+      # version (`5.5.7`, no longer `5.5.7-rc-500`), and that tag is published on Docker Hub only,
+      # never on GHCR. When the latest BRONZE build is a release, the image comes from Docker Hub -
+      # the same digest under its release tag.
       - name: Pull the build's image
         id: image
         env:
           VERSION: ${{ steps.resolve.outputs.version }}
         run: |
           set -euo pipefail
-          docker pull "$GHCR_ONTRACK:$VERSION"
-          docker tag "$GHCR_ONTRACK:$VERSION" "nemerosa/ontrack:$VERSION"
+          if docker pull "$GHCR_ONTRACK:$VERSION"; then
+            image="$GHCR_ONTRACK:$VERSION"
+          else
+            echo "No $GHCR_ONTRACK:$VERSION on GHCR: a released build, pulled from Docker Hub instead."
+            image="$DOCKERHUB_ONTRACK:$VERSION"
+            docker pull "$image"
+          fi
+          docker tag "$image" "nemerosa/ontrack:$VERSION"
           echo "ontrack_version=$VERSION" >> "$GITHUB_OUTPUT"
 
       # ------------------------------------------------------------------------------------
