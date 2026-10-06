@@ -9,7 +9,6 @@ import net.nemerosa.ontrack.model.security.EncryptionService
 import net.nemerosa.ontrack.model.security.SecurityService
 import net.nemerosa.ontrack.model.structure.NameDescription
 import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.http.HttpEntity
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 
@@ -150,12 +149,12 @@ constructor(
             ?: ResponseEntity.notFound().build()
 
     /**
-     * Importing the encryption key
+     * Importing the encryption key. The key is not echoed back: the response carries no body.
      */
     @PutMapping("/encryption")
-    fun importEncryptionKey(@RequestBody payload: String): HttpEntity<String> {
+    fun importEncryptionKey(@RequestBody payload: String): ResponseEntity<Void> {
         encryptionService.importKey(payload)
-        return ResponseEntity.accepted().body(payload)
+        return ResponseEntity.accepted().build()
     }
 
 }
