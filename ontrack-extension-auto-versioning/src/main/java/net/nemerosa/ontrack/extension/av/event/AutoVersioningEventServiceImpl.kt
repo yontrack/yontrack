@@ -6,6 +6,7 @@ import net.nemerosa.ontrack.extension.av.event.AutoVersioningEvents.AUTO_VERSION
 import net.nemerosa.ontrack.extension.av.event.AutoVersioningEvents.AUTO_VERSIONING_PR_MERGE_TIMEOUT_ERROR
 import net.nemerosa.ontrack.extension.av.event.AutoVersioningEvents.AUTO_VERSIONING_REJECTED
 import net.nemerosa.ontrack.extension.av.event.AutoVersioningEvents.AUTO_VERSIONING_SUCCESS
+import net.nemerosa.ontrack.extension.scm.changelog.SCMCommit
 import net.nemerosa.ontrack.extension.scm.service.SCMPullRequest
 import net.nemerosa.ontrack.model.events.EventFactory
 import net.nemerosa.ontrack.model.events.EventPostService
@@ -54,11 +55,10 @@ class AutoVersioningEventServiceImpl(
     override fun sendSuccessPush(
         order: AutoVersioningOrder,
         message: String,
-        commit: String,
-        commitLink: String,
+        commit: SCMCommit,
     ) {
         eventPostService.post(
-            autoVersioningEventsFactory.success(order, message, commit = commit, commitLink = commitLink)
+            autoVersioningEventsFactory.success(order, message, commit = commit)
         )
     }
 

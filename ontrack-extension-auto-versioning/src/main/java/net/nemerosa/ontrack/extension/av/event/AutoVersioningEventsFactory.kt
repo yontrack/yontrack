@@ -1,17 +1,20 @@
 package net.nemerosa.ontrack.extension.av.event
 
 import net.nemerosa.ontrack.extension.av.dispatcher.AutoVersioningOrder
+import net.nemerosa.ontrack.extension.scm.changelog.SCMCommit
 import net.nemerosa.ontrack.extension.scm.service.SCMPullRequest
 import net.nemerosa.ontrack.model.events.Event
 
 interface AutoVersioningEventsFactory {
 
+    /**
+     * Event sent when an [order] succeeds, either with a [pr] or with a direct push of a [commit].
+     */
     fun success(
         order: AutoVersioningOrder,
         message: String,
         pr: SCMPullRequest? = null,
-        commit: String? = null,
-        commitLink: String? = null,
+        commit: SCMCommit? = null,
     ): Event
 
     fun error(

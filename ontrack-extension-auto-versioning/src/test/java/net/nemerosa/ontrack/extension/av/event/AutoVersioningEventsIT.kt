@@ -1,7 +1,9 @@
 package net.nemerosa.ontrack.extension.av.event
 
+import net.nemerosa.ontrack.common.Time
 import net.nemerosa.ontrack.extension.av.AutoVersioningTestFixtures.createOrder
 import net.nemerosa.ontrack.extension.av.dispatcher.AutoVersioningOrder
+import net.nemerosa.ontrack.extension.scm.changelog.SimpleSCMCommit
 import net.nemerosa.ontrack.extension.scm.service.SCMPullRequest
 import net.nemerosa.ontrack.extension.scm.service.SCMPullRequestStatus
 import net.nemerosa.ontrack.it.AbstractDSLTestSupport
@@ -14,6 +16,8 @@ import net.nemerosa.ontrack.model.structure.PromotionRun
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNull
 
 @AsAdminTest
 internal class AutoVersioningEventsIT : AbstractDSLTestSupport() {
@@ -71,6 +75,12 @@ internal class AutoVersioningEventsIT : AbstractDSLTestSupport() {
                 )
             )
             assertAuditValues(event, order)
+            assertEquals("Pull request PR-42", event.getValue("CHANGE_NAME"))
+            assertEquals("https://scm/pr/42", event.getValue("CHANGE_LINK"))
+            assertEquals("PR-42", event.getValue("PR_NAME"))
+            assertEquals("https://scm/pr/42", event.getValue("PR_LINK"))
+            assertNull(event.values["COMMIT"], "No commit for a PR")
+            assertNull(event.values["COMMIT_LINK"], "No commit link for a PR")
             val text = eventTemplatingService.renderEvent(
                 event,
                 context = emptyMap(),
@@ -79,10 +89,54 @@ internal class AutoVersioningEventsIT : AbstractDSLTestSupport() {
             assertEquals(
                 """
                             Auto versioning of <a href="http://localhost:3000/project/${target.project.id}">${target.project.name}</a>/<a href="http://localhost:3000/branch/${target.id}">${target.name}</a> for dependency <a href="http://localhost:3000/project/${run.project.id}">${run.project.name}</a> version "1.1.0" has been done.
-    
+
                             Created, approved and merged.
-                            
-                            Pull request <a href="https://scm/pr/42">PR-42</a>
+
+                            <a href="https://scm/pr/42">Pull request PR-42</a>
+
+                            ${auditLink(order)}
+                        """.trimIndent(),
+                text
+            )
+        }
+    }
+
+    @Test
+    fun `Rendering the success event for a direct push`() {
+        withOrder { order, run, target ->
+            val event = autoVersioningEventsFactory.success(
+                order = order,
+                message = "Auto-versioning pushed.",
+                commit = SimpleSCMCommit(
+                    id = "abc1234def5678",
+                    shortId = "abc1234",
+                    author = "test",
+                    authorEmail = null,
+                    timestamp = Time.now(),
+                    message = "Auto-versioning",
+                    link = "https://scm/commit/abc1234def5678",
+                ),
+            )
+            assertAuditValues(event, order)
+            assertEquals("Commit abc1234", event.getValue("CHANGE_NAME"))
+            assertEquals("https://scm/commit/abc1234def5678", event.getValue("CHANGE_LINK"))
+            assertEquals("abc1234def5678", event.getValue("COMMIT"))
+            assertEquals("https://scm/commit/abc1234def5678", event.getValue("COMMIT_LINK"))
+            assertNull(event.values["PR_NAME"], "No PR for a direct push")
+            assertNull(event.values["PR_LINK"], "No PR link for a direct push")
+            val text = eventTemplatingService.renderEvent(
+                event,
+                context = emptyMap(),
+                renderer = htmlNotificationEventRenderer
+            )
+            assertFalse("Pull request" in text, "A direct push does not mention a pull request: $text")
+            assertEquals(
+                """
+                            Auto versioning of <a href="http://localhost:3000/project/${target.project.id}">${target.project.name}</a>/<a href="http://localhost:3000/branch/${target.id}">${target.name}</a> for dependency <a href="http://localhost:3000/project/${run.project.id}">${run.project.name}</a> version "1.1.0" has been done.
+
+                            Auto-versioning pushed.
+
+                            <a href="https://scm/commit/abc1234def5678">Commit abc1234</a>
 
                             ${auditLink(order)}
                         """.trimIndent(),

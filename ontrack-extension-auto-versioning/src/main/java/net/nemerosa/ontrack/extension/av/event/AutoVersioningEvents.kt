@@ -16,11 +16,11 @@ object AutoVersioningEvents {
             
             ${MESSAGE}
             
-            Pull request ${#.link?text=PR_NAME&href=PR_LINK}
+            ${#.link?text=CHANGE_NAME&href=CHANGE_LINK}
 
             ${#.link?text=AUDIT_NAME&href=AUDIT_LINK}
         """.trimIndent(),
-        description = "When an auto versioning request succeeds with the creation of a PR (merged or not).",
+        description = "When an auto versioning request succeeds, either with a PR (merged or not) or with a direct push to the target branch.",
         context = eventContext(
             eventProject("Target project"),
             eventBranch("Target branch"),
@@ -30,8 +30,12 @@ object AutoVersioningEvents {
             eventXProject("Source project"),
             eventValue("VERSION", "Version being set"),
             eventValue("MESSAGE", "Auto versioning message"),
-            eventValue("PR_NAME", "Title of the PR having been created"),
-            eventValue("PR_LINK", "Link to the PR having been created"),
+            eventValue("CHANGE_NAME", "Text of the link to the change the auto versioning made: its PR, or the commit it pushed"),
+            eventValue("CHANGE_LINK", "Link to the change the auto versioning made: its PR, or the commit it pushed"),
+            eventValue("PR_NAME", "Title of the PR having been created, only set when a PR was created"),
+            eventValue("PR_LINK", "Link to the PR having been created, only set when a PR was created"),
+            eventValue("COMMIT", "Commit having been pushed, only set on a direct push"),
+            eventValue("COMMIT_LINK", "Link to the commit having been pushed, only set on a direct push"),
             *auditValues,
         ),
     )

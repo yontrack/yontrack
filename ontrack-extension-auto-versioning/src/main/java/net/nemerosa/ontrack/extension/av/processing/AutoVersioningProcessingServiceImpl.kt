@@ -378,8 +378,7 @@ class AutoVersioningProcessingServiceImpl(
             autoVersioningEventService.sendSuccessPush(
                 order = order,
                 message = "Auto-versioning pushed.",
-                commit = commit.id,
-                commitLink = commit.link,
+                commit = commit,
             )
             // OK
             AutoVersioningProcessingOutcome.CREATED

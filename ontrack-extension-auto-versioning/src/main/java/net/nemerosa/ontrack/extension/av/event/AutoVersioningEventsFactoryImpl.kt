@@ -2,6 +2,7 @@ package net.nemerosa.ontrack.extension.av.event
 
 import net.nemerosa.ontrack.extension.av.dispatcher.AutoVersioningOrder
 import net.nemerosa.ontrack.extension.av.postprocessing.PostProcessingFailureException
+import net.nemerosa.ontrack.extension.scm.changelog.SCMCommit
 import net.nemerosa.ontrack.extension.scm.service.SCMPullRequest
 import net.nemerosa.ontrack.model.events.Event
 import net.nemerosa.ontrack.model.structure.ID
@@ -19,8 +20,7 @@ class AutoVersioningEventsFactoryImpl(
         order: AutoVersioningOrder,
         message: String,
         pr: SCMPullRequest?,
-        commit: String?,
-        commitLink: String?,
+        commit: SCMCommit?,
     ): Event =
         Event.of(AutoVersioningEvents.AUTO_VERSIONING_SUCCESS)
             .withBranch(order.branch)
@@ -28,10 +28,15 @@ class AutoVersioningEventsFactoryImpl(
             .with("VERSION", order.targetVersion)
             .with("PROMOTION", order.sourcePromotion)
             .with("MESSAGE", close(message))
+            .with(
+                "CHANGE_NAME",
+                pr?.let { "Pull request ${it.name}" } ?: commit?.let { "Commit ${it.shortId}" }
+            )
+            .with("CHANGE_LINK", pr?.link ?: commit?.link)
             .with("PR_NAME", pr?.name)
             .with("PR_LINK", pr?.link)
-            .with("COMMIT", commit)
-            .with("COMMIT_LINK", commitLink)
+            .with("COMMIT", commit?.id)
+            .with("COMMIT_LINK", commit?.link)
             .withAudit(order)
             .build()
 

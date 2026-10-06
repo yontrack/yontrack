@@ -1,6 +1,7 @@
 package net.nemerosa.ontrack.extension.av.event
 
 import net.nemerosa.ontrack.extension.av.dispatcher.AutoVersioningOrder
+import net.nemerosa.ontrack.extension.scm.changelog.SCMCommit
 import net.nemerosa.ontrack.extension.scm.service.SCMPullRequest
 
 /**
@@ -45,13 +46,14 @@ interface AutoVersioningEventService {
     )
 
     /**
-     * Broadcasts the success of an auto-versioning request based on a PR
+     * Broadcasts the success of an auto-versioning request based on a direct push
+     *
+     * @param commit Commit having been pushed onto the target branch
      */
     fun sendSuccessPush(
         order: AutoVersioningOrder,
         message: String,
-        commit: String,
-        commitLink: String,
+        commit: SCMCommit,
     )
 
 }
