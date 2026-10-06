@@ -104,6 +104,8 @@ class ScmCommitSearchExtension(
 
     override val indexerName: String = "SCM Commits"
 
+    override val nameReferences: List<SearchDocumentReference> = projectSearchDocumentReferences(SCM_COMMIT_SEARCH_RESULT_DATA_PROJECT)
+
     /**
      * The full scan, weekly, unless the scheduled indexation of the commits is disabled.
      */

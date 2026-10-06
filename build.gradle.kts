@@ -484,8 +484,9 @@ project(":ontrack-service") {
         })
         // -PsearchPerf.scale=0.1 for a smaller dataset, -PsearchPerf.rounds=N for more samples,
         // -PsearchPerf.reuse=true to keep the dataset of the previous run, -PsearchPerf.rebuild=false
-        // to skip the rebuild, -PsearchPerf.analyze=q1,q2 for the plans of some queries only (see the page)
-        listOf("searchPerf.scale", "searchPerf.rounds", "searchPerf.reuse", "searchPerf.rebuild", "searchPerf.analyze").forEach { name ->
+        // to skip the rebuild, -PsearchPerf.analyze=q1,q2 for the plans of some queries only,
+        // -PsearchPerf.names=false without the lookup of the names (see the page)
+        listOf("searchPerf.scale", "searchPerf.rounds", "searchPerf.reuse", "searchPerf.rebuild", "searchPerf.analyze", "searchPerf.names").forEach { name ->
             providers.gradleProperty(name).orNull?.let { systemProperty(name, it) }
         }
         systemProperty("searchPerf.report", searchPerfReport.get().asFile.absolutePath)

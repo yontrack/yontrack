@@ -18,7 +18,9 @@ import org.springframework.stereotype.Component
  * same document. The time of the source build is its recency.
  *
  * The documents are written in the transaction of the change: the creation and deletion of a link,
- * the update of its source or target build, and the change of display name of its target. The
+ * the update of its source or target build, and the change of display name of its target. Since
+ * they are matched on the name of the project of their target, the documents of the links to a
+ * renamed project are rewritten after the rename is committed (see [renameScopes]). The
  * documents of a deleted source build or branch are deleted by the search service, and those of a
  * deleted target build here. The deletion of the branch or project of a target — which would
  * need to look at all its builds — is left to the reconciliation job, which runs every day.
@@ -33,6 +35,24 @@ class BuildLinkSearchExtension(
 ) : AbstractExtension(extensionFeature), SearchDocumentIndexer, BuildLinkListener, EventListener {
 
     override val indexerName: String = "Build links"
+
+    override val nameReferences: List<SearchDocumentReference> =
+        buildSearchDocumentReferences(SOURCE_BUILD) + buildSearchDocumentReferences(TARGET_BUILD)
+
+    /**
+     * A link is matched on the name of the project of its target
+     */
+    override val renameScopes: List<SearchDocumentReference> = listOf(
+        SearchDocumentReference.project("$TARGET_BUILD.branch.project"),
+    )
+
+    override fun indexRenamed(scope: SearchDocumentReference, entity: ProjectEntity, processor: (SearchDocument) -> Unit) {
+        if (entity is Project) {
+            structureService.forEachBuildLinkTo(entity) { from, to, qualifier ->
+                processor(asSearchDocument(from, to, qualifier))
+            }
+        }
+    }
 
     /**
      * Daily reconciliation, for the deletions of the branch or project of a target
@@ -123,8 +143,8 @@ class BuildLinkSearchExtension(
             ).distinct(),
             text = null,
             data = mapOf(
-                "sourceBuild" to from.searchDocumentData(),
-                "targetBuild" to to.searchDocumentData(),
+                SOURCE_BUILD to from.searchDocumentData(),
+                TARGET_BUILD to to.searchDocumentData(),
                 "qualifier" to qualifier,
             ).asJson(),
             updatedAt = from.signature.time,
@@ -133,6 +153,9 @@ class BuildLinkSearchExtension(
 
     companion object {
         const val SEARCH_RESULT_TYPE = "build-link"
+
+        private const val SOURCE_BUILD = "sourceBuild"
+        private const val TARGET_BUILD = "targetBuild"
 
         /**
          * Page size to get all the links of a build

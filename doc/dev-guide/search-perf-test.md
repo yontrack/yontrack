@@ -122,6 +122,7 @@ the nightly stamp records it: a noisy runner must not turn it red.
 | `-PsearchPerf.rounds=20` | `10` | more samples per query |
 | `-PsearchPerf.reuse=true` | `false` | keeps the dataset of the previous run, when it has the same scale |
 | `-PsearchPerf.analyze=pay-10,fix` | | only prints the `EXPLAIN (ANALYZE, BUFFERS)` of the statements of the palette and of the results page, as an administrator and as the restricted user, for these queries — no assertion, no measure. With `reuse`, a minute per try |
+| `-PsearchPerf.names=false` | `true` | skips the lookup of the names of the projects and branches each search runs after its rows (#1889), to measure what it costs |
 | `-PsearchPerf.rebuild=false` | `true` | skips the rebuild, for working on the queries: the report then has no `rebuild_seconds`, which the nightly stamp requires |
 
 When working on it, `-x integrationTestComposeDown` keeps the stack up between two runs. The

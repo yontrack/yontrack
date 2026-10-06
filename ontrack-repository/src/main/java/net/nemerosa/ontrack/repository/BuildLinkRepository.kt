@@ -2,6 +2,7 @@ package net.nemerosa.ontrack.repository
 
 import net.nemerosa.ontrack.model.structure.Build
 import net.nemerosa.ontrack.model.structure.BuildLink
+import net.nemerosa.ontrack.model.structure.Project
 
 interface BuildLinkRepository {
 
@@ -31,5 +32,11 @@ interface BuildLinkRepository {
      * Loops over ALL the build links. Use this method with care, mostly for external indexation.
      */
     fun forEachBuildLink(code: (from: Build, to: Build, qualifier: String) -> Unit)
+
+    /**
+     * Loops over all the build links to the builds of a project. Use this method with care, mostly
+     * for external indexation.
+     */
+    fun forEachBuildLinkTo(project: Project, code: (from: Build, to: Build, qualifier: String) -> Unit)
 
 }

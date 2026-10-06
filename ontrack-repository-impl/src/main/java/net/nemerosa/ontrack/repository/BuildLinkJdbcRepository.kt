@@ -2,8 +2,10 @@ package net.nemerosa.ontrack.repository
 
 import net.nemerosa.ontrack.model.structure.Build
 import net.nemerosa.ontrack.model.structure.BuildLink
+import net.nemerosa.ontrack.model.structure.Project
 import net.nemerosa.ontrack.repository.support.AbstractJdbcRepository
 import org.springframework.stereotype.Repository
+import java.sql.ResultSet
 import javax.sql.DataSource
 
 @Repository
@@ -169,14 +171,34 @@ class BuildLinkJdbcRepository(
         jdbcTemplate!!.query(
             "SELECT * FROM BUILD_LINKS ORDER BY ID ASC"
         ) { rs ->
-            val buildId = id(rs, "buildId")
-            val targetBuildId = id(rs, "targetBuildId")
-            val qualifier = rs.getString("qualifier")
-            // Loads the build
-            val build: Build = buildJdbcRepositoryAccessor.getBuild(buildId)
-            val targetBuild: Build = buildJdbcRepositoryAccessor.getBuild(targetBuildId)
-            // Processing
-            code(build, targetBuild, qualifier)
+            processBuildLink(rs, code)
         }
+    }
+
+    override fun forEachBuildLinkTo(project: Project, code: (from: Build, to: Build, qualifier: String) -> Unit) {
+        namedParameterJdbcTemplate!!.query(
+            """
+                SELECT l.*
+                FROM BUILD_LINKS l
+                INNER JOIN BUILDS t ON t.ID = l.TARGETBUILDID
+                INNER JOIN BRANCHES b ON b.ID = t.BRANCHID
+                WHERE b.PROJECTID = :projectId
+                ORDER BY l.ID ASC
+            """,
+            params("projectId", project.id())
+        ) { rs ->
+            processBuildLink(rs, code)
+        }
+    }
+
+    private fun processBuildLink(rs: ResultSet, code: (from: Build, to: Build, qualifier: String) -> Unit) {
+        val buildId = id(rs, "buildId")
+        val targetBuildId = id(rs, "targetBuildId")
+        val qualifier = rs.getString("qualifier")
+        // Loads the build
+        val build: Build = buildJdbcRepositoryAccessor.getBuild(buildId)
+        val targetBuild: Build = buildJdbcRepositoryAccessor.getBuild(targetBuildId)
+        // Processing
+        code(build, targetBuild, qualifier)
     }
 }

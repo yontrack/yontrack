@@ -17,9 +17,10 @@ const val BRANCH_SEARCH_RESULT_TYPE = "branch"
  * Search documents for the branches: the name is the identifier, the description the free text,
  * and the title is `project/branch`, so that a branch is also found on the name of its project.
  *
- * The documents are written in the transaction of the branch events, and those of the branches of
- * a project are rewritten when the project is updated, since they carry its name. The documents
- * of a deleted branch are deleted by the search service.
+ * The documents are written in the transaction of the branch events. Since their titles carry the
+ * name of their project, those of the branches of a renamed project are rewritten after the rename
+ * is committed (see [renameScopes]). The documents of a deleted branch are deleted by the search
+ * service.
  */
 @Component
 class BranchSearchProvider(
@@ -36,6 +37,24 @@ class BranchSearchProvider(
     )
 
     override val indexerName: String = "Branches"
+
+    override val nameReferences: List<SearchDocumentReference> =
+        branchSearchDocumentReferences(SearchResult.SEARCH_RESULT_BRANCH)
+
+    /**
+     * The title of a branch carries the name of its project
+     */
+    override val renameScopes: List<SearchDocumentReference> = listOf(
+        SearchDocumentReference.project("${SearchResult.SEARCH_RESULT_BRANCH}.project"),
+    )
+
+    override fun indexRenamed(scope: SearchDocumentReference, entity: ProjectEntity, processor: (SearchDocument) -> Unit) {
+        if (entity is Project) {
+            structureService.getBranchesForProject(entity.id).forEach { branch ->
+                processor(branch.asSearchDocument())
+            }
+        }
+    }
 
     override fun indexAll(processor: (SearchDocument) -> Unit) {
         structureService.projectList.forEach { project ->
@@ -58,13 +77,6 @@ class BranchSearchProvider(
             EventFactory.DISABLE_BRANCH -> {
                 val branch = event.getEntity<Branch>(ProjectEntityType.BRANCH)
                 structureService.findBranchByID(branch.id)?.let { searchDocumentService.index(it.asSearchDocument()) }
-            }
-
-            EventFactory.UPDATE_PROJECT -> {
-                val project = event.getEntity<Project>(ProjectEntityType.PROJECT)
-                structureService.getBranchesForProject(project.id).forEach { branch ->
-                    searchDocumentService.index(branch.asSearchDocument())
-                }
             }
         }
     }

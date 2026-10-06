@@ -202,6 +202,12 @@ interface StructureService {
     fun forEachBuildLink(code: (from: Build, to: Build, qualifier: String) -> Unit)
 
     /**
+     * Loops over all the build links to the builds of a project. Use this method with care, mostly
+     * for external indexation.
+     */
+    fun forEachBuildLinkTo(project: Project, code: (from: Build, to: Build, qualifier: String) -> Unit)
+
+    /**
      * Looks for the first build which matches a given predicate.
      *
      * @param branchId       Branch to look builds into

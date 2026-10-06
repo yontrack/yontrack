@@ -143,3 +143,41 @@ class FailingSearchDocumentListener(
         }
     }
 }
+
+/**
+ * Test type whose documents carry the name of their project in their title, and are re-indexed when
+ * it is renamed: the documents of [source] referring to the renamed project are provided again, and
+ * the re-indexation fails for a project whose name starts with [FAILING].
+ */
+@Component
+class TestEpsilonSearchDocumentIndexer : AbstractTestSearchDocumentIndexer(TYPE, 1004) {
+    companion object {
+        const val TYPE = "test-epsilon"
+        const val FAILING = "failing-rename-"
+    }
+
+    override val nameReferences: List<SearchDocumentReference> = projectSearchDocumentReferences("project")
+
+    override val renameScopes: List<SearchDocumentReference> = listOf(SearchDocumentReference.project("project"))
+
+    /**
+     * IDs of the projects whose documents have been re-indexed after a rename
+     */
+    val renamed = CopyOnWriteArrayList<Int>()
+
+    override fun indexRenamed(scope: SearchDocumentReference, entity: ProjectEntity, processor: (SearchDocument) -> Unit) {
+        renamed += entity.id()
+        if (entity is Project && entity.name.startsWith(FAILING)) {
+            error("Failing re-indexation after the rename of ${entity.name}")
+        }
+        source.filter { it.projectId == entity.id() }.forEach(processor)
+    }
+
+    /**
+     * Document of a project, referring to it in its data and carrying its name in its title
+     */
+    fun projectDocument(key: String, project: Project, identifiers: List<String>) =
+        document(key, "${project.name} $key", project, identifiers).copy(
+            data = mapOf("key" to key, "project" to project.searchDocumentData()).asJson()
+        )
+}

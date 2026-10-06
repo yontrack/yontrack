@@ -20,4 +20,12 @@ data class SearchDocumentScope(
     val projectLessTypes: List<String>,
     val restrictedTypes: Map<String, List<Int>> = emptyMap(),
     val nonFuzzyTypes: List<String> = emptyList(),
-)
+) {
+
+    private val visibleProjectIds: Set<Int> by lazy { projectIds.toSet() }
+
+    /**
+     * Whether the documents of a project are visible — and its name.
+     */
+    fun isProjectVisible(projectId: Int): Boolean = allProjects || projectId in visibleProjectIds
+}

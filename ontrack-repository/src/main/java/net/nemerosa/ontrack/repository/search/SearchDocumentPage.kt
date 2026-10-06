@@ -1,6 +1,7 @@
 package net.nemerosa.ontrack.repository.search
 
 import net.nemerosa.ontrack.model.structure.ProjectEntityID
+import net.nemerosa.ontrack.model.structure.ProjectEntityType
 import net.nemerosa.ontrack.model.structure.SearchHighlightPart
 import tools.jackson.databind.JsonNode
 import java.time.LocalDateTime
@@ -48,4 +49,19 @@ data class SearchDocumentHit(
     val updatedAt: LocalDateTime,
     val score: Double,
     val highlight: List<SearchHighlightPart>? = null,
+)
+
+/**
+ * Current name of a project or branch referred to by the data of search documents.
+ *
+ * @property type [ProjectEntityType.PROJECT] or [ProjectEntityType.BRANCH]
+ * @property id ID of the project or branch
+ * @property name Its current name
+ * @property projectId ID of the project, the one of the branch for a branch
+ */
+data class SearchDocumentReferenceName(
+    val type: ProjectEntityType,
+    val id: Int,
+    val name: String,
+    val projectId: Int,
 )

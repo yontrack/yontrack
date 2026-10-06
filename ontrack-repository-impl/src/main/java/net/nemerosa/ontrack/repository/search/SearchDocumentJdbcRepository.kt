@@ -114,6 +114,42 @@ class SearchDocumentJdbcRepository(
             params("type", type).addValue("time", time)
         )
 
+    override fun deleteReferringIndexedBefore(type: String, path: List<String>, id: Int, time: LocalDateTime): Int =
+        namedParameterJdbcTemplate.update(
+            """
+                DELETE FROM SEARCH_DOCUMENTS
+                WHERE TYPE = :type
+                  AND DATA #>> CAST(:path AS TEXT[]) = :id
+                  AND INDEXED_AT < :time
+            """,
+            params("type", type)
+                .addValue("path", (path + "id").toTypedArray())
+                .addValue("id", id.toString())
+                .addValue("time", time)
+        )
+
+    override fun findReferenceNames(projectIds: Collection<Int>, branchIds: Collection<Int>): List<SearchDocumentReferenceName> =
+        namedParameterJdbcTemplate.query(
+            """
+                SELECT 'PROJECT' AS TYPE, p.ID, p.NAME, p.ID AS PROJECT_ID
+                FROM PROJECTS p
+                WHERE p.ID = ANY(CAST(:projectIds AS INT[]))
+                UNION ALL
+                SELECT 'BRANCH' AS TYPE, b.ID, b.NAME, b.PROJECTID AS PROJECT_ID
+                FROM BRANCHES b
+                WHERE b.ID = ANY(CAST(:branchIds AS INT[]))
+            """,
+            params("projectIds", projectIds.toTypedArray())
+                .addValue("branchIds", branchIds.toTypedArray())
+        ) { rs, _ ->
+            SearchDocumentReferenceName(
+                type = ProjectEntityType.valueOf(rs.getString("TYPE")),
+                id = rs.getInt("ID"),
+                name = rs.getString("NAME"),
+                projectId = rs.getInt("PROJECT_ID"),
+            )
+        }
+
     override fun deleteAll(type: String): Int =
         namedParameterJdbcTemplate.update(
             "DELETE FROM SEARCH_DOCUMENTS WHERE TYPE = :type",

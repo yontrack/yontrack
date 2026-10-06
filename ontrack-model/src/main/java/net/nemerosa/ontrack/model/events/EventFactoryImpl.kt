@@ -154,8 +154,8 @@ class EventFactoryImpl : EventFactory {
         return of(NEW_PROJECT).withProject(project).build()
     }
 
-    override fun updateProject(project: Project): Event {
-        return of(UPDATE_PROJECT).withProject(project).build()
+    override fun updateProject(project: Project, previousName: String?): Event {
+        return of(UPDATE_PROJECT).withProject(project).with(EventFactory.PREVIOUS_NAME, previousName).build()
     }
 
     override fun disableProject(project: Project): Event {
@@ -177,8 +177,8 @@ class EventFactoryImpl : EventFactory {
         return of(NEW_BRANCH).withBranch(branch).build()
     }
 
-    override fun updateBranch(branch: Branch): Event {
-        return of(UPDATE_BRANCH).withBranch(branch).build()
+    override fun updateBranch(branch: Branch, previousName: String?): Event {
+        return of(UPDATE_BRANCH).withBranch(branch).with(EventFactory.PREVIOUS_NAME, previousName).build()
     }
 
     override fun disableBranch(branch: Branch): Event {

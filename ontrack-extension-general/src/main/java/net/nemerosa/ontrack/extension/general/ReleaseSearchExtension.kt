@@ -35,6 +35,8 @@ class ReleaseSearchExtension(
 
     override val indexerName: String = "Release property"
 
+    override val nameReferences: List<SearchDocumentReference> = buildSearchDocumentReferences(SearchResult.SEARCH_RESULT_BUILD)
+
     override fun indexAll(processor: (SearchDocument) -> Unit) {
         propertyService.forEachEntityWithProperty<ReleasePropertyType, ReleaseProperty> { entityId, property ->
             if (entityId.type == ProjectEntityType.BUILD) {

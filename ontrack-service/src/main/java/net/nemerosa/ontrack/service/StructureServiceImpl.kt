@@ -120,8 +120,9 @@ class StructureServiceImpl(
     override fun saveProject(project: Project) {
         isEntityDefined(project, "Project must be defined")
         securityService.checkProjectFunction(project.id(), ProjectEdit::class.java)
+        val previousName = structureRepository.getProject(project.id).name
         structureRepository.saveProject(project)
-        eventPostService.post(eventFactory.updateProject(project))
+        eventPostService.post(eventFactory.updateProject(project, previousName.takeIf { it != project.name }))
     }
 
     override fun disableProject(project: Project): Project {
@@ -189,8 +190,9 @@ class StructureServiceImpl(
         isEntityDefined(branch, "Branch must be defined")
         isEntityDefined(branch.project, "Project must be defined")
         securityService.checkProjectFunction(branch.projectId(), BranchEdit::class.java)
+        val previousName = structureRepository.getBranch(branch.id).name
         structureRepository.saveBranch(branch)
-        eventPostService.post(eventFactory.updateBranch(branch))
+        eventPostService.post(eventFactory.updateBranch(branch, previousName.takeIf { it != branch.name }))
     }
 
     override fun disableBranch(branch: Branch): Branch {
@@ -573,6 +575,11 @@ class StructureServiceImpl(
     override fun forEachBuildLink(code: (from: Build, to: Build, qualifier: String) -> Unit) {
         securityService.checkGlobalFunction(ApplicationManagement::class.java)
         buildLinkRepository.forEachBuildLink(code)
+    }
+
+    override fun forEachBuildLinkTo(project: Project, code: (from: Build, to: Build, qualifier: String) -> Unit) {
+        securityService.checkGlobalFunction(ApplicationManagement::class.java)
+        buildLinkRepository.forEachBuildLinkTo(project, code)
     }
 
     override fun getPromotionLevelListForBranch(branchId: ID): List<PromotionLevel> {

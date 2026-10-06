@@ -39,6 +39,8 @@ class BuildSearchProvider(
 
     override val indexerName: String = "Builds"
 
+    override val nameReferences: List<SearchDocumentReference> = buildSearchDocumentReferences(SearchResult.SEARCH_RESULT_BUILD)
+
     override fun indexAll(processor: (SearchDocument) -> Unit) {
         structureService.projectList.forEach { project ->
             structureService.getBranchesForProject(project.id).forEach { branch ->

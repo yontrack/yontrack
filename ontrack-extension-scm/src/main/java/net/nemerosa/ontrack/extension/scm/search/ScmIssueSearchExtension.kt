@@ -49,6 +49,8 @@ class ScmIssueSearchExtension(
 
     override val indexerName: String = "SCM Issues"
 
+    override val nameReferences: List<SearchDocumentReference> = projectSearchDocumentReferences(SCM_ISSUE_SEARCH_RESULT_DATA_PROJECT)
+
     /**
      * Writes the documents of issues found in the commits of a project.
      */

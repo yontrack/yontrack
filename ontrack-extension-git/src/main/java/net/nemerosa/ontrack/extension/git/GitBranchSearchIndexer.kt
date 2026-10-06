@@ -37,6 +37,8 @@ class GitBranchSearchIndexer(
 
     override val indexerName: String = "Git Branches"
 
+    override val nameReferences: List<SearchDocumentReference> = branchSearchDocumentReferences(SearchResult.SEARCH_RESULT_BRANCH)
+
     override fun indexAll(processor: (SearchDocument) -> Unit) {
         propertyService.forEachEntityWithProperty<GitBranchConfigurationPropertyType, GitBranchConfigurationProperty> { entityId, property ->
             if (entityId.type == ProjectEntityType.BRANCH) {

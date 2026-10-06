@@ -20,7 +20,9 @@ import org.springframework.stereotype.Component
  * them.
  *
  * The catalog and its links to the projects are collected daily, outside any transaction: the
- * documents are rebuilt daily as well.
+ * documents are rebuilt daily as well. Since its title carries the name of the project an entry is
+ * linked to, the document of the entry of a renamed project is rewritten after the rename is
+ * committed (see [renameScopes]).
  */
 @Component
 class SCMCatalogSearchIndexer(
@@ -41,6 +43,25 @@ class SCMCatalogSearchIndexer(
     override val indexerName: String = "SCM Catalog"
 
     override val globalFunction: Class<out GlobalFunction> = SCMCatalogAccessFunction::class.java
+
+    override val nameReferences: List<SearchDocumentReference> =
+        projectSearchDocumentReferences(SearchResult.SEARCH_RESULT_PROJECT)
+
+    /**
+     * The title of an entry carries the name of the project it is linked to
+     */
+    override val renameScopes: List<SearchDocumentReference> = listOf(
+        SearchDocumentReference.project(SearchResult.SEARCH_RESULT_PROJECT),
+    )
+
+    override fun indexRenamed(scope: SearchDocumentReference, entity: ProjectEntity, processor: (SearchDocument) -> Unit) {
+        if (scmExtensionConfigProperties.catalog.enabled && entity is Project) {
+            catalogLinkService.getSCMCatalogEntry(entity)?.let { entry ->
+                // The project as it is now, not as it was renamed: it may have been renamed again since
+                processor(entry.asSearchDocument(catalogLinkService.getLinkedProject(entry)))
+            }
+        }
+    }
 
     override val indexerSchedule: Schedule =
         if (scmExtensionConfigProperties.catalog.enabled) {

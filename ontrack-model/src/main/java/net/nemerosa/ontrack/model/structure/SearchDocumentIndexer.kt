@@ -8,7 +8,9 @@ import net.nemerosa.ontrack.model.security.ProjectFunction
  * Describes the [search documents][SearchDocument] of one [search result type][SearchResultType].
  *
  * An indexer only describes documents: it carries no SQL and does not read the entities back when
- * a search is performed, since results are rendered from [SearchDocument.data].
+ * a search is performed, since results are rendered from [SearchDocument.data] — and from the
+ * current names of the projects and branches it refers to ([nameReferences]), resolved by the
+ * search service in one lookup per search.
  *
  * Declared as a Spring `@Component`, it is picked up automatically:
  *
@@ -83,5 +85,44 @@ interface SearchDocumentIndexer {
      * Runs as administrator.
      */
     fun indexAll(processor: (SearchDocument) -> Unit)
+
+    /**
+     * References, in the [data][SearchDocument.data] of the documents of this type, to the projects
+     * and branches whose names are resolved when searching: a result shows their current names,
+     * whatever names they had when its document was written. See [SearchDocumentReference].
+     *
+     * Every project or branch the data renders with [searchDocumentData] is declared here — with
+     * [projectSearchDocumentReferences], [branchSearchDocumentReferences] or
+     * [buildSearchDocumentReferences].
+     */
+    val nameReferences: List<SearchDocumentReference> get() = emptyList()
+
+    /**
+     * References, in the [data][SearchDocument.data] of the documents of this type, to the projects
+     * or branches whose name is in the [title][SearchDocument.title] or the
+     * [identifiers][SearchDocument.identifiers] of the documents — what they are matched on.
+     *
+     * When such a project or branch is renamed, the documents referring to it through one of these
+     * references are re-indexed by [indexRenamed], after the rename is committed: those it provides
+     * are written, and those of this type referring to the renamed entity which it does not
+     * provide are deleted.
+     *
+     * None by default: the names of the documents are then resolved when searching only, which is
+     * enough for a name the documents are not matched on.
+     */
+    val renameScopes: List<SearchDocumentReference> get() = emptyList()
+
+    /**
+     * Provides the documents of this type referring to a renamed project or branch through one of
+     * the [renameScopes].
+     *
+     * Runs as administrator, outside the transaction of the rename, after it has been committed.
+     *
+     * @param scope One of the [renameScopes]
+     * @param entity The renamed project or branch, with its new name
+     * @param processor Receives the documents to write
+     */
+    fun indexRenamed(scope: SearchDocumentReference, entity: ProjectEntity, processor: (SearchDocument) -> Unit) {
+    }
 
 }

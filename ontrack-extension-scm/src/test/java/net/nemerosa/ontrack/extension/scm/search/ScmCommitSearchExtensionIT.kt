@@ -72,6 +72,30 @@ class ScmCommitSearchExtensionIT : AbstractDSLTestSupport() {
         }
 
     @Test
+    fun `A commit and its issues show the new name of their renamed project, without any scan`() {
+        val issueKey = "ISS-" + uid("").filter { it.isDigit() }
+        mockSCMTester.withMockSCMRepository {
+            project {
+                val branch = mockBranch(this)
+                repositoryIssue(key = issueKey, message = "Sample issue")
+                val commit = branch.build().withRepositoryCommit("$issueKey Some fix")
+                indexNewCommits(this)
+                val newName = uid("P")
+                asAdmin {
+                    structureService.saveProject(Project(id, newName, description, isDisabled, signature))
+                }
+                @Suppress("UNCHECKED_CAST")
+                fun SearchResult.project(): Map<String, *> = data?.get("project") as Map<String, *>
+                fun found(query: String, type: String) = asUser {
+                    searchService.search(SearchQueryRequest(query = query, types = listOf(type), size = 1000))
+                }.items.single { it.title == query && it.project()["id"] == id() }
+                assertEquals(newName, found(commit, ScmCommitSearchExtension.SCM_COMMIT_SEARCH_RESULT_TYPE).project()["name"])
+                assertEquals(newName, found(issueKey, ScmIssueSearchExtension.SCM_ISSUE_SEARCH_RESULT_TYPE).project()["name"])
+            }
+        }
+    }
+
+    @Test
     fun `A commit is found by its hash, with what its result renders`() {
         mockSCMTester.withMockSCMRepository {
             project {

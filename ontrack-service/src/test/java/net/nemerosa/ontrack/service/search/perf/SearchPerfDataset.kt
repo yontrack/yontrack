@@ -351,7 +351,7 @@ class SearchPerfDataset(
                        tpr.NAME || ':' || coalesce(${buildDisplayName("tbu.ID")}, tbu.NAME),
                        ${identifiers("tpr.NAME || ':' || tbu.NAME", "tpr.NAME || ':' || ${buildDisplayName("tbu.ID")}")},
                        NULL,
-                       jsonb_build_object('sourceBuild', $buildData, 'targetBuild', jsonb_build_object('id', tbu.ID, 'name', tbu.NAME), 'qualifier', ''),
+                       jsonb_build_object('sourceBuild', $buildData, 'targetBuild', jsonb_build_object('id', tbu.ID, 'name', tbu.NAME, 'description', tbu.DESCRIPTION, 'branch', jsonb_build_object('id', tbr.ID, 'name', tbr.NAME, 'project', jsonb_build_object('id', tpr.ID, 'name', tpr.NAME))), 'qualifier', ''),
                        ${time("bu.ID", "10 minutes")}, $now
                 $buildJoins
                 JOIN BUILDS tbu ON tbu.ID = $target

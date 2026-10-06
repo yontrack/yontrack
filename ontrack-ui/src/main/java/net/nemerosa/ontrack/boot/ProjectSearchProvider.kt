@@ -35,6 +35,8 @@ class ProjectSearchProvider(
 
     override val indexerName: String = "Projects"
 
+    override val nameReferences: List<SearchDocumentReference> = projectSearchDocumentReferences(SearchResult.SEARCH_RESULT_PROJECT)
+
     override fun indexAll(processor: (SearchDocument) -> Unit) {
         structureService.projectList.forEach { project ->
             processor(project.asSearchDocument())

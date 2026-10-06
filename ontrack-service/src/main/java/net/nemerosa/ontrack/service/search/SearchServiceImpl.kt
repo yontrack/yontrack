@@ -71,9 +71,10 @@ class SearchServiceImpl(
         } else if (types.isEmpty()) {
             return SearchResults(items = emptyList(), offset = request.offset, total = 0, message = null)
         }
+        val scope = scope(types)
         val page = searchDocumentService.search(
             query = request.query,
-            scope = scope(types),
+            scope = scope,
             offset = request.offset,
             size = request.size,
             perType = request.perType,
@@ -81,8 +82,15 @@ class SearchServiceImpl(
         ) ?: return null
         val typesById = types.associateBy { it.id }
         val rebuilding = searchDocumentService.rebuildingTypes
+        // Current names of the projects and branches the documents found refer to
+        val hits = SearchDocumentNames.resolve(
+            hits = page.items,
+            references = { type -> indexers[type]?.nameReferences ?: emptyList() },
+            lookup = searchDocumentService::findReferenceNames,
+            visible = scope::isProjectVisible,
+        )
         return SearchResults(
-            items = page.items.mapNotNull { hit ->
+            items = hits.mapNotNull { hit ->
                 typesById[hit.type]?.let { type -> toSearchResult(hit, type) }
             },
             offset = if (request.perType != null) 0 else request.offset,

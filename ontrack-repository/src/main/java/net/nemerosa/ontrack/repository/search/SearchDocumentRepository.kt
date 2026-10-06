@@ -60,6 +60,29 @@ interface SearchDocumentRepository {
     fun deleteIndexedBefore(type: String, time: LocalDateTime): Int
 
     /**
+     * Deletes the documents of a type written before a given time, among those whose data refers
+     * to a given project or branch: what the re-indexation after a rename uses to drop the
+     * documents it did not write.
+     *
+     * @param type Type of the documents
+     * @param path Path, in the data of the documents, of the object carrying the `id` of the
+     * project or branch
+     * @param id ID of the project or branch
+     * @param time Time of the start of the re-indexation
+     * @return Number of deleted documents
+     */
+    fun deleteReferringIndexedBefore(type: String, path: List<String>, id: Int, time: LocalDateTime): Int
+
+    /**
+     * Current names of projects and branches, in one query.
+     *
+     * @param projectIds IDs of the projects
+     * @param branchIds IDs of the branches
+     * @return The names of those which exist
+     */
+    fun findReferenceNames(projectIds: Collection<Int>, branchIds: Collection<Int>): List<SearchDocumentReferenceName>
+
+    /**
      * Deletes all the documents of a type.
      */
     fun deleteAll(type: String): Int

@@ -12,9 +12,17 @@ import net.nemerosa.ontrack.repository.search.SearchDocumentJdbcRepository
 import net.nemerosa.ontrack.repository.search.SearchDocumentScope
 import net.nemerosa.ontrack.service.search.SearchDocumentServiceImpl
 import net.nemerosa.ontrack.service.search.SearchIndexMetrics
+import net.nemerosa.ontrack.service.search.SearchDocumentNames
 import net.nemerosa.ontrack.service.search.perf.SearchPerfDataset.Companion.TYPES
+import net.nemerosa.ontrack.service.search.perf.SearchPerfDataset.Companion.TYPE_BRANCH
 import net.nemerosa.ontrack.service.search.perf.SearchPerfDataset.Companion.TYPE_BUILD
+import net.nemerosa.ontrack.service.search.perf.SearchPerfDataset.Companion.TYPE_BUILD_LINK
+import net.nemerosa.ontrack.service.search.perf.SearchPerfDataset.Companion.TYPE_COMMIT
 import net.nemerosa.ontrack.service.search.perf.SearchPerfDataset.Companion.TYPE_FINDING
+import net.nemerosa.ontrack.service.search.perf.SearchPerfDataset.Companion.TYPE_GIT_BRANCH
+import net.nemerosa.ontrack.service.search.perf.SearchPerfDataset.Companion.TYPE_ISSUE
+import net.nemerosa.ontrack.service.search.perf.SearchPerfDataset.Companion.TYPE_PROJECT
+import net.nemerosa.ontrack.service.search.perf.SearchPerfDataset.Companion.TYPE_RELEASE
 import net.nemerosa.ontrack.service.search.perf.SearchPerfDataset.Companion.TYPE_SCM_CATALOG
 import net.nemerosa.ontrack.service.search.perf.SearchPerfPlans.IX_IDENTIFIERS_TRGM
 import net.nemerosa.ontrack.service.search.perf.SearchPerfPlans.TIER_INDEXES
@@ -162,6 +170,7 @@ object SearchPerf {
         details["search_config"] = linkedMapOf(
             "count_cap" to searcher.config.countCap,
             "work_mem" to searcher.config.workMem,
+            "names" to searcher.names,
         )
         val scenarios = Scenarios(
             buildNames = dataset.sampleBuildNames(jdbc, 20),
@@ -361,6 +370,11 @@ object SearchPerf {
     ) {
         val config = OntrackConfigProperties().search
 
+        /**
+         * Whether the names of the projects and branches are resolved, as the search service does
+         */
+        val names: Boolean = Config().names
+
         private val transaction = TransactionTemplate(transactionManager).apply { isReadOnly = true }
 
         /**
@@ -413,8 +427,38 @@ object SearchPerf {
         val highlight: Boolean,
     ) {
         fun run(searcher: Searcher, query: String) =
-            searcher.service.search(query, scope, offset, size, perType, highlight)
+            searcher.service.search(query, scope, offset, size, perType, highlight)?.let { page ->
+                if (searcher.names) {
+                    // As the search service does: the current names of what the rows refer to, in one lookup
+                    page.copy(
+                        items = SearchDocumentNames.resolve(
+                            hits = page.items,
+                            references = { type -> NAME_REFERENCES[type] ?: emptyList() },
+                            lookup = searcher.service::findReferenceNames,
+                            visible = scope::isProjectVisible,
+                        )
+                    )
+                } else {
+                    page
+                }
+            }
     }
+
+    /**
+     * References of the types of the dataset, as their indexers declare them
+     */
+    private val NAME_REFERENCES: Map<String, List<SearchDocumentReference>> = mapOf(
+        TYPE_PROJECT to projectSearchDocumentReferences("project"),
+        TYPE_BRANCH to branchSearchDocumentReferences("branch"),
+        TYPE_GIT_BRANCH to branchSearchDocumentReferences("branch"),
+        TYPE_BUILD to buildSearchDocumentReferences("build"),
+        TYPE_RELEASE to buildSearchDocumentReferences("build"),
+        TYPE_BUILD_LINK to buildSearchDocumentReferences("sourceBuild") + buildSearchDocumentReferences("targetBuild"),
+        TYPE_ISSUE to projectSearchDocumentReferences("project"),
+        TYPE_COMMIT to projectSearchDocumentReferences("project"),
+        TYPE_FINDING to projectSearchDocumentReferences("project") + SearchDocumentReference.branch("branches"),
+        TYPE_SCM_CATALOG to projectSearchDocumentReferences("project"),
+    )
 
     private fun palette(scope: SearchDocumentScope) =
         Search("palette", scope, offset = 0, size = PALETTE_SIZE, perType = PALETTE_PER_TYPE, highlight = false)
@@ -751,6 +795,7 @@ object SearchPerf {
         val rounds: Int = System.getProperty("searchPerf.rounds", "10").toInt()
         val reuse: Boolean = System.getProperty("searchPerf.reuse", "false").toBoolean()
         val rebuild: Boolean = System.getProperty("searchPerf.rebuild", "true").toBoolean()
+        val names: Boolean = System.getProperty("searchPerf.names", "true").toBoolean()
         val analyze: List<String> = System.getProperty("searchPerf.analyze", "")
             .split(",").map { it.trim() }.filter { it.isNotEmpty() }
         val report: String = System.getProperty("searchPerf.report", "build/reports/search-perf/search-perf.json")

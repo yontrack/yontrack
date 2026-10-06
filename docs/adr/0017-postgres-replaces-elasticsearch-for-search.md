@@ -63,3 +63,30 @@ tracked per indexer, and search answers with what exists so far in the meantime.
   back a deployment prerequisite, which is what this change removes.
 - **An asynchronous indexing queue** — lag, and a refresh setting to wait on in tests, where the
   in-transaction write with a savepoint gives neither.
+
+## Amendment, 2026-10-06: parent names are resolved at search time (#1889)
+
+A result is no longer rendered from `DATA` alone. Documents copied the names of the projects and
+branches they refer to when they were written, so a rename left them stale: a build showed the old
+name of its project until a rebuild, and the commits — written once, with `insertIfAbsent` — until
+the weekly full scan. Rewriting every document carrying a name on each rename would have put a
+bulk write in the transaction of the rename, which is what the savepoint design avoids.
+
+- **Names are resolved when searching.** `DATA` keeps the IDs of the projects and branches it
+  refers to; each indexer declares where they are (`SearchDocumentIndexer.nameReferences`). Once
+  the rows of a page — or of `perType` — are selected, the search service looks up their current
+  names in **one query per search**, never one per result. A project the user cannot see, or which
+  no longer exists, gets a `null` name: the lookup gives away no name. A title is still shown as
+  written — a build link is found and shown by `targetProject:build` — as it was before.
+- **What is matched on a name is re-indexed after the rename.** A document whose title or
+  identifiers carry the name of another entity — a branch (`project/branch`), a build link
+  (`targetProject:build`, never a branch name), a catalog entry (`project (repository)`) — declares it
+  (`SearchDocumentIndexer.renameScopes`). A rename, and only a rename, re-indexes those documents
+  through a scoped variant of the rebuild, asynchronously **after the commit**; a failure is logged
+  and counted in `ontrack_search_index_errors{type}`, and the reconciliation stays the safety net.
+  The update events say when there is a rename: they carry the previous name (`PREVIOUS_NAME`)
+  only then.
+
+The text above is left as it was decided, and the principle of the section *One table, not the
+source tables* holds: the lookup reads two primary-key indexes for the IDs of one page, it does
+not query the source tables to find anything.

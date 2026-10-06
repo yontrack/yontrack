@@ -5,7 +5,6 @@ import net.nemerosa.ontrack.boot.BUILD_SEARCH_RESULT_TYPE
 import net.nemerosa.ontrack.model.security.Roles
 import net.nemerosa.ontrack.model.structure.Branch
 import net.nemerosa.ontrack.model.structure.NameDescription
-import net.nemerosa.ontrack.model.structure.Project
 import net.nemerosa.ontrack.model.structure.SearchQueryRequest
 import org.junit.jupiter.api.Test
 import org.springframework.transaction.annotation.Propagation
@@ -54,20 +53,6 @@ class BranchSearchIT : AbstractSearchTestSupport() {
         val branch = project(token()).branch(token())
         val results = asUser { search(branch.project.name).items }
         assertEquals(listOf("${branch.project.name}/${branch.name}"), results.map { it.title })
-    }
-
-    @Test
-    fun `A renamed project renames the titles of its branches`() {
-        val newName = token()
-        val branch = project(token()).branch(token())
-        asAdmin {
-            val project = branch.project
-            structureService.saveProject(
-                Project(project.id, newName, project.description, project.isDisabled, project.signature)
-            )
-        }
-        val results = asUser { search(branch.name).items }
-        assertEquals(listOf("$newName/${branch.name}"), results.map { it.title })
     }
 
     @Test

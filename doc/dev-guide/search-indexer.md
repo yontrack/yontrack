@@ -4,7 +4,8 @@ Search runs on Postgres, in one table, `SEARCH_DOCUMENTS`, and one ranked query 
 *search result type*. An indexer does not search: it **describes the search documents** of its type,
 and the search service writes them and queries them. There is no SQL in an indexer, and nothing is
 read back from the entities when a search is performed — a result is rendered from what its
-document carries.
+document carries, with the current names of the projects and branches it refers to, looked up in
+one query per search (see *Names of projects and branches* below).
 
 The vocabulary is the one of `CONTEXT.md`: a *search document* is what an indexer writes about one
 findable thing, and a *search result type* is the kind of thing a result is.
@@ -41,6 +42,9 @@ interface SearchDocumentIndexer {
     val documentVersion: Int get() = 1
     val indexerSchedule: Schedule get() = Schedule.NONE
     fun indexAll(processor: (SearchDocument) -> Unit)
+    val nameReferences: List<SearchDocumentReference> get() = emptyList()  // names resolved when searching
+    val renameScopes: List<SearchDocumentReference> get() = emptyList()    // names matched on, re-indexed on a rename
+    fun indexRenamed(scope: SearchDocumentReference, entity: ProjectEntity, processor: (SearchDocument) -> Unit) {}
 }
 
 interface SearchDocumentService {
@@ -62,7 +66,10 @@ interface SearchDocumentService {
    `EventListener` for the structure events, a property type's `onPropertyChanged` /
    `onPropertyDeleted` hooks — through `SearchDocumentService.index` and `delete`.
 3. Give `indexAll` every document of the type, for the rebuilds.
-4. Add the `framework/search/{type}/Result.js` and `Icon.js` components in `ontrack-web-core`,
+4. Declare the projects and branches its `data` refers to in `nameReferences` — and, when their
+   names are in the title or identifiers, in `renameScopes` with `indexRenamed` (see *Names of
+   projects and branches* below).
+5. Add the `framework/search/{type}/Result.js` and `Icon.js` components in `ontrack-web-core`,
    reading the `data` of the result.
 
 `ProjectSearchProvider` (`ontrack-ui`) is the reference, and `BranchSearchProvider` and
@@ -127,10 +134,87 @@ class ProjectSearchProvider(
 - **`data`**: everything the `Result` component needs, so that no result costs a read of the
   database. It is returned as the `data` of the `SearchResult`. Render the structure entities with
   `searchDocumentData()` (`SearchDocumentData.kt`, `ontrack-model`), so that every `Result`
-  component receives a project, a branch or a build in the same shape. A document carrying
-  another entity's names is rewritten when that entity is updated.
+  component receives a project, a branch or a build in the same shape — and declare them in
+  `nameReferences`, so that their names are the current ones.
 - **`updatedAt`**: the recency of the thing (a build's creation, say). Equally relevant results are
   ranked newest first.
+
+### Names of projects and branches
+
+A document is written once and read many times, possibly long after the projects and branches it
+names have been renamed. Their names are therefore **not** taken from the document: `data` keeps
+their IDs, and the search service fills in their current names.
+
+**Declare the references in `nameReferences`.** A reference is the path, in `data`, of an object
+carrying the `id` and the `name` of a project or a branch — the shape `searchDocumentData()` gives
+them. An array met on the path is walked into: each element is a reference. For what
+`searchDocumentData()` renders, the helpers of `SearchDocumentData.kt` declare the entity and its
+parents:
+
+```kotlin
+// data = {sourceBuild: from.searchDocumentData(), targetBuild: to.searchDocumentData(), qualifier}
+override val nameReferences: List<SearchDocumentReference> =
+    buildSearchDocumentReferences("sourceBuild") + buildSearchDocumentReferences("targetBuild")
+```
+
+`projectSearchDocumentReferences(path)`, `branchSearchDocumentReferences(path)` (the branch and its
+project) and `buildSearchDocumentReferences(path)` (its branch and its project) cover the usual
+shapes, and `SearchDocumentReference.project(path)` / `.branch(path)` any other one — the branches
+of a finding, an array, are `SearchDocumentReference.branch("branches")`.
+
+Once the rows of a page — or of `perType` — are selected, the search service collects the IDs of
+all their references and looks their names up **in one query per search**
+(`SearchDocumentNames`, `ontrack-service`). Every `name` of a reference is replaced: by the current
+name of the project or branch, or by `null` when the user cannot see its project — the lookup must
+not leak the names of other projects — or when it does not exist any longer. A `Result` component
+reads the names from these objects, never from a copy elsewhere in `data` — the `item.projectName`
+of the commits and issues is such a copy, still written but read by nothing.
+
+The lookup gives away no name, but the `title` of a document is shown as it is: a build link is
+found, and shown, by `targetProject:build` whatever projects the user can see, since that is what
+it is searched by.
+
+**What is matched on a name is re-indexed on a rename.** Resolving the names fixes what is shown,
+not what is found: a document whose `title` or `identifiers` carry the name of a project or branch
+— a branch is found on `project/branch`, a build link on `targetProject:build`, a catalog entry on
+`project (repository)` — must be rewritten when it is renamed. Declare it:
+
+```kotlin
+// A link is matched on the name of the project of its target
+override val renameScopes: List<SearchDocumentReference> = listOf(
+    SearchDocumentReference.project("targetBuild.branch.project"),
+)
+
+override fun indexRenamed(scope: SearchDocumentReference, entity: ProjectEntity, processor: (SearchDocument) -> Unit) {
+    if (entity is Project) {
+        structureService.forEachBuildLinkTo(entity) { from, to, qualifier ->
+            processor(asSearchDocument(from, to, qualifier))
+        }
+    }
+}
+```
+
+Declare only the names the documents are matched on: a build link carries the name of the project
+of its target, not of its branch, so it re-indexes on a project rename only.
+
+`indexRenamed` is the scoped variant of `indexAll`: it provides the documents of the type referring
+to the renamed project or branch through the scope, as they are *now* — read them again rather
+than build them from `entity`, which may have been renamed again since. The search service writes them, then deletes
+the documents of the type referring to it through the scope which were not provided — the stale
+documents of that scope only. The path of a scope cannot cross an array.
+
+The re-indexation runs on a **rename only** — the update events carry the previous name
+(`EventFactory.PREVIOUS_NAME`) only then — asynchronously, **after the commit** of the rename
+(`SearchDocumentRenameListener`), one at a time in the order of the commits: a rename never carries
+a bulk rewrite. As administrator, outside
+any transaction. A failure is logged and counted in `ontrack_search_index_errors{type}`, and the
+reconciliation of the type repairs it. A test waits for it with
+`SearchDocumentRenameReindexation.awaitCompletion()`, from a test running outside a transaction
+(`@Transactional(propagation = Propagation.NOT_SUPPORTED)`), since nothing runs after the commit of
+a transaction which is rolled back.
+
+A type matched on no other entity's name — the commits, the issues — declares no rename scope:
+their names are resolved when searching, with no write at all.
 
 ### A type without a project
 
@@ -185,8 +269,8 @@ scan incrementally in between, as `ScmCommitSearchExtension` does:
   `SCMChangeLogEnabled.commitsSinceSupported`.
 
 `insertIfAbsent` never refreshes a document, nor its time of write: a document whose content may
-change goes through `index`. The commit documents carry the name of their project, which is
-therefore renamed in them only by the weekly full scan.
+change goes through `index`. The commit documents refer to their project, whose name is resolved
+when searching: a rename needs no rewrite of them.
 
 The issues named by the commits (`ScmIssueSearchExtension`) — their subject and trailer lines only,
 see `issueReferenceText` — are written by the same pass, with `index`. A full scan of a project
@@ -214,6 +298,8 @@ rebuild of their own type scans the commits again, for the issues only.
   indexer declares an `indexerSchedule` — which the types indexed outside any transaction do (SCM
   commits every week, the SCM catalog every day), and so do the types whose deletions cannot all
   be followed in the transaction (build links, every day).
+- **Renames.** The documents of the `renameScopes` of a renamed project or branch are re-indexed
+  after the commit, asynchronously; see *Names of projects and branches*.
 - **Batches.** `index(documents)` and `insertIfAbsent(documents)` write a batch in one savepoint:
   a failed batch writes none of its documents, and is counted as one error.
 
@@ -272,7 +358,8 @@ The titles are highlighted by the frontend, from the words of the query (`highli
 ## Tests
 
 `SearchServiceIT` (`ontrack-service`) shows how to test an indexer's documents with test indexers,
-and `ProjectSearchIT` (`ontrack-ui`) how to test one end to end. ITs run in a transaction which is
+and `ProjectSearchIT` (`ontrack-ui`) how to test one end to end. `SearchDocumentRenameIT` and
+`SearchRenameIT` show how to test the names after a rename. ITs run in a transaction which is
 rolled back: a test calling `rebuild` must run outside it
 (`@Transactional(propagation = Propagation.NOT_SUPPORTED)`), since the rebuild commits its own
 transactions and cannot see uncommitted data.

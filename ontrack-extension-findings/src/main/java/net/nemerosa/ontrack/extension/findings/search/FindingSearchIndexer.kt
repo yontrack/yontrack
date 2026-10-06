@@ -51,6 +51,9 @@ class FindingSearchIndexer(
 
     override val indexerName: String = "Security findings"
 
+    override val nameReferences: List<SearchDocumentReference> = projectSearchDocumentReferences(SearchResult.SEARCH_RESULT_PROJECT) +
+        SearchDocumentReference.branch(SEARCH_RESULT_BRANCHES)
+
     override val searchResultType = SearchResultType(
         feature = extensionFeature.featureDescription,
         id = FINDING_SEARCH_RESULT_TYPE,

@@ -23,7 +23,11 @@ interface EventFactory {
     // List of known events
     fun newProject(project: Project): Event
 
-    fun updateProject(project: Project): Event
+    /**
+     * @param project The project, as saved
+     * @param previousName Previous name of the project, when the update renames it
+     */
+    fun updateProject(project: Project, previousName: String? = null): Event
 
     fun disableProject(project: Project): Event
 
@@ -33,7 +37,11 @@ interface EventFactory {
 
     fun newBranch(branch: Branch): Event
 
-    fun updateBranch(branch: Branch): Event
+    /**
+     * @param branch The branch, as saved
+     * @param previousName Previous name of the branch, when the update renames it
+     */
+    fun updateBranch(branch: Branch, previousName: String? = null): Event
 
     fun disableBranch(branch: Branch): Event
 
@@ -138,6 +146,13 @@ interface EventFactory {
     val eventTypes: Collection<EventType>
 
     companion object {
+
+        /**
+         * Value of the update events of the projects and branches holding their previous name, when
+         * the update renames them
+         */
+        const val PREVIOUS_NAME = "PREVIOUS_NAME"
+
         val NEW_PROJECT: EventType =
             SimpleEventType(
                 id = "new_project",
@@ -155,6 +170,7 @@ interface EventFactory {
                 description = "When a project is updated.",
                 context = eventContext(
                     eventProject("Updated project"),
+                    eventValue(PREVIOUS_NAME, "Previous name of the project, only when the update renames it"),
                 ),
             )
 
@@ -207,6 +223,7 @@ interface EventFactory {
                 context = eventContext(
                     eventProject("Branch's project"),
                     eventBranch("Updated branch"),
+                    eventValue(PREVIOUS_NAME, "Previous name of the branch, only when the update renames it"),
                 ),
             )
         val ENABLE_BRANCH: EventType =

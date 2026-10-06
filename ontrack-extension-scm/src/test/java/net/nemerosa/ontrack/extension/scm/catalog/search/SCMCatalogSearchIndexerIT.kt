@@ -8,6 +8,7 @@ import net.nemerosa.ontrack.extension.scm.catalog.mock.MockSCMCatalogProvider
 import net.nemerosa.ontrack.it.AbstractDSLTestSupport
 import net.nemerosa.ontrack.it.AsAdminTest
 import net.nemerosa.ontrack.model.security.Roles
+import net.nemerosa.ontrack.model.structure.Project
 import net.nemerosa.ontrack.model.structure.SearchDocument
 import net.nemerosa.ontrack.model.structure.SearchDocumentService
 import net.nemerosa.ontrack.model.structure.SearchQueryRequest
@@ -117,6 +118,35 @@ class SCMCatalogSearchIndexerIT : AbstractDSLTestSupport() {
         val projectData = result.data?.get("project") as Map<String, *>
         assertEquals(project.id(), projectData["id"])
         assertEquals(project.name, projectData["name"])
+    }
+
+    @Test
+    fun `The entry of a renamed project is provided again with its new name`() {
+        val repository = token()
+        val entry = CatalogFixtures.entry(scm = "mocking", repository = "org/$repository", config = "config-1")
+        val project = project()
+        scmCatalogProvider.storeEntry(entry)
+        scmCatalogProvider.linkEntry(entry, project)
+        indexCatalog()
+        val newName = token()
+        asAdmin {
+            structureService.saveProject(
+                Project(project.id, newName, project.description, project.isDisabled, project.signature)
+            )
+        }
+        // The name is resolved when searching
+        val result = asGlobalRole(Roles.GLOBAL_READ_ONLY) { search(repository).items }.single()
+        @Suppress("UNCHECKED_CAST")
+        assertEquals(newName, (result.data?.get("project") as Map<String, *>)["name"])
+        // The title is rewritten by the re-indexation after the rename
+        val documents = mutableListOf<SearchDocument>()
+        asAdmin {
+            val renamed = structureService.getProject(project.id)
+            scmCatalogSearchIndexer.renameScopes.forEach { scope ->
+                scmCatalogSearchIndexer.indexRenamed(scope, renamed) { documents += it }
+            }
+        }
+        assertEquals(listOf("$newName (org/$repository)"), documents.map { it.title })
     }
 
     @Test
