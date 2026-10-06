@@ -336,6 +336,11 @@ the `reason` of the [cascade](#entry-types): the trail records that the evidence
 evidence a user deleted, such an evidence is no longer listed on the
 [audit trail page](#the-audit-trail-of-a-build) — its `evidence.deleted` entry is.
 
+Sending the validation data of a stamp again through the GitHub ingestion does not delete its
+validation run: with the status the run was created with, the data of the run is updated, and the
+run keeps its evidence and any status a user gave it since; with another status, a new run is
+created next to it, and the previous one keeps its evidence.
+
 The files are stored once per content (`blobs/<sha256>` in the bucket) and shared between the
 evidence which has the same content. A **daily sweep** removes the files which no evidence
 references any longer, and the uploads left behind, once they are more than 24 hours old — the

@@ -15,6 +15,7 @@ class IngestionValidateDateEventProcessor(
     private val structureService: StructureService,
     private val runInfoService: RunInfoService,
     private val validationRunStatusService: ValidationRunStatusService,
+    private val validationRunService: ValidationRunService,
     private val validationDataTypeService: ValidationDataTypeService,
 ) : AbstractIngestionBuildEventProcessor<GitHubIngestionValidateDataPayload>(
     ingestionModelAccessService
@@ -34,6 +35,10 @@ class IngestionValidateDateEventProcessor(
         val validationDataType = validationDataTypeService.getValidationDataType<Any, Any>(input.validationData.type)
             ?: throw ValidationRunDataTypeNotFoundException(input.validationData.type)
         val parsedData = validationDataType.fromForm(input.validationData.data)
+        // Validation status
+        val validationRunStatusId = input.validationStatus?.run {
+            validationRunStatusService.getValidationRunStatus(this)
+        }
         // Gets any existing validation run
         val run = structureService.getValidationRunsForBuildAndValidationStamp(
             buildId = build.id,
@@ -41,18 +46,24 @@ class IngestionValidateDateEventProcessor(
             offset = 0,
             count = 1,
         ).firstOrNull()
-        // Any existing run info
-        var existingRunInfo: RunInfoInput? = null
-        // If the run already exists, takes its run info and remove it
+        // An existing run is never deleted, so that it keeps its evidence, properties and history
         if (run != null) {
-            existingRunInfo = runInfoService.getRunInfo(run)?.toRunInfoInput()
-            structureService.deleteValidationRun(run)
+            // Validating the data as the creation of a run does, before changing anything
+            val validated = validationDataTypeService.validateData(
+                parsedData?.let { validationDataType.data(it) },
+                vs.dataType,
+                validationRunStatusId,
+            )
+            // Same status as the one the run was created with: the data is updated in place, if it
+            // changed. The statuses a user added since, like a triage, are kept.
+            if (validated.runStatusID == run.validationRunStatuses.last().statusID) {
+                if (!sameData(run.data, validated.runData)) {
+                    validationRunService.updateValidationRunData(run, validated.runData)
+                }
+                return IngestionEventProcessingResultDetails.processed()
+            }
         }
-        // Validation status
-        val validationRunStatusId = input.validationStatus?.run {
-            validationRunStatusService.getValidationRunStatus(this)
-        }
-        // Creates the validation run
+        // No run, or a different status: a new run, next to any existing one
         val validationRun = structureService.newValidationRun(
             build = build,
             validationRunRequest = ValidationRunRequest(
@@ -62,15 +73,30 @@ class IngestionValidateDateEventProcessor(
                 data = parsedData,
             )
         )
-        // Run info
+        // Run info of the previous run
+        val existingRunInfo = run?.let { runInfoService.getRunInfo(it) }
         if (existingRunInfo != null) {
             runInfoService.setRunInfo(
                 validationRun,
-                existingRunInfo
+                existingRunInfo.toRunInfoInput()
             )
         }
         // OK
         return IngestionEventProcessingResultDetails.processed()
+    }
+
+    /**
+     * Whether the data of an existing run is the same as the new one, compared as JSON.
+     */
+    private fun sameData(existing: ValidationRunData<*>?, new: ValidationRunData<Any>?): Boolean {
+        if (existing == null || new == null) {
+            return existing == null && new == null
+        }
+        if (existing.descriptor.id != new.descriptor.id) {
+            return false
+        }
+        val type = validationDataTypeService.getValidationDataType<Any, Any>(new.descriptor.id) ?: return false
+        return existing.data?.let { type.toJson(it) } == type.toJson(new.data)
     }
 
     override val payloadType: KClass<GitHubIngestionValidateDataPayload> =

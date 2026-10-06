@@ -28,6 +28,7 @@ dependencies {
     testImplementation("org.springframework.boot:spring-boot-starter-actuator")
     testImplementation(project(":ontrack-repository"))
     testImplementation(project(":ontrack-extension-stale"))
+    testImplementation(project(":ontrack-extension-audit-trail"))
     testImplementation("com.networknt:json-schema-validator")
     testImplementation(testFixtures(project(":ontrack-ui-graphql")))
     testImplementation(testFixtures(project(":ontrack-extension-api")))
