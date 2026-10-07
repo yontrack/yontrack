@@ -2,9 +2,13 @@
 
 Outcome of the grilling session of 2026-10-02 on what Yontrack contributes when AI coding agents
 become actors in software delivery. The outcome is this document and
-[`executive-summary.md`](executive-summary.md); no issue and no code yet. The research that fed it
+[`executive-summary.md`](executive-summary.md). The research that fed it
 is in [`research-web.md`](research-web.md) (the landscape, with sources) and
 [`research-v6.md`](research-v6.md) (what the `v6` branch already has).
+
+The issue breakdown, for milestone `6.0` under the `initiative: agentic-sdlc` label, is in
+[`issues.md`](issues.md), with the decisions of the second session (2026-10-07) that settled what
+the code on `main` had changed since.
 
 ## Where we start from
 
