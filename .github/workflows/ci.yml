@@ -384,7 +384,7 @@ jobs:
   # Compile, unit tests, backend Docker image.
   #
   # The frontend is not here: its Jest suite and its image depend on nothing this job produces, so
-  # they run beside it in `build-ui` rather than after it (#1870).
+  # they run beside it in `ui-unit` and `build-ui` rather than after it (#1870).
   #
   # Integration tests are deliberately excluded: `build` -> `check` -> `integrationTest` drags in
   # 547 IT classes across 34 modules, which is by far the largest cost on a 4 vCPU runner. They
@@ -465,7 +465,7 @@ jobs:
           fi
 
           # `-x :ontrack-web-core:test` takes the Jest suite, and the npm install in front of it,
-          # out of this job: `build-ui` runs it (#1870).
+          # out of this job: `ui-unit` runs it (#1870).
           # shellcheck disable=SC2086  # deliberate: empty or a single word
           ./gradlew build -x integrationTest -x buildDocs -x :ontrack-web-core:test $coverage_args \
             --stacktrace \
@@ -593,22 +593,25 @@ jobs:
           docker push "$GHCR_ONTRACK:$VERSION"
 
   # ---------------------------------------------------------------------------------------------
-  # Frontend: Jest suite and the UI Docker image, beside `build` rather than after it (#1870).
+  # Frontend: the Jest suite (`ui-unit`) and the UI Docker image (`build-ui`), beside `build`
+  # rather than after it (#1870), and beside each other.
   #
   # Neither depends on anything the Kotlin build produces, and in series they added the whole of
   # `next build` - two to four minutes - to the job every test job waits on. The jobs consuming the
-  # images need both `build` and this one.
+  # images need both `build` and `build-ui`.
+  #
+  # The Jest suite has a job of its own because nothing but the coverage report waits for it. In
+  # the same job as the image it put its three to four minutes - 173 suites under coverage on a
+  # 4 vCPU runner - in front of `next build`, and so in front of every Playwright and KDSL leg.
   # ---------------------------------------------------------------------------------------------
 
-  build-ui:
-    name: Build UI
+  ui-unit:
+    name: UI unit tests
     needs: [setup, yontrack]
     if: ${{ !cancelled() && needs.setup.result == 'success' && needs.yontrack.result != 'failure' }}
     runs-on: ubuntu-latest
     timeout-minutes: 60
     env:
-      VERSION: ${{ needs.setup.outputs.version }}
-      BASE_VERSION: ${{ needs.setup.outputs.base_version }}
       FULL_RUN: ${{ needs.setup.outputs.full_run }}
       COVERAGE: ${{ needs.setup.outputs.coverage }}
     steps:
@@ -620,13 +623,13 @@ jobs:
         id: job_start
         run: echo "started=$(date +%s)" >> "$GITHUB_OUTPUT"
 
-      # The full history for the same reason as everywhere else: the image is tagged with the
-      # project version, which the versioning plugin computes from the tags.
+      # The full history for the same reason as everywhere else: Gradle configures the versioning
+      # plugin, which computes the project version from the tags.
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
-      # The JDK is for Gradle itself, which drives the node plugin and the image build.
+      # The JDK is for Gradle itself, which drives the node plugin.
       - uses: actions/setup-java@v6
         with:
           distribution: zulu
@@ -656,8 +659,7 @@ jobs:
 
       # The suite runs once. On a coverage run that is `testCoverage` (#1820), the same suite with
       # `--coverage`, which writes the same JUnit report as `test` does - running `test` as well
-      # would only run it a second time. The image build below then skips `test`, which
-      # `dockerBuild` depends on, for the same reason.
+      # would only run it a second time.
       - name: UI unit tests
         id: test
         run: |
@@ -690,7 +692,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v7
         with:
-          name: build-ui-test-reports
+          name: ui-unit-test-reports
           path: ontrack-web-core/reports/**
           if-no-files-found: ignore
           retention-days: 7
@@ -705,11 +707,57 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
+  build-ui:
+    name: Build UI
+    needs: [setup, yontrack]
+    if: ${{ !cancelled() && needs.setup.result == 'success' && needs.yontrack.result != 'failure' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      VERSION: ${{ needs.setup.outputs.version }}
+      BASE_VERSION: ${{ needs.setup.outputs.base_version }}
+      FULL_RUN: ${{ needs.setup.outputs.full_run }}
+      # No build record artefact nor job summary from docker/build-push-action: the image is the
+      # only output this job hands on, through GHCR.
+      DOCKER_BUILD_RECORD_UPLOAD: "false"
+      DOCKER_BUILD_SUMMARY: "false"
+    steps:
+      # No history and no JDK: the image is built by BuildKit straight from the Dockerfile, which
+      # is what `:ontrack-web-core:dockerBuild` runs too, and its tag is the version `setup`
+      # computed. Going through Gradle cost a JDK, the Gradle state and a configuration of the
+      # whole build, for one `docker image build`.
+      - uses: actions/checkout@v7
+
+      - uses: docker/setup-buildx-action@v4
+
+      # The `deps` stage - `npm ci` into node_modules - is the one part of the image worth carrying
+      # from one run to the next: it changes with package-lock.json only, and costs 20-45 s. It is
+      # built on its own so that only its layers go to the GitHub cache; `mode=max` on the image
+      # itself would also store the builder stage, node_modules and .next together, over a
+      # gigabyte, in a repository cache that is capped at 10 GB. The runner stage is deliberately
+      # never cached: its `apk upgrade` has to take the Alpine fixes of the day (#1811).
+      #
+      # Written by the same runs as the Gradle state, and for the same reasons: see `setup`.
+      #
+      # Next's own build cache is not carried over either, measured: the Turbopack cache of a
+      # cold `next build` is 2.3 GB, 1.6 GB compressed.
+      - name: Build the dependencies stage
+        uses: docker/build-push-action@v7
+        with:
+          context: ontrack-web-core
+          target: deps
+          pull: true
+          cache-from: type=gha,scope=ontrack-ui-deps
+          cache-to: ${{ needs.setup.outputs.gradle_cache_read_only == 'false' && 'type=gha,scope=ontrack-ui-deps,mode=max' || '' }}
+
+      # The `deps` stage comes from the builder's own cache, which the step above has just filled.
       - name: Build the Docker image
-        run: |
-          ./gradlew :ontrack-web-core:dockerBuild -x :ontrack-web-core:test \
-            --stacktrace \
-            --console plain
+        uses: docker/build-push-action@v7
+        with:
+          context: ontrack-web-core
+          pull: true
+          load: true
+          tags: nemerosa/ontrack-ui:${{ env.BASE_VERSION }}
 
       - name: Log in to GHCR
         if: env.FULL_RUN == 'true'
@@ -1728,7 +1776,7 @@ jobs:
 
   coverage:
     name: Coverage report
-    needs: [setup, yontrack, build, build-ui, integration, kdsl, ui-tests]
+    needs: [setup, yontrack, build, ui-unit, integration, kdsl, ui-tests]
     if: >-
       ${{ !cancelled()
         && needs.setup.outputs.coverage == 'true'
