@@ -19,6 +19,9 @@ import BuildPromoteDialog, {useBuildPromoteDialog} from "@components/builds/Buil
  * `defaultPromotionLevel` instead: the dialog opens pre-filled with it, but nothing claims the
  * promotion is restricted to it. The dialog's level field has always been editable, so a label
  * naming a level was describing a restriction the dialog never had.
+ *
+ * `testId` overrides the test id of the trigger, for a host which offers a second affordance for the
+ * same build and level - like the "What's missing" popover beside the timeline's own thumbs-up.
  */
 export default function BuildPromoteAction({
                                                build,
@@ -27,6 +30,7 @@ export default function BuildPromoteAction({
                                                tooltip,
                                                onPromotion,
                                                presentation = 'icon',
+                                               testId,
                                            }) {
     const actualTooltip = tooltip
         ? tooltip
@@ -45,15 +49,17 @@ export default function BuildPromoteAction({
         })
     }
 
-    const testId = promotionLevel
-        ? `build-promote-${build.id}-${promotionLevel.id}`
-        : `build-promote-${build.id}`
+    const actualTestId = testId ?? (
+        promotionLevel
+            ? `build-promote-${build.id}-${promotionLevel.id}`
+            : `build-promote-${build.id}`
+    )
 
     return (
         <>
             {
                 presentation === 'button' ?
-                    <Button data-testid={testId} onClick={onPromote} title={actualTooltip}>
+                    <Button data-testid={actualTestId} onClick={onPromote} title={actualTooltip}>
                         <Space size={8}>
                             <FaRegThumbsUp/>
                             <Typography.Text>
@@ -62,7 +68,7 @@ export default function BuildPromoteAction({
                         </Space>
                     </Button> :
                     <Popover content={actualTooltip}>
-                        <FaRegThumbsUp data-testid={testId} className="ot-command" onClick={onPromote}/>
+                        <FaRegThumbsUp data-testid={actualTestId} className="ot-command" onClick={onPromote}/>
                     </Popover>
             }
             <BuildPromoteDialog buildPromoteDialog={dialog}/>

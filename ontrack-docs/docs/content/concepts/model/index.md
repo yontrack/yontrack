@@ -133,6 +133,21 @@ Each missing item has a _kind_, a _name_ and a _message_:
 | `MANUAL`         | promotion level, or rule   | a person must act: promote the build, or approve the deployment    |
 | `AGENT_POLICY`   | promotion level, or slot   | the agent reading the readiness is not admitted on the target      |
 
+### On the build page
+
+On the page of a build, each promotion level the build has not reached yet has a _What's missing_ button, beside it in
+the _Promotions_ section. So has each slot the build has not reached yet, beside its chip in the _Environments_
+section. The button opens a popover with the readiness of the build for that promotion level or slot, grouped by
+kind: a missing validation links to its validation stamp, a missing promotion shows the required promotion level, a
+failing promotion check gives its reason, and a promotion level without auto promotion says that it is promoted by a
+person.
+
+![What's missing for SILVER on the page of a build](build-readiness.png)
+
+When nothing is missing, the popover says _Ready_ and, for a promotion level, offers to promote the build if you are
+allowed to. The readiness is read when the popover opens, and read again while it is open whenever the build is
+validated or promoted from the page.
+
 ### Reading it
 
 The GraphQL API exposes it as the `readiness` field of `Build`, given exactly one of `promotionLevel` (a name on the

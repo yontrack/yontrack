@@ -1,4 +1,6 @@
-import React, {useState} from "react";
+import React, {useContext, useState} from "react";
+import {EventsContext} from "@components/common/EventsContext";
+import {BUILD_VALIDATED} from "@components/builds/buildEvents";
 import {gql} from "graphql-request";
 import {Button, Space, Typography} from "antd";
 import {FaEraser, FaGavel} from "react-icons/fa";
@@ -74,6 +76,17 @@ export default function BuildContentValidations({build}) {
 
     const reload = () => {
         setReloadCount(reloadCount + 1)
+    }
+
+    const eventsContext = useContext(EventsContext)
+
+    /*
+     * A run changing status changes the build's readiness as much as a new run does. A new run is
+     * announced by the validation dialog itself.
+     */
+    const onStatusChanged = () => {
+        eventsContext.fireEvent?.(BUILD_VALIDATED, {buildId: build.id})
+        reload()
     }
 
     const {data: filters} = useQuery(
@@ -211,7 +224,7 @@ export default function BuildContentValidations({build}) {
                     validationRuns={validationRuns}
                     pagination={pagination}
                     onChange={onTableChange}
-                    onStatusChanged={reload}
+                    onStatusChanged={onStatusChanged}
                     filtering={{
                         validationStamps,
                         statuses,

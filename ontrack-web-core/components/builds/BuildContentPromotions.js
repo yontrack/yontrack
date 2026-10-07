@@ -19,6 +19,7 @@ import {
     BuildAutoPromotionConditions,
     PromotionRunAutoPromotionConditions
 } from "@components/promotionLevels/AutoPromotionConditions";
+import WhatsMissing from "@components/readiness/WhatsMissing";
 
 const query = `
     query BuildPromotions($buildId: Int!) {
@@ -164,13 +165,35 @@ export default function BuildContentPromotions({build}) {
                 />,
             }))
         } else {
+            const canPromote = isAuthorized(buildData, 'build', 'promote')
             return [{
-                title: isAuthorized(buildData, 'build', 'promote') ?
-                    <BuildPromoteAction
+                title: <Space size={4}>
+                    {/* What the build still lacks to reach this level (#2023) */}
+                    <WhatsMissing
                         build={build}
                         promotionLevel={promotionLevel}
-                        onPromotion={reload}
-                    /> : undefined,
+                        label={promotionLevel.name}
+                        testId={`build-readiness-pl-${promotionLevel.id}`}
+                        readyAction={
+                            canPromote ?
+                                <BuildPromoteAction
+                                    build={build}
+                                    promotionLevel={promotionLevel}
+                                    presentation="button"
+                                    testId={`build-readiness-promote-${promotionLevel.id}`}
+                                    onPromotion={reload}
+                                /> : undefined
+                        }
+                    />
+                    {
+                        canPromote &&
+                        <BuildPromoteAction
+                            build={build}
+                            promotionLevel={promotionLevel}
+                            onPromotion={reload}
+                        />
+                    }
+                </Space>,
                 content: <Popover
                     title={
                         <Space>

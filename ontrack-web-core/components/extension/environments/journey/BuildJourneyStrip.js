@@ -1,5 +1,14 @@
 import {Space, Typography} from "antd"
 import JourneyChip from "@components/extension/environments/shared/JourneyChip"
+import WhatsMissing from "@components/readiness/WhatsMissing"
+import {slotDisplayNameWithoutProject} from "@components/extension/environments/shared/slotCellModel"
+
+/**
+ * The journey states in which the build has not reached the slot yet, and for which "What's
+ * missing" (#2023) has something to say: an approval still to give is as missing for a deployment
+ * in progress as it is for a build not deployed at all.
+ */
+const notReachedStates = ['ELIGIBLE', 'NOT_ELIGIBLE', 'IN_PROGRESS']
 
 /**
  * Where a build is, in one line: one chip per slot of its project, in environment order.
@@ -18,8 +27,10 @@ import JourneyChip from "@components/extension/environments/shared/JourneyChip"
  * @param {?Array} journey The entries of `Build.journey`, already in environment order
  * @param {?function} onSlotClick Called with a slot when a chip is clicked - the caller opens the
  *   slot drawer. Chips are inert when absent.
+ * @param {?Object} build The build, with its `id`. When given, every slot the build has not reached
+ *   yet gets a "What's missing" control beside its chip.
  */
-export default function BuildJourneyStrip({journey, onSlotClick}) {
+export default function BuildJourneyStrip({journey, onSlotClick, build}) {
 
     const entries = journey ?? []
 
@@ -35,12 +46,22 @@ export default function BuildJourneyStrip({journey, onSlotClick}) {
         <Space size={[4, 8]} wrap data-testid="build-journey-strip">
             {
                 entries.map(entry => (
-                    <JourneyChip
-                        key={entry.slot.id}
-                        entry={entry}
-                        onClick={onSlotClick}
-                        showIcon
-                    />
+                    <Space key={entry.slot.id} size={0}>
+                        <JourneyChip
+                            entry={entry}
+                            onClick={onSlotClick}
+                            showIcon
+                        />
+                        {
+                            build && notReachedStates.includes(entry.state) &&
+                            <WhatsMissing
+                                build={build}
+                                slot={entry.slot}
+                                label={slotDisplayNameWithoutProject(entry.slot)}
+                                testId={`build-readiness-slot-${entry.slot.id}`}
+                            />
+                        }
+                    </Space>
                 ))
             }
         </Space>

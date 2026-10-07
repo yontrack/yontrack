@@ -4,6 +4,9 @@ import SelectPromotionLevel from "@components/promotionLevels/SelectPromotionLev
 import dayjs from "dayjs";
 import {gql} from "graphql-request";
 import {useQuery} from "@components/services/GraphQL";
+import {useContext} from "react";
+import {EventsContext} from "@components/common/EventsContext";
+import {BUILD_PROMOTED} from "@components/builds/buildEvents";
 import {
     gqlPromotionLevelFieldSet,
     orderedPromotionLevelFields,
@@ -16,8 +19,14 @@ import {
 const {TextArea} = Input;
 
 export function useBuildPromoteDialog(config) {
+    const eventsContext = useContext(EventsContext)
     return useFormDialog({
         ...config,
+        onSuccess: (result, context) => {
+            // `?.`: outside any `EventsContextProvider`, nothing listens
+            eventsContext.fireEvent?.(BUILD_PROMOTED, {buildId: context?.build?.id})
+            config?.onSuccess?.(result, context)
+        },
         init: (form, context) => {
             form.setFieldsValue({
                 promotionLevel: context.promotionLevel?.name,

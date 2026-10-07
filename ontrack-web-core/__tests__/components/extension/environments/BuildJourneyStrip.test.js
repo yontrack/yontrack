@@ -73,6 +73,28 @@ describe('the build journey strip', () => {
         expect(onSlotClick).toHaveBeenCalledWith(theEntry.slot)
     })
 
+    it('offers "What\'s missing" on every slot the build has not reached, when given the build', () => {
+        render(<BuildJourneyStrip build={{id: '42'}} journey={[
+            entry('dev', 5, 'DEPLOYED'),
+            entry('staging', 10, 'SUPERSEDED'),
+            entry('qa', 15, 'IN_PROGRESS'),
+            entry('uat', 18, 'ELIGIBLE'),
+            entry('production', 20, 'NOT_ELIGIBLE'),
+        ]}/>)
+        const controls = screen.getAllByTestId(/^build-readiness-slot-/)
+        expect(controls.map(control => control.getAttribute('data-testid'))).toEqual([
+            'build-readiness-slot-slot-qa',
+            'build-readiness-slot-slot-uat',
+            'build-readiness-slot-slot-production',
+        ])
+        expect(screen.getByRole('button', {name: "What's missing for production"})).toBeInTheDocument()
+    })
+
+    it('offers no "What\'s missing" without the build', () => {
+        render(<BuildJourneyStrip journey={[entry('production', 20, 'NOT_ELIGIBLE')]}/>)
+        expect(screen.queryByTestId(/^build-readiness-slot-/)).not.toBeInTheDocument()
+    })
+
     it('says so when the project has no slot at all', () => {
         render(<BuildJourneyStrip journey={[]}/>)
         expect(screen.getByTestId('build-journey-empty'))

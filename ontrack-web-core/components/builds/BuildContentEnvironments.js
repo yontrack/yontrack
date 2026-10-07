@@ -83,7 +83,7 @@ export default function BuildContentEnvironments({build}) {
                     </Space>
                 }
             >
-                <BuildJourneyStrip journey={journey} onSlotClick={slotDrawer.openSlot}/>
+                <BuildJourneyStrip journey={journey} onSlotClick={slotDrawer.openSlot} build={build}/>
             </GridCell>
             <SlotDrawer
                 slotId={slotDrawer.slotId}

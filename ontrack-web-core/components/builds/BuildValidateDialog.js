@@ -4,7 +4,9 @@ import {gql} from "graphql-request";
 import SelectValidationStamp from "@components/validationStamps/SelectValidationStamp";
 import SelectValidationRunStatus from "@components/validationRuns/SelectValidationRunStatus";
 import Well from "@components/common/Well";
-import {useState} from "react";
+import {useContext, useState} from "react";
+import {EventsContext} from "@components/common/EventsContext";
+import {BUILD_VALIDATED} from "@components/builds/buildEvents";
 import ValidationRunDataForm from "@components/framework/validation-run-data-form/ValidationRunDataForm";
 
 const {TextArea} = Input;
@@ -13,8 +15,15 @@ export function useBuildValidateDialog(config) {
 
     const [dataType, setDataType] = useState()
 
+    const eventsContext = useContext(EventsContext)
+
     return useFormDialog({
         ...config,
+        onSuccess: (result, context) => {
+            // `?.`: outside any `EventsContextProvider`, nothing listens
+            eventsContext.fireEvent?.(BUILD_VALIDATED, {buildId: context?.build?.id})
+            config?.onSuccess?.(result, context)
+        },
         dataType, setDataType,
         init: (form, context) => {
             setDataType(context.validationStamp?.dataType)
