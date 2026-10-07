@@ -115,7 +115,7 @@ env:
   # whose data was silently lost (#1821). Keep them in step with the matrices below; getting one
   # wrong fails the coverage job loudly, which is the safe direction.
   KDSL_SHARDS: "2"
-  UI_MAIN_SHARDS: "3"
+  UI_MAIN_SHARDS: "4"
   # Run-scoped tag used to hand the Docker images from `build` (backend) and `build-ui` to the
   # jobs that consume them. Keyed on the run, deliberately not on the attempt: re-running just the
   # failed jobs must still find the images the original attempts pushed. A re-run of either job
@@ -1438,25 +1438,31 @@ jobs:
       #
       # Two shards took `main` from ~10 minutes to 6.1 and 6.6 (#1679), but the suite kept growing
       # and they reached 8.7 and 9.4 - the slowest legs of the parallel band, above KDSL at 8.4 and
-      # the slowest `integration` leg at 7.0. Hence three. See
-      # docs/adr/0005-test-suites-are-sharded-by-rule-not-by-list.md.
+      # the slowest `integration` leg at 7.0. Hence three. Three reached 7.8 to 9.6 with the 6.0
+      # features, the longest legs once the Jest suite no longer delayed the UI image. Hence four.
+      # See docs/adr/0005-test-suites-are-sharded-by-rule-not-by-list.md.
       matrix:
         include:
           - variant: main
-            label: main 1/3
+            label: main 1/4
             task: uiTest
             shard: 1
-            shards: 3
+            shards: 4
           - variant: main
-            label: main 2/3
+            label: main 2/4
             task: uiTest
             shard: 2
-            shards: 3
+            shards: 4
           - variant: main
-            label: main 3/3
+            label: main 3/4
             task: uiTest
             shard: 3
-            shards: 3
+            shards: 4
+          - variant: main
+            label: main 4/4
+            task: uiTest
+            shard: 4
+            shards: 4
           - variant: ldap
             label: ldap
             task: uiLdapTest
@@ -1479,7 +1485,7 @@ jobs:
       # what stops one job-level variable from collapsing three legs onto one session ID (#1819).
       #
       # COVERAGE_SESSION_SUFFIX applies to every variant, so it is set on the sharded legs only:
-      # `ui-main-1`…`ui-main-3`, but plain `ui-ldap` and `ui-oidc`.
+      # `ui-main-1`…`ui-main-4`, but plain `ui-ldap` and `ui-oidc`.
       COVERAGE: ${{ needs.setup.outputs.coverage }}
       COVERAGE_SESSION: ui-main
       COVERAGE_SESSION_SUFFIX: ${{ matrix.shards > 1 && matrix.shard || '' }}

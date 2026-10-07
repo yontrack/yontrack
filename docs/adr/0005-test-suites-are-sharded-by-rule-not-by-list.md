@@ -1,6 +1,6 @@
 # Test suites are sharded by a rule over the discovered set, never by a list
 
-`UI tests (main)` runs in three shards and `KDSL acceptance tests` in two, on
+`UI tests (main)` runs in four shards and `KDSL acceptance tests` in two, on
 separate runners. Which test goes to which shard is decided by a rule applied to the set
 of tests that were actually discovered — never by an enumeration of test names
 held in the workflow or the build.
@@ -112,3 +112,7 @@ case above, a third UI shard therefore shortens the critical path directly, and
 the UI legs have little to compile, so most of each shard's time is the suite
 itself. `main` now runs in three shards; nothing else changed, since
 `--shard=i/n` and the report naming already took any count.
+
+The same reading made it four. The three shards reached 7.8 to 9.6 minutes once
+the 6.0 features landed, and with the Jest suite moved off the job they wait for,
+they were what was left of the critical path besides the build itself.
