@@ -28,6 +28,8 @@ class GitLabSCMCommit(
 
     override val authorEmail: String? = commit.author_email
 
+    override val committer: String? = commit.committer_name
+
     override val timestamp: LocalDateTime = commit.committedTime ?: Time.now()
 
     /**

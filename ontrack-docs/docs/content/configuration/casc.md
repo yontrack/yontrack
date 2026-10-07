@@ -125,6 +125,23 @@ This downloads a `ontrack-casc-schema.json` file.
 
 You can use it to validate your CasC YAML files. See the [appendixes](../appendix/json-schemas.md) to learn more about using JSON schemas for edition and validation.
 
+## Agent markers
+
+The [agent markers](../integrations/changelogs/changelogs.md#agent-markers) - how a changelog
+recognises the assistants of a commit - are under `ontrack.config.settings.agent-markers`:
+
+```yaml
+ontrack:
+  config:
+    settings:
+      agent-markers:
+        builtInConventions: true
+        patterns:
+          - name: Acme Bot
+            type: LOGIN
+            value: acme-bot[bot]
+```
+
 ## Delivery scorecard and estates
 
 The settings of the [delivery scorecard](../scorecard/scorecard.md#settings) are under

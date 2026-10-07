@@ -22,4 +22,10 @@ class GitHubSCMCommit(commit: GitHubCommit) : SCMCommit {
     override val message: String = commit.commit.message
 
     override val link: String = commit.url
+
+    override val committer: String = commit.commit.committer.name
+
+    override val authorLogin: String? = commit.author?.login
+
+    override val committerLogin: String? = commit.committer?.login
 }

@@ -326,6 +326,122 @@ For GitHub and GitLab issues, a `#123` is not an issue of the repository when it
 reference to another repository (`owner/repo#123`), of a URL, or of an HTML entity (`&#39;`), or when
 it is directly followed by a letter or an underscore (`#123abc`).
 
+## Agent markers
+
+Each commit of a changelog knows the **assistants** - the kinds of coding agents, like Claude Code,
+Codex, Copilot or Devin - which helped write it. Yontrack reads them from the markers git carries:
+the trailers of the commit message, its author and its committer.
+
+Nothing is stored: the assistants are read from git every time the changelog is computed, so git
+stays the truth, and changing the settings below changes what the existing changelogs show.
+
+The assistants of a commit are available in the [API](#using-the-api), as the `assistants` field of
+a commit:
+
+```graphql
+{
+  scmChangeLog(from: 100, to: 110) {
+    commits {
+      commit {
+        id
+        assistants {
+          name         # Claude Code, Codex, Copilot, Devin...
+          markers      # CO_AUTHOR, ASSISTED_BY, SESSION_TRAILER, TRAILER, AUTHOR, COMMITTER
+          sessionLink  # e.g. the Claude-Session URL, when a trailer carries one
+        }
+      }
+    }
+  }
+}
+```
+
+An assistant appears **once** per commit, with all the markers which named it, and the first session
+link found.
+
+### What is recognised
+
+Only the **trailer block** of a message is read: its last paragraph, the subject excepted. A line
+looking like a trailer anywhere else in the body is prose. Trailer keys ignore the case.
+
+These conventions are built in:
+
+| Marker                                                                         | Assistant                                 |
+|--------------------------------------------------------------------------------|-------------------------------------------|
+| `Co-Authored-By: … <noreply@anthropic.com>`                                    | Claude Code                               |
+| `Co-authored-by: … <codex@openai.com>`                                         | Codex                                     |
+| `Co-authored-by: … <copilot@github.com>`, or `copilot@github.com` as author email | Copilot                                 |
+| `Assisted-by: <name>`                                                          | the name, up to its first `:`             |
+| `Claude-Session: <url>`                                                        | Claude Code, the URL being the session link |
+| `copilot-swe-agent[bot]` as author or committer login                          | Copilot                                   |
+| `devin-ai-integration[bot]` as author or committer login                       | Devin                                     |
+
+`Assisted-by:` is the convention of the Linux kernel and of Fedora, where its value reads
+`AGENT_NAME:MODEL_VERSION`: `Assisted-by: Claude:claude-opus-4` names the assistant `Claude`.
+
+A login is the account of the author or committer in the SCM, when the SCM gives one (GitHub does),
+or the name git records for them: bots commit under their login.
+
+For example, this commit has two assistants, Claude Code (`CO_AUTHOR` and `SESSION_TRAILER`, with
+its session link) and Codex (`ASSISTED_BY`):
+
+```
+#12 Search owners by phone number
+
+Co-Authored-By: Claude Opus 4 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_0123
+Co-Authored-By: Jane Doe <jane@example.com>
+Assisted-by: Codex:gpt-5
+```
+
+### Human co-authors are not assistants
+
+A `Co-Authored-By` trailer counts **only** when its email is an agent's. Pairing and squashed
+contributions make human co-authors common, and counting them would flag as assisted every commit
+two people wrote together: Jane Doe above is a co-author, not an assistant.
+
+An email which only looks like an agent's - `noreply@anthropic.com.example.com`,
+`fake-noreply@anthropic.com` - is not one either: the emails are matched as a whole.
+
+### Settings
+
+The _Agent markers_ settings, in the user menu at _System > Settings_, tune the recognition:
+
+* **Built-in conventions** - on by default, switches the whole table above on or off;
+* **Patterns** - additional rules, which add to the built-in conventions. They are how an enterprise
+  recognises its internal agents. Each pattern has:
+    * a **name** - the assistant to report;
+    * a **type** - what the value is matched against:
+        * `CO_AUTHOR_EMAIL` - a regular expression matching the **whole** email of a
+          `Co-Authored-By` trailer;
+        * `TRAILER` - a trailer key, whatever the value of the trailer;
+        * `AUTHOR_EMAIL` - a regular expression matching the **whole** email of the author;
+        * `LOGIN` - the exact login, or name, of the author or of the committer;
+    * a **value** - the regular expression, the trailer key or the login. Regular expressions,
+      trailer keys and logins ignore the case.
+
+An invalid regular expression is rejected when the settings are saved.
+
+The settings can be set as [code](../../configuration/casc.md), under
+`ontrack.config.settings.agent-markers`:
+
+```yaml
+ontrack:
+  config:
+    settings:
+      agent-markers:
+        builtInConventions: true
+        patterns:
+          - name: Acme Bot
+            type: CO_AUTHOR_EMAIL
+            value: .*-bot@acme\.com
+          - name: Acme Agent
+            type: TRAILER
+            value: Acme-Agent-Run
+          - name: Acme Bot
+            type: LOGIN
+            value: acme-bot[bot]
+```
+
 ## Configuration of changelogs
 
 Besides the [recursivity options](#recursive-changelogs), the two types of changelogs have their own configuration.

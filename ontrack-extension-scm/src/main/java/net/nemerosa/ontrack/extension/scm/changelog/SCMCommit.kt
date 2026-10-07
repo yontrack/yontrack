@@ -51,4 +51,25 @@ interface SCMCommit {
     @APIDescription("Link to the commit")
     val link: String
 
+    /**
+     * Name of the committer, when the SCM gives one and it may differ from the author.
+     *
+     * Not published in GraphQL: it is read to recognise the assistants of the commit.
+     */
+    val committer: String? get() = null
+
+    /**
+     * Login of the author in the SCM (e.g. a GitHub login), when the SCM gives one.
+     *
+     * Not published in GraphQL: it is read to recognise the assistants of the commit.
+     */
+    val authorLogin: String? get() = null
+
+    /**
+     * Login of the committer in the SCM (e.g. a GitHub login), when the SCM gives one.
+     *
+     * Not published in GraphQL: it is read to recognise the assistants of the commit.
+     */
+    val committerLogin: String? get() = null
+
 }

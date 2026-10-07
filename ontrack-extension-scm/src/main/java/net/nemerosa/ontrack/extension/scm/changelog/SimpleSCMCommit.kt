@@ -9,5 +9,8 @@ data class SimpleSCMCommit(
     override val authorEmail: String?,
     override val timestamp: LocalDateTime,
     override val message: String,
-    override val link: String
+    override val link: String,
+    override val committer: String? = null,
+    override val authorLogin: String? = null,
+    override val committerLogin: String? = null,
 ) : SCMCommit

@@ -20,6 +20,8 @@ class BitbucketServerSCMCommit(
     override val author: String = actualAuthor.name
     override val authorEmail: String = actualAuthor.emailAddress
 
+    override val committer: String = commit.committer.name
+
     private val actualTimestamp = commit.authorTimestamp ?: commit.committerTimestamp
 
     /**

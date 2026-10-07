@@ -97,6 +97,7 @@ data class GitLabCommit(
     val web_url: String? = null,
     val author_name: String? = null,
     val author_email: String? = null,
+    val committer_name: String? = null,
 ) {
     /**
      * [committed_date] as a UTC date and time, or `null` when GitLab sent none or an unreadable one.
