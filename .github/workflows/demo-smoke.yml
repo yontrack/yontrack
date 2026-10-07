@@ -209,6 +209,9 @@ jobs:
           java-version: "25"
 
       - uses: gradle/actions/setup-gradle@v6
+        with:
+          # Reads only: the `build` job of ci.yml is the one writer of the Gradle state.
+          cache-read-only: true
 
       - name: Build the seed program
         run: ./gradlew :ontrack-demo-seed:installDist --console plain

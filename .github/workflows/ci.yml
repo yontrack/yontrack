@@ -250,6 +250,13 @@ jobs:
           #
           # Keyed on the ref and not on `full_run`, for the same reason as coverage above. The
           # workflow_dispatch input forces it on, which is how a branch is measured warm.
+          #
+          # Within such a run, `build` is the one job that writes. Every job writing its own entry
+          # put the repository over its 10 GB cache quota - 23 dependency entries of ~250 MB each,
+          # one per job and shard - and the evictions that followed are what a cache is for not
+          # doing. A job that does not write restores the most recent entry of any job, which is
+          # then `build`'s: the dependencies, the transforms and the build cache of the commit
+          # before, which is what every other job needs too.
           gradle_cache_read_only=true
           if [ "$EVENT_NAME" != "pull_request" ]; then
             case "$REF" in
@@ -274,9 +281,10 @@ jobs:
 
           cat "$GITHUB_OUTPUT"
 
+      # Reads only: `build` is the one job that writes the Gradle state, see above.
       - uses: gradle/actions/setup-gradle@v6
         with:
-          cache-read-only: ${{ steps.params.outputs.gradle_cache_read_only }}
+          cache-read-only: true
 
       - name: Compute the version
         id: version
@@ -637,7 +645,7 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v6
         with:
-          cache-read-only: ${{ needs.setup.outputs.gradle_cache_read_only }}
+          cache-read-only: true  # `build` is the one job that writes, see `setup`
 
       # No actions/setup-node: the Gradle node plugin downloads its own Node (24.21.0 for
       # ontrack-web-core), and a runner-level Node would fight it.
@@ -939,7 +947,7 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v6
         with:
-          cache-read-only: ${{ needs.setup.outputs.gradle_cache_read_only }}
+          cache-read-only: true  # `build` is the one job that writes, see `setup`
 
       # ontrack-docs' documentation ITs shell out to `dot`.
       - name: Install graphviz
@@ -1208,7 +1216,7 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v6
         with:
-          cache-read-only: ${{ needs.setup.outputs.gradle_cache_read_only }}
+          cache-read-only: true  # `build` is the one job that writes, see `setup`
 
       - name: Log in to GHCR
         uses: docker/login-action@v4
@@ -1519,7 +1527,7 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v6
         with:
-          cache-read-only: ${{ needs.setup.outputs.gradle_cache_read_only }}
+          cache-read-only: true  # `build` is the one job that writes, see `setup`
 
       - name: Cache the npm downloads
         uses: actions/cache@v6
@@ -2249,7 +2257,7 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v6
         with:
-          cache-read-only: ${{ needs.setup.outputs.gradle_cache_read_only }}
+          cache-read-only: true  # `build` is the one job that writes, see `setup`
 
       # python3 and venv are already on ubuntu-latest, which createVenv/installDeps need.
       - name: Install graphviz

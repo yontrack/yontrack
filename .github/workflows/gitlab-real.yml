@@ -154,6 +154,9 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v6
         if: ${{ steps.fixture.outputs.provisioned == 'true' }}
+        with:
+          # Reads only: the `build` job of ci.yml is the one writer of the Gradle state.
+          cache-read-only: true
 
       # Only the tests which start pipelines: everything else in the module ran on the build's own
       # CI. integrationTest brings its own middleware up and down.

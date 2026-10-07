@@ -152,6 +152,9 @@ jobs:
           java-version: "25"
 
       - uses: gradle/actions/setup-gradle@v6
+        with:
+          # Reads only: the `build` job of ci.yml is the one writer of the Gradle state.
+          cache-read-only: true
 
       # Installed directly rather than through ontrack-github-actions-cli-config, which registers a
       # build as a side effect. This workflow reports on a build that already exists.
