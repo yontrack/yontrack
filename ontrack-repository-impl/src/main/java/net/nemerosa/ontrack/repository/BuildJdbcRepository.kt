@@ -27,7 +27,7 @@ class BuildJdbcRepository(
                 name = rs.getString("name"),
                 description = rs.getString("description"),
                 branch = branch ?: branchJdbcRepositoryAccessor.getBranch(id(rs, "branchid")),
-                signature = readSignature(rs)
+                signature = readSignatureWithActor(rs)
             )
         } ?: error("Build not found: $id")
 

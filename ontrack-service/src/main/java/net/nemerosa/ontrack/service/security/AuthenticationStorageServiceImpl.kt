@@ -45,7 +45,7 @@ class AuthenticationStorageServiceImpl(
                 authenticatedUser = user,
                 authorities = AuthorityUtils.createAuthorityList(SecurityRole.USER.name),
                 actor = actor?.takeIf { it.account == account.email }
-                    ?: Actor.degraded(account.email),
+                    ?: Actor.degraded(account.email, agent = ActorAgent.of(account)),
             )
         }
         val oldSecurityContext = SecurityContextHolder.getContext()

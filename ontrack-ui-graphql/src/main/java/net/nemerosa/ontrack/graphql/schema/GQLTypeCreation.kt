@@ -3,8 +3,10 @@ package net.nemerosa.ontrack.graphql.schema
 import graphql.Scalars
 import graphql.schema.DataFetcher
 import graphql.schema.GraphQLObjectType
+import graphql.schema.GraphQLTypeReference
 import net.nemerosa.ontrack.common.Time
 import net.nemerosa.ontrack.model.structure.Signature
+import net.nemerosa.ontrack.model.structure.SignatureActor
 import org.springframework.stereotype.Component
 
 @Component
@@ -24,6 +26,11 @@ class GQLTypeCreation : GQLType {
                                 .description("ISO timestamp")
                                 .type(Scalars.GraphQLString)
                     }
+                    .field {
+                        it.name("actor")
+                                .description("The agent behind the signature, null for a person. The user name of an agent's signature is the agent's identifier.")
+                                .type(GraphQLTypeReference(GQLTypeSignatureActor.SIGNATURE_ACTOR))
+                    }
                     .build()
 
     companion object {
@@ -37,6 +44,7 @@ class GQLTypeCreation : GQLType {
                 val user = signature.user
                 result = result.withUser(user.name)
                 result = result.withTime(Time.store(signature.time))
+                result = result.withActor(signature.actor)
             }
             return result
         }
@@ -55,9 +63,11 @@ class GQLTypeCreation : GQLType {
 
     data class Creation(
             val user: String? = null,
-            val time: String? = null
+            val time: String? = null,
+            val actor: SignatureActor? = null,
     ) {
-        fun withUser(v: String) = Creation(v, time)
-        fun withTime(v: String) = Creation(user, v)
+        fun withUser(v: String) = copy(user = v)
+        fun withTime(v: String) = copy(time = v)
+        fun withActor(v: SignatureActor?) = copy(actor = v)
     }
 }

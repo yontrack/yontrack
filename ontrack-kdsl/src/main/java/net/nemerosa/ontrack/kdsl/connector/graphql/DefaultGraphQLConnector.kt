@@ -25,7 +25,7 @@ class DefaultGraphQLConnector(
             .addCustomScalarAdapter(UUID.type, uuidCustomTypeAdapter)
             .addCustomScalarAdapter(JSON.type, jsonCustomTypeAdapter)
             .addHttpInterceptor(
-                authorizationInterceptor(token = connector.token)
+                headersInterceptor(connector.headers)
             )
             .apply {
                 clientConfiguration()
@@ -68,16 +68,13 @@ class DefaultGraphQLConnector(
         }
     }
 
-    private fun authorizationInterceptor(token: String?) = HeadersInterceptor(
-        headers = if (token.isNullOrBlank()) {
-            emptyList()
-        } else {
-            listOf(
-                HttpHeader(
-                    name = "X-Ontrack-Token",
-                    value = token
-                )
-            )
-        }
+    /**
+     * Sends the headers of the connector - its token, and the agent session headers if any - with
+     * every GraphQL call.
+     */
+    private fun headersInterceptor(headers: Map<String, String>) = HeadersInterceptor(
+        headers = headers
+            .filterValues { it.isNotBlank() }
+            .map { (name, value) -> HttpHeader(name = name, value = value) }
     )
 }

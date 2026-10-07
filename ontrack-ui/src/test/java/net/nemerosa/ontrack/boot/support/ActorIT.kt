@@ -12,6 +12,9 @@ import net.nemerosa.ontrack.it.AbstractDSLTestSupport
 import net.nemerosa.ontrack.json.parse
 import net.nemerosa.ontrack.json.parseAsJson
 import net.nemerosa.ontrack.model.security.Actor
+import net.nemerosa.ontrack.model.security.ActorAgent
+import net.nemerosa.ontrack.model.security.ActorAgentSession
+import net.nemerosa.ontrack.model.security.AgentSessionHeaders
 import net.nemerosa.ontrack.model.security.ActorJwt
 import net.nemerosa.ontrack.model.security.ActorVia
 import net.nemerosa.ontrack.model.security.AgentRegistrationInput
@@ -148,7 +151,76 @@ class ActorIT : AbstractDSLTestSupport() {
         val response = call { header(TokensConstants.HTTP_ONTRACK_TOKEN, token.value) }
         assertEquals(200, response.statusCode())
         assertEquals(
-            Actor(account = "$slug[agent]", via = ActorVia.TOKEN, tokenName = "session"),
+            Actor(
+                account = "$slug[agent]",
+                via = ActorVia.TOKEN,
+                tokenName = "session",
+                agent = ActorAgent(name = "$slug[agent]", displayName = "Agent", tool = "Codex", owner = owner.email),
+            ),
+            response.body().parseAsJson().parse<Actor>(),
+        )
+    }
+
+    @Test
+    fun `An agent token with session headers authenticates the agent and its session`() {
+        val owner = asAdmin { doCreateAccount() }
+        val slug = uid("a-").lowercase()
+        val token = asFixedAccount(owner) {
+            val agent = agentService.registerAgent(
+                AgentRegistrationInput(slug = slug, displayName = "Agent", tool = "Codex")
+            )
+            agentService.generateAgentToken(agent.id, "ci")
+        }
+        val response = call {
+            header(TokensConstants.HTTP_ONTRACK_TOKEN, token.value)
+            header(AgentSessionHeaders.HTTP_AGENT_SESSION, "session-1")
+            header(AgentSessionHeaders.HTTP_AGENT_SESSION_LINK, "https://chatgpt.com/codex/tasks/session-1")
+        }
+        assertEquals(200, response.statusCode())
+        val actor = response.body().parseAsJson().parse<Actor>()
+        assertEquals(
+            ActorAgentSession(id = "session-1", link = "https://chatgpt.com/codex/tasks/session-1"),
+            actor.agentSession,
+        )
+        assertEquals("$slug[agent]", actor.agent?.name)
+    }
+
+    @Test
+    fun `An agent session link which is not https is dropped, and the call still accepted`() {
+        val owner = asAdmin { doCreateAccount() }
+        val slug = uid("a-").lowercase()
+        val token = asFixedAccount(owner) {
+            val agent = agentService.registerAgent(
+                AgentRegistrationInput(slug = slug, displayName = "Agent", tool = "Codex")
+            )
+            agentService.generateAgentToken(agent.id, "ci")
+        }
+        val response = call {
+            header(TokensConstants.HTTP_ONTRACK_TOKEN, token.value)
+            header(AgentSessionHeaders.HTTP_AGENT_SESSION, "session-1")
+            header(AgentSessionHeaders.HTTP_AGENT_SESSION_LINK, "http://chatgpt.com/codex/tasks/session-1")
+        }
+        assertEquals(200, response.statusCode())
+        assertEquals(
+            ActorAgentSession(id = "session-1"),
+            response.body().parseAsJson().parse<Actor>().agentSession,
+        )
+    }
+
+    @Test
+    fun `The session headers of a person's token are ignored`() {
+        val (email, token) = asUser {
+            val token = tokensService.generateNewToken(TokenOptions(name = "pipeline"))
+            securityService.currentUser?.account?.email to token.value
+        }
+        val response = call {
+            header(TokensConstants.HTTP_ONTRACK_TOKEN, token)
+            header(AgentSessionHeaders.HTTP_AGENT_SESSION, "session-1")
+            header(AgentSessionHeaders.HTTP_AGENT_SESSION_LINK, "https://claude.ai/code/session-1")
+        }
+        assertEquals(200, response.statusCode())
+        assertEquals(
+            Actor(account = email!!, via = ActorVia.TOKEN, tokenName = "pipeline"),
             response.body().parseAsJson().parse<Actor>(),
         )
     }

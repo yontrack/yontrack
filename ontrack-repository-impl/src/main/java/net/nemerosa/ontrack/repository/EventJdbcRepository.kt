@@ -24,11 +24,12 @@ class EventJdbcRepository(
 ) : AbstractJdbcRepository(dataSource), EventRepository {
 
     override fun post(event: Event): Event {
-        val sql = StringBuilder("INSERT INTO EVENTS(EVENT_VALUES, EVENT_TIME, EVENT_USER, EVENT_TYPE, REF")
+        val sql = StringBuilder("INSERT INTO EVENTS(EVENT_VALUES, EVENT_TIME, EVENT_USER, ACTOR, EVENT_TYPE, REF")
         val params = MapSqlParameterSource()
         params.addValue("eventValues", writeJson(event.values))
         params.addValue("eventTime", dateTimeForDB(event.signature!!.time))
         params.addValue("eventUser", event.signature!!.user.name)
+        params.addValue("actor", writeSignatureActor(event.signature))
         params.addValue("eventType", event.eventType.id)
         params.addValue("ref", if (event.ref != null) event.ref!!.name else null)
         for (type in event.entities.keys) {
@@ -37,7 +38,7 @@ class EventJdbcRepository(
         for (type in event.extraEntities.keys) {
             sql.append(", X_").append(type.name)
         }
-        sql.append(") VALUES (CAST(:eventValues as JSONB), :eventTime, :eventUser, :eventType, :ref")
+        sql.append(") VALUES (CAST(:eventValues as JSONB), :eventTime, :eventUser, CAST(:actor AS JSONB), :eventType, :ref")
         for ((type, entity) in event.entities) {
             val typeEntry = type.name.lowercase(Locale.getDefault())
             sql.append(", :").append(typeEntry)
@@ -230,7 +231,7 @@ class EventJdbcRepository(
             LIMIT 1
         """,
         params("entityId", entityId.get()).addValue("eventType", eventType.id)
-    ) { rs: ResultSet?, _: Int -> readSignature(rs, "event_time", "event_user") }
+    ) { rs: ResultSet?, _: Int -> readSignature(rs, "event_time", "event_user", "actor") }
 
     override fun getLastEvent(
         entityType: ProjectEntityType,
@@ -258,7 +259,7 @@ class EventJdbcRepository(
         // Event type name
         val eventTypeName = rs.getString("event_type")
         // Signature
-        val signature = readSignature(rs, "event_time", "event_user")
+        val signature = readSignature(rs, "event_time", "event_user", "actor")
         // Entities
         val entities: MutableMap<ProjectEntityType, ProjectEntity> = LinkedHashMap()
         for (type in ProjectEntityType.values()) {

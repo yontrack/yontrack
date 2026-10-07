@@ -16,6 +16,12 @@ interface Connector {
     val token: String?
 
     /**
+     * Headers sent with every call, the token included
+     */
+    val headers: Map<String, String>
+        get() = token?.let { mapOf("X-Ontrack-Token" to it) } ?: emptyMap()
+
+    /**
      * Gets some content from a relative URL.
      */
     fun get(

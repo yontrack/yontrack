@@ -1,0 +1,19 @@
+query BuildSignature(
+    $id: Int!,
+) {
+    build(id: $id) {
+        creation {
+            user
+            time
+            actor {
+                kind
+                agent
+                displayName
+                tool
+                owner
+                sessionId
+                sessionLink
+            }
+        }
+    }
+}

@@ -39,6 +39,9 @@ class DefaultConnector(
     override val token: String?
         get() = defaultHeaders[X_ONTRACK_TOKEN]
 
+    override val headers: Map<String, String>
+        get() = defaultHeaders
+
     @Suppress("VulnerableCodeUsages")
     override fun get(
         path: String,

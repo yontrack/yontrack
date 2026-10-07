@@ -6,6 +6,7 @@ import jakarta.servlet.http.HttpServletResponse
 import net.nemerosa.ontrack.model.security.Account
 import net.nemerosa.ontrack.model.security.AccountLoginService
 import net.nemerosa.ontrack.model.security.Actor
+import net.nemerosa.ontrack.model.security.ActorAgent
 import net.nemerosa.ontrack.model.security.AgentIdentifiers
 import net.nemerosa.ontrack.model.security.ActorJwt
 import net.nemerosa.ontrack.model.security.ActorVia
@@ -56,7 +57,7 @@ class WebSecurityFilter(
                 is TokenAuthenticationToken -> authentication.account.let { account ->
                     authenticationUserService.asUser(
                         account,
-                        Actor(account = account.email, via = ActorVia.TOKEN),
+                        Actor(account = account.email, via = ActorVia.TOKEN, agent = ActorAgent.of(account)),
                     )
                 }
             }

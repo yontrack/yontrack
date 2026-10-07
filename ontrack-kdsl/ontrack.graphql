@@ -7923,10 +7923,30 @@ type ShareSCMFileChangeFilterPayload implements Payload {
 }
 
 type Signature {
+  "The agent behind the signature, null for a person. The user name of an agent's signature is the agent's identifier."
+  actor: SignatureActor
   "ISO timestamp"
   time: String
   "User name"
   user: String
+}
+
+"The agent behind a signature. A person's signature has none."
+type SignatureActor {
+  "Identifier of the agent, `<slug>[agent]`"
+  agent: String!
+  "Display name of the agent, as it was when it acted"
+  displayName: String!
+  "Kind of actor - always `agent`, since a person's signature has no actor"
+  kind: String!
+  "Email of the person accountable for the agent when it acted"
+  owner: String!
+  "Opaque identifier of the agent session behind the action, if the agent gave one"
+  sessionId: String
+  "Link to the agent session behind the action, if the agent gave one"
+  sessionLink: String
+  "Tool behind the agent (Claude Code, Codex, ...), as it was when it acted"
+  tool: String
 }
 
 "Deployment slot into an environment"

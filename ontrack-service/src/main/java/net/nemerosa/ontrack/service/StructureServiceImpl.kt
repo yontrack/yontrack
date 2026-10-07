@@ -298,7 +298,15 @@ class StructureServiceImpl(
         extensionManager.getExtensions(BuildValidationExtension::class.java).forEach { x -> x.validateBuild(build) }
     }
 
+    /**
+     * The [signature] with the actor of the authenticated context: a caller supplying its own
+     * signature (ingestion, backdated build) never claims to be, or not to be, an agent.
+     */
+    private fun authenticatedActor(signature: Signature): Signature =
+        signature.withActor(SignatureActor.of(securityService.currentActor))
+
     override fun newBuild(build: Build): Build {
+        val build = build.withSignature(authenticatedActor(build.signature))
         // Validation
         isEntityNew(build, "Build must be new")
         isEntityDefined(build.branch, "Branch must be defined")
@@ -808,6 +816,7 @@ class StructureServiceImpl(
     }
 
     override fun newPromotionRun(promotionRun: PromotionRun): PromotionRun {
+        val promotionRun = promotionRun.copy(signature = authenticatedActor(promotionRun.signature))
         // Validation
         isEntityNew(promotionRun, "Promotion run must be new")
         isEntityDefined(promotionRun.build, "Build must be defined")
@@ -1275,7 +1284,7 @@ class StructureServiceImpl(
             build,
             validationStamp,
             0,
-            validationRunRequest.signature ?: securityService.currentSignature,
+            authenticatedActor(validationRunRequest.signature ?: securityService.currentSignature),
             status.runStatusID,
             validationRunRequest.description
         ).withData(status.runData)
@@ -1541,6 +1550,12 @@ class StructureServiceImpl(
     }
 
     override fun newValidationRunStatus(validationRun: ValidationRun, runStatus: ValidationRunStatus): ValidationRun {
+        val runStatus = ValidationRunStatus(
+            id = runStatus.id,
+            signature = authenticatedActor(runStatus.signature),
+            statusID = runStatus.statusID,
+            description = runStatus.description,
+        )
         // Entity check
         isEntityDefined(validationRun, "Validation run must be defined")
         isEntityNew(runStatus, "Validation run status must not have any defined ID.")

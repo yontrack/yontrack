@@ -3,6 +3,8 @@ package net.nemerosa.ontrack.boot.support
 import jakarta.servlet.FilterChain
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
+import net.nemerosa.ontrack.model.security.ActorVia
+import net.nemerosa.ontrack.model.security.AgentSessionHeaders
 import net.nemerosa.ontrack.model.structure.TokensConstants
 import net.nemerosa.ontrack.model.structure.TokensService
 import org.springframework.security.core.context.SecurityContextHolder
@@ -16,6 +18,9 @@ import org.springframework.web.filter.OncePerRequestFilter
  * The authentication is kept in the request attributes, as the JWT one is, so that it survives the
  * error dispatch: a call to a path which does not exist then answers `404` to the caller of a
  * token, as to any other authenticated caller, instead of `401` (#1969).
+ *
+ * The agent session headers (`X-Yontrack-Agent-Session` and `X-Yontrack-Agent-Session-Link`) are
+ * passed along, and kept for an agent token only.
  */
 @Component
 class TokenSecurityFilter(
@@ -31,7 +36,11 @@ class TokenSecurityFilter(
     ) {
         val token = request.getHeader(TokensConstants.HTTP_ONTRACK_TOKEN)
         if (!token.isNullOrBlank()) {
-            val success = tokensService.useTokenForSecurityContext(token)
+            val success = tokensService.useTokenForSecurityContext(
+                token = token,
+                via = ActorVia.TOKEN,
+                agentSession = agentSessionHeaders(request),
+            )
             if (!success) {
                 response.status = HttpServletResponse.SC_UNAUTHORIZED
                 response.writer.write("Invalid API token")
@@ -40,6 +49,20 @@ class TokenSecurityFilter(
             securityContextRepository.saveContext(SecurityContextHolder.getContext(), request, response)
         }
         filterChain.doFilter(request, response)
+    }
+
+    /**
+     * Agent session headers of the request, if any. Only the token service decides whether to read
+     * them, that is, for an agent token.
+     */
+    private fun agentSessionHeaders(request: HttpServletRequest): AgentSessionHeaders? {
+        val id = request.getHeader(AgentSessionHeaders.HTTP_AGENT_SESSION)
+        val link = request.getHeader(AgentSessionHeaders.HTTP_AGENT_SESSION_LINK)
+        return if (id == null && link == null) {
+            null
+        } else {
+            AgentSessionHeaders(id = id, link = link)
+        }
     }
 
 }

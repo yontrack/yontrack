@@ -339,7 +339,7 @@ public class StructureJdbcRepository extends AbstractJdbcRepository implements S
                         rs.getString("name"),
                         rs.getString("description")
                 ),
-                readSignature(rs)
+                readSignatureWithActor(rs)
         ).withId(id(rs));
     }
 
@@ -348,12 +348,13 @@ public class StructureJdbcRepository extends AbstractJdbcRepository implements S
         // Creation
         try {
             int id = dbCreate(
-                    "INSERT INTO BUILDS(BRANCHID, NAME, DESCRIPTION, CREATION, CREATOR) VALUES (:branchId, :name, :description, :creation, :creator)",
+                    "INSERT INTO BUILDS(BRANCHID, NAME, DESCRIPTION, CREATION, CREATOR, ACTOR) VALUES (:branchId, :name, :description, :creation, :creator, CAST(:actor AS JSONB))",
                     params("name", build.getName())
                             .addValue("description", build.getDescription())
                             .addValue("branchId", build.getBranch().id())
                             .addValue("creation", dateTimeForDB(build.getSignature().getTime()))
                             .addValue("creator", build.getSignature().getUser().getName())
+                            .addValue("actor", writeSignatureActor(build.getSignature()))
             );
             return build.withId(id(id));
         } catch (DuplicateKeyException ex) {
@@ -366,11 +367,12 @@ public class StructureJdbcRepository extends AbstractJdbcRepository implements S
         // Update
         try {
             getNamedParameterJdbcTemplate().update(
-                    "UPDATE BUILDS SET NAME = :name, DESCRIPTION = :description, CREATION = :creation, CREATOR = :creator WHERE ID = :id",
+                    "UPDATE BUILDS SET NAME = :name, DESCRIPTION = :description, CREATION = :creation, CREATOR = :creator, ACTOR = CAST(:actor AS JSONB) WHERE ID = :id",
                     params("name", build.getName())
                             .addValue("description", build.getDescription())
                             .addValue("creation", dateTimeForDB(build.getSignature().getTime()))
                             .addValue("creator", build.getSignature().getUser().getName())
+                            .addValue("actor", writeSignatureActor(build.getSignature()))
                             .addValue("id", build.id())
             );
             return build;
@@ -607,12 +609,13 @@ public class StructureJdbcRepository extends AbstractJdbcRepository implements S
         return promotionRun.withId(
                 id(
                         dbCreate(
-                                "INSERT INTO PROMOTION_RUNS(BUILDID, PROMOTIONLEVELID, CREATION, CREATOR, DESCRIPTION) VALUES (:buildId, :promotionLevelId, :creation, :creator, :description)",
+                                "INSERT INTO PROMOTION_RUNS(BUILDID, PROMOTIONLEVELID, CREATION, CREATOR, ACTOR, DESCRIPTION) VALUES (:buildId, :promotionLevelId, :creation, :creator, CAST(:actor AS JSONB), :description)",
                                 params("buildId", promotionRun.getBuild().id())
                                         .addValue("promotionLevelId", promotionRun.getPromotionLevel().id())
                                         .addValue("description", promotionRun.getDescription())
                                         .addValue("creation", dateTimeForDB(promotionRun.getSignature().getTime()))
                                         .addValue("creator", promotionRun.getSignature().getUser().getName())
+                                        .addValue("actor", writeSignatureActor(promotionRun.getSignature()))
                         )
                 )
         );
@@ -760,7 +763,7 @@ public class StructureJdbcRepository extends AbstractJdbcRepository implements S
         return PromotionRun.of(
                 buildLoader.apply(id(rs, "buildId")),
                 promotionLevelLoader.apply(id(rs, "promotionLevelId")),
-                readSignature(rs),
+                readSignatureWithActor(rs),
                 rs.getString("description")
         ).withId(runId).withFieldValues(fieldValues);
     }
@@ -1396,7 +1399,7 @@ public class StructureJdbcRepository extends AbstractJdbcRepository implements S
     protected ValidationRunStatus toValidationRunStatus(ResultSet rs, Function<String, ValidationRunStatusID> validationRunStatusService) throws SQLException {
         return new ValidationRunStatus(
                 id(rs),
-                readSignature(rs),
+                readSignatureWithActor(rs),
                 validationRunStatusService.apply(rs.getString("validationRunStatusId")),
                 rs.getString("description")
         );
@@ -1404,13 +1407,14 @@ public class StructureJdbcRepository extends AbstractJdbcRepository implements S
 
     protected void newValidationRunStatus(int validationRunId, ValidationRunStatus validationRunStatus) {
         dbCreate(
-                "INSERT INTO VALIDATION_RUN_STATUSES(VALIDATIONRUNID, VALIDATIONRUNSTATUSID, CREATION, CREATOR, DESCRIPTION) " +
-                        "VALUES (:validationRunId, :validationRunStatusId, :creation, :creator, :description)",
+                "INSERT INTO VALIDATION_RUN_STATUSES(VALIDATIONRUNID, VALIDATIONRUNSTATUSID, CREATION, CREATOR, ACTOR, DESCRIPTION) " +
+                        "VALUES (:validationRunId, :validationRunStatusId, :creation, :creator, CAST(:actor AS JSONB), :description)",
                 params("validationRunId", validationRunId)
                         .addValue("validationRunStatusId", validationRunStatus.getStatusID().getId())
                         .addValue("description", validationRunStatus.getDescription())
                         .addValue("creation", dateTimeForDB(validationRunStatus.getSignature().getTime()))
                         .addValue("creator", validationRunStatus.getSignature().getUser().getName())
+                        .addValue("actor", writeSignatureActor(validationRunStatus.getSignature()))
         );
     }
 

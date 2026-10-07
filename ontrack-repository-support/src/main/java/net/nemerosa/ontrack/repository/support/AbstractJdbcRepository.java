@@ -11,6 +11,7 @@ import net.nemerosa.ontrack.model.exceptions.JsonParsingException;
 import net.nemerosa.ontrack.model.exceptions.JsonWritingException;
 import net.nemerosa.ontrack.model.structure.ID;
 import net.nemerosa.ontrack.model.structure.Signature;
+import net.nemerosa.ontrack.model.structure.SignatureActor;
 import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -147,6 +148,50 @@ public abstract class AbstractJdbcRepository {
                 Time.fromStorage(rs.getString(creationColumn)),
                 rs.getString(creatorColumn)
         );
+    }
+
+    /**
+     * Signature of a signed table, with its actor read from the {@code ACTOR} column.
+     *
+     * @see #readSignature(ResultSet, String, String, String)
+     */
+    public Signature readSignatureWithActor(ResultSet rs) throws SQLException {
+        return readSignature(rs, "creation", "creator", "actor");
+    }
+
+    /**
+     * Signature with its actor, read from a JSONB column. A query which does not select this column
+     * gives no actor, that is, a person's signature.
+     *
+     * @param rs             Row to read
+     * @param creationColumn Column of the time
+     * @param creatorColumn  Column of the user name
+     * @param actorColumn    JSONB column of the actor, null for a person
+     */
+    protected Signature readSignature(ResultSet rs, String creationColumn, String creatorColumn, String actorColumn) throws SQLException {
+        return readSignature(rs, creationColumn, creatorColumn).withActor(readSignatureActor(rs, actorColumn));
+    }
+
+    /**
+     * Actor of a signature, read from a JSONB column, null for a person or when the query does not
+     * select the column.
+     */
+    @Nullable
+    protected SignatureActor readSignatureActor(ResultSet rs, String actorColumn) throws SQLException {
+        try {
+            rs.findColumn(actorColumn);
+        } catch (SQLException ignored) {
+            return null;
+        }
+        return readJson(SignatureActor.class, rs, actorColumn);
+    }
+
+    /**
+     * JSON of the actor of a signature, to store with {@code CAST(:actor AS JSONB)}, null for a person.
+     */
+    @Nullable
+    protected String writeSignatureActor(@Nullable Signature signature) {
+        return signature != null ? writeJson(signature.getActor()) : null;
     }
 
     protected <E extends Enum<E>> E getEnum(Class<E> enumClass, ResultSet rs, String columnName) throws SQLException {

@@ -96,6 +96,69 @@ with it is authenticated as the agent:
 The `generateAgentToken`, `revokeAgentToken` and `revokeAllAgentTokens` mutations do the same
 through the API.
 
+## The agent on the record
+
+Whatever an agent does is signed with its identifier, `<slug>[agent]`, as the user of the
+signature — never with its owner's name. The signature also carries the **actor**: the agent, its
+display name and tool, its owner, and the agent session behind the action. They are copied when the
+agent acts, so the record keeps them when the agent is renamed, transferred or deleted.
+
+The actor is recorded on builds, validation run statuses, promotion runs, events and the changes
+of the deployment pipelines. A person's signature has no actor.
+
+Through the API, the `creation` field of a build, a promotion run or a validation run gives it:
+
+```graphql
+{
+  build(id: 123) {
+    creation {
+      user
+      time
+      actor { kind agent displayName tool owner sessionId sessionLink }
+    }
+  }
+}
+```
+
+`actor` is `null` for a person.
+
+When an agent's call leads Yontrack to act by itself, for example when it processes a payload
+received from the agent in the background, what it does is still signed with the agent as the
+actor.
+
+A caller supplying its own signature — the GitHub ingestion naming the user of a workflow run, or
+a backdated build — chooses the user and the time of the signature, never its actor: the actor is
+always the authenticated one. A caller can neither claim to be an agent nor hide that it is one.
+
+## Identifying a session
+
+An agent acts within a session: a conversation, a task or a run of the tool behind it. The agent
+names it with two HTTP headers sent alongside its token:
+
+| Header | Value |
+|---|---|
+| `X-Yontrack-Agent-Session` | The opaque identifier of the session, at most 255 characters |
+| `X-Yontrack-Agent-Session-Link` | An absolute `https` link to the session, at most 1000 characters |
+
+```bash
+curl https://yontrack.example.com/graphql \
+  -H "X-Ontrack-Token: $AGENT_TOKEN" \
+  -H "X-Yontrack-Agent-Session: 01JC9V6Z3N" \
+  -H "X-Yontrack-Agent-Session-Link: https://claude.ai/code/01JC9V6Z3N" \
+  -H "Content-Type: application/json" \
+  -d '{"query": "{ user { account { email } } }"}'
+```
+
+Yontrack stores the session and renders its link; it never fetches nor interprets it.
+
+* The headers are read for an **agent token** only. With any other token, or without a token,
+  they are ignored.
+* Both values are trimmed. A blank session, or one longer than 255 characters, is ignored.
+* A link which is not an absolute `https` URL, or which is longer than 1000 characters, is dropped
+  with a warning in the logs, and the session is kept without it. A link without a session is
+  ignored.
+* None of these ever fails the call.
+
 ## A CI pipeline is not an agent
 
 A CI pipeline acting through an account holding the `AUTOMATION` role is **automation**, not an

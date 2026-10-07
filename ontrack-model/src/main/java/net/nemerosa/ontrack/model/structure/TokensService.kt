@@ -3,6 +3,7 @@ package net.nemerosa.ontrack.model.structure
 import net.nemerosa.ontrack.common.Time
 import net.nemerosa.ontrack.model.security.Account
 import net.nemerosa.ontrack.model.security.ActorVia
+import net.nemerosa.ontrack.model.security.AgentSessionHeaders
 import java.time.LocalDateTime
 
 /**
@@ -81,12 +82,18 @@ interface TokensService {
      * Uses a token for the security context
      *
      * The [actor][net.nemerosa.ontrack.model.security.SecurityService.currentActor] of the context
-     * keeps the name of the token, never its value.
+     * keeps the name of the token, never its value. When the account of the token is an agent, the
+     * actor carries the agent, and the agent session given by the [agentSession] headers.
      *
      * @param token Token to use
      * @param via Channel the token comes through
+     * @param agentSession Agent session headers of the call, ignored unless the token is an agent's
      * @return True is the token was valid and could be used
      */
-    fun useTokenForSecurityContext(token: String, via: ActorVia = ActorVia.TOKEN): Boolean
+    fun useTokenForSecurityContext(
+        token: String,
+        via: ActorVia = ActorVia.TOKEN,
+        agentSession: AgentSessionHeaders? = null,
+    ): Boolean
 
 }

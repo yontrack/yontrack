@@ -43,7 +43,7 @@ class PromotionRunJdbcRepository(
             id = runId,
             build = actualBuild,
             promotionLevel = actualPL,
-            signature = readSignature(rs),
+            signature = readSignatureWithActor(rs),
             description = rs.getString("description"),
             fieldValues = getPromotionRunFieldValues(runId),
         )
@@ -141,7 +141,7 @@ class PromotionRunJdbcRepository(
         val builds = mutableMapOf<Int, Build>()
         return namedParameterJdbcTemplate!!.query(
             """
-                SELECT PR.ID, PR.BUILDID, B.NAME, B.DESCRIPTION, B.CREATION, B.CREATOR
+                SELECT PR.ID, PR.BUILDID, B.NAME, B.DESCRIPTION, B.CREATION, B.CREATOR, B.ACTOR
                 FROM PROMOTION_RUNS PR
                 INNER JOIN BUILDS B ON B.ID = PR.BUILDID
                 WHERE PR.PROMOTIONLEVELID = :promotionLevelId
@@ -156,7 +156,7 @@ class PromotionRunJdbcRepository(
                         name = rs.getString("NAME"),
                         description = rs.getString("DESCRIPTION"),
                         branch = promotionLevel.branch,
-                        signature = readSignature(rs),
+                        signature = readSignatureWithActor(rs),
                     )
                 },
                 id = rs.getInt("ID"),

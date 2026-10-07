@@ -126,4 +126,67 @@ class ActorTest {
             Actor.degraded("alice@yontrack.test"),
         )
     }
+
+    private val agent = ActorAgent(
+        name = "claude[agent]",
+        displayName = "Claude",
+        tool = "Claude Code",
+        owner = "damien@yontrack.test",
+    )
+
+    @Test
+    fun `JSON form of a person is unchanged by the agent fields`() {
+        // Exact text: the audit trail hashes the canonical form of this JSON
+        assertEquals(
+            """{"account":"ci@yontrack.test","via":"token","tokenName":"pipeline"}""",
+            ciToken.asJson().toString(),
+        )
+    }
+
+    @Test
+    fun `JSON form of an agent with its session`() {
+        val actor = Actor(
+            account = "claude[agent]",
+            via = ActorVia.TOKEN,
+            tokenName = "ci",
+            agent = agent,
+            agentSession = ActorAgentSession(id = "session-1", link = "https://claude.ai/code/session-1"),
+        )
+        assertEquals(
+            """{"account":"claude[agent]","via":"token","tokenName":"ci","agent":{"name":"claude[agent]","displayName":"Claude","tool":"Claude Code","owner":"damien@yontrack.test"},"agentSession":{"id":"session-1","link":"https://claude.ai/code/session-1"}}""".parseAsJson(),
+            actor.asJson(),
+        )
+        assertEquals(actor, actor.asJson().parse<Actor>())
+    }
+
+    @Test
+    fun `The agent actor is the actor itself when it is an agent`() {
+        val actor = Actor(account = "claude[agent]", via = ActorVia.TOKEN, agent = agent)
+        assertEquals(actor, actor.agentActor)
+    }
+
+    @Test
+    fun `The agent actor is the one the system acts on behalf of`() {
+        val actor = Actor(account = "claude[agent]", via = ActorVia.WEBHOOK, agent = agent)
+        assertEquals(actor, actor.runAs("github-ingestion").runAs("auto-promotion").agentActor)
+    }
+
+    @Test
+    fun `No agent actor for a person`() {
+        assertEquals(null, alice.runAs("auto-promotion").agentActor)
+    }
+
+    @Test
+    fun `Agent of an agent account`() {
+        val owner = Account.user("Damien", "damien@yontrack.test")
+        val account = Account.agent(
+            slug = "claude",
+            displayName = "Claude",
+            owner = owner,
+            tool = "Claude Code",
+            description = null,
+        )
+        assertEquals(agent, ActorAgent.of(account))
+        assertEquals(null, ActorAgent.of(owner))
+    }
 }

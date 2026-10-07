@@ -62,7 +62,7 @@ class ValidationRunJdbcRepository(
         val builds = mutableMapOf<Int, Build>()
         return namedParameterJdbcTemplate!!.query(
             """
-                SELECT VR.ID, VR.BUILDID, B.NAME, B.DESCRIPTION, B.CREATION, B.CREATOR,
+                SELECT VR.ID, VR.BUILDID, B.NAME, B.DESCRIPTION, B.CREATION, B.CREATOR, B.ACTOR,
                        ROW_NUMBER() OVER (PARTITION BY VR.BUILDID ORDER BY VR.ID) AS RUN_ORDER,
                        (
                            SELECT VRS.VALIDATIONRUNSTATUSID
@@ -88,15 +88,15 @@ class ValidationRunJdbcRepository(
     }
 
     /**
-     * A build of the [branch] from the columns `BUILDID`, `NAME`, `DESCRIPTION`, `CREATION` and
-     * `CREATOR`.
+     * A build of the [branch] from the columns `BUILDID`, `NAME`, `DESCRIPTION`, `CREATION`,
+     * `CREATOR` and `ACTOR`.
      */
     private fun toBuild(rs: ResultSet, branch: Branch) = Build(
         id = ID.of(rs.getInt("BUILDID")),
         name = rs.getString("NAME"),
         description = rs.getString("DESCRIPTION"),
         branch = branch,
-        signature = readSignature(rs),
+        signature = readSignatureWithActor(rs),
     )
 
 }

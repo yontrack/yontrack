@@ -2,6 +2,7 @@ package net.nemerosa.ontrack.service.security
 
 import net.nemerosa.ontrack.model.security.*
 import net.nemerosa.ontrack.model.structure.Signature
+import net.nemerosa.ontrack.model.structure.SignatureActor
 import net.nemerosa.ontrack.model.structure.Signature.Companion.anonymous
 import net.nemerosa.ontrack.model.structure.Signature.Companion.of
 import org.springframework.security.access.AccessDeniedException
@@ -61,7 +62,7 @@ class SecurityServiceImpl : SecurityService {
             val authenticatedUser = currentUser
             return authenticatedUser
                 ?.name
-                ?.let { of(it) }
+                ?.let { of(it).withActor(SignatureActor.of(currentActor)) }
                 ?: anonymous()
         }
 

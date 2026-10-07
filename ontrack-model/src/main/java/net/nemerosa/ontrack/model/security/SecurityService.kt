@@ -34,6 +34,12 @@ interface SecurityService {
     val isLogged: Boolean
         get() = currentUser != null
 
+    /**
+     * Signature of the current user, now.
+     *
+     * Its [actor][Signature.actor] is the agent of the [current actor][currentActor], or the agent the
+     * system acts on behalf of, and null when no agent is involved.
+     */
     val currentSignature: Signature
 
     /**

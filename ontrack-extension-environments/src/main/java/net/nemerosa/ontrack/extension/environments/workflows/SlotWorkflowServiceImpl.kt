@@ -179,7 +179,8 @@ class SlotWorkflowServiceImpl(
         securityService.checkSlotAccess<SlotUpdate>(slotWorkflowInstance.pipeline.slot)
         securityService.checkSlotAccess<SlotPipelineOverride>(slotWorkflowInstance.pipeline.slot)
         // Saving the override status
-        val user = securityService.currentSignature.user.name
+        val signature = securityService.currentSignature
+        val user = signature.user.name
         val timestamp = Time.now
         slotWorkflowInstanceRepository.override(
             slotWorkflowInstance = slotWorkflowInstance,
@@ -198,6 +199,7 @@ class SlotWorkflowServiceImpl(
             SlotPipelineChange(
                 pipeline = slotWorkflowInstance.pipeline,
                 user = user,
+                actor = signature.actor,
                 timestamp = timestamp,
                 type = SlotPipelineChangeType.WORKFLOW_OVERRIDDEN,
                 status = slotWorkflowInstance.pipeline.status,

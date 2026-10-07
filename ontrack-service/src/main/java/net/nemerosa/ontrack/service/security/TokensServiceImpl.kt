@@ -98,17 +98,25 @@ class TokensServiceImpl(
         }
         ?: false
 
-    override fun useTokenForSecurityContext(token: String, via: ActorVia): Boolean {
+    override fun useTokenForSecurityContext(
+        token: String,
+        via: ActorVia,
+        agentSession: AgentSessionHeaders?,
+    ): Boolean {
         val tokenAccount = findAccountByToken(token)
         return if (tokenAccount == null || !tokenAccount.token.valid) {
             false
         } else {
+            // The session headers are read for an agent only
+            val agent = ActorAgent.of(tokenAccount.account)
             authenticationUserService.asUser(
                 account = tokenAccount.account,
                 actor = Actor(
                     account = tokenAccount.account.email,
                     via = via,
                     tokenName = tokenAccount.token.name,
+                    agent = agent,
+                    agentSession = agent?.let { agentSession?.parse() },
                 ),
             )
             true

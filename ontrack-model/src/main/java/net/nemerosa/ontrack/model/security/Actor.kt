@@ -26,6 +26,9 @@ import java.io.Serializable
  * @property jwt Issuer and subject of the JWT, when [via] is [ActorVia.UI] or [ActorVia.JWT]
  * @property system Reason why the system acts, when it acts as administrator
  * @property onBehalfOf Actor whose action led the system to act, if any
+ * @property agent The registered agent, when the account is one (absent for a person, so that the
+ * JSON of a person's actor, and the audit trail hashes of it, are unchanged)
+ * @property agentSession The agent session behind the action, when the agent gave one
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 data class Actor(
@@ -35,7 +38,17 @@ data class Actor(
     val jwt: ActorJwt? = null,
     val system: String? = null,
     val onBehalfOf: Actor? = null,
+    val agent: ActorAgent? = null,
+    val agentSession: ActorAgentSession? = null,
 ) : Serializable {
+
+    /**
+     * The actor which is a registered agent: this one, or the first one the system acts on behalf
+     * of. Null when no agent is involved.
+     */
+    @get:JsonIgnore
+    val agentActor: Actor?
+        get() = if (agent != null) this else onBehalfOf?.agentActor
 
     /**
      * Is this the system acting as administrator?
@@ -83,10 +96,14 @@ data class Actor(
         /**
          * Actor of an account whose context was restored without knowing how it authenticated,
          * like a queued message which did not carry its actor.
+         *
+         * @param account Email of the account
+         * @param agent The agent, when the account is one
          */
-        fun degraded(account: String) = Actor(
+        fun degraded(account: String, agent: ActorAgent? = null) = Actor(
             account = account,
             via = ActorVia.SYSTEM,
+            agent = agent,
         )
     }
 }
@@ -144,4 +161,59 @@ enum class ActorVia {
 data class ActorJwt(
     val iss: String?,
     val sub: String?,
+) : Serializable
+
+/**
+ * The registered agent an [Actor] is.
+ *
+ * Its values are copied from the agent account when the actor is created, so that the record keeps
+ * them when the agent is renamed or deleted.
+ *
+ * @property name Identifier of the agent, `<slug>[agent]` (see [AgentIdentifiers])
+ * @property displayName Display name of the agent
+ * @property tool Tool behind the agent (Claude Code, Codex, ...)
+ * @property owner Email of the person accountable for the agent
+ */
+@JsonInclude(JsonInclude.Include.NON_NULL)
+data class ActorAgent(
+    val name: String,
+    val displayName: String,
+    val tool: String? = null,
+    val owner: String,
+) : Serializable {
+
+    companion object {
+
+        /**
+         * The agent of an account, null when the account is a person.
+         *
+         * @param account Account
+         * @throws IllegalStateException When the agent account has no owner
+         */
+        fun of(account: Account): ActorAgent? =
+            if (account.isAgent) {
+                ActorAgent(
+                    name = account.email,
+                    displayName = account.fullName,
+                    tool = account.agentTool,
+                    owner = account.owner?.email
+                        ?: error("Agent ${account.email} has no owner."),
+                )
+            } else {
+                null
+            }
+    }
+}
+
+/**
+ * Agent session: the opaque reference an agent gives for the conversation or the run behind an
+ * action. Yontrack stores it and renders its link, it never fetches it.
+ *
+ * @property id Opaque identifier of the session
+ * @property link Absolute `https` link to the session, if any
+ */
+@JsonInclude(JsonInclude.Include.NON_NULL)
+data class ActorAgentSession(
+    val id: String,
+    val link: String? = null,
 ) : Serializable

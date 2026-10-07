@@ -352,6 +352,7 @@ class SlotServiceImpl(
             SlotPipelineChange(
                 pipeline = pipeline,
                 user = securityService.currentSignature.user.name,
+                actor = securityService.currentSignature.actor,
                 timestamp = pipeline.start,
                 type = SlotPipelineChangeType.STATUS,
                 status = pipeline.status,
@@ -498,12 +499,14 @@ class SlotServiceImpl(
         override: SlotAdmissionRuleOverride? = null,
         time: LocalDateTime? = null,
     ) {
-        val user = securityService.currentSignature.user.name
+        val signature = securityService.currentSignature
+        val user = signature.user.name
         val timestamp = time ?: Time.now
         slotPipelineChangeRepository.save(
             SlotPipelineChange(
                 pipeline = pipeline,
                 user = user,
+                actor = signature.actor,
                 timestamp = timestamp,
                 type = type,
                 status = status,

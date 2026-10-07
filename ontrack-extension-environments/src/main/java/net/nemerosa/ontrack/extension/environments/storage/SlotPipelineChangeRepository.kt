@@ -18,13 +18,14 @@ class SlotPipelineChangeRepository(
     fun save(slotPipelineChange: SlotPipelineChange) {
         namedParameterJdbcTemplate!!.update(
             """
-                INSERT INTO ENV_SLOT_PIPELINE_CHANGE (ID, PIPELINE_ID, "USER", TIMESTAMP, TYPE, STATUS, MESSAGE, OVERRIDE_MESSAGE)
-                VALUES (:id, :pipelineId, :user, :timestamp, :type, :status, :message, :overrideMessage)
+                INSERT INTO ENV_SLOT_PIPELINE_CHANGE (ID, PIPELINE_ID, "USER", ACTOR, TIMESTAMP, TYPE, STATUS, MESSAGE, OVERRIDE_MESSAGE)
+                VALUES (:id, :pipelineId, :user, CAST(:actor AS JSONB), :timestamp, :type, :status, :message, :overrideMessage)
             """,
             mapOf(
                 "id" to slotPipelineChange.id,
                 "pipelineId" to slotPipelineChange.pipeline.id,
                 "user" to slotPipelineChange.user,
+                "actor" to writeJson(slotPipelineChange.actor),
                 "timestamp" to Time.store(slotPipelineChange.timestamp),
                 "type" to slotPipelineChange.type.name,
                 "status" to slotPipelineChange.status?.name,
@@ -55,6 +56,7 @@ class SlotPipelineChangeRepository(
                 status = rs.getString("status")?.let { SlotPipelineStatus.valueOf(it) },
                 message = rs.getString("message"),
                 overrideMessage = rs.getString("override_message"),
+                actor = readSignatureActor(rs, "actor"),
             )
         }
     }
