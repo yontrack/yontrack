@@ -49,11 +49,11 @@ const changeLog = {
     commits: [],
 }
 
-const renderContent = ({query = {}, preferences = {}} = {}) => {
+const renderContent = ({query = {}, preferences = {}, commits = []} = {}) => {
     mockRouter.query = {from: "101", to: "102", ...query}
     render(
         <PreferencesContext.Provider value={{...preferences, setPreferences: jest.fn(), loaded: true}}>
-            <ScmChangeLogContent changeLog={changeLog} loading={false} error={null}/>
+            <ScmChangeLogContent changeLog={{...changeLog, commits}} loading={false} error={null}/>
         </PreferencesContext.Provider>
     )
 }
@@ -131,6 +131,27 @@ describe('ScmChangeLogContent', () => {
                 [0, 5, 12],
                 [0, 12, 12],
             ])
+        })
+
+    })
+
+    describe('the assisted commits', () => {
+
+        const commit = (...names) => ({commit: {assistants: names.map(name => ({name, sessionLink: null}))}})
+
+        it('are counted in the header of the change log', () => {
+            renderContent({commits: [commit("Claude Code"), commit(), commit()]})
+            expect(screen.getByTestId('change-log-assisted-count')).toHaveTextContent('1 of 3 commits assisted')
+        })
+
+        it('are counted in the semantic view as well', () => {
+            renderContent({query: {view: 'semantic'}, commits: [commit("Claude Code"), commit()]})
+            expect(screen.getByTestId('change-log-assisted-count')).toHaveTextContent('1 of 2 commits assisted')
+        })
+
+        it('leave the header alone when there is none', () => {
+            renderContent({commits: [commit(), commit()]})
+            expect(screen.queryByTestId('change-log-assisted-count')).not.toBeInTheDocument()
         })
 
     })

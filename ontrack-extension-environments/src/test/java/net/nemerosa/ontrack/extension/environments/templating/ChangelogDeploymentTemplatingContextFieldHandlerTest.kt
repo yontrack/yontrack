@@ -65,4 +65,54 @@ class ChangelogDeploymentTemplatingContextFieldHandlerTest {
         )
     }
 
+    @Test
+    fun `Changelog for a deployment passes the assistants options`() {
+
+        val renderer = MarkdownEventRenderer(OntrackConfigProperties())
+
+        val deployment = SlotTestFixtures.testDeployment()
+
+        val previousDeployment = SlotTestFixtures.testDeployment(
+            build = BuildFixtures.testBuild(
+                branch = deployment.build.branch,
+            ),
+            slot = deployment.slot,
+        )
+
+        val slotPipelineRepository = mockk<SlotPipelineRepository>()
+        every {
+            slotPipelineRepository.findLastPipelineBySlotAndStatusExcludingOne(
+                slot = deployment.slot,
+                status = SlotPipelineStatus.DONE,
+                excludedPipeline = deployment,
+            )
+        } returns previousDeployment
+
+        val changeLogTemplatingService = mockk<ChangeLogTemplatingService>()
+        every {
+            changeLogTemplatingService.render(
+                fromBuild = previousDeployment.build,
+                toBuild = deployment.build,
+                config = match { it.assistants && it.assistedCount },
+                renderer = renderer,
+            )
+        } returns "1 of 1 commit assisted"
+
+        val handler = ChangelogDeploymentTemplatingContextFieldHandler(
+            slotPipelineRepository = slotPipelineRepository,
+            changeLogTemplatingService = changeLogTemplatingService,
+        )
+
+        val text = handler.render(
+            deployment = deployment,
+            config = TemplatingSourceConfig.fromMap(
+                "assistants" to "true",
+                "assistedCount" to "true",
+            ),
+            renderer = renderer,
+        )
+
+        assertEquals("1 of 1 commit assisted", text)
+    }
+
 }

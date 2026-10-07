@@ -13,6 +13,8 @@ class BuildChangeLogTemplatingSourceConfig(
     defaultQualifierFallback: Boolean = false,
     commitsOption: ChangeLogTemplatingCommitsOption = ChangeLogTemplatingCommitsOption.NONE,
     commitsMaxLength: Int = COMMIT_MESSAGE_DEFAULT_MAX_LENGTH,
+    assistants: Boolean = false,
+    assistedCount: Boolean = false,
     @APIDescription("ID to the build to get the change log from")
     val from: Int,
 ) : ChangeLogTemplatingServiceConfig(
@@ -23,4 +25,6 @@ class BuildChangeLogTemplatingSourceConfig(
     defaultQualifierFallback = defaultQualifierFallback,
     commitsOption = commitsOption,
     commitsMaxLength = commitsMaxLength,
+    assistants = assistants,
+    assistedCount = assistedCount,
 )

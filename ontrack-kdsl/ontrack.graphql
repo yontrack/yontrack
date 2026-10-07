@@ -9609,6 +9609,10 @@ input CancelSlotPipelineInput {
 input ChangeLogTemplatingServiceConfig {
   "Loop over all qualifiers for the last level of `dependencies`, including the default one. Qualifiers at `dependencies` take precedence."
   allQualifiers: Boolean
+  "If true, each commit line is followed by the assistants (agent kinds) which helped write the commit, e.g. `(assisted by Claude Code)`, the name of an assistant linking to its agent session when the commit carries one (Markdown and HTML only). Applies only when the commits are rendered (see `commitsOption`)."
+  assistants: Boolean
+  "If true, the change log starts with the number of its commits written with an assistant, e.g. `3 of 12 commits assisted`. Nothing is added when the change log has no commit."
+  assistedCount: Boolean
   "Maximum length of a commit message in a change log, ellipsis included. Only the first line of a commit message is ever rendered; set this to 0 to render that line in full."
   commitsMaxLength: Int
   "Defines how to render commits for a change log"

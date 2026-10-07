@@ -80,6 +80,10 @@ const gqlChangeLogContent = gql`
                 link
                 author
                 timestamp
+                assistants {
+                    name
+                    sessionLink
+                }
             }
             annotatedMessage
             build {

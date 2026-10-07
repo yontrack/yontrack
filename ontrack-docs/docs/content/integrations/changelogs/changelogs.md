@@ -358,6 +358,55 @@ a commit:
 An assistant appears **once** per commit, with all the markers which named it, and the first session
 link found.
 
+### On the changelog page
+
+On the [changelog page](#using-the-ui), a commit written with an assistant shows a small
+**assisted** marker next to its message. Its tooltip lists the assistants, and when the commit
+carries a session link (a `Claude-Session:` trailer), the marker opens the agent session in a new
+tab.
+
+The header of the changelog says how many of its commits are assisted, e.g.
+_1 of 12 commits assisted_. It says nothing when no commit is assisted.
+
+### In templates
+
+The changelogs rendered through [templating](#using-templating) - `Build.changelog`,
+`PromotionRun.changelog` and the `changelog` field of a deployment - take two options, both off by
+default, so that the existing templates render as before:
+
+* `assistants=true` - each commit line is followed by its assistants, e.g.
+  `(assisted by Claude Code)`. In Markdown and HTML, the name of an assistant links to its agent
+  session when the commit carries one. It applies to the commits, so only when they are rendered
+  (see `commitsOption`);
+* `assistedCount=true` - the changelog starts with the number of its assisted commits, e.g.
+  `3 of 12 commits assisted`.
+
+For example, for the body of a pull request:
+
+```
+${promotionRun.changelog?commitsOption=ALWAYS&assistants=true&assistedCount=true}
+```
+
+renders, in Markdown:
+
+```markdown
+1 of 2 commits assisted
+
+* [ISS-12](https://example.atlassian.net/browse/ISS-12) Search owners by phone number
+
+Commits:
+
+* [a1b2c3d](https://github.com/org/repo/commit/a1b2c3d) ISS-12 Fix the export (assisted by [Claude Code](https://claude.ai/code/session_0123))
+* [e4f5a6b](https://github.com/org/repo/commit/e4f5a6b) ISS-12 Search owners by phone number
+```
+
+The assistants of the commit of a build are also available on their own, as a comma-separated list of
+names, empty when there is none:
+
+```
+${build.scmCommit?field=assistants}
+```
+
 ### What is recognised
 
 Only the **trailer block** of a message is read: its last paragraph, the subject excepted. A line

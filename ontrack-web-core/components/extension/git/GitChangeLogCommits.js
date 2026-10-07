@@ -8,6 +8,7 @@ import {buildKnownName, buildLinkName} from "@components/common/Titles";
 import PromotionRun from "@components/promotionRuns/PromotionRun";
 import {FaLink} from "react-icons/fa";
 import SafeHTMLComponent from "@components/common/SafeHTMLComponent";
+import CommitAssistedMarker from "@components/extension/scm/assistants/CommitAssistedMarker";
 
 const {Column} = Table
 
@@ -48,6 +49,10 @@ export default function GitChangeLogCommits({id, loading, commits, diffLink}) {
                         render={(_, commit) =>
                             <Typography.Paragraph>
                                 <SafeHTMLComponent htmlContent={commit.annotatedMessage}/>
+                                <CommitAssistedMarker
+                                    assistants={commit.commit.assistants}
+                                    testId={`commit-assisted-${commit.commit.id}`}
+                                />
                             </Typography.Paragraph>
                         }
                     />

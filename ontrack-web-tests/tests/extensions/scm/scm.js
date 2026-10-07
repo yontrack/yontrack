@@ -2,6 +2,7 @@ import {expect} from "@playwright/test";
 
 const {createMockSCMContext} = require("@ontrack/extensions/scm/scm");
 const {ontrack} = require("@ontrack/ontrack");
+const {trimIndent} = require("@ontrack/utils");
 
 export const commits = [
     "ISS-20 Last commit before the change log",
@@ -155,6 +156,44 @@ export async function provisionSemanticChangeLog(ontrack) {
     return {from, middle, to, mockSCMContext}
 }
 
+/**
+ * Commits of a change log, one of them written with Claude Code, with the trailers Claude Code
+ * adds to its commits.
+ */
+export const assistedCommits = {
+    before: "Last commit before the assisted change log",
+    human: "Some feature written by hand",
+    assisted: trimIndent(`
+        Some fix written with an agent
+
+        Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+        Claude-Session: https://claude.ai/code/session_ui_test
+    `),
+}
+
+/**
+ * A change log between two builds of which one commit out of two is assisted.
+ */
+export async function provisionAssistedChangeLog(ontrack) {
+    const mockSCMContext = createMockSCMContext(ontrack)
+    const project = await ontrack.createProject()
+    await mockSCMContext.configureProjectForMockSCM(project)
+
+    const branch = await project.createBranch()
+    await mockSCMContext.configureBranchForMockSCM(branch)
+
+    const from = await mockSCMContext.setBuildWithCommits(
+        branch.createBuild(),
+        [assistedCommits.before],
+    )
+    const to = await mockSCMContext.setBuildWithCommits(
+        branch.createBuild(),
+        [assistedCommits.human, assistedCommits.assisted],
+    )
+
+    return {from, to, mockSCMContext}
+}
+
 export class SCMChangeLogPage {
 
     constructor(page, ontrack) {
@@ -222,6 +261,44 @@ export class SCMChangeLogPage {
             await expect(locator).toBeVisible()
         } else {
             await expect(locator).not.toBeVisible()
+        }
+    }
+
+    /**
+     * Checks the count of the assisted commits in the header of the change log.
+     *
+     * @param text Expected count, `null` when no count must be shown
+     */
+    async checkAssistedCount(text) {
+        const locator = this.page.getByTestId('change-log-assisted-count')
+        if (text) {
+            await expect(locator).toHaveText(text)
+        } else {
+            await expect(locator).not.toBeVisible()
+        }
+    }
+
+    /**
+     * Checks the "assisted" marker of a commit.
+     *
+     * @param commitId ID of the commit
+     * @param name Accessible name of the marker, `null` when the commit must have no marker
+     * @param sessionLink Agent session the marker links to, if any
+     */
+    async checkCommitAssisted(commitId, {name, sessionLink}) {
+        const commitRow = this.page.locator(`tr[data-row-key="commit-${commitId}"]`)
+        await expect(commitRow).toBeVisible()
+        if (!name) {
+            await expect(commitRow.getByTestId(`commit-assisted-${commitId}`)).toHaveCount(0)
+        } else if (sessionLink) {
+            const link = commitRow.getByRole('link', {name})
+            await expect(link).toBeVisible()
+            await expect(link).toHaveAttribute('href', sessionLink)
+            await expect(link).toHaveAttribute('target', '_blank')
+            await expect(link).toHaveAttribute('rel', 'noopener noreferrer')
+            await expect(link).toContainText('assisted')
+        } else {
+            await expect(commitRow.getByRole('img', {name})).toBeVisible()
         }
     }
 

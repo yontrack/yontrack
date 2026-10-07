@@ -14,6 +14,7 @@ import ChangeLogLinks from "@components/extension/scm/ChangeLogLinks";
 import ChangeLogSemantic from "@components/extension/scm/views/ChangeLogSemantic";
 import ChangeLogViewSelector from "@components/extension/scm/views/ChangeLogViewSelector";
 import useChangeLogViewSelection from "@components/extension/scm/views/useChangeLogViewSelection";
+import ChangeLogAssistedCount from "@components/extension/scm/assistants/ChangeLogAssistedCount";
 import {Alert, Empty, Typography} from "antd";
 
 /**
@@ -139,6 +140,9 @@ export default function ScmChangeLogContent({changeLog, loading, error}) {
                         title="This change log cannot be displayed."
                         description={error}
                     />
+                }
+                {
+                    !error && changeLog && <ChangeLogAssistedCount commits={changeLog.commits}/>
                 }
                 {
                     !error && changeLog && items &&
