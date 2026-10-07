@@ -184,3 +184,24 @@ export function restPredefinedValidationStampImageUri(predefinedValidationStamp)
 export function restValidationStampImageUri(validationStamp) {
     return `/api/protected/images/validationStamps/${validationStamp.id}`
 }
+
+/**
+ * Administration of every agent of the instance.
+ */
+export function agentsUri() {
+    return `/core/admin/agents`
+}
+
+/**
+ * The agents of the current user.
+ */
+export function myAgentsUri() {
+    return `/core/admin/my-agents`
+}
+
+/**
+ * Page of one agent: its details and its tokens.
+ */
+export function agentUri(agent) {
+    return `/core/admin/agents/${agent.id}`
+}

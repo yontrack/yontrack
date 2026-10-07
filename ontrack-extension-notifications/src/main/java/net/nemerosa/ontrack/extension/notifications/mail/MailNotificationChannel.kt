@@ -15,6 +15,7 @@ import net.nemerosa.ontrack.model.events.Event
 import net.nemerosa.ontrack.model.events.EventTemplatingService
 import net.nemerosa.ontrack.model.events.HtmlNotificationEventRenderer
 import net.nemerosa.ontrack.model.events.PlainEventRenderer
+import net.nemerosa.ontrack.model.security.AgentIdentifiers
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import org.springframework.core.env.Environment
@@ -22,7 +23,7 @@ import org.springframework.mail.javamail.JavaMailSender
 import org.springframework.stereotype.Component
 
 @Component
-@APIDescription("Sending a message by mail. The notification template is used for the body of the mail.")
+@APIDescription("Sending a message by mail. The notification template is used for the body of the mail. Agents are never mail recipients: their identifiers are removed from the recipients.")
 @Documentation(MailNotificationChannelConfig::class)
 @Documentation(MailNotificationChannelOutput::class, section = "output")
 class MailNotificationChannel(
@@ -69,6 +70,19 @@ class MailNotificationChannel(
             MailNotificationChannelConfig::subject.name to text
         ).asJson()
 
+    /**
+     * Removes the agent identifiers (`<slug>[agent]`) from a comma-separated list of recipients,
+     * which is kept as it is when it names no agent.
+     */
+    private fun withoutAgents(recipients: String): String {
+        val items = recipients.split(",").map { it.trim() }
+        return if (items.any { AgentIdentifiers.isAgentIdentifier(it) }) {
+            items.filter { it.isNotBlank() && !AgentIdentifiers.isAgentIdentifier(it) }.joinToString(",")
+        } else {
+            recipients
+        }
+    }
+
     override fun publish(
         recordId: String,
         config: MailNotificationChannelConfig,
@@ -91,10 +105,16 @@ class MailNotificationChannel(
             template = template,
             renderer = htmlNotificationEventRenderer,
         )
+        // Agents are never mail recipients
+        val to = withoutAgents(config.to)
+        val cc = config.cc?.let { withoutAgents(it) }?.takeIf { it.isNotBlank() }
+        if (to.isBlank()) {
+            return NotificationResult.disabled("No recipient left once the agents removed: agents never receive mail.")
+        }
         // Sending the message
         val sent = mailService.sendMail(
-            to = config.to,
-            cc = config.cc,
+            to = to,
+            cc = cc,
             subject = subject,
             body = message,
         )
@@ -102,8 +122,8 @@ class MailNotificationChannel(
         return if (sent) {
             NotificationResult.ok(
                 MailNotificationChannelOutput(
-                    to = config.to,
-                    cc = config.cc,
+                    to = to,
+                    cc = cc,
                     subject = subject,
                     body = message,
                 )

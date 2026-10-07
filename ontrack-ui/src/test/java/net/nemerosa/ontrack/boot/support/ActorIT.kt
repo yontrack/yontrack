@@ -14,6 +14,8 @@ import net.nemerosa.ontrack.json.parseAsJson
 import net.nemerosa.ontrack.model.security.Actor
 import net.nemerosa.ontrack.model.security.ActorJwt
 import net.nemerosa.ontrack.model.security.ActorVia
+import net.nemerosa.ontrack.model.security.AgentRegistrationInput
+import net.nemerosa.ontrack.model.security.AgentService
 import net.nemerosa.ontrack.model.security.SecurityService
 import net.nemerosa.ontrack.model.structure.TokenOptions
 import net.nemerosa.ontrack.model.structure.TokensConstants
@@ -37,6 +39,7 @@ import java.nio.file.Files
 import java.time.Instant
 import java.util.*
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 
 /**
  * The actor of an API call, as the security context holds it, for each way of authenticating.
@@ -59,6 +62,9 @@ class ActorIT : AbstractDSLTestSupport() {
 
     @Autowired
     private lateinit var tokensService: TokensService
+
+    @Autowired
+    private lateinit var agentService: AgentService
 
     private val client: HttpClient = HttpClient.newHttpClient()
 
@@ -117,6 +123,32 @@ class ActorIT : AbstractDSLTestSupport() {
         assertEquals(200, response.statusCode())
         assertEquals(
             Actor(account = email!!, via = ActorVia.TOKEN, tokenName = "pipeline"),
+            response.body().parseAsJson().parse<Actor>(),
+        )
+    }
+
+    @Test
+    fun `A JWT whose email is an agent identifier is refused`() {
+        val email = "${uid("jwt-").lowercase()}[agent]"
+        val response = call { header("Authorization", "Bearer ${jwt(email = email, subject = uid("sub-"), azp = null)}") }
+        assertEquals(401, response.statusCode())
+        assertNull(asAdmin { accountService.findAccountByName(email) }, "No account provisioned for the agent identifier")
+    }
+
+    @Test
+    fun `An agent token authenticates the agent by the name of its token`() {
+        val owner = asAdmin { doCreateAccount() }
+        val slug = uid("a-").lowercase()
+        val token = asFixedAccount(owner) {
+            val agent = agentService.registerAgent(
+                AgentRegistrationInput(slug = slug, displayName = "Agent", tool = "Codex")
+            )
+            agentService.generateAgentToken(agent.id, "session")
+        }
+        val response = call { header(TokensConstants.HTTP_ONTRACK_TOKEN, token.value) }
+        assertEquals(200, response.statusCode())
+        assertEquals(
+            Actor(account = "$slug[agent]", via = ActorVia.TOKEN, tokenName = "session"),
             response.body().parseAsJson().parse<Actor>(),
         )
     }

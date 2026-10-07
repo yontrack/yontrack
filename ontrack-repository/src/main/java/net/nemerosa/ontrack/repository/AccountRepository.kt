@@ -18,7 +18,8 @@ interface AccountRepository {
     fun newAccount(account: Account): Account
 
     /**
-     * Edits an existing account
+     * Edits an existing account: its full name, its email, and for an agent, its tool and its description.
+     * Neither its kind nor its owner change.
      */
     fun saveAccount(account: Account)
 
@@ -59,4 +60,16 @@ interface AccountRepository {
      * Finds or create the account
      */
     fun findOrCreateAccount(account: Account): Account
+
+    /**
+     * Gets the agent accounts, ordered by identifier.
+     *
+     * @param ownerId Restricts the list to the agents of this owner
+     */
+    fun findAgents(ownerId: ID? = null): List<Account>
+
+    /**
+     * Sets the owner of an agent account.
+     */
+    fun setOwner(agentId: ID, ownerId: ID)
 }

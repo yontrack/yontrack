@@ -7,6 +7,7 @@ import net.nemerosa.ontrack.test.TestUtils.uid
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.test.fail
 
 class MailChannelIT : AbstractMailTestSupport() {
@@ -118,6 +119,78 @@ class MailChannelIT : AbstractMailTestSupport() {
                                 """.trimIndent()
                             )
                         }
+                    }
+                }
+            }
+        }
+    }
+
+
+    @Test
+    fun `Agents never receive mail`() {
+        val name = uid("s")
+        val subject = "Mail without agents $name"
+        asAdmin {
+            project {
+                branch {
+                    val pl = promotionLevel()
+                    eventSubscriptionService.subscribe(
+                        name = uid("n-"),
+                        channel = mailNotificationChannel,
+                        channelConfig = MailNotificationChannelConfig(
+                            to = "claude-code-ci[agent], $DEFAULT_ADDRESS",
+                            cc = "codex[agent]",
+                            subject = subject,
+                        ),
+                        projectEntity = pl,
+                        keywords = null,
+                        origin = "test",
+                        contentTemplate = null,
+                        EventFactory.NEW_PROMOTION_RUN,
+                    )
+                    build {
+                        promote(pl)
+                        val mail = greenMail.receivedMessages.find { it.subject == subject }
+                            ?: fail("Mail was not sent to the person")
+                        assertEquals(
+                            listOf(DEFAULT_ADDRESS),
+                            mail.allRecipients.map { it.toString() },
+                            "Only the person receives the mail"
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `No mail at all when only agents are recipients`() {
+        val name = uid("s")
+        val subject = "Mail to agents only $name"
+        asAdmin {
+            project {
+                branch {
+                    val pl = promotionLevel()
+                    eventSubscriptionService.subscribe(
+                        name = uid("n-"),
+                        channel = mailNotificationChannel,
+                        channelConfig = MailNotificationChannelConfig(
+                            to = "claude-code-ci[agent]",
+                            cc = null,
+                            subject = subject,
+                        ),
+                        projectEntity = pl,
+                        keywords = null,
+                        origin = "test",
+                        contentTemplate = null,
+                        EventFactory.NEW_PROMOTION_RUN,
+                    )
+                    build {
+                        promote(pl)
+                        assertNull(
+                            greenMail.receivedMessages.find { it.subject == subject },
+                            "No mail sent to agents"
+                        )
                     }
                 }
             }

@@ -1,0 +1,13 @@
+query CurrentAccount {
+    user {
+        account {
+            id
+            email
+            fullName
+            kind
+            owner {
+                email
+            }
+        }
+    }
+}

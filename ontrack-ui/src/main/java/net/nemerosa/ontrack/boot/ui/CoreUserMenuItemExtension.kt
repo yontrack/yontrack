@@ -41,6 +41,16 @@ class CoreUserMenuItemExtension(
                 name = "Resources",
             )
 
+            // Any person registers and manages their own agents - an agent does not own any
+            if (securityService.currentUser?.account?.isAgent != true) {
+                items += UserMenuItem(
+                    groupId = CoreUserMenuGroups.USER,
+                    extension = "core/admin",
+                    id = "my-agents",
+                    name = "My agents",
+                )
+            }
+
             if (globalSettings) {
                 items += UserMenuItem(
                     groupId = CoreUserMenuGroups.CONFIGURATIONS,
@@ -101,6 +111,12 @@ class CoreUserMenuItemExtension(
                     extension = "core/admin",
                     id = "account-management",
                     name = "Account management",
+                )
+                items += UserMenuItem(
+                    groupId = CoreUserMenuGroups.SYSTEM,
+                    extension = "core/admin",
+                    id = "agents",
+                    name = "Agents",
                 )
             }
 

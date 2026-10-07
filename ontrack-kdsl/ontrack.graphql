@@ -70,6 +70,12 @@ interface ProjectEntity {
 union BuildPromotionInfoItemData = PromotionLevel | PromotionRun
 
 type Account {
+  "For an agent, its optional description"
+  agentDescription: String
+  "For an agent, the tool behind it (Claude Code, Codex, Copilot, Devin, ...)"
+  agentTool: String
+  "Agents owned by this account. Only visible to the account itself and to administrators."
+  agents: [Account!]!
   "List of authorized projects"
   authorizedProjects: [AuthorizedProject!]!
   "Email of the account"
@@ -81,6 +87,10 @@ type Account {
   "List of groups the account belongs to"
   groups: [AccountGroup!]!
   id: ID!
+  "Kind of the account: a person or a registered agent"
+  kind: AccountKind!
+  "For an agent, the person accountable for it - only its ID, full name and email. Null for a person."
+  owner: Account
   "Security role (admin or none)"
   role: String
   "List of authentication tokens linked to this account."
@@ -1402,6 +1412,12 @@ type DeleteAccountPayload implements Payload {
   errors: [UserError]
 }
 
+"Output type for the deleteAgent mutation."
+type DeleteAgentPayload implements Payload {
+  "List of errors"
+  errors: [UserError]
+}
+
 "Output type for the deleteAutoVersioningConfig mutation."
 type DeleteAutoVersioningConfigPayload implements Payload {
   "List of errors"
@@ -2677,6 +2693,14 @@ type FinishSlotPipelineDeploymentPayload implements Payload {
   finishStatus: SlotDeploymentActionStatus
 }
 
+"Output type for the generateAgentToken mutation."
+type GenerateAgentTokenPayload implements Payload {
+  "List of errors"
+  errors: [UserError]
+  "Generated token, with its value"
+  token: Token
+}
+
 "Output type for the generateToken mutation."
 type GenerateTokenPayload implements Payload {
   "List of errors"
@@ -3783,6 +3807,11 @@ type Mutation {
     "Input for the mutation"
     input: DeleteAccountGroupInput
   ): DeleteAccountGroupPayload
+  "Deletes an agent and its tokens. Its name stays on every signature. Owner or administrator only."
+  deleteAgent(
+    "Input for the mutation"
+    input: DeleteAgentInput
+  ): DeleteAgentPayload
   "Deletes the auto-versioning configuration from a branch"
   deleteAutoVersioningConfig(
     "Input for the mutation"
@@ -4297,6 +4326,11 @@ type Mutation {
     "Input for the mutation"
     input: FinishSlotPipelineDeploymentInput
   ): FinishSlotPipelineDeploymentPayload
+  "Generates a named token for an agent, under the usual validity rules of the instance. The value of the token is returned only this once. Owner or administrator only."
+  generateAgentToken(
+    "Input for the mutation"
+    input: GenerateAgentTokenInput
+  ): GenerateAgentTokenPayload
   "Generate a new token"
   generateToken(
     "Input for the mutation"
@@ -4436,6 +4470,11 @@ type Mutation {
     "Input for the mutation"
     input: RecomputeProjectScorecardInput
   ): RecomputeProjectScorecardPayload
+  "Registers an agent. Any user registers agents for themselves; only an administrator registers one for another owner. The agent is created with no rights of its own."
+  registerAgent(
+    "Input for the mutation"
+    input: RegisterAgentInput
+  ): RegisterAgentPayload
   "Reload the configuration from the CasC files"
   reloadCasc: ReloadCascPayload
   "Renames an existing subscription"
@@ -4472,6 +4511,16 @@ type Mutation {
     "Input for the mutation"
     input: RevokeAccountTokensInput
   ): RevokeAccountTokensPayload
+  "Revokes a named token of an agent. Owner or administrator only."
+  revokeAgentToken(
+    "Input for the mutation"
+    input: RevokeAgentTokenInput
+  ): RevokeAgentTokenPayload
+  "Revokes all the tokens of an agent. Owner or administrator only."
+  revokeAllAgentTokens(
+    "Input for the mutation"
+    input: RevokeAllAgentTokensInput
+  ): RevokeAllAgentTokensPayload
   "Revokes all tokens"
   revokeAllTokens: RevokeAllTokensPayload
   "Revoke the given token"
@@ -5049,6 +5098,11 @@ type Mutation {
     "Input for the mutation"
     input: TestWebhookInput
   ): TestWebhookPayload
+  "Transfers an agent to another owner, who must be a person. Administrator only."
+  transferAgent(
+    "Input for the mutation"
+    input: TransferAgentInput
+  ): TransferAgentPayload
   "Unmarks a branch as favourite"
   unfavouriteBranch(
     "Input for the mutation"
@@ -5064,6 +5118,11 @@ type Mutation {
     "Input for the mutation"
     input: UnshareSCMFileChangeFilterInput
   ): UnshareSCMFileChangeFilterPayload
+  "Updates the display name, the tool and the description of an agent. Its slug never changes. Owner or administrator only."
+  updateAgent(
+    "Input for the mutation"
+    input: UpdateAgentInput
+  ): UpdateAgentPayload
   "Updates an existing build"
   updateBuild(
     "Input for the mutation"
@@ -5803,6 +5862,13 @@ type Query {
     "Filtering accounts having this token in the name, email or groups"
     token: String
   ): [Account!]
+  "Registered agents: every agent for an administrator, only their own agents for any other user. An agent is an account of kind AGENT, owned by a person, acting with its own tokens."
+  agents(
+    "Restricts the list to the agent with this ID"
+    id: Int,
+    "Restricts the list to the agents of this owner, given by email"
+    owner: String
+  ): [Account!]!
   "Public keys of the instance, with which the endorsements of the entries of its trails are verified - empty while no key exists"
   auditTrailKeys: [AuditTrailKey!]!
   "Status of the audit trail: licence, evidence storage and instance key - requires the global settings"
@@ -6618,6 +6684,14 @@ type RecomputeProjectScorecardPayload implements Payload {
   errors: [UserError]
 }
 
+"Output type for the registerAgent mutation."
+type RegisterAgentPayload implements Payload {
+  "Registered agent"
+  agent: Account
+  "List of errors"
+  errors: [UserError]
+}
+
 "Output type for the reloadCasc mutation."
 type ReloadCascPayload implements Payload {
   "List of errors"
@@ -6660,6 +6734,18 @@ type RescheduleAutoVersioningPayload implements Payload {
 
 "Output type for the revokeAccountTokens mutation."
 type RevokeAccountTokensPayload implements Payload {
+  "List of errors"
+  errors: [UserError]
+}
+
+"Output type for the revokeAgentToken mutation."
+type RevokeAgentTokenPayload implements Payload {
+  "List of errors"
+  errors: [UserError]
+}
+
+"Output type for the revokeAllAgentTokens mutation."
+type RevokeAllAgentTokensPayload implements Payload {
   "List of errors"
   errors: [UserError]
 }
@@ -8292,6 +8378,14 @@ type Token {
   value: String
 }
 
+"Output type for the transferAgent mutation."
+type TransferAgentPayload implements Payload {
+  "Transferred agent"
+  agent: Account
+  "List of errors"
+  errors: [UserError]
+}
+
 "Trigger for something"
 type Trigger {
   "displayName field"
@@ -8326,6 +8420,14 @@ type UnfavouriteProjectPayload implements Payload {
 
 "Output type for the unshareSCMFileChangeFilter mutation."
 type UnshareSCMFileChangeFilterPayload implements Payload {
+  "List of errors"
+  errors: [UserError]
+}
+
+"Output type for the updateAgent mutation."
+type UpdateAgentPayload implements Payload {
+  "Updated agent"
+  agent: Account
   "List of errors"
   errors: [UserError]
 }
@@ -9010,6 +9112,14 @@ type WorkflowValidation {
   error: Boolean
   "errors field"
   errors: [String!]!
+}
+
+"Kind of an account: a person, or a registered agent"
+enum AccountKind {
+  "A registered agent: a non-human principal acting with its own API tokens, owned by a human account"
+  AGENT
+  "A person, logging in through the identity provider or using their own API tokens"
+  HUMAN
 }
 
 "Whether the instance key can endorse the entries"
@@ -10098,6 +10208,12 @@ input DeleteAccountInput {
   accountId: Int!
 }
 
+"Input type for the deleteAgent mutation."
+input DeleteAgentInput {
+  "ID of the agent"
+  id: Int!
+}
+
 "Input type for the deleteAutoVersioningConfig mutation."
 input DeleteAutoVersioningConfigInput {
   "ID of the branch to clean"
@@ -10930,6 +11046,14 @@ input FinishSlotPipelineDeploymentInput {
   pipelineId: String!
 }
 
+"Input type for the generateAgentToken mutation."
+input GenerateAgentTokenInput {
+  "ID of the agent"
+  id: Int!
+  "Name of the token, unique for the agent"
+  name: String!
+}
+
 "Input type for the generateToken mutation."
 input GenerateTokenInput {
   "name field"
@@ -11385,6 +11509,20 @@ input RecomputeProjectScorecardInput {
   projectId: Int!
 }
 
+"Input type for the registerAgent mutation."
+input RegisterAgentInput {
+  "Optional description of the agent"
+  description: String
+  "Display name of the agent"
+  displayName: String!
+  "Email of the owner of the agent. The current user when not set; only an administrator can give another owner."
+  owner: String
+  "Slug of the agent: 1 to 32 lowercase letters, digits or dashes. The agent is identified as `<slug>[agent]`, and the slug never changes."
+  slug: String!
+  "Tool behind the agent: Claude Code, Codex, Copilot, Devin, Other, or any other name"
+  tool: String!
+}
+
 "Input type for the renameSubscription mutation."
 input RenameSubscriptionInput {
   "Name of the subscription to rename"
@@ -11433,6 +11571,20 @@ input RescheduleAutoVersioningInput {
 input RevokeAccountTokensInput {
   "accountId field"
   accountId: Int!
+}
+
+"Input type for the revokeAgentToken mutation."
+input RevokeAgentTokenInput {
+  "ID of the agent"
+  id: Int!
+  "Name of the token"
+  name: String!
+}
+
+"Input type for the revokeAllAgentTokens mutation."
+input RevokeAllAgentTokensInput {
+  "ID of the agent"
+  id: Int!
 }
 
 "Input type for the revokeToken mutation."
@@ -13055,6 +13207,14 @@ input TestWebhookInput {
   name: String!
 }
 
+"Input type for the transferAgent mutation."
+input TransferAgentInput {
+  "ID of the agent"
+  id: Int!
+  "Email of the new owner, a person"
+  owner: String!
+}
+
 "Input type for the unfavouriteBranch mutation."
 input UnfavouriteBranchInput {
   "Branch ID"
@@ -13073,6 +13233,18 @@ input UnshareSCMFileChangeFilterInput {
   name: String!
   "ID of the project"
   projectId: Int!
+}
+
+"Input type for the updateAgent mutation."
+input UpdateAgentInput {
+  "Optional description of the agent"
+  description: String
+  "Display name of the agent"
+  displayName: String!
+  "ID of the agent"
+  id: Int!
+  "Tool behind the agent"
+  tool: String!
 }
 
 "Input type for the updateBuild mutation."

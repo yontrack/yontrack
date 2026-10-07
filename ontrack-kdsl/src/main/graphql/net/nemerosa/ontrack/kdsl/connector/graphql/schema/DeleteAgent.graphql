@@ -1,0 +1,5 @@
+mutation DeleteAgent($id: Int!) {
+    deleteAgent(input: {id: $id}) {
+        ...PayloadUserErrors
+    }
+}

@@ -11,6 +11,15 @@ export const useAccounts = ({refreshState, token}) => {
                     id
                     fullName
                     email
+                    kind
+                    owner {
+                        email
+                    }
+                    agents {
+                        id
+                        fullName
+                        email
+                    }
                     groups {
                         id
                         name

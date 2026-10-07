@@ -1,0 +1,5 @@
+mutation RevokeAgentToken($id: Int!, $name: String!) {
+    revokeAgentToken(input: {id: $id, name: $name}) {
+        ...PayloadUserErrors
+    }
+}

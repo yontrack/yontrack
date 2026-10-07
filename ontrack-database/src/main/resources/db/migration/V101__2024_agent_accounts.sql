@@ -1,0 +1,23 @@
+-- #2024 Agent accounts: an account of kind AGENT, owned by a human account, acting with its own tokens
+
+ALTER TABLE ACCOUNTS
+    ADD COLUMN KIND VARCHAR(16) NOT NULL DEFAULT 'HUMAN';
+
+-- Deleting the owner deletes its agents, and their tokens through the existing cascade
+ALTER TABLE ACCOUNTS
+    ADD COLUMN OWNER_ID INTEGER NULL REFERENCES ACCOUNTS (ID) ON DELETE CASCADE;
+
+ALTER TABLE ACCOUNTS
+    ADD COLUMN AGENT_TOOL VARCHAR(40) NULL;
+
+ALTER TABLE ACCOUNTS
+    ADD COLUMN AGENT_DESCRIPTION VARCHAR(500) NULL;
+
+ALTER TABLE ACCOUNTS
+    ADD CONSTRAINT ACCOUNTS_CK_KIND CHECK (KIND IN ('HUMAN', 'AGENT'));
+
+-- An agent has an owner, a person has none. That the owner is a person is checked by the service.
+ALTER TABLE ACCOUNTS
+    ADD CONSTRAINT ACCOUNTS_CK_AGENT_OWNER CHECK ((KIND = 'AGENT') = (OWNER_ID IS NOT NULL));
+
+CREATE INDEX ACCOUNTS_IX_OWNER ON ACCOUNTS (OWNER_ID);

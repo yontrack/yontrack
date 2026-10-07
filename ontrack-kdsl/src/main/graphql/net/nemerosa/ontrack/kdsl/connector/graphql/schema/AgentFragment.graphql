@@ -1,0 +1,11 @@
+fragment AgentFragment on Account {
+    id
+    email
+    fullName
+    kind
+    agentTool
+    agentDescription
+    owner {
+        email
+    }
+}

@@ -5,6 +5,7 @@ import net.nemerosa.ontrack.kdsl.connector.Connector
 import net.nemerosa.ontrack.kdsl.connector.graphql.checkData
 import net.nemerosa.ontrack.kdsl.connector.graphql.convert
 import net.nemerosa.ontrack.kdsl.connector.graphql.schema.CreateUserMutation
+import net.nemerosa.ontrack.kdsl.connector.graphql.schema.DeleteAccountMutation
 import net.nemerosa.ontrack.kdsl.connector.graphql.schema.GrantGlobalRoleToAccountMutation
 import net.nemerosa.ontrack.kdsl.connector.graphqlConnector
 import net.nemerosa.ontrack.kdsl.connector.parse
@@ -60,6 +61,15 @@ class AdminMgt(connector: Connector) : Connected(connector) {
                 )
             }
             ?: error("could not create user")
+
+    /**
+     * Deleting an account. The agents it owns are deleted with it.
+     */
+    fun deleteAccount(account: Account) {
+        graphqlConnector.mutate(
+            DeleteAccountMutation(account.id)
+        ) { it?.deleteAccount?.payloadUserErrors?.convert() }
+    }
 
     fun grantGlobalRoleToAccount(account: Account, globalRole: String) {
         graphqlConnector.mutate(

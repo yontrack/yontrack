@@ -15,3 +15,8 @@ To perform a GraphQL call you can use the generated token in the `X-Ontrack-Toke
 ```
 X-Ontrack-Token: <your token>
 ```
+
+## Tokens for an agent
+
+An AI coding agent gets tokens of its own, rather than one of yours: register it as an
+[agent](../agents/index.md), and generate its tokens from its page.

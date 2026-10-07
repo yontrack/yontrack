@@ -6,6 +6,7 @@ import jakarta.servlet.http.HttpServletResponse
 import net.nemerosa.ontrack.model.security.Account
 import net.nemerosa.ontrack.model.security.AccountLoginService
 import net.nemerosa.ontrack.model.security.Actor
+import net.nemerosa.ontrack.model.security.AgentIdentifiers
 import net.nemerosa.ontrack.model.security.ActorJwt
 import net.nemerosa.ontrack.model.security.ActorVia
 import net.nemerosa.ontrack.model.security.AuthenticationUserService
@@ -34,6 +35,19 @@ class WebSecurityFilter(
     ) {
         val authentication = SecurityContextHolder.getContext().authentication
         if (authentication != null && authentication.isAuthenticated) {
+            // An agent never logs in through the identity provider: a JWT claiming an agent identifier is refused
+            if (authentication is JwtAuthenticationToken) {
+                val email = jwtEmail(authentication)
+                if (!email.isNullOrBlank() && AgentIdentifiers.isAgentIdentifier(email)) {
+                    log.warn("JWT refused because its email is an agent identifier: {}", email)
+                    SecurityContextHolder.clearContext()
+                    response.sendError(
+                        HttpServletResponse.SC_UNAUTHORIZED,
+                        "An agent never logs in through the identity provider."
+                    )
+                    return
+                }
+            }
             when (authentication) {
                 is JwtAuthenticationToken -> accountFromJwt(authentication)?.let { account ->
                     authenticationUserService.asUser(account, actorFromJwt(account, authentication))
@@ -74,11 +88,7 @@ class WebSecurityFilter(
                 log.debug("JWT claim {}: {}", key, value)
             }
         }
-        val email = getClaim(
-            jwtAuthenticationToken,
-            defaultClaimName = "email",
-            customClaimName = ontrackConfigProperties.security.authorization.jwt.claims.email,
-        )
+        val email = jwtEmail(jwtAuthenticationToken)
         if (debug) log.debug("JWT email {}", email)
         if (email.isNullOrBlank()) {
             if (debug) log.debug("JWT email not set - not authenticated")
@@ -110,6 +120,13 @@ class WebSecurityFilter(
             return accountLoginService.login(email, fullName, groups)
         }
     }
+
+    private fun jwtEmail(jwtAuthenticationToken: JwtAuthenticationToken): String? =
+        getClaim(
+            jwtAuthenticationToken,
+            defaultClaimName = "email",
+            customClaimName = ontrackConfigProperties.security.authorization.jwt.claims.email,
+        )
 
     private fun getClaim(
         jwtAuthenticationToken: JwtAuthenticationToken,

@@ -1,0 +1,20 @@
+mutation RegisterAgent(
+    $slug: String!,
+    $displayName: String!,
+    $tool: String!,
+    $description: String,
+    $owner: String,
+) {
+    registerAgent(input: {
+        slug: $slug,
+        displayName: $displayName,
+        tool: $tool,
+        description: $description,
+        owner: $owner,
+    }) {
+        ...PayloadUserErrors
+        agent {
+            ...AgentFragment
+        }
+    }
+}

@@ -1,0 +1,5 @@
+mutation DeleteAccount($accountId: Int!) {
+    deleteAccount(input: {accountId: $accountId}) {
+        ...PayloadUserErrors
+    }
+}

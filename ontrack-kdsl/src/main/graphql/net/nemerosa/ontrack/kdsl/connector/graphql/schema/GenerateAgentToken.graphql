@@ -1,0 +1,8 @@
+mutation GenerateAgentToken($id: Int!, $name: String!) {
+    generateAgentToken(input: {id: $id, name: $name}) {
+        ...PayloadUserErrors
+        token {
+            value
+        }
+    }
+}

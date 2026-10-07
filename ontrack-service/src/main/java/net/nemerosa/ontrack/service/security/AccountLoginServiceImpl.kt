@@ -2,6 +2,8 @@ package net.nemerosa.ontrack.service.security
 
 import net.nemerosa.ontrack.model.security.Account
 import net.nemerosa.ontrack.model.security.AccountLoginService
+import net.nemerosa.ontrack.model.security.AgentIdentifierRefusedException
+import net.nemerosa.ontrack.model.security.AgentIdentifiers
 import net.nemerosa.ontrack.model.security.SecurityRole
 import net.nemerosa.ontrack.model.structure.ID
 import net.nemerosa.ontrack.repository.AccountIdpGroupRepository
@@ -17,6 +19,10 @@ class AccountLoginServiceImpl(
 ) : AccountLoginService {
 
     override fun login(email: String, fullName: String, idpGroups: List<String>): Account {
+        // An agent never logs in through the identity provider
+        if (AgentIdentifiers.isAgentIdentifier(email)) {
+            throw AgentIdentifierRefusedException(email)
+        }
         val account = accountRepository.findOrCreateAccount(
             Account(
                 id = ID.NONE,

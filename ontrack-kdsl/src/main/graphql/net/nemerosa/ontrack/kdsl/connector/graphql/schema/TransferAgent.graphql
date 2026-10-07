@@ -1,0 +1,8 @@
+mutation TransferAgent($id: Int!, $owner: String!) {
+    transferAgent(input: {id: $id, owner: $owner}) {
+        ...PayloadUserErrors
+        agent {
+            ...AgentFragment
+        }
+    }
+}

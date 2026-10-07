@@ -1,0 +1,5 @@
+query Agents($owner: String, $id: Int) {
+    agents(owner: $owner, id: $id) {
+        ...AgentFragment
+    }
+}

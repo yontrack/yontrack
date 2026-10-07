@@ -30,6 +30,10 @@ class AccountServiceImpl(
 
     override fun create(input: AccountInput): Account {
         securityService.checkGlobalFunction(AccountManagement::class.java)
+        // Agents are registered, never created as accounts
+        if (AgentIdentifiers.isAgentIdentifier(input.email)) {
+            throw AgentIdentifierRefusedException(input.email)
+        }
         // Creates the account
         var account = Account.user(
             fullName = input.fullName,
@@ -47,6 +51,13 @@ class AccountServiceImpl(
         securityService.checkGlobalFunction(AccountManagement::class.java)
         // Gets the existing account
         var account = getAccount(accountId)
+        // An agent is edited as an agent, and has no groups
+        if (account.isAgent) {
+            throw AgentAccountEditionException(account.email)
+        }
+        if (AgentIdentifiers.isAgentIdentifier(input.email)) {
+            throw AgentIdentifierRefusedException(input.email)
+        }
         // Updates it
         account = account.update(input)
         // Saves it
@@ -104,9 +115,9 @@ class AccountServiceImpl(
     override fun searchPermissionTargets(token: String): Collection<PermissionTarget> {
         securityService.checkGlobalFunction(AccountManagement::class.java)
         val targets: MutableList<PermissionTarget> = ArrayList()
-        // Users first
+        // Users first - agents have no ACL of their own
         targets.addAll(
-            accountRepository.findByNameToken(token).map { it.asPermissionTarget() }
+            accountRepository.findByNameToken(token).filter { !it.isAgent }.map { it.asPermissionTarget() }
         )
         // ... then groups
         targets.addAll(
