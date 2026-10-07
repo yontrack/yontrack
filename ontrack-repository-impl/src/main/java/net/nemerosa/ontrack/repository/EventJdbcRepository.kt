@@ -14,6 +14,7 @@ import net.nemerosa.ontrack.repository.support.AbstractJdbcRepository
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource
 import org.springframework.stereotype.Repository
 import java.sql.ResultSet
+import java.time.LocalDateTime
 import java.util.*
 import javax.sql.DataSource
 
@@ -160,6 +161,12 @@ class EventJdbcRepository(
             Int::class.java,
         ).isNotEmpty()
     }
+
+    override fun deleteEventsBefore(time: LocalDateTime, size: Int): Int =
+        namedParameterJdbcTemplate!!.update(
+            "DELETE FROM EVENTS WHERE ID IN (SELECT ID FROM EVENTS WHERE EVENT_TIME < :time LIMIT :size)",
+            params("time", Time.store(time)).addValue("size", size)
+        )
 
     override fun getLastEventId(): Int? =
         jdbcTemplate.queryForObject("SELECT MAX(ID) FROM EVENTS", Int::class.java)

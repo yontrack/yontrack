@@ -106,6 +106,7 @@ class OntrackConfigProperties {
         logger.info("[document] Documents engine = ${documents.engine}")
         logger.info("[templating] Errors = ${templating.errors}")
         logger.info("[events] Export max rows = ${events.export.maxRows}")
+        logger.info("[events] Cleanup batch size = ${events.cleanup.batchSize}")
     }
 
     /**
@@ -117,6 +118,12 @@ class OntrackConfigProperties {
          */
         @Valid
         var export = EventsExportProperties()
+
+        /**
+         * Cleanup of the events
+         */
+        @Valid
+        var cleanup = EventsCleanupProperties()
     }
 
     /**
@@ -126,6 +133,15 @@ class OntrackConfigProperties {
         @Min(1)
         @APIDescription("Maximum number of events in an export of the events, as CSV or JSON. When more events match the filter, the export holds the most recent ones only, and says it was truncated.")
         var maxRows: Int = 100_000
+    }
+
+    /**
+     * Cleanup of the events
+     */
+    class EventsCleanupProperties {
+        @Min(1)
+        @APIDescription("Maximum number of events deleted by one statement of the events cleanup job, which deletes the events older than their retention. Smaller batches keep the locks on the events table shorter.")
+        var batchSize: Int = 10_000
     }
 
     /**

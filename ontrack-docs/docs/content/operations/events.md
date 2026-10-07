@@ -261,3 +261,44 @@ query {
   }
 }
 ```
+
+## Retention
+
+By default, Yontrack keeps the events **forever**: only the deletion of an entity deletes its
+events. Deleting audit data is the decision of the administrators, who can set a **retention**,
+in days, after which the events are deleted.
+
+!!! warning
+
+    The deletion of the events cannot be undone. [Export](#export) the events you need to keep
+    before setting a retention.
+
+As an administrator, open the user menu, choose _System_ > _Settings_, then select _Events_:
+
+| Setting          | Default | Meaning                                                              |
+|------------------|---------|----------------------------------------------------------------------|
+| Retention (days) | `0`     | Number of days the events are kept. `0` keeps the events forever.    |
+
+A negative retention is refused.
+
+As [code](../configuration/casc.md):
+
+```yaml
+ontrack:
+  config:
+    settings:
+      events:
+        retentionDays: 365
+```
+
+### Cleanup job
+
+The *Events cleanup* job, `core / events-cleanup / events-cleanup` on the *Jobs* page, runs every
+day, and can be launched from there at any time. When the retention is `N` days, it deletes the
+events posted more than `N` days ago; when it is `0`, it does nothing.
+
+It deletes the events in batches of at most **10 000**, each in its own statement, to keep the
+locks on the events short. The administrators can change this size with the
+`ontrack.config.events.cleanup.batch-size` setting (see the
+[general configuration properties](../generated/configurations/net.nemerosa.ontrack.model.support.OntrackConfigProperties.md)).
+Each run logs the number of deleted events, at the `INFO` level.

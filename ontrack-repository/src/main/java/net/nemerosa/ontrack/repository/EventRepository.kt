@@ -7,6 +7,7 @@ import net.nemerosa.ontrack.model.structure.ID
 import net.nemerosa.ontrack.model.structure.ProjectEntity
 import net.nemerosa.ontrack.model.structure.ProjectEntityType
 import net.nemerosa.ontrack.model.structure.Signature
+import java.time.LocalDateTime
 
 interface EventRepository {
 
@@ -85,6 +86,15 @@ interface EventRepository {
      * @return `true` when there is an event past the [offset] first ones
      */
     fun hasEventsBeyond(filter: EventFilter, beforeId: Int?, offset: Int): Boolean
+
+    /**
+     * Deletes, in one statement, at most [size] events posted before [time].
+     *
+     * @param time Events posted strictly before this time (UTC) are deleted
+     * @param size Maximum number of events to delete
+     * @return Number of deleted events
+     */
+    fun deleteEventsBefore(time: LocalDateTime, size: Int): Int
 
     /**
      * ID of the last event, if any.
