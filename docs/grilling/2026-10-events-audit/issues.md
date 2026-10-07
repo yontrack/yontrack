@@ -9,7 +9,7 @@ All the issues are in `yontrack`, base branch `main`, milestone `6.0`. Each one 
 | EA1 | [#2013](https://github.com/yontrack/yontrack/issues/2013) | Admin-only `events` GraphQL query with filters (`EventsAudit`), indexes, `CONTEXT.md`, KDSL | — |
 | EA2 | [#2014](https://github.com/yontrack/yontrack/issues/2014) | Deprecate the `/rest/events` endpoints (markers, runtime warnings, migration page) | EA1 |
 | EA3 | [#2015](https://github.com/yontrack/yontrack/issues/2015) | *Information › Events* page, user documentation | EA1 |
-| EA4 | [#2016](https://github.com/yontrack/yontrack/issues/2016) | CSV and JSON export of the filtered events, capped and streamed | EA1, EA3 |
+| EA4 | [#2016](https://github.com/yontrack/yontrack/issues/2016) | CSV and JSON export of the filtered events, versioned (v1), capped and streamed | EA1, EA3 |
 | EA5 | [#2017](https://github.com/yontrack/yontrack/issues/2017) | Retention setting and cleanup job, off by default | — |
 
 ## Order

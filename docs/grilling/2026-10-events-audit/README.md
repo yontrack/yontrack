@@ -57,6 +57,7 @@ Facts read from the code on `main` (ba18b1c873) before the decisions were taken.
 | Q11 | Filters | Date range (`from`, `to`), user (case-insensitive prefix), event types (multi), project (`PROJECT` or `X_PROJECT`). A Flyway migration adds indexes on `EVENT_TIME` and `EVENT_USER`. No filter on the values |
 | Q12 | Columns, sort, count | Time, user, type, message, project; newest first (`ID DESC`), not sortable; **no total count**, "load more" pagination |
 | Q13 | Export format | **CSV and JSON**, through `format=csv\|json` on one endpoint; plain-text message, values as one JSON column in CSV |
+| Q13b | Export versioning | The export format is versioned, starting at **1**: `formatVersion` first in the JSON, an `X-Yontrack-Export-Format-Version` header for both formats. Adding a field or a trailing CSV column keeps the version; removing, renaming, retyping or reordering bumps it |
 | Q14 | Export size | Streamed, capped by `ontrack.config.events.export.max-rows` (default 100 000), with a truncation marker and a warning in the UI |
 | Q15 | Demo | No `DemoContent` change: seeding the demo already posts plenty of events |
 | Q16 | Retention configuration | A global settings section **Events** (UI + CasC), `retentionDays`, `0` = disabled = the default |
