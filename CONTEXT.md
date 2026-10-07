@@ -430,10 +430,11 @@ account, the channel (`ui`, `token`, `jwt`, `webhook` or `system`), the name of
 the API token (never its value) or the issuer and subject of the JWT. When
 Yontrack runs as administrator — an auto-promotion, an ingestion, a job — the
 actor is the *system*, with its reason, acting on behalf of the actor that set it
-off. Every entry carries one, taken at append time.
+off. An actor is a *human* or an *agent*; an agent's actor also names its owner
+and, when given, its agent session. Every entry carries one, taken at append time.
 _Avoid_: user, signature. A *user* is any authenticated account, whatever the
-channel, and a *signature* keeps only a name and a time — often the build's rather
-than the caller's.
+channel, and a *signature* keeps a name and a time, and the actor when an agent
+signed.
 
 **Endorsement**:
 The instance key's Ed25519 signature over one entry's hash, saying that this
@@ -463,3 +464,55 @@ file, or carrying an extra one, cannot be detected from the archive alone.
 *Seal* (the frozen, self-contained package of a trail) and *Instance trail* (the
 trail of changes to the audit feature itself) are reserved for 6.x: do not use
 them for anything else.
+
+### Agents
+
+**Agent**:
+A non-human principal that acts on Yontrack with its own API tokens: an account of
+kind *agent*, identified as `<slug>[agent]` (e.g. `claude-code-damien[agent]`),
+with a display name, a tool (Claude Code, Codex, Copilot, Devin, …) and an owner.
+Its rights are its owner's, narrowed by the agent policy. It never logs in through
+the identity provider.
+_Avoid_: bot, service account, automation user. A CI pipeline acting through an
+account holding `AUTOMATION` is not an agent.
+
+**Owner**:
+The account accountable for an agent. Every agent has exactly one. Demoting or
+deleting the owner bounds or deletes every agent it owns, and an administrator can
+transfer an agent to another owner.
+_Avoid_: creator, sponsor
+
+**Agent policy**:
+What an agent may do on top of its owner's rights:
+- it may read, and record evidence (builds, validation runs, links, build
+  properties);
+- it promotes only on a promotion level that admits agents, and deploys only on a
+  slot that admits agents;
+- it never satisfies a manual admission rule and never changes configuration.
+
+Every other function is denied to an agent by default.
+_Avoid_: agent permissions, agent role
+
+**Agent session**:
+The opaque reference an agent gives for the conversation or run behind an action:
+an id and, optionally, a link. It is carried on the actor, stored and rendered as a
+link, and never fetched nor interpreted.
+_Avoid_: session (collides with login and HTTP sessions), trace, conversation
+
+**Assistant**:
+The kind of agent that a commit's markers name, such as `Co-Authored-By` with a
+known agent address, `Assisted-by:`, `Claude-Session:` or a known bot login. It is
+a tool name, never a registered agent.
+_Avoid_: co-author, agent (an agent is a registered principal)
+
+**Assisted change**:
+The fact that a build's commits since the previous build on its branch name at
+least one assistant. It is recorded on the build with its basis: computed from git,
+set by CI, or unknown.
+_Avoid_: AI-generated, agent-made. Both overclaim authorship.
+
+**Readiness**:
+What a build still lacks to reach a promotion level or a slot: stamps not passed,
+promotion checks failing, admission rules not satisfied, a manual step, or the
+agent policy.
+_Avoid_: promotability, eligibility. *Eligible* already means something for slots.
