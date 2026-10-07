@@ -78,4 +78,60 @@ export class EventsPage {
     async filter() {
         await this.page.getByRole('button', {name: 'Filter', exact: true}).click()
     }
+
+    /**
+     * Downloads the CSV export of the filtered events, and returns its rows, header first.
+     */
+    async downloadCsv() {
+        const downloadPromise = this.page.waitForEvent('download')
+        await this.page.getByTestId('events-export-csv').click()
+        const download = await downloadPromise
+        expect(download.suggestedFilename()).toMatch(/^yontrack-events-\d{8}-\d{6}\.csv$/)
+        const stream = await download.createReadStream()
+        const chunks = []
+        for await (const chunk of stream) {
+            chunks.push(chunk)
+        }
+        return parseCsv(Buffer.concat(chunks).toString('utf-8'))
+    }
+}
+
+/**
+ * Rows of a CSV, whose values may be quoted, with the quotes doubled inside.
+ */
+const parseCsv = (text) => {
+    const rows = []
+    let row = []
+    let value = ''
+    let quoted = false
+    for (let i = 0; i < text.length; i++) {
+        const c = text[i]
+        if (quoted) {
+            if (c === '"' && text[i + 1] === '"') {
+                value += '"'
+                i++
+            } else if (c === '"') {
+                quoted = false
+            } else {
+                value += c
+            }
+        } else if (c === '"') {
+            quoted = true
+        } else if (c === ',') {
+            row.push(value)
+            value = ''
+        } else if (c === '\n') {
+            row.push(value)
+            rows.push(row)
+            row = []
+            value = ''
+        } else if (c !== '\r') {
+            value += c
+        }
+    }
+    if (value || row.length > 0) {
+        row.push(value)
+        rows.push(row)
+    }
+    return rows
 }

@@ -32,7 +32,8 @@ const SAME_VARIABLES = filterFormData => filterFormData
  * @param filterFormVariables Function turning the filter form data into query variables, for a form
  * field which is not a query variable as it is (like a date range). By default, the form data are
  * the variables.
- * @param filterExtraButtons List of extra buttons to put in the form on top of the table
+ * @param filterExtraButtons List of extra buttons to put in the form on top of the table, or a function
+ * returning them from the filter form data which is applied - for an action on what the table shows
  * @param autoRefresh Whether the table should contain an option for auto-refresh
  */
 export default function StandardTable({
@@ -116,7 +117,11 @@ export default function StandardTable({
                             filterForm={filterForm}
                             setFilterFormData={setFilterFormData}
                             onFilterFormValuesChanged={onFilterFormValuesChanged}
-                            filterExtraButtons={filterExtraButtons}
+                            filterExtraButtons={
+                                typeof filterExtraButtons === 'function' ?
+                                    filterExtraButtons(filterFormData) :
+                                    filterExtraButtons
+                            }
                             extraComponents={
                                 <>
                                 {

@@ -9,6 +9,7 @@ import SelectMultipleEvents from "@components/core/model/SelectMultipleEvents";
 import SelectProject from "@components/projects/SelectProject";
 import EventRowDetails from "@components/core/admin/events/EventRowDetails";
 import {eventsFilterVariables} from "@components/core/admin/events/eventsFilter";
+import EventsExportButtons from "@components/core/admin/events/EventsExportButtons";
 
 const query = gql`
     query Events(
@@ -73,6 +74,8 @@ const query = gql`
 /**
  * Read-only list of all the events of the instance, newest first. The `events` query requires
  * the events audit function: without it, the query is refused and its error is displayed.
+ *
+ * The events matching the applied filter can be downloaded as CSV or JSON.
  */
 export default function EventsView() {
     return (
@@ -83,6 +86,9 @@ export default function EventsView() {
             size={20}
             rowKey={event => event.id}
             filterFormVariables={eventsFilterVariables}
+            filterExtraButtons={(filterFormData) => [
+                <EventsExportButtons key="export" filterFormData={filterFormData}/>,
+            ]}
             filterForm={[
                 <Form.Item
                     key="range"

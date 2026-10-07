@@ -2434,6 +2434,14 @@ type EventType {
   id: String!
 }
 
+"What the export of the events matching a filter would hold"
+type EventsExportInfo {
+  "Maximum number of events in an export"
+  maxRows: Int!
+  "Whether more events than `maxRows` match the filter: the export then holds the `maxRows` most recent ones only"
+  truncated: Boolean!
+}
+
 "A file attached to a validation run, referenced by an evidence.attached entry of the trail of its build"
 type Evidence {
   "Server time of the upload, UTC"
@@ -5953,6 +5961,11 @@ type Query {
     "Size of the page"
     size: Int = 20
   ): EventPaginated
+  "What the export of the events matching a filter would hold: its maximum number of events, and whether more events than that match the filter. Requires the events audit function, granted to the administrators."
+  eventsExport(
+    "Filter on the events"
+    filter: EventFilterInput
+  ): EventsExportInfo
   "Security finding by ID. Null when it does not exist, or when the user is not granted the view of the findings of its project."
   finding(
     "ID of the finding"

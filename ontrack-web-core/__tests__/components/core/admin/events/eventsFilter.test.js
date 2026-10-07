@@ -1,6 +1,7 @@
 import dayjs from "dayjs"
 import utc from "dayjs/plugin/utc"
 import {eventEntityLink, eventsFilterVariables} from "@components/core/admin/events/eventsFilter"
+import {eventsExportUri} from "@components/common/Links"
 
 dayjs.extend(utc)
 
@@ -88,6 +89,33 @@ describe('eventEntityLink', () => {
             href: null,
             text: "Some entity",
         })
+    })
+
+})
+
+/**
+ * The export of the events is downloaded through the protected downloads of the UI, with the
+ * variables of the filter as its query string.
+ */
+describe('eventsExportUri', () => {
+
+    it('with no filter, only the format', () => {
+        expect(eventsExportUri("csv", {})).toBe("/api/protected/downloads/events/export?format=csv")
+    })
+
+    it('the variables of the filter as parameters, the event types repeated', () => {
+        expect(eventsExportUri("json", eventsFilterVariables({
+            range: [dayjs.utc("2026-10-01T08:30:00Z"), null],
+            user: "adm",
+            eventTypes: ["new_project", "new_branch"],
+            project: "my project",
+        }))).toBe(
+            "/api/protected/downloads/events/export?format=json" +
+            "&from=2026-10-01T08%3A30%3A00.000Z" +
+            "&user=adm" +
+            "&eventTypes=new_project&eventTypes=new_branch" +
+            "&project=my+project"
+        )
     })
 
 })

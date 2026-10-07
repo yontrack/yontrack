@@ -73,6 +73,42 @@ test('events page lists and filters the events of the instance', async ({page, o
     await expect(page.getByTestId("events").locator(".ant-empty-description")).toHaveText("No data")
 })
 
+test('events page downloads the filtered events as CSV', async ({page, ontrack}) => {
+    // A project with two builds
+    const project = await ontrack.createProject()
+    const branch = await project.createBranch()
+    const first = await branch.createBuild()
+    const second = await branch.createBuild()
+
+    await login(page, ontrack)
+    const eventsPage = new EventsPage(page, ontrack)
+    await eventsPage.goTo()
+
+    // Filtering on the builds of the project
+    await eventsPage.selectEventTypes(["new_build"])
+    await eventsPage.selectProject(project.name)
+    await eventsPage.filter()
+    await expect(eventsPage.rows()).toHaveCount(2)
+
+    // The download holds the same events, newest first
+    const [header, ...rows] = await eventsPage.downloadCsv()
+    expect(header).toEqual([
+        "id", "time", "user", "eventType", "message",
+        "project", "branch", "build", "promotionLevel", "validationStamp", "promotionRun", "validationRun",
+        "xProject", "xBranch", "xBuild", "xPromotionLevel", "xValidationStamp", "xPromotionRun", "xValidationRun",
+        "ref", "values",
+    ])
+    const items = rows.map(row => Object.fromEntries(header.map((name, index) => [name, row[index]])))
+    expect(items.map(item => [item.eventType, item.project, item.branch, item.build])).toEqual([
+        ["new_build", project.name, branch.name, second.name],
+        ["new_build", project.name, branch.name, first.name],
+    ])
+    // The values, as JSON
+    items.forEach(item => expect(() => JSON.parse(item.values)).not.toThrow())
+    // No warning, the export holding all the matching events
+    await expect(page.getByTestId('events-export-truncated')).toHaveCount(0)
+})
+
 test('events menu item hidden for a user without the events audit', async ({page, ontrack}) => {
     // The demo user holds no global role, and therefore no EventsAudit
     await login(page, ontrack, "demo@ontrack.local", "demo")

@@ -127,4 +127,19 @@ describe('StandardTable', () => {
         expect(variables[variables.length - 1]).toEqual({from: "a", to: "b", offset: 0, size: 2})
     })
 
+    it('gives the applied filter form data to the extra buttons when asked to', async () => {
+        // An action on what the table shows, like a download of the filtered items, needs the
+        // filter which is applied, not the one being typed
+        render(table(0, {
+            filter,
+            initialFilter: {user: "adm"},
+            filterForm: [<span key="field">Field</span>],
+            filterExtraButtons: (filterFormData) => [
+                <span key="button">Button for {filterFormData.user}</span>,
+            ],
+        }))
+
+        await waitFor(() => expect(screen.getByText("Button for adm")).toBeInTheDocument())
+    })
+
 })

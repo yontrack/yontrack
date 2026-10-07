@@ -68,6 +68,26 @@ export function evidenceDownloadUri(evidence) {
 }
 
 /**
+ * Download of the export of the events, through the protected downloads of the UI, which carry
+ * the token of the session.
+ *
+ * @param format `csv` or `json`
+ * @param variables Variables of the filter, as given by `eventsFilterVariables` - from, to, user,
+ * eventTypes, project
+ */
+export function eventsExportUri(format, variables = {}) {
+    const params = new URLSearchParams({format})
+    Object.entries(variables).forEach(([name, value]) => {
+        if (Array.isArray(value)) {
+            value.forEach(item => params.append(name, item))
+        } else if (value !== undefined && value !== null) {
+            params.append(name, value)
+        }
+    })
+    return `/api/protected/downloads/events/export?${params.toString()}`
+}
+
+/**
  * Upload of an evidence to a validation run, through the protected uploads of the UI.
  */
 export function validationRunEvidenceUploadUri(run) {

@@ -1,11 +1,14 @@
 package net.nemerosa.ontrack.kdsl.spec
 
 import com.apollographql.apollo.api.Optional
+import net.nemerosa.ontrack.kdsl.connector.Connected
+import net.nemerosa.ontrack.kdsl.connector.Connector
 import net.nemerosa.ontrack.kdsl.connector.graphql.GraphQLMissingDataException
 import net.nemerosa.ontrack.kdsl.connector.graphql.schema.EventsQuery
 import net.nemerosa.ontrack.kdsl.connector.graphql.schema.type.EventFilterInput
 import net.nemerosa.ontrack.kdsl.connector.graphqlConnector
 import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 
 /**
  * An event of the instance, as the audit of the events returns it.
@@ -91,4 +94,59 @@ fun Ontrack.events(
         },
         nextOffset = page.pageInfo?.nextPage?.offset,
     )
+}
+
+/**
+ * Format of an export of the events.
+ *
+ * @property id Value of the `format` parameter of the export
+ */
+enum class EventsExportFormat(val id: String) {
+    CSV("csv"),
+    JSON("json"),
+}
+
+/**
+ * Management of the events of the instance.
+ */
+val Ontrack.events: EventsMgt get() = EventsMgt(connector)
+
+/**
+ * Management of the events of the instance.
+ */
+class EventsMgt(connector: Connector) : Connected(connector) {
+
+    /**
+     * Export of the events, newest first, as the file the events page downloads. Requires the
+     * events audit function, granted to the administrators.
+     *
+     * All the criteria are optional, and apply together.
+     *
+     * @param format CSV or JSON
+     * @param from Events at or after this time (UTC, inclusive)
+     * @param to Events at or before this time (UTC, inclusive)
+     * @param user Case-insensitive prefix of the name of the user who posted the event
+     * @param eventTypes IDs of the event types to keep - empty for all of them
+     * @param project Name of a project, matching the event's project or its extra project
+     * @return Content of the file
+     */
+    fun export(
+        format: EventsExportFormat,
+        from: LocalDateTime? = null,
+        to: LocalDateTime? = null,
+        user: String? = null,
+        eventTypes: List<String> = emptyList(),
+        project: String? = null,
+    ): String =
+        connector.get(
+            path = "/rest/admin/events/export",
+            query = listOfNotNull(
+                "format" to format.id,
+                from?.let { "from" to it.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME) },
+                to?.let { "to" to it.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME) },
+                user?.let { "user" to it },
+                eventTypes.takeIf { it.isNotEmpty() }?.let { "eventTypes" to it.joinToString(",") },
+                project?.let { "project" to it },
+            ).toMap(),
+        ).body.asText()
 }

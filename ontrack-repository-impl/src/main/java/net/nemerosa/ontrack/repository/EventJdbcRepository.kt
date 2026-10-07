@@ -129,8 +129,53 @@ class EventJdbcRepository(
         entityLoader: (type: ProjectEntityType, id: ID) -> ProjectEntity,
         eventTypeLoader: (type: String) -> EventType,
     ): List<Event> {
+        val (where, params) = filterCriteria(filter)
+        return namedParameterJdbcTemplate!!.query(
+            "SELECT * FROM EVENTS $where ORDER BY ID DESC LIMIT :size OFFSET :offset",
+            params
+                .addValue("size", size)
+                .addValue("offset", offset)
+        ) { rs: ResultSet, _: Int -> toEvent(rs, entityLoader, eventTypeLoader) }
+    }
+
+    override fun findEventsBefore(
+        filter: EventFilter,
+        beforeId: Int,
+        size: Int,
+        entityLoader: (type: ProjectEntityType, id: ID) -> ProjectEntity,
+        eventTypeLoader: (type: String) -> EventType,
+    ): List<Event> {
+        val (where, params) = filterCriteria(filter, beforeId)
+        return namedParameterJdbcTemplate!!.query(
+            "SELECT * FROM EVENTS $where ORDER BY ID DESC LIMIT :size",
+            params.addValue("size", size)
+        ) { rs: ResultSet, _: Int -> toEvent(rs, entityLoader, eventTypeLoader) }
+    }
+
+    override fun hasEventsBeyond(filter: EventFilter, beforeId: Int?, offset: Int): Boolean {
+        val (where, params) = filterCriteria(filter, beforeId)
+        return namedParameterJdbcTemplate!!.queryForList(
+            "SELECT ID FROM EVENTS $where ORDER BY ID DESC LIMIT 1 OFFSET :offset",
+            params.addValue("offset", offset),
+            Int::class.java,
+        ).isNotEmpty()
+    }
+
+    override fun getLastEventId(): Int? =
+        jdbcTemplate.queryForObject("SELECT MAX(ID) FROM EVENTS", Int::class.java)
+
+    /**
+     * `WHERE` clause and parameters of a filter on the events.
+     *
+     * @param beforeId Only the events whose ID is lower than this one, if any
+     */
+    private fun filterCriteria(filter: EventFilter, beforeId: Int? = null): Pair<String, MapSqlParameterSource> {
         val criteria = mutableListOf<String>()
         val params = MapSqlParameterSource()
+        beforeId?.let {
+            criteria += "ID < :beforeId"
+            params.addValue("beforeId", it)
+        }
         filter.from?.let {
             criteria += "EVENT_TIME >= :from"
             params.addValue("from", Time.store(it))
@@ -152,12 +197,7 @@ class EventJdbcRepository(
             params.addValue("project", it)
         }
         val where = if (criteria.isEmpty()) "" else criteria.joinToString(" AND ", prefix = "WHERE ")
-        return namedParameterJdbcTemplate!!.query(
-            "SELECT * FROM EVENTS $where ORDER BY ID DESC LIMIT :size OFFSET :offset",
-            params
-                .addValue("size", size)
-                .addValue("offset", offset)
-        ) { rs: ResultSet, _: Int -> toEvent(rs, entityLoader, eventTypeLoader) }
+        return where to params
     }
 
     /**

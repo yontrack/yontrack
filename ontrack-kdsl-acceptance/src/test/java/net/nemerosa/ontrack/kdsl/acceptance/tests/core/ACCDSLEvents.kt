@@ -1,8 +1,12 @@
 package net.nemerosa.ontrack.kdsl.acceptance.tests.core
 
+import com.opencsv.CSVReader
+import net.nemerosa.ontrack.json.parseAsJson
 import net.nemerosa.ontrack.kdsl.acceptance.tests.AbstractACCDSLTestSupport
+import net.nemerosa.ontrack.kdsl.spec.EventsExportFormat
 import net.nemerosa.ontrack.kdsl.spec.events
 import org.junit.jupiter.api.Test
+import java.io.StringReader
 import java.time.LocalDateTime
 import java.time.ZoneOffset
 import kotlin.test.assertEquals
@@ -62,6 +66,49 @@ class ACCDSLEvents : AbstractACCDSLTestSupport() {
                 assertEquals(events.items.drop(3).map { it.id }, secondPage.items.map { it.id })
                 assertNull(secondPage.nextOffset, "No more pages")
             }
+        }
+    }
+
+    @Test
+    fun `Export of the events of a project`() {
+        project {
+            branch {
+                build("1") {}
+                build("2") {}
+            }
+
+            // CSV, filtered on the builds
+            val csv = ontrack.events.export(
+                format = EventsExportFormat.CSV,
+                project = name,
+                eventTypes = listOf("new_build"),
+            )
+            val rows = CSVReader(StringReader(csv)).use { it.readAll() }
+            val header = rows.first().toList()
+            val items = rows.drop(1).map { row -> header.zip(row).toMap() }
+            assertEquals(
+                listOf("new_build" to "2", "new_build" to "1"),
+                items.map { it["eventType"] to it["build"] },
+                "Builds of the project, newest first"
+            )
+            items.forEach { item ->
+                assertEquals(name, item["project"])
+                assertTrue(item["message"]?.contains("<") == false, "Plain text message: ${item["message"]}")
+            }
+
+            // JSON, all the events of the project
+            val json = ontrack.events.export(
+                format = EventsExportFormat.JSON,
+                project = name,
+            ).parseAsJson()
+            assertEquals(1, json.path("formatVersion").asInt())
+            assertEquals(false, json.path("truncated").asBoolean())
+            assertEquals(name, json.path("filter").path("project").asString())
+            assertEquals(
+                listOf("new_build", "new_build", "new_branch", "new_project"),
+                json.path("events").values().map { it.path("eventType").asString() },
+                "Events of the project, newest first",
+            )
         }
     }
 

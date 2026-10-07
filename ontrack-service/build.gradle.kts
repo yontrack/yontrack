@@ -17,6 +17,8 @@ dependencies {
     implementation("commons-io:commons-io")
     implementation("org.apache.commons:commons-lang3")
     implementation("org.jgrapht:jgrapht-core")
+    // CSV export of the events
+    implementation("com.opencsv:opencsv")
     implementation("com.github.ben-manes.caffeine:caffeine")
     implementation("org.flywaydb:flyway-core")
     implementation("org.springframework.boot:spring-boot-flyway")

@@ -18,6 +18,8 @@ dependencies {
     testImplementation("com.apollographql.apollo:apollo-api:4.1.1")
     testImplementation("commons-io:commons-io")
     testImplementation("commons-codec:commons-codec")
+    // Reading the CSV export of the events
+    testImplementation("com.opencsv:opencsv")
 
     testImplementation("org.influxdb:influxdb-java")
     testImplementation(testFixtures(project(":ontrack-extension-github")))

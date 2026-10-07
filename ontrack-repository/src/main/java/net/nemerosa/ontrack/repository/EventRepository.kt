@@ -57,6 +57,40 @@ interface EventRepository {
         eventTypeLoader: (type: String) -> EventType,
     ): List<Event>
 
+    /**
+     * Gets a chunk of the events matching a filter, newest first, with no project restriction,
+     * reading the events by keyset rather than by offset.
+     *
+     * @param filter Criteria on the events
+     * @param beforeId Only the events whose ID is lower than this one
+     * @param size Maximum number of events to return
+     * @param entityLoader Loading of the entities of the events
+     * @param eventTypeLoader Loading of the event types
+     * @return Events
+     */
+    fun findEventsBefore(
+        filter: EventFilter,
+        beforeId: Int,
+        size: Int,
+        entityLoader: (type: ProjectEntityType, id: ID) -> ProjectEntity,
+        eventTypeLoader: (type: String) -> EventType,
+    ): List<Event>
+
+    /**
+     * Whether more than [offset] events match a filter.
+     *
+     * @param filter Criteria on the events
+     * @param beforeId Only the events whose ID is lower than this one, if any
+     * @param offset Number of events to skip
+     * @return `true` when there is an event past the [offset] first ones
+     */
+    fun hasEventsBeyond(filter: EventFilter, beforeId: Int?, offset: Int): Boolean
+
+    /**
+     * ID of the last event, if any.
+     */
+    fun getLastEventId(): Int?
+
     fun getLastEventSignature(
         entityType: ProjectEntityType,
         entityId: ID,

@@ -120,3 +120,144 @@ query {
 
 The `GET /rest/events/...` REST endpoints are deprecated in favour of this query, and are removed
 in Yontrack 7 — see the [migration to V6](../appendix/migration-to-v6.md).
+
+## Export
+
+The events matching the filter of the page can be downloaded as a file: *Download CSV* and
+*Download JSON*, next to the filter, export the events of the filter **applied** to the table
+(click *Filter* first), newest first. The file is named `yontrack-events-<yyyyMMdd-HHmmss>.csv`
+(or `.json`), from the time of the export, in UTC.
+
+### Content
+
+Each event gives:
+
+| Field                                                         | Content                                                                 |
+|---------------------------------------------------------------|-------------------------------------------------------------------------|
+| `id`                                                          | ID of the event                                                         |
+| `time`                                                        | When the event was posted, as ISO-8601 in UTC, like `2026-10-07T09:15:00Z` |
+| `user`                                                        | Name of the user who posted the event                                   |
+| `eventType`                                                   | ID of the event type, like `new_build`                                  |
+| `message`                                                     | Message of the event, as plain text                                     |
+| `project`, `branch`, `build`, `promotionLevel`, `validationStamp` | Names of the entities the event is about                            |
+| `promotionRun`, `validationRun`                               | IDs of the runs the event is about                                      |
+| `xProject`, `xBranch`, `xBuild`, `xPromotionLevel`, `xValidationStamp`, `xPromotionRun`, `xValidationRun` | The same for the additional entities of the event |
+| `ref`                                                         | Type of the entity the event refers to first, like `BUILD`              |
+| `values`                                                      | Values of the event, by name                                            |
+
+**CSV.** The first row holds the names of the columns, in the order of the table above. An
+absent entity is an empty cell, and `values` is one column holding the values as a JSON
+object, like `{"BRANCH":"main","BRANCH_ID":"12"}`. The file is in UTF-8, its values quoted when
+they need to be.
+
+**JSON.** One object, which describes the export before its events:
+
+```json
+{
+  "formatVersion": 1,
+  "exportedAt": "2026-10-07T09:20:31.123Z",
+  "filter": {
+    "from": "2026-10-01T00:00:00Z",
+    "to": null,
+    "user": null,
+    "eventTypes": ["new_build"],
+    "project": "my-project"
+  },
+  "maxRows": 100000,
+  "truncated": false,
+  "events": [
+    {
+      "id": 1234,
+      "time": "2026-10-07T09:15:00Z",
+      "user": "admin",
+      "eventType": "new_build",
+      "message": "New build 12 for branch main in my-project.",
+      "project": "my-project",
+      "branch": "main",
+      "build": "12",
+      "promotionLevel": null,
+      "validationStamp": null,
+      "promotionRun": null,
+      "validationRun": null,
+      "xProject": null,
+      "xBranch": null,
+      "xBuild": null,
+      "xPromotionLevel": null,
+      "xValidationStamp": null,
+      "xPromotionRun": null,
+      "xValidationRun": null,
+      "ref": "BUILD",
+      "values": {}
+    }
+  ]
+}
+```
+
+An absent entity is `null`, and `values` is an object.
+
+### Format version
+
+The format of the export is versioned, so that a script reading it can check what it gets. The
+version is the same for both formats, and is currently **`1`**:
+
+- in the JSON, it is the first field, `formatVersion`;
+- for both formats, the answer has the `X-Yontrack-Export-Format-Version` header.
+
+**Adding** a field, or a column at the end of the CSV, keeps the version. **Removing, renaming or
+retyping** a field, or **reordering** the CSV columns, bumps it.
+
+### Maximum number of events
+
+An export holds at most **100 000** events, the most recent matching ones. The administrators can
+change this maximum with the `ontrack.config.events.export.max-rows` setting (see the
+[general configuration properties](../generated/configurations/net.nemerosa.ontrack.model.support.OntrackConfigProperties.md)).
+
+When more events match the filter, the export is **truncated**:
+
+- the page warns about it next to the buttons, before anything is downloaded;
+- the answer has the `X-Yontrack-Export-Truncated: true` header (`false` otherwise);
+- in the CSV, the last row has `TRUNCATED` as its `id`, and the message
+  `Export limited to <max-rows> events: narrow the filter`;
+- in the JSON, `truncated` is `true`, and `maxRows` gives the maximum.
+
+Narrow the filter - a shorter time range, for example - to get all the events.
+
+### REST endpoint
+
+The export is the `GET /rest/admin/events/export` endpoint, for the holders of the events audit
+function only. Its parameters are:
+
+| Parameter    | Content                                                                       |
+|--------------|-------------------------------------------------------------------------------|
+| `format`     | `csv` or `json` - required                                                    |
+| `from`, `to` | ISO-8601 times, both included - in UTC, unless they give an offset            |
+| `user`       | Prefix of the name of the user who posted the event, ignoring the case        |
+| `eventTypes` | IDs of event types, repeated (`eventTypes=a&eventTypes=b`) or separated by commas |
+| `project`    | Name of a project                                                             |
+
+For example, with an [API token](../security/tokens.md):
+
+```bash
+curl --fail-with-body \
+  -H "X-Ontrack-Token: $YONTRACK_TOKEN" \
+  --output events.csv \
+  "$YONTRACK_URL/rest/admin/events/export?format=csv&project=my-project&eventTypes=new_build&from=2026-10-01T00:00:00Z"
+```
+
+The file is written as it is read from the database, and its headers come first: a script can
+check `X-Yontrack-Export-Truncated` before reading the content. An unknown `format`, or a time
+which cannot be read, is refused with a `400`, and a user without the events audit function gets
+a `403`.
+
+The `eventsExport` GraphQL query takes the same filter as the `events` query, and tells, without
+exporting anything, the maximum number of events of an export and whether the export of the
+filter would be truncated:
+
+```graphql
+query {
+  eventsExport(filter: {project: "my-project"}) {
+    maxRows
+    truncated
+  }
+}
+```

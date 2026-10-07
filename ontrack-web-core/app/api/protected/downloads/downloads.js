@@ -4,13 +4,16 @@ import {NextResponse} from "next/server";
 /**
  * Headers of the backend's answer passed on to the browser, when the backend sends them: what the
  * content is, how to show it, and what keeps it from being shown in any other way — an evidence is
- * served with `nosniff` and a `Content-Security-Policy` of its own.
+ * served with `nosniff` and a `Content-Security-Policy` of its own — and what an export says of
+ * itself — the export of the events gives its format version and whether it is truncated.
  */
 const FORWARDED_HEADERS = [
     'Content-Type',
     'Content-Disposition',
     'X-Content-Type-Options',
     'Content-Security-Policy',
+    'X-Yontrack-Export-Format-Version',
+    'X-Yontrack-Export-Truncated',
 ]
 
 /**
@@ -20,13 +23,21 @@ const FORWARDED_HEADERS = [
 const contentSecurityPolicy = (policy) =>
     policy.includes('frame-ancestors') ? policy : `${policy}; frame-ancestors 'self'`
 
-export const download = async ({uri}) => {
+/**
+ * Downloads a file from the backend, with the token of the session, and passes it on as it comes.
+ *
+ * @param uri URI of the backend, relative to its root
+ * @param searchParams `URLSearchParams` to forward to the backend as its query string - none by
+ * default: a route forwards the query string of its request only when it says so
+ */
+export const download = async ({uri, searchParams}) => {
     const accessToken = await getAccessToken()
     if (!accessToken) {
         return NextResponse.json({error: "Unauthorized"}, {status: 401})
     }
 
-    const backendUrl = `${backend.url}/${uri}`
+    const query = searchParams?.toString()
+    const backendUrl = query ? `${backend.url}/${uri}?${query}` : `${backend.url}/${uri}`
 
     const backendResponse = await fetch(backendUrl, {
         method: 'GET',

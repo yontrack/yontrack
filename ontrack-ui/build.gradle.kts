@@ -41,6 +41,8 @@ dependencies {
     testImplementation(testFixtures(project(":ontrack-extension-api")))
     testImplementation(testFixtures(project(":ontrack-extension-support")))
     testImplementation(testFixtures(project(":ontrack-extension-casc")))
+    // Reading the CSV export of the events
+    testImplementation("com.opencsv:opencsv")
 
     // List of extensions needed for some tests spanning all modules
     testImplementation(project(":ontrack-extension-config"))

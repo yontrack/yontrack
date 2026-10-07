@@ -81,6 +81,12 @@ class OntrackConfigProperties {
     var tx = TransactionProperties()
 
     /**
+     * Events settings
+     */
+    @Valid
+    var events = EventsProperties()
+
+    /**
      * Key-store type
      */
     @APIDescription("Key store type to use to store encryption keys")
@@ -99,6 +105,27 @@ class OntrackConfigProperties {
         logger.info("[search] work_mem = ${search.workMem.ifBlank { "(database default)" }}")
         logger.info("[document] Documents engine = ${documents.engine}")
         logger.info("[templating] Errors = ${templating.errors}")
+        logger.info("[events] Export max rows = ${events.export.maxRows}")
+    }
+
+    /**
+     * Events settings
+     */
+    class EventsProperties {
+        /**
+         * Export of the events
+         */
+        @Valid
+        var export = EventsExportProperties()
+    }
+
+    /**
+     * Export of the events
+     */
+    class EventsExportProperties {
+        @Min(1)
+        @APIDescription("Maximum number of events in an export of the events, as CSV or JSON. When more events match the filter, the export holds the most recent ones only, and says it was truncated.")
+        var maxRows: Int = 100_000
     }
 
     /**
