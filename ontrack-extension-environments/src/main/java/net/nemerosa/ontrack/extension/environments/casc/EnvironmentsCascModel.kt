@@ -52,6 +52,8 @@ data class SlotEnvironmentCasc(
     val name: String,
     @APIDescription("Description for the slot")
     val description: String = "",
+    @APIDescription("Does this slot admit agents? A registered agent may start, run and finish a deployment pipeline only in a slot which admits agents, and only if its owner may. An agent never satisfies a manual approval. False by default.")
+    val agentsAdmitted: Boolean = false,
     @APIDescription("List of admission rules for this slot")
     val admissionRules: List<SlotEnvironmentAdmissionRuleCasc> = emptyList(),
     @APIDescription("List of workflows for this slot")

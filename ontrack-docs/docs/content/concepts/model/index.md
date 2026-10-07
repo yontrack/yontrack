@@ -62,6 +62,28 @@ Promotion level names can be anything, but you have to agree at your organizatio
 
 Promotion levels can have [configurable fields](promotion-level-fields.md) that users must fill in when promoting a build.
 
+### Agents admitted
+
+A registered [agent](../../agents/index.md) may promote a build only to a promotion level which
+**admits agents**, and only if its owner may promote. Without it, the promotion is refused with a
+message saying so:
+
+```
+agent claude-code-ci[agent] may not promote to GOLD: the promotion level does not admit agents (agent policy)
+```
+
+A promotion level admits agents when it has the *Agents admitted* property. Set it:
+
+* on the promotion level page, through its properties;
+* in the [CI configuration](../../configuration/ci-config.md#agents), with `agents: true` on the
+  promotion;
+* through the API, with the `setPromotionLevelAgentsAdmittedProperty(ById)` mutation, or as code
+  with the `net.nemerosa.ontrack.extension.general.AgentsAdmittedPropertyType` property.
+
+[Auto-promotion](auto-promotion.md) is **not** concerned: when an agent records the validations
+which promote a build automatically, the promotion is granted by Yontrack itself, on behalf of the
+agent, and the auto-promotion rules of the level are the gate.
+
 ## Validation runs
 
 When linked to a [build](#builds), a [validation stamp](#validation-stamps) can be passed, failed, in warning, etc. It

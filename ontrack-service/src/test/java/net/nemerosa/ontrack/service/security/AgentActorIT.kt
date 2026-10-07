@@ -18,8 +18,8 @@ import kotlin.test.assertNull
  * The actor on the record: the `ACTOR` column of the signed tables carries the agent which signed
  * the row, with its session, and is null for a person.
  *
- * Agents have no rights of their own yet (#2026): their actions are run here by the system on
- * their behalf, which keeps them as the user and the actor of the signature.
+ * The agent policy is not the point here (see AgentPolicyIT): the actions of the agent are run by
+ * the system on its behalf, which keeps them as the user and the actor of the signature.
  */
 class AgentActorIT : AbstractDSLTestSupport() {
 

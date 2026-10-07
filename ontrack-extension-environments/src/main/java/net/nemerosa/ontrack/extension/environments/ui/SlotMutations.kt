@@ -1,5 +1,6 @@
 package net.nemerosa.ontrack.extension.environments.ui
 
+import net.nemerosa.ontrack.common.api.APIDescription
 import net.nemerosa.ontrack.extension.environments.Slot
 import net.nemerosa.ontrack.extension.environments.service.EnvironmentService
 import net.nemerosa.ontrack.extension.environments.service.SlotService
@@ -40,6 +41,21 @@ class SlotMutations(
             }
             SlotList(slots = slots)
         },
+        simpleMutation(
+            name = "updateSlot",
+            description = "Updates the description of a slot and whether it admits agents",
+            input = UpdateSlotInput::class,
+            outputName = "slot",
+            outputDescription = "The updated slot",
+            outputType = Slot::class,
+        ) { input ->
+            val slot = slotService.getSlotById(input.slotId)
+            val updated = slot
+                .withDescription(input.description ?: slot.description)
+                .withAgentsAdmitted(input.agentsAdmitted ?: slot.agentsAdmitted)
+            slotService.saveSlot(updated)
+            slotService.getSlotById(input.slotId)
+        },
         unitMutation(
             name = "deleteSlot",
             description = "Deletes a slot using its ID",
@@ -56,6 +72,15 @@ data class CreateSlotsInput(
     val description: String?,
     @ListRef
     val environmentIds: List<String>,
+)
+
+data class UpdateSlotInput(
+    @APIDescription("ID of the slot")
+    val slotId: String,
+    @APIDescription("New description of the slot. Left out, the description is kept.")
+    val description: String? = null,
+    @APIDescription("Does the slot admit agents? Left out, the setting is kept.")
+    val agentsAdmitted: Boolean? = null,
 )
 
 data class DeleteSlotInput(

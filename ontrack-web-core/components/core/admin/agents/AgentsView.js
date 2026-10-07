@@ -26,7 +26,8 @@ export default function AgentsView() {
         >
             <Typography.Paragraph type="secondary">
                 Agents act on Yontrack with their own tokens, on behalf of the person who owns them.
-                Until the agent policy is in place, an agent has no rights at all.
+                An agent has the rights of its owner, narrowed by the agent policy: it reads, records
+                evidence, and promotes or deploys only where agents are admitted. It never approves.
             </Typography.Paragraph>
             <AgentsTable
                 agents={agents}

@@ -24,18 +24,28 @@ class AuthenticationUserServiceImpl(
 
 
     override fun createAuthenticatedUser(account: Account): AccountAuthenticatedUser {
-        // An agent has no rights of its own: no group, no ACL, and none of the rights granted
-        // to every authenticated user. The agent policy (#2026) is what will give it some.
+        // An agent has no rights of its own: no group, no ACL, and none of the rights granted to it
+        // directly. Its grants are computed for its owner, and narrowed by the agent policy in
+        // AccountAuthenticatedUser - nothing to keep in sync when the owner is demoted or deleted.
         if (account.isAgent) {
+            val owner = account.owner
+            val ownerUser = owner?.let { createHumanAuthenticatedUser(it) }
             return AccountAuthenticatedUser(
                 account = account,
-                authorisations = Authorisations.none(),
-                groups = emptyList(),
-                assignedGroups = emptyList(),
-                mappedGroups = emptyList(),
-                idpGroups = emptyList(),
+                authorisations = ownerUser?.authorisations ?: Authorisations.none(),
+                groups = ownerUser?.groups ?: emptyList(),
+                assignedGroups = ownerUser?.assignedGroups ?: emptyList(),
+                mappedGroups = ownerUser?.mappedGroups ?: emptyList(),
+                idpGroups = ownerUser?.idpGroups ?: emptyList(),
             )
         }
+        return createHumanAuthenticatedUser(account)
+    }
+
+    /**
+     * The roles, groups, IdP groups and project ACLs of a person.
+     */
+    private fun createHumanAuthenticatedUser(account: Account): AccountAuthenticatedUser {
         val (assignedGroups, mappedGroups, idpGroups) = accountGroupService.getAccountGroups(account)
         val groups = (assignedGroups + mappedGroups).distinctBy { it.id() }
         return AccountAuthenticatedUser(

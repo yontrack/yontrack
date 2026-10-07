@@ -152,6 +152,7 @@ class EnvironmentsInjection(
                                 project = project,
                                 qualifier = slotCasc.qualifier,
                                 description = generateSlotDescription(project, slotCasc, a),
+                                agentsAdmitted = a.agentsAdmitted,
                             ).apply {
                                 slotService.addSlot(this)
                             }
@@ -164,9 +165,11 @@ class EnvironmentsInjection(
                     onModification { a, existing ->
                         logger.info("[casc][slot] Existing slot ${project.name}[$qualifier] -> ${a.name}")
                         val description = generateSlotDescription(project, slotCasc, a)
-                        if (existing.description != description) {
-                            logger.info("[casc][slot] Existing slot ${project.name}[$qualifier] -> ${a.name} - updating description")
-                            slotService.saveSlot(existing.withDescription(description))
+                        if (existing.description != description || existing.agentsAdmitted != a.agentsAdmitted) {
+                            logger.info("[casc][slot] Existing slot ${project.name}[$qualifier] -> ${a.name} - updating description and agents admission")
+                            slotService.saveSlot(
+                                existing.withDescription(description).withAgentsAdmitted(a.agentsAdmitted)
+                            )
                         }
                         runSlotAdmissionRules(existing, a)
                         runSlotWorkflows(existing, a)

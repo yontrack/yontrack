@@ -3,6 +3,7 @@ package net.nemerosa.ontrack.boot.ui;
 import jakarta.servlet.http.HttpServletRequest;
 import net.nemerosa.ontrack.model.exceptions.InputException;
 import net.nemerosa.ontrack.model.exceptions.NotFoundException;
+import net.nemerosa.ontrack.model.security.AgentPolicyException;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -77,6 +78,15 @@ public class UIErrorHandler {
                 HttpStatus.BAD_REQUEST,
                 message
         );
+    }
+
+    /**
+     * A refusal by the agent policy says why: an agent which only gets "Not authorized." retries.
+     */
+    @ExceptionHandler(AgentPolicyException.class)
+    @ResponseBody
+    public ResponseEntity<UIErrorMessage> onAgentPolicyException(AgentPolicyException ex) {
+        return getMessageResponse(HttpStatus.FORBIDDEN, ex.getMessage());
     }
 
     @ExceptionHandler(AccessDeniedException.class)

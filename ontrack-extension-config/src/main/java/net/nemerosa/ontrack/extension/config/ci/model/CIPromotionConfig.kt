@@ -22,4 +22,13 @@ data class CIPromotionConfig(
                 "triggered by the promotion remains fired."
     )
     val autoRevoke: Boolean? = null,
+    /**
+     * Nullable on purpose - see [net.nemerosa.ontrack.model.structure.PromotionLevelConfiguration.agents].
+     */
+    @APIDescription(
+        "When true, registered agents are admitted to this promotion: an agent may promote a build to it, " +
+                "provided its owner may. When false, they are not. Left out, the setting of the promotion " +
+                "level is kept as it is."
+    )
+    val agents: Boolean? = null,
 )

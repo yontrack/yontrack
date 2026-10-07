@@ -18,7 +18,7 @@ import {
     gqlSharedAdmissionRuleData,
 } from "@components/extension/environments/shared/environmentsSharedGraphQL"
 import {gqlDeploymentPage} from "@components/extension/environments/deployment/deploymentGraphQL"
-import {gqlSlotDeployments, gqlSlotPage} from "@components/extension/environments/slot/slotGraphQL"
+import {gqlSlotDeployments, gqlSlotPage, gqlSlotUpdate} from "@components/extension/environments/slot/slotGraphQL"
 import {gqlBuildCurrentDeployments, gqlBuildJourney} from "@components/extension/environments/journey/buildJourneyGraphQL"
 import {gqlSetup} from "@components/extension/environments/setup/setupGraphQL"
 import {gqlSlotData} from "@components/extension/environments/EnvironmentGraphQL"
@@ -50,6 +50,8 @@ describe('the shared environments documents', () => {
 
     // Fragments cannot be validated on their own - an unused fragment is an error - so each is
     // checked through a query that spreads it.
+    check('the slot settings mutation', gqlSlotUpdate)
+
     check('the slot cell fragment', `
         query CheckSlotCell($id: String!) {
             slotById(id: $id) { ...SlotCellData }

@@ -23,13 +23,14 @@ class SlotRepository(
     fun addSlot(slot: Slot) {
         namedParameterJdbcTemplate!!.update(
             """
-                INSERT INTO ENV_SLOTS (ID, ENVIRONMENT_ID, PROJECT_ID, QUALIFIER, DESCRIPTION)
-                VALUES (:id, :environmentId, :projectId, :qualifier, :description)
+                INSERT INTO ENV_SLOTS (ID, ENVIRONMENT_ID, PROJECT_ID, QUALIFIER, DESCRIPTION, AGENTS_ADMITTED)
+                VALUES (:id, :environmentId, :projectId, :qualifier, :description, :agentsAdmitted)
                 ON CONFLICT (ID) DO UPDATE SET
                     ENVIRONMENT_ID = EXCLUDED.ENVIRONMENT_ID,
                     PROJECT_ID = EXCLUDED.PROJECT_ID,
                     QUALIFIER = EXCLUDED.QUALIFIER,
-                    DESCRIPTION = EXCLUDED.DESCRIPTION;
+                    DESCRIPTION = EXCLUDED.DESCRIPTION,
+                    AGENTS_ADMITTED = EXCLUDED.AGENTS_ADMITTED;
             """,
             mapOf(
                 "id" to slot.id,
@@ -37,6 +38,7 @@ class SlotRepository(
                 "projectId" to slot.project.id(),
                 "qualifier" to slot.qualifier,
                 "description" to slot.description,
+                "agentsAdmitted" to slot.agentsAdmitted,
             )
         )
     }
@@ -62,6 +64,7 @@ class SlotRepository(
         project = projectJdbcRepositoryAccessor.getProject(ID.of(rs.getInt("PROJECT_ID"))),
         qualifier = rs.getString("QUALIFIER"),
         description = rs.getString("DESCRIPTION"),
+        agentsAdmitted = rs.getBoolean("AGENTS_ADMITTED"),
     )
 
     fun findByEnvironmentAndProjectAndQualifier(environment: Environment, project: Project, qualifier: String): Slot? =
@@ -260,12 +263,14 @@ class SlotRepository(
         namedParameterJdbcTemplate!!.update(
             """
                 UPDATE ENV_SLOTS
-                SET DESCRIPTION = :description
+                SET DESCRIPTION = :description,
+                    AGENTS_ADMITTED = :agentsAdmitted
                 WHERE ID = :id
             """.trimIndent(),
             mapOf(
                 "id" to slot.id,
                 "description" to slot.description,
+                "agentsAdmitted" to slot.agentsAdmitted,
             )
         )
     }

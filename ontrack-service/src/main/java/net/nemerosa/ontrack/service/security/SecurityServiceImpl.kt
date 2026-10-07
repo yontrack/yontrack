@@ -21,6 +21,7 @@ class SecurityServiceImpl : SecurityService {
     }
 
     override fun checkGlobalFunction(fn: Class<out GlobalFunction>) {
+        checkAgentPolicy(fn)
         if (!isGlobalFunctionGranted(fn)) {
             throw AccessDeniedException("Global function '${fn.simpleName}' is not granted.")
         }
@@ -34,6 +35,7 @@ class SecurityServiceImpl : SecurityService {
     }
 
     override fun checkProjectFunction(projectId: Int, fn: Class<out ProjectFunction>) {
+        checkAgentPolicy(fn)
         if (!isProjectFunctionGranted(projectId, fn)) {
             throw AccessDeniedException(String.format("Project function '%s' is not granted", fn.simpleName))
         }
@@ -44,6 +46,16 @@ class SecurityServiceImpl : SecurityService {
         val user = currentUser
         // Checks
         return user != null && user.isGranted(projectId, fn)
+    }
+
+    /**
+     * A function the agent policy refuses is refused with a message saying so, never a bare 403.
+     */
+    private fun checkAgentPolicy(fn: Class<*>) {
+        val user = currentUser
+        if (user is AccountAuthenticatedUser && !user.isAllowedByAgentPolicy(fn)) {
+            throw AgentPolicyException.function(user.account, fn)
+        }
     }
 
     override val currentUser: AuthenticatedUser?

@@ -46,8 +46,30 @@ It is the home of one project's deployments into one environment.
   lists the [deployable](#eligible-and-deployable-builds) builds — the ones the slot's rules already
   accept. The *Show all eligible builds* switch widens the list to every eligible one, so that "why
   can I not deploy this?" has somewhere to be asked.
-* **Setup** holds the slot's admission rules and its workflows: adding, editing and deleting them,
-  and deleting the slot itself. The whole tab is hidden from a user who may not configure the slot.
+* **Setup** holds the slot's settings — its description, and whether it
+  [admits agents](#agents-admitted) — its admission rules and its workflows: adding, editing and
+  deleting them, and deleting the slot itself. The whole tab is hidden from a user who may not
+  configure the slot.
+
+### Agents admitted
+
+A registered [agent](../../agents/index.md) may start a deployment pipeline, start the deployment
+and finish it — or mark it as failed — only in a slot which **admits agents**, and only if its owner
+may. In any other slot, it is refused with a message saying so:
+
+```
+agent claude-code-ci[agent] may not start a pipeline on production/petclinic: the slot does not admit agents (agent policy)
+```
+
+A slot does not admit agents by default. Edit the settings in the slot's **Setup** tab, set
+`agentsAdmitted: true` for the slot's environment in the [CI configuration](#ci-configuration) or in
+the [CasC](#casc), or call the `updateSlot` mutation.
+
+Even in a slot which admits agents, an agent **never satisfies a manual approval**, whoever the rule
+lists: its approval is refused with "an agent cannot approve; ask _owner_", and the pipeline stays a
+candidate. This is how *agent asks, human approves* works for deployments: the agent starts the
+pipeline, a person approves it, and the agent — or anybody — then deploys. An agent never overrides
+an admission rule either.
 
 ## Eligible and deployable builds
 
@@ -235,6 +257,7 @@ configuration:
           - project: yontrack
             environments:
               - name: self.yontrack.com
+                agentsAdmitted: true
                 admissionRules:
                   - ruleId: promotion
                     ruleConfig:
@@ -267,7 +290,8 @@ actually deployed, like in a GitOps repository.
 
 ### CasC
 
-TBD
+The `environments` section of the CasC takes the same `environments` and `slots` as the
+[CI configuration](#ci-configuration), `agentsAdmitted` included.
 
 !!! warning "Removed setting: `settings.environments`"
 

@@ -116,6 +116,41 @@ class EnvironmentsCIConfigExtensionIT : AbstractQLKTITSupport() {
 
     @Test
     @AsAdminTest
+    fun `A slot admits agents through the CI configuration`() {
+        val environmentName = uid("env-")
+        val configuredProjectName = uid("cfg-")
+        val deployedProject = project()
+
+        fun configure(agentsAdmitted: Boolean?) = configTestSupport.configureProject(
+            yaml = """
+                version: v1
+                configuration:
+                  defaults:
+                    project:
+                      environments:
+                        environments:
+                          - name: $environmentName
+                            order: 200
+                        slots:
+                          - project: "${deployedProject.name}"
+                            environments:
+                              - name: $environmentName
+                                ${agentsAdmitted?.let { "agentsAdmitted: $it" } ?: ""}
+            """.trimIndent(),
+            ci = "generic",
+            scm = "mock",
+            env = EnvFixtures.generic(configuredProjectName)
+        )
+
+        configure(agentsAdmitted = true)
+        assertEquals(true, slotService.findSlotsByProject(deployedProject).single().agentsAdmitted)
+
+        configure(agentsAdmitted = null)
+        assertEquals(false, slotService.findSlotsByProject(deployedProject).single().agentsAdmitted, "False by default")
+    }
+
+    @Test
+    @AsAdminTest
     fun `Slot referencing an unknown environment is skipped without failing the injection`() {
         val environmentName = uid("env-")
         val unknownEnvironmentName = uid("missing-env-")

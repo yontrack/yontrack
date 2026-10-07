@@ -4,6 +4,8 @@ import net.nemerosa.ontrack.extension.config.ConfigTestSupport
 import net.nemerosa.ontrack.extension.config.EnvFixtures
 import net.nemerosa.ontrack.extension.config.EnvFixtures.TEST_BUILD_NUMBER
 import net.nemerosa.ontrack.extension.config.EnvFixtures.TEST_VERSION
+import net.nemerosa.ontrack.extension.general.AgentsAdmittedProperty
+import net.nemerosa.ontrack.extension.general.AgentsAdmittedPropertyType
 import net.nemerosa.ontrack.extension.general.AutoPromotionPropertyType
 import net.nemerosa.ontrack.extension.general.MetaInfoPropertyType
 import net.nemerosa.ontrack.extension.general.PromotionDependenciesPropertyType
@@ -250,6 +252,55 @@ class CoreConfigurationServiceIT : AbstractDSLTestSupport() {
             env = EnvFixtures.generic(configuredProjectName, scmBranch = "main"),
         )
         assertAutoRevoke(branch, expected = false)
+    }
+
+    private fun agentsConfig(agents: String?) = """
+        version: v1
+        configuration:
+          defaults:
+            branch:
+              promotions:
+                GOLD:
+                  ${agents?.let { "agents: $it" } ?: "promotions: []"}
+    """.trimIndent()
+
+    private fun configureAgents(agents: String?): Branch = configTestSupport.configureBranch(
+        yaml = agentsConfig(agents),
+        ci = "generic",
+        scm = "mock",
+        env = EnvFixtures.generic(configuredProjectName, scmBranch = "main"),
+    )
+
+    private fun agentsAdmitted(branch: Branch): AgentsAdmittedProperty? {
+        val gold = structureService.findPromotionLevelByName(branch.project.name, branch.name, "GOLD")
+            .getOrNull()
+            ?: fail("Missing GOLD promotion")
+        return propertyService.getPropertyValue(gold, AgentsAdmittedPropertyType::class.java)
+    }
+
+    @Test
+    @AsAdminTest
+    fun `Agents are admitted to a promotion with agents set to true`() {
+        val branch = configureAgents("true")
+        assertEquals(true, agentsAdmitted(branch)?.admitted)
+    }
+
+    @Test
+    @AsAdminTest
+    fun `Agents are not admitted to a promotion by default`() {
+        val branch = configureAgents(null)
+        assertEquals(null, agentsAdmitted(branch))
+    }
+
+    @Test
+    @AsAdminTest
+    fun `Agents set to false removes the admission, and leaving it out keeps it`() {
+        val branch = configureAgents("true")
+        assertEquals(true, agentsAdmitted(branch)?.admitted)
+        configureAgents(null)
+        assertEquals(true, agentsAdmitted(branch)?.admitted, "Left out, the admission is kept")
+        configureAgents("false")
+        assertEquals(null, agentsAdmitted(branch), "Set to false, the admission is removed")
     }
 
     /**

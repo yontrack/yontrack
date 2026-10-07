@@ -14,6 +14,7 @@ export const gqlSlotPage = gql`
             id
             qualifier
             description
+            agentsAdmitted
             environment {
                 id
                 name
@@ -27,6 +28,27 @@ export const gqlSlotPage = gql`
                 name
                 action
                 authorized
+            }
+        }
+    }
+`
+
+/**
+ * The settings of a slot: its description, and whether it admits agents.
+ */
+export const gqlSlotUpdate = gql`
+    mutation UpdateSlot(
+        $slotId: String!,
+        $description: String,
+        $agentsAdmitted: Boolean,
+    ) {
+        updateSlot(input: {
+            slotId: $slotId,
+            description: $description,
+            agentsAdmitted: $agentsAdmitted,
+        }) {
+            errors {
+                message
             }
         }
     }

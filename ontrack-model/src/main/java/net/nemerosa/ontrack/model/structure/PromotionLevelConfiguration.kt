@@ -26,6 +26,12 @@ data class PromotionLevelConfiguration(
      */
     @APIDescription("Revokes the promotion when one of its prerequisites is no longer valid. Revoking a promotion deletes it, but does not undo its effects: any notification or workflow already triggered by the promotion remains fired.")
     val autoRevoke: Boolean? = null,
+    /**
+     * Nullable on purpose, like [autoRevoke]: `null` means "this layer does not say", and leaves the
+     * *Agents admitted* property of the promotion level as it is.
+     */
+    @APIDescription("Agents are admitted to this promotion level (true) or not (false): a registered agent may promote a build to it, provided its owner may. Left out, the setting of the promotion level is kept as it is.")
+    val agents: Boolean? = null,
 ) {
     fun merge(other: PromotionLevelConfiguration) = PromotionLevelConfiguration(
         name = name,
@@ -38,5 +44,6 @@ data class PromotionLevelConfiguration(
         // receiver is the layer which gets the last word. It keeps its value when it states one, and falls
         // back to the earlier layer when it says nothing.
         autoRevoke = autoRevoke ?: other.autoRevoke,
+        agents = agents ?: other.agents,
     )
 }

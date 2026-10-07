@@ -70,6 +70,7 @@ class EnvironmentsCascContext(
                     environments = slots.map { slot ->
                         SlotEnvironmentCasc(
                             name = slot.environment.name,
+                            agentsAdmitted = slot.agentsAdmitted,
                             admissionRules = slotService.getAdmissionRuleConfigs(slot).map { rule ->
                                 SlotEnvironmentAdmissionRuleCasc(
                                     name = rule.name,

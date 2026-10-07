@@ -1886,6 +1886,22 @@ type DeleteProjectStalePropertyPayload implements Payload {
   project: Project
 }
 
+"Output type for the deletePromotionLevelAgentsAdmittedPropertyById mutation."
+type DeletePromotionLevelAgentsAdmittedPropertyByIdPayload implements Payload {
+  "List of errors"
+  errors: [UserError]
+  "Promotion level updated"
+  promotionLevel: PromotionLevel
+}
+
+"Output type for the deletePromotionLevelAgentsAdmittedProperty mutation."
+type DeletePromotionLevelAgentsAdmittedPropertyPayload implements Payload {
+  "List of errors"
+  errors: [UserError]
+  "Promotion level updated"
+  promotionLevel: PromotionLevel
+}
+
 "Output type for the deletePromotionLevelAutoPromotionPropertyById mutation."
 type DeletePromotionLevelAutoPromotionPropertyByIdPayload implements Payload {
   "List of errors"
@@ -4131,6 +4147,16 @@ type Mutation {
     "Input for the mutation"
     input: DeleteProjectStalePropertyByIdInput
   ): DeleteProjectStalePropertyByIdPayload
+  "Deletes the agents admitted property on a promotion level identified by name."
+  deletePromotionLevelAgentsAdmittedProperty(
+    "Input for the mutation"
+    input: DeletePromotionLevelAgentsAdmittedPropertyInput
+  ): DeletePromotionLevelAgentsAdmittedPropertyPayload
+  "Deletes the agents admitted property on a promotion level."
+  deletePromotionLevelAgentsAdmittedPropertyById(
+    "Input for the mutation"
+    input: DeletePromotionLevelAgentsAdmittedPropertyByIdInput
+  ): DeletePromotionLevelAgentsAdmittedPropertyByIdPayload
   "Deletes the auto promotion property on a promotion level identified by name."
   deletePromotionLevelAutoPromotionProperty(
     "Input for the mutation"
@@ -4844,6 +4870,16 @@ type Mutation {
     "Input for the mutation"
     input: SetProjectStalePropertyByIdInput
   ): SetProjectStalePropertyByIdPayload
+  "Set the agents admitted property on a promotion level identified by name."
+  setPromotionLevelAgentsAdmittedProperty(
+    "Input for the mutation"
+    input: SetPromotionLevelAgentsAdmittedPropertyInput
+  ): SetPromotionLevelAgentsAdmittedPropertyPayload
+  "Set the agents admitted property on a promotion level."
+  setPromotionLevelAgentsAdmittedPropertyById(
+    "Input for the mutation"
+    input: SetPromotionLevelAgentsAdmittedPropertyByIdInput
+  ): SetPromotionLevelAgentsAdmittedPropertyByIdPayload
   "Set the auto promotion property on a promotion level identified by name."
   setPromotionLevelAutoPromotionProperty(
     "Input for the mutation"
@@ -5173,6 +5209,11 @@ type Mutation {
     "Input for the mutation"
     input: UpdatePromotionLevelByIdInput
   ): UpdatePromotionLevelByIdPayload
+  "Updates the description of a slot and whether it admits agents"
+  updateSlot(
+    "Input for the mutation"
+    input: UpdateSlotInput
+  ): UpdateSlotPayload
   "Updates an existing validation stamp"
   updateValidationStampById(
     "Input for the mutation"
@@ -5637,6 +5678,8 @@ type ProjectRole {
 }
 
 type PromotionLevel implements Authorizable & ProjectEntity {
+  "Admits registered agents to this promotion level: an agent may promote a build to it, provided its owner may. Without it, an agent may not promote to this level. Auto-promotion is not concerned."
+  agentsAdmittedProperty: Property
   "Description with links."
   annotatedDescription: String
   "Authorizations for this context"
@@ -7612,6 +7655,22 @@ type SetProjectStalePropertyPayload implements Payload {
   project: Project
 }
 
+"Output type for the setPromotionLevelAgentsAdmittedPropertyById mutation."
+type SetPromotionLevelAgentsAdmittedPropertyByIdPayload implements Payload {
+  "List of errors"
+  errors: [UserError]
+  "Promotion level updated"
+  promotionLevel: PromotionLevel
+}
+
+"Output type for the setPromotionLevelAgentsAdmittedProperty mutation."
+type SetPromotionLevelAgentsAdmittedPropertyPayload implements Payload {
+  "List of errors"
+  errors: [UserError]
+  "Promotion level updated"
+  promotionLevel: PromotionLevel
+}
+
 "Output type for the setPromotionLevelAutoPromotionPropertyById mutation."
 type SetPromotionLevelAutoPromotionPropertyByIdPayload implements Payload {
   "List of errors"
@@ -7953,6 +8012,8 @@ type SignatureActor {
 type Slot implements Authorizable {
   "List of configured admission rules for this slot"
   admissionRules: [SlotAdmissionRuleConfig!]!
+  "Does this slot admit agents? A registered agent may start, run and finish a deployment pipeline only in a slot which admits agents, and only if its owner may. An agent never satisfies a manual approval."
+  agentsAdmitted: Boolean
   "Authorizations for this context"
   authorizations: [Authorization!]!
   "Does a slot upstream of this one in the project's slot graph hold a newer build?"
@@ -8524,6 +8585,14 @@ type UpdatePromotionLevelByIdPayload implements Payload {
   errors: [UserError]
   "Updated promotion level"
   promotionLevel: PromotionLevel
+}
+
+"Output type for the updateSlot mutation."
+type UpdateSlotPayload implements Payload {
+  "List of errors"
+  errors: [UserError]
+  "The updated slot"
+  slot: Slot
 }
 
 "Output type for the updateValidationStampById mutation."
@@ -10661,6 +10730,22 @@ input DeleteProjectStalePropertyInput {
   project: String!
 }
 
+"Input type for the deletePromotionLevelAgentsAdmittedPropertyById mutation."
+input DeletePromotionLevelAgentsAdmittedPropertyByIdInput {
+  "ID of the promotion level"
+  id: Int!
+}
+
+"Input type for the deletePromotionLevelAgentsAdmittedProperty mutation."
+input DeletePromotionLevelAgentsAdmittedPropertyInput {
+  "Branch name"
+  branch: String!
+  "Project name"
+  project: String!
+  "Promotion name"
+  promotion: String!
+}
+
 "Input type for the deletePromotionLevelAutoPromotionPropertyById mutation."
 input DeletePromotionLevelAutoPromotionPropertyByIdInput {
   "ID of the promotion level"
@@ -12455,6 +12540,26 @@ input SetProjectStalePropertyInput {
   promotionsToKeep: [String!]
 }
 
+"Input type for the setPromotionLevelAgentsAdmittedPropertyById mutation."
+input SetPromotionLevelAgentsAdmittedPropertyByIdInput {
+  "Agents are admitted when the property is set and this flag is true (the default)"
+  admitted: Boolean
+  "ID of the promotion level"
+  id: Int!
+}
+
+"Input type for the setPromotionLevelAgentsAdmittedProperty mutation."
+input SetPromotionLevelAgentsAdmittedPropertyInput {
+  "Agents are admitted when the property is set and this flag is true (the default)"
+  admitted: Boolean
+  "Branch name"
+  branch: String!
+  "Project name"
+  project: String!
+  "Promotion name"
+  promotion: String!
+}
+
 "Input type for the setPromotionLevelAutoPromotionPropertyById mutation."
 input SetPromotionLevelAutoPromotionPropertyByIdInput {
   "When enabled, the promotion is revoked as soon as one of its prerequisites - a required validation stamp or a required promotion - is no longer valid. Revoking a promotion deletes it, but does not undo its effects: any notification or workflow already triggered by the promotion remains fired. Defaults to false when absent."
@@ -13385,6 +13490,16 @@ input UpdatePromotionLevelByIdInput {
   id: Int!
   "Promotion level name"
   name: String!
+}
+
+"Input type for the updateSlot mutation."
+input UpdateSlotInput {
+  "Does the slot admit agents? Left out, the setting is kept."
+  agentsAdmitted: Boolean
+  "New description of the slot. Left out, the description is kept."
+  description: String
+  "ID of the slot"
+  slotId: String!
 }
 
 "Input type for the updateValidationStampById mutation."

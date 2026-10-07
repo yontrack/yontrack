@@ -22,7 +22,8 @@ export default function MyAgentsView() {
         >
             <Typography.Paragraph type="secondary">
                 Your agents act on Yontrack with their own tokens, and you are accountable for them.
-                Until the agent policy is in place, an agent has no rights at all.
+                An agent has your rights, narrowed by the agent policy: it reads, records evidence, and
+                promotes or deploys only where agents are admitted. It never approves.
             </Typography.Paragraph>
             <AgentsTable
                 agents={agents}

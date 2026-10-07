@@ -62,6 +62,10 @@ class StructureServiceImpl(
      * Provided lazily: a listener may depend on services which depend on this one.
      */
     private val cascadeDeletionListeners: ObjectProvider<CascadeDeletionListener>,
+    /**
+     * Provided lazily, like the listeners. Without any, no promotion level admits agents.
+     */
+    private val promotionLevelAgentAdmissions: ObjectProvider<PromotionLevelAgentAdmission>,
 ) : StructureService {
 
     private val logger = LoggerFactory.getLogger(StructureService::class.java)
@@ -827,6 +831,8 @@ class StructureServiceImpl(
         )
         // Checks the authorization
         securityService.checkProjectFunction(promotionRun.build.branch.project.id(), PromotionRunCreate::class.java)
+        // An agent promotes only on a level which admits agents
+        checkPromotionLevelAdmitsAgent(promotionRun.promotionLevel)
         // Validates the field values against the promotion level's field definitions
         validatePromotionRunFieldValues(promotionRun)
         // Checks the preconditions for the creation of the promotion run
@@ -841,6 +847,18 @@ class StructureServiceImpl(
         eventPostService.post(eventFactory.newPromotionRun(newPromotionRun))
         // OK
         return newPromotionRun.withFieldValues(promotionRun.fieldValues)
+    }
+
+    /**
+     * The agent policy: an agent may promote only to a promotion level which admits agents. The
+     * system acting on somebody's behalf (auto-promotion) is not an agent, and is not concerned.
+     */
+    private fun checkPromotionLevelAdmitsAgent(promotionLevel: PromotionLevel) {
+        val agent = securityService.currentAgent ?: return
+        val admitted = promotionLevelAgentAdmissions.any { it.isAgentsAdmitted(promotionLevel) }
+        if (!admitted) {
+            throw AgentPolicyException.promotionLevel(agent, promotionLevel)
+        }
     }
 
     private fun validatePromotionRunFieldValues(promotionRun: PromotionRun) {

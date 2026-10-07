@@ -1,0 +1,16 @@
+mutation UpdateSlot(
+    $slotId: String!,
+    $description: String,
+    $agentsAdmitted: Boolean,
+) {
+    updateSlot(input: {
+        slotId: $slotId,
+        description: $description,
+        agentsAdmitted: $agentsAdmitted,
+    }) {
+        ...PayloadUserErrors
+        slot {
+            ...SlotFragment
+        }
+    }
+}

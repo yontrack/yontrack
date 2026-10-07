@@ -129,6 +129,7 @@ class CIConfigurationParserImpl(
                     )
                 },
                 autoRevoke = config.autoRevoke,
+                agents = config.agents,
             )
         }
     }

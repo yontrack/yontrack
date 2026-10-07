@@ -47,6 +47,12 @@ class GQLTypeSlot(
             .field(Slot::project)
             .stringField(Slot::qualifier)
             .field(Slot::environment)
+            .booleanField(
+                Slot::agentsAdmitted,
+                "Does this slot admit agents? A registered agent may start, run and finish a deployment " +
+                        "pipeline only in a slot which admits agents, and only if its owner may. " +
+                        "An agent never satisfies a manual approval."
+            )
             // Authorizations
             .apply {
                 gqlInterfaceAuthorizableService.apply(this, Slot::class)

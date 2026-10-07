@@ -5,6 +5,7 @@ import net.nemerosa.ontrack.extension.environments.*
 import net.nemerosa.ontrack.json.parse
 import net.nemerosa.ontrack.json.parseOrNull
 import net.nemerosa.ontrack.model.security.SecurityService
+import net.nemerosa.ontrack.model.security.currentAgent
 import net.nemerosa.ontrack.model.structure.Build
 import org.springframework.stereotype.Component
 import kotlin.reflect.KClass
@@ -56,7 +57,7 @@ class ManualApprovalSlotAdmissionRule(
     /**
      * A build is deployable if the user has approved the rule in the pipeline.
      *
-     * Only some users or groups are eligible.
+     * Only some users or groups are eligible, never an agent (see [checkData]).
      */
     override fun isBuildDeployable(
         pipeline: SlotPipeline,
@@ -88,7 +89,14 @@ class ManualApprovalSlotAdmissionRule(
 
     override fun checkData(ruleConfig: JsonNode, data: JsonNode) {
         val c = parseConfig(ruleConfig)
-        val d = parseData(data)
+        parseData(data)
+        // An agent never approves, whatever the users and groups of the rule: a human does
+        val agent = securityService.currentAgent
+        if (agent != null) {
+            throw ManualApprovalSlotAdmissionRuleException(
+                "an agent cannot approve; ask ${agent.owner?.fullName ?: "a person"}"
+            )
+        }
         // Controls of the user
         val user = securityService.currentSignature.user.name
         if (c.users.isNotEmpty()) {

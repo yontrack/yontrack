@@ -5,6 +5,7 @@ fragment SlotFragment on Slot {
         ...ProjectFragment
     }
     qualifier
+    agentsAdmitted
     environment {
         ...EnvironmentFragment
     }

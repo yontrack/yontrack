@@ -9,6 +9,7 @@ import net.nemerosa.ontrack.model.security.SecurityService;
 import net.nemerosa.ontrack.model.settings.PredefinedPromotionLevelService;
 import net.nemerosa.ontrack.model.settings.PredefinedValidationStampService;
 import net.nemerosa.ontrack.model.structure.*;
+import net.nemerosa.ontrack.model.security.PromotionLevelAgentAdmission;
 import net.nemerosa.ontrack.repository.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.support.StaticListableBeanFactory;
@@ -68,7 +69,8 @@ public class StructureServiceImplTest {
                 mock(PromotionRunRepository.class),
                 mock(PromotionLevelRepository.class),
                 mock(ValidationRunRepository.class),
-                new StaticListableBeanFactory().getBeanProvider(CascadeDeletionListener.class)
+                new StaticListableBeanFactory().getBeanProvider(CascadeDeletionListener.class),
+                new StaticListableBeanFactory().getBeanProvider(PromotionLevelAgentAdmission.class)
         );
         // Model
         Project project = Project.of(nd("P", "Project")).withId(ID.of(1));

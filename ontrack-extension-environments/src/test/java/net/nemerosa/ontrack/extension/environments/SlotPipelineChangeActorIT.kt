@@ -15,8 +15,8 @@ import kotlin.test.assertNull
 /**
  * The `ACTOR` column of the changes of a slot pipeline.
  *
- * Agents have no rights of their own yet (#2026): their actions are run here by the system on
- * their behalf, which keeps them as the user and the actor of the change.
+ * The agent policy is not the point here (see AgentPolicyIT): the actions of the agent are run by
+ * the system on its behalf, which keeps them as the user and the actor of the change.
  */
 @QueueNoAsync
 class SlotPipelineChangeActorIT : AbstractDSLTestSupport() {

@@ -12,7 +12,7 @@ import net.nemerosa.ontrack.model.structure.Token
  * manages every agent, and is the only one to transfer one.
  *
  * An agent has no rights of its own: it is created without groups nor ACLs, and its effective
- * rights are empty until the agent policy gives it some.
+ * rights are its owner's, narrowed by the [agent policy][AgentPolicy].
  */
 interface AgentService {
 

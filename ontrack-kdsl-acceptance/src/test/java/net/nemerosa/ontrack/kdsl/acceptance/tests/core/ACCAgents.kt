@@ -24,10 +24,13 @@ class ACCAgents : AbstractACCDSLTestSupport() {
     @Test
     fun `An agent registered by its owner calls the API with its own token`() {
         val slug = slug()
+        val projectName = project { name }
         lateinit var owner: Account
         lateinit var token: String
+        var ownerSeesProject = false
         withUser { account ->
             owner = account
+            ownerSeesProject = ontrack.findProjectByName(projectName) != null
             val agent = ontrack.agents.register(
                 slug = slug,
                 displayName = "Claude Code for the acceptance tests",
@@ -44,8 +47,12 @@ class ACCAgents : AbstractACCDSLTestSupport() {
         assertEquals("$slug[agent]", current.email)
         assertEquals("AGENT", current.kind)
         assertEquals(owner.email, current.owner)
-        // No rights at all
-        assertTrue(asAgent.projects().isEmpty(), "An agent sees no project")
+        // The rights of its owner (#2026)
+        assertEquals(
+            ownerSeesProject,
+            asAgent.findProjectByName(projectName) != null,
+            "An agent sees what its owner sees"
+        )
 
         // Deleting the owner deletes the agent, and its token stops working
         ontrack.admin.deleteAccount(owner)

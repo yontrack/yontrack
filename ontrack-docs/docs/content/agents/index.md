@@ -23,12 +23,7 @@ the identity provider whose email is one.
 Agents are **never mail recipients**: the mail notifications skip any agent identifier among their
 recipients.
 
-!!! note "Rights"
-
-    An agent has **no rights at all** for now: it is created without groups nor permissions, and
-    even a role granted to it is ignored. With its token, an agent can tell who it is, and nothing
-    more. What an agent may do — its owner's rights, narrowed by an agent policy — comes with the
-    agent policy.
+An agent has **no rights of its own**: see [What an agent may do](#what-an-agent-may-do).
 
 ## The owner
 
@@ -158,6 +153,62 @@ Yontrack stores the session and renders its link; it never fetches nor interpret
   with a warning in the logs, and the session is kept without it. A link without a session is
   ignored.
 * None of these ever fails the call.
+
+## What an agent may do
+
+An agent's rights are **its owner's rights, narrowed by the agent policy**. Nothing is assigned to
+the agent itself — a role granted to an agent is ignored — so demoting or deleting the owner bounds
+the agent at once, with nothing to keep in sync. The owner's rights are all of them: roles, groups,
+groups mapped from the identity provider, and project permissions.
+
+| Action | Default |
+|---|---|
+| Read everything its owner can | yes |
+| Create builds, validation runs, build links and build properties (record evidence) | yes |
+| Promote | no, unless the promotion level [admits agents](../concepts/model/index.md#agents-admitted) |
+| Start or finish a deployment | no, unless the slot [admits agents](../integrations/environments/environments.md#agents-admitted) |
+| Satisfy a manual admission rule | **never** |
+| Change configuration (projects, branches, promotion levels, validation stamps, slots, subscriptions, CasC, settings, accounts) | no |
+| Delete builds or promotions, override admission rules, cancel deployments | no |
+
+Evidence is cheap to record and safe to audit; gates are where accountability lives.
+
+The policy is an **allowlist**: every function which is not listed in it is denied to agents,
+including the functions which extensions add later.
+
+| Function | Granted when |
+|---|---|
+| `ProjectList`, `ProjectView`, `EnvironmentList`, `SlotView`, `ProjectFindingsView`, `ProjectSubscriptionsRead`, SCM catalog access | the owner holds it |
+| `BuildCreate`, `BuildConfig` | the owner holds it |
+| `ValidationRunCreate`, `ValidationRunStatusChange`, `ValidationRunStatusCommentEditOwn` | the owner holds it |
+| `PromotionRunCreate` | the owner holds it, on a promotion level which admits agents |
+| `SlotPipelineCreate`, `SlotPipelineStart`, `SlotPipelineFinish`, `SlotPipelineData`, `SlotPipelineWorkflowRun` | the owner holds it, in a slot which admits agents |
+
+Never granted, whatever the owner may do: `SlotPipelineOverride`, `SlotPipelineCancel`,
+`SlotPipelineDelete`, the creation, edition and deletion of projects, branches, promotion levels,
+validation stamps and slots, `ProjectConfig`, the subscriptions, the CasC, `AccountManagement`,
+`ApplicationManagement`, `EventsAudit`, `BuildEdit`, `BuildDelete` and `PromotionRunDelete`.
+
+A refusal by the agent policy always says why, in the GraphQL error or in the body of the HTTP 403:
+
+```
+agent claude-code-ci[agent] may not ProjectEdit (agent policy)
+```
+
+### Agent asks, human approves
+
+An agent never approves a deployment: in a slot which admits agents, it starts the pipeline, and
+its approval of a [manual admission rule](../integrations/environments/environments.md#agents-admitted)
+is refused with "an agent cannot approve; ask _owner_" — even when the rule lists the agent. The
+pipeline stays a candidate until a person approves it. Promotions stay a person's decision, unless
+the promotion level admits agents.
+
+### Auto-promotion
+
+[Auto-promotion](../concepts/model/auto-promotion.md) is not concerned by the agent policy. When an
+agent records the validations which complete the requirements of a promotion level, Yontrack itself
+grants the promotion on the agent's behalf, whether the level admits agents or not: the
+auto-promotion rules of the level are the gate.
 
 ## A CI pipeline is not an agent
 

@@ -9,6 +9,11 @@ data class Slot(
     val description: String?,
     val project: Project,
     val qualifier: String,
+    /**
+     * Does this slot admit agents? An agent may start, run and finish a deployment pipeline only in a
+     * slot which admits agents - and only if its owner may. It never satisfies a manual approval.
+     */
+    val agentsAdmitted: Boolean = false,
 ) {
     companion object {
         const val DEFAULT_QUALIFIER = ""
@@ -19,12 +24,8 @@ data class Slot(
     }"
 
     override fun toString(): String = fullName()
-    fun withDescription(description: String?) = Slot(
-        id = id,
-        environment = environment,
-        description = description,
-        project = project,
-        qualifier = qualifier
-    )
+    fun withDescription(description: String?) = copy(description = description)
+
+    fun withAgentsAdmitted(agentsAdmitted: Boolean) = copy(agentsAdmitted = agentsAdmitted)
 
 }

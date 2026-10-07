@@ -11,8 +11,10 @@ import net.nemerosa.ontrack.extension.environments.workflows.SlotWorkflowService
 import net.nemerosa.ontrack.json.asJson
 import net.nemerosa.ontrack.model.events.EventPostService
 import net.nemerosa.ontrack.model.pagination.PaginatedList
+import net.nemerosa.ontrack.model.security.AgentPolicyException
 import net.nemerosa.ontrack.model.security.ProjectView
 import net.nemerosa.ontrack.model.security.SecurityService
+import net.nemerosa.ontrack.model.security.currentAgent
 import net.nemerosa.ontrack.model.structure.Build
 import net.nemerosa.ontrack.model.structure.Project
 import org.springframework.stereotype.Service
@@ -49,6 +51,17 @@ class SlotServiceImpl(
         // Saving
         slotRepository.addSlot(slot)
         eventPostService.post(environmentsEventsFactory.slotCreation(slot))
+    }
+
+    /**
+     * The agent policy: an agent acts on the pipelines of a slot only when the slot admits agents.
+     * The system acting on somebody's behalf is not an agent, and is not concerned.
+     */
+    private fun checkSlotAdmitsAgent(slot: Slot, action: String) {
+        val agent = securityService.currentAgent ?: return
+        if (!slot.agentsAdmitted) {
+            throw AgentPolicyException.slot(agent, action, slot.fullName())
+        }
     }
 
     override fun saveSlot(slot: Slot) {
@@ -330,6 +343,7 @@ class SlotServiceImpl(
         dateTime: LocalDateTime?,
     ): SlotPipeline {
         securityService.checkSlotAccess<SlotPipelineCreate>(slot)
+        checkSlotAdmitsAgent(slot, "start a pipeline")
         // Build must be eligible
         if (!isBuildEligible(slot, build)) {
             throw SlotPipelineBuildNotEligibleException(slot, build)
@@ -564,6 +578,7 @@ class SlotServiceImpl(
     ): SlotDeploymentActionStatus {
         val pipeline = slotPipelineRepository.getPipelineById(pipelineId)
         securityService.checkSlotAccess<SlotPipelineStart>(pipeline.slot)
+        checkSlotAdmitsAgent(pipeline.slot, "start a deployment")
 
         // Always checking the project
         if (pipeline.build.project != pipeline.slot.project) {
@@ -730,6 +745,7 @@ class SlotServiceImpl(
     ): SlotDeploymentActionStatus {
         val pipeline = slotPipelineRepository.getPipelineById(pipelineId)
         securityService.checkSlotAccess<SlotPipelineFinish>(pipeline.slot)
+        checkSlotAdmitsAgent(pipeline.slot, "finish a deployment")
         // Only last pipeline can be deployed
         val lastPipeline = getCurrentPipeline(pipeline.slot)
         if (lastPipeline?.id != pipeline.id) {
@@ -798,6 +814,7 @@ class SlotServiceImpl(
         val pipeline = slotPipelineRepository.getPipelineById(pipelineId)
         // Same right as finishing a deployment
         securityService.checkSlotAccess<SlotPipelineFinish>(pipeline.slot)
+        checkSlotAdmitsAgent(pipeline.slot, "fail a deployment")
         // Only a running pipeline can fail
         if (pipeline.status != SlotPipelineStatus.RUNNING) {
             return SlotDeploymentActionStatus.nok("Only a running deployment can be marked as failed.")
@@ -998,6 +1015,7 @@ class SlotServiceImpl(
         data: JsonNode
     ) {
         securityService.checkSlotAccess<SlotPipelineData>(pipeline.slot)
+        checkSlotAdmitsAgent(pipeline.slot, "set the data of a pipeline")
         // Checking that we are targeting the same slot
         checkSameSlot(pipeline, admissionRuleConfig)
         if (pipeline.status == SlotPipelineStatus.CANDIDATE) {

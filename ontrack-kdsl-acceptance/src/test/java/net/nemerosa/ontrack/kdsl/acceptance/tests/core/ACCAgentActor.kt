@@ -8,7 +8,6 @@ import net.nemerosa.ontrack.kdsl.spec.admin.agents
 import net.nemerosa.ontrack.kdsl.spec.admin.currentAccount
 import net.nemerosa.ontrack.kdsl.spec.signature
 import net.nemerosa.ontrack.kdsl.spec.withToken
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -60,7 +59,6 @@ class ACCAgentActor : AbstractACCDSLTestSupport() {
     }
 
     @Test
-    @Disabled("An agent has no rights until #2026 gives it the ones of its owner, BuildCreate included: enabled by #2026")
     fun `A build created by an agent with session headers names the agent, its owner and its session`() {
         val (owner, agent, token) = registerAgent()
         project {

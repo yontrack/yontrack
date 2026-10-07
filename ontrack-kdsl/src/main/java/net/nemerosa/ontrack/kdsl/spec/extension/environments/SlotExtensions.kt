@@ -11,4 +11,5 @@ fun SlotFragment.toSlot(connected: Connected) = Slot(
     project = project.projectFragment.toProject(connected),
     qualifier = qualifier,
     description = description ?: "",
+    agentsAdmitted = agentsAdmitted ?: false,
 )

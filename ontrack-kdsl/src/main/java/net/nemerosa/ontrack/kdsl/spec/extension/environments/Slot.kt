@@ -6,6 +6,7 @@ import net.nemerosa.ontrack.kdsl.connector.Connector
 import net.nemerosa.ontrack.kdsl.connector.graphql.convert
 import net.nemerosa.ontrack.kdsl.connector.graphql.schema.CreatePipelineMutation
 import net.nemerosa.ontrack.kdsl.connector.graphql.schema.SaveSlotAdmissionRuleConfigMutation
+import net.nemerosa.ontrack.kdsl.connector.graphql.schema.UpdateSlotMutation
 import net.nemerosa.ontrack.kdsl.connector.graphqlConnector
 import net.nemerosa.ontrack.kdsl.spec.Build
 import net.nemerosa.ontrack.kdsl.spec.Project
@@ -19,7 +20,32 @@ class Slot(
     val project: Project,
     val qualifier: String = "",
     val description: String = "",
+    /**
+     * Does this slot admit agents?
+     */
+    val agentsAdmitted: Boolean = false,
 ) : Resource(connector) {
+
+    /**
+     * Updates the description of this slot and whether it admits agents.
+     *
+     * @param description New description, kept when null
+     * @param agentsAdmitted Does the slot admit agents? Kept when null.
+     * @return The updated slot
+     */
+    fun update(
+        description: String? = null,
+        agentsAdmitted: Boolean? = null,
+    ): Slot =
+        graphqlConnector.mutate(
+            UpdateSlotMutation(
+                id,
+                Optional.presentIfNotNull(description),
+                Optional.presentIfNotNull(agentsAdmitted),
+            )
+        ) { it?.updateSlot?.payloadUserErrors?.convert() }
+            ?.updateSlot?.slot?.slotFragment?.toSlot(this)
+            ?: error("Cannot get the updated slot")
 
     /**
      * Starts a pipeline for a build in this slot, cancelling the slot's active pipeline.

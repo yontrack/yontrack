@@ -461,6 +461,19 @@ Two behaviours are worth knowing before enabling it:
 
 Enabling `autoRevoke` does not re-evaluate the builds which are already promoted: revocation is forward-looking.
 
+###### Agents
+
+Setting `agents` to `true` on a promotion sets [*Agents admitted*](../concepts/model/index.md#agents-admitted) on its promotion level: a registered [agent](../agents/index.md) may then promote a build to it, provided its owner may.
+
+```yaml
+branch:
+  promotions:
+    - GOLD:
+        agents: true
+```
+
+`agents` is not set by default. `true` admits agents, `false` stops admitting them, and leaving it out keeps the setting of the promotion level as it is - set in the UI or through CasC, say. A layer which does not mention it leaves the value set by the previous layer untouched.
+
 ###### Fields
 
 A promotion level can define a list of [fields](../concepts/model/promotion-level-fields.md) that must be filled in when a build is promoted. Fields are defined under the `fields` key of a promotion:
@@ -871,6 +884,8 @@ project:
     environments: [ list of environments ]
     slots: [ list of slots ]
 ```
+
+Each environment of a slot takes `agentsAdmitted: true` to [admit agents](../integrations/environments/environments.md#agents-admitted) in this slot (`false` by default).
 
 See the [environments reference](../integrations/environments/environments.md#ci-configuration) for some examples.
 

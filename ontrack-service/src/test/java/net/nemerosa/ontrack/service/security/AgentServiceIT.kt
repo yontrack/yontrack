@@ -283,7 +283,7 @@ class AgentServiceIT : AbstractDSLTestSupport() {
     }
 
     @Test
-    fun `Authentication with an agent token resolves the agent account, with no rights`() {
+    fun `Authentication with an agent token resolves the agent account, with the rights of its owner`() {
         val project = asAdmin { project() }
         val owner = person()
         val agent = owner.register()
@@ -298,10 +298,10 @@ class AgentServiceIT : AbstractDSLTestSupport() {
                 assertEquals(AccountKind.AGENT, account.kind)
                 assertEquals(owner.id, account.owner?.id)
                 assertEquals("ci", securityService.currentActor?.tokenName)
-                // No rights at all, not even those granted to every authenticated user
-                assertFalse(
+                // The rights of its owner, here those granted to every authenticated user
+                assertTrue(
                     securityService.isProjectFunctionGranted(project.id(), ProjectView::class.java),
-                    "An agent does not see the projects visible to all"
+                    "An agent sees the projects visible to its owner"
                 )
                 assertFalse(securityService.isGlobalFunctionGranted(ProjectCreation::class.java))
             }
@@ -311,7 +311,8 @@ class AgentServiceIT : AbstractDSLTestSupport() {
     }
 
     @Test
-    fun `An agent has no rights even when a role is assigned to it`() {
+    fun `A role assigned to an agent is ignored`() {
+        val project = asAdmin { project() }
         val agent = person().register()
         asAdmin {
             accountService.saveGlobalPermission(
@@ -324,6 +325,8 @@ class AgentServiceIT : AbstractDSLTestSupport() {
         asFixedAccount(user) {
             assertFalse(securityService.isGlobalFunctionGranted(AccountManagement::class.java))
             assertFalse(securityService.isGlobalFunctionGranted(ProjectCreation::class.java))
+            // Allowed by the agent policy, but its owner cannot
+            assertFalse(securityService.isProjectFunctionGranted(project.id(), BuildCreate::class.java))
         }
     }
 

@@ -468,6 +468,49 @@ class SlotGraphQLIT : AbstractQLKTITSupport() {
     }
 
     @Test
+    fun `Updating the description of a slot and whether it admits agents`() {
+        slotTestSupport.withSlot { slot ->
+            run(
+                """
+                    mutation {
+                        updateSlot(input: {slotId: "${slot.id}", description: "Canary", agentsAdmitted: true}) {
+                            slot {
+                                description
+                                agentsAdmitted
+                            }
+                            errors {
+                                message
+                            }
+                        }
+                    }
+                """
+            ) { data ->
+                checkGraphQLUserErrors(data, "updateSlot") { node ->
+                    assertEquals("Canary", node.path("slot").path("description").asText())
+                    assertEquals(true, node.path("slot").path("agentsAdmitted").asBoolean())
+                }
+            }
+            // Left out, the description is kept
+            run(
+                """
+                    mutation {
+                        updateSlot(input: {slotId: "${slot.id}", agentsAdmitted: false}) {
+                            errors {
+                                message
+                            }
+                        }
+                    }
+                """
+            ) { data ->
+                checkGraphQLUserErrors(data, "updateSlot")
+            }
+            val updated = slotService.getSlotById(slot.id)
+            assertEquals("Canary", updated.description)
+            assertEquals(false, updated.agentsAdmitted)
+        }
+    }
+
+    @Test
     fun `List of deployments for a slot filtered by build`() {
         slotTestSupport.withSlot { slot ->
             slotTestSupport.createRunAndFinishDeployment(slot = slot)
