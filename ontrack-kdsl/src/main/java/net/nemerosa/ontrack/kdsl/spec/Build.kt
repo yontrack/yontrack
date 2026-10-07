@@ -164,6 +164,13 @@ class Build(
         } ?: emptyList()
 
     /**
+     * What this build still lacks to reach a promotion level of its branch.
+     *
+     * @param promotionLevel Name of the promotion level
+     */
+    fun readiness(promotionLevel: String): Readiness = queryReadiness(promotionLevel = promotionLevel, slotId = null)
+
+    /**
      * Gets the list of builds used by _this_ build.
      */
     fun getLinksUsing(

@@ -96,6 +96,79 @@ A promotion level can be granted to a [build](#builds). This is called a _promot
 
 A promotion is either granted or not granted. When [promotion level fields](promotion-level-fields.md) are configured, field values can be associated with each promotion run.
 
+## Readiness
+
+The _readiness_ of a build says what it still lacks to reach a promotion level of its branch, or to be deployed in a
+[slot](../../integrations/environments/environments.md) of its project. It answers the question "is this build ready
+for GOLD, or for production, and what exactly is missing?" in one read, with every missing condition listed — not
+only the first one.
+
+It is computed when it is read, from the current state of the build and the current configuration of the promotion
+level or of the slot. Reading it changes nothing: it never promotes, deploys or records anything. It needs nothing more
+than to see the build's project.
+
+For a **promotion level**:
+
+* a build which already has the promotion level is ready, with nothing missing;
+* with an [auto promotion](auto-promotion.md), each required validation stamp which has not passed is missing, with the
+  status of its last run or _Not validated_, and so is each required promotion level the build has not reached — the
+  same conditions as the auto promotion itself;
+* each promotion check which would refuse the promotion is missing — the previous promotion condition, and each
+  promotion dependency which is not granted;
+* a promotion level without auto promotion is granted by a person: that is missing too, and the build is not ready
+  until someone promotes it, even when nothing else is missing.
+
+For a **slot**, every [admission rule](../../integrations/environments/environments.md#eligible-and-deployable-builds)
+which makes the build not eligible, or not deployable yet, is missing with its reason. A manual approval is missing
+until it is given on a deployment of the build.
+
+Each missing item has a _kind_, a _name_ and a _message_:
+
+| Kind             | Name                       | What it means                                                      |
+|------------------|----------------------------|--------------------------------------------------------------------|
+| `VALIDATION`     | validation stamp           | a stamp required by the auto promotion has not passed              |
+| `PROMOTION`      | promotion level            | a promotion required by the auto promotion is not granted          |
+| `CHECK`          | promotion check            | a promotion check would refuse the promotion                       |
+| `ADMISSION_RULE` | admission rule of the slot | the rule refuses the build, or does not let it be deployed yet     |
+| `MANUAL`         | promotion level, or rule   | a person must act: promote the build, or approve the deployment    |
+| `AGENT_POLICY`   | promotion level, or slot   | the agent reading the readiness is not admitted on the target      |
+
+### Reading it
+
+The GraphQL API exposes it as the `readiness` field of `Build`, given exactly one of `promotionLevel` (a name on the
+build's branch) and `slotId`:
+
+```graphql
+{
+  build(id: 123) {
+    readiness(promotionLevel: "GOLD") {
+      ready
+      missing {
+        kind
+        name
+        message
+      }
+    }
+  }
+}
+```
+
+The KDSL offers `build.readiness(promotionLevel = "GOLD")` and `build.readiness(slot = slot)`.
+
+### How agents use it
+
+Readiness is the question an agent asks before it acts on a delivery: before proposing a merge, starting a deployment
+or asking for a promotion, it reads what is missing rather than guessing from the builds and the runs. The kinds tell
+it what it can do about each item:
+
+* `VALIDATION` — produce the evidence: run the check, and record it as a validation run;
+* `PROMOTION` and `CHECK` — the build must first reach another promotion level;
+* `ADMISSION_RULE` — the build does not qualify for the slot yet, or not at all;
+* `MANUAL` — stop and ask a person: an agent never stands in for the person who promotes or approves.
+
+The [Yontrack MCP server](https://github.com/yontrack/yontrack-mcp) and the
+[Yontrack CLI](https://github.com/yontrack/yontrack-cli) read the same field.
+
 ## Properties
 
 Properties are heavily used in Yontrack to enrich the model with additional information. They can be attached to any

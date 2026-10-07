@@ -804,6 +804,13 @@ type Build implements Authorizable & ProjectEntity {
     "Fully qualified name of the property type"
     type: String
   ): [Property!]!
+  "What this build still lacks to reach a promotion level of its branch, or to be deployed in a slot of its project - exactly one of `promotionLevel` and `slotId` must be given. Every missing condition is listed: the validations and promotions required by an auto promotion, the promotion checks, the admission rules of a slot, and what needs a person. A build which already has the promotion level is ready. Computed now from the current state, and read-only: reading it promotes or deploys nothing."
+  readiness(
+    "Name of a promotion level of the build's branch"
+    promotionLevel: String,
+    "ID of a slot of the build's project"
+    slotId: String
+  ): Readiness!
   "Release indicator on the build."
   releaseProperty: Property
   "Renders a template for this build"
@@ -6548,6 +6555,24 @@ type RateLimit {
   used: Int
 }
 
+"What a build still lacks to reach a promotion level or a slot, computed now from the current state of the build and the current configuration of the target. Reading it changes nothing."
+type Readiness {
+  "Everything the build still lacks, one item per missing condition, empty when `ready` is true. All failing conditions are listed, not only the first one."
+  missing: [ReadinessItem!]!
+  "True when nothing is missing: the build already has the promotion level, or it meets every condition of the target. A level granted by a person, or a slot with a manual approval, keeps it false until that person acts, even when everything else is satisfied."
+  ready: Boolean!
+}
+
+"One thing a build still lacks to reach a promotion level or a slot"
+type ReadinessItem {
+  "Kind of the missing condition, which says what can be done about it"
+  kind: ReadinessKind!
+  "Explanation of what is missing, in plain words, ready to be shown or acted upon"
+  message: String!
+  "Name of what is missing: the validation stamp for VALIDATION, the promotion level for PROMOTION, the check for CHECK, the admission rule for ADMISSION_RULE, the promotion level or the admission rule for MANUAL"
+  name: String!
+}
+
 "One measurement of one project at one moment, taken by Yontrack from its own data, for one set. Durations are in seconds, frequencies per week."
 type Reading {
   "What the value rests on"
@@ -9271,6 +9296,22 @@ enum QueueRecordState {
   ROUTING_READY
   SENT
   STARTED
+}
+
+"Kind of a condition a build still lacks to reach a promotion level or a slot"
+enum ReadinessKind {
+  "An admission rule of the slot refuses the build, or does not allow it to be deployed yet"
+  ADMISSION_RULE
+  "The agent reading the readiness is not admitted on the promotion level or on the slot"
+  AGENT_POLICY
+  "A promotion check refuses the promotion, like a previous promotion condition or a promotion dependency"
+  CHECK
+  "A person must act: the promotion level is not auto promoted and is granted by a person, or the slot has a manual approval which has not been given"
+  MANUAL
+  "A promotion level required by the auto promotion of the level has not been reached by the build"
+  PROMOTION
+  "A validation stamp required by the auto promotion of the level has not passed on the build: validate it (again) to satisfy it"
+  VALIDATION
 }
 
 "What the value of a reading rests on: MEASURED from Yontrack's own data, ESTIMATED (never produced in 6.x) or UNKNOWN, with a reason."

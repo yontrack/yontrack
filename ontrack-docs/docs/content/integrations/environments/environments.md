@@ -77,6 +77,9 @@ In the GraphQL API:
   reason) and `pipelineOnlyRules` (the rules decided on the deployment only, like `manual`).
 * `startSlotPipeline` creates a candidate for any eligible build. Whether it can run is on the
   returned pipeline, in `runAction { ok }` and `admissionRules { check { ok reason } }`.
+* `Build.readiness(slotId)` lists, in one read, everything the build still lacks for one slot:
+  the rules which make it not eligible or not deployable, and a manual approval not given yet. See
+  [Readiness](../../concepts/model/index.md#readiness).
 
 ## The deployment page
 

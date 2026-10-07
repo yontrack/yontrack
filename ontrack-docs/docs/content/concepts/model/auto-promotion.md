@@ -45,6 +45,8 @@ These are the _current_ conditions and statuses. The auto promotion property is 
 
 The GraphQL API exposes them as the `autoPromotionConditions` field of `PromotionLevel` and of `PromotionRun`, and as the `autoPromotionConditions(promotionLevelId)` field of `Build`, for any promotion level of the build's branch, granted or not.
 
+The [readiness](index.md#readiness) of a build puts these conditions together with the promotion checks, into the list of what the build still lacks to reach the promotion level.
+
 ## Revoking a promotion
 
 By default, a promotion which has been granted stays granted, even if the validations which triggered it later fail.

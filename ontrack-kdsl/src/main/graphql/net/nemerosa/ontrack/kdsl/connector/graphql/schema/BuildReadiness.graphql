@@ -1,0 +1,16 @@
+query BuildReadiness(
+    $buildId: Int!,
+    $promotionLevel: String,
+    $slotId: String,
+) {
+    build(id: $buildId) {
+        readiness(promotionLevel: $promotionLevel, slotId: $slotId) {
+            ready
+            missing {
+                kind
+                name
+                message
+            }
+        }
+    }
+}
