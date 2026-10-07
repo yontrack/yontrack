@@ -295,6 +295,14 @@ widgets, one of which happens to render this matrix.
 
 ### Notifications
 
+**Event**:
+A record, in the `EVENTS` table, of something that happened to a project entity
+(or to the instance), with its type, its time, its user, the entities it concerns
+and its values. Posted by Yontrack, kept until it is cleaned up, and the input of
+notifications and of the events page.
+_Avoid_: log, entry, record. A *log* is the application's, an *entry* belongs to a
+trail, a *record* to the recordings extension.
+
 **Notification record**:
 The outcome of one notification fired by a subscription on an entity, resolving
 to a success, an in-flight, or an error state.
@@ -412,9 +420,9 @@ of the UI.
 One element of a trail: a typed, canonical payload with the actor and server time
 of the change, numbered within its trail and hashed together with the hash of the
 entry before it.
-_Avoid_: event, fact, record. An *event* is what the notification system posts,
-and an entry is often written because of one but is not it; a *record* is the
-recordings extension's.
+_Avoid_: event, fact, record. An *event* is what Yontrack posts in the `EVENTS`
+table and notifications react to, and an entry is often written because of one but
+is not it; a *record* is the recordings extension's.
 
 **Actor**:
 Who made a change and how they got in, as the security context holds it: the

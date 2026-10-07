@@ -2358,6 +2358,47 @@ type EstateSecurity {
   highTargetDays: Int
 }
 
+"Record of something that happened to a project entity, or to the instance, with its type, its time, its user, the entities it concerns and its values."
+type Event {
+  "Entities the event is about"
+  entities: [EventEntity!]!
+  "Type of the event"
+  eventType: EventType!
+  "Additional entities the event is about, like the target of a build link"
+  extraEntities: [EventEntity!]!
+  "ID of the event"
+  id: Int!
+  "Message of the event, rendered as HTML"
+  message: String!
+  "Project of the event, if any"
+  project: Project
+  "Type of the entity the event refers to first, if any"
+  ref: ProjectEntityType
+  "Time of the event (UTC)"
+  time: LocalDateTime!
+  "Name of the user who posted the event"
+  user: String!
+  "Values of the event"
+  values: [NameValue!]!
+}
+
+"Entity an event is about"
+type EventEntity {
+  "Display name of the entity, like `Branch P/X`"
+  displayName: String!
+  "ID of the entity"
+  id: Int!
+  "Type of the entity"
+  type: ProjectEntityType!
+}
+
+type EventPaginated {
+  "Information about the current page"
+  pageInfo: PageInfo
+  "Items in the current page"
+  pageItems: [Event!]!
+}
+
 "EventSubscriptionPayload"
 type EventSubscriptionPayload {
   "Channel to send this event to"
@@ -5903,6 +5944,15 @@ type Query {
   ): EventSubscriptionPayloadPaginated
   "List of all event types"
   eventTypes: [EventType!]!
+  "Audit of all the events of the instance, newest first, whatever the project ACLs. Requires the events audit function, granted to the administrators. A page holds at most 100 events. There is no total count: `pageInfo.nextPage` tells whether there are more events, and `pageInfo.totalSize` is only the number of events known so far."
+  events(
+    "Filter on the events"
+    filter: EventFilterInput,
+    "Offset for the page"
+    offset: Int = 0,
+    "Size of the page"
+    size: Int = 20
+  ): EventPaginated
   "Security finding by ID. Null when it does not exist, or when the user is not granted the view of the findings of its project."
   finding(
     "ID of the finding"
@@ -10720,6 +10770,20 @@ input EstateSecurityInput {
   freshnessDays: Int
   "Number of days a HIGH finding may stay open, null for no target"
   highTargetDays: Int
+}
+
+"Filter on the events of the instance. Every criterion is optional, and they are combined."
+input EventFilterInput {
+  "IDs of the event types to keep - empty or absent for all the types"
+  eventTypes: [String!]
+  "Events at or after this time (UTC, inclusive)"
+  from: LocalDateTime
+  "Name of a project, matching the event's project or its extra project. An unknown name returns no event."
+  project: String
+  "Events at or before this time (UTC, inclusive)"
+  to: LocalDateTime
+  "Case-insensitive prefix of the name of the user who posted the event"
+  user: String
 }
 
 input EventSubscriptionFilter {

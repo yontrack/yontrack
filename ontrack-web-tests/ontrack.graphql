@@ -114,6 +114,114 @@ type ApplyDashboardsPayload implements PayloadInterface {
   errors: [PayloadUserError]
 }
 
+"Endorsement of an entry by the instance key: the Ed25519 signature of its hash"
+type AuditTrailEndorsement {
+  "Technical ID of the endorsed entry"
+  entryId: Int!
+  "ID of the key which endorsed the entry"
+  keyId: String!
+  "Seq of the endorsed entry"
+  seq: Int!
+  "Signature of the hash of the entry, in base64"
+  signature: String!
+  "Server time of the endorsement: ISO-8601 in UTC with milliseconds"
+  time: String!
+}
+
+"An entry of the trail of a build"
+type AuditTrailEntry {
+  "Who made the change"
+  actor: JSON!
+  "Hash of the entry: SHA-256 of the canonical form of its envelope, in lowercase hex"
+  hash: String!
+  "Technical ID of the entry"
+  id: Int!
+  "What changed"
+  payload: JSON!
+  "Hash of the entry before, null for seq 1"
+  prevHash: String
+  "Schema version of the entry, which selects its hash format"
+  schemaVersion: Int!
+  "Position of the entry in the trail, from 1"
+  seq: Int!
+  "Server time of the entry, as hashed: ISO-8601 in UTC with milliseconds"
+  time: String!
+  "Type of the entry, like build.created or validation.run"
+  type: String!
+}
+
+"Public key of the instance, with which the endorsements of the entries of its trails are verified"
+type AuditTrailKey {
+  "Algorithm of the key: Ed25519"
+  algorithm: String!
+  "ID of the key, named by every endorsement it made: the first 16 hex characters of the SHA-256 of the DER SubjectPublicKeyInfo"
+  keyId: String!
+  "Public key, in PEM"
+  publicKey: String!
+}
+
+"Status of the audit trail"
+type AuditTrailStatus {
+  "Whether the instance key can endorse the entries"
+  keyStatus: AuditTrailKeyStatus!
+  "Public keys of the instance - empty while no key exists"
+  keys: [AuditTrailKey!]!
+  "Whether the licence allows the audit trail"
+  licensed: Boolean!
+  "Status of the evidence storage"
+  storage: AuditTrailStorageStatus!
+}
+
+"Status and configuration of the evidence storage - never its credentials"
+type AuditTrailStorageStatus {
+  "Configured bucket"
+  bucket: String
+  "When the storage was last probed, UTC, ISO-8601 local date time"
+  checkedAt: String!
+  "Configured endpoint"
+  endpoint: String
+  "Why the storage is not OK - null when it is"
+  message: String
+  "Whether the bucket is addressed path-style"
+  pathStyle: Boolean!
+  "Configured region"
+  region: String!
+  "State of the storage, as its last probe found it"
+  state: AuditTrailStorageState!
+}
+
+"Verification of the trail of a build"
+type AuditTrailVerification {
+  "Positions of the evidence.attached entries whose evidence no longer has the recorded digest - null unless the evidence was verified"
+  alteredEvidence: [Int!]
+  "Whether every hash recomputes from its entry, every entry is chained to the one before it, and the seqs run from 1 without gap"
+  chainIntact: Boolean!
+  "Whether every endorsement is the signature of the hash of its entry by a known public key of the instance"
+  endorsementsValid: Boolean!
+  "Position, from 1, of the first entry failing a check of the chain - the trail is verified up to the one before it. Null when the chain is intact."
+  firstBrokenSeq: Int
+  "Position of the first entry with an invalid endorsement, null when they are all valid"
+  firstInvalidEndorsementSeq: Int
+  "Positions of the evidence.attached entries whose evidence is absent from the storage - null unless the evidence was verified"
+  missingEvidence: [Int!]
+  "Whether the trail opens with trail.opened: its build predates it, and the trail starts at seq 1"
+  partial: Boolean!
+  "Every check which failed, by position"
+  problems: [AuditTrailVerificationProblem!]!
+  "Position of the first entry of the unendorsed tail of the trail - the entries after the last endorsed one, which no endorsement covers. Null when the last entry is endorsed or the trail is empty."
+  unendorsedFromSeq: Int
+}
+
+"A check of the verification of a trail which failed"
+type AuditTrailVerificationProblem {
+  "What failed, for a human"
+  message: String!
+  "Position of the entry, from 1 - its seq, unless the seqs themselves are wrong"
+  seq: Int!
+  "What failed"
+  type: TrailVerificationProblemType!
+}
+
 "A named authorization"
 type Authorization {
   "Action to authorize"
@@ -616,8 +724,15 @@ type BranchLink {
 type Build implements Authorizable & ProjectEntity {
   "Description with links."
   annotatedDescription: String
+  "Trail of the build: its entries, their endorsements and its verification - null when the build has no trail, the licence being off"
+  auditTrail: BuildAuditTrail
   "Authorizations for this context"
   authorizations: [Authorization!]!
+  "Current conditions of the auto promotion of a promotion level of this build's branch, with their current state for this build, whether it is promoted to this level or not - null when the promotion level has no auto promotion"
+  autoPromotionConditions(
+    "ID of the promotion level, which must belong to the build's branch"
+    promotionLevelId: Int!
+  ): AutoPromotionBuildConditions
   "Auto versioning information for this build, in regards of a parent branch"
   autoVersioning(
     "ID of the parent branch. Is overridden by the buildId argument, but at least one of each is required."
@@ -781,6 +896,21 @@ type Build implements Authorizable & ProjectEntity {
   ): [Validation!]!
   "Workflows which have been launched by a notification on an event for this entity, most recent first. Resolved by scanning the 100 most recent workflow notification records for this entity, so the list may be truncated on entities which accumulate many of them, like a project or a branch."
   workflowInstances: [WorkflowInstance!]!
+}
+
+"Trail of a build: the append-only, hash-chained record of its story"
+type BuildAuditTrail {
+  "Endorsements of the entries, by seq - none for the entries written while the instance key was not provisioned"
+  endorsements: [AuditTrailEndorsement!]!
+  "Entries of the trail, by seq"
+  entries: [AuditTrailEntry!]!
+  "Evidences of every validation run of the build, deleted ones included, in the order of their upload"
+  evidence: [Evidence!]!
+  "Verification of the trail: its chain, its endorsements and, on demand, its evidence"
+  verification(
+    "Whether to check the evidence the trail references too"
+    includeEvidence: Boolean = false
+  ): AuditTrailVerification!
 }
 
 "Gathering information about the auto versioning around this build"
@@ -1477,6 +1607,14 @@ type DeleteEnvironmentPayload implements Payload {
 type DeleteEstatePayload implements Payload {
   "List of errors"
   errors: [UserError]
+}
+
+"Output type for the deleteEvidence mutation."
+type DeleteEvidencePayload implements Payload {
+  "List of errors"
+  errors: [UserError]
+  "Deleted evidence"
+  evidence: Evidence
 }
 
 "Output type for the deleteGenericProperty mutation."
@@ -2220,6 +2358,47 @@ type EstateSecurity {
   highTargetDays: Int
 }
 
+"Record of something that happened to a project entity, or to the instance, with its type, its time, its user, the entities it concerns and its values."
+type Event {
+  "Entities the event is about"
+  entities: [EventEntity!]!
+  "Type of the event"
+  eventType: EventType!
+  "Additional entities the event is about, like the target of a build link"
+  extraEntities: [EventEntity!]!
+  "ID of the event"
+  id: Int!
+  "Message of the event, rendered as HTML"
+  message: String!
+  "Project of the event, if any"
+  project: Project
+  "Type of the entity the event refers to first, if any"
+  ref: ProjectEntityType
+  "Time of the event (UTC)"
+  time: LocalDateTime!
+  "Name of the user who posted the event"
+  user: String!
+  "Values of the event"
+  values: [NameValue!]!
+}
+
+"Entity an event is about"
+type EventEntity {
+  "Display name of the entity, like `Branch P/X`"
+  displayName: String!
+  "ID of the entity"
+  id: Int!
+  "Type of the entity"
+  type: ProjectEntityType!
+}
+
+type EventPaginated {
+  "Information about the current page"
+  pageInfo: PageInfo
+  "Items in the current page"
+  pageItems: [Event!]!
+}
+
 "EventSubscriptionPayload"
 type EventSubscriptionPayload {
   "Channel to send this event to"
@@ -2253,6 +2432,46 @@ type EventType {
   description: String!
   "id field"
   id: String!
+}
+
+"A file attached to a validation run, referenced by an evidence.attached entry of the trail of its build"
+type Evidence {
+  "Server time of the upload, UTC"
+  collectedAt: LocalDateTime!
+  "Actor of the upload, as entries carry it"
+  collectedBy: JSON!
+  "When the evidence was deleted, null while it is not"
+  deletedAt: LocalDateTime
+  "Path of the download of the content, relative to the root of the API - null once the evidence is deleted"
+  downloadUrl: String
+  "SHA-256 the client claimed, which matched the computed one"
+  externalDigest: String
+  "Name of the file - a label, never a path"
+  fileName: String!
+  "ID of the evidence"
+  id: Int!
+  "Media type declared by the client - the download serves it as such only for the allow-listed types whose content agrees with it"
+  mediaType: String!
+  "SHA-256 of the content as the server computed it, in lowercase hexadecimal"
+  sha256: String!
+  "Size of the content, in bytes"
+  size: Long!
+  "Where the client says the evidence comes from"
+  source: EvidenceSource
+  "Validation run the evidence is attached to"
+  validationRun: ValidationRun!
+  "ID of the validation run the evidence is attached to"
+  validationRunId: Int!
+}
+
+"Where an evidence comes from, as its client claims it"
+type EvidenceSource {
+  "Tool which produced the evidence, like trivy"
+  tool: String
+  "Where the evidence was produced - a CI job, a report: an HTTP or HTTPS URL"
+  url: String
+  "Version of the tool"
+  version: String
 }
 
 type ExtensionFeatureDescription {
@@ -3696,6 +3915,11 @@ type Mutation {
     "Input for the mutation"
     input: DeleteEstateInput
   ): DeleteEstatePayload
+  "Deletes an evidence: it is kept, marked as deleted, and its deletion is written to the trail of its build. Requires the EvidenceDelete function on its project."
+  deleteEvidence(
+    "Input for the mutation"
+    input: DeleteEvidenceInput
+  ): DeleteEvidencePayload
   "Generic deletion for a property and an entity"
   deleteGenericProperty(
     "Input for the mutation"
@@ -5564,6 +5788,12 @@ type Query {
     "Filtering accounts having this token in the name, email or groups"
     token: String
   ): [Account!]
+  "Public keys of the instance, with which the endorsements of the entries of its trails are verified - empty while no key exists"
+  auditTrailKeys: [AuditTrailKey!]!
+  "Status of the audit trail: licence, evidence storage and instance key - requires the global settings"
+  auditTrailStatus: AuditTrailStatus!
+  "State of the evidence storage, as its last probe found it - readable by every user, without the configuration of the storage"
+  auditTrailStorageState: AuditTrailStorageState!
   "Getting a list of authorizations for the authenticated user"
   authorizations: [Authorization!]!
   "List of audit entries for auto versioning processing orders"
@@ -5714,6 +5944,15 @@ type Query {
   ): EventSubscriptionPayloadPaginated
   "List of all event types"
   eventTypes: [EventType!]!
+  "Audit of all the events of the instance, newest first, whatever the project ACLs. Requires the events audit function, granted to the administrators. A page holds at most 100 events. There is no total count: `pageInfo.nextPage` tells whether there are more events, and `pageInfo.totalSize` is only the number of events known so far."
+  events(
+    "Filter on the events"
+    filter: EventFilterInput,
+    "Offset for the page"
+    offset: Int = 0,
+    "Size of the page"
+    size: Int = 20
+  ): EventPaginated
   "Security finding by ID. Null when it does not exist, or when the user is not granted the view of the findings of its project."
   finding(
     "ID of the finding"
@@ -7562,8 +7801,10 @@ type Slot implements Authorizable {
   authorizations: [Authorization!]!
   "Does a slot upstream of this one in the project's slot graph hold a newer build?"
   behind: Boolean!
-  "Is the in-flight deployment of this slot held up by a failing, non-overridden admission rule or workflow? False when nothing is in flight."
+  "Is the in-flight deployment of this slot held up by a failing or pending, non-overridden admission rule or workflow? False when nothing is in flight. See blockingState to tell the two apart."
   blocked: Boolean!
+  "How is the in-flight deployment of this slot held up? OK when it is not blocked, FAILED when one of its checks has failed, PENDING when it is only waiting for something expected to happen - a workflow running, an approval to give."
+  blockingState: SlotDeploymentCheckState!
   "Current pipeline in the slot"
   currentPipeline: SlotPipeline
   "description field"
@@ -7683,6 +7924,8 @@ type SlotDeploymentCheck {
   ok: Boolean
   "reason field"
   reason: String
+  "OK, still pending - it blocks, but is expected to pass, like a running workflow - or failed"
+  state: SlotDeploymentCheckState!
 }
 
 "Graph of slots for a project"
@@ -7715,7 +7958,7 @@ type SlotPipeline {
   changes: [SlotPipelineChange!]!
   "end field"
   end: LocalDateTime
-  "Error message if any"
+  "Reason of the first failed check of the current phase, if any. A pending check - a workflow still running, an approval still to give - is not an error: see pendingMessage."
   errorMessage: String
   "Can this deployment be completed?"
   finishAction: SlotPipelineDeploymentStatusProgress
@@ -7727,6 +7970,8 @@ type SlotPipeline {
   lastChange: SlotPipelineChange
   "number field"
   number: Int
+  "Reason of the first pending check of the current phase - a workflow still running, an approval still to give - when no check has failed."
+  pendingMessage: String
   "List of required inputs for the admission rules"
   requiredInputs: [SlotAdmissionRuleInput!]!
   "Can this deployment be actioned into a running state?"
@@ -8329,6 +8574,8 @@ type ValidationRun implements Authorizable & ProjectEntity {
     type: String
   ): [Decoration!]!
   description: String
+  "Evidences attached to the validation run, deleted ones included, in the order of their upload"
+  evidence: [Evidence!]!
   "Security findings reported by this run, each with its observation by this run (the severity, the installed version, the acceptance), the most severe first. Empty for a run which is not a security scan, and for a user who is not granted the view of the findings of the project."
   findings: [FindingObservation!]!
   id: ID!
@@ -8715,6 +8962,24 @@ type WorkflowValidation {
   errors: [String!]!
 }
 
+"Whether the instance key can endorse the entries"
+enum AuditTrailKeyStatus {
+  "No usable key, and none could be generated: entries are written but not endorsed"
+  NOT_PROVISIONED
+  "The key is there: every entry is endorsed"
+  OK
+}
+
+"State of the evidence storage of the audit trail"
+enum AuditTrailStorageState {
+  "The storage properties are not all set: evidence cannot be attached"
+  NOT_CONFIGURED
+  "The bucket is reachable"
+  OK
+  "The bucket cannot be reached - service down, bucket missing, credentials refused: evidence cannot be attached"
+  UNREACHABLE
+}
+
 "List of ways the auto approval is managed."
 enum AutoApprovalMode {
   CLIENT
@@ -9014,6 +9279,13 @@ enum SCMPullRequestStatus {
   UNKNOWN
 }
 
+"State of a deployment check: OK, still pending (it blocks, but is expected to pass), or failed"
+enum SlotDeploymentCheckState {
+  FAILED
+  OK
+  PENDING
+}
+
 "Type of change in a deployment"
 enum SlotPipelineChangeType {
   RULE_DATA
@@ -9036,6 +9308,18 @@ enum ThemeMode {
   DARK
   LIGHT
   SYSTEM
+}
+
+"Check of the verification of a trail which failed: SEQ, SCHEMA_VERSION, HASH, PREVIOUS_HASH, FIRST_ENTRY and BUILD break its chain; ENDORSEMENT and UNKNOWN_KEY invalidate an endorsement."
+enum TrailVerificationProblemType {
+  BUILD
+  ENDORSEMENT
+  FIRST_ENTRY
+  HASH
+  PREVIOUS_HASH
+  SCHEMA_VERSION
+  SEQ
+  UNKNOWN_KEY
 }
 
 "Defines how validation runs should be sorted"
@@ -9480,13 +9764,13 @@ input CreateGitHubConfigurationInput {
   name: String!
   "Personal Access Token"
   oauth2Token: String
-  "Password for authentication"
+  "Password for authentication. Deprecated: use a token or a GitHub App instead."
   password: String
   "GitHub server URL. Null will be replaced by https://github.com"
   url: String
   "User name for authentication"
   user: String
-  "Whether to pass the id input to the dispatched workflows, to find their run when GitHub does not return it. Defaults to true."
+  "Whether to pass the id input to the dispatched workflows, to find their run when GitHub does not return it. Defaults to false."
   workflowSendId: Boolean
 }
 
@@ -9950,6 +10234,12 @@ input DeleteEnvironmentInput {
 "Input type for the deleteEstate mutation."
 input DeleteEstateInput {
   "ID of the estate"
+  id: Int!
+}
+
+"Input type for the deleteEvidence mutation."
+input DeleteEvidenceInput {
+  "ID of the evidence to delete"
   id: Int!
 }
 
@@ -10480,6 +10770,20 @@ input EstateSecurityInput {
   freshnessDays: Int
   "Number of days a HIGH finding may stay open, null for no target"
   highTargetDays: Int
+}
+
+"Filter on the events of the instance. Every criterion is optional, and they are combined."
+input EventFilterInput {
+  "IDs of the event types to keep - empty or absent for all the types"
+  eventTypes: [String!]
+  "Events at or after this time (UTC, inclusive)"
+  from: LocalDateTime
+  "Name of a project, matching the event's project or its extra project. An unknown name returns no event."
+  project: String
+  "Events at or before this time (UTC, inclusive)"
+  to: LocalDateTime
+  "Case-insensitive prefix of the name of the user who posted the event"
+  user: String
 }
 
 input EventSubscriptionFilter {

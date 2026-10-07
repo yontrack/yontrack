@@ -99,6 +99,7 @@ interface RolesService {
                 DashboardEdition::class.java,
                 DashboardSharing::class.java,
                 DashboardGlobal::class.java,
+                EventsAudit::class.java,
         )
 
         /**

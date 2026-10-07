@@ -1,6 +1,8 @@
 package net.nemerosa.ontrack.repository
 
+import net.nemerosa.ontrack.common.Time
 import net.nemerosa.ontrack.model.events.Event
+import net.nemerosa.ontrack.model.events.EventFilter
 import net.nemerosa.ontrack.model.events.EventType
 import net.nemerosa.ontrack.model.structure.ID
 import net.nemerosa.ontrack.model.structure.ID.Companion.of
@@ -119,6 +121,53 @@ class EventJdbcRepository(
                 .addValue("offset", offset)
         ) { rs: ResultSet, _: Int -> toEvent(rs, entityLoader, eventTypeLoader) }
     }
+
+    override fun findEvents(
+        filter: EventFilter,
+        offset: Int,
+        size: Int,
+        entityLoader: (type: ProjectEntityType, id: ID) -> ProjectEntity,
+        eventTypeLoader: (type: String) -> EventType,
+    ): List<Event> {
+        val criteria = mutableListOf<String>()
+        val params = MapSqlParameterSource()
+        filter.from?.let {
+            criteria += "EVENT_TIME >= :from"
+            params.addValue("from", Time.store(it))
+        }
+        filter.to?.let {
+            criteria += "EVENT_TIME <= :to"
+            params.addValue("to", Time.store(it))
+        }
+        filter.user?.takeIf { it.isNotEmpty() }?.let {
+            criteria += """LOWER(EVENT_USER) LIKE (LOWER(:user) || '%') ESCAPE '\'"""
+            params.addValue("user", escapeLike(it))
+        }
+        filter.eventTypes?.takeIf { it.isNotEmpty() }?.let {
+            criteria += "EVENT_TYPE IN (:eventTypes)"
+            params.addValue("eventTypes", it)
+        }
+        filter.project?.takeIf { it.isNotBlank() }?.let {
+            criteria += "(PROJECT IN (SELECT ID FROM PROJECTS WHERE NAME = :project) OR X_PROJECT IN (SELECT ID FROM PROJECTS WHERE NAME = :project))"
+            params.addValue("project", it)
+        }
+        val where = if (criteria.isEmpty()) "" else criteria.joinToString(" AND ", prefix = "WHERE ")
+        return namedParameterJdbcTemplate!!.query(
+            "SELECT * FROM EVENTS $where ORDER BY ID DESC LIMIT :size OFFSET :offset",
+            params
+                .addValue("size", size)
+                .addValue("offset", offset)
+        ) { rs: ResultSet, _: Int -> toEvent(rs, entityLoader, eventTypeLoader) }
+    }
+
+    /**
+     * Escapes the `LIKE` wildcards and the escape character itself.
+     */
+    private fun escapeLike(value: String): String =
+        value
+            .replace("\\", "\\\\")
+            .replace("%", "\\%")
+            .replace("_", "\\_")
 
     override fun getLastEventSignature(
         entityType: ProjectEntityType,

@@ -1,0 +1,34 @@
+query Events(
+    $offset: Int!,
+    $size: Int!,
+    $filter: EventFilterInput,
+) {
+    events(
+        offset: $offset,
+        size: $size,
+        filter: $filter,
+    ) {
+        pageInfo {
+            nextPage {
+                offset
+                size
+            }
+        }
+        pageItems {
+            id
+            eventType {
+                id
+            }
+            time
+            user
+            message
+            project {
+                name
+            }
+            values {
+                name
+                value
+            }
+        }
+    }
+}

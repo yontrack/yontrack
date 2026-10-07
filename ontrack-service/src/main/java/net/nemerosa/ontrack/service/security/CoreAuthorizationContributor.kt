@@ -15,6 +15,8 @@ class CoreAuthorizationContributor : AuthorizationContributor {
         const val PROMOTION_LEVEL = "promotion_level"
         const val VALIDATION_STAMP = "validation_stamp"
         const val BUILD = "build"
+        const val EVENTS = "events"
+        const val AUDIT = "audit"
     }
 
     override fun appliesTo(context: Any): Boolean = context is GlobalAuthorizationContext
@@ -55,6 +57,12 @@ class CoreAuthorizationContributor : AuthorizationContributor {
                 VALIDATION_STAMP,
                 "bulkUpdate",
                 user.isGranted(GlobalSettings::class.java)
+            ),
+            // Audit of all the events
+            Authorization(
+                name = EVENTS,
+                action = AUDIT,
+                authorized = user.isGranted(EventsAudit::class.java)
             ),
         )
     }
