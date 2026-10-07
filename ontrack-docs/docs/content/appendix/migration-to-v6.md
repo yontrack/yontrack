@@ -625,6 +625,18 @@ Yontrack 7. Each use of one of them is counted in `ontrack_deprecated_usage_tota
 | The `SearchResults.pageInfo` field                     | `total`, with the `offset` and `size` arguments of `search`   |
 | The `SearchResults.pageItems` field                    | `items`                                                       |
 
+### REST API
+
+| Deprecated                                 | Use instead                                         |
+|--------------------------------------------|-----------------------------------------------------|
+| `GET /rest/events/root`                    | The `events` GraphQL query                          |
+| `GET /rest/events/{entityType}/{entityId}` | The `events` GraphQL query, filtered by its project |
+
+The `events` query is restricted to the `EventsAudit` global function, which only administrators
+have: once these endpoints are removed, the events of a project or of one of its entities are no
+longer readable by non-administrators. Each call to one of the endpoints is counted under its item,
+with `surface="rest"`.
+
 ### GitHub configurations
 
 | Deprecated                                                           | Use instead                                                          |

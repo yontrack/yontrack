@@ -1,5 +1,7 @@
 package net.nemerosa.ontrack.boot.ui;
 
+import net.nemerosa.ontrack.model.deprecation.DeprecationService;
+import net.nemerosa.ontrack.model.deprecation.DeprecationSurface;
 import net.nemerosa.ontrack.model.events.Event;
 import net.nemerosa.ontrack.model.events.EventQueryService;
 import net.nemerosa.ontrack.model.events.EventTemplatingService;
@@ -19,7 +21,11 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
- * Access to the events
+ * Access to the events.
+ * <p>
+ * Both endpoints are deprecated: the {@code events} GraphQL query replaces them. It is restricted to
+ * the {@code EventsAudit} global function (administrators), so the events of an entity are no longer
+ * readable by non-administrators once these endpoints are removed.
  */
 @RestController
 @RequestMapping("/rest/events")
@@ -31,22 +37,32 @@ public class EventController {
     private final PropertyService propertyService;
     private final HtmlNotificationEventRenderer htmlNotificationEventRenderer;
     private final EventTemplatingService eventTemplatingService;
+    private final DeprecationService deprecationService;
 
     @Autowired
-    public EventController(EventQueryService eventQueryService, PropertyService propertyService, HtmlNotificationEventRenderer htmlNotificationEventRenderer, EventTemplatingService eventTemplatingService) {
+    public EventController(EventQueryService eventQueryService, PropertyService propertyService, HtmlNotificationEventRenderer htmlNotificationEventRenderer, EventTemplatingService eventTemplatingService, DeprecationService deprecationService) {
         this.eventQueryService = eventQueryService;
         this.propertyService = propertyService;
         this.htmlNotificationEventRenderer = htmlNotificationEventRenderer;
         this.eventTemplatingService = eventTemplatingService;
+        this.deprecationService = deprecationService;
     }
 
     /**
      * Gets the list of events for the root.
+     *
+     * @deprecated Removed in V7. Use the events GraphQL query instead. See #2014
      */
+    @Deprecated
     @RequestMapping(value = "root", method = RequestMethod.GET)
     public List<UIEvent> getEvents(
             @RequestParam(required = false, defaultValue = "0") int offset,
             @RequestParam(required = false, defaultValue = "20") int count) {
+        deprecationService.deprecatedUsage(
+                DeprecationSurface.REST,
+                "GET /rest/events/root",
+                "Removed in V7. Use the events GraphQL query instead. See #2014"
+        );
         return eventQueryService.getEvents(offset, count).stream()
                         .map(this::toUIEvent)
                         .collect(Collectors.toList());
@@ -54,13 +70,21 @@ public class EventController {
 
     /**
      * Gets the list of events for an entity, accessible by the current user.
+     *
+     * @deprecated Removed in V7. Use the events GraphQL query instead. See #2014
      */
+    @Deprecated
     @RequestMapping(value = "{entityType}/{entityId}", method = RequestMethod.GET)
     public List<UIEvent> getEvents(
             @PathVariable ProjectEntityType entityType,
             @PathVariable ID entityId,
             @RequestParam(required = false, defaultValue = "0") int offset,
             @RequestParam(required = false, defaultValue = "10") int count) {
+        deprecationService.deprecatedUsage(
+                DeprecationSurface.REST,
+                "GET /rest/events/{entityType}/{entityId}",
+                "Removed in V7. Use the events GraphQL query instead. See #2014"
+        );
         // Gets the events
         return eventQueryService.getEvents(entityType, entityId, offset, count).stream()
                         .map(this::toUIEvent)
