@@ -5,6 +5,7 @@ import net.nemerosa.ontrack.extension.support.AbstractExtension
 import net.nemerosa.ontrack.extension.support.CoreExtensionFeature
 import net.nemerosa.ontrack.model.labels.LabelManagement
 import net.nemerosa.ontrack.model.security.AccountManagement
+import net.nemerosa.ontrack.model.security.EventsAudit
 import net.nemerosa.ontrack.model.security.GlobalSettings
 import net.nemerosa.ontrack.model.security.SecurityService
 import net.nemerosa.ontrack.model.security.isGlobalFunctionGranted
@@ -22,6 +23,7 @@ class CoreUserMenuItemExtension(
             val globalSettings = securityService.isGlobalFunctionGranted<GlobalSettings>()
             val accountManagement = securityService.isGlobalFunctionGranted<AccountManagement>()
             val labelManagement = securityService.isGlobalFunctionGranted<LabelManagement>()
+            val eventsAudit = securityService.isGlobalFunctionGranted<EventsAudit>()
 
             val items = mutableListOf<UserMenuItem>()
 
@@ -80,6 +82,16 @@ class CoreUserMenuItemExtension(
                     extension = "core/config",
                     id = "labels",
                     name = "Labels",
+                )
+            }
+
+            // The events page lists every event of the instance, whatever the project ACLs
+            if (eventsAudit) {
+                items += UserMenuItem(
+                    groupId = CoreUserMenuGroups.INFORMATION,
+                    extension = "core/admin",
+                    id = "events",
+                    name = "Events",
                 )
             }
 

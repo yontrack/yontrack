@@ -81,8 +81,26 @@ const branchInstance = (ontrack, data, project) => {
     branch.createBuild = async (name) => createBuild(branch, name)
     branch.disableBranch = async () => disableBranch(branch)
     branch.favourite = async () => favouriteBranch(branch)
+    branch.delete = async () => deleteBranch(branch)
 
     return branch
+}
+
+const deleteBranch = async (branch) => {
+    await graphQLCallMutation(
+        branch.ontrack.connection,
+        'deleteBranchById',
+        gql`
+            mutation DeleteBranch($id: Int!) {
+                deleteBranchById(input: {id: $id}) {
+                    errors {
+                        message
+                    }
+                }
+            }
+        `,
+        {id: Number(branch.id)}
+    )
 }
 
 /**

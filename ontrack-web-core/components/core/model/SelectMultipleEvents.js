@@ -2,7 +2,7 @@ import {useQuery} from "@components/services/GraphQL";
 import {gql} from "graphql-request";
 import {Select, Space, Tag} from "antd";
 
-export default function SelectMultipleEvents({value, onChange}) {
+export default function SelectMultipleEvents({id, value, onChange, style}) {
 
     const {data: eventTypes, loading, finished} = useQuery(
         gql`
@@ -22,6 +22,9 @@ export default function SelectMultipleEvents({value, onChange}) {
     return (
         <>
             <Select
+                id={id}
+                data-testid={id}
+                style={style}
                 loading={loading || !finished}
                 options={eventTypes}
                 allowClear={true}

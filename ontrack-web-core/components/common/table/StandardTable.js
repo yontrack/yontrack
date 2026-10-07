@@ -10,6 +10,7 @@ import {AutoRefreshButton, AutoRefreshContextProvider} from "@components/common/
 // The filters are dependencies of the query and of the filter form's effect: their defaults must
 // be the same object from one render to the next, or every render would send the query again
 const NO_FILTER = {}
+const SAME_VARIABLES = filterFormData => filterFormData
 
 /**
  * Table whose content is fetched using a GraphQL query.
@@ -28,6 +29,9 @@ const NO_FILTER = {}
  * @param footerExtra Extra information to display in the footer
  * @param rowKey Computing each row key (needed for expandable content)
  * @param filterForm List of Antd Form items to put in a form on top of the table (not displayed if empty)
+ * @param filterFormVariables Function turning the filter form data into query variables, for a form
+ * field which is not a query variable as it is (like a date range). By default, the form data are
+ * the variables.
  * @param filterExtraButtons List of extra buttons to put in the form on top of the table
  * @param autoRefresh Whether the table should contain an option for auto-refresh
  */
@@ -50,6 +54,7 @@ export default function StandardTable({
                                           footerExtra = '',
                                           rowKey,
                                           filterForm = [],
+                                          filterFormVariables = SAME_VARIABLES,
                                           filterExtraButtons = [],
                                           autoRefresh = false,
                                           scroll,
@@ -68,7 +73,7 @@ export default function StandardTable({
         variables: {
             ...variables,
             ...filter,
-            ...filterFormData,
+            ...filterFormVariables(filterFormData),
             offset: pagination.offset,
             size: pagination.size,
         },

@@ -165,6 +165,7 @@ nav:
       - Metrics: content/operations/metrics.md
       - Management port: content/operations/management-port.md
       - Search index: content/operations/search-index.md
+      - Events: content/operations/events.md
       - Troubleshooting:
           - Git connectivity: content/operations/git-connectivity.md
           - RabbitMQ: content/operations/rabbitmq.md

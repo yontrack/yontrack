@@ -111,4 +111,20 @@ describe('StandardTable', () => {
         expect(screen.getByText("two")).toBeInTheDocument()
     })
 
+    it('turns the filter form data into query variables when asked to', async () => {
+        // A form field whose value is not a query variable, like a date range giving two
+        // variables, is converted by `filterFormVariables`
+        render(table(0, {
+            filter,
+            initialFilter: {range: ["a", "b"]},
+            filterForm: [<span key="field">Field</span>],
+            filterFormVariables: ({range}) => ({from: range?.[0], to: range?.[1]}),
+        }))
+
+        await waitFor(() => expect(screen.getByText("two")).toBeInTheDocument())
+
+        const variables = global.fetch.mock.calls.map(([, init]) => JSON.parse(init.body).variables)
+        expect(variables[variables.length - 1]).toEqual({from: "a", to: "b", offset: 0, size: 2})
+    })
+
 })
