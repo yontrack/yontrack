@@ -325,7 +325,7 @@ configure(javaProjects) {
     val greenMailVersion = "1.6.15"
     val mockkVersion = "1.14.11"
     val jgitVersion = "6.6.1.202309021850-r"
-    val amqpClientVersion = "5.36.0"
+    val amqpClientVersion = "5.37.0"
     val msgpackCoreVersion = "0.9.12"
     val commonsBeanutilsVersion = "1.11.0"
     val tomcatVersion = "11.0.26"
