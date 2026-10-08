@@ -24,11 +24,11 @@ class CacheConfig(
         manager.setCaches(
                 // Built in caches
                 listOf(
-                        // Cache for settings
+                        // Cache for settings, one entry per settings type
                         CaffeineCache(
                                 Caches.SETTINGS,
                                 Caffeine.newBuilder()
-                                        .maximumSize(1)
+                                        .maximumSize(SETTINGS_CACHE_SIZE)
                                         .expireAfterWrite(10, TimeUnit.HOURS)
                                         .recordStats()
                                         .build()
@@ -47,5 +47,13 @@ class CacheConfig(
                     cacheConfigProperties.specs[name] ?: defaultSpec
             ).build()
     )
+
+    companion object {
+        /**
+         * Above the number of settings types (one per `SettingsProvider`), so that reading
+         * some settings never evicts others.
+         */
+        private const val SETTINGS_CACHE_SIZE = 1_000L
+    }
 
 }
