@@ -13,6 +13,7 @@ import org.springframework.beans.factory.ObjectProvider
 import org.springframework.cache.CacheManager
 import org.springframework.cache.annotation.CacheEvict
 import org.springframework.cache.annotation.Cacheable
+import org.springframework.core.Ordered
 import org.springframework.stereotype.Repository
 import org.springframework.transaction.support.TransactionSynchronization
 import org.springframework.transaction.support.TransactionSynchronizationManager
@@ -35,13 +36,31 @@ class PropertyJdbcRepository(
      * The cache entry of a property is evicted when it is written, which happens before the commit of
      * the transaction: a concurrent read between the two (like the background computations which
      * react to the changes of the properties) would put the previous value back into the cache, where
-     * it would stay. The entry is evicted again once the transaction is complete.
+     * it would stay. The entry is evicted again once the transaction is over:
+     *
+     * - after its commit, before any other reaction to this commit (which would otherwise read the
+     *   previous value from the cache), hence the highest precedence;
+     * - after its completion, for a rollback.
+     *
+     * A read which started before the commit and is still in progress during this eviction would
+     * still put the previous value in the cache after it: the [loading][loadProperty] of a property is
+     * synchronized, so that its eviction waits for it.
      */
-    private fun evictAfterCompletion(typeName: String, entityType: ProjectEntityType, entityId: ID) {
+    private fun evictAfterTransaction(typeName: String, entityType: ProjectEntityType, entityId: ID) {
         if (TransactionSynchronizationManager.isSynchronizationActive()) {
             val key = typeName + entityType.name + entityId.value
             TransactionSynchronizationManager.registerSynchronization(object : TransactionSynchronization {
+                override fun getOrder(): Int = Ordered.HIGHEST_PRECEDENCE
+
+                override fun afterCommit() {
+                    evict()
+                }
+
                 override fun afterCompletion(status: Int) {
+                    evict()
+                }
+
+                private fun evict() {
                     cacheManager.ifAvailable?.getCache(CACHE_PROPERTIES)?.evict(key)
                 }
             })
@@ -58,7 +77,11 @@ class PropertyJdbcRepository(
         ).filterNotNull().isNotEmpty()
     }
 
-    @Cacheable(cacheNames = [CACHE_PROPERTIES], key = "#typeName + #entityType.name() + #entityId.value")
+    @Cacheable(
+        cacheNames = [CACHE_PROPERTIES],
+        key = "#typeName + #entityType.name() + #entityId.value",
+        sync = true,
+    )
     override fun loadProperty(typeName: String, entityType: ProjectEntityType, entityId: ID): TProperty? {
         return getFirstItem(
             String.format(
@@ -71,7 +94,7 @@ class PropertyJdbcRepository(
 
     @CacheEvict(cacheNames = [CACHE_PROPERTIES], key = "#typeName + #entityType.name() + #entityId.value")
     override fun saveProperty(typeName: String, entityType: ProjectEntityType, entityId: ID, data: JsonNode) {
-        evictAfterCompletion(typeName, entityType, entityId)
+        evictAfterTransaction(typeName, entityType, entityId)
         val params = params("type", typeName).addValue("entityId", entityId.value)
         // Any previous value?
         val propertyId = getFirstItem(
@@ -103,7 +126,7 @@ class PropertyJdbcRepository(
 
     @CacheEvict(cacheNames = [CACHE_PROPERTIES], key = "#typeName + #entityType.name() + #entityId.value")
     override fun deleteProperty(typeName: String, entityType: ProjectEntityType, entityId: ID): Ack {
-        evictAfterCompletion(typeName, entityType, entityId)
+        evictAfterTransaction(typeName, entityType, entityId)
         return Ack.one(
             namedParameterJdbcTemplate!!.update(
                 String.format(
