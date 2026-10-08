@@ -134,6 +134,16 @@ class BuildFilterServiceImpl(
             data = data.withWithDisplayName(withDisplayName)
             return this
         }
+
+        override fun withAssisted(assisted: String): StandardFilterProviderDataBuilder {
+            data = data.withAssisted(assisted)
+            return this
+        }
+
+        override fun withActor(actor: String): StandardFilterProviderDataBuilder {
+            data = data.withActor(actor)
+            return this
+        }
     }
 
     override fun standardFilterProviderData(count: Int): StandardFilterProviderDataBuilder {

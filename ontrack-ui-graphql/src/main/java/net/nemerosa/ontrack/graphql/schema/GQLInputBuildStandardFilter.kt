@@ -6,6 +6,7 @@ import graphql.schema.*
 import net.nemerosa.ontrack.json.asJson
 import net.nemerosa.ontrack.model.buildfilter.BuildFilterProviderData
 import net.nemerosa.ontrack.model.buildfilter.BuildFilterService
+import net.nemerosa.ontrack.model.structure.BuildSearchForm
 import org.springframework.stereotype.Component
 
 @Component
@@ -76,6 +77,8 @@ class GQLInputBuildStandardFilter(
                             "The matching is case insensitive and partial - use ^ and $ to anchor the pattern."
                 )
             )
+            .field(formField("assisted", BuildSearchForm.ASSISTED_DESCRIPTION))
+            .field(formField("actor", BuildSearchForm.ACTOR_DESCRIPTION))
             .build()
     }
 

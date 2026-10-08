@@ -10110,6 +10110,10 @@ input AutoVersioningTrailFilter {
 
 "BuildSearchForm"
 input BuildSearchForm {
+  "Actor who created the build: `HUMAN` for a person, `AGENT` for any agent, or the identifier of one agent, `<slug>[agent]`. Case-insensitive."
+  actor: String
+  "Whether the commits of the build were written with assistants, from its assisted change: `YES`, `NO`, or `UNKNOWN` for a build whose assisted change is absent or could not be computed. Case-insensitive."
+  assisted: String
   "Regular expression to match against the branch name."
   branchName: String
   "When `buildName` is set, considers an exact match on the build name."
@@ -13523,8 +13527,12 @@ input SlotPipelineDataInputValue {
 }
 
 input StandardBuildFilter {
+  "Actor who created the build: `HUMAN` for a person, `AGENT` for any agent, or the identifier of one agent, `<slug>[agent]`. Case-insensitive."
+  actor: String
   "Build created after or on this date"
   afterDate: String
+  "Whether the commits of the build were written with assistants, from its assisted change: `YES`, `NO`, or `UNKNOWN` for a build whose assisted change is absent or could not be computed. Case-insensitive."
+  assisted: String
   "Build created before or on this date"
   beforeDate: String
   "Maximum number of builds to display"

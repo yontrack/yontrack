@@ -22,6 +22,8 @@ data class StandardBuildFilterData(
     val linkedTo: String? = null,
     val linkedToPromotion: String? = null,
     val withDisplayName: String? = null,
+    val assisted: String? = null,
+    val actor: String? = null,
 ) : StandardFilterDataBuilder<StandardBuildFilterData> {
 
     override fun withSincePromotionLevel(sincePromotionLevel: String?) =
@@ -74,6 +76,12 @@ data class StandardBuildFilterData(
 
     override fun withWithDisplayName(withDisplayName: String?) =
         copy(withDisplayName = withDisplayName)
+
+    override fun withAssisted(assisted: String?) =
+        copy(assisted = assisted)
+
+    override fun withActor(actor: String?) =
+        copy(actor = actor)
 
     companion object {
         @JvmStatic

@@ -204,6 +204,10 @@ The actor of an event can be selected on:
 * the *Actor* filter of the [events page](../operations/events.md#filtering-the-events) — persons,
   agents, or one agent — which its export follows, with the actor of each event in its columns.
 
+The builds of a branch can be filtered on whether they were [assisted](#assisted-builds) and on
+who created them — persons, agents, or one agent — from the *Agents* tab of the
+[standard build filter](../concepts/build-filtering/index.md#agents).
+
 The [Agents section of a build](#what-agents-did-on-a-build) lists what agents did on that build,
 the [activity of an agent](#agent-activity) what one agent did across the projects, and the
 [agent activity across the projects](#agent-activity-across-the-projects) what all of them did.

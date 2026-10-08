@@ -4,6 +4,8 @@ import SelectValidationStamp from "@components/validationStamps/SelectValidation
 import SelectValidationRunStatus from "@components/validationRuns/SelectValidationRunStatus";
 import {gql} from "graphql-request";
 import {useQuery} from "@components/services/GraphQL";
+import SelectBuildActor from "@components/framework/build-filter/SelectBuildActor";
+import {buildAssistedOptions} from "@components/framework/build-filter/buildFilterAgents";
 
 const NO_PROPERTIES = []
 
@@ -233,6 +235,38 @@ export default function StandardBuildFilterProvider({branch, buildFilterForm}) {
                                 branch={branch}
                                 useName={true}
                             />
+                        </Form.Item>
+                    </Col>
+                </Row>
+            </>
+        },
+        {
+            key: 'agents',
+            label: "Agents",
+            children: <>
+                <Row gutter={16}>
+                    <Col span={12}>
+                        {/* Assisted */}
+                        <Form.Item
+                            name={['data', 'assisted']}
+                            label="Assisted"
+                            extra="Whether the commits of the build were written with assistants. Unknown is for a build whose assisted change is absent or could not be computed."
+                        >
+                            <Select
+                                options={buildAssistedOptions}
+                                allowClear={true}
+                                placeholder="Any"
+                            />
+                        </Form.Item>
+                    </Col>
+                    <Col span={12}>
+                        {/* Actor */}
+                        <Form.Item
+                            name={['data', 'actor']}
+                            label="Created by"
+                            extra="Who created the build: a person, any agent, or one agent - pick it, or type its identifier."
+                        >
+                            <SelectBuildActor/>
                         </Form.Item>
                     </Col>
                 </Row>

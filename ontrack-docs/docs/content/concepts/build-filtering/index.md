@@ -53,6 +53,26 @@ criteria you fill in are combined: a build is kept only when it satisfies every 
 `Linked to` / `... with promotion`
 :   The same, for the builds the build is linked *to*.
 
+### Agents
+
+`Assisted`
+:   Whether the commits of the build were written with assistants, from its
+    [assisted change](../../agents/index.md#assisted-builds):
+
+    * *Assisted* - at least one assistant;
+    * *Not assisted* - the assisted change is known and has no assistant;
+    * *Unknown* - the build has no assisted change, or one which could not be computed.
+
+`Created by`
+:   Who created the build: *Humans* for a person, *Agents* for any
+    [agent](../../agents/index.md), or one agent. The list offers the agents you can see - all of
+    them for an administrator, your own otherwise - and the identifier of any other agent,
+    `<slug>[agent]`, can be typed in.
+
+Through the API, they are the `assisted` (`YES`, `NO` or `UNKNOWN`) and `actor` (`HUMAN`, `AGENT`
+or `<slug>[agent]`) fields of the `StandardBuildFilter` input, both case-insensitive. The build
+search of a project (its `BuildSearchForm`) has the same two criteria, in its advanced fields.
+
 ### Time
 
 `Build after` / `Build before`

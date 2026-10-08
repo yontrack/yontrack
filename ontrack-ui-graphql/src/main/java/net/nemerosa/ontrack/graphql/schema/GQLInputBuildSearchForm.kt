@@ -39,6 +39,8 @@ class GQLInputBuildSearchForm : GQLInputType<BuildSearchForm> {
                     .description(getPropertyDescription(BuildSearchForm::extensions))
                     .type(listInputType(BuildSearchFormExtension::class.toTypeRef(), nullable = true))
             }
+            .field(stringInputField(BuildSearchForm::assisted))
+            .field(stringInputField(BuildSearchForm::actor))
             .build()
 
     override fun convert(argument: Any?): BuildSearchForm = argument?.asJson()?.parse() ?: BuildSearchForm()

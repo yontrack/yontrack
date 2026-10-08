@@ -171,6 +171,14 @@ class CoreBuildFilterJdbcRepository(
             }
         }
 
+        // assisted & actor
+        try {
+            agentCriteria(form.assisted, form.actor, criteria, params)
+        } catch (_: CoreBuildFilterInvalidException) {
+            // Invalid criterion - not performing the request
+            return emptyList()
+        }
+
         // Extensions
         form.extensions?.forEach { (extension, value) ->
             helper.contribute(
@@ -526,6 +534,9 @@ class CoreBuildFilterJdbcRepository(
             }
         }
 
+        // assisted & actor
+        agentCriteria(data.assisted, data.actor, criteria, params)
+
         // Since build?
         if (sinceBuildId != null) {
             criteria.add("B.ID >= :sinceBuildId")
@@ -535,6 +546,55 @@ class CoreBuildFilterJdbcRepository(
         // Final SQL
         return createSQL(tables, criteria)
     }
+
+    /**
+     * Agent criteria (#2036), on the builds aliased `B`:
+     *
+     * * whether the build was assisted, from its `assistedChange` property - a build without the
+     *   property, or with one which could not be computed (basis `UNKNOWN`), is `UNKNOWN`;
+     * * which actor created the build, from its `ACTOR` column - `NULL` for a person.
+     *
+     * @throws CoreBuildFilterInvalidException When a criterion is not valid
+     */
+    private fun agentCriteria(
+        assisted: String?,
+        actor: String?,
+        criteria: MutableList<String>,
+        params: MutableMap<String, Any?>,
+    ) {
+        val assistedCriterion = agentCriterion { BuildAgentCriteria.parseAssisted(assisted) }
+        if (assistedCriterion != null) {
+            params["assistedType"] = BuildAgentCriteria.ASSISTED_CHANGE_PROPERTY_TYPE
+            params["assistedBasisDefault"] = BuildAgentCriteria.ASSISTED_CHANGE_BASIS_DEFAULT
+            params["assistedBasisUnknown"] = BuildAgentCriteria.ASSISTED_CHANGE_BASIS_UNKNOWN
+            // A known assisted change: a value stored without its basis was set by the CI
+            val known = "SELECT 1 FROM PROPERTIES PAC" +
+                    " WHERE PAC.BUILD = B.ID AND PAC.TYPE = :assistedType" +
+                    " AND COALESCE(PAC.JSON ->> 'basis', :assistedBasisDefault) <> :assistedBasisUnknown"
+            val assistants = "COALESCE(JSONB_ARRAY_LENGTH(CASE WHEN JSONB_TYPEOF(PAC.JSON -> 'assistants') = 'array' THEN PAC.JSON -> 'assistants' END), 0)"
+            criteria += when (assistedCriterion) {
+                BuildAssistedCriterion.YES -> "EXISTS ($known AND $assistants > 0)"
+                BuildAssistedCriterion.NO -> "EXISTS ($known AND $assistants = 0)"
+                BuildAssistedCriterion.UNKNOWN -> "NOT EXISTS ($known)"
+            }
+        }
+        when (val actorCriterion = agentCriterion { BuildAgentCriteria.parseActor(actor) }) {
+            null -> {}
+            BuildActorCriterion.Human -> criteria += "B.ACTOR IS NULL"
+            BuildActorCriterion.Agent -> criteria += "B.ACTOR IS NOT NULL"
+            is BuildActorCriterion.OneAgent -> {
+                criteria += "B.ACTOR ->> 'agent' = :actorAgent"
+                params["actorAgent"] = actorCriterion.identifier
+            }
+        }
+    }
+
+    private fun <T> agentCriterion(parsing: () -> T): T =
+        try {
+            parsing()
+        } catch (ex: BuildAgentCriterionException) {
+            throw CoreBuildFilterInvalidException(ex.message ?: "Invalid build filter criterion.")
+        }
 
     /**
      * Runs [block], converting a regular expression rejected by the database into a

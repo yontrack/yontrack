@@ -41,4 +41,24 @@ data class BuildSearchForm(
     @APILabel("Extensions")
     @APIDescription("Search extensions")
     val extensions: List<BuildSearchFormExtension>? = null,
-)
+    @APILabel("Assisted")
+    @APIDescription(ASSISTED_DESCRIPTION)
+    val assisted: String? = null,
+    @APILabel("Actor")
+    @APIDescription(ACTOR_DESCRIPTION)
+    val actor: String? = null,
+) {
+    companion object {
+        /**
+         * Description of the assisted criterion, shared by the build filters.
+         */
+        const val ASSISTED_DESCRIPTION =
+            "Whether the commits of the build were written with assistants, from its assisted change: `YES`, `NO`, or `UNKNOWN` for a build whose assisted change is absent or could not be computed. Case-insensitive."
+
+        /**
+         * Description of the actor criterion, shared by the build filters.
+         */
+        const val ACTOR_DESCRIPTION =
+            "Actor who created the build: `HUMAN` for a person, `AGENT` for any agent, or the identifier of one agent, `<slug>[agent]`. Case-insensitive."
+    }
+}

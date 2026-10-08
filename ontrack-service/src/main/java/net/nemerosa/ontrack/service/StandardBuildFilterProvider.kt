@@ -76,6 +76,8 @@ class StandardBuildFilterProvider(
             .withLinkedTo(data.getTextField("linkedTo"))
             .withLinkedToPromotion(data.getTextField("linkedToPromotion"))
             .withWithDisplayName(data.getTextField("withDisplayName"))
+            .withAssisted(data.getTextField("assisted"))
+            .withActor(data.getTextField("actor"))
 
     override fun validateData(branch: Branch, data: StandardBuildFilterData?): String? =
         if (data != null) {
@@ -93,8 +95,22 @@ class StandardBuildFilterProvider(
                 ?: validateProperty(data.withProperty, "With property")
                 // With display name
                 ?: validateRegex(data.withDisplayName, "With display name")
+                // Assisted & actor
+                ?: validateAgentCriterion { BuildAgentCriteria.parseAssisted(data.assisted) }
+                ?: validateAgentCriterion { BuildAgentCriteria.parseActor(data.actor) }
         } else {
             null
+        }
+
+    /**
+     * Checks that an agent criterion can be parsed.
+     */
+    private fun validateAgentCriterion(parsing: () -> Any?): String? =
+        try {
+            parsing()
+            null
+        } catch (ex: BuildAgentCriterionException) {
+            ex.message
         }
 
     /**

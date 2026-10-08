@@ -148,4 +148,63 @@ class StandardBuildFilterProviderTest {
         assertNull(error, "A blank regular expression is not validated")
     }
 
+    @Test
+    fun `Parsing the assisted and actor criteria`() {
+        val data = provider.parse(
+            mapOf(
+                "assisted" to "YES",
+                "actor" to "claude[agent]",
+            ).asJson()
+        )
+        assertNotNull(data) {
+            assertEquals("YES", it.assisted)
+            assertEquals("claude[agent]", it.actor)
+        }
+    }
+
+    @Test
+    fun `Parsing without any assisted nor actor criterion`() {
+        val data = provider.parse(
+            mapOf("count" to 5).asJson()
+        )
+        assertNotNull(data) {
+            assertNull(it.assisted)
+            assertNull(it.actor)
+        }
+    }
+
+    @Test
+    fun `Validation accepts the assisted and actor criteria`() {
+        listOf("YES", "no", "Unknown").forEach { assisted ->
+            listOf("HUMAN", "agent", "claude[agent]").forEach { actor ->
+                val error = provider.validateData(
+                    mock(Branch::class.java),
+                    StandardBuildFilterData.of(10).withAssisted(assisted).withActor(actor)
+                )
+                assertNull(error, "assisted=$assisted, actor=$actor is accepted")
+            }
+        }
+    }
+
+    @Test
+    fun `Validation rejects an incorrect assisted criterion`() {
+        val error = provider.validateData(
+            mock(Branch::class.java),
+            StandardBuildFilterData.of(10).withAssisted("maybe")
+        )
+        assertEquals("""Assisted must be YES, NO or UNKNOWN, not "maybe".""", error)
+    }
+
+    @Test
+    fun `Validation rejects an incorrect actor criterion`() {
+        val error = provider.validateData(
+            mock(Branch::class.java),
+            StandardBuildFilterData.of(10).withActor("damien@yontrack.test")
+        )
+        assertEquals(
+            """Actor must be HUMAN, AGENT or the identifier of an agent, <slug>[agent], not "damien@yontrack.test".""",
+            error
+        )
+    }
+
 }

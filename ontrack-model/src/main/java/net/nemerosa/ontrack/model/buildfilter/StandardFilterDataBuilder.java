@@ -37,4 +37,15 @@ public interface StandardFilterDataBuilder<T extends StandardFilterDataBuilder<T
     T withLinkedToPromotion(String linkedToPromotion);
 
     T withWithDisplayName(String withDisplayName);
+
+    /**
+     * Whether the build was assisted: {@code YES}, {@code NO} or {@code UNKNOWN} (#2036).
+     */
+    T withAssisted(String assisted);
+
+    /**
+     * Actor who created the build: {@code HUMAN}, {@code AGENT} or the identifier of one agent,
+     * {@code <slug>[agent]} (#2036).
+     */
+    T withActor(String actor);
 }

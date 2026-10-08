@@ -1,5 +1,5 @@
 import Well from "@components/common/Well";
-import {Button, Flex, Form, Input, InputNumber, Space} from "antd";
+import {Button, Flex, Form, Input, InputNumber, Select, Space} from "antd";
 import {FaEraser, FaLink, FaSearch} from "react-icons/fa";
 import SelectPromotionLevelForProject from "@components/promotionLevels/SelectPromotionLevelForProject";
 import {useContext, useEffect, useState} from "react";
@@ -8,6 +8,8 @@ import SelectEnvironmentName from "@components/extension/environments/SelectEnvi
 import SelectPropertyType from "@components/core/model/properties/SelectPropertyType";
 import {useRouter} from "next/router";
 import {projectBuildSearchUri} from "@components/common/Links";
+import SelectBuildActor from "@components/framework/build-filter/SelectBuildActor";
+import {buildAssistedOptions} from "@components/framework/build-filter/buildFilterAgents";
 
 export default function ProjectBuildSearchForm({project, loading, onSubmit}) {
 
@@ -132,6 +134,25 @@ export default function ProjectBuildSearchForm({project, loading, onSubmit}) {
                                 label="Property value"
                             >
                                 <Input style={{width: '12em'}}/>
+                            </Form.Item>
+                            {/* Whether the build was assisted (#2036) */}
+                            <Form.Item
+                                name="assisted"
+                                label="Assisted"
+                            >
+                                <Select
+                                    options={buildAssistedOptions}
+                                    allowClear={true}
+                                    placeholder="Any"
+                                    style={{width: '10em'}}
+                                />
+                            </Form.Item>
+                            {/* Actor who created the build (#2036) */}
+                            <Form.Item
+                                name="actor"
+                                label="Created by"
+                            >
+                                <SelectBuildActor/>
                             </Form.Item>
                         </Space>
                         {/* Buttons */}
