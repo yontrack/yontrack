@@ -31,9 +31,10 @@ name: Bitbucket pipelines (real)
 # would come back "build minutes exceeded" and stamp a FAILED BITBUCKET.REAL on a build which is
 # perfectly fine. A false red on every BRONZE is how a genuine failure later gets ignored.
 #
-# So there is a third guard: a cooldown. A run whose predecessor finished less than
-# `COOLDOWN_DAYS` ago stops before the tests and reports nothing, which lands ~4 runs a month
-# inside a 50-minute budget. `force` bypasses it for a manual dispatch.
+# So there is a third guard: a cooldown. A run whose last *real* predecessor - one which got past
+# the gate and started the test job - started less than `COOLDOWN_DAYS` ago stops before the tests
+# and reports nothing, which lands ~4 runs a month inside a 50-minute budget. `force` bypasses it
+# for a manual dispatch.
 
 on:
   workflow_dispatch:
@@ -69,12 +70,9 @@ on:
         default: false
         type: boolean
 
-# One run at a time, and cancel rather than queue - the opposite of the release and demo groups.
-# Queueing would run one pipeline suite per commit of a burst, which is precisely the spend this
-# workflow exists to avoid; the newest build is also the one worth stamping.
-concurrency:
-  group: bitbucket-real
-  cancel-in-progress: true
+# No workflow-level concurrency: it would let a run which is about to stop on the cooldown cancel
+# a real run in the middle of its pipelines, wasting the minutes already spent and reporting
+# nothing. The concurrency group is on the test job instead, which only a run past the gate reaches.
 
 permissions:
   contents: read
@@ -91,32 +89,40 @@ env:
   COOLDOWN_DAYS: '7'
 
 jobs:
-  bitbucket-real:
-    name: Real Bitbucket pipeline tests
+  # ----------------------------------------------------------------------------------------------
+  # Whether to run at all. Two independent reasons not to, neither of them a failure:
+  #
+  # * the fixture is provisioned by hand, by a human with a bitbucket.org account, and may not
+  #   exist at all - see ontrack-extension-bitbucket-cloud/scripts/bitbucket-cloud-test-workspace.sh
+  #   and the module's README;
+  # * the cooldown of the budget note above has not elapsed.
+  #
+  # Stopping rather than failing, and reporting no BITBUCKET.REAL rather than a FAILED one: the
+  # tests never ran, so "the real Bitbucket tests failed" would be a lie, and a red run on every
+  # BRONZE of main is how a real failure later gets ignored. The absent stamp is the honest
+  # signal, and the annotation below is what says why.
+  #
+  # A PARTIAL set of credentials is a different thing entirely and is not caught here: it
+  # reaches `bitbucketCloudTestEnabled`, which fails the tests outright rather than skipping
+  # them, so a half-rotated secret turns this workflow red as it should.
+  #
+  # A job of its own, outside the concurrency group of the test job: a run which stops here never
+  # touches the group, and so never cancels a real run in progress.
+  # ----------------------------------------------------------------------------------------------
+  gate:
+    name: Decide whether to run
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 10
+    outputs:
+      run: ${{ steps.gate.outputs.run }}
     env:
       ONTRACK_TEST_EXTENSION_BITBUCKET_CLOUD_WORKSPACE: ${{ secrets.ONTRACK_TEST_EXTENSION_BITBUCKET_CLOUD_WORKSPACE }}
-      ONTRACK_TEST_EXTENSION_BITBUCKET_CLOUD_PROJECT: ${{ secrets.ONTRACK_TEST_EXTENSION_BITBUCKET_CLOUD_PROJECT }}
       ONTRACK_TEST_EXTENSION_BITBUCKET_CLOUD_REPOSITORY: ${{ secrets.ONTRACK_TEST_EXTENSION_BITBUCKET_CLOUD_REPOSITORY }}
-      ONTRACK_TEST_EXTENSION_BITBUCKET_CLOUD_BOT_EMAIL: ${{ secrets.ONTRACK_TEST_EXTENSION_BITBUCKET_CLOUD_BOT_EMAIL }}
       ONTRACK_TEST_EXTENSION_BITBUCKET_CLOUD_BOT_TOKEN: ${{ secrets.ONTRACK_TEST_EXTENSION_BITBUCKET_CLOUD_BOT_TOKEN }}
-      ONTRACK_TEST_EXTENSION_BITBUCKET_CLOUD_APPROVER_EMAIL: ${{ secrets.ONTRACK_TEST_EXTENSION_BITBUCKET_CLOUD_APPROVER_EMAIL }}
-      ONTRACK_TEST_EXTENSION_BITBUCKET_CLOUD_APPROVER_TOKEN: ${{ secrets.ONTRACK_TEST_EXTENSION_BITBUCKET_CLOUD_APPROVER_TOKEN }}
-      ONTRACK_TEST_EXTENSION_BITBUCKET_CLOUD_ACCESS_TOKEN: ${{ secrets.ONTRACK_TEST_EXTENSION_BITBUCKET_CLOUD_ACCESS_TOKEN }}
-      ONTRACK_TEST_EXTENSION_BITBUCKET_CLOUD_TOKENS_EXPIRY: ${{ vars.ONTRACK_TEST_EXTENSION_BITBUCKET_CLOUD_TOKENS_EXPIRY }}
-      # The one place this is ever true. Everything else - ci.yml's integration shard 5, a
-      # developer's checkout - leaves it unset or pins it to false, and pays no build minute.
-      ONTRACK_TEST_EXTENSION_BITBUCKET_CLOUD_PIPELINES: "true"
     steps:
-      # The run time reported for the validation is measured from here.
-      - name: Record the job start
-        id: job_start
-        run: echo "started=$(date +%s)" >> "$GITHUB_OUTPUT"
-
       # How Yontrack finds this run: it polls the run's artifacts for this name, 10 times at 10s
-      # intervals, and gives up after that. So this goes before the checkout, and needs no checkout
-      # of its own - the file is empty and only its name carries the ID.
+      # intervals, and gives up after that. So this comes first, in the first job, and needs no
+      # checkout of its own - the file is empty and only its name carries the ID.
       - name: Correlation preparation
         run: touch inputs.properties
 
@@ -127,33 +133,19 @@ jobs:
           path: inputs.properties
           if-no-files-found: error
 
-      # ------------------------------------------------------------------------------------------
-      # Whether to run at all. Two independent reasons not to, neither of them a failure:
-      #
-      # * the fixture is provisioned by hand, by a human with a bitbucket.org account, and may not
-      #   exist at all - see ontrack-extension-bitbucket-cloud/scripts/bitbucket-cloud-test-workspace.sh
-      #   and the module's README;
-      # * the cooldown of the budget note above has not elapsed.
-      #
-      # Stopping rather than failing, and reporting no BITBUCKET.REAL rather than a FAILED one: the
-      # tests never ran, so "the real Bitbucket tests failed" would be a lie, and a red run on every
-      # BRONZE of main is how a real failure later gets ignored. The absent stamp is the honest
-      # signal, and the annotation below is what says why.
-      #
-      # A PARTIAL set of credentials is a different thing entirely and is not caught here: it
-      # reaches `bitbucketCloudTestEnabled`, which fails the tests outright rather than skipping
-      # them, so a half-rotated secret turns this workflow red as it should.
-      # ------------------------------------------------------------------------------------------
       - name: Decide whether to run
         id: gate
         env:
           GH_TOKEN: ${{ github.token }}
-          # The gate runs before the checkout, so `gh` has no local clone to infer the repository
+          # There is no checkout in this job, so `gh` has no local clone to infer the repository
           # from and fails with "not a git repository" unless it is named.
           GH_REPO: ${{ github.repository }}
           FORCE: ${{ inputs.force }}
+          # Must match the name of the test job below, and of its test step: that is how a real
+          # run is told apart from one which stopped here.
+          TEST_NAME: Real Bitbucket pipeline tests
         run: |
-          set -uo pipefail
+          set -euo pipefail
 
           skip() {
             echo "run=false" >> "$GITHUB_OUTPUT"
@@ -179,18 +171,38 @@ jobs:
             exit 0
           fi
 
-          # The most recent run of THIS workflow which actually reached the end, whatever its
-          # conclusion. `cancel-in-progress` collapses bursts into cancelled runs which spent
-          # nothing, so those must not start the clock; `status=completed` still includes them,
-          # which is why the conclusion is filtered too. The current run is `in_progress` and so
-          # is never its own predecessor.
-          previous=$(gh run list \
-            --workflow=bitbucket-real.yml --status=completed --limit 20 \
-            --json conclusion,updatedAt \
-            --jq '[.[] | select(.conclusion == "success" or .conclusion == "failure")] | .[0].updatedAt // empty')
+          # The most recent *real* run of this workflow: one whose test job started, whatever
+          # came of it - passed, failed, cancelled half-way through its pipelines, or still running.
+          # Not merely the most recent run: most runs stop on this very cooldown and end green
+          # having spent nothing, and counting them would restart the clock on every BRONZE so
+          # that the tests never ran again. A run counts when its test job is not skipped and its
+          # test step is not skipped either - the second test reads runs from before the gate had
+          # its own job, when the test job always ran and only the steps were skipped.
+          #
+          # Only the runs created inside the cooldown window can stop this one, so only those are
+          # read, newest first, one API call each, stopping at the first real one.
+          since=$(date -u -d "-$COOLDOWN_DAYS days" +%Y-%m-%dT%H:%M:%SZ)
+          runs=$(gh run list \
+            --workflow=bitbucket-real.yml --created ">=$since" --limit 500 \
+            --json databaseId --jq '.[].databaseId')
+
+          previous=""
+          for id in $runs; do
+            [ "$id" = "$GITHUB_RUN_ID" ] && continue
+            previous=$(gh run view "$id" --json jobs --jq "
+              [ .jobs[]
+                | select(.name == env.TEST_NAME and .conclusion != \"skipped\")
+                | select(([.steps[] | select(.name == env.TEST_NAME) | .conclusion] | first) != \"skipped\")
+                | .startedAt
+              ] | first // empty")
+            if [ -n "$previous" ]; then
+              echo "Last real run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/$id, started $previous."
+              break
+            fi
+          done
 
           if [ -z "$previous" ]; then
-            echo "No previous completed run: nothing to wait for."
+            echo "No real run in the last $COOLDOWN_DAYS days: running."
             echo "run=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -199,32 +211,61 @@ jobs:
           elapsed_days=$(( ( $(date -u +%s) - previous_ts ) / 86400 ))
           if [ "$elapsed_days" -lt "$COOLDOWN_DAYS" ]; then
             skip "Bitbucket pipelines cooldown" \
-              "The previous run finished $elapsed_days day(s) ago, less than the $COOLDOWN_DAYS-day cooldown. The bitbucket.org workspace has 50 build minutes a month, so these tests run about once a week and not on every BRONZE. No BITBUCKET.REAL validation is reported. Dispatch this workflow by hand with \`force\` to run it now."
+              "The last real run started $elapsed_days day(s) ago, less than the $COOLDOWN_DAYS-day cooldown. The bitbucket.org workspace has 50 build minutes a month, so these tests run about once a week and not on every BRONZE. No BITBUCKET.REAL validation is reported. Dispatch this workflow by hand with \`force\` to run it now."
           fi
 
-          echo "Previous run finished $elapsed_days day(s) ago: running."
+          echo "Last real run started $elapsed_days day(s) ago: running."
           echo "run=true" >> "$GITHUB_OUTPUT"
 
+  bitbucket-real:
+    name: Real Bitbucket pipeline tests
+    needs: gate
+    if: ${{ needs.gate.outputs.run == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    # One real run at a time, and cancel rather than queue - the opposite of the release and demo
+    # groups. Queueing would run one pipeline suite per commit of a burst, which is precisely the
+    # spend this workflow exists to avoid; the newest build is also the one worth stamping. Only
+    # runs past the gate get here, so the cancelling is between two real runs - a `force` dispatch
+    # replacing a run in progress, say - and never by a run which was going to stop anyway.
+    concurrency:
+      group: bitbucket-real
+      cancel-in-progress: true
+    env:
+      ONTRACK_TEST_EXTENSION_BITBUCKET_CLOUD_WORKSPACE: ${{ secrets.ONTRACK_TEST_EXTENSION_BITBUCKET_CLOUD_WORKSPACE }}
+      ONTRACK_TEST_EXTENSION_BITBUCKET_CLOUD_PROJECT: ${{ secrets.ONTRACK_TEST_EXTENSION_BITBUCKET_CLOUD_PROJECT }}
+      ONTRACK_TEST_EXTENSION_BITBUCKET_CLOUD_REPOSITORY: ${{ secrets.ONTRACK_TEST_EXTENSION_BITBUCKET_CLOUD_REPOSITORY }}
+      ONTRACK_TEST_EXTENSION_BITBUCKET_CLOUD_BOT_EMAIL: ${{ secrets.ONTRACK_TEST_EXTENSION_BITBUCKET_CLOUD_BOT_EMAIL }}
+      ONTRACK_TEST_EXTENSION_BITBUCKET_CLOUD_BOT_TOKEN: ${{ secrets.ONTRACK_TEST_EXTENSION_BITBUCKET_CLOUD_BOT_TOKEN }}
+      ONTRACK_TEST_EXTENSION_BITBUCKET_CLOUD_APPROVER_EMAIL: ${{ secrets.ONTRACK_TEST_EXTENSION_BITBUCKET_CLOUD_APPROVER_EMAIL }}
+      ONTRACK_TEST_EXTENSION_BITBUCKET_CLOUD_APPROVER_TOKEN: ${{ secrets.ONTRACK_TEST_EXTENSION_BITBUCKET_CLOUD_APPROVER_TOKEN }}
+      ONTRACK_TEST_EXTENSION_BITBUCKET_CLOUD_ACCESS_TOKEN: ${{ secrets.ONTRACK_TEST_EXTENSION_BITBUCKET_CLOUD_ACCESS_TOKEN }}
+      ONTRACK_TEST_EXTENSION_BITBUCKET_CLOUD_TOKENS_EXPIRY: ${{ vars.ONTRACK_TEST_EXTENSION_BITBUCKET_CLOUD_TOKENS_EXPIRY }}
+      # The one place this is ever true. Everything else - ci.yml's integration shard 5, a
+      # developer's checkout - leaves it unset or pins it to false, and pays no build minute.
+      ONTRACK_TEST_EXTENSION_BITBUCKET_CLOUD_PIPELINES: "true"
+    steps:
+      # The run time reported for the validation is measured from here.
+      - name: Record the job start
+        id: job_start
+        run: echo "started=$(date +%s)" >> "$GITHUB_OUTPUT"
+
       - uses: actions/checkout@v7
-        if: ${{ steps.gate.outputs.run == 'true' }}
 
       # Same identity as the integration shards of ci.yml: the Git test utilities commit in freshly
       # initialised repositories.
       - name: Configure git
-        if: ${{ steps.gate.outputs.run == 'true' }}
         run: |
           git config --global user.email "yontrack@nemerosa.net"
           git config --global user.name "Yontrack"
           git config --global init.defaultBranch main
 
       - uses: actions/setup-java@v6
-        if: ${{ steps.gate.outputs.run == 'true' }}
         with:
           distribution: zulu
           java-version: "25"
 
       - uses: gradle/actions/setup-gradle@v6
-        if: ${{ steps.gate.outputs.run == 'true' }}
         with:
           # Reads only: the `build` job of ci.yml is the one writer of the Gradle state.
           cache-read-only: true
@@ -233,7 +274,6 @@ jobs:
       # CI. integrationTest brings its own middleware up and down.
       - name: Real Bitbucket pipeline tests
         id: test
-        if: ${{ steps.gate.outputs.run == 'true' }}
         run: |
           ./gradlew :ontrack-extension-bitbucket-cloud:integrationTest \
             --tests '*BitbucketPipelinesNotificationChannelRealIT' \
@@ -242,7 +282,7 @@ jobs:
             --console plain
 
       - name: Upload the test results
-        if: ${{ !cancelled() && steps.gate.outputs.run == 'true' }}
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v7
         with:
           name: bitbucket-real-results
@@ -258,7 +298,7 @@ jobs:
       # the run which replaced it reports on a newer build.
       # ------------------------------------------------------------------------------------------
       - name: Install the Yontrack CLI
-        if: ${{ !cancelled() && steps.gate.outputs.run == 'true' }}
+        if: ${{ !cancelled() }}
         run: |
           set -euo pipefail
           curl -sSfL -o /usr/local/bin/yontrack \
@@ -268,7 +308,7 @@ jobs:
           yontrack version --cli
 
       - name: Configure the CLI
-        if: ${{ !cancelled() && steps.gate.outputs.run == 'true' }}
+        if: ${{ !cancelled() }}
         env:
           YONTRACK_URL: ${{ vars.YONTRACK_URL }}
           YONTRACK_TOKEN: ${{ secrets.YONTRACK_TOKEN }}
@@ -283,7 +323,7 @@ jobs:
       # build.
       - name: Resolve the build
         id: resolve
-        if: ${{ !cancelled() && steps.gate.outputs.run == 'true' }}
+        if: ${{ !cancelled() }}
         env:
           DEMO_PROJECT: ${{ env.BITBUCKET_REAL_PROJECT }}
           DEMO_BRANCH: ${{ env.BITBUCKET_REAL_BRANCH }}
@@ -291,7 +331,7 @@ jobs:
         run: scripts/demo-smoke.sh resolve
 
       - name: Validate BITBUCKET.REAL
-        if: ${{ !cancelled() && steps.gate.outputs.run == 'true' && steps.resolve.outputs.build != '' }}
+        if: ${{ !cancelled() && steps.resolve.outputs.build != '' }}
         env:
           STARTED: ${{ steps.job_start.outputs.started }}
           TEST: ${{ steps.test.outcome }}
