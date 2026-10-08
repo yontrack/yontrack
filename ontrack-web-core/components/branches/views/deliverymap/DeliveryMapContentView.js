@@ -1,7 +1,7 @@
 import {useContext, useEffect, useMemo, useState} from "react";
 import {Alert, Space, Typography} from "antd";
 import {useQuery} from "@components/services/GraphQL";
-import {AutoRefreshButton, AutoRefreshContext, AutoRefreshContextProvider} from "@components/common/AutoRefresh";
+import {AutoRefreshButton, AutoRefreshContext} from "@components/common/AutoRefresh";
 import CloseableAlert from "@components/common/CloseableAlert";
 import LoadingContainer from "@components/common/LoadingContainer";
 import {ValidationStampFilterContext} from "@components/branches/filters/validationStamps/ValidationStampFilterContext";
@@ -33,30 +33,29 @@ import DeliveryMapSlotDrawer from "@components/extension/environments/deliveryma
  * map by it.
  *
  * What it does own is the branch head in its header - the build every checkpoint's lag is counted
- * against - what is drawn on the map at all, and its own auto refresh. All three are ways of reading
- * this one graph rather than statements about the branch.
+ * against - and what is drawn on the map at all. Both are ways of reading this one graph rather than
+ * statements about the branch.
  *
- * The auto refresh context is provided HERE and consumed by the view below, which is why the two are
- * separate components: a component cannot read a context it provides itself.
+ * The auto refresh is NOT its own either: like the validation stamp filter, it belongs to the branch
+ * and is provided above the view switch, so that a refresh turned on here is still on in the other
+ * views. The map only carries its button and refetches on its ticks.
  *
  * @param branch Branch being displayed
  */
 export default function DeliveryMapContentView({branch}) {
+    // The slot drawer a slot checkpoint opens, and the deploy dialog behind it. Core to extension,
+    // like the registry's entry for the slot kind and for the same reason: the kinds on this map are
+    // an open set, and the extension contributing one owns both the checkpoint and what clicking it
+    // does.
     return (
-        <AutoRefreshContextProvider>
-            {/* The slot drawer a slot checkpoint opens, and the deploy dialog behind it. Core to
-                extension, like the registry's entry for the slot kind and for the same reason: the
-                kinds on this map are an open set, and the extension contributing one owns both the
-                checkpoint and what clicking it does. */}
-            <DeliveryMapSlotDrawer>
-                <DeliveryMapContent branch={branch}/>
-            </DeliveryMapSlotDrawer>
-        </AutoRefreshContextProvider>
+        <DeliveryMapSlotDrawer>
+            <DeliveryMapContent branch={branch}/>
+        </DeliveryMapSlotDrawer>
     )
 }
 
 /**
- * The view itself, inside the auto refresh context.
+ * The view itself, inside the slot drawer host.
  *
  * @param branch Branch being displayed
  */

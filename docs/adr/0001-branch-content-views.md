@@ -40,6 +40,11 @@ means editing a shared fetcher. State genuinely belonging to the branch rather t
 to any one view — the disabled-branch banner, and the validation stamp filter
 context that content views share — stays above the switch.
 
+Auto refresh is branch state in the same sense (#1195). Its context is provided by
+`BranchContent`, next to the validation stamp filter's, and every view carries the
+same `AutoRefreshButton` and refetches on its ticks: a refresh turned on in one view
+is still on in the next one. It is not persisted, so a page load starts with it off.
+
 Existing users keep the legacy table by default; the default flips to the pipeline
 in a later release once it has soaked. Silently replacing the page every user knows
 is how a redesign gets rolled back.

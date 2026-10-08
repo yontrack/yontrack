@@ -30,6 +30,23 @@ Three things follow from picking a view:
 The [build filter](../build-filtering/index.md) and the validation stamp filter sit *above* the
 view, not inside it. A filter you set in one view is still in force when you switch to another.
 
+### Refreshing
+
+Every view has an **Auto refresh** control, the last one of its toolbar. It reloads what the view
+shows on an interval you pick - from every 5 seconds to every 10 minutes, every minute by default -
+so a branch page left open shows new builds, runs and promotions without being reloaded:
+
+* turning it on refreshes the view straight away, then on every interval;
+* like the filters, it belongs to the branch rather than to one view: it is **still on when you
+  switch views**, at the same interval;
+* it is **not remembered**: opening or reloading the page always starts with auto refresh off;
+* a refresh keeps as many builds as are shown, including those brought in by **Load more**: a new
+  build appears at the top, and the oldest one drops off the bottom;
+* a refresh keeps what you were doing - the build being inspected, the two builds selected for a
+  change log, an open menu - and if one of the selected builds is no longer in the list, only that
+  selection is cleared;
+* a refresh which fails leaves the view as it was.
+
 ## The Builds view
 
 The Builds view is the historical reading of a branch: one row per build, most recent first, with
@@ -399,10 +416,9 @@ dragged; nothing on the map can be edited from it. It is a reading of the config
 configuration is changed where it lives - on the promotion level, on the branch, or on the slot the
 checkpoint links to.
 
-### Refreshing
+### Refreshing the map
 
-**Auto refresh** in the toolbar reloads the map on an interval you pick, like the other graphs of the
-product.
+The map follows the [auto refresh](#refreshing) of the branch, whose control sits in its header.
 
 The map does **not** rearrange itself when it refreshes. Almost nothing on it changes minute to
 minute: the configuration is static, and what moves is which build has arrived where. So a refresh

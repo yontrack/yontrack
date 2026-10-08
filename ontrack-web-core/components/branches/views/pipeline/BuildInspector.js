@@ -1,7 +1,10 @@
+import {useContext} from "react";
 import Link from "next/link";
 import {Skeleton, theme, Typography} from "antd";
 import {useQuery} from "@components/services/GraphQL";
 import {useRefresh} from "@components/common/RefreshUtils";
+import {AutoRefreshContext} from "@components/common/AutoRefresh";
+import useLastKnown from "@components/common/useLastKnown";
 import {buildUri} from "@components/common/Links";
 import {gqlPipelineBuildInspection} from "@components/branches/views/pipeline/pipelineQueries";
 import {buildVersion} from "@components/branches/views/pipeline/pipelineFacts";
@@ -39,16 +42,22 @@ export default function BuildInspector({buildId, selectedFilter, showValidations
 
     const [reloadCount, reload] = useRefresh()
 
-    const {data: build, loading, finished} = useQuery(
+    // The panel is part of what the view shows, so it follows the auto refresh as the timeline card
+    // above it does: a medal appearing on the card and not here would be two answers to one question.
+    const {autoRefreshCount} = useContext(AutoRefreshContext)
+
+    const {data: loadedBuild, finished} = useQuery(
         gqlPipelineBuildInspection,
         {
             variables: {buildId: Number(buildId)},
-            deps: [buildId, reloadCount],
+            deps: [buildId, reloadCount, autoRefreshCount],
             condition: !!buildId,
             initialData: null,
             dataFn: data => data.build,
         }
     )
+    // A refresh which fails keeps the panel as it was
+    const build = useLastKnown(loadedBuild)
 
     const onPromotion = () => {
         // Both the panel and the regions above it are stale after a promotion: the timeline card
@@ -69,11 +78,15 @@ export default function BuildInspector({buildId, selectedFilter, showValidations
     // fetch is in flight therefore opens a window with a fully "loaded" panel describing the build
     // before last. That was survivable while this was two panels of stale promotions; it is not now
     // that the header is a LINK, because the stale window offers the wrong build's page.
+    //
+    // `loading` is deliberately NOT read: a refetch of the SAME build - an auto refresh, a promotion
+    // - would otherwise swap the panel for a skeleton, closing any popover opened in it. A refetch
+    // of ANOTHER build is caught by `stale`.
     const stale = !build || String(build.id) !== String(buildId)
 
     return (
         <div data-testid="build-inspector">
-            <Skeleton loading={loading || !finished || stale} active>
+            <Skeleton loading={!finished || stale} active>
                 {
                     build && <>
                         <div

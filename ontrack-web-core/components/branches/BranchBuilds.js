@@ -18,6 +18,7 @@ import PromotionRunStep from "@components/promotionRuns/PromotionRunStep";
 import {useQuery} from "@components/services/GraphQL";
 import AssistedBadge from "@components/extension/scm/assistants/AssistedBadge";
 import ActorBadge from "@components/common/actors/ActorBadge";
+import {AutoRefreshButton} from "@components/common/AutoRefresh";
 
 const {Column} = Table;
 
@@ -229,6 +230,8 @@ export default function BranchBuilds({
                                 <ValidationStampFilterDropdown
                                     branch={branch}
                                 />
+                                {/* Auto refresh, shared by the content views of the branch */}
+                                <AutoRefreshButton/>
                                 {/* Loading indicator */}
                                 {
                                     loadingBuilds &&

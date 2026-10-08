@@ -3,10 +3,11 @@ import {useRouter} from "next/router";
 import BuildFilterDropdown from "@components/branches/filters/builds/BuildFilterDropdown";
 import ValidationStampFilterDropdown from "@components/branches/filters/validationStamps/ValidationStampFilterDropdown";
 import {scmChangeLogUri} from "@components/common/Links";
+import {AutoRefreshButton} from "@components/common/AutoRefresh";
 
 /**
- * The controls which act on the whole view: which builds it shows, which validations it shows, and
- * the change log between two of the builds it shows.
+ * The controls which act on the whole view: which builds it shows, which validations it shows, the
+ * change log between two of the builds it shows, and how often it refreshes itself.
  *
  * THE CHANGE LOG BUTTON IS HERE ON PURPOSE. Range selection is one of the branch page's most
  * valuable features and the pipeline view is meant to become the default way to read a branch; a
@@ -72,6 +73,8 @@ export default function PipelineToolbar({
                 </Popover>
             }
             <ValidationStampFilterDropdown branch={branch}/>
+            {/* Shared by the content views of the branch, so it stays on across a view switch */}
+            <AutoRefreshButton/>
             {
                 loading &&
                 <Popover data-testid="loading-builds" content="Loading builds...">

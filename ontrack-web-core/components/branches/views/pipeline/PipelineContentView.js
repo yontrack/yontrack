@@ -3,6 +3,8 @@ import {useRouter} from "next/router";
 import {Space, Typography} from "antd";
 import {useQuery} from "@components/services/GraphQL";
 import CloseableAlert from "@components/common/CloseableAlert";
+import {AutoRefreshContext} from "@components/common/AutoRefresh";
+import useLastKnown from "@components/common/useLastKnown";
 import {useEventForRefresh} from "@components/common/EventsContext";
 import {useRefresh} from "@components/common/RefreshUtils";
 import useRangeSelection from "@components/common/RangeSelection";
@@ -42,17 +44,20 @@ export default function PipelineContentView({branch}) {
 
     const buildCreated = useEventForRefresh("build.created")
     const [reloadCount, reload] = useRefresh()
+    const {autoRefreshCount} = useContext(AutoRefreshContext)
 
-    // What the branch says about itself, outside any filter
-    const {data: facts, loading: loadingFacts, finished: finishedFacts} = useQuery(
+    // What the branch says about itself, outside any filter. Refetched on every tick of the auto
+    // refresh as well as the page of builds is, and a refetch which fails keeps what was shown.
+    const {data: loadedFacts, finished: finishedFacts} = useQuery(
         gqlPipelineBranchFacts,
         {
             variables: {branchId: Number(branch.id)},
-            deps: [branch, reloadCount, buildCreated],
+            deps: [branch, reloadCount, buildCreated, autoRefreshCount],
             initialData: null,
             dataFn: data => data.branch,
         }
     )
+    const facts = useLastKnown(loadedFacts)
 
     const promotionLevels = facts?.promotionLevels ?? []
     const validationStamps = facts?.validationStamps ?? []
@@ -96,8 +101,9 @@ export default function PipelineContentView({branch}) {
     // build and rewriting the URL - the pages being loaded are being loaded for that request.
     const {selectedBuildId, selectBuild} = useBuildSelection({builds, resolving})
 
-    // Range selection, feeding the change log button in the toolbar
-    const rangeSelection = useRangeSelection()
+    // Range selection, feeding the change log button in the toolbar. A build a refresh took off the
+    // timeline is dropped from it, and only that one.
+    const rangeSelection = useRangeSelection({available: builds.map(build => build.id)})
 
     const hasBuilds = builds.length > 0
 
@@ -140,7 +146,8 @@ export default function PipelineContentView({branch}) {
             <PipelineStats
                 totalBuilds={totalBuilds}
                 latestBuild={latestBuild}
-                loading={loadingFacts || !finishedFacts}
+                // The first answer only: a refresh does not swap the stats for a skeleton
+                loading={!finishedFacts}
             />
             {/* Nothing at all on a branch with no promotion levels, and nothing on a branch with no
                 builds either: a full band of "never reached" stages above an empty timeline states

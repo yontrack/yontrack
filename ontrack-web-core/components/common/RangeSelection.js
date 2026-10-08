@@ -1,9 +1,27 @@
-import {useState} from "react";
+import {useEffect, useState} from "react";
 
-export default function useRangeSelection() {
+/**
+ * Selection of two elements - two builds, most of the time - as the boundaries of a range.
+ *
+ * @param available Elements which can be selected, when they can change under the selection - a
+ *   list of builds which refreshes itself. An element no longer in it is dropped from the selection,
+ *   and only that one. Left out, the selection is kept whatever happens around it.
+ */
+export default function useRangeSelection({available} = {}) {
 
     // See https://react.dev/learn/updating-arrays-in-state
     const [selection, setSelection] = useState([])
+
+    // Keyed on the content of the list rather than on its identity, which is new on every render
+    const availableKey = available?.join(',')
+    useEffect(() => {
+        if (available) {
+            setSelection(current => {
+                const kept = current.filter(x => available.includes(x))
+                return kept.length === current.length ? current : kept
+            })
+        }
+    }, [availableKey])
 
     const isSelected = (x) => selection.indexOf(x) >= 0
 

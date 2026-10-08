@@ -1,3 +1,4 @@
+import {useContext} from "react";
 import {gql} from "graphql-request";
 import {gqlBuilds} from "@components/branches/branchQueries";
 import BranchBuilds from "@components/branches/BranchBuilds";
@@ -5,6 +6,8 @@ import useRangeSelection from "@components/common/RangeSelection";
 import {useQuery} from "@components/services/GraphQL";
 import useBuildFilterSelection from "@components/branches/views/useBuildFilterSelection";
 import useBranchBuildsPage from "@components/branches/views/useBranchBuildsPage";
+import {AutoRefreshContext} from "@components/common/AutoRefresh";
+import useLastKnown from "@components/common/useLastKnown";
 
 // Stands in for the page info until the first page of builds has been loaded. `nextPage` is an empty
 // object rather than absent, which is what the "load more" button treated as "nothing more to load"
@@ -30,11 +33,14 @@ export default function BuildsContentView({branch}) {
         selectedBuildFilter,
     })
 
-    // Range selection
-    const rangeSelection = useRangeSelection()
+    // Range selection, which forgets a build a refresh took off the list
+    const rangeSelection = useRangeSelection({available: builds.map(build => build.id)})
+
+    // Refetched on every tick of the auto refresh too, so that a stamp created since gets its column
+    const {autoRefreshCount} = useContext(AutoRefreshContext)
 
     // Loading validation stamps
-    const {data: validationStamps} = useQuery(
+    const {data: loadedValidationStamps} = useQuery(
         gql`
             query GetValidationStamps($branchId: Int!) {
                 branches(id: $branchId) {
@@ -57,11 +63,13 @@ export default function BuildsContentView({branch}) {
         `,
         {
             variables: {branchId: Number(branch.id)},
-            deps: [branch],
+            deps: [branch, autoRefreshCount],
             initialData: [],
             dataFn: data => data.branches[0].validationStamps,
         }
     )
+    // A refresh which fails does not take the columns away
+    const validationStamps = useLastKnown(loadedValidationStamps)
 
     return (
         <BranchBuilds

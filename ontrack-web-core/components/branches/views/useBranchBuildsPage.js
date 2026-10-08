@@ -1,7 +1,7 @@
-import {useEffect, useState} from "react";
+import {useContext, useEffect, useRef, useState} from "react";
 import {useQuery} from "@components/services/GraphQL";
 import {useEventForRefresh} from "@components/common/EventsContext";
-import {useRefresh} from "@components/common/RefreshUtils";
+import {AutoRefreshContext} from "@components/common/AutoRefresh";
 
 /**
  * The page of builds a branch content view shows, accumulated across "load more".
@@ -13,7 +13,13 @@ import {useRefresh} from "@components/common/RefreshUtils";
  *
  * The query itself is the caller's, because the views draw different things and so ask for
  * different fields. Everything around it - the variables, the pagination, the accumulation, the
- * reload on `build.created` - is the same, and lives here.
+ * reload on `build.created` and on every tick of the branch's auto refresh - is the same, and lives
+ * here.
+ *
+ * A RELOAD IS NOT A REFETCH OF THE LAST PAGE. Once "load more" has run, the request in hand names
+ * the last page appended, and asking for it again appended it a second time. A reload asks instead
+ * for everything shown, in one page from the top - as many builds as are on screen - and REPLACES
+ * the list with it: new builds come in at the top, and the oldest drop off the bottom.
  *
  * @param branch Branch being displayed
  * @param query GraphQL document taking `$branchId`, `$offset`, `$size`, `$filterType`, `$filterData`
@@ -23,10 +29,8 @@ import {useRefresh} from "@components/common/RefreshUtils";
  */
 export default function useBranchBuildsPage({branch, query, selectedBuildFilter, size = 10}) {
 
+    // A new object for every request, even an identical one: its identity is what refetches
     const [pagination, setPagination] = useState({offset: 0, size})
-
-    const buildCreated = useEventForRefresh("build.created")
-    const [reloadCount, reload] = useRefresh()
 
     const {data: buildsPage, loading, finished} = useQuery(
         query,
@@ -39,7 +43,7 @@ export default function useBranchBuildsPage({branch, query, selectedBuildFilter,
                 // GraphQL type for the filter data is expected to be a string
                 filterData: selectedBuildFilter ? JSON.stringify(selectedBuildFilter.data) : undefined,
             },
-            deps: [branch, pagination, selectedBuildFilter, reloadCount, buildCreated],
+            deps: [branch, pagination, selectedBuildFilter],
             initialData: null,
             dataFn: data => data.branches[0].buildsPaginated,
         }
@@ -79,9 +83,32 @@ export default function useBranchBuildsPage({branch, query, selectedBuildFilter,
         // render after every response - the page info still names the offset just fetched - and it
         // also covers a user double-clicking the button.
         if (next && next.offset !== pagination.offset) {
-            setPagination(next)
+            // By the page size, whatever size the last request had: after a reload, that request was
+            // for every build shown, and "load more" must not double the list in one go.
+            setPagination({offset: next.offset, size})
         }
     }
+
+    // Offset 0, so that the effect above replaces instead of appending. A reload which fails sets
+    // no `buildsPage`, so the builds already shown stay.
+    const reload = () => {
+        setPagination({offset: 0, size: Math.max(size, page.builds.length)})
+    }
+
+    // What asks for a reload without the user doing anything: a build created on this page, and a
+    // tick of the auto refresh. Both are counters, and only a CHANGE of them is a request - a view
+    // mounted after a switch finds the auto refresh having ticked already, and fetching its first
+    // page is all it needs to do.
+    const buildCreated = useEventForRefresh("build.created")
+    const {autoRefreshCount} = useContext(AutoRefreshContext)
+    const signals = useRef({buildCreated, autoRefreshCount})
+    useEffect(() => {
+        const previous = signals.current
+        if (previous.buildCreated !== buildCreated || previous.autoRefreshCount !== autoRefreshCount) {
+            signals.current = {buildCreated, autoRefreshCount}
+            reload()
+        }
+    }, [buildCreated, autoRefreshCount])
 
     return {
         builds: page.builds,
