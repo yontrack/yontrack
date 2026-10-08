@@ -26,6 +26,9 @@ public abstract class AbstractSettingsManager<T> implements SettingsManager<T> {
         securityService.checkGlobalFunction(GlobalSettings.class);
         cachedSettingsService.invalidate(settingsClass);
         doSaveSettings(settings);
+        // Outside of a transaction, a read by another thread during the writing would have put
+        // the previous settings back into the cache
+        cachedSettingsService.invalidate(settingsClass);
     }
 
     protected abstract void doSaveSettings(T settings);
