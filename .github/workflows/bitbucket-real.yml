@@ -148,6 +148,9 @@ jobs:
         id: gate
         env:
           GH_TOKEN: ${{ github.token }}
+          # The gate runs before the checkout, so `gh` has no local clone to infer the repository
+          # from and fails with "not a git repository" unless it is named.
+          GH_REPO: ${{ github.repository }}
           FORCE: ${{ inputs.force }}
         run: |
           set -uo pipefail
