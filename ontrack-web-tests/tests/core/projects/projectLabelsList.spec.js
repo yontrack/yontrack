@@ -21,8 +21,9 @@ test('label chips in the project list, leading to the label page', async ({page,
     await widget.filterByName(project.name)
     await widget.expectProject(project)
 
-    // The label is displayed as a chip beside the project...
+    // The label is displayed as a chip beside the project, a quiet one so that the name stands out...
     await expect(widget.chip(label)).toBeVisible()
+    await expect(widget.chip(label)).toHaveAttribute('data-variant', 'quiet')
 
     // ... and it leads to the label page
     await widget.chip(label).click()
@@ -85,6 +86,10 @@ test('the label page lists the projects carrying the label', async ({page, ontra
     await labelPage.expectProject(second)
     await labelPage.expectNoProject(other)
 
-    // The chip of the label is displayed for each of them, and links back to this page
-    await expect(page.getByTestId(`label-${labelDisplay(label)}`)).toHaveCount(3)
+    // The chip of the label is displayed for each of them, and links back to this page...
+    const chips = page.getByTestId(`label-${labelDisplay(label)}`)
+    await expect(chips).toHaveCount(3)
+    // ... quiet in the project boxes, solid in the header of the page
+    await expect(chips.and(page.locator('[data-variant="quiet"]'))).toHaveCount(2)
+    await expect(chips.and(page.locator('[data-variant="solid"]'))).toHaveCount(1)
 })

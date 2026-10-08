@@ -22,8 +22,10 @@ A label is written, and searched for, as `category:name` - `team:payments`, `lan
 its name alone when it has no category. That display string is what the filters take; the category is
 not a namespace, just the first half of a name.
 
-The tag itself is drawn the same way everywhere - the Labels page, the project page, every project
-list - and on a project or in a project list, clicking it opens
+The tag is drawn filled with the label's colour on the Labels page and on the project page. In the
+project lists - the project widgets of the home page, the page of a label - it is drawn quietly
+instead, as neutral text with the label's colour as a small dot before it, so that the project
+names stand out. On a project or in a project list, clicking it opens
 [the label's own page](#the-page-of-a-label).
 
 !!! note "Labels are assigned by people, not computed"
