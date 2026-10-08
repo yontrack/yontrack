@@ -14,6 +14,13 @@ Auto promotion is configured by setting the "Auto promotion" property on a promo
 
     A [CHML](index.md#chml) or [Security findings](../../integrations/findings/findings.md#the-validation-stamp-type) validation stamp can also opt in, with `warningPassesAutoPromotion`, to having a last run in `WARNING` status count as passed. This applies to the auto promotion only — a `WARNING` run still shows as a warning everywhere else — and only to a last status of exactly `WARNING`: a warning later moved to another status, `INVESTIGATING` or `EXPLAINED` for example, does not count. With this option, a `WARNING` run both promotes a build and leaves an [auto revoked](#revoking-a-promotion) promotion standing.
 
+The promotion checks of the level apply to the auto promotion as to any other promotion — the
+previous promotion condition, the promotion dependencies, and
+[Assisted builds require](index.md#assisted-builds-require). When one of them refuses the promotion,
+the auto promotion **waits**: the validation or the promotion which triggered it is recorded all the
+same, and the build is promoted at the next validation or promotion which finds every check
+satisfied.
+
 ## Selecting the validations
 
 The list of validation stamps can be defined by:

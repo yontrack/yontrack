@@ -84,6 +84,46 @@ A promotion level admits agents when it has the *Agents admitted* property. Set 
 which promote a build automatically, the promotion is granted by Yontrack itself, on behalf of the
 agent, and the auto-promotion rules of the level are the gate.
 
+### Assisted builds require
+
+!!! note
+
+    This condition is under license, as the feature `extension.agents` ("Agent governance"). See
+    [Licensing](../../appendix/licensing.md).
+
+A promotion level can require more of an [assisted build](../../agents/index.md#assisted-builds) —
+one whose commits were written with coding agents — than of the others: with the *Assisted builds
+require* property, it lists validation stamps of its branch which an assisted build must **pass**
+before being promoted to the level. Typically, a human review or a security scan.
+
+When the build is assisted, and one of the listed stamps has not passed — its last run is not
+`PASSED` nor `FIXED`, or it has no run — the promotion is refused, naming the first such stamp:
+
+```
+Assisted build: REVIEW must pass first.
+```
+
+The rule **fails closed**: a build whose assisted change is not computed yet, or is `UNKNOWN` — no
+SCM, no previous build, an SCM error — counts as **assisted**. A race with the computation, which
+runs in the background after the build is created, or a missing SCM, never bypasses the review. A
+listed stamp which does not exist on the branch cannot pass either. A build known **not** to be
+assisted is not concerned.
+
+The condition applies to every promotion: by a person, by the API, by an agent,
+by [auto-promotion](auto-promotion.md) — which waits until the stamps have passed — and by
+workflows. The [readiness](#readiness) of the build lists every
+missing stamp, as a `CHECK` named *Assisted builds require*.
+
+Set it:
+
+* on the promotion level page, through its properties;
+* through the API, with the `setPromotionLevelAssistedBuildsRequireProperty(ById)` mutation and its
+  `validationStamps` list, or as code with the
+  `net.nemerosa.ontrack.extension.agents.assisted.AssistedBuildsRequirePropertyType` property.
+
+Without the license, the property is kept and stays visible, with a notice, but **does nothing**:
+assisted builds are promoted as any other. It applies again as soon as the license allows it.
+
 ## Validation runs
 
 When linked to a [build](#builds), a [validation stamp](#validation-stamps) can be passed, failed, in warning, etc. It
@@ -135,8 +175,9 @@ For a **promotion level**:
 * with an [auto promotion](auto-promotion.md), each required validation stamp which has not passed is missing, with the
   status of its last run or _Not validated_, and so is each required promotion level the build has not reached — the
   same conditions as the auto promotion itself;
-* each promotion check which would refuse the promotion is missing — the previous promotion condition, and each
-  promotion dependency which is not granted;
+* each promotion check which would refuse the promotion is missing — the previous promotion condition, each
+  promotion dependency which is not granted, and each stamp an assisted build has not passed
+  ([Assisted builds require](#assisted-builds-require));
 * a promotion level without auto promotion is granted by a person: that is missing too, and the build is not ready
   until someone promotes it, even when nothing else is missing.
 

@@ -829,6 +829,7 @@ jobs:
               ontrack-extension-findings
               ontrack-extension-scorecard
               ontrack-extension-audit-trail
+              ontrack-extension-agents
           - shard: 4
             modules: >-
               ontrack-extension-auto-versioning

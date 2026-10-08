@@ -25,6 +25,7 @@ class AutoPromotionEventListener(
     private val propertyService: PropertyService,
     private val securityService: SecurityService,
     private val autoPromotionPrerequisites: AutoPromotionPrerequisites,
+    private val promotionRunCheckService: PromotionRunCheckService,
 ) : EventListener {
 
     override fun onEvent(event: Event) {
@@ -171,14 +172,19 @@ class AutoPromotionEventListener(
                     // having made a validation might not be granted to
                     // creation a promotion
                     securityService.asAdmin(AUTO_PROMOTION) {
-                        structureService.newPromotionRun(
-                            of(
-                                build,
-                                promotionLevel,
-                                securityService.currentSignature,
-                                "Auto promotion"
+                        // The promotion checks (previous promotion, dependencies, assisted builds...)
+                        // may still refuse the promotion: the auto-promotion then waits for a later
+                        // event, rather than failing the validation or the promotion which triggered it
+                        if (promotionRunCheckService.explainPromotionRunCreation(build, promotionLevel).isEmpty()) {
+                            structureService.newPromotionRun(
+                                of(
+                                    build,
+                                    promotionLevel,
+                                    securityService.currentSignature,
+                                    "Auto promotion"
+                                )
                             )
-                        )
+                        }
                     }
                 }
             }

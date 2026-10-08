@@ -82,6 +82,7 @@ dependencies {
     runtimeOnly(project(":ontrack-extension-findings"))
     runtimeOnly(project(":ontrack-extension-scorecard"))
     runtimeOnly(project(":ontrack-extension-audit-trail"))
+    runtimeOnly(project(":ontrack-extension-agents"))
 }
 
 // `project.version` only ever holds the base version (5.4.0). The release-candidate suffix is

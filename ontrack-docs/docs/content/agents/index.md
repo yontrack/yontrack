@@ -360,6 +360,14 @@ separated by a comma and a space. It is posted **once** for a build: there is no
 a later value which disagrees posts nothing — a recomputation that disagrees is a configuration
 problem, not a change of the build. Like any event, notifications can subscribe to it.
 
+### Requiring validations of assisted builds
+
+A promotion level can require validations of assisted builds only — a human review, a security
+scan — with its [Assisted builds require](../concepts/model/index.md#assisted-builds-require)
+property. It **fails closed**: a build whose assisted change is not computed yet, or is `UNKNOWN`,
+counts as assisted. This ruling is under license, as the *Agent governance* feature
+(`extension.agents`) — see [Licensing](../appendix/licensing.md).
+
 ### Templating
 
 The builds expose their assisted change to [templates](../appendix/templating.md):

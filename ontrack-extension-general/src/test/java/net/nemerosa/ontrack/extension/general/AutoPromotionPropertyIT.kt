@@ -463,6 +463,39 @@ class AutoPromotionPropertyIT : AbstractDSLTestSupport() {
         }
     }
 
+    /**
+     * #2029 - A promotion check which refuses the promotion does not fail the validation which
+     * triggers the auto-promotion: the auto-promotion waits until the check accepts it.
+     */
+    @Test
+    fun `Auto promotion waits for the promotion checks`() {
+        project {
+            branch {
+                val vs = validationStamp("CI")
+                val silver = promotionLevel("SILVER")
+                val gold = promotionLevel("GOLD")
+                setProperty(
+                    gold,
+                    AutoPromotionPropertyType::class.java,
+                    AutoPromotionProperty(listOf(vs), "", "", emptyList())
+                )
+                setProperty(
+                    gold,
+                    PromotionDependenciesPropertyType::class.java,
+                    PromotionDependenciesProperty(listOf("SILVER"))
+                )
+                build {
+                    // The validation is recorded, but the dependency check refuses the auto-promotion
+                    validate(vs)
+                    checkBuildIsNotPromoted(this, gold)
+                    // Once the dependency is granted, the auto-promotion goes through
+                    promote(silver)
+                    checkBuildIsPromoted(this, gold)
+                }
+            }
+        }
+    }
+
     private fun checkBuildIsPromoted(build: Build, promotionLevel: PromotionLevel) {
         build.asUserWithView {
             val runs = structureService.getPromotionRunsForBuildAndPromotionLevel(build, promotionLevel)

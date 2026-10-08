@@ -1979,6 +1979,22 @@ type DeletePromotionLevelAgentsAdmittedPropertyPayload implements Payload {
   promotionLevel: PromotionLevel
 }
 
+"Output type for the deletePromotionLevelAssistedBuildsRequirePropertyById mutation."
+type DeletePromotionLevelAssistedBuildsRequirePropertyByIdPayload implements Payload {
+  "List of errors"
+  errors: [UserError]
+  "Promotion level updated"
+  promotionLevel: PromotionLevel
+}
+
+"Output type for the deletePromotionLevelAssistedBuildsRequireProperty mutation."
+type DeletePromotionLevelAssistedBuildsRequirePropertyPayload implements Payload {
+  "List of errors"
+  errors: [UserError]
+  "Promotion level updated"
+  promotionLevel: PromotionLevel
+}
+
 "Output type for the deletePromotionLevelAutoPromotionPropertyById mutation."
 type DeletePromotionLevelAutoPromotionPropertyByIdPayload implements Payload {
   "List of errors"
@@ -4244,6 +4260,16 @@ type Mutation {
     "Input for the mutation"
     input: DeletePromotionLevelAgentsAdmittedPropertyByIdInput
   ): DeletePromotionLevelAgentsAdmittedPropertyByIdPayload
+  "Deletes the assisted builds require property on a promotion level identified by name."
+  deletePromotionLevelAssistedBuildsRequireProperty(
+    "Input for the mutation"
+    input: DeletePromotionLevelAssistedBuildsRequirePropertyInput
+  ): DeletePromotionLevelAssistedBuildsRequirePropertyPayload
+  "Deletes the assisted builds require property on a promotion level."
+  deletePromotionLevelAssistedBuildsRequirePropertyById(
+    "Input for the mutation"
+    input: DeletePromotionLevelAssistedBuildsRequirePropertyByIdInput
+  ): DeletePromotionLevelAssistedBuildsRequirePropertyByIdPayload
   "Deletes the auto promotion property on a promotion level identified by name."
   deletePromotionLevelAutoPromotionProperty(
     "Input for the mutation"
@@ -4977,6 +5003,16 @@ type Mutation {
     "Input for the mutation"
     input: SetPromotionLevelAgentsAdmittedPropertyByIdInput
   ): SetPromotionLevelAgentsAdmittedPropertyByIdPayload
+  "Set the assisted builds require property on a promotion level identified by name."
+  setPromotionLevelAssistedBuildsRequireProperty(
+    "Input for the mutation"
+    input: SetPromotionLevelAssistedBuildsRequirePropertyInput
+  ): SetPromotionLevelAssistedBuildsRequirePropertyPayload
+  "Set the assisted builds require property on a promotion level."
+  setPromotionLevelAssistedBuildsRequirePropertyById(
+    "Input for the mutation"
+    input: SetPromotionLevelAssistedBuildsRequirePropertyByIdInput
+  ): SetPromotionLevelAssistedBuildsRequirePropertyByIdPayload
   "Set the auto promotion property on a promotion level identified by name."
   setPromotionLevelAutoPromotionProperty(
     "Input for the mutation"
@@ -5779,6 +5815,8 @@ type PromotionLevel implements Authorizable & ProjectEntity {
   agentsAdmittedProperty: Property
   "Description with links."
   annotatedDescription: String
+  "If the build is assisted (its commits were written with coding agents), these validation stamps must pass before it is promoted to this level. An unknown assisted change counts as assisted. Needs the licensed feature \"Agent governance\"."
+  assistedBuildsRequireProperty: Property
   "Authorizations for this context"
   authorizations: [Authorization!]!
   "Current conditions of the auto promotion of this promotion level - null when it has no auto promotion"
@@ -7778,6 +7816,22 @@ type SetPromotionLevelAgentsAdmittedPropertyByIdPayload implements Payload {
 
 "Output type for the setPromotionLevelAgentsAdmittedProperty mutation."
 type SetPromotionLevelAgentsAdmittedPropertyPayload implements Payload {
+  "List of errors"
+  errors: [UserError]
+  "Promotion level updated"
+  promotionLevel: PromotionLevel
+}
+
+"Output type for the setPromotionLevelAssistedBuildsRequirePropertyById mutation."
+type SetPromotionLevelAssistedBuildsRequirePropertyByIdPayload implements Payload {
+  "List of errors"
+  errors: [UserError]
+  "Promotion level updated"
+  promotionLevel: PromotionLevel
+}
+
+"Output type for the setPromotionLevelAssistedBuildsRequireProperty mutation."
+type SetPromotionLevelAssistedBuildsRequirePropertyPayload implements Payload {
   "List of errors"
   errors: [UserError]
   "Promotion level updated"
@@ -10887,6 +10941,22 @@ input DeletePromotionLevelAgentsAdmittedPropertyInput {
   promotion: String!
 }
 
+"Input type for the deletePromotionLevelAssistedBuildsRequirePropertyById mutation."
+input DeletePromotionLevelAssistedBuildsRequirePropertyByIdInput {
+  "ID of the promotion level"
+  id: Int!
+}
+
+"Input type for the deletePromotionLevelAssistedBuildsRequireProperty mutation."
+input DeletePromotionLevelAssistedBuildsRequirePropertyInput {
+  "Branch name"
+  branch: String!
+  "Project name"
+  project: String!
+  "Promotion name"
+  promotion: String!
+}
+
 "Input type for the deletePromotionLevelAutoPromotionPropertyById mutation."
 input DeletePromotionLevelAutoPromotionPropertyByIdInput {
   "ID of the promotion level"
@@ -12743,6 +12813,26 @@ input SetPromotionLevelAgentsAdmittedPropertyInput {
   project: String!
   "Promotion name"
   promotion: String!
+}
+
+"Input type for the setPromotionLevelAssistedBuildsRequirePropertyById mutation."
+input SetPromotionLevelAssistedBuildsRequirePropertyByIdInput {
+  "ID of the promotion level"
+  id: Int!
+  "Names of the validation stamps of the branch which an assisted build must pass before being promoted to this level"
+  validationStamps: [String!]!
+}
+
+"Input type for the setPromotionLevelAssistedBuildsRequireProperty mutation."
+input SetPromotionLevelAssistedBuildsRequirePropertyInput {
+  "Branch name"
+  branch: String!
+  "Project name"
+  project: String!
+  "Promotion name"
+  promotion: String!
+  "Names of the validation stamps of the branch which an assisted build must pass before being promoted to this level"
+  validationStamps: [String!]!
 }
 
 "Input type for the setPromotionLevelAutoPromotionPropertyById mutation."
