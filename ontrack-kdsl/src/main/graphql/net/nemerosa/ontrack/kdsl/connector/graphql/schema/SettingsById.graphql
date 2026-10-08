@@ -1,0 +1,8 @@
+query SettingsById($id: String!) {
+    settings {
+        settingsById(id: $id) {
+            id
+            values
+        }
+    }
+}

@@ -470,6 +470,25 @@ The _Agent markers_ settings, in the user menu at _System > Settings_, tune the 
 
 An invalid regular expression is rejected when the settings are saved.
 
+Only the administrators save the settings, but **whoever can create builds** on at least one project
+reads them - CI accounts and [agent](../../agents/index.md) tokens included - through the
+`settingsById` query:
+
+```graphql
+{
+  settings {
+    settingsById(id: "agent-markers") {
+      values  # { builtInConventions, patterns: [{ name, type, value }] }
+    }
+  }
+}
+```
+
+The markers decide no permission and hold nothing secret. When Yontrack has no SCM for a project,
+`yontrack build assisted --from-git A..B` parses the trailers of the range on the CI, and reads these
+settings to apply the custom patterns as the server would. A token which cannot read them gets the
+built-in conventions only, with a warning.
+
 The settings can be set as [code](../../configuration/casc.md), under
 `ontrack.config.settings.agent-markers`:
 

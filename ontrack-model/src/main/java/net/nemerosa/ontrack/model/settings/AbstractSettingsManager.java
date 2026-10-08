@@ -17,8 +17,19 @@ public abstract class AbstractSettingsManager<T> implements SettingsManager<T> {
 
     @Override
     public final T getSettings() {
-        securityService.checkGlobalFunction(GlobalSettings.class);
+        checkRead();
         return cachedSettingsService.getCachedSettings(settingsClass);
+    }
+
+    /**
+     * Checks that the current user may read these settings: only the administrators may.
+     * <p>
+     * A settings manager overrides it only for settings which decide no permission and hold
+     * nothing secret, to open their reading to more users. Saving the settings always requires
+     * the {@link GlobalSettings} function.
+     */
+    protected void checkRead() {
+        securityService.checkGlobalFunction(GlobalSettings.class);
     }
 
     @Override

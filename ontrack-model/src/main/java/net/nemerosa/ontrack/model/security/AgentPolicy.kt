@@ -74,6 +74,7 @@ object AgentPolicy {
         // Administration
         ProjectCreation::class.java.name,
         ApplicationManagement::class.java.name,
+        // Reading the agent markers settings is gated by `BuildCreate` instead, see `AgentMarkersSettingsManager`
         GlobalSettings::class.java.name,
         AccountManagement::class.java.name,
         AccountGroupManagement::class.java.name,
