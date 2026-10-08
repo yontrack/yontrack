@@ -1,0 +1,19 @@
+query UserAgentPolicy($project: String!, $branch: String) {
+    user {
+        agentPolicy(project: $project) {
+            owner
+            canRecordEvidence
+            promotionLevels(branch: $branch) {
+                id
+                branch
+                name
+            }
+            slots {
+                id
+                environment
+                qualifier
+                manualApproval
+            }
+        }
+    }
+}

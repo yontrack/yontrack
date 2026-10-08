@@ -2,6 +2,7 @@ package net.nemerosa.ontrack.extension.environments.readiness
 
 import net.nemerosa.ontrack.extension.api.SlotReadinessExtension
 import net.nemerosa.ontrack.extension.environments.EnvironmentsExtensionFeature
+import net.nemerosa.ontrack.extension.environments.Slot
 import net.nemerosa.ontrack.extension.environments.SlotAdmissionRuleConfig
 import net.nemerosa.ontrack.extension.environments.SlotPipeline
 import net.nemerosa.ontrack.extension.environments.rules.SlotAdmissionRuleRegistry
@@ -12,6 +13,9 @@ import net.nemerosa.ontrack.model.readiness.Readiness
 import net.nemerosa.ontrack.model.readiness.ReadinessInputException
 import net.nemerosa.ontrack.model.readiness.ReadinessItem
 import net.nemerosa.ontrack.model.readiness.ReadinessKind
+import net.nemerosa.ontrack.model.security.AgentPolicyService
+import net.nemerosa.ontrack.model.security.SecurityService
+import net.nemerosa.ontrack.model.security.currentAgent
 import net.nemerosa.ontrack.model.structure.Build
 import org.springframework.stereotype.Component
 
@@ -22,13 +26,17 @@ import org.springframework.stereotype.Component
  *   [admission rule][ReadinessKind.ADMISSION_RULE] item, with its reason;
  * - every rule which can only be decided on a deployment, like a manual approval, is checked on the
  *   active deployment of the build in the slot, when there is one, and is missing otherwise - a
- *   manual approval as a [manual][ReadinessKind.MANUAL] item.
+ *   manual approval as a [manual][ReadinessKind.MANUAL] item;
+ * - for an agent, a slot which does not admit agents is an [agent policy][ReadinessKind.AGENT_POLICY]
+ *   item.
  */
 @Component
 class SlotReadinessExtensionImpl(
     extensionFeature: EnvironmentsExtensionFeature,
     private val slotService: SlotService,
     private val slotAdmissionRuleRegistry: SlotAdmissionRuleRegistry,
+    private val securityService: SecurityService,
+    private val agentPolicyService: AgentPolicyService,
 ) : AbstractExtension(extensionFeature), SlotReadinessExtension {
 
     override fun getSlotReadiness(build: Build, slotId: String): Readiness {
@@ -71,9 +79,24 @@ class SlotReadinessExtensionImpl(
         } else {
             emptyList()
         }
+        // The agent policy, for an agent only
+        val agentPolicy = listOfNotNull(agentPolicyItem(slot))
         return Readiness.of(
-            (nonEligible + nonDeployable + pipelineOnly).sortedBy { it.kind.ordinal }
+            (nonEligible + nonDeployable + pipelineOnly + agentPolicy).sortedBy { it.kind.ordinal }
         )
+    }
+
+    private fun agentPolicyItem(slot: Slot): ReadinessItem? {
+        val agent = securityService.currentAgent ?: return null
+        return if (slot.agentsAdmitted) {
+            null
+        } else {
+            ReadinessItem(
+                kind = ReadinessKind.AGENT_POLICY,
+                name = slot.fullName(),
+                message = "agents are not admitted on ${slot.fullName()}; ask ${agentPolicyService.getOwnerName(agent)}",
+            )
+        }
     }
 
     private fun pipelineOnlyItem(pipeline: SlotPipeline?, config: SlotAdmissionRuleConfig): ReadinessItem? {

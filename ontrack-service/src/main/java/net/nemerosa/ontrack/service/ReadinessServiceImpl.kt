@@ -4,8 +4,10 @@ import net.nemerosa.ontrack.extension.api.ExtensionManager
 import net.nemerosa.ontrack.extension.api.PromotionLevelReadinessExtension
 import net.nemerosa.ontrack.extension.api.SlotReadinessExtension
 import net.nemerosa.ontrack.model.readiness.*
+import net.nemerosa.ontrack.model.security.AgentPolicyService
 import net.nemerosa.ontrack.model.security.ProjectView
 import net.nemerosa.ontrack.model.security.SecurityService
+import net.nemerosa.ontrack.model.security.currentAgent
 import net.nemerosa.ontrack.model.structure.Build
 import net.nemerosa.ontrack.model.structure.PromotionLevel
 import net.nemerosa.ontrack.model.structure.PromotionRunCheckService
@@ -20,6 +22,7 @@ class ReadinessServiceImpl(
     private val structureService: StructureService,
     private val promotionRunCheckService: PromotionRunCheckService,
     private val extensionManager: ExtensionManager,
+    private val agentPolicyService: AgentPolicyService,
 ) : ReadinessService {
 
     override fun getReadiness(build: Build, promotionLevel: String?, slotId: String?): Readiness {
@@ -68,10 +71,29 @@ class ReadinessServiceImpl(
                 message = it.reason,
             )
         }
+        // The agent policy, for an agent only
+        val agentPolicy = listOfNotNull(agentPolicyItem(promotionLevel))
         // What needs a person comes last
         return Readiness.of(
-            (conditions + checks).sortedBy { it.kind.ordinal }
+            (conditions + checks + agentPolicy).sortedBy { it.kind.ordinal }
         )
+    }
+
+    /**
+     * An agent reading the readiness of a level which does not admit agents learns it here, with
+     * everything else which is missing, rather than by being refused.
+     */
+    private fun agentPolicyItem(promotionLevel: PromotionLevel): ReadinessItem? {
+        val agent = securityService.currentAgent ?: return null
+        return if (agentPolicyService.isAgentsAdmitted(promotionLevel)) {
+            null
+        } else {
+            ReadinessItem(
+                kind = ReadinessKind.AGENT_POLICY,
+                name = promotionLevel.name,
+                message = "agents are not admitted on ${promotionLevel.name}; ask ${agentPolicyService.getOwnerName(agent)}",
+            )
+        }
     }
 
     private fun getSlotReadiness(build: Build, slotId: String): Readiness {

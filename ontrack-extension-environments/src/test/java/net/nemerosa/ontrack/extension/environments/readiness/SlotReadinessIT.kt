@@ -9,8 +9,10 @@ import net.nemerosa.ontrack.extension.environments.rules.core.ManualApprovalSlot
 import net.nemerosa.ontrack.extension.environments.rules.core.ManualApprovalSlotAdmissionRuleData
 import net.nemerosa.ontrack.extension.environments.service.SlotService
 import net.nemerosa.ontrack.graphql.AbstractQLKTITSupport
+import net.nemerosa.ontrack.it.AgentTestSupport
 import net.nemerosa.ontrack.it.AsAdminTest
 import net.nemerosa.ontrack.json.asJson
+import net.nemerosa.ontrack.model.security.Roles
 import net.nemerosa.ontrack.model.structure.Build
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -31,6 +33,9 @@ class SlotReadinessIT : AbstractQLKTITSupport() {
 
     @Autowired
     private lateinit var slotService: SlotService
+
+    @Autowired
+    private lateinit var agentTestSupport: AgentTestSupport
 
     private val readinessQuery = """
         query Readiness(${'$'}buildId: Int!, ${'$'}promotionLevel: String, ${'$'}slotId: String) {
@@ -174,6 +179,44 @@ class SlotReadinessIT : AbstractQLKTITSupport() {
                     assertEquals("ADMISSION_RULE", kind)
                     assertEquals("gold", name)
                     assertEquals("The build is not eligible for this slot: the Promotion rule refuses it.", message)
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `For an agent, a slot which does not admit agents is missing on the agent policy, with the rules`() {
+        val owner = doCreateAccountWithGlobalRole(Roles.GLOBAL_AUTOMATION)
+        val agent = agentTestSupport.registerAgent(owner = owner)
+        withGoldAndManualSlot { slot, _ ->
+            slot.project.branch {
+                promotionLevel("GOLD")
+                build {
+                    val readiness = agentTestSupport.withToken(agent.token) { readiness(slot) }
+                    assertFalse(readiness.path("ready").asBoolean())
+                    assertEquals(
+                        listOf(
+                            "ADMISSION_RULE" to "gold",
+                            "MANUAL" to "approval",
+                            "AGENT_POLICY" to slot.fullName(),
+                        ),
+                        readiness.kindsAndNames()
+                    )
+                    assertEquals(
+                        "agents are not admitted on ${slot.fullName()}; ask ${owner.fullName}",
+                        readiness.items().last().third
+                    )
+                    // A person is not concerned by the agent policy
+                    assertEquals(
+                        listOf("ADMISSION_RULE" to "gold", "MANUAL" to "approval"),
+                        readiness(slot).kindsAndNames()
+                    )
+                    // Once the slot admits agents
+                    slotService.saveSlot(slot.withAgentsAdmitted(true))
+                    assertEquals(
+                        listOf("ADMISSION_RULE" to "gold", "MANUAL" to "approval"),
+                        agentTestSupport.withToken(agent.token) { readiness(slot) }.kindsAndNames()
+                    )
                 }
             }
         }

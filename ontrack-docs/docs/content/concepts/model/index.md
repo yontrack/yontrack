@@ -144,6 +144,10 @@ For a **slot**, every [admission rule](../../integrations/environments/environme
 which makes the build not eligible, or not deployable yet, is missing with its reason. A manual approval is missing
 until it is given on a deployment of the build.
 
+When an [agent](../../agents/index.md) reads the readiness, a promotion level or a slot which does not
+[admit agents](#agents-admitted) is missing too, as an `AGENT_POLICY` item naming the owner of the agent to ask. The
+other items are still listed: the agent learns everything that is missing in one call. A person never gets this item.
+
 Each missing item has a _kind_, a _name_ and a _message_:
 
 | Kind             | Name                       | What it means                                                      |
@@ -201,7 +205,11 @@ it what it can do about each item:
 * `VALIDATION` — produce the evidence: run the check, and record it as a validation run;
 * `PROMOTION` and `CHECK` — the build must first reach another promotion level;
 * `ADMISSION_RULE` — the build does not qualify for the slot yet, or not at all;
-* `MANUAL` — stop and ask a person: an agent never stands in for the person who promotes or approves.
+* `MANUAL` — stop and ask a person: an agent never stands in for the person who promotes or approves;
+* `AGENT_POLICY` — the target does not admit agents: stop and ask the owner named in the message.
+
+An agent reads which promotion levels and slots admit it, for a whole project, in
+[its own policy](../../agents/index.md#reading-your-own-policy).
 
 The [Yontrack MCP server](https://github.com/yontrack/yontrack-mcp) and the
 [Yontrack CLI](https://github.com/yontrack/yontrack-cli) read the same field.

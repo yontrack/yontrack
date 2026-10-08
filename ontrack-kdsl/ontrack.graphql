@@ -117,6 +117,43 @@ type AddSlotWorkflowPayload implements Payload {
   slotWorkflow: SlotWorkflow
 }
 
+"What the current agent may do on a project: the rights of its owner, narrowed by the agent policy. Read it before acting rather than discovering the policy by being refused."
+type AgentPolicy {
+  "True when the agent may create builds and validation runs on the project"
+  canRecordEvidence: Boolean!
+  "Full name of the owner of the agent: the person to ask when the policy stops the agent"
+  owner: String!
+  "Promotion levels of the enabled branches of the project which admit agents, and on which the owner of the agent may promote. Empty when the owner may not promote."
+  promotionLevels(
+    "Name of a branch, to restrict the levels to this branch"
+    branch: String
+  ): [AgentPolicyPromotionLevel!]!
+  "Slots of the project which admit agents, and where the owner of the agent may start a deployment pipeline, each one saying whether a manual approval will still stop the agent"
+  slots: [AgentPolicySlot!]!
+}
+
+"A promotion level which admits agents, and on which the owner of the agent may promote"
+type AgentPolicyPromotionLevel {
+  "Name of the branch of the promotion level"
+  branch: String!
+  "ID of the promotion level"
+  id: Int!
+  "Name of the promotion level"
+  name: String!
+}
+
+"A slot which admits agents, and where the owner of the agent may start a deployment pipeline"
+type AgentPolicySlot {
+  "Name of the environment of the slot"
+  environment: String!
+  "ID of the slot"
+  id: String!
+  "True when the slot has a manual approval rule: the agent may start a pipeline, but a person must approve it - an agent never approves"
+  manualApproval: Boolean!
+  "Qualifier of the slot, empty for the default slot of the project in the environment"
+  qualifier: String!
+}
+
 type ApplyDashboardsPayload implements PayloadInterface {
   "Dashboards that were created or updated"
   dashboards: [Dashboard!]!
@@ -6678,7 +6715,7 @@ type ReadinessItem {
   kind: ReadinessKind!
   "Explanation of what is missing, in plain words, ready to be shown or acted upon"
   message: String!
-  "Name of what is missing: the validation stamp for VALIDATION, the promotion level for PROMOTION, the check for CHECK, the admission rule for ADMISSION_RULE, the promotion level or the admission rule for MANUAL"
+  "Name of what is missing: the validation stamp for VALIDATION, the promotion level for PROMOTION, the check for CHECK, the admission rule for ADMISSION_RULE, the promotion level or the admission rule for MANUAL, the promotion level or the full name of the slot for AGENT_POLICY"
   name: String!
 }
 
@@ -8621,6 +8658,11 @@ type UpdateWebhookPayload implements Payload {
 type User {
   "Account associated to the user"
   account: Account
+  "For an agent, what it may do on a project: the rights of its owner narrowed by the agent policy - recording evidence, the promotion levels and the slots which admit agents. Read it before acting rather than discovering the policy by being refused. Null for a person."
+  agentPolicy(
+    "Name of the project"
+    project: String!
+  ): AgentPolicy
   "List of groups the user is assigned to"
   assignedGroups: [AccountGroup!]!
   "idpGroups field"
@@ -9501,7 +9543,7 @@ enum QueueRecordState {
 enum ReadinessKind {
   "An admission rule of the slot refuses the build, or does not allow it to be deployed yet"
   ADMISSION_RULE
-  "The agent reading the readiness is not admitted on the promotion level or on the slot"
+  "The agent reading the readiness is not admitted on the promotion level or on the slot: its owner, or a person, must act. Only listed for an agent"
   AGENT_POLICY
   "A promotion check refuses the promotion, like a previous promotion condition or a promotion dependency"
   CHECK

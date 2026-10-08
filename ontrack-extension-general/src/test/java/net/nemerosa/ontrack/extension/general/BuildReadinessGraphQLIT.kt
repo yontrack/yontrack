@@ -1,9 +1,11 @@
 package net.nemerosa.ontrack.extension.general
 
 import net.nemerosa.ontrack.graphql.AbstractQLKTITSupport
+import net.nemerosa.ontrack.it.AgentTestSupport
 import net.nemerosa.ontrack.it.AsAdminTest
 import net.nemerosa.ontrack.model.readiness.ReadinessService
 import net.nemerosa.ontrack.model.security.GlobalSettings
+import net.nemerosa.ontrack.model.security.Roles
 import net.nemerosa.ontrack.model.structure.Build
 import net.nemerosa.ontrack.model.structure.PromotionLevel
 import net.nemerosa.ontrack.model.structure.ValidationRunStatusID
@@ -25,6 +27,9 @@ class BuildReadinessGraphQLIT : AbstractQLKTITSupport() {
 
     @Autowired
     private lateinit var readinessService: ReadinessService
+
+    @Autowired
+    private lateinit var agentTestSupport: AgentTestSupport
 
     private val readinessQuery = """
         query Readiness(${'$'}buildId: Int!, ${'$'}promotionLevel: String, ${'$'}slotId: String) {
@@ -266,6 +271,54 @@ class BuildReadinessGraphQLIT : AbstractQLKTITSupport() {
                             assertFalse(readinessService.getReadiness(build, "GOLD", null).ready)
                         }
                     }
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `For an agent, a level which does not admit agents is missing on the agent policy, with the stamps`() {
+        val owner = doCreateAccountWithGlobalRole(Roles.GLOBAL_AUTOMATION)
+        val agent = agentTestSupport.registerAgent(owner = owner)
+        project {
+            branch {
+                val passed = validationStamp("BUILD")
+                val notRun = validationStamp("ACCEPTANCE.TESTS")
+                val silver = promotionLevel("SILVER")
+                silver.autoPromote(AutoPromotionProperty(listOf(passed, notRun), "", "", emptyList()))
+                build {
+                    validate(passed)
+                    val readiness = agentTestSupport.withToken(agent.token) { readiness("SILVER") }
+                    assertFalse(readiness.path("ready").asBoolean())
+                    assertEquals(
+                        listOf(
+                            Triple("VALIDATION", "ACCEPTANCE.TESTS", "Not validated"),
+                            Triple("AGENT_POLICY", "SILVER", "agents are not admitted on SILVER; ask ${owner.fullName}"),
+                        ),
+                        readiness.items()
+                    )
+                    // A person is not concerned by the agent policy
+                    assertEquals(
+                        listOf("VALIDATION" to "ACCEPTANCE.TESTS"),
+                        readiness("SILVER").kindsAndNames()
+                    )
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `For an agent, a level which admits agents has nothing missing on the agent policy`() {
+        val agent = agentTestSupport.registerAgent(owner = doCreateAccountWithGlobalRole(Roles.GLOBAL_AUTOMATION))
+        project {
+            branch {
+                val stamp = validationStamp("BUILD")
+                val silver = promotionLevel("SILVER")
+                silver.autoPromote(AutoPromotionProperty(listOf(stamp), "", "", emptyList()))
+                setProperty(silver, AgentsAdmittedPropertyType::class.java, AgentsAdmittedProperty())
+                build {
+                    val readiness = agentTestSupport.withToken(agent.token) { readiness("SILVER") }
+                    assertEquals(listOf("VALIDATION" to "BUILD"), readiness.kindsAndNames())
                 }
             }
         }

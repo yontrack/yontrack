@@ -59,7 +59,7 @@ data class ReadinessItem(
     @APIDescription(
         "Name of what is missing: the validation stamp for VALIDATION, the promotion level for PROMOTION, " +
                 "the check for CHECK, the admission rule for ADMISSION_RULE, the promotion level or the " +
-                "admission rule for MANUAL"
+                "admission rule for MANUAL, the promotion level or the full name of the slot for AGENT_POLICY"
     )
     val name: String,
     @APIDescription("Explanation of what is missing, in plain words, ready to be shown or acted upon")
@@ -93,6 +93,7 @@ enum class ReadinessKind(
                 "slot has a manual approval which has not been given"
     ),
     AGENT_POLICY(
-        "The agent reading the readiness is not admitted on the promotion level or on the slot"
+        "The agent reading the readiness is not admitted on the promotion level or on the slot: its owner, " +
+                "or a person, must act. Only listed for an agent"
     ),
 }

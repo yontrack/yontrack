@@ -210,6 +210,46 @@ agent records the validations which complete the requirements of a promotion lev
 grants the promotion on the agent's behalf, whether the level admits agents or not: the
 auto-promotion rules of the level are the gate.
 
+## Reading your own policy
+
+An agent should know which gates it may pass **before** acting, rather than by being refused and
+retrying. It reads its own policy on a project through the `user` query, authenticated with its
+token:
+
+```graphql
+query AgentPolicy($project: String!, $branch: String) {
+  user {
+    account { kind owner { fullName email } }
+    agentPolicy(project: $project) {
+      owner
+      canRecordEvidence
+      promotionLevels(branch: $branch) { id branch name }
+      slots { id environment qualifier manualApproval }
+    }
+  }
+}
+```
+
+* `account.kind` is `AGENT`, and `account.owner` names the person accountable for the agent;
+* `agentPolicy` is `null` for a person. For an agent, it gives:
+    * `owner` — the full name of the owner, the person to ask when the policy stops the agent;
+    * `canRecordEvidence` — whether the agent may create builds and validation runs on the project;
+    * `promotionLevels` — the promotion levels of the **enabled** branches of the project which
+      [admit agents](../concepts/model/index.md#agents-admitted), provided the owner may promote on
+      the project: empty otherwise. The optional `branch` argument restricts them to one branch;
+    * `slots` — the slots of the project which
+      [admit agents](../integrations/environments/environments.md#agents-admitted), provided the
+      owner may start a deployment pipeline in them. `manualApproval` is `true` when a manual
+      admission rule will still stop the agent: it may start the pipeline, but a person approves it.
+
+An unknown project, or one the owner cannot see, is an error. This is the query the Yontrack conduct
+skill for agents runs before it acts on a project.
+
+The [readiness](../concepts/model/index.md#readiness) of a build tells the agent the same thing for
+one target: when the agent reads it for a promotion level or a slot which does not admit agents, an
+`AGENT_POLICY` item says so — "agents are not admitted on _GOLD_; ask _owner_" — alongside everything
+else which is missing, so that one call tells the agent all that stands in its way.
+
 ## A CI pipeline is not an agent
 
 A CI pipeline acting through an account holding the `AUTOMATION` role is **automation**, not an
