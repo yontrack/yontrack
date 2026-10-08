@@ -374,7 +374,7 @@ class SlotServiceImpl(
             )
         )
         // Event linked to the creation of this pipeline
-        val event = environmentsEventsFactory.pipelineCreation(pipeline)
+        val event = environmentsEventsFactory.pipelineCreation(pipeline, time)
         // Workflow triggers
         if (!forceDone) {
             slotWorkflowService.startWorkflowsForPipeline(
@@ -502,7 +502,7 @@ class SlotServiceImpl(
             message = reason,
             time = time,
         )
-        eventPostService.post(environmentsEventsFactory.pipelineCancelled(pipeline))
+        eventPostService.post(environmentsEventsFactory.pipelineCancelled(pipeline, time))
     }
 
     private fun changePipeline(
@@ -628,7 +628,7 @@ class SlotServiceImpl(
                 time = time,
             )
             // Event linked to the pipeline running
-            val event = environmentsEventsFactory.pipelineDeploying(pipeline)
+            val event = environmentsEventsFactory.pipelineDeploying(pipeline, time)
             if (!force) {
                 // Workflows
                 slotWorkflowService.startWorkflowsForPipeline(
@@ -796,7 +796,7 @@ class SlotServiceImpl(
             time = time,
         )
         // Workflows
-        val event = environmentsEventsFactory.pipelineDeployed(pipeline)
+        val event = environmentsEventsFactory.pipelineDeployed(pipeline, time)
         if (!skipWorkflows) {
             slotWorkflowService.startWorkflowsForPipeline(
                 pipeline,
@@ -832,7 +832,7 @@ class SlotServiceImpl(
             time = time,
         )
         // Workflows
-        val event = environmentsEventsFactory.pipelineFailed(pipeline)
+        val event = environmentsEventsFactory.pipelineFailed(pipeline, time)
         slotWorkflowService.startWorkflowsForPipeline(
             pipeline,
             SlotPipelineStatus.FAILED,

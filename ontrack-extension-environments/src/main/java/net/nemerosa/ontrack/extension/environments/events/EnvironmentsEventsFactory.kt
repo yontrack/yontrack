@@ -6,6 +6,7 @@ import net.nemerosa.ontrack.extension.environments.SlotAdmissionRuleConfig
 import net.nemerosa.ontrack.extension.environments.SlotPipeline
 import net.nemerosa.ontrack.extension.environments.workflows.SlotWorkflowInstance
 import net.nemerosa.ontrack.model.events.Event
+import java.time.LocalDateTime
 
 interface EnvironmentsEventsFactory {
 
@@ -17,11 +18,16 @@ interface EnvironmentsEventsFactory {
     fun slotUpdated(slot: Slot): Event
     fun slotDeleted(slot: Slot): Event
 
-    fun pipelineCreation(pipeline: SlotPipeline): Event
-    fun pipelineDeploying(pipeline: SlotPipeline): Event
-    fun pipelineDeployed(pipeline: SlotPipeline): Event
-    fun pipelineCancelled(pipeline: SlotPipeline): Event
-    fun pipelineFailed(pipeline: SlotPipeline): Event
+    /*
+     * The events of a pipeline are signed by the caller. Given a [time], a backdated action dates its
+     * event at that time - otherwise, now.
+     */
+
+    fun pipelineCreation(pipeline: SlotPipeline, time: LocalDateTime? = null): Event
+    fun pipelineDeploying(pipeline: SlotPipeline, time: LocalDateTime? = null): Event
+    fun pipelineDeployed(pipeline: SlotPipeline, time: LocalDateTime? = null): Event
+    fun pipelineCancelled(pipeline: SlotPipeline, time: LocalDateTime? = null): Event
+    fun pipelineFailed(pipeline: SlotPipeline, time: LocalDateTime? = null): Event
 
     /**
      * The [admissionRuleConfig] of the [pipeline] has been overridden with [message].

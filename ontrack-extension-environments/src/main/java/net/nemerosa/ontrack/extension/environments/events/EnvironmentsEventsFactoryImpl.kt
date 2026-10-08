@@ -10,6 +10,7 @@ import net.nemerosa.ontrack.model.events.EventFactory
 import net.nemerosa.ontrack.model.security.SecurityService
 import net.nemerosa.ontrack.model.support.StartupService
 import org.springframework.stereotype.Component
+import java.time.LocalDateTime
 
 @Component
 class EnvironmentsEventsFactoryImpl(
@@ -26,10 +27,25 @@ class EnvironmentsEventsFactoryImpl(
         .withProject(slot.project)
         .with(EnvironmentsEvents.EVENT_SLOT_ID, slot.id)
 
+    /**
+     * The build of the pipeline is registered, but not its signature: the event is signed by the
+     * caller, when posted (#2042).
+     */
     private fun Event.EventBuilder.withPipeline(pipeline: SlotPipeline) = this
         .withSlot(pipeline.slot)
         .withBuild(pipeline.build)
+        .withNoSignature()
         .with(EnvironmentsEvents.EVENT_PIPELINE_ID, pipeline.id)
+
+    /**
+     * A backdated action dates its event at its [time], still signed by the caller.
+     */
+    private fun Event.EventBuilder.withTime(time: LocalDateTime?) =
+        if (time != null) {
+            with(securityService.currentSignature.withTime(time))
+        } else {
+            this
+        }
 
     override fun environmentCreation(environment: Environment): Event =
         Event.of(EnvironmentsEvents.ENVIRONMENT_CREATION)
@@ -63,29 +79,34 @@ class EnvironmentsEventsFactoryImpl(
             .with(EnvironmentsEvents.EVENT_SLOT_QUALIFIER, slot.qualifier)
             .build()
 
-    override fun pipelineCreation(pipeline: SlotPipeline): Event =
+    override fun pipelineCreation(pipeline: SlotPipeline, time: LocalDateTime?): Event =
         Event.of(EnvironmentsEvents.PIPELINE_CREATION)
             .withPipeline(pipeline)
+            .withTime(time)
             .build()
 
-    override fun pipelineDeploying(pipeline: SlotPipeline): Event =
+    override fun pipelineDeploying(pipeline: SlotPipeline, time: LocalDateTime?): Event =
         Event.of(EnvironmentsEvents.PIPELINE_DEPLOYING)
             .withPipeline(pipeline)
+            .withTime(time)
             .build()
 
-    override fun pipelineDeployed(pipeline: SlotPipeline): Event =
+    override fun pipelineDeployed(pipeline: SlotPipeline, time: LocalDateTime?): Event =
         Event.of(EnvironmentsEvents.PIPELINE_DEPLOYED)
             .withPipeline(pipeline)
+            .withTime(time)
             .build()
 
-    override fun pipelineCancelled(pipeline: SlotPipeline): Event =
+    override fun pipelineCancelled(pipeline: SlotPipeline, time: LocalDateTime?): Event =
         Event.of(EnvironmentsEvents.PIPELINE_CANCELLED)
             .withPipeline(pipeline)
+            .withTime(time)
             .build()
 
-    override fun pipelineFailed(pipeline: SlotPipeline): Event =
+    override fun pipelineFailed(pipeline: SlotPipeline, time: LocalDateTime?): Event =
         Event.of(EnvironmentsEvents.PIPELINE_FAILED)
             .withPipeline(pipeline)
+            .withTime(time)
             .build()
 
     private fun Event.EventBuilder.withAdmissionRule(admissionRuleConfig: SlotAdmissionRuleConfig) = this
