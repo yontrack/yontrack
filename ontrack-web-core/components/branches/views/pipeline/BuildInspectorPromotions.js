@@ -11,6 +11,7 @@ import PromotionRunDeleteAction from "@components/promotionRuns/PromotionRunDele
 import {isAuthorized} from "@components/common/authorizations";
 import {promotionRunUri} from "@components/common/Links";
 import {nextPromotionLevel, topPromotionRuns} from "@components/branches/views/pipeline/pipelineFacts";
+import ActorBadge from "@components/common/actors/ActorBadge";
 
 /**
  * The promotions of the inspected build.
@@ -93,7 +94,8 @@ export default function BuildInspectorPromotions({build, onChange}) {
                                     >
                                         <TimestampText value={run.creation?.time}/>
                                     </Link>
-                                    {run.creation?.user && ` by ${run.creation.user}`}
+                                    {run.creation?.user && ' '}
+                                    <ActorBadge signature={run.creation} prefix="by"/>
                                 </Typography.Text>
                                 <AnnotatedDescription entity={run}/>
                                 {

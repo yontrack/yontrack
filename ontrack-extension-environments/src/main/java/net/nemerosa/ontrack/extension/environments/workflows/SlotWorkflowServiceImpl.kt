@@ -215,6 +215,7 @@ class SlotWorkflowServiceImpl(
             user = user,
             timestamp = timestamp,
             message = message,
+            actor = signature.actor,
         )
     }
 

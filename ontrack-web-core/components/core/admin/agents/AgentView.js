@@ -16,6 +16,7 @@ import DeleteAgentCommand from "@components/core/admin/agents/DeleteAgentCommand
 import {useRouter} from "next/router";
 import Link from "next/link";
 import {homeBreadcrumbs} from "@components/common/Breadcrumbs";
+import AccountKindTag from "@components/common/actors/AccountKindTag";
 
 /**
  * Page of an agent, for its owner and the administrators: its details and its tokens.
@@ -63,6 +64,11 @@ export default function AgentView({id}) {
                             column={1}
                             items={[
                                 {key: 'name', label: 'Display name', children: agent.fullName},
+                                {
+                                    key: 'kind',
+                                    label: 'Kind',
+                                    children: <AccountKindTag kind={agent.kind} testId="agent-kind"/>,
+                                },
                                 {
                                     key: 'identifier',
                                     label: 'Identifier',

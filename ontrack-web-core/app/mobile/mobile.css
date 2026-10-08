@@ -312,6 +312,32 @@ html, body {
 }
 
 /*
+ * The build screen's identity line: when it was created, and whether its commits
+ * were written with assistants (#2032). Wraps rather than pushing the badge off a
+ * 375px screen.
+ */
+.ot-mobile-build-identity {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 8px;
+}
+
+/*
+ * A row context naming an agent (#2032): the badge says "by Claude, owned by
+ * alice@example.com", which a single ellipsised line would cut in the middle of
+ * the owner. The line wraps instead, and so does the badge, inside its border.
+ */
+.ot-mobile-row-context:has(.ot-actor-badge) {
+    white-space: normal;
+}
+
+.ot-mobile-row-context .ot-actor-badge {
+    white-space: normal;
+    max-width: 100%;
+}
+
+/*
  * A row whose subject is a chip rather than a line of text - the build screen's
  * validations. The chip is a bordered box with its own internal ellipsis, so it
  * takes the room and the trailing time keeps its own.

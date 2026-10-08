@@ -1,11 +1,12 @@
 import {Space, Typography} from "antd";
 import ItemList from "@components/common/ItemList";
-import Timestamp from "@components/common/Timestamp";
+import TimestampText from "@components/common/TimestampText";
 import ValidationRunStatus from "@components/validationRuns/ValidationRunStatus";
 import AnnotatedDescription from "@components/common/AnnotatedDescription";
 import {isAuthorized} from "@components/common/authorizations";
 import {gql} from "graphql-request";
 import {callGraphQL} from "@components/services/GraphQL";
+import ActorBadge from "@components/common/actors/ActorBadge";
 
 export default function ValidationRunStatusList({run, onRunChanged}) {
 
@@ -76,13 +77,17 @@ export default function ValidationRunStatusList({run, onRunChanged}) {
                             key={vrs.id}
                             style={{padding: 8, paddingLeft: 24}}
                             actions={[
-                                <Timestamp
+                                <Typography.Text
                                     key={vrs.id}
-                                    prefix={
-                                        `${vrs.creation.user} @`
-                                    }
-                                    value={vrs.creation.time}
-                                />
+                                    type="secondary"
+                                    italic
+                                    style={{fontSize: '75%'}}
+                                    data-testid={`validation-run-status-signature-${vrs.id}`}
+                                >
+                                    <ActorBadge signature={vrs.creation} testId={`validation-run-status-actor-${vrs.id}`}/>
+                                    {' @ '}
+                                    <TimestampText value={vrs.creation.time}/>
+                                </Typography.Text>
                             ]}
                             title={
                                 <Space>

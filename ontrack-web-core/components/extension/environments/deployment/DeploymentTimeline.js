@@ -1,6 +1,7 @@
 import {Timeline, Typography} from "antd"
 import TimestampText from "@components/common/TimestampText"
 import {timelineEntries} from "@components/extension/environments/deployment/deploymentModel"
+import ActorBadge from "@components/common/actors/ActorBadge"
 
 /**
  * The audit timeline: how this deployment got where it is, newest first.
@@ -35,7 +36,10 @@ export default function DeploymentTimeline({deployment}) {
                     <div data-testid={`deployment-timeline-${entry.key}`}>
                         <div>
                             <Typography.Text>{entry.title}</Typography.Text>
-                            <Typography.Text type="secondary">{` — ${entry.user}`}</Typography.Text>
+                            <Typography.Text type="secondary">
+                                {' — '}
+                                <ActorBadge signature={entry} testId={`deployment-timeline-actor-${entry.key}`}/>
+                            </Typography.Text>
                         </div>
                         {
                             entry.message &&

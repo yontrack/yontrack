@@ -105,6 +105,27 @@ describe("what's blocking", () => {
             .toHaveTextContent('Approved by hand')
     })
 
+    it('badges an agent which overrode a check, with its owner (#2032)', () => {
+        const overridden = rule('r1', {ok: true, overridden: true})
+        overridden.override = {
+            ...overridden.override,
+            user: 'claude[agent]',
+            actor: {
+                kind: 'agent',
+                agent: 'claude[agent]',
+                displayName: 'Claude',
+                tool: 'Claude Code',
+                owner: 'alice@example.com',
+                sessionId: null,
+                sessionLink: null,
+            },
+        }
+        render(<WhatsBlocking deployment={deployment({rules: [overridden, rule('r2', {ok: false})]})}/>)
+        const detail = screen.getByTestId('whats-blocking-override-detail-rule-r1')
+        expect(detail).toHaveTextContent('Overridden by Claude, owned by alice@example.com')
+        expect(screen.getByRole('img', {name: 'by agent Claude, owned by alice@example.com'})).toBeInTheDocument()
+    })
+
     it('shows what was answered to a rule, under its row', () => {
         // The approval details were in the deployment's stored rule data all along and reached no
         // screen: an approval nobody can attribute is not much of an approval.

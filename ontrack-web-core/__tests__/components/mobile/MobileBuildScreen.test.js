@@ -86,10 +86,11 @@ const setResult = (result) => {
 const promotion = (id, levelId, name, {
     time = '2024-03-01T10:00:00Z',
     user = 'admin',
+    actor = null,
     workflowInstances = [],
 } = {}) => ({
     id,
-    creation: {time, user},
+    creation: {time, user, actor},
     promotionLevel: {id: levelId, name, image: false},
     workflowInstances,
 })
@@ -126,6 +127,7 @@ const build = ({
                    failed = [],
                    validations = [],
                    authorizations = [],
+                   assistedChange = null,
                } = {}) => setResult({
     data: {
         build: {
@@ -136,6 +138,7 @@ const build = ({
             creation: {time: '2024-03-01T09:00:00Z', user: 'ci'},
             branch: {id: 10, name: 'main', displayName: 'main', project: {id: 1, name: 'petclinic'}},
             authorizations,
+            assistedChange,
             promotionRuns: promotions,
             currentDeployments: deployments,
             candidatePipelines: candidates,
@@ -195,6 +198,45 @@ describe('the mobile build screen', () => {
             expect(screen.getByTestId('mobile-build-created')).toHaveTextContent('ci')
         })
 
+        it('says the build is assisted, in its header (#2032)', () => {
+            build({
+                assistedChange: {
+                    assisted: true,
+                    basis: 'COMPUTED',
+                    unknownReason: null,
+                    assistants: ['Claude Code'],
+                    assistedCommits: 2,
+                    totalCommits: 5,
+                    sessionLinks: [],
+                },
+            })
+            render(<MobileBuildScreen id="100"/>)
+            expect(screen.getByTestId('mobile-build-assisted')).toHaveTextContent('Assisted')
+            expect(screen.getByRole('img', {name: 'Assisted: 2 of 5 commits, by Claude Code'})).toBeInTheDocument()
+        })
+
+        it('has no assisted badge for a build which is not assisted', () => {
+            build({
+                assistedChange: {
+                    assisted: false,
+                    basis: 'COMPUTED',
+                    unknownReason: null,
+                    assistants: [],
+                    assistedCommits: 0,
+                    totalCommits: 5,
+                    sessionLinks: [],
+                },
+            })
+            render(<MobileBuildScreen id="100"/>)
+            expect(screen.queryByTestId('mobile-build-assisted')).not.toBeInTheDocument()
+        })
+
+        it('has no assisted badge when the assisted change is not computed', () => {
+            build()
+            render(<MobileBuildScreen id="100"/>)
+            expect(screen.queryByTestId('mobile-build-assisted')).not.toBeInTheDocument()
+        })
+
         it('shows the description when there is one', () => {
             build({description: "Owner search by phone number."})
             render(<MobileBuildScreen id="100"/>)
@@ -230,6 +272,35 @@ describe('the mobile build screen', () => {
             build()
             render(<MobileBuildScreen id="100"/>)
             expect(screen.getByTestId('mobile-build-promotions')).toHaveTextContent(/not been promoted/i)
+        })
+
+        it('names a person who promoted as before, without any badge (#2032)', () => {
+            build({promotions: [promotion(900, 500, 'BRONZE', {user: 'alice'})]})
+            render(<MobileBuildScreen id="100"/>)
+            expect(screen.getByTestId('mobile-build-promotion-900')).toHaveTextContent('by alice')
+            expect(screen.queryByTestId('mobile-build-promotion-actor-900')).not.toBeInTheDocument()
+        })
+
+        it('badges an agent which promoted, with its owner (#2032)', () => {
+            build({
+                promotions: [promotion(900, 500, 'BRONZE', {
+                    user: 'claude[agent]',
+                    actor: {
+                        kind: 'agent',
+                        agent: 'claude[agent]',
+                        displayName: 'Claude',
+                        tool: 'Claude Code',
+                        owner: 'alice@example.com',
+                        sessionId: null,
+                        sessionLink: null,
+                    },
+                })],
+            })
+            render(<MobileBuildScreen id="100"/>)
+            expect(screen.getByTestId('mobile-build-promotion-actor-900'))
+                .toHaveTextContent('by Claude, owned by alice@example.com')
+            expect(within(screen.getByTestId('mobile-build-promotion-900'))
+                .getByRole('img', {name: 'by agent Claude, owned by alice@example.com'})).toBeInTheDocument()
         })
 
         describe('the workflows a promotion set off', () => {

@@ -12,6 +12,7 @@ import {PromotionLevelImage} from "@components/promotionLevels/PromotionLevelIma
 import React from "react";
 import PromotionRunFieldValues from "@components/promotionRuns/PromotionRunFieldValues";
 import {PromotionRunAutoPromotionConditions} from "@components/promotionLevels/AutoPromotionConditions";
+import ActorBadge from "@components/common/actors/ActorBadge";
 
 /**
  * Representation of a promotion run to place in a list of steps.
@@ -27,7 +28,7 @@ export default function PromotionRunStep({run, onChange}) {
                     <div data-testid={`promotion-run-popover-${run.id}`}>
                         <Space orientation="vertical">
                             <PromotionLevelLink promotionLevel={run.promotionLevel}/>
-                            <Typography.Text>Promoted by {run.creation.user}</Typography.Text>
+                            <Typography.Text>Promoted <ActorBadge signature={run.creation} prefix="by" testId={`promotion-run-actor-${run.id}`}/></Typography.Text>
                             <TimestampText value={run.creation.time}/>
                             <AnnotatedDescription entity={run}/>
                             {

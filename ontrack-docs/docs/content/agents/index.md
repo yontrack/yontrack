@@ -98,8 +98,9 @@ signature — never with its owner's name. The signature also carries the **acto
 display name and tool, its owner, and the agent session behind the action. They are copied when the
 agent acts, so the record keeps them when the agent is renamed, transferred or deleted.
 
-The actor is recorded on builds, validation run statuses, promotion runs, events and the changes
-of the deployment pipelines. A person's signature has no actor.
+The actor is recorded on builds, validation run statuses, promotion runs, events, the changes
+of the deployment pipelines, and the data and the overrides of their admission rules. A person's
+signature has no actor.
 
 Through the API, the `creation` field of a build, a promotion run or a validation run gives it:
 
@@ -153,6 +154,43 @@ Yontrack stores the session and renders its link; it never fetches nor interpret
   with a warning in the logs, and the session is kept without it. A link without a session is
   ignored.
 * None of these ever fails the call.
+
+## Telling an agent from a person
+
+Wherever the UI says who did something, an agent is shown with a badge: a robot icon and "by
+*display name*, owned by *owner*". Its tooltip gives the identifier of the agent, its owner, its
+tool and its session; when the agent gave a [link to its session](#identifying-a-session), the
+badge opens it in a new tab. A person is shown as before, by their name, with nothing added.
+
+![The badges of a build created by an agent](agents-badges-build.png)
+
+A build also says whether its commits were [written with assistants](#assisted-builds):
+
+* **Assisted** — its tooltip gives the number of assisted commits, the assistants and the links to
+  their sessions;
+* **Assisted: unknown** — a neutral badge, whose tooltip says why it could not be computed;
+* nothing when the build is not assisted, or before it has been computed.
+
+The badges show on:
+
+| Where | Badges |
+|---|---|
+| The build page, and the rows of the builds on the branch page | Assisted, and the agent which created the build |
+| The validation run page and its statuses, the validations of a build | The agent behind each status |
+| The promotions of a build, the promotion run page, the history of a promotion level | The agent which promoted |
+| The deployment page: its timeline, the overrides and the answers to its admission rules | The agent behind each change |
+| *Accounts* and *Agents* in the administration | The kind of the account, *Agent* or *Person* |
+
+![The builds of a branch, one of them created by an agent](agents-badges-branch.png)
+
+On a phone, the build screen shows the *Assisted* badge in its header, and the agent which made
+each of its promotions:
+
+![The build screen of the mobile UI](agents-badges-mobile.png)
+
+The badges say what they mean in words: their colour and their icon are never the only cue, and a
+screen reader reads "by agent Claude, owned by alice@example.com" or "Assisted: 3 of 12 commits,
+by Claude Code".
 
 ## What an agent may do
 

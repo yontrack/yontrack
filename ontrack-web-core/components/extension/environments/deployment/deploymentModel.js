@@ -130,7 +130,8 @@ export const earlierPhases = (deployment) => {
  * on the old page showed the overrides at all.
  *
  * @param {Object} deployment The deployment, with `changes`.
- * @return {Array} `{key, title, message, user, timestamp, type, status}`, newest first.
+ * @return {Array} `{key, title, message, user, actor, timestamp, type, status}`, newest first - `actor`
+ *         being the agent behind the change, null for a person.
  */
 export const timelineEntries = (deployment) => {
     const changes = deployment?.changes ?? []
@@ -141,6 +142,7 @@ export const timelineEntries = (deployment) => {
             type: change.type,
             status: change.status,
             user: change.user,
+            actor: change.actor ?? null,
             timestamp: change.timestamp,
             title: timelineTitle(change),
             // The override message is the whole point of an override entry; for a status change it

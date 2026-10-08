@@ -221,6 +221,19 @@ describe('the audit timeline', () => {
         expect(entry.message).toBe('Window checked by phone with the on-call.')
     })
 
+    it('carries the agent behind a change, and no actor for a person (#2032)', () => {
+        const actor = {kind: 'agent', agent: 'claude[agent]', displayName: 'Claude', owner: 'alice@example.com'}
+        const [agentEntry, personEntry] = timelineEntries(deployment({
+            changes: [
+                statusChange('CANDIDATE', {timestamp: '2026-09-18T10:00:00'}),
+                {...statusChange('RUNNING', {timestamp: '2026-09-18T12:00:00'}), user: 'claude[agent]', actor},
+            ],
+        }))
+        expect(agentEntry.user).toBe('claude[agent]')
+        expect(agentEntry.actor).toEqual(actor)
+        expect(personEntry.actor).toBeNull()
+    })
+
     it('names a failure, and carries the message it was recorded with', () => {
         // The failure message is the one thing somebody reading the timeline wants to know: why.
         const [entry] = timelineEntries(deployment({

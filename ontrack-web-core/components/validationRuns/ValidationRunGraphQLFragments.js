@@ -1,5 +1,6 @@
 import {gql} from "graphql-request";
 import {gqlValidationChipStamp} from "@components/primitives/ValidationChipFragments";
+import {gqlSignatureActorFields} from "@components/common/actors/actors";
 
 export const gqlValidationRunContent = gql`
     fragment ValidationRunContent on ValidationRun {
@@ -37,6 +38,7 @@ export const gqlValidationRunContent = gql`
             creation {
                 user
                 time
+                ${gqlSignatureActorFields}
             }
             description
             annotatedDescription
@@ -70,6 +72,7 @@ export const gqlValidationRunTableContent = gql`
             creation {
                 time
                 user
+                ${gqlSignatureActorFields}
             }
             description
             annotatedDescription

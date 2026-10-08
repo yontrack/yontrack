@@ -9,18 +9,21 @@ export class Credentials {
 
 export class Connection {
 
-    constructor({ui, backend, mgt, credentials, token}) {
+    constructor({ui, backend, mgt, credentials, token, headers}) {
         this.ui = ui
         this.backend = backend
         this.mgt = mgt
         this.credentials = credentials
         this.token = token
+        // Extra headers sent with the token, like the agent session headers (#2025)
+        this.headers = headers ?? {}
     }
 
-    withToken(token) {
+    withToken(token, headers = {}) {
         return new Connection({
             ...this,
-            token
+            token,
+            headers,
         })
     }
 

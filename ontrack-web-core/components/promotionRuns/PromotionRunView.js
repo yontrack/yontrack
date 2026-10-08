@@ -18,6 +18,7 @@ import {
     AutoVersioningTrailPanelLabel,
     NotificationsPanelLabel
 } from "@components/promotionRuns/PromotionRunPanelLabels";
+import {gqlSignatureActorFields} from "@components/common/actors/actors";
 
 export default function PromotionRunView({id}) {
 
@@ -31,6 +32,7 @@ export default function PromotionRunView({id}) {
                     creation {
                         user
                         time
+                        ${gqlSignatureActorFields}
                     }
                     authorizations {
                         name

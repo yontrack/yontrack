@@ -40,3 +40,37 @@ export const countAssistedCommits = (commits) =>
  */
 export const assistedCountText = (assisted, total) =>
     `${assisted} of ${total} ${total === 1 ? 'commit' : 'commits'} assisted`
+
+/**
+ * The fields of a build's assisted change (#2028), to select on a build: `Build.assistedChange`,
+ * null when it has been neither computed nor set yet. See `AssistedBadge`.
+ */
+export const gqlAssistedChangeFields = `
+    assistedChange {
+        assisted
+        basis
+        unknownReason
+        assistants
+        assistedCommits
+        totalCommits
+        sessionLinks
+    }
+`
+
+/**
+ * "3 of 12 commits, by Claude Code, Codex" - what the badge of an assisted build says of it. The
+ * counts are left out when the CI did not give them.
+ *
+ * @param assistedChange `Build.assistedChange`
+ */
+export const assistedChangeSummary = (assistedChange) => {
+    const parts = []
+    const {assistedCommits, totalCommits, assistants} = assistedChange
+    if (assistedCommits !== null && assistedCommits !== undefined && totalCommits !== null && totalCommits !== undefined) {
+        parts.push(`${assistedCommits} of ${totalCommits} ${totalCommits === 1 ? 'commit' : 'commits'}`)
+    }
+    if (assistants?.length > 0) {
+        parts.push(`by ${assistants.join(', ')}`)
+    }
+    return parts.join(', ')
+}

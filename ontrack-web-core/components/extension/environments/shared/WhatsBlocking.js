@@ -16,6 +16,7 @@ import SlotPipelineOverrideWorkflowDialog, {
 } from "@components/extension/environments/SlotPipelineOverrideWorkflowDialog"
 import TimestampText from "@components/common/TimestampText"
 import {checksSummary, currentPhase, isClear, phaseItems} from "@components/extension/environments/shared/whatsBlockingModel"
+import ActorBadge from "@components/common/actors/ActorBadge"
 
 /**
  * Why a deployment is not moving, and what to do about it.
@@ -159,7 +160,9 @@ export default function WhatsBlocking({
                 item.overridden && item.override &&
                 <div data-testid={`${testId}-override-detail-${item.key}`}>
                     <Typography.Text type="secondary">
-                        {`Overridden by ${item.override.user} `}
+                        {'Overridden '}
+                        <ActorBadge signature={item.override} prefix="by"/>
+                        {' '}
                         <TimestampText value={item.override.timestamp} relative={true}/>
                         {item.override.message ? ` — ${item.override.message}` : ''}
                     </Typography.Text>

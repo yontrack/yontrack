@@ -17,15 +17,17 @@ class SlotPipelineAdmissionRuleStatusRepository(
     fun saveStatus(slotPipelineAdmissionRuleStatus: SlotPipelineAdmissionRuleStatus) {
         namedParameterJdbcTemplate!!.update(
             """
-                    INSERT INTO ENV_SLOT_PIPELINE_ADMISSION_RULE_STATUS(PIPELINE_ID, ADMISSION_RULE_CONFIG_ID, DATA, DATA_USER, DATA_TIMESTAMP, OVERRIDE_USER, OVERRIDE_TIMESTAMP, OVERRIDE_MESSAGE)
-                    VALUES(:pipelineId, :admissionRuleConfigId, CAST(:data AS JSONB), :dataUser, :dataTimestamp, :overrideUser, :overrideTimestamp, :overrideMessage)
+                    INSERT INTO ENV_SLOT_PIPELINE_ADMISSION_RULE_STATUS(PIPELINE_ID, ADMISSION_RULE_CONFIG_ID, DATA, DATA_USER, DATA_TIMESTAMP, DATA_ACTOR, OVERRIDE_USER, OVERRIDE_TIMESTAMP, OVERRIDE_MESSAGE, OVERRIDE_ACTOR)
+                    VALUES(:pipelineId, :admissionRuleConfigId, CAST(:data AS JSONB), :dataUser, :dataTimestamp, CAST(:dataActor AS JSONB), :overrideUser, :overrideTimestamp, :overrideMessage, CAST(:overrideActor AS JSONB))
                     ON CONFLICT (PIPELINE_ID, ADMISSION_RULE_CONFIG_ID) DO UPDATE SET
                         DATA = CAST(:data AS JSONB),
                         DATA_USER = :dataUser,
                         DATA_TIMESTAMP = :dataTimestamp,
+                        DATA_ACTOR = CAST(:dataActor AS JSONB),
                         OVERRIDE_USER = :overrideUser,
                         OVERRIDE_TIMESTAMP = :overrideTimestamp, 
-                        OVERRIDE_MESSAGE = :overrideMessage
+                        OVERRIDE_MESSAGE = :overrideMessage,
+                        OVERRIDE_ACTOR = CAST(:overrideActor AS JSONB)
                 """.trimIndent(),
             mapOf(
                 "pipelineId" to slotPipelineAdmissionRuleStatus.pipeline.id,
@@ -33,9 +35,11 @@ class SlotPipelineAdmissionRuleStatusRepository(
                 "data" to slotPipelineAdmissionRuleStatus.data?.data?.let { writeJson(it) },
                 "dataUser" to slotPipelineAdmissionRuleStatus.data?.user,
                 "dataTimestamp" to slotPipelineAdmissionRuleStatus.data?.timestamp?.let { Time.store(it) },
+                "dataActor" to slotPipelineAdmissionRuleStatus.data?.actor?.let { writeJson(it) },
                 "overrideUser" to slotPipelineAdmissionRuleStatus.override?.user,
                 "overrideTimestamp" to slotPipelineAdmissionRuleStatus.override?.timestamp?.let { Time.store(it) },
                 "overrideMessage" to slotPipelineAdmissionRuleStatus.override?.message,
+                "overrideActor" to slotPipelineAdmissionRuleStatus.override?.actor?.let { writeJson(it) },
             )
         )
     }
@@ -88,6 +92,7 @@ class SlotPipelineAdmissionRuleStatusRepository(
                 user = rs.getString("data_user"),
                 timestamp = rs.readLocalDateTimeNotNull("data_timestamp"),
                 data = data,
+                actor = readSignatureActor(rs, "data_actor"),
             )
         },
         override = rs.getString("override_user")?.let { user ->
@@ -95,6 +100,7 @@ class SlotPipelineAdmissionRuleStatusRepository(
                 user = user,
                 timestamp = rs.readLocalDateTimeNotNull("override_timestamp"),
                 message = rs.getString("override_message"),
+                actor = readSignatureActor(rs, "override_actor"),
             )
         },
     )

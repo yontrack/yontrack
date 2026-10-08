@@ -20,6 +20,8 @@ import {
     PromotionRunAutoPromotionConditions
 } from "@components/promotionLevels/AutoPromotionConditions";
 import WhatsMissing from "@components/readiness/WhatsMissing";
+import {gqlSignatureActorFields} from "@components/common/actors/actors";
+import ActorBadge from "@components/common/actors/ActorBadge";
 
 const query = `
     query BuildPromotions($buildId: Int!) {
@@ -43,6 +45,7 @@ const query = `
                 creation {
                     time
                     user
+                    ${gqlSignatureActorFields}
                 }
                 authorizations {
                     name
@@ -100,7 +103,7 @@ export default function BuildContentPromotions({build}) {
                     <Popover content={
                         <div data-testid={`build-promotion-run-popover-${run.id}`}>
                             <Space orientation="vertical">
-                                <Typography.Text>Promoted by {run.creation?.user}</Typography.Text>
+                                <Typography.Text>Promoted <ActorBadge signature={run.creation} prefix="by" testId={`build-promotion-run-actor-${run.id}`}/></Typography.Text>
                                 <TimestampText value={run.creation?.time}/>
                                 <AnnotatedDescription entity={run}/>
                                 {

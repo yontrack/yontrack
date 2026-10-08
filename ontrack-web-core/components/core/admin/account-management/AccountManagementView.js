@@ -18,6 +18,7 @@ import DeleteAccountCommand from "@components/core/admin/account-management/Dele
 import RevokeAllTokensCommand from "@components/core/admin/account-management/RevokeAllTokensCommand";
 import GlobalPermissionsCommand from "@components/core/admin/account-management/GlobalPermissionsCommand";
 import GroupMappingsCommand from "@components/core/admin/account-management/GroupMappingsCommand";
+import AccountKindTag from "@components/common/actors/AccountKindTag";
 
 export default function AccountManagementView() {
 
@@ -100,12 +101,12 @@ export default function AccountManagementView() {
                             render={(_, account) =>
                                 account.kind === 'AGENT' ?
                                     <Space>
-                                        <Tag color="purple">Agent</Tag>
+                                        <AccountKindTag kind={account.kind} testId={`account-kind-${account.id}`}/>
                                         <Typography.Text type="secondary">
                                             owned by {account.owner?.email}
                                         </Typography.Text>
                                     </Space> :
-                                    <Tag>Person</Tag>
+                                    <AccountKindTag kind={account.kind} testId={`account-kind-${account.id}`}/>
                             }
                         />
                         <Table.Column

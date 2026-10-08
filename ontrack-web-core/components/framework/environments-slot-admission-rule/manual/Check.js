@@ -1,5 +1,6 @@
 import {Typography} from "antd";
 import TimestampText from "@components/common/TimestampText";
+import ActorBadge from "@components/common/actors/ActorBadge";
 
 /**
  * A manual approval's account of itself: who answered, when, what they said, and which way.
@@ -11,7 +12,9 @@ import TimestampText from "@components/common/TimestampText";
  * asked.
  *
  * @param {Object} ruleConfig The configured rule: its message, and who may answer it.
- * @param {Object} ruleData What was answered - `{user, timestamp, data: {approval, message}}`.
+ * @param {Object} ruleData What was answered - `{user, actor, timestamp, data: {approval, message}}`.
+ *                         An agent never answers a manual approval (#2026); its badge is drawn all
+ *                         the same, the record being the one to say who answered.
  */
 export default function ManualAdmissionRuleCheck({check, ruleConfig, ruleData}) {
 
@@ -28,7 +31,9 @@ export default function ManualAdmissionRuleCheck({check, ruleConfig, ruleData}) 
 
     return (
         <Typography.Text type="secondary" data-testid="manual-approval-detail">
-            {`${approved ? 'Approved' : 'Rejected'} by ${ruleData.user} `}
+            {`${approved ? 'Approved' : 'Rejected'} `}
+            <ActorBadge signature={ruleData} prefix="by"/>
+            {' '}
             <TimestampText value={ruleData.timestamp} relative={true}/>
             {message ? ` — ${message}` : ''}
         </Typography.Text>

@@ -1,6 +1,8 @@
 import {gql} from "graphql-request";
 import {gqlDecorationFragment} from "@components/services/fragments";
 import {gqlValidationChipStamp} from "@components/primitives/ValidationChipFragments";
+import {gqlSignatureActorFields} from "@components/common/actors/actors";
+import {gqlAssistedChangeFields} from "@components/extension/scm/assistants/assistants";
 
 export const gqlBuilds = gql`
     query LoadBuilds(
@@ -32,7 +34,9 @@ export const gqlBuilds = gql`
                     name
                     creation {
                         time
+                        ${gqlSignatureActorFields}
                     }
+                    ${gqlAssistedChangeFields}
                     decorations {
                         ...decorationContent
                     }
@@ -41,6 +45,7 @@ export const gqlBuilds = gql`
                         creation {
                             time
                             user
+                            ${gqlSignatureActorFields}
                         }
                         description
                         annotatedDescription
@@ -85,6 +90,7 @@ export const gqlBuilds = gql`
                                 creation {
                                     time
                                     user
+                                    ${gqlSignatureActorFields}
                                 }
                                 description
                                 annotatedDescription

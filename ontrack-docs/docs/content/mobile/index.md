@@ -75,6 +75,10 @@ A build screen also lists that build's validations, read-only. They are otherwis
 scope, but whether a build is green is the question you answer before promoting or
 deploying it, and having to switch to the desktop UI to check would defeat the point.
 
+A build screen also tells an [agent](../agents/index.md#telling-an-agent-from-a-person) from a
+person: its header says when the build's commits were written with assistants, and each
+promotion made by an agent names the agent and its owner.
+
 ## What it deliberately does not do
 
 Everything else, and on purpose. Notably:

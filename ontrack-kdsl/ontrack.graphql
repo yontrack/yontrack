@@ -8323,6 +8323,8 @@ type SlotAdmissionRuleConfig {
 }
 
 type SlotAdmissionRuleData {
+  "The agent behind the data, null for a person"
+  actor: SignatureActor
   "data field"
   data: JSON
   "timestamp field"
@@ -8338,6 +8340,8 @@ type SlotAdmissionRuleInput {
 }
 
 type SlotAdmissionRuleOverride {
+  "The agent behind the override, null for a person"
+  actor: SignatureActor
   "message field"
   message: JSON
   "timestamp field"
@@ -8440,6 +8444,8 @@ type SlotPipelineAdmissionRuleStatus {
 
 "Change happening to a pipeline"
 type SlotPipelineChange {
+  "The agent behind the change, null for a person"
+  actor: SignatureActor
   "id field"
   id: String!
   "message field"

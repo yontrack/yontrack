@@ -1,9 +1,11 @@
 package net.nemerosa.ontrack.extension.environments.ui
 
 import graphql.schema.GraphQLObjectType
+import graphql.schema.GraphQLTypeReference
 import net.nemerosa.ontrack.extension.environments.SlotAdmissionRuleData
 import net.nemerosa.ontrack.graphql.schema.GQLType
 import net.nemerosa.ontrack.graphql.schema.GQLTypeCache
+import net.nemerosa.ontrack.graphql.schema.GQLTypeSignatureActor
 import net.nemerosa.ontrack.graphql.support.jsonField
 import net.nemerosa.ontrack.graphql.support.localDateTimeField
 import net.nemerosa.ontrack.graphql.support.stringField
@@ -22,5 +24,10 @@ class GQLTypeSlotAdmissionRuleData : GQLType {
             .stringField(SlotAdmissionRuleData::user)
             .localDateTimeField(SlotAdmissionRuleData::timestamp)
             .jsonField(SlotAdmissionRuleData::data)
+            .field {
+                it.name("actor")
+                    .description("The agent behind the data, null for a person")
+                    .type(GraphQLTypeReference(GQLTypeSignatureActor.SIGNATURE_ACTOR))
+            }
             .build()
 }

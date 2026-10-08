@@ -1,13 +1,14 @@
 import ValidationRunStatus from "@components/validationRuns/ValidationRunStatus";
 import {Space, Typography} from "antd";
 import AnnotatedDescription from "@components/common/AnnotatedDescription";
-import Timestamp from "@components/common/Timestamp";
+import TimestampText from "@components/common/TimestampText";
 import Duration from "@components/common/Duration";
 import React from "react";
 import ValidationRunStatusNone from "@components/validationRuns/ValidationRunStatusNone";
 import ValidationRunQuickTransition from "@components/validationRuns/ValidationRunQuickTransition";
 import {isAuthorized} from "@components/common/authorizations";
 import BuildValidateDialog, {useBuildValidateDialog} from "@components/builds/BuildValidateDialog";
+import ActorBadge from "@components/common/actors/ActorBadge";
 
 export default function ValidationRunCell({build, validationStamp, onChange}) {
 
@@ -63,11 +64,11 @@ export default function ValidationRunCell({build, validationStamp, onChange}) {
                                     <AnnotatedDescription entity={run.lastStatus} disabled={false}/>
                                 }
                                 {/* Creation of the status */}
-                                <Timestamp
-                                    prefix="Created on"
-                                    suffix={`by ${run.lastStatus.creation.user}`}
-                                    value={run.lastStatus.creation.time}
-                                />
+                                <Typography.Text type="secondary" italic style={{fontSize: '75%'}}>
+                                    <TimestampText prefix="Created on" value={run.lastStatus.creation.time}/>
+                                    {' '}
+                                    <ActorBadge signature={run.lastStatus.creation} prefix="by"/>
+                                </Typography.Text>
                                 {/* Run info */}
                                 {
                                     run.runInfo && run.runInfo.runTime &&

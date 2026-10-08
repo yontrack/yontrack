@@ -17,6 +17,8 @@ import useRangeSelection from "@components/common/RangeSelection";
 import {scmChangeLogUri} from "@components/common/Links";
 import {useRouter} from "next/router";
 import RangeSelector from "@components/common/RangeSelector";
+import {gqlSignatureActorFields} from "@components/common/actors/actors";
+import ActorBadge from "@components/common/actors/ActorBadge";
 
 const {Column} = Table
 
@@ -95,6 +97,7 @@ export default function ValidationStampHistory({validationStamp}) {
                             creation {
                                 user
                                 time
+                                ${gqlSignatureActorFields}
                             }
                             runInfo {
                                 runTime
@@ -318,7 +321,7 @@ export default function ValidationStampHistory({validationStamp}) {
                             <Space>
                                 <TimestampText value={run.creation.time}/>
                                 <Typography.Text disabled>
-                                    ({run.creation.user})
+                                    (<ActorBadge signature={run.creation}/>)
                                 </Typography.Text>
                             </Space>
                         }

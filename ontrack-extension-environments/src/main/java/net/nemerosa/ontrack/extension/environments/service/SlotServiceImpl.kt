@@ -970,10 +970,12 @@ class SlotServiceImpl(
             config = admissionRuleConfig,
         )
         // Overriding the rule
+        val signature = securityService.currentSignature
         val override = SlotAdmissionRuleOverride(
             timestamp = Time.now,
-            user = securityService.currentSignature.user.name,
+            user = signature.user.name,
             message = message,
+            actor = signature.actor,
         )
         slotPipelineAdmissionRuleStatusRepository.saveStatus(
             SlotPipelineAdmissionRuleStatus(
@@ -1033,11 +1035,14 @@ class SlotServiceImpl(
                 SlotPipelineAdmissionRuleStatus(
                     pipeline = pipeline,
                     admissionRuleConfig = admissionRuleConfig,
-                    data = SlotAdmissionRuleData(
-                        timestamp = Time.now,
-                        user = securityService.currentSignature.user.name,
-                        data = data,
-                    ),
+                    data = securityService.currentSignature.let { signature ->
+                        SlotAdmissionRuleData(
+                            timestamp = Time.now,
+                            user = signature.user.name,
+                            data = data,
+                            actor = signature.actor,
+                        )
+                    },
                     override = existing?.override,
                 )
             )

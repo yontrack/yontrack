@@ -22,6 +22,12 @@
  * **A promotion carries the workflows it set off** (#1737), one nested line
  * each, tapping through to the run's own screen. A promotion with none - which
  * is most of them - renders nothing extra. See `MobilePromotionWorkflows`.
+ *
+ * **Agents show where a phone decides** (#2032): the header says whether the
+ * build's commits were written with assistants (`AssistedBadge`), and each
+ * promotion says when an agent promoted (`ActorBadge`). Nothing else on a phone
+ * carries a badge - the mobile UI reads status, not administration - and the
+ * promote sheet adds none: the person holding the phone is the one promoting.
  */
 
 import {useState} from "react"
@@ -50,6 +56,10 @@ import {
 } from "@components/mobile/mobileRoutes"
 import DurationMs from "@components/common/DurationMs"
 import WorkflowInstanceStatus from "@components/extension/workflows/WorkflowInstanceStatus"
+import ActorBadge from "@components/common/actors/ActorBadge"
+import {gqlSignatureActorFields} from "@components/common/actors/actors"
+import AssistedBadge from "@components/extension/scm/assistants/AssistedBadge"
+import {gqlAssistedChangeFields} from "@components/extension/scm/assistants/assistants"
 
 /**
  * How many validation stamps the screen shows.
@@ -100,6 +110,8 @@ export default function MobileBuildScreen({id}) {
                         time
                         user
                     }
+                    # Whether its commits were written with assistants (#2032)
+                    ${gqlAssistedChangeFields}
                     branch {
                         id
                         name
@@ -123,6 +135,8 @@ export default function MobileBuildScreen({id}) {
                         creation {
                             time
                             user
+                            # The agent which promoted, if any (#2032)
+                            ${gqlSignatureActorFields}
                         }
                         promotionLevel {
                             id
@@ -234,9 +248,16 @@ export default function MobileBuildScreen({id}) {
                 {
                     build &&
                     <div className="ot-mobile-stack">
-                        <Typography.Text type="secondary" data-testid="mobile-build-created">
-                            <MobileSignature signature={build.creation}/>
-                        </Typography.Text>
+                        <div className="ot-mobile-build-identity">
+                            <Typography.Text type="secondary" data-testid="mobile-build-created">
+                                <MobileSignature signature={build.creation}/>
+                            </Typography.Text>
+                            {/* Renders nothing for a build which is not assisted, or not computed */}
+                            <AssistedBadge
+                                assistedChange={build.assistedChange}
+                                testId="mobile-build-assisted"
+                            />
+                        </div>
                         {
                             build.description &&
                             <Typography.Text data-testid="mobile-build-description">
@@ -287,7 +308,12 @@ export default function MobileBuildScreen({id}) {
                                                 {run.promotionLevel?.name}
                                             </span>
                                         }
-                                        context={<MobileSignature signature={run.creation}/>}
+                                        context={
+                                            <MobileSignature
+                                                signature={run.creation}
+                                                actorTestId={`mobile-build-promotion-actor-${run.id}`}
+                                            />
+                                        }
                                         /*
                                          * Decided here and not inside the
                                          * component: a component returning
@@ -550,12 +576,17 @@ function MobilePromotionWorkflows({run}) {
  *
  * Both halves of a `Signature`, and both optional: the user is dropped rather
  * than rendered as "by undefined" when the server did not record one.
+ *
+ * Who did it is an `ActorBadge`: a person is the bare name, as always, and an
+ * agent is its badge - when the query selected the `actor`, which only the
+ * promotions do.
  */
-function MobileSignature({signature}) {
+function MobileSignature({signature, actorTestId}) {
     return (
         <>
             <TimestampText value={signature?.time} relative/>
-            {signature?.user ? ` by ${signature.user}` : ''}
+            {signature?.user ? ' ' : ''}
+            <ActorBadge signature={signature} prefix="by" testId={actorTestId}/>
         </>
     )
 }

@@ -6,6 +6,7 @@ import ProjectLink from "@components/projects/ProjectLink";
 import TimestampText from "@components/common/TimestampText";
 import AnnotatedDescription from "@components/common/AnnotatedDescription";
 import PromotionRunFieldValues from "@components/promotionRuns/PromotionRunFieldValues";
+import ActorBadge from "@components/common/actors/ActorBadge";
 
 /**
  * Compact summary of a promotion run.
@@ -47,7 +48,7 @@ export default function PromotionRunSummary({run}) {
             label: "Promoted",
             children: <Space size="small">
                 <TimestampText value={run.creation.time}/>
-                <Typography.Text disabled>{`(${run.creation.user})`}</Typography.Text>
+                <Typography.Text disabled>(<ActorBadge signature={run.creation} testId="promotion-run-summary-actor"/>)</Typography.Text>
             </Space>,
         })
     }

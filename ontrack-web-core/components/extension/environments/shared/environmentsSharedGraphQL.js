@@ -1,4 +1,5 @@
 import {gql} from "graphql-request"
+import {gqlSignatureActorFields} from "@components/common/actors/actors"
 
 /**
  * What every shared component needs to know about a build.
@@ -101,6 +102,7 @@ export const gqlSharedAdmissionRuleData = gql`
             user
             timestamp
             message
+            ${gqlSignatureActorFields}
         }
         # What somebody answered this rule, and who. Only the rules that ask for an answer have any
         # - the manual approval is the one in the box today - and that is what lets "What's
@@ -109,6 +111,7 @@ export const gqlSharedAdmissionRuleData = gql`
             user
             timestamp
             data
+            ${gqlSignatureActorFields}
         }
         admissionRuleConfig {
             id
@@ -146,6 +149,7 @@ export const gqlSharedSlotWorkflowData = gql`
                 user
                 timestamp
                 message
+                ${gqlSignatureActorFields}
             }
             workflowInstance {
                 id

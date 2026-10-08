@@ -4,6 +4,7 @@ import {
     gqlSharedBuildData,
     gqlSharedSlotWorkflowData,
 } from "@components/extension/environments/shared/environmentsSharedGraphQL"
+import {gqlSignatureActorFields} from "@components/common/actors/actors"
 
 /**
  * Everything the deployment page draws, in one query.
@@ -38,6 +39,7 @@ export const gqlDeploymentPage = gql`
                 status
                 message
                 overrideMessage
+                ${gqlSignatureActorFields}
             }
             requiredInputs {
                 config {

@@ -29,6 +29,10 @@ import {isAuthorized} from "@components/common/authorizations";
 import PreviousBuildCommand from "@components/builds/PreviousBuildCommand";
 import NextBuildCommand from "@components/builds/NextBuildCommand";
 import {buildVisit, useRecordVisit} from "@components/search/palette/recentlyVisited";
+import {gqlSignatureActorFields} from "@components/common/actors/actors";
+import ActorBadge from "@components/common/actors/ActorBadge";
+import {gqlAssistedChangeFields} from "@components/extension/scm/assistants/assistants";
+import AssistedBadge from "@components/extension/scm/assistants/AssistedBadge";
 
 const noBuild = {branch: {project: {}}}
 
@@ -47,7 +51,9 @@ export default function BuildView({id}) {
                     creation {
                         user
                         time
+                        ${gqlSignatureActorFields}
                     }
+                    ${gqlAssistedChangeFields}
                     userMenuActions {
                         ...userMenuActionFragment
                     }
@@ -180,6 +186,9 @@ export default function BuildView({id}) {
                         <Space>
                             {build.name}
                             <Decorations entity={build}/>
+                            {/* Whether an agent wrote its commits, and whether an agent created it (#2032) */}
+                            <AssistedBadge assistedChange={build.assistedChange} testId="build-assisted"/>
+                            <ActorBadge signature={build.creation} prefix="by" hideHuman={true} testId="build-actor"/>
                             <AnnotatedDescription entity={build} type="secondary" disabled={false}/>
                         </Space>
                     }

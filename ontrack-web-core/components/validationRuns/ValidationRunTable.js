@@ -13,6 +13,7 @@ import ValidationRunData from "@components/framework/validation-run-data/Validat
 import BuildLink from "@components/builds/BuildLink";
 import PromotionRuns from "@components/promotionRuns/PromotionRuns";
 import ValidationRunQuickTransition from "@components/validationRuns/ValidationRunQuickTransition";
+import ActorBadge from "@components/common/actors/ActorBadge";
 
 /**
  * @param onStatusChanged When set, clicking a run's status opens its quick-transition popover,
@@ -115,7 +116,7 @@ export default function ValidationRunTable({
             render: (_, run) => <Popover
                 content={
                     <Space orientation="vertical">
-                        <Typography.Text>Created by {run.lastStatus.creation.user}</Typography.Text>
+                        <Typography.Text>Created <ActorBadge signature={run.lastStatus.creation} prefix="by"/></Typography.Text>
                         <AnnotatedDescription entity={run.lastStatus}/>
                     </Space>
                 }

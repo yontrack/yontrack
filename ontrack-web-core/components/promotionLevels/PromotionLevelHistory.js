@@ -15,6 +15,8 @@ import RangeSelector from "@components/common/RangeSelector";
 import {useRouter} from "next/router";
 import {scmChangeLogUri} from "@components/common/Links";
 import PromotionRunLink from "@components/promotionRuns/PromotionRunLink";
+import {gqlSignatureActorFields} from "@components/common/actors/actors";
+import ActorBadge from "@components/common/actors/ActorBadge";
 
 const {Column} = Table
 
@@ -97,6 +99,7 @@ export default function PromotionLevelHistory({promotionLevel}) {
                             creation {
                                 user
                                 time
+                                ${gqlSignatureActorFields}
                             }
                         }
                     }
@@ -266,7 +269,7 @@ export default function PromotionLevelHistory({promotionLevel}) {
                             <Space>
                                 <TimestampText value={run.creation.time}/>
                                 <Typography.Text disabled>
-                                    ({run.creation.user})
+                                    (<ActorBadge signature={run.creation}/>)
                                 </Typography.Text>
                             </Space>
                         }

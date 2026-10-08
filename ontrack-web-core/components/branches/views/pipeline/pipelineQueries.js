@@ -1,6 +1,7 @@
 import {gql} from "graphql-request";
 import {gqlDecorationFragment} from "@components/services/fragments";
 import {gqlValidationChipStamp} from "@components/primitives/ValidationChipFragments";
+import {gqlSignatureActorFields} from "@components/common/actors/actors";
 
 /**
  * The GraphQL the pipeline content view runs.
@@ -129,6 +130,7 @@ export const gqlPipelineBuilds = gql`
                         creation {
                             time
                             user
+                            ${gqlSignatureActorFields}
                         }
                         promotionLevel {
                             ...PipelinePromotionLevel
@@ -187,6 +189,7 @@ export const gqlPipelineBuildInspection = gql`
                 creation {
                     time
                     user
+                    ${gqlSignatureActorFields}
                 }
                 description
                 annotatedDescription
@@ -218,6 +221,7 @@ export const gqlPipelineBuildInspection = gql`
                         creation {
                             time
                             user
+                            ${gqlSignatureActorFields}
                         }
                         description
                         annotatedDescription

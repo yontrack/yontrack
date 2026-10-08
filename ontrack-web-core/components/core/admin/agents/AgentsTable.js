@@ -8,6 +8,7 @@ import {agentLastUsed} from "@components/core/admin/agents/agentsModel";
 import EditAgentCommand from "@components/core/admin/agents/EditAgentCommand";
 import TransferAgentCommand from "@components/core/admin/agents/TransferAgentCommand";
 import DeleteAgentCommand from "@components/core/admin/agents/DeleteAgentCommand";
+import AccountKindTag from "@components/common/actors/AccountKindTag";
 
 /**
  * List of agents with their tool, owner, tokens and actions.
@@ -33,7 +34,10 @@ export default function AgentsTable({agents, loading, refresh, showOwner = true,
                 title="Agent"
                 render={(_, agent) =>
                     <Space orientation="vertical" size={0}>
-                        <Link href={agentUri(agent)}>{agent.fullName}</Link>
+                        <Space size={4}>
+                            <Link href={agentUri(agent)}>{agent.fullName}</Link>
+                            <AccountKindTag kind={agent.kind} testId={`agent-kind-${agent.id}`}/>
+                        </Space>
                         <Typography.Text type="secondary">{agent.email}</Typography.Text>
                     </Space>
                 }

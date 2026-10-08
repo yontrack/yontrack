@@ -16,6 +16,8 @@ import {buildUri, scmChangeLogUri} from "@components/common/Links";
 import EntityNotificationsBadge from "@components/extension/notifications/EntityNotificationsBadge";
 import PromotionRunStep from "@components/promotionRuns/PromotionRunStep";
 import {useQuery} from "@components/services/GraphQL";
+import AssistedBadge from "@components/extension/scm/assistants/AssistedBadge";
+import ActorBadge from "@components/common/actors/ActorBadge";
 
 const {Column} = Table;
 
@@ -251,6 +253,17 @@ export default function BranchBuilds({
                         title={<div style={{width: spacerWidth}}/>}
                         render={(_, build) =>
                             <BuildBox build={build} displayDecorations={true}>
+                                {/* Whether an agent wrote its commits, and whether an agent created it (#2032) */}
+                                <AssistedBadge
+                                    assistedChange={build.assistedChange}
+                                    testId={`build-assisted-${build.id}`}
+                                />
+                                <ActorBadge
+                                    signature={build.creation}
+                                    prefix="by"
+                                    hideHuman={true}
+                                    testId={`build-actor-${build.id}`}
+                                />
                                 <EntityNotificationsBadge
                                     entityType="BUILD"
                                     entityId={build.id}

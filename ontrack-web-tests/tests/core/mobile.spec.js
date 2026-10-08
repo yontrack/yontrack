@@ -14,6 +14,7 @@ const {
 const {addSlotWorkflow} = require("@ontrack/extensions/environments/workflows");
 const {createPipeline} = require("../extensions/environments/pipelineFixtures");
 const {labelDisplay} = require("../support/labels");
+const {provisionAgentBuild} = require("./agents/agentBadges");
 
 /**
  * The mobile UI.
@@ -526,6 +527,28 @@ test.describe('the mobile UI on a phone', () => {
         const rows = deployments.locator('[data-testid^="mobile-build-deployment-"]')
         await expect(rows).toHaveCount(2)
         await expect(rows.first()).toContainText(`${production.name} [eu]`)
+    })
+
+    test('the build screen badges an assisted build and the agent which promoted it, at 375px', async ({page, ontrack}) => {
+        // #2032: the header says whether the commits were written with
+        // assistants, and the promotion list says which agent promoted, with
+        // its owner - and both fit a phone.
+        const {agent, owner, build, promotionRun} = await provisionAgentBuild(ontrack)
+
+        await page.setViewportSize({width: 375, height: 812})
+        await signInOnPhone(page, ontrack)
+        await page.goto(`${ontrack.connection.ui}/mobile/build/${build.id}`)
+
+        const assisted = page.getByTestId('mobile-build-assisted')
+        await expect(assisted).toBeVisible()
+        await expect(assisted).toHaveText('Assisted')
+        await expect(page.getByRole('img', {name: 'Assisted: 2 of 3 commits, by Claude Code'})).toBeVisible()
+
+        const actor = page.getByTestId(`mobile-build-promotion-actor-${promotionRun.id}`)
+        await expect(actor).toBeVisible()
+        await expect(actor).toContainText(`by ${agent.displayName}, owned by ${owner}`)
+
+        await expectNoSidewaysScroll(page)
     })
 
     test('the build actions are gated by what the user may do', async ({page, ontrack}) => {

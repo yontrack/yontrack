@@ -43,8 +43,8 @@ export class Ontrack {
     environments = new EnvironmentsExtension(this)
     autoVersioning = new AutoVersioningExtension(this)
 
-    // Cloning with a specific token
-    withToken = (token) => new Ontrack(
-        this.connection.withToken(token)
+    // Cloning with a specific token, and optionally extra headers
+    withToken = (token, headers) => new Ontrack(
+        this.connection.withToken(token, headers)
     )
 }

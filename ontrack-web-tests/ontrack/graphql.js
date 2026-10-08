@@ -17,6 +17,7 @@ export const graphQLCall = async (connection, query, variables = {}) => {
     }
 
     const headers = {
+        ...(connection.headers ?? {}),
         'X-Ontrack-Token': token,
     }
 

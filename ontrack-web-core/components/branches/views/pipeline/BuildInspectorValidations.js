@@ -4,6 +4,7 @@ import ValidationChip from "@components/primitives/ValidationChip";
 import TimestampText from "@components/common/TimestampText";
 import {filterValidations, validationStatusId} from "@components/branches/views/pipeline/pipelineFacts";
 import {NONE_STATUS_ID} from "@components/validationRuns/ValidationRunStatusConfig";
+import ActorBadge from "@components/common/actors/ActorBadge";
 
 /**
  * The validations of the inspected build, one chip per stamp.
@@ -47,7 +48,8 @@ export default function BuildInspectorValidations({build, selectedFilter}) {
                                     lastStatus?.creation?.time &&
                                     <Typography.Text type="secondary" style={{fontSize: token.fontSizeSM}}>
                                         <TimestampText value={lastStatus.creation.time}/>
-                                        {lastStatus.creation.user && ` by ${lastStatus.creation.user}`}
+                                        {lastStatus.creation.user && ' '}
+                                        <ActorBadge signature={lastStatus.creation} prefix="by"/>
                                     </Typography.Text>
                                 }
                             </Space>
