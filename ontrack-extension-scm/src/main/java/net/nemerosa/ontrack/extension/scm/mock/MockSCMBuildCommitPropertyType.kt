@@ -3,6 +3,7 @@ package net.nemerosa.ontrack.extension.scm.mock
 import tools.jackson.databind.JsonNode
 import net.nemerosa.ontrack.extension.scm.SCMExtensionFeature
 import net.nemerosa.ontrack.extension.scm.index.SCMBuildCommitIndexService
+import net.nemerosa.ontrack.extension.scm.service.SCMBuildCommitPropertyType
 import net.nemerosa.ontrack.extension.support.AbstractPropertyType
 import net.nemerosa.ontrack.json.parse
 import net.nemerosa.ontrack.model.json.schema.JsonType
@@ -25,7 +26,7 @@ import org.springframework.stereotype.Component
 class MockSCMBuildCommitPropertyType(
     extensionFeature: SCMExtensionFeature,
     private val scmBuildCommitIndexService: SCMBuildCommitIndexService,
-) : AbstractPropertyType<MockSCMBuildCommitProperty>(extensionFeature) {
+) : AbstractPropertyType<MockSCMBuildCommitProperty>(extensionFeature), SCMBuildCommitPropertyType {
 
     override val name: String = "Mock SCM commit"
 

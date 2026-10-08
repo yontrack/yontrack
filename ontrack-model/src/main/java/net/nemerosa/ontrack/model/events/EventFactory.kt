@@ -52,6 +52,24 @@ interface EventFactory {
     fun newBuild(build: Build): Event
 
     /**
+     * The change of the [build] has been found agent-assisted: its `assistedChange` property has been
+     * written for the first time with at least one assistant.
+     *
+     * @param build Assisted build
+     * @param assistants Names of the assistants
+     * @param assistedCommits Number of commits written with an assistant
+     * @param totalCommits Number of commits in the change of the build
+     * @param sessionLinks Links to the agent sessions behind the commits
+     */
+    fun buildAssisted(
+        build: Build,
+        assistants: List<String>,
+        assistedCommits: Int,
+        totalCommits: Int,
+        sessionLinks: List<String>,
+    ): Event
+
+    /**
      * The [build] has been saved, replacing the [previous] values of its name, description and
      * signature.
      */
@@ -267,6 +285,41 @@ interface EventFactory {
                     eventProject("Build's project"),
                     eventBranch("Build's branch"),
                     eventBuild("Created build"),
+                ),
+            )
+        /**
+         * Names of the assistants of an assisted build, comma-separated
+         */
+        const val BUILD_ASSISTED_ASSISTANTS = "assistants"
+
+        /**
+         * Number of commits written with an assistant in an assisted build
+         */
+        const val BUILD_ASSISTED_ASSISTED_COMMITS = "assistedCommits"
+
+        /**
+         * Number of commits in the change of an assisted build
+         */
+        const val BUILD_ASSISTED_TOTAL_COMMITS = "totalCommits"
+
+        /**
+         * Links to the agent sessions of an assisted build, comma-separated
+         */
+        const val BUILD_ASSISTED_SESSION_LINKS = "sessionLinks"
+
+        val BUILD_ASSISTED: EventType =
+            SimpleEventType(
+                id = "build_assisted",
+                template = "Build \${build} is assisted by \${assistants} (\${assistedCommits} of \${totalCommits} commits).",
+                description = "When the change of a build is first found agent-assisted, that is, when its assisted change property is first written with at least one assistant, whoever wrote it. Posted once for a build: there is no clearing event.",
+                context = eventContext(
+                    eventProject("Build's project"),
+                    eventBranch("Build's branch"),
+                    eventBuild("Assisted build"),
+                    eventValue(BUILD_ASSISTED_ASSISTANTS, "Names of the assistants, sorted, separated by a comma and a space"),
+                    eventValue(BUILD_ASSISTED_ASSISTED_COMMITS, "Number of commits written with an assistant"),
+                    eventValue(BUILD_ASSISTED_TOTAL_COMMITS, "Number of commits in the change of the build"),
+                    eventValue(BUILD_ASSISTED_SESSION_LINKS, "Links to the agent sessions behind the commits, separated by a comma and a space, empty if none"),
                 ),
             )
         val UPDATE_BUILD: EventType = SimpleEventType(

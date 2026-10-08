@@ -43,6 +43,23 @@ class MockSCMTester(
         }
     }
 
+    /**
+     * Runs some code while the reading of the commits of a change log calls the [interceptor] first,
+     * with the name of the repository: it may throw to simulate an SCM error, or wait.
+     */
+    fun <T> withCommitsInterceptor(
+        interceptor: (repository: String) -> Unit,
+        code: () -> T,
+    ): T {
+        val old = MockSCMExtension.commitsInterceptor
+        MockSCMExtension.commitsInterceptor = interceptor
+        try {
+            return code()
+        } finally {
+            MockSCMExtension.commitsInterceptor = old
+        }
+    }
+
     inner class MockSCMRepositoryContext(
         val repositoryName: String,
     ) {

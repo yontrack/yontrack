@@ -583,8 +583,10 @@ class MockSCMExtension(
         override fun getBuildCommit(build: Build): String? =
             propertyService.getPropertyValue(build, MockSCMBuildCommitPropertyType::class.java)?.id
 
-        override suspend fun getCommits(fromCommit: String, toCommit: String): List<SCMCommit> =
-            repository(mockScmProjectProperty.name).getCommits(fromCommit, toCommit)
+        override suspend fun getCommits(fromCommit: String, toCommit: String): List<SCMCommit> {
+            commitsInterceptor?.invoke(mockScmProjectProperty.name)
+            return repository(mockScmProjectProperty.name).getCommits(fromCommit, toCommit)
+        }
 
         override fun getConfiguredIssueService(): ConfiguredIssueService? =
             if (mockScmProjectProperty.issueServiceIdentifier != null) {
@@ -724,6 +726,13 @@ class MockSCMExtension(
 
     companion object {
         var issueRegex = "([A-Z]+-\\d+)".toRegex()
+
+        /**
+         * Called with the name of the repository before the commits of a change log are read, so that
+         * tests can make the SCM fail or wait.
+         */
+        @Volatile
+        var commitsInterceptor: ((repository: String) -> Unit)? = null
     }
 }
 

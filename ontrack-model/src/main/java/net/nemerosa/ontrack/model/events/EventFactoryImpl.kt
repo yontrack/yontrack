@@ -22,6 +22,11 @@ import net.nemerosa.ontrack.model.events.EventFactory.Companion.IMAGE_PROMOTION_
 import net.nemerosa.ontrack.model.events.EventFactory.Companion.IMAGE_VALIDATION_STAMP
 import net.nemerosa.ontrack.model.events.EventFactory.Companion.NEW_BRANCH
 import net.nemerosa.ontrack.model.events.EventFactory.Companion.NEW_BUILD
+import net.nemerosa.ontrack.model.events.EventFactory.Companion.BUILD_ASSISTED
+import net.nemerosa.ontrack.model.events.EventFactory.Companion.BUILD_ASSISTED_ASSISTANTS
+import net.nemerosa.ontrack.model.events.EventFactory.Companion.BUILD_ASSISTED_ASSISTED_COMMITS
+import net.nemerosa.ontrack.model.events.EventFactory.Companion.BUILD_ASSISTED_SESSION_LINKS
+import net.nemerosa.ontrack.model.events.EventFactory.Companion.BUILD_ASSISTED_TOTAL_COMMITS
 import net.nemerosa.ontrack.model.events.EventFactory.Companion.NEW_BUILD_LINK
 import net.nemerosa.ontrack.model.events.EventFactory.Companion.QUALIFIER
 import net.nemerosa.ontrack.model.events.EventFactory.Companion.NEW_CONFIGURATION
@@ -89,6 +94,7 @@ class EventFactoryImpl : EventFactory {
         register(DELETE_BRANCH)
 
         register(NEW_BUILD)
+        register(BUILD_ASSISTED)
         register(UPDATE_BUILD)
         register(UPDATE_BUILD_DISPLAY_NAME)
         register(DELETE_BUILD)
@@ -202,6 +208,21 @@ class EventFactoryImpl : EventFactory {
             .withBuild(build)
             .build()
     }
+
+    override fun buildAssisted(
+        build: Build,
+        assistants: List<String>,
+        assistedCommits: Int,
+        totalCommits: Int,
+        sessionLinks: List<String>,
+    ): Event =
+        of(BUILD_ASSISTED)
+            .withBuild(build)
+            .with(BUILD_ASSISTED_ASSISTANTS, assistants.joinToString(", "))
+            .with(BUILD_ASSISTED_ASSISTED_COMMITS, assistedCommits.toString())
+            .with(BUILD_ASSISTED_TOTAL_COMMITS, totalCommits.toString())
+            .with(BUILD_ASSISTED_SESSION_LINKS, sessionLinks.joinToString(", "))
+            .build()
 
     override fun updateBuild(build: Build, previous: Build): Event {
         return of(UPDATE_BUILD)

@@ -259,3 +259,112 @@ converts it into an agent.
 An agent is a non-human principal that decides what to do by itself — typically an AI coding
 agent working on a person's behalf. Register one when the record must be able to say "this was
 done by an agent, owned by this person".
+
+## Assisted builds
+
+A build is **assisted** when the commits of its change — since the previous build of its branch —
+were written with coding agents. The kinds of agents are the
+[assistants](../integrations/changelogs/changelogs.md#agent-markers) of the commits, recognised from
+their trailers (`Co-Authored-By`, `Assisted-by`, `Claude-Session`), their authors and the
+[Agent markers](../integrations/changelogs/changelogs.md#agent-markers) settings. They are not the
+registered agents above: *assisted by* comes from git, *actions by* from the record.
+
+The fact is a **property** of the build, _Assisted change_, rather than a validation: being assisted
+is neither a success nor a failure.
+
+| Field             | Meaning                                                                       |
+|-------------------|-------------------------------------------------------------------------------|
+| `basis`           | How the value was obtained: `COMPUTED`, `SET_BY_CI` or `UNKNOWN`              |
+| `unknownReason`   | Why the value is unknown, when the basis is `UNKNOWN`                         |
+| `assistants`      | Names of the assistants, distinct and sorted. The build is assisted when there is at least one |
+| `assistedCommits` | Number of commits written with an assistant                                   |
+| `totalCommits`    | Number of commits in the change of the build                                  |
+| `sessionLinks`    | Links to the agent sessions behind the commits, at most 20                    |
+| `previousBuildId` | ID of the build the change log was computed from                              |
+
+### How Yontrack computes it
+
+When a build is created, and when its commit is set — which usually happens just after — Yontrack
+computes the change log from the previous build of the branch which has a commit, and counts the
+assistants of its commits. This runs **in the background**, after the build is saved: creating a
+build never waits on the SCM.
+
+* A value **set by the CI** is never recomputed.
+* A build without a commit gets nothing yet: the computation runs again when the commit is set.
+* The value is `UNKNOWN` when the computation cannot run, with its reason:
+    * `no SCM` — the project has no SCM able to compute change logs;
+    * `no previous build with a commit` — typically, the first build of a branch;
+    * `SCM error: …` — the SCM failed. It is computed again the next time the commit of the build is
+      set.
+* Computing the value again gives the same value, and changes nothing.
+
+A build without the property has not been computed yet: like `UNKNOWN`, it is neither assisted nor
+not assisted.
+
+### Setting it from the CI
+
+When Yontrack has no SCM for the project, the CI sets the property itself, with the `SET_BY_CI`
+basis — which is the default of the mutation:
+
+```graphql
+mutation {
+  setBuildAssistedChangeProperty(input: {
+    project: "my-project",
+    branch: "main",
+    build: "42",
+    assistants: ["Claude Code"],
+    assistedCommits: 3,
+    totalCommits: 5,
+    sessionLinks: ["https://claude.ai/code/session_0123"],
+  }) {
+    errors { message }
+  }
+}
+```
+
+The generic property mutations (`setBuildPropertyById` with the
+`net.nemerosa.ontrack.extension.scm.changelog.assistants.AssistedChangePropertyType` type) accept the
+same fields as JSON.
+
+The number of assisted commits cannot exceed the total number of commits, and an `UNKNOWN` value
+cannot have assistants.
+
+The value is available in GraphQL as `Build.assistedChange`, `null` when it has been neither computed
+nor set:
+
+```graphql
+{
+  build(id: 42) {
+    assistedChange {
+      assisted
+      basis
+      unknownReason
+      assistants
+      assistedCommits
+      totalCommits
+      sessionLinks
+    }
+  }
+}
+```
+
+### The `build_assisted` event
+
+The first time the property of a build is written with at least one assistant, whether Yontrack
+computed it or the CI set it, the `build_assisted` event is posted:
+
+> Build 42 is assisted by Claude Code, Codex (2 of 5 commits).
+
+Its values are `assistants`, `assistedCommits`, `totalCommits` and `sessionLinks`, the lists being
+separated by a comma and a space. It is posted **once** for a build: there is no clearing event, and
+a later value which disagrees posts nothing — a recomputation that disagrees is a configuration
+problem, not a change of the build. Like any event, notifications can subscribe to it.
+
+### Templating
+
+The builds expose their assisted change to [templates](../appendix/templating.md):
+
+* `${build.assisted}` — `true`, `false`, or `unknown` when the value has not been computed or could
+  not be;
+* `${build.assistants}` — the names of the assistants, separated by a comma and a space; empty when
+  there is none.

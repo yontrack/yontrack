@@ -9,9 +9,13 @@ import net.nemerosa.ontrack.model.structure.PropertySearchArguments
 import net.nemerosa.ontrack.repository.support.AbstractJdbcRepository
 import net.nemerosa.ontrack.repository.support.createSQL
 import org.apache.commons.lang3.StringUtils
+import org.springframework.beans.factory.ObjectProvider
+import org.springframework.cache.CacheManager
 import org.springframework.cache.annotation.CacheEvict
 import org.springframework.cache.annotation.Cacheable
 import org.springframework.stereotype.Repository
+import org.springframework.transaction.support.TransactionSynchronization
+import org.springframework.transaction.support.TransactionSynchronizationManager
 import java.lang.String.format
 import java.sql.PreparedStatement
 import java.sql.ResultSet
@@ -23,8 +27,26 @@ import javax.sql.DataSource
 
 @Repository
 class PropertyJdbcRepository(
-    dataSource: DataSource
+    dataSource: DataSource,
+    private val cacheManager: ObjectProvider<CacheManager>,
 ) : AbstractJdbcRepository(dataSource), PropertyRepository {
+
+    /**
+     * The cache entry of a property is evicted when it is written, which happens before the commit of
+     * the transaction: a concurrent read between the two (like the background computations which
+     * react to the changes of the properties) would put the previous value back into the cache, where
+     * it would stay. The entry is evicted again once the transaction is complete.
+     */
+    private fun evictAfterCompletion(typeName: String, entityType: ProjectEntityType, entityId: ID) {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            val key = typeName + entityType.name + entityId.value
+            TransactionSynchronizationManager.registerSynchronization(object : TransactionSynchronization {
+                override fun afterCompletion(status: Int) {
+                    cacheManager.ifAvailable?.getCache(CACHE_PROPERTIES)?.evict(key)
+                }
+            })
+        }
+    }
 
     override fun hasProperty(typeName: String, entityType: ProjectEntityType, entityId: ID): Boolean {
         return namedParameterJdbcTemplate!!.queryForList(
@@ -36,7 +58,7 @@ class PropertyJdbcRepository(
         ).filterNotNull().isNotEmpty()
     }
 
-    @Cacheable(cacheNames = ["properties"], key = "#typeName + #entityType.name() + #entityId.value")
+    @Cacheable(cacheNames = [CACHE_PROPERTIES], key = "#typeName + #entityType.name() + #entityId.value")
     override fun loadProperty(typeName: String, entityType: ProjectEntityType, entityId: ID): TProperty? {
         return getFirstItem(
             String.format(
@@ -47,8 +69,9 @@ class PropertyJdbcRepository(
         ) { rs, rowNum -> toProperty(rs) }
     }
 
-    @CacheEvict(cacheNames = ["properties"], key = "#typeName + #entityType.name() + #entityId.value")
+    @CacheEvict(cacheNames = [CACHE_PROPERTIES], key = "#typeName + #entityType.name() + #entityId.value")
     override fun saveProperty(typeName: String, entityType: ProjectEntityType, entityId: ID, data: JsonNode) {
+        evictAfterCompletion(typeName, entityType, entityId)
         val params = params("type", typeName).addValue("entityId", entityId.value)
         // Any previous value?
         val propertyId = getFirstItem(
@@ -78,8 +101,9 @@ class PropertyJdbcRepository(
         }// Creation
     }
 
-    @CacheEvict(cacheNames = ["properties"], key = "#typeName + #entityType.name() + #entityId.value")
+    @CacheEvict(cacheNames = [CACHE_PROPERTIES], key = "#typeName + #entityType.name() + #entityId.value")
     override fun deleteProperty(typeName: String, entityType: ProjectEntityType, entityId: ID): Ack {
+        evictAfterCompletion(typeName, entityType, entityId)
         return Ack.one(
             namedParameterJdbcTemplate!!.update(
                 String.format(
@@ -221,6 +245,12 @@ class PropertyJdbcRepository(
     }
 
     companion object {
+
+        /**
+         * Cache of the properties
+         */
+        const val CACHE_PROPERTIES = "properties"
+
         @JvmStatic
         fun prepareQueryForPropertyValue(
             searchArguments: PropertySearchArguments,

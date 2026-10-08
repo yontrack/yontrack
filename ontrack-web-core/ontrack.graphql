@@ -161,6 +161,26 @@ type ApplyDashboardsPayload implements PayloadInterface {
   errors: [PayloadUserError]
 }
 
+"Assisted change of a build: whether the commits since the previous build on its branch were written with assistants (agent kinds). The build is assisted when the list of assistants is not empty."
+type AssistedChange {
+  "Distinct names of the assistants, sorted. The build is assisted when there is at least one."
+  assistants: [String!]!
+  "The build is assisted: there is at least one assistant."
+  assisted: Boolean!
+  "Number of commits written with an assistant."
+  assistedCommits: Int
+  "How the value was obtained: COMPUTED by Yontrack from the change log, SET_BY_CI, or UNKNOWN when it could not be computed."
+  basis: AssistedChangeBasis!
+  "ID of the build the change log was computed from, if any."
+  previousBuildId: Int
+  "Distinct links to the agent sessions behind the commits, at most 20."
+  sessionLinks: [String!]!
+  "Number of commits in the change of the build."
+  totalCommits: Int
+  "Why the value is unknown, when the basis is UNKNOWN: no SCM, no previous build with a commit, or the SCM error."
+  unknownReason: String
+}
+
 "Endorsement of an entry by the instance key: the Ed25519 signature of its hash"
 type AuditTrailEndorsement {
   "Technical ID of the endorsed entry"
@@ -771,6 +791,10 @@ type BranchLink {
 type Build implements Authorizable & ProjectEntity {
   "Description with links."
   annotatedDescription: String
+  "Assisted change of the build: whether its commits since the previous build on its branch were written with assistants. Null when it has been neither computed nor set yet, which counts as unknown."
+  assistedChange: AssistedChange
+  "Whether the commits of the build since the previous build on its branch were written with assistants (agent kinds): computed by Yontrack from the change log, or set by the CI."
+  assistedChangeProperty: Property
   "Trail of the build: its entries, their endorsements and its verification - null when the build has no trail, the licence being off"
   auditTrail: BuildAuditTrail
   "Authorizations for this context"
@@ -1527,6 +1551,22 @@ type DeleteBranchReleaseValidationPropertyByIdPayload implements Payload {
 type DeleteBranchReleaseValidationPropertyPayload implements Payload {
   "Branch updated"
   branch: Branch
+  "List of errors"
+  errors: [UserError]
+}
+
+"Output type for the deleteBuildAssistedChangePropertyById mutation."
+type DeleteBuildAssistedChangePropertyByIdPayload implements Payload {
+  "Build updated"
+  build: Build
+  "List of errors"
+  errors: [UserError]
+}
+
+"Output type for the deleteBuildAssistedChangeProperty mutation."
+type DeleteBuildAssistedChangePropertyPayload implements Payload {
+  "Build updated"
+  build: Build
   "List of errors"
   errors: [UserError]
 }
@@ -3915,6 +3955,16 @@ type Mutation {
     "Input for the mutation"
     input: DeleteBranchReleaseValidationPropertyByIdInput
   ): DeleteBranchReleaseValidationPropertyByIdPayload
+  "Deletes the assisted change property on a build identified by name."
+  deleteBuildAssistedChangeProperty(
+    "Input for the mutation"
+    input: DeleteBuildAssistedChangePropertyInput
+  ): DeleteBuildAssistedChangePropertyPayload
+  "Deletes the assisted change property on a build."
+  deleteBuildAssistedChangePropertyById(
+    "Input for the mutation"
+    input: DeleteBuildAssistedChangePropertyByIdInput
+  ): DeleteBuildAssistedChangePropertyByIdPayload
   "Deletes the bitbucket Pipelines run property on a build identified by name."
   deleteBuildBitbucketPipelineRunProperty(
     "Input for the mutation"
@@ -4692,6 +4742,16 @@ type Mutation {
     "Input for the mutation"
     input: SetBranchReleaseValidationPropertyByIdInput
   ): SetBranchReleaseValidationPropertyByIdPayload
+  "Set the assisted change property on a build identified by name."
+  setBuildAssistedChangeProperty(
+    "Input for the mutation"
+    input: SetBuildAssistedChangePropertyInput
+  ): SetBuildAssistedChangePropertyPayload
+  "Set the assisted change property on a build."
+  setBuildAssistedChangePropertyById(
+    "Input for the mutation"
+    input: SetBuildAssistedChangePropertyByIdInput
+  ): SetBuildAssistedChangePropertyByIdPayload
   "Set the bitbucket Pipelines run property on a build identified by name."
   setBuildBitbucketPipelineRunProperty(
     "Input for the mutation"
@@ -7348,6 +7408,22 @@ type SetBranchReleaseValidationPropertyPayload implements Payload {
   errors: [UserError]
 }
 
+"Output type for the setBuildAssistedChangePropertyById mutation."
+type SetBuildAssistedChangePropertyByIdPayload implements Payload {
+  "Build updated"
+  build: Build
+  "List of errors"
+  errors: [UserError]
+}
+
+"Output type for the setBuildAssistedChangeProperty mutation."
+type SetBuildAssistedChangePropertyPayload implements Payload {
+  "Build updated"
+  build: Build
+  "List of errors"
+  errors: [UserError]
+}
+
 "Output type for the setBuildBitbucketPipelineRunPropertyById mutation."
 type SetBuildBitbucketPipelineRunPropertyByIdPayload implements Payload {
   "Build updated"
@@ -9253,6 +9329,13 @@ enum AccountKind {
   HUMAN
 }
 
+"How the assisted change of a build was obtained: COMPUTED by Yontrack from the change log, SET_BY_CI, or UNKNOWN when it could not be computed (see its reason)."
+enum AssistedChangeBasis {
+  COMPUTED
+  SET_BY_CI
+  UNKNOWN
+}
+
 "Whether the instance key can endorse the entries"
 enum AuditTrailKeyStatus {
   "No usable key, and none could be generated: entries are written but not endorsed"
@@ -10409,6 +10492,22 @@ input DeleteBranchReleaseValidationPropertyByIdInput {
 input DeleteBranchReleaseValidationPropertyInput {
   "Branch name"
   branch: String!
+  "Project name"
+  project: String!
+}
+
+"Input type for the deleteBuildAssistedChangePropertyById mutation."
+input DeleteBuildAssistedChangePropertyByIdInput {
+  "ID of the build"
+  id: Int!
+}
+
+"Input type for the deleteBuildAssistedChangeProperty mutation."
+input DeleteBuildAssistedChangePropertyInput {
+  "Branch name"
+  branch: String!
+  "Build name"
+  build: String!
   "Project name"
   project: String!
 }
@@ -12028,6 +12127,50 @@ input SetBranchReleaseValidationPropertyInput {
   project: String!
   "Name of the validation to create when a release/label is set on a build"
   validation: String!
+}
+
+"Input type for the setBuildAssistedChangePropertyById mutation."
+input SetBuildAssistedChangePropertyByIdInput {
+  "Distinct names of the assistants, sorted. The build is assisted when there is at least one."
+  assistants: [String!]
+  "Number of commits written with an assistant."
+  assistedCommits: Int
+  "How the value was obtained, SET_BY_CI by default"
+  basis: AssistedChangeBasis
+  "ID of the build"
+  id: Int!
+  "ID of the build the change log was computed from, if any."
+  previousBuildId: Int
+  "Distinct links to the agent sessions behind the commits, at most 20."
+  sessionLinks: [String!]
+  "Number of commits in the change of the build."
+  totalCommits: Int
+  "Why the value is unknown, when the basis is UNKNOWN: no SCM, no previous build with a commit, or the SCM error."
+  unknownReason: String
+}
+
+"Input type for the setBuildAssistedChangeProperty mutation."
+input SetBuildAssistedChangePropertyInput {
+  "Distinct names of the assistants, sorted. The build is assisted when there is at least one."
+  assistants: [String!]
+  "Number of commits written with an assistant."
+  assistedCommits: Int
+  "How the value was obtained, SET_BY_CI by default"
+  basis: AssistedChangeBasis
+  "Branch name"
+  branch: String!
+  "Build name"
+  build: String!
+  "ID of the build the change log was computed from, if any."
+  previousBuildId: Int
+  "Project name"
+  project: String!
+  "Distinct links to the agent sessions behind the commits, at most 20."
+  sessionLinks: [String!]
+  "Number of commits in the change of the build."
+  totalCommits: Int
+  "Why the value is unknown, when the basis is UNKNOWN: no SCM, no previous build with a commit, or the SCM error."
+  unknownReason: String
 }
 
 "Input type for the setBuildBitbucketPipelineRunPropertyById mutation."
