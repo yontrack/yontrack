@@ -10,6 +10,7 @@ dependencies {
     implementation(project(":ontrack-extension-license"))
     implementation(project(":ontrack-extension-scm"))
     implementation(project(":ontrack-repository"))
+    implementation(project(":ontrack-repository-support"))
     implementation(project(":ontrack-ui-graphql"))
 
     testImplementation(testFixtures(project(":ontrack-it-utils")))

@@ -132,6 +132,28 @@ type AddSlotWorkflowPayload implements Payload {
   slotWorkflow: SlotWorkflow
 }
 
+"How much of the delivery the agents drive, over a window of days, across the projects the current user can see."
+type AgentActivityStats {
+  "Builds created in the window whose assisted change has at least one assistant"
+  assistedBuilds: Int!
+  "Share of the known builds which are assisted, between 0 and 1 - null when no build created in the window is known"
+  assistedShare: Float
+  "Builds created by agents in the window: `new_build` events whose actor is an agent"
+  builds: Int!
+  "Deployment actions by agents in the window: the slot pipelines started, starting their deployment or deployed (`slot-pipeline-creation`, `slot-pipeline-deploying` and `slot-pipeline-deployed` events) whose actor is an agent"
+  deployments: Int!
+  "Start of the window (UTC)"
+  from: LocalDateTime!
+  "Builds created in the window whose assisted change is known - computed by Yontrack or set by the CI. The denominator of the assisted share."
+  knownBuilds: Int!
+  "Promotions by agents in the window: `new_promotion_run` events whose actor is an agent"
+  promotions: Int!
+  "Builds created in the window whose assisted change is unknown - excluded from the assisted share"
+  unknownBuilds: Int!
+  "Number of days of the window, ending now"
+  window: Int!
+}
+
 "What the current agent may do on a project: the rights of its owner, narrowed by the agent policy. Read it before acting rather than discovering the policy by being refused."
 type AgentPolicy {
   "True when the agent may create builds and validation runs on the project"
@@ -2557,6 +2579,13 @@ type Event {
 }
 
 type EventAgentActionPaginated {
+  "Information about the current page"
+  pageInfo: PageInfo
+  "Items in the current page"
+  pageItems: [Event!]!
+}
+
+type EventAgentActionsPaginated {
   "Information about the current page"
   pageInfo: PageInfo
   "Items in the current page"
@@ -6116,6 +6145,32 @@ type Query {
     "Filtering accounts having this token in the name, email or groups"
     token: String
   ): [Account!]
+  "The latest actions of the agents: the events whose actor is an agent, newest first, on the projects the caller can see (the events without a project for the administrators only). A page holds at most 100 events. There is no total count: `pageInfo.nextPage` tells whether there are more events. The events follow the retention of the events. Requires the Agent governance licence (`extension.agents`)."
+  agentActions(
+    "Identifier of one agent, `<slug>[agent]` - all the agents when absent"
+    agent: String,
+    "IDs of the event types to keep - empty or absent for all the types"
+    eventTypes: [String!],
+    "Events at or after this time (UTC, inclusive)"
+    from: LocalDateTime,
+    "Offset for the page"
+    offset: Int = 0,
+    "Name of a project, matching the event's project or its extra project"
+    project: String,
+    "Size of the page"
+    size: Int = 20,
+    "Events at or before this time (UTC, inclusive)"
+    to: LocalDateTime
+  ): EventAgentActionsPaginated
+  "How much of the delivery the agents drive over a window of days: builds, promotions and deployments by agents, and the assisted share of the builds - across the projects the caller can see. Requires the Agent governance licence (`extension.agents`)."
+  agentActivityStats(
+    "Labels the projects must all carry, as `category:name` (`name` for a label without a category) - no restriction when empty or absent"
+    labels: [String!],
+    "Names of the projects to narrow the counts to - all the visible projects when empty or absent"
+    projects: [String!],
+    "Number of days of the window, ending now - 30 by default, at most 366"
+    window: Int
+  ): AgentActivityStats
   "Registered agents: every agent for an administrator, only their own agents for any other user. An agent is an account of kind AGENT, owned by a person, acting with its own tokens."
   agents(
     "Restricts the list to the agent with this ID"

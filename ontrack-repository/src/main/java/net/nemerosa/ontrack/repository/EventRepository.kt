@@ -89,6 +89,26 @@ interface EventRepository {
     ): List<Event>
 
     /**
+     * Counts the events whose actor is an agent, by event type - the aggregates of the agent activity
+     * widget (#2035). The events are counted by the database, never loaded.
+     *
+     * The events are selected as by [findAgentEvents]: the events of the persons are never counted,
+     * and neither is an event without a project.
+     *
+     * @param filter Criteria on the events
+     * @param projects IDs of the projects the events are counted for, as their project
+     * @param visibleProjects IDs of the projects the events may concern as their extra project: an event
+     * linking any other project is not counted
+     * @return Number of events for each event type having at least one - a type without any event is
+     * absent
+     */
+    fun countAgentEventsByType(
+        filter: EventFilter,
+        projects: Collection<Int>,
+        visibleProjects: Collection<Int>,
+    ): Map<String, Int>
+
+    /**
      * Gets the events matching a filter, newest first, with no project restriction.
      *
      * @param filter Criteria on the events

@@ -11,6 +11,7 @@ import net.nemerosa.ontrack.model.structure.ProjectEntityType
 import net.nemerosa.ontrack.model.structure.Signature
 import net.nemerosa.ontrack.model.support.NameValue
 import net.nemerosa.ontrack.repository.support.AbstractJdbcRepository
+import org.springframework.jdbc.core.RowCallbackHandler
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource
 import org.springframework.stereotype.Repository
 import java.sql.ResultSet
@@ -158,6 +159,49 @@ class EventJdbcRepository(
         if (projects != null && projects.isEmpty()) {
             return emptyList()
         }
+        val (where, params) = agentCriteria(filter, projects)
+        return namedParameterJdbcTemplate!!.query(
+            "SELECT * FROM EVENTS $where ORDER BY ID DESC LIMIT :size OFFSET :offset",
+            params
+                .addValue("size", size)
+                .addValue("offset", offset)
+        ) { rs: ResultSet, _: Int -> toEvent(rs, entityLoader, eventTypeLoader) }
+    }
+
+    override fun countAgentEventsByType(
+        filter: EventFilter,
+        projects: Collection<Int>,
+        visibleProjects: Collection<Int>,
+    ): Map<String, Int> {
+        if (projects.isEmpty()) {
+            return emptyMap()
+        }
+        val (where, params) = agentCriteria(filter, projects, visibleProjects)
+        val counts = mutableMapOf<String, Int>()
+        namedParameterJdbcTemplate!!.query(
+            "SELECT EVENT_TYPE, COUNT(*) AS EVENT_COUNT FROM EVENTS $where GROUP BY EVENT_TYPE",
+            params,
+            RowCallbackHandler { rs ->
+                counts[rs.getString("EVENT_TYPE")] = rs.getInt("EVENT_COUNT")
+            },
+        )
+        return counts
+    }
+
+    /**
+     * `WHERE` clause and parameters of a filter on the events of the agents, restricted to some
+     * projects.
+     *
+     * @param projects IDs of the projects the events may concern as their project - `null` for no
+     * restriction at all
+     * @param visibleProjects IDs of the projects the events may concern as their extra project - `null`
+     * for no restriction at all
+     */
+    private fun agentCriteria(
+        filter: EventFilter,
+        projects: Collection<Int>?,
+        visibleProjects: Collection<Int>? = projects,
+    ): Pair<String, MapSqlParameterSource> {
         val (where, params) = filterCriteria(filter)
         val criteria = mutableListOf<String>()
         if (where.isNotEmpty()) {
@@ -165,18 +209,17 @@ class EventJdbcRepository(
         }
         // Only the agents
         criteria += "ACTOR IS NOT NULL"
-        // Only the visible projects, on the project and on the extra project
+        // Only the given projects, on the project
         if (projects != null) {
-            criteria += "PROJECT IN (:visibleProjects)"
-            criteria += "(X_PROJECT IS NULL OR X_PROJECT IN (:visibleProjects))"
-            params.addValue("visibleProjects", projects)
+            criteria += "PROJECT IN (:projects)"
+            params.addValue("projects", projects)
         }
-        return namedParameterJdbcTemplate!!.query(
-            "SELECT * FROM EVENTS WHERE ${criteria.joinToString(" AND ")} ORDER BY ID DESC LIMIT :size OFFSET :offset",
-            params
-                .addValue("size", size)
-                .addValue("offset", offset)
-        ) { rs: ResultSet, _: Int -> toEvent(rs, entityLoader, eventTypeLoader) }
+        // Only the visible projects, on the extra project
+        if (visibleProjects != null) {
+            criteria += "(X_PROJECT IS NULL OR X_PROJECT IN (:visibleProjects))"
+            params.addValue("visibleProjects", visibleProjects)
+        }
+        return "WHERE ${criteria.joinToString(" AND ")}" to params
     }
 
     override fun findEvents(

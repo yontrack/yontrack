@@ -81,6 +81,8 @@ class GQLPaginatedListFactory(
      * @param itemPaginatedListProvider Function to provide the paginated list directly.
      * @param arguments Optional list of arguments to add to the field
      * @param additionalFields Optional list of fields to add, additionally to the page info and the page items.
+     * @param itemTypeSuffix Suffix to add to the item type when creating the paginated list type name, for
+     * a list of the same items whose type must not clash with another one
      *
      * @param T Type of item in the list
      */
@@ -93,6 +95,7 @@ class GQLPaginatedListFactory(
             itemPaginatedListProvider: (env: DataFetchingEnvironment, offset: Int, size: Int) -> PaginatedList<T>,
             arguments: List<GraphQLArgument> = emptyList(),
             additionalFields: List<GraphQLFieldDefinition> = emptyList(),
+            itemTypeSuffix: String = "",
     ): GraphQLFieldDefinition =
             createBasePaginatedListField(
                     cache,
@@ -102,6 +105,7 @@ class GQLPaginatedListFactory(
                     itemType,
                     arguments,
                     additionalFields,
+                    itemTypeSuffix,
             ).dataFetcher { environment ->
                 val offset = environment.getArgument<Int>(ARG_OFFSET) ?: 0
                 val size = environment.getArgument<Int>(ARG_SIZE) ?: PageRequest.DEFAULT_PAGE_SIZE

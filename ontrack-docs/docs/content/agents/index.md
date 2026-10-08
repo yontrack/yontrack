@@ -205,7 +205,8 @@ The actor of an event can be selected on:
   agents, or one agent — which its export follows, with the actor of each event in its columns.
 
 The [Agents section of a build](#what-agents-did-on-a-build) lists what agents did on that build,
-and the [activity of an agent](#agent-activity) what one agent did across the projects.
+the [activity of an agent](#agent-activity) what one agent did across the projects, and the
+[agent activity across the projects](#agent-activity-across-the-projects) what all of them did.
 
 ## What agents did on a build
 
@@ -319,6 +320,101 @@ holds at most 100 events, and there is no total count: `pageInfo.nextPage` tells
 more. `agentActivity` is empty for a person.
 
 Agent administration being desktop only, the mobile UI has no activity view.
+
+## Agent activity across the projects
+
+!!! note "Licensed feature"
+
+    The views of the agent activity across the projects are part of the *Agent governance* feature
+    (`extension.agents`) — see [Licensing](../appendix/licensing.md#agent-governance). Without it, the
+    widget and the page say that the license is needed, the *Latest agent actions* entry is not in
+    the menu, and the API refuses the reads.
+
+"How much of our delivery do agents drive?" Two views answer it across the projects, for **any
+user**, each one restricted to the projects this user can see: an action which also concerns a project
+you cannot see — a link from a build of that project, for example — is neither listed nor counted.
+
+### The agent activity widget
+
+The [*Agent activity*](../dashboards/widgets/agent-activity.md) dashboard widget counts, over the last
+**7**, **30** or **90** days (30 by default), across the projects you can see — or only some of them,
+given by name or by labels:
+
+![The agent activity widget](agents-activity-widget.png)
+
+| Tile | What it counts |
+|------|----------------|
+| Builds by agents | The builds created by an agent: the `new_build` events whose actor is an agent |
+| Promotions by agents | The promotions by an agent: the `new_promotion_run` events whose actor is an agent |
+| Deployments by agents | The deployment actions of an agent: the slot pipelines it started, it started to deploy, and it marked as deployed (`slot-pipeline-creation`, `slot-pipeline-deploying` and `slot-pipeline-deployed` events) |
+| Assisted share | The share of the builds whose commits were [written with assistants](#assisted-builds) - see below |
+
+The **assisted share** is about the builds created in the window, whoever created them:
+
+* its numerator is the number of builds whose assisted change has at least one assistant;
+* its denominator is the number of builds whose assisted change is **known** — computed by Yontrack
+  from the change log, or set by the CI;
+* the builds whose assisted change is **unknown** — no SCM, no previous build with a commit, an SCM
+  error — are **excluded** from the share, and counted apart, under the tile ("2 unknown"). So are
+  the builds whose assisted change is not computed yet.
+
+With no known build in the window, the share is "-" rather than 0%.
+
+Each tile opens the latest agent actions below, filtered on the window and on the event types it
+counts — and on the project, when the widget counts only one. The assisted share opens the builds
+created by agents.
+
+The counts are computed by the database: no event and no build is read to count it.
+
+### Latest agent actions
+
+_Information_ > _Latest agent actions_ lists what the agents did, newest first, on the projects you
+can see, filtered on a window of 7, 30 or 90 days (7 by default), an agent, event types and a
+project. _Load more_ reads the older ones.
+
+![The latest agent actions](agents-latest-actions.png)
+
+Each action gives its time, the [badge](#telling-an-agent-from-a-person) of the agent, its message,
+its project and a link to the agent [session](#identifying-a-session) behind it. The agent filter
+offers every agent to an administrator, and their own agents to anybody else. The actions on no
+project at all, like the deletion of a project, are shown to the administrators only.
+
+As everywhere else, the events are the source of these views, and the
+[retention of the events](../operations/events.md#retention) applies to them.
+
+Through the API, `agentActivityStats` gives the counts, and `agentActions` a page of the actions:
+
+```graphql
+{
+  agentActivityStats(window: 30, labels: ["team:platform"]) {
+    builds
+    promotions
+    deployments
+    assistedBuilds
+    knownBuilds
+    unknownBuilds
+    assistedShare
+  }
+  agentActions(agent: "claude[agent]", eventTypes: ["new_build"], project: "my-project", offset: 0, size: 20) {
+    pageInfo { nextPage { offset size } }
+    pageItems {
+      time
+      message
+      eventType { id }
+      project { name }
+      actor { agent displayName owner sessionLink }
+    }
+  }
+}
+```
+
+`assistedShare` is between 0 and 1, and null when no build is known. For `agentActions`, `from` and
+`to` bound the window, `agent`, `eventTypes` and `project` filter the actions — all optional. A page
+holds at most 100 events, and there is no total count: `pageInfo.nextPage` tells whether there are
+more.
+
+The mobile UI has neither dashboards nor the _Information_ menu: a link to the latest agent actions
+opens the "desktop only" screen on a phone.
 
 ## What an agent may do
 

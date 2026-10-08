@@ -19,3 +19,4 @@ Widgets are the building blocks of dashboards. Each widget displays a specific v
 | [End-to-end lead time](e2e-lead-time-chart.md) | `home/E2ELeadTimeChart` | Lead time across two projects |
 | [Project scorecard](project-scorecard.md) | `extension/scorecard/ProjectScorecard` | Targets met by a project in each of its estates, and its readings |
 | [Findings](findings.md) | `extension/findings/ProjectFindings` · `extension/findings/BranchFindings` | Security findings of a project or of a branch, by severity |
+| [Agent activity](agent-activity.md) | `extension/agents/AgentActivity` | Builds, promotions and deployments by agents, and the assisted share of the builds (licensed) |

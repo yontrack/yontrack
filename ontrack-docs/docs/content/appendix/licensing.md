@@ -47,10 +47,14 @@ and the readiness of a build. None of this needs a license.
   validation stamp restriction "evidence on this stamp must come from a non-agent actor".
 * [Agent activity](../agents/index.md#agent-activity) — what an agent did over the last days, for
   its owner and the administrators.
+* [Agent activity across the projects](../agents/index.md#agent-activity-across-the-projects) — the
+  *Agent activity* dashboard widget and the *Latest agent actions* page, for any user, on the projects
+  they can see.
 
 Without the license, these rulings are kept, visible and editable, but **do nothing**: an assisted
 build is promoted as any other, an agent records evidence on any stamp. They apply again as soon as the license allows them.
 
-The activity of an agent is not shown without the license: its tab says that the license is needed,
-and the API refuses it. What the agents do is still recorded, and comes back in the activity with the
+The activity of the agents is not shown without the license: the *Activity* tab of an agent, the
+*Agent activity* widget and the *Latest agent actions* page say that the license is needed, the
+*Latest agent actions* entry is not in the menu, and the API refuses the reads. What the agents do is still recorded, and comes back in the activity with the
 license.

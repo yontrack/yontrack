@@ -126,6 +126,14 @@ describe('mobileEquivalent', () => {
         expect(describeDesktopRoute('/extension/audit-trail/status')).toEqual('the audit trail status')
     })
 
+    it('leaves the latest agent actions desktop-only', () => {
+        // #2035: the mobile UI has no dashboards and no Information menu. The page
+        // reaches the interstitial, under a name a user can read.
+        expect(mobileEquivalent('/extension/agents/actions')).toBeNull()
+        expect(isRedirectExempt('/extension/agents/actions')).toBe(false)
+        expect(describeDesktopRoute('/extension/agents/actions')).toEqual('the latest agent actions')
+    })
+
     it('leaves the audit trail of a build desktop-only', () => {
         // #1967: the trail is an audit tool, not a phone one, and the mobile UI has no
         // validation run page. The sub-page of a build reaches the interstitial, under a

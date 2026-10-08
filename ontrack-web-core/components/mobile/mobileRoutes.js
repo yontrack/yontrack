@@ -276,6 +276,8 @@ const DESCRIPTIONS = [
     [/^\/extension\/scorecard\/estate\//, "an estate's scorecard"],
     // No audit trail status in the mobile UI: an admin page, desktop-only (#1963)
     [/^\/extension\/audit-trail\/status$/, 'the audit trail status'],
+    // No agent activity in the mobile UI: no dashboards, no Information menu (#2035)
+    [/^\/extension\/agents\/actions$/, 'the latest agent actions'],
     [/^\/extension\//, 'an extension page'],
     [/^\/core\/admin\//, 'an administration page'],
     [/^\/core\/config\//, 'a configuration page'],

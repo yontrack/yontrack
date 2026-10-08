@@ -119,6 +119,7 @@ export default function UserMenu({userMenu}) {
         'extension/github/ingestion/hook-payloads': <FaGithub/>,
         'extension/scorecard/estates': <FaLayerGroup/>,
         'extension/scorecard/scorecards': <FaTable/>,
+        'extension/agents/actions': <FaRobot/>,
     }
 
     useEffect(() => {
