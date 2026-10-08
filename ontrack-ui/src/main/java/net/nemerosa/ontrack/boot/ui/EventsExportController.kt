@@ -39,6 +39,7 @@ class EventsExportController(
      * @param user Case-insensitive prefix of the name of the user who posted the event
      * @param eventTypes IDs of the event types to keep, repeated or separated by commas
      * @param project Name of a project, matching the event's project or its extra project
+     * @param actor `agent`, `human`, or the identifier of one agent, `<slug>[agent]`
      */
     @GetMapping("export")
     fun export(
@@ -48,6 +49,7 @@ class EventsExportController(
         @RequestParam(required = false) user: String?,
         @RequestParam(required = false) eventTypes: List<String>?,
         @RequestParam(required = false) project: String?,
+        @RequestParam(required = false) actor: String?,
         response: HttpServletResponse,
     ) {
         val exportFormat = EventsExportFormat.parse(format ?: "")
@@ -57,6 +59,7 @@ class EventsExportController(
             user = user?.takeIf { it.isNotBlank() },
             eventTypes = eventTypes?.filter { it.isNotBlank() }?.takeIf { it.isNotEmpty() },
             project = project?.takeIf { it.isNotBlank() },
+            actor = actor?.takeIf { it.isNotBlank() },
         )
         // Checks the access, before anything is written
         val export = eventsExportService.export(filter, exportFormat)

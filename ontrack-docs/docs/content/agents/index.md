@@ -180,6 +180,7 @@ The badges show on:
 | The promotions of a build, the promotion run page, the history of a promotion level | The agent which promoted |
 | The deployment page: its timeline, the overrides and the answers to its admission rules | The agent behind each change |
 | *Accounts* and *Agents* in the administration | The kind of the account, *Agent* or *Person* |
+| *Information › Events* | The agent behind each event |
 
 ![The builds of a branch, one of them created by an agent](agents-badges-branch.png)
 
@@ -191,6 +192,17 @@ each of its promotions:
 The badges say what they mean in words: their colour and their icon are never the only cue, and a
 screen reader reads "by agent Claude, owned by alice@example.com" or "Assisted: 3 of 12 commits,
 by Claude Code".
+
+## Following what agents do
+
+The actor of an event can be selected on:
+
+* the [keywords of a subscription](../integrations/notifications/index.md#keywords) —
+  `actor:agent`, `actor:human` and `agent:<slug>` — so that "notify me when an agent promotes" or
+  "a person marked a deployment as done" are ordinary subscriptions, and the workflows they trigger
+  are filtered the same way;
+* the *Actor* filter of the [events page](../operations/events.md#filtering-the-events) — persons,
+  agents, or one agent — which its export follows, with the actor of each event in its columns.
 
 ## What an agent may do
 

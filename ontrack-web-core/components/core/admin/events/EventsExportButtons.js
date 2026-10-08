@@ -1,32 +1,9 @@
-import {gql} from "graphql-request";
 import {Alert, Button} from "antd";
 import {FaDownload} from "react-icons/fa";
 import {useQuery} from "@components/services/GraphQL";
 import {eventsExportUri} from "@components/common/Links";
 import {eventsFilterVariables} from "@components/core/admin/events/eventsFilter";
-
-const query = gql`
-    query EventsExport(
-        $from: LocalDateTime,
-        $to: LocalDateTime,
-        $user: String,
-        $eventTypes: [String!],
-        $project: String,
-    ) {
-        eventsExport(
-            filter: {
-                from: $from,
-                to: $to,
-                user: $user,
-                eventTypes: $eventTypes,
-                project: $project,
-            },
-        ) {
-            maxRows
-            truncated
-        }
-    }
-`
+import {gqlEventsExport} from "@components/core/admin/events/eventsQueries";
 
 /**
  * Downloads of the events matching the filter applied to the events page, as CSV or JSON, with a
@@ -39,7 +16,7 @@ const query = gql`
 export default function EventsExportButtons({filterFormData}) {
     const variables = eventsFilterVariables(filterFormData)
 
-    const {data: info} = useQuery(query, {
+    const {data: info} = useQuery(gqlEventsExport, {
         variables,
         deps: [filterFormData],
         dataFn: data => data.eventsExport,

@@ -75,6 +75,16 @@ export class EventsPage {
         await this.page.locator('.ant-select-dropdown:visible .ant-select-item-option').filter({hasText: name}).first().click()
     }
 
+    /**
+     * Selects the actor of the events, by the label of its option: "All", "Humans", "Agents", or
+     * the label of one agent.
+     */
+    async selectActor(label) {
+        const select = this.page.locator('#events-filter-actor')
+        await select.fill(label)
+        await this.page.locator('.ant-select-dropdown:visible .ant-select-item-option').filter({hasText: label}).first().click()
+    }
+
     async filter() {
         await this.page.getByRole('button', {name: 'Filter', exact: true}).click()
     }

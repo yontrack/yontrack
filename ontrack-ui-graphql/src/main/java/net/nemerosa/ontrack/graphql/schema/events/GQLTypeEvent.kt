@@ -10,6 +10,7 @@ import net.nemerosa.ontrack.graphql.schema.GQLTypeCache
 import net.nemerosa.ontrack.graphql.schema.GQLTypeEventType
 import net.nemerosa.ontrack.graphql.schema.GQLTypeNameValue
 import net.nemerosa.ontrack.graphql.schema.GQLTypeProject
+import net.nemerosa.ontrack.graphql.schema.GQLTypeSignatureActor
 import net.nemerosa.ontrack.graphql.support.GQLScalarLocalDateTime
 import net.nemerosa.ontrack.graphql.support.listType
 import net.nemerosa.ontrack.model.events.Event
@@ -65,6 +66,12 @@ class GQLTypeEvent(
                     .description("Name of the user who posted the event")
                     .type(GraphQLNonNull(GraphQLString))
                     .dataFetcher { env -> env.getSource<Event>()!!.signature?.user?.name }
+            }
+            .field {
+                it.name("actor")
+                    .description("Agent behind the event, null for a person")
+                    .type(GraphQLTypeReference(GQLTypeSignatureActor.SIGNATURE_ACTOR))
+                    .dataFetcher { env -> env.getSource<Event>()!!.signature?.actor }
             }
             .field {
                 it.name("message")

@@ -46,12 +46,36 @@ To create a subscription, select the _New subscription_ command and enter the fi
 
 * name - name of the subscription, required and unique for the entity (or among the global subscriptions)
 * events - list of [events](../../generated/events/index.md) to listen to
-* keywords - space-separated list of words which will be used to restrict the events being listened to
+* keywords - space-separated list of words which will be used to restrict the events being listened to.
+  See [Keywords](#keywords)
 * channel - destination for the notification.
   Depending on the channel being selected, additional fields are needed (for example, for a Slack notification, the Slack channel is required)
 * custom template - if provided, it'll override the default template associated with the event. See the [templating](../../appendix/templating.md) section for its syntax.
 
 In the subscription list, you can delete existing subscriptions.
+
+### Keywords
+
+The keywords of a subscription restrict the events it listens to. They are separated by spaces,
+case-insensitive, and **all** of them must match the event:
+
+* a plain keyword, like `GOLD` or `main`, must be the name of one of the entities of the event (its
+  branch, its promotion level, ...) or one of its values
+* three prefixed keywords select the events on their **actor**, the one who did what the event
+  records. They are read from the actor of the event, never from its entities or values:
+
+| Keyword                                 | Matches the events done...                          |
+|-----------------------------------------|-----------------------------------------------------|
+| `actor:agent`                           | by an [agent](../../agents/index.md)                |
+| `actor:human`                           | by a person - that is, not by an agent              |
+| `agent:<slug>[agent]` or `agent:<slug>` | by this agent, like `agent:claude[agent]` or `agent:claude` |
+
+For example, `actor:agent GOLD` on the `new_promotion_run` event notifies when an agent promotes a
+build to `GOLD`, and `actor:human` on the `slot-pipeline-deployed` event notifies when a person
+marks a deployment as done.
+
+[Workflows](../workflows/workflows.md) triggered by a subscription are filtered the same way, through
+the keywords of their subscription.
 
 ## Global subscriptions
 

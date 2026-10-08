@@ -204,6 +204,16 @@ class EventJdbcRepository(
             criteria += "(PROJECT IN (SELECT ID FROM PROJECTS WHERE NAME = :project) OR X_PROJECT IN (SELECT ID FROM PROJECTS WHERE NAME = :project))"
             params.addValue("project", it)
         }
+        when (val actor = filter.actorCriterion()) {
+            null -> {}
+            EventFilter.ACTOR_AGENT -> criteria += "ACTOR IS NOT NULL"
+            EventFilter.ACTOR_HUMAN -> criteria += "ACTOR IS NULL"
+            else -> {
+                // Uses the EVENTS_IX_ACTOR_AGENT partial index
+                criteria += "ACTOR IS NOT NULL AND ACTOR->>'agent' = :actorAgent"
+                params.addValue("actorAgent", actor)
+            }
+        }
         val where = if (criteria.isEmpty()) "" else criteria.joinToString(" AND ", prefix = "WHERE ")
         return where to params
     }

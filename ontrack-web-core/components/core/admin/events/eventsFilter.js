@@ -17,8 +17,10 @@ import {
  * @param user Prefix of the user name
  * @param eventTypes IDs of event types
  * @param project Name of a project
+ * @param actor Actor of the events: `human`, `agent`, the identifier of one agent, or
+ * `ACTOR_ALL` for any actor
  */
-export const eventsFilterVariables = ({range, user, eventTypes, project} = {}) => {
+export const eventsFilterVariables = ({range, user, eventTypes, project, actor} = {}) => {
     const variables = {}
     const [from, to] = range ?? []
     if (from) variables.from = from.toISOString()
@@ -27,7 +29,40 @@ export const eventsFilterVariables = ({range, user, eventTypes, project} = {}) =
     if (trimmedUser) variables.user = trimmedUser
     if (eventTypes?.length > 0) variables.eventTypes = eventTypes
     if (project) variables.project = project
+    if (actor && actor !== ACTOR_ALL) variables.actor = actor
     return variables
+}
+
+/**
+ * Value of the actor filter for the events of any actor - no filter.
+ */
+export const ACTOR_ALL = "all"
+
+/**
+ * Options of the actor filter of the events page: all the events, those of the persons, those of
+ * the agents, then each registered agent by its identifier (`<slug>[agent]`).
+ *
+ * The events of a deleted agent keep its name, and are found with "Agents".
+ *
+ * @param agents Registered agents, with their `email` (their identifier) and `fullName`
+ */
+export const eventsActorOptions = (agents = []) => {
+    const options = [
+        {value: ACTOR_ALL, label: "All"},
+        {value: "human", label: "Humans"},
+        {value: "agent", label: "Agents"},
+    ]
+    if (agents.length > 0) {
+        options.push({
+            label: "Agent",
+            title: "Agent",
+            options: agents.map(agent => ({
+                value: agent.email,
+                label: `${agent.fullName} (${agent.email})`,
+            })),
+        })
+    }
+    return options
 }
 
 const entityUris = {

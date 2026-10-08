@@ -126,6 +126,7 @@ class EventsExportServiceImpl(
                 "user" to filter.user,
                 "eventTypes" to filter.eventTypes,
                 "project" to filter.project,
+                "actor" to filter.actor,
             )
     }
 
@@ -155,6 +156,7 @@ class EventsExportServiceImpl(
         extraEntities = event.extraEntities.mapValues { (_, entity) -> entity.exportName() },
         ref = event.ref?.name,
         values = event.values.mapValuesTo(LinkedHashMap()) { (_, nameValue) -> nameValue.value },
+        actor = event.signature?.actor,
     )
 
     private fun renderMessage(event: Event): String =
@@ -208,13 +210,25 @@ class EventsExportServiceImpl(
         )
 
         /**
+         * Columns of the actor of the event, after the values: added to the version 1 of the
+         * format, at the end of the CSV, so that the columns before them keep their positions.
+         */
+        val ACTOR_COLUMNS: List<String> = listOf("actorKind", "agent", "owner", "sessionLink")
+
+        /**
+         * Kind of actor of the event of a person
+         */
+        const val ACTOR_KIND_HUMAN = "human"
+
+        /**
          * Columns of the version 1 of the format, CSV and JSON alike
          */
         val COLUMNS: List<String> =
             listOf("id", "time", "user", "eventType", "message") +
                     ENTITY_COLUMNS.map { it.second } +
                     ENTITY_COLUMNS.map { (_, name) -> "x${name.replaceFirstChar { it.uppercase() }}" } +
-                    listOf("ref", "values")
+                    listOf("ref", "values") +
+                    ACTOR_COLUMNS
 
         private val json = ObjectMapperFactory.create()
 
@@ -238,6 +252,7 @@ class EventsExportServiceImpl(
         val extraEntities: Map<ProjectEntityType, String>,
         val ref: String?,
         val values: Map<String, String>,
+        val actor: SignatureActor?,
     ) {
         /**
          * Values of the row, in the order of the [columns][COLUMNS], but the values
@@ -252,6 +267,18 @@ class EventsExportServiceImpl(
             ) + ENTITY_COLUMNS.map { (type, name) -> name to entities[type] } +
                     ENTITY_COLUMNS.map { (type, name) -> "x${name.replaceFirstChar { it.uppercase() }}" to extraEntities[type] } +
                     listOf("ref" to ref)
+
+        /**
+         * Actor of the event, in the order of the [actor columns][ACTOR_COLUMNS]: `human` and
+         * nothing else for a person.
+         */
+        fun actorScalars(): List<Pair<String, String?>> =
+            listOf(
+                "actorKind" to (actor?.kind ?: ACTOR_KIND_HUMAN),
+                "agent" to actor?.agent,
+                "owner" to actor?.owner,
+                "sessionLink" to actor?.session?.link,
+            )
     }
 
     private interface EventsExportWriter {
@@ -271,7 +298,8 @@ class EventsExportServiceImpl(
 
         override fun row(row: EventsExportRow) {
             val cells = row.scalars().map { (_, value) -> value?.toString() ?: "" } +
-                    json.writeValueAsString(row.values)
+                    json.writeValueAsString(row.values) +
+                    row.actorScalars().map { (_, value) -> value ?: "" }
             csv.writeNext(cells.toTypedArray(), false)
         }
 
@@ -323,6 +351,9 @@ class EventsExportServiceImpl(
                 generator.writeStringProperty(name, value)
             }
             generator.writeEndObject()
+            row.actorScalars().forEach { (name, value) ->
+                generator.writePOJOProperty(name, value)
+            }
             generator.writeEndObject()
         }
 

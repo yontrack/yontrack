@@ -4,6 +4,7 @@ const {login} = require("../login");
 const {generate} = require("@ontrack/utils");
 const {openUserMenuGroup, selectUserMenuItem} = require("../userMenu");
 const {EventsPage} = require("./events");
+const {registerAgent} = require("@ontrack/agents");
 
 test('events page lists and filters the events of the instance', async ({page, ontrack}) => {
     // A project, two branches, one of which is deleted: a `new_branch` event for the branch which
@@ -97,6 +98,7 @@ test('events page downloads the filtered events as CSV', async ({page, ontrack})
         "project", "branch", "build", "promotionLevel", "validationStamp", "promotionRun", "validationRun",
         "xProject", "xBranch", "xBuild", "xPromotionLevel", "xValidationStamp", "xPromotionRun", "xValidationRun",
         "ref", "values",
+        "actorKind", "agent", "owner", "sessionLink",
     ])
     const items = rows.map(row => Object.fromEntries(header.map((name, index) => [name, row[index]])))
     expect(items.map(item => [item.eventType, item.project, item.branch, item.build])).toEqual([
@@ -107,6 +109,58 @@ test('events page downloads the filtered events as CSV', async ({page, ontrack})
     items.forEach(item => expect(() => JSON.parse(item.values)).not.toThrow())
     // No warning, the export holding all the matching events
     await expect(page.getByTestId('events-export-truncated')).toHaveCount(0)
+})
+
+test('events page filters the events on their actor, and shows the agents', async ({page, ontrack}) => {
+    // A project and a branch created by a person, a build created by the person, and a build
+    // created by an agent with a session
+    const project = await ontrack.createProject()
+    const branch = await project.createBranch()
+    const personBuild = await branch.createBuild()
+    const agent = await registerAgent(ontrack, {displayName: "Claude", tool: "Claude Code"})
+    const session = {id: `session-${agent.id}`, link: `https://claude.ai/code/session-${agent.id}`}
+    const agentBranch = await agent.client(session).getBranchById(branch.id)
+    const agentBuild = await agentBranch.createBuild()
+
+    await login(page, ontrack)
+    const eventsPage = new EventsPage(page, ontrack)
+    await eventsPage.goTo()
+
+    // The builds of the project, of any actor
+    await eventsPage.selectEventTypes(["new_build"])
+    await eventsPage.selectProject(project.name)
+    await eventsPage.filter()
+    await expect(eventsPage.rows()).toHaveCount(2)
+
+    // The agents only: the build of the agent, with the badge of the agent in place of its user
+    await eventsPage.selectActor("Agents")
+    await eventsPage.filter()
+    await expect(eventsPage.rows()).toHaveCount(1)
+    await expect(eventsPage.rows().nth(0)).toContainText(agentBuild.name)
+    const badge = eventsPage.rows().nth(0).locator('[data-testid^="event-actor-"]')
+    await expect(badge).toContainText("Claude, owned by")
+    await expect(eventsPage.rows().nth(0).getByRole("link", {name: /^agent Claude, owned by /}))
+        .toHaveAttribute("href", session.link)
+
+    // The export follows the filter
+    const [header, ...rows] = await eventsPage.downloadCsv()
+    const items = rows.map(row => Object.fromEntries(header.map((name, index) => [name, row[index]])))
+    expect(items.map(item => [item.build, item.actorKind, item.agent, item.sessionLink])).toEqual([
+        [agentBuild.name, "agent", agent.email, session.link],
+    ])
+
+    // This agent only
+    await eventsPage.selectActor(agent.email)
+    await eventsPage.filter()
+    await expect(eventsPage.rows()).toHaveCount(1)
+    await expect(eventsPage.rows().nth(0)).toContainText(agentBuild.name)
+
+    // The persons only: the build of the person, with no badge
+    await eventsPage.selectActor("Humans")
+    await eventsPage.filter()
+    await expect(eventsPage.rows()).toHaveCount(1)
+    await expect(eventsPage.rows().nth(0)).toContainText(personBuild.name)
+    await expect(eventsPage.rows().nth(0).locator('[data-testid^="event-actor-"]')).toHaveCount(0)
 })
 
 test('events menu item hidden for a user without the events audit', async ({page, ontrack}) => {

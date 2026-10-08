@@ -52,6 +52,18 @@ describe('EventsExportButtons', () => {
         expect(screen.queryByText(/most recent matching events/)).not.toBeInTheDocument()
     })
 
+    it('downloads the events of the actor of the applied filter', async () => {
+        answer({maxRows: 100000, truncated: false})
+        render(<EventsExportButtons filterFormData={{actor: "agent"}}/>)
+
+        expect(screen.getByRole("link", {name: /Download CSV/})).toHaveAttribute(
+            "href", "/api/protected/downloads/events/export?format=csv&actor=agent"
+        )
+        await waitFor(() => expect(global.fetch).toHaveBeenCalled())
+        const {variables} = JSON.parse(global.fetch.mock.calls[0][1].body)
+        expect(variables).toEqual({actor: "agent"})
+    })
+
     it('warns when the export would be truncated', async () => {
         answer({maxRows: 3, truncated: true})
         render(<EventsExportButtons filterFormData={{}}/>)

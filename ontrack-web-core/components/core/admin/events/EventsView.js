@@ -1,5 +1,4 @@
-import {gql} from "graphql-request";
-import {DatePicker, Form, Input, Typography} from "antd";
+import {DatePicker, Form, Input} from "antd";
 import StandardTable from "@components/common/table/StandardTable";
 import TimestampText from "@components/common/TimestampText";
 import EventDisplay from "@components/core/model/EventDisplay";
@@ -10,70 +9,16 @@ import SelectProject from "@components/projects/SelectProject";
 import EventRowDetails from "@components/core/admin/events/EventRowDetails";
 import {eventsFilterVariables} from "@components/core/admin/events/eventsFilter";
 import EventsExportButtons from "@components/core/admin/events/EventsExportButtons";
-
-const query = gql`
-    query Events(
-        $offset: Int!,
-        $size: Int!,
-        $from: LocalDateTime,
-        $to: LocalDateTime,
-        $user: String,
-        $eventTypes: [String!],
-        $project: String,
-    ) {
-        events(
-            offset: $offset,
-            size: $size,
-            filter: {
-                from: $from,
-                to: $to,
-                user: $user,
-                eventTypes: $eventTypes,
-                project: $project,
-            },
-        ) {
-            pageInfo {
-                nextPage {
-                    offset
-                    size
-                }
-            }
-            pageItems {
-                id
-                eventType {
-                    id
-                    description
-                }
-                time
-                user
-                message
-                project {
-                    id
-                    name
-                }
-                entities {
-                    type
-                    id
-                    displayName
-                }
-                extraEntities {
-                    type
-                    id
-                    displayName
-                }
-                ref
-                values {
-                    name
-                    value
-                }
-            }
-        }
-    }
-`
+import SelectEventsActor from "@components/core/admin/events/SelectEventsActor";
+import ActorBadge from "@components/common/actors/ActorBadge";
+import {gqlEvents} from "@components/core/admin/events/eventsQueries";
 
 /**
  * Read-only list of all the events of the instance, newest first. The `events` query requires
  * the events audit function: without it, the query is refused and its error is displayed.
+ *
+ * The events can be filtered on their actor - persons, agents, or one agent - and the user of an
+ * event done by an agent is shown as the badge of the agent.
  *
  * The events matching the applied filter can be downloaded as CSV or JSON.
  */
@@ -81,7 +26,7 @@ export default function EventsView() {
     return (
         <StandardTable
             id="events"
-            query={query}
+            query={gqlEvents}
             queryNode="events"
             size={20}
             rowKey={event => event.id}
@@ -130,6 +75,13 @@ export default function EventsView() {
                 >
                     <SelectProject id="events-filter-project"/>
                 </Form.Item>,
+                <Form.Item
+                    key="actor"
+                    name="actor"
+                    label="Actor"
+                >
+                    <SelectEventsActor id="events-filter-actor"/>
+                </Form.Item>,
             ]}
             columns={[
                 {
@@ -141,8 +93,7 @@ export default function EventsView() {
                 {
                     key: 'user',
                     title: 'User',
-                    dataIndex: 'user',
-                    render: (value) => <Typography.Text>{value}</Typography.Text>,
+                    render: (_, event) => <ActorBadge signature={event} testId={`event-actor-${event.id}`}/>,
                 },
                 {
                     key: 'type',

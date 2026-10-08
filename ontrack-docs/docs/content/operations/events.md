@@ -32,7 +32,7 @@ Each row shows:
 | Column  | Content                                                       |
 |---------|---------------------------------------------------------------|
 | Time    | When the event was posted, in your own time zone              |
-| User    | Name of the user who posted the event                         |
+| User    | Name of the user who posted the event - for an event done by an [agent](../agents/index.md), the badge of the agent: its name and its owner, linking to its session when it gave one |
 | Type    | ID and description of the event type                          |
 | Message | Message of the event, with links to the entities it is about  |
 | Project | Project of the event, if any                                  |
@@ -60,6 +60,9 @@ The form above the table filters the events. Fill in any of the fields and click
 | User        | posted by a user whose name starts with the given text, ignoring the case         |
 | Event types | of any of the selected types                                                      |
 | Project     | of the selected project, or whose additional entities belong to it               |
+| Actor       | of any actor (*All*), done by a person (*Humans*), done by an [agent](../agents/index.md) (*Agents*), or done by one of the registered agents |
+
+The events of an agent which has since been deleted keep its name, and are found with *Agents*.
 
 The filters are combined: an event must match all of them to be listed.
 
@@ -77,6 +80,7 @@ query {
       user: "admin"
       eventTypes: ["new_promotion_run"]
       project: "my-project"
+      actor: "agent"
     }
     offset: 0
     size: 50
@@ -91,6 +95,12 @@ query {
       id
       time
       user
+      actor {
+        agent
+        displayName
+        owner
+        sessionLink
+      }
       eventType {
         id
       }
@@ -113,6 +123,9 @@ query {
 ```
 
 - `from` and `to` are UTC times, both included
+- `actor` is `agent` for the events done by agents, `human` for those done by persons, or the
+  identifier of one agent, like `claude[agent]`, ignoring the case
+- `actor` is null for an event done by a person
 - a page holds at most 100 events
 - there is no total count: `pageInfo.nextPage` is set as long as there are more events, and gives
   the `offset` and `size` of the next page
@@ -144,10 +157,16 @@ Each event gives:
 | `xProject`, `xBranch`, `xBuild`, `xPromotionLevel`, `xValidationStamp`, `xPromotionRun`, `xValidationRun` | The same for the additional entities of the event |
 | `ref`                                                         | Type of the entity the event refers to first, like `BUILD`              |
 | `values`                                                      | Values of the event, by name                                            |
+| `actorKind`                                                   | `agent` for an event done by an [agent](../agents/index.md), `human` otherwise |
+| `agent`                                                       | Identifier of the agent, like `claude[agent]` - empty for a person      |
+| `owner`                                                       | Email of the owner of the agent - empty for a person                    |
+| `sessionLink`                                                 | Link to the agent session, when the agent gave one                      |
 
 **CSV.** The first row holds the names of the columns, in the order of the table above. An
 absent entity is an empty cell, and `values` is one column holding the values as a JSON
-object, like `{"BRANCH":"main","BRANCH_ID":"12"}`. The file is in UTF-8, its values quoted when
+object, like `{"BRANCH":"main","BRANCH_ID":"12"}`. The actor columns come after `values`, at the
+end of the row: they were added to the version 1 of the format, and the columns before them kept
+their positions. The file is in UTF-8, its values quoted when
 they need to be.
 
 **JSON.** One object, which describes the export before its events:
@@ -161,7 +180,8 @@ they need to be.
     "to": null,
     "user": null,
     "eventTypes": ["new_build"],
-    "project": "my-project"
+    "project": "my-project",
+    "actor": null
   },
   "maxRows": 100000,
   "truncated": false,
@@ -169,7 +189,7 @@ they need to be.
     {
       "id": 1234,
       "time": "2026-10-07T09:15:00Z",
-      "user": "admin",
+      "user": "claude[agent]",
       "eventType": "new_build",
       "message": "New build 12 for branch main in my-project.",
       "project": "my-project",
@@ -187,13 +207,18 @@ they need to be.
       "xPromotionRun": null,
       "xValidationRun": null,
       "ref": "BUILD",
-      "values": {}
+      "values": {},
+      "actorKind": "agent",
+      "agent": "claude[agent]",
+      "owner": "alice@example.com",
+      "sessionLink": "https://claude.ai/code/session-1"
     }
   ]
 }
 ```
 
-An absent entity is `null`, and `values` is an object.
+An absent entity is `null`, and `values` is an object. For an event done by a person, `actorKind`
+is `human`, and `agent`, `owner` and `sessionLink` are `null`.
 
 ### Format version
 
@@ -234,6 +259,7 @@ function only. Its parameters are:
 | `user`       | Prefix of the name of the user who posted the event, ignoring the case        |
 | `eventTypes` | IDs of event types, repeated (`eventTypes=a&eventTypes=b`) or separated by commas |
 | `project`    | Name of a project                                                             |
+| `actor`      | `agent`, `human`, or the identifier of one agent, like `claude[agent]`        |
 
 For example, with an [API token](../security/tokens.md):
 

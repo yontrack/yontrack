@@ -7,6 +7,7 @@ import Well from "@components/common/Well";
 import NotificationChannelConfigForm from "@components/extension/notifications/NotificationChannelConfigForm";
 import {gql} from "graphql-request";
 import {callDynamicFunction} from "@components/common/DynamicFunction";
+import SubscriptionKeywordsHelp from "@components/extension/notifications/SubscriptionKeywordsHelp";
 
 export const useSubscriptionDialog = ({onSuccess, projectEntity}) => {
 
@@ -94,6 +95,7 @@ export default function SubscriptionDialog({subscriptionDialog}) {
                 <Form.Item
                     name="keywords"
                     label="Keywords"
+                    extra={<SubscriptionKeywordsHelp/>}
                 >
                     <Input/>
                 </Form.Item>

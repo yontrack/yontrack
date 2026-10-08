@@ -3,6 +3,7 @@ package net.nemerosa.ontrack.boot.ui
 import com.opencsv.CSVReader
 import net.nemerosa.ontrack.boot.Application
 import net.nemerosa.ontrack.it.AbstractDSLTestSupport
+import net.nemerosa.ontrack.it.AgentTestSupport
 import net.nemerosa.ontrack.json.parseAsJson
 import net.nemerosa.ontrack.model.events.Event
 import net.nemerosa.ontrack.model.events.EventFactory
@@ -57,6 +58,9 @@ class EventsExportHttpIT : AbstractDSLTestSupport() {
     @Autowired
     private lateinit var eventPostService: EventPostService
 
+    @Autowired
+    private lateinit var agentTestSupport: AgentTestSupport
+
     private val client: HttpClient = HttpClient.newHttpClient()
 
     /**
@@ -67,6 +71,8 @@ class EventsExportHttpIT : AbstractDSLTestSupport() {
         "project", "branch", "build", "promotionLevel", "validationStamp", "promotionRun", "validationRun",
         "xProject", "xBranch", "xBuild", "xPromotionLevel", "xValidationStamp", "xPromotionRun", "xValidationRun",
         "ref", "values",
+        // Added to the version 1 by #2031, at the end
+        "actorKind", "agent", "owner", "sessionLink",
     )
 
     /**
@@ -120,6 +126,38 @@ class EventsExportHttpIT : AbstractDSLTestSupport() {
                         .with(Signature.of(time.plusHours(3), user))
                         .build()
                 )
+            }
+        }
+    }
+
+    /**
+     * Events posted by a user of their own, by a person at 12:00, then by an agent at 13:00, with
+     * the link to its session.
+     */
+    private inner class ActorEvents {
+        val user = uid("ev")
+        val project: Project = asAdmin { project() }
+        val agent = agentTestSupport.registerAgent(owner = asAdmin { doCreateAccount() })
+
+        init {
+            val time = LocalDateTime.of(2020, 6, 1, 12, 0, 0)
+            asAdmin {
+                eventPostService.post(
+                    Event.of(EventFactory.UPDATE_PROJECT)
+                        .withProject(project)
+                        .with(Signature.of(time, user))
+                        .build()
+                )
+            }
+            agentTestSupport.withToken(agent.token, sessionId = "s-1", sessionLink = SESSION_LINK) {
+                securityService.asAdmin {
+                    eventPostService.post(
+                        Event.of(EventFactory.DISABLE_PROJECT)
+                            .withProject(project)
+                            .with(Signature.of(time.plusHours(1), user))
+                            .build()
+                    )
+                }
             }
         }
     }
@@ -256,7 +294,7 @@ class EventsExportHttpIT : AbstractDSLTestSupport() {
         assertEquals(1, json.path("formatVersion").asInt())
         assertTrue(json.path("exportedAt").asString().endsWith("Z"), "Exported at, in UTC")
         assertEquals(
-            listOf("from", "to", "user", "eventTypes", "project"),
+            listOf("from", "to", "user", "eventTypes", "project", "actor"),
             json.path("filter").fieldNames(),
         )
         assertEquals("2020-06-01T12:30:00Z", json.path("filter").path("from").asString())
@@ -353,5 +391,81 @@ class EventsExportHttpIT : AbstractDSLTestSupport() {
     fun `Export refused for a time which cannot be parsed`() {
         val response = export(auditorToken(), "format" to "csv", "from" to "yesterday")
         assertEquals(400, response.statusCode(), response.body())
+    }
+
+    @Test
+    fun `CSV export with the actor of the events, at the end of the columns`() {
+        val events = ActorEvents()
+        val response = export(auditorToken(), "format" to "csv", "user" to events.user)
+        assertEquals(200, response.statusCode(), response.body())
+        val rows = response.csv()
+        assertEquals(csvHeaderV1, rows.first())
+        assertEquals(
+            listOf("actorKind", "agent", "owner", "sessionLink"),
+            rows.first().takeLast(4),
+            "The actor columns come last",
+        )
+        val (byAgent, byPerson) = rows.drop(1).map { row -> csvHeaderV1.zip(row).toMap() }
+        assertEquals("disable_project", byAgent["eventType"])
+        assertEquals("agent", byAgent["actorKind"])
+        assertEquals(events.agent.account.email, byAgent["agent"])
+        assertEquals(events.agent.account.owner?.email, byAgent["owner"])
+        assertEquals(SESSION_LINK, byAgent["sessionLink"])
+        assertEquals("update_project", byPerson["eventType"])
+        assertEquals("human", byPerson["actorKind"])
+        assertEquals("", byPerson["agent"])
+        assertEquals("", byPerson["owner"])
+        assertEquals("", byPerson["sessionLink"])
+    }
+
+    @Test
+    fun `CSV export filtered on the agents`() {
+        val events = ActorEvents()
+        val response = export(auditorToken(), "format" to "csv", "user" to events.user, "actor" to "agent")
+        assertEquals(200, response.statusCode(), response.body())
+        val items = response.csv().drop(1).map { row -> csvHeaderV1.zip(row).toMap() }
+        assertEquals(listOf("disable_project"), items.map { it["eventType"] })
+    }
+
+    @Test
+    fun `JSON export filtered on one agent, then on the persons, with the actor fields`() {
+        val events = ActorEvents()
+
+        val agentJson = export(
+            auditorToken(),
+            "format" to "json",
+            "user" to events.user,
+            "actor" to events.agent.account.email,
+        ).let { response ->
+            assertEquals(200, response.statusCode(), response.body())
+            response.body().parseAsJson()
+        }
+        assertEquals(events.agent.account.email, agentJson.path("filter").path("actor").asString())
+        val byAgent = agentJson.path("events").values().single()
+        assertEquals(jsonEventFieldsV1, byAgent.fieldNames())
+        assertEquals("agent", byAgent.path("actorKind").asString())
+        assertEquals(events.agent.account.email, byAgent.path("agent").asString())
+        assertEquals(events.agent.account.owner?.email, byAgent.path("owner").asString())
+        assertEquals(SESSION_LINK, byAgent.path("sessionLink").asString())
+
+        val humanJson = export(
+            auditorToken(),
+            "format" to "json",
+            "user" to events.user,
+            "actor" to "human",
+        ).let { response ->
+            assertEquals(200, response.statusCode(), response.body())
+            response.body().parseAsJson()
+        }
+        val byPerson = humanJson.path("events").values().single()
+        assertEquals("update_project", byPerson.path("eventType").asString())
+        assertEquals("human", byPerson.path("actorKind").asString())
+        assertTrue(byPerson.path("agent").isNull)
+        assertTrue(byPerson.path("owner").isNull)
+        assertTrue(byPerson.path("sessionLink").isNull)
+    }
+
+    companion object {
+        private const val SESSION_LINK = "https://example.com/sessions/s-1"
     }
 }

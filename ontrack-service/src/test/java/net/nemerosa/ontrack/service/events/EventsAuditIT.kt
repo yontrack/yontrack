@@ -1,6 +1,7 @@
 package net.nemerosa.ontrack.service.events
 
 import net.nemerosa.ontrack.it.AbstractDSLTestSupport
+import net.nemerosa.ontrack.it.AgentTestSupport
 import net.nemerosa.ontrack.it.AsAdminTest
 import net.nemerosa.ontrack.model.events.Event
 import net.nemerosa.ontrack.model.events.EventFactory
@@ -39,6 +40,9 @@ class EventsAuditIT : AbstractDSLTestSupport() {
     @Autowired
     private lateinit var eventPostService: EventPostService
 
+    @Autowired
+    private lateinit var agentTestSupport: AgentTestSupport
+
     private val baseTime: LocalDateTime = LocalDateTime.of(2020, 6, 1, 12, 0, 0)
 
     /**
@@ -63,6 +67,23 @@ class EventsAuditIT : AbstractDSLTestSupport() {
             eventPostService.post(builder.build())
         }
     }
+
+    /**
+     * Posts an event signed by the [user], authenticated as the [agent]: the actor of the event is
+     * always the authenticated one.
+     */
+    private fun postAgentEvent(agent: AgentTestSupport.TestAgent, user: String) {
+        agentTestSupport.withToken(agent.token) {
+            securityService.asAdmin {
+                eventPostService.post(
+                    Event.of(EventFactory.UPDATE_PROJECT).with(Signature.of(baseTime, user)).withProject(defaultProject).build()
+                )
+            }
+        }
+    }
+
+    private fun agent(): AgentTestSupport.TestAgent =
+        agentTestSupport.registerAgent(owner = asAdmin { doCreateAccount() })
 
     private fun find(filter: EventFilter, offset: Int = 0, size: Int = 20): List<Event> =
         asAdmin {
@@ -277,6 +298,63 @@ class EventsAuditIT : AbstractDSLTestSupport() {
                 assertEquals(project.name, (event.entities[ProjectEntityType.PROJECT] as Project).name)
             }
         }
+    }
+
+    @Test
+    fun `Finding the events of the agents, of the persons, or of one agent`() {
+        val user = uid("ev")
+        val claude = agent()
+        val codex = agent()
+        postEvent(user = "${user}-alice")
+        postAgentEvent(claude, "${user}-claude")
+        postAgentEvent(codex, "${user}-codex")
+        postEvent(user = "${user}-bob")
+
+        assertEquals(
+            listOf("${user}-bob", "${user}-codex", "${user}-claude", "${user}-alice"),
+            find(EventFilter(user = user)).map { it.signature?.user?.name },
+            "No actor filter",
+        )
+        assertEquals(
+            listOf("${user}-codex", "${user}-claude"),
+            find(EventFilter(user = user, actor = "agent")).map { it.signature?.user?.name },
+            "Agents",
+        )
+        assertEquals(
+            listOf("${user}-bob", "${user}-alice"),
+            find(EventFilter(user = user, actor = "human")).map { it.signature?.user?.name },
+            "Persons",
+        )
+        assertEquals(
+            listOf("${user}-claude"),
+            find(EventFilter(user = user, actor = claude.account.email)).map { it.signature?.user?.name },
+            "One agent",
+        )
+        assertEquals(
+            listOf("${user}-claude"),
+            find(EventFilter(user = user, actor = " ${claude.account.email.uppercase()} ")).map { it.signature?.user?.name },
+            "One agent, ignoring the case",
+        )
+        assertEquals(
+            emptyList(),
+            find(EventFilter(user = user, actor = "unknown[agent]")),
+            "Unknown agent",
+        )
+        assertEquals(
+            4,
+            find(EventFilter(user = user, actor = " ")).size,
+            "A blank actor is no filter",
+        )
+    }
+
+    @Test
+    fun `The events read for the audit carry their actor`() {
+        val user = uid("ev")
+        val claude = agent()
+        postAgentEvent(claude, user)
+        val event = find(EventFilter(user = user)).single()
+        assertEquals(claude.account.email, event.signature?.actor?.agent)
+        assertEquals(claude.account.owner?.email, event.signature?.actor?.owner)
     }
 
 }

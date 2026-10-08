@@ -2508,6 +2508,8 @@ type EstateSecurity {
 
 "Record of something that happened to a project entity, or to the instance, with its type, its time, its user, the entities it concerns and its values."
 type Event {
+  "Agent behind the event, null for a person"
+  actor: SignatureActor
   "Entities the event is about"
   entities: [EventEntity!]!
   "Type of the event"
@@ -11362,6 +11364,8 @@ input EstateSecurityInput {
 
 "Filter on the events of the instance. Every criterion is optional, and they are combined."
 input EventFilterInput {
+  "Actor of the event: `agent` for the events of the agents, `human` for the events of the persons, or the identifier of one agent, `<slug>[agent]`. Case-insensitive."
+  actor: String
   "IDs of the event types to keep - empty or absent for all the types"
   eventTypes: [String!]
   "Events at or after this time (UTC, inclusive)"

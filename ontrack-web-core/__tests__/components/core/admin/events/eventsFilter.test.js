@@ -1,6 +1,11 @@
 import dayjs from "dayjs"
 import utc from "dayjs/plugin/utc"
-import {eventEntityLink, eventsFilterVariables} from "@components/core/admin/events/eventsFilter"
+import {
+    ACTOR_ALL,
+    eventEntityLink,
+    eventsActorOptions,
+    eventsFilterVariables,
+} from "@components/core/admin/events/eventsFilter"
 import {eventsExportUri} from "@components/common/Links"
 
 dayjs.extend(utc)
@@ -61,6 +66,42 @@ describe('eventsFilterVariables', () => {
         })
     })
 
+    it('the actor is passed as it is, and "all" gives no variable', () => {
+        expect(eventsFilterVariables({actor: "agent"})).toEqual({actor: "agent"})
+        expect(eventsFilterVariables({actor: "human"})).toEqual({actor: "human"})
+        expect(eventsFilterVariables({actor: "claude[agent]"})).toEqual({actor: "claude[agent]"})
+        expect(eventsFilterVariables({actor: ACTOR_ALL})).toEqual({})
+        expect(eventsFilterVariables({actor: null})).toEqual({})
+    })
+
+})
+
+/**
+ * The actor filter offers all the events, those of the persons, those of the agents, and each
+ * registered agent.
+ */
+describe('eventsActorOptions', () => {
+
+    it('without any agent, all, humans and agents', () => {
+        expect(eventsActorOptions([])).toEqual([
+            {value: "all", label: "All"},
+            {value: "human", label: "Humans"},
+            {value: "agent", label: "Agents"},
+        ])
+    })
+
+    it('each registered agent, by its identifier', () => {
+        const options = eventsActorOptions([
+            {id: 1, email: "claude[agent]", fullName: "Claude"},
+            {id: 2, email: "codex[agent]", fullName: "Codex"},
+        ])
+        expect(options.map(option => option.value ?? option.label)).toEqual(["all", "human", "agent", "Agent"])
+        expect(options[3].options).toEqual([
+            {value: "claude[agent]", label: "Claude (claude[agent])"},
+            {value: "codex[agent]", label: "Codex (codex[agent])"},
+        ])
+    })
+
 })
 
 /**
@@ -115,6 +156,12 @@ describe('eventsExportUri', () => {
             "&user=adm" +
             "&eventTypes=new_project&eventTypes=new_branch" +
             "&project=my+project"
+        )
+    })
+
+    it('the actor of the filter as a parameter', () => {
+        expect(eventsExportUri("csv", eventsFilterVariables({actor: "claude[agent]"}))).toBe(
+            "/api/protected/downloads/events/export?format=csv&actor=claude%5Bagent%5D"
         )
     })
 

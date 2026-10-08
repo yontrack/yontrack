@@ -33,6 +33,7 @@ class GQLInputEventFilter : GQLInputType<EventFilter> {
             .field(stringInputField(EventFilter::user))
             .field(inputField(EventFilter::eventTypes, GraphQLList(GraphQLNonNull(GraphQLString))))
             .field(stringInputField(EventFilter::project))
+            .field(stringInputField(EventFilter::actor))
             .build()
 
     override fun convert(argument: Any?): EventFilter =
@@ -43,6 +44,7 @@ class GQLInputEventFilter : GQLInputType<EventFilter> {
                 user = argument[EventFilter::user.name] as String?,
                 eventTypes = (argument[EventFilter::eventTypes.name] as List<*>?)?.map { it.toString() },
                 project = argument[EventFilter::project.name] as String?,
+                actor = argument[EventFilter::actor.name] as String?,
             )
         } else {
             EventFilter()

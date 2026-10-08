@@ -906,7 +906,8 @@ Each notification configuration has the following properties:
 * `name` - Unique name of the subscription in its scope.
 * `promotion` - Targeting a promotion instead of the branch. The promotion must have been configured first.
 * `events` - List of [events types](../generated/events/index.md) to subscribe to
-* `keywords` - Optional space-separated list of tokens to look for in the events
+* `keywords` - Optional space-separated list of tokens to look for in the events, including
+  `actor:agent`, `actor:human` and `agent:<slug>` - see [Keywords](../integrations/notifications/index.md#keywords)
 * `channel` - Name of the channel to send the notification to
 * `channelConfig` - Configuration of the [channel](../integrations/notifications/index.md)
 * `contentTemplate` - Optional template to use for the message

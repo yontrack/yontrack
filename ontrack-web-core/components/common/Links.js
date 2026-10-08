@@ -73,7 +73,7 @@ export function evidenceDownloadUri(evidence) {
  *
  * @param format `csv` or `json`
  * @param variables Variables of the filter, as given by `eventsFilterVariables` - from, to, user,
- * eventTypes, project
+ * eventTypes, project, actor
  */
 export function eventsExportUri(format, variables = {}) {
     const params = new URLSearchParams({format})

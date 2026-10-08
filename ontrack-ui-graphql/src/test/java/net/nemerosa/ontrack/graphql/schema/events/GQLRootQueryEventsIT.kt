@@ -1,6 +1,7 @@
 package net.nemerosa.ontrack.graphql.schema.events
 
 import net.nemerosa.ontrack.graphql.AbstractQLKTITSupport
+import net.nemerosa.ontrack.it.AgentTestSupport
 import net.nemerosa.ontrack.model.events.Event
 import net.nemerosa.ontrack.model.events.EventFactory
 import net.nemerosa.ontrack.model.events.EventPostService
@@ -19,6 +20,9 @@ class GQLRootQueryEventsIT : AbstractQLKTITSupport() {
     @Autowired
     private lateinit var eventPostService: EventPostService
 
+    @Autowired
+    private lateinit var agentTestSupport: AgentTestSupport
+
     private val query = """
         query Events(${'$'}offset: Int, ${'$'}size: Int, ${'$'}filter: EventFilterInput) {
             events(offset: ${'$'}offset, size: ${'$'}size, filter: ${'$'}filter) {
@@ -36,6 +40,13 @@ class GQLRootQueryEventsIT : AbstractQLKTITSupport() {
                     }
                     time
                     user
+                    actor {
+                        kind
+                        agent
+                        displayName
+                        owner
+                        sessionLink
+                    }
                     message
                     project {
                         name
@@ -90,6 +101,7 @@ class GQLRootQueryEventsIT : AbstractQLKTITSupport() {
                 )
                 assertEquals("2020-06-01T12:00:00", event.path("time").asString())
                 assertEquals(user, event.path("user").asString())
+                assertTrue(event.path("actor").isNull, "No actor for a person")
                 val message = event.path("message").asString()
                 assertTrue(message.startsWith("Project "), "Rendered message: $message")
                 assertTrue(message.contains(project.name), "Rendered message contains the project: $message")
@@ -205,6 +217,48 @@ class GQLRootQueryEventsIT : AbstractQLKTITSupport() {
     fun `The events cannot be queried without the events audit function`() {
         asUser {
             runWithError(query, errorClassification = ErrorType.FORBIDDEN)
+        }
+    }
+
+    @Test
+    fun `Filtering the events on their actor`() {
+        val user = uid("ev")
+        val agent = agentTestSupport.registerAgent(owner = asAdmin { doCreateAccount() }, displayName = "Claude")
+        val project = asAdmin { project() }
+        asAdmin {
+            eventPostService.post(
+                Event.of(EventFactory.UPDATE_PROJECT).withProject(project).with(Signature.of(user)).build()
+            )
+        }
+        agentTestSupport.withToken(agent.token, sessionId = "s-1", sessionLink = "https://example.com/s-1") {
+            securityService.asAdmin {
+                eventPostService.post(
+                    Event.of(EventFactory.DISABLE_PROJECT).withProject(project).with(Signature.of(user)).build()
+                )
+            }
+        }
+        asAdmin {
+            fun eventTypes(actor: String?): List<String> {
+                var result = emptyList<String>()
+                run(query, mapOf("filter" to mapOf("user" to user, "actor" to actor))) { data ->
+                    result = data.path("events").path("pageItems").values().map { it.path("eventType").path("id").asString() }
+                }
+                return result
+            }
+            assertEquals(listOf("disable_project", "update_project"), eventTypes(null))
+            assertEquals(listOf("disable_project"), eventTypes("agent"))
+            assertEquals(listOf("update_project"), eventTypes("human"))
+            assertEquals(listOf("disable_project"), eventTypes(agent.account.email))
+            assertEquals(emptyList(), eventTypes("unknown[agent]"))
+
+            run(query, mapOf("filter" to mapOf("user" to user, "actor" to "agent"))) { data ->
+                val actor = data.path("events").path("pageItems").single().path("actor")
+                assertEquals("agent", actor.path("kind").asString())
+                assertEquals(agent.account.email, actor.path("agent").asString())
+                assertEquals("Claude", actor.path("displayName").asString())
+                assertEquals(agent.account.owner?.email, actor.path("owner").asString())
+                assertEquals("https://example.com/s-1", actor.path("sessionLink").asString())
+            }
         }
     }
 
