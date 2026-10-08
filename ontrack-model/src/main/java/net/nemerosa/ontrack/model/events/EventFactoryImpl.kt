@@ -203,9 +203,13 @@ class EventFactoryImpl : EventFactory {
             .build()
     }
 
+    /**
+     * The creation of a build, possibly backdated, is signed by the build.
+     */
     override fun newBuild(build: Build): Event {
         return of(NEW_BUILD)
             .withBuild(build)
+            .with(build.signature)
             .build()
     }
 
@@ -227,7 +231,6 @@ class EventFactoryImpl : EventFactory {
     override fun updateBuild(build: Build, previous: Build): Event {
         return of(UPDATE_BUILD)
             .withBuild(build)
-            .withNoSignature()
             .with(PREVIOUS_BUILD_NAME, previous.name)
             .with(PREVIOUS_BUILD_DESCRIPTION, previous.description)
             .with(PREVIOUS_BUILD_CREATION, Time.store(previous.signature.time))
@@ -389,7 +392,6 @@ class EventFactoryImpl : EventFactory {
         of(DELETE_VALIDATION_RUN)
             .withBuild(validationRun.build)
             .with(validationRun.validationStamp)
-            .withNoSignature()
             .with(VALIDATION_RUN_ID, validationRun.id().toString())
             .with(VALIDATION_RUN_ORDER, validationRun.runOrder.toString())
             .withValidationRunStatus(validationRun.lastStatus.statusID)

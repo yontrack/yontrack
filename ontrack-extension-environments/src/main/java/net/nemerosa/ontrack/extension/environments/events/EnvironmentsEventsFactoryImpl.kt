@@ -28,13 +28,11 @@ class EnvironmentsEventsFactoryImpl(
         .with(EnvironmentsEvents.EVENT_SLOT_ID, slot.id)
 
     /**
-     * The build of the pipeline is registered, but not its signature: the event is signed by the
-     * caller, when posted (#2042).
+     * The event is signed by the caller, when posted - not by the build (#2042).
      */
     private fun Event.EventBuilder.withPipeline(pipeline: SlotPipeline) = this
         .withSlot(pipeline.slot)
         .withBuild(pipeline.build)
-        .withNoSignature()
         .with(EnvironmentsEvents.EVENT_PIPELINE_ID, pipeline.id)
 
     /**
@@ -135,7 +133,6 @@ class EnvironmentsEventsFactoryImpl(
     override fun pipelineDeleted(pipeline: SlotPipeline): Event =
         Event.of(EnvironmentsEvents.PIPELINE_DELETED)
             .withPipeline(pipeline)
-            .withNoSignature()
             .with(EnvironmentsEvents.EVENT_SLOT_QUALIFIER, pipeline.slot.qualifier)
             .with(EnvironmentsEvents.EVENT_PIPELINE_NUMBER, pipeline.number.toString())
             .with(EnvironmentsEvents.EVENT_PIPELINE_STATUS, pipeline.status.name)
@@ -148,7 +145,6 @@ class EnvironmentsEventsFactoryImpl(
     ): Event =
         Event.of(EnvironmentsEvents.PIPELINE_WORKFLOW_OVERRIDDEN)
             .withPipeline(slotWorkflowInstance.pipeline)
-            .withNoSignature()
             .with(EnvironmentsEvents.EVENT_SLOT_WORKFLOW_ID, slotWorkflowInstance.slotWorkflow.id)
             .with(EnvironmentsEvents.EVENT_SLOT_WORKFLOW_INSTANCE_ID, slotWorkflowInstance.id)
             .with(EnvironmentsEvents.EVENT_WORKFLOW_NAME, slotWorkflowInstance.slotWorkflow.workflow.name)

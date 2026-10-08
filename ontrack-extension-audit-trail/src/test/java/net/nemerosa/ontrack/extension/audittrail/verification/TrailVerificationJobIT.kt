@@ -1,6 +1,7 @@
 package net.nemerosa.ontrack.extension.audittrail.verification
 
 import io.micrometer.core.instrument.MeterRegistry
+import net.nemerosa.ontrack.common.Time
 import net.nemerosa.ontrack.extension.audittrail.AbstractAuditTrailITSupport
 import net.nemerosa.ontrack.extension.audittrail.canonical.CanonicalJson
 import net.nemerosa.ontrack.extension.audittrail.endorsement.InstanceKeyService
@@ -14,12 +15,15 @@ import net.nemerosa.ontrack.extension.notifications.subscriptions.EventSubscript
 import net.nemerosa.ontrack.extension.notifications.subscriptions.subscribe
 import net.nemerosa.ontrack.extension.queue.QueueNoAsync
 import net.nemerosa.ontrack.json.parseAsJson
+import net.nemerosa.ontrack.model.events.EventQueryService
 import net.nemerosa.ontrack.model.structure.Build
 import net.nemerosa.ontrack.model.structure.ProjectEntity
 import net.nemerosa.ontrack.test.TestUtils.uid
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 
 /**
  * The daily verification of the trails: the trails which gained entries since the last run are
@@ -48,6 +52,9 @@ class TrailVerificationJobIT : AbstractAuditTrailITSupport() {
 
     @Autowired
     private lateinit var instanceKeyService: InstanceKeyService
+
+    @Autowired
+    private lateinit var eventQueryService: EventQueryService
 
     @Test
     fun `A trail tampered with since the last run posts trail verification failed and is counted`() {
@@ -176,6 +183,39 @@ class TrailVerificationJobIT : AbstractAuditTrailITSupport() {
                             "One message, from the last run only",
                         )
                     }
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `The failed verification is signed by the job, at the time of the verification`() {
+        asAdmin {
+            project {
+                trailVerificationJob.verifyTrails()
+                branch {
+                    val buildTime = Time.now.minusDays(10).withNano(0)
+                    val build = build().updateBuildSignature(user = "build-creator", time = buildTime)
+                    namedParameterJdbcTemplate.update(
+                        "UPDATE BUILD_TRAIL_ENTRY SET ACTOR = :actor WHERE ID = :id",
+                        mapOf("id" to build.entryId(1), "actor" to """{"type":"USER","name":"mallory"}"""),
+                    )
+                    val before = Time.now.withNano(0)
+
+                    assertEquals(TrailVerificationJobRun(verifiedTrails = 1, failedTrails = 1), trailVerificationJob.verifyTrails())
+
+                    val event = eventQueryService.getLastEvent(build, AuditTrailEvents.TRAIL_VERIFICATION_FAILED)
+                    assertNotNull(event, "Event trail.verification.failed posted")
+                    val signature = event.signature
+                    assertNotNull(signature, "Event trail.verification.failed is signed")
+                    assertTrue(
+                        signature.user.name != "build-creator",
+                        "Event trail.verification.failed is signed by the job, not by the creator of the build"
+                    )
+                    assertTrue(
+                        !signature.time.isBefore(before),
+                        "Event trail.verification.failed is dated ${signature.time}, not before $before (the build was created at $buildTime)"
+                    )
                 }
             }
         }

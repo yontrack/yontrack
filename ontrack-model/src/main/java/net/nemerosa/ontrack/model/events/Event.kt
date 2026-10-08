@@ -65,8 +65,12 @@ class Event(
             return this
         }
 
+        /**
+         * Registers the build, its branch and its project - not the signature of the build: the event
+         * is signed by the caller when posted, unless it says otherwise (#2043).
+         */
         fun withBuild(build: Build): EventBuilder {
-            return withBranch(build.branch).with(build).with(build.signature)
+            return withBranch(build.branch).with(build)
         }
 
         fun withPromotionRun(promotionRun: PromotionRun): EventBuilder {
