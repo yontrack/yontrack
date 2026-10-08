@@ -99,6 +99,49 @@ class EventQueryServiceImpl(
     override fun getLastEvent(entity: ProjectEntity, eventType: EventType): Event? =
         getLastEvent(entity.projectEntityType, entity.id, eventType)
 
+    override fun getAgentActions(entity: ProjectEntity, offset: Int, size: Int): PaginatedList<Event> {
+        securityService.checkProjectFunction(entity, ProjectView::class.java)
+        val actualOffset = offset.coerceAtLeast(0)
+        val actualSize = size.coerceIn(1, EventQueryService.MAX_EVENTS_PAGE_SIZE)
+        // The entities are loaded whatever their project, and the events touching a project the
+        // user cannot see are left out afterwards: a link from a hidden project, for example
+        val events = securityService.asAdmin {
+            eventRepository.findAgentEvents(
+                entityType = entity.projectEntityType,
+                entityId = entity.id,
+                offset = actualOffset,
+                // One more event, to know if there is a next page
+                size = actualSize + 1,
+                entityLoader = { type, id -> type.getEntityFn(structureService).apply(id) },
+                eventTypeLoader = { eventFactory.toEventType(it) },
+            )
+        }
+        val read = events.take(actualSize)
+        val hasNext = events.size > actualSize
+        val items = read.filter { event ->
+            (event.entities.values + event.extraEntities.values).all {
+                securityService.isProjectFunctionGranted(it, ProjectView::class.java)
+            }
+        }
+        return PaginatedList(
+            pageInfo = PageInfo(
+                // No total count: only what is known so far
+                totalSize = actualOffset + items.size + (if (hasNext) 1 else 0),
+                currentOffset = actualOffset,
+                currentSize = items.size,
+                previousPage = if (actualOffset > 0) {
+                    val previousOffset = (actualOffset - actualSize).coerceAtLeast(0)
+                    PageRequest(previousOffset, actualOffset - previousOffset)
+                } else {
+                    null
+                },
+                // The offsets count the events read, including the ones left out
+                nextPage = if (hasNext) PageRequest(actualOffset + read.size, actualSize) else null,
+            ),
+            pageItems = items,
+        )
+    }
+
     override fun findEvents(filter: EventFilter, offset: Int, size: Int): PaginatedList<Event> {
         securityService.checkGlobalFunction(EventsAudit::class.java)
         val actualOffset = offset.coerceAtLeast(0)

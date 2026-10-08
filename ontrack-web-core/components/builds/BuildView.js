@@ -33,6 +33,7 @@ import {gqlSignatureActorFields} from "@components/common/actors/actors";
 import ActorBadge from "@components/common/actors/ActorBadge";
 import {gqlAssistedChangeFields} from "@components/extension/scm/assistants/assistants";
 import AssistedBadge from "@components/extension/scm/assistants/AssistedBadge";
+import {gqlBuildAgentActionsProbe} from "@components/builds/agents/buildAgents";
 
 const noBuild = {branch: {project: {}}}
 
@@ -54,6 +55,7 @@ export default function BuildView({id}) {
                         ${gqlSignatureActorFields}
                     }
                     ${gqlAssistedChangeFields}
+                    ${gqlBuildAgentActionsProbe}
                     userMenuActions {
                         ...userMenuActionFragment
                     }

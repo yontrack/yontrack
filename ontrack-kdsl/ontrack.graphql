@@ -171,6 +171,8 @@ type AssistedChange {
   assistedCommits: Int
   "How the value was obtained: COMPUTED by Yontrack from the change log, SET_BY_CI, or UNKNOWN when it could not be computed."
   basis: AssistedChangeBasis!
+  "Build the change log was computed from, if any, and if it still exists."
+  previousBuild: Build
   "ID of the build the change log was computed from, if any."
   previousBuildId: Int
   "Distinct links to the agent sessions behind the commits, at most 20."
@@ -789,6 +791,13 @@ type BranchLink {
 }
 
 type Build implements Authorizable & ProjectEntity {
+  "What the agents did on this build: its events (validations, promotions, links...) whose actor is an agent, newest first. Visible to anyone who can see the build. A page holds at most 100 events. There is no total count: `pageInfo.nextPage` tells whether there are more events. An event touching a project the user cannot see is left out. The events follow the retention of the events."
+  agentActions(
+    "Offset for the page"
+    offset: Int = 0,
+    "Size of the page"
+    size: Int = 20
+  ): EventAgentActionPaginated
   "Description with links."
   annotatedDescription: String
   "Assisted change of the build: whether its commits since the previous build on its branch were written with assistants. Null when it has been neither computed nor set yet, which counts as unknown."
@@ -2530,6 +2539,13 @@ type Event {
   user: String!
   "Values of the event"
   values: [NameValue!]!
+}
+
+type EventAgentActionPaginated {
+  "Information about the current page"
+  pageInfo: PageInfo
+  "Items in the current page"
+  pageItems: [Event!]!
 }
 
 "Entity an event is about"

@@ -8,8 +8,11 @@ import graphql.schema.GraphQLObjectType.newObject
 import net.nemerosa.ontrack.common.and
 import net.nemerosa.ontrack.extension.api.ExtensionManager
 import net.nemerosa.ontrack.graphql.schema.authorizations.GQLInterfaceAuthorizableService
+import net.nemerosa.ontrack.graphql.schema.events.GQLTypeEvent
 import net.nemerosa.ontrack.graphql.support.*
 import net.nemerosa.ontrack.graphql.support.pagination.GQLPaginatedListFactory
+import net.nemerosa.ontrack.model.events.Event
+import net.nemerosa.ontrack.model.events.EventQueryService
 import net.nemerosa.ontrack.model.labels.Label
 import net.nemerosa.ontrack.model.labels.LabelManagementService
 import net.nemerosa.ontrack.model.labels.LabelNotFoundException
@@ -34,6 +37,7 @@ class GQLTypeBuild(
     private val labelManagementService: LabelManagementService,
     private val validationStampService: ValidationStampService,
     private val projectLabelManagementService: ProjectLabelManagementService,
+    private val eventQueryService: EventQueryService,
     creation: GQLTypeCreation,
     projectEntityFieldContributors: List<GQLProjectEntityFieldContributor>,
     freeTextAnnotatorContributors: List<FreeTextAnnotatorContributor>,
@@ -317,6 +321,24 @@ class GQLTypeBuild(
                             size,
                             filter
                         )
+                    }
+                )
+            )
+            // Actions by agents on this build (#2033)
+            .field(
+                paginatedListFactory.createPaginatedField<Build, Event>(
+                    cache = cache,
+                    fieldName = "agentActions",
+                    fieldDescription = "What the agents did on this build: its events (validations, promotions, links...) " +
+                            "whose actor is an agent, newest first. Visible to anyone who can see the build. " +
+                            "A page holds at most ${EventQueryService.MAX_EVENTS_PAGE_SIZE} events. " +
+                            "There is no total count: `pageInfo.nextPage` tells whether there are more events. " +
+                            "An event touching a project the user cannot see is left out. " +
+                            "The events follow the retention of the events.",
+                    itemType = GQLTypeEvent.TYPE_NAME,
+                    itemTypeSuffix = "AgentAction",
+                    itemPaginatedListProvider = { _, build, offset, size ->
+                        eventQueryService.getAgentActions(build, offset, size)
                     }
                 )
             )

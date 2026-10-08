@@ -8,6 +8,13 @@ import {useContext} from "react";
 import BuildContentEnvironments from "@components/builds/BuildContentEnvironments";
 import GridTableContextProvider from "@components/grid/GridTableContext";
 import GridTable from "@components/grid/GridTable";
+import BuildContentAgents from "@components/builds/BuildContentAgents";
+import {hasAgentsSection} from "@components/builds/agents/buildAgents";
+
+/**
+ * Height of the *Agents* section, on top of the others when shown.
+ */
+const AGENTS_HEIGHT = 12
 
 export default function BuildContent({build}) {
 
@@ -33,6 +40,17 @@ export default function BuildContent({build}) {
             {i: "using", x: 0, y: 9, w: 6, h: 9},
             {i: "usedBy", x: 6, y: 9, w: 6, h: 9},
             {i: "notifications", x: 0, y: 18, w: 12, h: 9},
+        ]
+    }
+
+    // What agents had to do with this build (#2033), on top, when there is something to show. Both
+    // the layout and the items are computed from the build, which is already loaded: they always
+    // agree with each other, from the first render (#1634)
+    const showAgents = hasAgentsSection(build)
+    if (showAgents) {
+        defaultLayout = [
+            {i: "agents", x: 0, y: 0, w: 12, h: AGENTS_HEIGHT},
+            ...defaultLayout.map(it => ({...it, y: it.y + AGENTS_HEIGHT})),
         ]
     }
 
@@ -68,6 +86,16 @@ export default function BuildContent({build}) {
             />,
         },
     ]
+
+    if (showAgents) {
+        items.push({
+            id: "agents",
+            content: <BuildContentAgents
+                key={build.id}
+                build={build}
+            />,
+        })
+    }
 
     if (user.authorizations.environment?.view) {
         items.push({

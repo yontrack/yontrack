@@ -9,12 +9,14 @@ import {graphQLCallMutation} from "@ontrack/graphql";
  * @param assistedCommits Number of assisted commits
  * @param totalCommits Number of commits
  * @param sessionLinks Links to the agent sessions
+ * @param previousBuildId ID of the build the change is counted from, if any
  */
 export const setAssistedChange = async (build, {
     assistants = ["Claude Code"],
     assistedCommits = null,
     totalCommits = null,
     sessionLinks = [],
+    previousBuildId = null,
 } = {}) => {
     await graphQLCallMutation(
         build.ontrack.connection,
@@ -26,6 +28,7 @@ export const setAssistedChange = async (build, {
                 $assistedCommits: Int,
                 $totalCommits: Int,
                 $sessionLinks: [String!],
+                $previousBuildId: Int,
             ) {
                 setBuildAssistedChangePropertyById(input: {
                     id: $id,
@@ -33,6 +36,7 @@ export const setAssistedChange = async (build, {
                     assistedCommits: $assistedCommits,
                     totalCommits: $totalCommits,
                     sessionLinks: $sessionLinks,
+                    previousBuildId: $previousBuildId,
                 }) {
                     errors {
                         message
@@ -46,6 +50,7 @@ export const setAssistedChange = async (build, {
             assistedCommits,
             totalCommits,
             sessionLinks,
+            previousBuildId: previousBuildId !== null ? Number(previousBuildId) : null,
         }
     )
 }

@@ -124,6 +124,29 @@ class EventJdbcRepository(
         ) { rs: ResultSet, _: Int -> toEvent(rs, entityLoader, eventTypeLoader) }
     }
 
+    @Suppress("SqlResolve")
+    override fun findAgentEvents(
+        entityType: ProjectEntityType,
+        entityId: ID,
+        offset: Int,
+        size: Int,
+        entityLoader: (type: ProjectEntityType, id: ID) -> ProjectEntity,
+        eventTypeLoader: (type: String) -> EventType,
+    ): List<Event> =
+        namedParameterJdbcTemplate!!.query(
+            """
+                SELECT *
+                FROM EVENTS
+                WHERE (${entityType.name} = :entityId OR X_${entityType.name} = :entityId)
+                AND ACTOR IS NOT NULL
+                ORDER BY ID DESC
+                LIMIT :size OFFSET :offset
+            """,
+            params("entityId", entityId.get())
+                .addValue("size", size)
+                .addValue("offset", offset)
+        ) { rs: ResultSet, _: Int -> toEvent(rs, entityLoader, eventTypeLoader) }
+
     override fun findEvents(
         filter: EventFilter,
         offset: Int,

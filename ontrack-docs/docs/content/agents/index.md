@@ -204,6 +204,68 @@ The actor of an event can be selected on:
 * the *Actor* filter of the [events page](../operations/events.md#filtering-the-events) — persons,
   agents, or one agent — which its export follows, with the actor of each event in its columns.
 
+The [Agents section of a build](#what-agents-did-on-a-build) lists what agents did on that build.
+
+## What agents did on a build
+
+The build page has an **Agents** section, read before promoting a build: what agents had to do with
+it. It shows only when there is something to show — the commits of the build were assisted, or an
+agent acted on it — and anyone who can see the build sees it.
+
+![The Agents section of a build](agents-build-section.png)
+
+It holds two lists, which are never merged nor linked: an assistant named by a commit is a kind of
+tool, never a registered agent.
+
+**Assisted by**, from git — the [assisted change](#assisted-builds) of the build:
+
+* the assistants of its commits;
+* "*N* of *M* commits since *previous build*", linking to the change log between the two builds;
+* the links to the agent sessions behind the commits;
+* how this was obtained: computed by Yontrack from the change log, set by the CI, or unknown — with
+  the reason.
+
+**Actions by agents**, from the event log — the events of the build whose actor is an agent, newest
+first: its creation, its validations, its promotions, its links, its properties... Each one gives
+its time, its message, the [badge](#telling-an-agent-from-a-person) of the agent and a link to its
+[session](#identifying-a-session). _Load more_ reads the older ones. An event which also concerns a
+project you cannot see — a link from a build of that project, for example — is left out.
+
+The events are the source of these actions: there is no other record of them. With the
+[retention of the events](../operations/events.md#retention) set, the actions older than the
+retention period disappear from the section with the events. The *Assisted by* part is a property
+of the build, and stays.
+
+Through the API, `agentActions` gives the same page of events on a build, and the assisted change
+gives the build it was computed from:
+
+```graphql
+{
+  build(id: 123) {
+    assistedChange {
+      assistants
+      assistedCommits
+      totalCommits
+      previousBuild { id name }
+    }
+    agentActions(offset: 0, size: 20) {
+      pageInfo { nextPage { offset size } }
+      pageItems {
+        time
+        message
+        eventType { id }
+        actor { agent displayName owner sessionLink }
+      }
+    }
+  }
+}
+```
+
+A page holds at most 100 events. There is no total count: `pageInfo.nextPage` tells whether there
+are more.
+
+The mobile UI shows the badges only, not this section.
+
 ## What an agent may do
 
 An agent's rights are **its owner's rights, narrowed by the agent policy**. Nothing is assigned to

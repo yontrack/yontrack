@@ -41,6 +41,28 @@ interface EventRepository {
     ): List<Event>
 
     /**
+     * Gets the events of an entity whose actor is an agent, newest first: the entity is the one of
+     * the event (`BUILD` for a build) or one of its extra entities (`X_BUILD`). The events of the
+     * persons, whose actor is null, are left out.
+     *
+     * @param entityType Type of the entity
+     * @param entityId ID of the entity
+     * @param offset Number of events to skip
+     * @param size Maximum number of events to return
+     * @param entityLoader Loading of the entities of the events
+     * @param eventTypeLoader Loading of the event types
+     * @return Events
+     */
+    fun findAgentEvents(
+        entityType: ProjectEntityType,
+        entityId: ID,
+        offset: Int,
+        size: Int,
+        entityLoader: (type: ProjectEntityType, id: ID) -> ProjectEntity,
+        eventTypeLoader: (type: String) -> EventType,
+    ): List<Event>
+
+    /**
      * Gets the events matching a filter, newest first, with no project restriction.
      *
      * @param filter Criteria on the events

@@ -3,21 +3,27 @@ package net.nemerosa.ontrack.extension.scm.graphql
 import graphql.Scalars.GraphQLBoolean
 import graphql.schema.GraphQLNonNull
 import graphql.schema.GraphQLObjectType
+import graphql.schema.GraphQLTypeReference
 import net.nemerosa.ontrack.extension.scm.changelog.assistants.AssistedChangeProperty
 import net.nemerosa.ontrack.graphql.schema.GQLType
+import net.nemerosa.ontrack.graphql.schema.GQLTypeBuild
 import net.nemerosa.ontrack.graphql.schema.GQLTypeCache
 import net.nemerosa.ontrack.graphql.support.enumField
 import net.nemerosa.ontrack.graphql.support.getTypeDescription
 import net.nemerosa.ontrack.graphql.support.intField
 import net.nemerosa.ontrack.graphql.support.stringField
 import net.nemerosa.ontrack.graphql.support.stringListField
+import net.nemerosa.ontrack.model.structure.ID
+import net.nemerosa.ontrack.model.structure.StructureService
 import org.springframework.stereotype.Component
 
 /**
  * GraphQL type of the [assisted change][AssistedChangeProperty] of a build.
  */
 @Component
-class GQLTypeAssistedChange : GQLType {
+class GQLTypeAssistedChange(
+    private val structureService: StructureService,
+) : GQLType {
 
     override fun getTypeName(): String = "AssistedChange"
 
@@ -41,5 +47,14 @@ class GQLTypeAssistedChange : GQLType {
             .intField(AssistedChangeProperty::totalCommits)
             .stringListField(AssistedChangeProperty::sessionLinks)
             .intField(AssistedChangeProperty::previousBuildId)
+            .field {
+                it.name("previousBuild")
+                    .description("Build the change log was computed from, if any, and if it still exists.")
+                    .type(GraphQLTypeReference(GQLTypeBuild.BUILD))
+                    .dataFetcher { env ->
+                        val value: AssistedChangeProperty = env.getSource()!!
+                        value.previousBuildId?.let { id -> structureService.findBuildByID(ID.of(id)) }
+                    }
+            }
             .build()
 }
