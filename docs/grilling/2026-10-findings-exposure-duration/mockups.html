@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Exposure duration mockups</title>
+<style>
+:root{--fg:#1f1f1f;--muted:#5f5e5a;--border:#d3d1c7;--card:#fff;--bg:#f7f6f2;--crit-bg:#fcebeb;--crit:#a32d2d;--high-bg:#faeeda;--high:#854f0b;--bar:#5f5e5a;--accepted:#ba7517;--chosen:#185fa5;--link:#185fa5}
+body{font-family:system-ui,sans-serif;color:var(--fg);background:var(--bg);margin:0;padding:16px;max-width:900px}
+h1{font-size:20px;font-weight:500}h2{font-size:16px;font-weight:500;margin:24px 0 8px}
+.v{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px 16px;margin:0 0 12px}
+.v.chosen{border:2px solid var(--chosen)}.badge{font-size:12px;color:var(--chosen);margin-left:8px}
+table{width:100%;border-collapse:collapse;font-size:13px}th{text-align:left;font-weight:500;color:var(--muted);border-bottom:1px solid var(--border);padding:5px 6px}td{padding:5px 6px;border-bottom:1px solid #eeede8}
+.sev{padding:1px 6px;border-radius:6px;font-size:11px}.c{background:var(--crit-bg);color:var(--crit)}.h{background:var(--high-bg);color:var(--high)}.m{background:#f1efe8;color:var(--muted)}
+.mu{color:var(--muted)}.track{display:inline-block;width:70px;height:6px;border-radius:3px;background:#eeede8;vertical-align:middle;margin-right:6px;position:relative}.bar{position:absolute;left:0;top:0;height:6px;border-radius:3px;background:var(--bar)}.acc{background:var(--accepted)}
+a{color:var(--link)}
+</style>
+</head>
+<body>
+<h1>#2041 — exposure duration mockups</h1>
+
+<h2>Exposed for column</h2>
+<div class="v"><b>A · Duration only</b> <span class="mu">(tooltip: branch, stamp, since)</span>
+<table><tr><th>Severity</th><th>Finding</th><th>Exposed for ▼</th></tr>
+<tr><td><span class="sev c">critical</span></td><td>CVE-2024-1111 openssl</td><td>47 days</td></tr>
+<tr><td><span class="sev h">high</span></td><td>CVE-2024-3333 jackson</td><td class="mu">—</td></tr></table></div>
+<div class="v"><b>B · Duration and where</b>
+<table><tr><th>Severity</th><th>Finding</th><th>Exposed for ▼</th></tr>
+<tr><td><span class="sev c">critical</span></td><td>CVE-2024-1111 openssl</td><td>47 days <span class="mu">· release/2.5</span></td></tr>
+<tr><td><span class="sev h">high</span></td><td>CVE-2024-3333 jackson</td><td class="mu">—</td></tr></table></div>
+<div class="v chosen"><b>C · Duration with an age bar, resolved rows show time to fix</b><span class="badge">chosen, with the log scale below</span>
+<table><tr><th>Severity</th><th>Finding</th><th>Exposed on</th><th>Exposed for ▼</th></tr>
+<tr><td><span class="sev c">critical</span></td><td>CVE-2024-1111 openssl</td><td>main, release/2.5</td><td><span class="track"><span class="bar" style="width:61px"></span></span>47 days</td></tr>
+<tr><td><span class="sev h">high</span></td><td>CVE-2024-2222 log4j</td><td>main (accepted)</td><td><span class="track"><span class="bar acc" style="width:50px"></span></span>12 days</td></tr>
+<tr><td><span class="sev m">medium</span></td><td>CVE-2024-12798 logback</td><td>main</td><td><span class="track"><span class="bar" style="width:29px"></span></span>31 h</td></tr>
+<tr><td><span class="sev h">high</span></td><td>CVE-2024-3333 jackson</td><td class="mu">resolved</td><td class="mu">fixed after 3 days</td></tr></table></div>
+
+<h2>Bar scale</h2>
+<div class="v chosen"><b>A · Log scale, 1 h to 1 year</b><span class="badge">chosen</span> <span class="mu">— same bar on every page and sort</span></div>
+<div class="v"><b>B · Linear, relative to the longest on the page</b> <span class="mu">— changes when paging or filtering</span></div>
+<div class="v"><b>C · Relative to the remediation target</b> <span class="mu">— no single target for a project</span></div>
+
+<h2>Remediation time, on a finding exposed on main d0→d4 and d13→d16, and on release/2.5 d2→d7</h2>
+<div class="v"><b>Today</b> — firstSeen d0 → resolvedAt d16: one sample, 16 days, including the 6 resolved days</div>
+<div class="v chosen"><b>Episodes</b><span class="badge">chosen</span> — union of the periods in scope: d0→d7 and d13→d16, two samples of 7 and 3 days</div>
+<div class="v"><b>Periods</b> — every closed period: three samples of 4, 5 and 3 days; a fix on three branches counts three times</div>
+<div class="v"><b>Total</b> — one sample per finding, the sum of its episodes: 10 days; hides regressions</div>
+
+<h2>Link from the finding page</h2>
+<div class="v chosen"><b>A · Link in the exposure section header</b><span class="badge">chosen</span><br>
+<span style="display:flex;justify-content:space-between"><b>Exposure</b><a href="#">Remediation time on the scorecard →</a></span></div>
+<div class="v"><b>B · Inline project median and link</b> <span class="mu">— a scorecard query on every finding page</span></div>
+<div class="v"><b>C · No link</b></div>
+</body>
+</html>
