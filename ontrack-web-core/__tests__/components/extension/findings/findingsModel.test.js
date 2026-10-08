@@ -10,6 +10,10 @@ import {
     isFindingsRun,
     findingsFilterFromQuery,
     findingsFilterToQuery,
+    findingsSortFromQuery,
+    findingsSortToQuery,
+    exposureBarRatio,
+    exposedForText,
 } from "@components/extension/findings/findingsModel"
 import {projectFindingsUri} from "@components/common/Links"
 
@@ -233,5 +237,75 @@ describe('openFindingsLabel', () => {
 
     it('says when no finding is open', () => {
         expect(openFindingsLabel(counts(0, 0, 0, 0, 0))).toBe('No open finding')
+    })
+})
+
+describe('findingsSortFromQuery and findingsSortToQuery', () => {
+
+    it('reads the sort by exposure from the URL', () => {
+        expect(findingsSortFromQuery({id: '12', severity: 'HIGH', sort: 'EXPOSED_FOR'})).toBe('EXPOSED_FOR')
+    })
+
+    it('falls back on the default order for an absent or unknown sort', () => {
+        expect(findingsSortFromQuery({})).toBe('DEFAULT')
+        expect(findingsSortFromQuery({sort: 'exposed_for'})).toBe('DEFAULT')
+        expect(findingsSortFromQuery({sort: ['EXPOSED_FOR', 'DEFAULT']})).toBe('EXPOSED_FOR')
+    })
+
+    it('keeps the default order out of the URL', () => {
+        expect(findingsSortToQuery('DEFAULT')).toEqual({})
+        expect(findingsSortToQuery(undefined)).toEqual({})
+        expect(findingsSortToQuery('EXPOSED_FOR')).toEqual({sort: 'EXPOSED_FOR'})
+    })
+})
+
+describe('exposureBarRatio', () => {
+
+    const HOUR = 3600
+    const YEAR = 365 * 24 * HOUR
+
+    it('is empty up to an hour', () => {
+        expect(exposureBarRatio(0)).toBe(0)
+        expect(exposureBarRatio(30 * 60)).toBe(0)
+        expect(exposureBarRatio(HOUR)).toBe(0)
+    })
+
+    it('is full from a year', () => {
+        expect(exposureBarRatio(YEAR)).toBe(1)
+        expect(exposureBarRatio(3 * YEAR)).toBe(1)
+    })
+
+    it('grows on a log scale in between', () => {
+        // Half of the way between an hour and a year, on a log scale: their geometric mean
+        expect(exposureBarRatio(Math.sqrt(HOUR * YEAR))).toBeCloseTo(0.5, 6)
+        // A day and a week are far apart, a month and two months much less
+        const day = exposureBarRatio(24 * HOUR)
+        const week = exposureBarRatio(7 * 24 * HOUR)
+        const month = exposureBarRatio(30 * 24 * HOUR)
+        const twoMonths = exposureBarRatio(60 * 24 * HOUR)
+        expect(day).toBeCloseTo(Math.log(24) / Math.log(YEAR / HOUR), 6)
+        expect(week - day).toBeGreaterThan(twoMonths - month)
+    })
+
+    it('is empty for no duration', () => {
+        expect(exposureBarRatio(null)).toBe(0)
+        expect(exposureBarRatio(undefined)).toBe(0)
+    })
+})
+
+describe('exposedForText', () => {
+
+    it('gives the duration of the longest ongoing period', () => {
+        expect(exposedForText({ongoing: true, ongoingSeconds: 47 * 86400, lastEpisodeSeconds: 47 * 86400})).toBe('47 days')
+        expect(exposedForText({ongoing: true, ongoingSeconds: 31 * 3600, lastEpisodeSeconds: 40 * 3600})).toBe('31 h')
+    })
+
+    it('gives how long the last fix took for a fixed finding', () => {
+        expect(exposedForText({ongoing: false, ongoingSeconds: null, lastEpisodeSeconds: 3 * 86400})).toBe('fixed after 3 days')
+    })
+
+    it('is empty without any period', () => {
+        expect(exposedForText({ongoing: false, ongoingSeconds: null, lastEpisodeSeconds: null})).toBe('')
+        expect(exposedForText(null)).toBe('')
     })
 })

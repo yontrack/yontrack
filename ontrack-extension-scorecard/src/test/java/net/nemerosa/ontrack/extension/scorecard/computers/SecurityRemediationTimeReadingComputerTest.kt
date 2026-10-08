@@ -1,6 +1,7 @@
 package net.nemerosa.ontrack.extension.scorecard.computers
 
 import net.nemerosa.ontrack.extension.chart.support.Interval
+import net.nemerosa.ontrack.extension.findings.model.FindingExposureEpisode
 import net.nemerosa.ontrack.extension.findings.model.FindingSeverity
 import net.nemerosa.ontrack.extension.findings.model.FindingState
 import net.nemerosa.ontrack.extension.scorecard.model.ReadingBasis
@@ -22,7 +23,7 @@ class SecurityRemediationTimeReadingComputerTest {
     private var nextId = 1
 
     /**
-     * A finding first seen some days before the end of the window, resolved some days after
+     * A finding exposed from some days before the end of the window, fixed some days after
      */
     private fun resolved(
         firstSeenDaysAgo: Long,
@@ -31,17 +32,20 @@ class SecurityRemediationTimeReadingComputerTest {
     ) = SecurityFindingSample(
         findingId = nextId++,
         severity = severity,
-        firstSeen = end.minusDays(firstSeenDaysAgo),
-        resolvedAt = end.minusDays(firstSeenDaysAgo).plusDays(fixedInDays),
+        episodes = listOf(episode(firstSeenDaysAgo, fixedInDays)),
         state = FindingState.RESOLVED,
+    )
+
+    private fun episode(startDaysAgo: Long, lengthDays: Long?) = FindingExposureEpisode(
+        start = end.minusDays(startDaysAgo),
+        end = lengthDays?.let { end.minusDays(startDaysAgo).plusDays(it) },
     )
 
     private fun notResolved(state: FindingState, severity: FindingSeverity = FindingSeverity.HIGH) =
         SecurityFindingSample(
             findingId = nextId++,
             severity = severity,
-            firstSeen = end.minusDays(10),
-            resolvedAt = null,
+            episodes = listOf(episode(10, null)),
             state = state,
         )
 
@@ -62,16 +66,16 @@ class SecurityRemediationTimeReadingComputerTest {
     }
 
     @Test
-    fun `Median from first observation to resolution, the other statistics in the details`() {
+    fun `Median of the episodes ending in the window, the other statistics in the details`() {
         val outcome = SecurityRemediationTimeReadingComputer.aggregate(
             window,
             listOf(
                 resolved(firstSeenDaysAgo = 50, fixedInDays = 1),
                 resolved(firstSeenDaysAgo = 50, fixedInDays = 2, severity = FindingSeverity.HIGH),
                 resolved(firstSeenDaysAgo = 40, fixedInDays = 3),
-                // First seen before the window, resolved in it
+                // Started before the window, ended in it
                 resolved(firstSeenDaysAgo = 120, fixedInDays = 40, severity = FindingSeverity.HIGH),
-                // Resolved before the window: not a sample
+                // Ended before the window: not a sample
                 resolved(firstSeenDaysAgo = 150, fixedInDays = 10),
                 notResolved(FindingState.OPEN),
             )
@@ -111,5 +115,32 @@ class SecurityRemediationTimeReadingComputerTest {
         )
         assertEquals(ReadingUnknownReason.NO_SAMPLES, outcome.unknownReason)
         assertEquals(1, outcome.details["accepted"])
+    }
+
+    @Test
+    fun `A reopened finding gives one sample per episode ending in the window, the gap excluded`() {
+        val outcome = SecurityRemediationTimeReadingComputer.aggregate(
+            window,
+            listOf(
+                SecurityFindingSample(
+                    findingId = nextId++,
+                    severity = FindingSeverity.HIGH,
+                    episodes = listOf(
+                        // Ended before the window: not a sample
+                        episode(200, 10),
+                        episode(60, 7),
+                        episode(47, 3),
+                        // Ongoing: not a sample
+                        episode(5, null),
+                    ),
+                    state = FindingState.OPEN,
+                )
+            )
+        )
+        val day = 86400.0
+        assertEquals(2, outcome.details["count"])
+        assertEquals(3 * day, outcome.details["min"])
+        assertEquals(7 * day, outcome.details["max"])
+        assertEquals(5 * day, outcome.value)
     }
 }

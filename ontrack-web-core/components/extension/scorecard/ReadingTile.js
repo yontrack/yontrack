@@ -16,6 +16,7 @@ import {
     readingDetailItems,
     readingJudgement,
     readingName,
+    readingTileId,
     readingUsesMarker,
     scopeText,
     targetLineText,
@@ -145,8 +146,11 @@ const detailItems = (reading) => {
  * - `size="default"`, on the project page: the definition of the reading is in a popover.
  * - `size="large"`, on the scorecard page: a larger value, the definition inline, a taller chart
  *   with its axis labelled, and what explains the value under it.
+ *
+ * Given its `set` (`project` or the name of an estate), the tile has the DOM id
+ * `reading-<set>-<key>`, which a link can scroll to.
  */
-export default function ReadingTile({reading, size = 'default', testId}) {
+export default function ReadingTile({reading, size = 'default', testId, set}) {
 
     const large = size === 'large'
     const name = readingName(reading.key)
@@ -167,6 +171,7 @@ export default function ReadingTile({reading, size = 'default', testId}) {
 
     return (
         <div
+            id={set ? readingTileId(set, reading.key) : undefined}
             data-testid={testId}
             style={{
                 height: '100%',

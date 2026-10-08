@@ -5,6 +5,7 @@ import graphql.schema.GraphQLFieldDefinition
 import graphql.schema.GraphQLTypeReference
 import net.nemerosa.ontrack.extension.findings.model.Finding
 import net.nemerosa.ontrack.extension.findings.query.FindingQueryService
+import net.nemerosa.ontrack.extension.findings.query.FindingSort
 import net.nemerosa.ontrack.extension.findings.query.FindingsSummary
 import net.nemerosa.ontrack.graphql.schema.GQLProjectEntityFieldContributor
 import net.nemerosa.ontrack.graphql.schema.GQLTypeCache
@@ -33,7 +34,7 @@ class GQLProjectFindingsFieldContributor(
             paginatedListFactory.createPaginatedField<Project, Finding>(
                 cache = GQLTypeCache(),
                 fieldName = "findings",
-                fieldDescription = "Security findings of the project, the most severe first, then the most recently seen. " +
+                fieldDescription = "Security findings of the project, by default the most severe first, then the most recently seen. " +
                         "Empty for a user who is not granted the view of the findings of the project.",
                 itemType = GQLTypeFinding.FINDING,
                 arguments = listOf(
@@ -41,11 +42,18 @@ class GQLProjectFindingsFieldContributor(
                         .name(ARG_FILTER)
                         .description("Filter on the findings")
                         .type(gqlInputFindingFilter.typeRef)
-                        .build()
+                        .build(),
+                    GraphQLArgument.newArgument()
+                        .name(ARG_SORT)
+                        .description("Order of the findings, applied before the page is cut. DEFAULT when not given.")
+                        .type(GraphQLTypeReference(FindingSort::class.java.simpleName))
+                        .build(),
                 ),
                 itemPaginatedListProvider = { env, project, offset, size ->
                     val filter = gqlInputFindingFilter.convert(env.getArgument<Any>(ARG_FILTER))
-                    findingQueryService.getProjectFindings(project, filter, offset, size)
+                    val sort = env.getArgument<Any>(ARG_SORT)?.let { FindingSort.valueOf(it.toString()) }
+                        ?: FindingSort.DEFAULT
+                    findingQueryService.getProjectFindings(project, filter, offset, size, sort)
                 }
             ),
             GraphQLFieldDefinition.newFieldDefinition()
@@ -67,5 +75,6 @@ class GQLProjectFindingsFieldContributor(
 
     companion object {
         const val ARG_FILTER = "filter"
+        const val ARG_SORT = "sort"
     }
 }

@@ -124,4 +124,25 @@ describe('The scorecard page of a project', () => {
         fireEvent.click(within(screen.getByTestId('scorecard-set-card-Demo products')).getByRole('button', {pressed: false}))
         expect(onSetChange).toHaveBeenCalledWith('Demo products')
     })
+
+    it('gives each tile the DOM id of its reading in its set', () => {
+        renderView({set: 'project'})
+        expect(screen.getByTestId('reading-Project-delivery.leadTime')).toHaveAttribute('id', 'reading-project-delivery.leadTime')
+        renderView({set: 'Demo products'})
+        expect(screen.getByTestId('reading-Demo products-delivery.leadTime')).toHaveAttribute('id', 'reading-Demo products-delivery.leadTime')
+    })
+
+    it('scrolls to the reading the hash of the URL names', () => {
+        const scrollIntoView = jest.fn()
+        window.HTMLElement.prototype.scrollIntoView = scrollIntoView
+        window.location.hash = '#reading-project-delivery.leadTime'
+        try {
+            renderView({set: 'project'})
+            expect(scrollIntoView).toHaveBeenCalledTimes(1)
+            expect(scrollIntoView.mock.contexts[0]).toBe(screen.getByTestId('reading-Project-delivery.leadTime'))
+        } finally {
+            window.location.hash = ''
+            delete window.HTMLElement.prototype.scrollIntoView
+        }
+    })
 })

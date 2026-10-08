@@ -5,12 +5,31 @@ import {branchUri, findingUri} from "@components/common/Links";
 import FindingSeverityTag from "@components/extension/findings/FindingSeverityTag";
 import FindingStateTag from "@components/extension/findings/FindingStateTag";
 import TimestampText from "@components/common/TimestampText";
-import {exposedBranches, kindName} from "@components/extension/findings/findingsModel";
+import {
+    DEFAULT_FINDINGS_SORT,
+    exposedBranches,
+    EXPOSED_FOR_FINDINGS_SORT,
+    kindName,
+} from "@components/extension/findings/findingsModel";
+import FindingExposedFor from "@components/extension/findings/project/FindingExposedFor";
 
 /**
  * One page of the findings of a project.
+ *
+ * The order is the one of the server: the *Exposed for* column only says whether the findings are
+ * sorted by it, the longest exposed first, and asks for it (`onSortChange`, with `EXPOSED_FOR` or
+ * `DEFAULT`).
  */
-export default function ProjectFindingsTable({findings, totalSize, loading, current, pageSize, onPageChange}) {
+export default function ProjectFindingsTable({
+                                                 findings,
+                                                 totalSize,
+                                                 loading,
+                                                 current,
+                                                 pageSize,
+                                                 onPageChange,
+                                                 sort = DEFAULT_FINDINGS_SORT,
+                                                 onSortChange,
+                                             }) {
 
     const columns = [
         {
@@ -72,6 +91,15 @@ export default function ProjectFindingsTable({findings, totalSize, loading, curr
             },
         },
         {
+            key: 'exposedFor',
+            title: 'Exposed for',
+            sorter: true,
+            sortDirections: ['descend'],
+            sortOrder: sort === EXPOSED_FOR_FINDINGS_SORT ? 'descend' : null,
+            showSorterTooltip: {title: 'Sort by exposure, the longest exposed first'},
+            render: (_, finding) => <FindingExposedFor finding={finding}/>,
+        },
+        {
             key: 'lastSeen',
             title: 'Last seen',
             render: (_, finding) => <TimestampText value={finding.lastSeen} relative={true}/>,
@@ -86,6 +114,11 @@ export default function ProjectFindingsTable({findings, totalSize, loading, curr
             loading={loading}
             columns={columns}
             dataSource={findings}
+            onChange={(_pagination, _filters, sorter, {action}) => {
+                if (action === 'sort' && onSortChange) {
+                    onSortChange(sorter?.order ? EXPOSED_FOR_FINDINGS_SORT : DEFAULT_FINDINGS_SORT)
+                }
+            }}
             locale={{emptyText: 'No finding matches this filter'}}
             pagination={{
                 current,

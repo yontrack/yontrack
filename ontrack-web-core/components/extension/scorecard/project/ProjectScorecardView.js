@@ -1,3 +1,4 @@
+import {useEffect, useRef} from "react";
 import Head from "next/head";
 import {gql} from "graphql-request";
 import {Alert, Col, Empty, Row, Skeleton, Space, Typography} from "antd";
@@ -113,6 +114,18 @@ export default function ProjectScorecardView({id, set: setParameter, onSetChange
     const {set: shown} = resolveSet(sets, setParameter)
     const readings = sortedReadings(shown)
 
+    // A link to one reading (`#reading-<set>-<key>`) scrolls to its tile, once the tiles are shown
+    const tilesShown = computed && !!shown && readings.length > 0
+    const scrolled = useRef(false)
+    useEffect(() => {
+        if (!tilesShown || scrolled.current) return
+        scrolled.current = true
+        const hash = window.location.hash
+        if (hash.length > 1) {
+            document.getElementById(decodeURIComponent(hash.substring(1)))?.scrollIntoView({block: 'start'})
+        }
+    }, [tilesShown])
+
     const commands = []
     if (project && isAuthorized(project, 'project', 'config')) {
         commands.push(
@@ -191,6 +204,7 @@ export default function ProjectScorecardView({id, set: setParameter, onSetChange
                                                         <ReadingTile
                                                             size="large"
                                                             reading={reading}
+                                                            set={setParam(shown)}
                                                             testId={`reading-${shown.name}-${reading.key}`}
                                                         />
                                                     </Col>

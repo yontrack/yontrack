@@ -1,6 +1,7 @@
 package net.nemerosa.ontrack.extension.scorecard.samples
 
 import net.nemerosa.ontrack.extension.chart.support.Interval
+import net.nemerosa.ontrack.extension.findings.model.FindingExposureEpisode
 import net.nemerosa.ontrack.extension.findings.model.FindingKind
 import net.nemerosa.ontrack.extension.findings.model.FindingSeverity
 import net.nemerosa.ontrack.extension.findings.model.FindingState
@@ -30,9 +31,9 @@ interface SecuritySamples {
 
     /**
      * CRITICAL and HIGH findings of a project — by maximum severity — which matter to its
-     * remediation over the interval: the ones resolved at project level from the start of the
-     * interval, and the ones not resolved, with their state at the end of the interval on the
-     * branches in scope. Ordered by ID.
+     * remediation over the interval: the ones exposed on the branches in scope from the start of
+     * the interval, with their [exposure episodes][FindingExposureEpisode] on these branches, and
+     * their state at the end of the interval. Ordered by ID.
      *
      * The findings of a project belong to the project, not to a branch: a finding is resolved at
      * project level once no branch which counts for the project exposes it any more. Its location
@@ -40,7 +41,8 @@ interface SecuritySamples {
      * resolve it.
      *
      * @param project Project of the findings
-     * @param branches Branches in scope, which give the state of the findings not resolved
+     * @param branches Branches in scope, which give the episodes of the findings, and the state of
+     * the findings not resolved
      * @param interval Window of the reading. The state is evaluated on the day of its end, for the
      * expiry of the acceptances.
      */
@@ -56,19 +58,25 @@ interface SecuritySamples {
  *
  * @property findingId ID of the finding
  * @property severity Maximum severity of the finding across its observations
- * @property firstSeen Time of its first observation
- * @property resolvedAt Time it was resolved at project level, `null` while it is not
- * @property state State of the finding at the end of the window: `RESOLVED` when it has a
- * resolution time, else rolled up from its exposure on the branches in scope — `OPEN`, `ACCEPTED`,
+ * @property episodes Exposure episodes of the finding on the branches in scope, the oldest first:
+ * a reopening starts a new one, and a fix on several branches ends one only
+ * @property state State of the finding at the end of the window: `RESOLVED` when it is resolved at
+ * project level, else rolled up from its exposure on the branches in scope — `OPEN`, `ACCEPTED`,
  * or `RESOLVED` when no branch in scope exposes it
  */
 data class SecurityFindingSample(
     val findingId: Int,
     val severity: FindingSeverity,
-    val firstSeen: LocalDateTime,
-    val resolvedAt: LocalDateTime?,
+    val episodes: List<FindingExposureEpisode>,
     val state: FindingState,
-)
+) {
+    /**
+     * Start of the episode current at a given time: the latest one started by then, `null` when
+     * none had
+     */
+    fun episodeStartAt(time: LocalDateTime): LocalDateTime? =
+        episodes.lastOrNull { !it.start.isAfter(time) }?.start
+}
 
 /**
  * Remediation targets of a set: how many days a finding of each severity may stay open, `null`

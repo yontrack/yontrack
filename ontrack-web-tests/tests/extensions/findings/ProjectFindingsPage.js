@@ -48,4 +48,26 @@ export class ProjectFindingsPage {
             .getByTitle(label, {exact: true})
             .click()
     }
+
+    /**
+     * The external IDs listed by the table, in their order.
+     */
+    async externalIds() {
+        return this.table().locator('tbody tr.ant-table-row a code').allTextContents()
+    }
+
+    /**
+     * Header of the *Exposed for* column, which sorts the findings by exposure. The sticky header is
+     * rendered apart from the body: its cell is the first one.
+     */
+    exposedForHeader() {
+        return this.table().locator('th', {hasText: 'Exposed for'}).first()
+    }
+
+    /**
+     * The *Exposed for* cell of a finding, by its ID.
+     */
+    exposedFor(findingId) {
+        return this.table().getByTestId(`finding-exposed-for-${findingId}`)
+    }
 }

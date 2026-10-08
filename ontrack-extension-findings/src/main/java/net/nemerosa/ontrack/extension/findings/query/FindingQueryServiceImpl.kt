@@ -42,6 +42,7 @@ class FindingQueryServiceImpl(
         filter: FindingFilter,
         offset: Int,
         size: Int,
+        sort: FindingSort,
         date: LocalDate,
     ): PaginatedList<Finding> {
         if (!canSeeFindings(project.id())) return PaginatedList.empty()
@@ -56,9 +57,11 @@ class FindingQueryServiceImpl(
                     (filter.kind == null || finding.kind == filter.kind)
         }
 
+        var filterBranch: Branch? = null
         if (!filter.branch.isNullOrBlank()) {
             val branch = structureService.findBranchByName(project.name, filter.branch).getOrNull()
                 ?: return page(emptyList(), offset, size)
+            filterBranch = branch
             // On a given branch, the state is the one on this branch, whether it counts for the
             // project or not
             val exposures = findingRepository.findExposuresByBranch(branch.id()).groupBy { it.findingId }
@@ -74,7 +77,81 @@ class FindingQueryServiceImpl(
             findings = findings.filter { states[it.id] == filter.state }
         }
 
-        return page(findings.sortedWith(findingOrder), offset, size)
+        val exposedFor = when (sort) {
+            FindingSort.DEFAULT -> emptyMap()
+            FindingSort.EXPOSED_FOR -> loadExposedFor(
+                findingIds = findings.map { it.id },
+                branchIds = periodBranchIds(project, filterBranch),
+                date = date,
+            )
+        }
+        return page(findings.sortedWith(sort.comparator(exposedFor)), offset, size)
+    }
+
+    override fun getFindingsExposedFor(
+        findings: Collection<Finding>,
+        branch: String?,
+        date: LocalDate,
+    ): Map<Int, FindingExposedForView> {
+        val now = Time.now
+        val branches = mutableMapOf<Int, Branch>()
+        val stamps = mutableMapOf<Int, ValidationStamp>()
+        return findings.groupBy { it.projectId }.flatMap { (projectId, projectFindings) ->
+            val project = visibleProject(projectId) ?: return@flatMap emptyList()
+            val branchIds = if (branch.isNullOrBlank()) {
+                periodBranchIds(project, null)
+            } else {
+                // A branch the project does not have: no period counts
+                structureService.findBranchByName(project.name, branch).getOrNull()
+                    ?.let { periodBranchIds(project, it) }
+                    ?: emptySet()
+            }
+            loadExposedFor(projectFindings.map { it.id }, branchIds, date).map { (findingId, exposedFor) ->
+                val ongoing = exposedFor.ongoing
+                findingId to FindingExposedForView(
+                    exposedFor = exposedFor,
+                    branch = ongoing?.let {
+                        branches.getOrPut(it.branchId) { structureService.getBranch(ID.of(it.branchId)) }
+                    },
+                    validationStamp = ongoing?.let {
+                        stamps.getOrPut(it.validationStampId) {
+                            structureService.getValidationStamp(ID.of(it.validationStampId))
+                        }
+                    },
+                    ongoingSeconds = ongoing?.let { Duration.between(it.startedAt, now).seconds.coerceAtLeast(0) },
+                    lastEpisodeSeconds = exposedFor.lastEpisode?.duration(now)?.seconds,
+                )
+            }
+        }.toMap()
+    }
+
+    /**
+     * IDs of the branches whose periods say how long a finding has been exposed: the given branch
+     * only, or, with none, the branches which count toward the state of the findings in the project.
+     */
+    private fun periodBranchIds(project: Project, branch: Branch?): Set<Int> =
+        branch?.let { setOf(it.id()) } ?: findingStateService.getCountingBranchIds(project)
+
+    /**
+     * How long some findings of a project have been exposed on some of its branches, their
+     * periods and their exposures loaded in one query each.
+     *
+     * @param branchIds IDs of the branches whose periods count
+     */
+    private fun loadExposedFor(
+        findingIds: Collection<Int>,
+        branchIds: Set<Int>,
+        date: LocalDate,
+    ): Map<Int, FindingExposedFor> {
+        if (findingIds.isEmpty()) return emptyMap()
+        val periods = findingRepository.findExposurePeriodsByFindings(findingIds)
+            .filter { it.branchId in branchIds }
+            .groupBy { it.findingId }
+        val exposures = findingRepository.findExposuresByFindings(periods.keys)
+            .groupBy { it.findingId }
+        return findingIds.associateWith { findingId ->
+            FindingExposedFor.of(periods[findingId] ?: emptyList(), exposures[findingId] ?: emptyList(), date)
+        }
     }
 
     override fun getProjectFindingsSummary(project: Project, date: LocalDate): FindingsSummary? {
@@ -433,15 +510,5 @@ class FindingQueryServiceImpl(
                     .firstOrNull { it != 0 }
                     ?: 0
             }.thenBy { it.branch.name }
-
-        /**
-         * The most severe first, then the most recently seen.
-         */
-        private val findingOrder: Comparator<Finding> =
-            compareBy<Finding> { it.maxSeverity.ordinal }
-                .thenByDescending { it.lastSeen }
-                .thenBy { it.externalId }
-                .thenBy { it.location }
-                .thenBy { it.scanner }
     }
 }

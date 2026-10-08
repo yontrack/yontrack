@@ -731,6 +731,15 @@ export const orderedSets = (scorecard) => {
 export const PROJECT_SET_PARAM = 'project'
 
 /**
+ * The DOM id of the tile of a reading on the scorecard page of a project: `reading-<set>-<key>`,
+ * which a link to the reading scrolls to.
+ *
+ * @param set Set of the reading, as in the `set` parameter of the URL: {@link PROJECT_SET_PARAM} or the name of an estate
+ * @param key Key of the reading
+ */
+export const readingTileId = (set, key) => `reading-${set}-${key}`
+
+/**
  * How a set is named in a URL or a widget configuration: `project`, or the name of its estate.
  */
 export const setParam = (set) => set.estate ? set.estate.name : PROJECT_SET_PARAM

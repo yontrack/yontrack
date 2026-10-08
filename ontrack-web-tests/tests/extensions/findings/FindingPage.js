@@ -44,6 +44,13 @@ export class FindingPage {
         return this.page.getByTestId(`finding-exposure-lane-${branch}-${validationStamp}`)
     }
 
+    /**
+     * Link to the remediation time of the project on its scorecard, in the header of the exposure
+     */
+    scorecardRemediationLink() {
+        return this.page.getByTestId('finding-scorecard-remediation-link')
+    }
+
     historyEntry(type) {
         return this.page.getByTestId(`finding-history-${type}`)
     }

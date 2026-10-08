@@ -16,9 +16,11 @@ import java.time.Duration
 /**
  * `security.remediationTime`: how long the CRITICAL and HIGH findings of a project stay open.
  *
- * The findings resolved at project level in the window, from their first observation to their
- * resolution. The median, in seconds, goes in the value. Read on the branches in scope whatever the
- * marker, the same in every set: it needs no target.
+ * One sample per [exposure episode][net.nemerosa.ontrack.extension.findings.model.FindingExposureEpisode]
+ * of these findings on the branches in scope which ends in the window, from its start to its end: a
+ * reopened finding gives one sample per fix, the time it stayed resolved left out, and a fix applied
+ * on several branches gives one sample. The median, in seconds, goes in the value. Read on the
+ * branches in scope whatever the marker, the same in every set: it needs no target.
  *
  * Accepted findings are neither open nor resolved: they are counted apart, in the details.
  */
@@ -40,7 +42,7 @@ class SecurityRemediationTimeReadingComputer(
         /**
          * Median of the remediation times in the value, p90, mean, min, max and count in the
          * details, with `accepted`, the number of CRITICAL and HIGH findings accepted at the end of
-         * the window. `NO_SAMPLES` when no finding was resolved in the window.
+         * the window. `NO_SAMPLES` when no episode ended in the window.
          *
          * @param window Window of the reading
          * @param findings CRITICAL and HIGH findings of the project
@@ -48,8 +50,9 @@ class SecurityRemediationTimeReadingComputer(
         fun aggregate(window: Interval, findings: List<SecurityFindingSample>): ReadingOutcome {
             val accepted = mapOf("accepted" to findings.count { it.state == FindingState.ACCEPTED })
             val durations = findings
-                .filter { it.resolvedAt != null && it.resolvedAt in window }
-                .map { Duration.between(it.firstSeen, it.resolvedAt).seconds.toDouble() }
+                .flatMap { it.episodes }
+                .mapNotNull { episode -> episode.end?.takeIf { it in window }?.let { episode.start to it } }
+                .map { (start, end) -> Duration.between(start, end).seconds.toDouble() }
             val stats = DurationStatistics.of(durations)
             return if (stats == null) {
                 ReadingOutcome.unknown(ReadingUnknownReason.NO_SAMPLES, mapOf("count" to 0) + accepted)

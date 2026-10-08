@@ -14,6 +14,8 @@ import net.nemerosa.ontrack.extension.findings.model.FindingKind
 import net.nemerosa.ontrack.extension.findings.model.FindingObservation
 import net.nemerosa.ontrack.extension.findings.model.FindingSeverity
 import net.nemerosa.ontrack.extension.findings.model.FindingState
+import net.nemerosa.ontrack.extension.findings.query.FindingExposedFor
+import net.nemerosa.ontrack.extension.findings.query.FindingExposedForView
 import net.nemerosa.ontrack.extension.findings.query.FindingHistoryEntryView
 import net.nemerosa.ontrack.extension.findings.query.FindingObservationFilter
 import net.nemerosa.ontrack.extension.findings.query.FindingObservationView
@@ -27,6 +29,7 @@ import net.nemerosa.ontrack.graphql.support.stringField
 import net.nemerosa.ontrack.graphql.support.pagination.GQLPaginatedListFactory
 import net.nemerosa.ontrack.model.structure.ID
 import net.nemerosa.ontrack.model.structure.StructureService
+import org.dataloader.DataLoader
 import org.springframework.stereotype.Component
 import java.time.LocalDateTime
 
@@ -162,6 +165,27 @@ class GQLTypeFinding(
                         findingQueryService.getFindingResolvedIn(finding)
                     }
             }
+            .field {
+                it.name("exposedFor")
+                    .description(
+                        "How long the finding has been exposed: its longest ongoing period on one branch for one stamp, " +
+                                "and the length of its last exposure episode. Over the branches which count toward its state " +
+                                "in its project, or over one branch only."
+                    )
+                    .argument { arg ->
+                        arg.name(ARG_BRANCH)
+                            .description("Name of the branch whose periods count, instead of the branches which count in the project")
+                            .type(GraphQLString)
+                    }
+                    .type(GraphQLTypeReference(FindingExposedFor::class.java.simpleName))
+                    .dataFetcher { env ->
+                        val finding: Finding = env.getSource()!!
+                        val loader: DataLoader<FindingExposedForKey, FindingExposedForView> =
+                            env.dataLoaderRegistry.getDataLoader(FindingExposedForDataLoader.NAME)
+                                ?: error("No ${FindingExposedForDataLoader.NAME} data loader is registered.")
+                        loader.load(FindingExposedForKey(finding, env.getArgument<String>(ARG_BRANCH)?.takeIf { it.isNotBlank() }))
+                    }
+            }
             .field(
                 paginatedListFactory.createPaginatedField<Finding, FindingObservationView>(
                     cache = cache,
@@ -229,6 +253,7 @@ class GQLTypeFinding(
 
     companion object {
         const val FINDING = "Finding"
+        private const val ARG_BRANCH = "branch"
         private const val ARG_BRANCH_ID = "branchId"
         private const val ARG_VALIDATION_STAMP_ID = "validationStampId"
         private const val ARG_FROM = "from"

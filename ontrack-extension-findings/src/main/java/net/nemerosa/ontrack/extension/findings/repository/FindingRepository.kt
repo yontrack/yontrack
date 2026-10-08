@@ -207,4 +207,10 @@ interface FindingRepository {
      * Gets the periods of the exposures of a finding, on all branches, the oldest first.
      */
     fun findExposurePeriodsByFinding(findingId: Int): List<FindingExposurePeriod>
+
+    /**
+     * Gets the periods of the exposures of some findings, on all branches, in one query: by
+     * finding, then the oldest first.
+     */
+    fun findExposurePeriodsByFindings(findingIds: Collection<Int>): List<FindingExposurePeriod>
 }

@@ -25,12 +25,13 @@ import java.time.LocalDate
 interface FindingQueryService {
 
     /**
-     * Findings of a project, the most severe first, then the most recently seen.
+     * Findings of a project, by default the most severe first, then the most recently seen.
      *
      * @param project Project
      * @param filter Filter on the findings
      * @param offset Index of the first finding to return
      * @param size Maximum number of findings to return
+     * @param sort Order of the findings, applied before the page is cut
      * @param date Day against which the expiry of the acceptances is evaluated
      */
     fun getProjectFindings(
@@ -38,8 +39,25 @@ interface FindingQueryService {
         filter: FindingFilter,
         offset: Int,
         size: Int,
+        sort: FindingSort = FindingSort.DEFAULT,
         date: LocalDate = Time.now.toLocalDate(),
     ): PaginatedList<Finding>
+
+    /**
+     * How long some findings have been exposed, as the project findings table shows it, the
+     * periods of all of them loaded in one query per project.
+     *
+     * @param findings Findings, of one or several projects
+     * @param branch Name of the branch whose periods count, `null` for the branches which count
+     * toward the state of the findings in their project
+     * @param date Day against which the expiry of the acceptances is evaluated
+     * @return By finding ID. The findings the user cannot see are left out.
+     */
+    fun getFindingsExposedFor(
+        findings: Collection<Finding>,
+        branch: String?,
+        date: LocalDate = Time.now.toLocalDate(),
+    ): Map<Int, FindingExposedForView>
 
     /**
      * Summary of the findings of a project: its open findings by severity, and their exposure
@@ -225,4 +243,21 @@ data class FindingObservationView(
     val observation: FindingObservation,
     val finding: Finding,
     val validationRun: ValidationRun,
+)
+
+/**
+ * How long a finding has been exposed, with the branch and the stamp of its longest ongoing period.
+ *
+ * @property exposedFor How long the finding has been exposed
+ * @property branch Branch of the longest ongoing period, if any
+ * @property validationStamp Stamp of the longest ongoing period, if any
+ * @property ongoingSeconds Duration of the longest ongoing period, until now, if any
+ * @property lastEpisodeSeconds Length of the last episode, until now while it is ongoing, if any
+ */
+data class FindingExposedForView(
+    val exposedFor: FindingExposedFor,
+    val branch: Branch?,
+    val validationStamp: ValidationStamp?,
+    val ongoingSeconds: Long?,
+    val lastEpisodeSeconds: Long?,
 )

@@ -1,4 +1,5 @@
 import {findingsFilterToQuery} from "@components/extension/findings/findingsModel";
+import {readingTileId} from "@components/extension/scorecard/scorecardModel";
 
 export function homeUri() {
     return `/`
@@ -151,6 +152,17 @@ export function projectFindingsUri(project, filter = {}) {
  */
 export function projectScorecardUri(project, set) {
     return `/extension/scorecard/project/${project.id}${set ? `?set=${encodeURIComponent(set)}` : ''}`
+}
+
+/**
+ * One reading on the scorecard page of a project, which scrolls to its tile.
+ *
+ * @param project Project, with its `id`
+ * @param set Set of the reading, `project` or the name of an estate
+ * @param key Key of the reading, like `security.remediationTime`
+ */
+export function projectScorecardReadingUri(project, set, key) {
+    return `${projectScorecardUri(project, set)}#${readingTileId(set, key)}`
 }
 
 /**

@@ -11,7 +11,12 @@ import {downToProjectBreadcrumbs} from "@components/common/Breadcrumbs";
 import {useQuery} from "@components/services/GraphQL";
 import {isAuthorized} from "@components/common/authorizations";
 import {gqlProjectContentFragment} from "@components/projects/ProjectGraphQLFragments";
-import {findingsFilterFromQuery, findingsFilterToQuery} from "@components/extension/findings/findingsModel";
+import {
+    findingsFilterFromQuery,
+    findingsFilterToQuery,
+    findingsSortFromQuery,
+    findingsSortToQuery,
+} from "@components/extension/findings/findingsModel";
 import ProjectFindingsFilter from "@components/extension/findings/project/ProjectFindingsFilter";
 import ProjectFindingsTable from "@components/extension/findings/project/ProjectFindingsTable";
 
@@ -19,21 +24,23 @@ const DEFAULT_PAGE_SIZE = 20
 
 /**
  * The findings page of a project: its findings in a table, filtered by severity, state, branch,
- * scanner and kind.
+ * scanner and kind, and sorted by default or by exposure.
  *
- * The filter lives in the query of the URL — see `projectFindingsUri` — so that the Security
- * section of the project page can link to any of its counts, and a filtered list can be shared.
+ * The filter and the sort live in the query of the URL — see `projectFindingsUri` — so that the
+ * Security section of the project page can link to any of its counts, and a filtered list can be
+ * shared.
  */
 export default function ProjectFindingsView({id}) {
 
     const router = useRouter()
     const filter = findingsFilterFromQuery(router.query)
-    const filterKey = JSON.stringify(filter)
+    const sort = findingsSortFromQuery(router.query)
+    const listKey = JSON.stringify({filter, sort})
 
-    // The page goes back to the first one when the filter changes: kept together with the filter
-    // it was chosen for, rather than reset by an effect
-    const [pagination, setPagination] = useState({filterKey, current: 1, pageSize: DEFAULT_PAGE_SIZE})
-    const current = pagination.filterKey === filterKey ? pagination.current : 1
+    // The page goes back to the first one when the filter or the sort changes: kept together with
+    // the filter and the sort it was chosen for, rather than reset by an effect
+    const [pagination, setPagination] = useState({listKey, current: 1, pageSize: DEFAULT_PAGE_SIZE})
+    const current = pagination.listKey === listKey ? pagination.current : 1
     const pageSize = pagination.pageSize
 
     const {data: project, loading: projectLoading, finished: projectFinished} = useQuery(
@@ -69,9 +76,9 @@ export default function ProjectFindingsView({id}) {
 
     const {data: page, loading, error} = useQuery(
         gql`
-            query ProjectFindings($id: Int!, $filter: FindingFilter, $offset: Int!, $size: Int!) {
+            query ProjectFindings($id: Int!, $filter: FindingFilter, $sort: FindingSort, $branch: String, $offset: Int!, $size: Int!) {
                 project(id: $id) {
-                    findings(filter: $filter, offset: $offset, size: $size) {
+                    findings(filter: $filter, sort: $sort, offset: $offset, size: $size) {
                         pageInfo {
                             totalSize
                         }
@@ -92,21 +99,37 @@ export default function ProjectFindingsView({id}) {
                                 }
                                 state
                             }
+                            exposedFor(branch: $branch) {
+                                ongoing
+                                ongoingSeconds
+                                since
+                                branch {
+                                    id
+                                    name
+                                }
+                                validationStamp {
+                                    id
+                                    name
+                                }
+                                accepted
+                                reopened
+                                lastEpisodeSeconds
+                            }
                         }
                     }
                 }
             }
         `,
         {
-            variables: {id, filter, offset: (current - 1) * pageSize, size: pageSize},
-            deps: [id, filterKey, current, pageSize],
+            variables: {id, filter, sort, branch: filter.branch ?? null, offset: (current - 1) * pageSize, size: pageSize},
+            deps: [id, listKey, current, pageSize],
             condition: !!id,
             dataFn: data => data.project?.findings,
         }
     )
 
-    const onFilterChange = (field, value) => {
-        const query = findingsFilterToQuery({...filter, [field]: value})
+    const replaceQuery = (newFilter, newSort) => {
+        const query = {...findingsFilterToQuery(newFilter), ...findingsSortToQuery(newSort)}
         router.replace(
             {pathname: router.pathname, query: {...query, id: router.query.id}},
             undefined,
@@ -114,8 +137,12 @@ export default function ProjectFindingsView({id}) {
         )
     }
 
+    const onFilterChange = (field, value) => replaceQuery({...filter, [field]: value}, sort)
+
+    const onSortChange = (newSort) => replaceQuery(filter, newSort)
+
     const onPageChange = (newCurrent, newPageSize) => {
-        setPagination({filterKey, current: newPageSize !== pageSize ? 1 : newCurrent, pageSize: newPageSize})
+        setPagination({listKey, current: newPageSize !== pageSize ? 1 : newCurrent, pageSize: newPageSize})
     }
 
     const branches = (project?.findingsSummary?.branches ?? [])
@@ -171,6 +198,8 @@ export default function ProjectFindingsView({id}) {
                                 current={current}
                                 pageSize={pageSize}
                                 onPageChange={onPageChange}
+                                sort={sort}
+                                onSortChange={onSortChange}
                             />
                         </>
                     }

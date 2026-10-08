@@ -354,6 +354,20 @@ finding to the first run which no longer did. An exposure has one or more
 periods; a reopening starts a new one.
 _Avoid_: exposure window, incident
 
+**Exposure episode**:
+The union of the exposure periods of a finding on a set of branches: periods
+which overlap or touch (one ends at the instant the next starts) merge, with
+no gap tolerance. A reopening starts a new episode, and the time the finding
+stayed resolved belongs to no episode. Accepted stretches count as exposed.
+"Episode" for short.
+_Avoid_: incident, reopening
+
+**Remediation time**:
+The median length of the exposure episodes of the CRITICAL and HIGH findings
+of a project, on the branches in scope, which end in the window of the
+reading. A reopened finding gives one sample per fix; a fix applied on
+several branches gives one.
+
 **Acceptance**:
 A decision recorded outside Yontrack, read by it, that a finding is tolerated,
 possibly until an expiry.

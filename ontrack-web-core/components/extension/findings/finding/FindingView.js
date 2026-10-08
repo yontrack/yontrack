@@ -16,6 +16,7 @@ import FindingAcceptance from "@components/extension/findings/finding/FindingAcc
 import FindingExposureTable from "@components/extension/findings/finding/FindingExposureTable";
 import FindingExposureTimeline from "@components/extension/findings/finding/FindingExposureTimeline";
 import FindingHistory from "@components/extension/findings/finding/FindingHistory";
+import ScorecardRemediationLink from "@components/extension/findings/finding/ScorecardRemediationLink";
 
 const gqlFinding = gql`
     query Finding($id: Int!) {
@@ -196,7 +197,8 @@ export default function FindingView({id}) {
                                 </Col>
                             }
                             <Col span={24}>
-                                <PageSection id="finding-exposure-section" title="Exposure per branch" height="auto">
+                                <PageSection id="finding-exposure-section" title="Exposure per branch" height="auto"
+                                             extra={<ScorecardRemediationLink project={project}/>}>
                                     <FindingExposureTable exposures={finding.exposures}/>
                                 </PageSection>
                             </Col>

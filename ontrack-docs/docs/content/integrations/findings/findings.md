@@ -77,6 +77,18 @@ counts as exposed**: the vulnerable code still ships, and an acceptance is a dec
 risk, not a fix. Durations are given in minutes under an hour, in hours under 48 hours, and in
 days above.
 
+#### Exposure episodes
+
+Across branches and stamps, the periods of a finding make up its **exposure episodes**: an episode
+is the union of its periods on a set of branches, periods which overlap or touch — one ends at the
+instant the next one starts — merging, with no gap tolerance. A reopening starts a new episode; the
+time the finding stayed resolved belongs to no episode. As for the periods, an accepted stretch
+counts as exposed.
+
+The *Exposed for* column of the findings page and the
+[remediation readings](../../scorecard/scorecard.md#security-readings) of the scorecard measure
+episodes.
+
 !!! note
 
     The expiry of an acceptance is evaluated when the finding is read, not by a background job. An
@@ -545,7 +557,23 @@ In the UI:
     ![Security section of a project](findings-project-security.png)
 
 * the **findings page** of the project lists them, filtered by severity, state (open, accepted,
-  resolved), branch, scanner and kind.
+  resolved), branch, scanner and kind. Its **Exposed for** column says how long each finding has
+  been exposed:
+    * for a finding still exposed, the duration of its longest ongoing period on one branch for one
+      stamp — the figure the finding page gives per row — over the branches which count for the
+      project, or over the filtered branch only. An age bar comes before it, on a log scale from an
+      hour to a year, so that the bars of every page compare; it is amber when that exposure is
+      accepted. Hovering it gives the branch, the stamp, the start, and whether it is accepted or
+      reopened;
+    * for a fixed finding, `fixed after X`, X being the length of its last
+      [exposure episode](#exposure-episodes) — what it contributed to the remediation time.
+
+    Clicking the header of the column sorts the findings by it, the longest exposed first, across
+    all the pages, and goes back to the first page; findings exposed for as long keep the default
+    order. The findings without any ongoing period — the fixed ones, or the ones not exposed on the
+    filtered branch any more — come last, in the default order. The sort goes in the URL, with the
+    filter, and clicking the header again goes back to the default order: the most severe first,
+    then the most recently seen.
 
     ![Findings of a project](findings-project-findings.png)
 
@@ -555,7 +583,8 @@ In the UI:
       amber while accepted, ending on a green dot when fixed, with the builds at its ends;
     * its **exposure per branch**: for the current period of each branch and stamp, the build it
       was discovered in, the build it was fixed in, and how long it has been exposed, with the
-      earlier periods of a reopened finding;
+      earlier periods of a reopened finding. Its header links to the remediation time of the project
+      on its [scorecard](../../scorecard/scorecard.md#security-readings);
     * its **history**, the most recent first: its discovery, its exposure on other branches, its
       fixes and reopenings with their builds, the changes of its acceptance — accepted, withdrawn,
       expired — and, between them, its observations, grouped, which expand into the scans.
@@ -607,8 +636,11 @@ the project so, rather than showing zeros, and says when no finding has been rep
 
 Through the [GraphQL API](../../api/graphql.md):
 
-* `Project.findings(filter)` lists the findings of a project, paginated, most severe first, with the
-  same filters as the findings page
+* `Project.findings(filter, sort)` lists the findings of a project, paginated, most severe first, with
+  the same filters as the findings page; `sort: EXPOSED_FOR` sorts them the longest exposed first
+* `Finding.exposedFor(branch)` says how long a finding has been exposed: its longest ongoing period,
+  with its branch, stamp, start, and whether it is accepted or reopened, and the length of its last
+  exposure episode — over the branches which count for the project, or over the given branch
 * `Project.findingsSummary` gives the counts the Security section shows
 * `Branch.findingsSummary` gives the counts of one branch: its open findings by severity, the number
   of its accepted and resolved ones, and whether a finding has ever been reported on it

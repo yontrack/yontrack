@@ -19,7 +19,8 @@ import org.springframework.stereotype.Component
 /**
  * `security.overdue`: the open CRITICAL findings older than the CRITICAL target of the estate, plus
  * the open HIGH findings older than its HIGH target, at the end of the window. The age of a finding
- * runs from its first observation.
+ * runs from the start of its current exposure episode on the branches in scope: a reopened finding
+ * starts again from its reopening.
  *
  * Read on the branches in scope whatever the marker. With no target — the no-estate set, or an
  * estate with neither a CRITICAL nor a HIGH target — the reading is `UNKNOWN (NO_TARGET)`; with one
@@ -56,7 +57,7 @@ class SecurityOverdueReadingComputer(
          *
          * Details: `overdueCritical` and `overdueHigh` (`null` for a severity with no target),
          * `openCritical` and `openHigh`, `criticalTargetDays` and `highTargetDays`, `overdueSince`
-         * (first observation of the oldest overdue finding) and `accepted`, the number of CRITICAL
+         * (start of the current episode of the oldest overdue finding) and `accepted`, the number of CRITICAL
          * and HIGH findings accepted at the end of the window.
          *
          * @param window Window of the reading, whose end the age of the findings is measured at
@@ -74,7 +75,7 @@ class SecurityOverdueReadingComputer(
 
             fun overdue(findings: List<SecurityFindingSample>, days: Int?): List<SecurityFindingSample>? =
                 days?.let { window.end.minusDays(it.toLong()) }?.let { limit ->
-                    findings.filter { it.firstSeen < limit }
+                    findings.filter { finding -> finding.episodeStartAt(window.end)?.let { it < limit } ?: false }
                 }
 
             val overdueCritical = overdue(openCritical, targets.criticalDays)
@@ -87,7 +88,8 @@ class SecurityOverdueReadingComputer(
                 "criticalTargetDays" to targets.criticalDays,
                 "highTargetDays" to targets.highDays,
                 "overdueSince" to ((overdueCritical ?: emptyList()) + (overdueHigh ?: emptyList()))
-                    .minOfOrNull { it.firstSeen },
+                    .mapNotNull { it.episodeStartAt(window.end) }
+                    .minOrNull(),
                 "accepted" to findings.count { it.state == FindingState.ACCEPTED },
             )
             return if (overdueCritical == null && overdueHigh == null) {

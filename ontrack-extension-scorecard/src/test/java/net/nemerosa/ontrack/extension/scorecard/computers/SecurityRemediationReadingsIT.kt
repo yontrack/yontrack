@@ -200,6 +200,81 @@ class SecurityRemediationReadingsIT : EstatesTestSupport() {
     }
 
     @Test
+    fun `A reopened finding gives one sample per fix, the time it stayed fixed left out`() {
+        asAdmin {
+            project {
+                scannedBranch().apply {
+                    scan(60, finding("CVE-1", "HIGH"))
+                    // Fixed after 10 days
+                    scan(50)
+                    // Back 10 days later
+                    scan(40, finding("CVE-1", "HIGH"))
+                    // Fixed again after 5 days
+                    scan(35)
+                }
+                remediationTime().let { reading ->
+                    assertEquals(ReadingBasis.MEASURED, reading.basis)
+                    assertEquals(2, reading.details.path("count").asInt())
+                    assertEquals(5 * day, reading.details.path("min").asDouble())
+                    assertEquals(10 * day, reading.details.path("max").asDouble())
+                    assertEquals(7.5 * day, reading.value)
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `A fix applied on several branches gives one sample`() {
+        asAdmin {
+            project {
+                val main = scannedBranch("main")
+                val release = scannedBranch("release-2.4")
+                main.scan(30, finding("CVE-1", "CRITICAL"))
+                release.scan(28, finding("CVE-1", "CRITICAL"))
+                // Fixed on main, still exposed on the release branch
+                main.scan(20)
+                release.scan(15)
+                remediationTime().let { reading ->
+                    assertEquals(ReadingBasis.MEASURED, reading.basis)
+                    assertEquals(1, reading.details.path("count").asInt())
+                    assertEquals(15 * day, reading.value)
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `The age of a reopened finding runs from its reopening`() {
+        asAdmin {
+            val label = label()
+            project {
+                labels = listOf(label)
+                val estate = estate(label, security = EstateSecurity(highTargetDays = 14))
+                scannedBranch().apply {
+                    scan(60, finding("CVE-1", "HIGH"))
+                    scan(50)
+                    // Reopened 10 days ago: within the HIGH target of 14 days
+                    scan(10, finding("CVE-1", "HIGH"))
+                }
+                overdue(EstateReadingSet(estate)).let { reading ->
+                    assertEquals(ReadingBasis.MEASURED, reading.basis)
+                    assertEquals(0.0, reading.value)
+                    assertEquals(1, reading.details.path("openHigh").asInt())
+                }
+                // Over a HIGH target of 7 days, overdue since its reopening
+                val strict = estate(label, security = EstateSecurity(highTargetDays = 7))
+                overdue(EstateReadingSet(strict)).let { reading ->
+                    assertEquals(1.0, reading.value)
+                    assertEquals(1, reading.details.path("overdueHigh").asInt())
+                    assertTrue(
+                        reading.details.path("overdueSince").asText().startsWith(now.minusDays(10).toLocalDate().toString())
+                    )
+                }
+            }
+        }
+    }
+
+    @Test
     fun `Accepted findings are neither open nor resolved, counted apart`() {
         asAdmin {
             val label = label()

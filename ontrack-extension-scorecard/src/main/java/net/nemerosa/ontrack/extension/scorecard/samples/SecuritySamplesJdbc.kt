@@ -2,6 +2,7 @@ package net.nemerosa.ontrack.extension.scorecard.samples
 
 import net.nemerosa.ontrack.common.Time
 import net.nemerosa.ontrack.extension.chart.support.Interval
+import net.nemerosa.ontrack.extension.findings.model.FindingExposureEpisode
 import net.nemerosa.ontrack.extension.findings.model.FindingExposureState
 import net.nemerosa.ontrack.extension.findings.model.FindingKind
 import net.nemerosa.ontrack.extension.findings.model.FindingSeverity
@@ -111,52 +112,73 @@ class SecuritySamplesJdbc(
         branches: Collection<Branch>,
         interval: Interval,
     ): List<SecurityFindingSample> {
+        if (branches.isEmpty()) return emptyList()
+        val branchIds = branches.map { it.id() }.toSet()
+        // The findings with a period on the branches in scope which is open, or which ended in or
+        // after the window: the others have no episode ending in the window, and are not open
         val findings = namedParameterJdbcTemplate!!.query(
             """
-                SELECT F.ID, F.MAX_SEVERITY, F.FIRST_SEEN, F.RESOLVED_AT
+                SELECT F.ID, F.MAX_SEVERITY, F.RESOLVED_AT
                 FROM FINDINGS F
                 WHERE F.PROJECT_ID = :project
                 AND F.MAX_SEVERITY IN (:severities)
-                AND (F.RESOLVED_AT IS NULL OR F.RESOLVED_AT >= :start)
+                AND EXISTS (
+                    SELECT 1
+                    FROM FINDING_EXPOSURE_PERIODS P
+                    WHERE P.FINDING_ID = F.ID
+                    AND P.BRANCH_ID IN (:branches)
+                    AND (P.ENDED_AT IS NULL OR P.ENDED_AT >= :start)
+                )
                 ORDER BY F.ID
             """.trimIndent(),
             mapOf(
                 "project" to project.id(),
                 "severities" to REMEDIATION_SEVERITIES.map { it.name },
+                "branches" to branchIds,
                 "start" to Time.store(interval.start),
             )
         ) { rs, _ ->
-            SecurityFindingSample(
-                findingId = rs.getInt("ID"),
+            RemediationFinding(
+                id = rs.getInt("ID"),
                 severity = FindingSeverity.valueOf(rs.getString("MAX_SEVERITY")),
-                firstSeen = Time.fromStorage(rs.getString("FIRST_SEEN"))!!,
-                resolvedAt = Time.fromStorage(rs.getString("RESOLVED_AT")),
-                state = FindingState.RESOLVED,
+                resolved = rs.getString("RESOLVED_AT") != null,
             )
         }
+        if (findings.isEmpty()) return emptyList()
+        val findingIds = findings.map { it.id }
+        val periods = findingRepository.findExposurePeriodsByFindings(findingIds)
+            .filter { it.branchId in branchIds }
+            .groupBy { it.findingId }
         // State of the findings not resolved, from their exposure on the branches in scope, the
         // acceptances evaluated on the last day of the interval
         val date = interval.end.toLocalDate()
-        val branchIds = branches.map { it.id() }.toSet()
-        val exposures = findingRepository.findExposuresByFindings(
-            findings.filter { it.resolvedAt == null }.map { it.findingId }
-        )
+        val exposures = findingRepository.findExposuresByFindings(findings.filter { !it.resolved }.map { it.id })
             .filter { it.branchId in branchIds }
             .groupBy { it.findingId }
         return findings.map { finding ->
-            if (finding.resolvedAt != null) {
-                finding
-            } else {
-                finding.copy(
-                    state = FindingState.of(
-                        FindingExposureState.of(
-                            exposures[finding.findingId]?.map { it.stateOn(date) } ?: emptyList()
-                        )
+            SecurityFindingSample(
+                findingId = finding.id,
+                severity = finding.severity,
+                episodes = FindingExposureEpisode.of(periods[finding.id] ?: emptyList()),
+                state = if (finding.resolved) {
+                    FindingState.RESOLVED
+                } else {
+                    FindingState.of(
+                        FindingExposureState.of(exposures[finding.id]?.map { it.stateOn(date) } ?: emptyList())
                     )
-                )
-            }
+                },
+            )
         }
     }
+
+    /**
+     * A finding read for the remediation readings, before its episodes and its state
+     */
+    private data class RemediationFinding(
+        val id: Int,
+        val severity: FindingSeverity,
+        val resolved: Boolean,
+    )
 
     private fun findingKind(name: String): FindingKind? = FindingKind.entries.find { it.name == name }
 

@@ -1,6 +1,7 @@
 package net.nemerosa.ontrack.extension.scorecard.computers
 
 import net.nemerosa.ontrack.extension.chart.support.Interval
+import net.nemerosa.ontrack.extension.findings.model.FindingExposureEpisode
 import net.nemerosa.ontrack.extension.findings.model.FindingSeverity
 import net.nemerosa.ontrack.extension.findings.model.FindingState
 import net.nemerosa.ontrack.extension.scorecard.model.ReadingBasis
@@ -34,8 +35,12 @@ class SecurityOverdueReadingComputerTest {
     ) = SecurityFindingSample(
         findingId = nextId++,
         severity = severity,
-        firstSeen = end.minusDays(daysAgo),
-        resolvedAt = if (state == FindingState.RESOLVED) end.minusDays(1) else null,
+        episodes = listOf(
+            FindingExposureEpisode(
+                start = end.minusDays(daysAgo),
+                end = if (state == FindingState.RESOLVED) end.minusDays(1) else null,
+            )
+        ),
         state = state,
     )
 
@@ -139,5 +144,30 @@ class SecurityOverdueReadingComputerTest {
             findings,
         )
         assertEquals(5.0, outcome.value)
+    }
+
+    @Test
+    fun `The age of a reopened finding runs from the start of its current episode`() {
+        val reopened = SecurityFindingSample(
+            findingId = nextId++,
+            severity = FindingSeverity.CRITICAL,
+            episodes = listOf(
+                FindingExposureEpisode(start = end.minusDays(200), end = end.minusDays(150)),
+                FindingExposureEpisode(start = end.minusDays(9), end = end.minusDays(5)),
+                FindingExposureEpisode(start = end.minusDays(3), end = null),
+            ),
+            state = FindingState.OPEN,
+        )
+        assertEquals(0.0, SecurityOverdueReadingComputer.aggregate(window, targets, listOf(reopened)).value)
+        val overdue = reopened.copy(
+            episodes = reopened.episodes.dropLast(1) + FindingExposureEpisode(start = end.minusDays(4), end = null)
+        )
+        val outcome = SecurityOverdueReadingComputer.aggregate(
+            window,
+            SecurityTargets(criticalDays = 3, highDays = null),
+            listOf(overdue),
+        )
+        assertEquals(1.0, outcome.value)
+        assertEquals(end.minusDays(4), outcome.details["overdueSince"])
     }
 }

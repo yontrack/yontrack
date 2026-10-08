@@ -312,3 +312,57 @@ export function exposureTimeline(exposures = [], now = new Date()) {
 
     return {start: new Date(start), end: new Date(end), lanes, ticks}
 }
+
+/** The default order of the findings of a project: the most severe first, then the most recently seen. */
+export const DEFAULT_FINDINGS_SORT = 'DEFAULT'
+
+/** The findings of a project the longest exposed first. */
+export const EXPOSED_FOR_FINDINGS_SORT = 'EXPOSED_FOR'
+
+/** Orders of the findings of a project, as `Project.findings(sort)` takes them. */
+export const FINDINGS_SORTS = [DEFAULT_FINDINGS_SORT, EXPOSED_FOR_FINDINGS_SORT]
+
+/**
+ * The order of the findings from the query of the URL: `DEFAULT` unless it says another one of
+ * {@link FINDINGS_SORTS}.
+ */
+export function findingsSortFromQuery(query = {}) {
+    const value = single(query.sort)
+    return FINDINGS_SORTS.includes(value) ? value : DEFAULT_FINDINGS_SORT
+}
+
+/** The query of the URL from an order of the findings: nothing for the default one. */
+export function findingsSortToQuery(sort) {
+    return sort && sort !== DEFAULT_FINDINGS_SORT ? {sort} : {}
+}
+
+const YEAR = 365 * DAY
+
+/**
+ * Length of the age bar of an exposure, as a ratio of its full length: on a log scale from an hour
+ * (empty) to a year (full), whatever the page or the filter, so that bars can be compared.
+ *
+ * @param {number} seconds Duration of the exposure, in seconds
+ * @returns {number} Between 0 and 1
+ */
+export function exposureBarRatio(seconds) {
+    if (!seconds || seconds <= HOUR) return 0
+    if (seconds >= YEAR) return 1
+    return Math.log(seconds / HOUR) / Math.log(YEAR / HOUR)
+}
+
+/**
+ * How long a finding has been exposed, in one line: the duration of its longest ongoing period, or
+ * "fixed after X" for a fixed finding, X being the length of its last exposure episode.
+ *
+ * @param {object} exposedFor The `exposedFor` of a finding
+ * @returns {string} The text, empty for a finding without any period
+ */
+export function exposedForText(exposedFor) {
+    if (!exposedFor) return ''
+    if (exposedFor.ongoing) return formatExposureDuration(exposedFor.ongoingSeconds)
+    if (exposedFor.lastEpisodeSeconds !== null && exposedFor.lastEpisodeSeconds !== undefined) {
+        return `fixed after ${formatExposureDuration(exposedFor.lastEpisodeSeconds)}`
+    }
+    return ''
+}

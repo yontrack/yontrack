@@ -2738,6 +2738,11 @@ type FavouriteProjectPayload implements Payload {
 type Finding {
   "Acceptance recorded by the most recent observation of the finding. Null when this observation carries none, or when all the observations have been purged."
   acceptance: FindingAcceptance
+  "How long the finding has been exposed: its longest ongoing period on one branch for one stamp, and the length of its last exposure episode. Over the branches which count toward its state in its project, or over one branch only."
+  exposedFor(
+    "Name of the branch whose periods count, instead of the branches which count in the project"
+    branch: String
+  ): FindingExposedFor
   "Exposure of the finding on the branches of its project, resolved or not, one entry per branch and validation stamp, by branch name then stamp name"
   exposures: [FindingExposure!]!
   "Identifier given by the scanner, like a CVE or a rule ID"
@@ -2818,6 +2823,26 @@ type FindingAcceptedSpan {
   fromValidationRun: ValidationRun
   "End of the stretch: the observation without the acceptance, the day after its last day, or the end of the period. Null while it holds."
   to: LocalDateTime
+}
+
+"How long a security finding has been exposed on a set of branches: its longest ongoing period on one branch for one stamp, and the length of its last exposure episode ? the union of its periods, which merge when they overlap or touch."
+type FindingExposedFor {
+  "Whether the exposure of the longest ongoing period is accepted"
+  accepted: Boolean!
+  "Branch of the longest ongoing period. Null when none is ongoing."
+  branch: Branch
+  "Length of the last exposure episode in seconds, until now while it is ongoing: for a fixed finding, how long its last fix took. Null when the finding has no period."
+  lastEpisodeSeconds: Long
+  "Whether a period is ongoing"
+  ongoing: Boolean!
+  "Duration of the longest ongoing period in seconds, until now. Null when none is ongoing."
+  ongoingSeconds: Long
+  "Whether the longest ongoing period follows an earlier period of the same branch and stamp"
+  reopened: Boolean!
+  "Start of the longest ongoing period. Null when none is ongoing."
+  since: LocalDateTime
+  "Validation stamp of the longest ongoing period. Null when none is ongoing."
+  validationStamp: ValidationStamp
 }
 
 "A security finding is exposed on a branch while the latest scan of the same stamp on that branch reports it."
@@ -5871,14 +5896,16 @@ type Project implements Authorizable & ProjectEntity {
   disabled: Boolean!
   "Is this project a favourite of the current user?"
   favourite: Boolean
-  "Security findings of the project, the most severe first, then the most recently seen. Empty for a user who is not granted the view of the findings of the project."
+  "Security findings of the project, by default the most severe first, then the most recently seen. Empty for a user who is not granted the view of the findings of the project."
   findings(
     "Filter on the findings"
     filter: FindingFilter,
     "Offset for the page"
     offset: Int = 0,
     "Size of the page"
-    size: Int = 20
+    size: Int = 20,
+    "Order of the findings, applied before the page is cut. DEFAULT when not given."
+    sort: FindingSort
   ): FindingPaginated
   "Summary of the security findings of the project: its open findings by severity, and their exposure per branch. Null for a user who is not granted the view of the findings of the project."
   findingsSummary: FindingsSummary
@@ -9818,6 +9845,12 @@ enum FindingSeverity {
   LOW
   MEDIUM
   UNKNOWN
+}
+
+"Order of the findings of a project. DEFAULT: the most severe first, then the most recently seen. EXPOSED_FOR: the longest exposed first, by their longest ongoing period on one branch for one stamp, then in the default order; the findings without any ongoing period, the resolved ones among them, come last."
+enum FindingSort {
+  DEFAULT
+  EXPOSED_FOR
 }
 
 "State of a security finding in its project, rolled up from its exposure on the branches which count, or on one branch. OPEN: exposed without any acceptance holding. ACCEPTED: not open, but exposed under an acceptance which holds. RESOLVED: neither open nor accepted."

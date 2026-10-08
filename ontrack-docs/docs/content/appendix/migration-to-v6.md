@@ -333,6 +333,13 @@ renaming:
 the *Delivery scorecard* category, and the `ontrack_readings_computation` and
 `ontrack_readings_errors` metrics.
 
+**The remediation readings measure exposure episodes.** `security.remediationTime` and
+`security.overdue` no longer run from the first observation of a finding: the remediation time takes
+one sample per [exposure episode](../integrations/findings/findings.md#exposure-episodes) ending in
+the window, and the age of an overdue finding runs from the start of its current episode. A
+finding which was fixed and came back no longer counts the time it stayed fixed, **so their values
+can drop for reopened findings**, compared with the snapshots taken before.
+
 #### For API clients
 
 The data of a `security-findings` validation run now records the **kind** of the scan — `IMAGE`,

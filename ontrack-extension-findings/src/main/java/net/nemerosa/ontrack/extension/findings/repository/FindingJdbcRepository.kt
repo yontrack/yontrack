@@ -513,21 +513,35 @@ class FindingJdbcRepository(
         namedParameterJdbcTemplate!!.query(
             "SELECT * FROM FINDING_EXPOSURE_PERIODS WHERE FINDING_ID = :findingId ORDER BY STARTED_AT, ID",
             mapOf("findingId" to findingId)
-        ) { rs, _ ->
-            FindingExposurePeriod(
-                id = rs.getInt("ID"),
-                findingId = rs.getInt("FINDING_ID"),
-                branchId = rs.getInt("BRANCH_ID"),
-                validationStampId = rs.getInt("VALIDATION_STAMP_ID"),
-                startedAt = rs.readLocalDateTimeNotNull("STARTED_AT"),
-                startedByValidationRunId = rs.getObject("STARTED_BY_VALIDATION_RUN_ID", Integer::class.java)?.toInt(),
-                startedInBuild = rs.getString("STARTED_IN_BUILD"),
-                endedAt = rs.readLocalDateTime("ENDED_AT"),
-                endedByValidationRunId = rs.getObject("ENDED_BY_VALIDATION_RUN_ID", Integer::class.java)?.toInt(),
-                endedInBuild = rs.getString("ENDED_IN_BUILD"),
-                resolutionReason = rs.getString("RESOLUTION_REASON")?.let { FindingResolutionReason.valueOf(it) },
-            )
+        ) { rs, _ -> toExposurePeriod(rs) }
+
+    override fun findExposurePeriodsByFindings(findingIds: Collection<Int>): List<FindingExposurePeriod> =
+        if (findingIds.isEmpty()) {
+            emptyList()
+        } else {
+            namedParameterJdbcTemplate!!.query(
+                """
+                    SELECT * FROM FINDING_EXPOSURE_PERIODS
+                    WHERE FINDING_ID IN (:findingIds)
+                    ORDER BY FINDING_ID, STARTED_AT, ID
+                """.trimIndent(),
+                mapOf("findingIds" to findingIds)
+            ) { rs, _ -> toExposurePeriod(rs) }
         }
+
+    private fun toExposurePeriod(rs: ResultSet) = FindingExposurePeriod(
+        id = rs.getInt("ID"),
+        findingId = rs.getInt("FINDING_ID"),
+        branchId = rs.getInt("BRANCH_ID"),
+        validationStampId = rs.getInt("VALIDATION_STAMP_ID"),
+        startedAt = rs.readLocalDateTimeNotNull("STARTED_AT"),
+        startedByValidationRunId = rs.getObject("STARTED_BY_VALIDATION_RUN_ID", Integer::class.java)?.toInt(),
+        startedInBuild = rs.getString("STARTED_IN_BUILD"),
+        endedAt = rs.readLocalDateTime("ENDED_AT"),
+        endedByValidationRunId = rs.getObject("ENDED_BY_VALIDATION_RUN_ID", Integer::class.java)?.toInt(),
+        endedInBuild = rs.getString("ENDED_IN_BUILD"),
+        resolutionReason = rs.getString("RESOLUTION_REASON")?.let { FindingResolutionReason.valueOf(it) },
+    )
 
     companion object {
 

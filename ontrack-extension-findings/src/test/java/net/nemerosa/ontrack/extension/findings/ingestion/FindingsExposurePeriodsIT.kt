@@ -71,6 +71,32 @@ class FindingsExposurePeriodsIT : AbstractDSLTestSupport() {
     }
 
     @Test
+    fun `Periods of several findings in one batch, by finding, the oldest first`() {
+        project {
+            val main = branch()
+            val release = branch()
+            val mainScan = main.findingsStamp()
+            val releaseScan = release.findingsStamp()
+            main.scan(mainScan, null, entry("CVE-1"), entry("CVE-2"))
+            release.scan(releaseScan, null, entry("CVE-1"))
+            main.scan(mainScan, null, entry("CVE-2"))
+            main.scan(mainScan, null, entry("CVE-1"), entry("CVE-2"))
+            // Not asked for
+            main.scan(mainScan, null, entry("CVE-3"))
+
+            val cve1 = finding("CVE-1")
+            val cve2 = finding("CVE-2")
+            val periods = findingRepository.findExposurePeriodsByFindings(listOf(cve1.id, cve2.id))
+            assertEquals(setOf(cve1.id, cve2.id), periods.map { it.findingId }.toSet())
+            val cve1Periods = periods.filter { it.findingId == cve1.id }
+            assertEquals(findingRepository.findExposurePeriodsByFinding(cve1.id), cve1Periods)
+            assertEquals(3, cve1Periods.size)
+            assertEquals(1, periods.count { it.findingId == cve2.id })
+            assertEquals(emptyList(), findingRepository.findExposurePeriodsByFindings(emptyList()))
+        }
+    }
+
+    @Test
     fun `A finding still reported keeps one open period, accepted or not`() {
         project {
             branch {

@@ -175,23 +175,28 @@ Yontrack 6 recorded the kind has the kinds of the findings it reported.
     required by a promotion and the time of the latest scan.
 
 **Remediation time**
-:   How long the `CRITICAL` and `HIGH` findings of the project stay open: from the **first
-    observation** of a finding to its **resolution in the project**, for the findings resolved in the
-    window. The median goes in the value, with the 90th percentile, mean, minimum, maximum and count
-    in the details. A finding is resolved in the project once no branch in scope exposes it any more
-    — see [Project roll-up](../integrations/findings/findings.md#project-roll-up) — so a vulnerability
-    fixed on `main` and still exposed on a release branch is not remediated yet. The location of a
-    finding carries no version: bumping a dependency to a version which is still vulnerable does not
-    resolve it. It reads the same in every set, and needs no target to be measured.
+:   How long the `CRITICAL` and `HIGH` findings of the project stay open, measured on their
+    **exposure episodes**: an episode is the union of the
+    [exposure periods](../integrations/findings/findings.md#exposure-periods) of a finding on the
+    branches in scope — periods which overlap or touch merge, with no gap tolerance. One sample per
+    episode **ending in the window**, from its start to its end. A finding which was fixed, came
+    back and was fixed again gives one sample per fix, the time it stayed fixed left out; a fix
+    applied on `main` and on two release branches gives one sample, which ends with the last of
+    them — so a vulnerability fixed on `main` and still exposed on a release branch is not
+    remediated yet. The median goes in the value, with the 90th percentile, mean, minimum, maximum
+    and count in the details. The location of a finding carries no version: bumping a dependency to
+    a version which is still vulnerable does not end its episode. It reads the same in every set,
+    and needs no target to be measured.
 
 **Overdue findings**
 :   The open `CRITICAL` findings older than the estate's CRITICAL remediation target, plus the open
     `HIGH` findings older than its HIGH target, at the time of the reading. The age of a finding runs
-    from its first observation, and a finding is overdue once **strictly** older than its target. An
-    estate with a target for one severity only judges the findings of that severity; with no target
-    at all — the no-estate set, or an estate with neither — the reading is `UNKNOWN (NO_TARGET)`.
-    Its details give the open and overdue findings of each severity, the targets, and the first
-    observation of the oldest overdue finding.
+    from the start of its **current exposure episode** on the branches in scope — a reopened finding
+    starts again from its reopening — and a finding is overdue once **strictly** older than its
+    target. An estate with a target for one severity only judges the findings of that severity; with
+    no target at all — the no-estate set, or an estate with neither — the reading is
+    `UNKNOWN (NO_TARGET)`. Its details give the open and overdue findings of each severity, the
+    targets, and the start of the current episode of the oldest overdue finding.
 
 For both remediation readings, the severity of a finding is the highest it was ever reported with,
 and an **accepted** finding is neither open nor resolved: the accepted `CRITICAL` and `HIGH`
@@ -204,7 +209,7 @@ A reading Yontrack cannot take is `UNKNOWN`, with one of these reasons:
 | Reason          | Meaning                                                                                     |
 |-----------------|---------------------------------------------------------------------------------------------|
 | `NO_MARKER`     | No marker to read up to: no branch in scope has the promotion level, or the project has no slot in the marker environment with that qualifier, or that environment does not exist. |
-| `NO_SAMPLES`    | Nothing to measure in the window: nothing reached the marker, no build was run on a test stamp, for the time to restore an outage is still going on and none was restored, or — for the remediation time — no `CRITICAL` or `HIGH` finding was resolved in the window. |
+| `NO_SAMPLES`    | Nothing to measure in the window: nothing reached the marker, no build was run on a test stamp, for the time to restore an outage is still going on and none was restored, or — for the remediation time — no exposure episode of a `CRITICAL` or `HIGH` finding ended in the window. |
 | `NO_FAILURE`    | Time to restore only: nothing failed in the window, so there was nothing to restore. Shown as *No failure in window*, a neutral state rather than an unknown one. A time to restore never reads 0. |
 | `NO_TEST_STAMP` | Test readings only: no test stamp on the branches in scope.                                 |
 | `NOT_LICENSED`  | Delivery readings up to an environment, when the license does not include the environments. |
