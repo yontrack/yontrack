@@ -48,9 +48,9 @@ private class RecordingDemoTarget(
         private val record: (String) -> Unit,
     ) : DemoBuild by delegate {
 
-        override fun promote(promotionLevel: String, description: String, at: LocalDateTime) {
+        override fun promote(promotionLevel: String, description: String, at: LocalDateTime, byPerson: Boolean) {
             record("promote $promotionLevel")
-            delegate.promote(promotionLevel, description, at)
+            delegate.promote(promotionLevel, description, at, byPerson)
         }
 
         override fun validate(
@@ -58,9 +58,10 @@ private class RecordingDemoTarget(
             status: ValidationStatus,
             description: String,
             at: LocalDateTime,
+            byPerson: Boolean,
         ): DemoValidationRun {
             record("validate $validationStamp")
-            return delegate.validate(validationStamp, status, description, at)
+            return delegate.validate(validationStamp, status, description, at, byPerson)
         }
     }
 }
@@ -151,6 +152,7 @@ class DemoSeedTest {
                 DemoContent.SECURITY,
                 DemoContent.VISITS,
                 DemoContent.E2E,
+                DemoContent.VETS,
                 DemoContent.AUDIT_TRAIL,
                 DemoContent.AUDIT_TRAIL_TAMPERED,
                 DemoContent.CHANGELOG,

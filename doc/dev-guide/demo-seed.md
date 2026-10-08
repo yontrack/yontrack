@@ -9,7 +9,8 @@ churn, and no dependency on ArgoCD sync timing — a Helm pre-upgrade hook would
 *every* sync, so an unrelated values tweak would silently destroy the demo.
 
 Settings stay covered by CasC and users live in Keycloak, so projects, environments, labels,
-estates and dashboards are the only things the seed has to reset. What they have in common is that
+estates, dashboards and the dataset's two registered agents are the only things the seed has to
+reset. What they have in common is that
 they outlive a project deletion: a label is global and carried by several projects, so
 deleting every project leaves every label behind.
 
@@ -78,6 +79,11 @@ A licensed feature is needed as well, for the same reason:
 Unlike the two properties, a missing licence is caught before the reset: the seed reads the
 licence of the instance through `licenseInfo` and stops with "Nothing was deleted" when a
 feature is not enabled, as it does when the mock SCM is off.
+
+The agent governance (`extension.agents`) is not checked: what it gates - *Assisted builds
+require*, *Evidence from non-agents only*, the agent activity views - is configured whatever the
+licence says, does nothing without it, and the views show their licence notice. The development
+licence enables it; the demo's needs yontrack/yontrack-infra-gitops#208. See [The agents](#the-agents).
 
 The audit trail is the exception: what it needs does **not** stop the reset. Each piece is asked
 before anything is deleted, and when the instance cannot offer it the part of the demo needing it
@@ -467,6 +473,43 @@ which is what lets the unit tests check that seq 4 is the scan.
 `ProjectSpec.requires` and `DemoTarget.unavailable` are what leave a project out on an instance
 which cannot offer what it needs - see [What the target instance must have](#what-the-target-instance-must-have).
 A project which may be left out is not linked to from another one: `validate` refuses it.
+
+### The agents
+
+`petclinic-vets` shows the agents (#2037), and `DemoAgentsSeedTest` pins what it shows. Two agents
+are registered, owned by the account the seed runs as - `claude-code-demo[agent]` and
+`codex-demo[agent]` (`DemoDataset.agents`) - each with a token named `demo-seed`, through which the
+seed acts as the agent, in a session (`AgentSessionSpec`): the token goes with the
+`X-Yontrack-Agent-Session` and `-Link` headers, so that whatever is done is signed with the agent
+and links to its session. The links are on `agents.example.com`: a session is linked, never
+fetched, and a link to a real service would lead nowhere.
+
+- **The reset deletes the agents the dataset declares, and only those.** An agent is an account and
+  outlives the projects; the server refuses a second agent of the same slug. Any other agent of the
+  instance was registered by somebody, and is theirs.
+- **Their tokens are kept**, unlike the seeding account's own: an agent holds no right its owner
+  does not, and fewer, and a kept token is what the agents page shows as last used. The value is
+  never written anywhere, and the next reset deletes it with its agent.
+- **The agent does what the agent policy lets it, a person does the rest** (`BuildSpec.agent`). The
+  agent creates the build, its properties and links, records its validations and promotes it on the
+  levels admitting agents (`PromotionLevelSpec.agentsAdmitted`). A person - the account the seed
+  runs as - records the runs of a stamp taking evidence from non-agents only
+  (`ValidationStampSpec.nonAgentEvidence`), promotes on every other level, and backdates the build,
+  which is an edit the policy denies an agent; the signature of the build keeps its agent.
+- **The commits carry full messages.** `BuildSpec.commits` are messages, not subjects: Claude Code's
+  `Co-Authored-By` and `Claude-Session` trailers, Codex's `Co-authored-by`, and one co-author who is
+  a person and does not count. The server computes the assisted change of each build from them.
+- **The seed waits for the assisted change before promoting to a gated level.** The server computes
+  it in the background, and *Assisted builds require* (`PromotionLevelSpec.assistedBuildsRequire`)
+  fails closed: until the value is there, a build counts as assisted, and the non-assisted `202`
+  would be refused `GOLD` for a reason the dataset does not describe. The first build of the branch
+  has no change log to read: UNKNOWN, which counts as assisted, so it is reviewed.
+- **Agent asks, a person approves.** `codex-demo` starts the deployment of `204` to staging
+  (`DeploymentSpec.agent`), on a slot admitting agents (`SlotSpec.agentsAdmitted`) whose manual
+  approval leaves it a candidate.
+
+`InMemoryDemoTarget` enforces the agent policy, the two gates and the computation of the assisted
+change from the trailers, so that a dataset the server would refuse fails in the unit tests.
 
 ## How it is put together
 

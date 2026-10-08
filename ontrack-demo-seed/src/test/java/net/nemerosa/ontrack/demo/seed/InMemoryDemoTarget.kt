@@ -127,6 +127,58 @@ class InMemoryDemoTarget(
     }
 
     /**
+     * Registered agents, held by the instance: they are accounts, and outlive the projects the reset
+     * deletes.
+     */
+    val agents = mutableListOf<InMemoryAgent>()
+
+    override fun agents(): List<DemoAgent> = agents.toList()
+
+    override fun registerAgent(spec: AgentSpec): DemoAgent {
+        require(Regex("[a-z0-9-]{1,32}").matches(spec.slug)) { "Invalid agent slug: ${spec.slug}" }
+        // The identifier is the email of the account, unique on the instance
+        require(agents.none { it.identifier == spec.identifier }) { "Agent ${spec.identifier} already exists" }
+        journal += "agent ${spec.identifier}"
+        return InMemoryAgent(spec).also { agents += it }
+    }
+
+    inner class InMemoryAgent(val spec: AgentSpec) : DemoAgent {
+
+        override val identifier: String get() = spec.identifier
+
+        /** Names of the tokens of the agent which are still valid. */
+        val tokens = mutableSetOf<String>()
+
+        override fun delete() {
+            agents -= this
+        }
+
+        override fun generateToken(name: String): DemoAgentToken {
+            require(name !in tokens) { "The agent $identifier already has a token $name" }
+            tokens += name
+            return object : DemoAgentToken {
+                override fun inSession(session: AgentSessionSpec): DemoToken {
+                    require(session.agent == spec.slug) { "A session of ${session.agent} through a token of $identifier" }
+                    return InMemoryAgentToken(this@InMemoryAgent, name, session)
+                }
+            }
+        }
+    }
+
+    /**
+     * A token of an agent, sent with the headers of a session: what is done through it is the agent's.
+     */
+    inner class InMemoryAgentToken(
+        val agent: InMemoryAgent,
+        override val name: String,
+        val session: AgentSessionSpec,
+    ) : DemoToken {
+        override fun revoke() {
+            agent.tokens -= name
+        }
+    }
+
+    /**
      * Whether the trails are written: only while the licence allows the audit trail.
      */
     private val trailsWritten: Boolean get() = DemoCapability.AUDIT_TRAIL !in unavailableCapabilities
@@ -179,6 +231,10 @@ class InMemoryDemoTarget(
         labels.forEach { label ->
             add("label ${label.display} ${label.spec.color} \"${label.spec.description}\"")
         }
+        agents.forEach { agent ->
+            add("agent ${agent.identifier} \"${agent.spec.displayName}\" ${agent.spec.tool} \"${agent.spec.description}\"")
+            agent.tokens.sorted().forEach { add("  token $it") }
+        }
         projects.forEach { project ->
             add("project ${project.name} \"${project.description}\"")
             if (project.favourite) add("  favourite")
@@ -199,21 +255,27 @@ class InMemoryDemoTarget(
                     branch.autoPromotions[promotionLevel]?.let { add("      auto promotion $it") }
                     branch.promotionDependencies[promotionLevel]?.let { add("      depends on $it") }
                     if (promotionLevel in branch.previousPromotionRequired) add("      requires the previous promotion")
+                    if (promotionLevel in branch.agentsAdmitted) add("      admits agents")
+                    branch.assistedBuildsRequire[promotionLevel]?.let { add("      assisted builds require $it") }
                 }
                 branch.validationStamps.forEach { stamp ->
                     add("    validation stamp $stamp")
                     branch.findingsStamps[stamp]?.let { add("      findings $it") }
                     branch.chmlStamps[stamp]?.let { add("      chml $it") }
+                    if (stamp in branch.nonAgentStamps) add("      evidence from non-agents only")
                 }
                 branch.deletedValidationStamps.forEach { add("    deleted validation stamp $it") }
                 branch.builds.forEach { build ->
                     add("    build ${build.name} \"${build.description}\" at ${build.creation}")
-                    build.token?.let { add("      through the token ${it.name}") }
+                    build.token?.let { add("      through ${describe(it)}") }
+                    build.assistedChange?.let { add("      assisted change $it") }
                     build.releaseVersion?.let { add("      release $it") }
                     build.commitId?.let { add("      built from $it") }
-                    build.promotions.forEach { add("      promotion ${it.first} at ${it.second}") }
+                    build.promotions.forEachIndexed { index, it ->
+                        add("      promotion ${it.first} at ${it.second} by ${build.promotionActors[index]}")
+                    }
                     build.validations.forEach { validation ->
-                        add("      validation ${validation.stamp} ${validation.status} at ${validation.at}")
+                        add("      validation ${validation.stamp} ${validation.status} at ${validation.at} by ${validation.actor}")
                         validation.statusChanges.forEach { add("        status ${it.status} \"${it.description}\"") }
                         validation.evidence.forEach {
                             add("        evidence ${it.spec.fileName} ${it.spec.mediaType} ${it.sha256}" + if (it.deleted) " deleted" else "")
@@ -235,6 +297,7 @@ class InMemoryDemoTarget(
             add("environment ${environment.name} #${environment.order} \"${environment.description}\" ${environment.tags}")
             environment.slots.forEach { slot ->
                 add("  slot ${slot.project.name}${qualifierSuffix(slot.qualifier)} \"${slot.description}\"")
+                if (slot.agentsAdmitted) add("    admits agents")
                 slot.admissionRules.forEach { add("    rule ${it.name} ${it.ruleId} ${it.config}") }
                 slot.workflows.forEach { add("    workflow on ${it.trigger}: ${it.yaml.lines().first()}") }
                 slot.deployments.forEach {
@@ -248,7 +311,8 @@ class InMemoryDemoTarget(
                     add(
                         "    $what ${it.build.name}" +
                                 (it.times?.let { times -> " at ${times.start}..${times.end}" } ?: "") +
-                                (it.message?.let { message -> " \"$message\"" } ?: "")
+                                (it.message?.let { message -> " \"$message\"" } ?: "") +
+                                " by ${it.actor}"
                     )
                 }
             }
@@ -401,6 +465,12 @@ class InMemoryDemoTarget(
         val autoPromotions = mutableMapOf<String, AutoPromotionSpec>()
         val promotionDependencies = mutableMapOf<String, List<String>>()
         val previousPromotionRequired = mutableSetOf<String>()
+        /** The promotion levels admitting agents. */
+        val agentsAdmitted = mutableSetOf<String>()
+        /** The stamps an assisted build requires, by promotion level. */
+        val assistedBuildsRequire = mutableMapOf<String, List<String>>()
+        /** The stamps taking evidence from non-agents only. */
+        val nonAgentStamps = mutableSetOf<String>()
 
         /** A favourite of the seeding account, as [InMemoryProject.favourite] is. */
         var favourite: Boolean = false
@@ -479,6 +549,23 @@ class InMemoryDemoTarget(
             }
         }
 
+        override fun admitAgents(promotionLevel: String) {
+            requirePromotionLevel(promotionLevel)
+            agentsAdmitted += promotionLevel
+        }
+
+        override fun setAssistedBuildsRequire(promotionLevel: String, validationStamps: List<String>) {
+            requirePromotionLevel(promotionLevel)
+            assistedBuildsRequire[promotionLevel] = validationStamps
+        }
+
+        override fun restrictEvidenceToNonAgents(validationStamp: String) {
+            require(validationStamp in validationStamps) {
+                "Validation stamp $validationStamp does not exist in ${project.name}/${this.name}"
+            }
+            nonAgentStamps += validationStamp
+        }
+
         /**
          * The promotion level immediately below [promotionLevel] in this branch's order, which is
          * what the condition names - and `null` for the first level, which has none.
@@ -499,9 +586,14 @@ class InMemoryDemoTarget(
             return InMemoryBuild(this, name, description, creation, token).also { build ->
                 builds += build
                 // Two calls, as the seed makes them: Yontrack stamps a build with the time it is
-                // created, and the seed backdates it in a second one - which its trail records
+                // created, and the seed backdates it in a second one - which its trail records. An
+                // agent may not edit a build, so a person backdates the agent's.
                 build.entry("build.created")
-                build.entry("build.updated", "creation" to creation)
+                build.entry(
+                    "build.updated",
+                    "creation" to creation,
+                    actor = if (token is InMemoryAgentToken) SEED_ACTOR else build.actorOf(token),
+                )
             }
         }
 
@@ -538,8 +630,33 @@ class InMemoryDemoTarget(
     }
 
     private fun requireValid(token: DemoToken) {
-        check(token.name in tokens) { "The token ${token.name} is revoked" }
+        if (token is InMemoryAgentToken) {
+            check(token.agent in agents) { "The agent ${token.agent.identifier} is deleted" }
+            check(token.name in token.agent.tokens) { "The token ${token.name} of ${token.agent.identifier} is revoked" }
+        } else {
+            check(token.name in tokens) { "The token ${token.name} is revoked" }
+        }
     }
+
+    /**
+     * The actor of what is done through [token]: an agent in its session, the token, or the account the
+     * seed runs as. A revoked token is refused, as the server refuses it.
+     */
+    fun actorOf(token: DemoToken?): String {
+        token?.let { requireValid(it) }
+        return describe(token)
+    }
+
+    /**
+     * How [token] reads as an actor - `agent:<identifier> session <id>`, `token:<name>`, or the account
+     * the seed runs as - whether it is still valid or not.
+     */
+    fun describe(token: DemoToken?): String =
+        when (token) {
+            null -> SEED_ACTOR
+            is InMemoryAgentToken -> "agent:${token.agent.identifier} session ${token.session.id}"
+            else -> "token:${token.name}"
+        }
 
     inner class InMemoryBuild(
         val branch: InMemoryBranch,
@@ -560,10 +677,22 @@ class InMemoryDemoTarget(
          * seed runs as. A revoked token is refused, as the server refuses it.
          */
         private val actor: String
-            get() = token?.let {
-                requireValid(it)
-                "token:${it.name}"
-            } ?: SEED_ACTOR
+            get() = actorOf(token)
+
+        fun actorOf(token: DemoToken?): String = this@InMemoryDemoTarget.actorOf(token)
+
+        /** Whether what is done through this handle is done by an agent. */
+        private val byAgent: Boolean get() = token is InMemoryAgentToken
+
+        /** Who made each promotion, in the order of [promotions]. */
+        val promotionActors = mutableListOf<String>()
+
+        /**
+         * The assisted change of the build, as the server computes it once its commit is set - see
+         * [computeAssistedChange].
+         */
+        var assistedChange: InMemoryAssistedChange? = null
+            private set
 
         fun entry(type: String, vararg payload: Pair<String, Any?>, actor: String = this.actor) {
             if (trailsWritten) {
@@ -605,9 +734,25 @@ class InMemoryDemoTarget(
             trail[index] = entry.copy(payload = entry.payload + spec.payload, tampered = true)
         }
 
-        override fun promote(promotionLevel: String, description: String, at: LocalDateTime) {
+        override fun promote(promotionLevel: String, description: String, at: LocalDateTime, byPerson: Boolean) {
             require(promotionLevel in branch.promotionLevels) {
                 "No promotion level $promotionLevel on ${branch.project.name}/${branch.name}"
+            }
+            val promoter = if (byPerson) SEED_ACTOR else actor
+            // The agent policy (#2026): an agent promotes on a level admitting agents, and nowhere else
+            check(byPerson || !byAgent || promotionLevel in branch.agentsAdmitted) {
+                "$promoter may not promote to $promotionLevel: the promotion level does not admit agents (agent policy)"
+            }
+            // `AssistedBuildsRequireCheckExtension`, which fails closed: a build whose assisted change is
+            // absent or unknown counts as assisted
+            branch.assistedBuildsRequire[promotionLevel]?.let { stamps ->
+                if (assistedChange?.assisted != false) {
+                    stamps.forEach { stamp ->
+                        check(validations.lastOrNull { it.stamp == stamp }?.status in PASSING) {
+                            "Assisted build: $stamp must pass first."
+                        }
+                    }
+                }
             }
             // `PromotionRunDependenciesCheckExtension` refuses the promotion outright, as the
             // promotion is created, so a build promoted to GOLD before SILVER is refused even
@@ -634,7 +779,43 @@ class InMemoryDemoTarget(
                     }
             }
             promotions += promotionLevel to at
-            entry("promotion.added", "promotionLevel" to promotionLevel)
+            promotionActors += promoter
+            entry("promotion.added", "promotionLevel" to promotionLevel, actor = promoter)
+        }
+
+        /** `NonAgentEvidenceCheck`: an agent's run on such a stamp is refused, never ignored. */
+        private fun checkNotAgentEvidence(validationStamp: String, byPerson: Boolean = false) {
+            check(byPerson || !byAgent || validationStamp !in branch.nonAgentStamps) {
+                "$actor may not record a run of $validationStamp: its evidence must come from a person"
+            }
+        }
+
+        override fun awaitAssistedChange() {
+            checkNotNull(assistedChange) { "The assisted change of $name is never computed: it has no commit" }
+        }
+
+        /**
+         * As `AssistedChangeServiceImpl` computes it: the change log from the previous build of the branch
+         * with a commit, and UNKNOWN for the first one.
+         */
+        private fun computeAssistedChange(commitId: String) {
+            val repository = scmRepositories.getValue(branch.project.scmRepositoryName!!)
+            val previous = branch.builds.takeWhile { it != this }.lastOrNull { it.commitId != null }
+            assistedChange = if (previous == null) {
+                InMemoryAssistedChange(basis = "UNKNOWN")
+            } else {
+                val onBranch = repository.commits.filter { it.scmBranch == branch.scmBranch }
+                val from = onBranch.indexOfFirst { it.id == previous.commitId }
+                val to = onBranch.indexOfFirst { it.id == commitId }
+                val commits = onBranch.subList(from + 1, to + 1)
+                val assistants = commits.map { assistantsOf(it.message) }
+                InMemoryAssistedChange(
+                    basis = "COMPUTED",
+                    assistants = assistants.flatten().toSortedSet().toList(),
+                    assistedCommits = assistants.count { it.isNotEmpty() },
+                    totalCommits = commits.size,
+                )
+            }
         }
 
         override fun validate(
@@ -642,7 +823,9 @@ class InMemoryDemoTarget(
             status: ValidationStatus,
             description: String,
             at: LocalDateTime,
+            byPerson: Boolean,
         ): DemoValidationRun {
+            checkNotAgentEvidence(validationStamp, byPerson)
             require(validationStamp in branch.validationStamps) {
                 "No validation stamp $validationStamp on ${branch.project.name}/${branch.name}"
             }
@@ -655,11 +838,13 @@ class InMemoryDemoTarget(
             require(validationStamp !in branch.testsStamps) {
                 "$validationStamp on ${branch.project.name}/${branch.name} is a tests stamp, and takes the counts of its tests"
             }
-            entry("validation.run", "validationStamp" to validationStamp, "status" to status)
-            return InMemoryValidation(this, validationStamp, status, at).also { validations += it }
+            val validator = if (byPerson) SEED_ACTOR else actor
+            entry("validation.run", "validationStamp" to validationStamp, "status" to status, actor = validator)
+            return InMemoryValidation(this, validationStamp, status, at, validator).also { validations += it }
         }
 
         override fun validateWithTests(run: TestRunSpec, at: LocalDateTime) {
+            checkNotAgentEvidence(run.validationStamp)
             require(run.validationStamp in branch.testsStamps) {
                 "No tests stamp ${run.validationStamp} on ${branch.project.name}/${branch.name}"
             }
@@ -673,6 +858,7 @@ class InMemoryDemoTarget(
         }
 
         override fun scan(scan: ScanSpec, report: JsonNode, at: LocalDateTime) {
+            checkNotAgentEvidence(scan.validationStamp)
             require(scan.validationStamp in branch.findingsStamps) {
                 "No security-findings stamp ${scan.validationStamp} on ${branch.project.name}/${branch.name}"
             }
@@ -692,6 +878,7 @@ class InMemoryDemoTarget(
         override fun setCommit(commitId: String) {
             this.commitId = commitId
             entry("property.set", "propertyType" to "commit")
+            computeAssistedChange(commitId)
         }
     }
 
@@ -706,6 +893,8 @@ class InMemoryDemoTarget(
         val stamp: String,
         status: ValidationStatus,
         val at: LocalDateTime,
+        /** Who recorded the run. */
+        val actor: String,
     ) : DemoValidationRun {
 
         var status: ValidationStatus = status
@@ -795,6 +984,14 @@ class InMemoryDemoTarget(
         val workflows = mutableListOf<SlotWorkflowSpec>()
         val deployments = mutableListOf<InMemoryDeployment>()
 
+        /** Whether agents may deploy on this slot. */
+        var agentsAdmitted: Boolean = false
+            private set
+
+        override fun admitAgents() {
+            agentsAdmitted = true
+        }
+
         /**
          * What the slot is actually *holding*, which is the last deployment that reached
          * `DONE` and not simply the last one. The server reads the same distinction -
@@ -839,10 +1036,18 @@ class InMemoryDemoTarget(
             times: DeploymentTimes?,
             message: String?,
             overrides: List<RuleOverrideSpec>,
+            token: DemoToken?,
         ) {
             build as InMemoryBuild
             require(build.branch.project == project) {
                 "Cannot deploy ${build.branch.project.name} build on the ${project.name} slot"
+            }
+            val deployer = actorOf(token)
+            // The agent policy (#2026): an agent deploys on a slot admitting agents, never overrides a
+            // rule, and never answers an approval - a manual rule leaves its deployment a candidate
+            if (token is InMemoryAgentToken) {
+                check(agentsAdmitted) { "$deployer may not deploy on ${environment.name}/${project.name}: the slot does not admit agents (agent policy)" }
+                check(overrides.isEmpty()) { "$deployer may not override an admission rule (agent policy)" }
             }
             // The server's checks of a backdated pipeline: never before its build, never starting
             // before the latest start of the slot - and a deployment at the reset is the latest one
@@ -871,11 +1076,11 @@ class InMemoryDemoTarget(
                 val overridden = overrides.map { it.rule }.toSet()
                 admissionRules.filter { it.name !in overridden }.forEach { rule -> check(rule, build) }
             }
-            deployments += InMemoryDeployment(build, stopAt, times, message, overrides)
-            // As `DeploymentTrailEventMapper` writes them, by the account the seed runs as
+            deployments += InMemoryDeployment(build, stopAt, times, message, overrides, deployer)
+            // As `DeploymentTrailEventMapper` writes them, by whoever runs the deployment
             val deployment = "${environment.name}/${project.name}${qualifierSuffix(qualifier)}"
             fun entry(type: String, vararg payload: Pair<String, Any?>) =
-                build.entry(type, "deployment" to deployment, *payload, actor = SEED_ACTOR)
+                build.entry(type, "deployment" to deployment, *payload, actor = deployer)
             entry("deployment.created")
             overrides.forEach { entry("deployment.rule-overridden", "rule" to it.rule, "message" to it.message) }
             when (stopAt) {
@@ -942,7 +1147,23 @@ class InMemoryDemoTarget(
         val times: DeploymentTimes? = null,
         val message: String? = null,
         val overrides: List<RuleOverrideSpec> = emptyList(),
+        /** Who runs the deployment. */
+        val actor: String = SEED_ACTOR,
     )
+
+    /**
+     * The assisted change of a build - `AssistedChangeProperty` on the server, without its session links.
+     *
+     * @property assisted Whether the build is assisted, `null` when it is not known
+     */
+    data class InMemoryAssistedChange(
+        val basis: String,
+        val assistants: List<String> = emptyList(),
+        val assistedCommits: Int = 0,
+        val totalCommits: Int = 0,
+    ) {
+        val assisted: Boolean? get() = if (basis == "UNKNOWN") null else assistedCommits > 0
+    }
 
     /**
      * One entry of the trail of a build: its type, its actor - `token:<name>`, or [SEED_ACTOR] - and
@@ -1016,6 +1237,29 @@ class InMemoryDemoTarget(
          * dataset.
          */
         const val SEED_ACTOR = "seed"
+
+        /** The statuses a stamp an assisted build requires has to be at - PASSED, or FIXED. */
+        private val PASSING = setOf(ValidationStatus.PASSED, ValidationStatus.FIXED)
+
+        /**
+         * The assistants of a commit, as the built-in conventions of `SCMCommitAssistants` read them -
+         * the part of them the dataset uses: the trailers of the last paragraph, Claude and Codex as
+         * co-authors by their addresses, and a Claude session.
+         */
+        fun assistantsOf(message: String): Set<String> {
+            val paragraphs = message.trim().split(Regex("\\n\\s*\\n"))
+            if (paragraphs.size < 2) return emptySet()
+            return paragraphs.last().lines().mapNotNull { line ->
+                val key = line.substringBefore(':', "").trim().lowercase()
+                val value = line.substringAfter(':', "").trim()
+                when {
+                    key == "co-authored-by" && value.endsWith("<noreply@anthropic.com>") -> "Claude Code"
+                    key == "co-authored-by" && value.endsWith("<codex@openai.com>") -> "Codex"
+                    key == "claude-session" -> "Claude Code"
+                    else -> null
+                }
+            }.toSet()
+        }
 
         /**
          * What Yontrack accepts as an entity name — `NameDescription.NAME` on the server

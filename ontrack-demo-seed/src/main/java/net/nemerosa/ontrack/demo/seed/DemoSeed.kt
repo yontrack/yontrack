@@ -13,7 +13,7 @@ import java.time.LocalDateTime
  * The one exception is [CI_MIRROR_PROJECT], which the demo does not own.
  *
  * Settings are covered by CasC and users live in Keycloak, so projects, environments, labels,
- * estates and the demo dashboard are the only things this has to reset.
+ * estates, the demo dashboard and the dataset's agents are the only things this has to reset.
  *
  * @param clock Read once per run, so every build creation time in one run shares a
  * reference. Injected so that a test can pin it and compare two runs.
@@ -54,7 +54,7 @@ class DemoSeed(
             target.checkScorecardLicensed()
         }
         val now = LocalDateTime.now(clock)
-        reset()
+        reset(dataset)
         create(dataset, now, evidence)
     }
 
@@ -122,7 +122,7 @@ class DemoSeed(
      * older seed left under a name this one no longer uses — would otherwise outlive every
      * reset, and the demo's state is meant to be a function of the build.
      */
-    private fun reset() {
+    private fun reset(dataset: DemoDataset) {
         // First: an estate selects its projects by labels, and the server refuses to delete a label an
         // estate still names. Deleting an estate deletes its readings, and nothing else.
         target.estates().forEach { estate ->
@@ -150,6 +150,14 @@ class DemoSeed(
             log("Deleting label ${label.display}")
             label.delete()
         }
+        // An agent is an account, and outlives the projects the reset deletes; the server refuses a
+        // second one of the same slug. Only the ones the dataset declares: any other agent of the
+        // instance was registered by somebody, and is theirs.
+        val agents = dataset.agents.map { it.identifier }.toSet()
+        target.agents().filter { it.identifier in agents }.forEach { agent ->
+            log("Deleting agent ${agent.identifier}")
+            agent.delete()
+        }
     }
 
     /**
@@ -166,7 +174,7 @@ class DemoSeed(
                 target.openToken(name)
             }
         try {
-            create(dataset, now, evidence, tokens)
+            create(dataset, now, evidence, tokens + agentTokens(dataset))
         } finally {
             tokens.values.forEach { token ->
                 log("Revoking the API token ${token.name}")
@@ -174,6 +182,24 @@ class DemoSeed(
             }
         }
     }
+
+    /**
+     * Registers the agents of the dataset, and opens a token for each of its agent sessions, keyed by
+     * [sessionKey]. The tokens of the agents are kept - see [DemoAgent.generateToken].
+     */
+    private fun agentTokens(dataset: DemoDataset): Map<String, DemoToken> {
+        val agentTokens = dataset.agents.associate { spec ->
+            log("Registering agent ${spec.identifier}")
+            spec.slug to target.registerAgent(spec).generateToken(AGENT_TOKEN)
+        }
+        return dataset.agentSessions().associate { session ->
+            sessionKey(session) to agentTokens.getValue(session.agent).inSession(session)
+        }
+    }
+
+    private fun DemoDataset.agentSessions(): List<AgentSessionSpec> =
+        (projects.flatMap { project -> project.branches.flatMap { branch -> branch.builds.mapNotNull { it.agent } } } +
+                deployments.mapNotNull { it.agent }).distinct()
 
     private fun create(dataset: DemoDataset, now: LocalDateTime, evidence: Boolean, tokens: Map<String, DemoToken>) {
         val projects = mutableMapOf<String, DemoProject>()
@@ -235,6 +261,10 @@ class DemoSeed(
                     slotSpec.qualifier,
                     slotSpec.description,
                 )
+                if (slotSpec.agentsAdmitted) {
+                    log("Admitting agents on slot ${slotName(spec, slotSpec)}")
+                    slot.admitAgents()
+                }
                 // Before any deployment: the rules are what a deployment is checked against, and
                 // adding them afterwards would leave the slot holding a build it now refuses
                 slotSpec.admissionRules.forEach { ruleSpec ->
@@ -257,6 +287,7 @@ class DemoSeed(
                     times = spec.at?.let { deploymentTimes(it.resolve(now), now) },
                     message = spec.message,
                     overrides = spec.overrides,
+                    token = spec.agent?.let { tokens.getValue(sessionKey(it)) },
                 )
         }
 
@@ -349,6 +380,7 @@ class DemoSeed(
         if (spec.favourite) branch.markAsFavourite()
         spec.promotionLevels.forEach { branch.createPromotionLevel(it.name, it.description, it.workflow) }
         spec.validationStamps.forEach { branch.createValidationStamp(it.name, it.description, it.findings, it.tests, it.chml) }
+        spec.validationStamps.filter { it.nonAgentEvidence }.forEach { branch.restrictEvidenceToNonAgents(it.name) }
         // A third pass, after both: auto promotion and promotion dependencies name other promotion
         // levels and validation stamps of the same branch, and the property is written with their
         // ids, so all of them have to exist first. Before the builds, so that a build promoted here
@@ -363,7 +395,18 @@ class DemoSeed(
             if (promotionLevel.requiresPreviousPromotion) {
                 branch.setPreviousPromotionCondition(promotionLevel.name, true)
             }
+            if (promotionLevel.agentsAdmitted) {
+                branch.admitAgents(promotionLevel.name)
+            }
+            // Names stamps of the branch, like the auto promotion
+            promotionLevel.assistedBuildsRequire.takeIf { it.isNotEmpty() }
+                ?.let { branch.setAssistedBuildsRequire(promotionLevel.name, it) }
         }
+        // What an agent does itself, and what a person does for it: the agent policy, read off the dataset
+        val agentsAdmitted = spec.promotionLevels.filter { it.agentsAdmitted }.map { it.name }.toSet()
+        val nonAgentStamps = spec.validationStamps.filter { it.nonAgentEvidence }.map { it.name }.toSet()
+        // The condition fails closed, so a promotion to a gated level waits for the assisted change
+        val gated = spec.promotionLevels.filter { it.assistedBuildsRequire.isNotEmpty() }.map { it.name }.toSet()
         // Only where an auto promotion can fire - see below
         val promotionsFirst = spec.promotionLevels.any { it.autoPromotion != null }
         spec.builds.forEach { buildSpec ->
@@ -372,8 +415,10 @@ class DemoSeed(
                 name = buildSpec.name,
                 description = buildSpec.description,
                 creation = creation,
-                token = buildSpec.token?.let { tokens.getValue(it) },
+                token = buildSpec.token?.let { tokens.getValue(it) }
+                    ?: buildSpec.agent?.let { tokens.getValue(sessionKey(it)) },
             )
+            val byAgent = buildSpec.agent != null
             builds[BuildRef(projectSpec.name, spec.name, buildSpec.name)] = build
             buildSpec.release?.let { build.setRelease(it) }
             // The build is built from the last commit declared for it; the ones before are
@@ -420,8 +465,16 @@ class DemoSeed(
             // a trail where a build is promoted to GOLD before any of its validations ran is the
             // wrong story to tell an auditor.
             val promote = {
+                if (buildSpec.commits.isNotEmpty() && buildSpec.promotionLevels.any { it in gated }) {
+                    build.awaitAssistedChange()
+                }
                 buildSpec.promotionLevels.forEachIndexed { index, promotionLevel ->
-                    build.promote(promotionLevel, "", creation.plus(step.multipliedBy(validationCount + index + 1L)))
+                    build.promote(
+                        promotionLevel,
+                        "",
+                        creation.plus(step.multipliedBy(validationCount + index + 1L)),
+                        byPerson = byAgent && promotionLevel !in agentsAdmitted,
+                    )
                 }
             }
             if (promotionsFirst) promote()
@@ -431,6 +484,7 @@ class DemoSeed(
                     validation.status,
                     validation.description,
                     creation.plus(step.multipliedBy(index + 1L)),
+                    byPerson = byAgent && validation.validationStamp in nonAgentStamps,
                 )
                 // Posted by the pipeline with the run, the evidence comes first; a person then looks
                 // at the run, which is when its status changes and a file attached by mistake goes
@@ -487,5 +541,16 @@ class DemoSeed(
          * [DemoContent.CHANGELOG]. Goes away at the 6.0 cutover, with the mirror (#1875).
          */
         const val CI_MIRROR_PROJECT = "yontrack-ci"
+
+        /**
+         * Name of the token each agent of the dataset acts through - kept, see [DemoAgent.generateToken].
+         */
+        const val AGENT_TOKEN = "demo-seed"
+
+        /**
+         * How an agent session keys the tokens of the seed, beside the names of the tokens of the
+         * account it runs as: a token name has no `[`, which an agent identifier always has.
+         */
+        fun sessionKey(session: AgentSessionSpec): String = "${session.agent}[agent]#${session.id}"
     }
 }

@@ -107,6 +107,18 @@ interface DemoTarget {
     fun openToken(name: String): DemoToken
 
     /**
+     * Every registered agent the account the seed runs as can see - all of them, for an administrator.
+     * An agent is an account and outlives the projects the reset deletes, so the reset deletes the ones
+     * the dataset declares, and registers them again.
+     */
+    fun agents(): List<DemoAgent>
+
+    /**
+     * Registers an agent, owned by the account the seed runs as.
+     */
+    fun registerAgent(spec: AgentSpec): DemoAgent
+
+    /**
      * Every estate of the delivery scorecard on the instance - none when the instance is not
      * licensed for them. An estate names labels, and the server refuses to delete a label an estate
      * selects its projects by, so the reset deletes the estates first.
@@ -130,6 +142,42 @@ interface DemoToken {
 
     /** Revokes the token: nothing created through it can be changed through it any more. */
     fun revoke()
+}
+
+/**
+ * A registered agent of the instance.
+ *
+ * @property identifier `<slug>[agent]`, what the dataset recognises an agent by
+ */
+interface DemoAgent {
+    val identifier: String
+
+    /**
+     * Deletes the agent and its tokens. What it did stays signed with its name.
+     */
+    fun delete()
+
+    /**
+     * Generates a token for the agent. It is not revoked at the end of the reset, unlike the tokens of
+     * the account the seed runs as: an agent holds no right its owner does not, and fewer - see the
+     * agent policy - and the token is what the agents page shows as recently used. Its value is never
+     * written anywhere, and the next reset deletes it with its agent.
+     */
+    fun generateToken(name: String): DemoAgentToken
+}
+
+/**
+ * A token of a registered agent.
+ */
+interface DemoAgentToken {
+
+    /**
+     * The token, sent with the session headers of [session]: whatever is done through it is signed
+     * with the agent as its actor, and links to the session.
+     *
+     * [DemoToken.revoke] revokes the token of the agent.
+     */
+    fun inSession(session: AgentSessionSpec): DemoToken
 }
 
 interface DemoEstate {
@@ -255,6 +303,23 @@ interface DemoBranch {
     fun setPreviousPromotionCondition(promotionLevel: String, required: Boolean)
 
     /**
+     * Marks [promotionLevel] as admitting agents - see [PromotionLevelSpec.agentsAdmitted].
+     */
+    fun admitAgents(promotionLevel: String)
+
+    /**
+     * Requires [validationStamps] of an assisted build before it is promoted to [promotionLevel] - see
+     * [PromotionLevelSpec.assistedBuildsRequire]. Same ordering constraint as [setAutoPromotion]: the
+     * stamps are those of the branch.
+     */
+    fun setAssistedBuildsRequire(promotionLevel: String, validationStamps: List<String>)
+
+    /**
+     * Restricts the runs of [validationStamp] to persons - see [ValidationStampSpec.nonAgentEvidence].
+     */
+    fun restrictEvidenceToNonAgents(validationStamp: String)
+
+    /**
      * @param token Token the build is created through, and everything done to it through the
      * returned handle - its properties, validations, evidence, promotions and links. The account
      * the seed runs as otherwise.
@@ -276,7 +341,12 @@ interface DemoBuild {
      */
     fun setRelease(release: String)
 
-    fun promote(promotionLevel: String, description: String, at: LocalDateTime)
+    /**
+     * @param byPerson Whether the promotion is made by the account the seed runs as rather than by
+     * whoever created the build - a person promoting what an agent built, to a level which does not
+     * admit agents
+     */
+    fun promote(promotionLevel: String, description: String, at: LocalDateTime, byPerson: Boolean = false)
 
     /**
      * Records a run of [validationStamp] at [at].
@@ -284,8 +354,26 @@ interface DemoBuild {
      * The time is passed in for the same reason [promote] takes one: a run stamped with the moment
      * of the reset reads as having happened seconds ago whatever the age of the build it names, and
      * on a delivery map that puts the stamp *after* the promotion it granted (#1718).
+     *
+     * @param byPerson Whether the run is recorded by the account the seed runs as rather than by
+     * whoever created the build - a person, on a stamp taking evidence from non-agents only
      */
-    fun validate(validationStamp: String, status: ValidationStatus, description: String, at: LocalDateTime): DemoValidationRun
+    fun validate(
+        validationStamp: String,
+        status: ValidationStatus,
+        description: String,
+        at: LocalDateTime,
+        byPerson: Boolean = false,
+    ): DemoValidationRun
+
+    /**
+     * Waits until the server has computed the assisted change of the build, once its commit is set.
+     *
+     * The server computes it in the background, and the *Assisted builds require* condition fails
+     * closed: until the value is there, the build counts as assisted, and a promotion the dataset
+     * declares on a gated level could be refused for no reason the dataset describes.
+     */
+    fun awaitAssistedChange()
 
     /**
      * Posts the report of a security scan on a `security-findings` stamp, dated at [at] for the
@@ -368,6 +456,8 @@ interface DemoSlot {
      * @param times When each step happens, `null` for a deployment happening at the reset
      * @param message Why a failed deployment failed, or why a cancelled one was cancelled
      * @param overrides Admission rules overridden once the deployment is created, before it starts
+     * @param token Token the deployment is run through - an agent's, in a session - rather than the
+     * account the seed runs as
      */
     fun deploy(
         build: DemoBuild,
@@ -375,7 +465,13 @@ interface DemoSlot {
         times: DeploymentTimes?,
         message: String?,
         overrides: List<RuleOverrideSpec> = emptyList(),
+        token: DemoToken? = null,
     )
+
+    /**
+     * Lets agents start and finish deployments on this slot - see [SlotSpec.agentsAdmitted].
+     */
+    fun admitAgents()
 
     /**
      * Configures an admission rule on this slot.

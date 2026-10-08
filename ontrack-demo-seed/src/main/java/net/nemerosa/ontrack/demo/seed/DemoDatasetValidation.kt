@@ -49,6 +49,39 @@ fun DemoDataset.validate() {
         }
     }
 
+    // Agents next: builds and deployments name them, by slug
+    val agentSlugs = mutableSetOf<String>()
+    agents.forEach { agent ->
+        if (!AGENT_SLUG.matches(agent.slug)) {
+            problems += "Agent slug \"${agent.slug}\" must have 1 to 32 lowercase letters, digits or dashes."
+        }
+        if (!agentSlugs.add(agent.slug)) {
+            problems += "The dataset declares the agent ${agent.identifier} twice."
+        }
+        if (agent.displayName.isBlank() || agent.tool.isBlank()) {
+            problems += "Agent ${agent.identifier} needs a display name and a tool."
+        }
+    }
+
+    /**
+     * What the server would make of an agent session: an agent it knows, an identifier it keeps, and
+     * a link it does not drop - it drops one which is not an absolute `https` URL, with a warning only.
+     */
+    fun checkSession(session: AgentSessionSpec, where: String) {
+        if (session.agent !in agentSlugs) {
+            problems += "$where is run by the agent ${session.agent}, which the dataset never registers."
+        }
+        if (session.id.isBlank() || session.id.length > 255) {
+            problems += "$where names an agent session of 1 to 255 characters, not \"${session.id}\"."
+        }
+        session.link?.let { link ->
+            if (!isAbsoluteHttps(link)) {
+                problems += "$where links to the agent session \"$link\", which is not an absolute https URL: " +
+                        "the server would drop it."
+            }
+        }
+    }
+
     // Creation times are resolved against one arbitrary but fixed instant: `DaysAgo` is
     // monotonic in it, so which instant it is does not change the order it yields. Only a
     // branch mixing `DaysAgo` and `At` builds could read differently under another one, and
@@ -189,6 +222,17 @@ fun DemoDataset.validate() {
                 }
                 .toMap()
             val dependenciesOf = branch.promotionLevels.associate { it.name to it.dependsOn }
+            // The condition is written with the names of stamps of the branch, and one naming nothing
+            // there can never pass: every assisted build would be blocked for a reason nobody can fix
+            branch.promotionLevels.forEach { promotionLevel ->
+                promotionLevel.assistedBuildsRequire.forEach { stamp ->
+                    if (stamp !in validationStamps || stamp in deletedStamps) {
+                        problems += "Promotion level ${promotionLevel.name} of ${project.name}/${branch.name} " +
+                                "requires $stamp of assisted builds, which the branch does not keep."
+                    }
+                }
+            }
+            val nonAgentStamps = branch.validationStamps.filter { it.nonAgentEvidence }.map { it.name }.toSet()
             branch.builds.forEach { build ->
                 checkName(build.name, "Build")
                 buildRefs += BuildRef(project.name, branch.name, build.name)
@@ -208,6 +252,22 @@ fun DemoDataset.validate() {
                                 "before it on the branch."
                     }
                     promoted += promotionLevel
+                }
+                build.agent?.let { session ->
+                    val where = "Build ${build.name} of ${project.name}/${branch.name}"
+                    checkSession(session, where)
+                    if (build.token != null) {
+                        problems += "$where is created both through the token ${build.token} and by the " +
+                                "agent ${session.agent}."
+                    }
+                    // Only the plain runs are handed over to a person: a test run or a scan goes through
+                    // whoever created the build, and the server would refuse the agent's
+                    (build.tests.map { it.validationStamp } + build.scans.map { it.validationStamp })
+                        .filter { it in nonAgentStamps }
+                        .forEach { stamp ->
+                            problems += "$where posts a run of $stamp as the agent ${session.agent}, " +
+                                    "and the stamp takes evidence from non-agents only."
+                        }
                 }
                 if (build.token != null && !TOKEN_NAME.matches(build.token)) {
                     problems += "Build ${build.name} of ${project.name}/${branch.name} is created through " +
@@ -467,6 +527,18 @@ fun DemoDataset.validate() {
         val slot = environments.find { it.name == deployment.environment }
             ?.slots?.find { it.project == ref.project && it.qualifier == deployment.qualifier }
             ?: return@forEach
+        deployment.agent?.let { session ->
+            val where = "A deployment of ${ref.build} on ${deployment.environment}/${ref.project}"
+            checkSession(session, where)
+            if (!slot.agentsAdmitted) {
+                problems += "$where is run by the agent ${session.agent}, and the slot does not admit agents."
+            }
+            // An agent never answers an approval - nor overrides one, which the agent policy denies too
+            if (deployment.overrides.isNotEmpty()) {
+                problems += "$where is run by the agent ${session.agent}, and overrides admission rules, " +
+                        "which an agent may not."
+            }
+        }
         deployment.overrides.forEach { override ->
             if (slot.admissionRules.none { it.name == override.rule }) {
                 problems += "A deployment of ${ref.build} on ${deployment.environment}/${ref.project} " +
@@ -602,6 +674,22 @@ private val ISSUE_KEY = Regex("[A-Z]+-\\d+")
  * of its entities, because the name is what the trail shows as the actor, `token:<name>`.
  */
 private val TOKEN_NAME = Regex("[A-Za-z0-9._-]+")
+
+/**
+ * What the server accepts as the slug of an agent - `AgentService` on the server side.
+ */
+private val AGENT_SLUG = Regex("[a-z0-9-]{1,32}")
+
+/**
+ * Whether [link] is an absolute `https` URL, which is what the server keeps of an agent session link.
+ */
+private fun isAbsoluteHttps(link: String): Boolean =
+    try {
+        val uri = java.net.URI(link)
+        uri.isAbsolute && uri.scheme.equals("https", ignoreCase = true) && !uri.host.isNullOrBlank()
+    } catch (_: Exception) {
+        false
+    }
 
 /**
  * A `type/subtype` media type, without parameters - what the server keeps of a declared one.

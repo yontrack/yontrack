@@ -11,6 +11,12 @@ import net.nemerosa.ontrack.kdsl.spec.extension.audittrail.attachEvidence
 import net.nemerosa.ontrack.kdsl.spec.extension.audittrail.auditTrailStorageState
 import net.nemerosa.ontrack.kdsl.spec.extension.audittrail.evidence
 import net.nemerosa.ontrack.kdsl.spec.extension.audittrail.trail
+import net.nemerosa.ontrack.kdsl.spec.admin.Agent
+import net.nemerosa.ontrack.kdsl.spec.admin.agents
+import net.nemerosa.ontrack.kdsl.spec.extension.agents.assistedBuildsRequire
+import net.nemerosa.ontrack.kdsl.spec.extension.agents.nonAgentEvidence
+import net.nemerosa.ontrack.kdsl.spec.extension.scm.assistedChange
+import net.nemerosa.ontrack.kdsl.spec.withToken
 import net.nemerosa.ontrack.kdsl.spec.generateToken
 import net.nemerosa.ontrack.kdsl.spec.globalMessages
 import net.nemerosa.ontrack.kdsl.spec.revokeToken
@@ -156,11 +162,26 @@ class KdslDemoTarget(private val ontrack: Ontrack) : DemoTarget {
         ontrack.revokeToken(name)
         val value = ontrack.generateToken(name)
         return KdslDemoToken(
-            admin = ontrack,
             name = name,
             ontrack = Ontrack(DefaultConnector(url = ontrack.connector.url, token = value)),
+            agent = false,
+            revoker = { ontrack.revokeToken(name) },
         )
     }
+
+    override fun agents(): List<DemoAgent> =
+        ontrack.agents.list().map { KdslDemoAgent(ontrack, it) }
+
+    override fun registerAgent(spec: AgentSpec): DemoAgent =
+        KdslDemoAgent(
+            ontrack,
+            ontrack.agents.register(
+                slug = spec.slug,
+                displayName = spec.displayName,
+                tool = spec.tool,
+                description = spec.description,
+            )
+        )
 
     override fun createProject(name: String, description: String): DemoProject =
         KdslDemoProject(ontrack, ontrack.createProject(name, description))
@@ -341,6 +362,16 @@ class KdslDemoTarget(private val ontrack: Ontrack) : DemoTarget {
         const val PREFLIGHT_REPOSITORY = "demo-seed-preflight"
 
         /**
+         * *Agents admitted*, on a promotion level (#2026).
+         */
+        const val AGENTS_ADMITTED_PROPERTY = "net.nemerosa.ontrack.extension.general.AgentsAdmittedPropertyType"
+
+        /**
+         * How long the seed waits for the server to compute the assisted change of a build.
+         */
+        val ASSISTED_CHANGE_TIMEOUT: Duration = Duration.ofSeconds(60)
+
+        /**
          * The release property carries the version a build shows as its display name.
          */
         const val RELEASE_PROPERTY = "net.nemerosa.ontrack.extension.general.ReleasePropertyType"
@@ -398,16 +429,42 @@ class KdslDemoTarget(private val ontrack: Ontrack) : DemoTarget {
     }
 }
 
+/**
+ * @property ontrack The instance, as seen through the token
+ * @property agent Whether the token is an agent's, which may not do everything the seed does through a
+ * token of its own account - backdating a build above all
+ */
 private class KdslDemoToken(
-    private val admin: Ontrack,
     override val name: String,
-    /**
-     * The instance, as seen through the token.
-     */
     val ontrack: Ontrack,
+    val agent: Boolean,
+    private val revoker: () -> Unit,
 ) : DemoToken {
 
-    override fun revoke() = admin.revokeToken(name)
+    override fun revoke() = revoker()
+}
+
+private class KdslDemoAgent(
+    private val admin: Ontrack,
+    private val agent: Agent,
+) : DemoAgent {
+
+    override val identifier: String get() = agent.email
+
+    override fun delete() = agent.delete()
+
+    override fun generateToken(name: String): DemoAgentToken {
+        val value = agent.generateToken(name)
+        return object : DemoAgentToken {
+            override fun inSession(session: AgentSessionSpec): DemoToken =
+                KdslDemoToken(
+                    name = name,
+                    ontrack = admin.withToken(value, agentSession = session.id, agentSessionLink = session.link),
+                    agent = true,
+                    revoker = { agent.revokeToken(name) },
+                )
+        }
+    }
 }
 
 private class KdslDemoEstate(val estate: Estate) : DemoEstate {
@@ -583,15 +640,36 @@ private class KdslDemoBranch(
         promotionLevels.getValue(promotionLevel).previousPromotionCondition = required
     }
 
+    override fun admitAgents(promotionLevel: String) {
+        promotionLevels.getValue(promotionLevel)
+            .setProperty(KdslDemoTarget.AGENTS_ADMITTED_PROPERTY, mapOf("admitted" to true))
+    }
+
+    override fun setAssistedBuildsRequire(promotionLevel: String, validationStamps: List<String>) {
+        promotionLevels.getValue(promotionLevel).assistedBuildsRequire = validationStamps
+    }
+
+    override fun restrictEvidenceToNonAgents(validationStamp: String) {
+        validationStamps.getValue(validationStamp).nonAgentEvidence = true
+    }
+
     override fun createBuild(name: String, description: String, creation: LocalDateTime, token: DemoToken?): DemoBuild {
         // Through the token, the branch is the same one seen by another actor: everything done
         // through the build created there is written to its trail as the token's
-        val target = token?.let { (it as KdslDemoToken).ontrack }
+        val actor = token as KdslDemoToken?
+        val target = actor?.ontrack
             ?.findBranchByName(project.name, this.name)
             ?: branch
+        val created = target.createBuild(name, description)
         // Yontrack stamps a build with the time it is created, so the demo's history has
-        // to be backdated in a second call.
-        val build = target.createBuild(name, description).updateCreationTime(creation)
+        // to be backdated in a second call - by a person when the build is an agent's, since the
+        // agent policy denies an agent the edition of a build. The signature keeps its actor.
+        val build = if (actor?.agent == true) {
+            created.asSeenBy(project.ontrack).updateCreationTime(creation)
+            created
+        } else {
+            created.updateCreationTime(creation)
+        }
         return KdslDemoBuild(build, project.ontrack)
     }
 
@@ -614,8 +692,8 @@ private class KdslDemoBuild(val build: Build, private val admin: Ontrack) : Demo
         build.setProperty(KdslDemoTarget.RELEASE_PROPERTY, mapOf("name" to release))
     }
 
-    override fun promote(promotionLevel: String, description: String, at: LocalDateTime) {
-        build.promote(promotionLevel, description, at)
+    override fun promote(promotionLevel: String, description: String, at: LocalDateTime, byPerson: Boolean) {
+        (if (byPerson) build.asSeenBy(admin) else build).promote(promotionLevel, description, at)
     }
 
     override fun validate(
@@ -623,8 +701,28 @@ private class KdslDemoBuild(val build: Build, private val admin: Ontrack) : Demo
         status: ValidationStatus,
         description: String,
         at: LocalDateTime,
+        byPerson: Boolean,
     ): DemoValidationRun =
-        KdslDemoValidationRun(build.validate(validationStamp, status.name, description, at), admin)
+        KdslDemoValidationRun(
+            (if (byPerson) build.asSeenBy(admin) else build).validate(validationStamp, status.name, description, at),
+            admin,
+        )
+
+    /**
+     * Polls the property, as the account the seed runs as: the server writes it in the background
+     * once the commit property is set, `UNKNOWN` for the first build of a branch.
+     */
+    override fun awaitAssistedChange() {
+        val asAdmin = build.asSeenBy(admin)
+        val deadline = System.currentTimeMillis() + KdslDemoTarget.ASSISTED_CHANGE_TIMEOUT.toMillis()
+        while (asAdmin.assistedChange == null) {
+            check(System.currentTimeMillis() < deadline) {
+                "The assisted change of build ${build.name} was not computed within " +
+                        "${KdslDemoTarget.ASSISTED_CHANGE_TIMEOUT.seconds} seconds"
+            }
+            Thread.sleep(250)
+        }
+    }
 
     override fun scan(scan: ScanSpec, report: JsonNode, at: LocalDateTime) {
         build.validateWithFindings(
@@ -761,10 +859,13 @@ private class KdslDemoSlot(val slot: Slot) : DemoSlot {
         times: DeploymentTimes?,
         message: String?,
         overrides: List<RuleOverrideSpec>,
+        token: DemoToken?,
     ) {
+        // The same slot, as seen by whoever runs the deployment: an agent, in its session
+        val actor = (token as KdslDemoToken?)?.let { slot.asSeenBy(it.ontrack) } ?: slot
         // Backdated through the dates the pipeline mutations take, each step at its own time: the
         // scorecard's readings of an environment are the durations between them
-        val pipeline = slot.createPipeline((build as KdslDemoBuild).build, dateTime = times?.start)
+        val pipeline = actor.createPipeline((build as KdslDemoBuild).build, dateTime = times?.start)
         // Before it starts: an override is what lets it
         overrides.forEach { pipeline.overrideRule(it.rule, it.message) }
         when (stopAt) {
@@ -786,6 +887,10 @@ private class KdslDemoSlot(val slot: Slot) : DemoSlot {
         }
     }
 
+    override fun admitAgents() {
+        slot.update(agentsAdmitted = true)
+    }
+
     override fun addAdmissionRule(spec: SlotAdmissionRuleSpec) {
         slot.addAdmissionRule(
             ruleId = spec.ruleId,
@@ -801,3 +906,29 @@ private class KdslDemoSlot(val slot: Slot) : DemoSlot {
         )
     }
 }
+
+/**
+ * The same build, as seen by another client - its calls are made, and signed, as that client.
+ */
+private fun Build.asSeenBy(ontrack: Ontrack): Build =
+    Build(
+        connector = ontrack.connector,
+        branch = branch,
+        id = id,
+        name = name,
+        description = description,
+    )
+
+/**
+ * The same slot, as seen by another client - its calls are made, and signed, as that client.
+ */
+private fun Slot.asSeenBy(ontrack: Ontrack): Slot =
+    Slot(
+        connector = ontrack.connector,
+        id = id,
+        environment = environment,
+        project = project,
+        qualifier = qualifier,
+        description = description,
+        agentsAdmitted = agentsAdmitted,
+    )

@@ -20,7 +20,7 @@ the seed — keep it in sync by hand whenever that file changes.
 | Maintenance branch alongside `main`         | `petclinic` / `release-1.3`                                          | Its own promotion ladder and its own (failing) `CANARY` workflow                           |
 | Build dependency graph                      | `petclinic-ui` / `main`, builds `58` and `59`                        | Links down to `petclinic` builds, which link down to `common-library` builds               |
 | Environments and deployments                | `staging` and `production` environments                              | `petclinic` `105` deployed on staging, `104` deployed on production                        |
-| Shared dashboard                            | Dashboard picker → "Yontrack demo"                                    | Two `BranchStatuses` widgets ("Sample application", "End-to-end suites"), `EnvironmentList`, `LastActiveProjects`, `PromotionFrequencyChart`, `ProjectScorecard`, and the two findings widgets (`ProjectFindings`, `BranchFindings`) |
+| Shared dashboard                            | Dashboard picker → "Yontrack demo"                                    | Two `BranchStatuses` widgets ("Sample application", "End-to-end suites"), `EnvironmentList`, `LastActiveProjects`, `PromotionFrequencyChart`, `ProjectScorecard`, the two findings widgets (`ProjectFindings`, `BranchFindings`), and `AgentActivity` |
 | Self-hosted changelog                       | `yontrack` / `main`                                                   | One build per commit since the last release, always current, `BRONZE` only                 |
 | Change log between two builds               | `petclinic` / `main`, change log from build `104` to `107`            | Conventional-commit subjects, grouped issues, and the semantic view of the same change log |
 | Project labels                              | Any project page, the project lists, and _Configuration_ → _Labels_   | `team:` and `language:` chips on every project; filtering the project list on one or two of them |
@@ -46,6 +46,20 @@ the seed — keep it in sync by hand whenever that file changes.
 | Sticky header inside a section              | `petclinic-e2e` / `main`, build `nightly-30`, _Validations_ section    | 30 runs, one failed (`E2E.PAYMENTS`); the column headers stay at the top of the section while it scrolls |
 | Sticky header after _Load more_             | `petclinic-e2e` / `main`, stamp `E2E.SMOKE`, _Validation history_      | A run on every build, two failed; _Load more..._ a few times and the section scrolls under its header |
 | Sticky header in a widget                   | Dashboard "Yontrack demo", widget "End-to-end suites"                  | 15 branches of `petclinic-e2e`, more than the widget holds; the `BRONZE` and suite headers stay put |
+| Registered agents                           | _System_ → _Agents_; a `[agent]` row in _Account management_ with _Show agents_ | `claude-code-demo[agent]` (Claude Code) and `codex-demo[agent]` (Codex), owned by the seeding account, each with a `demo-seed` token recently used |
+| Assisted commits in a change log            | `petclinic-vets` / `main`, change log from `202` (1.1.0) to `204` (1.3.0) | "5 of 6 commits assisted"; an _assisted_ marker on each commit written with Claude Code or Codex |
+| A co-author who is a person                 | `petclinic-vets` / `main`, build `202` (1.1.0)                         | `Co-authored-by: Maria Escobar` does not count: 0 of 2 commits assisted, no badge                 |
+| Assisted and agent badges                   | `petclinic-vets` / `main` branch page, builds `203` and `204`          | _Assisted_, and "by Claude Code (demo), owned by …"; `201` reads _Assisted: unknown_ - the first build has no change log |
+| The _Agents_ section of a build             | `petclinic-vets`, build `204` (1.3.0)                                  | _Assisted by_ Claude Code, 2 of 2 commits, the session; _Actions by agents_: the builds, validations and `BRONZE` by Claude Code, the staging deployment asked by Codex |
+| An agent promoting where agents are admitted | `petclinic-vets` / `main`, `BRONZE` of `203` and `204`                | Promoted by `claude-code-demo[agent]`; `SILVER` and `GOLD` by a person                            |
+| Evidence from non-agents only               | `petclinic-vets` / `main`, `CODE.REVIEW`                               | Recorded by a person on `201` and `203`; an agent would be refused                               |
+| An assisted build passed after review       | `petclinic-vets`, build `203` (1.2.0)                                  | `CODE.REVIEW` passed, then `GOLD`: _Assisted builds require_ is satisfied                       |
+| An assisted build blocked short of GOLD     | `petclinic-vets`, build `204` (1.3.0), `GOLD` → _What's missing_       | "Assisted build: CODE.REVIEW must pass first."                                                  |
+| Agent asks, a person approves               | `staging` environment, `petclinic-vets` slot                           | `204` a candidate, started by `codex-demo[agent]`, waiting on the manual approval nobody but a person can give |
+| Per-agent activity                          | _System_ → _Agents_ → Claude Code (demo) → _Activity_                  | What the agent did over the window, with the session links                                       |
+| Latest agent actions, agent activity widget | User menu → _Latest agent actions_; dashboard "Yontrack demo", widget _Agent activity_ | Every agent action across projects; builds, promotions and deployments by agents and the assisted share over 7 days |
+| Actor filters                               | `petclinic-vets` / `main`, _Build filter_ (assisted, actor); _System_ → _Events_, actor filter | Only the assisted builds, or the builds of an agent; only the events signed by an agent |
+| Assisted build on a phone                   | `/mobile` → favourites → `petclinic-vets` / `main` → `204`, at 375 px    | The _Assisted_ badge in the header, and the agent which promoted it to `BRONZE`                  |
 | Audit trail of a release, intact            | `audit-trail-demo` / `main`, build `121` (2.4.0), _Audit trail_         | 34 entries, "Intact"; the pipeline's entries by `token ci-demo`, the status change, the deleted evidence and the deployments by the seeding account |
 | A failed run fixed with a comment           | `audit-trail-demo`, build `121`, `UNIT.TESTS`                            | FAILED by the pipeline, then FIXED by a person with the reason; both in the trail |
 | Evidence of every kind                      | `audit-trail-demo`, build `121`, the validation runs, _Evidence_        | A Trivy PDF, a PNG screenshot, a CycloneDX SBOM, a JUnit summary, a ZAP report in HTML (downloaded, never rendered) and `trivy-debug.log`, deleted |
@@ -63,6 +77,7 @@ the seed — keep it in sync by hand whenever that file changes.
 | `petclinic-billing` | `release-2.3`, `main`       | `team:apps`, `language:java`, `portfolio:product` | The security findings: two scans per build, one of them in SARIF       |
 | `petclinic-visits` | `main`                       | `team:apps`, `language:kotlin`, `portfolio:product`, `runs-in:production` | The delivery scorecard: 90 days of releases, test runs and production deployments |
 | `petclinic-e2e`    | `main`, 14 `feature-*`       | `team:apps`, `language:javascript`       | The long tables: 30 nightly builds, 30 end-to-end suite stamps, 15 branches - enough for every table showing them to scroll |
+| `petclinic-vets`   | `main`                       | `team:apps`, `language:java`             | The agents: commits written with assistants, builds and validations by a registered agent, the gates on agents, a deployment waiting for a person |
 | `audit-trail-demo` | `main`                       | `team:platform`, `language:kotlin`       | The audit trail: a release with its whole story and its evidence; left out without the licensed feature |
 | `audit-trail-tampered` | `main`                   | `team:platform`, `language:kotlin`       | A trail deliberately tampered with; left out without the demonstration tampering switch |
 | `yontrack`         | `main`                       | `team:platform`, `language:kotlin`       | Yontrack's own changelog, reseeded from git on every run              |
@@ -99,6 +114,11 @@ knowing about:
 - **The instance must enable the mock SCM**, with
   `ONTRACK_CONFIG_EXTENSION_SCM_MOCK_ENABLED=true`. Without it the reset fails partway, after
   the deletions — see [`doc/dev-guide/demo-seed.md`](../doc/dev-guide/demo-seed.md).
+
+`petclinic-vets` has a mock repository of its own, whose commits carry the trailers of the coding
+agents - `Co-Authored-By: Claude <noreply@anthropic.com>` with a `Claude-Session:` link, and
+`Co-authored-by: Codex <codex@openai.com>` - which is what its change log marks as assisted, and
+what Yontrack computes the assisted change of its builds from.
 
 The commit subjects are conventional-commit ones (`feat(api): …`, `fix: …`, `docs: …`)
 because the semantic change log groups commits by their type and drops every commit carrying

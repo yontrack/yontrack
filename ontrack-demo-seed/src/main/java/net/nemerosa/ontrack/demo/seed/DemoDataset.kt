@@ -34,6 +34,47 @@ data class DemoDataset(
      * the next night shows nothing of it.
      */
     val estates: List<EstateSpec> = emptyList(),
+    /**
+     * Registered agents, owned by the account the seed runs as. They are accounts rather than
+     * projects, so they outlive the projects the reset deletes: the reset deletes the ones the dataset
+     * declares - and only those, an agent somebody else registered on the instance is theirs - and
+     * registers them again, each with a token the seed acts through - see [AgentSessionSpec].
+     */
+    val agents: List<AgentSpec> = emptyList(),
+)
+
+/**
+ * A registered agent: an account of kind agent, owned by the account the seed runs as, acting with a
+ * token of its own (#2024).
+ *
+ * @property slug What identifies the agent, as `<slug>[agent]`: 1 to 32 lowercase letters, digits or
+ * dashes
+ * @property displayName How the agent is shown
+ * @property tool The tool behind the agent - Claude Code, Codex...
+ */
+data class AgentSpec(
+    val slug: String,
+    val displayName: String,
+    val tool: String,
+    val description: String,
+) {
+    /** The identifier of the agent, which is what its signatures carry as their user. */
+    val identifier: String get() = "$slug[agent]"
+}
+
+/**
+ * An agent acting within one of its sessions: the calls go through the token of the agent, with the
+ * session headers (#2025), so that whatever is done is signed with the agent as its actor and links to
+ * the session.
+ *
+ * @property agent Slug of the agent, one of [DemoDataset.agents]
+ * @property id Opaque identifier of the session, `X-Yontrack-Agent-Session`
+ * @property link Link to the session, `X-Yontrack-Agent-Session-Link` - an absolute `https` URL
+ */
+data class AgentSessionSpec(
+    val agent: String,
+    val id: String,
+    val link: String? = null,
 )
 
 /**
@@ -168,6 +209,13 @@ data class BranchSpec(
  * the `PreviousPromotionConditionPropertyType` property is a bare boolean and the server reads the
  * predecessor off the branch's own order. Set on the promotion level here rather than on the branch
  * or the project, which is where the demo would otherwise put a chain on every ladder it has.
+ * @property agentsAdmitted Whether an agent may promote to this level - the *Agents admitted* property
+ * (#2026). A build an agent created is promoted by the agent on such a level, and by a person on any
+ * other: an agent asks, a person approves.
+ * @property assistedBuildsRequire Validation stamps of the branch an assisted build must have passed
+ * before it is promoted to this level - the *Assisted builds require* property (#2029), licensed. The
+ * server fails closed: a build whose assisted change is not known yet counts as assisted, which is
+ * why the seed waits for it before promoting to such a level.
  */
 data class PromotionLevelSpec(
     val name: String,
@@ -176,6 +224,8 @@ data class PromotionLevelSpec(
     val autoPromotion: AutoPromotionSpec? = null,
     val dependsOn: List<String> = emptyList(),
     val requiresPreviousPromotion: Boolean = false,
+    val agentsAdmitted: Boolean = false,
+    val assistedBuildsRequire: List<String> = emptyList(),
 )
 
 /**
@@ -224,6 +274,9 @@ data class WorkflowSpec(val yaml: String)
  * @property deleted Whether the stamp is deleted once the whole dataset is seeded. Its runs go with
  * it, and every build carrying one records it in its trail as `validation.deleted`, with the reason
  * `cascade/validation-stamp-deleted` - which is the only reason to declare a stamp only to delete it.
+ * @property nonAgentEvidence Whether the runs of the stamp must come from a person - *Evidence from
+ * non-agents only* (#2030), licensed. On a build an agent created, a run of such a stamp is recorded by
+ * the account the seed runs as.
  */
 data class ValidationStampSpec(
     val name: String,
@@ -232,6 +285,7 @@ data class ValidationStampSpec(
     val tests: Boolean = false,
     val chml: CHMLSpec? = null,
     val deleted: Boolean = false,
+    val nonAgentEvidence: Boolean = false,
 )
 
 /**
@@ -278,7 +332,9 @@ enum class CHML {
  * @property commits Commit messages, oldest first, registered on the branch's SCM branch
  * when the build is created. The last one is the commit the build was built from; the ones
  * before it are the work that went into it, and are what the change log with the previous
- * build shows.
+ * build shows. Each is a FULL message: the subject on its first line, and, after a blank line,
+ * a body and trailers - `Co-Authored-By`, `Claude-Session`... - which are what the change log
+ * reads its assistants from, and the assisted change of the build is computed from (#2020, #2028).
  * @property scans Security scans of the build, each posted through `validateBuildWithFindings`
  * as the report of the scan, on a `security-findings` stamp. They take their rungs on the build's
  * ladder after its [validations] and its [tests], and before its promotions.
@@ -291,6 +347,11 @@ enum class CHML {
  * the account it runs as, and revokes it at the end of the reset: it is an administrator's.
  * @property tampering An entry of the trail of the build rewritten once everything is seeded, so
  * that its verification breaks there. Only on a project requiring [DemoCapability.TRAIL_TAMPERING].
+ * @property agent The agent the build is created by, and its story written as far as the agent policy
+ * lets it: its properties, its validations - except on a stamp taking evidence from non-agents only,
+ * [ValidationStampSpec.nonAgentEvidence] - its links, and its promotions to the levels which admit
+ * agents, [PromotionLevelSpec.agentsAdmitted]. A person - the account the seed runs as - does the
+ * rest, and backdates the build, which an agent may not. Not with [token].
  */
 data class BuildSpec(
     val name: String,
@@ -305,6 +366,7 @@ data class BuildSpec(
     val tests: List<TestRunSpec> = emptyList(),
     val token: String? = null,
     val tampering: TamperingSpec? = null,
+    val agent: AgentSessionSpec? = null,
 )
 
 /**
@@ -548,6 +610,8 @@ data class EnvironmentSpec(
  * is the default one and is what a project with a single deployment per environment uses; a
  * named one - `canary` - is a second slot of the same project in the same environment, with a
  * graph, a history and a set of rules of its own. It is what makes the matrix nest rows.
+ * @property agentsAdmitted Whether an agent may start, and finish, a deployment on this slot (#2026).
+ * A manual admission rule is never answered by an agent, admitted or not.
  */
 data class SlotSpec(
     val project: String,
@@ -555,6 +619,7 @@ data class SlotSpec(
     val qualifier: String = "",
     val admissionRules: List<SlotAdmissionRuleSpec> = emptyList(),
     val workflows: List<SlotWorkflowSpec> = emptyList(),
+    val agentsAdmitted: Boolean = false,
 )
 
 /**
@@ -591,6 +656,9 @@ data class SlotWorkflowSpec(
  * [DeploymentStop.CANCELLED] one was cancelled.
  * @property overrides Admission rules overridden before the deployment starts. An overridden rule
  * is not asked whether it admits the build - that is what overriding it means.
+ * @property agent The agent running the deployment, on a slot which
+ * [admits agents][SlotSpec.agentsAdmitted]. A deployment an agent starts and a manual rule stops is
+ * left as a candidate, waiting for a person: an agent asks, a person approves.
  */
 data class DeploymentSpec(
     val environment: String,
@@ -600,6 +668,7 @@ data class DeploymentSpec(
     val at: BuildCreation? = null,
     val message: String? = null,
     val overrides: List<RuleOverrideSpec> = emptyList(),
+    val agent: AgentSessionSpec? = null,
 )
 
 /**

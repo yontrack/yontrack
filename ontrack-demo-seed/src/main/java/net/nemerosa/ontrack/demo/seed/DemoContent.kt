@@ -231,6 +231,47 @@ object DemoContent {
     const val CHANGE_APPROVAL = "change-approval"
 
     /**
+     * The project of the agents (#2037): a service where coding agents work beside the team - commits
+     * written with assistants, builds and validations recorded by a registered agent, a promotion the
+     * agent may make, a review only a person may record, a level an assisted build reaches only once
+     * reviewed, and a deployment an agent asked for and a person has to approve. A project of its own
+     * for the reason [AUDIT_TRAIL] is one: its builds are read for who did what, and adding agents to
+     * the curated builds of [SERVICE] would change readings the rest of the demo is checked against.
+     */
+    const val VETS = "petclinic-vets"
+
+    /**
+     * The registered agent of Claude Code: it writes the code of [VETS] - its commits carry Claude as a
+     * co-author - and creates, validates and promotes its builds to [BRONZE], the one level admitting
+     * agents.
+     */
+    const val AGENT_CLAUDE = "claude-code-demo"
+
+    /** The registered agent of Codex: it asks for the deployment of [VETS_BLOCKED] to staging. */
+    const val AGENT_CODEX = "codex-demo"
+
+    /**
+     * The stamp of [VETS] a person records, never an agent - *Evidence from non-agents only* - and the
+     * one [GOLD] requires of an assisted build.
+     */
+    const val CODE_REVIEW = "CODE.REVIEW"
+
+    /** The assisted build of [VETS] promoted to [GOLD] once a person reviewed it. */
+    const val VETS_REVIEWED = "203"
+
+    /**
+     * The assisted build of [VETS] nobody reviewed yet: blocked short of [GOLD], and waiting for a person
+     * to approve its deployment to staging, which an agent asked for.
+     */
+    const val VETS_BLOCKED = "204"
+
+    /** The agent activity widget of the demo dashboard - fixed, like [DASHBOARD_UUID]. */
+    const val AGENT_ACTIVITY_WIDGET_UUID = "1c1f9c3e-8bfa-4a1f-8a0b-4e2f0b0d1a19"
+
+    /** The manual admission rule of the staging slot of [VETS], which only a person can answer. */
+    const val VETS_APPROVAL = "approval"
+
+    /**
      * The whole dataset, curated part and changelog project together.
      *
      * @param changelog Commits since the last release, one build each.
@@ -244,14 +285,16 @@ object DemoContent {
             security(),
             visits(),
             e2e(),
+            vets(),
             auditTrail(),
             auditTrailTampered(),
             changelogProject(changelog),
         ),
         environments = environments(),
-        deployments = deployments() + visitsDeployments() + auditTrailDeployments(),
+        deployments = deployments() + visitsDeployments() + auditTrailDeployments() + vetsDeployments(),
         dashboard = dashboard(),
         estates = estates(),
+        agents = agents(),
     )
 
     /**
@@ -1563,6 +1606,205 @@ object DemoContent {
     // ---------------------------------------------------------------------------------------------
 
     /**
+     * The two agents of the demo, owned by the account the seed runs as. Each gets a token, through
+     * which the seed acts as the agent - see [DemoSeed.AGENT_TOKEN].
+     */
+    private fun agents() = listOf(
+        AgentSpec(
+            slug = AGENT_CLAUDE,
+            displayName = "Claude Code (demo)",
+            tool = "Claude Code",
+            description = "Writes, builds and validates the code of $VETS, and promotes it to $BRONZE.",
+        ),
+        AgentSpec(
+            slug = AGENT_CODEX,
+            displayName = "Codex (demo)",
+            tool = "Codex",
+            description = "Asks for the deployments of $VETS to $STAGING.",
+        ),
+    )
+
+    /**
+     * A session of an agent of the demo. The link is a placeholder on a reserved domain: a session is
+     * stored and linked, never fetched, and a link to a real service would lead nowhere.
+     */
+    private fun agentSession(agent: String, id: String) = AgentSessionSpec(
+        agent = agent,
+        id = id,
+        link = "https://agents.example.com/$agent/sessions/$id",
+    )
+
+    private val vetsSessionReviewed = agentSession(AGENT_CLAUDE, "vets-$VETS_REVIEWED")
+    private val vetsSessionBlocked = agentSession(AGENT_CLAUDE, "vets-$VETS_BLOCKED")
+    private val vetsSessionDeploy = agentSession(AGENT_CODEX, "vets-deploy-$VETS_BLOCKED")
+
+    /**
+     * A commit message written with Claude Code, as Claude Code writes its trailers: Claude as a
+     * co-author, and the session the commit was written in.
+     */
+    private fun withClaude(subject: String, session: AgentSessionSpec) = """
+        |$subject
+        |
+        |Co-Authored-By: Claude <noreply@anthropic.com>
+        |Claude-Session: ${session.link}
+    """.trimMargin()
+
+    /** A commit message written with Codex, as Codex writes its trailer. */
+    private fun withCodex(subject: String) = """
+        |$subject
+        |
+        |Co-authored-by: Codex <codex@openai.com>
+    """.trimMargin()
+
+    /**
+     * The project of the agents - see [VETS]. Its four builds are the four readings of the assisted
+     * builds condition on [GOLD]:
+     *
+     * * 201, the first build of the branch, has no change log to read its assistants from: its assisted
+     *   change is UNKNOWN, which counts as assisted - the condition fails closed - so it is reviewed;
+     * * 202 is not assisted - its one co-author is a person, which does not count - and reaches [GOLD]
+     *   without a review;
+     * * [VETS_REVIEWED] is assisted, by Claude Code and Codex, created and validated by
+     *   [AGENT_CLAUDE], promoted to [BRONZE] by the agent, then reviewed and promoted by a person;
+     * * [VETS_BLOCKED] is assisted, by Claude Code alone, nobody reviewed it, and [GOLD] says what is
+     *   missing. [AGENT_CODEX] asked for it in [STAGING], where it waits for a person's approval.
+     */
+    private fun vets() = ProjectSpec(
+        name = VETS,
+        description = "Vet scheduling, written with coding agents: who wrote and built what, and what " +
+                "a person still has to approve.",
+        // Favourites, so that the assisted build is one tap away on a phone
+        favourite = true,
+        labels = listOf(LABEL_TEAM_APPS, LABEL_LANGUAGE_JAVA),
+        scm = ScmSpec(
+            repository = VETS,
+            issues = listOf(
+                IssueSpec("VETS-1", "List the vets with their specialities", type = "feature"),
+                IssueSpec("VETS-4", "Filter the vets by speciality", type = "feature"),
+                IssueSpec("VETS-7", "Book a visit slot with a vet", type = "feature"),
+                IssueSpec("VETS-9", "Cancel a booked visit", type = "feature"),
+            ),
+        ),
+        branches = listOf(
+            BranchSpec(
+                name = MAIN,
+                description = "Main development branch.",
+                scmBranch = SCM_MAIN,
+                favourite = true,
+                promotionLevels = listOf(
+                    bronze.copy(
+                        description = "The build is green. Agents are admitted: the agent which built it promotes it.",
+                        agentsAdmitted = true,
+                    ),
+                    silver,
+                    gold.copy(
+                        description = "A human approved the build for release - after a code review, " +
+                                "if agents helped write it.",
+                        assistedBuildsRequire = listOf(CODE_REVIEW),
+                    ),
+                ),
+                validationStamps = listOf(
+                    buildStamp,
+                    unitTests,
+                    ValidationStampSpec(
+                        CODE_REVIEW,
+                        "Code review, by a person: an agent may not record it.",
+                        nonAgentEvidence = true,
+                    ),
+                ),
+                builds = listOf(
+                    BuildSpec(
+                        name = "201",
+                        release = "1.0.0",
+                        description = "The vets and their specialities.",
+                        creation = DaysAgo(12),
+                        commits = listOf(
+                            "feat(vets): list the vets with their specialities, closes VETS-1",
+                            "test: cover the vet listing",
+                        ),
+                        validations = listOf(
+                            ValidationSpec(BUILD, PASSED),
+                            ValidationSpec(UNIT_TESTS, PASSED),
+                            ValidationSpec(CODE_REVIEW, PASSED, "First build of the branch: reviewed in full."),
+                        ),
+                        promotionLevels = listOf(BRONZE, SILVER, GOLD),
+                    ),
+                    BuildSpec(
+                        name = "202",
+                        release = "1.1.0",
+                        description = "Vets filtered by speciality. Not assisted: its co-author is a person.",
+                        creation = DaysAgo(8),
+                        commits = listOf(
+                            """
+                                |feat(vets): filter the vets by speciality, closes VETS-4
+                                |
+                                |Co-authored-by: Maria Escobar <maria.escobar@example.com>
+                            """.trimMargin(),
+                            "fix(vets): sort the specialities by name",
+                        ),
+                        validations = listOf(
+                            ValidationSpec(BUILD, PASSED),
+                            ValidationSpec(UNIT_TESTS, PASSED),
+                        ),
+                        promotionLevels = listOf(BRONZE, SILVER, GOLD),
+                    ),
+                    BuildSpec(
+                        name = VETS_REVIEWED,
+                        release = "1.2.0",
+                        description = "Visit booking, written with Claude Code and Codex, and reviewed.",
+                        creation = DaysAgo(4),
+                        agent = vetsSessionReviewed,
+                        commits = listOf(
+                            withClaude("feat(schedule): book a visit slot with a vet, closes VETS-7", vetsSessionReviewed),
+                            withClaude("test(schedule): cover overlapping bookings", vetsSessionReviewed),
+                            withCodex("refactor(schedule): extract the slot calendar"),
+                            "docs: describe the booking rules",
+                        ),
+                        validations = listOf(
+                            ValidationSpec(BUILD, PASSED),
+                            ValidationSpec(UNIT_TESTS, PASSED),
+                            ValidationSpec(CODE_REVIEW, PASSED, "Reviewed the booking rules and the calendar extraction."),
+                        ),
+                        promotionLevels = listOf(BRONZE, SILVER, GOLD),
+                    ),
+                    BuildSpec(
+                        name = VETS_BLOCKED,
+                        release = "1.3.0",
+                        description = "Visit cancellation, written with Claude Code. Waiting for its code review.",
+                        // Hours rather than a day: the head of the branch, and room for its rungs
+                        creation = HoursAgo(6),
+                        agent = vetsSessionBlocked,
+                        commits = listOf(
+                            withClaude("feat(schedule): cancel a booked visit, closes VETS-9", vetsSessionBlocked),
+                            withClaude("fix(schedule): free the slot of a cancelled visit", vetsSessionBlocked),
+                        ),
+                        validations = listOf(
+                            ValidationSpec(BUILD, PASSED),
+                            ValidationSpec(UNIT_TESTS, PASSED),
+                        ),
+                        // GOLD is what it lacks, for want of a review
+                        promotionLevels = listOf(BRONZE, SILVER),
+                    ),
+                ),
+            ),
+        ),
+    )
+
+    /**
+     * The agent asks, a person approves: [AGENT_CODEX] starts the deployment of [VETS_BLOCKED] to
+     * [STAGING], which admits agents, and the manual approval of the slot leaves it a candidate - an
+     * agent never answers one.
+     */
+    private fun vetsDeployments() = listOf(
+        DeploymentSpec(
+            STAGING,
+            BuildRef(VETS, MAIN, VETS_BLOCKED),
+            stopAt = DeploymentStop.CANDIDATE,
+            agent = vetsSessionDeploy,
+        ),
+    )
+
+    /**
      * The story of a release, as its trail records it: [AUDIT_TRAIL_RELEASE] is created by its
      * pipeline through the [CI_TOKEN] token, which sets its release and commit properties, runs seven
      * validations with their evidence, promotes it BRONZE, SILVER then GOLD and links it to two
@@ -1929,6 +2171,27 @@ object DemoContent {
                         ),
                     ),
                 ),
+                // Agents may deploy here, and a person approves what they ask for (#2026): the
+                // deployment an agent starts stays a candidate behind the approval
+                SlotSpec(
+                    project = VETS,
+                    description = "Vet scheduling on staging. Agents may ask; a person approves.",
+                    agentsAdmitted = true,
+                    admissionRules = listOf(
+                        SlotAdmissionRuleSpec(
+                            name = "silver",
+                            ruleId = SlotAdmissionRules.PROMOTION,
+                            config = mapOf("promotion" to SILVER),
+                        ),
+                        SlotAdmissionRuleSpec(
+                            name = VETS_APPROVAL,
+                            ruleId = SlotAdmissionRules.MANUAL,
+                            config = mapOf(
+                                "message" to "A person approves the deployments the agents ask for.",
+                            ),
+                        ),
+                    ),
+                ),
                 // The upstream half of the `canary` story - see the production slot below for
                 // why the qualifier is in the demo at all. It holds 107, the head of `main`,
                 // which is newer than anything the canary production slot holds (nothing), and
@@ -2269,6 +2532,18 @@ object DemoContent {
                     "branch" to SECURITY_RELEASE,
                 ).asJson(),
                 layout = DemoWidgetLayout(x = 6, y = 124, w = 6, h = 20),
+            ),
+            // What the agents did over the last week, across every project (#2035): the builds,
+            // validations and promotion of [VETS], the deployment asked for, and the assisted share
+            DemoWidget(
+                uuid = AGENT_ACTIVITY_WIDGET_UUID,
+                key = "extension/agents/AgentActivity",
+                config = mapOf(
+                    "window" to 7,
+                    "projects" to emptyList<String>(),
+                    "labels" to emptyList<String>(),
+                ).asJson(),
+                layout = DemoWidgetLayout(x = 0, y = 144, w = 6, h = 16),
             ),
         ),
     )
