@@ -122,6 +122,14 @@ object DemoContent {
     const val CVE_HIGH_FIXED = "CVE-2024-7254"
 
     /**
+     * A MEDIUM reported by the first build of [MAIN] of [SECURITY], fixed by the next one, and back
+     * two builds later, where it stays (#2040): the reopened finding of the demo, an exposure with two
+     * periods. A MEDIUM, so that neither the gating, the remediation time nor the overdue findings
+     * of the scorecard see it.
+     */
+    const val CVE_REOPENED = "CVE-2024-12798"
+
+    /**
      * What [silverAuto] selects its validation stamps by. A constant because the demo is read
      * against it in more than one place, and because it is the one piece of the dataset's
      * vocabulary that is a pattern rather than a name: it must keep matching [UNIT_TESTS] and
@@ -1023,6 +1031,20 @@ object DemoContent {
         fixedVersion = "42.7.2",
     )
 
+    /**
+     * [CVE_REOPENED]: fixed by the bump of logback in 2.4.1, back in 2.4.3 when the bump of
+     * spring-webmvc pinned it back to 1.5.12.
+     */
+    private val logbackJaninoEvaluator = FindingSpec(
+        externalId = CVE_REOPENED,
+        location = "pkg:maven/ch.qos.logback/logback-core",
+        severity = FindingSeverity.MEDIUM,
+        title = "Arbitrary code execution through JaninoEventEvaluator in logback-core",
+        url = "https://nvd.nist.gov/vuln/detail/$CVE_REOPENED",
+        installedVersion = "1.5.12",
+        fixedVersion = "1.5.13",
+    )
+
     private val protobufStackOverflow = FindingSpec(
         externalId = CVE_HIGH_FIXED,
         location = "pkg:maven/com.google.protobuf/protobuf-java",
@@ -1121,6 +1143,9 @@ object DemoContent {
      *   reported on one branch only, so resolved for the project as soon as its branch fixes it:
      *   eleven days and three days, the two remediations whose median the remediation time reads
      *   (#1912).
+     * * [CVE_REOPENED], a MEDIUM, is reported by the first build of [MAIN], fixed by the next one,
+     *   and back two builds later, where it stays: the reopened finding, whose exposure has two
+     *   periods (#2040).
      *
      * What the security readings of the scorecard read here, in "Demo products" (#1912): a maturity
      * of 3 - both expected kinds scanned the day before, and a scan which failed in the window - a
@@ -1158,21 +1183,27 @@ object DemoContent {
                 promotionLevels = listOf(bronze),
                 validationStamps = securityStamps,
                 builds = listOf(
-                    securityBuild("310", "2.4.0", "Invoices as PDF.", DaysAgo(13)),
+                    securityBuild(
+                        "310", "2.4.0", "Invoices as PDF.", DaysAgo(13),
+                        alsoReports = listOf(logbackJaninoEvaluator),
+                    ),
                     // Its dependency scan FAILS on an unaccepted CRITICAL: not promoted
                     securityBuild(
-                        "311", "2.4.1", "Payment reminders.", DaysAgo(10),
+                        "311", "2.4.1", "Payment reminders, and logback 1.5.13.", DaysAgo(10),
                         alsoReports = listOf(pgjdbcSqlInjection),
                         promoted = false,
                     ),
                     securityBuild("312", "2.4.2", "Invoice search by owner, and pgjdbc 42.7.2.", DaysAgo(7)),
+                    // The bump pins logback back to 1.5.12: CVE_REOPENED is back, and stays
                     securityBuild(
                         "313", "2.4.3", "Bump of spring-webmvc to 6.1.13.", DaysAgo(4),
                         highFixed = true,
+                        alsoReports = listOf(logbackJaninoEvaluator),
                     ),
                     securityBuild(
                         "314", "2.4.4", "Credit notes.", DaysAgo(1),
                         highFixed = true,
+                        alsoReports = listOf(logbackJaninoEvaluator),
                     ),
                 ),
             ),

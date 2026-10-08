@@ -137,8 +137,54 @@ interface FindingQueryService {
 
     /**
      * Observations of a finding, the most recent first.
+     *
+     * @param filter Filter on the observations: their branch, their stamp, their time
      */
-    fun getFindingObservations(finding: Finding, offset: Int, size: Int): PaginatedList<FindingObservationView>
+    fun getFindingObservations(
+        finding: Finding,
+        offset: Int,
+        size: Int,
+        filter: FindingObservationFilter = FindingObservationFilter(),
+    ): PaginatedList<FindingObservationView>
+
+    /**
+     * Periods of an exposure, the oldest first, with their stretches under an acceptance.
+     *
+     * @param exposure Exposure, as returned by [getFindingExposures]
+     * @param date Day against which the expiry of the acceptances is evaluated
+     */
+    fun getExposurePeriods(
+        exposure: FindingExposureView,
+        date: LocalDate = Time.now.toLocalDate(),
+    ): List<FindingExposurePeriodView>
+
+    /**
+     * Where and when a finding was first seen: the start of the earliest period of its exposures.
+     * `null` when it has none, or when it cannot be seen.
+     */
+    fun getFindingFirstSeenIn(finding: Finding): FindingSighting?
+
+    /**
+     * Where and when a finding resolved in its project: for a finding
+     * [resolved][FindingState.RESOLVED] there, the latest end of a period of its exposures on the
+     * branches which count. `null` otherwise.
+     *
+     * @param date Day against which the expiry of the acceptances is evaluated
+     */
+    fun getFindingResolvedIn(finding: Finding, date: LocalDate = Time.now.toLocalDate()): FindingSighting?
+
+    /**
+     * History of a finding, the most recent first: the periods of its exposures, the changes of
+     * acceptance within them, and its observations, grouped between these.
+     *
+     * @param date Day against which the expiry of the acceptances is evaluated
+     */
+    fun getFindingHistory(
+        finding: Finding,
+        offset: Int,
+        size: Int,
+        date: LocalDate = Time.now.toLocalDate(),
+    ): PaginatedList<FindingHistoryEntryView>
 
     /**
      * Acceptance recorded by the most recent observation of a finding, `null` when this

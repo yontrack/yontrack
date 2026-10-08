@@ -7,6 +7,7 @@ import net.nemerosa.ontrack.kdsl.acceptance.tests.support.resourceAsText
 import net.nemerosa.ontrack.kdsl.acceptance.tests.support.uid
 import net.nemerosa.ontrack.kdsl.connector.graphql.GraphQLClientException
 import net.nemerosa.ontrack.kdsl.connector.graphql.schema.type.FindingExposureState
+import net.nemerosa.ontrack.kdsl.connector.graphql.schema.type.FindingHistoryEntryType
 import net.nemerosa.ontrack.kdsl.connector.graphql.schema.type.FindingKind
 import net.nemerosa.ontrack.kdsl.connector.graphql.schema.type.FindingSeverity
 import net.nemerosa.ontrack.kdsl.connector.graphql.schema.type.FindingState
@@ -14,6 +15,8 @@ import net.nemerosa.ontrack.kdsl.spec.Branch
 import net.nemerosa.ontrack.kdsl.spec.ValidationRun
 import net.nemerosa.ontrack.kdsl.spec.extension.findings.FindingsReportFormat
 import net.nemerosa.ontrack.kdsl.spec.extension.findings.createFindingsValidationStamp
+import net.nemerosa.ontrack.kdsl.spec.extension.findings.exposurePeriods
+import net.nemerosa.ontrack.kdsl.spec.extension.findings.history
 import net.nemerosa.ontrack.kdsl.spec.extension.findings.findings
 import net.nemerosa.ontrack.kdsl.spec.extension.findings.validateWithFindings
 import net.nemerosa.ontrack.kdsl.spec.extension.license.devLicense
@@ -23,6 +26,7 @@ import org.junit.jupiter.api.Test
 import tools.jackson.databind.JsonNode
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -274,6 +278,46 @@ class ACCDSLFindings : AbstractACCDSLTestSupport() {
     }
 
     @Test
+    fun `A finding discovered, fixed and reopened has two periods of exposure and tells its history`() {
+        project {
+            branch {
+                createFindingsValidationStamp(name = STAMP)
+                val discovered = uid("bd-")
+                val fixed = uid("bd-")
+                val reopened = uid("bd-")
+                scan(entry("CVE-2021-44228", "CRITICAL"), build = discovered)
+                scan(entry("CVE-2021-44228", "CRITICAL"))
+                scan(build = fixed)
+                scan(entry("CVE-2021-44228", "CRITICAL"), build = reopened)
+
+                val finding = findings().items.single()
+                val periods = project.exposurePeriods(finding)
+                assertEquals(2, periods.size)
+                val (first, second) = periods
+                assertEquals(name, first.branch)
+                assertEquals(STAMP, first.validationStamp)
+                assertEquals(discovered, first.startedInBuild)
+                assertEquals(fixed, first.endedInBuild)
+                assertFalse(first.ongoing)
+                assertEquals(reopened, second.startedInBuild)
+                assertNull(second.endedAt)
+                assertTrue(second.ongoing)
+
+                assertEquals(
+                    listOf(
+                        FindingHistoryEntryType.REOPENED to reopened,
+                        FindingHistoryEntryType.RESOLVED to fixed,
+                        FindingHistoryEntryType.OBSERVATIONS to null,
+                        FindingHistoryEntryType.DISCOVERED to discovered,
+                    ),
+                    project.history(finding).map { it.type to it.build }
+                )
+                assertEquals(1, project.history(finding)[2].count)
+            }
+        }
+    }
+
+    @Test
     fun `The findings of a project are filtered by severity, scanner and kind`() {
         project {
             branch {
@@ -366,8 +410,8 @@ class ACCDSLFindings : AbstractACCDSLTestSupport() {
     /**
      * Posts a neutral report on a new build of this branch, for the [STAMP] validation stamp.
      */
-    private fun Branch.scan(vararg entries: Map<String, Any?>): ValidationRun =
-        createBuild(uid("bd-")).validateWithFindings(
+    private fun Branch.scan(vararg entries: Map<String, Any?>, build: String = uid("bd-")): ValidationRun =
+        createBuild(build).validateWithFindings(
             validation = STAMP,
             format = FindingsReportFormat.FINDINGS,
             report = neutralReport(scanner = "trivy", kind = "IMAGE", *entries),

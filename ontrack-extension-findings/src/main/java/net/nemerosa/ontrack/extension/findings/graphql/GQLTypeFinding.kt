@@ -2,14 +2,20 @@ package net.nemerosa.ontrack.extension.findings.graphql
 
 import graphql.Scalars.GraphQLInt
 import graphql.Scalars.GraphQLString
+import graphql.schema.DataFetchingEnvironment
+import graphql.schema.GraphQLArgument
 import graphql.schema.GraphQLNonNull
 import graphql.schema.GraphQLObjectType
 import graphql.schema.GraphQLTypeReference
+import net.nemerosa.ontrack.common.Time
+import net.nemerosa.ontrack.extension.findings.history.FindingHistoryEntry
 import net.nemerosa.ontrack.extension.findings.model.Finding
 import net.nemerosa.ontrack.extension.findings.model.FindingKind
 import net.nemerosa.ontrack.extension.findings.model.FindingObservation
 import net.nemerosa.ontrack.extension.findings.model.FindingSeverity
 import net.nemerosa.ontrack.extension.findings.model.FindingState
+import net.nemerosa.ontrack.extension.findings.query.FindingHistoryEntryView
+import net.nemerosa.ontrack.extension.findings.query.FindingObservationFilter
 import net.nemerosa.ontrack.extension.findings.query.FindingObservationView
 import net.nemerosa.ontrack.extension.findings.query.FindingQueryService
 import net.nemerosa.ontrack.graphql.schema.GQLType
@@ -22,6 +28,7 @@ import net.nemerosa.ontrack.graphql.support.pagination.GQLPaginatedListFactory
 import net.nemerosa.ontrack.model.structure.ID
 import net.nemerosa.ontrack.model.structure.StructureService
 import org.springframework.stereotype.Component
+import java.time.LocalDateTime
 
 /**
  * One known weakness at one location of one project.
@@ -32,6 +39,7 @@ class GQLTypeFinding(
     private val structureService: StructureService,
     private val gqlTypeFindingExposure: GQLTypeFindingExposure,
     private val gqlTypeFindingAcceptance: GQLTypeFindingAcceptance,
+    private val gqlTypeFindingSighting: GQLTypeFindingSighting,
     private val paginatedListFactory: GQLPaginatedListFactory,
 ) : GQLType {
 
@@ -129,20 +137,101 @@ class GQLTypeFinding(
                         findingQueryService.getFindingExposures(finding)
                     }
             }
+            .field {
+                it.name("firstSeenIn")
+                    .description(
+                        "Where and when the finding was first seen: the start of the earliest period of its exposures, " +
+                                "with its branch, its stamp, its run and its build. Null when it has no exposure."
+                    )
+                    .type(gqlTypeFindingSighting.typeRef)
+                    .dataFetcher { env ->
+                        val finding: Finding = env.getSource()!!
+                        findingQueryService.getFindingFirstSeenIn(finding)
+                    }
+            }
+            .field {
+                it.name("resolvedIn")
+                    .description(
+                        "Where and when the finding resolved in its project: the latest end of a period of its exposures " +
+                                "on the branches which count, with its branch, its stamp, its run and its build. " +
+                                "Null unless the finding is resolved in its project."
+                    )
+                    .type(gqlTypeFindingSighting.typeRef)
+                    .dataFetcher { env ->
+                        val finding: Finding = env.getSource()!!
+                        findingQueryService.getFindingResolvedIn(finding)
+                    }
+            }
             .field(
                 paginatedListFactory.createPaginatedField<Finding, FindingObservationView>(
                     cache = cache,
                     fieldName = "observations",
-                    fieldDescription = "Observations of the finding, the most recent first",
+                    fieldDescription = "Observations of the finding, the most recent first, optionally restricted to a branch, " +
+                            "a validation stamp and a time range (both ends included)",
                     itemType = FindingObservation::class.java.simpleName,
+                    arguments = listOf(
+                        GraphQLArgument.newArgument()
+                            .name(ARG_BRANCH_ID)
+                            .description("ID of the branch of the observations")
+                            .type(GraphQLInt)
+                            .build(),
+                        GraphQLArgument.newArgument()
+                            .name(ARG_VALIDATION_STAMP_ID)
+                            .description("ID of the validation stamp of the observations")
+                            .type(GraphQLInt)
+                            .build(),
+                        GraphQLArgument.newArgument()
+                            .name(ARG_FROM)
+                            .description("Earliest time of the observations")
+                            .type(GQLScalarLocalDateTime.INSTANCE)
+                            .build(),
+                        GraphQLArgument.newArgument()
+                            .name(ARG_TO)
+                            .description("Latest time of the observations")
+                            .type(GQLScalarLocalDateTime.INSTANCE)
+                            .build(),
+                    ),
+                    itemPaginatedListProvider = { env, finding, offset, size ->
+                        findingQueryService.getFindingObservations(
+                            finding = finding,
+                            offset = offset,
+                            size = size,
+                            filter = FindingObservationFilter(
+                                branchId = env.getArgument<Int>(ARG_BRANCH_ID),
+                                validationStampId = env.getArgument<Int>(ARG_VALIDATION_STAMP_ID),
+                                from = env.dateTimeArgument(ARG_FROM),
+                                to = env.dateTimeArgument(ARG_TO),
+                            ),
+                        )
+                    }
+                )
+            )
+            .field(
+                paginatedListFactory.createPaginatedField<Finding, FindingHistoryEntryView>(
+                    cache = cache,
+                    fieldName = "history",
+                    fieldDescription = "History of the finding, the most recent first: the start and the end of each period of its exposures, " +
+                            "the changes of acceptance within them, and its observations, grouped between these.",
+                    itemType = FindingHistoryEntry::class.java.simpleName,
                     itemPaginatedListProvider = { _, finding, offset, size ->
-                        findingQueryService.getFindingObservations(finding, offset, size)
+                        findingQueryService.getFindingHistory(finding, offset, size)
                     }
                 )
             )
             .build()
 
+    private fun DataFetchingEnvironment.dateTimeArgument(name: String): LocalDateTime? =
+        when (val value = getArgument<Any>(name)) {
+            null -> null
+            is LocalDateTime -> value
+            else -> Time.fromStorage(value.toString())
+        }
+
     companion object {
         const val FINDING = "Finding"
+        private const val ARG_BRANCH_ID = "branchId"
+        private const val ARG_VALIDATION_STAMP_ID = "validationStampId"
+        private const val ARG_FROM = "from"
+        private const val ARG_TO = "to"
     }
 }

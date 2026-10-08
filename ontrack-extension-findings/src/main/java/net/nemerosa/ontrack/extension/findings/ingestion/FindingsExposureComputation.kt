@@ -26,10 +26,16 @@ data class ReportedExposure(
  * @property saved Exposure rows to save, created or changed
  * @property transitions Transitions of the findings on the branch, in the order of the report,
  * then the resolutions
+ * @property openedPeriods IDs of the findings whose exposure on the branch, for the stamp, starts
+ * a period: a first exposure, or a return after resolution
+ * @property closedPeriods IDs of the findings whose exposure on the branch, for the stamp, ends
+ * its period: resolved by the scan
  */
 data class ExposureChange(
     val saved: List<FindingExposure>,
     val transitions: List<ExposureTransition>,
+    val openedPeriods: List<Int> = emptyList(),
+    val closedPeriods: List<Int> = emptyList(),
 )
 
 /**
@@ -89,9 +95,12 @@ object FindingsExposureComputation {
 
         // Rows of this stamp
         val saved = mutableListOf<FindingExposure>()
+        val openedPeriods = mutableListOf<Int>()
+        val closedPeriods = mutableListOf<Int>()
         reported.forEach { finding ->
             val row = current[finding.findingId]
             val exposure = if (row == null || row.resolvedAt != null) {
+                openedPeriods += finding.findingId
                 FindingExposure(
                     findingId = finding.findingId,
                     branchId = branchId,
@@ -113,6 +122,7 @@ object FindingsExposureComputation {
         current.values
             .filter { it.resolvedAt == null && it.findingId !in reportedIds }
             .forEach { row ->
+                closedPeriods += row.findingId
                 saved += row.copy(
                     resolvedAt = time,
                     resolutionReason = FindingResolutionReason.ABSENT,
@@ -145,6 +155,11 @@ object FindingsExposureComputation {
             }
         }
 
-        return ExposureChange(saved = saved, transitions = transitions)
+        return ExposureChange(
+            saved = saved,
+            transitions = transitions,
+            openedPeriods = openedPeriods,
+            closedPeriods = closedPeriods,
+        )
     }
 }

@@ -61,6 +61,22 @@ On a branch, a finding is in one of three states:
 When the finding comes back on a branch where it was resolved, it is exposed again, and flagged as
 _reopened_.
 
+#### Exposure periods
+
+The exposure of a finding on a branch, for a stamp, is made of one or more **periods**: each runs
+from the first scan which reported the finding to the first scan which no longer did. A reopening
+starts a new period; the earlier ones are kept.
+
+Each end of a period records its validation run and the display name of its build — the release
+label when there is one — so that the page of a finding says not only _when_ it was discovered and
+fixed, but _in which build_. When the builds are purged, their runs go with them, but the names of
+the builds stay.
+
+The duration of a period runs until it ends, or until now while it is open. **An accepted stretch
+counts as exposed**: the vulnerable code still ships, and an acceptance is a decision about the
+risk, not a fix. Durations are given in minutes under an hour, in hours under 48 hours, and in
+days above.
+
 !!! note
 
     The expiry of an acceptance is evaluated when the finding is read, not by a background job. An
@@ -533,9 +549,18 @@ In the UI:
 
     ![Findings of a project](findings-project-findings.png)
 
-* the **finding page** shows a finding's exposure per branch, the timeline of its observations, its
-  acceptance with statement and expiry, and the link to its description. Below, a vulnerability
-  fixed on `main` and still exposed on `release-2.3`:
+* the **finding page** shows a finding, where and when it was first seen — branch and build — its
+  acceptance with statement and expiry, and the link to its description, then:
+    * its **exposure timeline**: one lane per branch and stamp, a bar per period, red while exposed,
+      amber while accepted, ending on a green dot when fixed, with the builds at its ends;
+    * its **exposure per branch**: for the current period of each branch and stamp, the build it
+      was discovered in, the build it was fixed in, and how long it has been exposed, with the
+      earlier periods of a reopened finding;
+    * its **history**, the most recent first: its discovery, its exposure on other branches, its
+      fixes and reopenings with their builds, the changes of its acceptance — accepted, withdrawn,
+      expired — and, between them, its observations, grouped, which expand into the scans.
+
+    Below, a vulnerability fixed on `main` and still exposed on `release-2.3`:
 
     ![A finding](findings-finding.png)
 
@@ -588,6 +613,12 @@ Through the [GraphQL API](../../api/graphql.md):
 * `Branch.findingsSummary` gives the counts of one branch: its open findings by severity, the number
   of its accepted and resolved ones, and whether a finding has ever been reported on it
 * `ValidationRun.findings` lists the observations of a scan
+* `Finding.firstSeenIn` and `Finding.resolvedIn` give where and when a finding was first seen, and
+  resolved in its project: branch, stamp, run and build
+* `FindingExposure.periods` lists the periods of an exposure, with their builds, their duration and
+  their accepted stretches
+* `Finding.history` lists the history of a finding, paginated, and `Finding.observations` takes a
+  branch, a stamp and a time range to expand a group of it
 * `findings(externalId)` lists the findings with this external ID, across all the projects you can
   see the findings of
 * `finding(id)` gets one finding

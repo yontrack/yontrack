@@ -19,9 +19,23 @@ const severityColors = {
 }
 
 const gqlFindingObservations = gql`
-    query FindingObservations($id: Int!, $size: Int!) {
+    query FindingObservations(
+        $id: Int!,
+        $size: Int!,
+        $branchId: Int,
+        $validationStampId: Int,
+        $from: LocalDateTime,
+        $to: LocalDateTime,
+    ) {
         finding(id: $id) {
-            observations(offset: 0, size: $size) {
+            observations(
+                offset: 0,
+                size: $size,
+                branchId: $branchId,
+                validationStampId: $validationStampId,
+                from: $from,
+                to: $to,
+            ) {
                 pageInfo {
                     totalSize
                 }
@@ -107,16 +121,20 @@ function Observation({observation}) {
  * The timeline of the observations of a finding, the most recent first: each scan which
  * reported it, with the severity it asserted, the versions, and the acceptance at the time.
  * One page at first, more on demand.
+ *
+ * @param id ID of the finding
+ * @param filter Optional `{branchId, validationStampId, from, to}`, restricting the observations to
+ * those of a group of the history
  */
-export default function FindingObservationsTimeline({id}) {
+export default function FindingObservationsTimeline({id, filter}) {
 
     const [size, setSize] = useState(PAGE_SIZE)
 
     const {data, loading, finished, error} = useQuery(
         gqlFindingObservations,
         {
-            variables: {id, size},
-            deps: [id, size],
+            variables: {id, size, ...(filter ?? {})},
+            deps: [id, size, filter?.branchId, filter?.validationStampId, filter?.from, filter?.to],
             condition: !!id,
             dataFn: data => data.finding?.observations,
         }

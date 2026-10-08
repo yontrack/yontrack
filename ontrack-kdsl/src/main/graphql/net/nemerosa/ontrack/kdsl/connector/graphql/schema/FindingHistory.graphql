@@ -1,0 +1,34 @@
+query FindingHistory($id: Int!, $size: Int!) {
+    finding(id: $id) {
+        exposures {
+            branch {
+                name
+            }
+            validationStamp {
+                name
+            }
+            periods {
+                startedAt
+                startedInBuild
+                endedAt
+                endedInBuild
+                ongoing
+                durationSeconds
+            }
+        }
+        history(offset: 0, size: $size) {
+            pageItems {
+                type
+                time
+                branch {
+                    name
+                }
+                validationStamp {
+                    name
+                }
+                build
+                count
+            }
+        }
+    }
+}

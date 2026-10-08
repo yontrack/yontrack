@@ -224,8 +224,11 @@ and reports every problem at once. Destructive by design must not mean blank on 
 
 `petclinic-billing` carries the security findings (#1867): a HIGH reported by the first builds of
 `main`, fixed there by a dependency bump and still exposed on `release-2.3`; a CRITICAL under an
-acceptance which expires 90 days after the reset; and a code scan in SARIF with a HIGH accepted by a
-suppression. Its two stamps are `security-findings` ones, and a build does not say what status they
+acceptance which expires 90 days after the reset; a code scan in SARIF with a HIGH accepted by a
+suppression; and a MEDIUM reported by the first build of `main`, fixed by the next one and back two
+builds later, where it stays - the reopened finding, whose exposure has two periods (#2040). It is a
+MEDIUM so that the security readings of the scorecard, which read CRITICAL and HIGH findings only,
+are not changed by it. Its two stamps are `security-findings` ones, and a build does not say what status they
 reached: it declares **scans** (`BuildSpec.scans`), each a list of findings, and the server computes
 the status from them, as it does for any CI posting through `validateBuildWithFindings`.
 

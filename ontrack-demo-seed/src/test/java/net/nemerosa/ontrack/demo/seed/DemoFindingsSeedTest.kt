@@ -36,6 +36,23 @@ class DemoFindingsSeedTest {
     private fun seed(target: DemoTarget) = DemoSeed(target, clock, log = {})
 
     @Test
+    fun `the demo shows a MEDIUM fixed on main, back two builds later, and still exposed`() {
+        val main = branch(DemoContent.MAIN).builds
+        val reports = main.map { it.reports(DemoContent.SECURITY_DEPENDENCIES, DemoContent.CVE_REOPENED) }
+        assertEquals(listOf(true, false, false, true, true), reports)
+        val finding = main.first().scans.flatMap { it.findings }.single { it.externalId == DemoContent.CVE_REOPENED }
+        // A MEDIUM, invisible to the gating, the remediation time and the overdue findings
+        assertEquals(FindingSeverity.MEDIUM, finding.severity)
+        assertEquals(null, finding.acceptance)
+        assertTrue(
+            project.branches.filter { it.name != DemoContent.MAIN }.none { branch ->
+                branch.builds.any { it.reports(DemoContent.SECURITY_DEPENDENCIES, DemoContent.CVE_REOPENED) }
+            },
+            "Reported on main only",
+        )
+    }
+
+    @Test
     fun `the demo shows a HIGH reported by a few builds of main then fixed there, and still exposed on the release branch`() {
         val main = branch(DemoContent.MAIN).builds
         val reporting = main.takeWhile { it.reports(DemoContent.SECURITY_DEPENDENCIES, DemoContent.CVE_FIXED_ON_MAIN) }

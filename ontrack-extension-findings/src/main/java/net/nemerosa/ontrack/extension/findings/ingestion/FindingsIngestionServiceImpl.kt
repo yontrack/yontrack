@@ -8,6 +8,7 @@ import net.nemerosa.ontrack.extension.findings.events.FindingsEvents
 import net.nemerosa.ontrack.extension.findings.license.FindingsLicense
 import net.nemerosa.ontrack.extension.findings.metrics.FindingsMetrics
 import net.nemerosa.ontrack.extension.findings.model.Finding
+import net.nemerosa.ontrack.extension.findings.model.FindingExposurePeriod
 import net.nemerosa.ontrack.extension.findings.model.FindingObservation
 import net.nemerosa.ontrack.extension.findings.model.FindingResolutionReason
 import net.nemerosa.ontrack.extension.findings.model.FindingState
@@ -39,6 +40,7 @@ class FindingsIngestionServiceImpl(
     private val findingSearchIndexer: FindingSearchIndexer,
     private val meterRegistry: MeterRegistry,
     private val securityService: SecurityService,
+    private val buildDisplayNameService: BuildDisplayNameService,
 ) : FindingsIngestionService {
 
     private val parsers: Map<String, FindingsReportParser> = parsers.associateBy { it.format }
@@ -209,6 +211,30 @@ class FindingsIngestionServiceImpl(
             time = time,
         )
         findingRepository.saveExposures(change.saved)
+        // Periods of the exposure rows, with the run and the display name of its build
+        val build = run.build.let { buildDisplayNameService.getFirstBuildDisplayName(it) ?: it.name }
+        findingRepository.closeExposurePeriods(
+            branchId = branch.id(),
+            validationStampId = validationStamp.id(),
+            findingIds = change.closedPeriods,
+            endedAt = time,
+            endedByValidationRunId = run.id(),
+            endedInBuild = build,
+            resolutionReason = FindingResolutionReason.ABSENT,
+        )
+        findingRepository.openExposurePeriods(
+            change.openedPeriods.map { findingId ->
+                FindingExposurePeriod(
+                    id = 0,
+                    findingId = findingId,
+                    branchId = branch.id(),
+                    validationStampId = validationStamp.id(),
+                    startedAt = time,
+                    startedByValidationRunId = run.id(),
+                    startedInBuild = build,
+                )
+            }
+        )
         // Resolution time of the findings, following their state in the project
         val reported = written.associate { (finding, _) -> finding.id to finding }
         val resolvedIds = change.saved.map { it.findingId }.filter { it !in reported }

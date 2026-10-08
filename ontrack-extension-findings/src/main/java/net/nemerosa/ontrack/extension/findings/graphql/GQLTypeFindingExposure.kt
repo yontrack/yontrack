@@ -11,18 +11,23 @@ import net.nemerosa.ontrack.extension.findings.model.FindingExposure
 import net.nemerosa.ontrack.extension.findings.model.FindingExposureState
 import net.nemerosa.ontrack.extension.findings.model.FindingResolutionReason
 import net.nemerosa.ontrack.extension.findings.query.FindingExposureView
+import net.nemerosa.ontrack.extension.findings.query.FindingQueryService
 import net.nemerosa.ontrack.graphql.schema.GQLType
 import net.nemerosa.ontrack.graphql.schema.GQLTypeBranch
 import net.nemerosa.ontrack.graphql.schema.GQLTypeCache
 import net.nemerosa.ontrack.graphql.schema.GQLTypeValidationStamp
 import net.nemerosa.ontrack.graphql.support.GQLScalarLocalDateTime
+import net.nemerosa.ontrack.graphql.support.listType
 import org.springframework.stereotype.Component
 
 /**
  * Exposure of a finding on a branch, for the scans of one stamp.
  */
 @Component
-class GQLTypeFindingExposure : GQLType {
+class GQLTypeFindingExposure(
+    private val findingQueryService: FindingQueryService,
+    private val gqlTypeFindingExposurePeriod: GQLTypeFindingExposurePeriod,
+) : GQLType {
 
     override fun getTypeName(): String = FindingExposure::class.java.simpleName
 
@@ -87,6 +92,15 @@ class GQLTypeFindingExposure : GQLType {
                     .description("Why the finding was resolved, if it is")
                     .type(GraphQLTypeReference(FindingResolutionReason::class.java.simpleName))
                     .dataFetcher { env -> env.view.exposure.resolutionReason }
+            }
+            .field {
+                it.name("periods")
+                    .description(
+                        "Periods of the exposure, the oldest first: one per stretch from the first run which reported the finding " +
+                                "to the first run which no longer did. A reopening starts a new period."
+                    )
+                    .type(listType(gqlTypeFindingExposurePeriod.typeRef))
+                    .dataFetcher { env -> findingQueryService.getExposurePeriods(env.view) }
             }
             .build()
 

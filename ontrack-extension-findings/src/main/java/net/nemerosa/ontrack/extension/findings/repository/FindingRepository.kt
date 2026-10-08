@@ -2,11 +2,15 @@ package net.nemerosa.ontrack.extension.findings.repository
 
 import net.nemerosa.ontrack.extension.findings.model.Finding
 import net.nemerosa.ontrack.extension.findings.model.FindingExposure
+import net.nemerosa.ontrack.extension.findings.model.FindingExposurePeriod
+import net.nemerosa.ontrack.extension.findings.model.FindingObservationSighting
+import net.nemerosa.ontrack.extension.findings.model.FindingResolutionReason
 import net.nemerosa.ontrack.extension.findings.model.FindingObservation
 import net.nemerosa.ontrack.extension.findings.model.FindingSeverity
 import net.nemerosa.ontrack.extension.findings.model.FindingState
 import net.nemerosa.ontrack.extension.findings.model.RankedFinding
 import java.time.LocalDate
+import java.time.LocalDateTime
 
 /**
  * Storage of the findings, their observations and their exposure.
@@ -128,6 +132,12 @@ interface FindingRepository {
     fun findObservationsByValidationRun(validationRunId: Int): List<FindingObservation>
 
     /**
+     * Gets the observations of a finding, with the branch and the stamp of their runs, the most
+     * recent first.
+     */
+    fun findObservationSightingsByFinding(findingId: Int): List<FindingObservationSighting>
+
+    /**
      * Gets the severity of the latest observation of some findings by the runs of a validation
      * stamp. A finding whose observations were all purged has none.
      *
@@ -162,4 +172,39 @@ interface FindingRepository {
      * Gets the exposure on a branch, for the scans of one validation stamp, resolved or not.
      */
     fun findExposuresByBranchAndStamp(branchId: Int, validationStampId: Int): List<FindingExposure>
+
+    // Exposure periods
+
+    /**
+     * Opens periods of exposure, as one JDBC batch.
+     *
+     * @param periods Periods to open. Their ID is ignored.
+     */
+    fun openExposurePeriods(periods: List<FindingExposurePeriod>)
+
+    /**
+     * Ends the open periods of some findings on a branch, for the scans of one stamp.
+     *
+     * @param branchId ID of the branch
+     * @param validationStampId ID of the stamp of the scans
+     * @param findingIds IDs of the findings
+     * @param endedAt Time of the run which ends the periods
+     * @param endedByValidationRunId ID of this run
+     * @param endedInBuild Display name of the build of this run
+     * @param resolutionReason Why the periods end
+     */
+    fun closeExposurePeriods(
+        branchId: Int,
+        validationStampId: Int,
+        findingIds: Collection<Int>,
+        endedAt: LocalDateTime,
+        endedByValidationRunId: Int,
+        endedInBuild: String,
+        resolutionReason: FindingResolutionReason,
+    )
+
+    /**
+     * Gets the periods of the exposures of a finding, on all branches, the oldest first.
+     */
+    fun findExposurePeriodsByFinding(findingId: Int): List<FindingExposurePeriod>
 }

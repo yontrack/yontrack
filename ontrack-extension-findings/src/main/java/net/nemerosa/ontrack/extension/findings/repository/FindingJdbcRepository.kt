@@ -9,6 +9,7 @@ import org.springframework.jdbc.support.GeneratedKeyHolder
 import org.springframework.stereotype.Repository
 import java.sql.ResultSet
 import java.time.LocalDate
+import java.time.LocalDateTime
 import javax.sql.DataSource
 
 @Repository
@@ -308,6 +309,25 @@ class FindingJdbcRepository(
             mapOf("validationRunId" to validationRunId)
         ) { rs, _ -> toObservation(rs) }
 
+    override fun findObservationSightingsByFinding(findingId: Int): List<FindingObservationSighting> =
+        namedParameterJdbcTemplate!!.query(
+            """
+                SELECT O.*, S.BRANCHID, R.VALIDATIONSTAMPID
+                FROM FINDING_OBSERVATIONS O
+                INNER JOIN VALIDATION_RUNS R ON R.ID = O.VALIDATION_RUN_ID
+                INNER JOIN VALIDATION_STAMPS S ON S.ID = R.VALIDATIONSTAMPID
+                WHERE O.FINDING_ID = :findingId
+                ORDER BY O.OBSERVED_AT DESC, O.ID DESC
+            """.trimIndent(),
+            mapOf("findingId" to findingId)
+        ) { rs, _ ->
+            FindingObservationSighting(
+                observation = toObservation(rs),
+                branchId = rs.getInt("BRANCHID"),
+                validationStampId = rs.getInt("VALIDATIONSTAMPID"),
+            )
+        }
+
     override fun findLatestSeverities(validationStampId: Int, findingIds: Collection<Int>): Map<Int, FindingSeverity> =
         if (findingIds.isEmpty()) {
             emptyMap()
@@ -422,6 +442,92 @@ class FindingJdbcRepository(
         resolvedAt = rs.readLocalDateTime("RESOLVED_AT"),
         resolutionReason = rs.getString("RESOLUTION_REASON")?.let { FindingResolutionReason.valueOf(it) },
     )
+
+    // Exposure periods
+
+    override fun openExposurePeriods(periods: List<FindingExposurePeriod>) {
+        if (periods.isEmpty()) return
+        namedParameterJdbcTemplate!!.batchUpdate(
+            """
+                INSERT INTO FINDING_EXPOSURE_PERIODS (
+                    FINDING_ID, BRANCH_ID, VALIDATION_STAMP_ID,
+                    STARTED_AT, STARTED_BY_VALIDATION_RUN_ID, STARTED_IN_BUILD,
+                    ENDED_AT, ENDED_BY_VALIDATION_RUN_ID, ENDED_IN_BUILD, RESOLUTION_REASON
+                ) VALUES (
+                    :findingId, :branchId, :validationStampId,
+                    :startedAt, :startedBy, :startedInBuild,
+                    :endedAt, :endedBy, :endedInBuild, :resolutionReason
+                )
+            """.trimIndent(),
+            periods.map { period ->
+                MapSqlParameterSource()
+                    .addValue("findingId", period.findingId)
+                    .addValue("branchId", period.branchId)
+                    .addValue("validationStampId", period.validationStampId)
+                    .addValue("startedAt", dateTimeForDB(period.startedAt))
+                    .addValue("startedBy", period.startedByValidationRunId, java.sql.Types.INTEGER)
+                    .addValue("startedInBuild", period.startedInBuild)
+                    .addValue("endedAt", dateTimeForDB(period.endedAt))
+                    .addValue("endedBy", period.endedByValidationRunId, java.sql.Types.INTEGER)
+                    .addValue("endedInBuild", period.endedInBuild)
+                    .addValue("resolutionReason", period.resolutionReason?.name)
+            }.toTypedArray()
+        )
+    }
+
+    override fun closeExposurePeriods(
+        branchId: Int,
+        validationStampId: Int,
+        findingIds: Collection<Int>,
+        endedAt: LocalDateTime,
+        endedByValidationRunId: Int,
+        endedInBuild: String,
+        resolutionReason: FindingResolutionReason,
+    ) {
+        if (findingIds.isEmpty()) return
+        namedParameterJdbcTemplate!!.update(
+            """
+                UPDATE FINDING_EXPOSURE_PERIODS
+                SET ENDED_AT = :endedAt,
+                    ENDED_BY_VALIDATION_RUN_ID = :endedBy,
+                    ENDED_IN_BUILD = :endedInBuild,
+                    RESOLUTION_REASON = :resolutionReason
+                WHERE BRANCH_ID = :branchId
+                AND VALIDATION_STAMP_ID = :validationStampId
+                AND FINDING_ID IN (:findingIds)
+                AND ENDED_AT IS NULL
+            """.trimIndent(),
+            mapOf(
+                "endedAt" to dateTimeForDB(endedAt),
+                "endedBy" to endedByValidationRunId,
+                "endedInBuild" to endedInBuild,
+                "resolutionReason" to resolutionReason.name,
+                "branchId" to branchId,
+                "validationStampId" to validationStampId,
+                "findingIds" to findingIds,
+            )
+        )
+    }
+
+    override fun findExposurePeriodsByFinding(findingId: Int): List<FindingExposurePeriod> =
+        namedParameterJdbcTemplate!!.query(
+            "SELECT * FROM FINDING_EXPOSURE_PERIODS WHERE FINDING_ID = :findingId ORDER BY STARTED_AT, ID",
+            mapOf("findingId" to findingId)
+        ) { rs, _ ->
+            FindingExposurePeriod(
+                id = rs.getInt("ID"),
+                findingId = rs.getInt("FINDING_ID"),
+                branchId = rs.getInt("BRANCH_ID"),
+                validationStampId = rs.getInt("VALIDATION_STAMP_ID"),
+                startedAt = rs.readLocalDateTimeNotNull("STARTED_AT"),
+                startedByValidationRunId = rs.getObject("STARTED_BY_VALIDATION_RUN_ID", Integer::class.java)?.toInt(),
+                startedInBuild = rs.getString("STARTED_IN_BUILD"),
+                endedAt = rs.readLocalDateTime("ENDED_AT"),
+                endedByValidationRunId = rs.getObject("ENDED_BY_VALIDATION_RUN_ID", Integer::class.java)?.toInt(),
+                endedInBuild = rs.getString("ENDED_IN_BUILD"),
+                resolutionReason = rs.getString("RESOLUTION_REASON")?.let { FindingResolutionReason.valueOf(it) },
+            )
+        }
 
     companion object {
 

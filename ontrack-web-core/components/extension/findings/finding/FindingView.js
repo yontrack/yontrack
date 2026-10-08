@@ -14,7 +14,8 @@ import FindingSeverityTag from "@components/extension/findings/FindingSeverityTa
 import FindingSummary from "@components/extension/findings/finding/FindingSummary";
 import FindingAcceptance from "@components/extension/findings/finding/FindingAcceptance";
 import FindingExposureTable from "@components/extension/findings/finding/FindingExposureTable";
-import FindingObservationsTimeline from "@components/extension/findings/finding/FindingObservationsTimeline";
+import FindingExposureTimeline from "@components/extension/findings/finding/FindingExposureTimeline";
+import FindingHistory from "@components/extension/findings/finding/FindingHistory";
 
 const gqlFinding = gql`
     query Finding($id: Int!) {
@@ -31,6 +32,12 @@ const gqlFinding = gql`
             firstSeen
             lastSeen
             resolvedAt
+            firstSeenIn {
+                ...FindingSightingFields
+            }
+            resolvedIn {
+                ...FindingSightingFields
+            }
             project {
                 id
                 name
@@ -56,15 +63,62 @@ const gqlFinding = gql`
                 acceptanceExpiresAt
                 resolvedAt
                 resolutionReason
+                periods {
+                    startedAt
+                    startedBy {
+                        id
+                        runOrder
+                        build {
+                            id
+                        }
+                    }
+                    startedInBuild
+                    endedAt
+                    endedBy {
+                        id
+                        runOrder
+                        build {
+                            id
+                        }
+                    }
+                    endedInBuild
+                    resolutionReason
+                    ongoing
+                    durationSeconds
+                    acceptedSpans {
+                        from
+                        to
+                        fromBuild
+                        acceptance {
+                            statement
+                            expiresAt
+                        }
+                    }
+                }
             }
         }
+    }
+
+    fragment FindingSightingFields on FindingSighting {
+        time
+        branch {
+            id
+            name
+        }
+        validationRun {
+            id
+            build {
+                id
+            }
+        }
+        build
     }
 `
 
 /**
- * The page of one security finding, `/extension/findings/finding/{id}`: what it is, its acceptance
- * with its statement and expiry, its exposure per branch with its start, and the timeline of its
- * observations.
+ * The page of one security finding, `/extension/findings/finding/{id}`: what it is, where it was
+ * first seen and fixed, its acceptance with its statement and expiry, its exposure on a time axis
+ * and per branch, with the builds it was discovered and fixed in and for how long, and its history.
  *
  * A finding the user is not granted the view of is not told apart from one which does not exist:
  * the server answers null for both.
@@ -132,15 +186,24 @@ export default function FindingView({id}) {
                                     <FindingAcceptance acceptance={finding.acceptance}/>
                                 </PageSection>
                             </Col>
+                            {
+                                finding.exposures?.some(exposure => exposure.periods?.length > 0) &&
+                                <Col span={24}>
+                                    <PageSection id="finding-exposure-timeline-section" title="Exposure timeline"
+                                                 padding={true} height="auto">
+                                        <FindingExposureTimeline exposures={finding.exposures}/>
+                                    </PageSection>
+                                </Col>
+                            }
                             <Col span={24}>
                                 <PageSection id="finding-exposure-section" title="Exposure per branch" height="auto">
                                     <FindingExposureTable exposures={finding.exposures}/>
                                 </PageSection>
                             </Col>
                             <Col span={24}>
-                                <PageSection id="finding-observations-section" title="Observations" padding={true}
+                                <PageSection id="finding-history-section" title="History" padding={true}
                                              height="auto">
-                                    <FindingObservationsTimeline id={finding.id}/>
+                                    <FindingHistory id={finding.id}/>
                                 </PageSection>
                             </Col>
                         </Row>

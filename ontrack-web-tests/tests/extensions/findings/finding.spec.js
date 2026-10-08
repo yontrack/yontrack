@@ -50,7 +50,7 @@ const provisionFinding = async (ontrack, externalId) => {
     return {project, acceptedUntil, mainRun: validationRun}
 }
 
-test('finding page shows the exposure per branch, the acceptance and the timeline of the observations', async ({page, ontrack}) => {
+test('finding page shows the exposure per branch, the acceptance and the history', async ({page, ontrack}) => {
     const externalId = "CVE-2021-44228"
     const {project, acceptedUntil} = await provisionFinding(ontrack, externalId)
     await login(page, ontrack)
@@ -75,23 +75,74 @@ test('finding page shows the exposure per branch, the acceptance and the timelin
     await expect(acceptance.getByText('Not reachable')).toBeVisible()
     await expect(acceptance.getByText('.trivyignore.yaml')).toBeVisible()
 
-    // The exposure per branch, with its start
+    // The exposure per branch, with the builds and the duration
     await expect(findingPage.exposureRows()).toHaveCount(2)
     await expect(findingPage.exposure('main', 'SECURITY.IMAGE')).toContainText('Exposed')
     await expect(findingPage.exposure('release', 'SECURITY.IMAGE')).toContainText('Accepted')
     await expect(findingPage.exposure('release', 'SECURITY.IMAGE')).toContainText(`until ${acceptedUntil}`)
-    await expect(page.getByRole('columnheader', {name: 'Exposed since'})).toBeVisible()
+    await expect(page.getByRole('columnheader', {name: 'Discovered in'})).toBeVisible()
+    await expect(page.getByRole('columnheader', {name: 'Fixed in'})).toBeVisible()
+    await expect(page.getByRole('columnheader', {name: 'Exposed for'})).toBeVisible()
 
-    // The timeline of the observations, the most recent first
+    // The exposure on a time axis
+    await expect(findingPage.timelineLane('main', 'SECURITY.IMAGE')).toBeVisible()
+    await expect(findingPage.timelineLane('release', 'SECURITY.IMAGE')).toContainText('accepted')
+
+    // The history, the most recent first
+    await expect(findingPage.historyEntry('ACCEPTED')).toContainText('Accepted on release')
+    await expect(findingPage.historyEntry('ACCEPTED')).toContainText(`until ${acceptedUntil}`)
+    await expect(findingPage.historyEntry('EXPOSED')).toContainText('Exposed on release')
+    await expect(findingPage.historyEntry('DISCOVERED')).toContainText('Discovered on main')
+
+    // The second scan of main, grouped, and expanded into its observation
+    const group = findingPage.historyGroups().first()
+    await expect(group).toContainText('Reported by 1 scan on main')
+    await group.getByRole('button', {name: 'Show'}).click()
     const observations = findingPage.observations()
-    await expect(observations).toHaveCount(3)
-    await expect(observations.nth(0)).toContainText('on release')
-    await expect(observations.nth(0)).toContainText(`Accepted until ${acceptedUntil}`)
-    await expect(observations.nth(1)).toContainText('on main')
-    await expect(observations.nth(1).getByTestId('finding-severity-CRITICAL')).toBeVisible()
-    await expect(observations.nth(2).getByTestId('finding-severity-HIGH')).toBeVisible()
-    await expect(observations.nth(2)).toContainText('2.14.0')
-    await expect(observations.nth(2)).toContainText('2.17.1')
+    await expect(observations).toHaveCount(1)
+    await expect(observations.first().getByTestId('finding-severity-CRITICAL')).toBeVisible()
+    await expect(observations.first()).toContainText('2.14.0')
+    await expect(observations.first()).toContainText('2.17.1')
+})
+
+test('finding page shows a finding discovered, fixed and reopened, with its builds', async ({page, ontrack}) => {
+    const project = await ontrack.createProject()
+    const main = await project.createBranch("main")
+    const image = await createFindingsValidationStamp(main, "SECURITY.IMAGE")
+    const externalId = "CVE-2024-12798"
+    const reported = [finding({externalId, severity: "MEDIUM"})]
+    const discovered = await scanWithFindings(main, image, reported)
+    const fixed = await scanWithFindings(main, image, [])
+    const reopened = await scanWithFindings(main, image, reported)
+    await login(page, ontrack)
+
+    const findingsPage = new ProjectFindingsPage(page, project)
+    await findingsPage.goTo()
+    await findingsPage.table().getByRole('link', {name: externalId, exact: true}).click()
+    const findingPage = new FindingPage(page, ontrack)
+    await findingPage.expectOnPage(externalId)
+
+    // Where it was first seen
+    await expect(findingPage.summary()).toContainText(`on main, build ${discovered.name}`)
+
+    // The current period, reopened, and the earlier one
+    const exposure = findingPage.exposureRows().first()
+    await expect(findingPage.exposure('main', 'SECURITY.IMAGE')).toContainText('reopened')
+    await expect(exposure).toContainText(reopened.name)
+    await expect(exposure).toContainText('Not resolved')
+    await expect(exposure).toContainText('ongoing')
+    await expect(exposure).toContainText(`earlier:`)
+    await expect(exposure).toContainText(`${discovered.name} → ${fixed.name}`)
+
+    // Two bars on the lane, the first one fixed
+    const lane = findingPage.timelineLane('main', 'SECURITY.IMAGE')
+    await expect(lane.getByTestId('finding-exposure-bar')).toHaveCount(2)
+    await expect(lane.getByTestId('finding-exposure-fix')).toHaveCount(1)
+
+    // The history, from the discovery to the reopening
+    await expect(findingPage.historyEntry('REOPENED')).toContainText(`Reopened on main in build ${reopened.name}`)
+    await expect(findingPage.historyEntry('RESOLVED')).toContainText(`Fixed on main in build ${fixed.name}`)
+    await expect(findingPage.historyEntry('DISCOVERED')).toContainText(`Discovered on main in build ${discovered.name}`)
 })
 
 test('a search result lands on the finding page', async ({page, ontrack}) => {

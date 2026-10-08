@@ -132,6 +132,48 @@ class FindingsExposureComputationTest {
     }
 
     @Test
+    fun `A first scan opens a period for each finding it reports`() {
+        val change = compute(emptyList(), reported(1), reported(2, accepted = true))
+        assertEquals(listOf(1, 2), change.openedPeriods)
+        assertEquals(emptyList(), change.closedPeriods)
+    }
+
+    @Test
+    fun `A finding still reported keeps its period open`() {
+        val change = compute(listOf(exposure(1)), reported(1, accepted = true))
+        assertEquals(emptyList(), change.openedPeriods)
+        assertEquals(emptyList(), change.closedPeriods)
+    }
+
+    @Test
+    fun `A finding no longer reported closes its period`() {
+        val change = compute(listOf(exposure(1), exposure(2, accepted = true)), *emptyArray())
+        assertEquals(emptyList(), change.openedPeriods)
+        assertEquals(listOf(1, 2), change.closedPeriods)
+    }
+
+    @Test
+    fun `A finding reported after its resolution opens a new period`() {
+        val change = compute(listOf(exposure(1).resolved()), reported(1))
+        assertEquals(listOf(1), change.openedPeriods)
+        assertEquals(emptyList(), change.closedPeriods)
+    }
+
+    @Test
+    fun `A resolved finding still not reported changes no period`() {
+        val change = compute(listOf(exposure(1).resolved()), *emptyArray())
+        assertEquals(emptyList(), change.openedPeriods)
+        assertEquals(emptyList(), change.closedPeriods)
+    }
+
+    @Test
+    fun `The periods of another stamp are never changed`() {
+        val change = compute(listOf(exposure(1, stamp = otherStamp)), *emptyArray())
+        assertEquals(emptyList(), change.openedPeriods)
+        assertEquals(emptyList(), change.closedPeriods)
+    }
+
+    @Test
     fun `Rolling up states`() {
         assertEquals(null, FindingExposureState.of(emptyList()))
         assertEquals(

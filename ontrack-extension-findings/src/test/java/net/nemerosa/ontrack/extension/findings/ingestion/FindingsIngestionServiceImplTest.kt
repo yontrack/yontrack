@@ -47,6 +47,7 @@ class FindingsIngestionServiceImplTest {
         findingSearchIndexer = findingSearchIndexer,
         meterRegistry = meterRegistry,
         securityService = mockk(),
+        buildDisplayNameService = mockk(),
     )
 
     @Test

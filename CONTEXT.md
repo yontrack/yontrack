@@ -348,6 +348,12 @@ A finding is exposed on a branch while the latest scan of the same stamp on that
 branch reports it.
 _Avoid_: open (the project-level roll-up), affected
 
+**Exposure period**:
+One continuous stretch of an exposure, from the first run which reported the
+finding to the first run which no longer did. An exposure has one or more
+periods; a reopening starts a new one.
+_Avoid_: exposure window, incident
+
 **Acceptance**:
 A decision recorded outside Yontrack, read by it, that a finding is tolerated,
 possibly until an expiry.

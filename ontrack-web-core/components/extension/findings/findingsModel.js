@@ -3,6 +3,12 @@
  * as the URL of the project findings page carries it.
  */
 
+import dayjs from "dayjs";
+import utc from "dayjs/plugin/utc";
+import {UNKNOWN_BUILD} from "@components/extension/findings/finding/PeriodBuild";
+
+dayjs.extend(utc);
+
 /** Severities, the most severe first, as the server orders them. */
 export const FINDING_SEVERITIES = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'UNKNOWN']
 
@@ -213,4 +219,96 @@ export const FINDINGS_VALIDATION_DATA_TYPE = 'net.nemerosa.ontrack.extension.fin
 export function isFindingsRun(run) {
     return run?.data?.descriptor?.id === FINDINGS_VALIDATION_DATA_TYPE ||
         run?.validationStamp?.dataType?.descriptor?.id === FINDINGS_VALIDATION_DATA_TYPE
+}
+
+const HOUR = 3600
+const DAY = 24 * HOUR
+
+/**
+ * How long an exposure lasted: minutes under an hour, hours under 48 hours, whole days above.
+ *
+ * @param {number} seconds Duration, in seconds
+ * @param {boolean} ongoing Whether the exposure is still open
+ * @returns {string} "35 min", "31 h", "4 days" — with ", ongoing" for an open exposure
+ */
+export function formatExposureDuration(seconds, ongoing = false) {
+    if (seconds === null || seconds === undefined) return ''
+    let text
+    if (seconds < HOUR) {
+        text = `${Math.max(1, Math.floor(seconds / 60))} min`
+    } else if (seconds < 2 * DAY) {
+        text = `${Math.floor(seconds / HOUR)} h`
+    } else {
+        text = `${Math.floor(seconds / DAY)} days`
+    }
+    return ongoing ? `${text}, ongoing` : text
+}
+
+/**
+ * The periods of an exposure before its current one, in one line: "earlier: 19 h, 2.5.0 → 2.5.1".
+ *
+ * @param {Array} periods The `periods` of an exposure, the oldest first
+ * @returns {string} The summary, empty for an exposure with one period
+ */
+export function earlierPeriodsSummary(periods = []) {
+    const earlier = (periods ?? []).slice(0, -1)
+    if (earlier.length === 0) return ''
+    const build = (name) => name ?? UNKNOWN_BUILD
+    return 'earlier: ' + earlier
+        .map(p => `${formatExposureDuration(p.durationSeconds)}, ${build(p.startedInBuild)} → ${build(p.endedInBuild)}`)
+        .join('; ')
+}
+
+/**
+ * The exposure of a finding laid out on a time axis, from the start of its earliest period to
+ * now: one lane per branch and stamp, in the order of the exposure table, each with a bar per
+ * period and, over a bar, its stretches under an acceptance. Positions and widths are percentages
+ * of the axis.
+ *
+ * @param {Array} exposures The `exposures` of a finding, with their `periods`
+ * @param {Date} now End of the axis
+ * @returns {object|null} `{start, end, lanes, ticks}`, `null` when there is no period
+ */
+export function exposureTimeline(exposures = [], now = new Date()) {
+    const time = (value) => dayjs.utc(value).valueOf()
+    const periods = exposures.flatMap(exposure => exposure.periods ?? [])
+    if (periods.length === 0) return null
+
+    const start = Math.min(...periods.map(p => time(p.startedAt)))
+    const end = Math.max(now.getTime(), ...periods.filter(p => p.endedAt).map(p => time(p.endedAt)))
+    const span = Math.max(end - start, 1)
+    const at = (t) => ((t - start) / span) * 100
+
+    const stamps = new Map()
+    exposures.forEach(({branch}) => stamps.set(branch.id, (stamps.get(branch.id) ?? 0) + 1))
+
+    const lanes = exposureRows(exposures).map(row => ({
+        key: row.key,
+        branch: row.branch,
+        validationStamp: row.validationStamp,
+        showStamp: stamps.get(row.branch.id) > 1,
+        bars: (row.periods ?? []).map(period => {
+            const from = time(period.startedAt)
+            const to = period.endedAt ? time(period.endedAt) : end
+            return {
+                period,
+                left: at(from),
+                width: at(to) - at(from),
+                fixed: !!period.endedAt,
+                accepted: (period.acceptedSpans ?? []).map(acceptedSpan => {
+                    const spanFrom = time(acceptedSpan.from)
+                    const spanTo = acceptedSpan.to ? time(acceptedSpan.to) : to
+                    return {span: acceptedSpan, left: at(spanFrom), width: at(spanTo) - at(spanFrom)}
+                }),
+            }
+        }),
+    }))
+
+    const TICKS = 6
+    const ticks = Array.from({length: TICKS + 1}, (_, index) => {
+        const t = start + (span * index) / TICKS
+        return {key: index, left: at(t), time: new Date(t)}
+    })
+
+    return {start: new Date(start), end: new Date(end), lanes, ticks}
 }

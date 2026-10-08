@@ -1,6 +1,9 @@
 package net.nemerosa.ontrack.extension.findings.query
 
+import net.nemerosa.ontrack.common.Time
+import net.nemerosa.ontrack.extension.findings.history.FindingHistoryComputation
 import net.nemerosa.ontrack.extension.findings.model.Finding
+import net.nemerosa.ontrack.extension.findings.model.FindingExposurePeriod
 import net.nemerosa.ontrack.extension.findings.model.FindingAcceptance
 import net.nemerosa.ontrack.extension.findings.model.FindingExposureState
 import net.nemerosa.ontrack.extension.findings.model.FindingSeverity
@@ -12,6 +15,7 @@ import net.nemerosa.ontrack.extension.findings.state.FindingStateService
 import net.nemerosa.ontrack.model.pagination.PaginatedList
 import net.nemerosa.ontrack.model.security.SecurityService
 import net.nemerosa.ontrack.model.structure.Branch
+import net.nemerosa.ontrack.model.structure.BuildDisplayNameService
 import net.nemerosa.ontrack.model.structure.ID
 import net.nemerosa.ontrack.model.structure.Project
 import net.nemerosa.ontrack.model.structure.StructureService
@@ -19,6 +23,7 @@ import net.nemerosa.ontrack.model.structure.ValidationRun
 import net.nemerosa.ontrack.model.structure.ValidationStamp
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import java.time.Duration
 import java.time.LocalDate
 import kotlin.jvm.optionals.getOrNull
 
@@ -29,6 +34,7 @@ class FindingQueryServiceImpl(
     private val securityService: SecurityService,
     private val findingRepository: FindingRepository,
     private val findingStateService: FindingStateService,
+    private val buildDisplayNameService: BuildDisplayNameService,
 ) : FindingQueryService {
 
     override fun getProjectFindings(
@@ -244,9 +250,23 @@ class FindingQueryServiceImpl(
         finding: Finding,
         offset: Int,
         size: Int,
+        filter: FindingObservationFilter,
     ): PaginatedList<FindingObservationView> {
         if (!canSeeFindings(finding.projectId)) return PaginatedList.empty()
-        return page(findingRepository.findObservationsByFinding(finding.id), offset, size)
+        val observations = if (filter == FindingObservationFilter()) {
+            findingRepository.findObservationsByFinding(finding.id)
+        } else {
+            findingRepository.findObservationSightingsByFinding(finding.id)
+                .filter { sighting ->
+                    val time = sighting.observation.time
+                    (filter.branchId == null || sighting.branchId == filter.branchId) &&
+                            (filter.validationStampId == null || sighting.validationStampId == filter.validationStampId) &&
+                            (filter.from == null || time >= filter.from) &&
+                            (filter.to == null || time <= filter.to)
+                }
+                .map { it.observation }
+        }
+        return page(observations, offset, size)
             .map { observation ->
                 FindingObservationView(
                     observation = observation,
@@ -254,6 +274,125 @@ class FindingQueryServiceImpl(
                     validationRun = structureService.getValidationRun(ID.of(observation.validationRunId)),
                 )
             }
+    }
+
+    override fun getExposurePeriods(exposure: FindingExposureView, date: LocalDate): List<FindingExposurePeriodView> {
+        val findingId = exposure.exposure.findingId
+        val finding = findingRepository.findFindingById(findingId) ?: return emptyList()
+        if (!canSeeFindings(finding.projectId)) return emptyList()
+        val periods = findingRepository.findExposurePeriodsByFinding(findingId)
+            .filter { it.branchId == exposure.branch.id() && it.validationStampId == exposure.validationStamp.id() }
+        if (periods.isEmpty()) return emptyList()
+        val sightings = findingRepository.findObservationSightingsByFinding(findingId)
+        val now = Time.now
+        val runs = RunCache()
+        return periods.map { period ->
+            val startedBy = runs[period.startedByValidationRunId]
+            val endedBy = runs[period.endedByValidationRunId]
+            FindingExposurePeriodView(
+                period = period,
+                startedBy = startedBy,
+                startedInBuild = buildName(startedBy, period.startedInBuild),
+                endedBy = endedBy,
+                endedInBuild = buildName(endedBy, period.endedInBuild),
+                durationSeconds = Duration.between(period.startedAt, period.endedAt ?: now).seconds.coerceAtLeast(0),
+                acceptedSpans = FindingHistoryComputation.acceptedSpans(period, sightings, date).map { span ->
+                    val run = runs[span.fromValidationRunId]
+                    FindingAcceptedSpanView(
+                        span = span,
+                        fromValidationRun = run,
+                        fromBuild = buildName(run, null),
+                    )
+                },
+            )
+        }
+    }
+
+    override fun getFindingFirstSeenIn(finding: Finding): FindingSighting? {
+        if (!canSeeFindings(finding.projectId)) return null
+        val period = findingRepository.findExposurePeriodsByFinding(finding.id)
+            .minWithOrNull(FindingHistoryComputation.periodOrder)
+            ?: return null
+        val run = RunCache()[period.startedByValidationRunId]
+        return FindingSighting(
+            time = period.startedAt,
+            branch = structureService.getBranch(ID.of(period.branchId)),
+            validationStamp = structureService.getValidationStamp(ID.of(period.validationStampId)),
+            validationRun = run,
+            build = buildName(run, period.startedInBuild),
+        )
+    }
+
+    override fun getFindingResolvedIn(finding: Finding, date: LocalDate): FindingSighting? {
+        if (!canSeeFindings(finding.projectId)) return null
+        if (findingStateService.getFindingState(finding, date) != FindingState.RESOLVED) return null
+        val countingBranches = findingStateService.getCountingBranchIds(
+            structureService.getProject(ID.of(finding.projectId))
+        )
+        val period = findingRepository.findExposurePeriodsByFinding(finding.id)
+            .filter { it.branchId in countingBranches && it.endedAt != null }
+            .maxWithOrNull(compareBy<FindingExposurePeriod> { it.endedAt }.thenBy { it.id })
+            ?: return null
+        val run = RunCache()[period.endedByValidationRunId]
+        return FindingSighting(
+            time = period.endedAt!!,
+            branch = structureService.getBranch(ID.of(period.branchId)),
+            validationStamp = structureService.getValidationStamp(ID.of(period.validationStampId)),
+            validationRun = run,
+            build = buildName(run, period.endedInBuild),
+        )
+    }
+
+    override fun getFindingHistory(
+        finding: Finding,
+        offset: Int,
+        size: Int,
+        date: LocalDate,
+    ): PaginatedList<FindingHistoryEntryView> {
+        if (!canSeeFindings(finding.projectId)) return PaginatedList.empty()
+        val history = FindingHistoryComputation.history(
+            periods = findingRepository.findExposurePeriodsByFinding(finding.id),
+            sightings = findingRepository.findObservationSightingsByFinding(finding.id),
+            today = date,
+        )
+        val branches = mutableMapOf<Int, Branch>()
+        val stamps = mutableMapOf<Int, ValidationStamp>()
+        val runs = RunCache()
+        return page(history, offset, size).map { entry ->
+            val run = runs[entry.validationRunId]
+            val firstRun = runs[entry.firstValidationRunId]
+            val lastRun = runs[entry.lastValidationRunId]
+            FindingHistoryEntryView(
+                entry = entry,
+                branch = branches.getOrPut(entry.branchId) { structureService.getBranch(ID.of(entry.branchId)) },
+                validationStamp = stamps.getOrPut(entry.validationStampId) {
+                    structureService.getValidationStamp(ID.of(entry.validationStampId))
+                },
+                validationRun = run,
+                build = buildName(run, entry.build),
+                firstValidationRun = firstRun,
+                firstBuild = buildName(firstRun, null),
+                lastValidationRun = lastRun,
+                lastBuild = buildName(lastRun, null),
+            )
+        }
+    }
+
+    /**
+     * Display name of the build of a run while it exists, else the one which was kept
+     */
+    private fun buildName(run: ValidationRun?, kept: String?): String? =
+        run?.build?.let { build -> buildDisplayNameService.getFirstBuildDisplayName(build) ?: build.name } ?: kept
+
+    /**
+     * Runs by ID, each loaded once. A run referenced by a period or an observation exists: a
+     * purged one is no longer referenced.
+     */
+    private inner class RunCache {
+        private val runs = mutableMapOf<Int, ValidationRun>()
+
+        operator fun get(id: Int?): ValidationRun? =
+            id?.let { runs.getOrPut(it) { structureService.getValidationRun(ID.of(it)) } }
     }
 
     override fun getFindingAcceptance(finding: Finding): FindingAcceptance? =

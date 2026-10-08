@@ -1,13 +1,34 @@
+import Link from "next/link";
 import {Descriptions, Typography} from "antd";
 import {FaExternalLinkAlt} from "react-icons/fa";
 import FindingSeverityTag from "@components/extension/findings/FindingSeverityTag";
 import FindingStateTag from "@components/extension/findings/FindingStateTag";
 import TimestampText from "@components/common/TimestampText";
 import {kindName} from "@components/extension/findings/findingsModel";
+import {branchUri} from "@components/common/Links";
+import PeriodBuild from "@components/extension/findings/finding/PeriodBuild";
+
+/**
+ * When a finding was seen at a given moment, and, when known, where: its branch and its build.
+ *
+ * @param time Time, when no sighting is known
+ * @param sighting `{time, branch, validationRun, build}`, or nothing
+ */
+function Sighting({time, sighting}) {
+    if (!sighting) {
+        return <TimestampText value={time}/>
+    }
+    return (
+        <span data-testid="finding-sighting">
+            <TimestampText value={sighting.time}/> on <Link href={branchUri(sighting.branch)}>{sighting.branch.name}</Link>,
+            build <PeriodBuild run={sighting.validationRun} name={sighting.build}/>
+        </span>
+    )
+}
 
 /**
  * What a finding is: its identity as the scanner gives it, its severity and state in its project,
- * when it was seen, and the link to more information about it.
+ * when and where it was first seen and resolved, and the link to more information about it.
  */
 export default function FindingSummary({finding}) {
 
@@ -52,7 +73,7 @@ export default function FindingSummary({finding}) {
         {
             key: 'firstSeen',
             label: 'First seen',
-            children: <TimestampText value={finding.firstSeen}/>,
+            children: <Sighting time={finding.firstSeen} sighting={finding.firstSeenIn}/>,
         },
         {
             key: 'lastSeen',
@@ -62,7 +83,7 @@ export default function FindingSummary({finding}) {
         ...(finding.resolvedAt ? [{
             key: 'resolvedAt',
             label: 'Resolved',
-            children: <TimestampText value={finding.resolvedAt}/>,
+            children: <Sighting time={finding.resolvedAt} sighting={finding.resolvedIn}/>,
         }] : []),
         {
             key: 'url',

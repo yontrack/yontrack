@@ -35,6 +35,22 @@ export class FindingPage {
     observations() {
         return this.page.getByTestId('finding-observation')
     }
+
+    timeline() {
+        return this.page.getByTestId('finding-exposure-timeline')
+    }
+
+    timelineLane(branch, validationStamp) {
+        return this.page.getByTestId(`finding-exposure-lane-${branch}-${validationStamp}`)
+    }
+
+    historyEntry(type) {
+        return this.page.getByTestId(`finding-history-${type}`)
+    }
+
+    historyGroups() {
+        return this.page.getByTestId('finding-history-group')
+    }
 }
 
 /**

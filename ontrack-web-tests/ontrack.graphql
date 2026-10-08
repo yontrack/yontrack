@@ -2744,6 +2744,15 @@ type Finding {
   externalId: String!
   "Time of the first observation"
   firstSeen: LocalDateTime!
+  "Where and when the finding was first seen: the start of the earliest period of its exposures, with its branch, its stamp, its run and its build. Null when it has no exposure."
+  firstSeenIn: FindingSighting
+  "History of the finding, the most recent first: the start and the end of each period of its exposures, the changes of acceptance within them, and its observations, grouped between these."
+  history(
+    "Offset for the page"
+    offset: Int = 0,
+    "Size of the page"
+    size: Int = 20
+  ): FindingHistoryEntryPaginated
   "Unique ID of the finding"
   id: Int!
   "Kind of scan which reported the finding"
@@ -2754,17 +2763,27 @@ type Finding {
   location: String!
   "Maximum severity across the observations of the finding"
   maxSeverity: FindingSeverity!
-  "Observations of the finding, the most recent first"
+  "Observations of the finding, the most recent first, optionally restricted to a branch, a validation stamp and a time range (both ends included)"
   observations(
+    "ID of the branch of the observations"
+    branchId: Int,
+    "Earliest time of the observations"
+    from: LocalDateTime,
     "Offset for the page"
     offset: Int = 0,
     "Size of the page"
-    size: Int = 20
+    size: Int = 20,
+    "Latest time of the observations"
+    to: LocalDateTime,
+    "ID of the validation stamp of the observations"
+    validationStampId: Int
   ): FindingObservationPaginated
   "Project the finding belongs to"
   project: Project!
   "Time the finding was resolved in its project, if it is"
   resolvedAt: LocalDateTime
+  "Where and when the finding resolved in its project: the latest end of a period of its exposures on the branches which count, with its branch, its stamp, its run and its build. Null unless the finding is resolved in its project."
+  resolvedIn: FindingSighting
   "Name of the scanner which reported the finding"
   scanner: String!
   "State of the finding in its project, rolled up from its exposure on the branches which count: the branches matched by the branch model of the project (all of them when it has none), the disabled branches left out. Evaluated when it is read, so that an acceptance past its expiry stops counting."
@@ -2787,6 +2806,20 @@ type FindingAcceptance {
   statement: String
 }
 
+"Stretch of a period of exposure during which the finding was reported under an acceptance holding on the day of each scan."
+type FindingAcceptedSpan {
+  "Acceptance of the first observation"
+  acceptance: FindingAcceptance!
+  "Time of the first observation under the acceptance"
+  from: LocalDateTime!
+  "Display name of the build of the first observation"
+  fromBuild: String
+  "Run of the first observation"
+  fromValidationRun: ValidationRun
+  "End of the stretch: the observation without the acceptance, the day after its last day, or the end of the period. Null while it holds."
+  to: LocalDateTime
+}
+
 "A security finding is exposed on a branch while the latest scan of the same stamp on that branch reports it."
 type FindingExposure {
   "Last day this acceptance holds, as an ISO date (YYYY-MM-DD), if any"
@@ -2797,6 +2830,8 @@ type FindingExposure {
   branch: Branch!
   "Whether the branch counts toward the state of the finding in its project: matched by the branch model of the project (every branch when it has none, without SCM), and not disabled. A branch which does not count still exposes the finding."
   counts: Boolean!
+  "Periods of the exposure, the oldest first: one per stretch from the first run which reported the finding to the first run which no longer did. A reopening starts a new period."
+  periods: [FindingExposurePeriod!]!
   "Why the finding was resolved, if it is"
   resolutionReason: FindingResolutionReason
   "Time the finding was resolved on this branch for this stamp, if it is"
@@ -2807,6 +2842,71 @@ type FindingExposure {
   state: FindingExposureState!
   "Validation stamp of the scans"
   validationStamp: ValidationStamp!
+}
+
+"One continuous stretch of an exposure, from the first run which reported the finding to the first run which no longer did. An exposure has one or more periods; a reopening starts a new one."
+type FindingExposurePeriod {
+  "Stretches of the period during which the finding was reported under an acceptance, the oldest first"
+  acceptedSpans: [FindingAcceptedSpan!]!
+  "Duration of the period in seconds, until now while it is open. An accepted stretch counts as exposed."
+  durationSeconds: Long!
+  "Time of the run which ended the period, null while it is open"
+  endedAt: LocalDateTime
+  "Run which ended the period, the first one no longer reporting the finding. Null once its build is purged, or while the period is open."
+  endedBy: ValidationRun
+  "Display name of the build which ended the period, as for startedInBuild"
+  endedInBuild: String
+  "Whether the period is still open"
+  ongoing: Boolean!
+  "Why the period ended, if it did"
+  resolutionReason: FindingResolutionReason
+  "Time of the run which started the period"
+  startedAt: LocalDateTime!
+  "Run which started the period. Null once its build is purged, or for a period older than the periods themselves."
+  startedBy: ValidationRun
+  "Display name of the build which started the period: the one of the build while it exists, else the one kept when the period started. Null when unknown."
+  startedInBuild: String
+}
+
+"Entry in the history of a security finding: the start or the end of a period of exposure, a change of acceptance, or a group of observations between two of these."
+type FindingHistoryEntry {
+  "For an acceptance, or its expiry, the acceptance"
+  acceptance: FindingAcceptance
+  "Branch of the entry"
+  branch: Branch!
+  "Display name of the build of the run, or the one kept by the period. Null when unknown."
+  build: String
+  "For a group of observations, their number; 0 otherwise"
+  count: Int!
+  "For a group of observations, the display name of the build of the first one"
+  firstBuild: String
+  "For a group of observations, the time of the first one"
+  firstTime: LocalDateTime
+  "For a group of observations, the run of the first one"
+  firstValidationRun: ValidationRun
+  "For a group of observations, the display name of the build of the last one"
+  lastBuild: String
+  "For a group of observations, the time of the last one"
+  lastTime: LocalDateTime
+  "For a group of observations, the run of the last one"
+  lastValidationRun: ValidationRun
+  "For a resolution, its reason"
+  resolutionReason: FindingResolutionReason
+  "Time of the entry; for a group of observations, the time of the last one"
+  time: LocalDateTime!
+  "Type of the entry"
+  type: FindingHistoryEntryType!
+  "Run of the entry. Null once its build is purged, or for an entry no run made, like an expiry."
+  validationRun: ValidationRun
+  "Validation stamp of the scans"
+  validationStamp: ValidationStamp!
+}
+
+type FindingHistoryEntryPaginated {
+  "Information about the current page"
+  pageInfo: PageInfo
+  "Items in the current page"
+  pageItems: [FindingHistoryEntry!]!
 }
 
 "One sighting of a security finding by one scan of one build."
@@ -2849,6 +2949,20 @@ type FindingSeverityCount {
   count: Int!
   "Severity"
   severity: FindingSeverity!
+}
+
+"Where and when a security finding was seen at a given moment, like its discovery or its resolution: branch, stamp, run and build."
+type FindingSighting {
+  "Branch of the run"
+  branch: Branch!
+  "Display name of the build of the run, null when unknown"
+  build: String
+  "Time of the run"
+  time: LocalDateTime!
+  "Run, null once its build is purged, or for a period older than the periods themselves"
+  validationRun: ValidationRun
+  "Validation stamp of the run"
+  validationStamp: ValidationStamp!
 }
 
 "Exposure of the security findings of a project on one branch"
@@ -9667,6 +9781,18 @@ enum DeliveryMapEdgeKind {
 enum FindingExposureState {
   ACCEPTED
   EXPOSED
+  RESOLVED
+}
+
+"Type of an entry in the history of a security finding. DISCOVERED: start of the first period of the first exposure of the finding. EXPOSED: start of the first period of an exposure on another branch or stamp. REOPENED: start of a later period of an exposure. RESOLVED: end of a period. ACCEPTED: first observation of a period under an acceptance. ACCEPTANCE_WITHDRAWN: observation without acceptance after accepted ones. ACCEPTANCE_EXPIRED: day after the last day of an acceptance, evaluated when read. OBSERVATIONS: consecutive observations of a period between two other entries."
+enum FindingHistoryEntryType {
+  ACCEPTANCE_EXPIRED
+  ACCEPTANCE_WITHDRAWN
+  ACCEPTED
+  DISCOVERED
+  EXPOSED
+  OBSERVATIONS
+  REOPENED
   RESOLVED
 }
 
