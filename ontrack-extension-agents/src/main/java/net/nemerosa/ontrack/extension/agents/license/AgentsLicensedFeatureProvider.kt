@@ -8,8 +8,8 @@ import org.springframework.stereotype.Component
  * The licensed feature of the agent governance: one boolean feature, with no licence data - no quota,
  * no count.
  *
- * It gates every ruling on agents: the promotion condition on assisted builds, and later the stamp
- * restriction on agent-recorded evidence and the agent activity views. Recording agents is not gated.
+ * It gates every ruling on agents - the promotion condition on assisted builds, the stamp restriction
+ * on agent-recorded evidence - and the agent activity views. Recording agents is not gated.
  *
  * Every licensed feature is enabled by the development licence, and therefore in the dev profile
  * and in every test stack.

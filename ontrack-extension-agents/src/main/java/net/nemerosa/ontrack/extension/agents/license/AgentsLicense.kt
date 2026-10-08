@@ -2,6 +2,7 @@ package net.nemerosa.ontrack.extension.agents.license
 
 import net.nemerosa.ontrack.extension.agents.license.AgentsLicensedFeatureProvider.Companion.FEATURE_AGENTS
 import net.nemerosa.ontrack.extension.license.control.LicenseControlService
+import net.nemerosa.ontrack.extension.license.control.LicenseFeatureException
 import org.springframework.stereotype.Component
 
 /**
@@ -21,4 +22,16 @@ class AgentsLicense(
      */
     val agentsEnabled: Boolean
         get() = licenseControlService.isFeatureEnabled(FEATURE_AGENTS)
+
+    /**
+     * Checks that the licence allows the agent governance - for the reads which are refused without it,
+     * like the activity of the agents, rather than doing nothing.
+     *
+     * @throws LicenseFeatureException When it does not
+     */
+    fun checkAgents() {
+        if (!agentsEnabled) {
+            throw LicenseFeatureException(FEATURE_AGENTS)
+        }
+    }
 }

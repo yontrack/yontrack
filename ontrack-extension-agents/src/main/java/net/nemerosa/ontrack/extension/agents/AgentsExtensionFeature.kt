@@ -18,7 +18,7 @@ class AgentsExtensionFeature(
 ) : AbstractExtensionFeature(
     id = "agents",
     name = "Agent governance",
-    description = "Licensed rulings on agents: conditioning a promotion level on the assisted change of the builds",
+    description = "Licensed rulings on agents: conditioning a promotion level on the assisted change of the builds, restricting the evidence of agents, and the activity of the agents",
     options = ExtensionFeatureOptions.DEFAULT
         .withDependency(scmExtensionFeature),
 )

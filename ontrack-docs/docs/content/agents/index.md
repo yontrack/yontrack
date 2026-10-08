@@ -204,7 +204,8 @@ The actor of an event can be selected on:
 * the *Actor* filter of the [events page](../operations/events.md#filtering-the-events) — persons,
   agents, or one agent — which its export follows, with the actor of each event in its columns.
 
-The [Agents section of a build](#what-agents-did-on-a-build) lists what agents did on that build.
+The [Agents section of a build](#what-agents-did-on-a-build) lists what agents did on that build,
+and the [activity of an agent](#agent-activity) what one agent did across the projects.
 
 ## What agents did on a build
 
@@ -265,6 +266,59 @@ A page holds at most 100 events. There is no total count: `pageInfo.nextPage` te
 are more.
 
 The mobile UI shows the badges only, not this section.
+
+## Agent activity
+
+!!! note "Licensed feature"
+
+    The activity of the agents is part of the *Agent governance* feature (`extension.agents`) — see
+    [Licensing](../appendix/licensing.md#agent-governance). Without it, the *Activity* tab says that the
+    license is needed, and the API refuses the read.
+
+"What did this agent do in the last 7 days?" The page of an agent — from _User information_ >
+_My agents_, or _System_ > _Agents_ for an administrator — has an **Activity** tab: the actions of the
+agent, newest first, over the last **7**, **30** or **90** days (7 by default), which can be filtered
+by event type and by project.
+
+![The activity of an agent](agents-activity.png)
+
+Each action gives its time, its message, its project and a link to the agent
+[session](#identifying-a-session) behind it. _Load more_ reads the older ones.
+
+* **Who** — only the owner of the agent and the administrators read its activity. Anybody else is
+  refused, even if they can see the projects the agent acted on.
+* **What** — only the actions on the projects you can see: an action which also concerns a project you
+  cannot see — a link from a build of that project, for example — is left out. The actions on no
+  project at all, like the deletion of a project, are shown to the administrators only.
+
+As for the [Agents section of a build](#what-agents-did-on-a-build), the events are the source of
+the activity, and the [retention of the events](../operations/events.md#retention) applies to it.
+
+Through the API, `agentActivity` gives a page of the actions of an agent account, for its owner and the
+administrators:
+
+```graphql
+query AgentActivity($id: Int!, $from: LocalDateTime) {
+  agents(id: $id) {
+    agentActivity(from: $from, eventTypes: ["new_validation_run"], project: "my-project", offset: 0, size: 20) {
+      pageInfo { nextPage { offset size } }
+      pageItems {
+        time
+        message
+        eventType { id }
+        project { name }
+        actor { agent sessionLink }
+      }
+    }
+  }
+}
+```
+
+`from` and `to` bound the window, `eventTypes` and `project` filter the actions — all optional. A page
+holds at most 100 events, and there is no total count: `pageInfo.nextPage` tells whether there are
+more. `agentActivity` is empty for a person.
+
+Agent administration being desktop only, the mobile UI has no activity view.
 
 ## What an agent may do
 

@@ -147,6 +147,38 @@ class EventJdbcRepository(
                 .addValue("offset", offset)
         ) { rs: ResultSet, _: Int -> toEvent(rs, entityLoader, eventTypeLoader) }
 
+    override fun findAgentEvents(
+        filter: EventFilter,
+        projects: Collection<Int>?,
+        offset: Int,
+        size: Int,
+        entityLoader: (type: ProjectEntityType, id: ID) -> ProjectEntity,
+        eventTypeLoader: (type: String) -> EventType,
+    ): List<Event> {
+        if (projects != null && projects.isEmpty()) {
+            return emptyList()
+        }
+        val (where, params) = filterCriteria(filter)
+        val criteria = mutableListOf<String>()
+        if (where.isNotEmpty()) {
+            criteria += where.removePrefix("WHERE ")
+        }
+        // Only the agents
+        criteria += "ACTOR IS NOT NULL"
+        // Only the visible projects, on the project and on the extra project
+        if (projects != null) {
+            criteria += "PROJECT IN (:visibleProjects)"
+            criteria += "(X_PROJECT IS NULL OR X_PROJECT IN (:visibleProjects))"
+            params.addValue("visibleProjects", projects)
+        }
+        return namedParameterJdbcTemplate!!.query(
+            "SELECT * FROM EVENTS WHERE ${criteria.joinToString(" AND ")} ORDER BY ID DESC LIMIT :size OFFSET :offset",
+            params
+                .addValue("size", size)
+                .addValue("offset", offset)
+        ) { rs: ResultSet, _: Int -> toEvent(rs, entityLoader, eventTypeLoader) }
+    }
+
     override fun findEvents(
         filter: EventFilter,
         offset: Int,

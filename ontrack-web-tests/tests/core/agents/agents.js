@@ -52,8 +52,26 @@ export class AgentPage {
         this.ontrack = ontrack
     }
 
+    /**
+     * Goes to the page of an agent, given by its ID.
+     */
+    async goTo(id) {
+        await this.page.goto(`${this.ontrack.connection.ui}/core/admin/agents/${id}`)
+        await expect(this.page.getByTestId("agent-tabs")).toBeVisible()
+    }
+
     async checkAgent({slug}) {
         await expect(this.page.getByText(`${slug}[agent]`, {exact: true})).toBeVisible()
+    }
+
+    /**
+     * Opens the Activity tab and returns it.
+     */
+    async openActivity() {
+        await this.page.getByRole("tab", {name: "Activity"}).click()
+        const activity = this.page.getByTestId("agent-activity")
+        await expect(activity).toBeVisible()
+        return activity
     }
 
     /**

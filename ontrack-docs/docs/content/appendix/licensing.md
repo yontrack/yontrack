@@ -29,7 +29,7 @@ feature, whether it is enabled. Through the API, the same is in `licenseInfo` in
 | `extension.findings.native-formats` | Native scanner formats              | Reading the native scanner formats — SARIF, Trivy JSON — of the [findings](../integrations/findings/findings.md). The findings themselves and their neutral format are not licensed. |
 | `extension.scorecard`               | Delivery scorecard                  | The [estates](../scorecard/estates.md) and the readings of the projects in them. The [scorecard](../scorecard/scorecard.md) of a project on its own is not licensed. |
 | `extension.audit-trail`             | Audit trail                         | Writing the [audit trail](../audit-trail/index.md) of the builds, and their evidence. A trail already written stays readable. |
-| `extension.agents`                  | Agent governance                    | The rulings on [agents](#agent-governance). Recording them is not licensed. |
+| `extension.agents`                  | Agent governance                    | The rulings on [agents](#agent-governance) and their activity. Recording them is not licensed. |
 
 ## Agent governance
 
@@ -39,12 +39,18 @@ the agent policy and the *Agents admitted* setting of the promotion levels and s
 [assisted change](../agents/index.md#assisted-builds) of the builds and the `build_assisted` event,
 and the readiness of a build. None of this needs a license.
 
-*Agent governance* (`extension.agents`) gates **ruling on** agents:
+*Agent governance* (`extension.agents`) gates **ruling on** agents, and following what they do:
 
 * [Assisted builds require](../concepts/model/index.md#assisted-builds-require) — the promotion
   condition "if the build is assisted, these validation stamps must pass first".
 * [Evidence from non-agents only](../concepts/model/index.md#evidence-from-non-agents-only) — the
   validation stamp restriction "evidence on this stamp must come from a non-agent actor".
+* [Agent activity](../agents/index.md#agent-activity) — what an agent did over the last days, for
+  its owner and the administrators.
 
 Without the license, these rulings are kept, visible and editable, but **do nothing**: an assisted
 build is promoted as any other, an agent records evidence on any stamp. They apply again as soon as the license allows them.
+
+The activity of an agent is not shown without the license: its tab says that the license is needed,
+and the API refuses it. What the agents do is still recorded, and comes back in the activity with the
+license.

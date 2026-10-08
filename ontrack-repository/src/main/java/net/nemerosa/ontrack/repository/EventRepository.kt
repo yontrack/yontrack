@@ -63,6 +63,32 @@ interface EventRepository {
     ): List<Event>
 
     /**
+     * Gets the events whose actor is an agent, matching a filter, newest first - the ACL-filtered read
+     * of the agent actions (#2034).
+     *
+     * The events of the persons, whose actor is null, are always left out. The [actor][EventFilter.actor]
+     * of the filter narrows the events to one agent when it is an agent identifier, `<slug>[agent]`.
+     *
+     * @param filter Criteria on the events
+     * @param projects IDs of the projects the events may concern, both as their project and as their
+     * extra project: an event concerning any other project is left out, and so is an event without a
+     * project. `null` for no restriction at all, events without a project included.
+     * @param offset Number of events to skip
+     * @param size Maximum number of events to return
+     * @param entityLoader Loading of the entities of the events
+     * @param eventTypeLoader Loading of the event types
+     * @return Events
+     */
+    fun findAgentEvents(
+        filter: EventFilter,
+        projects: Collection<Int>?,
+        offset: Int,
+        size: Int,
+        entityLoader: (type: ProjectEntityType, id: ID) -> ProjectEntity,
+        eventTypeLoader: (type: String) -> EventType,
+    ): List<Event>
+
+    /**
      * Gets the events matching a filter, newest first, with no project restriction.
      *
      * @param filter Criteria on the events

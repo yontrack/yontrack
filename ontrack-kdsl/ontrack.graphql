@@ -70,6 +70,21 @@ interface ProjectEntity {
 union BuildPromotionInfoItemData = PromotionLevel | PromotionRun
 
 type Account {
+  "For an agent, what it did: its events, newest first, on the projects the caller can see (the events without a project for the administrators only). Only the owner of the agent and the administrators read it; anybody else is refused. Empty for a person. A page holds at most 100 events. There is no total count: `pageInfo.nextPage` tells whether there are more events. The events follow the retention of the events. Requires the Agent governance licence (`extension.agents`)."
+  agentActivity(
+    "IDs of the event types to keep - empty or absent for all the types"
+    eventTypes: [String!],
+    "Events at or after this time (UTC, inclusive)"
+    from: LocalDateTime,
+    "Offset for the page"
+    offset: Int = 0,
+    "Name of a project, matching the event's project or its extra project"
+    project: String,
+    "Size of the page"
+    size: Int = 20,
+    "Events at or before this time (UTC, inclusive)"
+    to: LocalDateTime
+  ): EventAgentActivityPaginated
   "For an agent, its optional description"
   agentDescription: String
   "For an agent, the tool behind it (Claude Code, Codex, Copilot, Devin, ...)"
@@ -2542,6 +2557,13 @@ type Event {
 }
 
 type EventAgentActionPaginated {
+  "Information about the current page"
+  pageInfo: PageInfo
+  "Items in the current page"
+  pageItems: [Event!]!
+}
+
+type EventAgentActivityPaginated {
   "Information about the current page"
   pageInfo: PageInfo
   "Items in the current page"
