@@ -66,6 +66,10 @@ class StructureServiceImpl(
      * Provided lazily, like the listeners. Without any, no promotion level admits agents.
      */
     private val promotionLevelAgentAdmissions: ObjectProvider<PromotionLevelAgentAdmission>,
+    /**
+     * Provided lazily, like the listeners. Without any, agents record evidence on every stamp.
+     */
+    private val agentEvidenceChecks: ObjectProvider<AgentEvidenceCheck>,
 ) : StructureService {
 
     private val logger = LoggerFactory.getLogger(StructureService::class.java)
@@ -861,6 +865,15 @@ class StructureServiceImpl(
         }
     }
 
+    /**
+     * Evidence on a validation stamp: when an agent is the actor of the [signature], every
+     * [AgentEvidenceCheck] may refuse it.
+     */
+    private fun checkAgentEvidence(validationStamp: ValidationStamp, signature: Signature) {
+        val agent = signature.actor ?: return
+        agentEvidenceChecks.forEach { it.checkAgentEvidence(validationStamp, agent) }
+    }
+
     private fun validatePromotionRunFieldValues(promotionRun: PromotionRun) {
         val fields = promotionLevelRepository.getPromotionLevelFields(promotionRun.promotionLevel.id)
         val valuesByName = promotionRun.fieldValues.associateBy { it.name }
@@ -1298,11 +1311,12 @@ class StructureServiceImpl(
             validationRunRequest.validationRunStatusId
         )
         // Validation run to create
+        val signature = authenticatedActor(validationRunRequest.signature ?: securityService.currentSignature)
         val validationRun = ValidationRun.of(
             build,
             validationStamp,
             0,
-            authenticatedActor(validationRunRequest.signature ?: securityService.currentSignature),
+            signature,
             status.runStatusID,
             validationRunRequest.description
         ).withData(status.runData)
@@ -1316,6 +1330,8 @@ class StructureServiceImpl(
         )
         // Checks the authorization
         securityService.checkProjectFunction(validationRun.build.branch.project.id(), ValidationRunCreate::class.java)
+        // An agent records evidence only on a stamp which accepts it
+        checkAgentEvidence(validationStamp, signature)
         // Actual creation
         val newValidationRun =
             structureRepository.newValidationRun(validationRun) { validationRunStatusService.getValidationRunStatus(it) }
@@ -1582,6 +1598,8 @@ class StructureServiceImpl(
             validationRun.build.branch.project.id(),
             ValidationRunStatusChange::class.java
         )
+        // An agent changes the status only on a stamp which accepts its evidence
+        checkAgentEvidence(validationRun.validationStamp, runStatus.signature)
         // Transition check
         validationRunStatusService.checkTransition(validationRun.lastStatus.statusID, runStatus.statusID)
         // Creation

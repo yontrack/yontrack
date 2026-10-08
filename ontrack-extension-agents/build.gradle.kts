@@ -2,7 +2,7 @@ plugins {
     `java-library`
 }
 
-description = "Agent governance: the licensed rulings on agents - the promotion condition on assisted builds, and later the stamp restriction and the activity views."
+description = "Agent governance: the licensed rulings on agents - the promotion condition on assisted builds, the stamp restriction on agent evidence, and later the activity views."
 
 dependencies {
     api(project(":ontrack-extension-support"))

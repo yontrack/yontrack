@@ -2187,6 +2187,22 @@ type DeleteValidationStampMetaInfoPropertyPayload implements Payload {
   validationStamp: ValidationStamp
 }
 
+"Output type for the deleteValidationStampNonAgentEvidencePropertyById mutation."
+type DeleteValidationStampNonAgentEvidencePropertyByIdPayload implements Payload {
+  "List of errors"
+  errors: [UserError]
+  "Validation stamp updated"
+  validationStamp: ValidationStamp
+}
+
+"Output type for the deleteValidationStampNonAgentEvidenceProperty mutation."
+type DeleteValidationStampNonAgentEvidencePropertyPayload implements Payload {
+  "List of errors"
+  errors: [UserError]
+  "Validation stamp updated"
+  validationStamp: ValidationStamp
+}
+
 "Output type for the deleteWebhook mutation."
 type DeleteWebhookPayload implements Payload {
   "List of errors"
@@ -4400,6 +4416,16 @@ type Mutation {
     "Input for the mutation"
     input: DeleteValidationStampMetaInfoPropertyByIdInput
   ): DeleteValidationStampMetaInfoPropertyByIdPayload
+  "Deletes the evidence from non-agents only property on a validation stamp identified by name."
+  deleteValidationStampNonAgentEvidenceProperty(
+    "Input for the mutation"
+    input: DeleteValidationStampNonAgentEvidencePropertyInput
+  ): DeleteValidationStampNonAgentEvidencePropertyPayload
+  "Deletes the evidence from non-agents only property on a validation stamp."
+  deleteValidationStampNonAgentEvidencePropertyById(
+    "Input for the mutation"
+    input: DeleteValidationStampNonAgentEvidencePropertyByIdInput
+  ): DeleteValidationStampNonAgentEvidencePropertyByIdPayload
   "Deleting an existing webhook"
   deleteWebhook(
     "Input for the mutation"
@@ -5138,6 +5164,16 @@ type Mutation {
     "Input for the mutation"
     input: SetValidationStampMetaInfoPropertyByIdInput
   ): SetValidationStampMetaInfoPropertyByIdPayload
+  "Set the evidence from non-agents only property on a validation stamp identified by name."
+  setValidationStampNonAgentEvidenceProperty(
+    "Input for the mutation"
+    input: SetValidationStampNonAgentEvidencePropertyInput
+  ): SetValidationStampNonAgentEvidencePropertyPayload
+  "Set the evidence from non-agents only property on a validation stamp."
+  setValidationStampNonAgentEvidencePropertyById(
+    "Input for the mutation"
+    input: SetValidationStampNonAgentEvidencePropertyByIdInput
+  ): SetValidationStampNonAgentEvidencePropertyByIdPayload
   "Sets a property on a validation stamp identified by name"
   setValidationStampProperty(
     "Input for the mutation"
@@ -8036,6 +8072,22 @@ type SetValidationStampMetaInfoPropertyPayload implements Payload {
   validationStamp: ValidationStamp
 }
 
+"Output type for the setValidationStampNonAgentEvidencePropertyById mutation."
+type SetValidationStampNonAgentEvidencePropertyByIdPayload implements Payload {
+  "List of errors"
+  errors: [UserError]
+  "Validation stamp updated"
+  validationStamp: ValidationStamp
+}
+
+"Output type for the setValidationStampNonAgentEvidenceProperty mutation."
+type SetValidationStampNonAgentEvidencePropertyPayload implements Payload {
+  "List of errors"
+  errors: [UserError]
+  "Validation stamp updated"
+  validationStamp: ValidationStamp
+}
+
 "Output type for the setValidationStampPropertyById mutation."
 type SetValidationStampPropertyByIdPayload implements Payload {
   "List of errors"
@@ -9108,6 +9160,8 @@ type ValidationStamp implements Authorizable & ProjectEntity {
   "List of meta information properties"
   metaInfoProperty: Property
   name: String
+  "Evidence on this validation stamp must come from a non-agent actor: an agent may neither create a validation run on it nor change the status of one of its runs. Needs the licensed feature \"Agent governance\"."
+  nonAgentEvidenceProperty: Property
   "List of properties"
   properties(
     "Keeps properties having a value"
@@ -11163,6 +11217,22 @@ input DeleteValidationStampMetaInfoPropertyInput {
   validation: String!
 }
 
+"Input type for the deleteValidationStampNonAgentEvidencePropertyById mutation."
+input DeleteValidationStampNonAgentEvidencePropertyByIdInput {
+  "ID of the validation stamp"
+  id: Int!
+}
+
+"Input type for the deleteValidationStampNonAgentEvidenceProperty mutation."
+input DeleteValidationStampNonAgentEvidencePropertyInput {
+  "Branch name"
+  branch: String!
+  "Project name"
+  project: String!
+  "Validation name"
+  validation: String!
+}
+
 "Input type for the deleteWebhook mutation."
 input DeleteWebhookInput {
   "Name of the webhook to delete"
@@ -13155,6 +13225,26 @@ input SetValidationStampMetaInfoPropertyInput {
   branch: String!
   "List of meta info"
   items: [MetaInfoPropertyItemInput!]!
+  "Project name"
+  project: String!
+  "Validation name"
+  validation: String!
+}
+
+"Input type for the setValidationStampNonAgentEvidencePropertyById mutation."
+input SetValidationStampNonAgentEvidencePropertyByIdInput {
+  "The restriction applies when the property is set and this flag is true (the default)"
+  enabled: Boolean
+  "ID of the validation stamp"
+  id: Int!
+}
+
+"Input type for the setValidationStampNonAgentEvidenceProperty mutation."
+input SetValidationStampNonAgentEvidencePropertyInput {
+  "Branch name"
+  branch: String!
+  "The restriction applies when the property is set and this flag is true (the default)"
+  enabled: Boolean
   "Project name"
   project: String!
   "Validation name"

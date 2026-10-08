@@ -164,7 +164,7 @@ groups mapped from the identity provider, and project permissions.
 | Action | Default |
 |---|---|
 | Read everything its owner can | yes |
-| Create builds, validation runs, build links and build properties (record evidence) | yes |
+| Create builds, validation runs, build links and build properties (record evidence) | yes, unless the validation stamp takes [evidence from non-agents only](../concepts/model/index.md#evidence-from-non-agents-only) |
 | Promote | no, unless the promotion level [admits agents](../concepts/model/index.md#agents-admitted) |
 | Start or finish a deployment | no, unless the slot [admits agents](../integrations/environments/environments.md#agents-admitted) |
 | Satisfy a manual admission rule | **never** |

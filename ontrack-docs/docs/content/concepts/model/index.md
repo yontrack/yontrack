@@ -52,6 +52,52 @@ because they are like actual stamps we would put on a given package, the [build]
 The validation stamps can be typed but not necessarily. For example, we can wish to represent a validation as a test
 summary, with the number of failed tests, skipped tests, passed tests, etc.
 
+### Evidence from non-agents only
+
+!!! note
+
+    This restriction is under license, as the feature `extension.agents` ("Agent governance"). See
+    [Licensing](../../appendix/licensing.md).
+
+By default, a registered [agent](../../agents/index.md) records evidence like anybody else: its
+validation runs count the same as a person's or a pipeline's. Some stamps are where a number must
+not come from an agent — a human review, a performance measure, a sign-off. **Agents produce
+configuration and rules, never numbers**: an agent may write the scan, the test, the check, but the
+result which gates a build should come from the pipeline which runs it, or from a person.
+
+With the *Evidence from non-agents only* property on a validation stamp, when the actor is an agent
+— the agent itself, or Yontrack acting on its behalf — both are **refused**:
+
+* creating a validation run on the stamp, whatever the way: the `createValidationRun*` and
+  `validateBuildWith*` mutations, the REST API, the GitHub ingestion, a notification;
+* changing the status of one of its runs, like `FAILED` to `EXPLAINED`;
+* changing the data of one of its runs, as the GitHub ingestion does when it validates a build
+  again with the same status.
+
+The refusal names the stamp:
+
+```
+evidence on REVIEW must come from a non-agent actor
+```
+
+The run is refused, never recorded and then ignored: a run on the record always counts. A person, a
+pipeline and Yontrack itself acting for a person are not concerned. The property is part of the
+stamp's configuration, which the [agent policy](../../agents/index.md#what-an-agent-may-do) never
+lets an agent change.
+
+Set it:
+
+* on the validation stamp page, through its properties;
+* through the API, with the `setValidationStampNonAgentEvidenceProperty(ById)` mutation, or as code
+  with the `net.nemerosa.ontrack.extension.agents.evidence.NonAgentEvidencePropertyType` property.
+
+It cannot be set in the [CI configuration](../../configuration/ci-config.md) nor in the CasC, which
+have no properties for the validation stamps.
+
+Without the license, the property is kept and stays visible, with a notice, but **does nothing**:
+agents record evidence on the stamp like anybody else. It applies again as soon as the license
+allows it.
+
 ## Promotion levels
 
 While validation stamps are linked to a specific kind of check, test, scan result, etc., _promotion levels_ are used to talk more generally about the quality of a given build.

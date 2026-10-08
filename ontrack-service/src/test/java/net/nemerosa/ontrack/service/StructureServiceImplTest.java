@@ -9,6 +9,7 @@ import net.nemerosa.ontrack.model.security.SecurityService;
 import net.nemerosa.ontrack.model.settings.PredefinedPromotionLevelService;
 import net.nemerosa.ontrack.model.settings.PredefinedValidationStampService;
 import net.nemerosa.ontrack.model.structure.*;
+import net.nemerosa.ontrack.model.security.AgentEvidenceCheck;
 import net.nemerosa.ontrack.model.security.PromotionLevelAgentAdmission;
 import net.nemerosa.ontrack.repository.*;
 import org.junit.jupiter.api.BeforeEach;
@@ -70,7 +71,8 @@ public class StructureServiceImplTest {
                 mock(PromotionLevelRepository.class),
                 mock(ValidationRunRepository.class),
                 new StaticListableBeanFactory().getBeanProvider(CascadeDeletionListener.class),
-                new StaticListableBeanFactory().getBeanProvider(PromotionLevelAgentAdmission.class)
+                new StaticListableBeanFactory().getBeanProvider(PromotionLevelAgentAdmission.class),
+                new StaticListableBeanFactory().getBeanProvider(AgentEvidenceCheck.class)
         );
         // Model
         Project project = Project.of(nd("P", "Project")).withId(ID.of(1));

@@ -43,6 +43,8 @@ and the readiness of a build. None of this needs a license.
 
 * [Assisted builds require](../concepts/model/index.md#assisted-builds-require) — the promotion
   condition "if the build is assisted, these validation stamps must pass first".
+* [Evidence from non-agents only](../concepts/model/index.md#evidence-from-non-agents-only) — the
+  validation stamp restriction "evidence on this stamp must come from a non-agent actor".
 
 Without the license, these rulings are kept, visible and editable, but **do nothing**: an assisted
-build is promoted as any other. They apply again as soon as the license allows them.
+build is promoted as any other, an agent records evidence on any stamp. They apply again as soon as the license allows them.

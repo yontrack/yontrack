@@ -2,10 +2,12 @@ package net.nemerosa.ontrack.service
 
 import net.nemerosa.ontrack.model.events.EventFactory
 import net.nemerosa.ontrack.model.events.EventPostService
+import net.nemerosa.ontrack.model.security.AgentEvidenceCheck
 import net.nemerosa.ontrack.model.security.ProjectEdit
 import net.nemerosa.ontrack.model.security.SecurityService
 import net.nemerosa.ontrack.model.structure.*
 import net.nemerosa.ontrack.repository.ValidationRunRepository
+import org.springframework.beans.factory.ObjectProvider
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -18,10 +20,18 @@ class ValidationRunServiceImpl(
     private val validationDataTypeService: ValidationDataTypeService,
     private val eventPostService: EventPostService,
     private val eventFactory: EventFactory,
+    /**
+     * Provided lazily. Without any, agents change evidence on every stamp.
+     */
+    private val agentEvidenceChecks: ObjectProvider<AgentEvidenceCheck>,
 ) : ValidationRunService {
 
     override fun updateValidationRunData(run: ValidationRun, data: ValidationRunData<*>?): ValidationRun {
         securityService.checkProjectFunction(run, ProjectEdit::class.java)
+        // An agent changes evidence only on a stamp which accepts it
+        SignatureActor.of(securityService.currentActor)?.let { agent ->
+            agentEvidenceChecks.forEach { it.checkAgentEvidence(run.validationStamp, agent) }
+        }
         val updated = validationRunRepository.updateValidationRunData(run, data)
         eventPostService.post(eventFactory.updateValidationRunData(updated))
         return updated
