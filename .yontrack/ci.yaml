@@ -286,11 +286,12 @@ configuration:
         # publishes it, and release.yml stamps DOCKER.HUB, DOCUMENTATION and GITHUB.RELEASE, but
         # not WIKI: a pre-release has no wiki page, and `scripts/release.sh wiki` says so with
         # `report=false`. Missing WIKI is what keeps every RELEASE side effect away from it - the
-        # self.dev slot, the `#internal-releases` message and the doc.yontrack.com dispatch below,
-        # and the `#releases` announcement under `custom.configs`. None of them can be filtered on
-        # the version instead: the slot's admission rules see branches and promotions only, and
-        # the `#releases` subscription, once created by a GA build, is never removed by CI. If
-        # WIKI ever gets reported for a pre-release, all four fire.
+        # self.dev slot, the `#internal-releases` message below, and the `#releases` announcement
+        # under `custom.configs`. None of them can be filtered on the version instead: the slot's
+        # admission rules see branches and promotions only, and the `#releases` subscription, once
+        # created by a GA build, is never removed by CI. If WIKI ever gets reported for a
+        # pre-release, all three fire. The doc.yontrack.com dispatch is not one of them: it hangs
+        # off GOLD, so that a beta reaches the site - see the GOLD workflow below.
         RELEASE:
           promotions:
             - GOLD
@@ -346,6 +347,26 @@ configuration:
                       # doc/dev-guide/patch-release.md before relying on either spelling.
                       - name: branch
                         value: "${branch}"
+              # Rebuilds docs.yontrack.com once release.yml has succeeded - and only then: a node
+              # whose parent did not succeed is cancelled. It hangs off GOLD rather than RELEASE so
+              # that it also runs for a pre-release, which is never granted RELEASE: the site links
+              # the newest beta as `X.Y.0 Beta` next to Latest, and drops the link once X.Y.0 is
+              # released. For an alpha it runs too, and changes nothing, since the site publishes
+              # no alpha. Which versions the site shows is decided there, not here: see the README
+              # of yontrack/doc.yontrack.com.
+              - id: docs.yontrack.com
+                executorId: notification
+                parents:
+                  - id: release
+                data:
+                  channel: github-workflow
+                  channelConfig:
+                    config: github.com
+                    owner: yontrack
+                    repository: doc.yontrack.com
+                    workflowId: doc.yml
+                    reference: main
+                    callMode: ASYNC
         # Never for a pre-release, which is not granted RELEASE: see the RELEASE promotion above.
         RELEASE:
           - name: On internal release
@@ -361,17 +382,6 @@ configuration:
                     Yontrack ${build} has been released.
       
                     ${promotionRun.changelog?title=true&commitsOption=ALWAYS}
-              - id: docs.yontrack.com
-                executorId: notification
-                data:
-                  channel: github-workflow
-                  channelConfig:
-                    config: github.com
-                    owner: yontrack
-                    repository: doc.yontrack.com
-                    workflowId: doc.yml
-                    reference: main
-                    callMode: ASYNC
       notificationsConfig:
         notifications:
           - name: On validation error

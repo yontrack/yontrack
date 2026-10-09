@@ -190,7 +190,7 @@ jobs:
 
       # Not for a pre-release, on purpose: `report` is false there. RELEASE requires WIKI, so a
       # pre-release records its publication with the three other stamps without being granted
-      # RELEASE - which is what keeps it off self.dev, Slack and doc.yontrack.com (#1987).
+      # RELEASE - which is what keeps it off self.dev and Slack (#1987).
       - name: Validate WIKI
         if: >-
           ${{ !cancelled()

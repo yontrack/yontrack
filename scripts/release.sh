@@ -427,10 +427,11 @@ rel_docs() {
 # A pre-release has no page, and its release does not link one. It is not checked, and `report`
 # says so: release.yml stamps WIKI only when it is true. RELEASE requires WIKI, so a pre-release
 # records its publication - DOCKER.HUB, DOCUMENTATION, GITHUB.RELEASE - without being granted
-# RELEASE, and nothing keyed off RELEASE fires for it: no self.dev deployment, no Slack message,
-# no doc.yontrack.com dispatch (#1987). The self.dev slot's admission rules cannot tell an alpha
-# from a GA, and a notification subscription made by CI is never removed, so filtering each of
-# them on the version is not an option. See `.yontrack/ci.yaml`.
+# RELEASE, and nothing keyed off RELEASE fires for it: no self.dev deployment, no Slack message
+# (#1987). The self.dev slot's admission rules cannot tell an alpha from a GA, and a notification
+# subscription made by CI is never removed, so filtering each of them on the version is not an
+# option. The doc.yontrack.com dispatch hangs off GOLD instead, so a beta does reach the site. See
+# `.yontrack/ci.yaml`.
 rel_wiki() {
     local version="${REL_VERSION:-}" dir="${REL_WIKI_DIR:-wiki}"
 

@@ -125,7 +125,8 @@ What differs:
 | Wiki page | Required, checked, stamped `WIKI` | None: not checked, `WIKI` not stamped |
 | Release body | Wiki link, then Yontrack's changelog since the last `RELEASE` | Git log since the previous pre-release |
 | `RELEASE` | Granted | **Never granted** |
-| self.dev, `#internal-releases`, `#releases`, doc.yontrack.com | Yes | No |
+| self.dev, `#internal-releases`, `#releases` | Yes | No |
+| docs.yontrack.com | Latest when it is the highest GA | A beta is linked as `X.Y.0 Beta`; an alpha is not published |
 
 **Ordering:** `6.0-alpha.N` < `6.0-beta.M` < `6.0.0`, and `5.5.7` < `6.0-alpha.0`.
 
@@ -134,13 +135,20 @@ or beta), or at the highest GA below it when it is the first: `6.0-alpha.0` star
 `6.0-beta.0` at the last alpha. A GA ignores pre-releases, so `6.0.0` covers everything since
 `5.5.7`.
 
-**Why no `RELEASE`:** a pre-release must not deploy to self.dev, post on Slack or dispatch
-doc.yontrack.com, and those cannot be filtered on the version. The self.dev slot's admission rules
-see branches and promotions only, and CI never removes the `#releases` subscription that the last
-GA build created on `main`. So `release.yml` records the publication with `DOCKER.HUB`,
-`DOCUMENTATION` and `GITHUB.RELEASE` and leaves `WIKI` out. `RELEASE` requires all four, so it is
-never granted and none of these fire. As a bonus, `6.0.0`'s Yontrack changelog then runs from the
-last `RELEASE` on `main` — `5.5.7`, the last GA released from it — rather than from its last beta.
+**Why no `RELEASE`:** a pre-release must not deploy to self.dev or post on Slack, and those cannot
+be filtered on the version. The self.dev slot's admission rules see branches and promotions only,
+and CI never removes the `#releases` subscription that the last GA build created on `main`. So
+`release.yml` records the publication with `DOCKER.HUB`, `DOCUMENTATION` and `GITHUB.RELEASE` and
+leaves `WIKI` out. `RELEASE` requires all four, so it is never granted and none of these fire. As
+a bonus, `6.0.0`'s Yontrack changelog then runs from the last `RELEASE` on `main` — `5.5.7`, the
+last GA released from it — rather than from its last beta.
+
+**The beta on docs.yontrack.com:** the site is rebuilt after every successful `release.yml`, by a
+node chained after `release` in the `GOLD` workflow of `.yontrack/ci.yaml` — not on `RELEASE`,
+which a beta never gets. The site, in `yontrack/doc.yontrack.com`, links the newest beta whose
+`DOCUMENTATION` passed as `6.0.0 Beta (6.0-beta.N)`, right after Latest. Each new beta moves the
+link; Latest stays the newest GA (`5.5.7`) throughout. Releasing `6.0.0` drops the link, and
+`6.0.0` becomes Latest. Alphas are never published there.
 
 **Cutting one:**
 
