@@ -87,6 +87,12 @@ class OntrackConfigProperties {
     var events = EventsProperties()
 
     /**
+     * GraphQL settings
+     */
+    @Valid
+    var graphql = GraphQLProperties()
+
+    /**
      * Key-store type
      */
     @APIDescription("Key store type to use to store encryption keys")
@@ -107,6 +113,74 @@ class OntrackConfigProperties {
         logger.info("[templating] Errors = ${templating.errors}")
         logger.info("[events] Export max rows = ${events.export.maxRows}")
         logger.info("[events] Cleanup batch size = ${events.cleanup.batchSize}")
+        graphql.limits.run {
+            logger.info("[graphql] Limits = $mode (aliases $maxAliases, directives per location $maxDirectivesPerLocation, depth $maxDepth, complexity $maxComplexity)")
+        }
+    }
+
+    /**
+     * GraphQL settings
+     */
+    class GraphQLProperties {
+        /**
+         * Limits on the cost of a query
+         */
+        @Valid
+        var limits = GraphQLLimitsProperties()
+    }
+
+    /**
+     * Limits on the cost of a GraphQL query, so that one request cannot make the server do an
+     * unbounded amount of work. The defaults sit well above the largest queries the Yontrack UI,
+     * the CLI and the standard introspection query send.
+     */
+    class GraphQLLimitsProperties {
+
+        @APIDescription("What a query going over one of the limits gets: `ENFORCE` (default) rejects it with one error before any of it runs, `WARN` only logs a warning and runs it, to watch the limits before enforcing them. Both count it in the `ontrack_graphql_limits_exceeded_total` metric.")
+        var mode: GraphQLLimitsMode = GraphQLLimitsMode.ENFORCE
+
+        @Min(0)
+        @APIDescription("Maximum number of aliases in a query document.")
+        var maxAliases: Int = DEFAULT_MAX_ALIASES
+
+        @Min(0)
+        @APIDescription("Maximum number of directives on one location of a query (a field, a fragment, a fragment spread, an operation or a variable). A directive which is not declared repeatable may never appear twice on one location.")
+        var maxDirectivesPerLocation: Int = DEFAULT_MAX_DIRECTIVES_PER_LOCATION
+
+        @Min(1)
+        @APIDescription("Maximum depth of a query: the number of nested field levels, `{ projects { name } }` having a depth of 2.")
+        var maxDepth: Int = DEFAULT_MAX_DEPTH
+
+        @Min(1)
+        @APIDescription("Maximum complexity of a query: its number of fields, once its fragments are expanded. A list counts once, whatever its size.")
+        var maxComplexity: Int = DEFAULT_MAX_COMPLEXITY
+
+        companion object {
+            const val DEFAULT_MAX_ALIASES = 30
+            const val DEFAULT_MAX_DIRECTIVES_PER_LOCATION = 3
+            const val DEFAULT_MAX_DEPTH = 25
+            const val DEFAULT_MAX_COMPLEXITY = 1000
+        }
+    }
+
+    /**
+     * What a GraphQL query going over one of the limits gets
+     */
+    enum class GraphQLLimitsMode(
+        /**
+         * Identifier, as a metric tag
+         */
+        val id: String,
+    ) {
+        /**
+         * Rejected with one error, before any of it runs
+         */
+        ENFORCE("enforce"),
+
+        /**
+         * A warning is logged, and the query runs
+         */
+        WARN("warn"),
     }
 
     /**

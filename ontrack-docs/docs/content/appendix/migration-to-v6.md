@@ -454,6 +454,31 @@ in asks for the credentials again instead of being answered silently. See
   instead of coming back to Yontrack. To keep signing out of Yontrack only, set the
   `NEXTAUTH_FEDERATED_SIGNOUT` environment variable of the UI to `false`.
 
+### GraphQL query limits
+
+The GraphQL API now limits the cost of a query: its number of aliases, of directives on one
+location, its depth and its complexity. A query going over one of them is rejected with one
+`ExecutionAborted` error, and none of it runs. See
+[GraphQL query limits](../security/graphql-limits.md)
+([#2046](https://github.com/yontrack/yontrack/issues/2046)).
+
+#### For API clients
+
+* **The Yontrack UI, the `yontrack` CLI and the MCP server are well within the defaults**: their
+  largest queries are measured on the [GraphQL query limits](../security/graphql-limits.md) page.
+* **A script or integration of your own** sending very large queries (more than 30 aliases, a depth
+  above 25, more than 1000 fields) gets the error instead of an answer. Split the query, or have the
+  limit raised.
+
+#### For deployers
+
+* **To find the clients going over a limit before enforcing it**, set
+  `ontrack.config.graphql.limits.mode: WARN` (`ONTRACK_CONFIG_GRAPHQL_LIMITS_MODE=WARN`): the
+  queries run, and each one going over a limit logs a warning and counts in the
+  `ontrack_graphql_limits_exceeded_total` metric.
+* **To raise a limit**, set the `ontrack.config.graphql.limits.max-*` property it names in its
+  error.
+
 ## Removed
 
 Yontrack 6 removes what Yontrack 5 deprecated. Each item is listed here with what to use instead,
