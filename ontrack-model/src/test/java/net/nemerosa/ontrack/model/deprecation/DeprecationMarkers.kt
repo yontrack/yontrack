@@ -107,9 +107,6 @@ object DeprecationMarkers {
     /** The baseline of the items which do not conform yet - it may only shrink */
     const val BASELINE = "ontrack-model/src/test/resources/deprecation/markers-baseline.txt"
 
-    /** Modules whose deprecations are external contracts: the KDSL is a client library */
-    private val externalRoots = listOf("ontrack-kdsl/src/main/")
-
     // ===========================================================================================
     // Check
     // ===========================================================================================
@@ -253,7 +250,7 @@ object DeprecationMarkers {
                     line = lineOf(text, match.range.first),
                     name = kotlinName(text, end),
                     message = message,
-                    external = externalRoots.any { path.startsWith(it) },
+                    external = false,
                 )
             }
             .toList()
@@ -273,7 +270,7 @@ object DeprecationMarkers {
                     line = lineOf(text, match.range.first),
                     name = javaName(text, end),
                     message = javadocTag(text, match.range.first),
-                    external = externalRoots.any { path.startsWith(it) },
+                    external = false,
                 )
             }
             .toList()

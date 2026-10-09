@@ -143,11 +143,9 @@ class DeprecationMarkersTest {
     }
 
     @Test
-    fun `A deprecated KDSL item is external`() {
+    fun `A deprecated KDSL item is internal`() {
         file("ontrack-kdsl/src/main/java/fixture/Connector.kt", "Connector.kt")
         file(migrationPage, "migration-empty.md")
-        assertEquals(setOf("kotlin ontrack-kdsl/src/main/java/fixture/Connector.kt#oldUpload"), violationKeys())
-        file(migrationPage, "migration-listing.md")
         assertEquals(emptySet(), violationKeys())
     }
 

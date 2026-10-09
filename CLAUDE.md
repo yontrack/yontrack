@@ -47,10 +47,10 @@ anything.
 - **Always** write the marker as `Removed in V7. Use X instead. See #NNNN` (or `No replacement.`),
   on every surface: Kotlin `@Deprecated("…")`, the Javadoc `@deprecated` tag, GraphQL
   `.deprecate("…")`, the JSDoc `@deprecated` tag, and the `message` of a runtime warning
-- An **external** item (GraphQL, REST, CasC, `ontrack.*` properties, environment variables, KDSL,
+- An **external** item (GraphQL, REST, CasC, `ontrack.*` properties, environment variables,
   templating) also gets a runtime warning through `DeprecationService`, and is named on
   `ontrack-docs/docs/content/appendix/migration-to-v6.md` **in the same commit** — a GraphQL field
-  or KDSL item as `` `Type.field` ``, a runtime warning by its `item`
+  as `` `Type.field` ``, a runtime warning by its `item`. The KDSL is internal: never on that page
 - A removal or deprecation is done when the migration page is updated, its lines are deleted from
   the marker-test baseline, and the demo seed, the mobile UI and the KDSL acceptance tests have
   been checked for the item — say which way you decided

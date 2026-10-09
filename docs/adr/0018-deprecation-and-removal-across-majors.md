@@ -9,7 +9,7 @@ below (#1917); every deprecation, from 6.0 on, follows it.
 ## What a deprecation is
 
 **External contracts are user-facing deprecations**: the GraphQL API, REST, CasC keys, `ontrack.*`
-configuration properties and environment variables, Helm values, the KDSL / CLI, notification
+configuration properties and environment variables, Helm values, the CLI, notification
 channels and templating, event types. They are named on the *Migration to V6* page
 (`ontrack-docs/docs/content/appendix/migration-to-v6.md`, then its V7 successor), and they get a
 runtime warning.
@@ -17,7 +17,7 @@ runtime warning.
 **Everything else is internal code.** There is no extension SPI — Yontrack extensions cannot be
 written outside the repository — so Kotlin interfaces and base classes are internal too. Internal
 code is cleaned up by the same rule, but never appears on the migration page and gets no runtime
-warning.
+warning. The KDSL is internal code as well: only Yontrack's own acceptance tests use it.
 
 ## Deprecated in N, removed in N+1
 
@@ -80,10 +80,9 @@ Internal code gets no warning.
 * the JSDoc `@deprecated` tags of `ontrack-web-core`.
 
 It fails on an item whose marker is missing, has no replacement or no issue, and on an **external**
-item not named on the migration page. External means: a GraphQL deprecation, a runtime warning, or a
-deprecation in the KDSL (`ontrack-kdsl/src/main`). A GraphQL field or a KDSL item is named as a
-qualified code span — `` `PromotionLevel.promotionRuns` ``, `` `Query.search(token)` ``; a runtime
-warning by its item, verbatim — `` `POST /rest/structure/promotionLevels/{id}/image` ``. A
+item not named on the migration page. External means: a GraphQL deprecation, or a runtime warning.
+A GraphQL field is named as a qualified code span — `` `PromotionLevel.promotionRuns` ``,
+`` `Query.search(token)` ``; a runtime warning by its item, verbatim — `` `POST /rest/structure/promotionLevels/{id}/image` ``. A
 runtime warning whose item is built at runtime has no name to look for and is not checked.
 
 The scan is textual, and reads the sources rather than the `ontrack.graphql` dumps, which are

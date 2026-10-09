@@ -1,8 +1,8 @@
 # Migration to V6
 
 Yontrack 6 is a major release. This page lists everything a Yontrack 5 installation must know to
-upgrade, for the people who **deploy** Yontrack, the clients of its **API** (GraphQL and REST), the
-users of the **KDSL** client, and those who configure it **as code** (CasC):
+upgrade, for the people who **deploy** Yontrack, the clients of its **API** (GraphQL and REST), and
+those who configure it **as code** (CasC):
 
 * [Upgrade path](#upgrade-path) — which versions upgrade to 6.0, and how to prepare;
 * [Breaking changes](#breaking-changes) — the platform changes and the features removed;
@@ -73,14 +73,6 @@ handled by Jackson 3: see [Jackson 3](#jackson-3).
   contacts the identity provider while starting up: the provider is reached on the first
   authenticated call, as it is without the setting.
 
-#### For KDSL users
-
-The KDSL builds its HTTP client with `spring-boot-restclient`. A program which built its own
-`RestTemplate` alongside it should build it from
-`net.nemerosa.ontrack.kdsl.connector.support.restTemplateBuilder()`: its JSON mapper then behaves as
-the one of the 5.x clients — unknown properties ignored, properties written in their declaration
-order — where the default one of Spring Framework 7 has the Jackson 3 defaults.
-
 ### Jackson 3
 
 Yontrack 6 reads and writes JSON with Jackson 3 (`tools.jackson`) instead of Jackson 2
@@ -95,19 +87,6 @@ Nothing: the data stored by Yontrack 5 is read as it is.
 The dates in the answers of the REST API (`/rest/...`) are written as the rest of Yontrack writes
 them — as a UTC timestamp string, `"2025-11-04T09:12:30.123400Z"` — where Yontrack 5 wrote them as
 an array of numbers, `[2025,11,4,9,12,30,123400000]`. The GraphQL API does not change.
-
-#### For KDSL users
-
-`JsonNode` in the KDSL API is now `tools.jackson.databind.JsonNode`. The
-[Jackson 3 migration guide](https://github.com/FasterXML/jackson/blob/main/jackson3/MIGRATING_TO_JACKSON_3.md)
-lists the classes and methods it renamed. Two changes compile and still break:
-
-* **`JsonNode.map`** — in Kotlin, `node.map { ... }` now calls the new `JsonNode.map(Function)`
-  member, which maps the node itself, instead of iterating over its elements. Write
-  `node.values().map { ... }`.
-* **Strict accessors** — `stringValue()` (formerly `textValue()`) and `intValue()` throw on a node of
-  another type, and `asText()` throws on an object or an array; `asText()` of a JSON `null` is `""`,
-  no longer `"null"`.
 
 ### Indicators removed
 
@@ -377,12 +356,6 @@ and be [recorded after the fact](../integrations/environments/environments.md#ba
   `pendingMessage` too, or `Slot.blocked`. `SlotDeploymentCheck.state` (`OK`, `PENDING`, `FAILED`)
   and `Slot.blockingState` are new and tell the two apart.
 
-#### For KDSL users
-
-`SlotPipeline.fail(message, dateTime)` and `SlotPipeline.cancel(reason, dateTime)` are new, and
-`Build.startPipeline`, `SlotPipeline.startDeploying` and `SlotPipeline.finishDeployment` take an
-optional `dateTime`.
-
 ### Audit trail
 
 Yontrack 6 records the story of every build in an [audit trail](../audit-trail/index.md), under
@@ -483,8 +456,8 @@ location, its depth and its complexity. A query going over one of them is reject
 
 Yontrack 6 removes what Yontrack 5 deprecated. Each item is listed here with what to use instead,
 by the way it is used: the GraphQL API, the REST API, configuration as code, the configuration
-properties and environment variables, templating, the CI configuration, the GitHub ingestion
-configuration, and the KDSL.
+properties and environment variables, templating, the CI configuration, and the GitHub ingestion
+configuration.
 
 The latest 5.5.x release counts every use of these items: see [Upgrade path](#upgrade-path).
 
@@ -537,10 +510,6 @@ base64 < gold.png | tr -d '\n' | curl -X PUT -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: text/plain" --data-binary @- \
   "$YONTRACK_URL/rest/structure/promotionLevels/42/image"
 ```
-
-The 6.x KDSL sets the image of a predefined promotion level with the `PUT` endpoint. A program
-calling `createPredefinedPromotionLevel` with an `image` must use it: the 5.x KDSL still calls the
-`POST` endpoint.
 
 ### Configuration as code
 
@@ -629,19 +598,6 @@ format of this file:
 Unlike the other items of this page, 5.5.x does not count the use of these formats: check the
 `ingestion.yml` files of the ingested repositories for a `version` other than `v2`.
 
-### KDSL
-
-| Removed                                          | Use instead                                           |
-|--------------------------------------------------|-------------------------------------------------------|
-| `NotificationsMgt.subscribe` without a `name`    | `NotificationsMgt.subscribe(name = ..., ...)`         |
-| `Connector.uploadFile` with a `Pair` file        | `Connector.uploadFile` with a `FileContent` file      |
-
-The `name` parameter of `NotificationsMgt.subscribe` no longer has a default: a call without it no
-longer compiles.
-
-`Connector.uploadFile(path, headers, file = name to bytes)` is gone: pass the file as a
-`FileContent(name, content, type)`, which also gives the part its content type.
-
 ## Newly deprecated
 
 Yontrack 6 deprecates the items below. They still work in every 6.x release, and are removed in
@@ -677,9 +633,9 @@ with `surface="rest"`.
 
 GitHub refuses passwords for its API. A GitHub configuration authenticating with a user and a
 password still works in 6.x, whether it is created in the UI, through the
-`createGitHubConfiguration` mutation — its `password` input field — as code, or with the
-`GitHubConfiguration.password` field of the KDSL. Each time such a configuration is saved or used,
-it is counted as `GitHub configuration password authentication`, with `surface="settings"`.
+`createGitHubConfiguration` mutation — its `password` input field — or as code. Each time such a
+configuration is saved or used, it is counted as `GitHub configuration password authentication`,
+with `surface="settings"`.
 The *GitHub configurations* page marks it with a warning in its *Authentication* column.
 
 ### Configuration as code
