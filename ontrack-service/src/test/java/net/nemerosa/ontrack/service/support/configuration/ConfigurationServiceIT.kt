@@ -8,6 +8,7 @@ import net.nemerosa.ontrack.extension.api.support.TestProperty.Companion.of
 import net.nemerosa.ontrack.extension.api.support.TestPropertyType
 import net.nemerosa.ontrack.it.AbstractServiceTestSupport
 import net.nemerosa.ontrack.it.AsAdminTest
+import net.nemerosa.ontrack.json.asJson
 import net.nemerosa.ontrack.model.security.EncryptionService
 import net.nemerosa.ontrack.model.security.GlobalSettings
 import net.nemerosa.ontrack.model.security.ProjectEdit
@@ -15,6 +16,7 @@ import net.nemerosa.ontrack.model.security.ProjectView
 import net.nemerosa.ontrack.model.support.ConfigurationRepository
 import net.nemerosa.ontrack.model.support.ConfigurationValidationException
 import net.nemerosa.ontrack.model.support.ConnectionResultType
+import net.nemerosa.ontrack.repository.PropertyRepository
 import net.nemerosa.ontrack.test.TestUtils
 import org.apache.commons.lang3.StringUtils
 import org.junit.jupiter.api.Test
@@ -32,6 +34,9 @@ class ConfigurationServiceIT : AbstractServiceTestSupport() {
 
     @Autowired
     private lateinit var encryptionService: EncryptionService
+
+    @Autowired
+    private lateinit var propertyRepository: PropertyRepository
 
     @Test
     fun validate_ok_on_new_configuration() {
@@ -313,5 +318,44 @@ class ConfigurationServiceIT : AbstractServiceTestSupport() {
                 )
             )
         })
+    }
+
+    /**
+     * Checks that configuration properties are removed when an associated configuration is deleted,
+     * even when another property of the same type cannot be read.
+     */
+    @Test
+    fun configuration_property_removed_on_configuration_deleted_despite_unreadable_property() {
+        // Creates two configurations
+        val conf1Name = TestUtils.uid("C")
+        val conf2Name = TestUtils.uid("C")
+        val conf1 = configurationService.newConfiguration(config(conf1Name))
+        val conf2 = configurationService.newConfiguration(config(conf2Name))
+        // Properties pointing to the configurations
+        val p1 = doCreateProject()
+        val p2 = doCreateProject()
+        propertyService.editProperty(p1, TestPropertyType::class.java, of(conf1, "1"))
+        propertyService.editProperty(p2, TestPropertyType::class.java, of(conf2, "2"))
+        // A property which cannot be read (no value), stored last so that it is met first by the cleanup
+        val unreadable = doCreateProject()
+        propertyRepository.saveProperty(
+            TestPropertyType::class.java.name,
+            unreadable.projectEntityType,
+            unreadable.id,
+            mapOf("configuration" to conf1Name).asJson()
+        )
+        // Deletes the first configuration
+        configurationService.deleteConfiguration(conf1Name)
+        // The property pointing to the deleted configuration is gone
+        assertFalse(
+            propertyService.hasProperty(p1, TestPropertyType::class.java),
+            "Property pointing to the deleted configuration should be gone"
+        )
+        // ... but not the one pointing to the other configuration
+        assertTrue(propertyService.hasProperty(p2, TestPropertyType::class.java))
+        // ... and the unreadable one is left alone
+        assertTrue(propertyService.hasProperty(unreadable, TestPropertyType::class.java))
+        // The configuration is gone
+        assertNull(configurationService.findConfiguration(conf1Name))
     }
 }
