@@ -92,6 +92,9 @@ object DemoContent {
     const val LABEL_LANGUAGE_JAVASCRIPT = "language:javascript"
     const val LABEL_LANGUAGE_KOTLIN = "language:kotlin"
 
+    /** The last builds widget of the demo dashboard - fixed, like [DASHBOARD_UUID]. */
+    const val LAST_BUILDS_WIDGET_UUID = "1c1f9c3e-8bfa-4a1f-8a0b-4e2f0b0d1a20"
+
     /**
      * The whole dataset, curated part and changelog project together.
      *
@@ -1072,6 +1075,20 @@ object DemoContent {
                     "period" to "3d",
                 ).asJson(),
                 layout = DemoWidgetLayout(x = 6, y = 50, w = 6, h = 20),
+            ),
+            // The last builds of the main branch of the service, as its branch page shows them, but
+            // restricted to the promotions and validations worth a glance from a dashboard
+            DemoWidget(
+                uuid = LAST_BUILDS_WIDGET_UUID,
+                key = "home/LastBuildsForBranch",
+                config = mapOf(
+                    "project" to SERVICE,
+                    "branch" to MAIN,
+                    "count" to 5,
+                    "promotions" to listOf(SILVER, GOLD),
+                    "validations" to listOf(BUILD, UNIT_TESTS, INTEGRATION_TESTS),
+                ).asJson(),
+                layout = DemoWidgetLayout(x = 0, y = 70, w = 12, h = 30),
             ),
         ),
     )
