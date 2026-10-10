@@ -48,6 +48,17 @@ class GQLTypeProperty(
                                     property.editable
                                 }
                                 .build()
+                ) // Error
+                .field(
+                        GraphQLFieldDefinition.newFieldDefinition()
+                                .name("error")
+                                .description("When the stored value of the property cannot be read, the reason why. The value is then null. Null when the property is fine.")
+                                .type(Scalars.GraphQLString)
+                                .dataFetcher { env ->
+                                    val property: Property<*> = env.getSource()!!
+                                    property.error
+                                }
+                                .build()
                 ) // OK
                 .build()
     }

@@ -47,6 +47,10 @@ describe('hasEntityDetails', () => {
         expect(hasEntityDetails({properties: [unset, set], information: []})).toBe(true)
     })
 
+    it('is true when one property cannot be read', () => {
+        expect(hasEntityDetails({properties: [unset, {...unset, error: 'Cannot read'}], information: []})).toBe(true)
+    })
+
     it('is true when there is one information entry', () => {
         expect(hasEntityDetails({properties: [unset], information: [{type: 'x', data: {}}]})).toBe(true)
     })

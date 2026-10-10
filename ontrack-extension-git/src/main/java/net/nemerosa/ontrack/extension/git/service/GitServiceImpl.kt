@@ -28,6 +28,7 @@ import net.nemerosa.ontrack.tx.TransactionService
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.PlatformTransactionManager
+import org.springframework.transaction.TransactionDefinition
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.transaction.support.TransactionTemplate
 import java.lang.String.format
@@ -59,10 +60,18 @@ class GitServiceImpl(
 
     private val transactionTemplate = TransactionTemplate(transactionManager)
 
+    /**
+     * Reading a configuration which fails in a transactional service would otherwise mark the whole
+     * transaction as rollback-only.
+     */
+    private val nestedTransactionTemplate = TransactionTemplate(transactionManager).apply {
+        propagationBehavior = TransactionDefinition.PROPAGATION_NESTED
+    }
+
     override fun forEachConfiguredProject(consumer: BiConsumer<Project, GitConfiguration>) {
         structureService.projectList
             .forEach { project ->
-                val configuration = getProjectConfiguration(project)
+                val configuration = getReadableProjectConfiguration(project)
                 if (configuration != null) {
                     consumer.accept(project, configuration)
                 }
@@ -71,7 +80,9 @@ class GitServiceImpl(
 
     override fun forEachConfiguredBranch(consumer: BiConsumer<Branch, GitBranchConfiguration>) {
         for (project in structureService.projectList) {
-            forEachConfiguredBranchInProject(project, consumer::accept)
+            if (getReadableProjectConfiguration(project) != null) {
+                forEachConfiguredBranchInProject(project, consumer::accept)
+            }
         }
     }
 
@@ -81,12 +92,36 @@ class GitServiceImpl(
     ) {
         structureService.getBranchesForProject(project.id)
             .forEach { branch ->
-                val configuration = getBranchConfiguration(branch)
+                val configuration = getReadableBranchConfiguration(branch)
                 if (configuration != null) {
                     consumer(branch, configuration)
                 }
             }
     }
+
+    /**
+     * Gets the Git configuration of a project when looping over projects, a configuration which cannot
+     * be read being skipped, so that the other projects are still processed.
+     */
+    private fun getReadableProjectConfiguration(project: Project): GitConfiguration? =
+        try {
+            nestedTransactionTemplate.execute { getProjectConfiguration(project) }
+        } catch (any: Exception) {
+            logger.warn("Cannot read the Git configuration of project ${project.name}, skipping it: ${any.message}")
+            null
+        }
+
+    /**
+     * Gets the Git configuration of a branch when looping over branches, a configuration which cannot
+     * be read being skipped, so that the other branches are still processed.
+     */
+    private fun getReadableBranchConfiguration(branch: Branch): GitBranchConfiguration? =
+        try {
+            nestedTransactionTemplate.execute { getBranchConfiguration(branch) }
+        } catch (any: Exception) {
+            logger.warn("Cannot read the Git configuration of branch ${branch.entityDisplayName}, skipping it: ${any.message}")
+            null
+        }
 
     override val jobRegistrations: Collection<JobRegistration>
         get() {

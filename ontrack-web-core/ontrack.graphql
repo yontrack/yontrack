@@ -737,7 +737,7 @@ type Branch implements Authorizable & ProjectEntity {
   promotionStatuses(names: [String!]!): [PromotionRun!]!
   "List of properties"
   properties(
-    "Keeps properties having a value"
+    "Keeps properties having a value, or a stored value which cannot be read"
     hasValue: Boolean = false,
     "Fully qualified name of the property type"
     type: String
@@ -916,7 +916,7 @@ type Build implements Authorizable & ProjectEntity {
   ): [PromotionRun!]!
   "List of properties"
   properties(
-    "Keeps properties having a value"
+    "Keeps properties having a value, or a stored value which cannot be read"
     hasValue: Boolean = false,
     "Fully qualified name of the property type"
     type: String
@@ -5950,7 +5950,7 @@ type Project implements Authorizable & ProjectEntity {
   ): [String!]!
   "List of properties"
   properties(
-    "Keeps properties having a value"
+    "Keeps properties having a value, or a stored value which cannot be read"
     hasValue: Boolean = false,
     "Fully qualified name of the property type"
     type: String
@@ -6127,7 +6127,7 @@ type PromotionLevel implements Authorizable & ProjectEntity {
   ): PromotionRunPaginated
   "List of properties"
   properties(
-    "Keeps properties having a value"
+    "Keeps properties having a value, or a stored value which cannot be read"
     hasValue: Boolean = false,
     "Fully qualified name of the property type"
     type: String
@@ -6200,7 +6200,7 @@ type PromotionRun implements Authorizable & ProjectEntity {
   promotionLevel: PromotionLevel!
   "List of properties"
   properties(
-    "Keeps properties having a value"
+    "Keeps properties having a value, or a stored value which cannot be read"
     hasValue: Boolean = false,
     "Fully qualified name of the property type"
     type: String
@@ -6229,6 +6229,8 @@ type PromotionRunPaginated {
 type Property {
   "True is the field is editable"
   editable: Boolean
+  "When the stored value of the property cannot be read, the reason why. The value is then null. Null when the property is fine."
+  error: String
   "Property type"
   type: PropertyType
   "JSON representation of the value"
@@ -9301,7 +9303,7 @@ type ValidationRun implements Authorizable & ProjectEntity {
   name: String
   "List of properties"
   properties(
-    "Keeps properties having a value"
+    "Keeps properties having a value, or a stored value which cannot be read"
     hasValue: Boolean = false,
     "Fully qualified name of the property type"
     type: String
@@ -9406,7 +9408,7 @@ type ValidationStamp implements Authorizable & ProjectEntity {
   nonAgentEvidenceProperty: Property
   "List of properties"
   properties(
-    "Keeps properties having a value"
+    "Keeps properties having a value, or a stored value which cannot be read"
     hasValue: Boolean = false,
     "Fully qualified name of the property type"
     type: String

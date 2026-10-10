@@ -36,7 +36,7 @@ class GQLProjectEntityPropertyListFieldContributor(
                 .argument(
                     GraphQLArgument.newArgument()
                         .name("hasValue")
-                        .description("Keeps properties having a value")
+                        .description("Keeps properties having a value, or a stored value which cannot be read")
                         .type(Scalars.GraphQLBoolean)
                         .defaultValue(false)
                         .build()
@@ -62,7 +62,7 @@ class GQLProjectEntityPropertyListFieldContributor(
                         } ?: true
                     }
                     .filter { property: Property<*> ->
-                        !hasValue || property.value != null
+                        !hasValue || property.value != null || property.hasError
                     }
                     .sortedBy { it.type.name }
             } else {

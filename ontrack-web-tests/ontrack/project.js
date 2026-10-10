@@ -83,11 +83,45 @@ export const projectInstance = (ontrack, data) => {
 
     project.createBranch = async (name) => createBranch(project, name)
     project.favourite = async () => favouriteProject(project)
+    project.setProperty = async (type, value) => setProjectProperty(project, type, value)
 
     // Notifications methods
     registerNotificationExtensions(project)
 
     return project
+}
+
+/**
+ * Sets a property on the project, by the FQCN of its type and its raw JSON value.
+ */
+const setProjectProperty = async (project, type, value) => {
+    await graphQLCallMutation(
+        project.ontrack.connection,
+        'setGenericProperty',
+        gql`
+            mutation SetProjectProperty(
+                $id: Int!,
+                $type: String!,
+                $value: JSON!,
+            ) {
+                setGenericProperty(input: {
+                    entityType: PROJECT,
+                    entityId: $id,
+                    type: $type,
+                    value: $value,
+                }) {
+                    errors {
+                        message
+                    }
+                }
+            }
+        `,
+        {
+            id: Number(project.id),
+            type,
+            value,
+        }
+    )
 }
 
 /**

@@ -11,9 +11,13 @@ import net.nemerosa.ontrack.model.security.SecurityService
 import net.nemerosa.ontrack.model.structure.*
 import net.nemerosa.ontrack.repository.PropertyRepository
 import net.nemerosa.ontrack.repository.TProperty
+import org.slf4j.LoggerFactory
 import org.springframework.security.access.AccessDeniedException
 import org.springframework.stereotype.Service
+import org.springframework.transaction.PlatformTransactionManager
+import org.springframework.transaction.TransactionDefinition
 import org.springframework.transaction.annotation.Transactional
+import org.springframework.transaction.support.TransactionTemplate
 import java.util.function.BiFunction
 import java.util.function.Predicate
 import kotlin.reflect.KClass
@@ -25,8 +29,15 @@ class PropertyServiceImpl(
         private val eventFactory: EventFactory,
         private val propertyRepository: PropertyRepository,
         private val securityService: SecurityService,
-        private val extensionManager: ExtensionManager
+        private val extensionManager: ExtensionManager,
+        transactionManager: PlatformTransactionManager,
 ) : PropertyService {
+
+    private val nestedTransaction = TransactionTemplate(transactionManager).apply {
+        propagationBehavior = TransactionDefinition.PROPAGATION_NESTED
+    }
+
+    private val logger = LoggerFactory.getLogger(PropertyServiceImpl::class.java)
 
     override val propertyTypes: List<PropertyType<*>> by lazy {
         val types = extensionManager.getExtensions(PropertyType::class.java)
@@ -54,8 +65,8 @@ class PropertyServiceImpl(
                 .filter { type -> type.supportedEntityTypes.contains(entity.projectEntityType) }
                 // ... filters them by access right
                 .filter { type -> type.canView(entity, securityService) }
-                // ... loads them from the store
-                .map { type -> getProperty(type, entity) }
+                // ... loads them from the store, an unreadable value not failing the whole list
+                .map { type -> getPropertyOrError(type, entity) }
                 // .. flags with edition rights
                 .map { prop -> prop.editable(prop.type.canEdit(entity, securityService)) }
     }
@@ -63,12 +74,14 @@ class PropertyServiceImpl(
     override fun <T> getProperty(entity: ProjectEntity, propertyTypeName: String): Property<T> {
         // Gets the property using its fully qualified type name
         val propertyType: PropertyType<T> = getPropertyTypeByName(propertyTypeName)
-        // Access
-        return getProperty(propertyType, entity)
+        // Access, an unreadable value being returned as an error
+        return getPropertyOrError(propertyType, entity)
     }
 
     override fun <T> getProperty(entity: ProjectEntity, propertyTypeClass: Class<out PropertyType<T>>): Property<T> {
-        return getProperty(entity, propertyTypeClass.name)
+        // The caller asks for the value: an unreadable value must fail, not look like a missing one
+        val propertyType: PropertyType<T> = getPropertyTypeByName(propertyTypeClass.name)
+        return getProperty(propertyType, entity)
     }
 
     override fun <T> getPropertyValue(entity: ProjectEntity, propertyTypeClass: Class<out PropertyType<T>>): T? {
@@ -98,16 +111,19 @@ class PropertyServiceImpl(
         if (!propertyType.canEdit(entity, securityService)) {
             throw AccessDeniedException("Property is not opened for viewing.")
         }
-        // Gets the existing value
-        val value = getPropertyValue(propertyType, entity)
-        // If existing, deletes it
-        return if (value != null) {
-            val ack = propertyRepository.deleteProperty(propertyType.javaClass.name, entity.projectEntityType, entity.id)
+        // Checks the existence without decoding, so that a property whose value cannot be read can be deleted
+        val typeName = propertyType.javaClass.name
+        return if (propertyRepository.hasProperty(typeName, entity.projectEntityType, entity.id)) {
+            // Existing value, for the listener, null when it cannot be read
+            val value = getPropertyOrError(propertyType, entity).value
+            val ack = propertyRepository.deleteProperty(typeName, entity.projectEntityType, entity.id)
             if (ack.success) {
                 // Property deletion event
                 eventPostService.post(eventFactory.propertyDelete(entity, propertyType))
-                // Listener
-                propertyType.onPropertyDeleted(entity, value)
+                // Listener, skipped when the stored value could not be read, as there is no value to pass
+                if (value != null) {
+                    propertyType.onPropertyDeleted(entity, value)
+                }
             }
             // OK
             ack
@@ -157,16 +173,47 @@ class PropertyServiceImpl(
         return if (value != null) Property.of(type, value) else Property.empty(type)
     }
 
-    protected fun <T> getPropertyValue(type: PropertyType<T>, entity: ProjectEntity): T? {
+    /**
+     * Same as [getProperty] but returns a property with an [error][Property.error] when its stored value
+     * cannot be decoded, instead of failing.
+     */
+    private fun <T> getPropertyOrError(type: PropertyType<T>, entity: ProjectEntity): Property<T> {
+        // Checks done outside the decoding, so that they are not turned into errors
+        checkPropertyAccess(type, entity)
+        val t = propertyRepository.loadProperty(type.javaClass.name, entity.projectEntityType, entity.id)
+            ?: return Property.empty(type)
+        return try {
+            // Decoding in a nested transaction: a transactional service failing during the decoding (a
+            // configuration service, for example) would otherwise mark the whole transaction as rollback-only
+            val value = nestedTransaction.execute { type.fromStorage(t.json) }
+            if (value != null) Property.of(type, value) else Property.empty(type)
+        } catch (any: Exception) {
+            logUnreadableProperty(type, entity, any)
+            Property.error(type, unreadablePropertyMessage(any))
+        }
+    }
+
+    private fun logUnreadableProperty(type: PropertyType<*>, entity: ProjectEntity, any: Exception) {
+        // No stack trace, as this would be logged at every page load
+        logger.warn(
+            "Cannot read the ${type.javaClass.name} property of ${entity.entityDisplayName}: ${unreadablePropertyMessage(any)}"
+        )
+    }
+
+    private fun checkPropertyAccess(type: PropertyType<*>, entity: ProjectEntity) {
         // Supported entity?
-        val typeName = type.javaClass.name
         if (!type.supportedEntityTypes.contains(entity.projectEntityType)) {
-            throw PropertyUnsupportedEntityTypeException(typeName, entity.projectEntityType)
+            throw PropertyUnsupportedEntityTypeException(type.javaClass.name, entity.projectEntityType)
         }
         // Checks for viewing
         if (!type.canView(entity, securityService)) {
             throw AccessDeniedException("Property is not opened for viewing.")
         }
+    }
+
+    protected fun <T> getPropertyValue(type: PropertyType<T>, entity: ProjectEntity): T? {
+        val typeName = type.javaClass.name
+        checkPropertyAccess(type, entity)
         // Gets the raw information from the repository
         val t = propertyRepository.loadProperty(
             typeName,
@@ -263,6 +310,30 @@ class PropertyServiceImpl(
             val data = property.type.copy(sourceEntity, it, targetEntity, replacementFn)
             // Direct edition
             editProperty(targetEntity, property.type, data)
+        }
+    }
+
+    companion object {
+
+        /**
+         * Location of a JSON parsing error, which may embed the source being parsed.
+         */
+        private val jsonSourceLocation = Regex("""\s*at \[Source: .*?; line: \d+, column: \d+]""", RegexOption.DOT_MATCHES_ALL)
+
+        /**
+         * Message for a property whose stored value cannot be read: the message of the root cause, without
+         * the stored value, which may hold secrets.
+         */
+        internal fun unreadablePropertyMessage(any: Throwable): String {
+            var root = any
+            while (root.cause != null && root.cause !== root) {
+                root = root.cause!!
+            }
+            val message = root.message
+                ?.replace(jsonSourceLocation, "")
+                ?.trim()
+                ?.takeIf { it.isNotBlank() }
+            return message ?: root.javaClass.simpleName
         }
     }
 

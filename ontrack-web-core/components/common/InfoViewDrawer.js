@@ -9,7 +9,7 @@ import InformationSection from "@components/framework/information/InformationSec
  * Does the entity carry anything worth opening its details for?
  */
 export const hasEntityDetails = ({properties, information}) =>
-    (properties ?? []).some(it => it.value) ||
+    (properties ?? []).some(it => it.value || it.error) ||
     (information ?? []).some(it => it.data)
 
 /**

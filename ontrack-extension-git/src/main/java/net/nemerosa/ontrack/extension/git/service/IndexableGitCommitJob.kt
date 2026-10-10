@@ -8,7 +8,6 @@ import net.nemerosa.ontrack.job.*
 import net.nemerosa.ontrack.job.orchestrator.JobOrchestratorSupplier
 import net.nemerosa.ontrack.model.security.SecurityService
 import net.nemerosa.ontrack.model.structure.Project
-import net.nemerosa.ontrack.model.structure.StructureService
 import org.springframework.stereotype.Component
 
 /**
@@ -17,7 +16,6 @@ import org.springframework.stereotype.Component
 @Component
 class IndexableGitCommitJob(
     private val securityService: SecurityService,
-    private val structureService: StructureService,
     private val gitService: GitService,
     private val gitRepositoryClientFactory: GitRepositoryClientFactory,
     private val gitConfigService: GitConfigService,
@@ -25,11 +23,10 @@ class IndexableGitCommitJob(
 
     override val jobRegistrations: Collection<JobRegistration>
         get() = securityService.asAdmin {
-            structureService
-                .projectList
-                .filter { project ->
-                    gitService.getProjectConfiguration(project) != null
-                }
+            // Projects whose Git configuration cannot be read are skipped
+            val projects = mutableListOf<Project>()
+            gitService.forEachConfiguredProject { project, _ -> projects += project }
+            projects
                 .flatMap { project ->
                     sequenceOf(
                         createIndexableGitCommitJobRegistration(project, overrides = true, schedule = Schedule.NONE),

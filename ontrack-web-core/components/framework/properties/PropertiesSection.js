@@ -32,6 +32,7 @@ export default function PropertiesSection({entityType, entityId, onPropertiesLoa
                             description
                         }
                         value
+                        error
                     }
                 }
             }
@@ -57,8 +58,8 @@ export default function PropertiesSection({entityType, entityId, onPropertiesLoa
 
             const transformedProperties = await Promise.all(
                 initialProperties.map(async (property) => {
+                    const shortName = getExtensionShortName(property.type.typeName)
                     if (property.value) {
-                        const shortName = getExtensionShortName(property.type.typeName)
                         const newValue = await callDynamicFunction(
                             `framework/properties/${shortName}/Prepare`,
                             property.value
@@ -69,7 +70,10 @@ export default function PropertiesSection({entityType, entityId, onPropertiesLoa
                             clientValue: newValue,
                         }
                     } else {
-                        return property
+                        return {
+                            ...property,
+                            shortName,
+                        }
                     }
                 })
             )
@@ -105,7 +109,8 @@ export default function PropertiesSection({entityType, entityId, onPropertiesLoa
             emptyText={canAdd ? "No properties set yet. Use + to add one." : undefined}
             items={
                 propertyList
-                    .filter(it => it.value)
+                    // A property whose stored value cannot be read is shown with its error, to be fixed or deleted
+                    .filter(it => it.value || it.error)
                     .map(property => {
                         return {
                             id: `property-${property.shortName}`,

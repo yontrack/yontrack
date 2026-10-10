@@ -2,7 +2,7 @@ import FormDialog, {useFormDialog} from "@components/form/FormDialog";
 import {useContext, useState} from "react";
 import {Alert, Empty, Form, Select, Space, Typography} from "antd";
 import PropertyIcon from "@components/framework/properties/PropertyIcon";
-import {FaAsterisk, FaPencilAlt} from "react-icons/fa";
+import {FaAsterisk, FaExclamationTriangle, FaPencilAlt} from "react-icons/fa";
 import PropertyComponent from "@components/framework/properties/PropertyComponent";
 import PropertyForm from "@components/framework/properties/PropertyForm";
 import {gql} from "graphql-request";
@@ -44,6 +44,9 @@ export const usePropertyDialog = () => {
                                 <Typography.Text>{property.type.name}</Typography.Text>
                                 {
                                     property.value && <FaAsterisk title="Value set" color="green"/>
+                                }
+                                {
+                                    property.error && <FaExclamationTriangle title="Value cannot be read" color="red"/>
                                 }
                                 {
                                     property.editable && <FaPencilAlt title="Value editable" color="blue"/>
@@ -135,16 +138,29 @@ export default function PropertyDialog({dialog}) {
                                 <Space orientation="vertical" className="ot-line">
                                     <Alert type="info" title="Non editable. Read only."/>
                                     {
-                                        !dialog.selectedProperty.value && <Empty description="No value"/>
+                                        !dialog.selectedProperty.value && !dialog.selectedProperty.error &&
+                                        <Empty description="No value"/>
                                     }
                                     {
-                                        dialog.selectedProperty.value && <PropertyComponent property={dialog.selectedProperty}/>
+                                        (dialog.selectedProperty.value || dialog.selectedProperty.error) &&
+                                        <PropertyComponent property={dialog.selectedProperty}/>
                                     }
                                 </Space>
                             </>
                         }
                         {
                             dialog.selectedProperty.editable && <>
+                                {
+                                    dialog.selectedProperty.error &&
+                                    <Form.Item>
+                                        <Alert
+                                            type="warning"
+                                            showIcon
+                                            title="The current value of this property cannot be read. Saving replaces it."
+                                            description={dialog.selectedProperty.error}
+                                        />
+                                    </Form.Item>
+                                }
                                 <PropertyForm property={dialog.selectedProperty} entity={dialog.entity} prefix="value" form={dialog.form}/>
                             </>
                         }

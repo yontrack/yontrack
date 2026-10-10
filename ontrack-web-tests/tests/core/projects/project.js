@@ -2,6 +2,7 @@ import {expect} from "@playwright/test";
 import {confirmBox} from "../../support/confirm";
 import {expectOnPage} from "../../support/page-utils";
 import {labelDisplay} from "../../support/labels";
+import {PropertiesSection} from "../properties/PropertiesSection";
 
 export class ProjectPage {
 
@@ -19,6 +20,13 @@ export class ProjectPage {
     async goTo() {
         await this.page.goto(`${this.ontrack.connection.ui}/project/${this.project.id}`)
         await this.expectOnPage()
+    }
+
+    async openProperties() {
+        const button = this.page.getByTestId('project-info')
+        await expect(button).toHaveText('Details')
+        await button.click()
+        return new PropertiesSection(this.page)
     }
 
     async checkNoDisabledBanner() {

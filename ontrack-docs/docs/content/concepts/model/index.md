@@ -310,6 +310,12 @@ For example, in this documentation, we'll often talk about the "release label" o
 
 Properties can be set by users using the UI, but more often than not, they are set automatically by the [CI engine](../../configuration/ci-config.md).
 
+A property whose stored value can no longer be read — for example, because it points to a configuration which has
+been deleted, or which was stored by an older version of Yontrack — is still listed in the details of its entity,
+with the reason why it cannot be read. A user allowed to edit the property can then set a new value, which replaces
+the unreadable one, or delete it. In the GraphQL API, the `error` field of such a property gives the reason, its
+`value` being `null`.
+
 !!! note
 
     The list of all existing properties is available in the [reference](../../generated/properties/index.md).

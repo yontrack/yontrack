@@ -23,7 +23,7 @@ jest.mock("../../../../components/common/ListSection", () => function ListSectio
 })
 
 jest.mock("../../../../components/framework/properties/PropertyComponent", () => function PropertyComponent({property}) {
-    return <span>{property.clientValue.prepared}</span>
+    return <span>{property.error ?? property.clientValue.prepared}</span>
 })
 
 jest.mock("../../../../components/core/model/properties/PropertyAddButton", () => () => null)
@@ -91,6 +91,31 @@ describe('PropertiesSection', () => {
 
         const items = screen.getAllByRole('listitem')
         expect(items.map(it => it.textContent)).toEqual(['FIRST', 'LAST'])
+    })
+
+    it('lists a property whose value cannot be read, with its error', async () => {
+        const pending = mockGraphQL()
+        const onPropertiesLoaded = jest.fn()
+
+        render(<PropertiesSection entityType="PROJECT" entityId="30" onPropertiesLoaded={onPropertiesLoaded}/>)
+
+        await waitFor(() => expect(pending).toHaveLength(1))
+        await act(async () => pending[0]({
+            entity: {
+                properties: [
+                    property('Alpha', 'first'),
+                    {...property('Broken', null), error: 'Cannot read authType'},
+                ]
+            }
+        }))
+
+        await waitFor(() => expect(onPropertiesLoaded).toHaveBeenCalledTimes(1))
+        const broken = onPropertiesLoaded.mock.calls[0][0][1]
+        expect(broken.shortName).toBe('general.BrokenPropertyType')
+        expect(broken.clientValue).toBeUndefined()
+
+        const items = screen.getAllByRole('listitem')
+        expect(items.map(it => it.textContent)).toEqual(['FIRST', 'Cannot read authType'])
     })
 
     it('reloads the properties when they are changed', async () => {

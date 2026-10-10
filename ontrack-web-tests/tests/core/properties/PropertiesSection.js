@@ -19,6 +19,15 @@ export class PropertiesSection {
     }
 
     /**
+     * Checks that the given property is displayed with an error, its value being unreadable.
+     */
+    async checkPropertyError(shortTypeName, message) {
+        const error = this.property(shortTypeName).getByTestId('property-error')
+        await expect(error).toBeVisible()
+        await expect(error).toContainText(message)
+    }
+
+    /**
      * Deletes the given property, confirming the deletion.
      */
     async deleteProperty(shortTypeName) {
