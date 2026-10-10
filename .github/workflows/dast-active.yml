@@ -8,7 +8,7 @@
 # ACTIVE means it attacks: ZAP sends injection, XSS, SSRF and traversal payloads, and it exercises
 # GraphQL MUTATIONS as well as queries. So it never touches the demo - it creates, changes and deletes
 # data - only a THROWAWAY stack brought up on the runner from the latest BRONZE image, seeded with
-# ontrack-demo-seed, and torn down after. The counts land on that BRONZE build as SECURITY.DAST.ACTIVE.
+# ontrack-demo-seed, and torn down after. The findings land on that BRONZE build as SECURITY.DAST.ACTIVE.
 #
 # What it does, in order:
 #   1. resolves the build to scan (the latest BRONZE on main, or the dispatched version) and pulls its
@@ -26,8 +26,8 @@
 #      intact - scan-readonly must not write, scan-project must not read or change another project;
 #   7. runs ZAP's active scan once per role, mutations included, the dangerous mutations stripped from
 #      the schema and logout / the management port excluded from attack;
-#   8. counts, reports to the private yontrack/security-reports under dast/active/, and reports
-#      SECURITY.DAST.ACTIVE on the build.
+#   8. counts, reports to the private yontrack/security-reports under dast/active/, and sends the
+#      findings by rule - never where nor how - to SECURITY.DAST.ACTIVE on the build (#1875).
 #
 # ---------------------------------------------------------------------------------------------
 # DISCLOSURE - identical to the passive scan, read it there. This repository is public: this workflow
@@ -68,9 +68,9 @@ permissions:
   contents: read
 
 env:
-  # See dast-passive.yml: 5.2.0 for `build search --with-display-name`, and validate is always called
-  # with --project/--branch/--build spelled out.
-  YONTRACK_CLI_VERSION: "5.2.0"
+  # See dast-passive.yml: 5.8.0 for `validate … findings`, and validate is always called with
+  # --project/--branch/--build spelled out.
+  YONTRACK_CLI_VERSION: "5.8.0"
   # The same digest-pinned ZAP image the passive scan uses (2.17.0). Moved together with the passive
   # pin by Dependabot.
   ZAP_IMAGE: ghcr.io/zaproxy/zaproxy@sha256:781a2bdaea47324e7bab583e2263f21d257b0aee61ed51521a5be45f5f5081ef
@@ -493,7 +493,9 @@ jobs:
               > "$WORK/out/findings-access-control-$role.json"
             documents+=("$WORK/out/findings-access-control-$role.json")
           done
-          scripts/security-dast.sh report "$WORK/out/report.md" "${documents[@]}"
+          # The findings report goes to Yontrack: what was found, never where nor how (#1875).
+          DAST_FINDINGS_OUT="$WORK/out/findings.json" \
+            scripts/security-dast.sh report "$WORK/out/report.md" "${documents[@]}"
           echo "path=$(scripts/security-dast.sh report-path)" >> "$GITHUB_OUTPUT"
 
       - name: Publish the report
@@ -513,10 +515,7 @@ jobs:
       # ------------------------------------------------------------------------------------
       - name: Validate SECURITY.DAST.ACTIVE
         env:
-          CRITICAL: ${{ steps.report.outputs.critical }}
-          HIGH: ${{ steps.report.outputs.high }}
-          MEDIUM: ${{ steps.report.outputs.medium }}
-          LOW: ${{ steps.report.outputs.low }}
+          REPORT: ${{ steps.prepare.outputs.work }}/out/findings.json
           STARTED: ${{ steps.job_start.outputs.started }}
           BUILD: ${{ steps.resolve.outputs.build }}
           VERSION: ${{ steps.resolve.outputs.version }}
@@ -532,7 +531,7 @@ jobs:
           yontrack validate \
             --project "$YONTRACK_PROJECT" --branch "$YONTRACK_BRANCH" --build "$BUILD" \
             --validation SECURITY.DAST.ACTIVE \
-            chml --critical "$CRITICAL" --high "$HIGH" --medium "$MEDIUM" --low "$LOW" \
+            findings --format findings --kind DAST --report "$REPORT" \
             $run_time_flag $run_info
 
       # ------------------------------------------------------------------------------------

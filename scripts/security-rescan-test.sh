@@ -176,9 +176,10 @@ setup_stubs() {
     : > "$WORK/summary"
     STUB_CALLS="$WORK/calls"
     STUB_GH_FAIL=""
-    STUB_GH_PAGES="$WORK/alerts1.json $WORK/alerts2.json"
+    STUB_GH_OPEN=""
+    STUB_GH_RESOLVED=""
     STUB_GRAPHQL_FAIL=""
-    export STUB_CALLS STUB_GH_FAIL STUB_GH_PAGES STUB_GRAPHQL_FAIL
+    export STUB_CALLS STUB_GH_FAIL STUB_GH_OPEN STUB_GH_RESOLVED STUB_GRAPHQL_FAIL
 }
 calls() { cat "$WORK/calls"; }
 queries() { cat "$WORK/queries"; }
@@ -229,21 +230,24 @@ assert_eq "1" "$rc" "targets: refuses to run without a project"
 # ===========================================================================
 
 setup_stubs
+FINDINGS_TYPE="net.nemerosa.ontrack.extension.findings.validation.FindingsValidationDataType"
 out="$(srs_stamp_config SECURITY.IMAGE.BACKEND)"; rc=$?
-assert_eq "0" "$rc" "stamp-config: reads a CHML stamp out of the CI configuration"
-assert_eq "net.nemerosa.ontrack.extension.general.validation.CHMLValidationDataType" \
-    "$(printf '%s' "$out" | jq -r '.dataType')" "stamp-config: resolves the chml alias to the data type behind it"
+assert_eq "0" "$rc" "stamp-config: reads a security-findings stamp out of the CI configuration"
+assert_eq "$FINDINGS_TYPE" \
+    "$(printf '%s' "$out" | jq -r '.dataType')" "stamp-config: resolves the security-findings alias to the data type behind it"
 assert_eq "CRITICAL" "$(printf '%s' "$out" | jq -r '.dataTypeConfig.failedLevel')" \
     "stamp-config: carries the thresholds CI declares, so both report against the same ones"
 
 out="$(srs_stamp_config SECURITY.SECRETS)"; rc=$?
 assert_eq "0" "$rc" "stamp-config: reads the secrets stamp"
-assert_eq "net.nemerosa.ontrack.extension.general.validation.ThresholdNumberValidationDataType" \
-    "$(printf '%s' "$out" | jq -r '.dataType')" "stamp-config: the secrets stamp counts a number"
-assert_eq "0" "$(printf '%s' "$out" | jq -r '.dataTypeConfig.failureThreshold')" \
-    "stamp-config: one open alert is a failure"
-assert_eq "false" "$(printf '%s' "$out" | jq -r '.dataTypeConfig.okIfGreater')" \
-    "stamp-config: and more is worse, not better"
+assert_eq "$FINDINGS_TYPE" \
+    "$(printf '%s' "$out" | jq -r '.dataType')" "stamp-config: the secrets stamp takes findings"
+assert_eq "CRITICAL|1" "$(printf '%s' "$out" | jq -r '.dataTypeConfig | "\(.failedLevel)|\(.failedValue)"')" \
+    "stamp-config: one open alert - a CRITICAL finding - is a failure"
+
+COVERAGE_TYPE="net.nemerosa.ontrack.extension.general.validation.MetricsValidationDataType"
+out="$(srs_stamp_config COVERAGE.UNIT)"; rc=$?
+assert_eq "$COVERAGE_TYPE" "$(printf '%s' "$out" | jq -r '.dataType')" "stamp-config: the other aliases still resolve"
 
 out="$(srs_stamp_config NO.SUCH.STAMP 2>&1)"; rc=$?
 assert_eq "1" "$rc" "stamp-config: a stamp the CI configuration does not declare is an error"
@@ -263,8 +267,8 @@ out="$(srs_setup_stamp yontrack release-5.3 SECURITY.SECRETS 2>&1)"; rc=$?
 assert_eq "0" "$rc" "setup-stamp: succeeds"
 assert_contains "$(queries)" "setupValidationStamp" "setup-stamp: creates the stamp if the branch has none, updates it otherwise"
 assert_contains "$(queries)" "release-5.3" "setup-stamp: on the branch of the build being rescanned"
-assert_contains "$(queries)" "ThresholdNumberValidationDataType" "setup-stamp: with the data type, so a branch whose CI config predates the stamp still gets the thresholds"
-assert_contains "$(queries)" "failureThreshold" "setup-stamp: and its configuration"
+assert_contains "$(queries)" "FindingsValidationDataType" "setup-stamp: with the data type, so a branch whose CI config predates the stamp still gets the thresholds"
+assert_contains "$(queries)" "failedLevel" "setup-stamp: and its configuration"
 
 setup_stubs
 STUB_GRAPHQL_ANSWER="$WORK/setup-user-error.json"
@@ -278,62 +282,96 @@ out="$(srs_setup_stamp yontrack "" SECURITY.SECRETS 2>&1)"; rc=$?
 assert_eq "1" "$rc" "setup-stamp: refuses to run without a branch"
 
 # ===========================================================================
-# count-secrets
+# secret-findings
 # ===========================================================================
 
-# One page of open secret-scanning alerts. Only the count is ever used; the fixtures carry the
-# surrounding fields precisely so that a test can prove they are not printed.
-cat > "$WORK/alerts1.json" <<'JSON'
+# The open and resolved secret-scanning alerts. The fixtures carry the secret itself, as an
+# answer without `hide_secret` would, precisely so that a test can prove it never goes anywhere.
+cat > "$WORK/alerts-open.json" <<'JSON'
 [
   {"number": 3, "state": "open", "secret_type": "github_personal_access_token",
+   "secret_type_display_name": "GitHub Personal Access Token",
    "secret": "ghp_SUPERSECRETVALUE", "html_url": "https://github.com/yontrack/yontrack/security/secret-scanning/3"},
   {"number": 2, "state": "open", "secret_type": "slack_api_token",
    "secret": "xoxb-SUPERSECRETVALUE", "html_url": "https://github.com/yontrack/yontrack/security/secret-scanning/2"}
 ]
-JSON
-
-cat > "$WORK/alerts2.json" <<'JSON'
 [
   {"number": 1, "state": "open", "secret_type": "aws_access_key_id",
+   "secret_type_display_name": "Amazon AWS Access Key ID",
    "secret": "AKIASUPERSECRETVALUE", "html_url": "https://github.com/yontrack/yontrack/security/secret-scanning/1"}
 ]
 JSON
 
-cat "$WORK/alerts1.json" "$WORK/alerts2.json" > "$WORK/alerts-paginated.json"
+# Resolved: as a false positive and as used in tests - accepted - and as revoked, which is a fix
+# and no longer a finding at all.
+cat > "$WORK/alerts-resolved.json" <<'JSON'
+[
+  {"number": 7, "state": "resolved", "resolution": "false_positive", "resolution_comment": "A sample in the docs",
+   "secret_type": "slack_api_token", "secret_type_display_name": "Slack API Token",
+   "secret": "xoxb-SUPERSECRETVALUE", "html_url": "https://github.com/yontrack/yontrack/security/secret-scanning/7"},
+  {"number": 6, "state": "resolved", "resolution": "used_in_tests", "resolution_comment": null,
+   "secret_type": "aws_access_key_id", "secret_type_display_name": "Amazon AWS Access Key ID",
+   "secret": "AKIASUPERSECRETVALUE", "html_url": "https://github.com/yontrack/yontrack/security/secret-scanning/6"},
+  {"number": 5, "state": "resolved", "resolution": "revoked", "resolution_comment": "Rotated",
+   "secret_type": "github_personal_access_token", "secret_type_display_name": "GitHub Personal Access Token",
+   "secret": "ghp_SUPERSECRETVALUE", "html_url": "https://github.com/yontrack/yontrack/security/secret-scanning/5"}
+]
+JSON
+
+cat "$WORK/alerts-open.json" "$WORK/alerts-resolved.json" > "$WORK/alerts-all.json"
 echo '[]' > "$WORK/alerts-empty.json"
 
-out="$(srs_count_secrets "$WORK/alerts1.json")"; rc=$?
-assert_eq "0" "$rc" "count-secrets: succeeds on one page"
-assert_eq "secrets=2" "$out" "count-secrets: counts the open alerts"
+report="$(srs_secret_findings "$WORK/alerts-all.json")"; rc=$?
+assert_eq "0" "$rc" "secret-findings: succeeds"
+assert_eq "github-secret-scanning|SECRETS" "$(printf '%s' "$report" | jq -r '"\(.scanner)|\(.kind)"')" \
+    "secret-findings: the scanner and the kind"
+assert_eq "5" "$(printf '%s' "$report" | jq '.findings | length')" \
+    "secret-findings: every page, open and accepted, without the revoked alert"
+assert_eq "github_personal_access_token|#3|CRITICAL|GitHub Personal Access Token" \
+    "$(printf '%s' "$report" | jq -r '.findings[0] | "\(.externalId)|\(.location)|\(.severity)|\(.title)"')" \
+    "secret-findings: the secret type, the alert number as location, CRITICAL - a leaked credential has no acceptable count"
+assert_eq "slack_api_token" "$(printf '%s' "$report" | jq -r '.findings[1].title')" \
+    "secret-findings: the type is the title when there is no display name"
+assert_eq "https://github.com/yontrack/yontrack/security/secret-scanning/3" \
+    "$(printf '%s' "$report" | jq -r '.findings[0].url')" "secret-findings: links to the alert"
+assert_eq "null" "$(printf '%s' "$report" | jq -c '.findings[0].acceptance')" \
+    "secret-findings: an open alert is not accepted"
+assert_eq '{"statement":"false_positive: A sample in the docs","source":"GitHub secret scanning alert #7"}' \
+    "$(printf '%s' "$report" | jq -c '.findings[3].acceptance')" \
+    "secret-findings: a false positive is an acceptance, with its comment"
+assert_eq '{"statement":"used_in_tests","source":"GitHub secret scanning alert #6"}' \
+    "$(printf '%s' "$report" | jq -c '.findings[4].acceptance')" \
+    "secret-findings: so is a secret used in tests, without comment"
+assert_not_contains "$report" "SUPERSECRETVALUE" "secret-findings: never the value of a secret"
+assert_eq "" "$(printf '%s' "$report" | jq -r '.findings[] | keys[] | select(IN("externalId","location","severity","title","url","acceptance") | not)')" \
+    "secret-findings: no field the neutral format would reject"
 
-out="$(srs_count_secrets "$WORK/alerts-paginated.json")"; rc=$?
-assert_eq "secrets=3" "$out" "count-secrets: adds up every page"
+report="$(srs_secret_findings < "$WORK/alerts-all.json")"; rc=$?
+assert_eq "5" "$(printf '%s' "$report" | jq '.findings | length')" "secret-findings: reads stdin when no file is given"
 
-out="$(srs_count_secrets "$WORK/alerts-empty.json")"; rc=$?
-assert_eq "0" "$rc" "count-secrets: succeeds when there is no open alert"
-assert_eq "secrets=0" "$out" "count-secrets: no alert counts as zero"
+report="$(srs_secret_findings "$WORK/alerts-empty.json")"; rc=$?
+assert_eq "0" "$rc" "secret-findings: no alert is a report"
+assert_eq "0" "$(printf '%s' "$report" | jq '.findings | length')" "secret-findings: with no finding"
 
-out="$(srs_count_secrets "$WORK/alerts-paginated.json" 2>&1)"
-assert_not_contains "$out" "SUPERSECRETVALUE" "count-secrets: never prints a secret"
-assert_not_contains "$out" "secret_type" "count-secrets: nor what kind of secret it is"
-assert_not_contains "$out" "security/secret-scanning" "count-secrets: nor where it is"
+out="$(srs_secret_findings "$WORK/nothing.json" 2>&1)"; rc=$?
+assert_eq "1" "$rc" "secret-findings: an empty answer is an error, not zero alerts"
 
-out="$(srs_count_secrets "$WORK/nothing.json" 2>&1)"; rc=$?
-assert_eq "1" "$rc" "count-secrets: an empty answer is an error, not zero alerts"
+out="$(srs_secret_findings "$WORK/broken.json" 2>&1)"; rc=$?
+assert_eq "1" "$rc" "secret-findings: an answer that is not JSON is an error, not zero alerts"
 
-out="$(srs_count_secrets "$WORK/broken.json" 2>&1)"; rc=$?
-assert_eq "1" "$rc" "count-secrets: an answer that is not JSON is an error, not zero alerts"
+out="$(srs_secret_findings "$WORK/error-object.json" 2>&1)"; rc=$?
+assert_eq "1" "$rc" "secret-findings: an API error object is an error, not zero alerts"
+assert_not_contains "$out" "SUPERSECRETVALUE" "secret-findings: and its error says nothing of the alerts"
 
-out="$(srs_count_secrets "$WORK/error-object.json" 2>&1)"; rc=$?
-assert_eq "1" "$rc" "count-secrets: an API error object is an error, not zero alerts"
-
-out="$(srs_count_secrets "$WORK/does-not-exist.json" 2>&1)"; rc=$?
-assert_eq "1" "$rc" "count-secrets: a missing file is an error, not zero alerts"
+out="$(srs_secret_findings "$WORK/does-not-exist.json" 2>&1)"; rc=$?
+assert_eq "1" "$rc" "secret-findings: a missing file is an error, not zero alerts"
 
 # ===========================================================================
 # secrets - against a stubbed gh
 # ===========================================================================
 
+# Answers the open alerts with STUB_GH_OPEN and the resolved ones with STUB_GH_RESOLVED, by the
+# `state` of the query.
 cat > "$WORK/bin/gh" <<'STUB'
 #!/usr/bin/env bash
 set -uo pipefail
@@ -342,40 +380,60 @@ if [ -n "${STUB_GH_FAIL:-}" ]; then
     echo "gh: Not Found (HTTP 404)" >&2
     exit 1
 fi
-for page in $STUB_GH_PAGES; do
-    cat "$page"
-done
+case "$*" in
+    *state=open*) cat "$STUB_GH_OPEN" ;;
+    *state=resolved*) cat "$STUB_GH_RESOLVED" ;;
+esac
 STUB
 chmod +x "$WORK/bin/gh"
 
-setup_stubs
+secrets_stubs() {
+    setup_stubs
+    STUB_GH_OPEN="$WORK/alerts-open.json"
+    STUB_GH_RESOLVED="$WORK/alerts-resolved.json"
+    export STUB_GH_OPEN STUB_GH_RESOLVED
+    rm -f "$WORK/secrets.json"
+}
+
+secrets_stubs
 out="$(PATH="$WORK/bin:$PATH" GITHUB_OUTPUT="$WORK/github_output" \
-    srs_secrets yontrack/yontrack 2>&1)"; rc=$?
+    srs_secrets yontrack/yontrack "$WORK/secrets.json" 2>&1)"; rc=$?
 assert_eq "0" "$rc" "secrets: succeeds"
 assert_contains "$(calls)" "--paginate" "secrets: follows every page"
-assert_contains "$(calls)" "repos/yontrack/yontrack/secret-scanning/alerts" "secrets: asks the secret-scanning alerts API"
-assert_contains "$(calls)" "state=open" "secrets: counts only the open alerts, so a resolved one lowers the count"
-assert_contains "$(calls)" "per_page=100" "secrets: asks for the largest pages"
-assert_eq "secrets=3" "$(cat "$WORK/github_output")" "secrets: writes the count to GITHUB_OUTPUT"
-assert_contains "$out" "secrets=3" "secrets: prints the count in the log"
+assert_contains "$(calls)" "repos/yontrack/yontrack/secret-scanning/alerts?state=open&hide_secret=true&per_page=100" \
+    "secrets: the open alerts, without their secret, in the largest pages"
+assert_contains "$(calls)" "repos/yontrack/yontrack/secret-scanning/alerts?state=resolved&hide_secret=true&per_page=100" \
+    "secrets: and the resolved ones, which may be acceptances"
+assert_eq "5" "$(jq '.findings | length' "$WORK/secrets.json")" "secrets: writes the report"
+assert_eq "secrets=3
+accepted=2" "$(cat "$WORK/github_output")" "secrets: writes the counts to GITHUB_OUTPUT"
+assert_contains "$out" "secrets=3" "secrets: prints the counts in the log"
 assert_not_contains "$out" "SUPERSECRETVALUE" "secrets: and prints nothing else about the alerts"
+assert_not_contains "$out" "secret_type" "secrets: nor what kind of secret it is"
 
-setup_stubs
-STUB_GH_PAGES="$WORK/alerts-empty.json"
+secrets_stubs
+STUB_GH_OPEN="$WORK/alerts-empty.json"
+STUB_GH_RESOLVED="$WORK/alerts-empty.json"
 out="$(PATH="$WORK/bin:$PATH" GITHUB_OUTPUT="$WORK/github_output" \
-    srs_secrets yontrack/yontrack 2>&1)"; rc=$?
+    srs_secrets yontrack/yontrack "$WORK/secrets.json" 2>&1)"; rc=$?
 assert_eq "0" "$rc" "secrets: succeeds with no alert"
-assert_eq "secrets=0" "$(cat "$WORK/github_output")" "secrets: no alert writes a zero"
+assert_eq "0" "$(jq '.findings | length' "$WORK/secrets.json")" "secrets: no alert is an empty report"
+assert_contains "$(cat "$WORK/github_output")" "secrets=0" "secrets: no alert writes a zero"
 
-setup_stubs
+secrets_stubs
 STUB_GH_FAIL=1
 out="$(PATH="$WORK/bin:$PATH" GITHUB_OUTPUT="$WORK/github_output" \
-    srs_secrets yontrack/yontrack 2>&1)"; rc=$?
+    srs_secrets yontrack/yontrack "$WORK/secrets.json" 2>&1)"; rc=$?
 assert_eq "1" "$rc" "secrets: an API error fails - a token that cannot read the alerts must not read as none"
 assert_eq "" "$(cat "$WORK/github_output")" "secrets: an API error writes no count"
+assert_eq "false" "$([ -f "$WORK/secrets.json" ] && echo true || echo false)" "secrets: and no report"
 
-setup_stubs
-out="$(PATH="$WORK/bin:$PATH" srs_secrets "" 2>&1)"; rc=$?
+secrets_stubs
+out="$(PATH="$WORK/bin:$PATH" srs_secrets "" "$WORK/secrets.json" 2>&1)"; rc=$?
 assert_eq "1" "$rc" "secrets: refuses to run without a repository"
+
+secrets_stubs
+out="$(PATH="$WORK/bin:$PATH" srs_secrets yontrack/yontrack "" 2>&1)"; rc=$?
+assert_eq "1" "$rc" "secrets: refuses to run without an output file"
 
 report_tests

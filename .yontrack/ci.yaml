@@ -15,60 +15,65 @@ configuration:
           tests: {}
         PLAYWRIGHT:
           tests: {}
-        # Fixable vulnerabilities in the two Docker images, counted by Trivy and reported by the
-        # `security-images` job in ci.yml on every full run (#1749). The images carry the jars and
-        # Next's standalone node_modules, so these are the runtime dependencies of both tiers.
+        # The six SECURITY stamps are `security-findings` stamps (#1875): each run carries the
+        # findings themselves - a Trivy report, or the neutral `findings` format - and Yontrack
+        # counts them by severity, accepted findings apart, against the thresholds below, which
+        # read as CHML's did. The CHML runs recorded before the switch stay on the charts.
+        #
+        # Fixable vulnerabilities in the two Docker images, found by Trivy and reported by the
+        # `security-images` job in ci.yml on every full run (#1749), as the Trivy JSON report.
+        # The images carry the jars and Next's standalone node_modules, so these are the runtime
+        # dependencies of both tiers. What .trivyignore.yaml accepts arrives as accepted findings.
         #
         # WARNING from the first HIGH, FAILED from the first CRITICAL. Not in any promotion yet:
         # they soak first, and are expected to join SILVER later.
         SECURITY.IMAGE.BACKEND:
-          chml:
+          security-findings:
             warningLevel: HIGH
             warningValue: 1
             failedLevel: CRITICAL
             failedValue: 1
         SECURITY.IMAGE.UI:
-          chml:
+          security-findings:
             warningLevel: HIGH
             warningValue: 1
             failedLevel: CRITICAL
             failedValue: 1
-        # Open CodeQL security alerts of the pushed branch, by security severity, counted from the
-        # code-scanning alerts API - so a dismissed false positive lowers the count - and reported
-        # by the `report` job of .github/workflows/codeql.yml once every language is analysed
-        # (#1750). Code-quality alerts, which have no security severity, are not counted.
+        # CodeQL security alerts of the pushed branch, by security severity, read from the
+        # code-scanning alerts API - a dismissed alert arrives as an accepted finding - and
+        # reported by the `report` job of .github/workflows/codeql.yml once every language is
+        # analysed (#1750). Code-quality alerts, which have no security severity, are left out.
         #
         # Same thresholds as the image scans, and likewise in no promotion yet.
         SECURITY.CODE:
-          chml:
+          security-findings:
             warningLevel: HIGH
             warningValue: 1
             failedLevel: CRITICAL
             failedValue: 1
-        # Open secret-scanning alerts of the repository, counted by the nightly
+        # Secret-scanning alerts of the repository, read by the nightly
         # .github/workflows/security-rescan.yml and reported on the newest released build only
         # (#1751). Repository-wide and not a property of a release, which is why it is reported
-        # once rather than on every build the rescan touches.
+        # once rather than on every build the rescan touches. One finding per alert - the type
+        # of secret at the alert's number, never its value - and an alert resolved as a false
+        # positive, as won't fix or as used in tests arrives as an accepted finding.
         #
-        # One open alert fails: a leaked credential has no acceptable count. `okIfGreater: false`
-        # is what says that more is worse - the threshold type reads high as good by default.
-        #
-        # Spelled as the data type's class name rather than as the `number` alias #1748 added:
-        # the alias reaches an instance only with the release that carries it, and
-        # `CIConfigurationParserImpl` rejects a name it does not know outright, which would fail
-        # the CI configuration on every push. The class name is what the alias resolves to and
-        # every version understands it. Switch to `number` once the instance runs a release with
-        # #1748 in it.
+        # One open alert fails: a leaked credential has no acceptable count, so every alert is a
+        # CRITICAL finding. Its history restarts at the switch: it was a ThresholdNumber stamp,
+        # whose runs do not chart as findings.
         #
         # Not in any promotion, like the other SECURITY stamps.
         SECURITY.SECRETS:
-          net.nemerosa.ontrack.extension.general.validation.ThresholdNumberValidationDataType:
-            failureThreshold: 0
-            okIfGreater: false
-        # Findings of the passive DAST scan of the demo instance, counted after suppressions by
+          security-findings:
+            warningLevel: HIGH
+            warningValue: 1
+            failedLevel: CRITICAL
+            failedValue: 1
+        # Findings of the passive DAST scan of the demo instance, normalised by
         # .github/workflows/dast-passive.yml and reported on the build the demo is running
-        # (#1765). One count per scanner rule, not per affected URL; informational findings are
-        # dropped, and ZAP has no Critical, so a passive ZAP-only run never produces one.
+        # (#1765). One finding per scanner rule, not per affected URL, and never the URLs
+        # themselves; informational findings are dropped, a suppressed one arrives as accepted,
+        # and ZAP has no Critical, so a passive ZAP-only run never produces one.
         #
         # Lower thresholds than the other SECURITY stamps on purpose: these are findings against a
         # deployment that is actually reachable, so one MEDIUM is worth a look and one HIGH is
@@ -76,12 +81,12 @@ configuration:
         # nothing in ci.yml depends on the workflow. What the numbers mean and where the detail
         # lives: security/dast/README.md.
         SECURITY.DAST:
-          chml:
+          security-findings:
             warningLevel: MEDIUM
             warningValue: 1
             failedLevel: HIGH
             failedValue: 1
-        # Findings of the weekly ACTIVE DAST scan, counted after suppressions by
+        # Findings of the weekly ACTIVE DAST scan, normalised as for the passive one by
         # .github/workflows/dast-active.yml and reported on the latest BRONZE build it scanned
         # (#1767). The active scan attacks a throwaway stack - injection, XSS, SSRF, traversal, and
         # GraphQL mutations - and adds the cross-role authorization checks (scan-readonly must not
@@ -91,7 +96,7 @@ configuration:
         # running Yontrack. Reporting only - in no promotion, and nothing in ci.yml depends on the
         # workflow. Where the detail lives: security/dast/README.md.
         SECURITY.DAST.ACTIVE:
-          chml:
+          security-findings:
             warningLevel: MEDIUM
             warningValue: 1
             failedLevel: HIGH
@@ -566,7 +571,7 @@ configuration:
               - name: self.dev.yontrack.com
                 admissionRules:
                   # A RELEASE build is deployable from `main` and from a patch branch alike. The
-                  # pattern reads the Yontrack branch name, so `release-5.4`, not `release/5.4`.
+                  # pattern reads the Yontrack branch name, so `release-6.1`, not `release/6.1`.
                   #
                   # One regex rather than two `includes` entries: the eligible-builds query ANDs
                   # its entries, so `main` and `release-.*` listed separately match no branch.
@@ -579,11 +584,16 @@ configuration:
                   # Nothing here can keep a 6.0 alpha on `main` out: no admission rule reads the
                   # version. The promotion rule does - a pre-release is never granted RELEASE, see
                   # the RELEASE promotion under `defaults` (#1987).
+                  #
+                  # `release-6.*` only, not every `release-*`: self.dev runs 6.x, its database
+                  # migrated past what 5.x knows, and a 5.5.x RELEASE from `release/5.5` deployed
+                  # there would downgrade onto that schema (#1875, decision 6 of
+                  # docs/grilling/2026-10-v6-cutover/README.md).
                   - name: "branchPattern"
                     ruleId: "branchPattern"
                     ruleConfig:
                       includes:
-                        - "^(main|release-.*)$"
+                        - "^(main|release-6\\..*)$"
                   - name: "promotion"
                     ruleId: "promotion"
                     ruleConfig:

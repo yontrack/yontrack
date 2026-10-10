@@ -6,8 +6,8 @@ what the scanners read is [`security/dast/`](../../security/dast/README.md).*
 
 Dynamic application security testing: scanning a **running** Yontrack over HTTP, as opposed to the
 supply-chain, SAST and secret scans that read the code and the images. The passive scan runs OWASP
-ZAP, graphql-cop and Nuclei against the public demo instance and records their findings, added up,
-on the deployed build as the CHML stamp `SECURITY.DAST`.
+ZAP, graphql-cop and Nuclei against the public demo instance and records their findings, one per
+rule, on the deployed build as the `security-findings` stamp `SECURITY.DAST` (#1875).
 
 Report only. `SECURITY.DAST` is in no promotion and nothing in `ci.yml` depends on this workflow.
 
@@ -53,7 +53,9 @@ touches the demo joins that group.
    grouped by tool. The passes are de-duplicated by rule and URL first, and the report says which
    role saw each finding.
 9. **Publishes the markdown report** to the private `yontrack/security-reports`.
-10. **Validates `SECURITY.DAST`** on the build, with the counts of all three. A scanner error reports no stamp
+10. **Validates `SECURITY.DAST`** on the build, with the findings of all three: one per rule, its title
+   and level, a suppressed one as accepted - never a URL nor a piece of evidence, which stay in the
+   private report. Yontrack counts them against the thresholds. A scanner error reports no stamp
    at all: nothing depends on this one, so an absent stamp stalls nothing and says the true
    thing - not scanned.
 
@@ -236,7 +238,7 @@ carries.
 [`.github/workflows/dast-active.yml`](../../.github/workflows/dast-active.yml) runs a second scan
 that **attacks**: ZAP sends injection, XSS, SSRF and traversal payloads and exercises GraphQL
 **mutations**, so it never touches the demo — only a **throwaway stack** brought up on the runner
-from the latest BRONZE image, seeded with `ontrack-demo-seed`, and torn down after. Its counts land
+from the latest BRONZE image, seeded with `ontrack-demo-seed`, and torn down after. Its findings land
 on that BRONZE build as `SECURITY.DAST.ACTIVE`. Weekly (Sunday 01:00 UTC) and on demand; report
 only, like the passive scan.
 

@@ -17,8 +17,9 @@
 # exercise it against stubs.
 #
 # The image scan is the composite action of #1749, not a copy of it: ci.yml and this workflow
-# must never disagree about what "the count" is. What differs is only which build the counts are
-# reported on, which is why that action returns counts and leaves the reporting to its caller.
+# must never disagree about what is scanned. What differs is only which build the report is sent
+# to, which is why that action returns the report and leaves the reporting to its caller. Every
+# SECURITY stamp receives its findings, not counts (#1875).
 #
 # Every action below is pinned by commit SHA, not by tag, like the other security workflows.
 # .github/dependabot.yml keeps the pins up to date.
@@ -43,10 +44,10 @@ permissions:
 
 env:
   # Pinned, like ci.yml's: an unpinned CLI lets a Yontrack release turn a green pipeline red in
-  # a repository nobody touched. Only `validate` is used here, and always with `--project`,
-  # `--branch` and `--build` spelled out - in 5.1.1 the typed subcommands read the build from
-  # their flag only (yontrack/yontrack-cli#73), and nothing in this workflow exports one anyway.
-  YONTRACK_CLI_VERSION: "5.1.1"
+  # a repository nobody touched. Same version as ci.yml, for `validate … findings` (#1875). Only
+  # `validate` is used here, and always with `--project`, `--branch` and `--build` spelled out:
+  # nothing in this workflow exports them.
+  YONTRACK_CLI_VERSION: "5.8.0"
   # The Yontrack project ci.yml registers its builds in.
   YONTRACK_PROJECT: yontrack
   # The published images, by the version tag the release pushed. Deliberately Docker Hub and not
@@ -219,10 +220,7 @@ jobs:
         if: ${{ !cancelled() && steps.backend.outcome != '' }}
         env:
           OUTCOME: ${{ steps.backend.outcome }}
-          CRITICAL: ${{ steps.backend.outputs.critical }}
-          HIGH: ${{ steps.backend.outputs.high }}
-          MEDIUM: ${{ steps.backend.outputs.medium }}
-          LOW: ${{ steps.backend.outputs.low }}
+          REPORT: ${{ steps.backend.outputs.report-dir }}/trivy.json
           STARTED: ${{ steps.job_start.outputs.started }}
         run: |
           set -uo pipefail
@@ -234,7 +232,7 @@ jobs:
             # shellcheck disable=SC2086  # deliberate: run info is a set of flags, not one word
             yontrack validate --project "$TARGET_PROJECT" --branch "$TARGET_BRANCH" --build "$TARGET_BUILD" \
               --validation SECURITY.IMAGE.BACKEND \
-              chml --critical "$CRITICAL" --high "$HIGH" --medium "$MEDIUM" --low "$LOW" \
+              findings --format trivy --kind IMAGE --report "$REPORT" \
               $run_time_flag $YONTRACK_RUN_INFO
           else
             # shellcheck disable=SC2086  # deliberate: run info is a set of flags, not one word
@@ -247,10 +245,7 @@ jobs:
         if: ${{ !cancelled() && steps.ui.outcome != '' }}
         env:
           OUTCOME: ${{ steps.ui.outcome }}
-          CRITICAL: ${{ steps.ui.outputs.critical }}
-          HIGH: ${{ steps.ui.outputs.high }}
-          MEDIUM: ${{ steps.ui.outputs.medium }}
-          LOW: ${{ steps.ui.outputs.low }}
+          REPORT: ${{ steps.ui.outputs.report-dir }}/trivy.json
           STARTED: ${{ steps.job_start.outputs.started }}
         run: |
           set -uo pipefail
@@ -262,7 +257,7 @@ jobs:
             # shellcheck disable=SC2086  # deliberate: run info is a set of flags, not one word
             yontrack validate --project "$TARGET_PROJECT" --branch "$TARGET_BRANCH" --build "$TARGET_BUILD" \
               --validation SECURITY.IMAGE.UI \
-              chml --critical "$CRITICAL" --high "$HIGH" --medium "$MEDIUM" --low "$LOW" \
+              findings --format trivy --kind IMAGE --report "$REPORT" \
               $run_time_flag $YONTRACK_RUN_INFO
           else
             # shellcheck disable=SC2086  # deliberate: run info is a set of flags, not one word
@@ -292,9 +287,9 @@ jobs:
   # SECURITY.SECRETS, on the newest target build only.
   # ---------------------------------------------------------------------------------------------
 
-  # A job of its own, rather than a step of the matrix above, for two reasons: the count is a
-  # number about the repository as it is today, not about a release, so reporting it on both
-  # targets would say the same thing twice; and `SECRET_SCANNING_TOKEN` then reaches exactly one
+  # A job of its own, rather than a step of the matrix above, for two reasons: the alerts are
+  # about the repository as it is today, not about a release, so reporting them on both targets
+  # would say the same thing twice; and `SECRET_SCANNING_TOKEN` then reaches exactly one
   # job, which is the whole point of a token scoped to secret scanning alone (#1747). It is used
   # here and nowhere else - never in ci.yml.
   secrets:
@@ -340,26 +335,27 @@ jobs:
           YONTRACK_TOKEN: ${{ secrets.YONTRACK_TOKEN }}
         run: scripts/security-rescan.sh setup-stamp "$TARGET_PROJECT" "$TARGET_BRANCH" SECURITY.SECRETS
 
-      # Only the count leaves this step. The alert bodies carry the secrets themselves, and a
-      # workflow log is a far easier thing to read than the Security tab they belong in.
-      - name: Count the open secret-scanning alerts
+      # The report goes to a file and to Yontrack, and only counts reach the log. The alerts are
+      # read without their secret, and the report keeps the type of each secret and the number of
+      # its alert, never the value (#1875) - a workflow log is a far easier thing to read than the
+      # Security tab they belong in.
+      - name: Read the secret-scanning alerts
         id: alerts
         env:
           GH_TOKEN: ${{ secrets.SECRET_SCANNING_TOKEN }}
-        run: scripts/security-rescan.sh secrets "$GITHUB_REPOSITORY"
+        run: |
+          set -euo pipefail
+          report="$RUNNER_TEMP/secret-findings.json"
+          scripts/security-rescan.sh secrets "$GITHUB_REPOSITORY" "$report"
+          echo "report=$report" >> "$GITHUB_OUTPUT"
 
-      # A count that could not be fetched is FAILED, never zero: a token that lost its access
-      # must not read as a repository with no leaked secret.
-      #
-      # The data goes as `{"value": N}` and not as a bare `N`. The CLI sends either faithfully,
-      # but `ThresholdNumberValidationDataType.fromForm` reads the number out of a `value` field
-      # and returns null for anything else - a bare number would arrive as no data at all and the
-      # call would fail asking for a status. See yontrack/yontrack-cli#69.
+      # Alerts that could not be fetched are FAILED, never an empty report: a token that lost its
+      # access must not read as a repository with no leaked secret.
       - name: Validate SECURITY.SECRETS
         if: ${{ !cancelled() }}
         env:
           OUTCOME: ${{ steps.alerts.outcome }}
-          SECRETS: ${{ steps.alerts.outputs.secrets }}
+          REPORT: ${{ steps.alerts.outputs.report }}
           STARTED: ${{ steps.job_start.outputs.started }}
         run: |
           set -uo pipefail
@@ -371,8 +367,7 @@ jobs:
             # shellcheck disable=SC2086  # deliberate: run info is a set of flags, not one word
             yontrack validate --project "$TARGET_PROJECT" --branch "$TARGET_BRANCH" --build "$TARGET_BUILD" \
               --validation SECURITY.SECRETS \
-              --data-type net.nemerosa.ontrack.extension.general.validation.ThresholdNumberValidationDataType \
-              --data "{\"value\": $SECRETS}" \
+              findings --format findings --kind SECRETS --report "$REPORT" \
               $run_time_flag $YONTRACK_RUN_INFO
           else
             # shellcheck disable=SC2086  # deliberate: run info is a set of flags, not one word
@@ -385,9 +380,10 @@ jobs:
         if: ${{ !cancelled() }}
         env:
           SECRETS: ${{ steps.alerts.outputs.secrets }}
+          ACCEPTED: ${{ steps.alerts.outputs.accepted }}
         run: |
           {
             echo "### Open secret-scanning alerts"
             echo
-            echo "Count: \`${SECRETS:-?}\`, reported on build \`$TARGET_PROJECT/$TARGET_BRANCH/$TARGET_BUILD\` ($TARGET_VERSION)."
+            echo "Count: \`${SECRETS:-?}\`, and ${ACCEPTED:-?} resolved as accepted, reported on build \`$TARGET_PROJECT/$TARGET_BRANCH/$TARGET_BUILD\` ($TARGET_VERSION)."
           } >> "$GITHUB_STEP_SUMMARY"

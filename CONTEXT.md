@@ -194,7 +194,7 @@ _Avoid_: validation result
 
 **Validation data type**:
 The shape of the data a validation run carries — test counts, a percentage, a
-CHML severity breakdown. It is the closest thing the domain has to a validation's
+CHML severity breakdown, the security findings of a scan. It is the closest thing the domain has to a validation's
 "kind".
 _Avoid_: validation kind, validation category
 

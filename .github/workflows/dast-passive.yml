@@ -36,7 +36,9 @@
 #   * this workflow prints COUNTS ONLY - never a URL, a parameter or a piece of evidence;
 #   * it uploads NO ARTIFACT, deliberately. Do not add one;
 #   * the full detail goes to the private yontrack/security-reports, one file per run;
-#   * the validation run points at this workflow run, never at the report;
+#   * the validation run points at this workflow run, never at the report, and carries the findings
+#     by rule - the rule, its title, its level, and the suppression accepting it - never where
+#     nor how (#1875);
 #   * nothing goes to code scanning - see "No SARIF" below.
 #
 # Anything a scanner writes to its own stdout goes through `scripts/security-dast.sh scrub`
@@ -96,13 +98,13 @@ permissions:
 
 env:
   # Pinned: an unpinned CLI lets a Yontrack release turn a green pipeline red in a repository
-  # nobody touched. 5.2.0 and not the 5.1.1 the other security workflows pin, because the build
-  # lookup this shares with demo-smoke.yml needs `build search --with-display-name`, which 5.1.1
-  # does not have - see scripts/yontrack-build.sh.
+  # nobody touched. 5.8.0, as the other security workflows pin, for `validate … findings` (#1875);
+  # the build lookup this shares with demo-smoke.yml needs `build search --with-display-name`,
+  # which came with 5.2.0 - see scripts/yontrack-build.sh.
   #
   # `validate` is always called with --project/--branch/--build spelled out: the typed subcommands
   # read the build from their flag only and ignore YONTRACK_BUILD_NAME (yontrack/yontrack-cli#73).
-  YONTRACK_CLI_VERSION: "5.2.0"
+  YONTRACK_CLI_VERSION: "5.8.0"
   # Pinned by digest, not by the `stable` tag. A scanner whose version moves under you turns
   # "three new findings" into "or maybe three new rules", which is the one question a report must
   # never leave open.
@@ -544,7 +546,9 @@ jobs:
           # One report, one set of counts, one validation run. The documents are de-duplicated by
           # rule and URL across roles before counting; the per-tool and per-role splits are in the
           # report only.
-          scripts/security-dast.sh report "$WORK/out/report.md" "${documents[@]}"
+          # The findings report goes to Yontrack: what was found, never where nor how (#1875).
+          DAST_FINDINGS_OUT="$WORK/out/findings.json" \
+            scripts/security-dast.sh report "$WORK/out/report.md" "${documents[@]}"
           echo "path=$(scripts/security-dast.sh report-path)" >> "$GITHUB_OUTPUT"
 
       # The private repository, and the only place the detail exists. The token is fine-grained
@@ -569,16 +573,14 @@ jobs:
       # this build has not been scanned. A FAILED stamp would say the opposite: that it was
       # scanned and came back bad.
       #
-      # Counts that could not be produced are never reported as zero either way. A scan that did
-      # not happen must not read as a clean instance.
+      # A report that could not be produced is never sent as an empty one either way. A scan that
+      # did not happen must not read as a clean instance. The stamp receives the findings report,
+      # one finding per rule and suppressions as acceptances, and Yontrack computes its status.
       # ------------------------------------------------------------------------------------
 
       - name: Validate SECURITY.DAST
         env:
-          CRITICAL: ${{ steps.report.outputs.critical }}
-          HIGH: ${{ steps.report.outputs.high }}
-          MEDIUM: ${{ steps.report.outputs.medium }}
-          LOW: ${{ steps.report.outputs.low }}
+          REPORT: ${{ steps.prepare.outputs.work }}/out/findings.json
           STARTED: ${{ steps.job_start.outputs.started }}
           BUILD: ${{ steps.resolve.outputs.build }}
           VERSION: ${{ steps.login.outputs.version }}
@@ -594,7 +596,7 @@ jobs:
           yontrack validate \
             --project "$YONTRACK_PROJECT" --branch "$YONTRACK_BRANCH" --build "$BUILD" \
             --validation SECURITY.DAST \
-            chml --critical "$CRITICAL" --high "$HIGH" --medium "$MEDIUM" --low "$LOW" \
+            findings --format findings --kind DAST --report "$REPORT" \
             $run_time_flag $run_info
 
       # ------------------------------------------------------------------------------------

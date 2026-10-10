@@ -2,6 +2,9 @@
 #
 # Scans a Docker image with Trivy and counts its vulnerabilities per severity (#1749).
 #
+# The Trivy JSON report itself is what the SECURITY.IMAGE.* stamps receive, as a `security-findings`
+# run (#1875): Yontrack computes their status from it. The counts are for the job summary.
+#
 # Called by .github/actions/security-image-scan, which ci.yml's `security-images` job uses on
 # every full run, and which the nightly rescan (#1751) is meant to reuse. The logic lives here
 # rather than inline in a workflow so that there is exactly one definition of "the count" - the
@@ -25,17 +28,18 @@
 #                                    large, and Trivy's 5m default is a scanner error waiting to
 #                                    happen)
 #
-# What is counted, and why:
+# What is scanned and counted, and why:
 #
-#   * Only vulnerabilities with a fix available (`--ignore-unfixed`). A count nobody can bring
-#     down by upgrading is noise on a stamp.
-#   * CRITICAL, HIGH, MEDIUM and LOW. UNKNOWN is left out: the CHML stamp has no slot for it.
+#   * Only vulnerabilities with a fix available (`--ignore-unfixed`). A finding nobody can make
+#     go away by upgrading is noise on a stamp.
+#   * CRITICAL, HIGH, MEDIUM and LOW. UNKNOWN is left out of the counts, as the stamp's
+#     thresholds have no level for it.
 #   * One entry per (vulnerability, package) as Trivy reports it: the same CVE in two packages
 #     counts twice, since both have to be upgraded.
 #   * Not what the ignore file accepts. The scan keeps those in the report (`--show-suppressed`),
-#     but under `ExperimentalModifiedFindings`, which the count does not read: they are there for
-#     the findings mirror (#1869), which sends them as accepted findings. Nor does the SARIF:
-#     Trivy's SARIF writer reads the vulnerabilities alone, so the Security tab is unchanged.
+#     but under `ExperimentalModifiedFindings`, which the count does not read: Yontrack reads them
+#     as accepted findings, with the statement of the ignore file. Nor does the SARIF: Trivy's
+#     SARIF writer reads the vulnerabilities alone, so the Security tab is unchanged.
 #
 # Findings never fail a scan - they only drive the stamp's status. A scanner *error* does:
 # an image that cannot be pulled or a database that cannot be downloaded must not read as an

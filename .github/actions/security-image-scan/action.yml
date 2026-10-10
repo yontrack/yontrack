@@ -1,5 +1,6 @@
 # Scans one Docker image with Trivy, uploads the findings to the GitHub Security tab, and hands
-# the counts per severity back to the caller (#1749).
+# the Trivy JSON report and the counts per severity back to the caller (#1749). The report is what
+# the caller sends to Yontrack (#1875); the counts are for its job summary.
 #
 # Reporting to Yontrack is deliberately left to the caller: ci.yml validates against the build of
 # its own run, and the nightly rescan (#1751) will report against other builds. What must be
@@ -21,7 +22,7 @@
 # Every action below is pinned by commit SHA, not by tag: the Trivy actions' tags were hijacked in
 # a 2026 supply-chain attack. .github/dependabot.yml keeps the pins up to date.
 name: Security image scan
-description: Scans a Docker image with Trivy and outputs its CHML vulnerability counts
+description: Scans a Docker image with Trivy and outputs its report and its vulnerability counts
 
 inputs:
   image:

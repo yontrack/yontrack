@@ -76,7 +76,7 @@ env:
   # here so the version shape does not depend on an implicit runner default.
   CI: "true"
   # Pinned: an unpinned CLI lets a Yontrack release turn a green pipeline red in a repository
-  # nobody touched. 5.8.0 for `validate … findings`, which the findings mirror uses (#1869).
+  # nobody touched. 5.8.0 for `validate … findings`, which the SECURITY stamps use (#1875).
   YONTRACK_CLI_VERSION: "5.8.0"
   # Run info reported with every validation. The Jenkins shared library computed this silently;
   # the Go CLI is purely declarative and sends `runInfo: null` unless the flags are spelled out,
@@ -2001,7 +2001,7 @@ jobs:
           echo "::warning::Some test legs reported no coverage execution data. The affected COVERAGE.* stamps are FAILED on the Yontrack build and name what was missing; the others carry no unique_line."
 
   # ---------------------------------------------------------------------------------------------
-  # Trivy scan of the two Docker images, reported as CHML counts (#1749).
+  # Trivy scan of the two Docker images, reported as security findings (#1749, #1875).
   #
   # The run-tagged images `build` and `build-ui` push: the Jib backend image carries the jars and the UI image
   # Next's standalone node_modules, so this covers the runtime dependencies of both tiers. It is
@@ -2011,9 +2011,10 @@ jobs:
   # shows it before it is merged. It needs only the two build jobs, so it runs alongside `integration`, `kdsl`
   # and `ui-tests` and adds no wall-clock time to the run.
   #
-  # Findings never fail this job: they only drive the stamps, WARNING from the first HIGH and
-  # FAILED from the first CRITICAL (.yontrack/ci.yaml). A scanner *error* does fail it, and still
-  # records a FAILED stamp so the build does not simply lack one.
+  # The stamps receive the Trivy JSON report itself, as `security-findings` runs: Yontrack records
+  # every finding, accepted ones included, and computes the status - WARNING from the first HIGH
+  # and FAILED from the first CRITICAL (.yontrack/ci.yaml). Findings never fail this job. A scanner
+  # *error* does fail it, and still records a FAILED stamp so the build does not simply lack one.
   #
   # The scan and the counting live in .github/actions/security-image-scan and
   # scripts/security-image-scan.sh, shared with the nightly rescan (#1751). Accepted risks go in
@@ -2079,16 +2080,13 @@ jobs:
           category: trivy-image-ui
 
       # `outcome` is empty only when the step was skipped. Anything but success means the scan
-      # itself went wrong, and the counts are then absent rather than zero - a scan that did not
+      # itself went wrong, and the report is then absent rather than empty - a scan that did not
       # happen must never read as a clean image.
       - name: Validate SECURITY.IMAGE.BACKEND
         if: ${{ !cancelled() && steps.backend.outcome != '' }}
         env:
           OUTCOME: ${{ steps.backend.outcome }}
-          CRITICAL: ${{ steps.backend.outputs.critical }}
-          HIGH: ${{ steps.backend.outputs.high }}
-          MEDIUM: ${{ steps.backend.outputs.medium }}
-          LOW: ${{ steps.backend.outputs.low }}
+          REPORT: ${{ steps.backend.outputs.report-dir }}/trivy.json
           STARTED: ${{ steps.job_start.outputs.started }}
         run: |
           run_time_flag=""
@@ -2098,7 +2096,7 @@ jobs:
           if [ "$OUTCOME" = "success" ]; then
             # shellcheck disable=SC2086  # deliberate: see YONTRACK_RUN_INFO
             yontrack validate --validation SECURITY.IMAGE.BACKEND \
-              chml --critical "$CRITICAL" --high "$HIGH" --medium "$MEDIUM" --low "$LOW" \
+              findings --format trivy --kind IMAGE --report "$REPORT" \
               $run_time_flag $YONTRACK_RUN_INFO
           else
             # shellcheck disable=SC2086  # deliberate: see YONTRACK_RUN_INFO
@@ -2110,10 +2108,7 @@ jobs:
         if: ${{ !cancelled() && steps.ui.outcome != '' }}
         env:
           OUTCOME: ${{ steps.ui.outcome }}
-          CRITICAL: ${{ steps.ui.outputs.critical }}
-          HIGH: ${{ steps.ui.outputs.high }}
-          MEDIUM: ${{ steps.ui.outputs.medium }}
-          LOW: ${{ steps.ui.outputs.low }}
+          REPORT: ${{ steps.ui.outputs.report-dir }}/trivy.json
           STARTED: ${{ steps.job_start.outputs.started }}
         run: |
           run_time_flag=""
@@ -2123,58 +2118,13 @@ jobs:
           if [ "$OUTCOME" = "success" ]; then
             # shellcheck disable=SC2086  # deliberate: see YONTRACK_RUN_INFO
             yontrack validate --validation SECURITY.IMAGE.UI \
-              chml --critical "$CRITICAL" --high "$HIGH" --medium "$MEDIUM" --low "$LOW" \
+              findings --format trivy --kind IMAGE --report "$REPORT" \
               $run_time_flag $YONTRACK_RUN_INFO
           else
             # shellcheck disable=SC2086  # deliberate: see YONTRACK_RUN_INFO
             yontrack validate --validation SECURITY.IMAGE.UI --status FAILED \
               $run_time_flag $YONTRACK_RUN_INFO
           fi
-
-      # The findings mirror (#1869). self.dev runs 5.x and takes CHML only, so on `v6` - and only
-      # there - the Trivy reports themselves also go to v6.dev, which runs 6.0 with the licence for
-      # the native formats. Never fails the job: self.dev is the instance of record, and every
-      # failure of the mirror is a warning. See scripts/security-findings-mirror.sh.
-      - name: Is the findings mirror on?
-        id: mirror
-        if: ${{ !cancelled() }}
-        run: scripts/security-findings-mirror.sh enabled "$GITHUB_REF_NAME"
-
-      - name: Mirror the image findings onto v6.dev
-        if: ${{ !cancelled() && steps.mirror.outputs.enabled == 'true' }}
-        continue-on-error: true
-        env:
-          V6_URL: ${{ vars.V6_URL || 'https://v6.dev.yontrack.com' }}
-          V6_TOKEN: ${{ secrets.V6_TOKEN }}
-          BACKEND_REPORT: ${{ steps.backend.outputs.report-dir }}/trivy.json
-          UI_REPORT: ${{ steps.ui.outputs.report-dir }}/trivy.json
-          BACKEND_OUTCOME: ${{ steps.backend.outcome }}
-          UI_OUTCOME: ${{ steps.ui.outcome }}
-          STARTED: ${{ steps.job_start.outputs.started }}
-        run: |
-          run_time_flag=""
-          if [ -n "${STARTED:-}" ]; then
-            run_time_flag="--run-time $(( $(date +%s) - STARTED ))"
-          fi
-          scripts/security-findings-mirror.sh configure "$V6_URL" "$V6_TOKEN"
-          # A scan that errored has no report worth mirroring - self.dev already has its FAILED.
-          if [ "$BACKEND_OUTCOME" = "success" ]; then
-            # shellcheck disable=SC2086  # deliberate: see YONTRACK_RUN_INFO
-            scripts/security-findings-mirror.sh publish "$YONTRACK_BRANCH_NAME" "$YONTRACK_BUILD_NAME" \
-              SECURITY.IMAGE.BACKEND trivy IMAGE "$BACKEND_REPORT" $run_time_flag $YONTRACK_RUN_INFO
-          fi
-          if [ "$UI_OUTCOME" = "success" ]; then
-            # shellcheck disable=SC2086  # deliberate: see YONTRACK_RUN_INFO
-            scripts/security-findings-mirror.sh publish "$YONTRACK_BRANCH_NAME" "$YONTRACK_BUILD_NAME" \
-              SECURITY.IMAGE.UI trivy IMAGE "$UI_REPORT" $run_time_flag $YONTRACK_RUN_INFO
-          fi
-
-      # Keeps the switch back to self.dev from being forgotten at the 6.0 cutover (#1875): on
-      # `main` and `release/*`, a 6.x build warns while self.dev still runs 5.x, and fails once it
-      # runs 6.x. After the validations, so that the stamps are recorded either way.
-      - name: Check the security findings are not left behind
-        if: ${{ !cancelled() }}
-        run: scripts/security-findings-mirror.sh guard "$GITHUB_REF_NAME" VERSION
 
       - name: Summarise the counts
         if: ${{ !cancelled() }}

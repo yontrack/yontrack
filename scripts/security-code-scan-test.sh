@@ -32,90 +32,140 @@ mkdir -p "$WORK/bin"
 # Fixtures - the shape GET /repos/{owner}/{repo}/code-scanning/alerts returns
 # ===========================================================================
 
-# One page: every security severity, plus code-quality alerts, which carry a `severity` but a
-# null or absent `security_severity_level` and must not be counted.
-cat > "$WORK/page1.json" <<'JSON'
+# The open alerts, on two pages, as `gh api --paginate` prints them: straight after one another.
+# A code-quality alert carries no `security_severity_level` and is not a security finding.
+cat > "$WORK/open.json" <<'JSON'
 [
-  {"number": 1, "state": "open", "tool": {"name": "CodeQL"},
-   "rule": {"id": "java/sql-injection", "severity": "error", "security_severity_level": "critical"}},
-  {"number": 2, "state": "open", "tool": {"name": "CodeQL"},
-   "rule": {"id": "js/xss", "severity": "error", "security_severity_level": "high"}},
-  {"number": 3, "state": "open", "tool": {"name": "CodeQL"},
-   "rule": {"id": "js/xss", "severity": "error", "security_severity_level": "high"}},
-  {"number": 4, "state": "open", "tool": {"name": "CodeQL"},
-   "rule": {"id": "actions/untrusted-checkout", "severity": "warning", "security_severity_level": "medium"}},
-  {"number": 5, "state": "open", "tool": {"name": "CodeQL"},
-   "rule": {"id": "java/unused-variable", "severity": "note", "security_severity_level": null}},
-  {"number": 6, "state": "open", "tool": {"name": "CodeQL"},
-   "rule": {"id": "js/useless-assignment", "severity": "warning"}}
+  {
+    "number": 12,
+    "state": "open",
+    "html_url": "https://github.com/yontrack/yontrack/security/code-scanning/12",
+    "rule": {
+      "id": "java/sql-injection",
+      "security_severity_level": "high",
+      "description": "Query built from user-controlled sources"
+    },
+    "most_recent_instance": {"location": {"path": "ontrack-service/src/Foo.kt", "start_line": 42}}
+  },
+  {
+    "number": 13,
+    "state": "open",
+    "html_url": "https://github.com/yontrack/yontrack/security/code-scanning/13",
+    "rule": {"id": "js/unused-local-variable", "security_severity_level": null, "description": "Unused variable"},
+    "most_recent_instance": {"location": {"path": "ontrack-web-core/a.js", "start_line": 1}}
+  }
+]
+[
+  {
+    "number": 14,
+    "state": "open",
+    "html_url": "https://github.com/yontrack/yontrack/security/code-scanning/14",
+    "rule": {"id": "js/xss", "security_severity_level": "critical", "description": "Cross-site scripting"},
+    "most_recent_instance": {"location": {"path": "ontrack-web-core/b.js", "start_line": 7}}
+  }
 ]
 JSON
 
-# A second page, as `gh api --paginate` prints it: straight after the first one.
-cat > "$WORK/page2.json" <<'JSON'
+cat > "$WORK/dismissed.json" <<'JSON'
 [
-  {"number": 7, "state": "open", "tool": {"name": "CodeQL"},
-   "rule": {"id": "java/path-injection", "severity": "error", "security_severity_level": "critical"}},
-  {"number": 8, "state": "open", "tool": {"name": "CodeQL"},
-   "rule": {"id": "js/weak-crypto", "severity": "warning", "security_severity_level": "low"}},
-  {"number": 9, "state": "open", "tool": {"name": "CodeQL"},
-   "rule": {"id": "js/weak-crypto", "severity": "warning", "security_severity_level": "low"}}
+  {
+    "number": 9,
+    "state": "dismissed",
+    "html_url": "https://github.com/yontrack/yontrack/security/code-scanning/9",
+    "dismissed_reason": "false positive",
+    "dismissed_comment": "Input is a constant",
+    "rule": {"id": "java/path-injection", "security_severity_level": "medium", "description": "Path from user input"},
+    "most_recent_instance": {"location": {"path": "ontrack-ui/src/Bar.kt", "start_line": 3}}
+  },
+  {
+    "number": 10,
+    "state": "dismissed",
+    "html_url": "https://github.com/yontrack/yontrack/security/code-scanning/10",
+    "dismissed_reason": "won't fix",
+    "dismissed_comment": null,
+    "rule": {"id": "java/weak-cryptographic-algorithm", "security_severity_level": "low", "description": "Weak crypto"},
+    "most_recent_instance": {"location": {"path": "ontrack-ui/src/Baz.kt", "start_line": 5}}
+  }
 ]
 JSON
 
-cat "$WORK/page1.json" "$WORK/page2.json" > "$WORK/paginated.json"
+cat "$WORK/open.json" "$WORK/dismissed.json" > "$WORK/all.json"
 echo '[]' > "$WORK/empty.json"
 : > "$WORK/nothing.json"
 echo '[{"number": 1,' > "$WORK/broken.json"
 echo '{"message": "no analysis found", "status": "404"}' > "$WORK/error-object.json"
 
 # ===========================================================================
-# count
+# findings
 # ===========================================================================
 
-out="$(scs_count "$WORK/page1.json")"; rc=$?
-assert_eq "0" "$rc" "count: succeeds on one page"
+report="$(scs_findings "$WORK/all.json")"; rc=$?
+assert_eq "0" "$rc" "findings: succeeds"
+assert_eq "codeql" "$(echo "$report" | jq -r '.scanner')" "findings: the scanner is CodeQL"
+assert_eq "CODE" "$(echo "$report" | jq -r '.kind')" "findings: the kind is CODE"
+assert_eq "4" "$(echo "$report" | jq '.findings | length')" \
+    "findings: every page, open and dismissed, without the code-quality alert"
+assert_eq "java/sql-injection|ontrack-service/src/Foo.kt|HIGH|high" \
+    "$(echo "$report" | jq -r '.findings[0] | "\(.externalId)|\(.location)|\(.severity)|\(.rawSeverity)"')" \
+    "findings: rule id, path without line, severity"
+assert_eq "Query built from user-controlled sources" "$(echo "$report" | jq -r '.findings[0].title')" \
+    "findings: the rule description is the title"
+assert_eq "https://github.com/yontrack/yontrack/security/code-scanning/12" \
+    "$(echo "$report" | jq -r '.findings[0].url')" "findings: links to the alert"
+assert_eq "null" "$(echo "$report" | jq -c '.findings[0].acceptance')" \
+    "findings: an open alert is not accepted"
+assert_eq "CRITICAL" "$(echo "$report" | jq -r '.findings[1].severity')" "findings: critical"
+assert_eq '{"statement":"false positive: Input is a constant","source":"GitHub code scanning alert #9"}' \
+    "$(echo "$report" | jq -c '.findings[2].acceptance')" \
+    "findings: a dismissal is an acceptance, with its reason and comment"
+assert_eq '{"statement":"won'"'"'t fix","source":"GitHub code scanning alert #10"}' \
+    "$(echo "$report" | jq -c '.findings[3].acceptance')" \
+    "findings: a dismissal without comment keeps its reason"
+assert_eq "" "$(echo "$report" | jq -r '.findings[] | keys[] | select(IN("externalId","location","severity","rawSeverity","title","url","acceptance") | not)')" \
+    "findings: no field the neutral format would reject"
+
+report="$(scs_findings < "$WORK/all.json")"; rc=$?
+assert_eq "0" "$rc" "findings: reads the alerts from stdin when no file is given"
+assert_eq "4" "$(echo "$report" | jq '.findings | length')" "findings: stdin is read like a file"
+
+report="$(scs_findings "$WORK/empty.json")"; rc=$?
+assert_eq "0" "$rc" "findings: no alert is a report"
+assert_eq "0" "$(echo "$report" | jq '.findings | length')" "findings: with no finding"
+
+out="$(scs_findings "$WORK/nothing.json" 2>&1)"; rc=$?
+assert_eq "1" "$rc" "findings: an empty answer is an error, not a clean report"
+
+out="$(scs_findings "$WORK/broken.json" 2>&1)"; rc=$?
+assert_eq "1" "$rc" "findings: an answer that is not JSON is an error, not a clean report"
+
+out="$(scs_findings "$WORK/error-object.json" 2>&1)"; rc=$?
+assert_eq "1" "$rc" "findings: an API error object is an error, not a clean report"
+
+out="$(scs_findings "$WORK/does-not-exist.json" 2>&1)"; rc=$?
+assert_eq "1" "$rc" "findings: a missing file is an error, not a clean report"
+
+# ===========================================================================
+# summary
+# ===========================================================================
+
+scs_findings "$WORK/all.json" > "$WORK/report.json"
 assert_eq "critical=1
-high=2
-medium=1
-low=0" "$out" "count: counts by security severity, and ignores alerts without one"
-
-out="$(scs_count "$WORK/paginated.json")"; rc=$?
-assert_eq "0" "$rc" "count: succeeds on several pages"
-assert_eq "critical=2
-high=2
-medium=1
-low=2" "$out" "count: adds up every page"
-
-out="$(scs_count < "$WORK/paginated.json")"; rc=$?
-assert_eq "0" "$rc" "count: reads the alerts from stdin when no file is given"
-assert_contains "$out" "low=2" "count: stdin is counted like a file"
-
-out="$(scs_count "$WORK/empty.json")"; rc=$?
-assert_eq "0" "$rc" "count: succeeds when there is no open alert"
-assert_eq "critical=0
-high=0
+high=1
 medium=0
-low=0" "$out" "count: no alert counts as zero"
+low=0
+accepted=2" "$(scs_summary "$WORK/report.json")" \
+    "summary: the open findings by severity, and the accepted ones apart"
 
-out="$(scs_count "$WORK/nothing.json" 2>&1)"; rc=$?
-assert_eq "1" "$rc" "count: an empty answer is an error, not zero alerts"
-
-out="$(scs_count "$WORK/broken.json" 2>&1)"; rc=$?
-assert_eq "1" "$rc" "count: an answer that is not JSON is an error, not zero alerts"
-
-out="$(scs_count "$WORK/error-object.json" 2>&1)"; rc=$?
-assert_eq "1" "$rc" "count: an API error object is an error, not zero alerts"
-
-out="$(scs_count "$WORK/does-not-exist.json" 2>&1)"; rc=$?
-assert_eq "1" "$rc" "count: a missing file is an error, not zero alerts"
+out="$(scs_summary "$WORK/does-not-exist.json" 2>&1)"; rc=$?
+assert_eq "1" "$rc" "summary: a missing report is an error"
 
 # ===========================================================================
 # fetch - against a stubbed gh
 # ===========================================================================
 
-# Prints the canned pages named by STUB_GH_PAGES back to back, as `gh api --paginate` does.
-# STUB_GH_FAIL makes it exit 1, which is what a 403 or a 404 looks like from outside.
+# Answers the open alerts with STUB_GH_OPEN and the dismissed ones with STUB_GH_DISMISSED, by the
+# `state` of the query. STUB_GH_FAIL makes it exit 1, which is what a 403 or a 404 looks like
+# from outside.
 cat > "$WORK/bin/gh" <<'STUB'
 #!/usr/bin/env bash
 set -uo pipefail
@@ -124,9 +174,10 @@ if [ -n "${STUB_GH_FAIL:-}" ]; then
     echo "gh: Not Found (HTTP 404)" >&2
     exit 1
 fi
-for page in $STUB_GH_PAGES; do
-    cat "$page"
-done
+case "$*" in
+    *state=open*) cat "$STUB_GH_OPEN" ;;
+    *state=dismissed*) cat "$STUB_GH_DISMISSED" ;;
+esac
 STUB
 chmod +x "$WORK/bin/gh"
 
@@ -135,50 +186,49 @@ setup_stubs() {
     : > "$WORK/calls"
     : > "$WORK/github_output"
     STUB_CALLS="$WORK/calls"
-    STUB_GH_PAGES="$WORK/page1.json $WORK/page2.json"
+    STUB_GH_OPEN="$WORK/open.json"
+    STUB_GH_DISMISSED="$WORK/dismissed.json"
     STUB_GH_FAIL=""
     STUB_YONTRACK_ANSWERS=""
-    export STUB_CALLS STUB_GH_PAGES STUB_GH_FAIL STUB_YONTRACK_ANSWERS
+    export STUB_CALLS STUB_GH_OPEN STUB_GH_DISMISSED STUB_GH_FAIL STUB_YONTRACK_ANSWERS
 }
 calls() { cat "$WORK/calls"; }
 
 setup_stubs
-out="$(PATH="$WORK/bin:$PATH" GITHUB_OUTPUT="$WORK/github_output" \
-    scs_fetch yontrack/yontrack refs/heads/main 2>&1)"; rc=$?
+out="$(PATH="$WORK/bin:$PATH" scs_fetch yontrack/yontrack refs/heads/main "$WORK/code.json" 2>&1)"; rc=$?
 assert_eq "0" "$rc" "fetch: succeeds"
 assert_contains "$(calls)" "--paginate" "fetch: follows every page"
-assert_contains "$(calls)" "repos/yontrack/yontrack/code-scanning/alerts?" "fetch: asks the code-scanning alerts API"
-assert_contains "$(calls)" "ref=refs/heads/main" "fetch: asks for the ref it was given"
-assert_contains "$(calls)" "state=open" "fetch: counts only the open alerts, so a dismissal lowers the count"
-assert_contains "$(calls)" "tool_name=CodeQL" "fetch: counts only CodeQL, not the Trivy alerts sharing the ref"
-assert_contains "$(calls)" "per_page=100" "fetch: asks for the largest pages"
-assert_eq "critical=2
-high=2
-medium=1
-low=2" "$(cat "$WORK/github_output")" "fetch: writes the counts to GITHUB_OUTPUT"
-assert_contains "$out" "critical=2" "fetch: prints the counts in the log"
+assert_contains "$(calls)" "repos/yontrack/yontrack/code-scanning/alerts?ref=refs/heads/main&state=open&tool_name=CodeQL&per_page=100" \
+    "fetch: the open CodeQL alerts of the ref - not the Trivy alerts sharing it - in the largest pages"
+assert_contains "$(calls)" "repos/yontrack/yontrack/code-scanning/alerts?ref=refs/heads/main&state=dismissed&tool_name=CodeQL&per_page=100" \
+    "fetch: and the dismissed ones, which become acceptances"
+assert_eq "4" "$(jq '.findings | length' "$WORK/code.json")" "fetch: writes the report"
 
 setup_stubs
-STUB_GH_PAGES="$WORK/empty.json"
-out="$(PATH="$WORK/bin:$PATH" GITHUB_OUTPUT="$WORK/github_output" \
-    scs_fetch yontrack/yontrack refs/heads/main 2>&1)"; rc=$?
+STUB_GH_OPEN="$WORK/empty.json"
+STUB_GH_DISMISSED="$WORK/empty.json"
+out="$(PATH="$WORK/bin:$PATH" scs_fetch yontrack/yontrack refs/heads/main "$WORK/code.json" 2>&1)"; rc=$?
 assert_eq "0" "$rc" "fetch: succeeds with no alert"
-assert_contains "$(cat "$WORK/github_output")" "critical=0" "fetch: no alert writes zeros"
+assert_eq "0" "$(jq '.findings | length' "$WORK/code.json")" "fetch: no alert is an empty report"
 
 setup_stubs
 STUB_GH_FAIL=1
-out="$(PATH="$WORK/bin:$PATH" GITHUB_OUTPUT="$WORK/github_output" \
-    scs_fetch yontrack/yontrack refs/heads/main 2>&1)"; rc=$?
+rm -f "$WORK/code.json"
+out="$(PATH="$WORK/bin:$PATH" scs_fetch yontrack/yontrack refs/heads/main "$WORK/code.json" 2>&1)"; rc=$?
 assert_eq "1" "$rc" "fetch: an API error fails"
-assert_eq "" "$(cat "$WORK/github_output")" "fetch: an API error writes no counts"
+assert_eq "false" "$([ -f "$WORK/code.json" ] && echo true || echo false)" "fetch: and writes no report"
 
 setup_stubs
-out="$(PATH="$WORK/bin:$PATH" scs_fetch "" refs/heads/main 2>&1)"; rc=$?
+out="$(PATH="$WORK/bin:$PATH" scs_fetch "" refs/heads/main "$WORK/code.json" 2>&1)"; rc=$?
 assert_eq "1" "$rc" "fetch: refuses to run without a repository"
 
 setup_stubs
-out="$(PATH="$WORK/bin:$PATH" scs_fetch yontrack/yontrack "" 2>&1)"; rc=$?
+out="$(PATH="$WORK/bin:$PATH" scs_fetch yontrack/yontrack "" "$WORK/code.json" 2>&1)"; rc=$?
 assert_eq "1" "$rc" "fetch: refuses to run without a ref"
+
+setup_stubs
+out="$(PATH="$WORK/bin:$PATH" scs_fetch yontrack/yontrack refs/heads/main "" 2>&1)"; rc=$?
+assert_eq "1" "$rc" "fetch: refuses to run without an output file"
 
 # ===========================================================================
 # resolve-build - against a stubbed yontrack
@@ -279,11 +329,11 @@ assert_eq "" "$(calls)" "resolve: checks its arguments before calling Yontrack"
 
 out="$(scs_main 2>&1)"; rc=$?
 assert_eq "1" "$rc" "no command: fails with the usage"
-assert_contains "$out" "count|fetch|resolve-build" "no command: prints the usage"
+assert_contains "$out" "findings|summary|fetch|resolve-build" "no command: prints the usage"
 
-out="$(scs_main count "$WORK/empty.json" 2>&1)"; rc=$?
-assert_eq "0" "$rc" "main: dispatches count"
-assert_contains "$out" "low=0" "main: count prints the counts"
+out="$(scs_main findings "$WORK/empty.json" 2>&1)"; rc=$?
+assert_eq "0" "$rc" "main: dispatches findings"
+assert_contains "$out" '"findings":[]' "main: findings prints the report"
 
 # --- report ----------------------------------------------------------------
 

@@ -10,7 +10,7 @@
 # reaches Yontrack only if something goes looking. Nothing pushes to a released commit, so
 # nothing re-runs its pipeline; this workflow is what re-measures it.
 #
-# Usage: scripts/security-rescan.sh targets|select|stamp-config|setup-stamp|secrets|count-secrets ...
+# Usage: scripts/security-rescan.sh targets|select|stamp-config|setup-stamp|secrets|secret-findings ...
 #
 #   targets PROJECT              Resolves the released builds to rescan and writes `count`,
 #                                `targets` (a one-line JSON array, ready for a matrix) and
@@ -23,9 +23,12 @@
 #   setup-stamp PROJECT BRANCH NAME
 #                                Creates NAME on PROJECT/BRANCH with that data type, or updates
 #                                it to it.
-#   secrets REPOSITORY           Counts the open secret-scanning alerts of REPOSITORY and prints
-#                                `secrets=N`, also written to $GITHUB_OUTPUT.
-#   count-secrets [FILE]         The pure half of `secrets`.
+#   secrets REPOSITORY OUTPUT    Fetches the open and resolved secret-scanning alerts of
+#                                REPOSITORY and writes them to OUTPUT as a report in the neutral
+#                                `findings` format. Prints `secrets=N` (the open alerts) and
+#                                `accepted=N`, also written to $GITHUB_OUTPUT.
+#   secret-findings [FILE]       The pure half of `secrets`: converts an answer of the
+#                                secret-scanning alerts API, read from FILE or stdin.
 #
 # Environment:
 #   YONTRACK_URL, YONTRACK_TOKEN   the instance the builds are read from and reported to
@@ -46,9 +49,11 @@
 #   * A promoted build whose display name is not a version has no release property, so nothing
 #     was published under it and there is no image tag to scan. It is skipped.
 #
-# What only the count of the secret-scanning alerts is ever printed for: the alert bodies carry
-# the secrets themselves. The count is the signal; anything more would put them in a workflow
-# log that is far easier to read than the Security tab they belong in.
+# The secret-scanning alerts are asked for without their secret (`hide_secret=true`), and the
+# report keeps only the type of each secret, the number and the link of its alert, and the
+# resolution of an accepted one - never the value (#1875). Only counts are ever printed: the
+# report goes to Yontrack, not to a workflow log, which is far easier to read than the Security
+# tab the alerts belong in.
 #
 # Requires jq and yq (mikefarah's, v4) on the PATH, plus `gh` for `secrets` and curl for
 # everything talking to Yontrack. ubuntu-latest carries all four.
@@ -263,6 +268,7 @@ srs_stamp_config() {
         metrics) data_type="net.nemerosa.ontrack.extension.general.validation.MetricsValidationDataType" ;;
         percentage) data_type="net.nemerosa.ontrack.extension.general.validation.ThresholdPercentageValidationDataType" ;;
         tests) data_type="net.nemerosa.ontrack.extension.general.validation.TestSummaryValidationDataType" ;;
+        security-findings) data_type="net.nemerosa.ontrack.extension.findings.validation.FindingsValidationDataType" ;;
         *) data_type="$type" ;;
     esac
 
@@ -335,46 +341,83 @@ srs_setup_stamp() {
 # Secret-scanning alerts
 # ---------------------------------------------------------------------------------------------
 
-# Prints `secrets=N` for an answer to the secret-scanning alerts API - one page or several
-# printed back to back, as `gh api --paginate` does.
+# The neutral `findings` report of an answer to the secret-scanning alerts API - one page or
+# several printed back to back, as `gh api --paginate` does.
+#
+#   * An open alert is a CRITICAL finding: a leaked credential has no acceptable count.
+#   * The secret type is the finding, the alert number its location: two leaks of the same kind of
+#     secret are two findings.
+#   * An alert resolved as a false positive, as won't fix or as used in tests is an accepted
+#     finding, its resolution and comment as the statement. One resolved as revoked - or whose
+#     pattern went away - is no longer a finding at all.
+#   * Every field is picked by name, so that the secret - which an answer asked for without
+#     `hide_secret` would carry - can never reach the report.
 #
 # `jq -s` slurps however many arrays the answer holds, and each of them must be an array: an
 # error object - a 403 from a token that cannot read the alerts, a 404 from a repository with
-# secret scanning off - is not a page of zero alerts. Only the length is ever emitted; the alert
-# objects are never printed.
-srs_count_secrets() {
+# secret scanning off - is not a page of zero alerts.
+srs_secret_findings() {
     local input="${1:--}"
     if [ "$input" != "-" ] && [ ! -f "$input" ]; then
         srs_fail "No alerts file at $input"
         return 1
     fi
-    jq -e -r -s '
+    jq -e -s -c '
         if length == 0 or any(.[]; type != "array") then
             error("not a list of secret-scanning alerts")
         else
-            "secrets=\([.[][]] | length)"
+            {
+                scanner: "github-secret-scanning",
+                kind: "SECRETS",
+                findings: [
+                    .[][]
+                    | select(.state == "open"
+                        or (.resolution | IN("false_positive", "wont_fix", "used_in_tests")))
+                    | {
+                        externalId: (.secret_type // "unknown"),
+                        location: "#\(.number)",
+                        severity: "CRITICAL",
+                        title: (.secret_type_display_name // .secret_type // "Unknown secret"),
+                        url: .html_url
+                    } + (
+                        if .state == "open" then {} else
+                            {acceptance: {
+                                statement: ([.resolution, .resolution_comment]
+                                    | map(select(. != null and . != "")) | join(": ")),
+                                source: "GitHub secret scanning alert #\(.number)"
+                            }}
+                        end
+                    )
+                ]
+            }
         end
-    ' "$input" || { srs_fail "Could not read the secret-scanning alerts"; return 1; }
+    ' "$input" 2>/dev/null || { srs_fail "Could not read the secret-scanning alerts"; return 1; }
 }
 
-# The open secret-scanning alerts of the repository, as a count and nothing else.
+# The secret-scanning alerts of the repository, as a report written to OUTPUT and counts.
 #
-# The answer is held in a variable and never echoed, never written to a file and never passed
-# through anything that logs: `gh` is given the token through the environment, and what leaves
-# this function is one number.
+# The answer is held in a variable and never echoed: `gh` is given the token through the
+# environment, and what leaves this function is the report file and two numbers.
 srs_secrets() {
-    local repository="${1:-}" alerts count
+    local repository="${1:-}" output="${2:-}" alerts state page report
     [ -n "$repository" ] || { srs_fail "No repository"; return 1; }
+    [ -n "$output" ] || { srs_fail "No output file"; return 1; }
 
-    echo "Counting the open secret-scanning alerts of $repository" >&2
-    # `gh`'s own diagnostics are left on stderr - they carry the HTTP status, never an alert -
-    # but its stdout is captured and never echoed.
-    alerts="$(gh api --paginate \
-        "repos/$repository/secret-scanning/alerts?state=open&per_page=100")" \
-        || { srs_fail "Could not fetch the secret-scanning alerts of $repository"; return 1; }
+    alerts=""
+    for state in open resolved; do
+        echo "Fetching the $state secret-scanning alerts of $repository" >&2
+        # `gh`'s own diagnostics are left on stderr - they carry the HTTP status, never an
+        # alert - but its stdout is captured and never echoed.
+        page="$(gh api --paginate \
+            "repos/$repository/secret-scanning/alerts?state=$state&hide_secret=true&per_page=100")" \
+            || { srs_fail "Could not fetch the $state secret-scanning alerts of $repository"; return 1; }
+        alerts+="$page"$'\n'
+    done
 
-    count="$(printf '%s' "$alerts" | srs_count_secrets)" || return 1
-    srs_output secrets "${count#secrets=}"
+    report="$(printf '%s' "$alerts" | srs_secret_findings)" || return 1
+    printf '%s\n' "$report" > "$output" || { srs_fail "Could not write the report to $output"; return 1; }
+    srs_output secrets "$(printf '%s' "$report" | jq '[.findings[] | select(.acceptance == null)] | length')"
+    srs_output accepted "$(printf '%s' "$report" | jq '[.findings[] | select(.acceptance != null)] | length')"
 }
 
 srs_main() {
@@ -386,9 +429,9 @@ srs_main() {
         stamp-config) srs_stamp_config "$@" ;;
         setup-stamp) srs_setup_stamp "$@" ;;
         secrets) srs_secrets "$@" ;;
-        count-secrets) srs_count_secrets "$@" ;;
+        secret-findings) srs_secret_findings "$@" ;;
         *)
-            echo "Usage: $0 targets|select|stamp-config|setup-stamp|secrets|count-secrets ..." >&2
+            echo "Usage: $0 targets|select|stamp-config|setup-stamp|secrets|secret-findings ..." >&2
             return 1
             ;;
     esac

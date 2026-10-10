@@ -1,5 +1,6 @@
 # Vulnerabilities whose risk is accepted, excluded from the Trivy scans of the Docker images and
-# therefore from the SECURITY.IMAGE.* counts in Yontrack. See #1749.
+# therefore from what the SECURITY.IMAGE.* stamps count in Yontrack. See #1749. The scan keeps
+# them in its report, and Yontrack shows them as accepted findings, with their statement (#1875).
 #
 # Every entry MUST carry both:
 #

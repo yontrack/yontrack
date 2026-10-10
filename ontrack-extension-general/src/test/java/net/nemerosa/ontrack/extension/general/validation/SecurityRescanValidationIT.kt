@@ -12,9 +12,14 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
 /**
- * The two server behaviours the nightly rescan of `.github/workflows/security-rescan.yml` is
+ * The two server behaviours the nightly rescan of `.github/workflows/security-rescan.yml` was
  * written around (#1751). Both are easy to get wrong in a workflow and impossible to see from
  * one, so they are pinned here.
+ *
+ * `SECURITY.SECRETS` has been a `security-findings` stamp since #1875, so the rescan no longer
+ * sends a number: the first behaviour is kept for whatever still uses the CLI's generic form on a
+ * [ThresholdNumberValidationDataType] stamp. The second is still why the rescan sets its stamps up
+ * on the target branch, whatever their data type.
  *
  *  1. A number sent as a bare JSON integer is *not* the data of a
  *     [ThresholdNumberValidationDataType] run. The Yontrack CLI's generic
@@ -36,8 +41,8 @@ class SecurityRescanValidationIT : AbstractQLKTITSupport() {
     private lateinit var thresholdNumberValidationDataType: ThresholdNumberValidationDataType
 
     /**
-     * The configuration `.yontrack/ci.yaml` declares for `SECURITY.SECRETS`: one open alert is a
-     * failure, and more is worse rather than better.
+     * The configuration `.yontrack/ci.yaml` declared for `SECURITY.SECRETS` until #1875: one open
+     * alert is a failure, and more is worse rather than better.
      */
     private val secretsConfig
         get() = thresholdNumberValidationDataType.config(

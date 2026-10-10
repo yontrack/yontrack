@@ -128,9 +128,11 @@ pages the spider happened to reach.
 | Low | LOW |
 | Informational, and Nuclei's `unknown` | dropped |
 
-ZAP and graphql-cop have no Critical; a Nuclei critical fails the stamp like a HIGH. The counts go to the
-`SECURITY.DAST` CHML stamp declared in `.yontrack/ci.yaml` — WARNING from one MEDIUM, FAILED from
-one HIGH — which is in no promotion: this is reporting, not gating.
+ZAP and graphql-cop have no Critical; a Nuclei critical fails the stamp like a HIGH. The findings go
+to the `SECURITY.DAST` stamp declared in `.yontrack/ci.yaml`, a `security-findings` stamp (#1875):
+one finding per rule, at its level, a suppressed one as accepted — its title and level, never a URL
+or a piece of evidence. Yontrack counts them — WARNING from one MEDIUM, FAILED from one HIGH — and
+the stamp is in no promotion: this is reporting, not gating.
 
 ## Suppressions and mitigations are reviewed in git
 

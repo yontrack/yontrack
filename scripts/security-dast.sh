@@ -88,7 +88,9 @@
 #                             URL, attributing each finding to the roles that saw it, applies the
 #                             rule levels and the suppressions, writes the markdown report to OUT_MD,
 #                             and prints the counts. With $GITHUB_OUTPUT set, writes `critical`,
-#                             `high`, `medium`, `low`, `findings` and `suppressed` to it.
+#                             `high`, `medium`, `low`, `findings` and `suppressed` to it. With
+#                             $DAST_FINDINGS_OUT set, also writes there the report the stamp
+#                             receives, in Yontrack's neutral `findings` format (#1875).
 #   report-path               Prints the path the report takes in yontrack/security-reports.
 #   publish REPO PATH FILE    Creates PATH in REPO with the contents of FILE. Never updates: one
 #                             file per run, never rewritten.
@@ -96,6 +98,7 @@
 #                             byte a scanner writes goes through this before it can reach a log.
 #
 # Environment (report, report-path):
+#   DAST_FINDINGS_OUT  where `report` writes the findings report for the stamp (default: none)
 #   DAST_KIND          `passive` or `active` (default: passive) - also the directory in the
 #                      private repository
 #   DAST_TARGET        what was scanned
@@ -1552,6 +1555,11 @@ sd_report() {
     printf '%s\n' "$verdict" | sd_render | sd_redact_tokens > "$out" \
         || { sd_fail "Could not write the report to $out"; return 1; }
 
+    if [ -n "${DAST_FINDINGS_OUT:-}" ]; then
+        printf '%s\n' "$verdict" | sd_findings_report > "$DAST_FINDINGS_OUT" \
+            || { sd_fail "Could not write the findings report to $DAST_FINDINGS_OUT"; return 1; }
+    fi
+
     local counts
     counts="$(printf '%s\n' "$verdict" | jq -r '
         "critical=\(.counts.CRITICAL)", "high=\(.counts.HIGH)",
@@ -1565,6 +1573,45 @@ sd_report() {
         echo "$counts" >> "$GITHUB_OUTPUT"
     fi
     return 0
+}
+
+# The report the SECURITY.DAST stamps receive (#1875), in Yontrack's neutral `findings` format,
+# from the verdict on stdin. The same decisions as the counts, and nothing they do not rest on:
+#
+#   * one finding per rule, as counted - `<scanner>:<ref or rule>` - at the level rules.tsv
+#     leaves it; the IGNOREd rules and the informational findings are not there;
+#   * a finding every instance of which a suppression covers is accepted, with the statement and
+#     the expiry of its suppressions. One with any instance left is open, as it is counted;
+#   * no location, no URL, no evidence and no description. The disclosure rule holds for
+#     Yontrack too: the stamp says what was found, the private report says where and how.
+sd_findings_report() {
+    jq -e '
+        ((.suppressions_applied // []) | map({key: .id, value: .}) | from_entries) as $sup
+        | {
+            scanner: "yontrack-dast",
+            kind: "DAST",
+            findings: [
+                .findings[]
+                | select(.risk != "INFO")
+                | select(.counted or ((.suppressed | length) > 0))
+                | ([.suppressed[].suppressed_by[]] | unique) as $ids
+                | {
+                    externalId: "\(.scanner):\((.ref // .rule) | tostring)",
+                    location: "",
+                    severity: .risk,
+                    title: (.name // .rule | tostring)
+                } + (
+                    if .counted then {} else
+                        {acceptance: {
+                            statement: ([$ids[] | $sup[.].statement // empty] | join("; ")),
+                            expiresAt: ([$ids[] | $sup[.].expired_at // empty] | min),
+                            source: "security/dast/suppressions.yaml: \($ids | join(", "))"
+                        }}
+                    end
+                )
+            ]
+        }
+    ' || { sd_fail "Could not write the findings report"; return 1; }
 }
 
 # ---------------------------------------------------------------------------------------------

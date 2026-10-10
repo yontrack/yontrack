@@ -126,7 +126,8 @@ instance that declares no DAST group at all.
 **Where its CI reports.** Every branch reports to self.dev.yontrack.com, which runs the current
 major's last release. When the next major builds something the current one cannot take, it needs a
 detour of its own. 6.0's security findings were one: 5.x could not take them, so `v6` mirrored them
-onto v6.dev as well (#1869). That mirror is dormant since the cutover, and #1875 removes it.
+onto v6.dev as well (#1869). The mirror went dormant at the cutover, and #1875 removed it once
+self.dev ran 6.0.
 
 ## Keeping it in step
 
@@ -227,11 +228,12 @@ moves one major on — `Removed in V7` and `Removed in V8` — for the next majo
 
 ### What the merge does not do
 
-**Move the security stamps back to self.dev** (#1875). The findings mirror stops with the `v6`
-branch, but self.dev only runs 6.0 once 6.0.0 is released, so the switch cannot happen at the
-merge. The last step of `security-images` in `ci.yml`, and of the `report` job in `codeql.yml`,
-holds the line: on `main` and `release/*`, a 6.x build warns while self.dev still runs 5.x, and
-fails once it runs 6.x, until #1875 has landed.
+- [x] **Move the security stamps back to self.dev** (#1875). The findings mirror stopped with the
+  `v6` branch, but self.dev only took findings once it ran 6.0, so the switch could not happen at
+  the merge. Until it did, a guard at the end of the security jobs warned on a 6.x build while
+  self.dev ran 5.x, and failed once it ran 6.x. #1875 switched the six SECURITY stamps of
+  `.yontrack/ci.yaml` to `security-findings`, removed the mirror and its guard, and narrowed the
+  self.dev slot to `^(main|release-6\..*)$` so that a 5.5.x RELEASE can no longer downgrade it.
 
 ## See also
 

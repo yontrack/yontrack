@@ -658,6 +658,37 @@ assert_not_contains "$report" "Server Leaks Information" \
 assert_not_contains "$counts" "demo.example.com" "report: the printed counts carry no URL"
 assert_not_contains "$counts" "/graphql" "report: the printed counts carry no path"
 
+# The findings report the stamp receives (#1875), in the neutral `findings` format.
+rm -f "$WORK/dast-findings.json"
+counts="$(DAST_FINDINGS_OUT="$WORK/dast-findings.json" sd_report "$WORK/report.md" "$WORK/findings.json")"; rc=$?
+assert_eq "0" "$rc" "report: succeeds with a findings report"
+assert_eq "yontrack-dast|DAST" "$(jq -r '"\(.scanner)|\(.kind)"' "$WORK/dast-findings.json")" \
+    "findings report: the scanner and the kind"
+assert_eq "zap:10038-1|MEDIUM|CSP Header Not Set
+zap:10098|MEDIUM|Cross-Domain Misconfiguration
+zap:99999|LOW|GraphQL Introspection Enabled" \
+    "$(jq -r '.findings[] | "\(.externalId)|\(.severity)|\(.title)"' "$WORK/dast-findings.json" | sort)" \
+    "findings report: one finding per rule, at the level rules.tsv leaves it, the IGNOREd and the informational ones dropped"
+assert_eq '{"statement":"The schema is public.","expiresAt":"2099-01-01","source":"security/dast/suppressions.yaml: graphql-introspection"}' \
+    "$(jq -c '.findings[] | select(.externalId == "zap:99999") | .acceptance' "$WORK/dast-findings.json")" \
+    "findings report: a suppressed finding is accepted, with the statement and the expiry of its suppression"
+assert_eq "null" "$(jq -c '.findings[] | select(.externalId == "zap:10098") | .acceptance' "$WORK/dast-findings.json")" \
+    "findings report: a counted finding is open - an expired suppression accepts nothing"
+assert_eq "2" "$(jq '[.findings[] | select(.acceptance == null)] | length' "$WORK/dast-findings.json")" \
+    "findings report: its open findings are the ones the counts count"
+assert_eq "" "$(jq -r '.findings[] | keys[] | select(IN("externalId","location","severity","title","acceptance") | not)' "$WORK/dast-findings.json")" \
+    "findings report: no field the neutral format would reject"
+# The disclosure rule holds for what goes to Yontrack too: what was found, never where nor how.
+assert_eq "" "$(jq -r '[.findings[].location] | unique | .[]' "$WORK/dast-findings.json")" \
+    "findings report: no location - the affected URLs stay in the private report"
+assert_not_contains "$(cat "$WORK/dast-findings.json")" "demo.example.com" "findings report: carries no URL"
+assert_not_contains "$(cat "$WORK/dast-findings.json")" "/graphql" "findings report: carries no path"
+
+rm -f "$WORK/dast-findings.json"
+counts="$(sd_report "$WORK/report.md" "$WORK/findings.json")"; rc=$?
+assert_eq "false" "$([ -f "$WORK/dast-findings.json" ] && echo true || echo false)" \
+    "report: no findings report unless one is asked for"
+
 # A suppression without a statement or an expiry is a finding that would vanish for good.
 cat > "$WORK/bad-suppressions.yaml" <<'YAML'
 version: 1

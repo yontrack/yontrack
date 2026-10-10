@@ -96,8 +96,8 @@ JSON
 echo '{"Results": [' > "$WORK/broken.json"
 
 # What `--show-suppressed` adds: the vulnerabilities the ignore file accepts, under
-# `ExperimentalModifiedFindings` rather than `Vulnerabilities`. They are what the findings mirror
-# sends as accepted findings (#1869), and they must not count.
+# `ExperimentalModifiedFindings` rather than `Vulnerabilities`. Yontrack reads them as accepted
+# findings out of the report (#1875), and they must not count.
 cat > "$WORK/suppressed.json" <<'JSON'
 {
   "SchemaVersion": 2,
