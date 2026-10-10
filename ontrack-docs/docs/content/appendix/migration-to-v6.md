@@ -14,6 +14,9 @@ those who configure it **as code** (CasC):
 
 * **From any 5.x release** — Yontrack 6.0 upgrades an installation running any 5.x release. Its
   database migrations run at its first start, whichever 5.x version it starts from.
+* **Old schema history** — a database whose history goes back to 2017 or earlier records some of its
+  migrations with the `SPRING_JDBC` type, which the Flyway of Yontrack 6 no longer knows. Yontrack 6
+  relabels them as `JDBC` at its first start: there is nothing to do by hand.
 * **From 4.x** — upgrade to a 5.x release first, and start it once, before upgrading to 6.0: see
   [Migration from V4](migration-from-v4.md). Yontrack 6 no longer carries the data conversions
   which 5.0 ran once at its first start, so a 4.x database upgraded straight to 6.0 is not
