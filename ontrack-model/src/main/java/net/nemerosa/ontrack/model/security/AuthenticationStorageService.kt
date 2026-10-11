@@ -1,7 +1,5 @@
 package net.nemerosa.ontrack.model.security
 
-import kotlin.random.Random
-
 /**
  * Service used to store and restore an authentication across boundaries (like queuing)
  */
@@ -34,8 +32,12 @@ interface AuthenticationStorageService {
 
     companion object {
         /**
-         * Known ID of the run-as admin
+         * ID of the run-as administrator, the same for every Yontrack process, so that a message
+         * dispatched as the system by one process is processed as the system by another.
+         *
+         * Angle brackets cannot appear in an unquoted email address, so no account can have
+         * this ID as its email.
          */
-        val RUN_AS_ADMINISTRATOR_ACCOUNT_ID = Random.nextInt(1_000_000).toString(10)
+        const val RUN_AS_ADMINISTRATOR_ACCOUNT_ID = "<system>"
     }
 }

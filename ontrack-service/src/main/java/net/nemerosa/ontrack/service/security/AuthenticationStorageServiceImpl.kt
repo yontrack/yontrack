@@ -30,7 +30,7 @@ class AuthenticationStorageServiceImpl(
             ?: throw AuthenticationStorageServiceNoAuthException()
 
     override fun withAccountId(accountId: String, actor: Actor?, code: () -> Unit) {
-        val authentication = if (accountId == AuthenticationStorageService.RUN_AS_ADMINISTRATOR_ACCOUNT_ID) {
+        val authentication = if (isRunAsAdministrator(accountId, actor)) {
             RunAsAuthenticatedUser.authentication(
                 authenticatedUser = null,
                 actor = actor?.takeIf { it.isSystem }
@@ -56,5 +56,22 @@ class AuthenticationStorageServiceImpl(
         } finally {
             SecurityContextHolder.setContext(oldSecurityContext)
         }
+    }
+
+    /**
+     * Is this the ID of the run-as administrator?
+     *
+     * Before #2065, each Yontrack process had its own random run-as ID, of up to six digits.
+     * A message dispatched as the system by such a process (the previous version during a rolling
+     * upgrade, or messages still queued at the upgrade) carries it, and is still restored as the
+     * system when its actor is the system, or absent (5.5 messages have none). The actor keeps an
+     * account whose email happens to be numeric on the account path. To be removed in V7.
+     */
+    private fun isRunAsAdministrator(accountId: String, actor: Actor?): Boolean =
+        accountId == AuthenticationStorageService.RUN_AS_ADMINISTRATOR_ACCOUNT_ID ||
+                (accountId.matches(legacyRunAsAdministratorAccountId) && (actor == null || actor.isSystem))
+
+    companion object {
+        private val legacyRunAsAdministratorAccountId = Regex("\\d{1,6}")
     }
 }

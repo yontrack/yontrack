@@ -276,9 +276,6 @@ object DemoContent {
     /** The agent activity widget of the demo dashboard - fixed, like [DASHBOARD_UUID]. */
     const val AGENT_ACTIVITY_WIDGET_UUID = "1c1f9c3e-8bfa-4a1f-8a0b-4e2f0b0d1a19"
 
-    /** The last builds widget of the demo dashboard - fixed, like [DASHBOARD_UUID]. */
-    const val LAST_BUILDS_WIDGET_UUID = "1c1f9c3e-8bfa-4a1f-8a0b-4e2f0b0d1a20"
-
     /** The manual admission rule of the staging slot of [VETS], which only a person can answer. */
     const val VETS_APPROVAL = "approval"
 
@@ -2578,20 +2575,6 @@ object DemoContent {
                     "labels" to emptyList<String>(),
                 ).asJson(),
                 layout = DemoWidgetLayout(x = 0, y = 144, w = 6, h = 16),
-            ),
-            // The last builds of the main branch of the service, as its branch page shows them, but
-            // restricted to the promotions and validations worth a glance from a dashboard
-            DemoWidget(
-                uuid = LAST_BUILDS_WIDGET_UUID,
-                key = "home/LastBuildsForBranch",
-                config = mapOf(
-                    "project" to SERVICE,
-                    "branch" to MAIN,
-                    "count" to 5,
-                    "promotions" to listOf(SILVER, GOLD),
-                    "validations" to listOf(BUILD, UNIT_TESTS, INTEGRATION_TESTS),
-                ).asJson(),
-                layout = DemoWidgetLayout(x = 0, y = 160, w = 12, h = 30),
             ),
         ),
     )

@@ -23,7 +23,7 @@ data class WorkflowInstanceLauncher(
             try {
                 val accountId = authenticationStorageService.getAccountId()
                 WorkflowInstanceLauncher(
-                    // The run-as administrator ID is only valid in the process which created it
+                    // The run-as administrator is no account: it is recovered as the system
                     account = accountId.takeIf { it != AuthenticationStorageService.RUN_AS_ADMINISTRATOR_ACCOUNT_ID },
                     actor = authenticationStorageService.getActor(),
                 )

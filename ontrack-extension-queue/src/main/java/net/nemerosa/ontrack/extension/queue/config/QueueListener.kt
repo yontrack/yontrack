@@ -133,8 +133,9 @@ class QueueListener(
 
                     // Account ID
                     val accountId = qp.accountName
-                    authenticationStorageService.withAccountId(accountId, qp.actor) {
-                        try {
+                    // A failure to restore the account is recorded like a failure of the processing
+                    try {
+                        authenticationStorageService.withAccountId(accountId, qp.actor) {
                             meterRegistry.queueProcessTime(qp) {
                                 logger.debug("Processing: {}", payload)
                                 queueProcessor.process(
@@ -146,21 +147,21 @@ class QueueListener(
                             }
                             meterRegistry.queueProcessCompleted(qp)
                             queueRecordService.completed(qp)
-                        } catch (any: Exception) {
-                            meterRegistry.queueProcessErrored(qp)
-                            if (isLeftForRedelivery(any, channel)) {
-                                // Typically, the listener was stopped and interrupted the processing:
-                                // the record is left as is, for the redelivery to process the message
-                                requeue = true
-                                logger.warn(
-                                    "Processing of message ${qp.id} interrupted, left for redelivery (processor = ${queueProcessor.id})",
-                                    any
-                                )
-                            } else {
-                                queueRecordService.errored(qp, any)
-                            }
-                            throw any
                         }
+                    } catch (any: Exception) {
+                        meterRegistry.queueProcessErrored(qp)
+                        if (isLeftForRedelivery(any, channel)) {
+                            // Typically, the listener was stopped and interrupted the processing:
+                            // the record is left as is, for the redelivery to process the message
+                            requeue = true
+                            logger.warn(
+                                "Processing of message ${qp.id} interrupted, left for redelivery (processor = ${queueProcessor.id})",
+                                any
+                            )
+                        } else {
+                            queueRecordService.errored(qp, any)
+                        }
+                        throw any
                     }
                 }
             } catch (any: Throwable) {
