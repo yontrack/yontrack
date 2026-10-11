@@ -47,7 +47,9 @@ class NotificationQueueProcessor(
     override fun getRoutingIdentifier(payload: NotificationQueuePayload): String = payload.id
 
     /**
-     * Immediately ack the messages
+     * Acks the messages once processed, so that a message in hand when the consumer stops is
+     * redelivered. A notification may then be sent twice, when the consumer stops between its
+     * sending and the recording of its end.
      */
-    override val ackMode: QueueAckMode = QueueAckMode.IMMEDIATE
+    override val ackMode: QueueAckMode = QueueAckMode.END
 }

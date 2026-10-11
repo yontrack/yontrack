@@ -38,49 +38,70 @@ class QueueRecordServiceImpl(
     }
 
     override fun sent(queuePayload: QueuePayload) {
-        recordingsService.updateRecord(queueRecordingsExtension, queuePayload.id) {
-            it.withState(QueueRecordState.SENT)
+        // A consumer may already have received the message: its state is kept
+        recordingsService.updateLockedRecord(queueRecordingsExtension, queuePayload.id) {
+            if (it.state == QueueRecordState.STARTED || it.state == QueueRecordState.ROUTING_READY) {
+                it.withState(QueueRecordState.SENT)
+            } else {
+                null
+            }
         }
     }
 
-    override fun received(queuePayload: QueuePayload, queue: String?) {
-        recordingsService.updateRecord(queueRecordingsExtension, queuePayload.id) {
+    override fun received(queuePayload: QueuePayload, queue: String?): Boolean =
+        transition(queuePayload) {
             it.withState(QueueRecordState.RECEIVED).withQueue(queue)
         }
-    }
 
     override fun parsed(queuePayload: QueuePayload, payload: Any) {
-        recordingsService.updateRecord(queueRecordingsExtension, queuePayload.id) {
+        transition(queuePayload) {
             it.withActualPayload(payload.asJson()).withState(QueueRecordState.PARSED)
         }
     }
 
     override fun cancelled(queuePayload: QueuePayload, cancelReason: String) {
-        recordingsService.updateRecord(queueRecordingsExtension, queuePayload.id) {
+        transition(queuePayload) {
             it.withException(cancelReason).withState(QueueRecordState.CANCELLED)
         }
     }
 
     override fun processing(queuePayload: QueuePayload) {
-        recordingsService.updateRecord(queueRecordingsExtension, queuePayload.id) {
+        transition(queuePayload) {
             it.withState(QueueRecordState.PROCESSING)
         }
     }
 
     override fun completed(queuePayload: QueuePayload) {
-        recordingsService.updateRecord(queueRecordingsExtension, queuePayload.id) {
+        transition(queuePayload) {
             it.withState(QueueRecordState.COMPLETED)
                 .withEndTime(Time.now())
         }
     }
 
     override fun errored(queuePayload: QueuePayload, exception: Exception) {
-        recordingsService.updateRecord(queueRecordingsExtension, queuePayload.id) {
+        transition(queuePayload) {
             it.withState(QueueRecordState.ERRORED)
                 .withEndTime(Time.now())
                 .withException(reducedStackTrace(exception))
         }
     }
+
+    /**
+     * Transition of the record of a message on the consumer side, under a lock on the record.
+     *
+     * A record in a final state is left unchanged: the message was redelivered after its
+     * processing was over, or this is the late outcome of an attempt superseded by a redelivery.
+     *
+     * @return `true` if the record was changed
+     */
+    private fun transition(queuePayload: QueuePayload, change: (QueueRecord) -> QueueRecord): Boolean =
+        recordingsService.updateLockedRecord(queueRecordingsExtension, queuePayload.id) { record ->
+            if (record.state.isFinal) {
+                null
+            } else {
+                change(record)
+            }
+        } != null
 
     companion object {
         private const val MAX_STACK_HEIGHT = 20

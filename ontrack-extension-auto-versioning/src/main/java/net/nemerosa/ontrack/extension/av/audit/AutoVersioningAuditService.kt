@@ -62,12 +62,18 @@ interface AutoVersioningAuditService {
     fun onScheduled(order: AutoVersioningOrder, routing: String)
 
     /**
-     * The [order] was received on the queue and is ready for processing
+     * The [order] was received on the queue and is ready for processing, unless it is no longer
+     * running.
+     *
+     * The check and the transition are made under a lock on the entry, so that an order is never
+     * received after it was throttled, nor when a redelivery reaches an order already over.
      *
      * @param order Auto versioning order
      * @param queue Actual queue where the message was sent
+     * @return `true` if the order was received and must be processed, `false` if it is no longer
+     * running (or has no entry) and must be skipped
      */
-    fun onReceived(order: AutoVersioningOrder, queue: String)
+    fun onReceived(order: AutoVersioningOrder, queue: String): Boolean
 
     /**
      * Marks the [order] has been in error.

@@ -37,9 +37,8 @@ class AutoVersioningAuditServiceImpl(
         super.onScheduled(order, routing)
     }
 
-    override fun onReceived(order: AutoVersioningOrder, queue: String) {
+    override fun onReceived(order: AutoVersioningOrder, queue: String): Boolean =
         super.onReceived(order, queue)
-    }
 
     override fun onError(order: AutoVersioningOrder, error: Throwable, vararg data: Pair<String, String>) {
         super.onError(order, error, *data)

@@ -54,7 +54,8 @@ class NotificationListenerQueueProcessor(
         payload.serializedEvent.id.toString()
 
     /**
-     * Immediately ack the messages
+     * Acks the messages once processed, so that a message in hand when the consumer stops is
+     * redelivered.
      */
-    override val ackMode: QueueAckMode = QueueAckMode.IMMEDIATE
+    override val ackMode: QueueAckMode = QueueAckMode.END
 }

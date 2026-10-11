@@ -49,6 +49,11 @@ class StorageJdbcRepository(
         params("store", store).addValue("key", key)
     ) { rs, _ -> readJson(rs, "DATA") }
 
+    override fun retrieveJsonForUpdate(store: String, key: String): JsonNode? = getFirstItem(
+        "SELECT DATA FROM STORAGE WHERE STORE = :store AND NAME = :key FOR UPDATE",
+        params("store", store).addValue("key", key)
+    ) { rs, _ -> readJson(rs, "DATA") }
+
     override fun getKeys(store: String): List<String> {
         return namedParameterJdbcTemplate!!.queryForList(
             "SELECT NAME FROM STORAGE WHERE STORE = :store ORDER BY NAME",

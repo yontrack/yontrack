@@ -85,6 +85,16 @@ interface StorageRepository {
     fun retrieveJson(store: String, key: String): JsonNode?
 
     /**
+     * Retrieves some JSON using a key, and locks the entry until the end of the current transaction
+     * (`SELECT ... FOR UPDATE`).
+     *
+     * @param store Store (typically an extension class name)
+     * @param key   Identifier of data
+     * @return Data or null if not found
+     */
+    fun retrieveJsonForUpdate(store: String, key: String): JsonNode?
+
+    /**
      * Lists all keys for a store
      *
      * @param store Store (typically an extension class name)

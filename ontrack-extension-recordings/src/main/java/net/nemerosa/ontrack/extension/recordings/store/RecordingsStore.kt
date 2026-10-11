@@ -9,6 +9,11 @@ interface RecordingsStore {
 
     fun findById(store: String, id: String): StoredRecording?
 
+    /**
+     * Gets a recording and locks it until the end of the current transaction.
+     */
+    fun findByIdForUpdate(store: String, id: String): StoredRecording?
+
     fun removeAllBefore(store: String, retentionDate: LocalDateTime, nonRunningOnly: Boolean)
 
     fun findByFilter(

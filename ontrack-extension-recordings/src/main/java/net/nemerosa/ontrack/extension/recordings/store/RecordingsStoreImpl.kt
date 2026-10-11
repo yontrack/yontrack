@@ -1,5 +1,6 @@
 package net.nemerosa.ontrack.extension.recordings.store
 
+import net.nemerosa.ontrack.json.parseInto
 import net.nemerosa.ontrack.model.pagination.PaginatedList
 import net.nemerosa.ontrack.model.support.StorageService
 import net.nemerosa.ontrack.repository.support.AbstractJdbcRepository
@@ -20,6 +21,9 @@ class RecordingsStoreImpl(
 
     override fun findById(store: String, id: String): StoredRecording? =
             storageService.find(store(store), id, StoredRecording::class)
+
+    override fun findByIdForUpdate(store: String, id: String): StoredRecording? =
+            storageService.findJsonForUpdate(store(store), id)?.parseInto(StoredRecording::class)
 
     override fun findByFilter(
             store: String,

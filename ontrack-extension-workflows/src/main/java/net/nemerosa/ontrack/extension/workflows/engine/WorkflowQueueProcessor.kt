@@ -25,9 +25,11 @@ class WorkflowQueueProcessor(
     override val defaultScale: Int = 5
 
     /**
-     * Immediately ack the messages
+     * Acks the messages once processed, so that a message in hand when the consumer stops is
+     * redelivered. The processing of a message launches the node, whose execution goes on
+     * outside the listener: the message is acked once the node is launched.
      */
-    override val ackMode: QueueAckMode = QueueAckMode.IMMEDIATE
+    override val ackMode: QueueAckMode = QueueAckMode.END
 
     override fun isCancelled(payload: WorkflowQueuePayload): String? = null
 

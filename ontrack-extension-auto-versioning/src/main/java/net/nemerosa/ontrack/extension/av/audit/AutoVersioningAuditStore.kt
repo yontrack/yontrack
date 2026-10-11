@@ -48,6 +48,15 @@ interface AutoVersioningAuditStore {
         vararg data: Pair<String, String>
     )
 
+    /**
+     * Adds the `RECEIVED` state to an entry if it is still running, under a lock on the entry
+     * held until the end of the current transaction.
+     *
+     * @return `true` if the state was added, `false` if the entry is no longer running or does
+     * not exist
+     */
+    fun receive(targetBranch: Branch, uuid: String, queue: String): Boolean
+
     fun findByUUID(targetBranch: Branch, uuid: String): AutoVersioningAuditEntry?
 
     /**

@@ -3,6 +3,7 @@ package net.nemerosa.ontrack.extension.av.queue
 import net.nemerosa.ontrack.extension.av.AutoVersioningConfigProperties
 import net.nemerosa.ontrack.extension.av.audit.AutoVersioningAuditQueryService
 import net.nemerosa.ontrack.extension.av.audit.AutoVersioningAuditService
+import net.nemerosa.ontrack.extension.av.dispatcher.AutoVersioningOrder
 import net.nemerosa.ontrack.extension.av.metrics.AutoVersioningMetricsService
 import net.nemerosa.ontrack.extension.av.processing.AutoVersioningProcessingService
 import net.nemerosa.ontrack.extension.av.retry.AutoVersioningRetryService
@@ -24,6 +25,7 @@ class AutoVersioningQueueProcessor(
     private val autoVersioningAuditService: AutoVersioningAuditService,
     private val autoVersioningProcessingService: AutoVersioningProcessingService,
     private val autoVersioningRetryService: AutoVersioningRetryService,
+    private val autoVersioningProcessingLock: AutoVersioningProcessingLock,
 ) : QueueProcessor<AutoVersioningQueuePayload> {
 
     private val logger: Logger = LoggerFactory.getLogger(AutoVersioningQueueProcessor::class.java)
@@ -35,10 +37,15 @@ class AutoVersioningQueueProcessor(
     override val defaultScale: Int? = autoVersioningConfigProperties.queue.scale
 
     /**
-     * Always ack the auto-versioning requests.
+     * Acks the orders once processed, so that an order in hand when the consumer stops is
+     * redelivered.
      */
-    override val ackMode: QueueAckMode = QueueAckMode.IMMEDIATE
+    override val ackMode: QueueAckMode = QueueAckMode.END
 
+    /**
+     * First check, without any lock: the decision to process the order is taken by [process],
+     * under the lock on its routing identifier and on its audit entry.
+     */
     override fun isCancelled(payload: AutoVersioningQueuePayload): String? {
         val order = payload.order
         val entry = autoVersioningAuditQueryService.findByUUID(order.branch, order.uuid)
@@ -56,24 +63,36 @@ class AutoVersioningQueueProcessor(
     }
 
     override fun process(payload: AutoVersioningQueuePayload, queueMetadata: QueueMetadata?) {
-        logger.info("Processing order [{}] started...", payload.order.uuid)
         val order = payload.order
         val queue = queueMetadata?.queueName
-        metrics.onReceiving(order, queue)
         securityService.asAdmin {
-            autoVersioningAuditService.onReceived(order, queue ?: "n/a")
-            try {
-                val outcome = metrics.processingTiming(order, queue) {
-                    // Transient failures are retried by the queue
-                    autoVersioningProcessingService.process(order, automaticRetries = true)
+            // Orders for the same target are processed one at a time, even by the consumers of
+            // two instances sharing the queue during a rolling upgrade
+            autoVersioningProcessingLock.withLock(payload.routingIdentifier()) {
+                // The order may have been throttled, or already processed when this is a redelivery
+                if (autoVersioningAuditService.onReceived(order, queue ?: "n/a")) {
+                    processReceived(order, queue)
+                } else {
+                    logger.warn("Order [{}] is no longer running, not processing", order.uuid)
                 }
-                logger.info("Processing order [{}] completed.", payload.order.uuid)
-                metrics.onProcessingCompleted(order, outcome)
-            } catch (any: Throwable) {
-                // Records the error, and either schedules an automatic retry or notifies the error
-                autoVersioningRetryService.onError(order, any)
-                metrics.onProcessingError()
             }
+        }
+    }
+
+    private fun processReceived(order: AutoVersioningOrder, queue: String?) {
+        logger.info("Processing order [{}] started...", order.uuid)
+        metrics.onReceiving(order, queue)
+        try {
+            val outcome = metrics.processingTiming(order, queue) {
+                // Transient failures are retried by the queue
+                autoVersioningProcessingService.process(order, automaticRetries = true)
+            }
+            logger.info("Processing order [{}] completed.", order.uuid)
+            metrics.onProcessingCompleted(order, outcome)
+        } catch (any: Throwable) {
+            // Records the error, and either schedules an automatic retry or notifies the error
+            autoVersioningRetryService.onError(order, any)
+            metrics.onProcessingError()
         }
     }
 

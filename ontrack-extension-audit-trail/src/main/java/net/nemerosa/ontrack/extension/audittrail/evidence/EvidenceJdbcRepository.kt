@@ -169,7 +169,8 @@ class EvidenceJdbcRepository(
     companion object {
         /**
          * First key of the advisory locks on the blobs, the second being a hash of their SHA-256:
-         * "EVID" in ASCII — next to the locks on the trails ("TRAI").
+         * "EVID" in ASCII — next to the locks on the trails ("TRAI") and on the processing of the
+         * auto-versioning orders ("AVQU").
          */
         const val BLOB_LOCK_CLASS: Int = 0x45564944
     }

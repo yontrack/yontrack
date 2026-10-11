@@ -108,8 +108,9 @@ class TrailEntryJdbcRepository(
     companion object {
         /**
          * First key of the advisory locks on the trails, the second being the ID of the build:
-         * "TRAI" in ASCII. The only other advisory locks of Yontrack are those of the blobs of the
-         * evidence ("EVID", `EvidenceJdbcRepository.BLOB_LOCK_CLASS`).
+         * "TRAI" in ASCII. The other advisory locks of Yontrack are those of the blobs of the evidence
+         * ("EVID", `EvidenceJdbcRepository.BLOB_LOCK_CLASS`) and of the processing of the
+         * auto-versioning orders ("AVQU", `AutoVersioningProcessingLock.LOCK_CLASS`).
          */
         const val TRAIL_LOCK_CLASS: Int = 0x54524149
     }

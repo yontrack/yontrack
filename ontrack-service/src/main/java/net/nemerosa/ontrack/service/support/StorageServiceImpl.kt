@@ -25,6 +25,9 @@ class StorageServiceImpl(
 
     override fun findJson(store: String, key: String): JsonNode? = repository.retrieveJson(store, key)
 
+    override fun findJsonForUpdate(store: String, key: String): JsonNode? =
+        repository.retrieveJsonForUpdate(store, key)
+
     override fun getKeys(store: String): List<String> = repository.getKeys(store)
 
     override fun getData(store: String): Map<String, JsonNode> = repository.getData(store)

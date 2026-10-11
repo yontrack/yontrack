@@ -43,15 +43,12 @@ abstract class AbstractAutoVersioningAuditService(
         )
     }
 
-    override fun onReceived(order: AutoVersioningOrder, queue: String) {
-        store.addState(
+    override fun onReceived(order: AutoVersioningOrder, queue: String): Boolean =
+        store.receive(
             targetBranch = order.branch,
             uuid = order.uuid,
-            routing = null,
             queue = queue,
-            state = AutoVersioningAuditState.RECEIVED
         )
-    }
 
     override fun onError(order: AutoVersioningOrder, error: Throwable, vararg data: Pair<String, String>) {
         val stack = reducedStackTrace(error)

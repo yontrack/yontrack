@@ -17,6 +17,7 @@ import net.nemerosa.ontrack.repository.support.readLocalDateTime
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
+import org.springframework.transaction.annotation.Transactional
 import java.sql.ResultSet
 import java.time.LocalDateTime
 import javax.sql.DataSource
@@ -228,6 +229,36 @@ class AutoVersioningAuditStoreImpl(
             """.trimIndent()
 
             namedParameterJdbcTemplate!!.update(updateSql, updateParams)
+        }
+    }
+
+    /**
+     * Transactional, so that the lock on the entry is held until its new state is written, even
+     * when the caller has no transaction of its own.
+     */
+    @Transactional
+    override fun receive(targetBranch: Branch, uuid: String, queue: String): Boolean {
+        val running = namedParameterJdbcTemplate!!.query(
+            "SELECT RUNNING FROM AV_AUDIT WHERE UUID = :uuid AND BRANCH_ID = :branchId FOR UPDATE",
+            mapOf(
+                "uuid" to uuid,
+                "branchId" to targetBranch.id()
+            )
+        ) { rs, _ ->
+            rs.getBoolean("RUNNING")
+        }.firstOrNull()
+        return if (running == true) {
+            addState(
+                targetBranch = targetBranch,
+                uuid = uuid,
+                routing = null,
+                queue = queue,
+                upgradeBranch = null,
+                state = AutoVersioningAuditState.RECEIVED,
+            )
+            true
+        } else {
+            false
         }
     }
 

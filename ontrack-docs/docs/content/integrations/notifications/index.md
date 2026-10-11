@@ -124,6 +124,10 @@ By clicking on the :material-plus: icon on the left, you can see more details ab
 
 Finally, the administrator can filter recordings on their results or channels.
 
+!!! note
+
+    A notification may be sent twice when Yontrack stops (for example during an upgrade) after it has sent the notification but before it has recorded it: the notification is then processed again on restart.
+
 ## Examples
 
 This section shows a number of custom templates for some events

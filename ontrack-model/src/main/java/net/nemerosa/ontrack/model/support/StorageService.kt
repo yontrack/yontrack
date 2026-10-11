@@ -29,6 +29,17 @@ interface StorageService {
     fun findJson(store: String, key: String): JsonNode?
 
     /**
+     * Retrieves some JSON using a key, and locks the entry until the end of the current transaction
+     * (`SELECT ... FOR UPDATE`), so that it can be read, changed and stored back without a
+     * concurrent change in between. Outside a transaction, the lock is released at once.
+     *
+     * @param store Store (typically an extension class name)
+     * @param key   Identifier of data
+     * @return Data or null if not found
+     */
+    fun findJsonForUpdate(store: String, key: String): JsonNode?
+
+    /**
      * Lists all keys for a store
      *
      * @param store Store (typically an extension class name)
