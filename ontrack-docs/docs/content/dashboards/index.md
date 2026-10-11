@@ -26,6 +26,8 @@ From the **Dashboard** menu you can:
 - **Share current dashboard** — promote a private dashboard to shared (requires `DashboardSharing`)
 - **Delete current dashboard** — remove the active dashboard (built-in dashboards cannot be deleted)
 
+In edit mode, each widget shows its type next to its commands, since its title, especially a custom one, may not say what kind of widget it is.
+
 ## Dashboards as Code
 
 Shared dashboards can be defined and managed as YAML, enabling version-controlled, team-wide dashboard definitions. See [Dashboards as Code](dashboards-as-code.md).
