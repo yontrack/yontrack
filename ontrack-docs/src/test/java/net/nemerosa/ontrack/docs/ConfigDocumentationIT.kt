@@ -7,9 +7,11 @@ import net.nemerosa.ontrack.model.annotations.getAPITypeName
 import net.nemerosa.ontrack.model.annotations.getPropertyDescription
 import net.nemerosa.ontrack.model.docs.DocumentationIgnore
 import org.junit.jupiter.api.Test
+import org.springframework.beans.factory.config.YamlPropertiesFactoryBean
 import org.springframework.boot.context.properties.ConfigurationProperties
 import org.springframework.boot.convert.DataSizeUnit
 import org.springframework.boot.convert.DurationUnit
+import org.springframework.core.io.ClassPathResource
 import org.springframework.util.unit.DataSize
 import org.springframework.util.unit.DataUnit
 import java.time.Duration
@@ -48,12 +50,46 @@ class ConfigDocumentationIT : AbstractDocGenIT() {
                     val name = getAPITypeName(configuration::class)
                     s.tocItem(name, fileName = "${id}.md")
                 }
+                s.tocItem(SPRING_BOOT_TITLE, fileName = "$SPRING_BOOT_FILE.md")
             }
 
             configurations.forEach { configuration ->
                 generateConfiguration(this, configuration)
             }
 
+            generateSpringBootConfiguration(this)
+
+        }
+    }
+
+    /**
+     * The Spring Boot properties which Yontrack sets in its `config/application.yml`, with the value
+     * it gives them: a property listed here and missing from the file fails the generation.
+     */
+    private fun generateSpringBootConfiguration(directoryContext: DocGenDirectoryContext) {
+        val applicationProperties = YamlPropertiesFactoryBean().run {
+            setResources(ClassPathResource("config/application.yml"))
+            `object` ?: error("Cannot read config/application.yml")
+        }
+        directoryContext.writeFile(
+            fileId = SPRING_BOOT_FILE,
+            title = SPRING_BOOT_TITLE,
+        ) { s ->
+            s.paragraph("Spring Boot properties which Yontrack sets to a value of its own. They can be overridden like any Spring Boot property.")
+            s.table("Name", "Environment", "Description", "Default value", "Notes")
+            springBootProperties.toSortedMap().forEach { (name, description) ->
+                val value = applicationProperties.getProperty(name)
+                    ?: error("$name is not set in config/application.yml")
+                writeProperty(
+                    s = s,
+                    propertyName = name,
+                    // Spring Boot binds an environment variable without the dashes of the property name
+                    envName = name.replace(".", "_").replace("-", "").uppercase(),
+                    description = description,
+                    defaultValue = value,
+                    deprecatedReason = "",
+                )
+            }
         }
     }
 
@@ -334,6 +370,18 @@ class ConfigDocumentationIT : AbstractDocGenIT() {
     fun isScalarProperty(prop: KProperty<*>): Boolean {
         val classifier = prop.returnType.classifier
         return classifier is KClass<*> && isScalarClass(classifier)
+    }
+
+    companion object {
+        private const val SPRING_BOOT_FILE = "spring-boot"
+        private const val SPRING_BOOT_TITLE = "Spring Boot configuration"
+
+        /**
+         * Description of the Spring Boot properties which Yontrack sets, indexed by name.
+         */
+        private val springBootProperties = mapOf(
+            "spring.lifecycle.timeout-per-shutdown-phase" to "When Yontrack stops - on a `SIGTERM`, during a rolling upgrade - time given to each phase of its graceful shutdown: the web server completing the requests in progress, the queue listeners completing the message in hand (see `ontrack.config.rabbitmq.listener-shutdown-timeout`). It fits in the termination grace period of 60 seconds of the Helm chart, after its `preStop` hook.",
+        )
     }
 
 }

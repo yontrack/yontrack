@@ -1,20 +1,28 @@
 package net.nemerosa.ontrack.service.support
 
 import com.github.benmanes.caffeine.cache.Cache
+import com.github.benmanes.caffeine.cache.Caffeine
+import com.github.benmanes.caffeine.cache.Ticker
 import net.nemerosa.ontrack.common.Caches
 import net.nemerosa.ontrack.it.AbstractServiceTestSupport
 import net.nemerosa.ontrack.model.settings.EventsSettings
 import net.nemerosa.ontrack.model.settings.SecuritySettings
+import net.nemerosa.ontrack.model.settings.SettingsProvider
+import net.nemerosa.ontrack.service.CacheConfig
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.beans.factory.support.StaticListableBeanFactory
 import org.springframework.cache.CacheManager
 import org.springframework.cache.caffeine.CaffeineCache
+import org.springframework.cache.support.SimpleCacheManager
 import org.springframework.transaction.PlatformTransactionManager
 import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.transaction.support.TransactionTemplate
 import java.util.concurrent.Executors
+import java.time.Duration
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicLong
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
@@ -31,6 +39,12 @@ class CachedSettingsServiceIT : AbstractServiceTestSupport() {
 
     @Autowired
     private lateinit var cacheManager: CacheManager
+
+    @Autowired
+    private lateinit var cacheConfig: CacheConfig
+
+    @Autowired
+    private lateinit var settingsProviders: List<SettingsProvider<*>>
 
     @Test
     fun `Several settings types stay cached together`() {
@@ -86,6 +100,59 @@ class CachedSettingsServiceIT : AbstractServiceTestSupport() {
                 settingsManagerService.saveSettings(settings)
             }
         }
+    }
+
+    @Test
+    fun `Settings written through an instance are seen by another instance once its cache expires`() {
+        // A second instance on the same database, with its own cache, whose clock the test controls
+        val time = AtomicLong()
+        val other = otherInstance { time.get() }
+
+        val settings = other.getCachedSettings(SecuritySettings::class.java)
+        asAdmin().execute {
+            settingsManagerService.saveSettings(settings.withDashboardSharing(!settings.grantDashboardSharingToAll))
+        }
+        assertEquals(
+            !settings.grantDashboardSharingToAll,
+            cachedSettingsService.getCachedSettings(SecuritySettings::class.java).grantDashboardSharingToAll,
+            "Seen at once by the instance which wrote them"
+        )
+
+        time.set(Duration.ofSeconds(59).toNanos())
+        assertEquals(
+            settings.grantDashboardSharingToAll,
+            other.getCachedSettings(SecuritySettings::class.java).grantDashboardSharingToAll,
+            "Still cached by the other instance"
+        )
+
+        time.set(Duration.ofMinutes(1).toNanos())
+        assertEquals(
+            !settings.grantDashboardSharingToAll,
+            other.getCachedSettings(SecuritySettings::class.java).grantDashboardSharingToAll,
+            "Seen by the other instance once its cache expires"
+        )
+    }
+
+    /**
+     * Cached settings of another instance, whose settings cache has the specification of this one.
+     */
+    private fun otherInstance(ticker: Ticker): CachedSettingsServiceImpl {
+        val spec = cacheConfig.specs.getValue(Caches.SETTINGS)
+        val otherCacheManager = SimpleCacheManager().apply {
+            setCaches(
+                listOf(
+                    CaffeineCache(
+                        Caches.SETTINGS,
+                        Caffeine.from(spec).ticker(ticker).executor(Runnable::run).build()
+                    )
+                )
+            )
+            initializeCaches()
+        }
+        val beanFactory = StaticListableBeanFactory().apply {
+            addBean("cacheManager", otherCacheManager)
+        }
+        return CachedSettingsServiceImpl(settingsProviders, beanFactory.getBeanProvider(CacheManager::class.java))
     }
 
     private val settingsCache: Cache<Any, Any>

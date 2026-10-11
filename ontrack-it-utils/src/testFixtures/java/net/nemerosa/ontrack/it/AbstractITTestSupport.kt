@@ -47,6 +47,8 @@ import javax.sql.DataSource
         // not the UI application.
         "ontrack.config.extension.workflows.mock.enabled=true",
         "ontrack.config.extension.scm.mock.enabled=true",
+        // Nothing to wait for: no other instance runs side by side
+        "ontrack.config.search.index.startup-delay=0",
     ]
 )
 abstract class AbstractITTestSupport {

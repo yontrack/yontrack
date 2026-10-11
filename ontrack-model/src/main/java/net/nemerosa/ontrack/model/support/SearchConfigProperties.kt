@@ -1,6 +1,9 @@
 package net.nemerosa.ontrack.model.support
 
 import net.nemerosa.ontrack.common.api.APIDescription
+import org.springframework.boot.convert.DurationUnit
+import java.time.Duration
+import java.time.temporal.ChronoUnit
 
 /**
  * Configuration properties for the search
@@ -31,5 +34,9 @@ class SearchConfigProperties {
 
         @APIDescription("Forces the rebuild of the search documents of all types at startup, in the background.")
         var reset = false
+
+        @DurationUnit(ChronoUnit.SECONDS)
+        @APIDescription("Delay before the rebuild of the search documents at startup (in seconds by default, or as `2m`, `90s`...), past the time when a previous instance, being replaced by a rolling upgrade, still writes documents in their previous format. Only one of the instances started side by side rebuilds the documents of a type. `0` rebuilds them at once.")
+        var startupDelay: Duration = Duration.ofMinutes(2)
     }
 }

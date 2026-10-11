@@ -28,6 +28,12 @@ spring:
   # Default profile
   profiles:
     default: prod
+  # Graceful shutdown (on SIGTERM, during a rolling upgrade): each phase - the web server draining
+  # its requests, the queue listeners completing the message in hand - is given 45s, within the
+  # termination grace period of 60s of the chart, after its preStop hook (#2058).
+  # See also ontrack.config.rabbitmq.listener-shutdown-timeout.
+  lifecycle:
+    timeout-per-shutdown-phase: 45s
   # Multipart requests are parsed only once a controller reads their parts: the upload of an
   # evidence reads them after its authorization (#1964). Their size limits are raised to the
   # maximum size of an evidence by the audit trail (EvidenceMultipartConfiguration).

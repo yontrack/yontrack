@@ -1,5 +1,10 @@
 ontrack:
   config:
+    search:
+      index:
+        # The dev stack and the KDSL acceptance tests run one instance only: the search documents
+        # are rebuilt at once at startup, instead of past the overlap of a rolling upgrade.
+        startup-delay: 0
     extension:
       scm:
         mock:
