@@ -1,0 +1,2 @@
+# Versions exempted from the expand rules
+V101: UNUSED_STUFF is read by no release (#1234)

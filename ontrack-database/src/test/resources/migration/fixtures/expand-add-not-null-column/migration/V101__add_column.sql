@@ -1,0 +1,7 @@
+-- The previous release does not fill it in
+ALTER TABLE BUILDS
+    ADD COLUMN ACTOR JSONB NOT NULL;
+-- With a default, or nullable: allowed
+ALTER TABLE BUILDS
+    ADD COLUMN ORIGIN VARCHAR(20) NOT NULL DEFAULT 'UI',
+    ADD COLUMN IF NOT EXISTS SOURCE TEXT NULL;

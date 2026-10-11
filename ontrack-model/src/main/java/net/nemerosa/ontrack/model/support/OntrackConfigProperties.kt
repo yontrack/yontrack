@@ -93,6 +93,11 @@ class OntrackConfigProperties {
     var graphql = GraphQLProperties()
 
     /**
+     * Database settings
+     */
+    var database = DatabaseProperties()
+
+    /**
      * Key-store type
      */
     @APIDescription("Key store type to use to store encryption keys")
@@ -113,9 +118,37 @@ class OntrackConfigProperties {
         logger.info("[templating] Errors = ${templating.errors}")
         logger.info("[events] Export max rows = ${events.export.maxRows}")
         logger.info("[events] Cleanup batch size = ${events.cleanup.batchSize}")
+        logger.info("[database] Contract migrations = ${database.contractMigrations}")
         graphql.limits.run {
             logger.info("[graphql] Limits = $mode (aliases $maxAliases, directives per location $maxDirectivesPerLocation, depth $maxDepth, complexity $maxComplexity)")
         }
+    }
+
+    /**
+     * Database settings
+     */
+    class DatabaseProperties {
+
+        @APIDescription("When the contract migrations run - the second phase of the database migrations, which drops what no running version uses any longer. `STARTUP` (default) runs them at startup, right after the expand migrations. `DEFERRED` runs only the expand migrations at startup, leaving the contract ones pending, for an upgrade without downtime: the previous version keeps running against the schema until it is gone, and the contract migrations are then run by `run-contract-and-exit`.")
+        var contractMigrations: ContractMigrationsMode = ContractMigrationsMode.STARTUP
+
+        @APIDescription("When `true`, Yontrack does not start: it runs the pending expand migrations, then the pending contract migrations in version order, logs what it applied and exits, with code 0, or with code 1 when a migration fails. Used by the post-upgrade hook of the Helm chart, once the previous version is gone.")
+        var runContractAndExit: Boolean = false
+    }
+
+    /**
+     * When the contract migrations run
+     */
+    enum class ContractMigrationsMode {
+        /**
+         * At startup, after the expand migrations
+         */
+        STARTUP,
+
+        /**
+         * Left pending at startup, run by `run-contract-and-exit`
+         */
+        DEFERRED,
     }
 
     /**

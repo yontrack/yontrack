@@ -1,8 +1,11 @@
 package net.nemerosa.ontrack.service.support;
 
+import net.nemerosa.ontrack.model.support.OntrackConfigProperties;
 import net.nemerosa.ontrack.model.support.StartupService;
 import org.flywaydb.core.Flyway;
+import org.flywaydb.core.api.MigrationInfo;
 import org.flywaydb.core.api.configuration.Configuration;
+import org.flywaydb.core.api.output.MigrateResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -11,20 +14,47 @@ import org.springframework.context.ApplicationContext;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
+import java.util.function.IntConsumer;
 import java.util.stream.Collectors;
 
+/**
+ * Migrates the database at startup, then starts the {@link StartupService}s.
+ * <p>
+ * The migrations run in two phases (#2057): the expand migrations of {@code db/migration} always,
+ * then the contract migrations of {@code db/contract}, according to
+ * {@code ontrack.config.database.contract-migrations}. With
+ * {@code ontrack.config.database.run-contract-and-exit}, the application runs both and exits, before
+ * any startup service and before the web server listens.
+ *
+ * @see ContractMigrations
+ */
 @Component
 public class StartupStrategy implements FlywayMigrationStrategy {
 
     private final Logger logger = LoggerFactory.getLogger(StartupStrategy.class);
 
     private final ApplicationContext applicationContext;
+    private final OntrackConfigProperties.DatabaseProperties database;
+    private final List<String> contractLocations;
+    private final IntConsumer exit;
 
     @Autowired
-    public StartupStrategy(ApplicationContext applicationContext) {
+    public StartupStrategy(ApplicationContext applicationContext, OntrackConfigProperties ontrackConfigProperties) {
+        this(applicationContext, ontrackConfigProperties.getDatabase(), List.of(ContractMigrations.LOCATION), System::exit);
+    }
+
+    /**
+     * @param contractLocations Locations of the contract migrations
+     * @param exit              Exits the application with a code, in the {@code run-contract-and-exit} mode
+     */
+    StartupStrategy(ApplicationContext applicationContext, OntrackConfigProperties.DatabaseProperties database, List<String> contractLocations, IntConsumer exit) {
         this.applicationContext = applicationContext;
+        this.database = database;
+        this.contractLocations = contractLocations;
+        this.exit = exit;
     }
 
     @Override
@@ -32,9 +62,23 @@ public class StartupStrategy implements FlywayMigrationStrategy {
         // Old schema histories carry a migration type which Flyway no longer knows
         relabelSpringJdbcMigrations(flyway);
 
+        // Only the migrations, then exiting
+        if (database.getRunContractAndExit()) {
+            runContractAndExit(flyway);
+            return;
+        }
+
         // Migrating the database
-        logger.info("Migrating the database...");
-        flyway.migrate();
+        migrateExpand(flyway);
+        Flyway contract = ContractMigrations.flyway(flyway, contractLocations);
+        if (database.getContractMigrations() == OntrackConfigProperties.ContractMigrationsMode.STARTUP) {
+            migrateContract(contract);
+        } else {
+            List<String> pending = Arrays.stream(contract.info().pending())
+                    .map(StartupStrategy::describe)
+                    .toList();
+            logger.info("[database] Contract migrations deferred, {} pending: {}", pending.size(), pending);
+        }
 
         // Getting the startup services
         List<StartupService> startupServices = applicationContext.getBeansOfType(StartupService.class).values().stream()
@@ -55,6 +99,47 @@ public class StartupStrategy implements FlywayMigrationStrategy {
             logger.info("Starting [{}] {}", startupService.startupOrder(), startupService.getName());
             startupService.start();
         });
+    }
+
+    /**
+     * Runs the pending expand migrations - none, after an upgrade whose new version has started -
+     * then the pending contract migrations, and exits with 0, or with 1 when a migration fails.
+     */
+    private void runContractAndExit(Flyway flyway) {
+        int code;
+        try {
+            logger.info("[database] Running the contract migrations, then exiting");
+            migrateExpand(flyway);
+            migrateContract(ContractMigrations.flyway(flyway, contractLocations));
+            logger.info("[database] Contract migrations done, exiting");
+            code = 0;
+        } catch (RuntimeException ex) {
+            logger.error("[database] Contract migrations failed, exiting", ex);
+            code = 1;
+        }
+        exit.accept(code);
+    }
+
+    private void migrateExpand(Flyway flyway) {
+        logger.info("Migrating the database...");
+        MigrateResult result = flyway.migrate();
+        logger.info("[database] Expand migrations applied: {}", result.migrationsExecuted);
+    }
+
+    private void migrateContract(Flyway contract) {
+        logger.info("[database] Running the contract migrations...");
+        MigrateResult result = contract.migrate();
+        if (result.migrations.isEmpty()) {
+            logger.info("[database] Contract migrations: none pending");
+        } else {
+            result.migrations.forEach(migration ->
+                    logger.info("[database] Contract migration applied: V{} - {}", migration.version, migration.description)
+            );
+        }
+    }
+
+    private static String describe(MigrationInfo info) {
+        return "V" + info.getVersion() + " - " + info.getDescription();
     }
 
     /**

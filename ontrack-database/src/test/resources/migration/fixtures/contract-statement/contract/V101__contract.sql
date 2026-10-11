@@ -1,0 +1,15 @@
+-- Allowed: drops, deletions and updates of the data of removed features
+DROP TABLE IF EXISTS OLD_STUFF CASCADE;
+DROP INDEX OLD_INDEX;
+DELETE FROM SETTINGS;
+DELETE FROM PROPERTIES WHERE TYPE = 'net.nemerosa.ontrack.extension.removed.RemovedPropertyType';
+UPDATE EVENTS SET REF = NULL WHERE EVENT_TYPE = 'removed_event';
+ALTER TABLE BUILDS
+    DROP COLUMN OLD_COLUMN,
+    DROP CONSTRAINT BUILDS_FK_OLD;
+-- Refused: an expansion has nothing to do in the contract phase
+CREATE TABLE NEW_STUFF (ID SERIAL PRIMARY KEY NOT NULL);
+ALTER TABLE BUILDS
+    DROP COLUMN OTHER_COLUMN,
+    ADD COLUMN NEW_COLUMN TEXT NULL;
+INSERT INTO SETTINGS (CATEGORY, NAME, VALUE) VALUES ('c', 'n', 'v');

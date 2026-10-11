@@ -1,0 +1,7 @@
+# Migrations exempted from the expand and contract rules (#2057), checked by
+# MigrationRulesRepositoryTest. One line per version, with the reason the rules do not apply:
+#
+#   V<n>: reason, with the issue
+#
+# A line exempting nothing fails the test: delete the line of a migration which no longer needs it.
+# See doc/dev-guide/database-migrations.md.
