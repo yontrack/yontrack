@@ -111,7 +111,8 @@ Every change follows this lifecycle, end to end — don't stop after step 2:
    `ontrack-demo-seed` (see *Definition of done* below); say which way you decided either way
 5. **Land on `main`** — merge the branch into `main`, then `git push origin main`. A fix in
    milestone `5.5` is then cherry-picked onto `release/5.5`, unless it went there directly
-   (`/fix-issue` has the steps)
+   (`/fix-issue` has the steps). Squash onto `git merge-base HEAD origin/main`, never a re-fetched
+   `origin/main`; before pushing, `git diff --stat origin/main HEAD` lists only the change's own files
 6. **Delete the local branch** — `git branch -d <branch>` once it is merged
 7. **Wait for the `main` build, then mark the issue ready and close it** — once CI on `main` is
    green, move the issue to `status:ready` and close it, provided it has a milestone (see *Issue
