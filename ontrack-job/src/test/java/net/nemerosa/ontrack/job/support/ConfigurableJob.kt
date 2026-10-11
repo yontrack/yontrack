@@ -19,6 +19,11 @@ constructor(
 
     var running: Boolean = false
 
+    /**
+     * Code run at the start of each run of the job
+     */
+    var onRun: (() -> Unit)? = null
+
     override fun isDisabled(): Boolean {
         return disabled
     }
@@ -35,6 +40,7 @@ constructor(
         return JobRun { listener ->
             running = true
             try {
+                onRun?.invoke()
                 if (this.wait > 0) {
                     try {
                         Thread.sleep(this.wait)

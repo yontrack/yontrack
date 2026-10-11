@@ -56,12 +56,21 @@ abstract class AbstractJobTest {
         }
     }
 
-    protected fun scheduler(initiallyPaused: Boolean = false, code: JobSchedulerContext.() -> Unit) {
-        val jobScheduler = createJobScheduler(initiallyPaused)
+    protected fun scheduler(
+        initiallyPaused: Boolean = false,
+        jobRunLock: JobRunLock = NOPJobRunLock,
+        jobHistoryRecorder: JobHistoryRecorder? = null,
+        code: JobSchedulerContext.() -> Unit,
+    ) {
+        val jobScheduler = createJobScheduler(initiallyPaused, jobRunLock, jobHistoryRecorder)
         JobSchedulerContext(jobScheduler).code()
     }
 
-    private fun createJobScheduler(initiallyPaused: Boolean): JobScheduler {
+    private fun createJobScheduler(
+        initiallyPaused: Boolean,
+        jobRunLock: JobRunLock,
+        jobHistoryRecorder: JobHistoryRecorder?,
+    ): JobScheduler {
         return DefaultJobScheduler(
             jobDecorator = NOPJobDecorator.INSTANCE,
             scheduler = scheduler,
@@ -69,7 +78,9 @@ abstract class AbstractJobTest {
             initiallyPaused = initiallyPaused,
             jobExecutorService = jobPool,
             scattering = false,
-            scatteringRatio = 1.0
+            scatteringRatio = 1.0,
+            jobHistoryRecorder = jobHistoryRecorder,
+            jobRunLock = jobRunLock,
         )
     }
 

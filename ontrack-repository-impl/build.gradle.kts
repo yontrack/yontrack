@@ -8,6 +8,7 @@ dependencies {
 
     implementation(project(":ontrack-database"))
     implementation(project(":ontrack-repository-support"))
+    implementation(project(":ontrack-job"))
     implementation("org.springframework:spring-context")
     implementation("org.springframework.boot:spring-boot-starter")
     implementation("org.springframework.boot:spring-boot-actuator")
@@ -16,6 +17,7 @@ dependencies {
     implementation("org.apache.commons:commons-lang3")
 
     testImplementation(testFixtures(project(":ontrack-it-utils")))
+    testImplementation("com.zaxxer:HikariCP")
 
     testRuntimeOnly(project(":ontrack-service"))
 }

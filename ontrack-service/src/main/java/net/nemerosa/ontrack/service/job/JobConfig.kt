@@ -3,6 +3,7 @@ package net.nemerosa.ontrack.service.job
 import io.micrometer.core.instrument.MeterRegistry
 import net.nemerosa.ontrack.common.Time
 import net.nemerosa.ontrack.job.JobListener
+import net.nemerosa.ontrack.job.JobRunLock
 import net.nemerosa.ontrack.job.JobScheduler
 import net.nemerosa.ontrack.job.support.DefaultJobScheduler
 import net.nemerosa.ontrack.job.support.TaskExecutor
@@ -26,6 +27,7 @@ class JobConfig(
     private val meterRegistry: MeterRegistry,
     private val settingsRepository: SettingsRepository,
     private val jobHistoryService: JobHistoryService,
+    private val jobRunLock: JobRunLock,
 ) {
     @Bean
     fun jobListener(): JobListener = DefaultJobListener(
@@ -75,6 +77,7 @@ class JobConfig(
             timeout = jobConfigProperties.timeout,
             timeoutControllerInterval = jobConfigProperties.timeoutControllerInterval,
             jobHistoryRecorder = jobHistoryService,
+            jobRunLock = jobRunLock,
         )
     }
 }

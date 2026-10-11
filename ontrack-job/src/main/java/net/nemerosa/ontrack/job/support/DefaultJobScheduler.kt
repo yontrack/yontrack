@@ -18,6 +18,7 @@ import kotlin.math.abs
 
 /**
  * @property meterRegistry If set, the scheduler will register job metrics
+ * @property jobRunLock Lock guarding every run of a job, so that at most one instance runs it at a time
  */
 class DefaultJobScheduler
 @JvmOverloads
@@ -33,6 +34,7 @@ constructor(
     private val timeout: Duration? = null,
     private val jobHistoryRecorder: JobHistoryRecorder? = null,
     timeoutControllerInterval: Duration? = null,
+    private val jobRunLock: JobRunLock = NOPJobRunLock,
 ) : JobScheduler {
 
     private val logger = LoggerFactory.getLogger(JobScheduler::class.java)
@@ -343,8 +345,6 @@ constructor(
                     }
 
                     override fun onCompletion() {
-                        logger.debug("[job][task]{} Removed job execution", job.key)
-                        currentExecution.set(null)
                         // Recording the metrics
                         val end = Time.now
                         start?.let {
@@ -461,14 +461,7 @@ constructor(
                     logger.debug("[job][run]{} Job task submitted asynchronously", job.key)
                     try {
                         jobExecutorService.execute {
-                            // Stopped before having started
-                            if (execution.isDone) return@execute
-                            try {
-                                taskRun.run()
-                                execution.complete(null)
-                            } catch (any: Throwable) {
-                                execution.completeExceptionally(any)
-                            }
+                            execute(execution, taskRun)
                         }
                     } catch (any: RejectedExecutionException) {
                         currentExecution.compareAndSet(execution, null)
@@ -480,6 +473,55 @@ constructor(
                 logger.debug("[job][run]{} Not valid - removing from schedule", job.key)
                 unschedule(job.key, false)
                 return Optional.empty()
+            }
+        }
+
+        /**
+         * Runs the job on the current thread, provided this instance can acquire the
+         * [run lock][JobRunLock] of the job, held for the whole run.
+         *
+         * When the lock is held elsewhere, the run is skipped silently: no history, no status change.
+         * The next tick of the schedule tries again.
+         */
+        private fun execute(execution: CompletableFuture<Void?>, taskRun: Runnable) {
+            // Stopped before having started
+            if (execution.isDone) return
+            var failure: Throwable? = null
+            try {
+                val lock = try {
+                    jobRunLock.tryLock(jobKey)
+                } catch (any: Exception) {
+                    logger.warn("[job][run]{} Not running now because the run lock could not be acquired", jobKey, any)
+                    throw any
+                }
+                if (lock == null) {
+                    logger.debug("[job][run]{} Not running now because running elsewhere", jobKey)
+                } else {
+                    try {
+                        taskRun.run()
+                    } finally {
+                        releaseLock(lock)
+                    }
+                }
+            } catch (any: Throwable) {
+                failure = any
+            } finally {
+                // Only once the lock is released can the job be run again
+                logger.debug("[job][task]{} Removed job execution", jobKey)
+                currentExecution.compareAndSet(execution, null)
+            }
+            if (failure != null) {
+                execution.completeExceptionally(failure)
+            } else {
+                execution.complete(null)
+            }
+        }
+
+        private fun releaseLock(lock: JobRunLockHandle) {
+            try {
+                lock.release()
+            } catch (any: Exception) {
+                logger.error("[job][run]$jobKey Could not release the run lock", any)
             }
         }
 

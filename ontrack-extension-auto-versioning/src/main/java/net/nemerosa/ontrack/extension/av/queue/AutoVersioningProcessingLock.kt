@@ -48,7 +48,8 @@ class AutoVersioningProcessingLock(
         /**
          * First key of the advisory locks on the processing of the auto-versioning orders, the
          * second being a hash of their routing identifier: "AVQU" in ASCII — next to the locks on
-         * the trails ("TRAI") and on the blobs of the evidence ("EVID").
+         * the trails ("TRAI"), on the blobs of the evidence ("EVID") and on the runs of the jobs
+         * ("JOBR").
          */
         const val LOCK_CLASS: Int = 0x41565155
     }
