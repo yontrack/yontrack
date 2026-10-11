@@ -15,9 +15,9 @@ dependencies {
     implementation("org.slf4j:slf4j-api")
     implementation("org.flywaydb:flyway-core")
     implementation("org.apache.commons:commons-lang3")
+    implementation("com.zaxxer:HikariCP")
 
     testImplementation(testFixtures(project(":ontrack-it-utils")))
-    testImplementation("com.zaxxer:HikariCP")
 
     testRuntimeOnly(project(":ontrack-service"))
 }

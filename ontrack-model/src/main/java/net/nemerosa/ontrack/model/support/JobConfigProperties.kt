@@ -9,7 +9,7 @@ import java.time.temporal.ChronoUnit
 
 class JobConfigProperties {
     @Min(1)
-    @APIDescription("Number of threads to use to run the background jobs")
+    @APIDescription("Number of threads to use to run the background jobs. Also sizes the pool of the database connections holding the run locks of the jobs, which is separate from the main pool: at most this number, plus a margin for the locks taken outside the jobs.")
     var poolSize = 10
 
     @APIDescription("Interval (in minutes) between each refresh of the job list")

@@ -1,16 +1,24 @@
 package net.nemerosa.ontrack.repository
 
+import ch.qos.logback.classic.Level
+import ch.qos.logback.classic.Logger
+import ch.qos.logback.classic.spi.ILoggingEvent
+import ch.qos.logback.core.read.ListAppender
+import com.zaxxer.hikari.HikariConfig
 import com.zaxxer.hikari.HikariDataSource
 import net.nemerosa.ontrack.it.AbstractITTestSupport
 import net.nemerosa.ontrack.job.JobCategory
 import net.nemerosa.ontrack.job.JobKey
 import net.nemerosa.ontrack.job.JobRunLock
+import net.nemerosa.ontrack.model.support.OntrackConfigProperties
 import net.nemerosa.ontrack.test.TestUtils.uid
 import org.junit.jupiter.api.Test
+import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.transaction.PlatformTransactionManager
 import org.springframework.transaction.TransactionDefinition
 import org.springframework.transaction.support.TransactionTemplate
+import java.sql.SQLException
 import kotlin.test.*
 
 class JdbcJobRunLockIT : AbstractITTestSupport() {
@@ -20,6 +28,9 @@ class JdbcJobRunLockIT : AbstractITTestSupport() {
 
     @Autowired
     private lateinit var transactionManager: PlatformTransactionManager
+
+    @Autowired
+    private lateinit var ontrackConfigProperties: OntrackConfigProperties
 
     private fun jobKey() = JobCategory.of(uid("jc-")).getType(uid("jt-")).getKey(uid("jk-"))
 
@@ -72,8 +83,63 @@ class JdbcJobRunLockIT : AbstractITTestSupport() {
     }
 
     @Test
+    fun `The locks are held by connections of a pool of their own`() {
+        val main = dataSource.unwrap(HikariDataSource::class.java)
+        val handle = assertNotNull(jobRunLock.tryLock(jobKey()), "Lock acquired")
+        try {
+            val pool = (jobRunLock as JdbcJobRunLock).lockPool.unwrap(HikariDataSource::class.java)
+            assertNotSame(main, pool, "Not the main pool")
+            assertNotEquals(main.poolName, pool.poolName, "Pool of its own")
+            assertTrue(pool.hikariPoolMXBean.activeConnections >= 1, "The lock holds a connection of its own pool")
+            assertEquals(
+                ontrackConfigProperties.jobs.poolSize + JdbcJobRunLock.LOCK_POOL_MARGIN,
+                pool.maximumPoolSize,
+                "Pool sized on the number of job threads"
+            )
+        } finally {
+            handle.release()
+        }
+    }
+
+    @Test
+    fun `A lock held longer than the leak detection threshold of the main pool is not reported as a leak`() {
+        // A main pool with the shortest leak detection threshold Hikari allows
+        val config = HikariConfig()
+        dataSource.unwrap(HikariDataSource::class.java).copyStateTo(config)
+        config.poolName = uid("main-")
+        config.leakDetectionThreshold = 2_000
+        config.minimumIdle = 0
+        config.maximumPoolSize = 2
+        HikariDataSource(config).use { main ->
+            val lock = JdbcJobRunLock(main, ontrackConfigProperties)
+            try {
+                val warnings = captureLeakWarnings {
+                    assertNotNull(lock.tryLock(jobKey()), "Lock acquired").release()
+                    assertEquals(
+                        0,
+                        lock.lockPool.unwrap(HikariDataSource::class.java).leakDetectionThreshold,
+                        "No leak detection on the connections of the locks"
+                    )
+                    val handle = assertNotNull(lock.tryLock(jobKey()), "Lock acquired")
+                    try {
+                        // Longer than the threshold, plus the period of the leak detection task
+                        Thread.sleep(3_000)
+                    } finally {
+                        handle.release()
+                    }
+                }
+                assertTrue(warnings.isEmpty(), "No leak reported: $warnings")
+            } finally {
+                lock.destroy()
+            }
+        }
+    }
+
+    @Test
     fun `The connections of the locks are returned to the pool`() {
-        val pool = dataSource.unwrap(HikariDataSource::class.java)
+        // Opens the pool of the locks
+        assertNotNull(jobRunLock.tryLock(jobKey()), "Lock acquired").release()
+        val pool = (jobRunLock as JdbcJobRunLock).lockPool.unwrap(HikariDataSource::class.java)
         val baseline = pool.hikariPoolMXBean.activeConnections
         // More locks than the pool has connections: any leak exhausts the pool
         repeat(pool.maximumPoolSize * 2) {
@@ -88,7 +154,7 @@ class JdbcJobRunLockIT : AbstractITTestSupport() {
             // Releasing twice is harmless
             handle.release()
         }
-        // Other threads of the application may borrow connections meanwhile
+        // Other jobs of the application may hold locks meanwhile
         val deadline = System.currentTimeMillis() + 10_000
         while (pool.hikariPoolMXBean.activeConnections > baseline && System.currentTimeMillis() < deadline) {
             Thread.sleep(100)
@@ -97,6 +163,27 @@ class JdbcJobRunLockIT : AbstractITTestSupport() {
             pool.hikariPoolMXBean.activeConnections <= baseline,
             "Pool active count back to baseline"
         )
+    }
+
+    @Test
+    fun `No lock is taken once closed`() {
+        val lock = JdbcJobRunLock(dataSource, ontrackConfigProperties)
+        lock.destroy()
+        assertFailsWith<SQLException> { lock.tryLock(jobKey()) }
+    }
+
+    private fun captureLeakWarnings(code: () -> Unit): List<String> {
+        val logger = LoggerFactory.getLogger("com.zaxxer.hikari.pool.ProxyLeakTask") as Logger
+        val appender = ListAppender<ILoggingEvent>()
+        appender.start()
+        logger.addAppender(appender)
+        try {
+            code()
+        } finally {
+            logger.detachAppender(appender)
+            appender.stop()
+        }
+        return appender.list.filter { it.level == Level.WARN }.map { it.formattedMessage }
     }
 
     /**
