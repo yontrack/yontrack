@@ -6,6 +6,7 @@ import {FaPencilAlt, FaRegSave, FaTrash, FaWindowClose} from "react-icons/fa";
 
 import GridCellCommand from "@components/grid/GridCellCommand";
 import PaddedContent from "@components/common/PaddedContent";
+import {Tag} from "antd";
 
 export default function DashboardWidgetCellWrapper({widget}) {
 
@@ -13,6 +14,7 @@ export default function DashboardWidgetCellWrapper({widget}) {
         title,
         extra,
         dashboardEdition,
+        widgetTypeName,
         widgetEdition,
         widgetSaving,
         startWidgetEdition,
@@ -34,6 +36,11 @@ export default function DashboardWidgetCellWrapper({widget}) {
                         {
                             dashboardEdition &&
                             <>
+                                {/* The type of the widget, which its title may not tell */}
+                                {
+                                    widgetTypeName &&
+                                    <Tag data-testid="widget-type">{widgetTypeName}</Tag>
+                                }
                                 <GridCellCommand
                                     condition={!widgetEdition}
                                     title="Configure this widget"

@@ -24,6 +24,8 @@ export const DashboardWidgetCellContext = createContext({
     },
     deleteWidget: () => {
     },
+    // Human-readable name of the type of the widget
+    widgetTypeName: undefined,
     // Adjusting the values received from the form
     onReceivingValues: undefined,
     onReceivingValuesHandler: (fn) => {
@@ -109,6 +111,7 @@ export default function DashboardWidgetCellContextProvider({widget, children}) {
         extra,
         setExtra,
         dashboardEdition: dashboardContext?.edition,
+        widgetTypeName: dashboardContext?.widgetTypeName?.(widget.key),
         widgetEdition,
         widgetSaving,
         widgetEditionForm,

@@ -338,3 +338,62 @@ test('a chart widget whose promotion level was deleted says so instead of loadin
     )
     await expect(alert).toContainText('Edit the dashboard to reconfigure this widget.')
 })
+
+test('in edition mode, every widget shows its type', async ({page, ontrack}) => {
+    const dashboardName = `widget-type-${Date.now()}`
+
+    const project = await ontrack.createProject()
+    const branch = await project.createBranch()
+
+    // Custom titles, which say nothing of what the widgets are
+    const yaml = [
+        `- name: "${dashboardName}"`,
+        `  widgets:`,
+        `    - key: "home/LastValidationsForBranch"`,
+        `      layout: {x: 0, y: 0, w: 6, h: 25}`,
+        `      config:`,
+        `        title: "My validations"`,
+        `        project: "${project.name}"`,
+        `        branch: "${branch.name}"`,
+        `    - key: "home/BranchStatuses"`,
+        `      layout: {x: 6, y: 0, w: 6, h: 25}`,
+        `      config:`,
+        `        title: "My branches"`,
+        `        branches:`,
+        `          - project: "${project.name}"`,
+        `            branch: "${branch.name}"`,
+    ].join('\n')
+
+    const data = await graphQLCallMutation(
+        ontrack.connection,
+        'applyDashboards',
+        applyDashboardsMutation,
+        {yaml}
+    )
+    const dashboardUuid = data.applyDashboards.dashboards[0].uuid
+
+    await login(page, ontrack)
+    await page.goto(`${ontrack.connection.ui}/?dashboard=${dashboardUuid}`)
+    await expect(page.getByText('My validations')).toBeVisible()
+
+    // Outside of the edition mode, the types are not displayed
+    const types = page.getByTestId('widget-type')
+    await expect(types).toHaveCount(0)
+
+    // In edition mode, each widget shows its type
+    await page.getByRole('button', {name: 'Dashboard', exact: true}).click()
+    await page.getByText('Edit current dashboard').click()
+    await expect(page.getByText('Dashboard in edition mode')).toBeVisible()
+    await expect(types).toHaveText(['Last validations for a branch', 'Branch statuses'])
+
+    // Still there while a widget is being configured
+    // The first command of the header is "Configure this widget"
+    await page.locator('.ant-card-head').filter({hasText: 'My validations'}).getByRole('button').first().click()
+    await expect(page.getByText('List of validations to display')).toBeVisible()
+    await expect(types).toHaveText(['Last validations for a branch', 'Branch statuses'])
+
+    // Leaving the edition mode: the types are gone again
+    await page.getByRole('button', {name: 'Cancel changes'}).click()
+    await expect(page.getByText('Dashboard in edition mode')).not.toBeVisible()
+    await expect(types).toHaveCount(0)
+})
