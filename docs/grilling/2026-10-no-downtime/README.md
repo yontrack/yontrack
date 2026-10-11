@@ -83,7 +83,7 @@ HA machinery.
 | Problem | Choice | Rejected |
 |---|---|---|
 | Jobs run twice | `pg_try_advisory_lock` per job run, on a dedicated connection for the run; the loser skips silently (debug log, no history row). Closes the auto-versioning scheduler race too. | "Do not start jobs until alone" (needs instance awareness); leader election (HA). |
-| Lost queued work | Ack after processing. Redelivery is idempotent through the queue record state under `SELECT ... FOR UPDATE`; auto-versioning also takes an advisory lock per routing key, restoring per-branch serialisation across two consumers. A duplicate notification on a crash between send and commit is accepted and documented. | Leaving `IMMEDIATE` ack: the upgrade would still lose work, less visibly. |
+| Lost queued work | Ack after processing. Redelivery is idempotent through the queue record state under `SELECT ... FOR UPDATE`; auto-versioning also takes an advisory lock per routing key, restoring per-branch serialisation across two consumers. A duplicate notification on a crash between send and commit is accepted and documented. Workflow nodes outlive their message: each is claimed by its process, whose heartbeat keeps it; the nodes of a process without heartbeat are resumed if they had not started executing, put in error otherwise (#2064). | Leaving `IMMEDIATE` ack: the upgrade would still lose work, less visibly. |
 | Stale caches | `settings` TTL 1 minute, `properties` 5 minutes. | A cache bus or DB version column (HA). |
 | Search rebuild race | Deferred past the overlap (configurable delay) and run under the job lock. | Accepting an incomplete index. |
 | Draining | `spring.lifecycle.timeout-per-shutdown-phase` 45s; a test that RabbitMQ listeners finish the message in hand on shutdown. | — |

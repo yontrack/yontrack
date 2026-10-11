@@ -3,7 +3,6 @@ package net.nemerosa.ontrack.extension.workflows.engine
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
-import net.nemerosa.ontrack.extension.queue.dispatching.QueueDispatcher
 import net.nemerosa.ontrack.extension.workflows.WorkflowConfigurationProperties
 import net.nemerosa.ontrack.extension.workflows.execution.WorkflowNodeExecutorService
 import net.nemerosa.ontrack.extension.workflows.repository.WorkflowInstanceRepository
@@ -47,15 +46,17 @@ class WorkflowEngineParentConditionsTest {
     fun before() {
         workflowInstanceRepository = mockk(relaxed = true)
         every { workflowInstanceRepository.findWorkflowInstance(instance.id) } returns instance
+        every { workflowInstanceRepository.claimNode(instance.id, any(), OWNER) } returns true
+        every { workflowInstanceRepository.nodeStarted(instance.id, any(), OWNER) } returns true
 
         val transactionManager = mockk<PlatformTransactionManager>(relaxed = true)
         every { transactionManager.getTransaction(any()) } returns SimpleTransactionStatus()
 
         engine = WorkflowEngineImpl(
             workflowInstanceRepository = workflowInstanceRepository,
-            queueDispatcher = mockk<QueueDispatcher>(relaxed = true),
-            workflowQueueProcessor = mockk(relaxed = true),
-            workflowQueueSourceExtension = mockk(relaxed = true),
+            workflowNodeDispatcher = mockk(relaxed = true),
+            workflowEngineProcess = mockk { every { ownerId() } returns OWNER },
+            authenticationStorageService = mockk(relaxed = true),
             workflowNodeExecutorService = mockk<WorkflowNodeExecutorService>(relaxed = true),
             workflowConfigurationProperties = WorkflowConfigurationProperties().apply {
                 parentWaitingInterval = Duration.ofMillis(10)
@@ -77,9 +78,9 @@ class WorkflowEngineParentConditionsTest {
         engine.processNode(instance.id, "other")
 
         verify(timeout = 5_000) {
-            workflowInstanceRepository.nodeCancelled(instance.id, "other", "Parents conditions were not met.")
+            workflowInstanceRepository.nodeCancelled(instance.id, "other", "Parents conditions were not met.", OWNER)
         }
-        verify(exactly = 0) { workflowInstanceRepository.nodeStarted(any(), any()) }
+        verify(exactly = 0) { workflowInstanceRepository.nodeStarted(any(), any(), any()) }
     }
 
     @Test
@@ -103,12 +104,13 @@ class WorkflowEngineParentConditionsTest {
             workflowInstanceRepository.nodeCancelled(
                 instance.id,
                 "other",
-                "The workflow was stopped before this node could start."
+                "The workflow was stopped before this node could start.",
+                OWNER,
             )
         }
         verify(exactly = 0) {
-            workflowInstanceRepository.nodeCancelled(instance.id, "other", "Parents conditions were not met.")
-            workflowInstanceRepository.nodeStarted(any(), any())
+            workflowInstanceRepository.nodeCancelled(instance.id, "other", "Parents conditions were not met.", OWNER)
+            workflowInstanceRepository.nodeStarted(any(), any(), any())
         }
     }
 
@@ -119,7 +121,11 @@ class WorkflowEngineParentConditionsTest {
 
         engine.processNode(instance.id, "other")
 
-        verify(timeout = 5_000) { workflowInstanceRepository.nodeStarted(instance.id, "other") }
-        verify(exactly = 0) { workflowInstanceRepository.nodeCancelled(any(), any(), any()) }
+        verify(timeout = 5_000) { workflowInstanceRepository.nodeStarted(instance.id, "other", OWNER) }
+        verify(exactly = 0) { workflowInstanceRepository.nodeCancelled(any(), any(), any(), any()) }
+    }
+
+    companion object {
+        private const val OWNER = "test-process"
     }
 }

@@ -5,12 +5,15 @@ import net.nemerosa.ontrack.common.Time
 import net.nemerosa.ontrack.extension.workflows.definition.Workflow
 import net.nemerosa.ontrack.extension.workflows.engine.WorkflowInstance
 import net.nemerosa.ontrack.extension.workflows.engine.WorkflowInstanceFilter
+import net.nemerosa.ontrack.extension.workflows.engine.WorkflowInstanceLauncher
 import net.nemerosa.ontrack.extension.workflows.engine.WorkflowInstanceNode
 import net.nemerosa.ontrack.extension.workflows.engine.WorkflowInstanceNodeStatus
+import net.nemerosa.ontrack.extension.workflows.recovery.WorkflowNodeRecoveryCandidate
 import net.nemerosa.ontrack.json.parse
 import net.nemerosa.ontrack.model.events.SerializableEvent
 import net.nemerosa.ontrack.model.events.merge
 import net.nemerosa.ontrack.model.pagination.PaginatedList
+import net.nemerosa.ontrack.model.security.Actor
 import net.nemerosa.ontrack.model.templating.TemplatingContextData
 import net.nemerosa.ontrack.model.trigger.TriggerData
 import net.nemerosa.ontrack.model.trigger.TriggerRegistry
@@ -29,11 +32,17 @@ class WorkflowInstanceRepository(
     val triggerRegistry: TriggerRegistry,
 ) : AbstractJdbcRepository(dataSource) {
 
-    fun createInstance(instance: WorkflowInstance) {
+    /**
+     * Stores a new instance, whose nodes are all about to be dispatched.
+     *
+     * @param instance Instance to store
+     * @param launcher Who launched the instance, if known, to resume its nodes as them
+     */
+    fun createInstance(instance: WorkflowInstance, launcher: WorkflowInstanceLauncher? = null) {
         namedParameterJdbcTemplate!!.update(
             """
-                INSERT INTO WKF_INSTANCES(ID, TIMESTAMP, WORKFLOW, EVENT, TRIGGER_ID, TRIGGER_DATA)
-                VALUES (:id, :timestamp, CAST(:workflow AS JSONB), CAST(:event AS JSONB), :triggerId, CAST(:triggerData AS JSONB))
+                INSERT INTO WKF_INSTANCES(ID, TIMESTAMP, WORKFLOW, EVENT, TRIGGER_ID, TRIGGER_DATA, ACCOUNT, ACTOR)
+                VALUES (:id, :timestamp, CAST(:workflow AS JSONB), CAST(:event AS JSONB), :triggerId, CAST(:triggerData AS JSONB), :account, CAST(:actor AS JSONB))
             """.trimIndent(),
             mapOf(
                 "id" to instance.id,
@@ -42,6 +51,8 @@ class WorkflowInstanceRepository(
                 "event" to writeJson(instance.event),
                 "triggerId" to instance.triggerData?.id,
                 "triggerData" to writeJson(instance.triggerData?.data),
+                "account" to launcher?.account,
+                "actor" to launcher?.actor?.let { writeJson(it) },
             )
         )
         instance.contexts.forEach { (contextName, contextData) ->
@@ -61,11 +72,12 @@ class WorkflowInstanceRepository(
         instance.nodesExecutions.forEach { nx ->
             namedParameterJdbcTemplate!!.update(
                 """
-                   INSERT INTO WKF_INSTANCE_NODES(INSTANCE_ID, NODE_ID, STATUS, START_TIME, END_TIME, OUTPUT, ERROR) 
-                   VALUES (:instanceId, :nodeId, :status, :startTime, :endTime, CAST(:output as JSONB), :error)
+                   INSERT INTO WKF_INSTANCE_NODES(INSTANCE_ID, NODE_ID, STATUS, START_TIME, END_TIME, OUTPUT, ERROR, DISPATCHED) 
+                   VALUES (:instanceId, :nodeId, :status, :startTime, :endTime, CAST(:output as JSONB), :error, :dispatched)
                 """.trimIndent(),
                 mapOf(
                     "instanceId" to instance.id,
+                    "dispatched" to dateTimeForDB(instance.timestamp),
                     "nodeId" to nx.id,
                     "status" to nx.status.name,
                     "startTime" to dateTimeForDB(nx.startTime),
@@ -279,58 +291,70 @@ class WorkflowInstanceRepository(
         error = rsn.getString("ERROR"),
     )
 
-    fun nodeWaiting(instanceId: String, nodeId: String) {
+    /**
+     * Claims a node for the process [owner], which is about to run it.
+     *
+     * @return False if the node was no longer to be run: claimed by another delivery of its message,
+     * or finished
+     */
+    fun claimNode(instanceId: String, nodeId: String, owner: String): Boolean =
         namedParameterJdbcTemplate!!.update(
             """
                 UPDATE WKF_INSTANCE_NODES
-                SET STATUS = :status
+                SET STATUS = :status, OWNER = :owner
                 WHERE INSTANCE_ID = :instanceId
                 AND NODE_ID = :nodeId
+                AND STATUS = :created
             """.trimIndent(),
             mapOf(
                 "instanceId" to instanceId,
                 "nodeId" to nodeId,
+                "owner" to owner,
                 "status" to WorkflowInstanceNodeStatus.WAITING.name,
+                "created" to WorkflowInstanceNodeStatus.CREATED.name,
             )
-        )
-    }
+        ) > 0
 
-    fun nodeStarted(instanceId: String, nodeId: String) {
+    fun nodeStarted(instanceId: String, nodeId: String, owner: String?): Boolean =
         namedParameterJdbcTemplate!!.update(
             """
                 UPDATE WKF_INSTANCE_NODES
                 SET STATUS = :status, START_TIME = :startTime
                 WHERE INSTANCE_ID = :instanceId
                 AND NODE_ID = :nodeId
+                AND (CAST(:owner AS VARCHAR) IS NULL OR OWNER = :owner)
             """.trimIndent(),
             mapOf(
                 "instanceId" to instanceId,
                 "nodeId" to nodeId,
+                "owner" to owner,
                 "status" to WorkflowInstanceNodeStatus.STARTED.name,
                 "startTime" to dateTimeForDB(Time.now),
             )
-        )
-    }
+        ) > 0
 
-    fun nodeSuccess(instanceId: String, nodeId: String, output: JsonNode?, event: SerializableEvent?) {
-        if (event != null) {
-            mergeInstanceEvent(instanceId, event)
-        }
-        namedParameterJdbcTemplate!!.update(
+    fun nodeSuccess(instanceId: String, nodeId: String, output: JsonNode?, event: SerializableEvent?, owner: String?): Boolean {
+        val updated = namedParameterJdbcTemplate!!.update(
             """
                 UPDATE WKF_INSTANCE_NODES
                 SET STATUS = :status, OUTPUT = CAST(:output as JSONB), END_TIME = :endTime
                 WHERE INSTANCE_ID = :instanceId
                 AND NODE_ID = :nodeId
+                AND (CAST(:owner AS VARCHAR) IS NULL OR OWNER = :owner)
             """.trimIndent(),
             mapOf(
                 "instanceId" to instanceId,
                 "nodeId" to nodeId,
+                "owner" to owner,
                 "status" to WorkflowInstanceNodeStatus.SUCCESS.name,
                 "output" to writeJson(output),
                 "endTime" to dateTimeForDB(Time.now),
             )
-        )
+        ) > 0
+        if (updated && event != null) {
+            mergeInstanceEvent(instanceId, event)
+        }
+        return updated
     }
 
     private fun mergeInstanceEvent(instanceId: String, event: SerializableEvent) {
@@ -364,59 +388,63 @@ class WorkflowInstanceRepository(
         )
     }
 
-    fun nodeProgress(instanceId: String, nodeId: String, output: JsonNode?) {
+    fun nodeProgress(instanceId: String, nodeId: String, output: JsonNode?, owner: String?): Boolean =
         namedParameterJdbcTemplate!!.update(
             """
                 UPDATE WKF_INSTANCE_NODES
                 SET OUTPUT = CAST(:output as JSONB)
                 WHERE INSTANCE_ID = :instanceId
                 AND NODE_ID = :nodeId
+                AND (CAST(:owner AS VARCHAR) IS NULL OR OWNER = :owner)
             """.trimIndent(),
             mapOf(
                 "instanceId" to instanceId,
                 "nodeId" to nodeId,
+                "owner" to owner,
                 "output" to writeJson(output),
             )
-        )
-    }
+        ) > 0
 
-    fun nodeError(instanceId: String, nodeId: String, message: String?, output: JsonNode?) {
+    fun nodeError(instanceId: String, nodeId: String, message: String?, output: JsonNode?, owner: String?): Boolean {
         val actualOutput = output ?: getNodeOutput(instanceId, nodeId)
-        namedParameterJdbcTemplate!!.update(
+        return namedParameterJdbcTemplate!!.update(
             """
                 UPDATE WKF_INSTANCE_NODES
                 SET STATUS = :status, OUTPUT = CAST(:output as JSONB), ERROR = :error, END_TIME = :endTime
                 WHERE INSTANCE_ID = :instanceId
                 AND NODE_ID = :nodeId
+                AND (CAST(:owner AS VARCHAR) IS NULL OR OWNER = :owner)
             """.trimIndent(),
             mapOf(
                 "instanceId" to instanceId,
                 "nodeId" to nodeId,
+                "owner" to owner,
                 "status" to WorkflowInstanceNodeStatus.ERROR.name,
                 "output" to writeJson(actualOutput),
                 "error" to message,
                 "endTime" to dateTimeForDB(Time.now),
             )
-        )
+        ) > 0
     }
 
-    fun nodeCancelled(instanceId: String, nodeId: String, message: String) {
+    fun nodeCancelled(instanceId: String, nodeId: String, message: String, owner: String?): Boolean =
         namedParameterJdbcTemplate!!.update(
             """
                 UPDATE WKF_INSTANCE_NODES
                 SET STATUS = :status, ERROR = :error, END_TIME = :endTime
                 WHERE INSTANCE_ID = :instanceId
                 AND NODE_ID = :nodeId
+                AND (CAST(:owner AS VARCHAR) IS NULL OR OWNER = :owner)
             """.trimIndent(),
             mapOf(
                 "instanceId" to instanceId,
                 "nodeId" to nodeId,
+                "owner" to owner,
                 "status" to WorkflowInstanceNodeStatus.CANCELLED.name,
                 "error" to message,
                 "endTime" to dateTimeForDB(Time.now),
             )
-        )
-    }
+        ) > 0
 
     fun getNodeStatus(instanceId: String, nodeId: String) =
         namedParameterJdbcTemplate!!.queryForObject(
@@ -482,12 +510,100 @@ class WorkflowInstanceRepository(
             // Marking each unfinished node as cancelled
             instance.nodesExecutions.forEach { nx ->
                 if (!nx.status.finished) {
-                    nodeCancelled(instanceId, nx.id, "Instance stopped")
+                    nodeCancelled(instanceId, nx.id, "Instance stopped", owner = null)
                 }
             }
             // Updates the instance status
         }
     }
+
+    /**
+     * Unfinished nodes, for their recovery.
+     */
+    fun findRecoveryCandidates(): List<WorkflowNodeRecoveryCandidate> =
+        jdbcTemplate!!.query(
+            """
+                SELECT n.INSTANCE_ID, n.NODE_ID, n.STATUS, n.OWNER, n.DISPATCHED, i.TIMESTAMP, i.ACCOUNT, i.ACTOR
+                FROM WKF_INSTANCE_NODES n
+                JOIN WKF_INSTANCES i ON i.ID = n.INSTANCE_ID
+                WHERE n.STATUS IN ('CREATED', 'WAITING', 'STARTED')
+            """.trimIndent()
+        ) { rs, _ ->
+            val account: String? = rs.getString("ACCOUNT")
+            val actor: Actor? = readJson(rs, "ACTOR")?.parse()
+            WorkflowNodeRecoveryCandidate(
+                instanceId = rs.getString("INSTANCE_ID"),
+                nodeId = rs.getString("NODE_ID"),
+                status = WorkflowInstanceNodeStatus.valueOf(rs.getString("STATUS")),
+                owner = rs.getString("OWNER"),
+                dispatched = rs.readLocalDateTime("DISPATCHED"),
+                instanceTimestamp = rs.readLocalDateTimeNotNull("TIMESTAMP"),
+                launcher = if (account != null || actor != null) {
+                    WorkflowInstanceLauncher(account = account, actor = actor)
+                } else {
+                    null
+                },
+            )
+        }
+
+    /**
+     * Puts a node back to [WorkflowInstanceNodeStatus.CREATED], without owner, as dispatched at [time].
+     *
+     * @return False if the node is no longer as the [candidate] saw it
+     */
+    fun resetNode(candidate: WorkflowNodeRecoveryCandidate, time: LocalDateTime): Boolean =
+        updateRecoveryCandidate(
+            candidate = candidate,
+            set = "STATUS = :newStatus, OWNER = NULL, DISPATCHED = :time",
+            params = mapOf(
+                "newStatus" to WorkflowInstanceNodeStatus.CREATED.name,
+                "time" to dateTimeForDB(time),
+            ),
+        )
+
+    /**
+     * Puts an abandoned node in error, without owner.
+     *
+     * @return False if the node is no longer as the [candidate] saw it
+     */
+    fun abandonNode(candidate: WorkflowNodeRecoveryCandidate, message: String, time: LocalDateTime): Boolean =
+        updateRecoveryCandidate(
+            candidate = candidate,
+            set = "STATUS = :newStatus, OWNER = NULL, ERROR = :error, END_TIME = :time",
+            params = mapOf(
+                "newStatus" to WorkflowInstanceNodeStatus.ERROR.name,
+                "error" to message,
+                "time" to dateTimeForDB(time),
+            ),
+        )
+
+    /**
+     * Updates a node only if it is still as the [candidate] saw it, so that two processes
+     * recovering the same node at once do not both act on it.
+     */
+    private fun updateRecoveryCandidate(
+        candidate: WorkflowNodeRecoveryCandidate,
+        set: String,
+        params: Map<String, Any?>,
+    ): Boolean =
+        namedParameterJdbcTemplate!!.update(
+            """
+                UPDATE WKF_INSTANCE_NODES
+                SET $set
+                WHERE INSTANCE_ID = :instanceId
+                AND NODE_ID = :nodeId
+                AND STATUS = :status
+                AND OWNER IS NOT DISTINCT FROM CAST(:owner AS VARCHAR)
+                AND DISPATCHED IS NOT DISTINCT FROM CAST(:dispatched AS VARCHAR)
+            """.trimIndent(),
+            params + mapOf(
+                "instanceId" to candidate.instanceId,
+                "nodeId" to candidate.nodeId,
+                "status" to candidate.status.name,
+                "owner" to candidate.owner,
+                "dispatched" to dateTimeForDB(candidate.dispatched),
+            )
+        ) > 0
 
     private fun buildFilter(
         workflowInstanceFilter: WorkflowInstanceFilter,

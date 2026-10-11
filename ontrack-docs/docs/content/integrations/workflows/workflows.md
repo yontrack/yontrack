@@ -167,6 +167,22 @@ the trigger matters: a workflow on `CANDIDATE` or `RUNNING` is a hard gate the d
 passes, and the map draws it as a prerequisite of the slot. One that has never run is drawn all the same — it is very
 often the reason nothing has ever been deployed there.
 
+### Workflows interrupted by a stop of Yontrack
+
+When Yontrack stops while workflows are running, for example during an upgrade, their nodes are recovered by the
+Yontrack instance which carries on:
+
+* a node which had not started executing yet — still waiting for its parents, or not picked up yet — is resumed,
+  under the identity of whoever launched the workflow;
+* a node which was executing is put in error, and its workflow stopped, with the message _Interrupted: the Yontrack
+  process running this node stopped._ It is not run again, because its action — a message, a pipeline, a pull request —
+  may already have happened.
+
+A node is recovered a few minutes after its Yontrack instance stopped (3 minutes by default), so that an instance
+still running alongside the new one during a rolling upgrade keeps its own nodes. A node of a workflow older than one
+day is put in error rather than resumed. These durations are set by the `ontrack.config.extension.workflows.recovery.*`
+[configuration properties](../../generated/configurations/net.nemerosa.ontrack.extension.workflows.WorkflowConfigurationProperties.md).
+
 ## Workflows settings
 
 Workflow statuses are saved by default for 14 days.

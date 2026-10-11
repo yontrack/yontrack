@@ -22,6 +22,47 @@ class WorkflowConfigurationProperties {
     @APIDescription("\"Simulated gate\" node executor properties")
     var mock = MockExecutorConfigProperties()
 
+    @APIDescription("Recovery of the workflow nodes left unfinished by a stopped Yontrack process")
+    var recovery = RecoveryConfigProperties()
+
+    /**
+     * Recovery of the workflow nodes left unfinished by a stopped Yontrack process.
+     *
+     * A process marks the nodes it runs as alive through a heartbeat. The nodes of a process
+     * without a recent heartbeat are recovered: resumed if they had not started executing, in
+     * error otherwise.
+     */
+    class RecoveryConfigProperties {
+        @APIDescription("Interval between two heartbeats of a Yontrack process, which mark the workflow nodes it runs as alive")
+        @DurationUnit(ChronoUnit.SECONDS)
+        var heartbeat: Duration = Duration.ofSeconds(30)
+
+        @APIDescription(
+            "Time after its last heartbeat beyond which a Yontrack process is considered stopped, " +
+                    "and the workflow nodes it was running are recovered. Must be well above the heartbeat interval."
+        )
+        @DurationUnit(ChronoUnit.SECONDS)
+        var staleAfter: Duration = Duration.ofMinutes(3)
+
+        @APIDescription(
+            "Time after its last dispatch beyond which a workflow node which no process has picked up " +
+                    "is dispatched again"
+        )
+        @DurationUnit(ChronoUnit.SECONDS)
+        var createdStaleAfter: Duration = Duration.ofMinutes(10)
+
+        @APIDescription(
+            "Age of a workflow instance beyond which its abandoned nodes are put in error instead of being resumed. " +
+                    "Also how long a stopped Yontrack process is remembered."
+        )
+        @DurationUnit(ChronoUnit.SECONDS)
+        var maxAge: Duration = Duration.ofDays(1)
+
+        @APIDescription("Interval between two runs of the recovery of the workflow nodes")
+        @DurationUnit(ChronoUnit.SECONDS)
+        var interval: Duration = Duration.ofMinutes(1)
+    }
+
     /**
      * Nested rather than a flat `mockExecutorEnabled`, so that the generated documentation
      * publishes a usable environment variable: the doc generator uppercases a camel-case field

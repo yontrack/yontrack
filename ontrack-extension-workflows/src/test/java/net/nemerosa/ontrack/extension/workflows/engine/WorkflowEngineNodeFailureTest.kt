@@ -4,7 +4,6 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
 import io.mockk.verify
-import net.nemerosa.ontrack.extension.queue.dispatching.QueueDispatcher
 import net.nemerosa.ontrack.extension.workflows.WorkflowConfigurationProperties
 import net.nemerosa.ontrack.extension.workflows.execution.WorkflowNodeExecutorService
 import net.nemerosa.ontrack.extension.workflows.repository.WorkflowInstanceRepository
@@ -23,6 +22,7 @@ import java.sql.SQLTransientConnectionException
 import java.time.Duration
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 
 /**
  * A database failure while processing a node used to escape the node's coroutine entirely, leaving
@@ -40,6 +40,9 @@ class WorkflowEngineNodeFailureTest {
     fun before() {
         workflowInstanceRepository = mockk(relaxed = true)
         every { workflowInstanceRepository.findWorkflowInstance(instance.id) } returns instance
+        every { workflowInstanceRepository.claimNode(instance.id, any(), OWNER) } returns true
+        every { workflowInstanceRepository.nodeStarted(instance.id, any(), OWNER) } returns true
+        every { workflowInstanceRepository.nodeError(instance.id, any(), any(), any(), OWNER) } returns true
         // By default no retry: the failures used here are not transient, and the test must stay fast
         engine = engineWith(retries = 0)
     }
@@ -56,9 +59,9 @@ class WorkflowEngineNodeFailureTest {
 
         return WorkflowEngineImpl(
             workflowInstanceRepository = workflowInstanceRepository,
-            queueDispatcher = mockk<QueueDispatcher>(relaxed = true),
-            workflowQueueProcessor = mockk(relaxed = true),
-            workflowQueueSourceExtension = mockk(relaxed = true),
+            workflowNodeDispatcher = mockk(relaxed = true),
+            workflowEngineProcess = mockk { every { ownerId() } returns OWNER },
+            authenticationStorageService = mockk(relaxed = true),
             workflowNodeExecutorService = mockk<WorkflowNodeExecutorService>(relaxed = true),
             workflowConfigurationProperties = WorkflowConfigurationProperties().apply {
                 parentWaitingInterval = Duration.ofMillis(parentWaitingMs)
@@ -75,15 +78,42 @@ class WorkflowEngineNodeFailureTest {
     private fun awaitNodeError(): String {
         val message = slot<String>()
         verify(timeout = 5_000) {
-            workflowInstanceRepository.nodeError(instance.id, "start", capture(message), null)
+            workflowInstanceRepository.nodeError(instance.id, "start", capture(message), null, OWNER)
         }
         return message.captured
+    }
+
+    /**
+     * The claim is made while the message is still in hand: a failure there is the queue's, and
+     * leaves the node to be dispatched again by the recovery.
+     */
+    @Test
+    fun `A database failure when claiming a node is left to the queue`() {
+        every {
+            workflowInstanceRepository.claimNode(instance.id, "start", OWNER)
+        } throws RuntimeException("Database is down")
+
+        assertFailsWith<RuntimeException> {
+            engine.processNode(instance.id, "start")
+        }
+
+        verify(exactly = 0) { workflowInstanceRepository.nodeError(any(), any(), any(), any(), any()) }
+    }
+
+    @Test
+    fun `A node already claimed is not launched again`() {
+        every { workflowInstanceRepository.claimNode(instance.id, "start", OWNER) } returns false
+
+        engine.processNode(instance.id, "start")
+
+        Thread.sleep(500)
+        verify(exactly = 0) { workflowInstanceRepository.nodeStarted(any(), any(), any()) }
     }
 
     @Test
     fun `A database failure when starting a node marks the node in error and stops the instance`() {
         every {
-            workflowInstanceRepository.nodeWaiting(instance.id, "start")
+            workflowInstanceRepository.nodeStarted(instance.id, "start", OWNER)
         } throws RuntimeException("Database is down")
 
         engine.processNode(instance.id, "start")
@@ -95,7 +125,7 @@ class WorkflowEngineNodeFailureTest {
     @Test
     fun `A failure without a message is recorded with its class name`() {
         every {
-            workflowInstanceRepository.nodeWaiting(instance.id, "start")
+            workflowInstanceRepository.nodeStarted(instance.id, "start", OWNER)
         } throws NullPointerException()
 
         engine.processNode(instance.id, "start")
@@ -125,7 +155,7 @@ class WorkflowEngineNodeFailureTest {
         engine.processNode(instance.id, "end")
 
         // The node went on to be started, so the parent status was eventually read
-        verify(timeout = 5_000) { workflowInstanceRepository.nodeStarted(instance.id, "end") }
+        verify(timeout = 5_000) { workflowInstanceRepository.nodeStarted(instance.id, "end", OWNER) }
         assertEquals(3, attempts)
     }
 
@@ -146,7 +176,8 @@ class WorkflowEngineNodeFailureTest {
                 instance.id,
                 "end",
                 "Could not open JDBC Connection for transaction",
-                null
+                null,
+                OWNER,
             )
             workflowInstanceRepository.stopInstance(instance.id)
         }
@@ -176,8 +207,9 @@ class WorkflowEngineNodeFailureTest {
         }
 
         val authenticationAtStart = AtomicReference<Authentication?>()
-        every { workflowInstanceRepository.nodeStarted(instance.id, "end") } answers {
+        every { workflowInstanceRepository.nodeStarted(instance.id, "end", OWNER) } answers {
             authenticationAtStart.set(SecurityContextHolder.getContext().authentication)
+            true
         }
 
         SecurityContextHolder.getContext().authentication = authentication
@@ -187,24 +219,28 @@ class WorkflowEngineNodeFailureTest {
             SecurityContextHolder.clearContext()
         }
 
-        verify(timeout = 5_000) { workflowInstanceRepository.nodeStarted(instance.id, "end") }
+        verify(timeout = 5_000) { workflowInstanceRepository.nodeStarted(instance.id, "end", OWNER) }
         assertEquals(authentication, authenticationAtStart.get())
     }
 
     @Test
     fun `A failure to record the node error does not escape the node coroutine`() {
         every {
-            workflowInstanceRepository.nodeWaiting(instance.id, "start")
+            workflowInstanceRepository.nodeStarted(instance.id, "start", OWNER)
         } throws RuntimeException("Database is down")
         every {
-            workflowInstanceRepository.nodeError(any(), any(), any(), any())
+            workflowInstanceRepository.nodeError(any(), any(), any(), any(), any())
         } throws RuntimeException("Database is still down")
 
         // Nothing thrown here, and nothing escaping to the coroutine handler either
         engine.processNode(instance.id, "start")
 
         verify(timeout = 5_000) {
-            workflowInstanceRepository.nodeError(instance.id, "start", "Database is down", null)
+            workflowInstanceRepository.nodeError(instance.id, "start", "Database is down", null, OWNER)
         }
+    }
+
+    companion object {
+        private const val OWNER = "test-process"
     }
 }

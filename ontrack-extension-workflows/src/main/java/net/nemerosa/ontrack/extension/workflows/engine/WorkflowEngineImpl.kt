@@ -4,8 +4,6 @@ import tools.jackson.databind.JsonNode
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withTimeoutOrNull
-import net.nemerosa.ontrack.extension.queue.dispatching.QueueDispatcher
-import net.nemerosa.ontrack.extension.queue.source.createQueueSource
 import net.nemerosa.ontrack.extension.workflows.WorkflowConfigurationProperties
 import net.nemerosa.ontrack.extension.workflows.definition.Workflow
 import net.nemerosa.ontrack.extension.workflows.definition.WorkflowNode
@@ -16,6 +14,7 @@ import net.nemerosa.ontrack.extension.workflows.execution.WorkflowNodeExecutorRe
 import net.nemerosa.ontrack.extension.workflows.execution.WorkflowNodeExecutorService
 import net.nemerosa.ontrack.extension.workflows.repository.WorkflowInstanceRepository
 import net.nemerosa.ontrack.model.events.SerializableEvent
+import net.nemerosa.ontrack.model.security.AuthenticationStorageService
 import net.nemerosa.ontrack.model.security.SecurityService
 import net.nemerosa.ontrack.model.templating.TemplatingContextData
 import net.nemerosa.ontrack.model.trigger.TriggerData
@@ -33,9 +32,9 @@ import java.time.Duration
 @Component
 class WorkflowEngineImpl(
     private val workflowInstanceRepository: WorkflowInstanceRepository,
-    private val queueDispatcher: QueueDispatcher,
-    private val workflowQueueProcessor: WorkflowQueueProcessor,
-    private val workflowQueueSourceExtension: WorkflowQueueSourceExtension,
+    private val workflowNodeDispatcher: WorkflowNodeDispatcher,
+    private val workflowEngineProcess: WorkflowEngineProcess,
+    private val authenticationStorageService: AuthenticationStorageService,
     private val workflowNodeExecutorService: WorkflowNodeExecutorService,
     private val workflowConfigurationProperties: WorkflowConfigurationProperties,
     private val securityService: SecurityService,
@@ -75,25 +74,14 @@ class WorkflowEngineImpl(
             contexts = contexts,
         )
 
-        // Storing the instance
+        // Storing the instance, with who launched it, so that its nodes can be resumed as them
+        val launcher = WorkflowInstanceLauncher.current(authenticationStorageService)
         transactionHelper.inNewTransaction {
-            workflowInstanceRepository.createInstance(instance)
+            workflowInstanceRepository.createInstance(instance, launcher)
         }
 
         for (node in instance.workflow.nodes) {
-            queueDispatcher.dispatch(
-                queueProcessor = workflowQueueProcessor,
-                payload = WorkflowQueuePayload(
-                    workflowInstanceId = instance.id,
-                    workflowNodeId = node.id,
-                ),
-                source = workflowQueueSourceExtension.createQueueSource(
-                    WorkflowQueueSourceData(
-                        workflowInstanceId = instance.id,
-                        workflowNodeId = node.id,
-                    )
-                )
-            )
+            workflowNodeDispatcher.dispatch(instance.id, node.id)
         }
 
         // OK
@@ -150,14 +138,24 @@ class WorkflowEngineImpl(
         if (nodeExecution.status.finished) {
             debug("NODE FINISHED", instance, workflowNodeId)
             return
-        } else if (nodeExecution.status != WorkflowInstanceNodeStatus.CREATED) {
-            error("NODE NOT IN CREATED STATE", instance, workflowNodeId)
+        }
+        // Claims the node before launching it, while its message is still in hand: once the
+        // message is acked, the node belongs to this process, which recovers it if this process
+        // stops. A failure here leaves the node to be dispatched again by the recovery.
+        val owner = workflowEngineProcess.ownerId()
+        val claimed = transactionHelper.inNewTransaction {
+            workflowInstanceRepository.claimNode(workflowInstanceId, workflowNodeId, owner)
+        }
+        if (!claimed) {
+            // Another delivery of the same message, or a node already running
+            debug("NODE ALREADY CLAIMED", instance, workflowNodeId)
             return
         }
+        debug("NODE WAITING", instance, workflowNodeId)
         // Starting the job for the node
         launchWithSecurityContext {
             try {
-                runNode(instance, workflowInstanceId, workflowNodeId, node)
+                runNode(instance, workflowInstanceId, workflowNodeId, node, owner)
             } catch (cancellation: CancellationException) {
                 // Cancellation is not a node failure - letting the coroutine machinery deal with it
                 throw cancellation
@@ -165,7 +163,7 @@ class WorkflowEngineImpl(
                 // Nothing must ever escape this coroutine: an uncaught error here would leave the
                 // node in a non-terminal state forever (and the instance running forever).
                 error("NODE UNCAUGHT ERROR", instance, workflowNodeId, any)
-                nodeErrorSafe(instance, workflowInstanceId, workflowNodeId, any)
+                nodeErrorSafe(instance, workflowInstanceId, workflowNodeId, any, owner)
             }
         }
         debug("NODE LAUNCHED", instance, workflowNodeId)
@@ -181,13 +179,11 @@ class WorkflowEngineImpl(
         workflowInstanceId: String,
         workflowNodeId: String,
         node: WorkflowNode,
+        owner: String,
     ) {
         // Call must be authenticated
         checkAuthentication("Workflow node process not authenticated")
         debug("NODE PROCESSING", instance, workflowNodeId)
-        // Changes the node's status to WAITING
-        debug("NODE WAITING", instance, workflowNodeId)
-        nodeWaiting(workflowInstanceId, workflowNodeId)
         // Waiting for the parent nodes to be OK
         val cancellation: String? = if (node.parents.isNotEmpty()) {
             debug("NODE WAITING FOR PARENTS", instance, workflowNodeId)
@@ -216,15 +212,19 @@ class WorkflowEngineImpl(
         }
         // Starting the node execution
         if (cancellation == null) {
+            if (!nodeStarted(workflowInstanceId, workflowNodeId, owner)) {
+                // Another process took the node over while it was waiting
+                debug("NODE TAKEN OVER", instance, workflowNodeId)
+                return
+            }
             debug("NODE STARTED", instance, workflowNodeId)
-            nodeStarted(workflowInstanceId, workflowNodeId)
             // Loading a fresh instance before starting
             val freshInstance = getWorkflowInstanceTx(workflowInstanceId)
             // Starts the node execution
-            nodeExecution(freshInstance, workflowNodeId)
+            nodeExecution(freshInstance, workflowNodeId, owner)
         } else {
             debug("NODE NOT STARTED: $cancellation", instance, workflowNodeId)
-            nodeCancelled(workflowInstanceId, workflowNodeId, cancellation)
+            nodeCancelled(workflowInstanceId, workflowNodeId, cancellation, owner)
         }
     }
 
@@ -297,7 +297,7 @@ class WorkflowEngineImpl(
         }
     }
 
-    private suspend fun nodeExecution(instance: WorkflowInstance, nodeId: String) {
+    private suspend fun nodeExecution(instance: WorkflowInstance, nodeId: String, owner: String) {
         // Getting the node
         val node = instance.workflow.getNode(nodeId)
         // Getting the node executor
@@ -312,7 +312,7 @@ class WorkflowEngineImpl(
         // Continuous feedback for the node
         val nodeFeedback: (output: JsonNode?) -> Unit = { output: JsonNode? ->
             if (output != null) {
-                nodeProgress(instance.id, nodeId, output)
+                nodeProgress(instance.id, nodeId, output, owner)
             }
         }
 
@@ -335,20 +335,20 @@ class WorkflowEngineImpl(
             // Timeout?
             if (result == null) {
                 debug("NODE TIMEOUT", instance, nodeId)
-                nodeError(instance.id, nodeId, "Timeout", null)
+                nodeError(instance.id, nodeId, "Timeout", null, owner)
             }
             // Progressing the instance or stopping it in case of error
             else {
                 when (result.type) {
                     WorkflowNodeExecutorResultType.ERROR -> {
                         debug("NODE ERROR (message = ${result.message})", instance, nodeId)
-                        nodeError(instance.id, nodeId, result.message, result.output)
+                        nodeError(instance.id, nodeId, result.message, result.output, owner)
                     }
 
                     WorkflowNodeExecutorResultType.SUCCESS -> {
                         debug("NODE SUCCESS", instance, nodeId)
                         // Stores the output back into the instance and progresses the node's status
-                        nodeSuccess(instance.id, nodeId, result.output, result.event)
+                        nodeSuccess(instance.id, nodeId, result.output, result.event, owner)
                     }
                 }
             }
@@ -358,7 +358,7 @@ class WorkflowEngineImpl(
         } catch (any: Throwable) {
             // Stores the node error status
             error("NODE UNCAUGHT ERROR", instance, nodeId, any)
-            nodeError(instance.id, nodeId, any.errorMessage(), null)
+            nodeError(instance.id, nodeId, any.errorMessage(), null, owner)
         }
     }
 
@@ -379,31 +379,31 @@ class WorkflowEngineImpl(
             workflowInstanceRepository.getNodeStatuses(instanceId, nodeIds)
         }
 
-    private fun nodeWaiting(workflowInstanceId: String, workflowNodeId: String) {
-        transactionHelper.inNewTransaction {
-            workflowInstanceRepository.nodeWaiting(workflowInstanceId, workflowNodeId)
-        }
-    }
+    /*
+     * The changes of a node are made only while this process still owns it: once the node has been
+     * recovered by another process, after this one was taken as stopped, they would overwrite the
+     * new run. Each returns false when the node was not changed.
+     */
 
-    private fun nodeStarted(workflowInstanceId: String, workflowNodeId: String) {
+    private fun nodeStarted(workflowInstanceId: String, workflowNodeId: String, owner: String): Boolean =
         transactionHelper.inNewTransaction {
-            workflowInstanceRepository.nodeStarted(workflowInstanceId, workflowNodeId)
+            workflowInstanceRepository.nodeStarted(workflowInstanceId, workflowNodeId, owner)
         }
-    }
 
     private fun nodeCancelled(
         workflowInstanceId: String,
         workflowNodeId: String,
-        @Suppress("SameParameterValue") message: String
+        @Suppress("SameParameterValue") message: String,
+        owner: String,
     ) {
         transactionHelper.inNewTransaction {
-            workflowInstanceRepository.nodeCancelled(workflowInstanceId, workflowNodeId, message)
+            workflowInstanceRepository.nodeCancelled(workflowInstanceId, workflowNodeId, message, owner)
         }
     }
 
-    private fun nodeProgress(workflowInstanceId: String, workflowNodeId: String, output: JsonNode) {
+    private fun nodeProgress(workflowInstanceId: String, workflowNodeId: String, output: JsonNode, owner: String) {
         transactionHelper.inNewTransaction {
-            workflowInstanceRepository.nodeProgress(workflowInstanceId, workflowNodeId, output)
+            workflowInstanceRepository.nodeProgress(workflowInstanceId, workflowNodeId, output, owner)
         }
     }
 
@@ -411,17 +411,23 @@ class WorkflowEngineImpl(
         workflowInstanceId: String,
         workflowNodeId: String,
         output: JsonNode?,
-        event: SerializableEvent?
+        event: SerializableEvent?,
+        owner: String,
     ) {
         transactionHelper.inNewTransaction {
-            workflowInstanceRepository.nodeSuccess(workflowInstanceId, workflowNodeId, output, event)
+            workflowInstanceRepository.nodeSuccess(workflowInstanceId, workflowNodeId, output, event, owner)
         }
     }
 
-    private fun nodeError(instanceId: String, nodeId: String, message: String?, output: JsonNode?) {
+    /**
+     * Puts the node in error and stops its instance - unless the node is no longer owned by this
+     * process, in which case its new owner decides.
+     */
+    private fun nodeError(instanceId: String, nodeId: String, message: String?, output: JsonNode?, owner: String) {
         transactionHelper.inNewTransaction {
-            workflowInstanceRepository.nodeError(instanceId, nodeId, message, output)
-            workflowInstanceRepository.stopInstance(instanceId)
+            if (workflowInstanceRepository.nodeError(instanceId, nodeId, message, output, owner)) {
+                workflowInstanceRepository.stopInstance(instanceId)
+            }
         }
     }
 
@@ -437,9 +443,10 @@ class WorkflowEngineImpl(
         instanceId: String,
         nodeId: String,
         failure: Throwable,
+        owner: String,
     ) {
         try {
-            nodeError(instanceId, nodeId, failure.errorMessage(), null)
+            nodeError(instanceId, nodeId, failure.errorMessage(), null, owner)
         } catch (secondary: Throwable) {
             error("NODE ERROR STATUS COULD NOT BE SAVED", instance, nodeId, secondary)
         }

@@ -110,7 +110,7 @@ class WorkflowInstanceRepositoryIT : AbstractDSLTestSupport() {
             triggerData = workflowTestSupport.testTriggerData(),
         )
         workflowInstanceRepository.createInstance(instance)
-        workflowInstanceRepository.nodeSuccess(instance.id, "start", null, null)
+        workflowInstanceRepository.nodeSuccess(instance.id, "start", null, null, owner = null)
 
         val statuses = workflowInstanceRepository.getNodeStatuses(instance.id, listOf("start", "end", "unknown"))
 

@@ -8,4 +8,6 @@ object WorkflowJobs {
 
     val TYPE_CLEANUP = CATEGORY.getType("cleanup-instances").withName("Cleanup of instances")
 
+    val TYPE_RECOVERY = CATEGORY.getType("recover-nodes").withName("Recovery of nodes")
+
 }
