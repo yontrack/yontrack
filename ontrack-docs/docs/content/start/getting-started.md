@@ -26,6 +26,8 @@ The default authentication mechanism, if no other configuration is provided, rel
 * a Keycloak instance configured for storing users
 * a Postgres 17 database for Keycloak
 
+To upgrade Yontrack later without downtime, see [Zero-downtime upgrades](../operations/zero-downtime-upgrades.md).
+
 ## Authentication setup
 
 By default, Yontrack is secured using a simple user store managed by Keycloak. If nothing is configured, the default user is `admin` with `admin` as a password.

@@ -37,6 +37,8 @@ those who configure it **as code** (CasC):
 
 * **Check the [breaking changes](#breaking-changes)** — among them, JDK 25 to run the JAR, the
   `pg_trgm` extension of Postgres, and the removed features.
+* **The upgrade to 6.0 restarts Yontrack** — the upgrades within 6.x can then run without
+  downtime: see [Zero-downtime upgrades](../operations/zero-downtime-upgrades.md).
 
 ## Breaking changes
 
