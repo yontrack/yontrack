@@ -1,4 +1,28 @@
+# Everything the host writes into this module and the image build must not see: the `Dockerfile`
+# runs `COPY . .` before `yarn build`, so whatever is not listed here is both sent as the build
+# context and copied into the builder stage.
+
+# Dependencies - installed by the `deps` stage from the lock file
 node_modules
+
+# Next.js output - the dev stack's Turbopack cache (`next dev`) grows to tens of GB and must not
+# be sent, nor reused by `yarn build`
+.next
+out
+.turbo
+.vercel
+
+# Gradle - the Node.js and npm downloaded by the Gradle node plugin
+.gradle
 build
-reports
+
+# Tests - Jest sources, JUnit reports and coverage reports
 __tests__
+reports
+coverage
+
+# Host-only files - local environment overrides, which `next build` would read, logs, OS litter
+.env*.local
+.env.development
+*.log
+.DS_Store
