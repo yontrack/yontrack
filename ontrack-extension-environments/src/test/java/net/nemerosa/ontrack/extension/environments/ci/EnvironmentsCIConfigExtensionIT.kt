@@ -3,11 +3,14 @@ package net.nemerosa.ontrack.extension.environments.ci
 import net.nemerosa.ontrack.extension.config.ConfigTestSupport
 import net.nemerosa.ontrack.extension.config.EnvFixtures
 import net.nemerosa.ontrack.extension.environments.SlotPipelineStatus
+import net.nemerosa.ontrack.extension.environments.rules.core.VersionPatternSlotAdmissionRule
+import net.nemerosa.ontrack.extension.environments.rules.core.VersionPatternSlotAdmissionRuleConfig
 import net.nemerosa.ontrack.extension.environments.service.EnvironmentService
 import net.nemerosa.ontrack.extension.environments.service.SlotService
 import net.nemerosa.ontrack.extension.environments.workflows.SlotWorkflowService
 import net.nemerosa.ontrack.graphql.AbstractQLKTITSupport
 import net.nemerosa.ontrack.it.AsAdminTest
+import net.nemerosa.ontrack.json.parse
 import net.nemerosa.ontrack.test.TestUtils.uid
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -147,6 +150,61 @@ class EnvironmentsCIConfigExtensionIT : AbstractQLKTITSupport() {
 
         configure(agentsAdmitted = null)
         assertEquals(false, slotService.findSlotsByProject(deployedProject).single().agentsAdmitted, "False by default")
+    }
+
+    @Test
+    @AsAdminTest
+    fun `A slot declared through the CI configuration admits builds on their version`() {
+        val environmentName = uid("env-")
+        val configuredProjectName = uid("cfg-")
+        val deployedProject = project()
+
+        // Same shape as the self.dev slot in `.yontrack/ci.yaml`
+        configTestSupport.configureProject(
+            yaml = """
+                version: v1
+                configuration:
+                  defaults:
+                    project:
+                      environments:
+                        environments:
+                          - name: $environmentName
+                            order: 200
+                        slots:
+                          - project: "${deployedProject.name}"
+                            environments:
+                              - name: $environmentName
+                                admissionRules:
+                                  - name: "versionPattern"
+                                    ruleId: "versionPattern"
+                                    ruleConfig:
+                                      includes:
+                                        - "\\d+\\.\\d+\\.\\d+(-beta\\.\\d+)?"
+                                      excludes:
+                                        - ".*-alpha\\..*"
+            """.trimIndent(),
+            ci = "generic",
+            scm = "mock",
+            env = EnvFixtures.generic(configuredProjectName)
+        )
+
+        val slot = slotService.findSlotsByProject(deployedProject).single()
+        val rule = slotService.getAdmissionRuleConfigs(slot).single()
+        assertEquals(VersionPatternSlotAdmissionRule.ID, rule.ruleId)
+        assertEquals(
+            VersionPatternSlotAdmissionRuleConfig(
+                includes = listOf("\\d+\\.\\d+\\.\\d+(-beta\\.\\d+)?"),
+                excludes = listOf(".*-alpha\\..*"),
+            ),
+            rule.ruleConfig.parse<VersionPatternSlotAdmissionRuleConfig>()
+        )
+
+        deployedProject.branch("main") {
+            val ga = build("6.0.0")
+            val alpha = build("6.0.0-alpha.3")
+            assertEquals(true, slotService.isBuildEligible(slot, ga))
+            assertEquals(false, slotService.isBuildEligible(slot, alpha))
+        }
     }
 
     @Test

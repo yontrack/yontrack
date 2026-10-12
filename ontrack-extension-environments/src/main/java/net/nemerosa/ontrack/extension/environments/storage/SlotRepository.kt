@@ -10,15 +10,43 @@ import net.nemerosa.ontrack.repository.ProjectJdbcRepositoryAccessor
 import net.nemerosa.ontrack.repository.support.AbstractJdbcRepository
 import org.springframework.stereotype.Repository
 import java.sql.ResultSet
+import java.sql.SQLException
 import javax.sql.DataSource
 
 @Repository
 class SlotRepository(
-    dataSource: DataSource,
+    private val dataSource: DataSource,
     private val environmentRepositoryAccessor: EnvironmentRepositoryAccessor,
     private val projectJdbcRepositoryAccessor: ProjectJdbcRepositoryAccessor,
     private val buildJdbcRepositoryAccessor: BuildJdbcRepositoryAccessor,
 ) : AbstractJdbcRepository(dataSource) {
+
+    /**
+     * Whether PostgreSQL accepts a regular expression, as the eligible-builds query runs it.
+     *
+     * Its dialect is not Java's: a possessive quantifier or an inline flag past the start compiles
+     * in Java and fails here, and a pattern of an admission rule failing here fails every listing
+     * of the slot's eligible builds.
+     *
+     * Asked on a connection of its own, outside the caller's transaction: a statement which fails
+     * aborts the PostgreSQL transaction it runs in.
+     */
+    fun isValidRegex(pattern: String): Boolean =
+        dataSource.connection.use { connection ->
+            connection.prepareStatement("SELECT '' ~* ?").use { statement ->
+                statement.setString(1, pattern)
+                try {
+                    statement.executeQuery().close()
+                    true
+                } catch (ex: SQLException) {
+                    if (ex.sqlState == PG_INVALID_REGULAR_EXPRESSION) false else throw ex
+                }
+            }
+        }
+
+    companion object {
+        private const val PG_INVALID_REGULAR_EXPRESSION = "2201B"
+    }
 
     fun addSlot(slot: Slot) {
         namedParameterJdbcTemplate!!.update(

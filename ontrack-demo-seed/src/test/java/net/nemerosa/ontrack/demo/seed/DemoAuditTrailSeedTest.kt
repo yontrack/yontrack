@@ -452,4 +452,32 @@ class DemoAuditTrailSeedTest {
             "which the slot does not have",
         )
     }
+
+    @Test
+    fun `production admits the GA release of the audit trail and not its release candidate`() {
+        val target = seeded()
+        val production = target.environments().flatMap { (it as InMemoryDemoTarget.InMemoryEnvironment).slots }
+            .single { it.project.name == DemoContent.AUDIT_TRAIL && it.environment.name == DemoContent.PRODUCTION }
+        val rule = production.admissionRules.single { it.ruleId == SlotAdmissionRules.VERSION_PATTERN }
+        assertTrue(versionIncludedByPattern("2.4.0", rule.config), "GA admitted")
+        assertTrue(!versionIncludedByPattern("2.4.0-rc.1", rule.config), "Release candidate refused")
+        assertEquals(listOf(DemoContent.AUDIT_TRAIL_RELEASE), production.heldBuilds.map { it.name })
+    }
+
+    private fun versionPattern(vararg includes: String) =
+        SlotAdmissionRuleSpec("versions", SlotAdmissionRules.VERSION_PATTERN, mapOf("includes" to includes.toList()))
+
+    @Test
+    fun `a deployment whose version the slot refuses is caught before anything is deleted`() {
+        assertRefused(deploymentDataset(listOf(versionPattern("\\d+\\.\\d+\\.\\d+")), emptyList()), "admits no version 1")
+    }
+
+    @Test
+    fun `a deployment whose version the slot admits goes through`() {
+        val target = InMemoryDemoTarget()
+        DemoSeed(target, clock, log = {}).run(deploymentDataset(listOf(versionPattern("\\d+")), emptyList()))
+
+        val slot = (target.environments().single() as InMemoryDemoTarget.InMemoryEnvironment).slots.single()
+        assertEquals(listOf("1"), slot.heldBuilds.map { it.name })
+    }
 }

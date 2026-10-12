@@ -29,6 +29,9 @@ internal object SlotAdmissionRules {
 
     /** `ManualApprovalSlotAdmissionRule.ID` on the server side. */
     const val MANUAL = "manual"
+
+    /** `VersionPatternSlotAdmissionRule.ID` on the server side. */
+    const val VERSION_PATTERN = "versionPattern"
 }
 
 /**
@@ -50,7 +53,18 @@ internal val SLOT_WORKFLOW_TRIGGERS = listOf("CANDIDATE", "RUNNING", "DONE", "FA
  * `FilterHelper.includes` on the server side, whose patterns are whole-string,
  * case-insensitive regular expressions.
  */
-internal fun branchIncludedByPattern(branch: String, config: Map<String, Any>): Boolean {
+internal fun branchIncludedByPattern(branch: String, config: Map<String, Any>): Boolean =
+    includedByPatterns(branch, config, noIncludesMeansAll = false)
+
+/**
+ * `VersionPatternSlotAdmissionRule.isVersionEligible` on the server side: the same patterns as
+ * the branch pattern's, except that no includes at all means every version. The version is the
+ * build's release when it has one, its name otherwise.
+ */
+internal fun versionIncludedByPattern(version: String, config: Map<String, Any>): Boolean =
+    includedByPatterns(version, config, noIncludesMeansAll = true)
+
+private fun includedByPatterns(text: String, config: Map<String, Any>, noIncludesMeansAll: Boolean): Boolean {
     @Suppress("UNCHECKED_CAST")
     val includes = config["includes"] as? List<String> ?: emptyList()
 
@@ -58,7 +72,8 @@ internal fun branchIncludedByPattern(branch: String, config: Map<String, Any>): 
     val excludes = config["excludes"] as? List<String> ?: emptyList()
 
     fun matches(patterns: List<String>) = patterns.any {
-        it.toRegex(RegexOption.IGNORE_CASE).matches(branch)
+        it.toRegex(RegexOption.IGNORE_CASE).matches(text)
     }
-    return matches(includes) && !matches(excludes)
+    val included = if (includes.isEmpty() && noIncludesMeansAll) true else matches(includes)
+    return included && !matches(excludes)
 }

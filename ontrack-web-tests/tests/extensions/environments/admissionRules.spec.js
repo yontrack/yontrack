@@ -31,6 +31,37 @@ test('adding a branch pattern admission rule with default name', async ({page, o
     })
 })
 
+test('adding a version pattern admission rule and seeing its summary', async ({page, ontrack}) => {
+    const {slot} = await createSlot(ontrack)
+
+    await login(page, ontrack)
+    const slotPage = new SlotPage(page, slot)
+    await slotPage.goTo()
+
+    const description = generate("rule-")
+    await slotPage.addAdmissionRule({
+        rule: "Version pattern",
+        name: "versionPattern",
+        description: description,
+        config: async () => {
+            const includes = page.getByLabel('Includes regular expressions')
+            await includes.click()
+            await includes.fill('\\d+\\.\\d+\\.\\d+(-beta\\.\\d+)?')
+            await includes.press('Enter')
+            const excludes = page.getByLabel('Excludes regular expressions')
+            await excludes.click()
+            await excludes.fill('.*-alpha\\..*')
+            await excludes.press('Enter')
+        }
+    })
+
+    const ruleConfigId = await ontrack.environments.findAdmissionRuleId({slot, ruleId: 'versionPattern'})
+    const rule = page.getByTestId(`slot-rule-${ruleConfigId}`)
+    await expect(rule).toContainText('Version')
+    await expect(rule).toContainText('\\d+\\.\\d+\\.\\d+(-beta\\.\\d+)?')
+    await expect(rule).toContainText('.*-alpha\\..*')
+})
+
 test('adding a manual approval admission rule with default name', async ({page, ontrack}) => {
     // Provisioning
     const {slot} = await createSlot(ontrack)

@@ -513,6 +513,11 @@ fun DemoDataset.validate() {
                         problems += "The ${deployment.environment}/${ref.project} slot admits no " +
                                 "build of ${ref.branch}, and ${ref.build} is one."
                     }
+                    val version = build.release ?: build.name
+                    if (rule.ruleId == SlotAdmissionRules.VERSION_PATTERN && !versionIncludedByPattern(version, rule.config)) {
+                        problems += "The ${deployment.environment}/${ref.project} slot admits no " +
+                                "version $version, which is ${ref.build}'s."
+                    }
                 }
             }
         }

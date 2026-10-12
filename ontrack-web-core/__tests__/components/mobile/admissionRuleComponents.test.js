@@ -72,6 +72,22 @@ describe('the mobile admission rule components', () => {
             expect(screen.getByText(/promotion is required/)).toBeInTheDocument()
         })
 
+        it('phrases a version pattern', () => {
+            render(<MobileAdmissionRuleSummary rule={{
+                name: 'versionPattern', ruleId: 'versionPattern',
+                ruleConfig: {includes: ['\\d+\\.\\d+\\.\\d+'], excludes: ['.*-alpha\\..*']},
+            }}/>)
+            expect(screen.getByText('\\d+\\.\\d+\\.\\d+')).toBeInTheDocument()
+            expect(screen.getByText('.*-alpha\\..*')).toBeInTheDocument()
+        })
+
+        it('says a version pattern with no patterns admits any version', () => {
+            render(<MobileAdmissionRuleSummary rule={{
+                name: 'versionPattern', ruleId: 'versionPattern', ruleConfig: {},
+            }}/>)
+            expect(screen.getByText('any')).toBeInTheDocument()
+        })
+
         it('falls back to the rule\'s own name rather than to nothing', () => {
             // Less informative than the sentence, but it names the thing that is
             // refusing - which is the minimum a user needs to go and look at it.

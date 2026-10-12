@@ -71,6 +71,48 @@ candidate. This is how *agent asks, human approves* works for deployments: the a
 pipeline, a person approves it, and the agent — or anybody — then deploys. An agent never overrides
 an admission rule either.
 
+## Admission rules
+
+A slot admits builds through its admission rules, and a build must pass all of them. Each one is
+configured by its id and a `ruleConfig`:
+
+| Rule | Id | Admits a build when |
+|------|----|---------------------|
+| Branch pattern | `branchPattern` | its branch matches `includes` and no `excludes`; with `lastBranchOnly`, deploying it also needs its branch to be the last of those branches |
+| Promotion | `promotion` | its branch has the `promotion` level; deploying it needs the build to be promoted to it |
+| Environment | `environment` | it has been deployed in the slot of `environmentName` (and `qualifier`) |
+| Manual approval | `manual` | someone approves the deployment, optionally restricted to `users` or `groups` |
+| Version pattern | `versionPattern` | its version matches `includes` and no `excludes` |
+
+### Version pattern
+
+The version pattern rule reads the build's **version**: its [release](../../generated/properties/property-net.nemerosa.ontrack.extension.general.ReleasePropertyType.md)
+label when it has one, its name otherwise. It tells a GA or a beta from an alpha when they all come
+from the same branch and reach the same promotion, which neither `branchPattern` nor `promotion`
+can.
+
+* `includes` — regular expressions, one of which the version must match. None means every version.
+* `excludes` — regular expressions, none of which the version must match. An exclusion wins over an
+  inclusion.
+
+Every expression must match the **whole** version, ignoring case: `\d+\.\d+\.\d+` admits `6.0.0`
+but not `6.0.0-alpha.3`. The expressions are read both by Yontrack and by its database, so keep to
+the syntax they share — classes such as `\d`, groups, alternations and quantifiers. A pattern
+either of them refuses, like a possessive `\d++` or an inline `(?i)`, is refused when the rule is
+saved.
+
+The version is a fact of the build, so a build the rule admits is both eligible and deployable.
+
+For example, GA and beta releases, but no alpha nor release candidate:
+
+```yaml
+admissionRules:
+  - ruleId: versionPattern
+    ruleConfig:
+      includes:
+        - "\\d+\\.\\d+\\.\\d+(-beta\\.\\d+)?"
+```
+
 ## Eligible and deployable builds
 
 Every admission rule of a slot answers two questions about a build:

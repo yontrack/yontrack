@@ -47,6 +47,7 @@ import BranchPatternSummary from "@components/framework/environments-slot-admiss
 import EnvironmentSummary from "@components/framework/environments-slot-admission-rule/environment/Summary"
 import ManualSummary from "@components/framework/environments-slot-admission-rule/manual/Summary"
 import PromotionSummary from "@components/framework/environments-slot-admission-rule/promotion/Summary"
+import VersionPatternSummary from "@components/framework/environments-slot-admission-rule/versionPattern/Summary"
 import ManualDataForm from "@components/framework/environments-slot-admission-rule/manual/DataForm"
 
 /** Rule id to the component phrasing it - "GOLD promotion is required". */
@@ -55,6 +56,7 @@ export const MOBILE_RULE_SUMMARIES = {
     environment: EnvironmentSummary,
     manual: ManualSummary,
     promotion: PromotionSummary,
+    versionPattern: VersionPatternSummary,
 }
 
 /** Rule id to the component drawing the input it wants. Only rules that need one. */

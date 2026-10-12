@@ -2312,6 +2312,14 @@ object DemoContent {
                             ruleId = SlotAdmissionRules.MANUAL,
                             config = mapOf("message" to "Approve the change in production."),
                         ),
+                        // GA releases only (#2069): the release candidate 2.4.0-rc.1 comes from
+                        // the same branch as 2.4.0, so neither the promotion nor the branch can
+                        // keep it out of production - its version does
+                        SlotAdmissionRuleSpec(
+                            name = "gaOnly",
+                            ruleId = SlotAdmissionRules.VERSION_PATTERN,
+                            config = mapOf("includes" to listOf("\\d+\\.\\d+\\.\\d+")),
+                        ),
                     ),
                 ),
                 // DELIBERATELY BROKEN, and the one thing in the dataset which is. Both rules

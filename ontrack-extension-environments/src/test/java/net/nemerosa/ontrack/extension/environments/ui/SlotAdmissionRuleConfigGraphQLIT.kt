@@ -248,4 +248,37 @@ class SlotAdmissionRuleConfigGraphQLIT : AbstractQLKTITSupport() {
         }
     }
 
+
+    @Test
+    fun `Creating a version pattern rule with an invalid regular expression is refused`() {
+        slotTestSupport.withSlot { slot ->
+            run(
+                """
+                    mutation {
+                        saveSlotAdmissionRuleConfig(input: {
+                            slotId: "${slot.id}",
+                            name: "versionPattern",
+                            description: "",
+                            ruleId: "versionPattern",
+                            ruleConfig: {
+                                includes: ["6.("]
+                            },
+                        }) {
+                            errors {
+                                message
+                            }
+                        }
+                    }
+                """.trimIndent()
+            ) { data ->
+                val errors = data.path("saveSlotAdmissionRuleConfig").path("errors")
+                assertEquals(1, errors.size())
+                assertEquals(
+                    "Invalid version pattern: 6.(",
+                    errors.first().path("message").asText(),
+                )
+                assertEquals(0, slotService.getAdmissionRuleConfigs(slot).size, "No rule saved")
+            }
+        }
+    }
 }

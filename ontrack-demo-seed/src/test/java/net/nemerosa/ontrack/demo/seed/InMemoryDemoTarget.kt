@@ -1113,6 +1113,13 @@ class InMemoryDemoTarget(
                     "$where admits no build of ${build.branch.name}, and ${build.name} is one."
                 }
 
+                SlotAdmissionRules.VERSION_PATTERN -> {
+                    val version = build.releaseVersion ?: build.name
+                    require(versionIncludedByPattern(version, rule.config)) {
+                        "$where admits no version $version, which is ${build.name}'s."
+                    }
+                }
+
                 // Nothing in the dataset answers an approval, so the deployment waits on it
                 SlotAdmissionRules.MANUAL -> error("$where waits for the approval ${rule.name}, which nobody gave.")
 
