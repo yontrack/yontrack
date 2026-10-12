@@ -222,8 +222,9 @@ configuration:
         DOCUMENTATION: {}
         # A check rather than a publication: the release page is hand-written end-user prose in
         # the wiki, produced before GOLD is granted (#1670), and this records that it is there
-        # and reachable from the index. The GitHub release links to it. Never reported for a
-        # pre-release, which has no page - and so never gets RELEASE, see below (#1987).
+        # and reachable from the index. The GitHub release links to it. Reported for every
+        # release, a pre-release included, whose page is its stage's - `Release-6.0.0-Beta`
+        # (#2070).
         WIKI: {}
       promotions:
         # DOCS sits here so that a docs build breaking is seen on the commit that broke it,
@@ -287,16 +288,11 @@ configuration:
         # constraint, not a side effect (#1673). On a release branch SILVER does not require
         # DEMO.SMOKE - see the SILVER comment above - so a patch is gated on GOLD alone (#1702).
         #
-        # A pre-release - `6.0.0-alpha.N`, `6.0.0-beta.N` - is NEVER granted RELEASE (#1987). GOLD
-        # publishes it, and release.yml stamps DOCKER.HUB, DOCUMENTATION and GITHUB.RELEASE, but
-        # not WIKI: a pre-release has no wiki page, and `scripts/release.sh wiki` says so with
-        # `report=false`. Missing WIKI is what keeps every RELEASE side effect away from it - the
-        # self.dev slot, the `#internal-releases` message below, and the `#releases` announcement
-        # under `custom.configs`. None of them can be filtered on the version instead: the slot's
-        # admission rules see branches and promotions only, and the `#releases` subscription, once
-        # created by a GA build, is never removed by CI. If WIKI ever gets reported for a
-        # pre-release, all three fire. The doc.yontrack.com dispatch is not one of them: it hangs
-        # off GOLD, so that a beta reaches the site - see the GOLD workflow below.
+        # Every release is granted RELEASE, alpha, beta and GA alike (#2070): one process, and
+        # everything keyed off RELEASE fires for all three - the `#internal-releases` message and
+        # the docs.yontrack.com rebuild below, and the `#releases` announcement under
+        # `custom.configs`. The one stage-dependent consequence is self.dev, which keeps an alpha
+        # out with a `versionPattern` admission rule of its own.
         RELEASE:
           promotions:
             - GOLD
@@ -352,27 +348,7 @@ configuration:
                       # doc/dev-guide/patch-release.md before relying on either spelling.
                       - name: branch
                         value: "${branch}"
-              # Rebuilds docs.yontrack.com once release.yml has succeeded - and only then: a node
-              # whose parent did not succeed is cancelled. It hangs off GOLD rather than RELEASE so
-              # that it also runs for a pre-release, which is never granted RELEASE: the site links
-              # the newest beta as `X.Y.0 Beta` next to Latest, and drops the link once X.Y.0 is
-              # released. For an alpha it runs too, and changes nothing, since the site publishes
-              # no alpha. Which versions the site shows is decided there, not here: see the README
-              # of yontrack/doc.yontrack.com.
-              - id: docs.yontrack.com
-                executorId: notification
-                parents:
-                  - id: release
-                data:
-                  channel: github-workflow
-                  channelConfig:
-                    config: github.com
-                    owner: yontrack
-                    repository: doc.yontrack.com
-                    workflowId: doc.yml
-                    reference: main
-                    callMode: ASYNC
-        # Never for a pre-release, which is not granted RELEASE: see the RELEASE promotion above.
+        # For every release, alpha, beta and GA alike: see the RELEASE promotion above.
         RELEASE:
           - name: On internal release
             nodes:
@@ -387,6 +363,21 @@ configuration:
                     Yontrack ${build} has been released.
       
                     ${promotionRun.changelog?title=true&commitsOption=ALWAYS}
+              # Rebuilds docs.yontrack.com once the release is complete: RELEASE means the S3
+              # documentation, among the rest, has been published. Which versions the site shows
+              # - one entry per stage, `6.0.0 Alpha`, then `6.0.0 Beta`, then the GA - is decided
+              # there, not here: see the README of yontrack/doc.yontrack.com.
+              - id: docs.yontrack.com
+                executorId: notification
+                data:
+                  channel: github-workflow
+                  channelConfig:
+                    config: github.com
+                    owner: yontrack
+                    repository: doc.yontrack.com
+                    workflowId: doc.yml
+                    reference: main
+                    callMode: ASYNC
       notificationsConfig:
         notifications:
           - name: On validation error
@@ -581,10 +572,6 @@ configuration:
                   # `release-*` branch would win over `main`, and no build of `main` could be
                   # deployed again while one exists.
                   #
-                  # Nothing here can keep a 6.0 alpha on `main` out: no admission rule reads the
-                  # version. The promotion rule does - a pre-release is never granted RELEASE, see
-                  # the RELEASE promotion under `defaults` (#1987).
-                  #
                   # `release-6.*` only, not every `release-*`: self.dev runs 6.x, its database
                   # migrated past what 5.x knows, and a 5.5.x RELEASE from `release/5.5` deployed
                   # there would downgrade onto that schema (#1875, decision 6 of
@@ -598,6 +585,15 @@ configuration:
                     ruleId: "promotion"
                     ruleConfig:
                       promotion: "RELEASE"
+                  # A beta and a GA, never an alpha: every release is granted RELEASE (#2070), so
+                  # the stage is told apart by the version. At RELEASE the display name is the
+                  # base version - `6.0.0-beta.6`, `6.0.1` - release.yml having rewritten it from
+                  # the rc version before the last stamp. A full, case-insensitive match (#2069).
+                  - name: "versionPattern"
+                    ruleId: "versionPattern"
+                    ruleConfig:
+                      includes:
+                        - "\\d+\\.\\d+\\.\\d+(-beta\\.\\d+)?"
                 workflows:
                   # Same as the demo slot: without a CANDIDATE workflow asking for the
                   # deployment to start, the pipeline never leaves the candidate state
@@ -657,24 +653,23 @@ configuration:
       # published from one of them by release.yml. Without the alternative this block matches
       # nothing, and the `#releases` subscription below silently stops being configured.
       #
-      # A pre-release candidate, `6.0.0-alpha.N.rc.<run>`, does not match, and that is intended: a
-      # pre-release is not announced on `#releases`, and has no wiki page to link (#1987). It is
-      # not what keeps the announcement away, though. CI never removes a subscription, so the one
-      # the last 5.x build created on `main` is still there during the 6.0 alphas; what keeps it
-      # quiet is that a pre-release is never granted RELEASE - see the RELEASE promotion above.
+      # A pre-release candidate, `6.0.0-beta.N.rc.<run>`, matches too: every release is announced,
+      # alpha, beta and GA alike (#2070).
       - conditions:
           - name: environment-regex
             config:
               name: VERSION
-              regex: '\d+\.\d+\.\d+(-rc\.\d+)?'
+              regex: '\d+\.\d+\.\d+(-(alpha|beta)\.\d+)?([-.]rc\.\d+)?'
         branch:
           notificationsConfig:
             notifications:
-            # The wiki link uses `${build.release}`, not `${build}`: the latter renders a link to the
-            # build, and the page is named for the bare version. By RELEASE the property has been
-            # rewritten from `6.0.1-rc.41` to `6.0.1` at GOLD, and the WIKI stamp that RELEASE
-            # requires has checked that `Release-5.3.0` exists - the same URL release.sh puts in
-            # the GitHub release.
+            # The wiki link reads the `wiki-page` meta-info item, which release.yml records next to
+            # the release property rewrite, before the last stamp: the page is named for the stage,
+            # `Release-6.0.0-Beta` for every beta, and no template rebuilds that from the version.
+            # The WIKI stamp that RELEASE requires has checked that the page exists - the same URL
+            # release.sh puts in the GitHub release. `error=true`: a build released before the
+            # item existed renders a templating error rather than a link to a page that is not
+            # there.
             - name: On RELEASE
               promotion: RELEASE
               events:
@@ -686,7 +681,7 @@ configuration:
               contentTemplate: |
                 Yontrack ${build} has been released.
 
-                📝 Release notes: https://github.com/yontrack/yontrack/wiki/Release-${build.release}
+                📝 Release notes: https://github.com/yontrack/yontrack/wiki/${build.meta?name=wiki-page&error=true}
 
                 ${promotionRun.changelog?title=true&commitsOption=OPTIONAL}
 

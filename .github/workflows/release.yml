@@ -20,11 +20,12 @@ name: Release
 # stubbed clients. Most of that logic is about refusing to run, which is the part worth testing:
 # publishing is the one step in this pipeline that cannot be undone.
 #
-# A pre-release - `6.0.0-alpha.N`, `6.0.0-beta.N`, or the legacy `6.0-beta.N` - goes through
-# here too (#1987, #2068). It is published to Docker Hub, S3 and GitHub like any release, but
-# the GitHub release is marked as a pre-release and never Latest, and it has no wiki page. WIKI
-# is therefore not reported for it, so RELEASE is never granted, and nothing keyed off RELEASE
-# fires: see the RELEASE comments in .yontrack/ci.yaml.
+# One process for every release, alpha, beta and GA alike (#2070): `6.0.0-alpha.N`,
+# `6.0.0-beta.N` and `6.0.0` go through the same steps, report the same four validations, and are
+# all granted RELEASE. Only two things depend on the stage, and the version decides both: the wiki
+# page checked and linked - `Release-6.0.0-Alpha`, `Release-6.0.0-Beta`, `Release-6.0.0` - and the
+# GitHub pre-release flag. Only `main` and a release branch are released: `resolve` refuses a
+# `v<N>` major branch, whose builds are development builds.
 
 on:
   workflow_dispatch:
@@ -150,8 +151,9 @@ jobs:
       # Everything that can refuse the release runs before anything is published.
       # ------------------------------------------------------------------------------------
 
-      # Resolves the build, works out the version to publish, and hard-fails if the git tag or
-      # any of the four Docker Hub tags already exists.
+      # Refuses any branch but main and a release branch, resolves the build, works out the
+      # version to publish, and hard-fails if the git tag or any of the four Docker Hub tags
+      # already exists.
       - name: Resolve the release
         id: resolve
         env:
@@ -181,21 +183,18 @@ jobs:
       # every other step is easier to not-do than to undo. WIKI stays a check, not a publication
       # step - the page is written by a human before GOLD is granted.
       #
-      # A pre-release has no page and passes without a check, with `report=false`: see below.
+      # The page is the stage's for a pre-release, `Release-6.0.0-Beta`: `resolve` names it.
       - name: Check the wiki release page
         id: wiki
         env:
           REL_VERSION: ${{ steps.resolve.outputs.version }}
         run: scripts/release.sh wiki
 
-      # Not for a pre-release, on purpose: `report` is false there. RELEASE requires WIKI, so a
-      # pre-release records its publication with the three other stamps without being granted
-      # RELEASE - which is what keeps it off self.dev and Slack (#1987).
+      # For every release, a pre-release included: RELEASE requires WIKI (#2070).
       - name: Validate WIKI
         if: >-
           ${{ !cancelled()
             && steps.resolve.outputs.build != ''
-            && steps.wiki.outputs.report == 'true'
             && (steps.wiki.outcome == 'success' || steps.wiki.outcome == 'failure') }}
         env:
           WIKI_OUTCOME: ${{ steps.wiki.outcome }}
@@ -336,42 +335,24 @@ jobs:
             --validation DOCUMENTATION --status "$status" \
             $run_time_flag $YONTRACK_RUN_INFO
 
-      # `--target` is the commit the build was made from, read off the build itself: this
-      # workflow runs on `main` as it is today, which is not where the release is.
+      # The body is the same shape for every release: the wiki page, then the changelog. The
+      # flags come from the version: `--prerelease --latest=false` for an alpha or a beta,
+      # `--latest` only for the highest GA (#1702, #1987). See `rel_publish`.
       #
-      # `--latest` is spelled out because `gh` leaves GitHub's `make_latest` at its default of
-      # true, and a 5.3.2 patch published after 5.4.0 would take the repository's "Latest release"
-      # badge and flip the README's shields.io version. `resolve` works out which it is (#1702).
-      # A pre-release is never Latest, and is marked `--prerelease` (#1987).
-      #
-      # `REL_SHA` is the upper bound of the changelog fallback: on a freshly cut release branch
-      # Yontrack has no previous RELEASE-promoted build to measure from, and the git range from
-      # the previous tag stands in.
+      # `REL_SHA` is the tag's target and the upper bound of the changelog fallback: on a freshly
+      # cut release branch Yontrack has no previous RELEASE-promoted build to measure from, and
+      # the git range from the previous tag stands in. YONTRACK_URL and YONTRACK_TOKEN: a GA
+      # following its betas measures from the previous GA's build, which is looked up there.
       - name: Create the GitHub release
         id: release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          VERSION: ${{ steps.resolve.outputs.version }}
-          SHA: ${{ steps.resolve.outputs.sha }}
-          LATEST: ${{ steps.resolve.outputs.latest }}
-          PRERELEASE: ${{ steps.resolve.outputs.prerelease }}
+          YONTRACK_URL: ${{ vars.YONTRACK_URL }}
+          YONTRACK_TOKEN: ${{ secrets.YONTRACK_TOKEN }}
           REL_VERSION: ${{ steps.resolve.outputs.version }}
           REL_BUILD_ID: ${{ steps.resolve.outputs.build_id }}
           REL_SHA: ${{ steps.resolve.outputs.sha }}
-        run: |
-          set -euo pipefail
-          scripts/release.sh body > release-body.md
-          cat release-body.md
-          prerelease_flag=()
-          if [ "$PRERELEASE" = "true" ]; then
-            prerelease_flag=(--prerelease)
-          fi
-          gh release create "$VERSION" \
-            --title "$VERSION" \
-            --target "$SHA" \
-            --latest="$LATEST" \
-            "${prerelease_flag[@]}" \
-            --notes-file release-body.md
+        run: scripts/release.sh publish
 
       # ------------------------------------------------------------------------------------
       # The build's identity, before the last stamp.
@@ -381,32 +362,47 @@ jobs:
       # display name, which is the `release` property: `6.0.1-rc.100` until here, `6.0.1` from
       # now on, matching every artefact just published. See docs/adr/0006.
       #
+      # Next to it, the wiki page goes on the build as the `wiki-page` meta-info item: the
+      # `#releases` announcement links `Release-6.0.0-Beta` for a beta, a name no template can
+      # rebuild from the version (#2070).
+      #
       # This sits *before* `Validate GITHUB.RELEASE` and not after, which matters more than it
       # looks. That stamp is the last of the four RELEASE needs, so auto-promotion grants RELEASE
       # synchronously on it - and everything keyed off RELEASE then reads the display name as it
       # is at that instant. Rewriting afterwards would have the `#internal-releases` message
-      # announce `6.0.1-rc.100`, and would have the self slot auto-version `image.tag` to
-      # `6.0.1-rc.100` from `${build.release}` - a tag that exists on GHCR and never on Docker
-      # Hub, which is where self pulls from.
+      # announce `6.0.1-rc.100`, would have `#releases` find no page to link, and would have the
+      # self slot auto-version `image.tag` to `6.0.1-rc.100` from `${build.release}` - a tag that
+      # exists on GHCR and never on Docker Hub, which is where self pulls from.
       #
       # It is still after every publication step: the artefacts have to exist under the version
       # before the build claims to be it. And it is safe this late because only `resolve` looks
       # the build up by display name; every step after it uses the build *name*, which is
       # immutable.
       - name: Rewrite the release property
+        id: identity
         env:
-          VERSION: ${{ steps.resolve.outputs.version }}
+          YONTRACK_URL: ${{ vars.YONTRACK_URL }}
+          YONTRACK_TOKEN: ${{ secrets.YONTRACK_TOKEN }}
           BUILD: ${{ steps.resolve.outputs.build }}
+          REL_VERSION: ${{ steps.resolve.outputs.version }}
+          REL_BUILD_ID: ${{ steps.resolve.outputs.build_id }}
         run: |
           set -euo pipefail
           yontrack build set-property \
             --project "$RELEASE_PROJECT" --branch "$RELEASE_BRANCH" --build "$BUILD" \
-            release "$VERSION"
+            release "$REL_VERSION"
+          scripts/release.sh meta
+
+      # Not stamped at all when the identity could not be written: GITHUB.RELEASE is the last of
+      # the RELEASE needs, and RELEASE granted on a build with no `wiki-page`, or still named as
+      # its rc, would announce and deploy the wrong thing. Skipped - because the GitHub release
+      # failed - is still stamped, FAILED.
 
       - name: Validate GITHUB.RELEASE
         if: >-
           ${{ !cancelled()
             && steps.resolve.outputs.build != ''
+            && steps.identity.outcome != 'failure'
             && (steps.release.outcome == 'success' || steps.release.outcome == 'failure') }}
         env:
           RELEASE_OUTCOME: ${{ steps.release.outcome }}
@@ -430,7 +426,8 @@ jobs:
         env:
           VERSION: ${{ steps.resolve.outputs.version }}
           RC_VERSION: ${{ steps.resolve.outputs.rc_version }}
-          WIKI: ${{ steps.wiki.outputs.report == 'false' && 'not required (pre-release)' || steps.wiki.outcome }}
+          WIKI_PAGE: ${{ steps.resolve.outputs.wiki_page }}
+          WIKI: ${{ steps.wiki.outcome }}
           PUSH: ${{ steps.push.outcome }}
           UPLOAD: ${{ steps.upload.outcome }}
           RELEASED: ${{ steps.release.outcome }}
@@ -440,7 +437,7 @@ jobs:
             echo
             echo "| Step | Outcome |"
             echo "|---|---|"
-            echo "| Wiki release page | ${WIKI:-skipped} |"
+            echo "| Wiki release page (\`$WIKI_PAGE\`) | ${WIKI:-skipped} |"
             echo "| Docker Hub | ${PUSH:-skipped} |"
             echo "| Documentation | ${UPLOAD:-skipped} |"
             echo "| GitHub release | ${RELEASED:-skipped} |"

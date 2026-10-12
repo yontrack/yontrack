@@ -8,21 +8,27 @@
 # because most of what this file does is refuse to run, which is exactly the part worth
 # testing.
 #
-# Usage: scripts/release.sh resolve|docs|wiki|body
+# Usage: scripts/release.sh resolve|docs|wiki|body|publish|meta
 #
-#   resolve  Finds the build the version names, works out the version to publish, and refuses
-#            to publish over anything that already exists. Outputs `version`, `rc_version`,
-#            `build`, `build_id`, `run_id`, `sha`, `latest` and `prerelease`; every later step is
-#            driven by those.
+# One process for every release, alpha, beta and GA alike (#2070): the version decides the stage
+# cells - the name of the wiki page and the GitHub pre-release flag - and nothing else.
+#
+#   resolve  Refuses any branch but `main` and a release branch, finds the build the version
+#            names, works out the version to publish, and refuses to publish over anything that
+#            already exists. Outputs `version`, `rc_version`, `build`, `build_id`, `run_id`,
+#            `sha` and `wiki_page`, which drive every later step, and `latest` and `prerelease`,
+#            for the log: `publish` decides those two again from the version.
 #   docs     Finds the docs artefact on the CI run recorded on the build, before anything is
 #            published. Outputs `artifact_id`.
-#   wiki     Checks the release page exists in the wiki and is reachable from the index. A
-#            check, not a publication step - the page is written by a human before GOLD. Outputs
-#            `report`, false for a pre-release, which has no page and is not stamped WIKI.
+#   wiki     Checks the release page of the version's stage exists in the wiki and is reachable
+#            from the index. A check, not a publication step - the page is written by a human
+#            before GOLD.
 #   body     Composes the GitHub release body: the wiki link first, the changelog second. Falls
 #            back to the git range when Yontrack has no changelog to give, which is the normal
-#            case on a freshly cut release branch. A pre-release has no wiki link, and the git
-#            range is its changelog.
+#            case on a freshly cut release branch.
+#   publish  Creates the GitHub release with that body: a pre-release for an alpha or a beta,
+#            Latest only for the highest GA.
+#   meta     Records the wiki page on the build, as the `wiki-page` meta-info item.
 #
 # Environment:
 #   YONTRACK_URL           Yontrack instance
@@ -31,12 +37,12 @@
 #                          at that point (`6.0.1-rc.700`, `6.0.0-beta.7.rc.700`)
 #   RELEASE_VERSION        version to publish under; defaults to the base version
 #   RELEASE_PROJECT        Yontrack project (default: yontrack)
-#   RELEASE_BRANCH         Yontrack branch (default: main)
+#   RELEASE_BRANCH         Yontrack branch (default: main); `main` or a release branch
 #   RELEASE_REPOSITORY     GitHub repository (default: yontrack/yontrack)
 #   REL_WIKI_DIR           checkout of the wiki (default: wiki)
 #   REL_VERSION            version being published, for the steps after `resolve`
 #   REL_RC_VERSION         the rc version, i.e. the GHCR tag to re-tag from
-#   REL_BUILD_ID           Yontrack build id, for the changelog boundary
+#   REL_BUILD_ID           Yontrack build id, for the changelog boundary and the meta-info item
 #   REL_RUN_ID             CI run holding the docs artefact
 #   REL_SHA                commit the release targets, and the upper bound of the changelog
 #                          fallback
@@ -115,8 +121,8 @@ rel_valid_version() {
 
 # A pre-release: `X.Y.0-alpha.N` or `X.Y.0-beta.N`, what `VersionCalculator` builds from a
 # `VERSION` of `X.Y-alpha` or `X.Y-beta` (#2068), or the legacy `X.Y-alpha.N` and `X.Y-beta.N` it
-# built before (#1987). Published like a release, but as a GitHub pre-release, never Latest, with
-# no wiki page - and so never granted RELEASE, see `rel_wiki`.
+# built before (#1987). Released like a GA - wiki page, WIKI, RELEASE - but as a GitHub
+# pre-release, never Latest (#2070).
 rel_is_prerelease() {
     local key
     key="$(rel_version_key "$1")" || return 1
@@ -126,6 +132,32 @@ rel_is_prerelease() {
 # The `X Y` of a version in `rel_valid_version`'s sense.
 rel_major_minor() {
     rel_version_key "$1" | cut -d' ' -f1,2
+}
+
+# The wiki page a version's release notes live on, without its `.md`: the version with the
+# pre-release number removed and the stage capitalised - the convention the wiki already follows.
+# One page per stage, renamed from stage to stage by whoever writes the notes:
+# `6.0.0-alpha.3` -> `Release-6.0.0-Alpha`, `6.0.0-beta.6` -> `Release-6.0.0-Beta`,
+# `6.0.0` -> `Release-6.0.0`. Fails on anything that is not a version.
+rel_wiki_page() {
+    local v="$1"
+    rel_valid_version "$v" || return 1
+    if [[ "$v" =~ ^(.+)-alpha\.[0-9]+$ ]]; then
+        printf 'Release-%s-Alpha' "${BASH_REMATCH[1]}"
+    elif [[ "$v" =~ ^(.+)-beta\.[0-9]+$ ]]; then
+        printf 'Release-%s-Beta' "${BASH_REMATCH[1]}"
+    else
+        printf 'Release-%s' "$v"
+    fi
+}
+
+# Whether a Yontrack branch is one a release is published from: `main`, or a release branch in
+# either of its spellings - `release-6.0`, the escaped Yontrack name, or `release/6.0`, which the
+# GOLD workflow has been seen to pass (see "Two names for one branch" in
+# doc/dev-guide/patch-release.md). A `v<N>` major branch and a feature branch build development
+# versions only: GOLD granted there would otherwise publish `7.0.0-rc.R` as `7.0.0`.
+rel_releasable_branch() {
+    [[ "$1" =~ ^(main|release[-/][0-9]+\.[0-9]+)$ ]]
 }
 
 # Whether $1 is strictly greater than $2, both versions in `rel_valid_version`'s sense.
@@ -210,6 +242,21 @@ rel_previous_version() {
     printf '%s' "${best_pre:-$best}"
 }
 
+# Whether $1 is a GA following pre-releases of its own X.Y.Z - `6.0.0` after `6.0.0-beta.N`, or
+# after the legacy `6.0-beta.N`, whose patch is 0. Its notes cover everything since the previous
+# GA, not just since the last beta.
+rel_follows_prereleases() {
+    local version="$1" xyz tag
+    rel_is_prerelease "$version" && return 1
+    xyz="$(rel_version_key "$version" | cut -d' ' -f1-3)" || return 1
+    while read -r tag; do
+        [ -n "$tag" ] || continue
+        rel_is_prerelease "$tag" || continue
+        [ "$(rel_version_key "$tag" | cut -d' ' -f1-3)" = "$xyz" ] && return 0
+    done <<< "$(rel_version_tags)"
+    return 1
+}
+
 # ---------------------------------------------------------------------------------------------
 # Yontrack
 # ---------------------------------------------------------------------------------------------
@@ -260,6 +307,20 @@ rel_build_details() {
             buildGitHubWorkflowRunProperty { value }
         }
     }"
+}
+
+# The id of the build released as $1, or nothing when there is none: promoted to RELEASE, with
+# $1 as its `release` property. Across the project and not on REL_BRANCH: the previous GA may
+# have been released from another branch - 5.5.8 from `release/5.5` for a 6.0.0 on `main`.
+rel_released_build_id() {
+    rel_graphql "query {
+        builds(project: \"$REL_PROJECT\", buildProjectFilter: {
+            promotionName: \"RELEASE\",
+            property: \"net.nemerosa.ontrack.extension.general.ReleasePropertyType\",
+            propertyValue: \"$1\",
+            maximumCount: 1
+        }) { id }
+    }" | jq -r '.data.builds[0].id // empty'
 }
 
 # ---------------------------------------------------------------------------------------------
@@ -329,6 +390,13 @@ rel_check_unpublished() {
 # ---------------------------------------------------------------------------------------------
 
 rel_resolve() {
+    # Before anything else, the version included: a `v<N>` build is a development build whatever
+    # it is named, and nothing about it is worth looking up.
+    rel_releasable_branch "$REL_BRANCH" || {
+        rel_fail "Cannot release from the branch $REL_BRANCH: only main and a release branch (release/X.Y or release-X.Y) are released. A v<N> major branch is never released - see doc/dev-guide/major-branch.md."
+        return 1
+    }
+
     local rc_version="${RELEASE_BUILD_VERSION:-}"
     [ -n "$rc_version" ] || { rel_fail "RELEASE_BUILD_VERSION is not set: nothing to release."; return 1; }
 
@@ -385,10 +453,13 @@ rel_resolve() {
     rel_is_latest "$version" && latest=true
     local prerelease=false
     rel_is_prerelease "$version" && prerelease=true
+    local wiki_page
+    wiki_page="$(rel_wiki_page "$version")"
 
     rel_log "Releasing $rc_version (build $build_name) as $version, from CI run $run_id on $sha."
     rel_log "Latest release: $latest."
     rel_log "Pre-release: $prerelease."
+    rel_log "Release notes: $wiki_page."
     rel_output version "$version"
     rel_output rc_version "$rc_version"
     rel_output build "$build_name"
@@ -397,6 +468,7 @@ rel_resolve() {
     rel_output sha "$sha"
     rel_output latest "$latest"
     rel_output prerelease "$prerelease"
+    rel_output wiki_page "$wiki_page"
     rel_summary "Releasing \`$rc_version\` as \`$version\` from [CI run $run_id](${GITHUB_SERVER_URL:-https://github.com}/$REL_REPOSITORY/actions/runs/$run_id)."
     return 0
 }
@@ -437,41 +509,28 @@ rel_docs() {
 # publication - the page is what makes the GitHub release worth opening, and the release links
 # to it, so a missing or unreachable page makes the release a dead end.
 #
-# A pre-release has no page, and its release does not link one. It is not checked, and `report`
-# says so: release.yml stamps WIKI only when it is true. RELEASE requires WIKI, so a pre-release
-# records its publication - DOCKER.HUB, DOCUMENTATION, GITHUB.RELEASE - without being granted
-# RELEASE, and nothing keyed off RELEASE fires for it: no self.dev deployment, no Slack message
-# (#1987). The self.dev slot's admission rules cannot tell an alpha from a GA, and a notification
-# subscription made by CI is never removed, so filtering each of them on the version is not an
-# option. The doc.yontrack.com dispatch hangs off GOLD instead, so a beta does reach the site. See
-# `.yontrack/ci.yaml`.
+# Checked for every release, a pre-release included (#2070): its page is its stage's,
+# `Release-6.0.0-Beta`, renamed from `Release-6.0.0-Alpha` when the betas start. WIKI is reported
+# whatever the stage, so RELEASE follows, and so does everything keyed off it - self.dev keeps an
+# alpha out with an admission rule of its own. See `.yontrack/ci.yaml`.
 rel_wiki() {
-    local version="${REL_VERSION:-}" dir="${REL_WIKI_DIR:-wiki}"
-
-    if rel_is_prerelease "$version"; then
-        rel_output report false
-        rel_log "$version is a pre-release: no release page is required, WIKI is not reported, and RELEASE is not granted."
-        return 0
-    fi
-    # Before any check: a GA whose check fails is still stamped, FAILED.
-    rel_output report true
-
+    local version="${REL_VERSION:-}" dir="${REL_WIKI_DIR:-wiki}" page
     [ -n "$version" ] || { rel_fail "REL_VERSION is not set: no page to look for."; return 1; }
+    page="$(rel_wiki_page "$version")" || { rel_fail "'$version' is not a version: no page to look for."; return 1; }
 
-    local page="Release-$version.md"
-    [ -f "$dir/$page" ] || {
-        rel_fail "The wiki has no $page. Write the release notes before granting GOLD."
+    [ -f "$dir/$page.md" ] || {
+        rel_fail "The wiki has no $page.md. Write the release notes - or rename the previous stage's page - before granting GOLD."
         return 1
     }
 
     # The link target, not the version: the archive pages name versions in prose, so matching
     # the version alone would pass on a sentence mentioning it.
-    grep -qF "](Release-$version)" "$dir/Home.md" || {
-        rel_fail "$page is not linked from Home.md: a page nobody can reach from the index is a page nobody reads."
+    grep -qF "]($page)" "$dir/Home.md" || {
+        rel_fail "$page.md is not linked from Home.md: a page nobody can reach from the index is a page nobody reads."
         return 1
     }
 
-    rel_log "The wiki has $page and links it from the index."
+    rel_log "The wiki has $page.md and links it from the index."
     return 0
 }
 
@@ -480,10 +539,25 @@ rel_wiki() {
 # `--to` is given explicitly because this workflow has no build context of its own: it must not
 # register a build, and without `--to` the CLI reads the id out of the environment a build
 # registration would have left behind.
+#
+# The previous RELEASE build of the branch is the boundary - `6.0.0-beta.6` from `6.0.0-beta.5`,
+# `6.0.1` from `6.0.0` - except for a GA following pre-releases of its own X.Y.Z: the last
+# RELEASE there is a beta, and `6.0.0` covers everything since 5.5.x. That one measures from the
+# previous GA's build, and fails when it cannot be found, so that the git range from the previous
+# GA's tag stands in rather than the changelog since the last beta.
 rel_changelog() {
+    local version="${REL_VERSION:-}" previous from
+    local -a boundary=(--from-promotion RELEASE)
+    if rel_follows_prereleases "$version"; then
+        previous="$(rel_previous_version "$version")"
+        [ -n "$previous" ] || return 1
+        from="$(rel_released_build_id "$previous")" || return 1
+        [ -n "$from" ] || return 1
+        boundary=(--from "$from")
+    fi
     yontrack build changelog export \
         --to "${REL_BUILD_ID:-}" \
-        --from-promotion RELEASE \
+        "${boundary[@]}" \
         --format markdown
 }
 
@@ -492,7 +566,8 @@ rel_changelog() {
 # The fallback for a patch: a freshly cut `release/5.3` has no previously RELEASE-promoted build
 # to measure from - 5.3.1 was released from a build on `main` - so `--from-promotion RELEASE`
 # comes back empty, on the one kind of release where "what changed" is the whole point. The git
-# range IS the changelog there: it is literally the cherry-picks (#1702).
+# range IS the changelog there: it is literally the cherry-picks (#1702). Also the fallback of a
+# GA whose previous GA's build cannot be found, measured from that GA's tag.
 #
 # Fails, rather than inventing a range, when there is no previous release or no commit to measure
 # to. `release.yml` checks out with `fetch-depth: 0`, so every tag and ref is present when there
@@ -509,21 +584,12 @@ rel_git_changelog() {
 #
 # End-user prose lives in the wiki, internals live in the release where developers look for
 # them, and neither is duplicated. The order is the convention: whoever opens the release sees
-# the readable page first.
+# the readable page first. One shape for every release, alpha, beta and GA alike (#2070): only
+# the page differs.
 rel_body() {
-    local version="${REL_VERSION:-}" changelog
+    local version="${REL_VERSION:-}" page changelog
     [ -n "$version" ] || { rel_fail "REL_VERSION is not set: nothing to describe."; return 1; }
-
-    # A pre-release has no wiki page to link, and Yontrack's changelog measures from the last
-    # RELEASE, which a pre-release never becomes: from `6.0-alpha.3` it would reach back to 5.5.7.
-    # The git range from the previous pre-release is the changelog there.
-    if rel_is_prerelease "$version"; then
-        changelog="$(rel_git_changelog 2>/dev/null)" || changelog=""
-        printf '## Pre-release\n\n'
-        printf 'A pre-release of Yontrack %s, with no release notes page of its own.\n\n' "${version%%-*}"
-        rel_body_changes "$changelog"
-        return 0
-    fi
+    page="$(rel_wiki_page "$version")" || { rel_fail "'$version' is not a version: nothing to describe."; return 1; }
 
     # A changelog that cannot be computed must not sink the release. The first release after
     # this pipeline lands has no previous RELEASE build to measure from, and the part a human
@@ -538,7 +604,7 @@ rel_body() {
     fi
 
     printf '## Release notes\n\n'
-    printf '%s/%s/wiki/Release-%s\n\n' "${GITHUB_SERVER_URL:-https://github.com}" "$REL_REPOSITORY" "$version"
+    printf '%s/%s/wiki/%s\n\n' "${GITHUB_SERVER_URL:-https://github.com}" "$REL_REPOSITORY" "$page"
     rel_body_changes "$changelog"
     return 0
 }
@@ -553,14 +619,69 @@ rel_body_changes() {
     fi
 }
 
+# The GitHub release, with the body above as its notes.
+#
+# `--target` is the commit the build was made from, read off the build itself: release.yml runs
+# on `main` as it is today, which is not where the release is.
+#
+# `--latest` is spelled out because `gh` leaves GitHub's `make_latest` at its default of true,
+# and a 5.3.2 patch published after 5.4.0 would take the repository's "Latest release" badge and
+# flip the README's shields.io version (#1702). Every alpha and beta is `--prerelease`, and never
+# Latest: a beta published after 5.5.8 must not take the badge (#1987). Both decided here, from the
+# version and the tags, by the same predicates `resolve` reported them with - the tag list has not
+# moved in between, since the tag is what this step creates.
+rel_publish() {
+    local version="${REL_VERSION:-}" sha="${REL_SHA:-}" latest=false body
+    local -a prerelease=()
+    [ -n "$version" ] || { rel_fail "REL_VERSION is not set: nothing to publish."; return 1; }
+    [ -n "$sha" ] || { rel_fail "REL_SHA is not set: nothing to tag."; return 1; }
+    rel_is_latest "$version" && latest=true
+    rel_is_prerelease "$version" && prerelease=(--prerelease)
+
+    body="$(rel_body)" || return 1
+    printf '%s\n' "$body"
+    # `${a[@]+...}`: an empty array is an unbound variable to bash 3.2 under `set -u`, and
+    # release-test.sh is run by hand on macOS too.
+    printf '%s\n' "$body" | gh release create "$version" \
+        --title "$version" \
+        --target "$sha" \
+        --latest="$latest" \
+        ${prerelease[@]+"${prerelease[@]}"} \
+        --notes-file -
+}
+
+# The wiki page recorded on the build, as the `wiki-page` meta-info item: what the `#releases`
+# announcement links, `Release-6.0.0-Beta` for a beta, rather than a page name rebuilt from the
+# version in a template. `append` keeps the build's other items - `rc-version` among them.
+rel_meta() {
+    local build_id="${REL_BUILD_ID:-}" version="${REL_VERSION:-}" page answer errors
+    [ -n "$build_id" ] || { rel_fail "REL_BUILD_ID is not set: no build to record the page on."; return 1; }
+    page="$(rel_wiki_page "$version")" || { rel_fail "'$version' is not a version: no page to record."; return 1; }
+
+    answer="$(rel_graphql "mutation {
+        setBuildMetaInfoPropertyById(input: {
+            id: $build_id,
+            append: true,
+            items: [{name: \"wiki-page\", value: \"$page\"}]
+        }) { errors { message } }
+    }")" || return 1
+    errors="$(echo "$answer" | jq -r '(.data.setBuildMetaInfoPropertyById.errors // []) | map(.message) | join("; ")')"
+    [ -n "$errors" ] && { rel_fail "Could not record the wiki page on build $build_id: $errors"; return 1; }
+
+    rel_log "Recorded wiki-page=$page on build $build_id."
+    return 0
+}
+
 rel_main() {
     case "${1:-}" in
         resolve) rel_resolve ;;
         docs) rel_docs ;;
         wiki) rel_wiki ;;
         body) rel_body ;;
+        publish) rel_publish ;;
+        meta) rel_meta ;;
         *)
-            rel_fail "Usage: $0 resolve|docs|wiki|body"
+            rel_fail "Usage: $0 resolve|docs|wiki|body|publish|meta"
             return 1
             ;;
     esac

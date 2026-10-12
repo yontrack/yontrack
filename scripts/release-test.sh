@@ -79,6 +79,28 @@ if [ -f "$REL_STUB_DIR/graphql_transport_fails" ]; then
     exit 6
 fi
 
+# The released build a GA's changelog measures from, looked up across the project.
+case "$body" in
+    *buildProjectFilter*)
+        if [ -f "$REL_STUB_DIR/released_build.json" ]; then
+            cat "$REL_STUB_DIR/released_build.json"
+        else
+            echo '{"data":{"builds":[]}}'
+        fi
+        echo 200
+        exit 0
+        ;;
+    *MetaInfoPropertyById*)
+        if [ -f "$REL_STUB_DIR/meta_errors" ]; then
+            echo '{"data":{"setBuildMetaInfoPropertyById":{"errors":[{"message":"Build not found"}]}}}'
+        else
+            echo '{"data":{"setBuildMetaInfoPropertyById":{"errors":[]}}}'
+        fi
+        echo 200
+        exit 0
+        ;;
+esac
+
 if [ -f "$REL_STUB_DIR/build.json" ]; then
     cat "$REL_STUB_DIR/build.json"
 else
@@ -134,6 +156,12 @@ if [ "${1:-}" = "api" ]; then
         exit 1
     fi
     cat "$REL_STUB_DIR/artifacts.json"
+    exit 0
+fi
+
+# `gh release create`, reading its notes from stdin: the notes are kept for the assertions.
+if [ "${1:-}" = "release" ] && [ "${2:-}" = "create" ]; then
+    cat > "$REL_STUB_DIR/release_notes.md"
     exit 0
 fi
 
@@ -709,9 +737,9 @@ assert_contains "$body" "No changelog available" "body: falls all the way back t
 # built as `6.0-alpha.N`, which CI turned into `6.0-alpha.N-rc-<run>` (#1987). The new shape,
 # `6.0.0-alpha.N`, is tested in the next section; both must keep working.
 #
-# A pre-release goes through GOLD like any other release, with three differences: GitHub marks it
-# as a pre-release and never as Latest, its notes start at the previous pre-release, and it has no
-# wiki page - which, because RELEASE requires WIKI, also keeps it from being granted RELEASE.
+# A pre-release goes through GOLD like any other release (#2070). What differs is decided by
+# the version alone: GitHub marks it as a pre-release and never as Latest, its notes start at the
+# previous pre-release, and its wiki page is the page of its stage - see the last section.
 
 is_prerelease() { yes_no rel_is_prerelease "$1"; }
 is_valid() { yes_no rel_valid_version "$1"; }
@@ -845,46 +873,6 @@ TAGS
 assert_eq "6.0.1" "$(rel_previous_version 6.1-alpha.0)" \
     "rel_previous_version: a pre-release ignores the previous minor's pre-releases"
 
-# wiki: a pre-release has no page, and is not checked for one. `report=false` keeps release.yml
-# from stamping WIKI - which is what keeps RELEASE, and everything keyed off it, away from it.
-setup_stub
-out="$(REL_VERSION=6.0-alpha.0 rel_wiki 2>&1)"; rc=$?
-assert_eq "0" "$rc" "wiki: a pre-release needs no page"
-assert_contains "$(outputs)" "report=false" "wiki: WIKI is not reported for a pre-release"
-assert_contains "$out" "RELEASE" "wiki: says what not reporting WIKI means"
-
-setup_stub
-out="$(REL_VERSION=5.3.0 rel_wiki 2>&1)"; rc=$?
-assert_contains "$(outputs)" "report=true" "wiki: WIKI is reported for a GA"
-
-# Reported FAILED, not skipped, when the GA's page is missing.
-setup_stub
-rm "$REL_WIKI_DIR/Release-5.3.0.md"
-out="$(REL_VERSION=5.3.0 rel_wiki 2>&1)"; rc=$?
-assert_eq "1" "$rc" "wiki: still fails a GA with no page"
-assert_contains "$(outputs)" "report=true" "wiki: a GA's failed check is still reported"
-
-# body: no wiki link, and the git range from the previous pre-release rather than Yontrack's
-# changelog, which measures from the last RELEASE - a build a pre-release never becomes.
-setup_stub
-cat > "$REL_STUB_DIR/tags" <<'TAGS'
-5.5.7
-6.0-alpha.0
-6.0-alpha.1
-TAGS
-body="$(REL_VERSION=6.0-alpha.2 REL_BUILD_ID=220 REL_SHA=abc1234def5678 rel_body 2>/dev/null)"; rc=$?
-assert_eq "0" "$rc" "body: succeeds for a pre-release"
-assert_not_contains "$body" "wiki/Release-" "body: a pre-release links no wiki page"
-assert_contains "$body" "pre-release" "body: says it is a pre-release"
-assert_contains "$body" "#1701 Fix the thing" "body: a pre-release carries the git log"
-assert_contains "$(calls)" "6.0-alpha.1..abc1234def5678" "body: measures from the previous alpha"
-assert_not_contains "$(calls)" "--from-promotion" "body: does not ask Yontrack for a changelog since RELEASE"
-
-setup_stub
-echo "5.5.7" > "$REL_STUB_DIR/tags"
-body="$(REL_VERSION=6.0-alpha.0 REL_BUILD_ID=200 REL_SHA=abc1234def5678 rel_body 2>/dev/null)"; rc=$?
-assert_contains "$(calls)" "5.5.7..abc1234def5678" "body: the first alpha measures from the previous GA"
-
 # ===========================================================================
 # Semantic versions (#2068): `X.Y.0-stage.N`, and `rc.<run>` candidates
 # ===========================================================================
@@ -933,10 +921,10 @@ assert_eq "no" "$(version_gt 5.5.9 6.0.0-alpha.0)" "rel_version_gt: a 5.5 patch 
 
 # resolve: every alpha and beta is a GitHub pre-release and never Latest, legacy or not; a GA
 # never is a pre-release.
-# A fresh stub holding build $2 named $1, with the tags $3; run in this shell, not in a `$( )`,
-# so that the case sees the stub it sets up.
+# A fresh stub holding build $2 named $1, with the tags $3, on the branch $4 (main by default);
+# run in this shell, not in a `$( )`, so that the case sees the stub it sets up.
 stub_rc_build() {
-    setup_stub
+    setup_stub "${4:-main}"
     [ -n "${3:-}" ] && printf '%s\n' "$3" > "$REL_STUB_DIR/tags"
     printf '{"Id":"%s","Name":"20261012055547-%s","DisplayName":"%s"}\n' "$2" "$2" "$1" \
         > "$REL_STUB_DIR/search.json"
@@ -1020,12 +1008,253 @@ assert_eq "6.0.1" "$(rel_previous_version 6.1.0-alpha.0)" \
 assert_eq "5.5.8" "$(rel_previous_version 5.5.9)" \
     "rel_previous_version: a 5.5 patch ignores everything above it"
 
-# body: a new-shape pre-release measures from the previous pre-release.
+# ===========================================================================
+# One release process for alpha, beta and GA (#2070)
+# ===========================================================================
+
+# Two kinds of build: development builds, and builds granted GOLD on `main` or a release branch.
+# A pre-release is published by the same steps as a GA - wiki page, WIKI, RELEASE, one body
+# shape - and only the stage cells differ: the page's name, and the GitHub pre-release flag.
+
+# resolve: only `main` and a release branch are released, in both spellings of the release branch
+# (see "Two names for one branch" in doc/dev-guide/patch-release.md). Before anything else: GOLD
+# on a `v7` build would otherwise publish `7.0.0-rc.R` as `7.0.0`.
+for branch in v7 claude-foo-pipeline feature/foo release-6 release/6.0-hotfix mainline; do
+    setup_stub "$branch"
+    out="$(RELEASE_BUILD_VERSION=7.0.0-rc.5 rel_resolve 2>&1)"; rc=$?
+    assert_eq "1" "$rc" "resolve: refuses the branch $branch"
+    assert_contains "$out" "$branch" "resolve: names the branch it refused ($branch)"
+    assert_eq "" "$(calls)" "resolve: refuses $branch before asking anything"
+    assert_eq "" "$(outputs)" "resolve: outputs nothing for $branch"
+done
+
+setup_stub v7
+out="$(rel_resolve 2>&1)"
+assert_contains "$out" "never released" "resolve: says a major branch is never released"
+
+# The check comes first, even before the version is looked at.
+setup_stub v7
+out="$(RELEASE_BUILD_VERSION="" rel_resolve 2>&1)"; rc=$?
+assert_eq "1" "$rc" "resolve: refuses a major branch with no version"
+assert_contains "$out" "v7" "resolve: the branch is what it refuses first"
+
+for branch in main release/6.0 release-6.0 release-5.5; do
+    setup_stub "$branch"
+    out="$(rel_resolve 2>&1)"; rc=$?
+    assert_eq "0" "$rc" "resolve: accepts the branch $branch"
+done
+
+# The page name: the version with the pre-release number removed and the stage capitalised, the
+# convention the wiki already follows for `Release-6.0.0-Beta`.
+assert_eq "Release-6.0.0-Alpha" "$(rel_wiki_page 6.0.0-alpha.3)" "rel_wiki_page: an alpha's page is its stage's"
+assert_eq "Release-6.0.0-Alpha" "$(rel_wiki_page 6.0.0-alpha.0)" "rel_wiki_page: every alpha shares it"
+assert_eq "Release-6.0.0-Beta" "$(rel_wiki_page 6.0.0-beta.6)" "rel_wiki_page: a beta's page is its stage's"
+assert_eq "Release-6.0.0-Beta" "$(rel_wiki_page 6.0.0-beta.12)" "rel_wiki_page: a two-digit beta too"
+assert_eq "Release-6.0.0" "$(rel_wiki_page 6.0.0)" "rel_wiki_page: a GA's page is its version"
+assert_eq "Release-6.0.1" "$(rel_wiki_page 6.0.1)" "rel_wiki_page: a patch's page is its version"
+assert_eq "Release-5.5.9" "$(rel_wiki_page 5.5.9)" "rel_wiki_page: a 5.5 patch's page is unchanged"
+assert_eq "no" "$(yes_no rel_wiki_page 6.0.1-rc.7)" "rel_wiki_page: a candidate has no page"
+
+stub_rc_build 6.0.0-beta.6.rc.700 700 "$TAGS_6_0"
+out="$(RELEASE_BUILD_VERSION=6.0.0-beta.6.rc.700 rel_resolve 2>&1)"; rc=$?
+assert_contains "$(outputs)" "wiki_page=Release-6.0.0-Beta" "resolve: names the page a beta is checked against"
+
+setup_stub
+out="$(rel_resolve 2>&1)"; rc=$?
+assert_contains "$(outputs)" "wiki_page=Release-5.3.0" "resolve: names the page a GA is checked against"
+
+# A page in the stub wiki, linked from the index as the wiki links them.
+add_wiki_page() {
+    echo "# $1" > "$REL_WIKI_DIR/$1.md"
+    echo "* [$1]($1)" >> "$REL_WIKI_DIR/Home.md"
+}
+
+# wiki: checked for every release, with no `report=false` way out - WIKI is reported for an
+# alpha, a beta and a GA alike, so RELEASE follows for all three.
+for stage in "6.0.0-alpha.3 Release-6.0.0-Alpha" "6.0.0-beta.6 Release-6.0.0-Beta" "6.0.0 Release-6.0.0"; do
+    read -r version page <<< "$stage"
+
+    setup_stub
+    add_wiki_page "$page"
+    out="$(REL_VERSION=$version rel_wiki 2>&1)"; rc=$?
+    assert_eq "0" "$rc" "wiki: $version passes with $page"
+    assert_not_contains "$(outputs)" "report=false" "wiki: $version is not let off WIKI"
+
+    setup_stub
+    out="$(REL_VERSION=$version rel_wiki 2>&1)"; rc=$?
+    assert_eq "1" "$rc" "wiki: $version fails with no $page"
+    assert_contains "$out" "$page.md" "wiki: names the page $version needs"
+
+    setup_stub
+    echo "# $page" > "$REL_WIKI_DIR/$page.md"
+    out="$(REL_VERSION=$version rel_wiki 2>&1)"; rc=$?
+    assert_eq "1" "$rc" "wiki: $version fails when $page is not linked from the index"
+done
+
+# The page is renamed from stage to stage: the alpha's page does not do for a beta.
+setup_stub
+add_wiki_page Release-6.0.0-Alpha
+out="$(REL_VERSION=6.0.0-beta.0 rel_wiki 2>&1)"; rc=$?
+assert_eq "1" "$rc" "wiki: the alpha's page does not do for the first beta"
+assert_contains "$out" "Release-6.0.0-Beta.md" "wiki: names the beta's page"
+
+# body: one shape for the three stages - the release notes link, then the changes. Only the page
+# differs, so with the page masked the three bodies are the same text.
+first_shape=""
+for stage in "6.0.0-alpha.3 Release-6.0.0-Alpha" "6.0.0-beta.6 Release-6.0.0-Beta" "6.0.0 Release-6.0.0"; do
+    read -r version page <<< "$stage"
+    setup_stub
+    body="$(REL_VERSION=$version REL_BUILD_ID=700 REL_SHA=abc1234def5678 rel_body 2>/dev/null)"; rc=$?
+    assert_eq "0" "$rc" "body: succeeds for $version"
+    assert_contains "$body" "## Release notes" "body: $version opens on the release notes"
+    assert_contains "$body" "https://github.com/yontrack/yontrack/wiki/$page" "body: $version links $page"
+    assert_contains "$body" "## Changes" "body: $version carries the changes"
+    assert_contains "$body" "#1672" "body: $version carries Yontrack's changelog"
+    assert_not_contains "$body" "Pre-release" "body: $version has no pre-release section"
+    shape="$(printf '%s' "$body" | sed -E 's#/wiki/Release-[A-Za-z0-9.-]+#/wiki/PAGE#')"
+    [ -n "$first_shape" ] || first_shape="$shape"
+    assert_eq "$first_shape" "$shape" "body: $version has the same shape as an alpha"
+done
+
+# The changelog boundary of a pre-release, and of a GA following a GA: the previous RELEASE build
+# of the branch - `6.0.0-beta.6` from `6.0.0-beta.5`, `6.0.1` from `6.0.0`.
+setup_stub
+printf '%s\n6.0.0-beta.5\n' "$TAGS_6_0" > "$REL_STUB_DIR/tags"
+body="$(REL_VERSION=6.0.0-beta.6 REL_BUILD_ID=700 REL_SHA=abc1234def5678 rel_body 2>/dev/null)"
+assert_contains "$(calls)" "--to 700 --from-promotion RELEASE" "body: a beta measures from the previous RELEASE"
+assert_not_contains "$(calls)" "buildProjectFilter" "body: a beta does not look for the previous GA"
+
+setup_stub
+printf '%s\n6.0.0-beta.6\n6.0.0\n' "$TAGS_6_0" > "$REL_STUB_DIR/tags"
+body="$(REL_VERSION=6.0.1 REL_BUILD_ID=950 REL_SHA=abc1234def5678 rel_body 2>/dev/null)"
+assert_contains "$(calls)" "--to 950 --from-promotion RELEASE" "body: a GA following a GA measures from the previous RELEASE"
+assert_not_contains "$(calls)" "buildProjectFilter" "body: a GA following a GA does not look for the previous GA"
+
+# A pre-release whose Yontrack changelog is empty still falls back to the git range from the
+# previous pre-release.
 setup_stub
 printf '%s\n6.0.0-beta.6\n' "$TAGS_6_0" > "$REL_STUB_DIR/tags"
-body="$(REL_VERSION=6.0.0-beta.7 REL_BUILD_ID=720 REL_SHA=abc1234def5678 rel_body 2>/dev/null)"; rc=$?
-assert_eq "0" "$rc" "body: succeeds for a new-shape pre-release"
-assert_not_contains "$body" "wiki/Release-" "body: a new-shape pre-release links no wiki page"
-assert_contains "$(calls)" "6.0.0-beta.6..abc1234def5678" "body: measures from the previous new-shape beta"
+touch "$REL_STUB_DIR/changelog_fails"
+body="$(REL_VERSION=6.0.0-beta.7 REL_BUILD_ID=720 REL_SHA=abc1234def5678 rel_body 2>/dev/null)"
+assert_contains "$(calls)" "6.0.0-beta.6..abc1234def5678" "body: a beta falls back to the git range from the previous beta"
+assert_contains "$body" "#1701 Fix the thing" "body: and carries it"
+
+# A GA following pre-releases of its own X.Y.Z measures from the previous GA, not from the last
+# beta: `6.0.0` covers everything since 5.5.x. That GA may sit on another branch, so it is found
+# across the project by its release property.
+setup_stub
+printf '%s\n6.0.0-beta.6\n' "$TAGS_6_0" > "$REL_STUB_DIR/tags"
+echo '{"data":{"builds":[{"id":558}]}}' > "$REL_STUB_DIR/released_build.json"
+body="$(REL_VERSION=6.0.0 REL_BUILD_ID=900 REL_SHA=abc1234def5678 rel_body 2>/dev/null)"; rc=$?
+assert_eq "0" "$rc" "body: succeeds for the GA after its betas"
+assert_contains "$(calls)" "--to 900 --from 558" "body: the GA after its betas measures from the previous GA's build"
+assert_not_contains "$(calls)" "--from-promotion" "body: not from the last RELEASE, which is a beta"
+assert_contains "$(calls)" "buildProjectFilter" "body: looks the previous GA up across the project"
+assert_contains "$(calls)" "5.5.8" "body: by its version"
+assert_contains "$body" "#1672" "body: carries Yontrack's changelog from there"
+assert_contains "$body" "wiki/Release-6.0.0" "body: and links the GA's page"
+
+# Legacy pre-releases count as the GA's pre-releases too: `6.0-beta.5` is `6.0.0-beta.5`.
+setup_stub
+printf '5.5.8\n6.0-beta.5\n' > "$REL_STUB_DIR/tags"
+echo '{"data":{"builds":[{"id":558}]}}' > "$REL_STUB_DIR/released_build.json"
+body="$(REL_VERSION=6.0.0 REL_BUILD_ID=900 REL_SHA=abc1234def5678 rel_body 2>/dev/null)"
+assert_contains "$(calls)" "--to 900 --from 558" "body: legacy betas are the GA's pre-releases too"
+
+# The previous GA's build cannot be found: the git range from its tag.
+setup_stub
+printf '%s\n6.0.0-beta.6\n' "$TAGS_6_0" > "$REL_STUB_DIR/tags"
+body="$(REL_VERSION=6.0.0 REL_BUILD_ID=900 REL_SHA=abc1234def5678 rel_body 2>/dev/null)"; rc=$?
+assert_eq "0" "$rc" "body: succeeds when the previous GA's build cannot be found"
+assert_contains "$(calls)" "5.5.8..abc1234def5678" "body: falls back to the git range from the previous GA's tag"
+assert_not_contains "$(calls)" "--from-promotion" "body: still not from the last RELEASE"
+assert_contains "$body" "#1701 Fix the thing" "body: carries the git range"
+
+setup_stub
+printf '%s\n6.0.0-beta.6\n' "$TAGS_6_0" > "$REL_STUB_DIR/tags"
+touch "$REL_STUB_DIR/graphql_transport_fails"
+body="$(REL_VERSION=6.0.0 REL_BUILD_ID=900 REL_SHA=abc1234def5678 rel_body 2>/dev/null)"; rc=$?
+assert_eq "0" "$rc" "body: survives Yontrack failing the previous GA's lookup"
+assert_contains "$(calls)" "5.5.8..abc1234def5678" "body: and falls back to the git range"
+
+# publish: every alpha and beta is a GitHub pre-release and never Latest; a GA is never a
+# pre-release, and is Latest only when it is the highest GA.
+publish() {
+    REL_VERSION="$1" REL_BUILD_ID=700 REL_SHA=abc1234def5678 rel_publish > /dev/null 2>&1
+}
+
+setup_stub
+printf '%s\n' "$TAGS_6_0" > "$REL_STUB_DIR/tags"
+publish 6.0.0-alpha.3; rc=$?
+assert_eq "0" "$rc" "publish: succeeds for an alpha"
+assert_contains "$(calls)" "release create 6.0.0-alpha.3 --title 6.0.0-alpha.3 --target abc1234def5678 --latest=false --prerelease" \
+    "publish: an alpha is a pre-release, never Latest"
+assert_contains "$(cat "$REL_STUB_DIR/release_notes.md")" "wiki/Release-6.0.0-Alpha" "publish: an alpha's notes are the body"
+
+setup_stub
+printf '%s\n' "$TAGS_6_0" > "$REL_STUB_DIR/tags"
+publish 6.0.0-beta.6
+assert_contains "$(calls)" "--latest=false --prerelease" "publish: a beta is a pre-release, never Latest"
+
+setup_stub
+printf '%s\n6.0.0-beta.6\n' "$TAGS_6_0" > "$REL_STUB_DIR/tags"
+publish 6.0.0
+assert_contains "$(calls)" "release create 6.0.0 --title 6.0.0 --target abc1234def5678 --latest=true --notes-file -" \
+    "publish: the highest GA is Latest"
+assert_not_contains "$(calls)" "--prerelease" "publish: a GA is not a pre-release"
+
+setup_stub
+printf '%s\n6.0.0\n' "$TAGS_6_0" > "$REL_STUB_DIR/tags"
+publish 5.5.9
+assert_contains "$(calls)" "--latest=false --notes-file -" "publish: a GA below the highest is not Latest"
+assert_not_contains "$(calls)" "--prerelease" "publish: and not a pre-release either"
+
+setup_stub
+publish ""; rc=$?
+assert_eq "1" "$rc" "publish: refuses to run with no version"
+assert_not_contains "$(calls)" "release create" "publish: creates nothing then"
+
+# meta: the page is recorded on the build, so that everything keyed off RELEASE can link it.
+setup_stub
+out="$(REL_BUILD_ID=700 REL_VERSION=6.0.0-beta.6 rel_meta 2>&1)"; rc=$?
+assert_eq "0" "$rc" "meta: records the page"
+assert_contains "$(calls)" "MetaInfoPropertyById" "meta: as a meta-info item"
+assert_contains "$(calls)" "id: 700" "meta: on the build being released"
+assert_contains "$(calls)" "wiki-page" "meta: under the name the CI config reads"
+assert_contains "$(calls)" "Release-6.0.0-Beta" "meta: with the stage's page"
+assert_contains "$(calls)" "append: true" "meta: next to the build's other items"
+
+setup_stub
+touch "$REL_STUB_DIR/meta_errors"
+out="$(REL_BUILD_ID=700 REL_VERSION=6.0.0-beta.6 rel_meta 2>&1)"; rc=$?
+assert_eq "1" "$rc" "meta: fails when Yontrack refuses the item"
+assert_contains "$out" "Build not found" "meta: says why"
+
+setup_stub
+out="$(REL_VERSION=6.0.0-beta.6 rel_meta 2>&1)"; rc=$?
+assert_eq "1" "$rc" "meta: refuses to run with no build"
+
+# 5.5, unchanged: a `5.5.N-rc-R` from release/5.5 goes through the GA path it always took -
+# `Release-5.5.N`, the changelog since the last RELEASE, a GA on GitHub.
+stub_rc_build 5.5.9-rc-41 41 "$TAGS_6_0
+6.0.0-beta.6" release-5.5
+out="$(RELEASE_BUILD_VERSION=5.5.9-rc-41 rel_resolve 2>&1)"; rc=$?
+assert_eq "0" "$rc" "5.5: resolve accepts the candidate on release-5.5"
+assert_contains "$(outputs)" "version=5.5.9" "5.5: published under its base version"
+assert_contains "$(outputs)" "wiki_page=Release-5.5.9" "5.5: checked against Release-5.5.9"
+assert_contains "$(outputs)" "prerelease=false" "5.5: not a pre-release"
+add_wiki_page Release-5.5.9
+out="$(REL_VERSION=5.5.9 rel_wiki 2>&1)"; rc=$?
+assert_eq "0" "$rc" "5.5: the wiki check passes on Release-5.5.9"
+: > "$REL_STUB_DIR/calls.log"
+body="$(REL_VERSION=5.5.9 REL_BUILD_ID=41 REL_SHA=abc1234def5678 rel_body 2>/dev/null)"
+assert_contains "$body" "wiki/Release-5.5.9" "5.5: the body links Release-5.5.9"
+assert_contains "$(calls)" "--to 41 --from-promotion RELEASE" "5.5: the changelog runs from the last RELEASE"
+assert_not_contains "$(calls)" "buildProjectFilter" "5.5: no previous-GA lookup"
+: > "$REL_STUB_DIR/calls.log"
+publish 5.5.9
+assert_contains "$(calls)" "release create 5.5.9" "5.5: published on GitHub"
+assert_contains "$(calls)" "--latest=true --notes-file -" "5.5: Latest while no 6.0 GA exists"
+assert_not_contains "$(calls)" "--prerelease" "5.5: not a GitHub pre-release"
 
 report_tests

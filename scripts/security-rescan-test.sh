@@ -99,6 +99,39 @@ cat > "$WORK/builds-majors.json" <<'JSON'
 ]
 JSON
 
+# Pre-releases are granted RELEASE like a GA (#2070), in the new shape and the legacy one. They
+# are not what users run: the latest RELEASE of the current minor is the latest GA.
+cat > "$WORK/builds-prereleases.json" <<'JSON'
+[
+  {"id": 99, "name": "b-6-1-0-alpha-0", "displayName": "6.1.0-alpha.0",
+   "branch": {"name": "main", "project": {"name": "yontrack"}}},
+  {"id": 98, "name": "b-6-0-1", "displayName": "6.0.1",
+   "branch": {"name": "release-6.0", "project": {"name": "yontrack"}}},
+  {"id": 97, "name": "b-6-0-0", "displayName": "6.0.0",
+   "branch": {"name": "main", "project": {"name": "yontrack"}}},
+  {"id": 96, "name": "b-6-0-0-beta-7", "displayName": "6.0.0-beta.7",
+   "branch": {"name": "main", "project": {"name": "yontrack"}}},
+  {"id": 95, "name": "b-6-0-beta-5", "displayName": "6.0-beta.5",
+   "branch": {"name": "main", "project": {"name": "yontrack"}}},
+  {"id": 91, "name": "b-5-5-8", "displayName": "5.5.8",
+   "branch": {"name": "release-5.5", "project": {"name": "yontrack"}}}
+]
+JSON
+
+# A minor whose only releases so far are pre-releases has no GA to rescan.
+cat > "$WORK/builds-prereleases-only.json" <<'JSON'
+[
+  {"id": 96, "name": "b-6-0-0-beta-7", "displayName": "6.0.0-beta.7",
+   "branch": {"name": "main", "project": {"name": "yontrack"}}},
+  {"id": 94, "name": "b-6-0-0-alpha-2", "displayName": "6.0.0-alpha.2",
+   "branch": {"name": "main", "project": {"name": "yontrack"}}},
+  {"id": 91, "name": "b-5-5-8", "displayName": "5.5.8",
+   "branch": {"name": "release-5.5", "project": {"name": "yontrack"}}},
+  {"id": 90, "name": "b-5-4-3", "displayName": "5.4.3",
+   "branch": {"name": "release-5.4", "project": {"name": "yontrack"}}}
+]
+JSON
+
 : > "$WORK/nothing.json"
 echo '[{"id": 1,' > "$WORK/broken.json"
 echo '{"message": "Not found", "status": "404"}' > "$WORK/error-object.json"
@@ -124,6 +157,16 @@ assert_eq "5.3.10" "$(printf '%s' "$out" | jq -r '.[1].version')" "select: picks
 out="$(srs_select "$WORK/builds-majors.json")"; rc=$?
 assert_eq "6.0.0" "$(printf '%s' "$out" | jq -r '.[0].version')" "select: a new major is the current minor"
 assert_eq "5.4.1" "$(printf '%s' "$out" | jq -r '.[1].version')" "select: the previous minor can be under the previous major"
+
+out="$(srs_select "$WORK/builds-prereleases.json")"; rc=$?
+assert_eq "0" "$rc" "select: succeeds on an answer carrying RELEASE pre-releases"
+assert_eq "6.0.1" "$(printf '%s' "$out" | jq -r '.[0].version')" "select: the latest RELEASE of the current minor is its latest GA, not a later alpha"
+assert_eq "5.5.8" "$(printf '%s' "$out" | jq -r '.[1].version')" "select: a minor with only an alpha is not a minor yet"
+assert_eq "" "$(printf '%s' "$out" | jq -r '.[] | select(.version | test("alpha|beta"))')" "select: skips a RELEASE pre-release, new shape or legacy"
+
+out="$(srs_select "$WORK/builds-prereleases-only.json")"; rc=$?
+assert_eq "5.5.8" "$(printf '%s' "$out" | jq -r '.[0].version')" "select: betas alone do not make 6.0 the current minor"
+assert_eq "5.4.3" "$(printf '%s' "$out" | jq -r '.[1].version')" "select: the previous minor is the GA before it"
 
 out="$(srs_select "$WORK/builds-one-minor.json")"; rc=$?
 assert_eq "1" "$(printf '%s' "$out" | jq 'length')" "select: one minor gives one target"

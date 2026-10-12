@@ -1,8 +1,8 @@
 # Releasing
 
 Granting `GOLD` on a build publishes it. `.github/workflows/release.yml` does the publishing and
-reports the four validations that grant `RELEASE` — three of them for a pre-release, which is never
-granted `RELEASE`: see [Pre-releases](#pre-releases).
+reports the four validations that grant `RELEASE`. An alpha, a beta and a GA go through the same
+steps: see [Pre-releases](#pre-releases) for the few cells that differ.
 
 Nothing is rebuilt. The images are re-tagged from the GHCR tags CI already pushed, the
 documentation is the artefact CI already archived, and what ships is the release candidate itself
@@ -16,7 +16,7 @@ under its base version — see
 | `BRONZE`  | `BUILD`, `UI_UNIT`, `INTEGRATION`, `KDSL.ACCEPTANCE`, `PLAYWRIGHT`, `DOCS` | The build is green    |
 | `SILVER`  | `BRONZE` + `DEMO.SMOKE` on `main`; `BRONZE` alone on a release branch | Deployed to the demo and verified — or, on a release branch, green |
 | `GOLD`    | `SILVER`, granted **by hand**                                | A human tested the demo and approved the release |
-| `RELEASE` | `GOLD` + `DOCKER.HUB`, `GITHUB.RELEASE`, `DOCUMENTATION`, `WIKI` | Publication of a GA completed |
+| `RELEASE` | `GOLD` + `DOCKER.HUB`, `GITHUB.RELEASE`, `DOCUMENTATION`, `WIKI` | Publication completed — alpha, beta or GA |
 
 `GOLD` *triggers* publication; `RELEASE` *records* that it succeeded. A promotion whose validations
 were its own triggers would be circular, which is why both levels exist. `RELEASE` is a receipt.
@@ -31,15 +31,23 @@ the other way round.
 
 ## Releasing a build
 
+Only a build of `main` or of a release branch is released. `release.yml` refuses any other branch
+before it looks at anything else — a `v<N>` major branch and a feature branch build development
+versions only, see [Major branch](major-branch.md).
+
 1. Watch for the `SILVER` message in `#notifications`. It carries the demo URL and the version.
 2. Look at the demo. It is running that exact build against a seeded dataset.
-3. Write the release notes in the wiki — `/release-notes <version>` in the wiki checkout — and
-   push them. This happens **before** `GOLD`, not after: it is the only ordering in which the
+3. Write the release notes of the build's stage in the wiki — `/release-notes <version>` in the
+   wiki checkout — and push them. The page is named for the stage, not the build:
+   `Release-6.0.0-Alpha` for every alpha, `Release-6.0.0-Beta` for every beta, `Release-6.0.0` for
+   the GA, then `Release-6.0.1`, … When the stage moves on, the page is **renamed** to the new
+   stage's name, with a "Moved to …" stub left at the old name, and linked from `Home.md` under
+   its new name. This happens **before** `GOLD`, not after: it is the only ordering in which the
    GitHub release can link to a page worth reading the moment it is published.
 4. Grant `GOLD` on the build.
 
 That is the whole manual part. The `GOLD` promotion workflow dispatches `release.yml` through the
-`github-workflow` notification channel, passing the version.
+`github-workflow` notification channel, passing the version and the branch.
 
 ### Why `GOLD` uses `dependsOn`, not `promotions`
 
@@ -61,13 +69,17 @@ Docker Hub. `dependsOn` gives the intended shape: manual only, and still refused
 
 | # | Step | Stamp |
 |---|------|-------|
-| 1 | Resolve the build, work out the version, refuse to publish over anything that exists | |
+| 1 | Refuse any branch but `main` and a release branch; resolve the build, work out the version, refuse to publish over anything that exists | |
 | 2 | Check the docs artefact is still on the CI run | |
-| 3 | Check the wiki release page exists and is linked from the index | `WIKI` |
+| 3 | Check the stage's wiki page exists and is linked from the index | `WIKI` |
 | 4 | Re-tag GHCR → Docker Hub, both organisations | `DOCKER.HUB` |
 | 5 | Upload the docs artefact to S3 under the released version | `DOCUMENTATION` |
 | 6 | Create the GitHub release | `GITHUB.RELEASE` |
-| 7 | Rewrite the `release` property to the final version | |
+| 7 | Rewrite the `release` property to the final version, and record the wiki page as the `wiki-page` meta-info item | |
+
+Step 7 runs before the `GITHUB.RELEASE` stamp, the last `RELEASE` needs: everything keyed off
+`RELEASE` reads the build as it is at that instant — the self.dev slot its version, the `#releases`
+announcement its page.
 
 Steps 1 to 3 are the ones that can refuse, and they all run before step 4 — the first step that
 cannot be undone. An expired docs artefact or a missing wiki page costs a re-run, not a half-done
@@ -124,65 +136,93 @@ The rc version is still needed throughout: it is the GHCR tag the images are re-
 Whether the published version takes GitHub's "Latest release" badge is decided rather than defaulted:
 `resolve` compares it against every released tag and passes `--latest=<true|false>`. Left at `gh`'s
 default of true, a 5.3.2 patch published after 5.4.0 would take the badge and flip the README's
-shields.io version to the previous minor. A pre-release is never Latest — see
-[Pre-releases](#pre-releases).
+shields.io version to the previous minor. A pre-release is never Latest, and does not count in
+the comparison — see [Pre-releases](#pre-releases).
+
+### The changelog
+
+The release body is the same for every release: `## Release notes` with the link to the stage's
+wiki page, then `## Changes`. The changes are Yontrack's changelog from:
+
+* the previous `RELEASE` build of the branch, for a pre-release and for a GA following a GA —
+  `6.0.0-beta.6` from `6.0.0-beta.5`, `6.0.1` from `6.0.0`;
+* the previous GA's build, for a GA following pre-releases of its own `X.Y.Z` — `6.0.0` covers
+  everything since `5.5.x`, not just since the last beta. That build is found across the project,
+  by its `release` property, since it may sit on another branch.
+
+When Yontrack has nothing to give — a freshly cut release branch, or a previous GA it cannot find —
+the git range from the previous release's tag stands in: the previous pre-release of the same `X.Y`
+for a pre-release, the previous GA for a GA.
 
 ## Pre-releases
 
 A `VERSION` of `X.Y-alpha` or `X.Y-beta` on `main` builds `X.Y.0-alpha.N` or `X.Y.0-beta.N` —
 `VersionCalculator` numbers them from the existing tags, starting at 0 and counting the legacy
 `X.Y-alpha.N` and `X.Y-beta.N` tags too, so `6.0-beta.6` is followed by `6.0.0-beta.7` — and CI
-turns that into the `X.Y.0-beta.N.rc.<run>` candidate. A pre-release is released through `GOLD`
-like any other version, and the guards, the Docker Hub tags and the S3 docs under
-`release/<version>/` are the same. What differs:
+turns that into the `X.Y.0-beta.N.rc.<run>` candidate.
 
-| | GA (`6.0.0`) | Pre-release (`6.0.0-beta.7`) |
-|---|---|---|
-| GitHub release | Latest when it is the highest GA | Marked as a pre-release, never Latest |
-| Wiki page | Required, checked, stamped `WIKI` | None: not checked, `WIKI` not stamped |
-| Release body | Wiki link, then Yontrack's changelog since the last `RELEASE` | Git log since the previous pre-release |
-| `RELEASE` | Granted | **Never granted** |
-| self.dev, `#internal-releases`, `#releases` | Yes | No |
-| docs.yontrack.com | Latest when it is the highest GA | A beta is linked as `X.Y.0 Beta`; an alpha is not published |
+There are two kinds of build, and only two:
+
+* **Development**: every build of a `v<N>` major branch and of a feature branch, and every rc
+  candidate before `GOLD`.
+* **Release**: a build granted `GOLD` on `main` or on a release branch, whatever its stage.
+
+Every release goes through the same steps. Only the cells marked *stage* differ:
+
+| | Alpha | Beta | GA (and 6.x patches) |
+|---|---|---|---|
+| Candidates deployed to | demo.dev, every green build of `main` | same | same; none for a patch |
+| `GOLD` | by hand, `main` or `release/*` only | same | same |
+| Wiki page, required before `GOLD` | *stage*: `Release-6.0.0-Alpha` | *stage*: the same page renamed `Release-6.0.0-Beta` | *stage*: renamed `Release-6.0.0`; then `Release-6.0.1`, … |
+| Git tag, Docker Hub, S3 docs, GitHub release | one per version: `6.0.0-alpha.N` | `6.0.0-beta.N` | `6.0.0` |
+| GitHub release body | wiki link + Yontrack changelog | same | same |
+| GitHub release flags | *stage*: pre-release, never Latest | *stage*: same | Latest when the highest GA |
+| Validations reported | `WIKI`, `DOCKER.HUB`, `DOCUMENTATION`, `GITHUB.RELEASE` | same | same |
+| `RELEASE` | ✓ | ✓ | ✓ |
+| Slack `#internal-releases`, `#releases` | ✓ | ✓ | ✓ |
+| docs.yontrack.com rebuilt | on `RELEASE` | same | same |
+| self.dev | *stage*: ✗ | ✓ | ✓ |
 
 **Ordering:** `6.0.0-alpha.N` < `6.0.0-beta.M` < `6.0.0`, and `5.5.7` < `6.0.0-alpha.0`. A legacy
 pre-release is patch 0: `6.0-beta.6` < `6.0.0-beta.7`.
 
-**Notes base:** a pre-release's git log starts at the previous pre-release of the same `X.Y` (alpha
-or beta, legacy shape or not), or at the highest GA below it when it is the first: `6.0-alpha.0`
-started at `5.5.7`, `6.0-beta.0` at the last alpha, and `6.0.0-beta.7` starts at `6.0-beta.6`. A
-GA ignores pre-releases, so `6.0.0` covers everything since `5.5.7`.
+**The wiki page** is the version with the pre-release number removed and the stage capitalised:
+`6.0.0-alpha.3` → `Release-6.0.0-Alpha`, `6.0.0-beta.6` → `Release-6.0.0-Beta`, `6.0.1` →
+`Release-6.0.1`. `release.yml` records it on the build as the `wiki-page` meta-info item, which the
+`#releases` announcement links.
 
-**Why no `RELEASE`:** a pre-release must not deploy to self.dev or post on Slack, and those cannot
-be filtered on the version. The self.dev slot's admission rules see branches and promotions only,
-and CI never removes the `#releases` subscription that the last GA build created on `main`. So
-`release.yml` records the publication with `DOCKER.HUB`, `DOCUMENTATION` and `GITHUB.RELEASE` and
-leaves `WIKI` out. `RELEASE` requires all four, so it is never granted and none of these fire. As
-a bonus, `6.0.0`'s Yontrack changelog then runs from the last `RELEASE` on `main` — `5.5.7`, the
-last GA released from it — rather than from its last beta.
+**Keeping an alpha off self.dev:** every release is granted `RELEASE`, so the self.dev slot tells
+the stages apart by the version, with a `versionPattern` admission rule admitting `X.Y.Z` and
+`X.Y.Z-beta.N` only. By `RELEASE`, the build's display name is the base version.
 
-**The beta on docs.yontrack.com:** the site is rebuilt after every successful `release.yml`, by a
-node chained after `release` in the `GOLD` workflow of `.yontrack/ci.yaml` — not on `RELEASE`,
-which a beta never gets. The site, in `yontrack/doc.yontrack.com`, links the newest beta whose
-`DOCUMENTATION` passed as `6.0.0 Beta (6.0.0-beta.N)`, right after Latest. Each new beta moves the
-link; Latest stays the newest GA (`5.5.7`) throughout. Releasing `6.0.0` drops the link, and
-`6.0.0` becomes Latest. Alphas are never published there.
+**docs.yontrack.com** is rebuilt on `RELEASE`, alongside `#internal-releases`. Which versions the
+site shows — one entry per stage, `6.0.0 Alpha`, then `6.0.0 Beta`, replaced by the GA — is decided
+in `yontrack/doc.yontrack.com`.
+
+**Legacy pre-releases** (`6.0-alpha.N`, `6.0-beta.N`) were published before this process, with no
+wiki page and no `RELEASE`. They cannot be re-released, and are left as they are.
 
 **Cutting one:**
 
 1. Set `VERSION` to `X.Y-alpha` (later `X.Y-beta`, then `X.Y`) on `main` and push.
 2. Wait for the build to reach `SILVER`, as for any release.
-3. Grant `GOLD`. No wiki page is needed.
-4. `/release-milestone X.Y X.Y.0-alpha.N` to mark the milestone's ready issues as released in it.
+3. Write or rename the stage's wiki page, as in [Releasing a build](#releasing-a-build).
+4. Grant `GOLD`.
+5. `/release-milestone X.Y X.Y.0-alpha.N` to mark the milestone's ready issues as released in it.
 
-`scripts/security-rescan.sh` still rescans GA releases only.
+`scripts/security-rescan.sh` still rescans GA releases only: a pre-release is skipped even though it
+carries `RELEASE`, and the latest `RELEASE` of a minor is its latest GA.
 
 ### From alpha to GA
+
+Each move also renames the stage's wiki page before the next `GOLD`: `Release-X.Y.0-Alpha` becomes
+`Release-X.Y.0-Beta`, which becomes `Release-X.Y.0`, each time with a "Moved to …" stub at the old
+name.
 
 The stage moves on a change of `VERSION`, against these criteria:
 
 * **Alpha → beta** (`X.Y-alpha` → `X.Y-beta`): the `X.Y` milestone has no open feature left. Bugs
-  may remain.
+  may remain. From the first beta, releases reach self.dev.
 * **Beta → GA** (`X.Y-beta` → `X.Y`), when all three hold:
   * the deprecation gate passes — no `Removed in V<X>` marker left and an empty marker baseline,
     see [the gate](major-branch.md#the-gate);
@@ -196,7 +236,8 @@ The stage moves on a change of `VERSION`, against these criteria:
 `docker-hub` and `release` jobs, the S3 upload and the `feature/*-publication` escape hatch are all
 gone.
 
-The release train runs on `main` and on the one live `release/*` branch, and on nothing else. Patches
+The release train runs on `main` and on the one live `release/*` branch, and on nothing else —
+`release.yml` refuses any other branch. Patches
 to the previous minor go through the same four validations and the same human `GOLD` gate — see
 [Patch releases](patch-release.md).
 

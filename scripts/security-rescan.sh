@@ -48,6 +48,9 @@
 #     promotion says it was released; the display name says which version it is.
 #   * A promoted build whose display name is not a version has no release property, so nothing
 #     was published under it and there is no image tag to scan. It is skipped.
+#   * GA releases only. A pre-release - `6.0.0-beta.7`, or the legacy `6.0-beta.5` - is granted
+#     RELEASE like a GA (#2070), but it is not what users are asked to run: it is skipped, and the
+#     latest RELEASE of a minor is its latest GA. Only an `X.Y.Z` display name is selected.
 #
 # The secret-scanning alerts are asked for without their secret (`hide_secret=true`), and the
 # report keeps only the type of each secret, the number and the link of its alert, and the
@@ -173,6 +176,7 @@ srs_select() {
         else
             [
                 .[0][]
+                # A GA: no pre-release, no candidate, no build name.
                 | select((.displayName // "") | test("^[0-9]+\\.[0-9]+\\.[0-9]+$"))
                 | . as $build
                 | (.displayName | split(".") | map(tonumber)) as $v

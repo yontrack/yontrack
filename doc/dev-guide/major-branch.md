@@ -11,8 +11,9 @@ differently on it, and how it ends. It is written from what `v6` did.
 
 **A second `main`, not a feature branch.** It carries its own `VERSION` file (`7.0`), it is built
 by the same `ci.yml`, it goes through the same promotion chain, and it has a deployment environment
-of its own. The only thing it does not do is release: `GOLD` is a human gate, and nobody grants it
-on the major branch.
+of its own. The only thing it does not do is release: its builds are development builds, and
+`release.yml` refuses a `v<N>` branch before it looks at anything else — even a `GOLD` granted there
+by mistake publishes nothing (#2070). See [Releasing a build](release.md#releasing-a-build).
 
 Apart from `VERSION`, the pipeline, the environment definition and the versioning rules below
 live on `main` and are inherited by the major branch through the regular merges from `main`. That
@@ -113,7 +114,7 @@ Same `ci.yml`, same `.yontrack/ci.yaml`, and the branch conditions do the rest.
 | What SILVER means | deployed and verified | deployed and verified |
 | Real GitLab / Bitbucket pipeline tests | yes | **no** |
 | DAST scanned | yes | no — but the CasC reload runs on both |
-| Released by `release.yml` | yes | no — nobody grants GOLD on the major branch |
+| Released by `release.yml` | yes | no — `release.yml` refuses the branch |
 
 **No third-party pipeline tests:** the real GitLab and Bitbucket Cloud runs are scoped `^main$` and
 metered against free minutes in the fixture namespaces. Extending them to the major branch would

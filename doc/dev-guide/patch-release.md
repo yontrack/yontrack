@@ -136,7 +136,7 @@ Two things then differ from a release off `main`:
   cherry-picks.
 
 Everything else is the ordinary release: four validations, `RELEASE` as the receipt, the
-`#internal-releases` message, and the `doc.yontrack.com` dispatch that follows `release.yml`.
+`#internal-releases` message, and the `doc.yontrack.com` rebuild, both on `RELEASE`.
 
 ## Why `SILVER` is declared the way it is
 
