@@ -101,7 +101,7 @@ PATH="$STUB_ROOT/bin:$PATH"
 export PATH
 
 # Resets the stub to a healthy default: latest BRONZE is build 100
-# (5.3.0-rc-100), the demo currently runs build 90, and starting a pipeline
+# (5.3.0-rc.100), the demo currently runs build 90, and starting a pipeline
 # succeeds.
 setup_stub() {
     DD_STUB_DIR="$(mktemp -d "$STUB_ROOT/case.XXXXXX")" || { echo "FATAL: mktemp failed" >&2; exit 1; }
@@ -109,7 +109,7 @@ setup_stub() {
     : > "$DD_STUB_DIR/calls.log"
 
     cat > "$DD_STUB_DIR/latest.json" <<'JSON'
-{"Id":"100","Name":"20260901055547-100","DisplayName":"5.3.0-rc-100"}
+{"Id":"100","Name":"20260901055547-100","DisplayName":"5.3.0-rc.100"}
 JSON
 
     cat > "$DD_STUB_DIR/slot.json" <<'JSON'
@@ -118,7 +118,7 @@ JSON
   "lastDeployedPipeline": {
     "id": "pipeline-0",
     "number": 6,
-    "build": {"id": "90", "name": "20260801010101-90", "displayName": "5.3.0-rc-90"}
+    "build": {"id": "90", "name": "20260801010101-90", "displayName": "5.3.0-rc.90"}
   }
 }
 JSON
@@ -128,11 +128,11 @@ JSON
 JSON
 
     cat > "$DD_STUB_DIR/resolve.json" <<'JSON'
-{"Id":"77","Name":"20260801010101-77","DisplayName":"5.3.0-rc-77"}
+{"Id":"77","Name":"20260801010101-77","DisplayName":"5.3.0-rc.77"}
 JSON
 
     cat > "$DD_STUB_DIR/rc.json" <<'JSON'
-{"build":{"rcVersion":"5.3.0-rc-100"}}
+{"build":{"rcVersion":"5.3.0-rc.100"}}
 JSON
 }
 
@@ -157,15 +157,19 @@ assert_eq "deploy" "$r" "dd_should_deploy: a slot that has never deployed anythi
 # `--with-display-name` is matched case-insensitively and *partially* by the
 # server, so a bare version would match more builds than the one asked for.
 
-assert_eq '^5\.3\.0-rc-45$' "$(yontrack_exact_pattern 5.3.0-rc-45)" \
+assert_eq '^5\.3\.0-rc\.45$' "$(yontrack_exact_pattern 5.3.0-rc.45)" \
     "yontrack_exact_pattern anchors the pattern and escapes the dots"
+
+# A build CI registered before #2068 keeps the legacy candidate shape.
+assert_eq '^5\.5\.8-rc-41$' "$(yontrack_exact_pattern 5.5.8-rc-41)" \
+    "yontrack_exact_pattern handles a legacy candidate version"
 
 assert_eq '^20260801010101-55$' "$(yontrack_exact_pattern 20260801010101-55)" \
     "yontrack_exact_pattern leaves a plain build name alone apart from the anchors"
 
-# The dots are the ones that matter in practice: unescaped, 5.3.0-rc-4 would
-# match 5x3x0-rc-4, and unanchored it would match 5.3.0-rc-45.
-assert_contains "$(yontrack_exact_pattern 5.3.0-rc-4)" '5\.3\.0-rc-4' \
+# The dots are the ones that matter in practice: unescaped, 5.3.0-rc.4 would
+# match 5x3x0-rcx4, and unanchored it would match 5.3.0-rc.45.
+assert_contains "$(yontrack_exact_pattern 5.3.0-rc.4)" '5\.3\.0-rc\.4' \
     "yontrack_exact_pattern escapes every dot"
 
 assert_eq '^a\*b\+c\[d\]$' "$(yontrack_exact_pattern 'a*b+c[d]')" \
@@ -180,7 +184,7 @@ assert_contains "$(calls)" "slot pipeline start" "nightly: starts a pipeline"
 assert_contains "$(calls)" "--build 20260901055547-100" "nightly: starts it for the latest promoted build"
 assert_contains "$(calls)" "--environment demo.dev.yontrack.com" "nightly: targets the demo environment"
 assert_contains "$(calls)" "--with-promotion BRONZE" "nightly: resolves against the BRONZE promotion"
-assert_contains "$out" "5.3.0-rc-100" "nightly: reports the build it deployed"
+assert_contains "$out" "5.3.0-rc.100" "nightly: reports the build it deployed"
 
 # The pipeline it started has to be named in the log: it is the only handle on
 # what happens next, and a deployment that stalls downstream is otherwise
@@ -198,7 +202,7 @@ out="$(dd_main 2>&1)"; rc=$?
 assert_eq "0" "$rc" "outputs: succeeds"
 assert_contains "$(cat "$GITHUB_OUTPUT")" "pipeline=pipeline-1" "outputs: exposes the pipeline id"
 assert_contains "$(cat "$GITHUB_OUTPUT")" "deployed=true" "outputs: flags that it deployed"
-assert_contains "$(cat "$GITHUB_OUTPUT")" "build=5.3.0-rc-100" "outputs: names the build"
+assert_contains "$(cat "$GITHUB_OUTPUT")" "build=5.3.0-rc.100" "outputs: names the build"
 unset GITHUB_OUTPUT
 
 # A payload carrying neither a pipeline nor an error used to be checked here.
@@ -214,7 +218,7 @@ cat > "$DD_STUB_DIR/slot.json" <<'JSON'
   "lastDeployedPipeline": {
     "id": "pipeline-0",
     "number": 6,
-    "build": {"id": "100", "name": "20260901055547-100", "displayName": "5.3.0-rc-100"}
+    "build": {"id": "100", "name": "20260901055547-100", "displayName": "5.3.0-rc.100"}
   }
 }
 JSON
@@ -232,7 +236,7 @@ cat > "$DD_STUB_DIR/slot.json" <<'JSON'
   "lastDeployedPipeline": {
     "id": "pipeline-0",
     "number": 6,
-    "build": {"id": "100", "name": "20260901055547-100", "displayName": "5.3.0-rc-100"}
+    "build": {"id": "100", "name": "20260901055547-100", "displayName": "5.3.0-rc.100"}
   }
 }
 JSON
@@ -243,7 +247,7 @@ assert_contains "$(calls)" "--build 20260901055547-100" "manual redeploy: redepl
 # --- acceptance: a manual dispatch with an explicit display name -----------
 
 setup_stub
-out="$(DEMO_MANUAL=true DEMO_BUILD=5.3.0-rc-77 dd_main 2>&1)"; rc=$?
+out="$(DEMO_MANUAL=true DEMO_BUILD=5.3.0-rc.77 dd_main 2>&1)"; rc=$?
 assert_eq "0" "$rc" "explicit build: succeeds"
 assert_contains "$(calls)" "--with-display-name" "explicit build: resolves the display name"
 assert_contains "$(calls)" "--build 20260801010101-77" "explicit build: deploys the named build"
@@ -317,7 +321,7 @@ assert_not_contains "$(calls)" "slot pipeline start" "rc version unreadable: sta
 
 setup_stub
 out="$(dd_main 2>&1)"; rc=$?
-assert_contains "$out" "image tag 5.3.0-rc-100" "a build with an rc version: says which tag the demo gets"
+assert_contains "$out" "image tag 5.3.0-rc.100" "a build with an rc version: says which tag the demo gets"
 
 # --- report ----------------------------------------------------------------
 

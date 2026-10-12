@@ -85,10 +85,11 @@ dependencies {
     runtimeOnly(project(":ontrack-extension-agents"))
 }
 
-// `project.version` only ever holds the base version (5.4.0). The release-candidate suffix is
-// computed by the CI shell *after* Gradle has run - see the "Compute the version" step in
-// .github/workflows/ci.yml. The `build` job exports it as VERSION, and bootBuildInfo runs inside
-// its `dockerBuild jibDockerBuild` step, so the value is in scope.
+// `project.version` only ever holds the base version (6.0.1, 6.0.0-beta.7). The release-candidate
+// version (6.0.1-rc.700, 6.0.0-beta.7.rc.700) is written by `writeVersion` and read by the CI shell
+// - see the "Compute the version" step in .github/workflows/ci.yml. The `build` job exports it as
+// VERSION, and bootBuildInfo runs inside its `dockerBuild jibDockerBuild` step, so the value is in
+// scope.
 //
 // The displayed version is the base version, the rc one is kept as `full`: a release re-tags this
 // image without rebuilding it, so the base version is the only one it can show once released.

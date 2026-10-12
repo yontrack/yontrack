@@ -288,34 +288,28 @@ jobs:
 
       - name: Compute the version
         id: version
-        env:
-          BRANCH_NAME: ${{ github.ref_name }}
-          RUN_NUMBER: ${{ github.run_number }}
+        # GITHUB_REF_NAME and GITHUB_RUN_NUMBER, which `writeVersion` reads, are set by Actions.
         run: |
           set -euo pipefail
           ./gradlew writeVersion --stacktrace --parallel --console plain
 
           # What Gradle tags the Docker images with.
           BASE_VERSION="$(cat build/version.txt)"
-          VERSION="$BASE_VERSION"
 
-          # Every build on a release branch is a release candidate: this workflow no longer
-          # produces a release version at all. `release.yml` publishes an rc build under its base
-          # version, which is where `5.0.42` comes from now (#1672).
+          # What the images are pushed to GHCR as, and the build registered under. Every build
+          # on main, on a release branch and on the next-major branch is a release candidate:
+          # this workflow no longer produces a release version at all. `release.yml` publishes an
+          # rc build under its base version, which is where `6.0.1` comes from now (#1672).
           #
-          # `release/*` is a patch branch for the previous minor (#1702): its builds go through
-          # the same pipeline and are published by release.yml just as main's are, so their GHCR
-          # tags need the same `-rc-<run>` suffix to keep from colliding with a published version.
-          # See doc/dev-guide/patch-release.md.
-          #
-          # `v<major>` is the development branch of the next major - a second `main`, with its own
-          # VERSION file, its own promotion chain and its own environment - so it produces release
-          # candidates just as main does. See doc/dev-guide/major-branch.md. Two patterns rather
-          # than a regex because `case` globs cannot express `v[0-9]+`; `v7-spring-boot-5` is a
-          # feature branch and deliberately matches neither, exactly as in `VersionCalculator`.
-          case "$BRANCH_NAME" in
-            main|release/*|v[0-9]|v[0-9][0-9]) VERSION="${BASE_VERSION}-rc-${RUN_NUMBER}" ;;
-          esac
+          # `writeVersion` decides it, from the branch and GITHUB_RUN_NUMBER, so that the
+          # candidate shape is unit tested with the others (VersionCalculatorTest): `rc.<run>`
+          # appended as SemVer identifiers - `6.0.1-rc.700`, `6.0.0-beta.6.rc.700` - so that the
+          # run number compares as a number (#2068, docs/adr/0020). `release/*` is a patch branch
+          # for the previous minor (#1702) and `v<major>` the development branch of the next
+          # major: both produce candidates exactly as main does, so that their GHCR tags never
+          # collide with a published version. A feature branch version is already unique, and
+          # is its own candidate. See doc/dev-guide/patch-release.md and major-branch.md.
+          VERSION="$(cat build/candidate-version.txt)"
 
           echo "base_version=$BASE_VERSION" >> "$GITHUB_OUTPUT"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
@@ -594,7 +588,7 @@ jobs:
           # deployed to an environment at all.
           #
           # This never collides across branches: on main, release/* and the next-major branch the
-          # version carries the `-rc-<run_number>` suffix, on a release run it is the release
+          # version carries the `rc.<run_number>` identifiers, on a release run it is the release
           # itself, and on a feature branch VersionCalculator already appends the branch name and
           # short commit.
           docker tag "nemerosa/ontrack:$BASE_VERSION" "$GHCR_ONTRACK:$VERSION"

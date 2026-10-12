@@ -237,8 +237,8 @@ build_json() {
 }
 
 {
-    echo "$c1 $(build_json b-1 6.0.0-rc-1)"
-    echo "$c3 $(build_json b-3 6.0.0-rc-3)"
+    echo "$c1 $(build_json b-1 6.0-beta.6-rc-1)"
+    echo "$c3 $(build_json b-3 6.0.0-beta.7.rc.3)"
 } > "$WORK/builds.txt"
 run_script resolve yontrack main "$REPO"
 assert_eq "0" "$script_status" "the head has a build: $out"
@@ -247,11 +247,11 @@ assert_contains "$calls" "build search --project yontrack --branch main --commit
 assert_eq "1" "$(grep -c . <<< "$calls")" "the head only"
 assert_eq "commit=$c3
 build=b-3
-version=6.0.0-rc-3" "$(cat "$WORK/github-output.txt")" "the head's build, as step outputs"
+version=6.0.0-beta.7.rc.3" "$(cat "$WORK/github-output.txt")" "the head's build, as step outputs"
 assert_not_contains "$out" "::notice" "nothing to notice"
 
 # The head is a [skip ci] commit, with no build of its own.
-echo "$c1 $(build_json b-1 6.0.0-rc-1)" > "$WORK/builds.txt"
+echo "$c1 $(build_json b-1 6.0-beta.6-rc-1)" > "$WORK/builds.txt"
 run_script resolve yontrack main "$REPO"
 assert_eq "0" "$script_status" "an older commit with a build will do"
 assert_eq "$c3 $c2 $c1" "$(sed -e 's/.*--commit //' -e 's/ .*//' <<< "$calls" | tr '\n' ' ' | sed 's/ $//')" \

@@ -19,11 +19,11 @@ on:
   workflow_dispatch:
     inputs:
       # Two versions, because at the moment release notes are written these differ. A build
-      # holds `5.3.0-rc-41` from BRONZE and is rewritten to `5.3.0` only at GOLD, and the notes
+      # holds `6.0.1-rc.41` from BRONZE and is rewritten to `6.0.1` only at GOLD, and the notes
       # are authored *before* GOLD is granted. So the demo answers with the rc version while the
       # wiki page - and therefore the images - must be named for the base version.
       version:
-        description: 'Version the demo is running, and must report (e.g. 5.3.0-rc-41)'
+        description: 'Version the demo is running, and must report (e.g. 6.0.1-rc.41)'
         required: true
         type: string
       release:

@@ -79,7 +79,10 @@ functional one.
 
 **The version is derived by stripping a suffix.** `release.yml` computes the
 published version as the display name with a trailing `-rc-<digits>` removed, and
-refuses anything that is not then three dot-separated numbers. A build with no
+refuses anything that is not then three dot-separated numbers. Since #2068 the
+candidate suffix is `rc.<run>` — `6.0.1-rc.700`, `6.0.0-beta.7.rc.700` — and a
+pre-release is a version too: see
+[ADR 0020](0020-every-build-version-is-semantic.md). A build with no
 `release` property has its own name as its display name, and that guard is what
 stops a timestamp being published as a version.
 

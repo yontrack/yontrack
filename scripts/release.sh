@@ -28,7 +28,7 @@
 #   YONTRACK_URL           Yontrack instance
 #   YONTRACK_TOKEN         API token on it
 #   RELEASE_BUILD_VERSION  version the GOLD promotion named, i.e. the build's display name
-#                          at that point (`5.3.0-rc-100`)
+#                          at that point (`6.0.1-rc.700`, `6.0.0-beta.7.rc.700`)
 #   RELEASE_VERSION        version to publish under; defaults to the base version
 #   RELEASE_PROJECT        Yontrack project (default: yontrack)
 #   RELEASE_BRANCH         Yontrack branch (default: main)
@@ -69,30 +69,36 @@ rel_summary() { [ -n "${GITHUB_STEP_SUMMARY:-}" ] && echo "$1" >> "$GITHUB_STEP_
 # Version
 # ---------------------------------------------------------------------------------------------
 
-# The version an rc version is a candidate for: `5.3.0-rc-100` -> `5.3.0`.
+# The version an rc version is a candidate for: `6.0.1-rc.700` -> `6.0.1`,
+# `6.0.0-beta.7.rc.700` -> `6.0.0-beta.7`, and in the legacy shape still built by release/5.5,
+# `5.5.9-rc-41` -> `5.5.9` (see docs/adr/0020).
 #
 # This one line is the build-identity decision made concrete (see docs/adr/0006). Nothing is
 # rebuilt for a release, so what ships is the rc build, published under the version its
 # artefacts are named for.
 #
-# Only a trailing `-rc-<digits>` is stripped. A feature-branch version carries the branch name
-# and a short commit, and turning that into something that merely looks releasable is the
-# accident rel_check_unpublished exists to catch - so it is left alone here and rejected by
-# rel_valid_version below.
+# Only a trailing `-rc.<digits>`, `.rc.<digits>` or legacy `-rc-<digits>` is stripped. A
+# feature-branch version carries the branch name and a short commit, and turning that into
+# something that merely looks releasable is the accident rel_check_unpublished exists to catch -
+# so it is left alone here and rejected by rel_valid_version below.
 rel_base_version() {
-    printf '%s' "$1" | sed -E 's/-rc-[0-9]+$//'
+    printf '%s' "$1" | sed -E 's/([-.]rc\.|-rc-)[0-9]+$//'
 }
 
 # A version as five numbers to compare field by field: major, minor, patch, stage, stage number.
-# The stage is 0 for alpha, 1 for beta and 2 for a GA, which puts `6.0-alpha.N` < `6.0-beta.M` <
-# `6.0.0`, and a pre-release's patch is 0, which puts `6.0.1` above `6.0-beta.M` and `5.5.7` below
-# `6.0-alpha.0`. Fails on anything that is not a version.
+# The stage is 0 for alpha, 1 for beta and 2 for a GA, which puts `6.0.0-alpha.N` <
+# `6.0.0-beta.M` < `6.0.0`. Three shapes: a GA `X.Y.Z`, a pre-release `X.Y.Z-(alpha|beta).N`, and
+# the legacy pre-release `X.Y-(alpha|beta).N`, published up to `6.0-beta.6` and never renamed,
+# whose patch is 0 - so `6.0-beta.6` < `6.0.0-beta.7`, `6.0.1` is above `6.0-beta.M` and `5.5.7`
+# below `6.0-alpha.0`. Fails on anything that is not a version.
 rel_version_key() {
-    local v="$1"
+    local v="$1" stage=0
     if [[ "$v" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
         echo "${BASH_REMATCH[1]} ${BASH_REMATCH[2]} ${BASH_REMATCH[3]} 2 0"
+    elif [[ "$v" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)-(alpha|beta)\.([0-9]+)$ ]]; then
+        [ "${BASH_REMATCH[4]}" = "beta" ] && stage=1
+        echo "${BASH_REMATCH[1]} ${BASH_REMATCH[2]} ${BASH_REMATCH[3]} $stage ${BASH_REMATCH[5]}"
     elif [[ "$v" =~ ^([0-9]+)\.([0-9]+)-(alpha|beta)\.([0-9]+)$ ]]; then
-        local stage=0
         [ "${BASH_REMATCH[3]}" = "beta" ] && stage=1
         echo "${BASH_REMATCH[1]} ${BASH_REMATCH[2]} 0 $stage ${BASH_REMATCH[4]}"
     else
@@ -107,13 +113,19 @@ rel_valid_version() {
     rel_version_key "$1" > /dev/null
 }
 
-# A pre-release: `X.Y-alpha.N` or `X.Y-beta.N`, what `VersionCalculator` builds from a `VERSION`
-# of `X.Y-alpha` or `X.Y-beta` (#1987). Published like a release, but as a GitHub pre-release,
-# never Latest, with no wiki page - and so never granted RELEASE, see `rel_wiki`.
+# A pre-release: `X.Y.0-alpha.N` or `X.Y.0-beta.N`, what `VersionCalculator` builds from a
+# `VERSION` of `X.Y-alpha` or `X.Y-beta` (#2068), or the legacy `X.Y-alpha.N` and `X.Y-beta.N` it
+# built before (#1987). Published like a release, but as a GitHub pre-release, never Latest, with
+# no wiki page - and so never granted RELEASE, see `rel_wiki`.
 rel_is_prerelease() {
     local key
     key="$(rel_version_key "$1")" || return 1
     [ "$(echo "$key" | cut -d' ' -f4)" != 2 ]
+}
+
+# The `X Y` of a version in `rel_valid_version`'s sense.
+rel_major_minor() {
+    rel_version_key "$1" | cut -d' ' -f1,2
 }
 
 # Whether $1 is strictly greater than $2, both versions in `rel_valid_version`'s sense.
@@ -121,7 +133,7 @@ rel_is_prerelease() {
 # Field by field as numbers, rather than `sort -V`: the release runs on ubuntu-latest, but
 # release-test.sh is run by hand on a developer machine too, and BSD `sort -V` is not GNU's. The
 # comparison that matters either way is 5.3.10 against 5.3.9, which any string ordering gets
-# backwards - and `6.0-beta.0` against `6.0.0`, which `sort -V` gets backwards too.
+# backwards - and `6.0.0-beta.0` against `6.0.0`, which `sort -V` gets backwards too.
 rel_version_gt() {
     local i ak bk
     local -a af bf
@@ -137,7 +149,7 @@ rel_version_gt() {
 }
 
 # Every released version, pre-releases included, from the git tags. `rel_valid_version`'s shape,
-# and nothing else: the repository also carries `experimental-pipeline-<sha>` tags and `-rc-`
+# and nothing else: the repository also carries `experimental-pipeline-<sha>` tags and `rc`
 # candidates, and neither is a release.
 rel_version_tags() {
     rel_git_tags | while read -r tag; do
@@ -176,8 +188,8 @@ rel_is_latest() {
 #
 # A GA starts at the highest GA below it: pre-releases are ignored, so 6.0.0 starts at 5.5.7 and
 # its notes cover the whole of 6.0. A pre-release starts at the previous pre-release of its own
-# X.Y, alpha or beta, or at the highest GA below it when it is the first: `6.0-alpha.0` starts at
-# 5.5.7, `6.0-beta.0` at the last alpha.
+# X.Y, alpha or beta, legacy shape or not, or at the highest GA below it when it is the first:
+# `6.0-alpha.0` starts at 5.5.7, `6.0-beta.0` at the last alpha, `6.0.0-beta.7` at `6.0-beta.6`.
 rel_previous_version() {
     local version="$1" tag best="" best_pre=""
     while read -r tag; do
@@ -185,8 +197,9 @@ rel_previous_version() {
         rel_version_gt "$version" "$tag" || continue
         if rel_is_prerelease "$tag"; then
             rel_is_prerelease "$version" || continue
-            # Same X.Y: what comes before the stage, `6.0` in `6.0-alpha.1`.
-            [ "${tag%%-*}" = "${version%%-*}" ] || continue
+            # Same X.Y, from the key: what precedes the first hyphen is `6.0` in the legacy
+            # `6.0-beta.5` and `6.0.0` in `6.0.0-beta.6`.
+            [ "$(rel_major_minor "$tag")" = "$(rel_major_minor "$version")" ] || continue
             if [ -z "$best_pre" ] || rel_version_gt "$tag" "$best_pre"; then
                 best_pre="$tag"
             fi

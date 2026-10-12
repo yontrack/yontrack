@@ -287,7 +287,7 @@ configuration:
         # constraint, not a side effect (#1673). On a release branch SILVER does not require
         # DEMO.SMOKE - see the SILVER comment above - so a patch is gated on GOLD alone (#1702).
         #
-        # A pre-release - `6.0-alpha.N`, `6.0-beta.N` - is NEVER granted RELEASE (#1987). GOLD
+        # A pre-release - `6.0.0-alpha.N`, `6.0.0-beta.N` - is NEVER granted RELEASE (#1987). GOLD
         # publishes it, and release.yml stamps DOCKER.HUB, DOCUMENTATION and GITHUB.RELEASE, but
         # not WIKI: a pre-release has no wiki page, and `scripts/release.sh wiki` says so with
         # `report=false`. Missing WIKI is what keeps every RELEASE side effect away from it - the
@@ -343,7 +343,7 @@ configuration:
                       # Which Yontrack branch holds the build. `release.yml` resolves the version
                       # back to a build by display name in `<project>/<branch>`, and its `branch`
                       # input defaults to `main` - so without this a patch would be looked up on
-                      # main and fail with "No build named 5.3.2-rc-N in yontrack/main" (#1702).
+                      # main and fail with "No build named 5.3.2-rc.N in yontrack/main" (#1702).
                       #
                       # It yields `main` on main. On a release branch it was expected to yield the
                       # escaped Yontrack name, `release-5.3`, but the first patch release (5.4.2)
@@ -506,7 +506,7 @@ configuration:
                           targetPropertyType: "yaml-path"
                           targetProperty: "image.tag"
                           # The build NAME is a timestamp-run pair (20260901055547-36), never
-                          # a tag. The rc version - 5.3.0-rc-36 on main - IS the durable GHCR tag
+                          # a tag. The rc version - 6.0.1-rc.36 on main - IS the durable GHCR tag
                           # pushed by #1661, and ci.yml records it on every build twice: as the
                           # `release` property and as the `rc-version` meta-info item.
                           #
@@ -651,13 +651,13 @@ configuration:
       # Keeps the public release announcement off feature branches, whose versions carry a branch
       # name and a short commit.
       #
-      # The `-rc-<run>` alternative is load-bearing since #1673: `EnvironmentRegexCondition` uses
+      # The `-rc.<run>` alternative is load-bearing since #1673: `EnvironmentRegexCondition` uses
       # `Regex.matches()`, a FULL match, and `ci.yml` no longer produces a bare `5.3.0` for any
       # build at all - every build on main and release/* is a candidate now, and the release is
       # published from one of them by release.yml. Without the alternative this block matches
       # nothing, and the `#releases` subscription below silently stops being configured.
       #
-      # A pre-release candidate, `6.0-alpha.N-rc-<run>`, does not match, and that is intended: a
+      # A pre-release candidate, `6.0.0-alpha.N.rc.<run>`, does not match, and that is intended: a
       # pre-release is not announced on `#releases`, and has no wiki page to link (#1987). It is
       # not what keeps the announcement away, though. CI never removes a subscription, so the one
       # the last 5.x build created on `main` is still there during the 6.0 alphas; what keeps it
@@ -666,13 +666,13 @@ configuration:
           - name: environment-regex
             config:
               name: VERSION
-              regex: '\d+\.\d+\.\d+(-rc-\d+)?'
+              regex: '\d+\.\d+\.\d+(-rc\.\d+)?'
         branch:
           notificationsConfig:
             notifications:
             # The wiki link uses `${build.release}`, not `${build}`: the latter renders a link to the
             # build, and the page is named for the bare version. By RELEASE the property has been
-            # rewritten from `5.3.0-rc-41` to `5.3.0` at GOLD, and the WIKI stamp that RELEASE
+            # rewritten from `6.0.1-rc.41` to `6.0.1` at GOLD, and the WIKI stamp that RELEASE
             # requires has checked that `Release-5.3.0` exists - the same URL release.sh puts in
             # the GitHub release.
             - name: On RELEASE

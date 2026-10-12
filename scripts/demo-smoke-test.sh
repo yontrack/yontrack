@@ -129,7 +129,7 @@ export PATH
 DEMO_TOKEN="a-token"
 export DEMO_TOKEN
 
-# Resets the stub to a healthy default: the demo reports 5.3.0-rc-100 and the seeded
+# Resets the stub to a healthy default: the demo reports 5.3.0-rc.100 and the seeded
 # project answers with a branch and a build.
 setup_stub() {
     DSM_STUB_DIR="$(mktemp -d "$STUB_ROOT/case.XXXXXX")" || { echo "FATAL: mktemp failed" >&2; exit 1; }
@@ -137,7 +137,7 @@ setup_stub() {
     : > "$DSM_STUB_DIR/calls.log"
 
     cat > "$DSM_STUB_DIR/info.json" <<'JSON'
-{"data":{"info":{"version":{"full":"5.3.0-rc-100"}}}}
+{"data":{"info":{"version":{"full":"5.3.0-rc.100"}}}}
 JSON
 
     cat > "$DSM_STUB_DIR/projects.json" <<'JSON'
@@ -149,7 +149,7 @@ JSON
 JSON
 
     cat > "$DSM_STUB_DIR/build.json" <<'JSON'
-{"Id":"100","Name":"20260901055547-100","DisplayName":"5.3.0-rc-100"}
+{"Id":"100","Name":"20260901055547-100","DisplayName":"5.3.0-rc.100"}
 JSON
 
     cat > "$DSM_STUB_DIR/reload-casc.json" <<'JSON'
@@ -175,7 +175,7 @@ dsm_sleep() { DSM_TEST_NOW=$(( DSM_TEST_NOW + $1 )); }
 # --- dsm_version -------------------------------------------------------------
 
 setup_stub
-assert_eq "5.3.0-rc-100" "$(dsm_version)" "dsm_version reads the full version out of the payload"
+assert_eq "5.3.0-rc.100" "$(dsm_version)" "dsm_version reads the full version out of the payload"
 assert_contains "$(calls)" "https://demo.dev.yontrack.com/graphql" \
     "dsm_version asks the demo's GraphQL endpoint"
 
@@ -213,23 +213,23 @@ DSM_TEST_NOW=0
 DSM_TIMEOUT=600
 # shellcheck disable=SC2034
 DSM_INTERVAL=15
-out="$(dsm_wait_for_version 5.3.0-rc-100 2>&1)"; rc=$?
+out="$(dsm_wait_for_version 5.3.0-rc.100 2>&1)"; rc=$?
 assert_eq "0" "$rc" "dsm_wait_for_version succeeds when the demo already runs the version"
 assert_contains "$out" "after 1 attempt" "dsm_wait_for_version stops at the first match"
 
 setup_stub
 DSM_TEST_NOW=0
-out="$(dsm_wait_for_version 5.3.0-rc-101 2>&1)"; rc=$?
+out="$(dsm_wait_for_version 5.3.0-rc.101 2>&1)"; rc=$?
 assert_eq "1" "$rc" "dsm_wait_for_version fails when the demo keeps reporting the old version"
-assert_contains "$out" "5.3.0-rc-100" "dsm_wait_for_version says what the demo actually reports"
-assert_contains "$out" "expected 5.3.0-rc-101" "dsm_wait_for_version says what it was waiting for"
+assert_contains "$out" "5.3.0-rc.100" "dsm_wait_for_version says what the demo actually reports"
+assert_contains "$out" "expected 5.3.0-rc.101" "dsm_wait_for_version says what it was waiting for"
 
 # A demo that never comes up at all must fail the same way, not hang: this is the
 # "deliberately broken demo fails it rather than timing out silently" case.
 setup_stub
 touch "$DSM_STUB_DIR/transport_fails"
 DSM_TEST_NOW=0
-out="$(dsm_wait_for_version 5.3.0-rc-100 2>&1)"; rc=$?
+out="$(dsm_wait_for_version 5.3.0-rc.100 2>&1)"; rc=$?
 assert_eq "1" "$rc" "dsm_wait_for_version fails when the demo never answers"
 assert_contains "$out" "unreachable" "dsm_wait_for_version says the demo was unreachable"
 
@@ -237,7 +237,7 @@ assert_contains "$out" "unreachable" "dsm_wait_for_version says the demo was unr
 setup_stub
 DSM_TEST_NOW=0
 DSM_TIMEOUT=0
-out="$(dsm_wait_for_version 5.3.0-rc-999 2>&1)"; rc=$?
+out="$(dsm_wait_for_version 5.3.0-rc.999 2>&1)"; rc=$?
 assert_eq "1" "$rc" "dsm_wait_for_version gives up once the deadline has passed"
 assert_eq "1" "$(grep -c graphql "$DSM_STUB_DIR/calls.log")" \
     "dsm_wait_for_version still makes one attempt when the deadline is already reached"
@@ -422,27 +422,27 @@ DSM_CASC_GROUP="DAST Project"
 # version, so the version has to be resolved back to a build before anything can be reported.
 
 setup_stub
-assert_eq "20260901055547-100" "$(dsm_resolve_build 5.3.0-rc-100)" \
+assert_eq "20260901055547-100" "$(dsm_resolve_build 5.3.0-rc.100)" \
     "dsm_resolve_build returns the build name, not the display name"
 
 # Shared with demo-deploy.sh: the display name is matched partially and case-insensitively by
 # the server, so an unanchored version would resolve to a different build.
 setup_stub
-out="$(dsm_resolve_build 5.3.0-rc-10 2>&1)"
-assert_contains "$(calls)" '--with-display-name ^5\.3\.0-rc-10$' \
+out="$(dsm_resolve_build 5.3.0-rc.10 2>&1)"
+assert_contains "$(calls)" '--with-display-name ^5\.3\.0-rc\.10$' \
     "dsm_resolve_build asks for an exact match on the display name"
 
 # A GOLD build: the release property, and with it the display name, became the base version
 # when release.yml published it. The rc version the slot deployed is still on the build, as its
 # `rc-version` meta-info item, which nothing renames (#1999).
 setup_stub
-echo '{"Id":"562","Name":"20261005092915-562","DisplayName":"6.0-alpha.0"}' > "$DSM_STUB_DIR/rc-build.json"
+echo '{"Id":"562","Name":"20261005092915-562","DisplayName":"6.0.0-beta.7"}' > "$DSM_STUB_DIR/rc-build.json"
 touch "$DSM_STUB_DIR/display_search_empty"
-out="$(dsm_resolve_build 6.0-alpha.0-rc-562 2>&1)"; rc=$?
+out="$(dsm_resolve_build 6.0.0-beta.7.rc.562 2>&1)"; rc=$?
 assert_eq "0" "$rc" "dsm_resolve_build finds a GOLD build by its rc version"
 assert_eq "20261005092915-562" "$out" "dsm_resolve_build returns the GOLD build's name"
 assert_contains "$(calls)" \
-    '--with-property net.nemerosa.ontrack.extension.general.MetaInfoPropertyType --with-property-value rc-version:6.0-alpha.0-rc-562' \
+    '--with-property net.nemerosa.ontrack.extension.general.MetaInfoPropertyType --with-property-value rc-version:6.0.0-beta.7.rc.562' \
     "dsm_resolve_build looks the rc version up in the build's meta-info"
 assert_not_contains "$(calls)" "--with-display-name" \
     "dsm_resolve_build does not fall back once the meta-info has answered"
@@ -450,25 +450,32 @@ assert_not_contains "$(calls)" "--with-display-name" \
 # A build registered before CI recorded the meta-info item: its display name is still the rc
 # version, unless it went GOLD since.
 setup_stub
-out="$(dsm_resolve_build 5.3.0-rc-100 2>&1)"; rc=$?
+out="$(dsm_resolve_build 5.3.0-rc.100 2>&1)"; rc=$?
 assert_eq "0" "$rc" "dsm_resolve_build falls back to the display name without the meta-info"
-assert_contains "$(calls)" '--with-display-name ^5\.3\.0-rc-100$' \
+assert_contains "$(calls)" '--with-display-name ^5\.3\.0-rc\.100$' \
     "dsm_resolve_build falls back to an exact display name match"
+
+# A build CI registered before #2068 keeps the legacy candidate shape, and is found the same way.
+setup_stub
+out="$(dsm_resolve_build 5.5.8-rc-41 2>&1)"; rc=$?
+assert_eq "0" "$rc" "dsm_resolve_build finds a build with a legacy candidate version"
+assert_contains "$(calls)" '--with-display-name ^5\.5\.8-rc-41$' \
+    "dsm_resolve_build asks for an exact match on a legacy candidate version"
 
 setup_stub
 touch "$DSM_STUB_DIR/search_empty"
-out="$(dsm_resolve_build 5.3.0-rc-999 2>&1)"; rc=$?
+out="$(dsm_resolve_build 5.3.0-rc.999 2>&1)"; rc=$?
 assert_eq "1" "$rc" "dsm_resolve_build fails when the version names no build"
-assert_contains "$out" "5.3.0-rc-999" "dsm_resolve_build names the version it looked for"
+assert_contains "$out" "5.3.0-rc.999" "dsm_resolve_build names the version it looked for"
 
 setup_stub
 touch "$DSM_STUB_DIR/search_fails"
-out="$(dsm_resolve_build 5.3.0-rc-100 2>&1)"; rc=$?
+out="$(dsm_resolve_build 5.3.0-rc.100 2>&1)"; rc=$?
 assert_eq "1" "$rc" "dsm_resolve_build fails when Yontrack cannot be reached"
 
 setup_stub
 echo '{"unexpected":"shape"}' > "$DSM_STUB_DIR/build.json"
-out="$(dsm_resolve_build 5.3.0-rc-100 2>&1)"; rc=$?
+out="$(dsm_resolve_build 5.3.0-rc.100 2>&1)"; rc=$?
 assert_eq "1" "$rc" "dsm_resolve_build fails rather than validating something unnamed"
 
 # --- yontrack_record_rc_version ---------------------------------------------
@@ -476,11 +483,11 @@ assert_eq "1" "$rc" "dsm_resolve_build fails rather than validating something un
 # What ci.yml records is what the lookup above, and the demo slot in .yontrack/ci.yaml, read:
 # the same item name, appended to the build's other meta-info rather than replacing it.
 setup_stub
-out="$(yontrack_record_rc_version 562 6.0-alpha.0-rc-562 2>&1)"; rc=$?
+out="$(yontrack_record_rc_version 562 6.0.0-beta.7.rc.562 2>&1)"; rc=$?
 assert_eq "0" "$rc" "yontrack_record_rc_version passes when the mutation does"
 assert_contains "$(calls)" '"id":562' "yontrack_record_rc_version targets the build by its ID"
 assert_contains "$(calls)" '"append":true' "yontrack_record_rc_version keeps the other meta-info items"
-assert_contains "$(calls)" '{"name":"rc-version","value":"6.0-alpha.0-rc-562"}' \
+assert_contains "$(calls)" '{"name":"rc-version","value":"6.0.0-beta.7.rc.562"}' \
     "yontrack_record_rc_version records the item the lookup reads"
 assert_contains "$(calls)" "--fail-on-user-errors" \
     "yontrack_record_rc_version fails when the mutation reports an error"
@@ -503,7 +510,7 @@ GITHUB_OUTPUT="$DSM_STUB_DIR/github_output"
 export GITHUB_OUTPUT
 out="$(dsm_version_command 2>&1)"; rc=$?
 assert_eq "0" "$rc" "version: passes when the demo answers"
-assert_contains "$(cat "$GITHUB_OUTPUT")" "version=5.3.0-rc-100" \
+assert_contains "$(cat "$GITHUB_OUTPUT")" "version=5.3.0-rc.100" \
     "version: hands the deployed version to the next step"
 unset GITHUB_OUTPUT
 
@@ -520,7 +527,7 @@ assert_eq "1" "$rc" "version: fails rather than handing on an empty version"
 setup_stub
 GITHUB_OUTPUT="$DSM_STUB_DIR/github_output"
 export GITHUB_OUTPUT
-out="$(DEMO_VERSION=5.3.0-rc-100 dsm_resolve 2>&1)"; rc=$?
+out="$(DEMO_VERSION=5.3.0-rc.100 dsm_resolve 2>&1)"; rc=$?
 assert_eq "0" "$rc" "resolve: passes when the version names a build"
 assert_contains "$(cat "$GITHUB_OUTPUT")" "build=20260901055547-100" \
     "resolve: hands the build name to the next step"
@@ -533,7 +540,7 @@ assert_eq "1" "$rc" "resolve: refuses to run without a version"
 
 setup_stub
 DSM_TEST_NOW=0
-out="$(DEMO_VERSION=5.3.0-rc-100 dsm_poll 2>&1)"; rc=$?
+out="$(DEMO_VERSION=5.3.0-rc.100 dsm_poll 2>&1)"; rc=$?
 assert_eq "0" "$rc" "poll: passes when the demo runs the deployed version"
 
 setup_stub
@@ -542,7 +549,7 @@ assert_eq "1" "$rc" "poll: refuses to run without a version to wait for"
 assert_not_contains "$(calls)" "graphql" "poll: asks nothing when it has no version"
 
 setup_stub
-out="$(DEMO_TOKEN='' DEMO_VERSION=5.3.0-rc-100 dsm_poll 2>&1)"; rc=$?
+out="$(DEMO_TOKEN='' DEMO_VERSION=5.3.0-rc.100 dsm_poll 2>&1)"; rc=$?
 assert_eq "1" "$rc" "poll: refuses to run without a token"
 assert_contains "$out" "DEMO_TOKEN" "poll: says which variable is missing"
 

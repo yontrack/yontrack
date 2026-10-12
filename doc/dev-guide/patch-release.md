@@ -5,8 +5,13 @@ Once `main` has moved to 5.4, a defect in 5.3 is fixed on a `release/5.3` branch
 
 The version machinery needed nothing: `VersionCalculator.computeReleaseVersion` derives the version
 from the branch name — `release/5.3` scans `git tag -l` for `5.3.<n>` and answers `5.3.2` — and
-`ci.yml` appends `-rc-<run>` on `release/*` exactly as it does on `main`. What was main-only was the
+every build on `release/*` is a candidate exactly as on `main`. What was main-only was the
 *release path*, and #1702 is what made it work from a release branch.
+
+The examples on this page are 5.x, whose candidates keep the legacy `-rc-<run>` shape: `release/5.5`
+has its own `ci.yml` and is not touched by #2068. A `release/6.*` build is a SemVer candidate,
+`6.0.2-rc.<run>` — see [Versions](release.md#versions) and
+[ADR 0020](../../docs/adr/0020-every-build-version-is-semantic.md).
 
 ## The rules
 

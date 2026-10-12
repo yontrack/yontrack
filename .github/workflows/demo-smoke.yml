@@ -36,7 +36,7 @@ on:
         default: manual
         type: string
       version:
-        description: 'Version deployed (e.g. 5.3.0-rc-41), which the instance must report'
+        description: 'Version deployed (e.g. 6.0.1-rc.41), which the instance must report'
         required: true
         type: string
       # The instance to verify. Everything that is per-instance - URL, API token, UI

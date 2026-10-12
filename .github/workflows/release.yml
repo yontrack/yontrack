@@ -20,11 +20,11 @@ name: Release
 # stubbed clients. Most of that logic is about refusing to run, which is the part worth testing:
 # publishing is the one step in this pipeline that cannot be undone.
 #
-# A pre-release - `6.0-alpha.N`, `6.0-beta.N` - goes through here too (#1987). It is published to
-# Docker Hub, S3 and GitHub like any release, but the GitHub release is marked as a pre-release
-# and never Latest, and it has no wiki page. WIKI is therefore not reported for it, so RELEASE is
-# never granted, and nothing keyed off RELEASE fires: see the RELEASE comments in
-# .yontrack/ci.yaml.
+# A pre-release - `6.0.0-alpha.N`, `6.0.0-beta.N`, or the legacy `6.0-beta.N` - goes through
+# here too (#1987, #2068). It is published to Docker Hub, S3 and GitHub like any release, but
+# the GitHub release is marked as a pre-release and never Latest, and it has no wiki page. WIKI
+# is therefore not reported for it, so RELEASE is never granted, and nothing keyed off RELEASE
+# fires: see the RELEASE comments in .yontrack/ci.yaml.
 
 on:
   workflow_dispatch:
@@ -40,7 +40,7 @@ on:
         default: manual
         type: string
       version:
-        description: 'Version being released, as the build shows it (e.g. 5.3.0-rc-100)'
+        description: 'Version being released, as the build shows it (e.g. 6.0.1-rc.100)'
         required: true
         type: string
       release_version:
@@ -56,7 +56,7 @@ on:
       # name: `main` for a normal release, `release-5.3` - the escaped form of the SCM branch
       # `release/5.3` - for a patch. `resolve` looks the build up by display name in
       # `<project>/<branch>`, so a patch resolved against the default would fail with
-      # "No build named 5.3.2-rc-N in yontrack/main" (#1702).
+      # "No build named 5.3.2-rc.N in yontrack/main" (#1702).
       branch:
         description: 'Yontrack branch holding the build (e.g. main, release-5.3)'
         required: false
@@ -378,15 +378,15 @@ jobs:
       # ------------------------------------------------------------------------------------
 
       # The build *name* never changes - it is an opaque timestamp-run pair. What changes is the
-      # display name, which is the `release` property: `5.3.0-rc-100` until here, `5.3.0` from
+      # display name, which is the `release` property: `6.0.1-rc.100` until here, `6.0.1` from
       # now on, matching every artefact just published. See docs/adr/0006.
       #
       # This sits *before* `Validate GITHUB.RELEASE` and not after, which matters more than it
       # looks. That stamp is the last of the four RELEASE needs, so auto-promotion grants RELEASE
       # synchronously on it - and everything keyed off RELEASE then reads the display name as it
       # is at that instant. Rewriting afterwards would have the `#internal-releases` message
-      # announce `5.3.0-rc-100`, and would have the self slot auto-version `image.tag` to
-      # `5.3.0-rc-100` from `${build.release}` - a tag that exists on GHCR and never on Docker
+      # announce `6.0.1-rc.100`, and would have the self slot auto-version `image.tag` to
+      # `6.0.1-rc.100` from `${build.release}` - a tag that exists on GHCR and never on Docker
       # Hub, which is where self pulls from.
       #
       # It is still after every publication step: the artefacts have to exist under the version

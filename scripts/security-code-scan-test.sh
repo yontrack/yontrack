@@ -253,7 +253,7 @@ case "${answers[$index]}" in
 {
   "Id": "4242",
   "Name": "1234",
-  "DisplayName": "5.3.0-rc-1234",
+  "DisplayName": "6.0.0-beta.7.rc.1234",
   "Branch": {
     "Id": "12",
     "Name": "main",

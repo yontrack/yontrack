@@ -702,12 +702,15 @@ assert_eq "0" "$rc" "body: survives a git log that fails too"
 assert_contains "$body" "No changelog available" "body: falls all the way back to the notice"
 
 # ===========================================================================
-# Pre-releases: `X.Y-alpha.N` and `X.Y-beta.N`
+# Pre-releases, legacy shape: `X.Y-alpha.N` and `X.Y-beta.N`
 # ===========================================================================
 
-# A `VERSION` of `6.0-alpha` builds as `6.0-alpha.N`, which CI turns into `6.0-alpha.N-rc-<run>`
-# (#1987). It goes through GOLD like any other release, with three differences: GitHub marks it as
-# a pre-release and never as Latest, its notes start at the previous pre-release, and it has no
+# The legacy shape, published up to `6.0-beta.6` and never renamed: a `VERSION` of `6.0-alpha`
+# built as `6.0-alpha.N`, which CI turned into `6.0-alpha.N-rc-<run>` (#1987). The new shape,
+# `6.0.0-alpha.N`, is tested in the next section; both must keep working.
+#
+# A pre-release goes through GOLD like any other release, with three differences: GitHub marks it
+# as a pre-release and never as Latest, its notes start at the previous pre-release, and it has no
 # wiki page - which, because RELEASE requires WIKI, also keeps it from being granted RELEASE.
 
 is_prerelease() { yes_no rel_is_prerelease "$1"; }
@@ -723,7 +726,6 @@ assert_eq "yes" "$(is_valid 6.0-alpha.0)" "rel_valid_version: accepts an alpha"
 assert_eq "yes" "$(is_valid 6.0-beta.3)" "rel_valid_version: accepts a beta"
 assert_eq "no" "$(is_valid 6.0-alpha)" "rel_valid_version: refuses a stage with no number"
 assert_eq "no" "$(is_valid 6.0-gamma.1)" "rel_valid_version: refuses an unknown stage"
-assert_eq "no" "$(is_valid 6.0.0-alpha.1)" "rel_valid_version: refuses a stage on a three-part version"
 assert_eq "no" "$(is_valid 6.0-alpha.0-rc-12)" "rel_valid_version: refuses a pre-release candidate"
 assert_eq "no" "$(is_valid 6.0-alpha.0-my-branch-abc1234)" "rel_valid_version: refuses a feature-branch version"
 
@@ -882,5 +884,148 @@ setup_stub
 echo "5.5.7" > "$REL_STUB_DIR/tags"
 body="$(REL_VERSION=6.0-alpha.0 REL_BUILD_ID=200 REL_SHA=abc1234def5678 rel_body 2>/dev/null)"; rc=$?
 assert_contains "$(calls)" "5.5.7..abc1234def5678" "body: the first alpha measures from the previous GA"
+
+# ===========================================================================
+# Semantic versions (#2068): `X.Y.0-stage.N`, and `rc.<run>` candidates
+# ===========================================================================
+
+# Every version main builds is SemVer 2.0.0 now: `6.0.0-beta.7`, whose candidate is
+# `6.0.0-beta.7.rc.<run>`, and `6.0.1`, whose candidate is `6.0.1-rc.<run>`. The legacy
+# pre-releases stay published under their own names, and release.yml always runs from main, so a
+# `5.5.N-rc-R` build from release/5.5 must still be released exactly as before.
+
+assert_eq "6.0.1" "$(rel_base_version 6.0.1-rc.700)" \
+    "rel_base_version strips a GA candidate's rc.<run>"
+assert_eq "6.0.0-beta.6" "$(rel_base_version 6.0.0-beta.6.rc.700)" \
+    "rel_base_version strips a pre-release candidate's rc.<run>"
+assert_eq "6.0.0-alpha.0" "$(rel_base_version 6.0.0-alpha.0.rc.12)" \
+    "rel_base_version strips an alpha candidate's rc.<run>"
+assert_eq "5.5.9" "$(rel_base_version 5.5.9-rc-41)" \
+    "rel_base_version still strips a 5.5 candidate's -rc-<run>"
+assert_eq "6.0-beta.5" "$(rel_base_version 6.0-beta.5-rc-650)" \
+    "rel_base_version still strips a legacy pre-release candidate's -rc-<run>"
+assert_eq "6.0.0-claude-foo-pipeline-abc1234" "$(rel_base_version 6.0.0-claude-foo-pipeline-abc1234)" \
+    "rel_base_version does not touch a feature-branch version in the new shape"
+assert_eq "6.0.1-rc.x" "$(rel_base_version 6.0.1-rc.x)" \
+    "rel_base_version only strips a numeric rc.<run>"
+
+assert_eq "yes" "$(is_valid 6.0.0-alpha.0)" "rel_valid_version: accepts an alpha in the new shape"
+assert_eq "yes" "$(is_valid 6.0.0-beta.6)" "rel_valid_version: accepts a beta in the new shape"
+assert_eq "no" "$(is_valid 6.0.0-beta)" "rel_valid_version: refuses a new-shape stage with no number"
+assert_eq "no" "$(is_valid 6.0.0-beta.6.rc.700)" "rel_valid_version: refuses a pre-release candidate"
+assert_eq "no" "$(is_valid 6.0.1-rc.700)" "rel_valid_version: refuses a GA candidate"
+assert_eq "no" "$(is_valid 6.0.0-claude-foo-pipeline-abc1234)" "rel_valid_version: refuses a new-shape feature-branch version"
+
+assert_eq "yes" "$(is_prerelease 6.0.0-alpha.0)" "rel_is_prerelease: a new-shape alpha is a pre-release"
+assert_eq "yes" "$(is_prerelease 6.0.0-beta.6)" "rel_is_prerelease: a new-shape beta is a pre-release"
+assert_eq "yes" "$(is_prerelease 6.0-beta.5)" "rel_is_prerelease: a legacy beta is still a pre-release"
+assert_eq "no" "$(is_prerelease 6.0.1)" "rel_is_prerelease: a patch is not a pre-release"
+
+# The legacy shape is patch 0: the numbering carries on across the switch, and so does the order.
+assert_eq "yes" "$(version_gt 6.0.0-beta.6 6.0-beta.5)" "rel_version_gt: the first new-shape beta is above the last legacy one"
+assert_eq "no" "$(version_gt 6.0-beta.6 6.0.0-beta.7)" "rel_version_gt: a legacy beta is below a later new-shape one"
+assert_eq "yes" "$(version_gt 6.0.0-beta.10 6.0.0-beta.9)" "rel_version_gt: beta 10 is greater than beta 9"
+assert_eq "yes" "$(version_gt 6.0.0-beta.0 6.0.0-alpha.9)" "rel_version_gt: a new-shape beta is above every alpha"
+assert_eq "yes" "$(version_gt 6.0.0 6.0.0-beta.9)" "rel_version_gt: the GA is above its new-shape betas"
+assert_eq "yes" "$(version_gt 6.0.1 6.0.0-beta.9)" "rel_version_gt: a patch is above the new-shape betas"
+assert_eq "yes" "$(version_gt 6.0.0-alpha.0 5.5.9)" "rel_version_gt: a new-shape alpha is above the previous minor"
+assert_eq "no" "$(version_gt 5.5.9 6.0.0-alpha.0)" "rel_version_gt: a 5.5 patch is below a new-shape alpha"
+
+# resolve: every alpha and beta is a GitHub pre-release and never Latest, legacy or not; a GA
+# never is a pre-release.
+# A fresh stub holding build $2 named $1, with the tags $3; run in this shell, not in a `$( )`,
+# so that the case sees the stub it sets up.
+stub_rc_build() {
+    setup_stub
+    [ -n "${3:-}" ] && printf '%s\n' "$3" > "$REL_STUB_DIR/tags"
+    printf '{"Id":"%s","Name":"20261012055547-%s","DisplayName":"%s"}\n' "$2" "$2" "$1" \
+        > "$REL_STUB_DIR/search.json"
+}
+TAGS_6_0="5.5.7
+5.5.8
+6.0-alpha.0
+6.0-beta.5"
+
+stub_rc_build 6.0.0-alpha.0.rc.200 200
+out="$(RELEASE_BUILD_VERSION=6.0.0-alpha.0.rc.200 rel_resolve 2>&1)"; rc=$?
+assert_eq "0" "$rc" "resolve: accepts a new-shape alpha"
+assert_contains "$(outputs)" "version=6.0.0-alpha.0" "resolve: publishes a new-shape alpha under its base version"
+assert_contains "$(outputs)" "rc_version=6.0.0-alpha.0.rc.200" "resolve: carries the new-shape rc version"
+assert_contains "$(outputs)" "prerelease=true" "resolve: a new-shape alpha is a pre-release"
+assert_contains "$(outputs)" "latest=false" "resolve: a new-shape alpha is not Latest"
+
+stub_rc_build 6.0.0-beta.6.rc.700 700 "$TAGS_6_0"
+out="$(RELEASE_BUILD_VERSION=6.0.0-beta.6.rc.700 rel_resolve 2>&1)"; rc=$?
+assert_eq "0" "$rc" "resolve: accepts the first new-shape beta after the legacy ones"
+assert_contains "$(outputs)" "version=6.0.0-beta.6" "resolve: publishes the beta under its base version"
+assert_contains "$(outputs)" "prerelease=true" "resolve: a new-shape beta is a pre-release"
+assert_contains "$(outputs)" "latest=false" "resolve: a new-shape beta is not Latest"
+
+stub_rc_build 6.0-beta.5-rc-650 650 "5.5.8"
+out="$(RELEASE_BUILD_VERSION=6.0-beta.5-rc-650 rel_resolve 2>&1)"; rc=$?
+assert_eq "0" "$rc" "resolve: still accepts a legacy beta candidate"
+assert_contains "$(outputs)" "version=6.0-beta.5" "resolve: publishes a legacy beta under its base version"
+assert_contains "$(outputs)" "prerelease=true" "resolve: a legacy beta is a pre-release"
+assert_contains "$(outputs)" "latest=false" "resolve: a legacy beta is not Latest"
+
+stub_rc_build 6.0.0-rc.900 900 "$TAGS_6_0
+6.0.0-beta.6"
+out="$(RELEASE_BUILD_VERSION=6.0.0-rc.900 rel_resolve 2>&1)"; rc=$?
+assert_eq "0" "$rc" "resolve: accepts the GA candidate"
+assert_contains "$(outputs)" "version=6.0.0" "resolve: publishes the GA under its base version"
+assert_contains "$(outputs)" "prerelease=false" "resolve: the GA is not a pre-release"
+assert_contains "$(outputs)" "latest=true" "resolve: the GA after its betas is Latest"
+
+stub_rc_build 6.0.1-rc.950 950 "$TAGS_6_0
+6.0.0-beta.6
+6.0.0"
+out="$(RELEASE_BUILD_VERSION=6.0.1-rc.950 rel_resolve 2>&1)"; rc=$?
+assert_eq "0" "$rc" "resolve: accepts a patch candidate"
+assert_contains "$(outputs)" "version=6.0.1" "resolve: publishes the patch under its base version"
+assert_contains "$(outputs)" "prerelease=false" "resolve: a patch is not a pre-release"
+assert_contains "$(outputs)" "latest=true" "resolve: the newest patch is Latest"
+
+# 5.5, unchanged: a `5.5.N-rc-R` build from release/5.5 is released as before, and is Latest only
+# while no 6.0 GA exists.
+stub_rc_build 5.5.9-rc-41 41 "$TAGS_6_0
+6.0.0-beta.6"
+out="$(RELEASE_BUILD_VERSION=5.5.9-rc-41 rel_resolve 2>&1)"; rc=$?
+assert_eq "0" "$rc" "resolve: still accepts a 5.5 candidate"
+assert_contains "$(outputs)" "version=5.5.9" "resolve: publishes a 5.5 patch under its base version"
+assert_contains "$(outputs)" "prerelease=false" "resolve: a 5.5 patch is not a pre-release"
+assert_contains "$(outputs)" "latest=true" "resolve: the new-shape betas do not keep a 5.5 patch from being Latest"
+
+stub_rc_build 5.5.9-rc-41 41 "$TAGS_6_0
+6.0.0"
+out="$(RELEASE_BUILD_VERSION=5.5.9-rc-41 rel_resolve 2>&1)"; rc=$?
+assert_eq "0" "$rc" "resolve: still accepts a 5.5 candidate after the 6.0 GA"
+assert_contains "$(outputs)" "latest=false" "resolve: a 5.5 patch after the 6.0 GA is not Latest"
+
+# The notes base: the major.minor comes from the version, not from what precedes the first
+# hyphen, which is `6.0` for a legacy pre-release and `6.0.0` for a new one.
+setup_stub
+printf '%s\n' "$TAGS_6_0" > "$REL_STUB_DIR/tags"
+assert_eq "6.0-beta.5" "$(rel_previous_version 6.0.0-beta.6)" \
+    "rel_previous_version: the first new-shape beta starts at the last legacy one"
+assert_eq "6.0-alpha.0" "$(rel_previous_version 6.0.0-beta.0)" \
+    "rel_previous_version: a new-shape stage starts at a legacy pre-release of its X.Y"
+echo "6.0.0-beta.6" >> "$REL_STUB_DIR/tags"
+assert_eq "6.0.0-beta.6" "$(rel_previous_version 6.0.0-beta.7)" \
+    "rel_previous_version: a new-shape beta starts at the previous new-shape beta"
+assert_eq "5.5.8" "$(rel_previous_version 6.0.0)" \
+    "rel_previous_version: the GA ignores its pre-releases, legacy or new"
+printf '6.0.0\n6.0.1\n' >> "$REL_STUB_DIR/tags"
+assert_eq "6.0.1" "$(rel_previous_version 6.1.0-alpha.0)" \
+    "rel_previous_version: a new-shape pre-release ignores the previous minor's pre-releases"
+assert_eq "5.5.8" "$(rel_previous_version 5.5.9)" \
+    "rel_previous_version: a 5.5 patch ignores everything above it"
+
+# body: a new-shape pre-release measures from the previous pre-release.
+setup_stub
+printf '%s\n6.0.0-beta.6\n' "$TAGS_6_0" > "$REL_STUB_DIR/tags"
+body="$(REL_VERSION=6.0.0-beta.7 REL_BUILD_ID=720 REL_SHA=abc1234def5678 rel_body 2>/dev/null)"; rc=$?
+assert_eq "0" "$rc" "body: succeeds for a new-shape pre-release"
+assert_not_contains "$body" "wiki/Release-" "body: a new-shape pre-release links no wiki page"
+assert_contains "$(calls)" "6.0.0-beta.6..abc1234def5678" "body: measures from the previous new-shape beta"
 
 report_tests

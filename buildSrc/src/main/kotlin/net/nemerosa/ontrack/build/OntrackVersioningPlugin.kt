@@ -16,9 +16,10 @@ class OntrackVersioningPlugin : Plugin<Project> {
     }
 
     override fun apply(project: Project) {
-        val computed = versionCalculator(project).computeVersion()
+        val calculator = versionCalculator(project)
+        val computed = calculator.computeVersion()
         val isCI = System.getenv("CI")?.equals("true", ignoreCase = true) == true
-        val finalVersion = if (isCI) computed else "$computed-dev"
+        val finalVersion = if (isCI) computed else VersionCalculator.devVersion(computed)
         project.version = finalVersion
         project.logger.lifecycle("Computed version: $finalVersion")
 
@@ -29,6 +30,15 @@ class OntrackVersioningPlugin : Plugin<Project> {
                 versionFile.parentFile.mkdirs()
                 versionFile.writeText(project.version.toString())
                 project.logger.lifecycle("Version written to: ${versionFile.absolutePath}")
+                // What CI pushes to GHCR and registers in Yontrack: the rc version on main, a major
+                // branch and a release branch, the version itself on a feature branch. A local
+                // build is never a candidate.
+                val candidateFile = project.file("build/candidate-version.txt")
+                candidateFile.writeText(
+                    if (isCI) calculator.computeCandidateVersion(System.getenv("GITHUB_RUN_NUMBER"))
+                    else project.version.toString()
+                )
+                project.logger.lifecycle("Candidate version written to: ${candidateFile.absolutePath}")
             }
         }
     }

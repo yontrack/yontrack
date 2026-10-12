@@ -16,7 +16,7 @@ on:
   workflow_dispatch:
     inputs:
       build:
-        description: 'Build to deploy (e.g. 5.3.0-rc-41). Defaults to the latest BRONZE on main.'
+        description: 'Build to deploy (e.g. 6.0.1-rc.41). Defaults to the latest BRONZE on main.'
         required: false
         type: string
 

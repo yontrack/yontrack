@@ -98,10 +98,26 @@ exactly why the check is there.
 
 ### Versions
 
-`release.yml` publishes under the **base** version: `5.3.0-rc-100` ships as `5.3.0`. The image was
-built as `5.3.0` and displays that version (`info.version.display`, while `info.version.full` keeps
-`5.3.0-rc-100`), so it can be published under nothing else: `resolve` refuses a `release_version`
-input that differs from the base version.
+`release.yml` publishes under the **base** version: `6.0.1-rc.700` ships as `6.0.1`, and
+`6.0.0-beta.7.rc.700` as `6.0.0-beta.7`. The image was built as the base version and displays it
+(`info.version.display`, while `info.version.full` keeps the rc version), so it can be published
+under nothing else: `resolve` refuses a `release_version` input that differs from the base version.
+
+Every version CI builds is valid SemVer 2.0.0 and a valid Docker tag
+([ADR 0020](../../docs/adr/0020-every-build-version-is-semantic.md)):
+
+| Kind | Format | Example |
+|---|---|---|
+| GA release | `X.Y.Z` | `6.0.1` |
+| Pre-release | `X.Y.0-alpha.N`, `X.Y.0-beta.N` | `6.0.0-beta.7` |
+| Candidate (`main`, `release/*`, `v<N>`) | `-rc.<run>`, or `.rc.<run>` on a pre-release | `6.0.1-rc.700`, `6.0.0-beta.7.rc.700` |
+| Feature branch | `X.Y.0-<branch>-<sha>`, the branch reduced to `[0-9A-Za-z-]` and cut to 124 characters overall (128 with a local `.dev`) | `6.0.0-claude-foo-pipeline-abc1234` |
+| Local build | `-dev`, or `.dev` on a pre-release | `6.0.1-dev`, `6.0.0-beta.7.dev` |
+
+`VersionCalculator` computes all of them; `writeVersion` writes the base version to
+`build/version.txt` and the candidate to `build/candidate-version.txt`, which `ci.yml` reads. The
+legacy shapes — `6.0-alpha.0` to `6.0-beta.6`, and `5.5.N-rc-<run>` from `release/5.5` — are
+published and never renamed, and `release.sh` still accepts them.
 
 The rc version is still needed throughout: it is the GHCR tag the images are re-tagged *from*.
 
@@ -113,13 +129,14 @@ shields.io version to the previous minor. A pre-release is never Latest — see
 
 ## Pre-releases
 
-A `VERSION` of `X.Y-alpha` or `X.Y-beta` on `main` builds `X.Y-alpha.N` or `X.Y-beta.N` —
-`VersionCalculator` numbers them from the existing tags, starting at 0 — and CI turns that into the
-usual `X.Y-alpha.N-rc-<run>` candidate. A pre-release is released through `GOLD` like any other
-version, and the guards, the Docker Hub tags and the S3 docs under `release/<version>/` are the same.
-What differs:
+A `VERSION` of `X.Y-alpha` or `X.Y-beta` on `main` builds `X.Y.0-alpha.N` or `X.Y.0-beta.N` —
+`VersionCalculator` numbers them from the existing tags, starting at 0 and counting the legacy
+`X.Y-alpha.N` and `X.Y-beta.N` tags too, so `6.0-beta.6` is followed by `6.0.0-beta.7` — and CI
+turns that into the `X.Y.0-beta.N.rc.<run>` candidate. A pre-release is released through `GOLD`
+like any other version, and the guards, the Docker Hub tags and the S3 docs under
+`release/<version>/` are the same. What differs:
 
-| | GA (`6.0.0`) | Pre-release (`6.0-alpha.2`) |
+| | GA (`6.0.0`) | Pre-release (`6.0.0-beta.7`) |
 |---|---|---|
 | GitHub release | Latest when it is the highest GA | Marked as a pre-release, never Latest |
 | Wiki page | Required, checked, stamped `WIKI` | None: not checked, `WIKI` not stamped |
@@ -128,12 +145,13 @@ What differs:
 | self.dev, `#internal-releases`, `#releases` | Yes | No |
 | docs.yontrack.com | Latest when it is the highest GA | A beta is linked as `X.Y.0 Beta`; an alpha is not published |
 
-**Ordering:** `6.0-alpha.N` < `6.0-beta.M` < `6.0.0`, and `5.5.7` < `6.0-alpha.0`.
+**Ordering:** `6.0.0-alpha.N` < `6.0.0-beta.M` < `6.0.0`, and `5.5.7` < `6.0.0-alpha.0`. A legacy
+pre-release is patch 0: `6.0-beta.6` < `6.0.0-beta.7`.
 
 **Notes base:** a pre-release's git log starts at the previous pre-release of the same `X.Y` (alpha
-or beta), or at the highest GA below it when it is the first: `6.0-alpha.0` starts at `5.5.7` and
-`6.0-beta.0` at the last alpha. A GA ignores pre-releases, so `6.0.0` covers everything since
-`5.5.7`.
+or beta, legacy shape or not), or at the highest GA below it when it is the first: `6.0-alpha.0`
+started at `5.5.7`, `6.0-beta.0` at the last alpha, and `6.0.0-beta.7` starts at `6.0-beta.6`. A
+GA ignores pre-releases, so `6.0.0` covers everything since `5.5.7`.
 
 **Why no `RELEASE`:** a pre-release must not deploy to self.dev or post on Slack, and those cannot
 be filtered on the version. The self.dev slot's admission rules see branches and promotions only,
@@ -146,7 +164,7 @@ last GA released from it — rather than from its last beta.
 **The beta on docs.yontrack.com:** the site is rebuilt after every successful `release.yml`, by a
 node chained after `release` in the `GOLD` workflow of `.yontrack/ci.yaml` — not on `RELEASE`,
 which a beta never gets. The site, in `yontrack/doc.yontrack.com`, links the newest beta whose
-`DOCUMENTATION` passed as `6.0.0 Beta (6.0-beta.N)`, right after Latest. Each new beta moves the
+`DOCUMENTATION` passed as `6.0.0 Beta (6.0.0-beta.N)`, right after Latest. Each new beta moves the
 link; Latest stays the newest GA (`5.5.7`) throughout. Releasing `6.0.0` drops the link, and
 `6.0.0` becomes Latest. Alphas are never published there.
 
@@ -155,7 +173,7 @@ link; Latest stays the newest GA (`5.5.7`) throughout. Releasing `6.0.0` drops t
 1. Set `VERSION` to `X.Y-alpha` (later `X.Y-beta`, then `X.Y`) on `main` and push.
 2. Wait for the build to reach `SILVER`, as for any release.
 3. Grant `GOLD`. No wiki page is needed.
-4. `/release-milestone X.Y X.Y-alpha.N` to mark the milestone's ready issues as released in it.
+4. `/release-milestone X.Y X.Y.0-alpha.N` to mark the milestone's ready issues as released in it.
 
 `scripts/security-rescan.sh` still rescans GA releases only.
 

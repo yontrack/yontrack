@@ -54,7 +54,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to scan (e.g. 5.5.0-rc-212). Blank scans the latest BRONZE build of main.'
+        description: 'Version to scan (e.g. 6.0.1-rc.212). Blank scans the latest BRONZE build of main.'
         required: false
         type: string
 

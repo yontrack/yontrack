@@ -16,8 +16,9 @@ misread.
 
 `VersionCalculator.computeMainVersion` reads it, scans `git tag -l` for `5.4.<n>`, and answers the
 next free patch. With no `5.4.*` tag yet that is `5.4.0`, so **the first `main` build after the bump
-is `5.4.0-rc-1`** — a release candidate for a version that has never been published, which is exactly
-what it is. The `-rc-<run>` suffix comes from `ci.yml`; `ci.yml` produces no bare version at all.
+is `5.4.0-rc-<run>`** — a release candidate for a version that has never been published, which is
+exactly what it is. CI produces no bare version at all. Since #2068 the candidate of a 6.x minor is
+`6.1.0-rc.<run>`, decided by `VersionCalculator` — see [Versions](release.md#versions).
 
 The bump is Damien's call, not an agent's.
 

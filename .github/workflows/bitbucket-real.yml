@@ -51,7 +51,7 @@ on:
         default: manual
         type: string
       version:
-        description: 'Version of the build which was promoted (e.g. 5.5.0-rc-12), as the build displays it'
+        description: 'Version of the build which was promoted (e.g. 6.0.1-rc.12), as the build displays it'
         required: true
         type: string
       project:

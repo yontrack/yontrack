@@ -22,19 +22,21 @@ is deliberate, and section [Keeping it in step](#keeping-it-in-step) says why.
 
 `VersionCalculator` sends a branch matching `v<major>` down the same path as `main`
 (`computeMainVersion`): it reads the branch's own `VERSION` file, scans `git tag -l` for
-`7.0.<n>`, and answers the next free patch. With no `7.0.*` tag yet, that is `7.0.0`, and `ci.yml`
-appends the `-rc-<run>` suffix just as it does on `main`. **A `v7` build is `7.0.0-rc-<run>`.**
+`7.0.<n>`, and answers the next free patch. With no `7.0.*` tag yet, that is `7.0.0`, and every
+build is a candidate just as on `main`. **A `v7` build is `7.0.0-rc.<run>`** — or
+`7.0.0-alpha.N.rc.<run>` with a `VERSION` of `7.0-alpha` (see [Versions](release.md#versions)).
 
 That version is the `release` property on the Yontrack build, the durable GHCR tag, and what the
 slot's auto-versioning writes into the gitops repository — one identifier across the three, exactly
 as on `main`. See [ADR 0006](../../docs/adr/0006-build-identity-through-the-release.md).
 
-The match is anchored and digits-only, in `VersionCalculator` and in `ci.yml` alike:
+The match is anchored and digits-only, in `VersionCalculator`, which also decides the candidate
+that `ci.yml` reads:
 
 | Branch              | Version               |
 |---------------------|-----------------------|
-| `v7`                | `7.0.0-rc-42`         |
-| `v7-spring-boot-5`  | `7.0-v7-spring-boot-5-1a2b3c4` |
+| `v7`                | `7.0.0-rc.42`         |
+| `v7-spring-boot-5`  | `7.0.0-v7-spring-boot-5-1a2b3c4` |
 
 A branch working *towards* the next major is still a feature branch and keeps the feature version
 shape. Feature branches for next-major work are cut from a freshly fetched `origin/v7` and merged

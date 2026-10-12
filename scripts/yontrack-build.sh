@@ -10,7 +10,7 @@
 # Turns a literal into a regex matching exactly it, and nothing else.
 #
 # `--with-display-name` is matched case-insensitively and *partially* by the server, so an
-# unanchored "5.3.0-rc-4" would also match 5.3.0-rc-45 and act on the wrong build. Anchoring
+# unanchored "6.0.1-rc.4" would also match 6.0.1-rc.45 and act on the wrong build. Anchoring
 # alone is not enough either: the dots in a version are regex wildcards.
 yontrack_exact_pattern() {
     printf '^%s$' "$(printf '%s' "$1" | sed 's/[][^$.*+?(){}|\\]/\\&/g')"
@@ -32,7 +32,7 @@ yontrack_build_by_display_name() {
 }
 
 # The meta-info item holding a build's rc version: the version CI built and pushed to GHCR as,
-# `6.0-alpha.0-rc-562` on main. Unlike the `release` property, which release.yml rewrites to the
+# `6.0.0-beta.7.rc.562` on main. Unlike the `release` property, which release.yml rewrites to the
 # base version when the build goes GOLD, nothing renames it, so the demo slot deploys it and the
 # smoke test finds the build by it (#1999). .yontrack/ci.yaml reads it by this same name.
 YONTRACK_RC_VERSION_META="rc-version"
