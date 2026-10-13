@@ -16,6 +16,11 @@ paths:
   JSON schema with `/add-json-schema`.
 - Services are an interface plus an `*ServiceImpl` with constructor injection; they check
   permissions through `SecurityService` and post `EventFactory` events for cross-cutting concerns.
+- Several backend replicas run at once, always: **never** cache database data across requests
+  (`@Cacheable`, a singleton map), queue work in memory, or call `jobScheduler.schedule` outside a
+  `JobProvider` / `JobOrchestratorSupplier`. Read ADR 0021
+  (`docs/adr/0021-backend-replicas-share-no-state-in-memory.md`) before adding any state that
+  outlives a request.
 
 ## Naming
 
