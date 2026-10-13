@@ -158,6 +158,8 @@ class KdslStackTest {
                 "ontrack.acceptance.ha.a.mgt.url" to "http://localhost:19080/manage",
                 "ontrack.acceptance.ha.b.url" to "http://localhost:18281",
                 "ontrack.acceptance.ha.b.mgt.url" to "http://localhost:19081/manage",
+                // The containers of the stack, which a test kills and starts again
+                "ontrack.acceptance.ha.project" to "yontrack-kdsl-ha-feature-a",
             ),
             instance.haSystemProperties,
         )

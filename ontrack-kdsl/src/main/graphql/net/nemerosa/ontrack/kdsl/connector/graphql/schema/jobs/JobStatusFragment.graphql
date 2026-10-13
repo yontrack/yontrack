@@ -19,5 +19,12 @@ fragment JobStatusFragment on JobStatus {
     runCount
     nextRunDate
     lastRunDate
+    lastRunDurationMs
+    lastError
+    lastErrorCount
+    lastTimeoutCount
+    progressText
+    runningOn
+    runningSince
     state
 }

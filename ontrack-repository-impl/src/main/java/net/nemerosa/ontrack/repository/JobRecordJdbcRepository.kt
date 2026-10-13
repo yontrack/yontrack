@@ -4,12 +4,14 @@ import net.nemerosa.ontrack.common.Time
 import net.nemerosa.ontrack.job.JobCategory
 import net.nemerosa.ontrack.job.JobKey
 import net.nemerosa.ontrack.job.JobListener
+import net.nemerosa.ontrack.job.JobRunProgress
 import net.nemerosa.ontrack.job.JobType
 import net.nemerosa.ontrack.job.Schedule
 import net.nemerosa.ontrack.repository.support.AbstractJdbcRepository
 import org.springframework.stereotype.Repository
 import tools.jackson.databind.JsonNode
 import java.sql.ResultSet
+import java.time.LocalDateTime
 import java.util.concurrent.TimeUnit
 import javax.sql.DataSource
 
@@ -87,6 +89,73 @@ class JobRecordJdbcRepository(dataSource: DataSource) : AbstractJdbcRepository(d
         )
     }
 
+    override fun startRun(scheduler: String, key: JobKey, startedAt: LocalDateTime) {
+        namedParameterJdbcTemplate!!.update(
+            """
+                UPDATE JOBS
+                SET RUN_COUNT = RUN_COUNT + 1, LAST_RUN_DATE = :startedAt,
+                    PROGRESS_PERCENTAGE = NULL, PROGRESS_MESSAGE = NULL, STOP_REQUESTED = FALSE
+                $WHERE_KEY
+            """,
+            keyParams(scheduler, key).addValue("startedAt", Time.store(startedAt)),
+        )
+    }
+
+    override fun setProgress(scheduler: String, key: JobKey, progress: JobRunProgress) {
+        namedParameterJdbcTemplate!!.update(
+            "UPDATE JOBS SET PROGRESS_PERCENTAGE = :percentage, PROGRESS_MESSAGE = :message $WHERE_KEY",
+            keyParams(scheduler, key)
+                .addValue("percentage", progress.percentage)
+                .addValue("message", progress.message),
+        )
+    }
+
+    override fun endRun(scheduler: String, key: JobKey, durationMs: Long, error: String?, timedOut: Boolean) {
+        val sql = if (error == null) {
+            """
+                UPDATE JOBS
+                SET LAST_RUN_DURATION_MS = :duration, LAST_ERROR = NULL, ERROR_COUNT = 0, TIMEOUT_COUNT = 0,
+                    PROGRESS_PERCENTAGE = NULL, PROGRESS_MESSAGE = NULL, STOP_REQUESTED = FALSE
+                $WHERE_KEY
+            """
+        } else {
+            """
+                UPDATE JOBS
+                SET LAST_ERROR = :error, ERROR_COUNT = ERROR_COUNT + 1,
+                    TIMEOUT_COUNT = CASE WHEN :timedOut THEN TIMEOUT_COUNT ELSE 0 END,
+                    PROGRESS_PERCENTAGE = NULL, PROGRESS_MESSAGE = NULL, STOP_REQUESTED = FALSE
+                $WHERE_KEY
+            """
+        }
+        namedParameterJdbcTemplate!!.update(
+            sql,
+            keyParams(scheduler, key)
+                .addValue("duration", durationMs)
+                .addValue("error", error)
+                .addValue("timedOut", timedOut),
+        )
+    }
+
+    override fun recordTimeout(scheduler: String, key: JobKey) {
+        namedParameterJdbcTemplate!!.update(
+            "UPDATE JOBS SET TIMEOUT_COUNT = TIMEOUT_COUNT + 1 $WHERE_KEY",
+            keyParams(scheduler, key),
+        )
+    }
+
+    override fun requestStop(scheduler: String, key: JobKey) {
+        namedParameterJdbcTemplate!!.update(
+            "UPDATE JOBS SET STOP_REQUESTED = TRUE $WHERE_KEY",
+            keyParams(scheduler, key),
+        )
+    }
+
+    override fun findStopRequested(scheduler: String): List<JobKey> =
+        namedParameterJdbcTemplate!!.query(
+            "$SELECT WHERE J.SCHEDULER = :scheduler AND J.STOP_REQUESTED",
+            params("scheduler", scheduler),
+        ) { rs, _ -> toRecord(rs).key }
+
     override fun lockForReconciliation(scheduler: String) {
         // pg_advisory_xact_lock returns void: the row is read and ignored
         namedParameterJdbcTemplate!!.query(
@@ -129,23 +198,56 @@ class JobRecordJdbcRepository(dataSource: DataSource) : AbstractJdbcRepository(d
         schedule = readSchedule(readJson(rs, "SCHEDULE")),
         paused = rs.getBoolean("PAUSED"),
         nextFireTime = rs.getLong("NEXT_FIRE_TIME").takeIf { !rs.wasNull() && it > 0 }?.let { Time.from(it) },
+        runningOn = rs.getString("RUNNING_ON"),
+        runningSince = rs.getLong("RUNNING_SINCE").takeIf { !rs.wasNull() && it > 0 }?.let { Time.from(it) },
+        runCount = rs.getLong("RUN_COUNT"),
+        lastRunDate = Time.fromStorage(rs.getString("LAST_RUN_DATE")),
+        lastRunDurationMs = rs.getLong("LAST_RUN_DURATION_MS"),
+        lastError = rs.getString("LAST_ERROR"),
+        errorCount = rs.getLong("ERROR_COUNT"),
+        timeoutCount = rs.getLong("TIMEOUT_COUNT"),
+        progress = rs.getString("PROGRESS_MESSAGE")?.let { message ->
+            JobRunProgress(
+                percentage = rs.getInt("PROGRESS_PERCENTAGE").takeIf { !rs.wasNull() } ?: -1,
+                message = message,
+            )
+        },
+        stopRequested = rs.getBoolean("STOP_REQUESTED"),
     )
 
     companion object {
 
         /**
-         * Rows of the jobs with the next fire of their trigger, if any: the trigger of a job has
-         * the same name and group as the job, its group being the keys of its category and type,
-         * separated by a slash.
+         * Rows of the jobs with the next fire of their trigger, if any, and the fire of the job
+         * being executed, if any (#2079): the trigger of a job has the same name and group as the
+         * job, its group being the keys of its category and type, separated by a slash. A fire of
+         * a job is executed by one Quartz instance at a time, the job not allowing concurrent
+         * runs; Quartz removes the fires of an instance which stopped checking in.
          */
         private const val SELECT = """
-            SELECT J.*, T.NEXT_FIRE_TIME
+            SELECT J.*, T.NEXT_FIRE_TIME, F.INSTANCE_NAME AS RUNNING_ON, F.FIRED_TIME AS RUNNING_SINCE
             FROM JOBS J
             LEFT JOIN QRTZ_TRIGGERS T
                 ON T.SCHED_NAME = J.SCHEDULER
                 AND T.TRIGGER_NAME = J.JOB_KEY
                 AND T.TRIGGER_GROUP = J.JOB_CATEGORY || '/' || J.JOB_TYPE
+            LEFT JOIN LATERAL (
+                SELECT FT.INSTANCE_NAME, FT.FIRED_TIME
+                FROM QRTZ_FIRED_TRIGGERS FT
+                WHERE FT.SCHED_NAME = J.SCHEDULER
+                AND FT.JOB_NAME = J.JOB_KEY
+                AND FT.JOB_GROUP = J.JOB_CATEGORY || '/' || J.JOB_TYPE
+                AND FT.STATE = 'EXECUTING'
+                ORDER BY FT.FIRED_TIME
+                LIMIT 1
+            ) F ON TRUE
         """
+
+        /**
+         * Row of one job, by its key
+         */
+        private const val WHERE_KEY =
+            "WHERE SCHEDULER = :scheduler AND JOB_CATEGORY = :category AND JOB_TYPE = :type AND JOB_KEY = :key"
 
         /**
          * Category of the settings in which Yontrack 5 recorded the paused jobs, by the string form of

@@ -3588,6 +3588,8 @@ type JiraConfiguration {
 type JobActionResult {
   "Error message"
   error: String
+  "For launchJob: whether the job was triggered, or is already running"
+  launchStatus: JobLaunchStatus
   "Result"
   ok: Boolean!
 }
@@ -3773,6 +3775,10 @@ type JobStatus {
   progressText: String!
   "runCount field"
   runCount: Int
+  "Replica running the job, if running: its host name, the name of its pod in Kubernetes"
+  runningOn: String
+  "Start of the current run, if running"
+  runningSince: LocalDateTime
   "schedule field"
   schedule: Schedule!
   "state field"
@@ -4764,7 +4770,7 @@ type Mutation {
     "Input for the mutation"
     input: GrantGlobalRoleToAccountGroupInput
   ): GrantGlobalRoleToAccountGroupPayload
-  "Launches a job"
+  "Launches a job, unless it is already running, on any replica: launchStatus tells which"
   launchJob(id: Int!): JobActionResult!
   "Launches an existing workflow"
   launchWorkflow(
@@ -5449,7 +5455,7 @@ type Mutation {
     "Input for the mutation"
     input: StartSlotPipelineDeploymentInput
   ): StartSlotPipelineDeploymentPayload
-  "Stops a job"
+  "Stops a job, on whichever replica it runs"
   stopJob(id: Int!): JobActionResult!
   "Stopping a running workflow. Does not do anything if already stopped."
   stopWorkflow(
@@ -9903,6 +9909,16 @@ enum IngestionHookPayloadStatus {
 enum JobHistoryItemStatus {
   ERROR
   SUCCESS
+}
+
+"Answer to a request to run a job now"
+enum JobLaunchStatus {
+  "The job is already running, on this replica or another one: it is not run again"
+  ALREADY_RUNNING
+  "The job is invalid or disabled, and cannot run"
+  NOT_RUNNABLE
+  "The job runs once, now, on any replica"
+  TRIGGERED
 }
 
 "Global state of a job"

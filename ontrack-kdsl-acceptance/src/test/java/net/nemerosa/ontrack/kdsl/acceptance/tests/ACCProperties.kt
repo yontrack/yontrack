@@ -81,6 +81,12 @@ object ACCProperties {
                 val url: String by fromEnv()
             }
         }
+
+        /**
+         * Compose project of the stack, naming the containers of the backends, which a test kills
+         * and starts again (#2079)
+         */
+        val project: String? by optionalFromEnv()
     }
 
     @Target(AnnotationTarget.PROPERTY)

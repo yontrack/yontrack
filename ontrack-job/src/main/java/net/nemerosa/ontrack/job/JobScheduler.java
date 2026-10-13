@@ -16,6 +16,10 @@ import java.util.concurrent.CompletableFuture;
  * <p>
  * A job runs once per period in the cluster, on any replica. Its pause, and the pause of all the
  * jobs, are stored, and apply to every replica. Its ID is the same on every replica.
+ * <p>
+ * Its status is the same on every replica (#2079): whether it is running, on which replica and
+ * since when, from the runs Quartz is executing; its progress, last run and counters, written by the
+ * replica running it.
  */
 public interface JobScheduler {
 
@@ -68,7 +72,9 @@ public interface JobScheduler {
     boolean resume(JobKey key);
 
     /**
-     * Gets the status for a job
+     * Gets the status for a job, the same on every replica: whether it runs, on which replica and
+     * since when ({@link JobStatus#isRunning()}, {@link JobStatus#getRunningOn()},
+     * {@link JobStatus#getRunningSince()}), its last run and its last error.
      *
      * @param key Key of the job to get a status for
      * @return The job status or empty if not found.
@@ -107,12 +113,22 @@ public interface JobScheduler {
     Collection<JobStatus> getJobStatuses();
 
     /**
+     * Fires a job once, now, on any replica, without waiting for its schedule - unless it is
+     * already running, on any replica.
+     *
+     * @param jobKey Key of the job to fire immediately
+     * @return Whether the job was triggered, and if so, a future completed once the run is over. A
+     * run on another replica completes it once this replica finds the fire gone.
+     * @throws JobNotScheduledException If the job is not scheduled
+     */
+    JobLaunch launch(JobKey jobKey);
+
+    /**
      * Fires a job once, now, on any replica, without waiting for its schedule.
      *
      * @param jobKey Key of the job to fire immediately
      * @return Future completed once the run is over, or empty if the job cannot run now: invalid,
-     * disabled, or already running on this replica. A run on another replica completes it once
-     * this replica finds the fire gone.
+     * disabled, or already running on any replica. See {@link #launch(JobKey)}.
      * @throws JobNotScheduledException If the job is not scheduled
      */
     Optional<CompletableFuture<?>> fireImmediately(JobKey jobKey);
@@ -135,11 +151,12 @@ public interface JobScheduler {
     Optional<JobKey> getJobKey(long id);
 
     /**
-     * Stops a run of a job on this replica.
+     * Stops the run of a job, on whichever replica it runs: a run on this replica is interrupted at
+     * once, a run on another replica within a few seconds, by that replica.
      *
      * @param key Key of the job to stop
-     * @return <code>true</code> if the job was stopped, <code>false</code> if the job is not
-     * running on this replica.
+     * @return <code>true</code> if the job is running and its stop is requested,
+     * <code>false</code> if the job is not running.
      * @throws JobNotScheduledException If the job is not scheduled
      */
     boolean stop(JobKey key);

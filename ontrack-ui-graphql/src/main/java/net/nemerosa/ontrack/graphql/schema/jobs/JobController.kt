@@ -19,8 +19,7 @@ class JobController(
     @MutationMapping
     fun launchJob(@Argument id: Long): JobActionResult {
         return withJobKey(id) { key ->
-            val future = jobScheduler.fireImmediately(key).getOrNull()
-            JobActionResult.check(future != null, "Could not launch the job with ID = $id")
+            JobActionResult.launch(id, jobScheduler.launch(key))
         }
     }
 

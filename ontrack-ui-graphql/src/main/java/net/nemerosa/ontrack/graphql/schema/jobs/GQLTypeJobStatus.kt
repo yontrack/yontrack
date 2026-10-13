@@ -43,6 +43,8 @@ class GQLTypeJobStatus(
             .longField(JobStatus::lastErrorCount)
             .longField(JobStatus::lastTimeoutCount)
             .stringField(JobStatus::lastError)
+            .stringField(JobStatus::runningOn, "Replica running the job, if running: its host name, the name of its pod in Kubernetes")
+            .localDateTimeField(JobStatus::runningSince, "Start of the current run, if running")
             .field(JobStatus::state)
             .booleanField(JobStatus::isError)
             .booleanField(JobStatus::isTimeout)
@@ -59,7 +61,7 @@ class GQLTypeJobStatus(
                 it.canBeDeleted()
             }
             .booleanFieldFunction<JobStatus>(name = "canBeStopped", description = "Checks if the job can be stopped") {
-                it.canBeDeleted()
+                it.canBeStopped()
             }
             // Job history
             .field {

@@ -1,11 +1,11 @@
 extend type Mutation {
-    """Launches a job"""
+    """Launches a job, unless it is already running, on any replica: launchStatus tells which"""
     launchJob(id: Int!): JobActionResult!
     """Pauses a job"""
     pauseJob(id: Int!): JobActionResult!
     """Resumes a job"""
     resumeJob(id: Int!): JobActionResult!
-    """Stops a job"""
+    """Stops a job, on whichever replica it runs"""
     stopJob(id: Int!): JobActionResult!
     """Deletes a job"""
     deleteJob(id: Int!): JobActionResult!
@@ -20,6 +20,18 @@ type JobActionResult {
     ok: Boolean!
     """Error message"""
     error: String
+    """For launchJob: whether the job was triggered, or is already running"""
+    launchStatus: JobLaunchStatus
+}
+
+"""Answer to a request to run a job now"""
+enum JobLaunchStatus {
+    """The job runs once, now, on any replica"""
+    TRIGGERED
+    """The job is already running, on this replica or another one: it is not run again"""
+    ALREADY_RUNNING
+    """The job is invalid or disabled, and cannot run"""
+    NOT_RUNNABLE
 }
 
 extend type Query {

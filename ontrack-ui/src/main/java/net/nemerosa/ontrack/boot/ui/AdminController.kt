@@ -64,14 +64,14 @@ constructor(
     }
 
     /**
-     * Launches a job
+     * Launches a job, unless it is already running, on any replica
      */
     @PostMapping("jobs/{id:\\d+}")
-    fun launchJob(@PathVariable id: Long): Ack {
+    fun launchJob(@PathVariable id: Long): JobLaunchResponse {
         securityService.checkGlobalFunction(ApplicationManagement::class.java)
         return jobScheduler.getJobKey(id)
-            .map { key -> Ack.validate(jobScheduler.fireImmediately(key) != null) }
-            .orElse(Ack.NOK)
+            .map { key -> JobLaunchResponse.of(jobScheduler.launch(key)) }
+            .orElse(JobLaunchResponse(success = false, status = null, runningOn = null))
     }
 
     /**

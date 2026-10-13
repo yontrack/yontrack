@@ -18,6 +18,7 @@ export default function JobActions({job, onDone}) {
                     ${mutation}(id: $id) {
                         ok
                         error
+                        launchStatus
                     }
                 }
             `,
@@ -28,6 +29,9 @@ export default function JobActions({job, onDone}) {
             const result = data[mutation]
             if (result.ok) {
                 messageApi.success(`Job ${verb} successfully.`)
+            } else if (result.launchStatus === 'ALREADY_RUNNING') {
+                // Not an error: the job runs already, on this replica or another one
+                messageApi.info(result.error ?? 'Job is already running.')
             } else if (result.error) {
                 messageApi.error(`Job could not be ${verb}: ${result.error}`)
             } else {

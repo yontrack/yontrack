@@ -13,43 +13,43 @@ import net.nemerosa.ontrack.common.doc.MetricsMeterType
 @APIDescription("Metrics for the execution of background jobs.")
 object JobMetrics {
 
-    @APIDescription("Total number of registered background jobs.")
+    @APIDescription("Total number of registered background jobs. In the cluster, read from the database: every replica reports the same value - aggregate it with max, not sum.")
     @MetricsMeterDocumentation(
         type = MetricsMeterType.COUNT
     )
     const val ontrack_job_count_total = "ontrack_job_count_total"
 
-    @APIDescription("Total number of running background jobs.")
+    @APIDescription("Total number of running background jobs. In the cluster, read from the database: every replica reports the same value - aggregate it with max, not sum.")
     @MetricsMeterDocumentation(
         type = MetricsMeterType.COUNT
     )
     const val ontrack_job_running_total = "ontrack_job_running_total"
 
-    @APIDescription("Total number of disabled background jobs.")
+    @APIDescription("Total number of disabled background jobs. In the cluster, read from the database: every replica reports the same value - aggregate it with max, not sum.")
     @MetricsMeterDocumentation(
         type = MetricsMeterType.COUNT
     )
     const val ontrack_job_disabled_total = "ontrack_job_disabled_total"
 
-    @APIDescription("Total number of paused background jobs.")
+    @APIDescription("Total number of paused background jobs. In the cluster, read from the database: every replica reports the same value - aggregate it with max, not sum.")
     @MetricsMeterDocumentation(
         type = MetricsMeterType.COUNT
     )
     const val ontrack_job_paused_total = "ontrack_job_paused_total"
 
-    @APIDescription("Total number of invalid background jobs.")
+    @APIDescription("Total number of invalid background jobs. In the cluster, read from the database: every replica reports the same value - aggregate it with max, not sum.")
     @MetricsMeterDocumentation(
         type = MetricsMeterType.COUNT
     )
     const val ontrack_job_invalid_total = "ontrack_job_invalid_total"
 
-    @APIDescription("Total number of errored background jobs.")
+    @APIDescription("Total number of errored background jobs. In the cluster, read from the database: every replica reports the same value - aggregate it with max, not sum.")
     @MetricsMeterDocumentation(
         type = MetricsMeterType.COUNT
     )
     const val ontrack_job_error_total = "ontrack_job_error_total"
 
-    @APIDescription("Total number of timed out background jobs.")
+    @APIDescription("Total number of timed out background jobs. In the cluster, read from the database: every replica reports the same value - aggregate it with max, not sum.")
     @MetricsMeterDocumentation(
         type = MetricsMeterType.COUNT
     )

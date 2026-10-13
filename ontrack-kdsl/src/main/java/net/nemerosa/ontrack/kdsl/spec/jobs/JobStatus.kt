@@ -10,8 +10,15 @@ import java.time.LocalDateTime
  * @property category Key of the category of the job
  * @property type Key of the type of the job
  * @property key ID of the job within its type
- * @property runCount Number of runs on the replica which answered
+ * @property runCount Number of runs in the cluster
  * @property state Name of the state of the job (`IDLE`, `RUNNING`, `PAUSED`...)
+ * @property lastRunDurationMs Duration of the last successful run
+ * @property lastError Error of the last run, if it failed
+ * @property lastErrorCount Number of runs in a row which failed
+ * @property lastTimeoutCount Number of runs in a row stopped by their timeout
+ * @property progress Progress of the current run, empty if none
+ * @property runningOn Replica running the job, if running: its host name
+ * @property runningSince Start of the current run, if running
  */
 data class JobStatus(
     val id: Int,
@@ -27,6 +34,13 @@ data class JobStatus(
     val nextRunDate: LocalDateTime?,
     val lastRunDate: LocalDateTime?,
     val state: String,
+    val lastRunDurationMs: Long,
+    val lastError: String?,
+    val lastErrorCount: Long,
+    val lastTimeoutCount: Long,
+    val progress: String,
+    val runningOn: String?,
+    val runningSince: LocalDateTime?,
 )
 
 /**

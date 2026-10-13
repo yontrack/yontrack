@@ -3,7 +3,27 @@ import DurationMs from "@components/common/DurationMs";
 import TimestampText from "@components/common/TimestampText";
 
 export default function JobDetails({job}) {
-    const items = [
+    const items = []
+    if (job.runningOn) {
+        items.push(
+            {
+                key: 'runningOn',
+                label: 'Running on',
+                children: job.runningOn,
+            },
+            {
+                key: 'runningSince',
+                label: 'Running since',
+                children: <TimestampText value={job.runningSince}/>,
+            },
+            {
+                key: 'progress',
+                label: 'Progress',
+                children: job.progressText,
+            },
+        )
+    }
+    items.push(
         {
             key: 'runCount',
             label: 'Run count',
@@ -34,7 +54,14 @@ export default function JobDetails({job}) {
             label: 'Next run',
             children: <TimestampText value={job.nextRunDate}/>,
         },
-    ]
+    )
+    if (job.lastError) {
+        items.push({
+            key: 'lastError',
+            label: 'Last error',
+            children: job.lastError,
+        })
+    }
 
     return (
         <>

@@ -40,8 +40,6 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicLong
-import java.util.concurrent.atomic.AtomicReference
 import org.quartz.JobKey as QuartzJobKey
 
 /**
@@ -59,8 +57,13 @@ import org.quartz.JobKey as QuartzJobKey
  *   still unknown, the fire is skipped.
  * - The pause of a job is stored in `JOBS` and in Quartz, the pause of all the jobs is the one of
  *   Quartz: both apply to every replica and survive restarts.
- * - The running state, progress and counters of the runs are those of this replica only (#2079
- *   shares them), as are the stop of a run and the timeouts.
+ * - The status of a job is the same on every replica (#2079): whether it runs, on which replica and
+ *   since when, is read from the fires Quartz is executing, whose instance ID is the host name of
+ *   the replica, and which Quartz removes when a replica stops checking in. The progress, last run
+ *   and counters are columns of `JOBS`, written by the replica running the job.
+ * - A stop is requested in `JOBS`: each replica checks every [SWEEP_INTERVAL_MS] whether the stop
+ *   of one of its runs is requested, and interrupts it. A run is stopped by its timeout on the
+ *   replica running it.
  *
  * Every write to Quartz and to `JOBS` runs in a transaction of its own, committed on return
  * whatever the transaction of the caller, so that no trigger waits for the caller's commit, and
@@ -98,9 +101,9 @@ class QuartzJobScheduler(
     private var timer: ScheduledExecutorService? = null
 
     /**
-     * Runs and their counters, on this replica
+     * Runs on this replica
      */
-    private val runtimes = ConcurrentHashMap<JobKey, JobRuntime>()
+    private val localRuns = ConcurrentHashMap<JobKey, LocalRun>()
 
     /**
      * Fires requested by this replica, by trigger, completed when their run is over
@@ -165,6 +168,7 @@ class QuartzJobScheduler(
             val timeoutInterval = ontrackConfigProperties.jobs.timeoutControllerInterval
             scheduleWithFixedDelay(::controlTimeouts, timeoutInterval.toMillis(), timeoutInterval.toMillis(), TimeUnit.MILLISECONDS)
             scheduleWithFixedDelay(::sweepPendingFires, SWEEP_INTERVAL_MS, SWEEP_INTERVAL_MS, TimeUnit.MILLISECONDS)
+            scheduleWithFixedDelay(::controlStops, SWEEP_INTERVAL_MS, SWEEP_INTERVAL_MS, TimeUnit.MILLISECONDS)
         }
     }
 
@@ -199,6 +203,24 @@ class QuartzJobScheduler(
             logger.debug("[job] {} job(s) have been stopped because of timeout", stopped)
         } catch (any: Exception) {
             logger.error("[job] Cannot check the timeouts of the jobs", any)
+        }
+    }
+
+    /**
+     * Interrupts the runs of this replica whose stop is requested, by any replica.
+     */
+    private fun controlStops() {
+        if (localRuns.isEmpty()) return
+        try {
+            val requested = jobRecordRepository.findStopRequested(name).toSet()
+            localRuns.forEach { (key, run) ->
+                if (key in requested) {
+                    logger.info("[job]{} Stop requested - stopping the job", key)
+                    run.thread.interrupt()
+                }
+            }
+        } catch (any: Exception) {
+            logger.error("[job] Cannot check the stops of the jobs", any)
         }
     }
 
@@ -406,27 +428,55 @@ class QuartzJobScheduler(
             logger.debug("[job][run]{} Disabled, not run", key)
             return
         }
-        val runtime = runtimes.computeIfAbsent(key) { JobRuntime() }
-        runtime.running.set(RunningJob(Thread.currentThread(), System.currentTimeMillis()))
+        val run = LocalRun(Thread.currentThread(), System.currentTimeMillis())
+        localRuns[key] = run
         try {
-            monitoredRun(job, runtime).run()
+            monitoredRun(job, run).run()
         } catch (any: Exception) {
             // Already reported by the listeners
             logger.debug("[job][run]{} Failure", key, any)
         } finally {
-            runtime.running.set(null)
-            runtime.progress.set(null)
+            localRuns.remove(key, run)
             // Clears any interruption by a stop, before the thread goes back to Quartz
             Thread.interrupted()
         }
     }
 
-    private fun monitoredRun(job: Job, runtime: JobRuntime): Runnable {
+    /**
+     * Writes the status of a run to `JOBS`, for every replica to read. A failure to write is logged,
+     * and does not fail the run.
+     */
+    private fun share(key: JobKey, what: String, code: () -> Unit) {
+        try {
+            writeTransaction.executeWithoutResult { code() }
+        } catch (any: Exception) {
+            logger.error("[job][run]$key Cannot record the $what of the run", any)
+        }
+    }
+
+    /**
+     * Writes the last progress of a run, if not written yet.
+     */
+    private fun shareProgress(key: JobKey, run: LocalRun) {
+        val progress = run.progress
+        if (progress != null && !run.progressShared) {
+            run.progressShared = true
+            run.progressSharedAt = System.currentTimeMillis()
+            share(key, "progress") { jobRecordRepository.setProgress(name, key, progress) }
+        }
+    }
+
+    private fun monitoredRun(job: Job, run: LocalRun): Runnable {
         val key = job.key
         val runListener = JobRunListener { progress ->
             jobListener.onJobProgress(key, progress)
             logger.debug("[job][progress]{} {}", key, progress.text)
-            runtime.progress.set(progress)
+            run.progress = progress
+            run.progressShared = false
+            // At most one write per interval: a job may report its progress for each item it processes
+            if (System.currentTimeMillis() - run.progressSharedAt >= PROGRESS_INTERVAL_MS) {
+                shareProgress(key, run)
+            }
         }
         val decoratedTask = jobDecorator.decorate(job) { job.task.run(runListener) }
         val recorded = MonitoredRun(decoratedTask, object : MonitoredRunListenerAdapter() {
@@ -464,33 +514,36 @@ class QuartzJobScheduler(
         return MonitoredRun(recorded, object : MonitoredRunListener {
             override fun onStart() {
                 logger.debug("[job][task]{} On start", key)
-                runtime.lastRunDate.set(Time.now())
-                runtime.runCount.incrementAndGet()
+                share(key, "start") { jobRecordRepository.startRun(name, key, Time.now()) }
                 jobListener.onJobStart(key)
             }
 
             override fun onSuccess(duration: Long) {
-                runtime.lastRunDurationMs.set(duration)
                 logger.debug("[job][task]{} Success in {} ms", key, duration)
+                share(key, "end") {
+                    jobRecordRepository.endRun(name, key, durationMs = duration, error = null, timedOut = run.timedOut)
+                }
                 jobListener.onJobEnd(key, duration)
-                runtime.lastErrorCount.set(0)
-                runtime.lastError.set(null)
-                runtime.lastTimeoutCount.set(0)
             }
 
             override fun onFailure(ex: Exception) {
-                runtime.lastErrorCount.incrementAndGet()
-                runtime.lastError.set(ex.message)
-                // A run stopped by its timeout fails, and keeps its timeout counted
-                if (runtime.running.get()?.timedOut != true) {
-                    runtime.lastTimeoutCount.set(0)
-                }
                 logger.debug("[job][task]{} Failure: {}", key, ex.message)
+                // The error is reported with the last progress of the run
+                shareProgress(key, run)
                 try {
-                    jobListener.onJobError(status(key) ?: return, ex)
+                    status(key)?.let { jobListener.onJobError(it, ex) }
                 } catch (uncaught: Exception) {
                     logger.error("[job][task]$key Could not process error for job because of:", uncaught)
                     logger.error("[job][task]$key Initial error for job:", ex)
+                }
+                // A run stopped by its timeout fails, and keeps its timeout counted
+                share(key, "end") {
+                    jobRecordRepository.endRun(
+                        name, key,
+                        durationMs = 0,
+                        error = ex.message ?: ex::class.java.name,
+                        timedOut = run.timedOut,
+                    )
                 }
             }
 
@@ -501,28 +554,47 @@ class QuartzJobScheduler(
         })
     }
 
+    /**
+     * A run on this replica is interrupted at once. The stop of a run on another replica is
+     * requested in `JOBS`, and that replica interrupts it within [SWEEP_INTERVAL_MS].
+     */
     override fun stop(key: JobKey): Boolean {
-        if (jobRegistry.find(key) == null && jobRecordRepository.findByKey(name, key) == null) {
+        val record = jobRecordRepository.findByKey(name, key)
+        if (jobRegistry.find(key) == null && record == null) {
             throw JobNotScheduledException(key)
         }
-        return interrupt(key)
+        val running = record?.let { running(it) }
+        return if (interrupt(key)) {
+            true
+        } else if (running != null) {
+            logger.info("[job]{} Requesting the stop of the job, running on {}", key, running.on)
+            writeTransaction.executeWithoutResult { jobRecordRepository.requestStop(name, key) }
+            true
+        } else {
+            false
+        }
     }
 
+    /**
+     * Interrupts the run of a job on this replica, if any.
+     */
     private fun interrupt(key: JobKey): Boolean {
-        val running = runtimes[key]?.running?.get() ?: return false
+        val run = localRuns[key] ?: return false
         logger.info("[job]{} Stopping the job", key)
-        running.thread.interrupt()
+        run.thread.interrupt()
         return true
     }
 
-    override fun checkForTimeouts(): Int = runtimes.count { (key, runtime) ->
-        val running = runtime.running.get()
+    override fun checkForTimeouts(): Int = localRuns.count { (key, run) ->
         val timeout = jobRegistry.find(key)?.job?.timeout ?: ontrackConfigProperties.jobs.timeout
-        if (running != null && System.currentTimeMillis() - running.start >= timeout.toMillis()) {
+        if (System.currentTimeMillis() - run.start >= timeout.toMillis()) {
             logger.info("[job][timeout]{} Timeout - stopping the job", key)
-            running.timedOut = true
-            interrupt(key)
-            runtime.lastTimeoutCount.incrementAndGet()
+            // Counted once per run, interrupted at every control until it stops
+            if (!run.timedOut) {
+                run.timedOut = true
+                share(key, "timeout") { jobRecordRepository.recordTimeout(name, key) }
+            }
+            run.thread.interrupt()
             true
         } else {
             false
@@ -533,21 +605,26 @@ class QuartzJobScheduler(
     // Fires
     // ============================================================================================
 
-    override fun fireImmediately(jobKey: JobKey): Optional<CompletableFuture<*>> {
+    override fun launch(jobKey: JobKey): JobLaunch {
         checkStarted()
         val registration = registration(jobKey)
-        if (runtimes[jobKey]?.running?.get() != null) {
-            logger.debug("[job][run]{} Not fired because already running", jobKey)
-            return Optional.empty()
+        val runningOn = jobRecordRepository.findByKey(name, jobKey)?.let { running(it) }?.on
+        if (runningOn != null) {
+            logger.debug("[job][run]{} Not fired because already running on {}", jobKey, runningOn)
+            return JobLaunch(JobLaunchStatus.ALREADY_RUNNING, runningOn = runningOn)
         }
         val job = registration.job
         if (!job.isValid || job.isDisabled) {
             logger.debug("[job][run]{} Not fired because not valid or disabled", jobKey)
-            return Optional.empty()
+            return JobLaunch(JobLaunchStatus.NOT_RUNNABLE)
         }
         val triggerKey = TriggerKey("$FIRE_PREFIX${UUID.randomUUID()}", QuartzSchedules.group(jobKey))
-        return Optional.of(fire(registration, triggerKey, Instant.now()) ?: error("Fire $triggerKey not created"))
+        val future = fire(registration, triggerKey, Instant.now()) ?: error("Fire $triggerKey not created")
+        return JobLaunch(JobLaunchStatus.TRIGGERED, future = future)
     }
+
+    override fun fireImmediately(jobKey: JobKey): Optional<CompletableFuture<*>> =
+        Optional.ofNullable(launch(jobKey).future)
 
     override fun fireLater(jobKey: JobKey, delay: Duration): Optional<CompletableFuture<*>> {
         checkStarted()
@@ -702,14 +779,13 @@ class QuartzJobScheduler(
         )
 
     /**
-     * Status of a job of the cluster: its ID, schedule and pause from `JOBS` and Quartz, its
-     * description and validity from this replica's registry when it knows it, its runs from this
-     * replica.
+     * Status of a job of the cluster: its ID, schedule, pause and runs from `JOBS` and Quartz, its
+     * description and validity from this replica's registry when it knows it.
      */
     private fun toStatus(record: JobRecord): JobStatus {
         val job = jobRegistry.find(record.key)?.job
         val key = job?.key ?: record.key
-        val runtime = runtimes[key]
+        val running = running(record)
         val valid = job?.let { isValid(it) } ?: true
         return JobStatus(
             id = record.id.toLong(),
@@ -717,20 +793,45 @@ class QuartzJobScheduler(
             schedule = record.schedule,
             actualSchedule = QuartzSchedules.actualSchedule(key, record.schedule, scattering),
             description = job?.description ?: record.description,
-            isRunning = runtime?.running?.get() != null,
+            isRunning = running != null,
             isValid = valid,
             isPaused = record.paused,
             isDisabled = job?.isDisabled ?: false,
-            progress = runtime?.progress?.get(),
-            runCount = runtime?.runCount?.get() ?: 0,
-            lastRunDate = runtime?.lastRunDate?.get(),
-            lastRunDurationMs = runtime?.lastRunDurationMs?.get() ?: 0,
+            // The progress of a run lost with its replica is not shown
+            progress = record.progress?.takeIf { running != null },
+            runCount = record.runCount,
+            lastRunDate = record.lastRunDate,
+            lastRunDurationMs = record.lastRunDurationMs,
             nextRunDate = record.nextFireTime?.takeIf { valid },
-            lastErrorCount = runtime?.lastErrorCount?.get() ?: 0,
-            lastTimeoutCount = runtime?.lastTimeoutCount?.get() ?: 0,
-            lastError = runtime?.lastError?.get(),
+            lastErrorCount = record.errorCount,
+            lastTimeoutCount = record.timeoutCount,
+            lastError = record.lastError,
+            runningOn = running?.on,
+            runningSince = running?.since,
         )
     }
+
+    /**
+     * Where and since when a job runs, if it does.
+     *
+     * A run on this replica is known exactly: Quartz keeps its fire for a few milliseconds after the
+     * run is over. A run on another replica is the fire Quartz executes there. Both are dated by the
+     * fire, as every replica sees it.
+     */
+    private fun running(record: JobRecord): Running? {
+        val instance = scheduler.schedulerInstanceId
+        val local = localRuns[record.key]
+        val remote = record.runningOn
+        return if (local != null) {
+            Running(instance, record.runningSince?.takeIf { remote == instance } ?: Time.from(local.start))
+        } else if (remote != null && remote != instance) {
+            Running(remote, record.runningSince)
+        } else {
+            null
+        }
+    }
+
+    private data class Running(val on: String, val since: LocalDateTime?)
 
     private fun isValid(job: Job): Boolean =
         try {
@@ -756,7 +857,7 @@ class QuartzJobScheduler(
     /**
      * Run of a job on this replica
      */
-    private class RunningJob(
+    private class LocalRun(
         val thread: Thread,
         val start: Long,
     ) {
@@ -765,20 +866,24 @@ class QuartzJobScheduler(
          */
         @Volatile
         var timedOut: Boolean = false
-    }
 
-    /**
-     * Runs and counters of a job on this replica
-     */
-    private class JobRuntime {
-        val running = AtomicReference<RunningJob?>()
-        val progress = AtomicReference<JobRunProgress?>()
-        val runCount = AtomicLong()
-        val lastRunDate = AtomicReference<LocalDateTime?>()
-        val lastRunDurationMs = AtomicLong()
-        val lastErrorCount = AtomicLong()
-        val lastTimeoutCount = AtomicLong()
-        val lastError = AtomicReference<String?>()
+        /**
+         * Last progress of the run
+         */
+        @Volatile
+        var progress: JobRunProgress? = null
+
+        /**
+         * Is the last progress written to `JOBS`?
+         */
+        @Volatile
+        var progressShared: Boolean = true
+
+        /**
+         * When the progress was last written to `JOBS`
+         */
+        @Volatile
+        var progressSharedAt: Long = 0
     }
 
     companion object {
@@ -795,8 +900,14 @@ class QuartzJobScheduler(
         private const val FIRE_PREFIX_LENGTH = 8
 
         /**
-         * Interval between two checks of the fires requested here and run elsewhere
+         * Interval between two checks of the fires requested here and run elsewhere, and between
+         * two checks of the stops requested for the runs of this replica
          */
         private const val SWEEP_INTERVAL_MS = 2_000L
+
+        /**
+         * Minimum interval between two writes of the progress of a run
+         */
+        private const val PROGRESS_INTERVAL_MS = 1_000L
     }
 }

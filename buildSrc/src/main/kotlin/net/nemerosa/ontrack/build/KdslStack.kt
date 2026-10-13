@@ -248,12 +248,16 @@ data class KdslStackInstance(
             "ontrack.acceptance.connection.mgt.url" to haAManagementUrl,
         ) + haBackendSystemProperties
 
-    /** The properties only the `ha` package reads: each backend, bypassing the proxy. */
+    /**
+     * The properties only the `ha` package reads: each backend, bypassing the proxy, and the Compose
+     * project of the stack, whose containers a test kills and starts again (#2079).
+     */
     private val haBackendSystemProperties: Map<String, String> = mapOf(
         "ontrack.acceptance.ha.a.url" to haAUrl,
         "ontrack.acceptance.ha.a.mgt.url" to haAManagementUrl,
         "ontrack.acceptance.ha.b.url" to haBUrl,
         "ontrack.acceptance.ha.b.mgt.url" to haBManagementUrl,
+        "ontrack.acceptance.ha.project" to haProjectName,
     )
 
     /**

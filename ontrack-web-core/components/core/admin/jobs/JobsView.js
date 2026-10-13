@@ -69,6 +69,10 @@ export default function JobsView() {
                     }
                     description
                     state
+                    runningOn
+                    runningSince
+                    progressText
+                    lastError
                     canRun
                     canPause
                     canResume
@@ -232,7 +236,13 @@ export default function JobsView() {
                                     {
                                         key: 'state',
                                         title: 'State',
-                                        render: (_, job) => <JobState value={job.state}/>,
+                                        render: (_, job) => <Space orientation="vertical" size={0}>
+                                            <JobState value={job.state}/>
+                                            {
+                                                job.runningOn &&
+                                                <Typography.Text type="secondary">on {job.runningOn}</Typography.Text>
+                                            }
+                                        </Space>,
                                     },
                                     {
                                         key: 'error',

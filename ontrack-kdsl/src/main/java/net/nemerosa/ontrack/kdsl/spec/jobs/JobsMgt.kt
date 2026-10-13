@@ -78,14 +78,19 @@ class JobsMgt(connector: Connector) : Connected(connector) {
     }
 
     /**
-     * Runs a job once, now, on any replica.
+     * Runs a job once, now, on any replica, unless it is already running.
+     *
+     * @return `TRIGGERED`, or `ALREADY_RUNNING` when the job runs already, on any replica
      */
-    fun runNow(id: Int) = check("run job $id") {
-        graphqlConnector.mutate(LaunchJobMutation(id)) { null }?.launchJob?.let { it.ok to it.error }
+    fun runNow(id: Int): String {
+        val result = graphqlConnector.mutate(LaunchJobMutation(id)) { null }?.launchJob
+            ?: error("No answer to run job $id")
+        return result.launchStatus?.name?.takeIf { it != "NOT_RUNNABLE" }
+            ?: error("Could not run job $id: ${result.error}")
     }
 
     /**
-     * Stops a running job.
+     * Stops a running job, on whichever replica it runs.
      */
     fun stop(id: Int) = check("stop job $id") {
         graphqlConnector.mutate(StopJobMutation(id)) { null }?.stopJob?.let { it.ok to it.error }
@@ -135,4 +140,11 @@ private fun JobStatusFragment.toJobStatus() = JobStatus(
     nextRunDate = nextRunDate,
     lastRunDate = lastRunDate,
     state = state.name,
+    lastRunDurationMs = lastRunDurationMs?.toLong() ?: 0,
+    lastError = lastError,
+    lastErrorCount = lastErrorCount?.toLong() ?: 0,
+    lastTimeoutCount = lastTimeoutCount?.toLong() ?: 0,
+    progress = progressText,
+    runningOn = runningOn,
+    runningSince = runningSince,
 )

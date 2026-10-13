@@ -22,7 +22,9 @@ paths:
   is supplied with `Schedule.NONE` and fired with `fireImmediately`. A job refreshing what is per
   pod by nature (a gauge of this pod, the reachability of a store from it) is registered with
   `JobScope.REPLICA`, runs on every replica and is listed in `ReplicaJobsIT`; a result the same for
-  the cluster is stored in the database by a cluster job (#2078). Read ADR 0021
+  the cluster is stored in the database by a cluster job (#2078). Whether a job runs, where, its
+  last run and last error: `JobScheduler.getJobStatus(key)`, the same on every replica (#2079) -
+  never a flag of your own. Read ADR 0021
   (`docs/adr/0021-backend-replicas-share-no-state-in-memory.md`) before adding any state that
   outlives a request.
 

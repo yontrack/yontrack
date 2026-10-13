@@ -75,7 +75,8 @@ x-ontrack: &ontrack
     # it (#2087)
     ONTRACK_CONFIG_CASC_LOCATIONS: "file:/casc/kdsl-ha.yaml"
     # ... the probe jobs, a periodic one every 2 seconds and a manual one, which ACCHAJobs runs,
-    # pauses and counts across both backends (#2077)
+    # pauses and counts across both backends (#2077), and a slow one, running until stopped, whose
+    # status ACCHAJobStatus reads through both (#2079)
     ONTRACK_CONFIG_JOBS_TESTING_ENABLED: "true"
     ONTRACK_CONFIG_JOBS_TESTING_PERIOD: "2s"
     # ... the SCM catalog, whose gauges one backend computes and both report, which
@@ -153,14 +154,18 @@ services:
 
   # A and B start together, on an empty database: their startup tasks run one replica at a time
   # (#2087), which ACCHAStartup checks.
+  # Their host names, the IDs of their Quartz instances, name the replica a job runs on (#2079),
+  # as the pod names do in Kubernetes.
   ontrack-a:
     <<: *ontrack
+    hostname: ontrack-a
     ports:
       - "${YONTRACK_KDSL_HA_A_PORT:-18080}:8080"
       - "${YONTRACK_KDSL_HA_A_MGMT_PORT:-18880}:8800"
 
   ontrack-b:
     <<: *ontrack
+    hostname: ontrack-b
     ports:
       - "${YONTRACK_KDSL_HA_B_PORT:-18081}:8080"
       - "${YONTRACK_KDSL_HA_B_MGMT_PORT:-18881}:8800"
