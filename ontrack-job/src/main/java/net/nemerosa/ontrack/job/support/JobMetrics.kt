@@ -4,6 +4,7 @@ import net.nemerosa.ontrack.common.api.APIDescription
 import net.nemerosa.ontrack.common.api.APIName
 import net.nemerosa.ontrack.common.doc.MetricsDocumentation
 import net.nemerosa.ontrack.common.doc.MetricsMeterDocumentation
+import net.nemerosa.ontrack.common.doc.MetricsMeterTag
 import net.nemerosa.ontrack.common.doc.MetricsMeterType
 
 @Suppress("ConstPropertyName")
@@ -54,11 +55,22 @@ object JobMetrics {
     )
     const val ontrack_job_timeout_total = "ontrack_job_timeout_total"
 
-    @APIDescription("Duration of the last job execution")
+    @APIDescription("Duration of the runs of a job, on this replica - of every job, whether it runs once per period in the cluster or on every replica")
     @MetricsMeterDocumentation(
         type = MetricsMeterType.TIMER,
     )
     const val ontrack_job_duration = "ontrack_job_duration"
+
+    @APIDescription("Number of the failed runs of a job running on every replica, on this replica. These jobs are not on the jobs page.")
+    @MetricsMeterDocumentation(
+        type = MetricsMeterType.COUNT,
+        tags = [
+            MetricsMeterTag(tag_job_category, "Category of the job"),
+            MetricsMeterTag(tag_job_type, "Type of the job"),
+            MetricsMeterTag(tag_job_key, "ID of the job"),
+        ],
+    )
+    const val ontrack_job_replica_error = "ontrack_job_replica_error"
 
     const val tag_job_category = "job_category"
     const val tag_job_type = "job_type"

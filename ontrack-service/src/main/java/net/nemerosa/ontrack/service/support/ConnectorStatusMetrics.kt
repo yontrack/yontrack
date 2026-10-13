@@ -41,7 +41,8 @@ class ConnectorStatusMetrics(
     fun bindTo() {
         connectorStatusIndicator.forEach { indicator ->
 
-            val gauge = { job: ConnectorStatusJob -> job.statuses[indicator.type] }
+            // Read from the database on each scrape: the statuses are collected by one replica
+            val gauge = { job: ConnectorStatusJob -> job.statuses(indicator.type) }
 
             val tags = listOf(
                     Tag.of("type", indicator.type)

@@ -6,10 +6,14 @@ import net.nemerosa.ontrack.extension.scm.catalog.SCMCatalogProjectFilterLink
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 
+/**
+ * Gauges of the SCM catalog, read from the counts stored by [SCMCatalogMetricsJob] (#2078): the
+ * same on every replica.
+ */
 @Component
 @Transactional(readOnly = true)
 class SCMCatalogMetrics(
-        private val scmCatalogMetricsCache: SCMCatalogMetricsCache
+        private val scmCatalogMetricsStore: SCMCatalogMetricsStore
 ) : MeterBinder {
 
     override fun bindTo(registry: MeterRegistry) {
@@ -21,7 +25,7 @@ class SCMCatalogMetrics(
     }
 
     private fun register(registry: MeterRegistry, name: String, link: SCMCatalogProjectFilterLink) {
-        registry.gauge(name, scmCatalogMetricsCache) { scmCatalogMetricsCache.counts[link]?.toDouble() ?: 0.0 }
+        registry.gauge(name, scmCatalogMetricsStore) { it.counts()[link]?.toDouble() ?: 0.0 }
     }
 
     /**

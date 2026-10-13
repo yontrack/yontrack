@@ -12,6 +12,9 @@ import org.springframework.stereotype.Component
  * Gauges of the number and size of the evidences per project ([AuditTrailMetrics.evidenceCount],
  * [AuditTrailMetrics.evidenceSize]), refreshed every 15 minutes from the database — never read on
  * every scrape. The gauges of a project which no longer has evidences are removed.
+ *
+ * The gauges are registered in the meter registry of each replica: the job runs on every replica
+ * ([JobScope.REPLICA], #2078).
  */
 @Component
 class EvidenceMetrics(
@@ -43,7 +46,7 @@ class EvidenceMetrics(
     private fun tags(stats: EvidenceProjectStats) = Tags.of(AuditTrailMetrics.Tags.PROJECT, stats.project)
 
     override fun getStartingJobs(): Collection<JobRegistration> = listOf(
-        JobRegistration(this, Schedule.everyMinutes(15))
+        JobRegistration(this, Schedule.everyMinutes(15), JobScope.REPLICA)
     )
 
     override fun getKey(): JobKey = JOB_TYPE.getKey("metrics")

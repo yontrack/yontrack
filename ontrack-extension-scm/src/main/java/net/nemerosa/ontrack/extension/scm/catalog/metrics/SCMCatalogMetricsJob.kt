@@ -7,9 +7,13 @@ import net.nemerosa.ontrack.job.*
 import net.nemerosa.ontrack.model.support.JobProvider
 import org.springframework.stereotype.Component
 
+/**
+ * Indexes the entries of the SCM catalog, and computes its counts, once a day in the cluster: the
+ * counts are stored in the database, where the gauges of every replica read them (#2078).
+ */
 @Component
 class SCMCatalogMetricsJob(
-    private val scmCatalogMetricsCache: SCMCatalogMetricsCache,
+    private val scmCatalogMetricsStore: SCMCatalogMetricsStore,
     private val scmCatalogFilterService: SCMCatalogFilterService,
     private val scmExtensionConfigProperties: SCMExtensionConfigProperties,
 ) : JobProvider {
@@ -37,7 +41,7 @@ class SCMCatalogMetricsJob(
 
         override fun getTask() = JobRun {
             val counts = scmCatalogFilterService.indexCatalogProjectEntries()
-            scmCatalogMetricsCache.counts = counts
+            scmCatalogMetricsStore.store(counts)
         }
 
     }

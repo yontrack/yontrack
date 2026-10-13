@@ -4,8 +4,9 @@ package net.nemerosa.ontrack.extension.audittrail.storage
  * The storage of the evidence: an S3-compatible bucket, configured by the
  * `ontrack.extension.audit-trail.storage.*` properties.
  *
- * Its status is probed every minute by [EvidenceStorageProbeJob] and cached in between, so that
- * reading it — on every page, through the global messages — never calls the storage.
+ * Its status is probed every minute by [EvidenceStorageProbeJob], on every replica, and kept in
+ * between, so that reading it — on every page, through the global messages — never calls the
+ * storage.
  */
 interface EvidenceStorageService {
 

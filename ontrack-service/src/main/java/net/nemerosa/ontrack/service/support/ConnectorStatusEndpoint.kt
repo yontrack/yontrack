@@ -10,10 +10,6 @@ class ConnectorStatusEndpoint(
 ) {
 
     @ReadOperation
-    fun invoke() = ConnectorGlobalStatus(
-            connectorStatusJob.statuses.values.flatten().sortedBy {
-                it.status.description.connector
-            }
-    )
+    fun invoke(): ConnectorGlobalStatus = connectorStatusJob.globalStatus
 
 }

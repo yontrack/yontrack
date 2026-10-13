@@ -47,6 +47,9 @@ import org.quartz.JobKey as QuartzJobKey
 /**
  * Job scheduler on Quartz, clustered through the database (#2077).
  *
+ * Only for the jobs of scope [JobScope.CLUSTER]: the ones of scope [JobScope.REPLICA] run on the
+ * [ReplicaJobScheduler] of each replica, and are unknown here (#2078).
+ *
  * - The jobs known by this replica are in the [JobRegistry], refreshed from the providers and the
  *   suppliers at startup, then every `ontrack.config.jobs.orchestration` minutes.
  * - The jobs of the cluster are the rows of `JOBS` - giving them their ID - and the Quartz jobs and

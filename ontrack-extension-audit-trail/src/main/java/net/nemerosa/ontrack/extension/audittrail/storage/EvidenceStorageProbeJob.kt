@@ -7,6 +7,9 @@ import org.springframework.stereotype.Component
 /**
  * Probes the [evidence storage][EvidenceStorageService] every minute, so that its status — read
  * by the global messages, the health and the status page — is never older than that.
+ *
+ * The status is the reachability of the storage from this replica, kept in its memory: the job
+ * runs on every replica ([JobScope.REPLICA], #2078).
  */
 @Component
 class EvidenceStorageProbeJob(
@@ -14,7 +17,7 @@ class EvidenceStorageProbeJob(
 ) : JobProvider, Job {
 
     override fun getStartingJobs(): Collection<JobRegistration> = listOf(
-        JobRegistration(this, Schedule.EVERY_MINUTE)
+        JobRegistration(this, Schedule.EVERY_MINUTE, JobScope.REPLICA)
     )
 
     override fun getKey(): JobKey = JOB_TYPE.getKey("probe")

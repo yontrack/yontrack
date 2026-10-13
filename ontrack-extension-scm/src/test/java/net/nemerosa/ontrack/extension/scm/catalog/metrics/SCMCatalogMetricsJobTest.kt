@@ -6,6 +6,7 @@ import io.mockk.verify
 import net.nemerosa.ontrack.extension.scm.SCMExtensionConfigProperties
 import net.nemerosa.ontrack.extension.scm.catalog.SCMCatalogFilterService
 import net.nemerosa.ontrack.extension.scm.catalog.SCMCatalogProjectFilterLink
+import net.nemerosa.ontrack.job.JobScope
 import org.junit.jupiter.api.Test
 import java.util.concurrent.TimeUnit
 import kotlin.test.assertEquals
@@ -15,10 +16,10 @@ class SCMCatalogMetricsJobTest {
 
     @Test
     fun `Collection of catalog metrics`() {
-        val cache: SCMCatalogMetricsCache = mockk(relaxed = true)
+        val store: SCMCatalogMetricsStore = mockk(relaxed = true)
         val filterService: SCMCatalogFilterService = mockk(relaxed = true)
         val provider = SCMCatalogMetricsJob(
-            scmCatalogMetricsCache = cache,
+            scmCatalogMetricsStore = store,
             scmCatalogFilterService = filterService,
             scmExtensionConfigProperties = SCMExtensionConfigProperties().apply {
                 catalog.enabled = true
@@ -46,10 +47,11 @@ class SCMCatalogMetricsJobTest {
         assertEquals("catalog-metrics", job.key.type.key)
         assertEquals("catalog-metrics", job.key.id)
         assertEquals("Collection of SCM Catalog metrics", job.description)
+        assertEquals(JobScope.CLUSTER, jobRegistration.scope)
 
         job.task.run { println(it) }
         verify {
-            cache.counts = counts
+            store.store(counts)
         }
     }
 }

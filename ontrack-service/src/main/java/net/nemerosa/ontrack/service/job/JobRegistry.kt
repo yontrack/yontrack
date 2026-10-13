@@ -2,6 +2,7 @@ package net.nemerosa.ontrack.service.job
 
 import net.nemerosa.ontrack.job.JobKey
 import net.nemerosa.ontrack.job.JobRegistration
+import net.nemerosa.ontrack.job.JobScope
 import net.nemerosa.ontrack.job.orchestrator.JobOrchestratorSupplier
 import net.nemerosa.ontrack.model.security.SecurityService
 import net.nemerosa.ontrack.model.support.JobProvider
@@ -17,6 +18,10 @@ import org.quartz.JobKey as QuartzJobKey
  * Jobs known by this replica: those of every [JobProvider] and [JobOrchestratorSupplier], which
  * every replica evaluates, so that any replica can run any job of the cluster.
  *
+ * The jobs of scope [JobScope.CLUSTER] are the jobs of the cluster, run by Quartz. The ones of scope
+ * [JobScope.REPLICA] are given to the [ReplicaJobScheduler] of this replica at each refresh, and are
+ * not known as jobs of the cluster: [all] and [find] ignore them.
+ *
  * Refreshed at startup, then periodically, and when a job unknown here is fired. The jobs are read
  * as an administrator, in a transaction - joining the one of the caller, if any, so that a caller
  * having just changed what a supplier gives sees its change.
@@ -28,6 +33,7 @@ import org.quartz.JobKey as QuartzJobKey
 class JobRegistry(
     private val applicationContext: ApplicationContext,
     private val securityService: SecurityService,
+    private val replicaJobScheduler: ReplicaJobScheduler,
     transactionManager: PlatformTransactionManager,
 ) {
 
@@ -59,7 +65,7 @@ class JobRegistry(
     private var completeRefresh: Boolean = true
 
     /**
-     * All the jobs known by this replica
+     * All the jobs of the cluster, known by this replica
      */
     val all: Collection<JobRegistration> get() = registrations.values
 
@@ -84,11 +90,14 @@ class JobRegistry(
             }
             indexed[key] = registration
         }
-        registrations = indexed
-        byQuartzKey = indexed.values.associateBy { QuartzSchedules.jobKey(it.job.key) }
+        val (cluster, replica) = indexed.values.partition { it.scope == JobScope.CLUSTER }
+        registrations = cluster.associateBy { it.job.key }
+        byQuartzKey = cluster.associateBy { QuartzSchedules.jobKey(it.job.key) }
         completeRefresh = failures == 0
         lastRefreshMs = System.currentTimeMillis()
-        logger.debug("[job][registry] {} jobs", indexed.size)
+        logger.debug("[job][registry] {} jobs of the cluster, {} jobs on every replica", cluster.size, replica.size)
+        // As for the jobs of the cluster, the jobs of a provider which failed are not removed
+        replicaJobScheduler.reconcile(replica, complete = completeRefresh)
     }
 
     private fun collect(onFailure: () -> Unit): List<JobRegistration> {
