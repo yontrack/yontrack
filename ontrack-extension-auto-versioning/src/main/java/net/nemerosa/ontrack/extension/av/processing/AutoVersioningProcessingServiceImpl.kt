@@ -13,6 +13,7 @@ import net.nemerosa.ontrack.extension.av.postprocessing.PostProcessingInfo
 import net.nemerosa.ontrack.extension.av.postprocessing.PostProcessingNotFoundException
 import net.nemerosa.ontrack.extension.av.postprocessing.PostProcessingRegistry
 import net.nemerosa.ontrack.extension.av.properties.FilePropertyType
+import net.nemerosa.ontrack.extension.av.queue.AutoVersioningProcessingLock
 import net.nemerosa.ontrack.extension.av.retry.AutoVersioningDeferredErrorException
 import net.nemerosa.ontrack.extension.av.retry.AutoVersioningRetryService
 import net.nemerosa.ontrack.extension.av.retry.autoVersioningErrorMessage
@@ -51,6 +52,7 @@ class AutoVersioningProcessingServiceImpl(
     private val structureService: StructureService,
     private val autoVersioningVersionRuleRegistry: AutoVersioningVersionRuleRegistry,
     private val autoVersioningRetryService: AutoVersioningRetryService,
+    private val autoVersioningProcessingLock: AutoVersioningProcessingLock,
 ) : AutoVersioningProcessingService {
 
     private val logger: Logger = LoggerFactory.getLogger(AutoVersioningProcessingServiceImpl::class.java)
@@ -360,11 +362,14 @@ class AutoVersioningProcessingServiceImpl(
             logger.debug("Processing auto-versioning order direct push: {}", order)
             // Audit
             autoVersioningAuditService.onPushing(order, upgradeBranch)
-            // Pushing the branch directly
-            val commit: SCMCommit = scm.mergeBranch(
-                head = upgradeBranch,
-                base = scmBranch,
-            )
+            // Pushing the branch directly, one merge at a time into the target branch: orders
+            // with different paths are processed concurrently
+            val commit: SCMCommit = autoVersioningProcessingLock.withMergeLock(scm.repositoryURI, scmBranch) {
+                scm.mergeBranch(
+                    head = upgradeBranch,
+                    base = scmBranch,
+                )
+            }
             // The upgrade branch was only needed to hold the change & to run the post-processing,
             // and it has now been merged into the target branch: it can be deleted.
             deleteUpgradeBranch(scm, upgradeBranch)

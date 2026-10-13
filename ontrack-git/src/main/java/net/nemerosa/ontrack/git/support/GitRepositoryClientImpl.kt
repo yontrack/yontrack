@@ -29,6 +29,7 @@ import org.eclipse.jgit.revwalk.RevWalk
 import org.eclipse.jgit.revwalk.filter.MessageRevFilter
 import org.eclipse.jgit.storage.file.FileRepositoryBuilder
 import org.eclipse.jgit.transport.CredentialsProvider
+import org.eclipse.jgit.transport.RemoteRefUpdate
 import org.eclipse.jgit.treewalk.AbstractTreeIterator
 import org.eclipse.jgit.treewalk.CanonicalTreeParser
 import org.slf4j.LoggerFactory
@@ -738,34 +739,23 @@ class GitRepositoryClientImpl(
         val directoryLock = getDirectoryLock(repositoryDir.absolutePath)
         directoryLock.lock()
         try {
-            // Fetch latest remote state
-            fetch { logger.debug("[git] $it") }
-            // Checkout base branch locally, resetting from remote tracking ref
-            val localBaseExists = git.repository.findRef("refs/heads/$base") != null
-            if (localBaseExists) {
-                git.checkout().setName(base).call()
-                git.reset().setMode(ResetCommand.ResetType.HARD).setRef("refs/remotes/origin/$base").call()
-            } else {
-                git.checkout().setName(base).setStartPoint("refs/remotes/origin/$base").setCreateBranch(true).call()
+            // JGit does not throw on a rejected push: a remote base branch which moved since the
+            // fetch is merged again, a bounded number of times
+            var rejection = ""
+            repeat(MERGE_ATTEMPTS) { attempt ->
+                val (newHead, pushRejection) = mergeAndPush(head, base)
+                if (pushRejection == null) {
+                    // Returns the merge commit
+                    val revCommit = RevWalk(git.repository).parseCommit(newHead)
+                    return toCommit(revCommit)
+                }
+                rejection = pushRejection
+                logger.warn(
+                    "[git] Push of the merge of {} into {} rejected by {} (attempt {}/{}): {}",
+                    head, base, repository.remote, attempt + 1, MERGE_ATTEMPTS, pushRejection,
+                )
             }
-            // Merge head into base
-            val headRef = git.repository.resolve("refs/remotes/origin/$head")
-                ?: error("Cannot resolve remote branch $head in ${repository.remote}")
-            val mergeResult = git.merge()
-                .include(headRef)
-                .setMessage("Merge $head into $base")
-                .call()
-            if (!mergeResult.mergeStatus.isSuccessful) {
-                throw GitRepositoryMergeException(repository.remote, head, base, mergeResult.mergeStatus.name)
-            }
-            // Push base to remote
-            git.push()
-                .setRemote("origin")
-                .add("refs/heads/$base")
-                .invoke("Pushing $base to ${repository.remote}")
-            // Return the merge commit
-            val revCommit = RevWalk(git.repository).parseCommit(mergeResult.newHead)
-            return toCommit(revCommit)
+            throw GitRepositoryPushRejectedException(repository.remote, head, base, MERGE_ATTEMPTS, rejection)
         } catch (e: GitAPIException) {
             throw GitRepositoryAPIException(repository.remote, e)
         } catch (e: IOException) {
@@ -775,8 +765,55 @@ class GitRepositoryClientImpl(
         }
     }
 
+    /**
+     * Merges the remote [head] into the latest state of the remote [base] and pushes it.
+     *
+     * @return The new head of [base] and, when the push was rejected, the reason why
+     */
+    private fun mergeAndPush(head: String, base: String): Pair<ObjectId, String?> {
+        // Fetch latest remote state
+        fetch { logger.debug("[git] $it") }
+        // Checkout base branch locally, resetting from remote tracking ref
+        val localBaseExists = git.repository.findRef("refs/heads/$base") != null
+        if (localBaseExists) {
+            git.checkout().setName(base).call()
+            git.reset().setMode(ResetCommand.ResetType.HARD).setRef("refs/remotes/origin/$base").call()
+        } else {
+            git.checkout().setName(base).setStartPoint("refs/remotes/origin/$base").setCreateBranch(true).call()
+        }
+        // Merge head into base
+        val headRef = git.repository.resolve("refs/remotes/origin/$head")
+            ?: error("Cannot resolve remote branch $head in ${repository.remote}")
+        val mergeResult = git.merge()
+            .include(headRef)
+            .setMessage("Merge $head into $base")
+            .call()
+        if (!mergeResult.mergeStatus.isSuccessful) {
+            throw GitRepositoryMergeException(repository.remote, head, base, mergeResult.mergeStatus.name)
+        }
+        // Push base to remote
+        val rejection = git.push()
+            .setRemote("origin")
+            .add("refs/heads/$base")
+            .invoke("Pushing $base to ${repository.remote}")
+            .flatMap { it.remoteUpdates }
+            .filter {
+                it.status != RemoteRefUpdate.Status.OK && it.status != RemoteRefUpdate.Status.UP_TO_DATE
+            }
+            .takeIf { it.isNotEmpty() }
+            ?.joinToString { update ->
+                listOfNotNull(update.remoteName, update.status.name, update.message).joinToString(" ")
+            }
+        return mergeResult.newHead to rejection
+    }
+
     companion object {
         private val directoryLocks = ConcurrentHashMap<String, ReentrantLock>()
+
+        /**
+         * Number of times a merge is done and pushed before its rejection by the remote fails it.
+         */
+        private const val MERGE_ATTEMPTS = 3
 
         private fun getDirectoryLock(path: String): ReentrantLock =
             directoryLocks.computeIfAbsent(path) { ReentrantLock() }

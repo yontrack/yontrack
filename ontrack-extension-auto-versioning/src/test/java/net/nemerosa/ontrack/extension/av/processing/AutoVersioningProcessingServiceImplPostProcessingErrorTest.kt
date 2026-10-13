@@ -16,6 +16,7 @@ import net.nemerosa.ontrack.extension.av.event.AutoVersioningEventService
 import net.nemerosa.ontrack.extension.av.metrics.AutoVersioningMetricsService
 import net.nemerosa.ontrack.extension.av.postprocessing.PostProcessing
 import net.nemerosa.ontrack.extension.av.postprocessing.PostProcessingRegistry
+import net.nemerosa.ontrack.extension.av.queue.AutoVersioningProcessingLock
 import net.nemerosa.ontrack.extension.av.retry.AutoVersioningDeferredErrorException
 import net.nemerosa.ontrack.extension.av.retry.AutoVersioningRetryService
 import net.nemerosa.ontrack.extension.av.retry.AutoVersioningRetryableException
@@ -91,6 +92,7 @@ class AutoVersioningProcessingServiceImplPostProcessingErrorTest {
             structureService = mockk<StructureService>(relaxed = true),
             autoVersioningVersionRuleRegistry = mockk<AutoVersioningVersionRuleRegistry>(relaxed = true),
             autoVersioningRetryService = mockk<AutoVersioningRetryService>(relaxed = true),
+            autoVersioningProcessingLock = mergeLock(),
         )
 
         assertFailsWith<RuntimeException> {
@@ -156,6 +158,7 @@ class AutoVersioningProcessingServiceImplPostProcessingErrorTest {
             structureService = mockk<StructureService>(relaxed = true),
             autoVersioningVersionRuleRegistry = mockk<AutoVersioningVersionRuleRegistry>(relaxed = true),
             autoVersioningRetryService = mockk<AutoVersioningRetryService>(relaxed = true),
+            autoVersioningProcessingLock = mergeLock(),
         )
 
         val outcome = service.process(order)
@@ -301,9 +304,21 @@ class AutoVersioningProcessingServiceImplPostProcessingErrorTest {
             structureService = mockk<StructureService>(relaxed = true),
             autoVersioningVersionRuleRegistry = mockk<AutoVersioningVersionRuleRegistry>(relaxed = true),
             autoVersioningRetryService = retryService,
+            autoVersioningProcessingLock = mergeLock(),
         )
 
         return FailingPostProcessingContext(order, service, autoVersioningEventService, retryService)
+    }
+
+    /**
+     * Lock which runs the merges at once.
+     */
+    private fun mergeLock(): AutoVersioningProcessingLock {
+        val lock = mockk<AutoVersioningProcessingLock>()
+        every { lock.withMergeLock(any(), any(), any<() -> Any?>()) } answers {
+            thirdArg<() -> Any?>().invoke()
+        }
+        return lock
     }
 
 }
