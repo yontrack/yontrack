@@ -2,6 +2,9 @@
 # compose/docker-compose-kdsl-ha.yml. Both backends start together and apply it, which
 # ACCHAStartup checks: several configurations, so that two replicas applying it at once would
 # collide on one of them. Keep it in step with ACCHAStartup.
+#
+# No password: nothing is encrypted while the backends start, so that ACCHAEncryption (#2086), the
+# first test to run, meets a key store without a key, which both backends then need at once.
 ontrack:
   config:
     jira:

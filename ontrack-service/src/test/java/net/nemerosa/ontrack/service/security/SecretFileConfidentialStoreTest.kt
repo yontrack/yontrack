@@ -84,7 +84,7 @@ internal class SecretFileConfidentialStoreTest {
         }
         val store = SecretFileConfidentialStore(properties)
 
-        val encryptionService = EncryptionServiceImpl(mockk(relaxed = true), store)
+        val encryptionService = EncryptionServiceImpl(mockk(relaxed = true), store, InMemoryConfidentialKeyVersions())
         val plain = "some plain text"
         val encrypted = encryptionService.encrypt(plain)
         assertNotNull(encrypted) {

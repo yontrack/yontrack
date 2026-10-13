@@ -6,20 +6,12 @@ import net.nemerosa.ontrack.kdsl.connector.graphql.GraphQLClientException
 import net.nemerosa.ontrack.kdsl.connector.support.DefaultConnector
 import net.nemerosa.ontrack.kdsl.spec.Ontrack
 import net.nemerosa.ontrack.kdsl.spec.admin.admin
-import net.nemerosa.ontrack.kdsl.spec.extension.github.ingestion.GitHubIngestionSettings
 import net.nemerosa.ontrack.kdsl.spec.extension.github.ingestion.gitHubIngestion
 import net.nemerosa.ontrack.kdsl.spec.generateToken
 import net.nemerosa.ontrack.kdsl.spec.revokeToken
 import net.nemerosa.ontrack.kdsl.spec.settings.security
 import net.nemerosa.ontrack.kdsl.spec.settings.settings
-import org.apache.commons.codec.digest.HmacAlgorithms
-import org.apache.commons.codec.digest.HmacUtils
 import org.junit.jupiter.api.Test
-import java.net.URI
-import java.net.http.HttpClient
-import java.net.http.HttpRequest
-import java.net.http.HttpResponse
-import java.util.*
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
@@ -63,7 +55,6 @@ class ACCHASettings : AbstractACCHATestSupport() {
         val newSecret = ontrackA.generateToken(newName)
         try {
             ontrackA.settings.gitHubIngestion.with(update = { it.withSecret(oldSecret) }) {
-                shareEncryptionKey()
                 assertEquals(200, pingB(signedWith = oldSecret), "Delivery signed with the secret accepted by B")
 
                 ontrackA.settings.gitHubIngestion.set(
@@ -89,67 +80,5 @@ class ACCHASettings : AbstractACCHATestSupport() {
             if (e.message?.contains("Project access not granted") == true) false else throw e
         }
 
-    /**
-     * The webhook secret is stored encrypted, with the key of the `jdbc` store. Until #2086, two
-     * replicas started together may each generate a key, and one of them then encrypts with a key
-     * the other has not: once A has written the secret, the key of the store is imported into both,
-     * which reloads it. #2086 removes this step.
-     */
-    private fun shareEncryptionKey() {
-        val export = http(
-            HttpRequest.newBuilder(URI("${ACCProperties.HA.A.url}/rest/admin/encryption")).GET()
-        )
-        assertEquals(200, export.statusCode(), "Encryption key exported")
-        val key = export.body()
-        listOf(ACCProperties.HA.A.url, ACCProperties.HA.B.url).forEach { url ->
-            val import = http(
-                HttpRequest.newBuilder(URI("$url/rest/admin/encryption"))
-                    .header("Content-Type", "text/plain")
-                    .PUT(HttpRequest.BodyPublishers.ofString(key))
-            )
-            assertEquals(202, import.statusCode(), "Encryption key imported into $url")
-        }
-    }
-
-    private fun http(request: HttpRequest.Builder): HttpResponse<String> =
-        HttpClient.newHttpClient().send(
-            request.header(DefaultConnector.X_ONTRACK_TOKEN, ACCProperties.Connection.token).build(),
-            HttpResponse.BodyHandlers.ofString(),
-        )
-
-    private fun GitHubIngestionSettings.withSecret(secret: String) = GitHubIngestionSettings(
-        token = secret,
-        retentionDays = retentionDays,
-        orgProjectPrefix = orgProjectPrefix,
-        indexationInterval = indexationInterval,
-        repositoryIncludes = repositoryIncludes,
-        repositoryExcludes = repositoryExcludes,
-        issueServiceIdentifier = issueServiceIdentifier,
-        enabled = true,
-    )
-
-    /**
-     * Delivers a `ping` event to the GitHub ingestion hook of B, as GitHub does, signed with the
-     * given secret. Accepted, it is acknowledged and not processed.
-     *
-     * @return HTTP status of the delivery
-     */
-    private fun pingB(signedWith: String): Int {
-        val body = """{"zen":"Keep it logically awesome."}"""
-        val signature = "sha256=" + HmacUtils(HmacAlgorithms.HMAC_SHA_256, signedWith).hmacHex(body)
-        val response = HttpClient.newHttpClient().send(
-            HttpRequest.newBuilder(URI("${ACCProperties.HA.B.url}/hook/secured/github/ingestion"))
-                .header("Content-Type", "application/json")
-                .header("X-GitHub-Delivery", UUID.randomUUID().toString())
-                .header("X-GitHub-Event", "ping")
-                .header("X-GitHub-Hook-ID", "123456789")
-                .header("X-GitHub-Hook-Installation-Target-ID", "1234567890")
-                .header("X-GitHub-Hook-Installation-Target-Type", "organization")
-                .header("X-Hub-Signature-256", signature)
-                .POST(HttpRequest.BodyPublishers.ofString(body))
-                .build(),
-            HttpResponse.BodyHandlers.ofString(),
-        )
-        return response.statusCode()
-    }
+    private fun pingB(signedWith: String): Int = pingIngestionHook(ACCProperties.HA.B.url, signedWith)
 }

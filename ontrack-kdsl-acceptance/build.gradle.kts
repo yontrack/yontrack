@@ -390,6 +390,9 @@ tasks.register<Test>("kdslHaTest") {
     mustRunAfter("test", kdslAcceptanceTest)
     outputs.cacheIf("acceptance tests run against a live instance") { false }
     include("$haTests/ACC*.class")
+    // The classes run in the order of their @Order, unordered ones last: ACCHAEncryption (#2086)
+    // is the first test to meet the empty key store of the stack just started.
+    systemProperty("junit.jupiter.testclass.order.default", "org.junit.jupiter.api.ClassOrderer\$OrderAnnotation")
     testClassesDirs = sourceSets["test"].output.classesDirs
     classpath = sourceSets["test"].runtimeClasspath
     val testFilter = System.getProperty("test.filter")

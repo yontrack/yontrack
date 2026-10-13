@@ -34,18 +34,8 @@ class OtherReplica(
             keyParams(key),
             String::class.java,
         ) ?: error("Job $key not scheduled")
-        if (schedulers.add(scheduler)) {
-            jdbc.update(
-                """
-                    INSERT INTO QRTZ_SCHEDULER_STATE (SCHED_NAME, INSTANCE_NAME, LAST_CHECKIN_TIME, CHECKIN_INTERVAL)
-                    VALUES (:scheduler, :instance, :now, :interval)
-                """,
-                MapSqlParameterSource()
-                    .addValue("scheduler", scheduler)
-                    .addValue("instance", instance)
-                    .addValue("now", System.currentTimeMillis())
-                    .addValue("interval", CHECKIN_INTERVAL_MS),
-            )
+        if (scheduler !in schedulers) {
+            checkIn(scheduler)
         }
         jdbc.update(
             """
@@ -62,6 +52,26 @@ class OtherReplica(
                 .addValue("instance", instance)
                 .addValue("since", since),
         )
+    }
+
+    /**
+     * Checks this replica in with the Quartz scheduler of the given name, at the given time (epoch
+     * milliseconds): by default now, as a live replica does.
+     */
+    fun checkIn(scheduler: String, at: Long = System.currentTimeMillis()) {
+        jdbc.update(
+            """
+                INSERT INTO QRTZ_SCHEDULER_STATE (SCHED_NAME, INSTANCE_NAME, LAST_CHECKIN_TIME, CHECKIN_INTERVAL)
+                VALUES (:scheduler, :instance, :at, :interval)
+                ON CONFLICT (SCHED_NAME, INSTANCE_NAME) DO UPDATE SET LAST_CHECKIN_TIME = :at
+            """,
+            MapSqlParameterSource()
+                .addValue("scheduler", scheduler)
+                .addValue("instance", instance)
+                .addValue("at", at)
+                .addValue("interval", CHECKIN_INTERVAL_MS),
+        )
+        schedulers += scheduler
     }
 
     /**
@@ -88,6 +98,9 @@ class OtherReplica(
         .addValue("key", key.id)
 
     companion object {
-        private const val CHECKIN_INTERVAL_MS = 3_600_000L
+        /**
+         * Check-in interval of the other replicas, in milliseconds
+         */
+        const val CHECKIN_INTERVAL_MS = 3_600_000L
     }
 }

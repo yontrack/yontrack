@@ -17,11 +17,16 @@ class EncryptionServiceImpl(
 
     @Autowired
     @Suppress("SpringJavaInjectionPointsAutowiringInspection")
-    constructor(securityService: SecurityService, confidentialStore: ConfidentialStore) : this(
+    constructor(
+        securityService: SecurityService,
+        confidentialStore: ConfidentialStore,
+        confidentialKeyVersions: ConfidentialKeyVersions,
+    ) : this(
         securityService,
         CryptoConfidentialKey(
             confidentialStore,
-            ENCRYPTION_KEY
+            ENCRYPTION_KEY,
+            confidentialKeyVersions,
         )
     )
 

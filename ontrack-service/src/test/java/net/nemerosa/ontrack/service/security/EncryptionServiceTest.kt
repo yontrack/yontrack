@@ -21,7 +21,8 @@ class EncryptionServiceTest {
                 mockk(relaxed = true),
                 FileConfidentialStore(
                     dir
-                )
+                ),
+                InMemoryConfidentialKeyVersions(),
             )
             // Asserts master key file is created
             assertTrue(File(dir, "master.key").exists())
