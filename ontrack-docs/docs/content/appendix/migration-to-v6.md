@@ -457,6 +457,37 @@ location, its depth and its complexity. A query going over one of them is reject
 * **To raise a limit**, set the `ontrack.config.graphql.limits.max-*` property it names in its
   error.
 
+### Ordered queues: GitHub ingestion and TFC
+
+The GitHub ingestion and the TFC hooks process the events of a repository, or of a workspace, in
+order, one at a time. Their RabbitMQ queues are now declared with a single active consumer
+(`x-single-active-consumer`): the broker delivers the messages of a queue to one consumer at a time,
+whatever the number of backends, and hands over to another backend when it goes away. Before, each
+backend added its own consumer, and the events of one repository could be processed concurrently,
+and out of order, while two backends ran side by side
+([#2082](https://github.com/yontrack/yontrack/issues/2082)).
+
+#### For deployers
+
+* **New queue and exchange names** — the arguments of an existing queue cannot change, so these
+  queues, and their exchanges, have new names:
+    * GitHub ingestion: the `github.ingestion.v2` exchange, and the `github.ingestion.v2.default`,
+      `github.ingestion.v2.default.N` and `github.ingestion.v2.<name>` queues, instead of
+      `github.ingestion`, `github.ingestion.default`, `github.ingestion.default.N` and
+      `github.ingestion.<name>`;
+    * TFC: the `ontrack.queue.tfc.v2` exchange, and the `ontrack.queue.tfc.v2.N` queues, instead
+      of `ontrack.queue.tfc` and `ontrack.queue.tfc.N`.
+* **Messages left in the old queues are abandoned** — the backends of the previous version consume
+  their queues until they stop, and the messages still there are not moved to the new ones.
+* **The old queues and exchanges are deleted automatically** — nothing to do: the *Legacy queue
+  cleanup* job deletes, every 10 minutes, the old queues no backend consumes anymore, then the old
+  exchanges. A queue still consumed by a backend of the previous version, during the upgrade, is
+  kept until that backend is gone.
+* **Changed values** — the `queue` tag of the
+  `ontrack_extension_github_ingestion_queue_consumed_count` metric, the queue stored with the new
+  GitHub ingestion payloads, which the `queue` filter of their GraphQL query matches, and the queue
+  of the new TFC queue records take the new names. The older ones keep the old names.
+
 ## Removed
 
 Yontrack 6 removes what Yontrack 5 deprecated. Each item is listed here with what to use instead,

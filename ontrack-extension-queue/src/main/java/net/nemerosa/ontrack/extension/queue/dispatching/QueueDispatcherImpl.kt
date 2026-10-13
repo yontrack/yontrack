@@ -5,6 +5,7 @@ import net.nemerosa.ontrack.extension.queue.QueueConfigProperties
 import net.nemerosa.ontrack.extension.queue.QueuePayload
 import net.nemerosa.ontrack.extension.queue.QueueProcessor
 import net.nemerosa.ontrack.extension.queue.metrics.queueMessageSent
+import net.nemerosa.ontrack.extension.queue.queueNamePrefix
 import net.nemerosa.ontrack.extension.queue.record.QueueRecordService
 import net.nemerosa.ontrack.extension.queue.source.QueueSource
 import net.nemerosa.ontrack.json.asJson
@@ -62,7 +63,7 @@ class QueueDispatcherImpl(
             routingFeedback(routingKey)
 
             val message = queuePayload.asJson().format()
-            val topic = "ontrack.queue.${queueProcessor.id}"
+            val topic = queueProcessor.queueNamePrefix
             amqpTemplate.convertAndSend(
                 topic,
                 routingKey,

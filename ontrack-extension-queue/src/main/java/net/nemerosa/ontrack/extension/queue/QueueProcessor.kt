@@ -34,6 +34,18 @@ interface QueueProcessor<T : Any> {
     val maxConcurrency: Int get() = 1
 
     /**
+     * True when the messages of a queue must be processed in order, by one consumer at a time,
+     * whatever the number of backends: the queues are declared with `x-single-active-consumer`,
+     * and the broker fails over to another consumer when the active one goes away.
+     *
+     * The queues of such a processor have their own names, [queueNamePrefix] ending with `.v2`,
+     * since the arguments of an existing queue cannot change.
+     *
+     * Its [maxConcurrency] must be 1.
+     */
+    val singleActiveConsumer: Boolean get() = false
+
+    /**
      * Gets a specific routing key for the payload.
      *
      * Returns null by default, to rely on the global settings

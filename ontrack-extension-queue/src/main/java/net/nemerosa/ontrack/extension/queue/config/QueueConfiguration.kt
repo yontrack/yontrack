@@ -29,7 +29,10 @@ class QueueConfiguration(
             declarables: MutableList<Declarable>,
             processor: QueueProcessor<*>
     ) {
-        val id = processor.id
+        // One consumer at a time means one listener per queue
+        check(!processor.singleActiveConsumer || processor.maxConcurrency <= 1) {
+            "Queue processor ${processor.id} has a single active consumer and cannot have a maximum concurrency of ${processor.maxConcurrency}: it must be 1."
+        }
         // Topic
         val topic = processor.queueNamePrefix
         val exchange = DirectExchange(topic)
@@ -39,7 +42,11 @@ class QueueConfiguration(
         val prefix = processor.queueNamePrefix
         val scale = queueConfigProperties.getQueueProcessorScale(processor)
         (0 until scale).forEach { index ->
-            val queue = Queue("$prefix.$index", true)
+            val queue = if (processor.singleActiveConsumer) {
+                QueueBuilder.durable("$prefix.$index").singleActiveConsumer().build()
+            } else {
+                Queue("$prefix.$index", true)
+            }
             val binding = BindingBuilder
                     .bind(queue)
                     .to(exchange)

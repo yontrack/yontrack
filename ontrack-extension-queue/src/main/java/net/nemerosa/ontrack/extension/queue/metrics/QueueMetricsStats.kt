@@ -4,6 +4,7 @@ import io.micrometer.core.instrument.MeterRegistry
 import io.micrometer.core.instrument.Tag
 import net.nemerosa.ontrack.extension.queue.QueueConfigProperties
 import net.nemerosa.ontrack.extension.queue.QueueProcessor
+import net.nemerosa.ontrack.extension.queue.queueNamePrefix
 import net.nemerosa.ontrack.model.support.StartupService
 import org.springframework.amqp.core.AmqpAdmin
 import org.springframework.stereotype.Component
@@ -29,7 +30,7 @@ class QueueMetricsStats(
                 var count = 0
                 val scale = queueConfigProperties.getQueueProcessorScale(queueProcessor)
                 (0 until scale).forEach { index ->
-                    val queueName = "ontrack.queue.${queueProcessor.id}.$index"
+                    val queueName = "${queueProcessor.queueNamePrefix}.$index"
                     val queueProperties: Properties? = amqpAdmin.getQueueProperties(queueName)
                     count += queueProperties?.get("QUEUE_MESSAGE_COUNT")?.toString()?.toInt(10) ?: 0
                 }

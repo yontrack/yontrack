@@ -65,6 +65,11 @@ hand, the broker delivers it again, to the other backend. A stopping backend tak
 and gives the one in hand up to `ontrack.config.rabbitmq.listener-shutdown-timeout` (30 seconds by
 default) to complete.
 
+The GitHub ingestion and the TFC hooks process the events of a repository, or of a workspace, in
+order. Their queues have a single active consumer: the broker delivers their messages to one
+backend at a time, and hands over to the other one when it goes away, so the events stay in order
+whatever the number of backends.
+
 ### Caches during the overlap
 
 Each backend caches the settings and the properties of the entities in memory. A change made

@@ -9,6 +9,9 @@ import kotlin.math.abs
 
 /**
  * Configuration of the queues.
+ *
+ * Each queue is declared with a single active consumer, so that the events of a repository are
+ * processed in order, whatever the number of backends.
  */
 @Configuration
 class AsyncIngestionHookQueueConfig(
@@ -25,7 +28,7 @@ class AsyncIngestionHookQueueConfig(
         // Repository-specific queues
         ingestionConfigProperties.processing.repositories.forEach { (name, _) ->
             // The queue
-            val queue = Queue("$QUEUE_PREFIX.$name")
+            val queue = queue("$QUEUE_PREFIX.$name")
             // The binding
             val binding = BindingBuilder
                 .bind(queue)
@@ -39,7 +42,7 @@ class AsyncIngestionHookQueueConfig(
         if (ingestionConfigProperties.processing.scale > 1) {
             (1..ingestionConfigProperties.processing.scale).forEach { no ->
                 val index = no - 1 // Starting at 0
-                val queue = Queue("$QUEUE_PREFIX.$DEFAULT.$index", true)
+                val queue = queue("$QUEUE_PREFIX.$DEFAULT.$index")
                 val binding = BindingBuilder
                     .bind(queue)
                     .to(exchange)
@@ -48,10 +51,7 @@ class AsyncIngestionHookQueueConfig(
                 declarables += binding
             }
         } else {
-            val defaultQueue = Queue(
-                "$QUEUE_PREFIX.$DEFAULT",
-                true, // We keep the queue alive for reprocessing
-            ).apply {
+            val defaultQueue = queue("$QUEUE_PREFIX.$DEFAULT").apply {
                 declarables += this
             }
             // Catch-all binding
@@ -63,6 +63,11 @@ class AsyncIngestionHookQueueConfig(
         // OK
         return Declarables(declarables)
     }
+
+    /**
+     * Durable queue (kept alive for reprocessing), with one consumer at a time
+     */
+    private fun queue(name: String): Queue = QueueBuilder.durable(name).singleActiveConsumer().build()
 
     companion object {
 
@@ -104,9 +109,19 @@ class AsyncIngestionHookQueueConfig(
             }
 
         /**
-         * Topic exchange name
+         * Topic exchange name.
+         *
+         * Distinct from the [LEGACY_TOPIC] of the queues without a single active consumer, so
+         * that, during a rolling upgrade, a message is published either to the old queues or to
+         * the new ones, never to both.
          */
-        const val TOPIC = "github.ingestion"
+        const val TOPIC = "github.ingestion.v2"
+
+        /**
+         * Former topic exchange name, also prefix of the former queues
+         */
+        @Deprecated("Removed in V7. No replacement. See #2091")
+        const val LEGACY_TOPIC = "github.ingestion"
 
         /**
          * Prefix for the queue names

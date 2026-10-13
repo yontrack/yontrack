@@ -18,6 +18,9 @@ class TFCQueueProcessor(
 
     override val id: String = "tfc"
 
+    // Events of a workspace are processed in order, whatever the number of backends
+    override val singleActiveConsumer: Boolean = true
+
     override fun getRoutingIdentifier(payload: RunPayload): String = payload.workspaceName
 
     override val payloadType: KClass<RunPayload> = RunPayload::class
