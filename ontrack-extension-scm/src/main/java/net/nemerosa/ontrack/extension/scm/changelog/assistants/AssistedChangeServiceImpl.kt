@@ -11,6 +11,8 @@ import net.nemerosa.ontrack.model.structure.StructureService
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
+import java.io.InterruptedIOException
+import java.nio.channels.ClosedByInterruptException
 
 @Service
 class AssistedChangeServiceImpl(
@@ -85,6 +87,11 @@ class AssistedChangeServiceImpl(
                 )
             )
         } catch (any: Exception) {
+            // An interrupted computation is not an SCM error: its replica is stopping, and the queue
+            // redelivers its message to another one
+            if (any.isInterruption()) {
+                throw any
+            }
             logger.warn("Cannot compute the assisted change of build ${build.entityDisplayName}", any)
             AssistedChangeProperty.unknown(
                 reason = AssistedChangeProperty.REASON_SCM_ERROR_PREFIX + (any.message ?: any::class.java.name),
@@ -92,6 +99,11 @@ class AssistedChangeServiceImpl(
             )
         }
     }
+
+    private fun Throwable.isInterruption(): Boolean =
+        generateSequence(this) { it.cause }.any {
+            it is InterruptedException || it is InterruptedIOException || it is ClosedByInterruptException
+        }
 
     private fun hasCommitProperty(build: Build): Boolean =
         propertyService.getProperties(build).any { property ->

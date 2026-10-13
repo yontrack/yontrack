@@ -1,17 +1,10 @@
 package net.nemerosa.ontrack.kdsl.acceptance.tests.ha
 
 import tools.jackson.databind.JsonNode
-import net.nemerosa.ontrack.json.asJson
-import net.nemerosa.ontrack.json.parseAsJson
 import net.nemerosa.ontrack.kdsl.acceptance.tests.ACCProperties
-import net.nemerosa.ontrack.kdsl.connector.support.DefaultConnector
 import net.nemerosa.ontrack.kdsl.spec.configurations.configurations
 import net.nemerosa.ontrack.kdsl.spec.extension.jira.jira
 import org.junit.jupiter.api.Test
-import java.net.URI
-import java.net.http.HttpClient
-import java.net.http.HttpRequest
-import java.net.http.HttpResponse
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 
@@ -59,19 +52,6 @@ class ACCHAStartup : AbstractACCHATestSupport() {
                 "The administrator account is in its group, once",
             )
         }
-    }
-
-    private fun graphQL(url: String, query: String): JsonNode {
-        val response = HttpClient.newHttpClient().send(
-            HttpRequest.newBuilder(URI("$url/graphql"))
-                .header("Content-Type", "application/json")
-                .header(DefaultConnector.X_ONTRACK_TOKEN, ACCProperties.Connection.token)
-                .POST(HttpRequest.BodyPublishers.ofString(mapOf("query" to query.trimIndent()).asJson().toString()))
-                .build(),
-            HttpResponse.BodyHandlers.ofString(),
-        )
-        assertEquals(200, response.statusCode(), "GraphQL call to $url: ${response.body()}")
-        return response.body().parseAsJson()
     }
 
     companion object {

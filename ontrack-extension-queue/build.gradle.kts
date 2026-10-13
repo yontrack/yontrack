@@ -9,7 +9,6 @@ dependencies {
 
     implementation(project(":ontrack-ui-graphql"))
     implementation(project(":ontrack-repository-support"))
-    implementation(project(":ontrack-extension-casc"))
     implementation(project(":ontrack-extension-recordings"))
     implementation("io.micrometer:micrometer-core")
     implementation("org.slf4j:slf4j-api")

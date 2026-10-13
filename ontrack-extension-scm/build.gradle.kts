@@ -11,12 +11,15 @@ dependencies {
     implementation("org.apache.commons:commons-lang3")
     implementation("commons-codec:commons-codec")
     implementation(project(":ontrack-repository-support"))
+    // The assisted changes are computed through a queue (#2083)
+    implementation(project(":ontrack-extension-queue"))
     implementation("io.micrometer:micrometer-core")
     implementation("com.opencsv:opencsv")
 
     testImplementation(testFixtures(project(":ontrack-it-utils")))
     testImplementation(testFixtures(project(":ontrack-model")))
     testImplementation(testFixtures(project(":ontrack-ui-graphql")))
+    testImplementation(testFixtures(project(":ontrack-extension-queue")))
     // Needed to set display names on builds (release property)
     testImplementation(project(":ontrack-extension-general"))
 

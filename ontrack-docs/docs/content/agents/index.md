@@ -553,7 +553,8 @@ is neither a success nor a failure.
 When a build is created, and when its commit is set — which usually happens just after — Yontrack
 computes the change log from the previous build of the branch which has a commit, and counts the
 assistants of its commits. This runs **in the background**, after the build is saved: creating a
-build never waits on the SCM.
+build never waits on the SCM. With several replicas of Yontrack, any of them computes it, one
+computation at a time per build.
 
 * A value **set by the CI** is never recomputed.
 * A build without a commit gets nothing yet: the computation runs again when the commit is set.

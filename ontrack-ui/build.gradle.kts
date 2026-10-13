@@ -41,6 +41,8 @@ dependencies {
     testImplementation(testFixtures(project(":ontrack-extension-api")))
     testImplementation(testFixtures(project(":ontrack-extension-support")))
     testImplementation(testFixtures(project(":ontrack-extension-casc")))
+    // Waiting for the re-indexation of the search documents after a rename (#2083)
+    testImplementation(testFixtures(project(":ontrack-extension-queue")))
     // Reading the CSV export of the events
     testImplementation("com.opencsv:opencsv")
 

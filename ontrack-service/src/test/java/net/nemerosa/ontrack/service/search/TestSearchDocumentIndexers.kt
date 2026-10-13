@@ -165,8 +165,23 @@ class TestEpsilonSearchDocumentIndexer : AbstractTestSearchDocumentIndexer(TYPE,
      */
     val renamed = CopyOnWriteArrayList<Int>()
 
+    /**
+     * Names of the projects whose documents have been re-indexed after a rename
+     */
+    val renamedNames = CopyOnWriteArrayList<String>()
+
+    /**
+     * Called at the start of each re-indexation after a rename
+     */
+    @Volatile
+    var onIndexRenamed: (ProjectEntity) -> Unit = {}
+
     override fun indexRenamed(scope: SearchDocumentReference, entity: ProjectEntity, processor: (SearchDocument) -> Unit) {
+        onIndexRenamed(entity)
         renamed += entity.id()
+        if (entity is Project) {
+            renamedNames += entity.name
+        }
         if (entity is Project && entity.name.startsWith(FAILING)) {
             error("Failing re-indexation after the rename of ${entity.name}")
         }

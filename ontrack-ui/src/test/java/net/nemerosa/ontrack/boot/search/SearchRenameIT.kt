@@ -3,6 +3,7 @@ package net.nemerosa.ontrack.boot.search
 import net.nemerosa.ontrack.boot.BRANCH_SEARCH_RESULT_TYPE
 import net.nemerosa.ontrack.boot.BUILD_SEARCH_RESULT_TYPE
 import net.nemerosa.ontrack.extension.general.BuildLinkSearchExtension
+import net.nemerosa.ontrack.extension.queue.QueueTestSupport
 import net.nemerosa.ontrack.extension.general.ReleaseSearchExtension
 import net.nemerosa.ontrack.model.security.Roles
 import net.nemerosa.ontrack.model.structure.Branch
@@ -10,7 +11,6 @@ import net.nemerosa.ontrack.model.structure.NameDescription
 import net.nemerosa.ontrack.model.structure.Project
 import net.nemerosa.ontrack.model.structure.SearchQueryRequest
 import net.nemerosa.ontrack.model.structure.SearchResult
-import net.nemerosa.ontrack.model.structure.SearchDocumentRenameReindexation
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.transaction.annotation.Propagation
@@ -20,12 +20,13 @@ import kotlin.test.assertEquals
 
 /**
  * Search results after the rename of a project or a branch: their names are the current ones,
- * resolved when searching, and the documents matched on them are re-indexed after the rename.
+ * resolved when searching, and the documents matched on them are re-indexed after the rename, through
+ * the `search-rename` queue.
  */
 class SearchRenameIT : AbstractSearchTestSupport() {
 
     @Autowired
-    private lateinit var searchDocumentRenameReindexation: SearchDocumentRenameReindexation
+    private lateinit var queueTestSupport: QueueTestSupport
 
     /**
      * Random name, which no other one is similar to, even by trigram
@@ -122,7 +123,7 @@ class SearchRenameIT : AbstractSearchTestSupport() {
             val oldName = branch.project.name
             val newName = token()
             renameProject(branch.project, newName)
-            searchDocumentRenameReindexation.awaitCompletion()
+            queueTestSupport.awaitProcessing("search-rename")
             asUser {
                 assertEquals(
                     listOf("$newName/${branch.name}"),

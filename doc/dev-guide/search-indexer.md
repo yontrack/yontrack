@@ -204,12 +204,15 @@ the documents of the type referring to it through the scope which were not provi
 documents of that scope only. The path of a scope cannot cross an array.
 
 The re-indexation runs on a **rename only** — the update events carry the previous name
-(`EventFactory.PREVIOUS_NAME`) only then — asynchronously, **after the commit** of the rename
-(`SearchDocumentRenameListener`), one at a time in the order of the commits: a rename never carries
-a bulk rewrite. As administrator, outside
-any transaction. A failure is logged and counted in `ontrack_search_index_errors{type}`, and the
-reconciliation of the type repairs it. A test waits for it with
-`SearchDocumentRenameReindexation.awaitCompletion()`, from a test running outside a transaction
+(`EventFactory.PREVIOUS_NAME`) only then — asynchronously, **after the commit** of the rename: a
+rename never carries a bulk rewrite. `SearchRenameEventListener` posts the renamed entity to the
+`search-rename` queue (in `ontrack-extension-queue`, the core having no queue), and any replica runs
+`SearchDocumentRenameReindexation.reindexRenamed` for it (#2083), as administrator, outside any
+transaction. The re-indexations of an entity run one at a time across the replicas, under an
+advisory lock on the entity, and each reads the current name: two quick renames end with the
+documents of the last one, and a redelivered message is harmless. A failure is logged and counted
+in `ontrack_search_index_errors{type}`. A test waits for it with
+`QueueTestSupport.awaitProcessing("search-rename")`, from a test running outside a transaction
 (`@Transactional(propagation = Propagation.NOT_SUPPORTED)`), since nothing runs after the commit of
 a transaction which is rolled back.
 
