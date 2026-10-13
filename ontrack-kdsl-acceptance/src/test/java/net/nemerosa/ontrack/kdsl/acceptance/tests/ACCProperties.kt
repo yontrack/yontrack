@@ -87,6 +87,15 @@ object ACCProperties {
          * and starts again (#2079)
          */
         val project: String? by optionalFromEnv()
+
+        /**
+         * The remotes of the Git tests (#2085): a directory of this host, where the tests write bare
+         * repositories, which both backends mount as `/git-remote`
+         */
+        object Git {
+            @DefaultValue("build/kdsl-ha/git")
+            val dir: String by fromEnv()
+        }
     }
 
     @Target(AnnotationTarget.PROPERTY)

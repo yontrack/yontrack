@@ -8,7 +8,11 @@ import java.util.function.Predicate
 import java.util.stream.Stream
 
 /**
- * Defines a client for a Git repository.
+ * Defines a client for a Git repository, through a local clone.
+ *
+ * Every read from the clone makes sure it is fresh first (#2085): the clone is made on the first
+ * use, fetched when its last fetch is older than the freshness window, and made again when the
+ * repository was reset since, on whichever replica, see [GitCloneGenerations].
  */
 interface GitRepositoryClient {
 
@@ -23,13 +27,7 @@ interface GitRepositoryClient {
     val tags: Collection<GitTag>
 
     /**
-     * Gets the synchronisation status
-     */
-    val synchronisationStatus: GitSynchronisationStatus
-
-    /**
-     * Gets the list of all local branches, and their last commit. If the repository is not synched, or is currently
-     * being synched, the map is returned empty.
+     * Gets the list of all the branches of the clone, and their last commit.
      */
     val branches: GitBranchesInfo
 
@@ -54,7 +52,9 @@ interface GitRepositoryClient {
     fun test()
 
     /**
-     * Makes sure the repository is synchronised with its remote location.
+     * Makes sure the repository is synchronised with its remote location: fetched whatever the time
+     * of its last fetch, or cloned when never done, or done before the last reset of the repository.
+     * Nothing is done if the clone is being synchronised already on this replica.
      *
      * @param logger Used to log messages during the synchronisation
      */
@@ -179,11 +179,6 @@ interface GitRepositoryClient {
      * @return Content of the document (assumed to be a [String]) or `null` if not present
      */
     fun download(branch: String, path: String): String?
-
-    /**
-     * Resets the repository. Performs even if there is a synchronisation going on.
-     */
-    fun reset()
 
     /**
      * Checks if the repository is ready to be used

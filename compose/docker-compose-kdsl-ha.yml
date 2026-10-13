@@ -82,8 +82,15 @@ x-ontrack: &ontrack
     # ... the SCM catalog, whose gauges one backend computes and both report, which
     # ACCHAReplicaJobs checks (#2078)
     ONTRACK_CONFIG_EXTENSION_SCM_CATALOG_ENABLED: "true"
+    # ... the Git clones of each backend, which ACCHAGitClones reads through both (#2085): a read
+    # fetches once its clone is older than 5 seconds, rather than the default minute
+    ONTRACK_CONFIG_EXTENSION_GIT_REMOTE_FRESHNESS: "5s"
   volumes:
     - ./casc/kdsl-ha.yaml:/casc/kdsl-ha.yaml:ro
+    # The remotes of the Git tests: bare repositories which the tests write on the host and both
+    # backends clone, as `file:///git-remote/<name>.git`. `kdslHaTest` creates the directory before
+    # the stack starts and gives it to the tests (#2085).
+    - "${YONTRACK_KDSL_HA_GIT_DIR:-../ontrack-kdsl-acceptance/build/kdsl-ha/git}:/git-remote:ro"
   depends_on:
     postgres:
       condition: service_healthy

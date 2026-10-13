@@ -1,18 +1,18 @@
 package net.nemerosa.ontrack.extension.git.service
 
 import net.nemerosa.ontrack.extension.git.GitConfigProperties
-import net.nemerosa.ontrack.git.GitRepositoryClientFactory
 import net.nemerosa.ontrack.job.*
 import net.nemerosa.ontrack.model.support.JobProvider
 import org.springframework.stereotype.Component
 
 /**
- * Job to cleanup existing indexations.
+ * Job to cleanup existing indexations: run on one replica, it resets the clones of every replica,
+ * which each makes them again on its next use (#2085).
  */
 @Component
 class GitIndexationCleanupJob(
     private val gitConfigProperties: GitConfigProperties,
-    private val gitRepositoryClientFactory: GitRepositoryClientFactory,
+    private val gitCloneGenerationService: GitCloneGenerationService,
 ) : JobProvider {
 
     override fun getStartingJobs() = if (gitConfigProperties.indexation.cleanup.enabled) {
@@ -39,7 +39,7 @@ class GitIndexationCleanupJob(
                 .getKey("main")
 
         override fun getTask() = JobRun {
-            gitRepositoryClientFactory.reset()
+            gitCloneGenerationService.resetAll()
         }
 
         override fun getDescription(): String = "Resetting all Git indexations."

@@ -4,6 +4,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import net.nemerosa.ontrack.common.Time
 import net.nemerosa.ontrack.common.Utils
+import net.nemerosa.ontrack.git.GitCloneGenerations
 import net.nemerosa.ontrack.git.GitRepository
 import net.nemerosa.ontrack.git.GitRepositoryClient
 import net.nemerosa.ontrack.git.exceptions.*
@@ -37,7 +38,9 @@ import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.IOException
 import java.lang.String.format
+import java.time.Clock
 import java.time.Duration
+import java.time.Instant
 import java.time.LocalDateTime
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap
@@ -46,6 +49,19 @@ import java.util.function.Consumer
 import java.util.function.Predicate
 import java.util.stream.Stream
 
+/**
+ * Client of the local clone of a remote repository.
+ *
+ * Each replica has clones of its own (#2085). Every read goes through [ensureFresh], which clones the
+ * repository on its first use, fetches when the last fetch of the clone is older than the
+ * [freshness] window, and clones it again when it was made before the last reset of the repository,
+ * its [generation][GitCloneGenerations]. The last fetch and the generation of a clone are kept in the
+ * clone itself, so that a client, created for each use, finds them.
+ *
+ * @param freshness How old the last fetch of the clone can be when it is read
+ * @param generations Current reset generation of the repository, the same on every replica
+ * @param clock Time of the fetches
+ */
 class GitRepositoryClientImpl(
     private val repositoryDir: File,
     private val repository: GitRepository,
@@ -54,17 +70,35 @@ class GitRepositoryClientImpl(
     private val config: GitConnectionConfig,
     private val retries: UInt = 3u,
     private val interval: Duration = Duration.ofSeconds(30),
+    private val freshness: Duration = DEFAULT_FRESHNESS,
+    private val generations: GitCloneGenerations = GitCloneGenerations.NONE,
+    private val clock: Clock = Clock.systemUTC(),
 ) : GitRepositoryClient {
 
     private val logger = LoggerFactory.getLogger(GitRepositoryClient::class.java)
-    private val git: Git
-    private val credentialsProvider: CredentialsProvider?
-    private val sync = ReentrantLock()
+
+    /**
+     * Reopened when the clone is made again
+     */
+    @Volatile
+    private var git: Git = openGit()
+    private val credentialsProvider: CredentialsProvider? = repository.authenticator?.getCredentialsProvider()
+
+    /**
+     * Lock of the clone, shared by all the clients of this replica: a client is created for each use
+     */
+    private val directoryLock: ReentrantLock = getDirectoryLock(repositoryDir.absolutePath)
+
+    /**
+     * When this client last made sure the clone was fresh
+     */
+    @Volatile
+    private var checkedAt: Instant? = null
 
     private val isClonedOrCloning: Boolean
         get() = File(repositoryDir, ".git").exists()
 
-    override val isReady: Boolean get() = isClonedOrCloning && !sync.isLocked
+    override val isReady: Boolean get() = isClonedOrCloning && !directoryLock.isLocked
 
     /**
      * Runs a remote command, with authentication, timeout & retry management.
@@ -101,18 +135,12 @@ class GitRepositoryClientImpl(
 
         }
 
-    override val synchronisationStatus: GitSynchronisationStatus
-        get() = when {
-            sync.isLocked -> GitSynchronisationStatus.RUNNING
-            isClonedOrCloning -> GitSynchronisationStatus.IDLE
-            else -> GitSynchronisationStatus.NONE
-        }
-
     override val branches: GitBranchesInfo
-        get() = if (!isClonedOrCloning) {
-            GitBranchesInfo.empty()
-        } else if (sync.tryLock()) {
-            try {
+        get() {
+            ensureFresh()
+            return if (!isClonedOrCloning) {
+                GitBranchesInfo.empty()
+            } else try {
                 val repo = git.repository
                 val revWalk = RevWalk(repo)
                 val branchRefs = git.branchList().setListMode(ListBranchCommand.ListMode.REMOTE).call()
@@ -133,32 +161,23 @@ class GitRepositoryClientImpl(
                 throw GitRepositoryAPIException(repository.remote, e)
             } catch (e: IOException) {
                 throw GitRepositoryIOException(repository.remote, e)
-            } finally {
-                sync.unlock()
             }
-        } else {
-            GitBranchesInfo.empty()
         }
 
     override val defaultBranch: String?
-        get() = if (!isClonedOrCloning) {
-            null
-        } else if (sync.tryLock()) {
-            try {
-                val repo = git.repository
-                repo.branch
-            } catch (e: GitAPIException) {
-                throw GitRepositoryAPIException(repository.remote, e)
+        get() {
+            ensureFresh()
+            return if (!isClonedOrCloning) {
+                null
+            } else try {
+                git.repository.branch
             } catch (e: IOException) {
                 throw GitRepositoryIOException(repository.remote, e)
-            } finally {
-                sync.unlock()
             }
-        } else {
-            null
         }
 
     override fun getBranchesForCommit(commit: String): List<String> {
+        ensureFresh()
         try {
             val list = git.branchList()
                 .setContains(commit)
@@ -178,6 +197,7 @@ class GitRepositoryClientImpl(
 
     override val tags: Collection<GitTag>
         get() {
+            ensureFresh()
             try {
                 val repo = git.repository
                 val revWalk = RevWalk(repo)
@@ -188,23 +208,21 @@ class GitRepositoryClientImpl(
             }
         }
 
-    init {
-        // Gets the Git repository
-        val gitRepository: Repository
+    /**
+     * Opens the clone, which may not exist yet. The Git directory is the one of the clone, never one
+     * of its parents.
+     */
+    private fun openGit(): Git =
         try {
-            gitRepository = FileRepositoryBuilder()
-                .setWorkTree(repositoryDir)
-                .findGitDir(repositoryDir)
-                .build()
+            Git(
+                FileRepositoryBuilder()
+                    .setGitDir(File(repositoryDir, ".git"))
+                    .setWorkTree(repositoryDir)
+                    .build()
+            )
         } catch (e: IOException) {
             throw GitRepositoryInitException(e)
         }
-
-        // Gets the Git
-        git = Git(gitRepository)
-        // Credentials
-        credentialsProvider = repository.authenticator?.getCredentialsProvider()
-    }
 
     /**
      * Tries to ls-remote the heads
@@ -222,22 +240,61 @@ class GitRepositoryClientImpl(
 
     }
 
+    /**
+     * Fetches the clone whatever the time of its last fetch, cloning it if needed, or again when it
+     * is older than the reset generation of the repository.
+     */
     override fun sync(logger: Consumer<String>) {
-        if (sync.tryLock()) {
+        if (directoryLock.tryLock()) {
             try {
-                // Clone or update?
-                if (isClonedOrCloning) {
-                    // Fetch
-                    fetch(logger)
+                val now = clock.instant()
+                val generation = generations.getGeneration(repository)
+                val state = readState()
+                if (state == null || state.generation < generation) {
+                    cloneRemote(generation, logger)
                 } else {
-                    // Clone
-                    cloneRemote(logger)
+                    fetch(logger)
+                    writeState(state.generation, now)
                 }
+                checkedAt = now
             } finally {
-                sync.unlock()
+                directoryLock.unlock()
             }
         } else {
             logger.accept(format("[git] %s is already synchronising, trying later", repository.remote))
+        }
+    }
+
+    /**
+     * Makes sure the clone can be read: cloned if never done, or done before the last reset of the
+     * repository; fetched if its last fetch is older than the [freshness] window. A clone whose
+     * remote cannot be fetched is read as it is.
+     *
+     * A repository without a remote is a local one, read where it is.
+     */
+    private fun ensureFresh() {
+        if (repository.remote.isBlank()) return
+        val now = clock.instant()
+        val checked = checkedAt
+        if (checked != null && Duration.between(checked, now) < freshness) return
+        directoryLock.lock()
+        try {
+            val generation = generations.getGeneration(repository)
+            val state = readState()
+            if (state == null || state.generation < generation) {
+                cloneRemote(generation) { logger.debug(it) }
+            } else if (Duration.between(state.fetchedAt, now) >= freshness) {
+                try {
+                    fetch { logger.debug(it) }
+                } catch (any: RuntimeException) {
+                    logger.warn("[git] Cannot fetch ${repository.remote}, reading its clone as it is", any)
+                }
+                // Not tried again before the end of the window, even when it failed
+                writeState(state.generation, now)
+            }
+            checkedAt = now
+        } finally {
+            directoryLock.unlock()
         }
     }
 
@@ -253,7 +310,6 @@ class GitRepositoryClientImpl(
         }
     }
 
-    @Synchronized
     private fun fetch(logger: Consumer<String>) {
         logger.accept(format("[git] Pulling %s", repository.remote))
         try {
@@ -267,8 +323,14 @@ class GitRepositoryClientImpl(
         logger.accept(format("[git] Pulling done for %s", repository.remote))
     }
 
-    @Synchronized
-    private fun cloneRemote(logger: Consumer<String>) {
+    /**
+     * Clones the repository, deleting any clone first, and records the reset [generation] it was
+     * cloned at.
+     */
+    private fun cloneRemote(generation: Long, logger: Consumer<String>) {
+        val now = clock.instant()
+        git.close()
+        deleteClone()
         logger.accept(format("[git] Cloning %s", repository.remote))
         try {
             catchRemote {
@@ -276,18 +338,74 @@ class GitRepositoryClientImpl(
                     .setDirectory(repositoryDir)
                     .setURI(repository.remote)
                     .invoke("Cloning ${repository.remote}")
+                    .close()
             }
         } catch (e: GitAPIException) {
+            deleteClone()
             throw GitRepositoryAPIException(repository.remote, e)
+        } catch (any: RuntimeException) {
+            // No half clone left, taken for a clone by the next use
+            deleteClone()
+            throw any
+        } finally {
+            git = openGit()
         }
 
         // Check
         if (!isClonedOrCloning) {
             throw GitRepositoryCannotCloneException(repository.remote)
         }
+        writeState(generation, now)
         // Done
         logger.accept(format("[git] Clone done for %s", repository.remote))
     }
+
+    /**
+     * Deletes the content of the clone, keeping its directory.
+     */
+    private fun deleteClone() {
+        try {
+            if (repositoryDir.exists()) {
+                FileUtils.cleanDirectory(repositoryDir)
+            }
+        } catch (e: IOException) {
+            throw GitRepositoryIOException(repository.remote, e)
+        }
+    }
+
+    /**
+     * State of the clone: the reset generation it was made at, and its last fetch.
+     */
+    private data class CloneState(val generation: Long, val fetchedAt: Instant)
+
+    private val stateFile: File get() = File(repositoryDir, ".git/$STATE_FILE")
+
+    /**
+     * Reads the state of the clone, `null` when there is no clone. A clone made by a version
+     * without this state is at generation 0, and was never fetched.
+     */
+    private fun readState(): CloneState? =
+        if (!isClonedOrCloning) {
+            null
+        } else if (!stateFile.exists()) {
+            CloneState(0, Instant.EPOCH)
+        } else {
+            val properties = Properties()
+            stateFile.inputStream().use { properties.load(it) }
+            CloneState(
+                generation = properties.getProperty("generation")?.toLongOrNull() ?: 0,
+                fetchedAt = properties.getProperty("fetchedAt")?.toLongOrNull()?.let { Instant.ofEpochMilli(it) }
+                    ?: Instant.EPOCH,
+            )
+        }
+
+    private fun writeState(generation: Long, fetchedAt: Instant) {
+        val properties = Properties()
+        properties.setProperty("generation", generation.toString())
+        properties.setProperty("fetchedAt", fetchedAt.toEpochMilli().toString())
+        stateFile.outputStream().use { properties.store(it, "State of the clone (#2085)") }
+    }
+
 
     override fun isCompatible(repository: GitRepository): Boolean {
         return this.repository == repository
@@ -299,6 +417,7 @@ class GitRepositoryClientImpl(
         include: Boolean,
         code: (RevCommit) -> T?,
     ): T? {
+        ensureFresh()
         try {
             val gitRepository = git.repository
 
@@ -344,6 +463,7 @@ class GitRepositoryClientImpl(
     }
 
     override fun forEachCommit(code: (GitCommit) -> Unit) {
+        ensureFresh()
         try {
             git.log().all().call()
                 .map { toCommit(it) }
@@ -363,6 +483,7 @@ class GitRepositoryClientImpl(
         count: Int,
         code: (GitCommit) -> Unit
     ) {
+        ensureFresh()
         try {
             val gitRepository = git.repository
 
@@ -415,6 +536,7 @@ class GitRepositoryClientImpl(
     }
 
     override fun log(from: String, to: String): Stream<GitCommit> {
+        ensureFresh()
         try {
             val gitRepository = git.repository
             val oFrom = gitRepository.resolve(from)
@@ -439,6 +561,7 @@ class GitRepositoryClientImpl(
     }
 
     override fun graph(from: String, to: String): GitLog {
+        ensureFresh()
         try {
             val range = range(from, to, false)
             val walk = PlotWalk(git.repository)
@@ -473,21 +596,25 @@ class GitRepositoryClientImpl(
         // Ignore exceptions, in order to ignore Git configuration errors
         // In the Git repo is wrongly configured, the token is considered at not found
         return try {
+            ensureFresh()
             val log = git.log()
                 .all()
                 .setRevFilter(MessageRevFilter.create(token))
                 .setMaxCount(1)
             val commits = log.call()
             commits.iterator().hasNext()
-        } catch (e: GitAPIException) {
+        } catch (_: GitRepositoryException) {
             false
-        } catch (e: IOException) {
+        } catch (_: GitAPIException) {
+            false
+        } catch (_: IOException) {
             false
         }
 
     }
 
     override fun findCommitForRegex(branch: String, regex: String): RevCommit? {
+        ensureFresh()
         try {
             val resolvedBranch = git.repository.resolve(getBranchRef(branch))
             return if (resolvedBranch != null) {
@@ -513,6 +640,7 @@ class GitRepositoryClientImpl(
     }
 
     override fun getLastCommitForExpression(regex: String): String? {
+        ensureFresh()
         return try {
             val log = git.log()
                 .all()
@@ -542,10 +670,12 @@ class GitRepositoryClientImpl(
      * @see net.nemerosa.ontrack.git.support.GitClientSupport.tagContains
      */
     override fun getTagsWhichContainCommit(gitCommitId: String): Collection<String> {
+        ensureFresh()
         return GitClientSupport.tagContains(repositoryDir, gitCommitId)
     }
 
     override fun unifiedDiff(from: String, to: String, pathFilter: Predicate<String>): String {
+        ensureFresh()
         try {
             val range = range(from, to)
 
@@ -579,19 +709,9 @@ class GitRepositoryClientImpl(
     }
 
     override fun download(branch: String, path: String): String? {
-        // Sync first
-        sync { logger.debug(it) }
+        ensureFresh()
         // Git show
         return GitClientSupport.showPath(repositoryDir, getBranchRef(branch), path)
-    }
-
-    override fun reset() {
-        try {
-            FileUtils.forceDelete(repositoryDir)
-        } catch (e: IOException) {
-            throw GitRepositoryIOException(repository.remote, e)
-        }
-
     }
 
     private fun formatDiffEntry(formatter: DiffFormatter, entry: DiffEntry) {
@@ -604,6 +724,7 @@ class GitRepositoryClientImpl(
     }
 
     override fun diff(from: String, to: String): GitDiff {
+        ensureFresh()
         try {
             val range = range(from, to)
 
@@ -636,6 +757,7 @@ class GitRepositoryClientImpl(
     }
 
     override fun getCommitFor(id: String): GitCommit? {
+        ensureFresh()
         return try {
             val repo = git.repository
             val objectId = repo.resolve("$id^0")
@@ -670,6 +792,7 @@ class GitRepositoryClientImpl(
     }
 
     override fun isCommit(commitish: String): Boolean {
+        ensureFresh()
         try {
             val repo = git.repository
             return repo.resolve(commitish) != null
@@ -736,9 +859,10 @@ class GitRepositoryClientImpl(
     }
 
     override fun mergeBranch(head: String, base: String): GitCommit {
-        val directoryLock = getDirectoryLock(repositoryDir.absolutePath)
         directoryLock.lock()
         try {
+            // Cloned if never done, and fetched again by the merge itself
+            ensureFresh()
             // JGit does not throw on a rejected push: a remote base branch which moved since the
             // fetch is merged again, a bounded number of times
             var rejection = ""
@@ -808,6 +932,20 @@ class GitRepositoryClientImpl(
     }
 
     companion object {
+
+        /**
+         * How old the last fetch of a clone can be when it is read, by default
+         */
+        val DEFAULT_FRESHNESS: Duration = Duration.ofMinutes(1)
+
+        /**
+         * State of a clone, in its Git directory: its reset generation and its last fetch
+         */
+        private const val STATE_FILE = "yontrack-clone.properties"
+
+        /**
+         * Locks of the clones, by directory, for this replica
+         */
         private val directoryLocks = ConcurrentHashMap<String, ReentrantLock>()
 
         /**

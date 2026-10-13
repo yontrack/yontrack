@@ -2,7 +2,6 @@ package net.nemerosa.ontrack.extension.git.service
 
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
-import net.nemerosa.ontrack.common.FutureUtils
 import net.nemerosa.ontrack.common.asOptional
 import net.nemerosa.ontrack.extension.git.GitConfigProperties
 import net.nemerosa.ontrack.extension.git.casc.GitConfigService
@@ -53,6 +52,7 @@ class GitServiceImpl(
     private val gitPullRequestCache: DefaultGitPullRequestCache,
     private val gitNoRemoteCounter: GitNoRemoteCounter,
     private val gitConfigService: GitConfigService,
+    private val gitCloneGenerationService: GitCloneGenerationService,
     transactionManager: PlatformTransactionManager
 ) : GitService, JobOrchestratorSupplier {
 
@@ -158,16 +158,6 @@ class GitServiceImpl(
         }
     }
 
-    private fun syncAndWait(gitConfiguration: GitConfiguration): Any? {
-        // Gets the sync job (might be null)
-        val sync = sync(gitConfiguration, GitSynchronisationRequest.SYNC)
-        return if (sync != null) {
-            FutureUtils.wait("Synchronisation for " + gitConfiguration.name, sync)
-        } else {
-            null
-        }
-    }
-
     private fun getRequiredProjectConfiguration(project: Project): GitConfiguration {
         return getProjectConfiguration(project) ?: throw GitProjectNotConfiguredException(project.id)
     }
@@ -179,25 +169,11 @@ class GitServiceImpl(
         return client.isPatternFound(token)
     }
 
-    override fun lookupCommit(configuration: GitConfiguration, id: String): GitCommit? {
-        // Gets the client client for this configuration
-        val gitClient = gitRepositoryClientFactory.getClient(configuration.gitRepository, gitConfigService.gitConnectionConfig)
-        // Gets the commit
-        return gitClient.getCommitFor(id)
-    }
-
     override fun forEachCommit(gitConfiguration: GitConfiguration, code: (GitCommit) -> Unit) {
         // Gets the client for this configuration
         val gitClient = gitRepositoryClientFactory.getClient(gitConfiguration.gitRepository, gitConfigService.gitConnectionConfig)
         // Looping
         gitClient.forEachCommit(code)
-    }
-
-    override fun isRepositorySynched(gitConfiguration: GitConfiguration): Boolean {
-        // Gets the client client for this configuration
-        val gitClient = gitRepositoryClientFactory.getClient(gitConfiguration.gitRepository, gitConfigService.gitConnectionConfig)
-        // Test
-        return gitClient.isReady
     }
 
     override fun getRemoteBranches(gitConfiguration: GitConfiguration): List<String> {
@@ -229,11 +205,11 @@ class GitServiceImpl(
     }
 
     override fun sync(gitConfiguration: GitConfiguration, request: GitSynchronisationRequest): Future<*>? {
-        // Reset the repository?
+        // Reset of the clones of every replica, each making its own again on its next use
         if (request.isReset) {
-            gitRepositoryClientFactory.getClient(gitConfiguration.gitRepository, gitConfigService.gitConnectionConfig).reset()
+            gitCloneGenerationService.reset(gitConfiguration.gitRepository)
         }
-        // Schedules the job
+        // Runs the indexation now, on any replica
         return jobScheduler.fireImmediately(getGitIndexationJobKey(gitConfiguration)).orElse(null)
     }
 
@@ -244,25 +220,38 @@ class GitServiceImpl(
             ?: throw GitProjectNotConfiguredException(project.id)
     }
 
+    /**
+     * The status is the one of the indexation job, the same on every replica (#2085). The branches
+     * come from the clone of this replica, fresh, once the repository has been indexed.
+     */
     private fun getGitSynchronisationInfo(gitConfiguration: GitConfiguration): GitSynchronisationInfo {
-        // Gets the client for this configuration
-        val client = gitRepositoryClientFactory.getClient(gitConfiguration.gitRepository, gitConfigService.gitConnectionConfig)
-        // Gets the status
-        val status = client.synchronisationStatus
-        // Collects the branch info
+        val jobStatus = jobScheduler.getJobStatus(getGitIndexationJobKey(gitConfiguration)).getOrNull()
+        val status = when {
+            jobStatus == null -> GitSynchronisationStatus.NONE
+            jobStatus.isRunning -> GitSynchronisationStatus.RUNNING
+            jobStatus.lastRunDate == null -> GitSynchronisationStatus.NONE
+            else -> GitSynchronisationStatus.IDLE
+        }
         val branches: List<GitBranchInfo> = if (status == GitSynchronisationStatus.IDLE) {
-            client.branches.branches
+            try {
+                gitRepositoryClientFactory.getClient(gitConfiguration.gitRepository, gitConfigService.gitConnectionConfig)
+                    .branches.branches
+            } catch (any: Exception) {
+                logger.warn("Cannot read the branches of ${gitConfiguration.remote}: ${any.message}")
+                emptyList()
+            }
         } else {
             emptyList()
         }
-        // OK
         return GitSynchronisationInfo(
-            gitConfiguration.type,
-            gitConfiguration.name,
-            gitConfiguration.remote,
-            gitConfiguration.indexationInterval,
-            status,
-            branches
+            type = gitConfiguration.type,
+            name = gitConfiguration.name,
+            remote = gitConfiguration.remote,
+            indexationInterval = gitConfiguration.indexationInterval,
+            status = status,
+            branches = branches,
+            lastRunDate = jobStatus?.lastRunDate,
+            lastError = jobStatus?.lastError,
         )
     }
 
@@ -484,10 +473,7 @@ class GitServiceImpl(
         // Configuration for the sync
         val confProperty = propertyService.getPropertyValue(branch, GitBranchConfigurationPropertyType::class.java)
         val override = confProperty != null && confProperty.override
-        // Makes sure of synchronization
-        listener.message("Synchronizing before importing")
-        syncAndWait(configuration)
-        // Gets the list of tags
+        // Gets the list of tags, from a clone fetched if older than the freshness window
         listener.message("Getting list of tags")
         val tags = gitClient.tags
         // Creates the builds

@@ -25,6 +25,8 @@ paths:
   (`KdslStack.BASE_HA_*`, recorded in `.yontrack-kdsl/instance.env`), passed to the tests as
   `ontrack.acceptance.ha.{a,b}.url` and `.mgt.url` by `KdslStackInstance.haSystemProperties`, with
   the Compose project as `ontrack.acceptance.ha.project` for the tests killing a backend. The
-  backends' host names are `ontrack-a` and `ontrack-b`: the replica a job runs on (#2079).
+  backends' host names are `ontrack-a` and `ontrack-b`: the replica a job runs on (#2079). Both
+  mount `ontrack-kdsl-acceptance/build/kdsl-ha/git` as `/git-remote`, the bare repositories the Git
+  tests write (`ontrack.acceptance.ha.git.dir`, #2085).
 - `docs/adr/0012-parallel-integration-test-stacks.md` and
   `docs/adr/0013-parallel-kdsl-acceptance-stacks.md` explain the scheme.

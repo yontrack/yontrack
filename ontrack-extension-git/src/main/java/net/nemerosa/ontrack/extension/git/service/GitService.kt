@@ -110,14 +110,6 @@ interface GitService {
     fun forEachConfiguredBranchInProject(project: Project, consumer: (Branch, GitBranchConfiguration) -> Unit)
 
     /**
-     * Looks up a commit in the given `configuration`.
-     *
-     * @param id Commit long or short ID
-     * @return The content of a commit if it exists, `null` otherwise.
-     */
-    fun lookupCommit(configuration: GitConfiguration, id: String): GitCommit?
-
-    /**
      * Downloads the file at the given path for a branch
      *
      * @param project Project holding the Git configuration
@@ -143,7 +135,9 @@ interface GitService {
     fun projectSync(project: Project, request: GitSynchronisationRequest): Ack
 
     /**
-     * Synchronises the Git repository attached to this configuration using an asynchronous job.
+     * Synchronises the Git repository attached to this configuration using an asynchronous job, on any
+     * replica. A reset bumps the reset generation of the repository: every replica clones it again
+     * on its next use (#2085).
      *
      * @param gitConfiguration Configuration to sync
      * @param request          Sync request
@@ -169,7 +163,8 @@ interface GitService {
     )
 
     /**
-     * Gets the Git synchronisation information.
+     * Gets the Git synchronisation information: the shared status of the indexation job, the same
+     * on every replica, and the branches of the repository.
      *
      * @param project Project configured for Git
      * @return Synchronisation information
@@ -223,10 +218,5 @@ interface GitService {
      * Loops over the commits of a configuration
      */
     fun forEachCommit(gitConfiguration: GitConfiguration, code: (GitCommit) -> Unit)
-
-    /**
-     * Checks if the repository is ready to be used.
-     */
-    fun isRepositorySynched(gitConfiguration: GitConfiguration): Boolean
 
 }

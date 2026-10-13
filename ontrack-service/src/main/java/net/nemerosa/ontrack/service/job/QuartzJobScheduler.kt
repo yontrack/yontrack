@@ -420,11 +420,19 @@ class QuartzJobScheduler(
 
     private fun run(job: Job) {
         val key = job.key
-        if (!job.isValid) {
+        // Checked under the decorator of the job, as its task: on a thread of Quartz, a check reading
+        // entities, like the existence of the branch of a branch job, has no rights otherwise (#2085)
+        var valid = false
+        var disabled = false
+        jobDecorator.decorate(job) {
+            valid = job.isValid
+            disabled = valid && job.isDisabled
+        }()
+        if (!valid) {
             logger.debug("[job][run]{} Not valid, not run", key)
             return
         }
-        if (job.isDisabled) {
+        if (disabled) {
             logger.debug("[job][run]{} Disabled, not run", key)
             return
         }

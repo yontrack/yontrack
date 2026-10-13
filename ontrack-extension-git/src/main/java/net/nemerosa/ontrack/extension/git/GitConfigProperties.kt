@@ -52,7 +52,7 @@ class GitConfigProperties {
      */
     class GitIndexationCleanupConfigProperties {
 
-        @APIDescription("Cleanup of Git indexations working directories")
+        @APIDescription("Cleanup of Git indexations working directories: the clones of every replica are made again on their next use")
         var enabled = true
 
         @APIDescription("Cron for the job (empty to let it run manually)")
@@ -111,6 +111,18 @@ class GitConfigProperties {
             """
         )
         var maxNoRemote: Int = 3
+
+        @DurationUnit(ChronoUnit.SECONDS)
+        @APIDescription(
+            """
+                How old (by default in seconds) the last fetch of a local clone can be when it is read.
+                An older clone is fetched first. Each replica has clones of its own, and fetches them
+                when it reads them: the indexation job, run on one replica, does not refresh the others.
+
+                Set to 1 minute by default.
+            """
+        )
+        var freshness: Duration = Duration.ofMinutes(1)
 
     }
 

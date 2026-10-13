@@ -59,6 +59,10 @@ val kdslNames = KdslStack.names(rootDir)
 val kdslStack: KdslStackInstance by lazy { KdslStack.resolve(rootDir) }
 val kdslComposeEnvironment: Provider<Map<String, String>> = provider { kdslStack.composeEnvironment }
 
+// The remotes of the Git tests of the `-ha` variant (#2085): bare repositories which the tests write
+// and both backends mount. Created before the stack starts, or Docker creates it, owned by root.
+val kdslHaGitDir: File = layout.buildDirectory.dir("kdsl-ha/git").get().asFile
+
 // Test coverage of the backend *container* (#1819).
 //
 // The code the acceptance and Playwright suites exercise does not run in a Gradle JVM: it runs in
@@ -131,6 +135,7 @@ configure<ComposeExtension> {
         setProjectName(kdslNames.haProjectName)
         environment.put("ONTRACK_VERSION", ontrackVersion)
         environment.putAll(kdslComposeEnvironment)
+        environment.put("YONTRACK_KDSL_HA_GIT_DIR", kdslHaGitDir.absolutePath)
         captureContainersOutput.set(true)
         captureContainersOutputToFiles.set(file("build/logs/kdsl-ha/containers"))
         composeLogToFile.set(file("build/logs/kdsl-ha/compose"))
@@ -182,6 +187,9 @@ listOf("kdslAcceptanceTest", "kdslLdap", "kdslOidc").forEach { variant ->
 tasks.named("kdslHaComposeUp") {
     if (!isCI) {
         dependsOn(":ontrack-ui:dockerBuild")
+    }
+    doFirst {
+        kdslHaGitDir.mkdirs()
     }
 }
 
@@ -408,6 +416,8 @@ tasks.register<Test>("kdslHaTest") {
             "-D$key=${System.getProperty(key) ?: value}"
         }
     })
+    // The remotes of the Git tests, which the backends mount (#2085)
+    systemProperty("ontrack.acceptance.ha.git.dir", System.getProperty("ontrack.acceptance.ha.git.dir") ?: kdslHaGitDir.absolutePath)
     dependsOn(kdslHaComposeUp)
     if (!isCI) {
         finalizedBy(kdslHaComposeDown)
