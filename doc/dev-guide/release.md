@@ -45,9 +45,14 @@ versions only, see [Major branch](major-branch.md).
    its new name. This happens **before** `GOLD`, not after: it is the only ordering in which the
    GitHub release can link to a page worth reading the moment it is published.
 4. Grant `GOLD` on the build.
+5. Optionally, once `release.yml` has finished and the build is granted `RELEASE`: start the
+   self.dev candidate when you want the release there. A beta or a GA becomes eligible for the
+   self.dev slot, and nothing deploys it there automatically — see
+   [Keeping an alpha off self.dev](#pre-releases).
 
-That is the whole manual part. The `GOLD` promotion workflow dispatches `release.yml` through the
-`github-workflow` notification channel, passing the version and the branch.
+That is the whole manual part of the release itself. The `GOLD` promotion workflow dispatches
+`release.yml` through the `github-workflow` notification channel, passing the version and the
+branch.
 
 ### Why `GOLD` uses `dependsOn`, not `promotions`
 
@@ -181,7 +186,7 @@ Every release goes through the same steps. Only the cells marked *stage* differ:
 | `RELEASE` | ✓ | ✓ | ✓ |
 | Slack `#internal-releases`, `#releases` | ✓ | ✓ | ✓ |
 | docs.yontrack.com rebuilt | on `RELEASE` | same | same |
-| self.dev | *stage*: ✗ | ✓ | ✓ |
+| self.dev | *stage*: ✗ | eligible (deployed by hand) | eligible (deployed by hand) |
 
 **Ordering:** `6.0.0-alpha.N` < `6.0.0-beta.M` < `6.0.0`, and `5.5.7` < `6.0.0-alpha.0`. A legacy
 pre-release is patch 0: `6.0-beta.6` < `6.0.0-beta.7`.
@@ -193,7 +198,12 @@ pre-release is patch 0: `6.0-beta.6` < `6.0.0-beta.7`.
 
 **Keeping an alpha off self.dev:** every release is granted `RELEASE`, so the self.dev slot tells
 the stages apart by the version, with a `versionPattern` admission rule admitting `X.Y.Z` and
-`X.Y.Z-beta.N` only. By `RELEASE`, the build's display name is the base version.
+`X.Y.Z-beta.N` only. By `RELEASE`, the build's display name is the base version. Eligibility is
+all the slot decides: an eligible build is listed on the slot, nothing more. Deploying it is a
+human step, like `GOLD`. *Deploy* on the slot creates a candidate, and since the slot has no
+`CANDIDATE` workflow, the candidate stays one until someone clicks *Start the deployment*. Its
+`RUNNING` workflow then writes the gitops change, with `autoApproval`, and marks the deployment
+done.
 
 **docs.yontrack.com** is rebuilt on `RELEASE`, alongside `#internal-releases`. Which versions the
 site shows — one entry per stage, `6.0.0 Alpha`, then `6.0.0 Beta`, replaced by the GA — is decided
@@ -222,7 +232,7 @@ name.
 The stage moves on a change of `VERSION`, against these criteria:
 
 * **Alpha → beta** (`X.Y-alpha` → `X.Y-beta`): the `X.Y` milestone has no open feature left. Bugs
-  may remain. From the first beta, releases reach self.dev.
+  may remain. From the first beta, releases become eligible for self.dev.
 * **Beta → GA** (`X.Y-beta` → `X.Y`), when all three hold:
   * the deprecation gate passes — no `Removed in V<X>` marker left and an empty marker baseline,
     see [the gate](major-branch.md#the-gate);

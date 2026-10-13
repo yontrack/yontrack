@@ -2,6 +2,7 @@ package net.nemerosa.ontrack.extension.environments.ci
 
 import net.nemerosa.ontrack.extension.config.ConfigTestSupport
 import net.nemerosa.ontrack.extension.config.EnvFixtures
+import net.nemerosa.ontrack.extension.environments.Slot
 import net.nemerosa.ontrack.extension.environments.SlotPipelineStatus
 import net.nemerosa.ontrack.extension.environments.rules.core.VersionPatternSlotAdmissionRule
 import net.nemerosa.ontrack.extension.environments.rules.core.VersionPatternSlotAdmissionRuleConfig
@@ -115,6 +116,82 @@ class EnvironmentsCIConfigExtensionIT : AbstractQLKTITSupport() {
         val workflow = workflows.first()
         assertEquals("Creation", workflow.workflow.name)
         assertEquals(SlotPipelineStatus.CANDIDATE, workflow.trigger)
+    }
+
+    @Test
+    @AsAdminTest
+    fun `A workflow removed from the CI configuration is removed from the slot`() {
+        val environmentName = uid("env-")
+        val configuredProjectName = uid("cfg-")
+        val deployedProject = project()
+
+        // Same shape as the self.dev slot in `.yontrack/ci.yaml` before and after #2074: the
+        // CANDIDATE workflow goes, the RUNNING one stays.
+        val candidateWorkflow = """
+            - name: Starting the deployment
+              trigger: CANDIDATE
+              nodes:
+                - id: deploying
+                  executorId: mock
+                  data:
+                    text: Deploying
+        """.trimIndent()
+        val runningWorkflow = """
+            - name: Deploying
+              trigger: RUNNING
+              nodes:
+                - id: deploy
+                  executorId: mock
+                  data:
+                    text: Deploy
+        """.trimIndent()
+
+        // The column of the entries under `workflows:` in the template below
+        val workflowsIndent = " ".repeat(18)
+
+        fun slotWorkflows(slot: Slot) =
+            slotWorkflowService.getSlotWorkflowsBySlot(slot).associate { it.workflow.name to it.trigger }
+
+        fun configure(vararg workflows: String) = configTestSupport.configureProject(
+            yaml = """
+                |version: v1
+                |configuration:
+                |  defaults:
+                |    project:
+                |      environments:
+                |        environments:
+                |          - name: $environmentName
+                |            order: 200
+                |        slots:
+                |          - project: "${deployedProject.name}"
+                |            environments:
+                |              - name: $environmentName
+                |                workflows:
+                |${workflows.joinToString("\n").prependIndent(workflowsIndent)}
+            """.trimMargin(),
+            ci = "generic",
+            scm = "mock",
+            env = EnvFixtures.generic(configuredProjectName)
+        )
+
+        configure(candidateWorkflow, runningWorkflow)
+        val slot = slotService.findSlotsByProject(deployedProject).single()
+        assertEquals(
+            mapOf(
+                "Starting the deployment" to SlotPipelineStatus.CANDIDATE,
+                "Deploying" to SlotPipelineStatus.RUNNING,
+            ),
+            slotWorkflows(slot)
+        )
+
+        configure(runningWorkflow)
+        assertEquals(
+            mapOf(
+                "Deploying" to SlotPipelineStatus.RUNNING,
+            ),
+            slotWorkflows(slot),
+            "Only the RUNNING workflow is left on the slot"
+        )
     }
 
     @Test

@@ -595,16 +595,16 @@ configuration:
                       includes:
                         - "\\d+\\.\\d+\\.\\d+(-beta\\.\\d+)?"
                 workflows:
-                  # Same as the demo slot: without a CANDIDATE workflow asking for the
-                  # deployment to start, the pipeline never leaves the candidate state
-                  # and the RUNNING workflow below never triggers.
-                  - trigger: "CANDIDATE"
-                    name: "Starting the deployment"
-                    nodes:
-                      - id: "deploying"
-                        description: "Moving the pipeline to running"
-                        executorId: "slot-pipeline-deploying"
-                        data: {}
+                  # No CANDIDATE workflow, unlike the demo slot, and on purpose: self.dev is never
+                  # deployed automatically (#2074). The admission rules above only make a build
+                  # eligible. Deploying it from the slot creates a pipeline in CANDIDATE, and with
+                  # nothing here to move it on, it stays a candidate until someone clicks "Start
+                  # the deployment". Deploying a release here is a human step, like GOLD.
+                  #
+                  # Starting it moves the pipeline to RUNNING, and the workflow below then does
+                  # the rest: the gitops change, the end of the deployment, the notification.
+                  # `autoApproval` stays true - the human decision is starting the pipeline, not
+                  # merging its PR.
                   - trigger: "RUNNING"
                     name: "Deploying"
                     nodes:
