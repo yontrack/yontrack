@@ -23,6 +23,9 @@ import java.util.function.Predicate
 import kotlin.reflect.KClass
 
 /**
+ * The properties are read through the read memo of the unit of work, never cached across units
+ * (#2081): see [PropertyReadMemo].
+ *
  * The methods which only read properties never mark the transaction as rollback-only when they fail, for
  * example on a stored value which cannot be decoded anymore. Their callers can then catch the failure and go on,
  * like when a project's SCM configuration cannot be read, without failing the whole request when it commits.
@@ -44,6 +47,8 @@ class PropertyServiceImpl(
 
     private val logger = LoggerFactory.getLogger(PropertyServiceImpl::class.java)
 
+    private val memo = PropertyReadMemo(propertyRepository)
+
     override val propertyTypes: List<PropertyType<*>> by lazy {
         val types = extensionManager.getExtensions(PropertyType::class.java)
         val result = mutableListOf<PropertyType<*>>()
@@ -64,17 +69,32 @@ class PropertyServiceImpl(
     }
 
     @Transactional(noRollbackFor = [Exception::class])
-    override fun getProperties(entity: ProjectEntity): List<Property<*>> {
-        // With all the existing properties...
-        return propertyTypes
+    override fun getProperties(entity: ProjectEntity): List<Property<*>> =
+        getProperties(entity, propertyTypes)
+
+    @Transactional(noRollbackFor = [Exception::class])
+    override fun getProperties(entity: ProjectEntity, propertyTypeName: String): List<Property<*>> =
+        getProperties(entity, listOfNotNull(cache[propertyTypeName]))
+
+    private fun getProperties(entity: ProjectEntity, types: List<PropertyType<*>>): List<Property<*>> {
+        // With the given property types...
+        val visibleTypes = types
                 // ... filters them by entity
                 .filter { type -> type.supportedEntityTypes.contains(entity.projectEntityType) }
                 // ... filters them by access right
                 .filter { type -> type.canView(entity, securityService) }
-                // ... loads them from the store, an unreadable value not failing the whole list
-                .map { type -> getPropertyOrError(type, entity) }
+        if (visibleTypes.isEmpty()) return emptyList()
+        // All the stored properties of the entity, in one query
+        val stored = memo.stored(entity.projectEntityType, entity.id)
+        return visibleTypes
+                // ... decodes them, an unreadable value not failing the whole list
+                .map { type -> decodeOrError(type, entity, stored[type.javaClass.name]) }
                 // .. flags with edition rights
                 .map { prop -> prop.editable(prop.type.canEdit(entity, securityService)) }
+    }
+
+    override fun prefetchProperties(entities: Collection<ProjectEntity>) {
+        memo.prefetch(entities)
     }
 
     @Transactional(noRollbackFor = [Exception::class])
@@ -99,7 +119,7 @@ class PropertyServiceImpl(
 
     @Transactional(noRollbackFor = [Exception::class])
     override fun <T> hasProperty(entity: ProjectEntity, propertyTypeClass: Class<out PropertyType<T>>): Boolean {
-        return propertyRepository.hasProperty(propertyTypeClass.name, entity.projectEntityType, entity.id)
+        return memo.stored(propertyTypeClass.name, entity.projectEntityType, entity.id) != null
     }
 
     override fun editProperty(entity: ProjectEntity, propertyTypeName: String, data: JsonNode): Ack {
@@ -127,6 +147,7 @@ class PropertyServiceImpl(
             // Existing value, for the listener, null when it cannot be read
             val value = getPropertyOrError(propertyType, entity).value
             val ack = propertyRepository.deleteProperty(typeName, entity.projectEntityType, entity.id)
+            memo.written(typeName, entity.projectEntityType, entity.id)
             if (ack.success) {
                 // Property deletion event
                 eventPostService.post(eventFactory.propertyDelete(entity, propertyType))
@@ -170,6 +191,7 @@ class PropertyServiceImpl(
                 entity.id,
                 storage
         )
+        memo.written(propertyType.javaClass.name, entity.projectEntityType, entity.id)
         // Property change event
         eventPostService.post(eventFactory.propertyChange(entity, propertyType))
         // Listener
@@ -190,20 +212,34 @@ class PropertyServiceImpl(
     private fun <T> getPropertyOrError(type: PropertyType<T>, entity: ProjectEntity): Property<T> {
         // Checks done outside the decoding, so that they are not turned into errors
         checkPropertyAccess(type, entity)
-        val t = propertyRepository.loadProperty(type.javaClass.name, entity.projectEntityType, entity.id)
-            ?: return Property.empty(type)
-        return try {
-            // Decoding in a nested transaction: a transactional service failing during the decoding (a
-            // configuration service, for example) would otherwise mark the whole transaction as rollback-only
-            val value = nestedTransaction.execute { type.fromStorage(t.json) }
-            if (value != null) Property.of(type, value) else Property.empty(type)
-        } catch (any: Exception) {
-            logUnreadableProperty(type, entity, any)
-            Property.error(type, unreadablePropertyMessage(any))
-        }
+        val t = memo.stored(type.javaClass.name, entity.projectEntityType, entity.id)
+        return decodeOrError(type, entity, t)
     }
 
-    private fun logUnreadableProperty(type: PropertyType<*>, entity: ProjectEntity, any: Exception) {
+    /**
+     * Decodes the stored property [t] - none meaning an empty property - into a property, with an
+     * [error][Property.error] when it cannot be decoded.
+     */
+    private fun <T> decodeOrError(type: PropertyType<T>, entity: ProjectEntity, t: TProperty?): Property<T> {
+        if (t == null) return Property.empty(type)
+        val decoded = memo.decoded(type.javaClass.name, entity.projectEntityType, entity.id) {
+            // Decoding in a nested transaction: a transactional service failing during the decoding (a
+            // configuration service, for example) would otherwise mark the whole transaction as rollback-only
+            nestedTransaction.execute { type.fromStorage(t.json) }
+        }
+        return decoded.fold(
+            onSuccess = { value ->
+                @Suppress("UNCHECKED_CAST")
+                if (value != null) Property.of(type, value as T) else Property.empty(type)
+            },
+            onFailure = { any ->
+                logUnreadableProperty(type, entity, any)
+                Property.error(type, unreadablePropertyMessage(any))
+            },
+        )
+    }
+
+    private fun logUnreadableProperty(type: PropertyType<*>, entity: ProjectEntity, any: Throwable) {
         // No stack trace, as this would be logged at every page load
         logger.warn(
             "Cannot read the ${type.javaClass.name} property of ${entity.entityDisplayName}: ${unreadablePropertyMessage(any)}"
@@ -225,14 +261,13 @@ class PropertyServiceImpl(
         val typeName = type.javaClass.name
         checkPropertyAccess(type, entity)
         // Gets the raw information from the repository
-        val t = propertyRepository.loadProperty(
-            typeName,
-                entity.projectEntityType,
-                entity.id)
+        val t = memo.stored(typeName, entity.projectEntityType, entity.id)
                 ?: return null
-        // If null, returns null
-        // Converts the stored value into an actual value
-        return type.fromStorage(t.json)
+        // Converts the stored value into an actual value, failing if it cannot be decoded
+        @Suppress("UNCHECKED_CAST")
+        return memo.decoded(typeName, entity.projectEntityType, entity.id) {
+            type.fromStorage(t.json)
+        }.getOrThrow() as T?
     }
 
     @Transactional(noRollbackFor = [Exception::class])

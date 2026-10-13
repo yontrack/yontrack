@@ -54,13 +54,14 @@ class GQLProjectEntityPropertyListFieldContributor(
                 // Filters
                 val typeFilter: String? = environment.getArgument("type")
                 val hasValue: Boolean = environment.getArgument<Boolean>("hasValue") ?: false
-                // Gets the raw list
-                propertyService.getProperties(o as ProjectEntity)
-                    .filter { property: Property<*> ->
-                        typeFilter?.let {
-                            it == property.typeDescriptor.typeName
-                        } ?: true
-                    }
+                // Gets the raw list, decoding only the asked type if any
+                val entity = o as ProjectEntity
+                val properties = if (typeFilter != null) {
+                    propertyService.getProperties(entity, typeFilter)
+                } else {
+                    propertyService.getProperties(entity)
+                }
+                properties
                     .filter { property: Property<*> ->
                         !hasValue || property.value != null || property.hasError
                     }

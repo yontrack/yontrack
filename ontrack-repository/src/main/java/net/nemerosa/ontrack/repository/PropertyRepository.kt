@@ -18,6 +18,16 @@ interface PropertyRepository {
 
     fun loadProperty(typeName: String, entityType: ProjectEntityType, entityId: ID): TProperty?
 
+    /**
+     * Loads every property of the given entities, all of the same type, in one query - or in a few,
+     * for many entities.
+     *
+     * @param entityType Type of the entities
+     * @param entityIds IDs of the entities
+     * @return Stored properties of these entities, in no particular order
+     */
+    fun loadProperties(entityType: ProjectEntityType, entityIds: Collection<ID>): List<TProperty>
+
     fun saveProperty(typeName: String, entityType: ProjectEntityType, entityId: ID, data: JsonNode)
 
     fun deleteProperty(typeName: String, entityType: ProjectEntityType, entityId: ID): Ack

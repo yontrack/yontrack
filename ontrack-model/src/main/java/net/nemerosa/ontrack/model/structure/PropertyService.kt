@@ -37,6 +37,25 @@ interface PropertyService {
     fun getProperties(entity: ProjectEntity): List<Property<*>>
 
     /**
+     * Same as [getProperties], restricted to one type of property, without decoding the others.
+     *
+     * @param entity Entity
+     * @param propertyTypeName Fully qualified name of the property type
+     * @return The property of this type, if the type exists, supports the entity and can be seen by
+     * the current user - or an empty list
+     */
+    fun getProperties(entity: ProjectEntity, propertyTypeName: String): List<Property<*>>
+
+    /**
+     * Announces that the properties of these [entities] are likely to be read in the current unit of
+     * work, like those of the items of a list: the first read of a property of one of them loads the
+     * properties of all of them, in one query, into the read memo of the unit of work (#2081).
+     *
+     * Nothing is loaded before such a read, and nothing at all outside of a unit of work.
+     */
+    fun prefetchProperties(entities: Collection<ProjectEntity>)
+
+    /**
      * Gets the value for a given property for an entity. If the property is not set, a non-null
      * [net.nemerosa.ontrack.model.structure.Property] is returned but is marked as
      * [empty][net.nemerosa.ontrack.model.structure.Property.isEmpty].

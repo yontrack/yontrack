@@ -1,42 +1,26 @@
 package net.nemerosa.ontrack.service
 
-import net.nemerosa.ontrack.extension.api.support.TestProperty
-import net.nemerosa.ontrack.extension.api.support.TestPropertyType
 import net.nemerosa.ontrack.it.AbstractServiceTestSupport
-import net.nemerosa.ontrack.it.AsAdminTest
-import net.nemerosa.ontrack.repository.PropertyRepository
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
-import kotlin.test.assertTrue
+import org.springframework.cache.CacheManager
+import kotlin.test.assertEquals
 
-@AsAdminTest
+/**
+ * Several replicas run at once: the settings and the properties are read once per unit of work,
+ * never cached across requests (#2080, #2081, ADR 0021).
+ */
 class CacheConfigIT : AbstractServiceTestSupport() {
 
     @Autowired
-    private lateinit var propertyRepository: PropertyRepository
+    private lateinit var cacheManager: CacheManager
 
     @Test
-    fun `Properties are cached`() {
-        val project = doCreateProject()
-        setProperty(
-            project,
-            TestPropertyType::class.java,
-            TestProperty.of("test")
+    fun `Neither the settings nor the properties are cached`() {
+        assertEquals(
+            emptyList(),
+            cacheManager.cacheNames.filter { it.lowercase() in setOf("settings", "properties") },
         )
-        // Gets the raw property
-        val p = propertyRepository.loadProperty(
-            TestPropertyType::class.java.name,
-            project.projectEntityType,
-            project.id
-        )
-        // Gets it a second time
-        val p2 = propertyRepository.loadProperty(
-            TestPropertyType::class.java.name,
-            project.projectEntityType,
-            project.id
-        )
-        // Checks this is the same instance
-        assertTrue(p === p2, "Cache enabled")
     }
 
 }

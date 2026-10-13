@@ -9,14 +9,7 @@ import net.nemerosa.ontrack.model.structure.PropertySearchArguments
 import net.nemerosa.ontrack.repository.support.AbstractJdbcRepository
 import net.nemerosa.ontrack.repository.support.createSQL
 import org.apache.commons.lang3.StringUtils
-import org.springframework.beans.factory.ObjectProvider
-import org.springframework.cache.CacheManager
-import org.springframework.cache.annotation.CacheEvict
-import org.springframework.cache.annotation.Cacheable
-import org.springframework.core.Ordered
 import org.springframework.stereotype.Repository
-import org.springframework.transaction.support.TransactionSynchronization
-import org.springframework.transaction.support.TransactionSynchronizationManager
 import java.lang.String.format
 import java.sql.PreparedStatement
 import java.sql.ResultSet
@@ -26,46 +19,14 @@ import java.util.function.BiFunction
 import java.util.function.Predicate
 import javax.sql.DataSource
 
+/**
+ * Access to the properties, never cached: they are read once per unit of work, through the read
+ * memo of the property service (#2081, ADR 0021).
+ */
 @Repository
 class PropertyJdbcRepository(
     dataSource: DataSource,
-    private val cacheManager: ObjectProvider<CacheManager>,
 ) : AbstractJdbcRepository(dataSource), PropertyRepository {
-
-    /**
-     * The cache entry of a property is evicted when it is written, which happens before the commit of
-     * the transaction: a concurrent read between the two (like the background computations which
-     * react to the changes of the properties) would put the previous value back into the cache, where
-     * it would stay. The entry is evicted again once the transaction is over:
-     *
-     * - after its commit, before any other reaction to this commit (which would otherwise read the
-     *   previous value from the cache), hence the highest precedence;
-     * - after its completion, for a rollback.
-     *
-     * A read which started before the commit and is still in progress during this eviction would
-     * still put the previous value in the cache after it: the [loading][loadProperty] of a property is
-     * synchronized, so that its eviction waits for it.
-     */
-    private fun evictAfterTransaction(typeName: String, entityType: ProjectEntityType, entityId: ID) {
-        if (TransactionSynchronizationManager.isSynchronizationActive()) {
-            val key = typeName + entityType.name + entityId.value
-            TransactionSynchronizationManager.registerSynchronization(object : TransactionSynchronization {
-                override fun getOrder(): Int = Ordered.HIGHEST_PRECEDENCE
-
-                override fun afterCommit() {
-                    evict()
-                }
-
-                override fun afterCompletion(status: Int) {
-                    evict()
-                }
-
-                private fun evict() {
-                    cacheManager.ifAvailable?.getCache(CACHE_PROPERTIES)?.evict(key)
-                }
-            })
-        }
-    }
 
     override fun hasProperty(typeName: String, entityType: ProjectEntityType, entityId: ID): Boolean {
         return namedParameterJdbcTemplate!!.queryForList(
@@ -77,11 +38,6 @@ class PropertyJdbcRepository(
         ).filterNotNull().isNotEmpty()
     }
 
-    @Cacheable(
-        cacheNames = [CACHE_PROPERTIES],
-        key = "#typeName + #entityType.name() + #entityId.value",
-        sync = true,
-    )
     override fun loadProperty(typeName: String, entityType: ProjectEntityType, entityId: ID): TProperty? {
         return getFirstItem(
             String.format(
@@ -92,9 +48,15 @@ class PropertyJdbcRepository(
         ) { rs, rowNum -> toProperty(rs) }
     }
 
-    @CacheEvict(cacheNames = [CACHE_PROPERTIES], key = "#typeName + #entityType.name() + #entityId.value")
+    override fun loadProperties(entityType: ProjectEntityType, entityIds: Collection<ID>): List<TProperty> =
+        entityIds.map { it.value }.distinct().chunked(BATCH_SIZE).flatMap { ids ->
+            namedParameterJdbcTemplate!!.query(
+                "SELECT * FROM PROPERTIES WHERE ${entityType.name} IN (:ids)",
+                params("ids", ids),
+            ) { rs, _ -> toProperty(rs) }
+        }
+
     override fun saveProperty(typeName: String, entityType: ProjectEntityType, entityId: ID, data: JsonNode) {
-        evictAfterTransaction(typeName, entityType, entityId)
         val params = params("type", typeName).addValue("entityId", entityId.value)
         // Any previous value?
         val propertyId = getFirstItem(
@@ -124,9 +86,7 @@ class PropertyJdbcRepository(
         }// Creation
     }
 
-    @CacheEvict(cacheNames = [CACHE_PROPERTIES], key = "#typeName + #entityType.name() + #entityId.value")
     override fun deleteProperty(typeName: String, entityType: ProjectEntityType, entityId: ID): Ack {
-        evictAfterTransaction(typeName, entityType, entityId)
         return Ack.one(
             namedParameterJdbcTemplate!!.update(
                 String.format(
@@ -270,9 +230,9 @@ class PropertyJdbcRepository(
     companion object {
 
         /**
-         * Cache of the properties
+         * Maximum number of entities whose properties are loaded by one query
          */
-        const val CACHE_PROPERTIES = "properties"
+        private const val BATCH_SIZE = 500
 
         @JvmStatic
         fun prepareQueryForPropertyValue(
