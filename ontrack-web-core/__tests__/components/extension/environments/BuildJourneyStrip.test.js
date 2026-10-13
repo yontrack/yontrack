@@ -100,4 +100,14 @@ describe('the build journey strip', () => {
         expect(screen.getByTestId('build-journey-empty'))
             .toHaveTextContent('This project has no deployment slot.')
     })
+
+    it('says the journey could not be loaded when the query failed, not that there is no slot', () => {
+        // A failed query leaves `useQuery`'s data at null, which is not an empty journey (#2075).
+        render(<BuildJourneyStrip journey={null} error="Expected a rule of type versionPattern"/>)
+        expect(screen.getByTestId('build-journey-error'))
+            .toHaveTextContent('Could not load the environments.')
+        expect(screen.getByTestId('build-journey-error'))
+            .toHaveTextContent('Expected a rule of type versionPattern')
+        expect(screen.queryByTestId('build-journey-empty')).not.toBeInTheDocument()
+    })
 })

@@ -17,6 +17,7 @@ import net.nemerosa.ontrack.model.security.SecurityService
 import net.nemerosa.ontrack.model.security.currentAgent
 import net.nemerosa.ontrack.model.structure.Build
 import net.nemerosa.ontrack.model.structure.Project
+import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.LocalDateTime
@@ -311,10 +312,25 @@ class SlotServiceImpl(
         )
     }
 
-    private fun isBuildEligible(slot: Slot, config: SlotAdmissionRuleConfig, build: Build): Boolean {
-        val rule = slotAdmissionRuleRegistry.getRule(config.ruleId)
-        return isBuildEligible(slot, rule, config.ruleConfig, build)
-    }
+    /**
+     * Whether one rule admits [build] - and **a rule which cannot be evaluated refuses it**.
+     *
+     * Failing closed keeps the build out of a slot nobody can vouch for, and keeps the failure in
+     * that slot: thrown, it took down every slot of the project with it, so that `Build.journey`
+     * and the deploy dialogs answered nothing at all (#2075). The rule then appears among the
+     * refusing ones, and the cause is in the log.
+     */
+    private fun isBuildEligible(slot: Slot, config: SlotAdmissionRuleConfig, build: Build): Boolean =
+        try {
+            val rule = slotAdmissionRuleRegistry.getRule(config.ruleId)
+            isBuildEligible(slot, rule, config.ruleConfig, build)
+        } catch (any: Exception) {
+            logger.error(
+                "Admission rule ${config.name} (${config.ruleId}) of slot ${slot.id} could not be evaluated for build ${build.id}: refusing the build",
+                any
+            )
+            false
+        }
 
     private fun <C : Any, D> isBuildEligible(
         slot: Slot,
@@ -1059,4 +1075,9 @@ class SlotServiceImpl(
         }
         eventPostService.post(environmentsEventsFactory.pipelineStatusChanged(pipeline, admissionRuleConfig))
     }
+
+    companion object {
+        private val logger = LoggerFactory.getLogger(SlotServiceImpl::class.java)
+    }
+
 }

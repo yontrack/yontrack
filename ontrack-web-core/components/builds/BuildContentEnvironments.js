@@ -28,7 +28,7 @@ export default function BuildContentEnvironments({build}) {
 
     const freshness = useFreshness()
 
-    const {data: journey, loading, finished} = useQuery(
+    const {data: journey, loading, finished, error} = useQuery(
         gqlBuildJourney,
         {
             variables: {buildId: Number(build.id)},
@@ -83,7 +83,12 @@ export default function BuildContentEnvironments({build}) {
                     </Space>
                 }
             >
-                <BuildJourneyStrip journey={journey} onSlotClick={slotDrawer.openSlot} build={build}/>
+                <BuildJourneyStrip
+                    journey={journey}
+                    error={error}
+                    onSlotClick={slotDrawer.openSlot}
+                    build={build}
+                />
             </GridCell>
             <SlotDrawer
                 slotId={slotDrawer.slotId}

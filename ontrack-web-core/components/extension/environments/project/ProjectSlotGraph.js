@@ -1,7 +1,7 @@
 import {useCallback, useEffect, useState} from "react"
 import {applyNodeChanges, Background, ControlButton, Controls, ReactFlow} from "reactflow"
 import {FaProjectDiagram} from "react-icons/fa"
-import {Empty, Spin} from "antd"
+import {Alert, Empty, Spin} from "antd"
 import {useQuery} from "@components/services/GraphQL"
 import {autoLayout} from "@components/links/GraphUtils"
 import SlotGraphNode, {SlotGraphNodeContext} from "@components/extension/environments/project/SlotGraphNode"
@@ -42,7 +42,7 @@ const GRAPH_HEIGHT = '600px'
  */
 export default function ProjectSlotGraph({project, qualifier, onSlotClick, refreshCount = 0}) {
 
-    const {data: slotGraph, loading, finished} = useQuery(gqlProjectSlotGraph, {
+    const {data: slotGraph, loading, finished, error} = useQuery(gqlProjectSlotGraph, {
         variables: {id: Number(project?.id), qualifier},
         condition: !!project,
         deps: [project?.id, qualifier, refreshCount],
@@ -95,8 +95,17 @@ export default function ProjectSlotGraph({project, qualifier, onSlotClick, refre
                     /*
                      * A project with no slot for this qualifier is not an error and not a loading
                      * state: it is a project nobody has given a slot yet, and an empty React Flow
-                     * canvas says nothing at all about which of the three it is.
+                     * canvas says nothing at all about which of the three it is. A failed query
+                     * leaves the graph at null, which is the third one, and says so (#2075).
                      */
+                    error ?
+                        <Alert
+                            type="error"
+                            showIcon
+                            title="Could not load the environments."
+                            description={error}
+                            data-testid="project-slot-graph-error"
+                        /> :
                     empty ?
                         <Empty
                             data-testid="project-slot-graph-empty"

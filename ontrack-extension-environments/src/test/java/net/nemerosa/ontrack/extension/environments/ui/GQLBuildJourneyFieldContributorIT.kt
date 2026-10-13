@@ -2,11 +2,13 @@ package net.nemerosa.ontrack.extension.environments.ui
 
 import tools.jackson.databind.JsonNode
 import net.nemerosa.ontrack.extension.environments.EnvironmentTestSupport
+import net.nemerosa.ontrack.extension.environments.SlotAdmissionRuleConfig
 import net.nemerosa.ontrack.extension.environments.SlotAdmissionRuleTestFixtures
 import net.nemerosa.ontrack.extension.environments.SlotTestSupport
 import net.nemerosa.ontrack.extension.environments.service.SlotService
 import net.nemerosa.ontrack.graphql.AbstractQLKTITSupport
 import net.nemerosa.ontrack.it.AsAdminTest
+import net.nemerosa.ontrack.json.asJson
 import net.nemerosa.ontrack.model.structure.Build
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -93,6 +95,48 @@ class GQLBuildJourneyFieldContributorIT : AbstractQLKTITSupport() {
                             entry.path("nonEligibleRules").values().map { it.path("name").asText() }
                         )
                         assertTrue(entry.path("pipeline").isNull, "No deployment yet")
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `A rule which cannot be evaluated refuses the build in its own slot and leaves the others alone`() {
+        project {
+            environmentTestSupport.withEnvironment(order = 1) { stagingEnv ->
+                environmentTestSupport.withEnvironment(order = 2) { productionEnv ->
+                    val staging = slotTestSupport.slot(project = project, environment = stagingEnv)
+                    val production = slotTestSupport.slot(project = project, environment = productionEnv)
+                    // A rule this version does not know: configured ahead of the upgrade which brings
+                    // it, as self.dev's `versionPattern` rule was on 6.0-beta.6 (#2075).
+                    slotService.addAdmissionRuleConfig(
+                        SlotAdmissionRuleConfig(
+                            slot = production,
+                            name = "fromTheFuture",
+                            description = null,
+                            ruleId = "unknown-rule",
+                            ruleConfig = mapOf<String, Any>().asJson(),
+                        )
+                    )
+                    branch {
+                        build {
+                            journey(this) { entries ->
+                                assertEquals(
+                                    listOf(staging.id to "ELIGIBLE", production.id to "NOT_ELIGIBLE"),
+                                    entries.map {
+                                        it.path("slot").path("id").asText() to it.path("state").asText()
+                                    },
+                                    "Both slots are on the journey"
+                                )
+                                assertEquals(
+                                    listOf("fromTheFuture"),
+                                    entries[1].path("nonEligibleRules").values().map { it.path("name").asText() },
+                                    "The rule which could not be evaluated is the one refusing"
+                                )
+                            }
+                            assertEquals(false, slotService.isBuildEligible(production, this))
+                        }
                     }
                 }
             }

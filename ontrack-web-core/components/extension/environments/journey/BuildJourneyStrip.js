@@ -1,4 +1,4 @@
-import {Space, Typography} from "antd"
+import {Alert, Space, Typography} from "antd"
 import JourneyChip from "@components/extension/environments/shared/JourneyChip"
 import WhatsMissing from "@components/readiness/WhatsMissing"
 import {slotDisplayNameWithoutProject} from "@components/extension/environments/shared/slotCellModel"
@@ -29,8 +29,22 @@ const notReachedStates = ['ELIGIBLE', 'NOT_ELIGIBLE', 'IN_PROGRESS']
  *   slot drawer. Chips are inert when absent.
  * @param {?Object} build The build, with its `id`. When given, every slot the build has not reached
  *   yet gets a "What's missing" control beside its chip.
+ * @param {?string} error The message of a failed journey query. A failure leaves the journey at
+ *   `null`, which must not be read as "no slot" (#2075): the strip says it could not answer instead.
  */
-export default function BuildJourneyStrip({journey, onSlotClick, build}) {
+export default function BuildJourneyStrip({journey, onSlotClick, build, error}) {
+
+    if (error) {
+        return (
+            <Alert
+                type="error"
+                showIcon
+                title="Could not load the environments."
+                description={error}
+                data-testid="build-journey-error"
+            />
+        )
+    }
 
     const entries = journey ?? []
 
