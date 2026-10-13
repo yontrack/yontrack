@@ -2,6 +2,7 @@ package net.nemerosa.ontrack.extension.github.app
 
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.verify
 import net.nemerosa.ontrack.common.Time
 import net.nemerosa.ontrack.common.toJavaDate
 import net.nemerosa.ontrack.extension.github.app.client.GitHubAppAccount
@@ -74,6 +75,38 @@ class DefaultGitHubAppTokenServiceTest {
         assertTrue(secondToken != token, "A new token has been generated")
     }
 
+    @Test
+    fun `Getting a new token after the configuration has been edited`() {
+        configureClient()
+
+        val token = service.getAppInstallationToken(
+            configurationName = TEST_CONFIG,
+            appId = TEST_APP_ID,
+            appPrivateKey = TestUtils.resourceString(TEST_APP_PRIVATE_KEY_RESOURCE_PATH),
+            appInstallationAccountName = TEST_APP_INSTALLATION_ACCOUNT_LOGIN
+        )
+        assertTrue(token != null && token.isNotBlank(), "Token has been generated")
+
+        // The configuration is edited: same name, another app
+        val editedToken = service.getAppInstallationToken(
+            configurationName = TEST_CONFIG,
+            appId = TEST_OTHER_APP_ID,
+            appPrivateKey = TestUtils.resourceString(TEST_APP_PRIVATE_KEY_RESOURCE_PATH),
+            appInstallationAccountName = TEST_APP_INSTALLATION_ACCOUNT_LOGIN
+        )
+        assertTrue(editedToken != null && editedToken != token, "A new token has been generated for the edited configuration")
+        verify(exactly = 2) { client.generateInstallationToken(any(), TEST_APP_INSTALLATION_ID) }
+
+        // The edited configuration keeps its own token
+        val editedTokenAgain = service.getAppInstallationToken(
+            configurationName = TEST_CONFIG,
+            appId = TEST_OTHER_APP_ID,
+            appPrivateKey = TestUtils.resourceString(TEST_APP_PRIVATE_KEY_RESOURCE_PATH),
+            appInstallationAccountName = TEST_APP_INSTALLATION_ACCOUNT_LOGIN
+        )
+        assertEquals(editedToken, editedTokenAgain, "Reusing the token of the edited configuration")
+    }
+
     private fun configureClient() {
         every { client.getAppInstallations(any()) } returns listOf(
             GitHubAppInstallation(
@@ -97,6 +130,7 @@ class DefaultGitHubAppTokenServiceTest {
     companion object {
         const val TEST_CONFIG = "test"
         const val TEST_APP_ID = "123456"
+        const val TEST_OTHER_APP_ID = "654321"
         const val TEST_APP_PRIVATE_KEY_RESOURCE_PATH = "/test-app.pem"
         const val TEST_APP_INSTALLATION_ID = "1234567890"
         const val TEST_APP_INSTALLATION_ACCOUNT_LOGIN = "test"

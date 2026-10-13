@@ -10,6 +10,9 @@ interface GitHubAppTokenService {
     /**
      * Gets the current app installation access token, renews it if needed, and returns `null` if
      * the token cannot get generated in any way.
+     *
+     * The token is renewed as soon as the app ID, private key or installation account of the
+     * configuration differ from the ones it was generated for.
      */
     fun getAppInstallationToken(
         configurationName: String,
@@ -30,7 +33,7 @@ interface GitHubAppTokenService {
     ): GitHubAppToken?
 
     /**
-     * Invalidates any current token.
+     * Drops any current token of this configuration, for example when it is deleted.
      */
     fun invalidateAppInstallationToken(configurationName: String)
 

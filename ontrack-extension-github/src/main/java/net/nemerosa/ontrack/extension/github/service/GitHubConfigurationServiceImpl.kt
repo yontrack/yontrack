@@ -65,6 +65,11 @@ class GitHubConfigurationServiceImpl(
         return extra
     }
 
+    override fun deleteConfiguration(name: String) {
+        super.deleteConfiguration(name)
+        gitHubAppTokenService.invalidateAppInstallationToken(name)
+    }
+
     override fun validate(configuration: GitHubEngineConfiguration): ConnectionResult =
         try {
             // Gets the client
