@@ -49,6 +49,12 @@ import javax.sql.DataSource
         "ontrack.config.extension.scm.mock.enabled=true",
         // Nothing to wait for: no other instance runs side by side
         "ontrack.config.search.index.startup-delay=0",
+        // The assisted changes and the search renames are processed at once, after the commit which
+        // triggers them (#2083). Through the queue, they could be consumed by the integration tests
+        // of another module, running at the same time on the same broker, whose mock SCM and search
+        // indexers are not the ones of this module.
+        "ontrack.extension.queue.specific.assisted-change.async=false",
+        "ontrack.extension.queue.specific.search-rename.async=false",
     ]
 )
 abstract class AbstractITTestSupport {

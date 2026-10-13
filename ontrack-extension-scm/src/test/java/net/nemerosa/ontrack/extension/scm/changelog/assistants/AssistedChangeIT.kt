@@ -1,8 +1,6 @@
 package net.nemerosa.ontrack.extension.scm.changelog.assistants
 
-import net.nemerosa.ontrack.extension.queue.QueueConfigProperties
 import net.nemerosa.ontrack.extension.queue.QueueTestSupport
-import net.nemerosa.ontrack.extension.queue.queueNamePrefix
 import net.nemerosa.ontrack.extension.scm.mock.MockSCMBuildCommitProperty
 import net.nemerosa.ontrack.extension.scm.mock.MockSCMBuildCommitPropertyType
 import net.nemerosa.ontrack.extension.scm.mock.MockSCMTester
@@ -19,10 +17,7 @@ import net.nemerosa.ontrack.model.structure.Build
 import net.nemerosa.ontrack.model.structure.Project
 import net.nemerosa.ontrack.model.structure.ProjectEntityType
 import net.nemerosa.ontrack.model.templating.TemplatingService
-import net.nemerosa.ontrack.rabbitmq.OntrackRabbitMQConfigProperties
 import org.junit.jupiter.api.Test
-import org.springframework.amqp.rabbit.listener.AbstractMessageListenerContainer
-import org.springframework.amqp.rabbit.listener.RabbitListenerEndpointRegistry
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
@@ -31,14 +26,17 @@ import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
- * The assisted change is computed in the background, through the `assisted-change` queue, after the
- * commit of the transaction which triggers it: the data of the tests must be committed, and is
- * removed at the end.
+ * The assisted change is computed through the `assisted-change` queue, after the commit of the
+ * transaction which triggers it: the data of the tests must be committed, and is removed at the end.
+ *
+ * The integration tests process this queue at once, after the commit (see `AbstractITTestSupport`):
+ * it is processed in the background by the KDSL acceptance tests (`ACCAssistedChange`,
+ * `ACCHAAssistedChange`).
  */
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @AsAdminTest
@@ -55,15 +53,6 @@ class AssistedChangeIT : AbstractDSLTestSupport() {
 
     @Autowired
     private lateinit var assistedChangeQueueProcessor: AssistedChangeQueueProcessor
-
-    @Autowired
-    private lateinit var queueConfigProperties: QueueConfigProperties
-
-    @Autowired
-    private lateinit var rabbitListenerEndpointRegistry: RabbitListenerEndpointRegistry
-
-    @Autowired
-    private lateinit var ontrackRabbitMQConfigProperties: OntrackRabbitMQConfigProperties
 
     @Autowired
     private lateinit var eventQueryService: EventQueryService
@@ -305,33 +294,6 @@ class AssistedChangeIT : AbstractDSLTestSupport() {
     }
 
     @Test
-    fun `The creation of a build does not wait on the SCM`() {
-        withBranch { repository, branchBuild ->
-            branchBuild { withRepositoryCommit("Before") }
-            val started = CountDownLatch(1)
-            val release = CountDownLatch(1)
-            val to = mockSCMTester.withCommitsInterceptor({ name ->
-                if (name == repository) {
-                    started.countDown()
-                    release.await(30, TimeUnit.SECONDS)
-                }
-            }) {
-                try {
-                    val build = branchBuild { withRepositoryCommit("Some feature") }
-                    // The build and its commit are there, while the SCM is still being read
-                    assertTrue(started.await(30, TimeUnit.SECONDS), "The SCM is read in the background")
-                    assertNull(assistedChange(build), "Not computed yet")
-                    build
-                } finally {
-                    release.countDown()
-                }
-            }
-            awaitComputations()
-            assertEquals(AssistedChangeBasis.COMPUTED, assistedChange(to)?.basis)
-        }
-    }
-
-    @Test
     fun `Two computations of the same build run one at a time, whatever their consumer`() {
         withBranch { repository, branchBuild ->
             branchBuild { withRepositoryCommit("Before") }
@@ -370,42 +332,30 @@ class AssistedChangeIT : AbstractDSLTestSupport() {
     }
 
     @Test
-    fun `A computation interrupted when its consumer stops is redelivered, and completed`() {
+    fun `An interrupted computation is thrown for the queue to redeliver, and not stored as an SCM error`() {
         withBranch { repository, branchBuild ->
             val from = branchBuild { withRepositoryCommit("Before") }
-            lateinit var commit: String
-            val to = branchBuild {
-                commit = withRepositoryCommit(
-                    """
-                        Some fix
-
-                        Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
-                    """.trimIndent(),
-                    property = false,
-                )
-            }
-            // No commit yet: nothing read from the SCM
-            awaitComputations()
-            val reads = AtomicInteger()
-            val firstRead = CountDownLatch(1)
-            mockSCMTester.withCommitsInterceptor({ name ->
-                if (name == repository && reads.incrementAndGet() == 1) {
-                    firstRead.countDown()
-                    // Until its consumer stops, like the one of a pod being stopped
-                    Thread.sleep(60_000)
-                }
+            // The consumer is stopping
+            val to = mockSCMTester.withCommitsInterceptor({ name ->
+                if (name == repository) throw InterruptedException("Stopping")
             }) {
-                asAdmin {
-                    propertyService.editProperty(
-                        to,
-                        MockSCMBuildCommitPropertyType::class.java,
-                        MockSCMBuildCommitProperty(commit),
+                val build = branchBuild {
+                    withRepositoryCommit(
+                        """
+                            Some fix
+
+                            Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+                        """.trimIndent()
                     )
                 }
-                assertTrue(firstRead.await(30, TimeUnit.SECONDS), "The computation reads the SCM")
-                restartConsumers()
-                awaitComputations()
+                assertFailsWith<InterruptedException> {
+                    asAdmin { assistedChangeService.computeAssistedChange(build) }
+                }
+                build
             }
+            assertNull(assistedChange(to), "Not stored as an SCM error")
+            // Redelivered to another consumer
+            assistedChangeQueueProcessor.process(AssistedChangeQueuePayload(buildId = to.id()), null)
             assertEquals(
                 AssistedChangeProperty(
                     basis = AssistedChangeBasis.COMPUTED,
@@ -417,34 +367,8 @@ class AssistedChangeIT : AbstractDSLTestSupport() {
                     previousBuildId = from.id(),
                 ),
                 assistedChange(to),
-                "The redelivered message is computed, and not stored as an SCM error",
-            )
-            assertTrue(reads.get() > 1, "The SCM is read again")
-        }
-    }
-
-    /**
-     * Stops the consumers of the queue, without waiting for the messages they hold for longer than a
-     * second, then starts them again: the messages they held are redelivered.
-     */
-    private fun restartConsumers() {
-        val containers = (0 until queueConfigProperties.getQueueProcessorScale(assistedChangeQueueProcessor)).map { index ->
-            assertNotNull(
-                rabbitListenerEndpointRegistry.getListenerContainer(
-                    "${assistedChangeQueueProcessor.queueNamePrefix}.$index"
-                ) as AbstractMessageListenerContainer?,
-                "Listener container of the queue $index"
             )
         }
-        containers.forEach { container ->
-            container.setShutdownTimeout(1_000)
-            try {
-                container.stop()
-            } finally {
-                container.setShutdownTimeout(ontrackRabbitMQConfigProperties.listenerShutdownTimeout.toMillis())
-            }
-        }
-        containers.forEach { it.start() }
     }
 
     @Test
