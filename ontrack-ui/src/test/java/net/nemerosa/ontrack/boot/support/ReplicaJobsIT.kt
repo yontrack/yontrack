@@ -44,6 +44,8 @@ class ReplicaJobsIT : AbstractWebTestSupport() {
                 "audit-trail/evidence-metrics/metrics",
                 // Reachability of the evidence storage from each pod
                 "audit-trail/evidence-storage/probe",
+                // Rate-limit gauges of the GitHub configurations, in the meter registry of each pod
+                "github/rate-limit-metrics/gauges",
             ),
             replicaJobs,
         )

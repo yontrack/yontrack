@@ -14,13 +14,16 @@ import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate
  * and not to recover its fires. [Closing][close] it removes its fires and its check-in.
  *
  * The job of a fire must be scheduled already: the name of its Quartz scheduler is read from its
- * row of `JOBS`.
+ * row of `JOBS`, unless given.
  *
  * @property instance ID of the Quartz instance of this replica, its host name
+ * @param scheduler Name of the Quartz scheduler of the fires, for a job whose key is in `JOBS` for
+ * other schedulers too - the ones of earlier test runs
  */
 class OtherReplica(
     private val jdbc: NamedParameterJdbcTemplate,
     val instance: String = uid("replica-"),
+    private val scheduler: String? = null,
 ) : AutoCloseable {
 
     private val schedulers = mutableSetOf<String>()
@@ -29,7 +32,7 @@ class OtherReplica(
      * Records a fire of a job executed by this replica, started at [since] (epoch milliseconds).
      */
     fun run(key: JobKey, since: Long = System.currentTimeMillis()) {
-        val scheduler = jdbc.queryForObject(
+        val scheduler = this.scheduler ?: jdbc.queryForObject(
             "SELECT SCHEDULER FROM JOBS WHERE JOB_CATEGORY = :category AND JOB_TYPE = :type AND JOB_KEY = :key",
             keyParams(key),
             String::class.java,

@@ -18,9 +18,10 @@ class ACCActuator : AbstractACCTestSupport() {
             tags.find { it.name == "application" && it.value == "ontrack" },
             "Tag application is present and is equal to `ontrack`"
         )
+        // The host name of the backend, the name of its pod in Kubernetes (#2088)
         assertNotNull(
-            tags.find { it.name == "application_instance" && it.value == "ontrack" },
-            "Tag application_instance is present and is equal to `ontrack`"
+            tags.find { it.name == "application_instance" && it.value.isNotBlank() },
+            "Tag application_instance is present and names the backend"
         )
     }
 

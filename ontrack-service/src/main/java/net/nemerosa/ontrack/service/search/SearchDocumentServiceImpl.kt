@@ -22,7 +22,6 @@ import org.springframework.stereotype.Service
 import org.springframework.transaction.PlatformTransactionManager
 import org.springframework.transaction.TransactionDefinition
 import org.springframework.transaction.support.TransactionTemplate
-import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Postgres storage of the search documents.
@@ -46,16 +45,6 @@ class SearchDocumentServiceImpl(
     private val savepoint = TransactionTemplate(platformTransactionManager).apply {
         propagationBehavior = TransactionDefinition.PROPAGATION_NESTED
     }
-
-    /**
-     * Types being rebuilt
-     */
-    private val rebuilding: MutableSet<String> = ConcurrentHashMap.newKeySet()
-
-    /**
-     * Types whose documents are being rebuilt.
-     */
-    val rebuildingTypes: Set<String> get() = rebuilding.toSet()
 
     override fun index(document: SearchDocument) {
         write(document.type, "index ${document.key}") {
@@ -124,13 +113,8 @@ class SearchDocumentServiceImpl(
 
     override fun rebuild(indexer: SearchDocumentIndexer) {
         val type = indexer.searchResultType.id
-        rebuilding += type
-        try {
-            meterRegistry.time(SearchIndexMetrics.rebuild, SearchIndexMetrics.METRIC_TYPE to type) {
-                doRebuild(indexer, type)
-            }
-        } finally {
-            rebuilding -= type
+        meterRegistry.time(SearchIndexMetrics.rebuild, SearchIndexMetrics.METRIC_TYPE to type) {
+            doRebuild(indexer, type)
         }
     }
 

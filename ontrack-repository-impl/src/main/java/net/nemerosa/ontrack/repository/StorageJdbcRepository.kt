@@ -44,6 +44,19 @@ class StorageJdbcRepository(
         )
     }
 
+    override fun increment(store: String, key: String): Int =
+        namedParameterJdbcTemplate!!.queryForObject(
+            """
+                INSERT INTO STORAGE (STORE, NAME, DATA)
+                VALUES (:store, :key, JSONB_BUILD_OBJECT('count', 1))
+                ON CONFLICT (STORE, NAME) DO
+                UPDATE SET DATA = JSONB_BUILD_OBJECT('count', COALESCE((STORAGE.DATA ->> 'count')::INT, 0) + 1)
+                RETURNING (DATA ->> 'count')::INT
+            """,
+            params("store", store).addValue("key", key),
+            Int::class.java
+        ) ?: error("No count returned for $store/$key")
+
     override fun retrieveJson(store: String, key: String): JsonNode? = getFirstItem(
         "SELECT DATA FROM STORAGE WHERE STORE = :store AND NAME = :key",
         params("store", store).addValue("key", key)

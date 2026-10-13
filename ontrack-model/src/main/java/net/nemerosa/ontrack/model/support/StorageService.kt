@@ -40,6 +40,28 @@ interface StorageService {
     fun findJsonForUpdate(store: String, key: String): JsonNode?
 
     /**
+     * Increments a counter, atomically: concurrent increments, on any replica, are all counted. A
+     * counter which does not exist starts at 1. It is reset by [deleting][delete] it.
+     *
+     * The counter is stored as `{"count": <n>}`.
+     *
+     * @param store Store (typically an extension class name)
+     * @param key   Identifier of the counter
+     * @return Count after the increment
+     */
+    fun increment(store: String, key: String): Int
+
+    /**
+     * Gets the value of a counter maintained by [increment].
+     *
+     * @param store Store (typically an extension class name)
+     * @param key   Identifier of the counter
+     * @return Value of the counter, 0 if it does not exist
+     */
+    fun getCount(store: String, key: String): Int =
+        findJson(store, key)?.path(COUNT_FIELD)?.asInt(0) ?: 0
+
+    /**
      * Lists all keys for a store
      *
      * @param store Store (typically an extension class name)
@@ -193,5 +215,12 @@ interface StorageService {
             .mapValues { (_, value) ->
                 value.parseInto(type.kotlin)
             }
+    }
+
+    companion object {
+        /**
+         * Field of the value of a counter
+         */
+        const val COUNT_FIELD = "count"
     }
 }

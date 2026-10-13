@@ -31,8 +31,8 @@ import java.util.concurrent.ExecutionException
  * - unless a delayed fire of the job is already pending, requested by another replica;
  * - its run is skipped when the documents have been rebuilt meanwhile, unless forced by `reset`.
  *
- * While a type is rebuilt, search answers with what exists so far, and the replica which rebuilds
- * it says that the search index is being built.
+ * While a type is rebuilt, search answers with what exists so far, and every replica says that the
+ * search index is being built: the job is running (#2088).
  */
 @Component
 class SearchDocumentStartupRebuild(

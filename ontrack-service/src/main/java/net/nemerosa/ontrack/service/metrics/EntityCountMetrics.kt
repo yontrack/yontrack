@@ -6,6 +6,13 @@ import net.nemerosa.ontrack.repository.StatsRepository
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 
+/**
+ * Gauges of the number of entities, `ontrack_entity_<entity>_total` (project, branch, build,
+ * promotionLevel, promotionRun, validationStamp, validationRun, validationRunStatus, property,
+ * event), read from the database on each scrape.
+ *
+ * In the cluster, every replica reports the same values - aggregate them with `max`, not `sum`.
+ */
 @Component
 @Transactional(readOnly = true)
 class EntityCountMetrics(

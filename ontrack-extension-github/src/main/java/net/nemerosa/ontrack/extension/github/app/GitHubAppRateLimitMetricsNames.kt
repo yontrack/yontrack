@@ -17,7 +17,7 @@ import net.nemerosa.ontrack.common.doc.MetricsMeterType
 object GitHubAppRateLimitMetricsNames {
 
     object Core {
-        @APIDescription("Core limit")
+        @APIDescription("Core limit of the GitHub configuration. Read from GitHub every minute by every replica: the replicas report the same value - aggregate it with max, not sum.")
         @MetricsMeterDocumentation(
             type = MetricsMeterType.GAUGE,
             tags = [
@@ -26,7 +26,7 @@ object GitHubAppRateLimitMetricsNames {
         )
         const val ontrack_extension_github_ratelimit_core_limit = "ontrack_extension_github_ratelimit_core_limit"
 
-        @APIDescription("Core remaining")
+        @APIDescription("Core remaining of the GitHub configuration. Read from GitHub every minute by every replica: the replicas report the same value - aggregate it with max, not sum.")
         @MetricsMeterDocumentation(
             type = MetricsMeterType.GAUGE,
             tags = [
@@ -36,7 +36,7 @@ object GitHubAppRateLimitMetricsNames {
         const val ontrack_extension_github_ratelimit_core_remaining =
             "ontrack_extension_github_ratelimit_core_remaining"
 
-        @APIDescription("Core used")
+        @APIDescription("Core used of the GitHub configuration. Read from GitHub every minute by every replica: the replicas report the same value - aggregate it with max, not sum.")
         @MetricsMeterDocumentation(
             type = MetricsMeterType.GAUGE,
             tags = [
@@ -47,7 +47,7 @@ object GitHubAppRateLimitMetricsNames {
     }
 
     object GraphQL {
-        @APIDescription("GraphQL limit")
+        @APIDescription("GraphQL limit of the GitHub configuration. Read from GitHub every minute by every replica: the replicas report the same value - aggregate it with max, not sum.")
         @MetricsMeterDocumentation(
             type = MetricsMeterType.GAUGE,
             tags = [
@@ -56,7 +56,7 @@ object GitHubAppRateLimitMetricsNames {
         )
         const val ontrack_extension_github_ratelimit_graphql_limit = "ontrack_extension_github_ratelimit_graphql_limit"
 
-        @APIDescription("GraphQL remaining")
+        @APIDescription("GraphQL remaining of the GitHub configuration. Read from GitHub every minute by every replica: the replicas report the same value - aggregate it with max, not sum.")
         @MetricsMeterDocumentation(
             type = MetricsMeterType.GAUGE,
             tags = [
@@ -66,7 +66,7 @@ object GitHubAppRateLimitMetricsNames {
         const val ontrack_extension_github_ratelimit_graphql_remaining =
             "ontrack_extension_github_ratelimit_graphql_remaining"
 
-        @APIDescription("GraphQL used")
+        @APIDescription("GraphQL used of the GitHub configuration. Read from GitHub every minute by every replica: the replicas report the same value - aggregate it with max, not sum.")
         @MetricsMeterDocumentation(
             type = MetricsMeterType.GAUGE,
             tags = [
@@ -77,7 +77,7 @@ object GitHubAppRateLimitMetricsNames {
     }
 
     object Search {
-        @APIDescription("Number of times the search limit was exceeded.")
+        @APIDescription("Number of times the search limit was exceeded, on this replica - sum it over the replicas.")
         @MetricsMeterDocumentation(
             type = MetricsMeterType.COUNT,
             tags = [

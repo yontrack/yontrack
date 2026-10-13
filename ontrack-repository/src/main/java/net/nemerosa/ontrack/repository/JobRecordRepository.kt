@@ -30,6 +30,13 @@ interface JobRecordRepository {
     fun findByKey(scheduler: String, key: JobKey): JobRecord?
 
     /**
+     * The jobs of a category, by ID.
+     *
+     * @param category Key of the category
+     */
+    fun findByCategory(scheduler: String, category: String): List<JobRecord>
+
+    /**
      * Creates the row of a job. A job which an earlier version of Yontrack recorded as paused, in
      * the settings, starts paused.
      */

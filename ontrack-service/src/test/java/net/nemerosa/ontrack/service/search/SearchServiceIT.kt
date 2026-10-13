@@ -4,6 +4,9 @@ import io.micrometer.core.instrument.MeterRegistry
 import net.nemerosa.ontrack.common.Time
 import net.nemerosa.ontrack.it.AbstractDSLTestSupport
 import net.nemerosa.ontrack.it.AsAdminTest
+import net.nemerosa.ontrack.it.jobs.OtherReplica
+import net.nemerosa.ontrack.job.JobKey
+import net.nemerosa.ontrack.service.job.JobSchedulerName
 import net.nemerosa.ontrack.model.security.ProjectEdit
 import net.nemerosa.ontrack.model.security.Roles
 import net.nemerosa.ontrack.model.structure.*
@@ -51,6 +54,9 @@ class SearchServiceIT : AbstractDSLTestSupport() {
 
     @Autowired
     private lateinit var transactionManager: PlatformTransactionManager
+
+    @Autowired
+    private lateinit var jobSchedulerName: JobSchedulerName
 
     private val testTypes = listOf(TestAlphaSearchDocumentIndexer.TYPE, TestBetaSearchDocumentIndexer.TYPE)
 
@@ -782,6 +788,37 @@ class SearchServiceIT : AbstractDSLTestSupport() {
             rebuild.join()
         }
         assertNull(asAdmin { search(u) }.message)
+    }
+
+    @Test
+    fun `A message says the index is being built while the rebuild job of a type runs on another replica`() {
+        assertBeingBuiltWhileRunningElsewhere(SearchDocumentIndexationJobs.rebuildJobType.getKey(TestAlphaSearchDocumentIndexer.TYPE))
+    }
+
+    @Test
+    fun `A message says the index is being built while the startup rebuild of a type runs on another replica`() {
+        assertBeingBuiltWhileRunningElsewhere(SearchDocumentStartupRebuild.startupRebuildKey(alpha))
+    }
+
+    /**
+     * The flag is the status of the job, the same on every replica (#2088).
+     */
+    private fun assertBeingBuiltWhileRunningElsewhere(key: JobKey) {
+        val u = token()
+        val project = project()
+        index(alpha.document("a-$u", "A", project, identifiers = listOf(u)))
+        assertNull(asAdmin { search(u) }.message, "No message before the rebuild")
+        OtherReplica(namedParameterJdbcTemplate, scheduler = jobSchedulerName.value).use { other ->
+            other.run(key)
+            val results = asAdmin { search(u) }
+            assertEquals("Search index is being built", results.message)
+            assertEquals(listOf("a-$u"), results.items.map { it.key }, "What exists so far is still returned")
+            assertNull(
+                asAdmin { search(u, types = listOf(TestBetaSearchDocumentIndexer.TYPE)) }.message,
+                "No message for the other types"
+            )
+        }
+        assertNull(asAdmin { search(u) }.message, "No message once the rebuild is over")
     }
 
     @Test

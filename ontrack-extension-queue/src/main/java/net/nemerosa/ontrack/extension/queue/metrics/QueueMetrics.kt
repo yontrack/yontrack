@@ -10,7 +10,8 @@ object QueueMetrics {
     const val processTime = "ontrack_extension_queue_process_time"
 
     /**
-     * Pending items into the queue
+     * Pending items into the queue, tagged by `processor`: the messages in RabbitMQ, the same for
+     * every replica - aggregate it with `max`, not `sum`.
      */
     const val pending = "ontrack_extension_queue_pending"
 

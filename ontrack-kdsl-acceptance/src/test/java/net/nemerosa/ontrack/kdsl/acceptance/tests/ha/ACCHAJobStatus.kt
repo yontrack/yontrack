@@ -7,11 +7,6 @@ import net.nemerosa.ontrack.kdsl.spec.jobs.JobStatus
 import net.nemerosa.ontrack.kdsl.spec.jobs.jobs
 import org.junit.jupiter.api.Assumptions.assumeTrue
 import org.junit.jupiter.api.Test
-import java.net.URI
-import java.net.http.HttpClient
-import java.net.http.HttpRequest
-import java.net.http.HttpResponse
-import java.util.concurrent.TimeUnit
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -143,38 +138,10 @@ class ACCHAJobStatus : AbstractACCHATestSupport() {
     private fun status(ontrack: Ontrack): JobStatus =
         ontrack.jobs.status(CATEGORY, TYPE, SLOW) ?: fail("Probe job $SLOW not found")
 
-    private fun docker(vararg args: String) {
-        val process = ProcessBuilder(listOf("docker") + args).redirectErrorStream(true).start()
-        val output = process.inputStream.bufferedReader().readText()
-        assertTrue(process.waitFor(60, TimeUnit.SECONDS), "docker ${args.joinToString(" ")} is over")
-        assertEquals(0, process.exitValue(), "docker ${args.joinToString(" ")}: $output")
-    }
-
-    private fun waitForHealth(hostName: String) {
-        val url = if (hostName == A) ACCProperties.HA.A.Mgt.url else ACCProperties.HA.B.Mgt.url
-        val client = HttpClient.newHttpClient()
-        waitUntil(timeout = 300_000L, interval = 2_000L, task = "Backend $hostName is up again") {
-            try {
-                client.send(
-                    HttpRequest.newBuilder(URI("$url/health")).GET().build(),
-                    HttpResponse.BodyHandlers.discarding(),
-                ).statusCode() == 200
-            } catch (_: Exception) {
-                false
-            }
-        }
-    }
-
     companion object {
         private const val CATEGORY = "testing"
         private const val TYPE = "probe"
         private const val PERIODIC = "periodic"
         private const val SLOW = "slow"
-
-        /**
-         * Host names of the backends, in `compose/docker-compose-kdsl-ha.yml`
-         */
-        private const val A = "ontrack-a"
-        private const val B = "ontrack-b"
     }
 }

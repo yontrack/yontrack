@@ -21,7 +21,7 @@ object AutoVersioningMetrics {
 
     object States {
 
-        @APIDescription("Number of audit entries in a given state.")
+        @APIDescription("Number of audit entries in a given state. In the cluster, read from the database: every replica reports the same value - aggregate it with max, not sum.")
         @MetricsMeterDocumentation(
             type = MetricsMeterType.COUNT,
             tags = [

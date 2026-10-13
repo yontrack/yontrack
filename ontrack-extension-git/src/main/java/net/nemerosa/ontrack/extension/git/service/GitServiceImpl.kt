@@ -538,21 +538,21 @@ class GitServiceImpl(
                 listener(it)
             }
             // Reset the counter for the project
-            gitNoRemoteCounter.resetNoRemoteCount(project.name)
+            gitNoRemoteCounter.resetNoRemoteCount(project)
         } catch (ex: GitRepositoryNoRemoteException) {
             // Remote was mentioned as not existing
-            if (gitConfigProperties.remote.maxNoRemote > 0) {
-                // Gets the counter for the project
-                val count = gitNoRemoteCounter.getNoRemoteCount(project.name)
-                // If < threshold, just increment the counter
-                if (count < gitConfigProperties.remote.maxNoRemote) {
-                    gitNoRemoteCounter.incNoRemoteCount(project.name)
-                } else {
-                    // If >= threshold, disable the project and logs the incident
+            val maxNoRemote = gitConfigProperties.remote.maxNoRemote
+            if (maxNoRemote > 0) {
+                // Counting the failure, for all the replicas
+                val count = gitNoRemoteCounter.incNoRemoteCount(project)
+                // Past the accepted failures, disable the project and logs the incident
+                if (count > maxNoRemote) {
                     securityService.asAdmin {
                         structureService.disableProject(project)
                     }
-                    logger.info("Indexation of Git repository for project ${project.name} failed because of no remote ${gitConfigProperties.remote.maxNoRemote} times in a row. Disabling the project.")
+                    // A project enabled again gets the same number of attempts
+                    gitNoRemoteCounter.resetNoRemoteCount(project)
+                    logger.info("Indexation of Git repository for project ${project.name} failed because of no remote $count times in a row. Disabling the project.")
                 }
             } else {
                 throw ex

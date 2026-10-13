@@ -47,7 +47,8 @@ interface SearchService {
     fun indexReset(reindex: Boolean, logErrors: Boolean): Ack
 
     /**
-     * Rebuilds the search documents of a given result type. Waits until the rebuild is completed.
+     * Rebuilds the search documents of a given result type, through its rebuild job, which runs on
+     * any replica. Waits until the rebuild is completed.
      *
      * @param resultType Result type to rebuild
      * @throws SearchResultTypeNotFoundException If no indexer serves this type

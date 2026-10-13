@@ -36,6 +36,12 @@ class JobRecordJdbcRepository(dataSource: DataSource) : AbstractJdbcRepository(d
             keyParams(scheduler, key),
         ) { rs, _ -> toRecord(rs) }
 
+    override fun findByCategory(scheduler: String, category: String): List<JobRecord> =
+        namedParameterJdbcTemplate!!.query(
+            "$SELECT WHERE J.SCHEDULER = :scheduler AND J.JOB_CATEGORY = :category ORDER BY J.ID",
+            params("scheduler", scheduler).addValue("category", category),
+        ) { rs, _ -> toRecord(rs) }
+
     override fun create(scheduler: String, key: JobKey, description: String, schedule: Schedule): JobRecord {
         namedParameterJdbcTemplate!!.update(
             """

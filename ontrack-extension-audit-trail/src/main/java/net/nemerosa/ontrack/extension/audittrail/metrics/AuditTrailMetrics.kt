@@ -44,7 +44,8 @@ object AuditTrailMetrics {
 
     @APIDescription(
         "Number of the evidences of a project which are not deleted. Refreshed every 15 minutes; a project " +
-                "without any evidence has no value."
+                "without any evidence has no value. In the cluster, read from the database by every replica: " +
+                "the replicas report the same value - aggregate it with max, not sum."
     )
     @MetricsMeterDocumentation(
         type = MetricsMeterType.GAUGE,
@@ -57,7 +58,8 @@ object AuditTrailMetrics {
     @APIDescription(
         "Total size, in bytes, of the evidences of a project which are not deleted — a content shared by " +
                 "several evidences counted for each, although the storage keeps it once. Refreshed every 15 " +
-                "minutes; a project without any evidence has no value."
+                "minutes; a project without any evidence has no value. In the cluster, read from the database by " +
+                "every replica: the replicas report the same value - aggregate it with max, not sum."
     )
     @MetricsMeterDocumentation(
         type = MetricsMeterType.GAUGE,

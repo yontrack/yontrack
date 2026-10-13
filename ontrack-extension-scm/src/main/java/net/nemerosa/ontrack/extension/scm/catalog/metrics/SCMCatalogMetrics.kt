@@ -8,7 +8,7 @@ import org.springframework.transaction.annotation.Transactional
 
 /**
  * Gauges of the SCM catalog, read from the counts stored by [SCMCatalogMetricsJob] (#2078): the
- * same on every replica.
+ * same on every replica - aggregate them with `max`, not `sum`.
  */
 @Component
 @Transactional(readOnly = true)

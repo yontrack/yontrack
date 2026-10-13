@@ -77,6 +77,9 @@ POST /rest/search/index/reset
 
 `GET /rest/search/types` lists the types.
 
+Both run the *rebuild* job of each type, on any replica: one rebuild of a type at a time, and,
+while it runs, the search says through every replica that the search index is being built.
+
 ## Metrics
 
 | Metric                            | Type    | Tags   | Description                                                          |

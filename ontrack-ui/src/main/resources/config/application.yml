@@ -61,7 +61,8 @@ management:
   metrics:
     tags:
       application: ontrack
-      application_instance: ontrack
+      # The replica reporting the metrics: its host name, the name of its pod in Kubernetes (#2088)
+      application_instance: ${HOSTNAME:ontrack}
   # Listening on a specific port
   server:
     port: 8800

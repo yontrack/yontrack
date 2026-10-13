@@ -106,6 +106,15 @@ public interface JobScheduler {
     Collection<JobKey> getJobKeysOfCategory(JobCategory category);
 
     /**
+     * Gets the statuses of the jobs of a category, the same on every replica, in one read: for
+     * example, whether some of them are running.
+     *
+     * @param category Job category
+     * @return Statuses of the jobs of this category (never null)
+     */
+    Collection<JobStatus> getJobStatusesOfCategory(JobCategory category);
+
+    /**
      * Gets the list of job statuses
      *
      * @return All job statuses (never null)

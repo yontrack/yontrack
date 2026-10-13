@@ -79,6 +79,9 @@ x-ontrack: &ontrack
     # status ACCHAJobStatus reads through both (#2079)
     ONTRACK_CONFIG_JOBS_TESTING_ENABLED: "true"
     ONTRACK_CONFIG_JOBS_TESTING_PERIOD: "2s"
+    # ... the slow testing type of search results, whose rebuild runs on one backend while
+    # ACCHASearchRebuild reads the rebuild message through both (#2088)
+    ONTRACK_CONFIG_SEARCH_TESTING_ENABLED: "true"
     # ... the SCM catalog, whose gauges one backend computes and both report, which
     # ACCHAReplicaJobs checks (#2078)
     ONTRACK_CONFIG_EXTENSION_SCM_CATALOG_ENABLED: "true"

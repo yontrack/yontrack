@@ -56,6 +56,9 @@ interface SearchDocumentService {
     /**
      * Rebuilds all the documents of an indexer: all the documents it provides are written, and
      * the documents of its type it did not provide are deleted.
+     *
+     * Runs on the calling thread: meant for the rebuild jobs of the type, whose status says that
+     * the search index is being built (#2088). Elsewhere, see [SearchService.reindex].
      */
     fun rebuild(indexer: SearchDocumentIndexer)
 

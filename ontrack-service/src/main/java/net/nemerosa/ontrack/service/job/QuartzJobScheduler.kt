@@ -779,6 +779,9 @@ class QuartzJobScheduler(
     override fun getJobStatuses(): Collection<JobStatus> =
         jobRecordRepository.findAll(name).map { toStatus(it) }
 
+    override fun getJobStatusesOfCategory(category: JobCategory): Collection<JobStatus> =
+        jobRecordRepository.findByCategory(name, category.key).map { toStatus(it) }
+
     override fun getJobKey(id: Long): Optional<JobKey> =
         Optional.ofNullable(
             id.takeIf { it in 1..Int.MAX_VALUE }

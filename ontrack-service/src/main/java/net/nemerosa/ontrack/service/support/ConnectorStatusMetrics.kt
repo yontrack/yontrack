@@ -9,6 +9,13 @@ import net.nemerosa.ontrack.model.support.ConnectorStatusType
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 
+/**
+ * Gauges of the statuses of the connectors, `ontrack_connector_count`, `ontrack_connector_up` and
+ * `ontrack_connector_down`, tagged by `type`, read from the statuses collected by
+ * [ConnectorStatusJob] and stored in the database (#2078).
+ *
+ * In the cluster, every replica reports the same values - aggregate them with `max`, not `sum`.
+ */
 @Component
 @Transactional(readOnly = true)
 class ConnectorStatusMetrics(

@@ -1,26 +1,37 @@
 package net.nemerosa.ontrack.extension.git.service
 
+import net.nemerosa.ontrack.model.structure.Project
+import net.nemerosa.ontrack.model.support.StorageService
 import org.springframework.stereotype.Component
 
 /**
- * Local in-memory cache for counting the number of times a project sync failed because its remote did not exist.
- *
- * TODO V5 Use a real cache mechanism
+ * Number of the synchronisations of a project which failed in a row because its remote did not
+ * exist, counted for all the replicas: in the database, incremented atomically (#2088).
  */
 @Component
-class GitNoRemoteCounter {
+class GitNoRemoteCounter(
+    private val storageService: StorageService,
+) {
 
-    private val counters = mutableMapOf<String, Int>()
+    fun getNoRemoteCount(project: Project): Int = storageService.getCount(STORE, key(project))
 
-    fun getNoRemoteCount(project: String) = counters[project] ?: 0
-
-    fun resetNoRemoteCount(project: String) {
-        counters.remove(project)
+    fun resetNoRemoteCount(project: Project) {
+        storageService.delete(STORE, key(project))
     }
 
-    fun incNoRemoteCount(project: String) {
-        val value = getNoRemoteCount(project)
-        counters[project] = value + 1
-    }
+    /**
+     * Counts one more failure.
+     *
+     * @return Number of failures in a row, this one included
+     */
+    fun incNoRemoteCount(project: Project): Int = storageService.increment(STORE, key(project))
 
+    private fun key(project: Project) = project.id.toString()
+
+    companion object {
+        /**
+         * Store of the counters, one per project, by ID
+         */
+        val STORE: String = GitNoRemoteCounter::class.java.name
+    }
 }

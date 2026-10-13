@@ -5,6 +5,11 @@ import net.nemerosa.ontrack.model.support.StorageService
 import net.nemerosa.ontrack.test.TestUtils
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.transaction.annotation.Propagation
+import org.springframework.transaction.annotation.Transactional
+import java.util.concurrent.Callable
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -53,5 +58,45 @@ class StorageServiceIT : AbstractServiceTestSupport() {
         assertEquals(2, data.size.toLong())
         assertEquals(stored1, data["1"])
         assertEquals(stored2, data["2"])
+    }
+
+    @Test
+    fun `A counter starts at 1 and is incremented`() {
+        val store = TestUtils.uid("C")
+        assertEquals(0, storageService.getCount(store, "1"), "No counter yet")
+        assertEquals(1, storageService.increment(store, "1"))
+        assertEquals(2, storageService.increment(store, "1"))
+        assertEquals(1, storageService.increment(store, "2"), "Counters are per key")
+        assertEquals(2, storageService.getCount(store, "1"))
+    }
+
+    @Test
+    fun `A counter is reset by deleting it`() {
+        val store = TestUtils.uid("C")
+        storageService.increment(store, "1")
+        storageService.increment(store, "1")
+        storageService.delete(store, "1")
+        assertEquals(0, storageService.getCount(store, "1"))
+        assertEquals(1, storageService.increment(store, "1"))
+    }
+
+    /**
+     * Each increment commits on its own connection, as on several replicas.
+     */
+    @Test
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    fun `Concurrent increments are all counted`() {
+        val store = TestUtils.uid("C")
+        val executor = Executors.newFixedThreadPool(8)
+        try {
+            val counts = executor.invokeAll(
+                (1..40).map { Callable { storageService.increment(store, "1") } }
+            ).map { it.get(30, TimeUnit.SECONDS) }
+            assertEquals((1..40).toList(), counts.sorted(), "Each increment gives its own count")
+            assertEquals(40, storageService.getCount(store, "1"))
+        } finally {
+            executor.shutdownNow()
+            storageService.clear(store)
+        }
     }
 }

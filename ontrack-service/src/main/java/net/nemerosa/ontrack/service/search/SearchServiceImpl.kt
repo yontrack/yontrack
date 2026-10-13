@@ -1,5 +1,7 @@
 package net.nemerosa.ontrack.service.search
 
+import net.nemerosa.ontrack.job.JobLaunchStatus
+import net.nemerosa.ontrack.job.JobScheduler
 import net.nemerosa.ontrack.json.toObject
 import net.nemerosa.ontrack.model.Ack
 import net.nemerosa.ontrack.model.security.ProjectList
@@ -16,6 +18,10 @@ import org.springframework.transaction.annotation.Transactional
 /**
  * Search on the search documents stored in Postgres, as described by the
  * [indexers][SearchDocumentIndexer] (ADR 0017).
+ *
+ * A type is being rebuilt while its rebuild job, or its rebuild job at startup, runs on any replica:
+ * read from the status of the jobs, the same on every replica (#2088). The rebuilds asked through
+ * this service run as the rebuild job of their type.
  */
 @Service
 @Transactional(readOnly = true)
@@ -24,6 +30,7 @@ class SearchServiceImpl(
     private val searchDocumentService: SearchDocumentServiceImpl,
     private val securityService: SecurityService,
     private val structureService: StructureService,
+    private val jobScheduler: JobScheduler,
 ) : SearchService {
 
     companion object {
@@ -34,6 +41,11 @@ class SearchServiceImpl(
          * project, so for all of them.
          */
         private const val NO_PROJECT_ID = 0
+
+        /**
+         * Interval between two attempts to launch a rebuild job which is already running
+         */
+        private const val RELAUNCH_INTERVAL_MS = 1_000L
     }
 
     private val logger: Logger = LoggerFactory.getLogger(SearchServiceImpl::class.java)
@@ -81,7 +93,7 @@ class SearchServiceImpl(
             highlight = request.highlight,
         ) ?: return null
         val typesById = types.associateBy { it.id }
-        val rebuilding = searchDocumentService.rebuildingTypes
+        val rebuilding = rebuildingTypes()
         // Current names of the projects and branches the documents found refer to
         val hits = SearchDocumentNames.resolve(
             hits = page.items,
@@ -101,6 +113,20 @@ class SearchServiceImpl(
             },
         )
     }
+
+    /**
+     * Types being rebuilt, on any replica: those whose rebuild job, or rebuild job at startup, runs.
+     */
+    private fun rebuildingTypes(): Set<String> =
+        jobScheduler.getJobStatusesOfCategory(SearchDocumentIndexationJobs.jobCategory)
+            .filter { status ->
+                status.isRunning && (
+                        status.key.sameType(SearchDocumentIndexationJobs.rebuildJobType) ||
+                                status.key.sameType(SearchDocumentStartupRebuild.startupRebuildJobType)
+                        )
+            }
+            .map { it.key.id }
+            .toSet()
 
     /**
      * What the current user can see, for the given types.
@@ -164,7 +190,7 @@ class SearchServiceImpl(
             try {
                 searchDocumentService.clear(indexer.searchResultType.id)
                 if (reindex) {
-                    searchDocumentService.rebuild(indexer)
+                    rebuild(indexer)
                 }
                 true
             } catch (any: Exception) {
@@ -182,7 +208,36 @@ class SearchServiceImpl(
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     override fun reindex(resultType: String) {
         val indexer = indexers[resultType] ?: throw SearchResultTypeNotFoundException(resultType)
-        searchDocumentService.rebuild(indexer)
+        rebuild(indexer)
+    }
+
+    /**
+     * Runs the rebuild job of a type, on any replica, and waits for the end of its run: one rebuild
+     * of a type at a time in the cluster, which the status of the job shows. A run already in
+     * progress is waited for before launching another one, which sees all the changes made before
+     * this call.
+     *
+     * @throws SearchIndexRebuildException If the rebuild failed
+     */
+    private fun rebuild(indexer: SearchDocumentIndexer) {
+        val type = indexer.searchResultType.id
+        val key = SearchDocumentIndexationJobs.rebuildJobType.getKey(type)
+        while (true) {
+            val launch = jobScheduler.launch(key)
+            when (launch.status) {
+                JobLaunchStatus.TRIGGERED -> {
+                    launch.future?.get()
+                    break
+                }
+
+                JobLaunchStatus.ALREADY_RUNNING -> Thread.sleep(RELAUNCH_INTERVAL_MS)
+
+                JobLaunchStatus.NOT_RUNNABLE -> throw SearchIndexRebuildException(type, "its rebuild job cannot run")
+            }
+        }
+        jobScheduler.getJobStatus(key).orElse(null)?.lastError?.let { error ->
+            throw SearchIndexRebuildException(type, error)
+        }
     }
 
 }

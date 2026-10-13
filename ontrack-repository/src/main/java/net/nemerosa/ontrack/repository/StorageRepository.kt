@@ -76,6 +76,16 @@ interface StorageRepository {
     fun storeJson(store: String, key: String, node: JsonNode)
 
     /**
+     * Increments a counter in one statement (upsert), so that concurrent increments, on any
+     * replica, are all counted. The counter is stored as `{"count": <n>}`, and starts at 1.
+     *
+     * @param store Store (typically an extension class name)
+     * @param key   Identifier of the counter
+     * @return Count after the increment
+     */
+    fun increment(store: String, key: String): Int
+
+    /**
      * Retrieves some JSON using a key
      *
      * @param store Store (typically an extension class name)
