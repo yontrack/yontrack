@@ -370,6 +370,9 @@ configure(javaProjects) {
         "io.mockk:mockk-dsl:$mockkVersion",
         "io.mockk:mockk-dsl-jvm:$mockkVersion",
 
+        // Counting the SQL queries of the integration tests (QueryCounter in ontrack-it-utils, #2080)
+        "net.ttddyy:datasource-proxy:1.11.0",
+
         // Local clones of the Git repositories (ontrack-git). The pure-Git support is gone (#1924), but
         // GitHub, GitLab and Bitbucket still walk their commits and merge their branches on a clone.
         "org.eclipse.jgit:org.eclipse.jgit:$jgitVersion",

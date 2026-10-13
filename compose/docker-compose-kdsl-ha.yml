@@ -56,8 +56,12 @@ x-ontrack: &ontrack
     MANAGEMENT_ENDPOINT_ACCOUNT_ACCESS: unrestricted
     # ... configurations are not tested
     ONTRACK_CONFIG_CONFIGURATION_TEST: "false"
-    # ... GitHub ingestion specifics
-    ONTRACK_EXTENSION_GITHUB_INGESTION_HOOK_SIGNATURE_DISABLED: true
+    # ... one encryption key for both backends, in the database, as the chart configures it: the
+    # default `file` store would give each backend a key of its own
+    ONTRACK_CONFIG_KEY_STORE: jdbc
+    # ... GitHub ingestion: the signatures of the hook are checked, unlike in the main stack, for
+    # ACCHASettings to check that a secret rotated through one backend is enforced by the other
+    ONTRACK_EXTENSION_GITHUB_INGESTION_HOOK_SIGNATURE_DISABLED: false
     # ... Jira in mock mode
     ONTRACK_EXTENSION_JIRA_CLIENT_TYPE: mock
     # ... audit trail evidence in the stack's MinIO (#1962), reached inside the network

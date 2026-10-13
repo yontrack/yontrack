@@ -23,6 +23,7 @@ dependencies {
     testFixturesImplementation("org.springframework.boot:spring-boot-starter-test")
     testFixturesImplementation("io.micrometer:micrometer-core")
     testFixturesImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-core")
+    testFixturesImplementation("net.ttddyy:datasource-proxy")
 
     testFixturesImplementation("io.mockk:mockk")
     testFixturesImplementation("io.mockk:mockk-jvm")

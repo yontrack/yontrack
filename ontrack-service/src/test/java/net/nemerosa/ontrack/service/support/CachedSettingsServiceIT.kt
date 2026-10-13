@@ -1,171 +1,159 @@
 package net.nemerosa.ontrack.service.support
 
-import com.github.benmanes.caffeine.cache.Cache
-import com.github.benmanes.caffeine.cache.Caffeine
-import com.github.benmanes.caffeine.cache.Ticker
-import net.nemerosa.ontrack.common.Caches
 import net.nemerosa.ontrack.it.AbstractServiceTestSupport
+import net.nemerosa.ontrack.it.QueryCounter
+import net.nemerosa.ontrack.it.RecordedQueries
 import net.nemerosa.ontrack.model.settings.EventsSettings
 import net.nemerosa.ontrack.model.settings.SecuritySettings
-import net.nemerosa.ontrack.model.settings.SettingsProvider
-import net.nemerosa.ontrack.service.CacheConfig
+import net.nemerosa.ontrack.model.support.ReadMemo
+import net.nemerosa.ontrack.model.support.SettingsRepository
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.beans.factory.support.StaticListableBeanFactory
-import org.springframework.cache.CacheManager
-import org.springframework.cache.caffeine.CaffeineCache
-import org.springframework.cache.support.SimpleCacheManager
 import org.springframework.transaction.PlatformTransactionManager
 import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.transaction.support.TransactionTemplate
 import java.util.concurrent.Executors
-import java.time.Duration
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicLong
 import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 
 /**
- * The settings are cached for all the threads, which read them from the database: a read from another
- * thread while some settings are being written puts their committed value into the cache, which must
- * neither hide the new value from the transaction which writes them, nor stay in the cache after its
- * commit.
+ * The settings are read once per unit of work - an HTTP request, a queue message - and fresh
+ * outside of one, never from a cache which would outlive it: what another replica writes is read
+ * by the next unit of this one (#2080).
  */
 class CachedSettingsServiceIT : AbstractServiceTestSupport() {
+
+    @Autowired
+    private lateinit var queryCounter: QueryCounter
 
     @Autowired
     private lateinit var platformTransactionManager: PlatformTransactionManager
 
     @Autowired
-    private lateinit var cacheManager: CacheManager
+    private lateinit var settingsRepository: SettingsRepository
 
-    @Autowired
-    private lateinit var cacheConfig: CacheConfig
+    /**
+     * Queries of the current thread reading the settings of the given [type]
+     */
+    private fun RecordedQueries.settings(type: Class<*>): RecordedQueries =
+        on("SETTINGS").withParameter(type.name).filter { it.thread == Thread.currentThread().name }
 
-    @Autowired
-    private lateinit var settingsProviders: List<SettingsProvider<*>>
-
-    @Test
-    fun `Several settings types stay cached together`() {
+    private fun security(): SecuritySettings =
         cachedSettingsService.getCachedSettings(SecuritySettings::class.java)
-        cachedSettingsService.getCachedSettings(EventsSettings::class.java)
-        // Runs the pending evictions
-        settingsCache.cleanUp()
-        val cached = settingsCache.asMap().keys
-        assertTrue(SecuritySettings::class.java in cached, "Security settings still cached")
-        assertTrue(EventsSettings::class.java in cached, "Events settings still cached")
+
+    private fun saveSecurity(settings: SecuritySettings) {
+        asAdmin().execute {
+            settingsManagerService.saveSettings(settings)
+        }
     }
 
     @Test
-    fun `Settings written by a transaction are read by it, whatever another thread reads meanwhile`() {
-        val settings = cachedSettingsService.getCachedSettings(SecuritySettings::class.java)
-        asAdmin().execute {
-            settingsManagerService.saveSettings(settings.withDashboardSharing(!settings.grantDashboardSharingToAll))
+    fun `With no unit of work, each read of some settings goes to the database`() {
+        val queries = queryCounter.record {
+            security()
+            security()
         }
-        assertEquals(
-            settings.grantDashboardSharingToAll,
-            readFromAnotherThread().grantDashboardSharingToAll,
-            "Not committed yet"
+        assertEquals(2, queries.settings(SecuritySettings::class.java).size, "One query per read: $queries")
+    }
+
+    @Test
+    fun `In a unit of work, a settings type is read once, in one query`() {
+        val queries = queryCounter.record {
+            ReadMemo.unitOfWork {
+                security()
+                security()
+                cachedSettingsService.getCachedSettings(EventsSettings::class.java)
+                cachedSettingsService.getCachedSettings(EventsSettings::class.java)
+            }
+        }
+        assertEquals(1, queries.settings(SecuritySettings::class.java).size, "Security settings: $queries")
+        assertEquals(1, queries.settings(EventsSettings::class.java).size, "Events settings: $queries")
+    }
+
+    @Test
+    fun `Each unit of work reads the settings again`() {
+        val queries = queryCounter.record {
+            ReadMemo.unitOfWork { security() }
+            ReadMemo.unitOfWork { security() }
+        }
+        assertEquals(2, queries.settings(SecuritySettings::class.java).size, "One query per unit: $queries")
+    }
+
+    @Test
+    fun `Settings written and read in the same unit of work are read with their new value`() {
+        ReadMemo.unitOfWork {
+            val settings = security()
+            saveSecurity(settings.withDashboardSharing(!settings.grantDashboardSharingToAll))
+            assertEquals(!settings.grantDashboardSharingToAll, security().grantDashboardSharingToAll)
+        }
+    }
+
+    @Test
+    fun `Settings written outside a unit of work are read with their new value`() {
+        val settings = security()
+        saveSecurity(settings.withDashboardSharing(!settings.grantDashboardSharingToAll))
+        assertEquals(!settings.grantDashboardSharingToAll, security().grantDashboardSharingToAll)
+    }
+
+    /**
+     * Another replica writes directly into the database, which the unit of work of this one
+     * reads the next time.
+     */
+    @Test
+    fun `Settings written by another replica are read by the next unit of work`() {
+        val settings = ReadMemo.unitOfWork { security() }
+        settingsRepository.setBoolean(
+            SecuritySettings::class.java,
+            SecuritySettings::grantDashboardSharingToAll.name,
+            !settings.grantDashboardSharingToAll,
         )
         assertEquals(
             !settings.grantDashboardSharingToAll,
-            cachedSettingsService.getCachedSettings(SecuritySettings::class.java).grantDashboardSharingToAll,
-            "Written by this transaction"
+            ReadMemo.unitOfWork { security() }.grantDashboardSharingToAll,
         )
+    }
+
+    @Test
+    fun `A thread outside the unit of work reads fresh settings`() {
+        val executor = Executors.newSingleThreadExecutor()
+        try {
+            val queries = queryCounter.record {
+                ReadMemo.unitOfWork {
+                    security()
+                    executor.submit { security() }.get(30, TimeUnit.SECONDS)
+                    executor.submit { security() }.get(30, TimeUnit.SECONDS)
+                }
+            }
+            assertEquals(
+                3,
+                queries.on("SETTINGS").withParameter(SecuritySettings::class.java.name).size,
+                "Once in the unit, twice by the other thread: $queries"
+            )
+        } finally {
+            executor.shutdown()
+        }
     }
 
     @Test
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
-    fun `A concurrent read before the commit of some settings does not leave their previous value in the cache`() {
-        val settings = cachedSettingsService.getCachedSettings(SecuritySettings::class.java)
-        try {
-            TransactionTemplate(platformTransactionManager).executeWithoutResult {
-                asAdmin().execute {
-                    settingsManagerService.saveSettings(settings.withDashboardSharing(!settings.grantDashboardSharingToAll))
-                }
+    fun `Settings written by a rolled back transaction are not left in the unit of work`() {
+        ReadMemo.unitOfWork {
+            val settings = security()
+            TransactionTemplate(platformTransactionManager).executeWithoutResult { status ->
+                saveSecurity(settings.withDashboardSharing(!settings.grantDashboardSharingToAll))
                 assertEquals(
-                    settings.grantDashboardSharingToAll,
-                    readFromAnotherThread().grantDashboardSharingToAll,
-                    "Not committed yet"
+                    !settings.grantDashboardSharingToAll,
+                    security().grantDashboardSharingToAll,
+                    "Read by the transaction which writes them"
                 )
+                status.setRollbackOnly()
             }
             assertEquals(
-                !settings.grantDashboardSharingToAll,
-                cachedSettingsService.getCachedSettings(SecuritySettings::class.java).grantDashboardSharingToAll,
-                "Committed value"
+                settings.grantDashboardSharingToAll,
+                security().grantDashboardSharingToAll,
+                "Rolled back"
             )
-        } finally {
-            asAdmin().execute {
-                settingsManagerService.saveSettings(settings)
-            }
-        }
-    }
-
-    @Test
-    fun `Settings written through an instance are seen by another instance once its cache expires`() {
-        // A second instance on the same database, with its own cache, whose clock the test controls
-        val time = AtomicLong()
-        val other = otherInstance { time.get() }
-
-        val settings = other.getCachedSettings(SecuritySettings::class.java)
-        asAdmin().execute {
-            settingsManagerService.saveSettings(settings.withDashboardSharing(!settings.grantDashboardSharingToAll))
-        }
-        assertEquals(
-            !settings.grantDashboardSharingToAll,
-            cachedSettingsService.getCachedSettings(SecuritySettings::class.java).grantDashboardSharingToAll,
-            "Seen at once by the instance which wrote them"
-        )
-
-        time.set(Duration.ofSeconds(59).toNanos())
-        assertEquals(
-            settings.grantDashboardSharingToAll,
-            other.getCachedSettings(SecuritySettings::class.java).grantDashboardSharingToAll,
-            "Still cached by the other instance"
-        )
-
-        time.set(Duration.ofMinutes(1).toNanos())
-        assertEquals(
-            !settings.grantDashboardSharingToAll,
-            other.getCachedSettings(SecuritySettings::class.java).grantDashboardSharingToAll,
-            "Seen by the other instance once its cache expires"
-        )
-    }
-
-    /**
-     * Cached settings of another instance, whose settings cache has the specification of this one.
-     */
-    private fun otherInstance(ticker: Ticker): CachedSettingsServiceImpl {
-        val spec = cacheConfig.specs.getValue(Caches.SETTINGS)
-        val otherCacheManager = SimpleCacheManager().apply {
-            setCaches(
-                listOf(
-                    CaffeineCache(
-                        Caches.SETTINGS,
-                        Caffeine.from(spec).ticker(ticker).executor(Runnable::run).build()
-                    )
-                )
-            )
-            initializeCaches()
-        }
-        val beanFactory = StaticListableBeanFactory().apply {
-            addBean("cacheManager", otherCacheManager)
-        }
-        return CachedSettingsServiceImpl(settingsProviders, beanFactory.getBeanProvider(CacheManager::class.java))
-    }
-
-    private val settingsCache: Cache<Any, Any>
-        get() = (cacheManager.getCache(Caches.SETTINGS) as CaffeineCache).nativeCache
-
-    private fun readFromAnotherThread(): SecuritySettings {
-        val executor = Executors.newSingleThreadExecutor()
-        try {
-            return executor.submit<SecuritySettings> {
-                cachedSettingsService.getCachedSettings(SecuritySettings::class.java)
-            }.get(30, TimeUnit.SECONDS)
-        } finally {
-            executor.shutdown()
         }
     }
 

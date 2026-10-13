@@ -72,9 +72,10 @@ whatever the number of backends.
 
 ### Caches during the overlap
 
-Each backend caches the settings and the properties of the entities in memory. A change made
-through one backend is seen by the other one once its cache expires: after one minute for the
-settings, five minutes for the properties.
+The settings are not cached: each backend reads them once per request, so that a change made
+through one backend applies to the next request served by the other one. Each backend caches the
+properties of the entities in memory: a change made through one backend is seen by the other one
+once its cache expires, after five minutes.
 
 The search documents are rebuilt at startup when a new version changes their format. This rebuild
 waits for `ontrack.config.search.index.startup-delay` (two minutes by default), past the time when
@@ -142,8 +143,8 @@ kubectl delete pvc <release>-yontrack-chart
   pod starts with an empty data volume: expect some extra load on the Git servers.
 * **A notification can be sent twice** if a backend stops between sending it and recording that it
   was sent: the message is delivered again, and processed again.
-* **The settings may lag by up to one minute** on the other backend, after a change: see
-  [Caches during the overlap](#caches-during-the-overlap).
+* **The properties of the entities may lag by up to five minutes** on the other backend, after a
+  change: see [Caches during the overlap](#caches-during-the-overlap). The settings do not lag.
 * **The search may be incomplete for a while** after an upgrade that changes the format of the
   search documents, until their rebuild, which starts two minutes after the new backend.
 

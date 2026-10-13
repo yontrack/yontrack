@@ -11,6 +11,7 @@ import net.nemerosa.ontrack.extension.github.ingestion.processing.IngestionHookP
 import net.nemerosa.ontrack.json.parse
 import net.nemerosa.ontrack.json.parseAsJson
 import net.nemerosa.ontrack.model.security.AuthenticationStorageService
+import net.nemerosa.ontrack.model.support.ReadMemo
 import org.slf4j.LoggerFactory
 import org.springframework.amqp.core.Message
 import org.springframework.amqp.core.MessageListener
@@ -81,7 +82,16 @@ class AsyncIngestionHookQueueListener(
         return this
     }
 
+    /**
+     * The processing of a message is a unit of work, with its own read memo (ADR 0021).
+     */
     private fun onMessage(message: Message) {
+        ReadMemo.unitOfWork {
+            processMessage(message)
+        }
+    }
+
+    private fun processMessage(message: Message) {
         try {
             val body = message.body.toString(Charsets.UTF_8)
             val payload = body.parseAsJson().parse<IngestionHookPayload>()

@@ -4,6 +4,7 @@ import net.nemerosa.ontrack.json.parse
 import net.nemerosa.ontrack.json.parseAsJson
 import net.nemerosa.ontrack.model.settings.SettingsProvider
 import net.nemerosa.ontrack.model.support.SettingsRepository
+import net.nemerosa.ontrack.model.support.values
 import net.nemerosa.ontrack.model.support.getBoolean
 import org.springframework.stereotype.Component
 
@@ -12,19 +13,22 @@ class AgentMarkersSettingsProvider(
     private val settingsRepository: SettingsRepository,
 ) : SettingsProvider<AgentMarkersSettings> {
 
-    override fun getSettings() = AgentMarkersSettings(
-        builtInConventions = settingsRepository.getBoolean(
-            AgentMarkersSettings::builtInConventions,
-            true
-        ),
-        patterns = parsePatterns(
-            settingsRepository.getString(
-                AgentMarkersSettings::class.java,
-                AgentMarkersSettings::patterns.name,
-                ""
-            )
-        ),
-    )
+    override fun getSettings(): AgentMarkersSettings {
+        val values = settingsRepository.values(AgentMarkersSettings::class.java)
+        return AgentMarkersSettings(
+            builtInConventions = values.getBoolean(
+                AgentMarkersSettings::builtInConventions,
+                true
+            ),
+            patterns = parsePatterns(
+                values.getString(
+                    AgentMarkersSettings::class.java,
+                    AgentMarkersSettings::patterns.name,
+                    ""
+                )
+            ),
+        )
+    }
 
     private fun parsePatterns(json: String): List<AgentMarkerPattern> =
         if (json.isBlank()) {

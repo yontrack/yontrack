@@ -4,27 +4,35 @@ import kotlin.reflect.KProperty0
 import kotlin.reflect.KProperty1
 
 /**
+ * All the stored fields of a settings [category], read in one query, as [SettingsValues].
+ *
+ * Typed as a [SettingsReader], whose Java signatures read as those of the [SettingsRepository].
+ */
+fun SettingsRepository.values(category: Class<*>): SettingsReader =
+    SettingsValues(category, getAllValues(category))
+
+/**
  * Type safe access to settings.
  */
-inline fun <reified T> SettingsRepository.getString(property: KProperty1<T, String?>, defaultValue: String): String =
+inline fun <reified T> SettingsReader.getString(property: KProperty1<T, String?>, defaultValue: String): String =
     getString(T::class.java, property.name, defaultValue)
 
 /**
  * Type safe access to settings.
  */
-inline fun <reified T> SettingsRepository.getInt(property: KProperty1<T, Int?>, defaultValue: Int): Int =
+inline fun <reified T> SettingsReader.getInt(property: KProperty1<T, Int?>, defaultValue: Int): Int =
     getInt(T::class.java, property.name, defaultValue)
 
 /**
  * Type safe access to settings.
  */
-inline fun <reified T> SettingsRepository.getLong(property: KProperty1<T, Long?>, defaultValue: Long): Long =
+inline fun <reified T> SettingsReader.getLong(property: KProperty1<T, Long?>, defaultValue: Long): Long =
     getLong(T::class.java, property.name, defaultValue)
 
 /**
  * Type safe access to settings.
  */
-inline fun <reified T> SettingsRepository.getBoolean(
+inline fun <reified T> SettingsReader.getBoolean(
     property: KProperty1<T, Boolean?>,
     defaultValue: Boolean,
 ): Boolean =
@@ -33,7 +41,7 @@ inline fun <reified T> SettingsRepository.getBoolean(
 /**
  * Type safe access to settings.
  */
-inline fun <reified T, reified E : Enum<E>> SettingsRepository.getEnum(
+inline fun <reified T, reified E : Enum<E>> SettingsReader.getEnum(
     property: KProperty1<T, E?>,
     defaultValue: E,
 ): E =
@@ -45,7 +53,7 @@ inline fun <reified T, reified E : Enum<E>> SettingsRepository.getEnum(
 /**
  * Type safe access to settings.
  */
-inline fun <reified T> SettingsRepository.getPassword(
+inline fun <reified T> SettingsReader.getPassword(
     property: KProperty1<T, String?>,
     defaultValue: String,
     noinline decryptService: (String?) -> String?,

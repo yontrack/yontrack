@@ -11,6 +11,7 @@ import net.nemerosa.ontrack.extension.queue.record.QueueRecordService
 import net.nemerosa.ontrack.json.parseAsJson
 import net.nemerosa.ontrack.model.security.AuthenticationStorageService
 import net.nemerosa.ontrack.model.security.SecurityService
+import net.nemerosa.ontrack.model.support.ReadMemo
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import org.springframework.amqp.core.AcknowledgeMode
@@ -84,7 +85,16 @@ class QueueListener(
         private val queueProcessor: QueueProcessor<T>
     ) : ChannelAwareMessageListener {
 
+        /**
+         * The processing of a message is a unit of work, with its own read memo (ADR 0021).
+         */
         override fun onMessage(message: Message, channel: Channel?) {
+            ReadMemo.unitOfWork {
+                processMessage(message, channel)
+            }
+        }
+
+        private fun processMessage(message: Message, channel: Channel?) {
 
             if (queueProcessor.ackMode == QueueAckMode.IMMEDIATE) {
                 ackMessage(message, channel)
