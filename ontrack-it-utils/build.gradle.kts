@@ -7,6 +7,7 @@ dependencies {
     testFixturesApi("org.springframework:spring-test")
     testFixturesApi(project(":ontrack-common"))
     testFixturesApi(project(":ontrack-model"))
+    testFixturesApi(project(":ontrack-job"))
     testFixturesApi(project(":ontrack-test-utils"))
     testFixturesApi("org.springframework:spring-jdbc")
     testFixturesApi("org.springframework.security:spring-security-core")

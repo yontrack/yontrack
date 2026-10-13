@@ -1,0 +1,16 @@
+query JobHistory($category: String!, $type: String!, $from: LocalDateTime!, $to: LocalDateTime!) {
+    jobs(category: $category, type: $type, size: 1000) {
+        pageItems {
+            id
+            key {
+                id
+            }
+            jobHistory(from: $from, to: $to, skipErrors: false) {
+                startedAt
+                endedAt
+                status
+                message
+            }
+        }
+    }
+}

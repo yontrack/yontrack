@@ -3,7 +3,6 @@ package net.nemerosa.ontrack.extension.scorecard.job
 import net.nemerosa.ontrack.common.Time
 import net.nemerosa.ontrack.extension.scorecard.engine.ReadingEngine
 import net.nemerosa.ontrack.extension.scorecard.engine.ReadingSets
-import net.nemerosa.ontrack.extension.scorecard.estates.Estate
 import net.nemerosa.ontrack.extension.scorecard.license.ScorecardLicense
 import net.nemerosa.ontrack.extension.scorecard.model.EstateReadingSet
 import net.nemerosa.ontrack.extension.scorecard.model.NoEstateReadingSet
@@ -15,7 +14,6 @@ import net.nemerosa.ontrack.job.orchestrator.JobOrchestratorSupplier
 import net.nemerosa.ontrack.model.security.SecurityService
 import net.nemerosa.ontrack.model.settings.CachedSettingsService
 import net.nemerosa.ontrack.model.structure.ID
-import net.nemerosa.ontrack.model.structure.Project
 import net.nemerosa.ontrack.model.structure.StructureService
 import org.springframework.scheduling.support.CronExpression
 import org.springframework.stereotype.Component
@@ -32,8 +30,8 @@ import org.springframework.stereotype.Component
  * Without the licence of the delivery scorecard, the estate jobs are not supplied, and an estate
  * job which runs anyway skips its estate. The snapshots are kept.
  *
- * The recompute jobs of the projects and of the estates are created on demand, see [recomputeJob]
- * and [estateRecomputeJob].
+ * The recompute jobs, one per project and one per estate, are supplied too, with no schedule: a
+ * recompute fires them, and any replica can run them (#2077).
  */
 @Component
 class ScorecardJobs(
@@ -66,6 +64,11 @@ class ScorecardJobs(
          * Key of the recompute job of an estate
          */
         fun estateRecomputeJobKey(estateId: Int): JobKey = recomputeJobType.getKey("estate-$estateId")
+
+        /**
+         * Key of the recompute job of a project
+         */
+        fun recomputeJobKey(projectId: Int): JobKey = recomputeJobType.getKey(projectId.toString())
     }
 
     override val jobRegistrations: Collection<JobRegistration>
@@ -82,6 +85,10 @@ class ScorecardJobs(
                     job = EstateReadingsJob(estate.id, estate.name, estateJobKey(estate.id)),
                     schedule = schedule,
                 )
+            } + estates.map { estate ->
+                JobRegistration.of(EstateReadingsJob(estate.id, estate.name, estateRecomputeJobKey(estate.id)))
+            } + securityService.asAdmin { structureService.projectList }.map { project ->
+                JobRegistration.of(RecomputeJob(project.id(), project.name))
             }
         }
 
@@ -136,17 +143,6 @@ class ScorecardJobs(
         progress("$count snapshot(s) older than $limit purged")
     }
 
-    /**
-     * Manual job recomputing the readings of a project, for every set it is in.
-     */
-    fun recomputeJob(project: Project): Job = RecomputeJob(project.id(), project.name)
-
-    /**
-     * Manual job recomputing the readings of an estate, for every non-disabled project it selects.
-     */
-    fun estateRecomputeJob(estate: Estate): Job =
-        EstateReadingsJob(estate.id, estate.name, estateRecomputeJobKey(estate.id))
-
     private inner class NoEstateReadingsJob : Job {
         override fun getKey(): JobKey = noEstateJobKey
         override fun getTask() = JobRun { listener -> computeNoEstateReadings { listener.message(it) } }
@@ -169,7 +165,7 @@ class ScorecardJobs(
         private val projectId: Int,
         private val projectName: String,
     ) : Job {
-        override fun getKey(): JobKey = recomputeJobType.getKey(projectId.toString())
+        override fun getKey(): JobKey = recomputeJobKey(projectId)
 
         override fun getTask() = JobRun { listener ->
             securityService.asAdmin {

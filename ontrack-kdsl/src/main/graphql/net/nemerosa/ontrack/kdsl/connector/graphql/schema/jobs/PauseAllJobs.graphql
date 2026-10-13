@@ -1,0 +1,6 @@
+mutation PauseAllJobs {
+    pauseAllJobs {
+        ok
+        error
+    }
+}

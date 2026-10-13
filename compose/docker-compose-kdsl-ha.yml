@@ -74,6 +74,10 @@ x-ontrack: &ontrack
     # ... the same configuration as code for both backends, which start together and both apply
     # it (#2087)
     ONTRACK_CONFIG_CASC_LOCATIONS: "file:/casc/kdsl-ha.yaml"
+    # ... the probe jobs, a periodic one every 2 seconds and a manual one, which ACCHAJobs runs,
+    # pauses and counts across both backends (#2077)
+    ONTRACK_CONFIG_JOBS_TESTING_ENABLED: "true"
+    ONTRACK_CONFIG_JOBS_TESTING_PERIOD: "2s"
   volumes:
     - ./casc/kdsl-ha.yaml:/casc/kdsl-ha.yaml:ro
   depends_on:

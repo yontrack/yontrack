@@ -1,158 +1,97 @@
 package net.nemerosa.ontrack.service.search
 
-import ch.qos.logback.classic.Logger
-import ch.qos.logback.classic.spi.ILoggingEvent
-import ch.qos.logback.core.read.ListAppender
+import net.nemerosa.ontrack.common.Time
 import net.nemerosa.ontrack.it.AbstractDSLTestSupport
-import net.nemerosa.ontrack.job.JobRunLock
-import net.nemerosa.ontrack.model.structure.SearchDocument
-import net.nemerosa.ontrack.model.support.OntrackConfigProperties
+import net.nemerosa.ontrack.job.JobScheduler
+import net.nemerosa.ontrack.model.job.JobHistoryService
+import net.nemerosa.ontrack.model.structure.SearchDocumentIndexer
 import net.nemerosa.ontrack.model.support.StorageService
-import net.nemerosa.ontrack.test.TestUtils.uid
-import org.junit.jupiter.api.AfterEach
-import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
 import java.time.Duration
-import java.util.concurrent.CopyOnWriteArrayList
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.TimeUnit
 import kotlin.test.assertEquals
-import kotlin.test.assertTrue
+import kotlin.test.assertNotNull
 
 /**
- * Rebuild of the search documents at startup, by instances of Yontrack started side by side
- * against the same database, as during a rolling upgrade.
+ * Rebuild of the search documents at startup, a job per type, fired once in the cluster by the
+ * replicas which start (#2077).
  *
- * Not transactional: the rebuilds run in the background, and each instance takes its lock on a
- * connection of its own.
+ * Not transactional: the rebuilds run as jobs.
  */
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 class SearchDocumentStartupRebuildIT : AbstractDSLTestSupport() {
 
     @Autowired
-    private lateinit var searchDocumentService: SearchDocumentServiceImpl
+    private lateinit var searchDocumentStartupRebuild: SearchDocumentStartupRebuild
+
+    @Autowired
+    private lateinit var searchDocumentIndexers: List<SearchDocumentIndexer>
+
+    @Autowired
+    private lateinit var testAlphaSearchDocumentIndexer: TestAlphaSearchDocumentIndexer
 
     @Autowired
     private lateinit var storageService: StorageService
 
     @Autowired
-    private lateinit var jobRunLock: JobRunLock
+    private lateinit var jobScheduler: JobScheduler
 
-    private val appender = ListAppender<ILoggingEvent>()
+    @Autowired
+    private lateinit var jobHistoryService: JobHistoryService
 
-    private val logger = LoggerFactory.getLogger(SearchDocumentStartupRebuild::class.java) as Logger
+    private val indexer: SearchDocumentIndexer get() = testAlphaSearchDocumentIndexer
 
-    @BeforeEach
-    fun captureLogs() {
-        appender.start()
-        logger.addAppender(appender)
-    }
+    private val key get() = SearchDocumentStartupRebuild.startupRebuildKey(indexer)
 
-    @AfterEach
-    fun releaseLogs() {
-        logger.detachAppender(appender)
-        appender.stop()
-    }
-
-    private fun logs(): List<String> = appender.list.map { it.formattedMessage }
+    private fun runs() =
+        jobHistoryService.getHistory(key, Time.now.minusHours(1), Time.now.plusHours(1), skipErrors = false).size
 
     /**
-     * Indexer of a new type, which records when its documents are rebuilt.
+     * The documents of the test type are out of date
      */
-    private class RecordingIndexer : AbstractTestSearchDocumentIndexer(uid("test-startup-"), 2000) {
+    private fun outOfDate() {
+        storageService.delete(SearchDocumentStartupRebuild.STORE, indexer.searchResultType.id)
+    }
 
-        val rebuilds = CopyOnWriteArrayList<Long>()
+    @Test
+    fun `The rebuild of every type is a job`() {
+        val keys = jobScheduler.getJobKeysOfType(SearchDocumentStartupRebuild.startupRebuildJobType)
+        assertEquals(
+            searchDocumentIndexers.map { SearchDocumentStartupRebuild.startupRebuildKey(it) }.toSet(),
+            keys.toSet(),
+        )
+    }
 
-        /**
-         * Counted down when a rebuild starts
-         */
-        val started = CountDownLatch(1)
-
-        override fun indexAll(processor: (SearchDocument) -> Unit) {
-            rebuilds += System.nanoTime()
-            started.countDown()
-            super.indexAll(processor)
+    @Test
+    fun `The documents of a type out of date are rebuilt once, after the startup delay`() {
+        outOfDate()
+        val before = runs()
+        assertEquals(1, searchDocumentStartupRebuild.launch(Duration.ofSeconds(2)), "Rebuild fired")
+        assertEquals(0, searchDocumentStartupRebuild.launch(Duration.ofSeconds(2)), "No second rebuild while the first one is pending")
+        assertEquals(before, runs(), "Not rebuilt before the delay")
+        searchDocumentStartupRebuild.awaitCompletion()
+        assertEquals(before + 1, runs(), "Rebuilt once")
+        assertNotNull(
+            storageService.find(
+                SearchDocumentStartupRebuild.STORE,
+                indexer.searchResultType.id,
+                SearchDocumentStartupRebuild.SearchDocumentRebuildStatus::class
+            ),
+            "The version of the documents is stored"
+        ) {
+            assertEquals(indexer.documentVersion, it.version)
         }
     }
 
-    /**
-     * An instance of Yontrack, as far as the startup rebuild of the search documents goes.
-     */
-    private fun instance(indexer: RecordingIndexer, startupDelay: Duration = Duration.ZERO) =
-        SearchDocumentStartupRebuild(
-            searchDocumentIndexers = listOf(indexer),
-            searchDocumentService = searchDocumentService,
-            storageService = storageService,
-            ontrackConfigProperties = OntrackConfigProperties().apply {
-                search.index.startupDelay = startupDelay
-            },
-            jobRunLock = jobRunLock,
-        )
-
     @Test
-    fun `Of two instances rebuilding the documents of a type together, one rebuilds them and the other one skips`() {
-        val indexer = RecordingIndexer()
-        // The first rebuild is held until the other instance has tried its own
-        indexer.blocker = CountDownLatch(1)
-        val first = instance(indexer)
-        val second = instance(indexer)
-        try {
-            first.start()
-            assertTrue(indexer.started.await(30, TimeUnit.SECONDS), "First rebuild started")
-            second.start()
-            second.awaitCompletion()
-        } finally {
-            indexer.blocker?.countDown()
-        }
-        first.awaitCompletion()
-
-        assertEquals(1, indexer.rebuilds.size, "One rebuild")
-        assertTrue(
-            logs().any {
-                it == "[search][${indexer.searchResultType.id}] Skipping the rebuild of the search documents: another instance is rebuilding them"
-            },
-            "The skipped rebuild is logged"
-        )
+    fun `The documents of a type up to date are not rebuilt`() {
+        outOfDate()
+        searchDocumentStartupRebuild.launch(Duration.ZERO)
+        searchDocumentStartupRebuild.awaitCompletion()
+        val before = runs()
+        assertEquals(0, searchDocumentStartupRebuild.launch(Duration.ZERO), "No rebuild fired")
+        assertEquals(before, runs(), "Not rebuilt again")
     }
-
-    @Test
-    fun `An instance does not rebuild the documents of a type which another instance has rebuilt meanwhile`() {
-        val indexer = RecordingIndexer()
-        val first = instance(indexer)
-        // Both instances start, and find the type to be rebuilt
-        val second = instance(indexer, startupDelay = Duration.ofSeconds(3))
-        first.start()
-        second.start()
-        first.awaitCompletion()
-        assertEquals(1, indexer.rebuilds.size, "Rebuilt by the first instance")
-        second.awaitCompletion()
-
-        assertEquals(1, indexer.rebuilds.size, "One rebuild")
-        assertTrue(
-            logs().any {
-                it == "[search][${indexer.searchResultType.id}] Skipping the rebuild of the search documents: another instance has rebuilt them"
-            },
-            "The skipped rebuild is logged"
-        )
-    }
-
-    @Test
-    fun `The documents are not rebuilt before the startup delay`() {
-        val indexer = RecordingIndexer()
-        val delay = Duration.ofSeconds(2)
-        val instance = instance(indexer, startupDelay = delay)
-        val start = System.nanoTime()
-        instance.start()
-        assertTrue(indexer.rebuilds.isEmpty(), "Not rebuilt at startup")
-        instance.awaitCompletion()
-
-        assertEquals(1, indexer.rebuilds.size, "Rebuilt once the delay has passed")
-        val waited = Duration.ofNanos(indexer.rebuilds.first() - start)
-        assertTrue(waited >= delay, "Rebuilt after $waited, not before the delay of $delay")
-    }
-
 }

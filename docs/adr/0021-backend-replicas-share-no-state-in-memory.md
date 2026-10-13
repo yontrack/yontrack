@@ -60,4 +60,5 @@ after Flyway; what they write must stay idempotent.
 - Gauges with database-wide values are reported by every replica and are aggregated with `max`;
   `application_instance` is the pod name.
 - Advisory locks have no shared helper yet; each takes a lock class of its own, listed next to the
-  existing ones (`JOBR` goes away with Quartz; `AVQU`, `AVMG`, `TRAI`, `EVID` stay).
+  existing ones (`JOBR` went away with Quartz, whose reconciliation of the jobs takes `JOBS`, #2077;
+  `AVQU`, `AVMG`, `TRAI`, `EVID` stay).

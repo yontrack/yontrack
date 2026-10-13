@@ -17,8 +17,9 @@ paths:
 - Services are an interface plus an `*ServiceImpl` with constructor injection; they check
   permissions through `SecurityService` and post `EventFactory` events for cross-cutting concerns.
 - Several backend replicas run at once, always: **never** cache database data across requests
-  (`@Cacheable`, a singleton map), queue work in memory, or call `jobScheduler.schedule` outside a
-  `JobProvider` / `JobOrchestratorSupplier`. Read ADR 0021
+  (`@Cacheable`, a singleton map), or queue work in memory. A job comes from a `JobProvider` or a
+  `JobOrchestratorSupplier` only - `JobScheduler` has no `schedule` (#2077): a job to run on demand
+  is supplied with `Schedule.NONE` and fired with `fireImmediately`. Read ADR 0021
   (`docs/adr/0021-backend-replicas-share-no-state-in-memory.md`) before adding any state that
   outlives a request.
 

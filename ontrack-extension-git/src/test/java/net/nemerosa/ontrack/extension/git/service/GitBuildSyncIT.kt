@@ -11,8 +11,7 @@ import net.nemerosa.ontrack.extension.scm.support.TagPattern
 import net.nemerosa.ontrack.git.support.GitRepo
 import net.nemerosa.ontrack.it.AbstractServiceTestSupport
 import net.nemerosa.ontrack.it.AsAdminTest
-import net.nemerosa.ontrack.job.JobRunListener
-import net.nemerosa.ontrack.job.orchestrator.JobOrchestrator
+import net.nemerosa.ontrack.job.JobScheduler
 import net.nemerosa.ontrack.model.security.ProjectEdit
 import net.nemerosa.ontrack.test.TestUtils.uid
 import org.junit.jupiter.api.Test
@@ -31,7 +30,7 @@ class GitBuildSyncIT : AbstractServiceTestSupport() {
     @Autowired
     private lateinit var tagPatternBuildNameGitCommitLink: TagPatternBuildNameGitCommitLink
     @Autowired
-    private lateinit var jobOrchestrator: JobOrchestrator
+    private lateinit var jobScheduler: JobScheduler
 
     @Test
     fun `main sync`() {
@@ -90,7 +89,7 @@ class GitBuildSyncIT : AbstractServiceTestSupport() {
 
                 // Job registration
                 asAdmin().execute {
-                    jobOrchestrator.orchestrate(JobRunListener.out())
+                    jobScheduler.refresh()
                 }
 
                 // Build synchronisation

@@ -23,17 +23,4 @@ public class NOPJobListener implements JobListener {
     @Override
     public void onJobProgress(JobKey key, JobRunProgress progress) {
     }
-
-    @Override
-    public boolean isPausedAtStartup(JobKey key) {
-        return false;
-    }
-
-    @Override
-    public void onJobPaused(JobKey key) {
-    }
-
-    @Override
-    public void onJobResumed(JobKey key) {
-    }
 }

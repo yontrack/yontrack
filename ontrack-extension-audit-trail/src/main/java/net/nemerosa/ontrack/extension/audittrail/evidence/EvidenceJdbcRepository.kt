@@ -170,7 +170,7 @@ class EvidenceJdbcRepository(
         /**
          * First key of the advisory locks on the blobs, the second being a hash of their SHA-256:
          * "EVID" in ASCII — next to the locks on the trails ("TRAI"), on the processing of the
-         * auto-versioning orders ("AVQU") and on the runs of the jobs ("JOBR").
+         * auto-versioning orders ("AVQU") and on the reconciliation of the jobs ("JOBS").
          */
         const val BLOB_LOCK_CLASS: Int = 0x45564944
     }

@@ -1,36 +1,37 @@
 package net.nemerosa.ontrack.service.search
 
-import jakarta.annotation.PreDestroy
-import kotlinx.coroutines.*
-import net.nemerosa.ontrack.job.JobKey
-import net.nemerosa.ontrack.job.JobRunLock
-import net.nemerosa.ontrack.job.JobType
+import net.nemerosa.ontrack.job.*
 import net.nemerosa.ontrack.model.structure.SearchDocumentIndexer
 import net.nemerosa.ontrack.model.structure.SearchIndexStartupReset
+import net.nemerosa.ontrack.model.support.JobProvider
 import net.nemerosa.ontrack.model.support.OntrackConfigProperties
-import net.nemerosa.ontrack.model.support.StartupService
 import net.nemerosa.ontrack.model.support.StorageService
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
+import org.springframework.boot.context.event.ApplicationReadyEvent
+import org.springframework.context.event.EventListener
 import org.springframework.stereotype.Component
+import java.time.Duration
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.ExecutionException
 
 /**
- * Rebuilds, in the background at startup, the search documents of every indexer which has not been
- * rebuilt yet at its current [document version][SearchDocumentIndexer.documentVersion].
+ * Rebuilds, at startup, the search documents of every indexer which has not been rebuilt yet at its
+ * current [document version][SearchDocumentIndexer.documentVersion].
  *
- * The rebuild of each indexer is tracked by its own storage key, so that a new indexer, or a new
- * version of the documents of an indexer, triggers only its own rebuild. The
- * `ontrack.config.search.index.reset` setting forces the rebuild of all of them.
+ * The rebuild of each indexer is a job of its own, with no schedule, tracked by its own storage key,
+ * so that a new indexer, or a new version of the documents of an indexer, triggers only its own
+ * rebuild. The `ontrack.config.search.index.reset` setting forces the rebuild of all of them.
  *
- * Several instances may start side by side, as during a rolling upgrade, while the previous one is
- * still writing documents in their previous format. So the rebuild:
+ * Several replicas may start side by side, and during a rolling upgrade the previous version still
+ * writes documents in their previous format. So, once a replica has started, the job of each type to
+ * rebuild is fired once in the cluster (#2077):
  *
- * - waits for `ontrack.config.search.index.startup-delay`, past the overlap of the instances;
- * - runs under the [JobRunLock] of the [indexer][startupRebuildKey]: an instance which finds it held
- *   by another one skips the rebuild;
- * - is skipped when another instance has completed it meanwhile, unless forced by `reset`.
+ * - after `ontrack.config.search.index.startup-delay`, past the overlap of the replicas;
+ * - unless a delayed fire of the job is already pending, requested by another replica;
+ * - its run is skipped when the documents have been rebuilt meanwhile, unless forced by `reset`.
  *
- * While a type is rebuilt, search answers with what exists so far, and the instance which rebuilds
+ * While a type is rebuilt, search answers with what exists so far, and the replica which rebuilds
  * it says that the search index is being built.
  */
 @Component
@@ -39,39 +40,48 @@ class SearchDocumentStartupRebuild(
     private val searchDocumentService: SearchDocumentServiceImpl,
     private val storageService: StorageService,
     private val ontrackConfigProperties: OntrackConfigProperties,
-    private val jobRunLock: JobRunLock,
-) : StartupService, SearchIndexStartupReset {
+    private val jobScheduler: JobScheduler,
+) : JobProvider, SearchIndexStartupReset {
 
     private val logger: Logger = LoggerFactory.getLogger(SearchDocumentStartupRebuild::class.java)
 
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-
     @Volatile
-    private var rebuilds: List<Job> = emptyList()
+    private var rebuilds: List<CompletableFuture<*>> = emptyList()
 
-    override fun getName(): String = "Rebuild of the search documents"
+    override fun getStartingJobs(): Collection<JobRegistration> =
+        searchDocumentIndexers.map { indexer ->
+            JobRegistration(StartupRebuildJob(indexer), Schedule.NONE)
+        }
+
+    @EventListener(ApplicationReadyEvent::class)
+    fun start() {
+        launch(ontrackConfigProperties.search.index.startupDelay)
+    }
 
     /**
-     * After the registration of the jobs
+     * Fires the rebuild of every type out of date, after a delay.
+     *
+     * @return Number of rebuilds fired by this call
      */
-    override fun startupOrder(): Int = StartupService.JOB_REGISTRATION + 1
-
-    override fun start() {
+    internal fun launch(startupDelay: Duration): Int {
         val reset = ontrackConfigProperties.search.index.reset
         val due = searchDocumentIndexers.filter { indexer -> reset || !isUpToDate(indexer) }
         if (due.isEmpty()) {
             logger.info("[search] All search documents are up to date")
-        } else {
-            val startupDelay = ontrackConfigProperties.search.index.startupDelay
-            rebuilds = due.map { indexer ->
-                val type = indexer.searchResultType.id
-                logger.info("[search][$type] Launching the rebuild of the search documents in $startupDelay")
-                scope.launch {
-                    delay(startupDelay.toMillis())
-                    rebuild(indexer, reset)
-                }
-            }
+            return 0
         }
+        val fired = due.mapNotNull { indexer ->
+            val type = indexer.searchResultType.id
+            val fire = jobScheduler.fireLater(startupRebuildKey(indexer), startupDelay).orElse(null)
+            if (fire != null) {
+                logger.info("[search][$type] Launching the rebuild of the search documents in $startupDelay")
+            } else {
+                logger.info("[search][$type] The rebuild of the search documents is already launched")
+            }
+            fire
+        }
+        rebuilds = rebuilds + fired
+        return fired.size
     }
 
     private fun isUpToDate(indexer: SearchDocumentIndexer): Boolean =
@@ -81,57 +91,55 @@ class SearchDocumentStartupRebuild(
             SearchDocumentRebuildStatus::class
         )?.version == indexer.documentVersion
 
-    private fun rebuild(indexer: SearchDocumentIndexer, reset: Boolean) {
+    private fun rebuild(indexer: SearchDocumentIndexer, listener: JobRunListener) {
         val type = indexer.searchResultType.id
-        try {
-            val lock = jobRunLock.tryLock(startupRebuildKey(indexer))
-            if (lock == null) {
-                logger.info("[search][$type] Skipping the rebuild of the search documents: another instance is rebuilding them")
-                return
-            }
-            try {
-                if (!reset && isUpToDate(indexer)) {
-                    logger.info("[search][$type] Skipping the rebuild of the search documents: another instance has rebuilt them")
-                } else {
-                    searchDocumentService.rebuild(indexer)
-                    storageService.store(STORE, type, SearchDocumentRebuildStatus(indexer.documentVersion))
-                }
-            } finally {
-                lock.release()
-            }
-        } catch (any: Exception) {
-            logger.error("[search][$type] Cannot rebuild the search documents", any)
+        if (!ontrackConfigProperties.search.index.reset && isUpToDate(indexer)) {
+            listener.message("[search][$type] Skipping the rebuild of the search documents: they have been rebuilt meanwhile")
+        } else {
+            listener.message("[search][$type] Rebuilding the search documents")
+            searchDocumentService.rebuild(indexer)
+            storageService.store(STORE, type, SearchDocumentRebuildStatus(indexer.documentVersion))
         }
     }
 
+    /**
+     * Waits for the rebuilds fired by this replica.
+     */
     override fun awaitCompletion() {
-        runBlocking { rebuilds.joinAll() }
+        rebuilds.forEach { rebuild ->
+            try {
+                rebuild.get()
+            } catch (any: ExecutionException) {
+                logger.error("[search] Cannot rebuild the search documents", any.cause)
+            }
+        }
     }
 
-    /**
-     * A rebuild still waiting for its delay is not run.
-     */
-    @PreDestroy
-    fun cancel() {
-        scope.cancel()
+    private inner class StartupRebuildJob(
+        private val indexer: SearchDocumentIndexer,
+    ) : Job {
+        override fun getKey(): JobKey = startupRebuildKey(indexer)
+        override fun getTask() = JobRun { listener -> rebuild(indexer, listener) }
+        override fun getDescription(): String = "Rebuild of the search documents at startup: ${indexer.indexerName}"
+        override fun isDisabled(): Boolean = false
     }
 
     companion object {
-        private val STORE: String = SearchDocumentStartupRebuild::class.java.name
+        /**
+         * Storage of the version of the documents of each type, when last rebuilt
+         */
+        internal val STORE: String = SearchDocumentStartupRebuild::class.java.name
 
         /**
-         * Type of the keys of the [run locks][JobRunLock] of the startup rebuilds, apart from the
-         * key of the [reconciliation job][SearchDocumentIndexationJobs.rebuildJobType]: a
-         * reconciliation run by a previous version of Yontrack, still running side by side, must
-         * not make this one skip the rebuild of the documents in their new format.
+         * Type of the startup rebuild jobs, apart from the
+         * [reconciliation jobs][SearchDocumentIndexationJobs.rebuildJobType]
          */
         val startupRebuildJobType: JobType = SearchDocumentIndexationJobs.jobCategory
             .getType("startup-rebuild")
             .withName("Search documents rebuild at startup")
 
         /**
-         * Key of the lock of the startup rebuild of an indexer, fixed by the ID of its type of
-         * search result, so that it is the same across instances and versions.
+         * Key of the startup rebuild job of an indexer, fixed by the ID of its type of search result
          */
         fun startupRebuildKey(indexer: SearchDocumentIndexer): JobKey =
             startupRebuildJobType.getKey(indexer.searchResultType.id)

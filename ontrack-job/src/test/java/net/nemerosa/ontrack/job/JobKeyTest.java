@@ -1,6 +1,5 @@
 package net.nemerosa.ontrack.job;
 
-import net.nemerosa.ontrack.job.support.ConfigurableJob;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -12,12 +11,11 @@ public class JobKeyTest {
     public void same_category() {
         JobKey key = Fixtures.TEST_CATEGORY.getType("xxx").getKey("xxx");
         assertTrue(key.sameCategory(Fixtures.TEST_CATEGORY));
-        assertTrue(new ConfigurableJob().getKey().sameCategory(Fixtures.TEST_CATEGORY));
     }
 
     /**
-     * The string form of a job key is also the key of its run lock, shared across instances and
-     * versions: it must not change.
+     * The string form of a job key is also the name under which Yontrack 5 recorded a paused job
+     * in the settings, read when the job is first stored: it must not change.
      */
     @Test
     public void key_string() {

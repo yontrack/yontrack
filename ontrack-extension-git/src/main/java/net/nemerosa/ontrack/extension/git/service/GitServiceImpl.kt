@@ -580,21 +580,6 @@ class GitServiceImpl(
             .everyMinutes(configuration.indexationInterval.toLong())
     }
 
-    override fun scheduleGitBuildSync(branch: Branch, property: GitBranchConfigurationProperty) {
-        if (property.buildTagInterval > 0) {
-            jobScheduler.schedule(
-                createBuildSyncJob(branch),
-                Schedule.everyMinutes(property.buildTagInterval.toLong())
-            )
-        } else {
-            unscheduleGitBuildSync(branch, property)
-        }
-    }
-
-    override fun unscheduleGitBuildSync(branch: Branch, property: GitBranchConfigurationProperty) {
-        jobScheduler.unschedule(getGitBranchSyncJobKey(branch))
-    }
-
     override fun getCommitForBuild(build: Build): IndexableGitCommit? =
         entityStore.findByName(
             build,

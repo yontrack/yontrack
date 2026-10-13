@@ -1,0 +1,6 @@
+mutation LaunchJob($id: Int!) {
+    launchJob(id: $id) {
+        ok
+        error
+    }
+}

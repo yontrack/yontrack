@@ -6,7 +6,6 @@ import net.nemerosa.ontrack.extension.scorecard.license.ScorecardLicense
 import net.nemerosa.ontrack.extension.scorecard.security.EstateManagement
 import net.nemerosa.ontrack.extension.scorecard.storage.EstateRepository
 import net.nemerosa.ontrack.job.JobScheduler
-import net.nemerosa.ontrack.job.Schedule
 import net.nemerosa.ontrack.model.labels.LabelManagementService
 import net.nemerosa.ontrack.model.labels.findLabelByDisplay
 import net.nemerosa.ontrack.model.security.SecurityService
@@ -25,7 +24,6 @@ class EstateServiceImpl(
     private val estateRepository: EstateRepository,
     private val labelManagementService: LabelManagementService,
     private val structureService: StructureService,
-    private val scorecardJobs: ScorecardJobs,
     private val jobScheduler: JobScheduler,
     computers: List<ReadingComputer>,
 ) : EstateService {
@@ -103,9 +101,7 @@ class EstateServiceImpl(
 
     override fun recompute(estate: Estate): CompletableFuture<*>? {
         checkManagement()
-        val job = scorecardJobs.estateRecomputeJob(estate)
-        jobScheduler.schedule(job, Schedule.NONE)
-        return jobScheduler.fireImmediately(job.key).orElse(null)
+        return jobScheduler.fireImmediately(ScorecardJobs.estateRecomputeJobKey(estate.id)).orElse(null)
     }
 
     private fun checkManagement() {

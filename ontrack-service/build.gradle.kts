@@ -22,6 +22,8 @@ dependencies {
     implementation("com.github.ben-manes.caffeine:caffeine")
     implementation("org.flywaydb:flyway-core")
     implementation("org.springframework.boot:spring-boot-flyway")
+    // Job scheduler, clustered through the database (#2077)
+    implementation("org.springframework.boot:spring-boot-starter-quartz")
 
     runtimeOnly("org.hibernate.validator:hibernate-validator")
 

@@ -7,9 +7,7 @@ import net.nemerosa.ontrack.extension.issues.model.toIdentifier
 import net.nemerosa.ontrack.git.support.GitRepo
 import net.nemerosa.ontrack.it.AbstractServiceTestSupport
 import net.nemerosa.ontrack.it.AsAdminTest
-import net.nemerosa.ontrack.job.JobRunListener
 import net.nemerosa.ontrack.job.JobScheduler
-import net.nemerosa.ontrack.job.orchestrator.JobOrchestrator
 import net.nemerosa.ontrack.model.security.ProjectEdit
 import net.nemerosa.ontrack.test.TestUtils.uid
 import org.junit.jupiter.api.Test
@@ -22,9 +20,6 @@ class GitIndexationJobIT : AbstractServiceTestSupport() {
 
     @Autowired
     private lateinit var jobScheduler: JobScheduler
-
-    @Autowired
-    private lateinit var jobOrchestrator: JobOrchestrator
 
     /**
      * Regression test for #434. Checks that changing the Git configuration of a project does change its
@@ -62,7 +57,7 @@ class GitIndexationJobIT : AbstractServiceTestSupport() {
 
             // Runs the orchestration
             asAdmin().execute {
-                jobOrchestrator.orchestrate(JobRunListener.out())
+                jobScheduler.refresh()
             }
 
             // Checks that the indexation job is registered
@@ -92,7 +87,7 @@ class GitIndexationJobIT : AbstractServiceTestSupport() {
 
             // Runs the orchestration
             asAdmin().execute {
-                jobOrchestrator.orchestrate(JobRunListener.out())
+                jobScheduler.refresh()
             }
 
             // Checks that the NEW indexation job is registered

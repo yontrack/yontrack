@@ -242,6 +242,12 @@ configure(javaProjects) {
         jvmArgumentProviders.add(CommandLineArgumentProvider {
             itStack.systemProperties.map { (key, value) -> "-D$key=$value" }
         })
+
+        // One Quartz scheduler per Spring context (#2077): the job scheduler is clustered through
+        // the database, and the integration tests of several modules - and the several contexts of
+        // one module - share it. With one name each, none runs, nor removes, the jobs of another.
+        // Resolved by Spring, once per context.
+        systemProperty("spring.quartz.scheduler-name", "it-\${random.uuid}")
     }
 
     // Synchronization with shutting down the database

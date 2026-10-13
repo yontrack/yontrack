@@ -1,0 +1,23 @@
+fragment JobStatusFragment on JobStatus {
+    id
+    key {
+        id
+        type {
+            key
+            name
+            category {
+                key
+                name
+            }
+        }
+    }
+    description
+    isPaused
+    isRunning
+    isValid
+    isDisabled
+    runCount
+    nextRunDate
+    lastRunDate
+    state
+}

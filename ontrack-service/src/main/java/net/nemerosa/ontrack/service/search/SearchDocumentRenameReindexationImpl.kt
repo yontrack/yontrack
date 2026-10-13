@@ -93,7 +93,7 @@ class SearchDocumentRenameReindexationImpl(
         /**
          * First key of the advisory locks on the re-indexation of a renamed project or branch, the
          * second being a hash of its type and ID: "SRNM" in ASCII — next to the locks on the trails
-         * ("TRAI"), on the blobs of the evidence ("EVID"), on the runs of the jobs ("JOBR"), on the
+         * ("TRAI"), on the blobs of the evidence ("EVID"), on the reconciliation of the jobs ("JOBS"), on the
          * processing of the auto-versioning orders ("AVQU", "AVMG"), on the startup ("STRT") and on
          * the assisted changes ("ASCH").
          */

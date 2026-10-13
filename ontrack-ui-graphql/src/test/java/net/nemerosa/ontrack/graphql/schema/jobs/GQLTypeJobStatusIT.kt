@@ -3,6 +3,7 @@ package net.nemerosa.ontrack.graphql.schema.jobs
 import net.nemerosa.ontrack.common.Time
 import net.nemerosa.ontrack.graphql.AbstractQLKTITSupport
 import net.nemerosa.ontrack.it.AsAdminTest
+import net.nemerosa.ontrack.it.jobs.TestJobSupplier
 import net.nemerosa.ontrack.job.*
 import net.nemerosa.ontrack.model.job.JobHistoryItemStatus
 import net.nemerosa.ontrack.model.job.JobHistoryService
@@ -22,6 +23,9 @@ class GQLTypeJobStatusIT : AbstractQLKTITSupport() {
 
     @Autowired
     private lateinit var jobScheduler: JobScheduler
+
+    @Autowired
+    private lateinit var testJobSupplier: TestJobSupplier
 
     @Test
     fun `Getting the history of a single job`() {
@@ -181,7 +185,7 @@ class GQLTypeJobStatusIT : AbstractQLKTITSupport() {
             override fun isDisabled(): Boolean = false
         }
 
-        jobScheduler.schedule(job, Schedule.NONE)
+        testJobSupplier.schedule(jobScheduler, job, Schedule.NONE)
 
         repeat(21) {
             val start = now.minusDays(21 - it.toLong()).plusHours(12)

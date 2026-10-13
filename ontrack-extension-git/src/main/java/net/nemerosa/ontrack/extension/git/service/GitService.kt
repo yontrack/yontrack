@@ -176,10 +176,6 @@ interface GitService {
      */
     fun getProjectGitSyncInfo(project: Project): GitSynchronisationInfo
 
-    fun scheduleGitBuildSync(branch: Branch, property: GitBranchConfigurationProperty)
-
-    fun unscheduleGitBuildSync(branch: Branch, property: GitBranchConfigurationProperty)
-
     /**
      * Checks the log history and returns `true` if the token can be found.
      *

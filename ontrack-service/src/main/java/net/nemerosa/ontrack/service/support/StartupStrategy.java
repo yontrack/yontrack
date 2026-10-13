@@ -45,7 +45,7 @@ public class StartupStrategy implements FlywayMigrationStrategy {
     /**
      * First key of the advisory lock of the startup phase, the second being {@link #LOCK_KEY}:
      * "STRT" in ASCII — next to the locks on the trails ("TRAI"), on the blobs of the evidence
-     * ("EVID"), on the runs of the jobs ("JOBR") and on the processing of the auto-versioning
+     * ("EVID"), on the reconciliation of the jobs ("JOBS") and on the processing of the auto-versioning
      * orders ("AVQU", "AVMG").
      */
     public static final int LOCK_CLASS = 0x53545254;

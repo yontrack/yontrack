@@ -1,0 +1,6 @@
+mutation ResumeAllJobs {
+    resumeAllJobs {
+        ok
+        error
+    }
+}

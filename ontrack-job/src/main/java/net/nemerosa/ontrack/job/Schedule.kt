@@ -27,8 +27,11 @@ data class Schedule(
         )
     }
 
+    /**
+     * Initial delay, converted into the unit of the schedule
+     */
     fun after(initial: Duration): Schedule {
-        return after(initial.toMillis().toInt())
+        return after(unit.convert(initial).toInt())
     }
 
     companion object {

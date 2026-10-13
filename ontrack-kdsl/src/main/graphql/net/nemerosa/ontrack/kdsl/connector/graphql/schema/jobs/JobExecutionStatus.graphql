@@ -1,0 +1,5 @@
+query JobExecutionStatus {
+    jobExecutionStatus {
+        paused
+    }
+}

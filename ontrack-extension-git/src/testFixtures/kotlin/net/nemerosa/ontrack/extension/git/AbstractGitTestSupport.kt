@@ -19,8 +19,7 @@ import net.nemerosa.ontrack.git.GitRepositoryClientFactory
 import net.nemerosa.ontrack.git.support.GitRepo
 import net.nemerosa.ontrack.graphql.AbstractQLKTITSupport
 import net.nemerosa.ontrack.it.AsAdminTest
-import net.nemerosa.ontrack.job.JobRunListener
-import net.nemerosa.ontrack.job.orchestrator.JobOrchestrator
+import net.nemerosa.ontrack.job.JobScheduler
 import net.nemerosa.ontrack.model.structure.*
 import net.nemerosa.ontrack.model.support.NoConfig
 import net.nemerosa.ontrack.test.TestUtils
@@ -58,7 +57,7 @@ abstract class AbstractGitTestSupport : AbstractQLKTITSupport() {
     protected lateinit var gitConfigService: GitConfigService
 
     @Autowired
-    private lateinit var jobOrchestrator: JobOrchestrator
+    private lateinit var jobScheduler: JobScheduler
 
     /**
      * Working with the PR cache disabled
@@ -144,7 +143,7 @@ abstract class AbstractGitTestSupport : AbstractQLKTITSupport() {
         // Makes sure to register the project
         if (sync) {
             asAdmin().execute {
-                jobOrchestrator.orchestrate(JobRunListener.out())
+                jobScheduler.refresh()
             }
         }
     }
@@ -162,7 +161,7 @@ abstract class AbstractGitTestSupport : AbstractQLKTITSupport() {
         // Makes sure to register the project
         if (sync) {
             asAdmin().execute {
-                jobOrchestrator.orchestrate(JobRunListener.out())
+                jobScheduler.refresh()
             }
         }
     }

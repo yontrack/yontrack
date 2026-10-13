@@ -5,7 +5,6 @@ import net.nemerosa.ontrack.it.AbstractServiceTestSupport
 import net.nemerosa.ontrack.job.JobCategory
 import net.nemerosa.ontrack.job.JobStatus
 import net.nemerosa.ontrack.job.Schedule
-import net.nemerosa.ontrack.model.support.SettingsRepository
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 
@@ -14,12 +13,9 @@ class DefaultJobListenerIT : AbstractServiceTestSupport() {
     @Autowired
     private lateinit var meterRegistry: MeterRegistry
 
-    @Autowired
-    private lateinit var settingsRepository: SettingsRepository
-
     @Test
     fun onJobError() {
-        val jobListener = DefaultJobListener(meterRegistry, settingsRepository)
+        val jobListener = DefaultJobListener(meterRegistry)
         val jobStatus = JobStatus(
             id = 1,
             key = JobCategory.of("test").getType("test").getKey("1"),

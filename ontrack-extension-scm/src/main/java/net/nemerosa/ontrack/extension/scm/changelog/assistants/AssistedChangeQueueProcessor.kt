@@ -90,7 +90,7 @@ class AssistedChangeQueueProcessor(
         /**
          * First key of the advisory locks on the computation of the assisted change of a build, the
          * second being the ID of the build: "ASCH" in ASCII — next to the locks on the trails
-         * ("TRAI"), on the blobs of the evidence ("EVID"), on the runs of the jobs ("JOBR"), on the
+         * ("TRAI"), on the blobs of the evidence ("EVID"), on the reconciliation of the jobs ("JOBS"), on the
          * processing of the auto-versioning orders ("AVQU", "AVMG"), on the startup ("STRT") and on
          * the re-indexation of the renamed entities ("SRNM").
          */

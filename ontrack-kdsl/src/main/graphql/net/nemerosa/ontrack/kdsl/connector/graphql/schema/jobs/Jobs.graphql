@@ -1,0 +1,7 @@
+query Jobs($category: String, $type: String, $size: Int) {
+    jobs(category: $category, type: $type, size: $size) {
+        pageItems {
+            ...JobStatusFragment
+        }
+    }
+}

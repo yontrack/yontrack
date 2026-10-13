@@ -1,0 +1,6 @@
+mutation ResumeJob($id: Int!) {
+    resumeJob(id: $id) {
+        ok
+        error
+    }
+}

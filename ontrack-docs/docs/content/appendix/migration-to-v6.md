@@ -711,11 +711,19 @@ ontrack:
 | Deprecated                                      | Use instead                                    |
 |-------------------------------------------------|------------------------------------------------|
 | `ontrack.extension.queue.general.warn-if-async` | `ontrack.extension.queue.general.warn-if-sync` |
+| `ontrack.config.jobs.paused-at-startup`         | The *Pause all* action of the *Jobs* page      |
 
 The property emits a warning when the queues are processed synchronously: its former name said the
 opposite of what it does. The old name, in any of its spellings — `warnIfAsync`, or
 `ONTRACK_EXTENSION_QUEUE_GENERAL_WARNIFASYNC` as an environment variable — still sets the property,
 and is counted once at startup with `surface="config"`. When both are set, the new name wins.
+
+The jobs run in a scheduler shared by all the replicas, and pausing all the jobs is stored: it
+applies to every replica, survives restarts, and lasts until somebody resumes all the jobs.
+`ontrack.config.jobs.paused-at-startup` (`ONTRACK_CONFIG_JOBS_PAUSEDATSTARTUP`) still pauses all the
+jobs when a replica starts with it — and so pauses the whole cluster, until resumed. Pause all the
+jobs from the *Jobs* page, or with the `pauseAllJobs` mutation, instead. The property is counted once
+at startup with `surface="config"` when it is set.
 
 ### CI environment
 

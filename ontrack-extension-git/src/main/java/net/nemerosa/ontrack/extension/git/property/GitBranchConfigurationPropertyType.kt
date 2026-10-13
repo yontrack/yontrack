@@ -120,14 +120,12 @@ class GitBranchConfigurationPropertyType(
 
     override fun onPropertyChanged(entity: ProjectEntity, value: GitBranchConfigurationProperty) {
         if (entity is Branch) {
-            gitService.scheduleGitBuildSync(entity, value)
             gitBranchSearchIndexer.onGitBranchChanged(entity, value)
         }
     }
 
     override fun onPropertyDeleted(entity: ProjectEntity, oldValue: GitBranchConfigurationProperty) {
         if (entity is Branch) {
-            gitService.unscheduleGitBuildSync(entity, oldValue)
             gitBranchSearchIndexer.onGitBranchDeleted(entity)
         }
     }

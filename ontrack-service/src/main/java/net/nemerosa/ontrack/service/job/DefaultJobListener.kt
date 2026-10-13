@@ -5,30 +5,17 @@ import net.nemerosa.ontrack.job.JobKey
 import net.nemerosa.ontrack.job.JobListener
 import net.nemerosa.ontrack.job.JobRunProgress
 import net.nemerosa.ontrack.job.JobStatus
-import net.nemerosa.ontrack.model.support.SettingsRepository
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
-import org.springframework.transaction.annotation.Transactional
 import java.util.concurrent.TimeUnit
 
 open class DefaultJobListener(
     private val meterRegistry: MeterRegistry,
-    private val settingsRepository: SettingsRepository
 ) : JobListener {
 
     private val logger: Logger = LoggerFactory.getLogger(DefaultJobListener::class.java)
 
     override fun onJobStart(key: JobKey) {
-    }
-
-    @Transactional
-    override fun onJobPaused(key: JobKey) {
-        settingsRepository.setBoolean(JobListener::class.java, key.toString(), true)
-    }
-
-    @Transactional
-    override fun onJobResumed(key: JobKey) {
-        settingsRepository.delete(JobListener::class.java, key.toString())
     }
 
     override fun onJobEnd(key: JobKey, milliseconds: Long) {
@@ -49,12 +36,4 @@ open class DefaultJobListener(
     }
 
     override fun onJobProgress(key: JobKey, progress: JobRunProgress) {}
-
-    override fun isPausedAtStartup(key: JobKey): Boolean {
-        return settingsRepository.getBoolean(
-            JobListener::class.java,
-            key.toString(),
-            false
-        )
-    }
 }

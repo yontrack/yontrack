@@ -1,0 +1,6 @@
+mutation StopJob($id: Int!) {
+    stopJob(id: $id) {
+        ok
+        error
+    }
+}

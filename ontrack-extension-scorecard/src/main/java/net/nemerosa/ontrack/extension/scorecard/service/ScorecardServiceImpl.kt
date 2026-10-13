@@ -11,7 +11,6 @@ import net.nemerosa.ontrack.extension.scorecard.model.ReadingKeys
 import net.nemerosa.ontrack.extension.scorecard.storage.EstateRepository
 import net.nemerosa.ontrack.extension.scorecard.storage.ReadingRepository
 import net.nemerosa.ontrack.job.JobScheduler
-import net.nemerosa.ontrack.job.Schedule
 import net.nemerosa.ontrack.model.security.ProjectConfig
 import net.nemerosa.ontrack.model.security.SecurityService
 import net.nemerosa.ontrack.model.structure.Project
@@ -25,7 +24,6 @@ class ScorecardServiceImpl(
     private val securityService: SecurityService,
     private val readingSets: ReadingSets,
     private val readingRepository: ReadingRepository,
-    private val scorecardJobs: ScorecardJobs,
     private val jobScheduler: JobScheduler,
     private val estateRepository: EstateRepository,
     private val estateService: EstateService,
@@ -77,9 +75,7 @@ class ScorecardServiceImpl(
 
     override fun recompute(project: Project): CompletableFuture<*>? {
         securityService.checkProjectFunction(project, ProjectConfig::class.java)
-        val job = scorecardJobs.recomputeJob(project)
-        jobScheduler.schedule(job, Schedule.NONE)
-        return jobScheduler.fireImmediately(job.key).orElse(null)
+        return jobScheduler.fireImmediately(ScorecardJobs.recomputeJobKey(project.id())).orElse(null)
     }
 
     private val catalogueOrder: Comparator<Reading> =
