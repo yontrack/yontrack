@@ -28,18 +28,24 @@ class AutoVersioningTrackingStoreMigration(
 
     override fun startupOrder(): Int = StartupService.JOB_REGISTRATION
 
+    /**
+     * Each trail is removed from the store once copied, and only it (#2087): a trail which cannot
+     * be copied stays in the store, with the ones after it, for the next start.
+     */
     override fun start() {
         val store = "AutoVersioningTracking"
         namedParameterJdbcTemplate!!.query(
             """
-                SELECT PROMOTION_RUN, DATA
+                SELECT ID, PROMOTION_RUN, DATA
                 FROM ENTITY_STORE
                 WHERE STORE = :store
+                ORDER BY ID
             """.trimIndent(),
             mapOf(
                 "store" to store
             )
         ) { rs ->
+            val id = rs.getInt("ID")
             val promotionRunId = rs.getInt("PROMOTION_RUN")
             val data = readJson(rs, "DATA")
 
@@ -50,14 +56,14 @@ class AutoVersioningTrackingStoreMigration(
                 trail = data.parse<StoredAutoVersioningTrail>(),
             )
 
-            // Deletion of existing records
+            // Deletion of the record once copied
             namedParameterJdbcTemplate!!.update(
                 """
-                DELETE FROM ENTITY_STORE
-                WHERE STORE = :store
-            """.trimIndent(),
+                    DELETE FROM ENTITY_STORE
+                    WHERE ID = :id
+                """.trimIndent(),
                 mapOf(
-                    "store" to store,
+                    "id" to id,
                 )
             )
         }

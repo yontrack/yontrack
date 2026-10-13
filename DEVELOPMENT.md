@@ -342,6 +342,7 @@ token, from A's management endpoint. The ports reach them as
 `ontrack.acceptance.ha.{a,b}.url` and `ontrack.acceptance.ha.{a,b}.mgt.url`;
 an explicit `-D` still wins.
 
-B starts once A is healthy: two backends starting together on an empty
-database is #2087's to make safe. The `kdsl-ha` CI job runs the task on every
-full run, next to `kdsl`.
+A and B start together, on an empty database, with the same configuration as
+code (`compose/casc/kdsl-ha.yaml`): their startup tasks run one backend at a
+time (#2087), which `ACCHAStartup` checks. The `kdsl-ha` CI job runs the task
+on every full run, next to `kdsl`.

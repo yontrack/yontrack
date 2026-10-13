@@ -1,0 +1,22 @@
+# Configuration as code of both backends of the `-ha` KDSL stack (#2087), mounted by
+# compose/docker-compose-kdsl-ha.yml. Both backends start together and apply it, which
+# ACCHAStartup checks: several configurations, so that two replicas applying it at once would
+# collide on one of them. Keep it in step with ACCHAStartup.
+ontrack:
+  config:
+    jira:
+      - name: ha-startup-1
+        url: https://jira-1.example.com
+        user: ha-startup
+      - name: ha-startup-2
+        url: https://jira-2.example.com
+        user: ha-startup
+      - name: ha-startup-3
+        url: https://jira-3.example.com
+        user: ha-startup
+      - name: ha-startup-4
+        url: https://jira-4.example.com
+        user: ha-startup
+      - name: ha-startup-5
+        url: https://jira-5.example.com
+        user: ha-startup

@@ -15,7 +15,7 @@
 # project name and the ports by `KdslStack` in buildSrc -- see
 # docs/adr/0013-parallel-kdsl-acceptance-stacks.md.
 
-# The configuration both backends share; only their ports and their dependencies differ.
+# The configuration both backends share; only their ports differ.
 x-ontrack: &ontrack
   image: "nemerosa/ontrack:${ONTRACK_VERSION:-latest}"
   environment:
@@ -71,6 +71,25 @@ x-ontrack: &ontrack
     ONTRACK_EXTENSION_AUDITTRAIL_STORAGE_PATHSTYLE: "true"
     ONTRACK_EXTENSION_AUDITTRAIL_STORAGE_ACCESSKEY: yontrack-minio
     ONTRACK_EXTENSION_AUDITTRAIL_STORAGE_SECRETKEY: yontrack-minio-secret
+    # ... the same configuration as code for both backends, which start together and both apply
+    # it (#2087)
+    ONTRACK_CONFIG_CASC_LOCATIONS: "file:/casc/kdsl-ha.yaml"
+  volumes:
+    - ./casc/kdsl-ha.yaml:/casc/kdsl-ha.yaml:ro
+  depends_on:
+    postgres:
+      condition: service_healthy
+    rabbitmq:
+      condition: service_started
+    minio:
+      condition: service_healthy
+  # Both are waited for by the Compose plugin before the tests run
+  healthcheck:
+    test: [ "CMD-SHELL", "wget -q -O /dev/null http://localhost:8800/manage/health || exit 1" ]
+    interval: 5s
+    timeout: 5s
+    retries: 60
+    start_period: 30s
 
 services:
 
@@ -125,36 +144,19 @@ services:
       retries: 30
       start_period: 10s
 
+  # A and B start together, on an empty database: their startup tasks run one replica at a time
+  # (#2087), which ACCHAStartup checks.
   ontrack-a:
     <<: *ontrack
     ports:
       - "${YONTRACK_KDSL_HA_A_PORT:-18080}:8080"
       - "${YONTRACK_KDSL_HA_A_MGMT_PORT:-18880}:8800"
-    depends_on:
-      postgres:
-        condition: service_healthy
-      rabbitmq:
-        condition: service_started
-      minio:
-        condition: service_healthy
-    # B waits for it, see below.
-    healthcheck:
-      test: [ "CMD-SHELL", "wget -q -O /dev/null http://localhost:8800/manage/health || exit 1" ]
-      interval: 5s
-      timeout: 5s
-      retries: 60
-      start_period: 30s
 
   ontrack-b:
     <<: *ontrack
     ports:
       - "${YONTRACK_KDSL_HA_B_PORT:-18081}:8080"
       - "${YONTRACK_KDSL_HA_B_MGMT_PORT:-18881}:8800"
-    depends_on:
-      # B starts once A is up, not alongside it: two backends starting together on an empty
-      # database is #2087's to make safe, and its test is the one that removes this wait.
-      ontrack-a:
-        condition: service_healthy
 
   proxy:
     image: nginx:1.28.0-alpine

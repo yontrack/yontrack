@@ -14,6 +14,11 @@ import org.springframework.context.ApplicationContext;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
+import javax.sql.DataSource;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
@@ -28,11 +33,27 @@ import java.util.stream.Collectors;
  * {@code ontrack.config.database.contract-migrations}. With
  * {@code ontrack.config.database.run-contract-and-exit}, the application runs both and exits, before
  * any startup service and before the web server listens.
+ * <p>
+ * The startup services run under one advisory lock (#2087), so that replicas starting together run
+ * them one at a time: what they write must stay idempotent.
  *
  * @see ContractMigrations
  */
 @Component
 public class StartupStrategy implements FlywayMigrationStrategy {
+
+    /**
+     * First key of the advisory lock of the startup phase, the second being {@link #LOCK_KEY}:
+     * "STRT" in ASCII — next to the locks on the trails ("TRAI"), on the blobs of the evidence
+     * ("EVID"), on the runs of the jobs ("JOBR") and on the processing of the auto-versioning
+     * orders ("AVQU", "AVMG").
+     */
+    public static final int LOCK_CLASS = 0x53545254;
+
+    /**
+     * Second key of the advisory lock of the startup phase: there is only one.
+     */
+    public static final int LOCK_KEY = 0;
 
     private final Logger logger = LoggerFactory.getLogger(StartupStrategy.class);
 
@@ -80,6 +101,19 @@ public class StartupStrategy implements FlywayMigrationStrategy {
             logger.info("[database] Contract migrations deferred, {} pending: {}", pending.size(), pending);
         }
 
+        // Startup services, one replica at a time
+        runStartupServices(flyway.getConfiguration().getDataSource());
+    }
+
+    /**
+     * Runs the {@link StartupService}s, in order, under the advisory lock of the startup phase
+     * (#2087): replicas starting together run them one at a time, the others waiting for the lock.
+     * <p>
+     * The lock is a session-level one, held by a connection of its own for the whole phase, and
+     * released at its end, failed or not. A replica which dies holding it releases it with its
+     * session.
+     */
+    private void runStartupServices(DataSource dataSource) {
         // Getting the startup services
         List<StartupService> startupServices = applicationContext.getBeansOfType(StartupService.class).values().stream()
                 // ... order them by starting number
@@ -93,12 +127,66 @@ public class StartupStrategy implements FlywayMigrationStrategy {
                 logger.info("[{}] {}", startupService.startupOrder(), startupService.getName())
         );
 
-        // Startup services
-        logger.info("Starting startup services...");
-        startupServices.forEach(startupService -> {
-            logger.info("Starting [{}] {}", startupService.startupOrder(), startupService.getName());
-            startupService.start();
-        });
+        try (Connection connection = dataSource.getConnection()) {
+            lock(connection);
+            try {
+                // Startup services
+                logger.info("Starting startup services...");
+                startupServices.forEach(startupService -> {
+                    logger.info("Starting [{}] {}", startupService.startupOrder(), startupService.getName());
+                    startupService.start();
+                });
+            } finally {
+                unlock(connection);
+            }
+        } catch (SQLException ex) {
+            throw new IllegalStateException("[startup] Failure on the startup lock", ex);
+        }
+    }
+
+    private void lock(Connection connection) throws SQLException {
+        // The lock is held by the session, not by a transaction
+        connection.setAutoCommit(true);
+        if (!callLockFunction(connection, "pg_try_advisory_lock")) {
+            logger.info("[startup] Another instance is running its startup services, waiting for it...");
+            try (PreparedStatement statement = connection.prepareStatement("SELECT pg_advisory_lock(?, ?)")) {
+                statement.setInt(1, LOCK_CLASS);
+                statement.setInt(2, LOCK_KEY);
+                // pg_advisory_lock returns void: the row is read and ignored
+                statement.executeQuery().close();
+            }
+        }
+        logger.info("[startup] Startup lock acquired");
+    }
+
+    /**
+     * Releases the lock. Should this fail, the session is ended instead, which releases it: back
+     * in its pool, the connection would keep it.
+     */
+    private void unlock(Connection connection) throws SQLException {
+        try {
+            if (callLockFunction(connection, "pg_advisory_unlock")) {
+                logger.info("[startup] Startup lock released");
+            } else {
+                logger.warn("[startup] The startup lock was not held when releasing it");
+            }
+        } catch (SQLException ex) {
+            logger.error("[startup] Cannot release the startup lock, ending the session instead", ex);
+            connection.abort(Runnable::run);
+        }
+    }
+
+    /**
+     * Calls an advisory lock function returning a boolean on the lock of the startup phase.
+     */
+    private static boolean callLockFunction(Connection connection, String function) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement("SELECT " + function + "(?, ?)")) {
+            statement.setInt(1, LOCK_CLASS);
+            statement.setInt(2, LOCK_KEY);
+            try (ResultSet rs = statement.executeQuery()) {
+                return rs.next() && rs.getBoolean(1);
+            }
+        }
     }
 
     /**
