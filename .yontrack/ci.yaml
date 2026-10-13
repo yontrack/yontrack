@@ -13,6 +13,10 @@ configuration:
           tests: {}
         KDSL.ACCEPTANCE:
           tests: {}
+        # The cross-replica tests: the `ha` package against two backends behind a proxy, reported by
+        # the `kdsl-ha` job in ci.yml on every full run (#2076).
+        KDSL.HA:
+          tests: {}
         PLAYWRIGHT:
           tests: {}
         # The six SECURITY stamps are `security-findings` stamps (#1875): each run carries the
@@ -237,6 +241,7 @@ configuration:
             - UI_UNIT
             - INTEGRATION
             - KDSL.ACCEPTANCE
+            - KDSL.HA
             - PLAYWRIGHT
             - DOCS
         # No workflow node of its own: BRONZE is what admits a build to the demo slot, the

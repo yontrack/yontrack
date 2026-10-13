@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <rect x="4" y="4" width="120" height="120" rx="22" ry="22" fill="#00796B"/>
+  <!-- the proxy, fanning out to two backends -->
+  <path d="M 64 40 L 64 56 M 36 72 L 36 62 Q 36 56 42 56 L 86 56 Q 92 56 92 62 L 92 72"
+        fill="none" stroke="#FFFFFF" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="64" cy="31" r="13" fill="#FFFFFF"/>
+  <!-- backend A -->
+  <rect x="16" y="72" width="40" height="38" rx="7" ry="7" fill="#FFFFFF"/>
+  <line x1="25" y1="84" x2="47" y2="84" stroke="#00796B" stroke-width="5" stroke-linecap="round"/>
+  <line x1="25" y1="98" x2="47" y2="98" stroke="#00796B" stroke-width="5" stroke-linecap="round"/>
+  <!-- backend B -->
+  <rect x="72" y="72" width="40" height="38" rx="7" ry="7" fill="#FFFFFF"/>
+  <line x1="81" y1="84" x2="103" y2="84" stroke="#00796B" stroke-width="5" stroke-linecap="round"/>
+  <line x1="81" y1="98" x2="103" y2="98" stroke="#00796B" stroke-width="5" stroke-linecap="round"/>
+</svg>

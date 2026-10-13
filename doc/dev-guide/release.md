@@ -13,7 +13,7 @@ under its base version — see
 
 | Level     | Requires                                                     | Meaning                            |
 |-----------|--------------------------------------------------------------|------------------------------------|
-| `BRONZE`  | `BUILD`, `UI_UNIT`, `INTEGRATION`, `KDSL.ACCEPTANCE`, `PLAYWRIGHT`, `DOCS` | The build is green    |
+| `BRONZE`  | `BUILD`, `UI_UNIT`, `INTEGRATION`, `KDSL.ACCEPTANCE`, `KDSL.HA`, `PLAYWRIGHT`, `DOCS` | The build is green |
 | `SILVER`  | `BRONZE` + `DEMO.SMOKE` on `main`; `BRONZE` alone on a release branch | Deployed to the demo and verified — or, on a release branch, green |
 | `GOLD`    | `SILVER`, granted **by hand**                                | A human tested the demo and approved the release |
 | `RELEASE` | `GOLD` + `DOCKER.HUB`, `GITHUB.RELEASE`, `DOCUMENTATION`, `WIKI` | Publication completed — alpha, beta or GA |

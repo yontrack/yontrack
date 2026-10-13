@@ -1423,13 +1423,14 @@ jobs:
   # behind a proxy (compose/docker-compose-kdsl-ha.yml). In parallel with `kdsl`, on its own runner:
   # the two stacks share the KDSL ports. It needs the backend image only, not the UI's.
   #
-  # Nothing reads its result but the run's own conclusion, which is enough: a red job fails the run,
-  # and a failed run keeps the commit from `status:ready`.
+  # A red job fails the run, which keeps the commit from `status:ready`, and records KDSL.HA as
+  # FAILED, which keeps the build from BRONZE. One job, no shards: it validates itself, without the
+  # report job `kdsl` needs.
   # ---------------------------------------------------------------------------------------------
 
   kdsl-ha:
     name: KDSL cross-replica tests
-    needs: [setup, build]
+    needs: [setup, yontrack, build]
     if: >-
       ${{ !cancelled()
         && needs.build.result == 'success'
@@ -1442,6 +1443,12 @@ jobs:
       # The compose files resolve the images as nemerosa/ontrack:${ONTRACK_VERSION:-latest}.
       ONTRACK_VERSION: ${{ needs.setup.outputs.base_version }}
     steps:
+      # The run time of KDSL.HA is measured from here, as for KDSL.ACCEPTANCE: restoring the image
+      # and bringing the stack up are part of what the tests cost.
+      - name: Record the job start
+        id: job_start
+        run: echo "started=$(date +%s)" >> "$GITHUB_OUTPUT"
+
       - uses: actions/checkout@v7
 
       - uses: actions/setup-java@v6
@@ -1453,6 +1460,14 @@ jobs:
         with:
           cache-read-only: true  # `build` is the one job that writes, see `setup`
 
+      - name: Link to the Yontrack build
+        uses: nemerosa/ontrack-github-actions-cli-library/ontrack-cli-workflow-build@v1.0.3
+        with:
+          project: ${{ needs.yontrack.outputs.project }}
+          yontrack-url: ${{ vars.YONTRACK_URL }}
+          yontrack-token: ${{ secrets.YONTRACK_TOKEN }}
+          version: ${{ env.YONTRACK_CLI_VERSION }}
+
       - name: Log in to GHCR
         uses: docker/login-action@v4
         with:
@@ -1461,6 +1476,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Restore the Docker image
+        id: restore
         run: |
           set -euo pipefail
           docker pull "$GHCR_ONTRACK:$RUN_TAG"
@@ -1472,8 +1488,33 @@ jobs:
           ./gradlew :ontrack-kdsl-acceptance:kdslHaComposeUp --stacktrace --console plain
 
       - name: KDSL cross-replica tests
+        id: test
         run: |
           ./gradlew :ontrack-kdsl-acceptance:kdslHaTest --stacktrace --console plain
+
+      # Whatever failed -- the image, the stack, the tests -- the stamp says so, rather than
+      # KDSL.HA being absent from the build. Only a green test step reads the JUnit reports.
+      - name: Validate KDSL.HA
+        if: ${{ !cancelled() && steps.restore.outcome != '' }}
+        env:
+          STARTED: ${{ steps.job_start.outputs.started }}
+          TEST_OUTCOME: ${{ steps.test.outcome }}
+        run: |
+          run_time_flag=""
+          if [ -n "${STARTED:-}" ]; then
+            run_time_flag="--run-time $(( $(date +%s) - STARTED ))"
+          fi
+          if [ "$TEST_OUTCOME" != "success" ]; then
+            # shellcheck disable=SC2086  # deliberate: see YONTRACK_RUN_INFO
+            yontrack validate --validation KDSL.HA --status FAILED \
+              $run_time_flag $YONTRACK_RUN_INFO
+          else
+            # shellcheck disable=SC2086  # deliberate: see YONTRACK_RUN_INFO
+            yontrack validate --validation KDSL.HA \
+              junit --pattern "ontrack-kdsl-acceptance/build/test-results/kdslHaTest/*.xml" \
+              --fail-when-no-results \
+              $run_time_flag $YONTRACK_RUN_INFO
+          fi
 
       - name: Upload the test results
         if: always()
