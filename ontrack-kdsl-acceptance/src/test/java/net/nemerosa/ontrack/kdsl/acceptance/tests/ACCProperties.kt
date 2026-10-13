@@ -57,6 +57,32 @@ object ACCProperties {
         val url: String by fromEnv()
     }
 
+    /**
+     * The two backends of the cross-replica stack (#2076), each reached directly. Read by the `ha`
+     * package only, which reaches the proxy in front of them through [Connection.url].
+     */
+    object HA {
+        object A {
+            @DefaultValue("http://localhost:18080")
+            val url: String by fromEnv()
+
+            object Mgt {
+                @DefaultValue("http://localhost:18880/manage")
+                val url: String by fromEnv()
+            }
+        }
+
+        object B {
+            @DefaultValue("http://localhost:18081")
+            val url: String by fromEnv()
+
+            object Mgt {
+                @DefaultValue("http://localhost:18881/manage")
+                val url: String by fromEnv()
+            }
+        }
+    }
+
     @Target(AnnotationTarget.PROPERTY)
     @Retention(AnnotationRetention.RUNTIME)
     annotation class DefaultValue(

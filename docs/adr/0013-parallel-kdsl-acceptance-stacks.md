@@ -133,3 +133,14 @@ the UI callback of each slot literally, and `KeycloakRealmsTest` checks them aga
 
 The IPv6-probe story above is a record of what happened. The dev stack no longer publishes 9300,
 but the probe fix still holds for every other port.
+
+## Amendment, 2026-10-13: a fourth variant with two backends (#2076)
+
+`compose/docker-compose-kdsl-ha.yml` puts two backends, `ontrack-a` and `ontrack-b`, behind an
+nginx round-robin proxy, for the cross-replica tests of the `ha` package (`kdslHaTest`). It is a
+fourth variant of the same slot, sequenced after the others: `kdslHaComposeUp` waits for
+`kdslOidcComposeDown`. Its Compose project is `yontrack-kdsl-ha-<slug>`.
+
+The proxy takes the slot's Yontrack port. Each backend has an app and a management port of its
+own, on new base ports: 18080 and 18880 for A, 18081 and 18881 for B. They are offset by
+`slot * 100` like every other port, and are probed for all four variants.

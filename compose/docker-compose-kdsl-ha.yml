@@ -1,0 +1,165 @@
+# Middleware and two backends behind a proxy, for the KDSL acceptance tests of the `ha` package
+# (#2076): what happens when a request lands on one replica and the next one on another.
+#
+# Two backends, `ontrack-a` and `ontrack-b`, from the same image, on one Postgres, RabbitMQ and
+# MinIO, behind an nginx proxy doing plain round-robin. No UI, no Keycloak, no InfluxDB: the tests
+# authenticate with a token, and read nothing back from either.
+#
+# A test fixture only: in production the load balancing is the Kubernetes Service's.
+#
+# Every published port is parameterised so that several checkouts can run the acceptance tests
+# side by side. The proxy takes the slot's Yontrack port, A and B each an app and a management
+# port of their own.
+#
+# Started and stopped by the Gradle Docker Compose plugin (`kdslHaTest`), which is given the
+# project name and the ports by `KdslStack` in buildSrc -- see
+# docs/adr/0013-parallel-kdsl-acceptance-stacks.md.
+
+# The configuration both backends share; only their ports and their dependencies differ.
+x-ontrack: &ontrack
+  image: "nemerosa/ontrack:${ONTRACK_VERSION:-latest}"
+  environment:
+    # Development configuration
+    SPRING_PROFILES_ACTIVE: dev
+
+    ############################################################
+    # Configuration of Ontrack
+    ############################################################
+
+    # General configuration -- half the heap of the main stack's single backend: there are two of
+    # them, and the `ha` package is small
+    JAVA_OPTIONS: "-Xmx1024m -Xms1024m"
+
+    # Database
+    SPRING_DATASOURCE_URL: "jdbc:postgresql://postgres/ontrack"
+
+    # RabbitMQ
+    SPRING_RABBITMQ_HOST: rabbitmq
+    SPRING_RABBITMQ_USERNAME: ontrack
+    SPRING_RABBITMQ_PASSWORD: ontrack
+
+    # Authentication -- there is no Keycloak in this stack: the tests send a token, and these are
+    # never used to validate a JWT
+    SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI: "http://localhost:${YONTRACK_KDSL_KEYCLOAK_PORT:-8008}/realms/ontrack"
+    # We need to skip the host verification (keycloak vs. localhost)
+    # DO NOT USE IN PRODUCTION
+    SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: http://keycloak:8080/realms/ontrack/protocol/openid-connect/certs
+
+    ############################################################
+    # Configuration for the tests
+    ############################################################
+
+    # ... the management endpoints the tests use (prometheus for the metrics, account for
+    # the tokens) - the default exposure is narrower, see #1772
+    MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: "health,info,prometheus,account"
+    # ... account tokens can be provisioned
+    MANAGEMENT_ENDPOINT_ACCOUNT_ACCESS: unrestricted
+    # ... configurations are not tested
+    ONTRACK_CONFIG_CONFIGURATION_TEST: "false"
+    # ... GitHub ingestion specifics
+    ONTRACK_EXTENSION_GITHUB_INGESTION_HOOK_SIGNATURE_DISABLED: true
+    # ... Jira in mock mode
+    ONTRACK_EXTENSION_JIRA_CLIENT_TYPE: mock
+    # ... audit trail evidence in the stack's MinIO (#1962), reached inside the network
+    ONTRACK_EXTENSION_AUDITTRAIL_STORAGE_ENDPOINT: http://minio:9000
+    ONTRACK_EXTENSION_AUDITTRAIL_STORAGE_BUCKET: yontrack-audit-trail
+    ONTRACK_EXTENSION_AUDITTRAIL_STORAGE_REGION: us-east-1
+    ONTRACK_EXTENSION_AUDITTRAIL_STORAGE_PATHSTYLE: "true"
+    ONTRACK_EXTENSION_AUDITTRAIL_STORAGE_ACCESSKEY: yontrack-minio
+    ONTRACK_EXTENSION_AUDITTRAIL_STORAGE_SECRETKEY: yontrack-minio-secret
+
+services:
+
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: ontrack
+      POSTGRES_USER: ontrack
+      POSTGRES_PASSWORD: ontrack
+    ports:
+      - "${YONTRACK_KDSL_POSTGRES_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ontrack -d ontrack"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  rabbitmq:
+    image: rabbitmq:4.1.3-management
+    hostname: rabbit
+    environment:
+      RABBITMQ_DEFAULT_USER: ontrack
+      RABBITMQ_DEFAULT_PASS: ontrack
+    ports:
+      - "${YONTRACK_KDSL_RABBIT_MGMT_PORT:-15672}:15672"
+      - "${YONTRACK_KDSL_RABBIT_PORT:-5672}:5672"
+
+  # S3-compatible storage for the evidence of the audit trail (#1962).
+  # pgsty/silo is the community fork of MinIO -- the upstream image is no
+  # longer published -- pinned by release and digest. Its bucket is created at
+  # start by minio/start.sh, and the service is healthy once it exists.
+  # buildSrc's `Minio` holds the image, bucket and credentials, and `MinioTest`
+  # keeps this file in step with it.
+  minio:
+    image: "pgsty/silo:RELEASE.2026-09-16T00-00-00Z@sha256:635197cb9f36d01bee221d34d1c7d7960f6a95c48b0b6c01d99cd13bdae51a46"
+    entrypoint: [ "/bin/sh", "/yontrack/start.sh" ]
+    environment:
+      MINIO_ROOT_USER: yontrack-minio
+      MINIO_ROOT_PASSWORD: yontrack-minio-secret
+      YONTRACK_MINIO_BUCKET: yontrack-audit-trail
+    ports:
+      - "${YONTRACK_KDSL_MINIO_PORT:-19000}:9000"
+    volumes:
+      - ./minio/start.sh:/yontrack/start.sh:ro
+    # Nothing to keep between runs: the data lives in memory.
+    tmpfs:
+      - /data
+    healthcheck:
+      test: [ "CMD-SHELL", "test -f /tmp/yontrack-bucket-ready && silo healthcheck --quiet" ]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
+
+  ontrack-a:
+    <<: *ontrack
+    ports:
+      - "${YONTRACK_KDSL_HA_A_PORT:-18080}:8080"
+      - "${YONTRACK_KDSL_HA_A_MGMT_PORT:-18880}:8800"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_started
+      minio:
+        condition: service_healthy
+    # B waits for it, see below.
+    healthcheck:
+      test: [ "CMD-SHELL", "wget -q -O /dev/null http://localhost:8800/manage/health || exit 1" ]
+      interval: 5s
+      timeout: 5s
+      retries: 60
+      start_period: 30s
+
+  ontrack-b:
+    <<: *ontrack
+    ports:
+      - "${YONTRACK_KDSL_HA_B_PORT:-18081}:8080"
+      - "${YONTRACK_KDSL_HA_B_MGMT_PORT:-18881}:8800"
+    depends_on:
+      # B starts once A is up, not alongside it: two backends starting together on an empty
+      # database is #2087's to make safe, and its test is the one that removes this wait.
+      ontrack-a:
+        condition: service_healthy
+
+  proxy:
+    image: nginx:1.28.0-alpine
+    ports:
+      - "${YONTRACK_KDSL_ONTRACK_PORT:-8080}:8080"
+    volumes:
+      - ./nginx/kdsl-ha.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      ontrack-a:
+        condition: service_started
+      ontrack-b:
+        condition: service_started

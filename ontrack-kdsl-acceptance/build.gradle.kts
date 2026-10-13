@@ -43,7 +43,7 @@ val ontrackVersion: String = System.getenv("ONTRACK_VERSION")?.takeIf { it.isNot
 // port it publishes are derived from a slot, so that two worktrees can run the
 // acceptance tests at the same time. The main working copy takes slot 0 and
 // keeps the historical ports -- which is what every CI runner, a fresh clone,
-// also gets. The three variants share one slot: they are sequenced below so
+// also gets. The four variants share one slot: they are sequenced below so
 // that they are never up at the same time.
 // See docs/adr/0013-parallel-kdsl-acceptance-stacks.md.
 //
@@ -52,7 +52,7 @@ val ontrackVersion: String = System.getenv("ONTRACK_VERSION")?.takeIf { it.isNot
 // by every Gradle invocation in the checkout, and a build that is never going
 // to run the acceptance tests -- `:ontrack-extension-x:integrationTest`, say --
 // used to die on a "no free slot" raised by a stack it does not touch. Naming
-// the three Compose projects costs nothing and stays eager; everything derived
+// the four Compose projects costs nothing and stays eager; everything derived
 // from the slot goes through `kdslStack`, which resolves once, lazily, and
 // therefore reports a failure against the task that asked for it.
 val kdslNames = KdslStack.names(rootDir)
@@ -124,6 +124,18 @@ configure<ComposeExtension> {
         composeLogToFile.set(file("build/logs/kdsl-oidc/compose"))
         retainContainersOnStartupFailure.set(true)
     }
+    // Two backends behind a proxy, for the `ha` package (#2076). Never with the coverage override:
+    // it instruments a service named `ontrack`, which this stack does not have.
+    createNested("kdslHa").apply {
+        useComposeFiles.add("${rootDir}/compose/docker-compose-kdsl-ha.yml")
+        setProjectName(kdslNames.haProjectName)
+        environment.put("ONTRACK_VERSION", ontrackVersion)
+        environment.putAll(kdslComposeEnvironment)
+        captureContainersOutput.set(true)
+        captureContainersOutputToFiles.set(file("build/logs/kdsl-ha/containers"))
+        composeLogToFile.set(file("build/logs/kdsl-ha/compose"))
+        retainContainersOnStartupFailure.set(true)
+    }
 }
 
 val isCI = System.getenv("CI") == "true"
@@ -147,7 +159,7 @@ val kdslStackSlot = tasks.register("kdslStackSlot") {
 
 // Both the build and the up task of each variant read the ports, and Compose
 // builds before it starts, so the claim has to come before the earliest of them.
-listOf("kdslAcceptanceTest", "kdslLdap", "kdslOidc").forEach { variant ->
+listOf("kdslAcceptanceTest", "kdslLdap", "kdslOidc", "kdslHa").forEach { variant ->
     listOf("ComposeBuild", "ComposeUp").forEach { phase ->
         tasks.named("$variant$phase") {
             dependsOn(kdslStackSlot)
@@ -163,6 +175,13 @@ listOf("kdslAcceptanceTest", "kdslLdap", "kdslOidc").forEach { variant ->
             dependsOn(":ontrack-ui:dockerBuild")
             dependsOn(":ontrack-web-core:dockerBuild")
         }
+    }
+}
+
+// The `-ha` variant runs no UI: the backend image is all it needs.
+tasks.named("kdslHaComposeUp") {
+    if (!isCI) {
+        dependsOn(":ontrack-ui:dockerBuild")
     }
 }
 
@@ -286,6 +305,13 @@ tasks.named("kdslOidcComposeUp") {
     dependsOn("kdslLdapComposeDown")
 }
 
+tasks.named("kdslHaComposeUp") {
+    dependsOn("kdslOidcComposeDown")
+    // `./gradlew kdslAcceptanceTest kdslHaTest`: the main stack is down before this one comes up,
+    // on the same ports, rather than whenever Gradle happens to schedule its finalizer.
+    mustRunAfter(kdslAcceptanceTestComposeDown, "kdslLdapComposeDown")
+}
+
 // Restricting unit tests
 
 tasks.named<Test>("test") {
@@ -295,6 +321,9 @@ tasks.named<Test>("test") {
 
 // Running the acceptance tests
 
+// The cross-replica tests (#2076): their own package, their own stack, their own task.
+val haTests = "net/nemerosa/ontrack/kdsl/acceptance/tests/ha/**"
+
 val kdslAcceptanceTest = tasks.register<Test>("kdslAcceptanceTest") {
     useJUnitPlatform()
     mustRunAfter("test")
@@ -302,6 +331,8 @@ val kdslAcceptanceTest = tasks.register<Test>("kdslAcceptanceTest") {
     // not one of its inputs.
     outputs.cacheIf("acceptance tests run against a live instance") { false }
     include("**/ACC*.class")
+    // The `ha` package needs two backends, and runs under `kdslHaTest`
+    exclude(haTests)
     // Gradle 9 no longer gives a registered Test task the test source set by convention: without
     // these two the task is silently NO-SOURCE.
     testClassesDirs = sourceSets["test"].output.classesDirs
@@ -340,5 +371,42 @@ val kdslAcceptanceTest = tasks.register<Test>("kdslAcceptanceTest") {
     }
     if (!isCI) {
         finalizedBy(kdslAcceptanceTestComposeDown)
+    }
+}
+
+// Running the cross-replica tests (#2076)
+//
+// The `ha` package only, against `compose/docker-compose-kdsl-ha.yml`: two backends behind a proxy,
+// on the checkout's KDSL slot. The rest of the suite cannot simply run there -- several tests read
+// per-JVM state back through the backend, the in-memory notification channel and the mock SCM store.
+
+val kdslHaComposeUp = tasks.named("kdslHaComposeUp")
+val kdslHaComposeDown = tasks.named("kdslHaComposeDown")
+
+tasks.register<Test>("kdslHaTest") {
+    group = "verification"
+    description = "Runs the cross-replica acceptance tests against two backends behind a proxy"
+    useJUnitPlatform()
+    mustRunAfter("test", kdslAcceptanceTest)
+    outputs.cacheIf("acceptance tests run against a live instance") { false }
+    include("$haTests/ACC*.class")
+    testClassesDirs = sourceSets["test"].output.classesDirs
+    classpath = sourceSets["test"].runtimeClasspath
+    val testFilter = System.getProperty("test.filter")
+    if (testFilter != null) {
+        filter {
+            includeTestsMatching(testFilter)
+        }
+    }
+    // The proxy, each backend, and A's management endpoint for the token -- an explicit -D wins,
+    // as for kdslAcceptanceTest.
+    jvmArgumentProviders.add(CommandLineArgumentProvider {
+        kdslStack.haSystemProperties.map { (key, value) ->
+            "-D$key=${System.getProperty(key) ?: value}"
+        }
+    })
+    dependsOn(kdslHaComposeUp)
+    if (!isCI) {
+        finalizedBy(kdslHaComposeDown)
     }
 }

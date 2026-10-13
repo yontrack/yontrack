@@ -1419,6 +1419,81 @@ jobs:
           fi
 
   # ---------------------------------------------------------------------------------------------
+  # Cross-replica acceptance tests (#2076): the `ha` package of the KDSL suite, against two backends
+  # behind a proxy (compose/docker-compose-kdsl-ha.yml). In parallel with `kdsl`, on its own runner:
+  # the two stacks share the KDSL ports. It needs the backend image only, not the UI's.
+  #
+  # Nothing reads its result but the run's own conclusion, which is enough: a red job fails the run,
+  # and a failed run keeps the commit from `status:ready`.
+  # ---------------------------------------------------------------------------------------------
+
+  kdsl-ha:
+    name: KDSL cross-replica tests
+    needs: [setup, build]
+    if: >-
+      ${{ !cancelled()
+        && needs.build.result == 'success'
+        && needs.setup.outputs.full_run == 'true'
+        && needs.setup.outputs.skip_kdsl_acceptance != 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      BASE_VERSION: ${{ needs.setup.outputs.base_version }}
+      # The compose files resolve the images as nemerosa/ontrack:${ONTRACK_VERSION:-latest}.
+      ONTRACK_VERSION: ${{ needs.setup.outputs.base_version }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: zulu
+          java-version: "25"
+
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-read-only: true  # `build` is the one job that writes, see `setup`
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Restore the Docker image
+        run: |
+          set -euo pipefail
+          docker pull "$GHCR_ONTRACK:$RUN_TAG"
+          docker tag "$GHCR_ONTRACK:$RUN_TAG" "nemerosa/ontrack:$BASE_VERSION"
+
+      # As in `kdsl`: under CI=true the Gradle build leaves bringing the stack up to the workflow.
+      - name: Start the environment
+        run: |
+          ./gradlew :ontrack-kdsl-acceptance:kdslHaComposeUp --stacktrace --console plain
+
+      - name: KDSL cross-replica tests
+        run: |
+          ./gradlew :ontrack-kdsl-acceptance:kdslHaTest --stacktrace --console plain
+
+      - name: Upload the test results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: kdsl-ha-results
+          path: ontrack-kdsl-acceptance/build/test-results/kdslHaTest/**/*.xml
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Upload the KDSL logs
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: kdsl-ha-logs
+          path: ontrack-kdsl-acceptance/build/logs/**
+          if-no-files-found: ignore
+          retention-days: 7
+
+  # ---------------------------------------------------------------------------------------------
   # Playwright UI tests, one runner per authentication variant, and per shard of the main suite.
   # ---------------------------------------------------------------------------------------------
 

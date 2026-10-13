@@ -307,3 +307,41 @@ by `itStackSlot` in the same way.
 The arithmetic lives in `KdslStack` in `buildSrc`, is covered by
 `KdslStackTest`, and is explained in
 `docs/adr/0013-parallel-kdsl-acceptance-stacks.md`.
+
+### Cross-replica tests (two backends)
+
+```bash
+./gradlew :ontrack-kdsl-acceptance:kdslHaTest
+```
+
+The tests of the `net.nemerosa.ontrack.kdsl.acceptance.tests.ha` package --
+the `ACCHA*` classes -- check what happens when a request lands on one backend
+and the next one on another (#2076). The task brings up
+`compose/docker-compose-kdsl-ha.yml`: two backends, `ontrack-a` and
+`ontrack-b`, from the same image, on one Postgres, RabbitMQ and MinIO, behind
+an nginx proxy doing plain round-robin. No UI, no Keycloak, no InfluxDB. It
+runs that package only, then tears the stack down; `kdslAcceptanceTest` never
+runs it.
+
+The stack is the fourth variant of the KDSL slot, sequenced after the `-oidc`
+one. The proxy takes the slot's Yontrack port; each backend has its own:
+
+| Service         | Slot 0 | Slot 1 |
+|-----------------|--------|--------|
+| Proxy           | 8080   | 8180   |
+| A               | 18080  | 18180  |
+| A management    | 18880  | 18980  |
+| B               | 18081  | 18181  |
+| B management    | 18881  | 18981  |
+
+`AbstractACCHATestSupport` gives a test three connections: `ontrack` through
+the proxy, `ontrackA` and `ontrackB` to each backend directly. They share one
+token, from A's management endpoint. The ports reach them as
+`ontrack.acceptance.connection.url` (the proxy),
+`ontrack.acceptance.connection.mgt.url` (A's management) and
+`ontrack.acceptance.ha.{a,b}.url` and `ontrack.acceptance.ha.{a,b}.mgt.url`;
+an explicit `-D` still wins.
+
+B starts once A is healthy: two backends starting together on an empty
+database is #2087's to make safe. The `kdsl-ha` CI job runs the task on every
+full run, next to `kdsl`.

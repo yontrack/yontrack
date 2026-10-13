@@ -4,14 +4,15 @@ import java.io.File
 
 /**
  * Port allocation for the KDSL acceptance Compose stacks
- * (`compose/docker-compose-kdsl.yml` and its `-ldap` and `-oidc` variants),
- * on top of [StackSlots].
+ * (`compose/docker-compose-kdsl.yml` and its `-ldap`, `-oidc` and `-ha`
+ * variants), on top of [StackSlots].
  *
- * The three stacks share one slot. They are sequenced so that they are never
+ * The four stacks share one slot. They are sequenced so that they are never
  * up at the same time -- `kdslLdapComposeUp` waits for
- * `kdslAcceptanceTestComposeDown`, and `kdslOidcComposeUp` for
- * `kdslLdapComposeDown` -- so one set of ports serves all three, and a
- * checkout has one set of acceptance ports to remember rather than three.
+ * `kdslAcceptanceTestComposeDown`, `kdslOidcComposeUp` for
+ * `kdslLdapComposeDown`, and `kdslHaComposeUp` for `kdslOidcComposeDown` --
+ * so one set of ports serves all four, and a checkout has one set of
+ * acceptance ports to remember rather than four.
  *
  * See `docs/adr/0013-parallel-kdsl-acceptance-stacks.md`.
  */
@@ -62,6 +63,20 @@ object KdslStack {
      */
     const val BASE_MINIO = Minio.BASE_PORT
 
+    /**
+     * The two backends of the `-ha` variant (#2076), each reached directly, next to the nginx
+     * proxy in front of them, which takes [BASE_ONTRACK]. Only that variant publishes them, but
+     * the four share the slot, so they are probed for all four.
+     *
+     * A and B are one apart and the slots a hundred, so the two never meet. Over four slots the
+     * management ports span 18880-19181, interleaved with MinIO's 19000-19300 without touching it:
+     * `no two base ports collide over the slot range` keeps it that way.
+     */
+    const val BASE_HA_A = 18080
+    const val BASE_HA_B = 18081
+    const val BASE_HA_A_MGMT = 18880
+    const val BASE_HA_B_MGMT = 18881
+
     val BASE_PORTS = listOf(
         BASE_UI,
         BASE_LDAP,
@@ -75,6 +90,10 @@ object KdslStack {
         BASE_INFLUXDB,
         BASE_ONTRACK_MGMT,
         BASE_MINIO,
+        BASE_HA_A,
+        BASE_HA_B,
+        BASE_HA_A_MGMT,
+        BASE_HA_B_MGMT,
     )
 
     const val INSTANCE_ENV_PATH = ".yontrack-kdsl/instance.env"
@@ -114,7 +133,7 @@ object KdslStack {
 }
 
 /**
- * The Compose project name of each of the three acceptance variants.
+ * The Compose project name of each of the four acceptance variants.
  *
  * Split out of [KdslStackInstance] because it is the half that needs no slot:
  * a project is named after the checkout, not after the ports it publishes.
@@ -125,11 +144,12 @@ data class KdslStackNames(val slug: String) {
     val projectName: String = "yontrack-kdsl-$slug"
     val ldapProjectName: String = "yontrack-kdsl-ldap-$slug"
     val oidcProjectName: String = "yontrack-kdsl-oidc-$slug"
+    val haProjectName: String = "yontrack-kdsl-ha-$slug"
 }
 
 /**
  * The resolved KDSL acceptance stack for one checkout: the Compose project
- * name of each of the three variants, and the host ports they publish.
+ * name of each of the four variants, and the host ports they publish.
  */
 data class KdslStackInstance(
     val slug: String,
@@ -141,6 +161,7 @@ data class KdslStackInstance(
     val projectName: String get() = names.projectName
     val ldapProjectName: String get() = names.ldapProjectName
     val oidcProjectName: String get() = names.oidcProjectName
+    val haProjectName: String get() = names.haProjectName
 
     val uiPort: Int = StackSlots.port(KdslStack.BASE_UI, slot)
     val ldapPort: Int = StackSlots.port(KdslStack.BASE_LDAP, slot)
@@ -154,6 +175,10 @@ data class KdslStackInstance(
     val influxdbPort: Int = StackSlots.port(KdslStack.BASE_INFLUXDB, slot)
     val ontrackManagementPort: Int = StackSlots.port(KdslStack.BASE_ONTRACK_MGMT, slot)
     val minioPort: Int = StackSlots.port(KdslStack.BASE_MINIO, slot)
+    val haAPort: Int = StackSlots.port(KdslStack.BASE_HA_A, slot)
+    val haBPort: Int = StackSlots.port(KdslStack.BASE_HA_B, slot)
+    val haAManagementPort: Int = StackSlots.port(KdslStack.BASE_HA_A_MGMT, slot)
+    val haBManagementPort: Int = StackSlots.port(KdslStack.BASE_HA_B_MGMT, slot)
 
     val ontrackUrl: String = "http://localhost:$ontrackPort"
     val ontrackManagementUrl: String = "http://localhost:$ontrackManagementPort/manage"
@@ -167,7 +192,15 @@ data class KdslStackInstance(
      */
     val minioUrl: String = "http://localhost:$minioPort"
 
-    /** Passed to `docker compose`, and read by the three `docker-compose-kdsl*.yml` files. */
+    /** Backend A of the `-ha` variant, bypassing the proxy, which is on [ontrackUrl]. */
+    val haAUrl: String = "http://localhost:$haAPort"
+    val haAManagementUrl: String = "http://localhost:$haAManagementPort/manage"
+
+    /** Backend B of the `-ha` variant, bypassing the proxy, which is on [ontrackUrl]. */
+    val haBUrl: String = "http://localhost:$haBPort"
+    val haBManagementUrl: String = "http://localhost:$haBManagementPort/manage"
+
+    /** Passed to `docker compose`, and read by the four `docker-compose-kdsl*.yml` files. */
     val composeEnvironment: Map<String, String> = mapOf(
         "YONTRACK_KDSL_UI_PORT" to uiPort.toString(),
         "YONTRACK_KDSL_LDAP_PORT" to ldapPort.toString(),
@@ -181,6 +214,10 @@ data class KdslStackInstance(
         "YONTRACK_KDSL_INFLUXDB_PORT" to influxdbPort.toString(),
         "YONTRACK_KDSL_ONTRACK_MGMT_PORT" to ontrackManagementPort.toString(),
         "YONTRACK_KDSL_MINIO_PORT" to minioPort.toString(),
+        "YONTRACK_KDSL_HA_A_PORT" to haAPort.toString(),
+        "YONTRACK_KDSL_HA_B_PORT" to haBPort.toString(),
+        "YONTRACK_KDSL_HA_A_MGMT_PORT" to haAManagementPort.toString(),
+        "YONTRACK_KDSL_HA_B_MGMT_PORT" to haBManagementPort.toString(),
     )
 
     /**
@@ -195,6 +232,28 @@ data class KdslStackInstance(
         "ontrack.acceptance.connection.url" to ontrackUrl,
         "ontrack.acceptance.connection.mgt.url" to ontrackManagementUrl,
         "ontrack.acceptance.influxdb.url" to influxdbUrl,
+    )
+
+    /**
+     * The `ACCProperties` knobs of `kdslHaTest`, which runs the `ha` package against the `-ha`
+     * variant (#2076): `ontrack` through the proxy, `ontrackA` and `ontrackB` straight to each
+     * backend.
+     *
+     * The proxy publishes no management port, so the token -- which lives in the database and
+     * works on both backends -- is obtained from A's.
+     */
+    val haSystemProperties: Map<String, String>
+        get() = mapOf(
+            "ontrack.acceptance.connection.url" to ontrackUrl,
+            "ontrack.acceptance.connection.mgt.url" to haAManagementUrl,
+        ) + haBackendSystemProperties
+
+    /** The properties only the `ha` package reads: each backend, bypassing the proxy. */
+    private val haBackendSystemProperties: Map<String, String> = mapOf(
+        "ontrack.acceptance.ha.a.url" to haAUrl,
+        "ontrack.acceptance.ha.a.mgt.url" to haAManagementUrl,
+        "ontrack.acceptance.ha.b.url" to haBUrl,
+        "ontrack.acceptance.ha.b.mgt.url" to haBManagementUrl,
     )
 
     /**
@@ -221,12 +280,15 @@ data class KdslStackInstance(
                 "KDSL_PROJECT" to projectName,
                 "KDSL_LDAP_PROJECT" to ldapProjectName,
                 "KDSL_OIDC_PROJECT" to oidcProjectName,
+                "KDSL_HA_PROJECT" to haProjectName,
                 "YONTRACK_KDSL_UI_URL" to uiUrl,
                 "YONTRACK_KDSL_ONTRACK_URL" to ontrackUrl,
                 "YONTRACK_KDSL_KEYCLOAK_URL" to keycloakUrl,
                 "YONTRACK_KDSL_MINIO_URL" to minioUrl,
+                "YONTRACK_KDSL_HA_A_URL" to haAUrl,
+                "YONTRACK_KDSL_HA_B_URL" to haBUrl,
             ) + composeEnvironment,
-            systemProperties = systemProperties,
+            systemProperties = systemProperties + haBackendSystemProperties,
         )
     }
 

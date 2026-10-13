@@ -86,6 +86,7 @@ class KdslStackTest {
         assertEquals("yontrack-kdsl-feature-a", names.projectName)
         assertEquals("yontrack-kdsl-ldap-feature-a", names.ldapProjectName)
         assertEquals("yontrack-kdsl-oidc-feature-a", names.oidcProjectName)
+        assertEquals("yontrack-kdsl-ha-feature-a", names.haProjectName)
     }
 
     @Test
@@ -97,13 +98,78 @@ class KdslStackTest {
         assertEquals(names.projectName, instance.projectName)
         assertEquals(names.ldapProjectName, instance.ldapProjectName)
         assertEquals(names.oidcProjectName, instance.oidcProjectName)
+        assertEquals(names.haProjectName, instance.haProjectName)
     }
 
     @Test
-    fun `the three variants get three different compose projects`() {
+    fun `the four variants get four different compose projects`() {
         val instance = KdslStackInstance(slug = "feature-a", slot = 1)
-        val projects = setOf(instance.projectName, instance.ldapProjectName, instance.oidcProjectName)
-        assertEquals(3, projects.size, "the three variants must not share a Compose project")
+        val projects = setOf(
+            instance.projectName,
+            instance.ldapProjectName,
+            instance.oidcProjectName,
+            instance.haProjectName,
+        )
+        assertEquals(4, projects.size, "the four variants must not share a Compose project")
+    }
+
+    @Test
+    fun `slot zero gives the two backends of the HA stack their base ports`() {
+        // The proxy takes the slot's Ontrack port, so that `connection.url` means the same thing in
+        // both suites; each backend gets an app and a management port of its own (#2076).
+        val instance = KdslStackInstance(slug = "yontrack", slot = 0)
+        assertEquals(18080, instance.haAPort)
+        assertEquals(18880, instance.haAManagementPort)
+        assertEquals(18081, instance.haBPort)
+        assertEquals(18881, instance.haBManagementPort)
+        assertEquals("http://localhost:18080", instance.haAUrl)
+        assertEquals("http://localhost:18880/manage", instance.haAManagementUrl)
+        assertEquals("http://localhost:18081", instance.haBUrl)
+        assertEquals("http://localhost:18881/manage", instance.haBManagementUrl)
+    }
+
+    @Test
+    fun `the ports of the two backends are offset per slot and probed`() {
+        val instance = KdslStackInstance(slug = "feature-a", slot = 2)
+        assertEquals(18280, instance.haAPort)
+        assertEquals(19080, instance.haAManagementPort)
+        assertEquals(18281, instance.haBPort)
+        assertEquals(19081, instance.haBManagementPort)
+        listOf(
+            KdslStack.BASE_HA_A,
+            KdslStack.BASE_HA_A_MGMT,
+            KdslStack.BASE_HA_B,
+            KdslStack.BASE_HA_B_MGMT,
+        ).forEach { base ->
+            assertTrue(base in KdslStack.BASE_PORTS, "the HA port $base must be probed too")
+        }
+    }
+
+    @Test
+    fun `the HA tests are pointed at the proxy and at each backend`() {
+        val instance = KdslStackInstance(slug = "feature-a", slot = 2)
+        assertEquals(
+            mapOf(
+                // Through the proxy, on the slot's Ontrack port
+                "ontrack.acceptance.connection.url" to "http://localhost:8280",
+                // The token comes from A's management endpoint: the proxy publishes none
+                "ontrack.acceptance.connection.mgt.url" to "http://localhost:19080/manage",
+                "ontrack.acceptance.ha.a.url" to "http://localhost:18280",
+                "ontrack.acceptance.ha.a.mgt.url" to "http://localhost:19080/manage",
+                "ontrack.acceptance.ha.b.url" to "http://localhost:18281",
+                "ontrack.acceptance.ha.b.mgt.url" to "http://localhost:19081/manage",
+            ),
+            instance.haSystemProperties,
+        )
+    }
+
+    @Test
+    fun `the main suite is not given the HA properties`() {
+        val instance = KdslStackInstance(slug = "feature-a", slot = 2)
+        assertTrue(
+            instance.systemProperties.keys.none { it.startsWith("ontrack.acceptance.ha.") },
+            "the main suite runs against one backend: ${instance.systemProperties.keys}",
+        )
     }
 
     @Test
@@ -183,6 +249,11 @@ class KdslStackTest {
             assertTrue(text.contains("YONTRACK_KDSL_MINIO_PORT=19300"), text)
             assertTrue(text.contains("YONTRACK_KDSL_MINIO_URL=http://localhost:19300"), text)
             assertTrue(text.contains("KDSL_OIDC_PROJECT=yontrack-kdsl-oidc-feature-a"), text)
+            assertTrue(text.contains("KDSL_HA_PROJECT=yontrack-kdsl-ha-feature-a"), text)
+            assertTrue(text.contains("YONTRACK_KDSL_HA_A_PORT=18380"), text)
+            assertTrue(text.contains("YONTRACK_KDSL_HA_B_MGMT_PORT=19181"), text)
+            assertTrue(text.contains("YONTRACK_KDSL_HA_A_URL=http://localhost:18380"), text)
+            assertTrue(text.contains("YONTRACK_KDSL_HA_B_URL=http://localhost:18381"), text)
         } finally {
             dir.deleteRecursively()
         }
