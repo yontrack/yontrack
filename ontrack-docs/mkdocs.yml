@@ -171,6 +171,7 @@ nav:
       - Search index: content/operations/search-index.md
       - Events: content/operations/events.md
       - Zero-downtime upgrades: content/operations/zero-downtime-upgrades.md
+      - High availability: content/operations/high-availability.md
       - Troubleshooting:
           - Git connectivity: content/operations/git-connectivity.md
           - RabbitMQ: content/operations/rabbitmq.md

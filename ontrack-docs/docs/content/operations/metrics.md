@@ -4,6 +4,10 @@
 
 The list of all Yontrack specific metrics is available in the [reference](../generated/metrics/index.md).
 
+With several backend replicas, every metric is tagged with the replica reporting it,
+`application_instance`, and some gauges must be aggregated with `max` rather than `sum`: see
+[High availability](high-availability.md#metrics).
+
 ## Usage of deprecated features
 
 Yontrack counts every use of a deprecated external feature — a GraphQL field or argument, a REST

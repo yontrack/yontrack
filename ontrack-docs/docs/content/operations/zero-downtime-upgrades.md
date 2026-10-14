@@ -52,10 +52,21 @@ migrations in the hook.
 
 ### One runner per background job
 
-While two backends run side by side, both schedule the same background jobs. Each run of a job
-first takes a Postgres advisory lock on the job: one backend runs it, and the other one skips that
-run. The connections holding these locks come from a pool of their own, next to the main pool of the
-backend: see [Database connections](#database-connections).
+The background jobs are scheduled by [Quartz](https://www.quartz-scheduler.org/), clustered through
+the database: the backends sharing the database are the instances of one scheduler, named
+`yontrack` by default (`spring.quartz.scheduler-name`), each instance being named after the host
+name of its backend, the name of its pod. The jobs, their triggers and their pauses are stored in
+the database, and each fire of a trigger is taken by one backend only: a job runs once per period,
+whatever the number of backends running, and never twice at the same time.
+
+While two backends run side by side, the new one joins the scheduler of the previous one. When the
+previous backend stops, a run in progress on it is lost, and the job runs again at its next fire.
+Quartz uses the main connection pool of the backend: see
+[Database connections](#database-connections).
+
+> The one rollout from a version without Quartz — a 6.0 beta earlier than 6.0.0-beta.8 to a later
+> one — runs both schedulers side by side: a job may run twice during that rollout. An upgrade from
+> 5.5 to 6.0 restarts Yontrack, with no such overlap.
 
 ### Queue messages acknowledged after processing
 
@@ -70,16 +81,13 @@ order. Their queues have a single active consumer: the broker delivers their mes
 backend at a time, and hands over to the other one when it goes away, so the events stay in order
 whatever the number of backends.
 
-### Caches during the overlap
-
-Neither the settings nor the properties of the entities are cached: each backend reads them once
-per request, or per message of a queue, so that a change made through one backend applies to the
-next request served by the other one.
+### Search documents in a new format
 
 The search documents are rebuilt at startup when a new version changes their format. This rebuild
 waits for `ontrack.config.search.index.startup-delay` (two minutes by default), past the time when
-the previous backend still writes documents in their previous format, and only one of the backends
-started side by side runs it. See [Search index](search-index.md).
+the previous backend still writes documents in their previous format. It is a job of the `search`
+category, `search / startup-rebuild / <type>`, run once in the cluster, whatever the number of
+backends started side by side. See [Search index](search-index.md).
 
 ## Requirements
 
@@ -118,10 +126,16 @@ details. In short:
 
 ### Database connections
 
-During a rollout, two backends are connected to the database. Each one has its main connection
-pool, plus a pool for the locks of the background jobs, sized on `ontrack.config.jobs.pool-size`,
-whose connections are only opened while jobs run. Check that the `max_connections` of Postgres
-leaves room for the pools of both backends, next to its other clients.
+During a rollout, one more backend is connected to the database. Each backend has one connection
+pool, which its requests, its queue listeners and its background jobs share: Quartz and the jobs it
+runs (up to `ontrack.config.jobs.pool-size` at the same time on each backend) use the main pool.
+Check that the `max_connections` of Postgres leaves room for the pools of all the backends, next to
+its other clients. The
+[chart README](https://github.com/yontrack/yontrack-chart#database-connections) gives the
+connection budget, and checks it against the bundled database.
+
+> Before 6.0.0-beta.8, each backend also had a pool of its own for the locks of the background jobs.
+> It matters only during an upgrade from such a version, while its backend still runs.
 
 ### Switching an existing installation
 
@@ -188,9 +202,10 @@ and nothing to do: an upgrade restarts Yontrack, as it always did.
 
 ## Limits
 
-* **Not high availability** — the backend runs one replica in steady state. A second one only runs
-  during a rollout. The loss of the node running the backend is an outage, until Kubernetes starts
-  the backend again.
+* **Not high availability by itself** — by default, the backend runs one replica in steady state,
+  and a second one only during a rollout: the loss of the node running the backend, or its drain, is
+  an outage until Kubernetes starts the backend again. To run several backends permanently, see
+  [High availability](high-availability.md).
 * **Docker Compose restarts** — an upgrade with Docker Compose stops the backend and starts the
   new one.
 * **Major upgrades restart** — an upgrade from one major version to the next, 5.5 to 6.0 for

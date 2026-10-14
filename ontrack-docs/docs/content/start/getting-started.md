@@ -27,6 +27,8 @@ The default authentication mechanism, if no other configuration is provided, rel
 * a Postgres 17 database for Keycloak
 
 To upgrade Yontrack later without downtime, see [Zero-downtime upgrades](../operations/zero-downtime-upgrades.md).
+To run several backends, so that a node drain or the loss of a pod is not an outage, see
+[High availability](../operations/high-availability.md).
 
 ## Authentication setup
 
