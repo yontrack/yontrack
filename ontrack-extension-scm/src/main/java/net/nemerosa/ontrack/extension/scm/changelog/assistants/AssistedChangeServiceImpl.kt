@@ -35,11 +35,18 @@ class AssistedChangeServiceImpl(
             return current
         }
         // Computation
-        val value = compute(build) ?: return current
+        val value = compute(build)
         // The CI may have set the value meanwhile
         val latest = getAssistedChange(build)
         if (latest?.basis == AssistedChangeBasis.SET_BY_CI) {
             return latest
+        }
+        // No commit (any more): back to "not computed"
+        if (value == null) {
+            if (latest != null) {
+                propertyService.deleteProperty(build, AssistedChangePropertyType::class.java)
+            }
+            return null
         }
         // Writing the value only if it changes
         if (value != latest) {
@@ -49,7 +56,7 @@ class AssistedChangeServiceImpl(
     }
 
     /**
-     * Computes the value for a build, `null` if the build has no commit yet.
+     * Computes the value for a build, `null` if the build has no commit.
      */
     private fun compute(build: Build): AssistedChangeProperty? {
         val scm = scmDetector.getSCM(build.project) as? SCMChangeLogEnabled
@@ -61,7 +68,7 @@ class AssistedChangeServiceImpl(
                 null
             }
         }
-        // No commit yet: its property comes later
+        // No commit: not set yet, or removed
         if (scm.getBuildCommit(build).isNullOrBlank()) {
             return null
         }

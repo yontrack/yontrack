@@ -17,7 +17,8 @@ interface AssistedChangeService {
      * Computes the assisted change of a build and stores it, synchronously.
      *
      * 1. A value set by the CI wins: it is kept.
-     * 2. Nothing is done while the build has no commit.
+     * 2. A build without a commit has no value: the stored one, if any, is deleted — the commit of the
+     *    build was removed, and the value computed from it is no longer true.
      * 3. `UNKNOWN` is stored when the project has no SCM able to compute change logs, when no previous
      *    build on the branch has a commit, or when the SCM fails.
      * 4. Otherwise, the change log from the previous build with a commit gives the `COMPUTED` value.

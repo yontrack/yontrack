@@ -550,14 +550,16 @@ is neither a success nor a failure.
 
 ### How Yontrack computes it
 
-When a build is created, and when its commit is set — which usually happens just after — Yontrack
-computes the change log from the previous build of the branch which has a commit, and counts the
-assistants of its commits. This runs **in the background**, after the build is saved: creating a
-build never waits on the SCM. With several replicas of Yontrack, any of them computes it, one
-computation at a time per build.
+When the commit of a build is set — when the build is created, or just after — Yontrack computes the
+change log from the previous build of the branch which has a commit, and counts the assistants of
+its commits. This runs **in the background**, after the build is saved: setting the commit never
+waits on the SCM. With several replicas of Yontrack, any of them computes it, one computation at a
+time per build.
 
 * A value **set by the CI** is never recomputed.
-* A build without a commit gets nothing yet: the computation runs again when the commit is set.
+* A build without a commit gets nothing yet: the computation runs when the commit is set.
+* When the commit of a build is **removed**, its computed value is removed too — the build is back
+  to not computed. A value set by the CI is kept.
 * The value is `UNKNOWN` when the computation cannot run, with its reason:
     * `no SCM` — the project has no SCM able to compute change logs;
     * `no previous build with a commit` — typically, the first build of a branch;

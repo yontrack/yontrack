@@ -63,6 +63,112 @@ class AssistedChangeIT : AbstractDSLTestSupport() {
     @Autowired
     private lateinit var eventTemplatingService: EventTemplatingService
 
+    @Autowired
+    private lateinit var queueDispatcherSpy: QueueDispatcherSpy
+
+    @Test
+    fun `A new build without a commit sends no message`() {
+        withBranch { _, branchBuild ->
+            branchBuild { withRepositoryCommit("Before") }
+            val build = branchBuild {}
+            awaitComputations()
+            assertEquals(0, messages(build))
+        }
+    }
+
+    @Test
+    fun `A build created and given its commit in one transaction sends one message`() {
+        withBranch { _, branchBuild ->
+            branchBuild { withRepositoryCommit("Before") }
+            val build = inNewTransaction {
+                branchBuild { withRepositoryCommit("Some feature") }
+            }
+            awaitComputations()
+            assertEquals(1, messages(build))
+            assertEquals(AssistedChangeBasis.COMPUTED, assistedChange(build)?.basis)
+        }
+    }
+
+    @Test
+    fun `A commit set twice in one transaction sends one message`() {
+        withBranch { _, branchBuild ->
+            val from = branchBuild { withRepositoryCommit("Before") }
+            val build = branchBuild {}
+            inNewTransaction {
+                asAdmin {
+                    build.withRepositoryCommit("Some feature")
+                    build.withRepositoryCommit(
+                        """
+                            Some fix
+
+                            Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+                        """.trimIndent()
+                    )
+                }
+            }
+            awaitComputations()
+            assertEquals(1, messages(build))
+            // Computed from the last commit
+            assertEquals(
+                AssistedChangeProperty(
+                    basis = AssistedChangeBasis.COMPUTED,
+                    unknownReason = null,
+                    assistants = listOf("Claude Code"),
+                    assistedCommits = 1,
+                    totalCommits = 2,
+                    sessionLinks = emptyList(),
+                    previousBuildId = from.id(),
+                ),
+                assistedChange(build),
+            )
+        }
+    }
+
+    @Test
+    fun `Removing the commit of a build deletes its computed assisted change`() {
+        withBranch { _, branchBuild ->
+            branchBuild { withRepositoryCommit("Before") }
+            val build = branchBuild { withRepositoryCommit("Some feature") }
+            awaitComputations()
+            assertEquals(AssistedChangeBasis.COMPUTED, assistedChange(build)?.basis)
+            removeCommit(build)
+            assertNull(assistedChange(build))
+        }
+    }
+
+    @Test
+    fun `Removing the commit of a build deletes its unknown assisted change`() {
+        withBranch { _, branchBuild ->
+            val first = branchBuild { withRepositoryCommit("Before") }
+            awaitComputations()
+            assertEquals(AssistedChangeBasis.UNKNOWN, assistedChange(first)?.basis)
+            removeCommit(first)
+            assertNull(assistedChange(first))
+        }
+    }
+
+    @Test
+    fun `Removing the commit of a build keeps an assisted change set by the CI`() {
+        withBranch { _, branchBuild ->
+            branchBuild { withRepositoryCommit("Before") }
+            val ciValue = AssistedChangeProperty(
+                basis = AssistedChangeBasis.SET_BY_CI,
+                assistants = listOf("Some agent"),
+                assistedCommits = 1,
+                totalCommits = 1,
+            )
+            val build = branchBuild {
+                withRepositoryCommit("Some feature")
+                asGlobalRole(Roles.GLOBAL_AUTOMATION) {
+                    propertyService.editProperty(this, AssistedChangePropertyType::class.java, ciValue)
+                }
+            }
+            awaitComputations()
+            removeCommit(build)
+            assertEquals(ciValue, assistedChange(build))
+        }
+    }
+
     @Test
     fun `Commit set after the creation of the build gives a computed value with the counts`() {
         withAssistedBranch { _, from, to ->
@@ -395,6 +501,24 @@ class AssistedChangeIT : AbstractDSLTestSupport() {
                 context = mapOf("build" to build),
                 renderer = PlainEventRenderer.INSTANCE,
             )
+        }
+
+    /**
+     * Removes the commit of a build, and waits for the computation it triggers
+     */
+    private fun removeCommit(build: Build) {
+        val before = messages(build)
+        asAdmin { propertyService.deleteProperty(build, MockSCMBuildCommitPropertyType::class.java) }
+        awaitComputations()
+        assertEquals(before + 1, messages(build), "Removing the commit sends one message")
+    }
+
+    /**
+     * Number of messages dispatched to the queue of the assisted changes for a build
+     */
+    private fun messages(build: Build): Int =
+        queueDispatcherSpy.dispatched(assistedChangeQueueProcessor.id).count {
+            (it as AssistedChangeQueuePayload).buildId == build.id()
         }
 
     private fun assistedChange(build: Build): AssistedChangeProperty? =
