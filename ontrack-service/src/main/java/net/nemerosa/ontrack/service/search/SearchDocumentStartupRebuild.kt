@@ -31,6 +31,15 @@ import java.util.concurrent.ExecutionException
  * - unless a delayed fire of the job is already pending, requested by another replica;
  * - its run is skipped when the documents have been rebuilt meanwhile, unless forced by `reset`.
  *
+ * The promise is one *rebuild* per type in the cluster, not one *run*: the delayed fire of a job is
+ * a one-shot trigger, gone once fired, so a replica which read that a type is out of date before
+ * another one stored its rebuild fires the job again. That run skips, and says so in the history of
+ * the job (#2094).
+ *
+ * `reset` is a recovery switch, never to be left on: while set, it rebuilds every type at every
+ * start of every replica, and a run never skips, so a replica starting while the rebuild of the
+ * others is fired or running may rebuild a type again. Turn it off once the rebuild is done.
+ *
  * While a type is rebuilt, search answers with what exists so far, and every replica says that the
  * search index is being built: the job is running (#2088).
  */
@@ -70,6 +79,16 @@ class SearchDocumentStartupRebuild(
             logger.info("[search] All search documents are up to date")
             return 0
         }
+        return fire(due, startupDelay)
+    }
+
+    /**
+     * Fires the rebuild of some types, after a delay, unless a delayed fire of their job is pending.
+     * Called directly by the tests, as a replica which read that these types are out of date.
+     *
+     * @return Number of rebuilds fired by this call
+     */
+    internal fun fire(due: List<SearchDocumentIndexer>, startupDelay: Duration): Int {
         val fired = due.mapNotNull { indexer ->
             val type = indexer.searchResultType.id
             val fire = jobScheduler.fireLater(startupRebuildKey(indexer), startupDelay).orElse(null)

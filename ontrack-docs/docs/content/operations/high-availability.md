@@ -123,6 +123,22 @@ is ready.
 `ontrack.config.jobs.pool-size` (10 by default) is the number of jobs a replica can run at the same
 time: a cluster of N replicas can run up to N times that many.
 
+### Search index
+
+The [rebuild of the search documents at startup](search-index.md#rebuilds) happens once per type in
+the cluster, even when several replicas start together. Its job, `search / startup-rebuild / <type>`,
+may still run more than once: a replica which saw a type out of date while another one was
+rebuilding it fires the job again once the first run is over. That second run does nothing, and the
+message of its run in the job history, `jobHistory { message }` in GraphQL, says so: *"they have
+been rebuilt meanwhile"*.
+
+`ontrack.config.search.index.reset` is a recovery switch, not a setting to keep:
+
+* while it is set, every start of every replica rebuilds the documents of every type;
+* a replica starting while another one is rebuilding may rebuild the same types again.
+
+Turn it off once the rebuild is done.
+
 ### Load balancing
 
 The Kubernetes `Service` in front of the backends balances the **connections**, not the requests: a

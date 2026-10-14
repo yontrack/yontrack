@@ -131,13 +131,22 @@ class ACCHAJobs : AbstractACCHATestSupport() {
         }
     }
 
+    /**
+     * One rebuild per type in the cluster, not one run: a backend firing the rebuild of a type once
+     * the fire of the other one is over runs the job again, and that run skips (#2094).
+     */
     @Test
     fun `the search documents are rebuilt once at startup when both backends start together`() {
         val rebuilds = ontrackA.jobs.list(category = "search", type = "startup-rebuild")
         assertTrue(rebuilds.isNotEmpty(), "Startup rebuild jobs are listed")
         rebuilds.forEach { job ->
             val runs = ontrackB.jobs.history(job.category, job.type, job.key, now().minusDays(1), far())
-            assertEquals(1, runs.size, "Search documents of ${job.key} rebuilt once at startup: $runs")
+            assertTrue(
+                runs.all { it.status == "SUCCESS" },
+                "Every startup rebuild of ${job.key} is successful: $runs"
+            )
+            val rebuilt = runs.filterNot { it.message?.endsWith(REBUILT_MEANWHILE) ?: false }
+            assertEquals(1, rebuilt.size, "Search documents of ${job.key} rebuilt once at startup: $runs")
         }
     }
 
@@ -197,5 +206,11 @@ class ACCHAJobs : AbstractACCHATestSupport() {
         private val PERIOD: Duration = Duration.ofSeconds(2)
 
         private val WINDOW: Duration = PERIOD.multipliedBy(10)
+
+        /**
+         * End of the message of a startup rebuild which skips, the documents of its type having been
+         * rebuilt by another run (`SearchDocumentStartupRebuild`)
+         */
+        private const val REBUILT_MEANWHILE = "they have been rebuilt meanwhile"
     }
 }

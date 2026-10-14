@@ -512,7 +512,14 @@ class QuartzJobScheduler(
                         )
                     ).record(Duration.between(it, end))
                     try {
-                        jobHistoryRecorder.record(jobKey = key, startedAt = it, endedAt = end, error = error)
+                        jobHistoryRecorder.record(
+                            jobKey = key,
+                            startedAt = it,
+                            endedAt = end,
+                            error = error,
+                            // Says what a successful run did, or why it did nothing (#2094)
+                            message = run.progress?.message,
+                        )
                     } catch (any: Exception) {
                         logger.error("[job][run]$key Cannot record the run in the history", any)
                     }
@@ -661,6 +668,10 @@ class QuartzJobScheduler(
                 if (scheduler.checkExists(triggerKey)) {
                     false
                 } else {
+                    // "Trigger ... returned null on nextFireTime and yet still exists in DB!", logged
+                    // by a replica for such a trigger, is harmless (#2094): Quartz acquires triggers
+                    // without a lock, and another replica fired it in between - complete, with no next
+                    // fire time, it stays in the database until its run is over. Quartz skips it.
                     scheduler.scheduleJob(
                         TriggerBuilder.newTrigger()
                             .withIdentity(triggerKey)

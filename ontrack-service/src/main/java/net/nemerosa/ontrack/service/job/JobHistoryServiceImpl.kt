@@ -23,8 +23,10 @@ class JobHistoryServiceImpl(
         startedAt: LocalDateTime,
         endedAt: LocalDateTime,
         error: String?,
+        message: String?,
     ): Int {
-        val status = if (error.isNullOrBlank()) JobHistoryItemStatus.SUCCESS else JobHistoryItemStatus.ERROR
+        val failed = !error.isNullOrBlank()
+        val status = if (failed) JobHistoryItemStatus.ERROR else JobHistoryItemStatus.SUCCESS
         return jobHistoryRepository.record(
             item = JobHistoryItem(
                 id = 0,
@@ -34,7 +36,7 @@ class JobHistoryServiceImpl(
                 startedAt = startedAt,
                 endedAt = endedAt,
                 status = status,
-                message = error,
+                message = if (failed) error else message,
             )
         )
     }

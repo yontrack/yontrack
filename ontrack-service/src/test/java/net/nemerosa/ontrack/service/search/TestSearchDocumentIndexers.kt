@@ -11,6 +11,7 @@ import net.nemerosa.ontrack.json.asJson
 import org.springframework.stereotype.Component
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.CountDownLatch
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * Base for the indexers of the tests, whose documents are provided by the tests themselves.
@@ -39,7 +40,13 @@ abstract class AbstractTestSearchDocumentIndexer(
     @Volatile
     var blocker: CountDownLatch? = null
 
+    /**
+     * Number of calls to [indexAll], that is, of rebuilds of the documents of this type
+     */
+    val indexAllCalls = AtomicInteger()
+
     override fun indexAll(processor: (SearchDocument) -> Unit) {
+        indexAllCalls.incrementAndGet()
         blocker?.await()
         source.forEach(processor)
     }
