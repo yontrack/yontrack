@@ -12,7 +12,6 @@ import net.nemerosa.ontrack.job.orchestrator.JobOrchestratorSupplier
 import net.nemerosa.ontrack.model.security.SecurityService
 import net.nemerosa.ontrack.model.structure.*
 import net.nemerosa.ontrack.model.support.AbstractBranchJob
-import net.nemerosa.ontrack.model.support.ConfigurationServiceListener
 import org.apache.commons.lang3.Strings
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
@@ -26,13 +25,9 @@ class ArtifactoryPromotionSyncServiceImpl(
     private val configurationService: ArtifactoryConfigurationService,
     private val artifactoryConfProperties: ArtifactoryConfProperties,
     private val securityService: SecurityService,
-) : ArtifactoryPromotionSyncService, JobOrchestratorSupplier, ConfigurationServiceListener<ArtifactoryConfiguration> {
+) : ArtifactoryPromotionSyncService, JobOrchestratorSupplier {
 
     private val logger = LoggerFactory.getLogger(ArtifactoryPromotionSyncServiceImpl::class.java)
-
-    init {
-        configurationService.addConfigurationServiceListener(this)
-    }
 
     override val jobRegistrations: Collection<JobRegistration>
         get() = if (artifactoryConfProperties.buildSyncDisabled) {

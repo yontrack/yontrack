@@ -71,11 +71,6 @@ interface ConfigurationService<T : Configuration<T>> {
     val configurationType: Class<T>
 
     /**
-     * Adds a configuration event listener to this service
-     */
-    fun addConfigurationServiceListener(listener: ConfigurationServiceListener<T>)
-
-    /**
      * Given a configuration, optionally returns some extra data about it.
      *
      * @param config Configuration

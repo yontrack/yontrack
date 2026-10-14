@@ -7,7 +7,6 @@ import net.nemerosa.ontrack.model.security.EncryptionService
 import net.nemerosa.ontrack.model.security.GlobalSettings
 import net.nemerosa.ontrack.model.security.SecurityService
 import net.nemerosa.ontrack.model.support.*
-import java.util.*
 
 abstract class AbstractConfigurationService<T : Configuration<T>>(
     private val configurationClass: Class<T>,
@@ -18,8 +17,6 @@ abstract class AbstractConfigurationService<T : Configuration<T>>(
     private val eventFactory: EventFactory,
     private val ontrackConfigProperties: OntrackConfigProperties
 ) : ConfigurationService<T> {
-
-    private val listeners: MutableList<ConfigurationServiceListener<T>> = LinkedList()
 
     /**
      * Checks the accesses by checking the [net.nemerosa.ontrack.model.security.GlobalSettings] function.
@@ -43,11 +40,6 @@ abstract class AbstractConfigurationService<T : Configuration<T>>(
         validateAndCheck(configuration)
         configurationRepository.save(encrypt(configuration))
         eventPostService.post(eventFactory.newConfiguration(configuration))
-        listeners.forEach { listener ->
-            listener.onNewConfiguration(
-                configuration
-            )
-        }
         return configuration.obfuscate()
     }
 
@@ -64,14 +56,8 @@ abstract class AbstractConfigurationService<T : Configuration<T>>(
     override fun deleteConfiguration(name: String) {
         checkAccess()
         val configuration = getConfiguration(name)
-        // Notifies of the deletion BEFORE the actual deletion, giving a change to the listeners to list access the configuration
+        // Notifies of the deletion BEFORE the actual deletion, giving the event listeners a last chance to access the configuration
         eventPostService.post(eventFactory.deleteConfiguration(configuration))
-        // Listeners
-        listeners.forEach { listener ->
-            listener.onDeletedConfiguration(
-                configuration
-            )
-        }
         // Actual deletion
         configurationRepository.delete(configurationClass, name)
     }
@@ -83,11 +69,6 @@ abstract class AbstractConfigurationService<T : Configuration<T>>(
         validateAndCheck(configToSave)
         configurationRepository.save(encrypt(configToSave))
         eventPostService.post(eventFactory.updateConfiguration(configuration))
-        listeners.forEach { listener ->
-            listener.onUpdatedConfiguration(
-                configuration
-            )
-        }
     }
 
     /**
@@ -137,10 +118,6 @@ abstract class AbstractConfigurationService<T : Configuration<T>>(
         return config.encrypt {
             encryptionService.encrypt(it)
         }
-    }
-
-    override fun addConfigurationServiceListener(listener: ConfigurationServiceListener<T>) {
-        listeners.add(listener)
     }
 
     protected fun decrypt(config: T): T {
