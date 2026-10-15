@@ -15,6 +15,7 @@ import net.nemerosa.ontrack.repository.JobRecord
 import net.nemerosa.ontrack.repository.JobRecordRepository
 import org.apache.commons.lang3.concurrent.BasicThreadFactory
 import org.quartz.JobBuilder
+import org.quartz.ObjectAlreadyExistsException
 import org.quartz.Scheduler
 import org.quartz.SchedulerException
 import org.quartz.SimpleScheduleBuilder
@@ -672,18 +673,24 @@ class QuartzJobScheduler(
                     // by a replica for such a trigger, is harmless (#2094): Quartz acquires triggers
                     // without a lock, and another replica fired it in between - complete, with no next
                     // fire time, it stays in the database until its run is over. Quartz skips it.
-                    scheduler.scheduleJob(
-                        TriggerBuilder.newTrigger()
-                            .withIdentity(triggerKey)
-                            .forJob(QuartzSchedules.jobKey(key))
-                            .startAt(Date.from(at))
-                            .withSchedule(SimpleScheduleBuilder.simpleSchedule().withMisfireHandlingInstructionFireNow())
-                            .build()
-                    )
-                    if (scheduler.getTriggerState(triggerKey) == Trigger.TriggerState.PAUSED) {
-                        scheduler.resumeTrigger(triggerKey)
+                    try {
+                        scheduler.scheduleJob(
+                            TriggerBuilder.newTrigger()
+                                .withIdentity(triggerKey)
+                                .forJob(QuartzSchedules.jobKey(key))
+                                .startAt(Date.from(at))
+                                .withSchedule(SimpleScheduleBuilder.simpleSchedule().withMisfireHandlingInstructionFireNow())
+                                .build()
+                        )
+                        if (scheduler.getTriggerState(triggerKey) == Trigger.TriggerState.PAUSED) {
+                            scheduler.resumeTrigger(triggerKey)
+                        }
+                        true
+                    } catch (_: ObjectAlreadyExistsException) {
+                        // Another replica created the same trigger after the check above, which runs
+                        // outside the lock of Quartz: the fire is requested (#2097)
+                        false
                     }
-                    true
                 }
             } ?: false
         } catch (any: Exception) {

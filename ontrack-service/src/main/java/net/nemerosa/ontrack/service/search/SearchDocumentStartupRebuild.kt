@@ -91,7 +91,13 @@ class SearchDocumentStartupRebuild(
     internal fun fire(due: List<SearchDocumentIndexer>, startupDelay: Duration): Int {
         val fired = due.mapNotNull { indexer ->
             val type = indexer.searchResultType.id
-            val fire = jobScheduler.fireLater(startupRebuildKey(indexer), startupDelay).orElse(null)
+            // Never stops the startup of the replica, nor the rebuild of the other types (#2097)
+            val fire = try {
+                jobScheduler.fireLater(startupRebuildKey(indexer), startupDelay).orElse(null)
+            } catch (any: Exception) {
+                logger.error("[search][$type] Cannot launch the rebuild of the search documents", any)
+                return@mapNotNull null
+            }
             if (fire != null) {
                 logger.info("[search][$type] Launching the rebuild of the search documents in $startupDelay")
             } else {
