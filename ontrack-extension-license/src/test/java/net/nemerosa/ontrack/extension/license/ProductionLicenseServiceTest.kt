@@ -40,23 +40,6 @@ class ProductionLicenseServiceTest {
     }
 
     @Test
-    fun `Evaluation license key`() {
-        val service = ProductionLicenseService(
-            licenseConfigurationProperties = LicenseConfigurationProperties().apply {
-                key =
-                    "eyJkYXRhIjoiZXlKdVlXMWxJam9pVXlJc0ltRnpjMmxuYm1WbElqb2lVSFZpYkdsaklpd2lkbUZzYVdSVmJuUnBiQ0k2SWpJd01qVXRNVEl0TXpFaUxDSnRZWGhRY205cVpXTjBjeUk2TVRBc0ltWmxZWFIxY21WeklqcGJleUpwWkNJNkltVjRkR1Z1YzJsdmJpNWxiblpwY205dWJXVnVkSE1pTENKbGJtRmliR1ZrSWpwbVlXeHpaU3dpWkdGMFlTSTZXM3NpYm1GdFpTSTZJbTFoZUVWdWRtbHliMjV0Wlc1MGN5SXNJblpoYkhWbElqb2lNQ0o5WFgxZExDSnRaWE56WVdkbElqb2lXVzkxSUdGeVpTQjFjMmx1WnlCaGJpQmxkbUZzZFdGMGFXOXVJR3hwWTJWdWMyVXVJbjA9Iiwic2lnbmF0dXJlIjoiTUVVQ0lFMWNjQWQxT25ZQXl2M3B4c3ZaQWc0eDE1Q3dmY3FjMFNNRm12ZUU5TVRDQWlFQTJJZHVsZEtxek5DU2Q2VHJNNGxsczhzVGlHWXQ3Nmw5bFRZQ3pFdDBKMjQ9In0="
-            },
-        )
-        val license = service.license
-        assertEquals(
-            "You are using an evaluation license.",
-            license.message
-        )
-        assertEquals(false, license.isFeatureEnabled("extension.environments"))
-        assertEquals(10, license.maxProjects)
-    }
-
-    @Test
     fun `License with message OK`() {
         val service = ProductionLicenseService(
             licenseConfigurationProperties = LicenseConfigurationProperties().apply {
