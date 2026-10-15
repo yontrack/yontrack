@@ -325,7 +325,7 @@ configure(javaProjects) {
     // module declared without one.
     // ===============================================================================================================
 
-    val kotlinVersion = "2.4.20"
+    val kotlinVersion = "2.4.21"
     val kotlinCoroutinesVersion = "1.11.0"
     val jjwtVersion = "0.12.6"
     val greenMailVersion = "1.6.15"
