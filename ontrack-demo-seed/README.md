@@ -105,12 +105,13 @@ keeps the reset self-contained — no credentials, no network egress — at two 
 knowing about:
 
 - **The commits only survive a backend restart where the mock SCM is persistent.**
-  `MockSCMExtension` holds its repositories on the bean. The demo resets on every deployment,
-  but a pod restart in between leaves `petclinic` pointing at a repository the mock SCM no
-  longer has — and since the build commit properties are in the database, the change log fails
-  with `Repository petclinic not found` rather than reading empty, until the next reset.
-  `ONTRACK_CONFIG_EXTENSION_SCM_MOCK_PERSISTENT=true` makes the mock SCM keep its repositories
-  in the database instead.
+  By default the mock SCM holds its repositories in the memory of each backend. The demo resets
+  on every deployment, but a pod restart in between leaves `petclinic` pointing at a repository
+  the mock SCM no longer has — and since the build commit properties are in the database, the
+  change log fails with `Repository petclinic not found` rather than reading empty, until the
+  next reset. `ONTRACK_CONFIG_EXTENSION_SCM_MOCK_PERSISTENT=true` makes the mock SCM keep its
+  repositories in the database only, where every backend replica reads them. With several
+  replicas it is required: without it the reset itself fails (#2099).
 - **The instance must enable the mock SCM**, with
   `ONTRACK_CONFIG_EXTENSION_SCM_MOCK_ENABLED=true`. Without it the reset fails partway, after
   the deletions — see [`doc/dev-guide/demo-seed.md`](../doc/dev-guide/demo-seed.md).

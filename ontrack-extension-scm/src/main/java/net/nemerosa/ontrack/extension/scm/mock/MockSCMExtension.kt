@@ -48,65 +48,31 @@ class MockSCMExtension(
         TODO("Not yet implemented")
     }
 
-    private val repositories = mutableMapOf<String, MockRepository>()
-
     /**
-     * Whether [repositories] has been filled from [mockSCMStore] yet.
-     *
-     * Loading happens on the first access rather than at bean creation: with the default
-     * [NoMockSCMStore] there is nothing to load, and where there is, the storage is a
-     * database the mock SCM has no reason to touch while the context is still starting.
-     */
-    private var loaded = false
-
-    @Synchronized
-    private fun repositories(): MutableMap<String, MockRepository> {
-        if (!loaded) {
-            mockSCMStore.loadAll().forEach { data ->
-                repositories[data.name] = MockRepository.fromData(data, ::saveRepository)
-            }
-            // Only once the load went through: a store that cannot answer at all - the database
-            // being down, say - must fail again on the next call rather than latch the mock SCM
-            // into looking permanently empty.
-            loaded = true
-        }
-        return repositories
-    }
-
-    private fun saveRepository(repository: MockRepository) {
-        mockSCMStore.save(repository.toData())
-    }
-
-    /**
-     * Registers an empty repository, discarding whatever the previous one of that name held —
-     * in the store as well, so that a re-registration does not leave the old commits behind
-     * for the next restart to bring back.
+     * Registers an empty repository, discarding whatever the previous one of that name held.
      */
     fun registerRepository(name: String) {
-        val repository = MockRepository(name, ::saveRepository)
-        repositories()[name] = repository
-        saveRepository(repository)
+        mockSCMStore.save(MockRepository(name, mockSCMStore::save))
     }
 
     /**
      * Unlike [registerRepository] this does not write the repository it creates: the read
-     * endpoints go through here, and an empty repository is what the next start would build
+     * endpoints go through here, and an empty repository is what reading it again would build
      * anyway. It reaches the store as soon as anything is registered in it.
      */
     fun repositoryOrCreate(name: String): MockRepository =
-        repositories().getOrPut(name) { MockRepository(name, ::saveRepository) }
+        mockSCMStore.find(name) ?: MockRepository(name, mockSCMStore::save)
 
-    fun repository(name: String): MockRepository = repositories()[name]
+    fun repository(name: String): MockRepository = mockSCMStore.find(name)
         ?: error("Repository $name not found")
 
     /**
      * The repository, or `null` when there is none — where [repository] fails and
      * [repositoryOrCreate] would create one.
      */
-    fun findRepository(name: String): MockRepository? = repositories()[name]
+    fun findRepository(name: String): MockRepository? = mockSCMStore.find(name)
 
     fun deleteRepository(repoName: String) {
-        repositories().remove(repoName)
         mockSCMStore.delete(repoName)
     }
 

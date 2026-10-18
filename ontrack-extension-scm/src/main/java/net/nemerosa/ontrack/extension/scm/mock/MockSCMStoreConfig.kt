@@ -30,7 +30,7 @@ class MockSCMStoreConfig {
         if (scmExtensionConfigProperties.mock.persistent) {
             StorageMockSCMStore(storageService)
         } else {
-            NoMockSCMStore
+            InMemoryMockSCMStore()
         }
 
 }

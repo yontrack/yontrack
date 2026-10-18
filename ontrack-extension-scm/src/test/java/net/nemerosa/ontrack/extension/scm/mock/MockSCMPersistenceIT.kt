@@ -11,13 +11,13 @@ import org.springframework.beans.factory.annotation.Autowired
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
-import kotlin.test.assertSame
+import kotlin.test.assertIs
 
 /**
  * Testing the mock SCM's optional persistence.
  *
- * A restart is simulated with a second [MockSCMExtension] on the same store: the repositories
- * live on the bean, so a new bean reading the same store is exactly what a restart produces.
+ * A restart, or another backend replica, is simulated with a second [MockSCMExtension] on the
+ * same store: a new bean reading the same store is exactly what either produces.
  */
 class MockSCMPersistenceIT : AbstractDSLTestSupport() {
 
@@ -35,8 +35,7 @@ class MockSCMPersistenceIT : AbstractDSLTestSupport() {
 
     @Test
     fun `Persistence is off by default`() {
-        assertSame(
-            NoMockSCMStore,
+        assertIs<InMemoryMockSCMStore>(
             mockSCMStore,
             "Integration tests create their mock data inside the test and must not pay for the writes",
         )
@@ -148,6 +147,90 @@ class MockSCMPersistenceIT : AbstractDSLTestSupport() {
         assertNull(
             restarted.findRepository(unreadable),
             "What cannot be read is skipped, and the mock SCM starts without it",
+        )
+    }
+
+    @Test
+    fun `A repository registered through another backend is seen by one which read the store before`() {
+        val store = StorageMockSCMStore(storageService)
+        val name = uid("repo-")
+        val backendA = extension(store)
+        val backendB = extension(store)
+
+        // Backend B reads the store first, before the repository exists
+        assertNull(backendB.findRepository(name))
+
+        backendA.registerRepository(name)
+        val commitId = backendA.repository(name).registerCommit("main", "First commit")
+
+        assertEquals(
+            "First commit",
+            backendB.repository(name).getCommit(commitId)?.message,
+            "The repository and its commit are seen by the other backend (#2099)",
+        )
+    }
+
+    @Test
+    fun `Commits registered through two backends follow one another`() {
+        val store = StorageMockSCMStore(storageService)
+        val name = uid("repo-")
+        val backendA = extension(store)
+        val backendB = extension(store)
+
+        backendA.registerRepository(name)
+        val firstId = backendA.repository(name).registerCommit("main", "First commit")
+        // Backend B reads the repository...
+        assertEquals("First commit", backendB.repository(name).getCommit(firstId)?.message)
+        // ... before backend A adds to it
+        val secondId = backendA.repository(name).registerCommit("main", "Second commit")
+        assertEquals("Second commit", backendB.repository(name).getCommit(secondId)?.message)
+        val thirdId = backendB.repository(name).registerCommit("main", "Third commit")
+
+        // Same numbering as a single process would have produced
+        val reference = MockSCMExtension.MockRepository(name)
+        reference.registerCommit("main", "First commit")
+        reference.registerCommit("main", "Second commit")
+        assertEquals(reference.registerCommit("main", "Third commit"), thirdId)
+
+        assertEquals(
+            listOf("First commit", "Second commit", "Third commit"),
+            backendA.repository(name).getBranch("main")?.commits?.map { it.message },
+        )
+    }
+
+    @Test
+    fun `A repository deleted through another backend is gone from all of them`() {
+        val store = StorageMockSCMStore(storageService)
+        val name = uid("repo-")
+        val backendA = extension(store)
+        val backendB = extension(store)
+
+        backendA.registerRepository(name)
+        backendA.repository(name).registerCommit("main", "First commit")
+        assertNotNull(backendB.findRepository(name))
+
+        backendA.deleteRepository(name)
+
+        assertNull(backendB.findRepository(name), "The deletion is seen by the other backend")
+    }
+
+    @Test
+    fun `A repository registered again through another backend is empty on all of them`() {
+        val store = StorageMockSCMStore(storageService)
+        val name = uid("repo-")
+        val backendA = extension(store)
+        val backendB = extension(store)
+
+        backendA.registerRepository(name)
+        backendA.repository(name).registerCommit("main", "First commit")
+        assertNotNull(backendB.repository(name).getBranch("main"))
+
+        // As a demo reset does, through whichever backend answers
+        backendA.registerRepository(name)
+
+        assertNull(
+            backendB.repository(name).getBranch("main"),
+            "The commits of the previous registration are gone from the other backend too",
         )
     }
 
