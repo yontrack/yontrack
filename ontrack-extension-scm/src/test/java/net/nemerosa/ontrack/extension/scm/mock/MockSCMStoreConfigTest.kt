@@ -5,7 +5,6 @@ import net.nemerosa.ontrack.extension.scm.SCMExtensionConfigProperties
 import net.nemerosa.ontrack.model.support.StorageService
 import org.junit.jupiter.api.Test
 import kotlin.test.assertIs
-import kotlin.test.assertSame
 
 class MockSCMStoreConfigTest {
 
@@ -13,8 +12,8 @@ class MockSCMStoreConfigTest {
     private val storageService = mockk<StorageService>()
 
     @Test
-    fun `Mock SCM keeps nothing by default`() {
-        assertSame(NoMockSCMStore, store(SCMExtensionConfigProperties()))
+    fun `Mock SCM keeps its repositories in memory by default`() {
+        assertIs<InMemoryMockSCMStore>(store(SCMExtensionConfigProperties()))
     }
 
     @Test
