@@ -135,6 +135,35 @@ kill $(cat .yontrack-dev/backend.pid)
 > directly. The Spring Boot actuator runs at http://localhost:8800/manage, and
 > the application itself on http://localhost:3000.
 
+## Developing in a dev container
+
+`.devcontainer/devcontainer.json` packages the prerequisites above -- JDK 25
+(Zulu), Node 24 and Docker -- for VS Code, IntelliJ IDEA or any tool that
+supports [dev containers](https://containers.dev/). Once the container is up,
+everything in this guide works unchanged from its terminal:
+`scripts/dev-stack.sh up`, `./gradlew integrationTest`, the KDSL acceptance
+tests.
+
+Docker runs *inside* the container (the `docker-in-docker` feature), not
+through the host's socket. The stacks reach their middleware on
+`localhost:<port>` and probe that same `localhost` to pick a slot; with the
+host's socket, the containers would publish their ports on the host and the
+backend would not find Postgres.
+
+The container is the main working copy, so the development stack takes slot 0
+and its usual ports, which are forwarded to the host *under the same numbers*:
+the Keycloak issuer is `http://localhost:<port>/realms/ontrack` for both the
+browser and the backend, so a remapped port breaks the login. Free those ports
+on the host before opening the container -- they are not forwarded
+otherwise. For the same reason, GitHub Codespaces, which serves forwarded ports
+on `*.github.dev` URLs, is not supported.
+
+A worktree created inside the container gets its own slot as usual; forward
+its ports yourself, from `.yontrack-dev/instance.env`.
+
+Give the container room: a stack pays for a JVM, a Node process and its
+middleware containers (ADR 0004), and Gradle comes on top.
+
 ## Dependency management
 
 Versions come from BOMs declared as Gradle platforms, not from the

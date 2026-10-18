@@ -1,0 +1,41 @@
+// Dev container for Yontrack: the prerequisites of DEVELOPMENT.md, so that
+// `scripts/dev-stack.sh up`, `./gradlew integrationTest` and the KDSL acceptance
+// tests run inside it unchanged. DEVELOPMENT.md, "Developing in a dev container".
+{
+    "name": "Yontrack",
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu-24.04",
+    "features": {
+        // Same distribution and major as CI and .sdkmanrc
+        "ghcr.io/devcontainers/features/java:1": {
+            "version": "25",
+            "jdkDistro": "zulu"
+        },
+        // The major the Gradle node plugin and ontrack-web-core/Dockerfile use
+        "ghcr.io/devcontainers/features/node:1": {
+            "version": "24"
+        },
+        // Docker *in* Docker, not the host's socket: the stacks reach their
+        // middleware on localhost:<port>, which must be this container's localhost.
+        "ghcr.io/devcontainers/features/docker-in-docker:2": {
+            "moby": true
+        }
+    },
+    // Slot 0 of the development stack: the dev container is the main working copy.
+    // Ports keep their number on the host because the Keycloak issuer is
+    // http://localhost:<port> for both the browser and the backend.
+    "forwardPorts": [3000, 8080, 8800, 8008, 19001],
+    "portsAttributes": {
+        "3000": {"label": "UI", "requireLocalPort": true, "onAutoForward": "openBrowserOnce"},
+        "8080": {"label": "Backend", "requireLocalPort": true, "onAutoForward": "silent"},
+        "8800": {"label": "Management", "requireLocalPort": true, "onAutoForward": "silent"},
+        "8008": {"label": "Keycloak", "requireLocalPort": true, "onAutoForward": "silent"},
+        "19001": {"label": "MinIO console", "onAutoForward": "silent"}
+    },
+    "otherPortsAttributes": {"onAutoForward": "silent"},
+    // A JVM, a Node process, the middleware containers and Gradle (ADR 0004)
+    "hostRequirements": {
+        "cpus": 4,
+        "memory": "16gb"
+    },
+    "remoteUser": "vscode"
+}
