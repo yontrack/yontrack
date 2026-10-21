@@ -241,6 +241,40 @@ class DashboardServiceIT : AbstractDSLTestSupport() {
         }
     }
 
+    @Test
+    fun `A branch statuses widget whose config still carries the removed refresh interval saves and reads back`() {
+        // The refresh interval was removed from the widget in 6.0 (#2104): a stored dashboard or an
+        // imported YAML file may still carry it, and it must be ignored.
+        val config = mapOf(
+            "title" to "Branch statuses",
+            "branches" to listOf(
+                mapOf("project" to "P", "branch" to "main"),
+            ),
+            "refreshInterval" to mapOf("count" to 5, "unit" to "M"),
+        ).asJson()
+        asUser {
+            val dashboard = dashboardService.saveDashboard(
+                SaveDashboardInput(
+                    uuid = null,
+                    name = uid("dash_"),
+                    userScope = DashboardContextUserScope.PRIVATE,
+                    widgets = listOf(
+                        WidgetInstanceInput(
+                            uuid = null,
+                            key = "home/BranchStatuses",
+                            config = config,
+                            layout = WidgetLayout(x = 0, y = 0, w = 12, h = 30),
+                        )
+                    ),
+                    select = false,
+                )
+            )
+            val read = dashboardService.findDashboardByUuid(dashboard.uuid)
+            assertEquals(dashboard, read)
+            assertEquals(config, read?.widgets?.single()?.config)
+        }
+    }
+
     private fun withNoDashboard(code: () -> Unit) {
         asAdmin {
             val dashboards = dashboardService.userDashboards()

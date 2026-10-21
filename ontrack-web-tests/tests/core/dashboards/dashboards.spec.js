@@ -397,3 +397,47 @@ test('in edition mode, every widget shows its type', async ({page, ontrack}) => 
     await expect(page.getByText('Dashboard in edition mode')).not.toBeVisible()
     await expect(types).toHaveCount(0)
 })
+
+test('the branch statuses widget form has no refresh interval field', async ({page, ontrack}) => {
+    const dashboardName = `branch-statuses-form-${Date.now()}`
+
+    const project = await ontrack.createProject()
+    const branch = await project.createBranch()
+
+    const yaml = [
+        `- name: "${dashboardName}"`,
+        `  widgets:`,
+        `    - key: "home/BranchStatuses"`,
+        `      layout: {x: 0, y: 0, w: 12, h: 25}`,
+        `      config:`,
+        `        title: "My branches"`,
+        `        branches:`,
+        `          - project: "${project.name}"`,
+        `            branch: "${branch.name}"`,
+    ].join('\n')
+
+    const data = await graphQLCallMutation(
+        ontrack.connection,
+        'applyDashboards',
+        applyDashboardsMutation,
+        {yaml}
+    )
+    const dashboardUuid = data.applyDashboards.dashboards[0].uuid
+
+    await login(page, ontrack)
+    await page.goto(`${ontrack.connection.ui}/?dashboard=${dashboardUuid}`)
+    await expect(page.getByText('My branches')).toBeVisible()
+
+    // Configuring the widget
+    await page.getByRole('button', {name: 'Dashboard', exact: true}).click()
+    await page.getByText('Edit current dashboard').click()
+    await expect(page.getByText('Dashboard in edition mode')).toBeVisible()
+    // The first command of the header is "Configure this widget"
+    await page.locator('.ant-card-head').filter({hasText: 'My branches'}).getByRole('button').first().click()
+    await expect(page.getByText('If checked, displays run info')).toBeVisible()
+
+    // The refresh interval was never read, so the form no longer offers it (issue #2104)
+    await expect(page.getByText('Refresh interval')).toHaveCount(0)
+
+    await page.getByRole('button', {name: 'Cancel changes'}).click()
+})

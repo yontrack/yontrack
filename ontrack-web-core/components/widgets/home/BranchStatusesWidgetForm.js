@@ -2,7 +2,6 @@ import {Button, Form, Input, Space, Switch} from "antd";
 import {useContext} from "react";
 import {FaPlus, FaTrash} from "react-icons/fa";
 import SelectProjectBranch from "@components/branches/SelectProjectBranch";
-import SelectInterval from "@components/common/SelectInterval";
 import {DashboardWidgetCellContext} from "@components/dashboards/DashboardWidgetCellContextProvider";
 import SortableList, {SortableItem} from "react-easy-sort";
 import {formFieldArraySwap} from "@components/form/formUtils";
@@ -14,7 +13,6 @@ export default function BranchStatusesWidgetForm({
                                                      validationConfigs,
                                                      displayValidationResults,
                                                      displayValidationRun,
-                                                     refreshInterval,
                                                      branches,
                                                      title
                                                  }) {
@@ -182,13 +180,6 @@ export default function BranchStatusesWidgetForm({
                         </>
                     )}
                 </Form.List>
-                <Form.Item
-                    name="refreshInterval"
-                    label="Refresh interval"
-                    initialValue={refreshInterval}
-                >
-                    <SelectInterval/>
-                </Form.Item>
             </Form>
         </>
     )

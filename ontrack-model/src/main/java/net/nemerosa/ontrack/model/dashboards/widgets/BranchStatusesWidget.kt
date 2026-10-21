@@ -18,7 +18,6 @@ data class BranchStatusesWidgetConfig(
     val promotionConfigs: List<PromotionConfig> = emptyList(),
     val validationConfigs: List<ValidationConfig> = emptyList(),
     val branches: List<BranchStatusesWidgetConfigBranch> = emptyList(),
-    val refreshInterval: Duration = Duration.ZERO,
     @APIDescription("If checked, displays additional results with each validation, like test summary, etc.")
     val displayValidationResults: Boolean = false,
     @APIDescription("If checked, displays run info")

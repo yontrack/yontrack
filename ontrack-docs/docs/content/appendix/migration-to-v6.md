@@ -492,8 +492,8 @@ and out of order, while two backends ran side by side
 
 Yontrack 6 removes what Yontrack 5 deprecated. Each item is listed here with what to use instead,
 by the way it is used: the GraphQL API, the REST API, configuration as code, the configuration
-properties and environment variables, templating, the CI configuration, and the GitHub ingestion
-configuration.
+properties and environment variables, templating, the CI configuration, the GitHub ingestion
+configuration, and the dashboard widgets.
 
 The latest 5.5.x release counts every use of these items: see [Upgrade path](#upgrade-path).
 
@@ -633,6 +633,15 @@ format of this file:
 
 Unlike the other items of this page, 5.5.x does not count the use of these formats: check the
 `ingestion.yml` files of the ingested repositories for a `version` other than `v2`.
+
+### Dashboard widgets
+
+| Removed                                                                  | Use instead                                                                                                       |
+|--------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------|
+| `refreshInterval` of the Branch statuses widget (`home/BranchStatuses`) | No replacement: the field was never read. A leftover key in a stored dashboard or an imported YAML file is ignored |
+
+Unlike the other items of this page, this field was never deprecated in Yontrack 5, and 5.5.x does
+not count its use: it was never read, so removing it changes nothing a dashboard displays.
 
 ## Newly deprecated
 

@@ -14,7 +14,6 @@ Shows promotion and validation statuses for a configured list of branches in a t
 | `validationConfigs` | object[] | `[]` | Validation stamps to display as columns. Each entry has `validationStamp` (string) and an optional `period`. |
 | `displayValidationResults` | boolean | `false` | Show detailed validation result statuses inside cells. |
 | `displayValidationRun` | boolean | `false` | Show a link to the individual validation run. |
-| `refreshInterval` | ISO 8601 duration | `"PT0S"` | Auto-refresh interval. `"PT0S"` disables auto-refresh. |
 
 ## Example
 
@@ -31,5 +30,4 @@ config:
       period: "PT24H"
     - promotionLevel: "PRODUCTION"
   displayValidationResults: true
-  refreshInterval: "PT5M"
 ```
