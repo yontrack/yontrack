@@ -48,6 +48,7 @@ import net.nemerosa.ontrack.kdsl.spec.extension.findings.createFindingsValidatio
 import net.nemerosa.ontrack.kdsl.spec.extension.findings.validateWithFindings
 import net.nemerosa.ontrack.kdsl.spec.extension.general.AutoPromotionProperty
 import net.nemerosa.ontrack.kdsl.spec.extension.general.TestSummary
+import net.nemerosa.ontrack.kdsl.spec.extension.general.createOnPromotionValidationStamp
 import net.nemerosa.ontrack.kdsl.spec.extension.general.createTestSummaryValidationStamp
 import net.nemerosa.ontrack.kdsl.spec.extension.general.validateWithTestSummary
 import net.nemerosa.ontrack.kdsl.spec.extension.general.autoPromotion
@@ -590,9 +591,18 @@ private class KdslDemoBranch(
         findings: FindingsThresholdsSpec?,
         tests: Boolean,
         chml: CHMLSpec?,
+        onPromotion: OnPromotionSpec?,
     ) {
         validationStamps[name] = if (tests) {
             branch.createTestSummaryValidationStamp(name = name, description = description)
+        } else if (onPromotion != null) {
+            branch.createOnPromotionValidationStamp(
+                name = name,
+                description = description,
+                project = onPromotion.project,
+                qualifier = onPromotion.qualifier,
+                promotion = onPromotion.promotion,
+            )
         } else if (findings != null) {
             branch.createFindingsValidationStamp(
                 name = name,

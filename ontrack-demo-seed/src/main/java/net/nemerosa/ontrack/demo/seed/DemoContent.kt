@@ -249,6 +249,18 @@ object DemoContent {
     const val VETS = "petclinic-vets"
 
     /**
+     * A consumer of [LIBRARY] and [SERVICE] whose SILVER requires theirs, through two validation
+     * on promotion stamps (#2101).
+     */
+    const val PORTAL = "petclinic-portal"
+
+    /** Validation on promotion stamp of [PORTAL], granted when the [LIBRARY] build it uses is SILVER. */
+    const val LIBRARY_SILVER = "LIBRARY.SILVER"
+
+    /** Validation on promotion stamp of [PORTAL], granted when the [SERVICE] build it uses is SILVER. */
+    const val SERVICE_SILVER = "PETCLINIC.SILVER"
+
+    /**
      * The registered agent of Claude Code: it writes the code of [VETS] - its commits carry Claude as a
      * co-author - and creates, validates and promotes its builds to [BRONZE], the one level admitting
      * agents.
@@ -297,6 +309,7 @@ object DemoContent {
             visits(),
             e2e(),
             vets(),
+            portal(),
             auditTrail(),
             auditTrailTampered(),
             changelogProject(changelog),
@@ -954,6 +967,71 @@ object DemoContent {
                             ValidationSpec(SECURITY_SCAN, WARNING, "One high advisory in a transitive dependency."),
                         ),
                         links = listOf(BuildRef(SERVICE, MAIN, "105")),
+                    ),
+                ),
+            ),
+        ),
+    )
+
+    /**
+     * A consumer of [LIBRARY] and [SERVICE] which may only reach SILVER once the builds it uses are
+     * SILVER themselves: its SILVER is auto promoted on its own validations plus two validation on
+     * promotion stamps, which the server grants when the links are created (#2101). Neither build
+     * declares SILVER: the server promotes the one whose dependencies are both SILVER.
+     */
+    private fun portal() = ProjectSpec(
+        name = PORTAL,
+        description = "Customer portal, released only on top of SILVER dependencies.",
+        labels = listOf(LABEL_TEAM_APPS, LABEL_LANGUAGE_JAVASCRIPT),
+        branches = listOf(
+            BranchSpec(
+                name = MAIN,
+                description = "Main development branch.",
+                promotionLevels = listOf(
+                    silver.copy(
+                        autoPromotion = AutoPromotionSpec(
+                            validationStamps = listOf(BUILD, UNIT_TESTS, LIBRARY_SILVER, SERVICE_SILVER),
+                        ),
+                    ),
+                ),
+                validationStamps = listOf(
+                    buildStamp,
+                    unitTests,
+                    ValidationStampSpec(
+                        LIBRARY_SILVER,
+                        "The $LIBRARY build this build uses is SILVER.",
+                        onPromotion = OnPromotionSpec(project = LIBRARY, promotion = SILVER),
+                    ),
+                    ValidationStampSpec(
+                        SERVICE_SILVER,
+                        "The $SERVICE build this build uses is SILVER.",
+                        onPromotion = OnPromotionSpec(project = SERVICE, promotion = SILVER),
+                    ),
+                ),
+                builds = listOf(
+                    // Uses a service build which never reached SILVER: only the library stamp passes
+                    BuildSpec(
+                        name = "21",
+                        release = "0.9.0",
+                        description = "Owner self-service sign-up.",
+                        creation = DaysAgo(1, hour = 14),
+                        validations = listOf(
+                            ValidationSpec(BUILD, PASSED),
+                            ValidationSpec(UNIT_TESTS, PASSED),
+                        ),
+                        links = listOf(BuildRef(LIBRARY, MAIN, "42"), BuildRef(SERVICE, MAIN, "106")),
+                    ),
+                    // Both dependencies SILVER: the server grants both stamps, and SILVER with them
+                    BuildSpec(
+                        name = "22",
+                        release = "0.9.1",
+                        description = "Owner self-service sign-up, on the canary service.",
+                        creation = HoursAgo(3),
+                        validations = listOf(
+                            ValidationSpec(BUILD, PASSED),
+                            ValidationSpec(UNIT_TESTS, PASSED),
+                        ),
+                        links = listOf(BuildRef(LIBRARY, MAIN, "42"), BuildRef(SERVICE, MAIN, "107")),
                     ),
                 ),
             ),

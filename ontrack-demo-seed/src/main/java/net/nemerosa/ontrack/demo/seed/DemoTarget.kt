@@ -267,6 +267,7 @@ interface DemoBranch {
      * @param findings Thresholds of a `security-findings` stamp, `null` for an ordinary one
      * @param tests Whether the stamp is a `tests` one, of the test summary data type
      * @param chml CHML configuration of the stamp, or null for a stamp without any data type
+     * @param onPromotion Configuration of a validation on promotion stamp, or null
      */
     fun createValidationStamp(
         name: String,
@@ -274,6 +275,7 @@ interface DemoBranch {
         findings: FindingsThresholdsSpec? = null,
         tests: Boolean = false,
         chml: CHMLSpec? = null,
+        onPromotion: OnPromotionSpec? = null,
     )
 
     /**

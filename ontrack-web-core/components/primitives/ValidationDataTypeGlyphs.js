@@ -7,6 +7,7 @@ import {
     TbFileText,
     TbFlask,
     TbHash,
+    TbLink,
     TbPercentage,
     TbRubberStamp,
     TbShieldExclamation,
@@ -59,6 +60,8 @@ export const VALIDATION_DATA_TYPE_GLYPHS = {
     'findings.validation.FindingsValidationDataType': TbShieldSearch,
     // A version being pushed up.
     'av.validation.AutoVersioningValidationDataType': TbArrowBigUpLine,
+    // Granted by the promotion of a linked build: a link.
+    'general.validation.OnPromotionValidationDataType': TbLink,
 }
 
 /**

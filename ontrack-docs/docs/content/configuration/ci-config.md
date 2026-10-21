@@ -350,6 +350,7 @@ the following aliases can be used:
 | `number`     | [Number](../concepts/model/index.md#number)                   |
 | `metrics`    | [Metrics](../concepts/model/index.md#metrics)                 |
 | `security-findings` | [Security findings](../integrations/findings/findings.md#the-validation-stamp-type) |
+| `on-promotion` | [Validation on promotion](../concepts/model/index.md#validation-on-promotion) |
 
 For example, to fail a validation as soon as at least one secret is detected (`okIfGreater: false` means that the
 lower the value, the better):
@@ -377,6 +378,32 @@ branch:
           warningValue: 1
           warningPassesAutoPromotion: true
 ```
+
+As a last example, validations granted by the promotions of the builds this build is linked to, in projects `B`
+and `C` - the second one through the links qualified with `runtime` only - and an auto promotion depending on them:
+
+```yaml
+branch:
+  validations:
+    - B-SILVER:
+        on-promotion:
+          project: B
+          promotion: SILVER
+    - C-SILVER:
+        on-promotion:
+          project: C
+          qualifier: runtime
+          promotion: SILVER
+  promotions:
+    - SILVER:
+        validations:
+          - unit-tests
+          - B-SILVER
+          - C-SILVER
+```
+
+See [validation on promotion](../concepts/model/index.md#validation-on-promotion) for when these validations are
+granted, and failed.
 
 !!! note
 
